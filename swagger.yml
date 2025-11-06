@@ -2729,6 +2729,7 @@ components:
         - "GROUP_SUMMARY"
         - "FILTERED_RECEIPTS"
         - "GROUP_ACTIVITY"
+        - "PIE_CHART"
     AiType:
       type: string
       enum:
