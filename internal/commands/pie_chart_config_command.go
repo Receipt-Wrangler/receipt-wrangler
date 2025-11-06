@@ -1,7 +1,8 @@
 package commands
 
+import "receipt-wrangler/api/internal/models"
+
 type PieChartConfigCommand struct {
 	ReceiptFilter ReceiptPagedRequestFilter
-	Labels        []string
-	Colors        []string
+	PieChartType  models.PieChartType
 }

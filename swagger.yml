@@ -2730,6 +2730,13 @@ components:
         - "FILTERED_RECEIPTS"
         - "GROUP_ACTIVITY"
         - "PIE_CHART"
+    PieChartType:
+      type: string
+      enum:
+        - "CATEGORIES"
+        - "TAGS"
+        - "PAID_BY"
+        - "STATUS"
     AiType:
       type: string
       enum:
@@ -4119,6 +4126,16 @@ components:
           type: object
           additionalProperties: { }
           description: Configuration of widget
+    PieChartConfigCommand:
+      type: object
+      properties:
+        receiptFilter:
+          $ref: "#/components/schemas/ReceiptPagedRequestFilter"
+          description: Filter for receipts
+        pieChartType:
+          $ref: "#/components/schemas/PieChartType"
+          description: Type of pie chart
+      description: Configuration for pie chart widget
     AppData:
       type: object
       required:
