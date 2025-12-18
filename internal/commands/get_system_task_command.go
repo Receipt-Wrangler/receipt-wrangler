@@ -31,16 +31,5 @@ func (command *GetSystemTaskCommand) LoadDataFromRequest(w http.ResponseWriter, 
 func (command *GetSystemTaskCommand) Validate() structs.ValidatorError {
 	vErrs := command.PagedRequestCommand.Validate()
 
-	associatedEntityIdIsEmpty := command.AssociatedEntityId == 0
-	associatedEntityTypeIsEmpty := len(command.AssociatedEntityType) == 0
-
-	if associatedEntityIdIsEmpty && associatedEntityTypeIsEmpty {
-		vErrs.Errors["command"] = "Command cannot be empty."
-	}
-
-	if !associatedEntityIdIsEmpty && associatedEntityTypeIsEmpty {
-		vErrs.Errors["associatedEntityType"] = "Associated entity type cannot be empty."
-	}
-
 	return vErrs
 }
