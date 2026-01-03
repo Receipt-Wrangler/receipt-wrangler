@@ -68,8 +68,8 @@ ENV PYTHONPATH="/app/receipt-wrangler-api/wranglervenv/lib/python3.11/site-packa
 
 # Setup nginx
 WORKDIR /app/receipt-wrangler-api/docker
-COPY . .
-COPY ./entrypoint.sh /app
+COPY docker/ .
+COPY docker/entrypoint.sh /app
 RUN chmod 777 /app/entrypoint.sh
 
 # Install nginx
@@ -79,7 +79,7 @@ RUN apt install nginx -y
 # Remove default configs
 RUN rm /etc/nginx/sites-enabled/*
 RUN rm /etc/nginx/sites-available/*
-COPY ./default.conf /etc/nginx/conf.d/default.conf
+COPY docker/default.conf /etc/nginx/conf.d/default.conf
 
 # Copy desktop dist
 COPY --from=node /app/receipt-wrangler-desktop/dist/receipt-wrangler/browser /usr/share/nginx/html
