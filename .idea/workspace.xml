@@ -4,12 +4,8 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="1121391f-bfef-4c97-a438-a8b41793f28b" name="Changes" comment="update workflows">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker/.github/workflows/docker-image.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker/.github/workflows/release.yml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/docker/Dockerfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker/dev/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/docker/dev/Dockerfile" afterDir="false" />
+    <list default="true" id="1121391f-bfef-4c97-a438-a8b41793f28b" name="Changes" comment="update dev container">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/ci.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/ci.yml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -170,7 +166,15 @@
       <option name="project" value="LOCAL" />
       <updated>1767469034041</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="update dev container">
+      <option name="closed" value="true" />
+      <created>1767469896108</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1767469896108</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -183,7 +187,8 @@
     </ignored-roots>
     <MESSAGE value="add" />
     <MESSAGE value="update workflows" />
-    <option name="LAST_COMMIT_MESSAGE" value="update workflows" />
+    <MESSAGE value="update dev container" />
+    <option name="LAST_COMMIT_MESSAGE" value="update dev container" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
