@@ -16,11 +16,10 @@ RUN apt-get install -y default-jre
 # Start in app dir
 WORKDIR /app
 
-# Clone desktop
-RUN git clone https://github.com/Receipt-Wrangler/receipt-wrangler-desktop.git
+# Copy desktop source from local monolith
+COPY desktop/ /app/receipt-wrangler-desktop/
 
 # Setup Desktop
-RUN ls
 WORKDIR /app/receipt-wrangler-desktop
 RUN npm install -g @angular/cli
 RUN npm install -g @openapitools/openapi-generator-cli
@@ -29,9 +28,9 @@ RUN npm install -g @openapitools/openapi-generator-cli
 RUN npm install
 RUN npm run build
 
-# Clone api soruce
+# Copy API source from local monolith
 WORKDIR /app
-RUN git clone https://github.com/Receipt-Wrangler/receipt-wrangler-api.git
+COPY api/ /app/receipt-wrangler-api/
 
 # Clone docs source
 RUN git clone https://github.com/Receipt-Wrangler/receipt-wrangler-doc.git
@@ -55,7 +54,7 @@ ENV BASE_PATH="/app/receipt-wrangler-api"
 RUN bash set-up-dependencies.sh
 
 # Install python dependencies for imap-client
-RUN bash pip3 install -r imap-client/requirements.txt --break-system-packages
+RUN pip3 install -r imap-client/requirements.txt --break-system-packages
 
 # Build api
 RUN go build

@@ -5,25 +5,12 @@ WORKDIR /app
 ARG VERSION
 ARG BUILD_DATE
 
-## Add git
-RUN apk add --no-cache git
-
-# Clone desktop source
-RUN git clone https://github.com/Receipt-Wrangler/receipt-wrangler-desktop.git
+# Copy desktop source from local monolith
+COPY desktop/ ./receipt-wrangler-desktop/
 
 # Setup Desktop
 RUN npm install -g @angular/cli
 WORKDIR /app/receipt-wrangler-desktop
-
-# Conditional logic to pull a specific tag if VERSION is set
-RUN if [ -n "$VERSION" ] && [ "$VERSION" != "latest" ]; then \
-      git checkout $VERSION; \
-    else \
-      echo "No specific version specified, using default branch"; \
-    fi
-
-# Set up npmrc
-COPY . .
 
 RUN npm install
 RUN npm run build
@@ -35,19 +22,11 @@ FROM golang:1.24-trixie
 ARG VERSION
 ARG BUILD_DATE
 
-# Clone app source
-WORKDIR /app
-RUN git clone https://github.com/Receipt-Wrangler/receipt-wrangler.git
+# Copy API source from local monolith
+COPY api/ /app/receipt-wrangler-api/
 
 # Setup API
-WORKDIR /app/receipt-wrangler/api
-
-# Conditional logic to pull a specific tag if VERSION is set
-RUN if [ -n "$VERSION" ] && [ "$VERSION" != "latest" ]; then \
-      git checkout $VERSION; \
-    else \
-      echo "No specific version specified, using default branch"; \
-    fi
+WORKDIR /app/receipt-wrangler-api
 
 # Add local bin to path for python dependencies
 ENV PATH="~/.local/bin:${PATH}"
@@ -56,7 +35,7 @@ ENV PATH="~/.local/bin:${PATH}"
 ENV ENV="prod"
 
 # Set base path
-ENV BASE_PATH="/app/receipt-wrangler/api"
+ENV BASE_PATH="/app/receipt-wrangler-api"
 
 # Set build date
 ENV BUILD_DATE=${BUILD_DATE}
