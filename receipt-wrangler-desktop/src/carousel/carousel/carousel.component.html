@@ -1,0 +1,70 @@
+<carousel
+  [interval]="0"
+  [isAnimated]="true"
+  [activeSlide]="currentlyShownImageIndex"
+  (activeSlideChange)="updateCurrentlyShownImage($event)"
+>
+  <slide *ngFor="let preview of imagePreviews; let i = index">
+    <ng-template
+      [ngTemplateOutlet]="buttonControls"
+      [ngTemplateOutletContext]="{
+        i: i,
+      }"
+    ></ng-template>
+
+    <app-image-viewer
+      *ngIf="preview?.encodedImage || preview?.file"
+      [imageBase64]="preview?.encodedImage"
+      [imageFile]="$any(preview.file)"
+      [scale]="scale"
+      (wheel)="onScroll($event)"
+    ></app-image-viewer>
+  </slide>
+
+  <slide *ngFor="let image of images; let i = index">
+    <ng-template
+      [ngTemplateOutlet]="buttonControls"
+      [ngTemplateOutletContext]="{
+        i: i,
+      }"
+    ></ng-template>
+
+    <app-image-viewer
+      *ngIf="image?.encodedImage"
+      [imageBase64]="image.encodedImage"
+      [scale]="scale"
+      (wheel)="onScroll($event)"
+    ></app-image-viewer>
+  </slide>
+</carousel>
+
+<ng-template #buttonControls let-i="i">
+  <div *ngIf="!hideButtonControls" class="row justify-content-center">
+    <app-button
+      class="col-auto"
+      matButtonType="iconButton"
+      icon="zoom_in"
+      tooltip="Zoom In"
+      [disabled]="disabled"
+      (clicked)="zoomIn()"
+    ></app-button>
+    <app-button
+      class="col-auto"
+      matButtonType="iconButton"
+      icon="zoom_out"
+      tooltip="Zoom Out"
+      [disabled]="disabled"
+      (clicked)="zoomOut()"
+    ></app-button>
+    <app-button
+      *ngIf="!(mode | inputReadonly)"
+      class="col-auto"
+      matButtonType="iconButton"
+      icon="delete"
+      tooltip="Remove Image"
+      color="warn"
+      [disabled]="disabled"
+      (clicked)="emitRemoveButtonClicked(i)"
+    ></app-button>
+  </div>
+</ng-template>

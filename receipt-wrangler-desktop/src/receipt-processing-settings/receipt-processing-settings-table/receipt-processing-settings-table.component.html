@@ -1,0 +1,76 @@
+<app-table-header headerText="Receipt Processing Settings">
+  <app-add-button
+    tooltip="Create Receipt Processing Settings"
+    [buttonRouterLink]="['create']"
+  ></app-add-button>
+</app-table-header>
+<app-table
+  [dataSource]="dataSource"
+  [columns]="columns"
+  [displayedColumns]="displayedColumns"
+  [pagination]="true"
+  [length]="totalCount"
+  [page]="((baseTableService.page$ | async) || 1) - 1"
+  [pageSize]="(baseTableService.pageSize$ | async)|| 10"
+  (sorted)="sorted($event)"
+  (pageChange)="pageChanged($event)"
+></app-table>
+
+<ng-template #nameCell let-element="element">
+  <a
+    [routerLink]="['/system-settings/receipt-processing-settings', element.id, 'view']"
+  >
+    {{ element.name }}
+
+  </a>
+</ng-template>
+
+<ng-template #descriptionCell let-element="element">
+  {{ element.description }}
+</ng-template>
+
+<ng-template #promptCell let-element="element">
+  {{ element.prompt.name }}
+</ng-template>
+
+<ng-template #aiTypeCell let-element="element">
+  {{ element.aiType | aiType }}
+</ng-template>
+
+<ng-template #ocrEngineCell let-element="element">
+  {{ element.ocrEngine | ocrEngine }}
+</ng-template>
+
+<ng-template #createdAtCell let-element="element">
+  {{ element.createdAt | date: "short" }}
+</ng-template>
+
+<ng-template #updatedAtCell let-element="element">
+  {{ element.updatedAt | date: "short" }}
+</ng-template>
+
+<ng-template #actionsCell let-element="element">
+  <div class="d-flex">
+    <app-edit-button
+      color="accent"
+      tooltip="Edit receipt processing settings"
+      [buttonRouterLink]="['/system-settings/receipt-processing-settings/' + element.id + '/edit']"
+    ></app-edit-button>
+    <app-button
+      color="accent"
+      matButtonType="iconButton"
+      icon="wifi"
+      tooltip="Check Receipt Processing Connectivity"
+      (clicked)="checkConnectivity(element.id)"
+    ></app-button>
+    <app-delete-button
+      tooltip="Delete receipt processing settings"
+      [disabled]="systemSettings.receiptProcessingSettingsId === element.id ||
+       systemSettings.fallbackReceiptProcessingSettingsId === element.id"
+      (clicked)="deleteReceiptProcessingSettings(element)"
+      (click)="disabledDeleteButtonClicked(element, systemSettings.receiptProcessingSettingsId === element.id ||
+       systemSettings.fallbackReceiptProcessingSettingsId === element.id)"
+    ></app-delete-button>
+  </div>
+</ng-template>
+

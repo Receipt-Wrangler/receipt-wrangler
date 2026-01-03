@@ -1,0 +1,62 @@
+<div class="d-flex flex-column">
+  <app-table-header headerText="Emails">
+    <app-add-button
+      tooltip="Create email"
+      [buttonRouterLink]="['create']"
+    ></app-add-button>
+  </app-table-header>
+  <div class="table-container">
+    <app-table
+      [dataSource]="dataSource"
+      [columns]="columns"
+      [displayedColumns]="displayedColumns"
+      [pagination]="true"
+      [length]="totalCount"
+      [page]="((tableState | async)?.page || 1) - 1"
+      [pageSize]="(tableState | async)?.pageSize || 10"
+      (sorted)="sorted($event)"
+      (pageChange)="pageChanged($event)"
+    ></app-table>
+  </div>
+</div>
+
+<ng-template #usernameCell let-element="element">
+  <a [routerLink]="['/system-settings/system-emails/' + element.id + '/view']">
+    {{ element.username }}
+  </a>
+</ng-template>
+
+<ng-template #hostCell let-element="element">
+  {{ element.host }}
+</ng-template>
+
+<ng-template #createdAtCell let-element="element">
+  {{ element.createdAt | date : "short" }}
+</ng-template>
+
+<ng-template #updatedAtCell let-element="element">
+  {{ element.updatedAt | date : "short" }}
+</ng-template>
+
+<ng-template #actionsCell let-element="element" let-index="index">
+  <div class="d-flex align-items-center">
+    <app-edit-button
+      color="accent"
+      [buttonRouterLink]="['/system-settings/system-emails/' + element.id + '/edit']"
+      [tooltip]="'Edit email'"
+    ></app-edit-button>
+    <app-button
+      color="accent"
+      matButtonType="iconButton"
+      icon="wifi"
+      tooltip="Check Email Connectivity"
+      (clicked)="checkEmailConnectivity(element.id)"
+    ></app-button>
+    <app-delete-button
+      tooltip="Delete email"
+      [disabled]="(relatedSystemEmailMap.get(element.id)?.length || 0) > 0"
+      (clicked)="deleteButtonClicked(element)"
+      (click)="disabledDeleteButtonClicked(element)"
+    ></app-delete-button>
+  </div>
+</ng-template>

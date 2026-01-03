@@ -1,0 +1,22 @@
+<app-dialog
+  headerText="Filter Groups"
+>
+  <form
+    [formGroup]="form"
+    (ngSubmit)="submit()"
+  >
+    <app-select
+      label="Groups to View"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+      [inputFormControl]="form | formGet: 'associatedGroup'"
+      [options]="associatedGroupOptions"
+    ></app-select>
+  </form>
+
+  <app-dialog-footer
+    submitButtonTooltip="Apply filter"
+    (submitClicked)="submit()"
+    (cancelClicked)="cancel()"
+  ></app-dialog-footer>
+</app-dialog>

@@ -1,0 +1,38 @@
+@use "../../variables.scss" as variables;
+
+app-card {
+  .mat-mdc-card-header-text {
+    width: 100%;
+  }
+  
+  .mat-mdc-card {
+    border-radius: variables.$border-radius-xl !important;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+    transition: all 0.3s ease-in-out;
+    overflow: hidden;
+    
+    &:hover {
+      border-color: rgba(0, 0, 0, 0.1);
+      transform: translateY(-2px);
+      box-shadow: variables.$shadow-xl !important;
+    }
+  }
+  
+  .mat-mdc-card-header {
+    padding: variables.$spacing-lg;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(8px);
+  }
+  
+  .mat-mdc-card-content {
+    padding: variables.$spacing-lg;
+  }
+  
+  .mat-mdc-card-actions {
+    padding: variables.$spacing-md variables.$spacing-lg;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    background-color: rgba(248, 250, 252, 0.5);
+  }
+}

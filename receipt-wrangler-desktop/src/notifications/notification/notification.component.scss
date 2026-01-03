@@ -1,0 +1,11 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+.notification {
+  text-decoration: none !important;
+  color: black !important;
+  :hover {
+    background-color: rgba(map.get(variables.$accent-palette, 50), 0.1) !important;
+    border-radius: 5% !important;
+  }
+}

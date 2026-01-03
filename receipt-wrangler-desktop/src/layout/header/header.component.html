@@ -1,0 +1,95 @@
+<ng-container *ngIf="!!(isLoggedIn | async)">
+  <div
+    id="header-container"
+    class="header-container d-flex justify-content-between align-items-center"
+  >
+    <div class="col d-flex align-items-center">
+      <button
+        mat-icon-button
+        color="accent"
+        class="nav-button"
+        matTooltip="Toggle sidebar"
+        (click)="toggleSidebar()"
+      >
+        <mat-icon>menu</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        color="accent"
+        class="nav-button"
+        matTooltip="Dashboard"
+        routerLinkActive="active-link"
+        [routerLink]="dashboardHeaderLink"
+      >
+        <mat-icon>dashboard</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        color="accent"
+        class="nav-button"
+        matTooltip="Receipt List"
+        routerLinkActive="active-link"
+        [routerLink]="receiptHeaderLink"
+      >
+        <mat-icon>receipt_long</mat-icon>
+      </button>
+      @for (shortcut of (userPreferences | async)?.userShortcuts ?? []; track shortcut["id"]) {
+        <a [href]="shortcut.url">
+          <button
+            mat-icon-button
+            color="accent"
+            class="nav-button"
+            routerLinkActive="active-link"
+            [matTooltip]="shortcut.name"
+          >
+            <mat-icon>{{ shortcut.icon }}</mat-icon>
+          </button>
+        </a>
+      }
+    </div>
+    <div class="col-auto d-flex align-items-center justify-content-end">
+      <app-searchbar class="receipt-searchbar w-100 me-2"></app-searchbar>
+      <app-button
+        class="ms-4"
+        #notificationsPopover="ngbPopover"
+        matButtonType="iconButton"
+        icon="notifications"
+        triggers="click:clickouside"
+        autoClose="outside"
+        placement="bottom-end"
+        [matBadgeContent]="notificationCount"
+        [ngbPopover]="notifications"
+        (clicked)="notificationsPopover.open()"
+      ></app-button>
+
+      <img
+        class="mx-4"
+        src="assets/branding/logo-large.svg"
+      >
+    </div>
+  </div>
+</ng-container>
+<ng-container *ngIf="showProgressBar | async">
+  <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+</ng-container>
+
+<ng-template
+  #navButton
+  let-srcPath="srcPath"
+  let-routerLink="routerLink"
+  let-tooltip="tooltip"
+>
+  <button
+    mat-icon-button
+    color="accent"
+    class="nav-button"
+    [routerLink]="routerLink"
+    [matTooltip]="tooltip"
+  >
+    <img [src]="srcPath"/>
+  </button>
+</ng-template>
+
+<ng-template #notifications>
+  <app-notifications-list></app-notifications-list>
+</ng-template>

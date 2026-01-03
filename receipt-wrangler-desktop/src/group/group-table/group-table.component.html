@@ -1,0 +1,68 @@
+<div class="d-flex flex-column">
+  <app-table-header [headerText]="tableHeaderText">
+    <div class="d-flex align-items-center">
+      <app-add-button
+        tooltip="Create Group"
+        [buttonRouterLink]="['create']"
+      ></app-add-button>
+      <ng-container *ngIf="isAdmin">
+        <app-button
+          matButtonType="iconButton"
+          icon="filter_alt"
+          color="accent"
+          tooltip="Filter Groups"
+          (clicked)="openFilterDialog()"
+        ></app-button>
+      </ng-container>
+    </div>
+  </app-table-header>
+  <div class="table-container">
+    <app-table
+      [dataSource]="dataSource"
+      [columns]="columns"
+      [displayedColumns]="displayedColumns"
+      [pagination]="true"
+      [length]="totalCount"
+      [page]="((baseTableService.page$ | async) || 1) - 1"
+      [pageSize]="(baseTableService.pageSize$ | async) || 10"
+      (sorted)="sorted($event)"
+      (pageChange)="pageChanged($event)"
+    ></app-table>
+  </div>
+</div>
+
+<ng-template #nameCell let-element="element" let-index="index">
+  <a [routerLink]="['/groups/' + element.id + '/details/view']">
+    {{ element.name }}
+  </a>
+</ng-template>
+
+<ng-template #numberOfMembersCell let-element="element" let-index="index">
+  {{ element.groupMembers.length }}
+</ng-template>
+
+<ng-template #createdAtCell let-element="element" let-index="index">
+  {{ element.createdAt | date : "short" }}
+</ng-template>
+
+<ng-template #updatedAtCell let-element="element" let-index="index">
+  {{ element.updatedAt | date : "short" }}
+</ng-template>
+
+<ng-template #actionsCell let-element="element" let-index="index">
+  <div class="d-flex">
+    <app-edit-button
+      *ngIf="(element.id | groupRole : groupRole.Owner) || isAdmin"
+      color="accent"
+      tooltip="Edit group"
+      [buttonRouterLink]="(element | groupTableEditButton: isAdmin).routerLink"
+      [buttonQueryParams]="(element | groupTableEditButton: isAdmin).queryParams"
+    ></app-edit-button>
+    <app-delete-button
+      *ngIf="element.id | groupRole : groupRole.Owner"
+      tooltip="Delete Group"
+      [disabled]="(groups | async)?.length === 1"
+      (clicked)="deleteGroup(index)"
+    ></app-delete-button>
+  </div>
+</ng-template>

@@ -1,0 +1,45 @@
+@use "../../variables.scss" as variables;
+
+app-button {
+  width: fit-content;
+
+  .mat-badge-content {
+    color: white;
+    border-radius: variables.$border-radius-lg;
+    font-weight: 600;
+    font-size: 0.75rem;
+    background-color: #ef4444;
+    box-shadow: variables.$shadow-sm;
+  }
+  
+  .mat-mdc-button,
+  .mat-mdc-raised-button,
+  .mat-mdc-icon-button {
+    border-radius: variables.$border-radius-lg !important;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    
+    &:hover {
+      transform: translateY(-1px);
+    }
+  }
+  
+  .mat-mdc-raised-button {
+    box-shadow: variables.$shadow-sm !important;
+    
+    &:hover {
+      box-shadow: variables.$shadow-md !important;
+    }
+    
+    &.mat-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      border: none;
+    }
+  }
+  
+  .mat-mdc-icon-button {
+    &:hover {
+      background-color: rgba(59, 130, 246, 0.1);
+    }
+  }
+}

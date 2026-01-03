@@ -1,0 +1,33 @@
+<app-form
+  [form]="form"
+  [formConfig]="formConfig"
+  [formTemplate]="formTemplate"
+  [editButtonRouterLink]="[editSettingsUrl]"
+  [editButtonQueryParams]="{tab: 'settings'}"
+  [canEdit]="canEditEmailSettings"
+  (submitted)="submit()"
+></app-form>
+
+<ng-template #formTemplate>
+  <app-audit-detail-section
+    [data]="group.groupSettings"
+  ></app-audit-detail-section>
+  <app-form-section headerText="Email Settings">
+    <app-group-settings-email
+      [form]="form"
+      [canEdit]="canEditEmailSettings"
+      [formConfig]="formConfig"
+      (formCommand)="handleFormCommand($event)"
+    ></app-group-settings-email>
+  </app-form-section>
+  <app-form-section
+    headerText="AI Settings"
+  >
+    <app-group-settings-ai
+      [form]="form"
+      [canEdit]="canEditEmailSettings"
+      [formConfig]="formConfig"
+      (formCommand)="handleFormCommand($event)"
+    ></app-group-settings-ai>
+  </app-form-section>
+</ng-template>

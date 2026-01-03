@@ -1,0 +1,38 @@
+<app-table-header headerText="Custom Fields">
+  <app-add-button (clicked)="openCustomFieldDialog()" tooltip="Add custom field">
+  </app-add-button>
+</app-table-header>
+<div class="table-container">
+  <app-table
+    [columns]="columns"
+    [dataSource]="dataSource"
+    [displayedColumns]="displayedColumns"
+    [length]="totalCount"
+    [pageSize]="(state | async)?.pageSize ?? 1"
+    [page]="((state | async)?.page ?? 1) - 1"
+    [pagination]="true"
+    (pageChange)="updatePageData($event)"
+    (sorted)="sorted({sortState : $event})"
+  ></app-table>
+</div>
+
+<ng-template #nameCell let-element="element">
+  <a class="cursor-pointer" (click)="openCustomFieldDialog(element)">{{ element.name }}</a>
+</ng-template>
+
+<ng-template #typeCell let-element="element">
+  {{ element.type | customFieldType }}
+</ng-template>
+
+<ng-template #descriptionCell let-element="element">
+  {{ element.description }}
+</ng-template>
+
+<ng-template #actionsCell let-element="element" let-index="index">
+  <app-delete-button
+    *appRole="'ADMIN'"
+    tooltip="Delete custom field"
+    (clicked)="openDeleteConfirmationDialog(element)"
+  >
+  </app-delete-button>
+</ng-template>

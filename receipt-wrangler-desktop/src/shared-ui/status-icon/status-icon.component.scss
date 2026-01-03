@@ -1,0 +1,10 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+.success-icon {
+  color: map.get(variables.$success-palette, 500);
+}
+
+.error-icon {
+  color: map.get(variables.$warn-palette, 500);
+}

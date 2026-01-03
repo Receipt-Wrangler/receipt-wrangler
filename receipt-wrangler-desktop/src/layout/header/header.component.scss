@@ -1,0 +1,75 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+.nav-button {
+  width: 56px;
+  height: 56px;
+  border-radius: variables.$border-radius-lg !important;
+  transition: all 0.2s ease-in-out;
+  margin: 0 variables.$spacing-xs;
+
+  img {
+    width: 28px;
+    height: 28px;
+    transition: all 0.2s ease-in-out;
+  }
+
+  svg {
+    width: 28px;
+    height: 28px;
+    transition: all 0.2s ease-in-out;
+  }
+
+  mat-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+  }
+
+  &:hover {
+    background-color: map.get(variables.$primary-palette, 50);
+    transform: translateY(-1px);
+    box-shadow: variables.$shadow-md;
+  }
+}
+
+.notifications-bell {
+  width: 56px;
+  height: 56px;
+  border-radius: variables.$border-radius-lg !important;
+  transition: all 0.2s ease-in-out;
+  
+  &:hover {
+    background-color: map.get(variables.$primary-palette, 50);
+    transform: translateY(-1px);
+  }
+}
+
+.header-container {
+  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
+  box-shadow: variables.$shadow-sm;
+  padding: variables.$spacing-md variables.$spacing-lg;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.active-link {
+  background-color: map.get(variables.$primary-palette, 100) !important;
+  
+  > * {
+    fill: map.get(variables.$primary-palette, 600) !important;
+    color: map.get(variables.$primary-palette, 600) !important;
+  }
+}
+
+.receipt-searchbar {
+  width: 28rem !important;
+  max-width: 100%;
+}

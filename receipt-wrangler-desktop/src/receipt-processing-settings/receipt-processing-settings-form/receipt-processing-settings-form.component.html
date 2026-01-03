@@ -1,0 +1,132 @@
+<form
+  [formGroup]="form"
+  (ngSubmit)="submit()"
+>
+  <app-form-header
+    [headerText]="formConfig.headerText"
+    [headerButtonsTemplate]="headerButtons">
+  </app-form-header>
+  <app-audit-detail-section
+    [data]="originalReceiptProcessingSettings"
+    [formMode]="formConfig.mode">
+  </app-audit-detail-section>
+  <app-form-section headerText="Details">
+    <app-input
+      label="Name"
+      [inputFormControl]="form | formGet: 'name'"
+      [readonly]="formConfig.mode | inputReadonly"
+    ></app-input>
+    <app-input
+      label="Description"
+      [inputFormControl]="form | formGet: 'description'"
+      [readonly]="formConfig.mode | inputReadonly"
+    ></app-input>
+    <app-autocomlete
+      label="Prompt"
+      optionValueKey="id"
+      optionDisplayKey="name"
+      optionFilterKey="name"
+      hint="Select a Prompt"
+      [displayWith]="promptDisplayWith.bind(this)"
+      [options]="prompts"
+      [multiple]="false"
+      [readonly]="formConfig.mode | inputReadonly"
+      [inputFormControl]="form | formGet: 'promptId'"
+    ></app-autocomlete>
+    <app-select
+      label="OCR Engine"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+      [inputFormControl]="form | formGet: 'ocrEngine'"
+      [options]="ocrEngineOptions"
+    ></app-select>
+    <app-select
+      label="Ai Type"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+      [inputFormControl]="form | formGet: 'aiType'"
+      [options]="aiTypeOptions"
+    ></app-select>
+    <div class="d-flex flex-column">
+      <ng-container *ngIf="
+      (form | formGet: 'aiType')?.value === AiType.OpenAi ||
+       (form | formGet: 'aiType')?.value === AiType.Gemini ||
+       (form | formGet: 'aiType')?.value === AiType.OpenAiCustom
+"
+      >
+        <app-input
+          *ngIf="formConfig.mode != FormMode.view"
+          label="Api Key"
+          [readonly]="formConfig.mode | inputReadonly"
+          [inputFormControl]="form | formGet: 'key'"
+          [showVisibilityEye]="true"
+        ></app-input>
+      </ng-container>
+
+      @if ((form | formGet: 'aiType')?.value === AiType.OpenAiCustom ||
+      (form | formGet: 'aiType')?.value === AiType.Ollama) {
+        <app-input
+          [label]="(form | formGet: 'aiType')?.value | urlLabel"
+          [readonly]="formConfig.mode | inputReadonly"
+          [inputFormControl]="form | formGet: 'url'"
+        ></app-input>
+      }
+
+      <app-input
+        label="Model"
+        [readonly]="formConfig.mode | inputReadonly"
+        [inputFormControl]="form | formGet: 'model'"
+      ></app-input>
+      <app-checkbox
+        class="ms-4 mb-2 is-vision-model"
+        label="Use Vision?"
+        [readonly]="formConfig.mode | inputReadonly"
+        [inputFormControl]="form | formGet: 'isVisionModel'"
+      ></app-checkbox>
+    </div>
+  </app-form-section>
+  <app-form-section
+    *ngIf="formConfig.mode != FormMode.add"
+    headerText="System Tasks"
+  >
+    <app-task-table
+      [associatedEntityType]="AssociatedEntityType.ReceiptProcessingSettings"
+      [associatedEntityId]="originalReceiptProcessingSettings?.id"
+      [expandedRowTemplate]="expandedRowTemplate"
+    ></app-task-table>
+  </app-form-section>
+  <app-form-button-bar [mode]="formConfig.mode">
+    <app-submit-button
+      *ngIf="!(formConfig.mode | inputReadonly)"
+      class="mb-4"
+      [onlyIcon]="false"
+    ></app-submit-button>
+  </app-form-button-bar>
+</form>
+
+<ng-template #headerButtons>
+  <div class="d-flex">
+    <app-edit-button
+      *ngIf="formConfig.mode === FormMode.view"
+      color="accent"
+      [buttonRouterLink]="['/system-settings/receipt-processing-settings/' + originalReceiptProcessingSettings?.id + '/edit']"
+    ></app-edit-button>
+    <app-button
+      matButtonType="iconButton"
+      icon="wifi"
+      color="accent"
+      tooltip="Check Connectivity"
+      [disabled]="form.invalid"
+      (clicked)="checkConnectivity()"
+    ></app-button>
+  </div>
+</ng-template>
+
+<ng-template
+  #expandedRowTemplate
+  let-element="element"
+>
+  <app-receipt-processing-settings-child-system-task-accordion
+    [childTasks]="element?.childSystemTasks ?? []"
+  ></app-receipt-processing-settings-child-system-task-accordion>
+</ng-template>

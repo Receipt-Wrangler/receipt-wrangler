@@ -1,0 +1,19 @@
+<app-dialog [headerText]="headerText">
+  <form [formGroup]="form">
+    <div class="d-flex flex-column">
+      <app-input
+        label="Name"
+        [inputFormControl]="form | formGet : 'name'"
+      ></app-input>
+      <app-input
+        label="Description"
+        [inputFormControl]="form | formGet : 'description'"
+      ></app-input>
+    </div>
+
+    <app-dialog-footer
+      (submitClicked)="submit()"
+      (cancelClicked)="closeDialog()"
+    ></app-dialog-footer>
+  </form>
+</app-dialog>

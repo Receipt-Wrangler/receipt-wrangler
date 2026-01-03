@@ -1,0 +1,40 @@
+<div class="p-4">
+  <h2 class="header-text">
+    {{ user ? "Edit " + user.displayName : "Create User" }}
+  </h2>
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <app-form-section headerText="User Details">
+      <app-input
+        label="Username"
+        [inputFormControl]="form | formGet : 'username'"
+      ></app-input>
+      <app-input
+        label="Displayname"
+        [inputFormControl]="form | formGet : 'displayName'"
+      ></app-input>
+      <app-input
+        *ngIf="!user"
+        label="Password"
+        type="password"
+        [inputFormControl]="form | formGet : 'password'"
+        [showVisibilityEye]="true"
+      ></app-input>
+      <app-select
+        label="User Role"
+        optionValueKey="value"
+        optionDisplayKey="displayValue"
+        [inputFormControl]="form | formGet : 'userRole'"
+        [options]="userRoleOptions"
+      ></app-select>
+      <app-checkbox
+        label="Is Dummy User?"
+        [helpText]="isDummerUserHelpText"
+        [inputFormControl]="form | formGet : 'isDummyUser'"
+      ></app-checkbox>
+    </app-form-section>
+    <div class="d-flex justify-content-end align-items-center">
+      <app-submit-button></app-submit-button>
+      <app-cancel-button (clicked)="closeModal()"></app-cancel-button>
+    </div>
+  </form>
+</div>

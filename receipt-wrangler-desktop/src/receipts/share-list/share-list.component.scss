@@ -1,0 +1,39 @@
+@use "../../variables.scss" as variables;
+
+app-share-list {
+  .item-form-container:nth-child(even) {
+    background-color: #efefef;
+  }
+
+  .item-form-container:nth-child(odd) {
+    background-color: #f6f6f6;
+  }
+
+  .green-check {
+    .mat-mdc-icon-button {
+      color: variables.$success-green !important;
+    }
+  }
+
+  // Match the item-list accordion header styling
+  .mat-expansion-panel-header {
+    .mat-expansion-panel-header-title {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: #333;
+    }
+    
+    .mat-expansion-panel-header-description {
+      flex: 1;
+      
+      .d-flex {
+        align-items: center;
+        
+        span {
+          font-size: 0.9rem;
+          color: #666;
+        }
+      }
+    }
+  }
+}

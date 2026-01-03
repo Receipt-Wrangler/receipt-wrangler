@@ -1,0 +1,68 @@
+<div class="d-flex flex-column">
+  <app-table-header [headerText]="tableHeaderText">
+    <div class="d-flex align-items-center">
+      <app-add-button
+        tooltip="Create API Key"
+        (clicked)="openCreateApiKeyDialog()"
+      ></app-add-button>
+      <ng-container *ngIf="isAdmin">
+        <app-button
+          matButtonType="iconButton"
+          icon="filter_alt"
+          color="accent"
+          tooltip="Filter API Keys"
+          (clicked)="openFilterDialog()"
+        ></app-button>
+      </ng-container>
+    </div>
+  </app-table-header>
+  <div class="table-container">
+    <app-table
+      [dataSource]="dataSource"
+      [columns]="columns"
+      [displayedColumns]="displayedColumns"
+      [pagination]="true"
+      [length]="totalCount"
+      [page]="((baseTableService.page$ | async) || 1) - 1"
+      [pageSize]="(baseTableService.pageSize$ | async) || 10"
+      (sorted)="sorted($event)"
+      (pageChange)="pageChanged($event)"
+    ></app-table>
+  </div>
+</div>
+
+<ng-template #nameCell let-element="element" let-index="index">
+  {{ element.name }}
+</ng-template>
+
+<ng-template #descriptionCell let-element="element" let-index="index">
+  {{ element.description || '-' }}
+</ng-template>
+
+<ng-template #createdByCell let-element="element" let-index="index">
+  {{ (element.createdBy | user)?.displayName || element.createdByString }}
+</ng-template>
+
+<ng-template #createdAtCell let-element="element" let-index="index">
+  {{ element.createdAt | date : "short" }}
+</ng-template>
+
+<ng-template #lastUsedAtCell let-element="element" let-index="index">
+  {{ (element.lastUsedAt | date : "short") || 'Never' }}
+</ng-template>
+
+
+<ng-template #actionsCell let-element="element" let-index="index">
+  <div class="d-flex">
+    <app-edit-button
+      *ngIf="isOwner(element)"
+      color="accent"
+      tooltip="Edit API Key"
+      (clicked)="openEditDialog(element)"
+    ></app-edit-button>
+    <app-delete-button
+      tooltip="Delete API Key"
+      (clicked)="deleteApiKey(element)"
+    ></app-delete-button>
+  </div>
+</ng-template>

@@ -1,0 +1,10 @@
+<app-dialog [headerText]="headerText">
+  <span>
+    {{ dialogContent }}
+  </span>
+  <app-dialog-footer
+    submitButtonTooltip="Confirm"
+    (submitClicked)="submitButtonClicked()"
+    (cancelClicked)="cancelButtonClicked()"
+  ></app-dialog-footer>
+</app-dialog>

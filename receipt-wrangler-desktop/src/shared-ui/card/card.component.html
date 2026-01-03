@@ -1,0 +1,12 @@
+<mat-card
+  [ngClass]="cardStyle"
+>
+  <mat-card-header class="w-100">
+    <mat-card-title class="w-100">
+      <ng-content select="[header]"></ng-content>
+    </mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <ng-content select="[content]"></ng-content>
+  </mat-card-content>
+</mat-card>

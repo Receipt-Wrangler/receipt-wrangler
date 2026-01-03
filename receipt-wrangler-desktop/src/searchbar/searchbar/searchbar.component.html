@@ -1,0 +1,21 @@
+<form class="w-100" class="form">
+  <mat-form-field class="w-100" appearance="outline">
+    <span matPrefix><mat-icon class="px-2">search</mat-icon></span>
+    <input
+      type="text"
+      matInput
+      placeholder="Search receipts"
+      [formControl]="searchFormControl"
+      [matAutocomplete]="auto"
+    />
+    <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayWith">
+      <mat-option
+        *ngFor="let result of results"
+        [value]="result"
+        (click)="navigateToResult(result)"
+      >
+        <div>{{ result | searchResult }}</div>
+      </mat-option>
+    </mat-autocomplete>
+  </mat-form-field>
+</form>

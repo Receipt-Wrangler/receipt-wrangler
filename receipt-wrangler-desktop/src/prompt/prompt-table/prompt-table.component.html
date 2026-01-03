@@ -1,0 +1,72 @@
+<div class="d-flex flex-column">
+  <app-table-header headerText="Prompts">
+    <div class="d-flex">
+      <app-add-button
+        tooltip="Create Prompt"
+        [buttonRouterLink]="['create']"
+      ></app-add-button>
+      <app-button
+        *ngIf="!defaultPromptExists"
+        color="accent"
+        tooltip="Create default prompt"
+        icon="note_add"
+        matButtonType="iconButton"
+        (clicked)="createDefaultPrompt()">
+      </app-button>
+    </div>
+  </app-table-header>
+  <div class="table-container">
+    <app-table
+      [dataSource]="dataSource"
+      [columns]="columns"
+      [displayedColumns]="displayedColumns"
+      [pagination]="true"
+      [length]="totalCount"
+      [page]="((tableState | async)?.page || 1) - 1"
+      [pageSize]="(tableState | async)?.pageSize || 10"
+      (sorted)="sorted($event)"
+      (pageChange)="pageChanged($event)"
+    ></app-table>
+  </div>
+</div>
+
+<ng-template #nameCell let-element="element">
+  <a [routerLink]="['/system-settings/prompts/' + element.id + '/view']">
+    {{ element.name }}
+  </a>
+</ng-template>
+
+<ng-template #descriptionCell let-element="element">
+  {{ element.description }}
+</ng-template>
+
+<ng-template #createdAtCell let-element="element">
+  {{ element.createdAt | date : "short" }}
+</ng-template>
+
+<ng-template #updatedAtCell let-element="element">
+  {{ element.updatedAt | date : "short" }}
+</ng-template>
+
+<ng-template #actionsCell let-element="element" let-index="index">
+  <div class="d-flex">
+    <app-edit-button
+      tooltip="Edit Prompt"
+      color="accent"
+      [buttonRouterLink]="['/system-settings/prompts/' + element.id + '/edit']"
+    ></app-edit-button>
+    <app-button
+      color="accent"
+      tooltip="Duplicate prompt"
+      icon="file_copy"
+      matButtonType="iconButton"
+      (clicked)="duplicatePrompt(element.id)"
+    ></app-button>
+    <app-delete-button
+      tooltip="Delete Prompt"
+      [disabled]="(relatedPromptMap.get(element.id)?.length || 0) > 0"
+      (clicked)="deletePrompt(element)"
+      (click)="disabledDeleteButtonClicked(element)"
+    ></app-delete-button>
+  </div>
+</ng-template>

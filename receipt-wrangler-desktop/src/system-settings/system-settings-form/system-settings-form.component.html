@@ -1,0 +1,182 @@
+<app-form-header
+  [headerText]="formConfig.headerText"
+  [headerButtonsTemplate]="headerButtons"
+></app-form-header>
+
+@if (showRestartTaskServerAlert) {
+  <div class="m-2">
+    <app-alert
+      #alert
+      class="scroll-snap"
+      @fadeInOut
+      type="warning"
+      message="Please restart the task server for the changes to take effect."
+    ></app-alert>
+  </div>
+}
+
+<app-audit-detail-section
+  *ngIf="formConfig.mode != FormMode.add"
+  [data]="originalSystemSettings"
+></app-audit-detail-section>
+<form
+  [formGroup]="form"
+  (ngSubmit)="submit()"
+>
+  <app-form-section
+    headerText="Details"
+  >
+    <app-checkbox
+      label="Enable Local Signup"
+      [inputFormControl]="form | formGet:'enableLocalSignUp'"
+      [readonly]="formConfig.mode |  inputReadonly"
+    ></app-checkbox>
+    <app-checkbox
+      label="Debug OCR"
+      [inputFormControl]="form | formGet:'debugOcr'"
+      [readonly]="formConfig.mode |  inputReadonly"
+    ></app-checkbox>
+    <app-autocomlete
+      optionFilterKey="name"
+      optionDisplayKey="name"
+      label="Receipt Processing Settings"
+      optionValueKey="id"
+      [inputFormControl]="form | formGet:'receiptProcessingSettingsId'"
+      [options]="allReceiptProcessingSettings"
+      [displayWith]="displayWith.bind(this)"
+      [readonly]="formConfig.mode |  inputReadonly"
+    ></app-autocomlete>
+    <app-autocomlete
+      #fallbackReceiptProcessingSettings
+      optionFilterKey="name"
+      optionDisplayKey="name"
+      label="Fallback Receipt Processing Settings"
+      optionValueKey="id"
+      [inputFormControl]="form | formGet:'fallbackReceiptProcessingSettingsId'"
+      [options]="filteredReceiptProcessingSettings"
+      [displayWith]="displayWith.bind(this)"
+      [readonly]="(formConfig.mode |  inputReadonly) || !(form | formGet:'receiptProcessingSettingsId').value"
+    ></app-autocomlete>
+  </app-form-section>
+  <app-form-section
+    headerText="Task Server Settings"
+    [headerButtonsTemplate]="taskServerSettingsHeaderButtons"
+  >
+    <app-input
+      label="Task Concurrency"
+      type="number"
+      hint="The max amount of tasks that can be run concurrently. 0 or Negative means max cpu cores available to the process."
+      [inputFormControl]="form | formGet:'taskConcurrency'"
+    ></app-input>
+    <app-input
+      label="Email polling interval (in seconds)"
+      type="number"
+      [inputFormControl]="form | formGet:'emailPollingInterval'"
+      [readonly]="formConfig.mode |  inputReadonly"
+    ></app-input>
+    <app-form-section
+      headerText="Task Queue Configuration"
+    >
+      <ng-container *ngFor="let data of queueData">
+        <ng-template
+          [ngTemplateOutlet]="queueCard"
+          [ngTemplateOutletContext]="{
+        queueData: data,
+        }"
+        ></ng-template>
+      </ng-container>
+    </app-form-section>
+  </app-form-section>
+  <app-form-section
+    headerText="Currency Format"
+  >
+    <div class="d-flex flex-column mb-3">
+      <strong>Previews</strong>
+      <span>{{ 123456789.12 | customCurrency :  (form | formGet: 'currencyDisplay').value :  (form | formGet: 'currencyDecimalSeparator').value : (form | formGet: 'currencyThousandthsSeparator').value : ((form | formGet: 'currencySymbolPosition').value) : ((form | formGet: 'currencyHideDecimalPlaces').value) }}</span>
+      <span>{{ 12.99 | customCurrency :  (form | formGet: 'currencyDisplay').value :  (form | formGet: 'currencyDecimalSeparator').value : (form | formGet: 'currencyThousandthsSeparator').value : ((form | formGet: 'currencySymbolPosition').value) : ((form | formGet: 'currencyHideDecimalPlaces').value) }}</span>
+      <span>{{ 10000 | customCurrency :  (form | formGet: 'currencyDisplay').value :  (form | formGet: 'currencyDecimalSeparator').value : (form | formGet: 'currencyThousandthsSeparator').value : ((form | formGet: 'currencySymbolPosition').value) : ((form | formGet: 'currencyHideDecimalPlaces').value) }}</span>
+      <span>{{ -10000 | customCurrency :  (form | formGet: 'currencyDisplay').value :  (form | formGet: 'currencyDecimalSeparator').value : (form | formGet: 'currencyThousandthsSeparator').value : ((form | formGet: 'currencySymbolPosition').value) : ((form | formGet: 'currencyHideDecimalPlaces').value) }}</span>
+    </div>
+    <app-input
+      label="Symbol Display"
+      [readonly]="formConfig.mode | inputReadonly"
+      [inputFormControl]="form | formGet: 'currencyDisplay'"
+    ></app-input>
+    <app-select
+      label="Symbol Position"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+      [inputFormControl]="form  | formGet:'currencySymbolPosition'"
+      [options]="symbolPositions"
+    ></app-select>
+    <app-select
+      label="Thousandths Separator"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+      [inputFormControl]="form  | formGet:'currencyThousandthsSeparator'"
+      [options]="decimalSeparators"
+    ></app-select>
+    <app-select
+      label="Decimal Separator"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+      [inputFormControl]="form  | formGet:'currencyDecimalSeparator'"
+      [options]="decimalSeparators"
+    ></app-select>
+    <app-checkbox
+      label="Hide Decimal Places"
+      [inputFormControl]="form | formGet:'currencyHideDecimalPlaces'"
+    ></app-checkbox>
+  </app-form-section>
+  <app-form-button-bar
+    [mode]="formConfig.mode"
+  >
+    <app-submit-button
+      class="mb-4"
+      [onlyIcon]="false"
+    ></app-submit-button>
+  </app-form-button-bar>
+</form>
+
+<ng-template #headerButtons>
+  <app-edit-button
+    *ngIf="formConfig.mode != FormMode.edit"
+    color="accent"
+    [buttonRouterLink]="['/system-settings/settings', 'edit']"
+  ></app-edit-button>
+</ng-template>
+
+<ng-template
+  #queueCard
+  let-queueData="queueData"
+>
+  <div class="mb-2">
+    <app-card>
+      <ng-container header>
+        {{ queueData.displayValue }}
+      </ng-container>
+      <ng-container content>
+        <small>{{ queueData.description }}</small>
+        <div class="mt-2">
+          <app-input
+            label="Priority"
+            type="number"
+            hint="Higher the value means higher the priority."
+            [readonly]="formConfig.mode |  inputReadonly"
+            [inputFormControl]="form | taskQueueFormControl:queueData.value: 'priority'"
+          ></app-input>
+        </div>
+      </ng-container>
+    </app-card>
+  </div>
+</ng-template>
+
+<ng-template #taskServerSettingsHeaderButtons>
+  <app-button
+    matButtonType="iconButton"
+    icon="restart_alt"
+    color="accent"
+    tooltip="Restart Task Server"
+    (clicked)="restartTaskServer()"
+  ></app-button>
+</ng-template>

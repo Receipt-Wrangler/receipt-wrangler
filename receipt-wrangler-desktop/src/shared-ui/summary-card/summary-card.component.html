@@ -1,0 +1,40 @@
+<app-card
+  cardStyle="dashboard-card"
+>
+  <ng-container header>
+    <h3>{{ headerText }}</h3>
+  </ng-container>
+  <ng-container content>
+    <ng-template
+      [ngTemplateOutlet]="owedTemplate"
+      [ngTemplateOutletContext]="{
+        map: usersOweMap,
+        headerText: 'Users Owe Me',
+        emptyText: 'Nobody owes me!'
+      }"
+    ></ng-template>
+    <ng-template
+      [ngTemplateOutlet]="owedTemplate"
+      [ngTemplateOutletContext]="{
+        map: userOwesMap,
+        headerText: 'I Owe',
+        emptyText: 'Phew, I don\'t owe anything!'
+      }"
+    ></ng-template>
+  </ng-container>
+</app-card>
+
+<ng-template
+  let-map="map"
+  let-headerText="headerText"
+  let-emptyText="emptyText"
+  #owedTemplate
+>
+  <mat-list>
+    <strong>{{ headerText }}</strong>
+    <mat-list-item *ngIf="map.size === 0">{{ emptyText }}</mat-list-item>
+    <mat-list-item *ngFor="let e of map | keyvalue">
+      {{ ($any(e.key) | user)?.displayName }} - {{ $any(e.value) | customCurrency }}
+    </mat-list-item>
+  </mat-list>
+</ng-template>

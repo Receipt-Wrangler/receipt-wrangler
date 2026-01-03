@@ -1,0 +1,26 @@
+<div class="container-fluid">
+  <div class="row g-3">
+    <div class="d-block widget col-12 col-md-6 col-lg-4 col-xxl-3" *ngFor="let widget of selectedDashboard?.widgets">
+      <ng-container [ngSwitch]="widget.widgetType">
+        <ng-container *ngSwitchCase="widgetType.GroupSummary">
+          <app-summary-card
+            [headerText]="widget.name ?? 'Receipt Summary'"
+            [groupId]="selectedDashboard?.groupId ?? ''"
+          ></app-summary-card>
+        </ng-container>
+        <ng-container *ngSwitchCase="widgetType.FilteredReceipts">
+          <app-filtered-receipts
+            [widget]="widget"
+            [groupId]="selectedDashboard?.groupId"
+          ></app-filtered-receipts>
+        </ng-container>
+        <ng-container *ngSwitchCase="widgetType.GroupActivity">
+          <app-activity
+            [widget]="widget"
+            [groupId]="selectedDashboard?.groupId"
+          ></app-activity>
+        </ng-container>
+      </ng-container>
+    </div>
+  </div>
+</div>

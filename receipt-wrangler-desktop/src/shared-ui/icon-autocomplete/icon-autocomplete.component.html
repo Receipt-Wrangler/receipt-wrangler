@@ -1,0 +1,26 @@
+<app-autocomlete
+  optionFilterKey="displayValue"
+  optionDisplayKey="displayValue"
+  optionValueKey="value"
+  [label]="label"
+  [inputFormControl]="inputFormControl"
+  [options]="(icons | async) ?? []"
+  [optionTemplate]="optionTemplate"
+  [displayWith]="displayWith.bind(this)"
+></app-autocomlete>
+
+<ng-template
+  #optionTemplate
+  let-option="option"
+>
+  <div class="d-flex align-items-center">
+    <mat-icon
+      class="me-2"
+      color="accent"
+    >
+      {{ option.value }}
+    </mat-icon>
+    {{ option.displayValue }}
+
+  </div>
+</ng-template>

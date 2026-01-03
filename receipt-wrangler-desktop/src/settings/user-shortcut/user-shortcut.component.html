@@ -1,0 +1,52 @@
+<app-editable-list
+  trackByKey="trackby"
+  [listData]="userShortcuts.value"
+  [itemTitleTemplate]="itemTitleTemplate"
+  [itemSubtitleTemplate]="itemSubtitleTemplate"
+  [editTemplate]="editTemplate"
+  [readonly]="formConfig.mode | inputReadonly"
+  (deleteButtonClicked)="removeShortcut($event)"
+></app-editable-list>
+
+<ng-template #itemTitleTemplate let-row="row">
+  <div class="d-flex align-items-center">
+    <mat-icon class="me-2" color="accent">{{ row.icon }}</mat-icon>
+    <div>{{ row.name }}</div>
+  </div>
+</ng-template>
+
+<ng-template #itemSubtitleTemplate let-row="row">
+  {{ row.url }}
+</ng-template>
+
+
+<ng-template
+  #editTemplate
+  let-i="i"
+>
+  <app-card>
+    <ng-container header>
+      {{ isAddingShortcut ? 'Add' : 'Edit' }} Shortcut
+    </ng-container>
+    <ng-container content>
+      <div class="d-flex flex-column justify-content-center">
+        <app-input
+          label="Name"
+          [inputFormControl]="parentForm | formGet : 'userShortcuts.' + i + '.name'"
+        ></app-input>
+        <app-input
+          label="Url"
+          [inputFormControl]="parentForm | formGet : 'userShortcuts.' + i + '.url'"
+        ></app-input>
+        <app-icon-autocomplete
+          label="Icon"
+          [inputFormControl]="parentForm | formGet : 'userShortcuts.' + i + '.icon'"
+        ></app-icon-autocomplete>
+      </div>
+      <app-dialog-footer
+        (submitClicked)="emitShortcutDoneClicked()"
+        (cancelClicked)="emitShortcutCancelClicked()"
+      ></app-dialog-footer>
+    </ng-container>
+  </app-card>
+</ng-template>

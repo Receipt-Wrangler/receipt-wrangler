@@ -1,0 +1,293 @@
+@use "../../variables.scss" as variables;
+
+app-auth-form {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: variables.$spacing-lg;
+
+  // Fun background elements
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: radial-gradient(circle at 20% 80%, rgba(39, 177, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(39, 177, 255, 0.06) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .auth-container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .auth-card {
+    background: white;
+    border-radius: variables.$border-radius-2xl;
+    box-shadow: 0 8px 32px rgba(39, 177, 255, 0.12);
+    padding: variables.$spacing-2xl;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #27b1ff 0%, #009efa 100%);
+    }
+  }
+
+  .logo-section {
+    text-align: center;
+    margin-bottom: variables.$spacing-lg;
+
+    .logo {
+      width: 100px;
+      height: auto;
+      margin-bottom: variables.$spacing-md;
+      transition: transform 0.3s ease;
+
+      &:hover {
+        transform: scale(1.05) rotate(2deg);
+      }
+    }
+
+    .welcome-text {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: variables.$spacing-xs;
+
+      .wave {
+        display: inline-block;
+        animation: wave 2s ease-in-out infinite;
+      }
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: #64748b;
+      font-weight: 400;
+    }
+  }
+
+  .form-fields {
+    margin-bottom: variables.$spacing-sm;
+
+    app-input {
+      display: block;
+      width: 100%;
+      margin-bottom: variables.$spacing-sm;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      ::ng-deep {
+        .mat-mdc-form-field {
+          width: 100%;
+
+          .mat-mdc-text-field-wrapper {
+            height: 56px;
+            border-radius: variables.$border-radius-xl !important;
+            background-color: #f8fafc;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+            &:hover {
+              border-color: #27b1ff;
+              background-color: white;
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(39, 177, 255, 0.1);
+            }
+          }
+
+          &.mat-focused .mat-mdc-text-field-wrapper {
+            border-color: #27b1ff;
+            background-color: white;
+            box-shadow: 0 0 0 4px rgba(39, 177, 255, 0.12);
+            transform: translateY(-1px);
+          }
+
+          .mat-mdc-form-field-label {
+            color: #64748b;
+            font-weight: 500;
+          }
+        }
+      }
+    }
+  }
+
+  .form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: variables.$spacing-sm;
+
+    .primary-action {
+      width: 100%;
+
+      app-button {
+        width: 100%;
+        display: block;
+
+        ::ng-deep .mat-mdc-raised-button {
+          width: 100%;
+          height: 56px;
+          border-radius: variables.$border-radius-xl !important;
+          font-weight: 600;
+          font-size: 1rem;
+          background: linear-gradient(135deg, #27b1ff 0%, #009efa 100%);
+          color: white;
+          box-shadow: 0 4px 14px rgba(39, 177, 255, 0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+          &:hover {
+            background: linear-gradient(135deg, #009efa 0%, #0086d4 100%);
+            box-shadow: 0 6px 20px rgba(39, 177, 255, 0.4);
+            transform: translateY(-2px);
+          }
+        }
+      }
+    }
+
+    .secondary-action {
+      width: 100%;
+      text-align: center;
+      padding: variables.$spacing-xs 0;
+
+      app-button {
+        width: 100%;
+        display: block;
+
+        ::ng-deep .mat-mdc-raised-button {
+          width: 100%;
+          height: 48px;
+          border-radius: variables.$border-radius-xl !important;
+          font-weight: 500;
+          font-size: 0.95rem;
+          background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+          color: white;
+          box-shadow: 0 2px 8px rgba(100, 116, 139, 0.2);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+          &:hover {
+            background: linear-gradient(135deg, #475569 0%, #334155 100%);
+            box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+            transform: translateY(-1px);
+          }
+        }
+      }
+    }
+  }
+
+  // Fun animations
+  @keyframes wave {
+    0%, 100% {
+      transform: rotate(0deg);
+    }
+    10%, 30%, 50%, 70% {
+      transform: rotate(-10deg);
+    }
+    20%, 40%, 60%, 80% {
+      transform: rotate(10deg);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%);
+
+    .loading-gif {
+      width: 60px;
+      height: 60px;
+      margin-bottom: variables.$spacing-lg;
+      border-radius: 50%;
+      padding: variables.$spacing-sm;
+      background: white;
+      box-shadow: 0 4px 12px rgba(39, 177, 255, 0.1);
+    }
+
+    .loading-text {
+      color: #64748b;
+      font-weight: 500;
+      font-size: 1rem;
+    }
+  }
+
+  // Responsive design
+  @media (max-width: 768px) {
+    padding: variables.$spacing-md;
+
+    .auth-card {
+      padding: variables.$spacing-xl;
+    }
+
+    .logo-section {
+      .logo {
+        width: 80px;
+      }
+
+      .welcome-text {
+        font-size: 1.5rem;
+      }
+    }
+  }
+
+  @media (max-width: 480px) {
+    padding: variables.$spacing-sm;
+
+    .auth-card {
+      padding: variables.$spacing-lg;
+    }
+
+    .logo-section {
+      margin-bottom: variables.$spacing-lg;
+
+      .logo {
+        width: 70px;
+        margin-bottom: variables.$spacing-md;
+      }
+
+      .welcome-text {
+        font-size: 1.25rem;
+      }
+
+      .subtitle {
+        font-size: 0.9rem;
+      }
+    }
+
+    .form-fields {
+      margin-bottom: variables.$spacing-lg;
+
+      app-input {
+        margin-bottom: variables.$spacing-md;
+      }
+    }
+  }
+}
+

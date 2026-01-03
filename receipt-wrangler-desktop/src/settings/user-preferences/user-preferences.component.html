@@ -1,0 +1,71 @@
+<app-form
+  [form]="form"
+  [formConfig]="formConfig"
+  [formTemplate]="formTemplate"
+  [editButtonRouterLink]="['/settings/user-preferences/edit']"
+  [editButtonQueryParams]="{tab: 'user-preferences'}"
+  [submitButtonDisabled]="(userShortcutComponent?.editableListComponent?.getCurrentRowOpen() ?? -1) >= 0"
+  (submitted)="submit()"
+></app-form>
+
+<ng-template #formTemplate>
+  <div class="w-100">
+    <app-form-section headerText="Receipt preferences">
+      <div class="mb-3">
+        <app-checkbox
+          class="mb-2"
+          label="Default to show large image previews?"
+          [inputFormControl]="form | formGet : 'showLargeImagePreviews'"
+          [readonly]="formConfig.mode | inputReadonly"
+        ></app-checkbox>
+      </div>
+    </app-form-section>
+    <app-form-section
+      *appFeature="'aiPoweredReceipts'"
+      headerText="Quick scan defaults"
+    >
+      <app-group-autocomplete
+        label="Default Group"
+        [inputFormControl]="form | formGet : 'quickScanDefaultGroupId'"
+        [readonly]="formConfig.mode | inputReadonly"
+      >
+      </app-group-autocomplete>
+      <app-user-autocomplete
+        label="Default Paid By"
+        [inputFormControl]="form | formGet : 'quickScanDefaultPaidById'"
+        [groupId]="form.get('quickScanDefaultGroupId')?.value"
+        [selectGroupMembersOnly]="true"
+        [readonly]="formConfig.mode | inputReadonly"
+      ></app-user-autocomplete>
+      <app-status-select
+        aria-label="Default Status"
+        [inputFormControl]="form | formGet : 'quickScanDefaultStatus'"
+        [readonly]="formConfig.mode | inputReadonly"
+        [addBlankOption]="true"
+      ></app-status-select>
+    </app-form-section>
+    <app-form-section
+      headerText="Shortcuts"
+      [headerButtonsTemplate]="shortcutHeaderButtons"
+    >
+      <app-user-shortcut
+        [parentForm]="form"
+        [formConfig]="formConfig"
+        [originalUserShortcuts]="originalUserShortcuts"
+        (shortcutDoneClicked)="shortcutDoneClicked()"
+        (shortcutCancelClicked)="shortcutCancelClicked()"
+        (formCommand)="handleFormCommand($event)"
+      ></app-user-shortcut>
+    </app-form-section>
+  </div>
+</ng-template>
+
+<ng-template #shortcutHeaderButtons>
+  @if (formConfig.mode === FormMode.edit) {
+    <app-add-button
+      tooltip="Add shortcut"
+      [disabled]="(userShortcutComponent?.editableListComponent?.getCurrentRowOpen() ?? -1) >= 0"
+      (clicked)="addNewShortcut()"
+    ></app-add-button>
+  }
+</ng-template>

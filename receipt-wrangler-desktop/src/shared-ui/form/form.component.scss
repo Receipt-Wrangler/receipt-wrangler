@@ -1,0 +1,62 @@
+@use "../../variables.scss" as variables;
+
+app-form {
+  .mat-mdc-card {
+    border-radius: variables.$border-radius-xl !important;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+    overflow: hidden;
+  }
+  
+  .form-section {
+    padding: variables.$spacing-lg;
+    
+    &:not(:last-child) {
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+  }
+  
+  .mat-mdc-form-field {
+    width: 100%;
+    margin-bottom: variables.$spacing-md;
+    
+    .mat-mdc-text-field-wrapper {
+      border-radius: variables.$border-radius-lg !important;
+      background-color: rgba(248, 250, 252, 0.5);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease-in-out;
+      
+      &:hover {
+        border-color: rgba(0, 0, 0, 0.1);
+        background-color: rgba(255, 255, 255, 0.8);
+      }
+    }
+    
+    &.mat-focused .mat-mdc-text-field-wrapper {
+      border-color: rgba(59, 130, 246, 0.5);
+      background-color: rgba(255, 255, 255, 1);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  }
+  
+  .mat-mdc-select .mat-mdc-select-trigger {
+    border-radius: variables.$border-radius-lg !important;
+    background-color: rgba(248, 250, 252, 0.5);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease-in-out;
+    
+    &:hover {
+      border-color: rgba(0, 0, 0, 0.1);
+      background-color: rgba(255, 255, 255, 0.8);
+    }
+  }
+  
+  .form-actions {
+    padding: variables.$spacing-lg;
+    background-color: rgba(248, 250, 252, 0.3);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    gap: variables.$spacing-md;
+    justify-content: flex-end;
+  }
+}

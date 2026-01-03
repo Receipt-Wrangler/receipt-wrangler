@@ -1,0 +1,17 @@
+<app-autocomlete
+  class="w-100"
+  label="Categories"
+  optionFilterKey="name"
+  creatableValueKey="name"
+  [inputFormControl]="inputFormControl"
+  [options]="categories"
+  [optionTemplate]="categoryOptionTemplate"
+  [optionChipTemplate]="categoryOptionTemplate"
+  [multiple]="true"
+  [creatable]="true"
+  [readonly]="readonly"
+></app-autocomlete>
+
+<ng-template #categoryOptionTemplate let-option="option"
+>{{ option.name }}
+</ng-template>

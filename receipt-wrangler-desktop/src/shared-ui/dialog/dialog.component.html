@@ -1,0 +1,11 @@
+<div class="p-4">
+  <div class="d-flex align-items-center justify-content-between">
+    <h2>{{ headerText }}</h2>
+    <ng-container *ngIf="actionsTemplate">
+      <ng-template [ngTemplateOutlet]="actionsTemplate"></ng-template>
+    </ng-container>
+  </div>
+  <mat-dialog-content>
+    <ng-content></ng-content>
+  </mat-dialog-content>
+</div>

@@ -1,0 +1,17 @@
+.widget {
+  min-width: 50%;
+  display: flex;
+  flex-direction: column;
+}
+
+.widget app-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+}

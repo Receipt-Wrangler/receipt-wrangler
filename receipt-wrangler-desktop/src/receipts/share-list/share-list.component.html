@@ -1,0 +1,178 @@
+<mat-accordion multi>
+  @if (isAdding) {
+    <app-card
+      cardStyle="w-100 mb-2"
+    >
+      <ng-container header>
+        Add Share
+      </ng-container>
+      <div content>
+        <app-user-autocomplete
+          label="Shared with"
+          [inputFormControl]="newItemFormGroup | formGet : 'chargedToUserId'"
+          [groupId]="(form | formGet : 'groupId').value"
+          [readonly]="mode | inputReadonly"
+        ></app-user-autocomplete>
+        <div class="row g-0 mt-2">
+          <app-input
+            label="Name"
+            class="col"
+            [inputFormControl]="newItemFormGroup | formGet : 'name'"
+          >
+          </app-input>
+          <app-input
+            label="Amount"
+            class="col"
+            type="text"
+            [isCurrency]="true"
+            [inputFormControl]="newItemFormGroup | formGet : 'amount'"
+            [readonly]="mode | inputReadonly"
+          >
+          </app-input>
+
+          @if (!selectedGroup?.groupReceiptSettings?.hideShareCategories) {
+            <app-category-autocomplete
+              [categories]="categories"
+              [inputFormControl]="newItemFormGroup | formGet : 'categories'"
+              [readonly]="mode | inputReadonly"
+            ></app-category-autocomplete>
+          }
+
+          @if (!selectedGroup?.groupReceiptSettings?.hideShareTags) {
+            <app-tag-autocomplete
+              [tags]="tags"
+              [inputFormControl]="newItemFormGroup | formGet : 'tags'"
+              [readonly]="mode | inputReadonly"
+            ></app-tag-autocomplete>
+          }
+          <app-dialog-footer
+            submitButtonTooltip="Done"
+            (submitClicked)="submitNewItemFormGroup()"
+            (cancelClicked)="exitAddMode()"
+          ></app-dialog-footer>
+        </div>
+      </div>
+    </app-card>
+  }
+
+  @if (userItemMap.size === 0 && mode === formMode.view) {
+    <div>No shares for this receipt</div>
+  }
+  <mat-expansion-panel
+    #userExpansionPanel
+    *ngFor="let key of userItemMap | mapKey; let i = index"
+    (closed)="checkLastInlineItem(key)"
+  >
+    @let user = key | user;
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        {{ user?.displayName }} ({{ (userItemMap | mapGet : key)?.length || 0 }})
+      </mat-panel-title>
+      <mat-panel-description>
+        <div class="d-flex justify-content-between align-items-center w-100">
+          @let userTotalData = userItemMap | userTotalWithPercentage : key : form;
+          <span>
+            Total amount owed: {{ userTotalData.total | customCurrency }} 
+            ({{ userTotalData.percentage }}% of total)
+          </span>
+          @if (originalReceipt?.groupId | groupRole : groupRole.Editor) {
+            <div>
+              <app-add-button
+                tooltip="Add Share"
+                [disabled]="mode === formMode.view"
+                (clicked)="addInlineItem(user?.id?.toString() ?? '', $event)"
+              ></app-add-button>
+              <app-button
+                matButtonType="iconButton"
+                icon="check"
+                tooltip="Resolve all user's items"
+                [disabled]="mode === formMode.view"
+                [ngClass]="{
+                'green-check': allUserItemsResolved(key)
+              }"
+                (clicked)="resolveAllItemsClicked($event, key)"
+              ></app-button>
+            </div>
+          }
+        </div>
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+    <ng-container
+      *ngFor="let itemData of userItemMap | mapGet : key; let i = index"
+    >
+      <app-card
+        cardStyle="mb-2"
+      >
+        <div content class="d-flex flex-column item-form-container">
+          @if (itemData.isLinkedItem && itemData.parentItem) {
+            <div class="d-flex align-items-center mb-2 p-2 bg-light border-start border-primary">
+              <mat-icon class="me-2 text-primary">link</mat-icon>
+              <small class="text-muted">
+                Split from: <strong>{{ itemData.parentItem.name }}</strong> 
+                ({{ itemData.parentItem.amount | customCurrency }})
+              </small>
+            </div>
+          }
+          <div class="d-flex justify-content-end">
+            @if (!(mode | inputReadonly)) {
+              <app-delete-button
+                tooltip="Remove Share"
+                [disabled]="
+              !(originalReceipt?.groupId | groupRole : groupRole.Editor)
+            "
+                (clicked)="removeItem(itemData)"
+              ></app-delete-button>
+            }
+          </div>
+          <div class="row g-0">
+            <app-input
+              class="col"
+              #nameField
+              label="Name"
+              [inputId]="'name-' + i"
+              [inputFormControl]="form | formGet : getFormControlPath(itemData, 'name')"
+              [readonly]="mode | inputReadonly"
+              (inputBlur)="addInlineItemOnBlur(key, i)"
+            >
+            </app-input>
+            <app-input
+              class="col"
+              label="Amount"
+              [isCurrency]="true"
+              [inputFormControl]="form | formGet : getFormControlPath(itemData, 'amount')"
+              [readonly]="mode | inputReadonly"
+              (inputBlur)="addInlineItemOnBlur(key, i)"
+            >
+            </app-input>
+            <app-select
+              class="col"
+              label="Status"
+              optionValueKey="value"
+              optionDisplayKey="displayValue"
+              [inputFormControl]="form | formGet : getFormControlPath(itemData, 'status')"
+              [readonly]="mode | inputReadonly"
+              [options]="itemStatusOptions"
+              (inputBlur)="addInlineItemOnBlur(key, i)"
+            >
+            </app-select>
+            @if (!selectedGroup?.groupReceiptSettings?.hideShareCategories) {
+              <app-category-autocomplete
+                [categories]="categories"
+                [inputFormControl]="form | formGet : getFormControlPath(itemData, 'categories')"
+                [readonly]="mode | inputReadonly"
+              ></app-category-autocomplete>
+            }
+
+            @if (!selectedGroup?.groupReceiptSettings?.hideShareTags) {
+              <app-tag-autocomplete
+                [tags]="tags"
+                [inputFormControl]="form | formGet : getFormControlPath(itemData, 'tags')"
+                [readonly]="mode | inputReadonly"
+              ></app-tag-autocomplete>
+            }
+          </div>
+        </div>
+      </app-card>
+    </ng-container>
+  </mat-expansion-panel>
+</mat-accordion>

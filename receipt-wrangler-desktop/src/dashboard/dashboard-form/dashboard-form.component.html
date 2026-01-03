@@ -1,0 +1,106 @@
+<app-dialog [headerText]="headerText">
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="d-flex flex-column">
+      <div>
+        <app-input
+          label="Dashboard Name"
+          [inputFormControl]="form | formGet : 'name'"
+        ></app-input>
+      </div>
+      <app-form-section
+        headerText="Widgets"
+        [indent]="false"
+        [headerButtonsTemplate]="widgetHeaderButtons"
+      >
+        <app-editable-list
+          trackByKey="value"
+          [listData]="widgets.controls"
+          [editTemplate]="widgetEdit"
+          [itemTitleTemplate]="widgetItemTitleTemplate"
+          [itemSubtitleTemplate]="widgetItemSubtitleTemplate"
+          (deleteButtonClicked)="removeWidget($event)"
+        ></app-editable-list>
+      </app-form-section>
+    </div>
+    <app-dialog-footer
+      [disableWhenProgressBarIsShown]="true"
+      (cancelClicked)="cancelButtonClicked()"
+    ></app-dialog-footer>
+  </form>
+</app-dialog>
+
+<ng-template #filterFooter></ng-template>
+
+<ng-template #widgetEdit let-i="i">
+  <app-card>
+    <ng-container header>
+      <div class="mb-2">
+        @if (isAddingWidget) {
+          Add Widget
+        } @else {
+          Edit Widget
+        }
+      </div>
+    </ng-container>
+    <ng-container content>
+      <app-input
+        label="Name"
+        [inputFormControl]="
+                      form | formGet : 'widgets.' + i + '.name'
+                    "
+      ></app-input>
+      <app-select
+        label="Type"
+        optionValueKey="value"
+        optionDisplayKey="displayValue"
+        [inputFormControl]="
+                      form | formGet : 'widgets.' + i + '.widgetType'
+                    "
+        [options]="widgetTypeOptions"
+      ></app-select>
+      <ng-container
+        [ngSwitch]="widgets.controls[i].value.widgetType"
+      >
+        <ng-container *ngSwitchCase="WidgetType.GroupSummary">
+        </ng-container>
+        <ng-container *ngSwitchCase="WidgetType.FilteredReceipts">
+          <app-receipt-filter
+            class="w-100"
+            [parentForm]="form"
+            [basePath]="'widgets.' + i + '.configuration.'"
+            [footerTemplate]="filterFooter"
+            [inDialog]="false"
+            (formCommand)="handleFormCommand($event)"
+          ></app-receipt-filter>
+        </ng-container>
+      </ng-container>
+      <app-dialog-footer
+        submitButtonTooltip="Done"
+        submitButtonType="button"
+        (submitClicked)="submitWidget(i)"
+        (cancelClicked)="cancelWidgetEdit()"
+      ></app-dialog-footer>
+    </ng-container>
+  </app-card>
+</ng-template>
+
+<ng-template
+  #widgetItemTitleTemplate
+  let-row="row"
+>
+  {{ row.value.name ?? "Group Summary" }}
+</ng-template>
+
+<ng-template
+  #widgetItemSubtitleTemplate
+  let-row="row">
+  {{ row.value.widgetType | widgetType }}
+</ng-template>
+
+<ng-template #widgetHeaderButtons>
+  <app-add-button
+    tooltip="Add Widget"
+    [disabled]="((widgetList?.rowOpenObservable | async) ?? -1) >= 0"
+    (clicked)="addWidget()"
+  ></app-add-button>
+</ng-template>

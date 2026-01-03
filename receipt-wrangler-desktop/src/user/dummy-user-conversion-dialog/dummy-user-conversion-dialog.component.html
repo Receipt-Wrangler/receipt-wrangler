@@ -1,0 +1,14 @@
+<app-dialog headerText="Convert {{ user.displayName }} to a normal user">
+  <form (ngSubmit)="submitButtonClicked()">
+    <app-input
+      label="Password"
+      type="password"
+      [inputFormControl]="form | formGet : 'password'"
+      [showVisibilityEye]="true"
+    ></app-input>
+  </form>
+  <app-dialog-footer
+    (submitClicked)="submitButtonClicked()"
+    (cancelClicked)="cancelButtonClicked()"
+  ></app-dialog-footer>
+</app-dialog>

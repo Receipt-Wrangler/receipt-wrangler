@@ -1,0 +1,17 @@
+@use "../../variables.scss" as variables;
+@use "sass:map";
+
+app-activity {
+  .succeeded {
+    color: map.get(variables.$success-palette, 800);
+  }
+
+  .failed {
+    color: map.get(variables.$warn-palette, 800);
+  }
+
+  .aligned-content {
+    display: inline-block;
+    vertical-align: middle;
+  }
+}

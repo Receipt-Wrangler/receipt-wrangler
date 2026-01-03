@@ -1,0 +1,86 @@
+<app-dialog headerText="Quick Scan" [actionsTemplate]="actionsTemplate">
+  <form [formGroup]="form">
+    <app-upload-image
+      [multiple]="true"
+      (fileLoaded)="fileLoaded($event)"
+    ></app-upload-image>
+    <div
+      *ngIf="images.length === 0"
+    >
+      <strong> Select images to upload</strong>
+    </div>
+    <carousel
+      [interval]="0"
+      [isAnimated]="true"
+      [showIndicators]="false"
+      [(activeSlide)]="currentlySelectedIndex"
+    >
+      <slide *ngFor="let preview of images; let i = index">
+        <div class="d-flex flex-column justify-content-center">
+          <img
+            class="mb-2"
+            alt="quick scan image"
+            [src]="preview.encodedImage || preview.url ?? ''"
+          >
+          <app-group-autocomplete
+            [inputFormControl]="form | formGet : 'groupIds.' + i"
+          ></app-group-autocomplete>
+          <app-user-autocomplete
+            class="w-100"
+            label="Default Paid By"
+            [inputFormControl]="form | formGet : 'paidByUserIds.' + i"
+            [groupId]="form.get('groupIds.' + i)?.value"
+            [selectGroupMembersOnly]="true"
+          ></app-user-autocomplete>
+          <app-status-select
+            label="Default Status"
+            [inputFormControl]="form | formGet : 'statuses.' + i"
+          ></app-status-select>
+        </div>
+      </slide>
+    </carousel>
+
+  </form>
+  <app-dialog-footer
+    submitButtonTooltip="Submit Scans"
+    [disableWhenProgressBarIsShown]="true"
+    (submitClicked)="submitButtonClicked()"
+    (cancelClicked)="cancelButtonClicked()"
+  ></app-dialog-footer>
+</app-dialog>
+
+<ng-template #actionsTemplate>
+  <div class="d-flex align-items-center">
+    <app-button
+      class="me-2"
+      matButtonType="iconButton"
+      tooltip="Upload Images"
+      icon="upload"
+      (clicked)="openImageUploadComponent()">
+    </app-button>
+    <app-button
+      *ngIf="images.length > 1"
+      matButtonType="iconButton"
+      icon="arrow_back"
+      tooltip="Navigate left"
+      color="accent"
+      (clicked)="navigateImages(-1)"
+    >
+    </app-button>
+    <app-button
+      *ngIf="images.length > 1"
+      matButtonType="iconButton"
+      icon="arrow_forward"
+      tooltip="Navigate right"
+      color="accent"
+      (clicked)="navigateImages(1)"
+    >
+    </app-button>
+    <app-delete-button
+      *ngIf="images.length > 0"
+      tooltip="Remove Current Image"
+      (clicked)="removeImage(currentlySelectedIndex)"
+    >
+    </app-delete-button>
+  </div>
+</ng-template>

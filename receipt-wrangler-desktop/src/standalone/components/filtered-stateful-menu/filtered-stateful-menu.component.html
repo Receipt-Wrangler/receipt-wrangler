@@ -1,0 +1,65 @@
+<app-button
+  [buttonClass]="buttonClass"
+  [color]="color"
+  [buttonText]="buttonText"
+  [type]="type"
+  [matButtonType]="matButtonType"
+  [icon]="icon"
+  [customIcon]="customIcon"
+  [tooltip]="tooltip"
+  [matBadgeContent]="matBadgeContent"
+  [matBadgeColor]="matBadgeColor"
+  [cdkMenuTriggerFor]="menu"
+  (cdkMenuOpened)="resetFilter()"
+>
+</app-button>
+
+<ng-template #menu>
+  <div class="mat-mdc-menu-panel" cdkMenu>
+    @if (headerText) {
+      <h5 class="justify-content-center m-3">
+        {{ headerText }}
+      </h5>
+    }
+    <app-input
+      [label]="filterLabel"
+      [inputFormControl]="filterFormControl"
+      (click)="$event.stopImmediatePropagation(); $event.stopPropagation();"
+    ></app-input>
+    <div class="d-flex flex-column">
+      @if (filteredItems.length === 0) {
+        <div
+          mat-menu-item
+          class="pe-none"
+        >
+          No items found
+        </div>
+      }
+      @for (item of filteredItems; track item.value) {
+        <button
+          mat-menu-item
+          class="w-100 p-2"
+          [disabled]="readonly"
+          (click)="onItemSelected(item, $event)"
+        >
+          <div class="d-flex align-items-center">
+            <mat-checkbox
+              class="checkbox"
+              [checked]="item.selected"
+              [disabled]="readonly"
+            ></mat-checkbox>
+            <div class="d-flex flex-column">
+              <strong>
+                {{ item.displayValue }}
+              </strong>
+              @if (item.subtitle) {
+                <small> {{ item.subtitle }}</small>
+              }
+            </div>
+          </div>
+        </button>
+      }
+    </div>
+  </div>
+</ng-template>
+

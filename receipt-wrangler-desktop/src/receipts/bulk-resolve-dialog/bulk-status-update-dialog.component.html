@@ -1,0 +1,20 @@
+<app-dialog headerText="Bulk Status Update">
+  <form [formGroup]="form">
+    <app-select
+      label="Status"
+      [inputFormControl]="form | formGet : 'status'"
+      [options]="receiptStatusOptions"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+    ></app-select>
+    <app-textarea
+      label="Comment"
+      placeholder="Paid via venmo..."
+      [inputFormControl]="form | formGet : 'comment'"
+    ></app-textarea>
+    <app-dialog-footer
+      (submitClicked)="submitButtonClicked()"
+      (cancelClicked)="cancelButtonClicked()"
+    ></app-dialog-footer>
+  </form>
+</app-dialog>

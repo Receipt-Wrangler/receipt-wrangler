@@ -1,0 +1,77 @@
+<div class="d-flex flex-column">
+  <app-table-header headerText="Users">
+    <div class="d-flex gap-2">
+      <app-button
+        *ngIf="hasSelectedUsers"
+        buttonText="Delete Selected"
+        color="warn"
+        icon="delete"
+        (clicked)="bulkDeleteUsers()"
+      ></app-button>
+      <app-button
+        buttonText="Create User"
+        (clicked)="openUserFormDialog()"
+      ></app-button>
+    </div>
+  </app-table-header>
+  <div class="table-container">
+    <app-table
+      [dataSource]="dataSource"
+      [columns]="columns"
+      [displayedColumns]="displayedColumns"
+      [selectionCheckboxes]="true"
+    ></app-table>
+  </div>
+</div>
+
+<ng-template #usernameCell let-element="element">
+  {{ element.username }}
+</ng-template>
+
+<ng-template #displayNameCell let-element="element">
+  {{ element.displayName }}
+</ng-template>
+
+<ng-template #userRoleCell let-element="element">
+  {{ element.userRole | status }}
+</ng-template>
+
+<ng-template #createdAtCell let-element="element">
+  {{ element.createdAt | date : "short" }}
+</ng-template>
+
+<ng-template #updatedAtCell let-element="element">
+  {{ element.updatedAt | date : "short" }}
+</ng-template>
+
+<ng-template #actionsCell let-element="element" let-index="index">
+  <div class="d-flex align-items-center">
+    <app-button
+      matButtonType="iconButton"
+      icon="edit"
+      tooltip="Edit User"
+      color="accent"
+      (clicked)="openUserFormDialog(element)"
+    ></app-button>
+    <app-button
+      matButtonType="iconButton"
+      icon="password"
+      tooltip="Set password"
+      color="accent"
+      (clicked)="openResetPasswordDialog(element)"
+    ></app-button>
+    <app-button
+      *ngIf="element.isDummyUser"
+      matButtonType="iconButton"
+      icon="person"
+      color="accent"
+      tooltip="Convert to normal user"
+      (clicked)="openDummyUserConversionDialog(element)"
+    >
+    </app-button>
+    <app-delete-button
+      *ngIf="(userId | async) !== element.id.toString()"
+      (clicked)="deleteUser(index)"
+    ></app-delete-button>
+  </div>
+</ng-template>

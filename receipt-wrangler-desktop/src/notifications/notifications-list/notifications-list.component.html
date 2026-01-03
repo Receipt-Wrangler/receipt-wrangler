@@ -1,0 +1,21 @@
+<div class="d-flex justify-items-end align-items-center">
+  <strong class="me-3">Notifications</strong>
+  <app-button
+    matButtonType="basic"
+    buttonText="Mark all as read"
+    (clicked)="deleteAllNotifications()"
+    [disabled]="notifications.length === 0"
+  ></app-button>
+</div>
+<hr />
+<div class="d-flex flex-column align-items-center">
+  <div class="w-100" *ngFor="let notification of notifications">
+    <app-notification
+      class="w-100"
+      [notification]="notification"
+      (notificationDeleted)="notificationDeleted($event)"
+    ></app-notification>
+    <hr />
+  </div>
+  <div *ngIf="notifications.length === 0">All caught up!</div>
+</div>

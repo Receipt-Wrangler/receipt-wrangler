@@ -1,0 +1,92 @@
+<div class="mb-2">
+  <app-checkbox
+    label="Enable Email Integration"
+    [inputFormControl]="form | formGet : 'emailIntegrationEnabled'"
+    [readonly]="formConfig.mode | inputReadonly"
+  ></app-checkbox>
+</div>
+<app-autocomlete
+  optionFilterKey="username"
+  optionDisplayKey="username"
+  label="Email to Read Receipts From"
+  optionValueKey="id"
+  [inputFormControl]="form | formGet:'systemEmailId'"
+  [options]="systemEmails"
+  [displayWith]="systemEmailDisplayWith.bind(this)"
+  [readonly]="formConfig.mode |  inputReadonly"
+></app-autocomlete>
+<app-user-autocomplete
+  class="mb-2"
+  label="Default Paid By"
+  [inputFormControl]="form | formGet : 'emailDefaultReceiptPaidById'"
+  [groupId]="group.id.toString()"
+  [selectGroupMembersOnly]="true"
+  [readonly]="formConfig.mode | inputReadonly"
+></app-user-autocomplete>
+
+<div class="mb-2">
+  <app-status-select
+    aria-label="Default Status"
+    [inputFormControl]="form | formGet : 'emailDefaultReceiptStatus'"
+    [addBlankOption]="true"
+    [readonly]="formConfig.mode | inputReadonly"
+  ></app-status-select>
+</div>
+
+<app-form-list
+  addButtonText="Add Subject Line Regex"
+  nothingToDisplayText="No regexes configured"
+  headerText="Subject Line Regexes"
+  [array]="subjectLineRegexes.controls"
+  [itemDisplayTemplate]="subjectLineRegexDisplayTemplate"
+  [itemEditTemplate]="subjectLineRegexEditingTemplate"
+  [disabled]="formConfig.mode | inputReadonly"
+  (addButtonClicked)="addSubjectLineRegex()"
+  (itemDoneButtonClicked)="itemDoneButtonClicked(0)"
+  (itemCancelButtonClicked)="subjectLineItemCancelButtonClicked()"
+  (itemDeleteButtonClicked)="subjectLineItemDeleteButtonClicked($event)"
+>
+</app-form-list>
+
+<app-form-list
+  addButtonText="Add Email to Whitelist"
+  nothingToDisplayText="No emails configured"
+  headerText="Email Whitelist"
+  [array]="emailWhiteList.controls"
+  [itemDisplayTemplate]="emailWhiteListDisplayTemplate"
+  [itemEditTemplate]="emailWhiteListEditingTemplate"
+  [disabled]="formConfig.mode | inputReadonly"
+  (addButtonClicked)="addEmailWhiteList()"
+  (itemDoneButtonClicked)="itemDoneButtonClicked(1)"
+  (itemCancelButtonClicked)="emailWhiteListItemCancelButtonClicked()"
+  (itemDeleteButtonClicked)="emailWhiteListItemDeleteButtonClicked($event)"
+>
+</app-form-list>
+
+<ng-template #subjectLineRegexDisplayTemplate let-index="index">
+  {{ subjectLineRegexes.controls[index].value.regex }}
+</ng-template>
+
+<ng-template #subjectLineRegexEditingTemplate let-index="index">
+  <div class="w-100">
+    <app-input
+      label="Regex"
+      [inputFormControl]="
+        form | formGet : 'subjectLineRegexes.' + index + '.regex'
+      "
+    ></app-input>
+  </div>
+</ng-template>
+
+<ng-template #emailWhiteListDisplayTemplate let-index="index">
+  {{ emailWhiteList.controls[index].value.email }}
+</ng-template>
+
+<ng-template #emailWhiteListEditingTemplate let-index="index">
+  <div class="w-100">
+    <app-input
+      label="Email"
+      [inputFormControl]="form | formGet : 'emailWhiteList.' + index + '.email'"
+    ></app-input>
+  </div>
+</ng-template>

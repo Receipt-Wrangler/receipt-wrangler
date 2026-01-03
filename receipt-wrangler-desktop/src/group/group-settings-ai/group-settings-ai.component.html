@@ -1,0 +1,20 @@
+<app-autocomlete
+  optionFilterKey="name"
+  optionDisplayKey="name"
+  label="Group specific prompt"
+  optionValueKey="id"
+  [inputFormControl]="form | formGet:'promptId'"
+  [options]="prompts"
+  [displayWith]="promptDisplayWith.bind(this)"
+  [readonly]="formConfig.mode |  inputReadonly"
+></app-autocomlete>
+<app-autocomlete
+  optionFilterKey="name"
+  optionDisplayKey="name"
+  label="Fallback group specific prompt"
+  optionValueKey="id"
+  [inputFormControl]="form | formGet:'fallbackPromptId'"
+  [options]="prompts"
+  [displayWith]="promptDisplayWith.bind(this)"
+  [readonly]="formConfig.mode |  inputReadonly"
+></app-autocomlete>

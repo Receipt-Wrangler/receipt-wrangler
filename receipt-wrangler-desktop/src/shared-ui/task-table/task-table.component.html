@@ -1,0 +1,52 @@
+<app-table
+  [dataSource]="dataSource"
+  [columns]="columns"
+  [displayedColumns]="displayedColumns"
+  [pagination]="true"
+  [length]="totalCount"
+  [page]="((tableService.page$ | async)  || 1 ) - 1"
+  [pageSize]="(tableService.pageSize$ | async) || 10"
+  [expandedRowTemplate]="expandedRowTemplate"
+  [rowExpandable]="rowExpandable"
+  (sorted)="sorted($event)"
+  (pageChange)="pageChanged($event)"
+></app-table>
+
+<ng-template let-element="element" #typeCell>
+  {{ element.type | systemTaskType }}
+</ng-template>
+
+<ng-template let-element="element" #startedAtCell>
+  {{ element.startedAt | date: "short" }}
+</ng-template>
+
+<ng-template let-element="element" #endedAtCell>
+  {{ element.endedAt | date: "short" }}
+</ng-template>
+
+<ng-template let-element="element" #statusCell>
+  <app-status-icon [taskStatus]="element.status"></app-status-icon>
+</ng-template>
+
+<ng-template let-element="element" #ranByUserIdCell>
+  {{ (element.ranByUserId | user)?.displayName ?? "System" }}
+</ng-template>
+
+<ng-template let-element="element" #resultDescriptionCell>
+  <ng-container
+    *ngIf="element.type === SystemTaskType.EmailRead"
+  >
+    Captured Metadata:
+  </ng-container>
+  <ng-container
+    *ngIf="element.type === SystemTaskType.EmailUpload || element.type === SystemTaskType.QuickScan"
+  >
+    Receipt data from AI:
+  </ng-container>
+  <app-pretty-json
+    [json]="element.resultDescription"
+    [verticalJson]="false"
+  ></app-pretty-json>
+</ng-template>
+
+
