@@ -16,11 +16,11 @@ RUN apt-get install -y default-jre
 # Start in app dir
 WORKDIR /app
 
-# Copy desktop source from local monolith
-COPY desktop/ /app/receipt-wrangler-desktop/
+# Copy repository into app directory
+COPY . /app
 
 # Setup Desktop
-WORKDIR /app/receipt-wrangler-desktop
+WORKDIR /app/desktop
 RUN npm install -g @angular/cli
 RUN npm install -g @openapitools/openapi-generator-cli
 
@@ -28,18 +28,17 @@ RUN npm install -g @openapitools/openapi-generator-cli
 RUN npm install
 RUN npm run build
 
-# Copy API source from local monolith
-WORKDIR /app
-COPY api/ /app/receipt-wrangler-api/
+# Set up docs
+WORKDIR /docs
 
 # Clone docs source
 RUN git clone https://github.com/Receipt-Wrangler/receipt-wrangler-doc.git
-WORKDIR /app/receipt-wrangler-doc
+WORKDIR /docs/receipt-wrangler-doc
 
 RUN npm install
 
 # Setup API
-WORKDIR /app/receipt-wrangler-api
+WORKDIR /app/api
 
 # Add local bin to path for python dependencies
 ENV PATH="~/.local/bin:${PATH}"
@@ -48,7 +47,7 @@ ENV PATH="~/.local/bin:${PATH}"
 ENV ENV="dev"
 
 # Set base path
-ENV BASE_PATH="/app/receipt-wrangler-api"
+ENV BASE_PATH="/app/api"
 
 # Install tesseract dependencies
 RUN bash set-up-dependencies.sh
@@ -61,20 +60,20 @@ RUN go build
 
 # Set up data volume
 RUN mkdir data
-VOLUME /app/receipt-wrangler-api/data
+VOLUME /app/api/data
 
 # Set up temp directory
 RUN mkdir temp
 
 # Set up sqlite volume
-VOLUME /app/receipt-wrangler-api/sqlite
+VOLUME /app/api/sqlite
 
 # Add logs volume
 RUN mkdir logs
-VOLUME /app/receipt-wrangler-api/logs
+VOLUME /app/api/logs
 
 # Set pythonpath
-ENV PYTHONPATH="/app/receipt-wrangler-api/wranglervenv/lib/python3.11/site-packages"
+ENV PYTHONPATH="/app/api/wranglervenv/lib/python3.11/site-packages"
 
 # Expose http port
 EXPOSE 80
@@ -83,7 +82,6 @@ EXPOSE 80
 RUN apt-get update
 RUN apt-get install -y curl openssh-server
 
-RUN mkdir /var/run/sshd
 # Set root password for SSH access (change 'your_password' to something secure)
 RUN echo 'root:development' | chpasswd
 # Configure SSH to allow root login
