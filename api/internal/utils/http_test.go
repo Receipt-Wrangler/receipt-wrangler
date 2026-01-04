@@ -68,31 +68,121 @@ func TestWriteCustomErrorResponseWritesResponse(t *testing.T) {
 	}
 }
 
-// TODO: move test
-// func TestWriteValidatorErrorResponseWritesResponse(t *testing.T) {
-// 	var errBytes = make([]byte, 100)
-// 	var bodyVErr structs.ValidatorError
-// 	vErr := structs.ValidatorError{
-// 		Errors: make(map[string]string),
-// 	}
-// 	nameErr := "error"
-// 	amountErr := "amount cannot be empty"
+func TestMarshalResponseDataShouldMarshalStruct(t *testing.T) {
+	data := struct {
+		Name  string `json:"name"`
+		Value int    `json:"value"`
+	}{
+		Name:  "test",
+		Value: 123,
+	}
 
-// 	vErr.Errors["name"] = nameErr
-// 	vErr.Errors["amount"] = amountErr
+	result, err := MarshalResponseData(data)
+	if err != nil {
+		PrintTestError(t, err, nil)
+	}
 
-// 	w := httptest.NewRecorder()
+	expected := `{"name":"test","value":123}`
+	if string(result) != expected {
+		PrintTestError(t, string(result), expected)
+	}
+}
 
-// 	WriteValidatorErrorResponse(w, vErr, 400)
+func TestMarshalResponseDataShouldMarshalMap(t *testing.T) {
+	data := map[string]interface{}{
+		"key": "value",
+		"num": 42,
+	}
 
-// 	if w.Result().StatusCode != 400 {
-// 		PrintTestError(t, w.Result().StatusCode, 400)
-// 	}
+	result, err := MarshalResponseData(data)
+	if err != nil {
+		PrintTestError(t, err, nil)
+	}
 
-// 	w.Body.Read(errBytes)
-// 	json.Unmarshal(errBytes[0:50], &bodyVErr)
+	// Unmarshal and verify
+	var resultMap map[string]interface{}
+	json.Unmarshal(result, &resultMap)
 
-// 	if reflect.DeepEqual(vErr, bodyVErr) {
-// 		PrintTestError(t, vErr, bodyVErr)
-// 	}
-// }
+	if resultMap["key"] != "value" {
+		PrintTestError(t, resultMap["key"], "value")
+	}
+}
+
+func TestMarshalResponseDataShouldMarshalSlice(t *testing.T) {
+	data := []string{"a", "b", "c"}
+
+	result, err := MarshalResponseData(data)
+	if err != nil {
+		PrintTestError(t, err, nil)
+	}
+
+	expected := `["a","b","c"]`
+	if string(result) != expected {
+		PrintTestError(t, string(result), expected)
+	}
+}
+
+func TestMarshalResponseDataShouldReturnErrorForInvalidData(t *testing.T) {
+	// Channels cannot be marshaled to JSON
+	data := make(chan int)
+
+	_, err := MarshalResponseData(data)
+	if err == nil {
+		t.Errorf("Expected error for unmarshallable data, got nil")
+	}
+}
+
+func TestSetJSONResponseHeadersShouldSetContentType(t *testing.T) {
+	w := httptest.NewRecorder()
+
+	SetJSONResponseHeaders(w)
+
+	contentType := w.Header().Get("Content-Type")
+	expected := "application/json"
+
+	if contentType != expected {
+		PrintTestError(t, contentType, expected)
+	}
+}
+
+func TestIsMobileAppShouldReturnTrueForDartUserAgent(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/api", nil)
+	r.Header.Set("User-Agent", "Dart/2.18 (dart:io)")
+
+	result := IsMobileApp(r)
+
+	if !result {
+		t.Errorf("Expected IsMobileApp to return true for dart:io user agent")
+	}
+}
+
+func TestIsMobileAppShouldReturnFalseForBrowserUserAgent(t *testing.T) {
+	testCases := []string{
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+		"Chrome/91.0.4472.124 Safari/537.36",
+		"",
+	}
+
+	for _, userAgent := range testCases {
+		r := httptest.NewRequest(http.MethodGet, "/api", nil)
+		r.Header.Set("User-Agent", userAgent)
+
+		result := IsMobileApp(r)
+
+		if result {
+			t.Errorf("Expected IsMobileApp to return false for user agent %q", userAgent)
+		}
+	}
+}
+
+func TestIsMobileAppShouldReturnTrueForFlutterUserAgent(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/api", nil)
+	r.Header.Set("User-Agent", "Flutter/3.0 (dart:io) package:http/http.dart")
+
+	result := IsMobileApp(r)
+
+	if !result {
+		t.Errorf("Expected IsMobileApp to return true for Flutter/dart:io user agent")
+	}
+}

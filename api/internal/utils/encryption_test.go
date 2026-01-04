@@ -139,3 +139,48 @@ func TestShouldEncodeValueToBase64(t *testing.T) {
 		PrintTestError(t, encodedValue, expected)
 	}
 }
+
+func TestDecryptB64EncodedDataShouldReturnErrorForInvalidBase64(t *testing.T) {
+	key := "superSecureKey"
+	invalidBase64 := "not-valid-base64!!!"
+
+	_, err := DecryptB64EncodedData(key, invalidBase64)
+	if err == nil {
+		t.Errorf("Expected error for invalid base64 input, got nil")
+	}
+}
+
+func TestDecryptB64EncodedDataShouldReturnErrorForInvalidCipherText(t *testing.T) {
+	key := "superSecureKey"
+	// Valid base64 but invalid cipher text
+	validBase64InvalidCipher := Base64Encode([]byte("this is not encrypted data but is longer than nonce"))
+
+	_, err := DecryptB64EncodedData(key, validBase64InvalidCipher)
+	if err == nil {
+		t.Errorf("Expected error for invalid cipher text, got nil")
+	}
+}
+
+func TestDecryptDataShouldReturnErrorForCorruptCipherText(t *testing.T) {
+	key := "superSecureKey"
+	// Create corrupt cipher text that's long enough to have nonce + ciphertext
+	corruptCipher := make([]byte, 50)
+	for i := range corruptCipher {
+		corruptCipher[i] = byte(i)
+	}
+
+	_, err := DecryptData(key, corruptCipher)
+	if err == nil {
+		t.Errorf("Expected error for corrupt cipher text, got nil")
+	}
+}
+
+func TestEncryptAndEncodeToBase64ShouldReturnErrorForEmptyKey(t *testing.T) {
+	key := ""
+	value := "someValue"
+
+	_, err := EncryptAndEncodeToBase64(key, value)
+	if err == nil {
+		t.Errorf("Expected error for empty key, got nil")
+	}
+}
