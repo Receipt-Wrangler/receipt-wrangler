@@ -3,7 +3,7 @@ name: CI - Build and Test
 
 on:
   push:
-    branches: [tech/monolith]
+    branches: [main]
     paths:
       - 'api/**'
       - 'desktop/**'
