@@ -1,0 +1,38 @@
+<mat-list>
+  @for (row of listData; let i = $index; track row?.[trackByKey]) {
+    @if ((rowOpenObservable | async) === i && editTemplate) {
+      <ng-template
+        [ngTemplateOutlet]="editTemplate"
+        [ngTemplateOutletContext]="{ i: i }"
+      ></ng-template>
+    } @else {
+      <mat-list-item>
+        <ng-container
+          matListItemTitle
+          [ngTemplateOutlet]="itemTitleTemplate"
+          [ngTemplateOutletContext]="{ row: row }"
+        ></ng-container>
+        <ng-container
+          matListItemLine
+          [ngTemplateOutlet]="itemSubtitleTemplate"
+          [ngTemplateOutletContext]="{ row: row }"
+        >
+        </ng-container>
+        @if (!readonly) {
+          <div matListItemMeta>
+            <app-edit-button
+              color="accent"
+              [disabled]="(rowOpenObservable | async) !== undefined"
+              (clicked)="handleEditButtonClicked(i)"
+            ></app-edit-button>
+            <app-delete-button
+              [disabled]="(rowOpenObservable | async) !== undefined"
+              (clicked)="handleDeleteButtonClicked(i)"
+            >
+            </app-delete-button>
+          </div>
+        }
+      </mat-list-item>
+    }
+  }
+</mat-list>

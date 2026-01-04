@@ -1,0 +1,15 @@
+<app-autocomlete
+  class="w-100"
+  label="Group"
+  optionFilterKey="name"
+  optionValueKey="id"
+  [inputFormControl]="inputFormControl"
+  [options]="(groups | async) ?? []"
+  [optionTemplate]="groupOptionTemplate"
+  [readonly]="readonly"
+  [displayWith]="groupDisplayWith.bind(this)"
+></app-autocomlete>
+
+<ng-template #groupOptionTemplate let-option="option"
+  >{{ option.name }}
+</ng-template>

@@ -1,0 +1,172 @@
+<app-table-header [headerText]="headerText">
+  <div class="d-flex align-items-center">
+    <app-button
+      *ngIf="canEdit"
+      class="me-2"
+      icon="add"
+      matButtonType="iconButton"
+      tooltip="Add Receipt"
+      [buttonRouterLink]="['/receipts/add']"
+    ></app-button>
+    <app-quick-scan-button
+      *ngIf="canEdit"
+      class="me-2"
+      (afterClosed)="getFilteredReceipts()"
+    >
+    </app-quick-scan-button>
+    @if (dataSource.data.length > 0) {
+      <app-export-button
+        [groupId]="groupId"
+        [filter]="(filter | async) ?? undefined"
+      ></app-export-button>
+    }
+    <app-button
+      class="me-2 filter-button"
+      icon="filter_alt"
+      matButtonType="iconButton"
+      tooltip="Filter Receipts"
+      color="accent"
+      matBadgeColor="accent"
+      [matBadgeContent]="numFiltersApplied | async"
+      (clicked)="filterButtonClicked()"
+    ></app-button>
+    <app-button
+      class="me-2"
+      icon="view_column"
+      matButtonType="iconButton"
+      tooltip="Configure Columns"
+      color="accent"
+      (clicked)="configureColumnsButtonClicked()"
+    ></app-button>
+    <app-button
+      *ngIf="(numFiltersApplied | async) ?? 0 > 0"
+      @fadeInOut
+      class="me-2"
+      icon="restart_alt"
+      matButtonType="iconButton"
+      tooltip="Reset filter"
+      color="accent"
+      (clicked)="resetFilterButtonClicked()"
+    ></app-button>
+    <ng-container *ngIf="canEdit && group?.groupSettings?.emailIntegrationEnabled">
+      <app-button
+        *appFeature="'aiPoweredReceipts'"
+        class="me-2"
+        icon="mail"
+        matButtonType="iconButton"
+        tooltip="Poll email(s)"
+        color="accent"
+        matBadgeColor="accent"
+        (clicked)="pollEmail()"
+      ></app-button>
+    </ng-container>
+
+    @if (selectedReceiptIds.length > 1) {
+      <app-queue-start-menu
+        buttonText="Start Queue"
+        color="accent"
+        [receiptIds]="selectedReceiptIds"
+      ></app-queue-start-menu>
+    }
+
+    @if (selectedReceiptIds.length > 0) {
+      <app-button
+        matButtonType="iconButton"
+        icon="more_vert"
+        color="accent"
+        [matMenuTriggerFor]="menu"
+      ></app-button>
+
+      <mat-menu #menu="matMenu">
+        <button mat-menu-item (click)="exportSelectedReceipts()">Export Selected Receipts</button>
+
+        @if (canEdit) {
+          <button mat-menu-item (click)="showStatusUpdateDialog()">Bulk Status Update</button>
+        }
+      </mat-menu>
+    }
+  </div>
+</app-table-header>
+<app-summary-card
+  *ngIf="selectedReceiptIds.length"
+  @fadeInOut
+  headerText="Selected Receipt summary"
+  [receiptIds]="selectedReceiptIds"
+  [groupId]="(selectedGroupId | async) ?? ''"
+></app-summary-card>
+<div class="table-container">
+  <app-table
+    [columns]="columns"
+    [displayedColumns]="displayedColumns"
+    [dataSource]="dataSource"
+    [pagination]="true"
+    [length]="totalCount"
+    [selectionCheckboxes]="true"
+    [page]="$any(page | async) - 1"
+    [pageSize]="(pageSize | async) ?? 50"
+    (sorted)="sort($event)"
+    (pageChange)="updatePageData($event)"
+  ></app-table>
+</div>
+
+<ng-template #createdAtCell let-element="element"
+>{{ element.createdAt | date }}
+</ng-template>
+
+<ng-template #dateCell let-element="element"
+>{{ element.date | date }}
+</ng-template>
+
+<ng-template #nameCell let-element="element">
+  <a [routerLink]="['/receipts/' + element.id + '/view']">
+    {{ element.name }}
+  </a>
+</ng-template>
+
+<ng-template #paidByCell let-element="element">
+  {{ (element.paidByUserId | user)?.displayName }}
+</ng-template>
+
+<ng-template #amountCell let-element="element">
+  {{ element.amount | customCurrency }}
+</ng-template>
+
+<ng-template #categoryCell let-element="element">
+  {{ element?.categories | name }}
+</ng-template>
+
+<ng-template #tagCell let-element="element">
+  {{ element.tags | name }}
+</ng-template>
+
+<ng-template #statusCell let-element="element">
+  <app-status-chip [status]="element.status"></app-status-chip>
+</ng-template>
+
+<ng-template #resolvedDateCell let-element="element">
+  {{ element.resolvedDate | date : "medium" }}
+</ng-template>
+
+<ng-template #actionsCell let-element="element" let-index="index">
+  <div class="d-flex w-100">
+    <app-edit-button
+      color="accent"
+      [buttonRouterLink]="['/receipts/' + element.id + '/edit']"
+    ></app-edit-button>
+    <app-button
+      matButtonType="iconButton"
+      icon="file_copy"
+      tooltip="Duplicate"
+      color="accent"
+      (clicked)="duplicateReceipt(element.id)"
+    ></app-button>
+    <app-button
+      matButtonType="iconButton"
+      icon="delete"
+      buttonText="hello"
+      color="warn"
+      tooltip="Delete"
+      (clicked)="deleteReceipt(element)"
+    ></app-button>
+  </div>
+</ng-template>

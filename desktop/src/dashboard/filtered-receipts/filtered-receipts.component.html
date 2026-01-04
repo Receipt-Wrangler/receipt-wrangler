@@ -1,0 +1,67 @@
+<app-card cardStyle="dashboard-card">
+  <ng-container header>
+    <div class="d-flex justify-content-between align-items-center">
+      <h3>
+        {{ widget.name }}
+      </h3>
+      @if (receipts.length > 1) {
+        <div>
+          <app-queue-start-menu
+            [receipts]="receipts"
+            matButtonType="iconButton"
+            buttonIcon="queue_play_next"
+            color="accent"
+          >
+          </app-queue-start-menu>
+          <app-export-button
+            [groupId]="groupId?.toString()"
+            [filter]="$any(widget.configuration)"
+          ></app-export-button>
+        </div>
+      }
+    </div>
+  </ng-container>
+  <ng-container content>
+    <app-dashboard-list
+      noItemFoundText="No receipts found"
+      [items]="receipts"
+      [itemSize]="80"
+      [itemAvatarTemplate]="itemAvatarTemplate"
+      [itemHeaderTemplate]="itemHeaderTemplate"
+      [itemLineTemplate]="itemLineTemplate"
+      [itemLineTemplate2]="itemLineTemplate2"
+      [itemMetaTemplate]="itemMetaTemplate"
+      [buildRouterLinkString]="buildItemRouterLink"
+      (endOfListReached)="endOfListReached()"
+    ></app-dashboard-list>
+  </ng-container>
+</app-card>
+
+<ng-template #itemAvatarTemplate let-item=item>
+  <app-date-block
+    [date]="item.createdAt"
+  ></app-date-block>
+</ng-template>
+
+<ng-template #itemHeaderTemplate let-item=item>
+  <strong>
+    {{ item.name }}
+  </strong>
+</ng-template>
+
+<ng-template #itemMetaTemplate let-item=item>
+  <app-status-chip [status]="item.status"></app-status-chip>
+</ng-template>
+
+
+<ng-template #itemLineTemplate let-item=item>
+  <span class="amount-info">{{ item.amount | customCurrency }}</span>
+  <span class="paid-by-info"> paid by <span
+    class="user-name">{{ (item.paidByUserId | user)?.displayName ?? 'Unknown' }}</span></span>
+</ng-template>
+
+<ng-template #itemLineTemplate2 let-item=item>
+  {{ item.createdAt | date }}
+</ng-template>
+
+

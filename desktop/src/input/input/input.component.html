@@ -1,0 +1,43 @@
+<div class="d-flex">
+  <mat-form-field [appearance]="appearance" class="w-100">
+    <mat-label>{{ label }}</mat-label>
+    <div class="d-flex align-items-center">
+      <input
+        #nativeInput
+        matInput
+        [id]="inputId"
+        [type]="type"
+        [readonly]="readonly"
+        [formControl]="inputFormControl"
+        [prefix]="maskPrefix"
+        [suffix]="maskSuffix"
+        [mask]="mask"
+        [decimalMarker]="decimalMarker"
+        [thousandSeparator]="thousandSeparator"
+        (blur)="inputBlur.emit($event)"
+      />
+    </div>
+    <mat-error *ngFor="let err of formControlErrors | async">{{
+        err.message
+      }}
+    </mat-error>
+    <div matSuffix *ngIf="showVisibilityEye">
+      <button
+        *ngIf="showVisibilityEye"
+        class="visibility-eye-button"
+        mat-icon-button
+        type="button"
+        [matTooltip]="type === 'password' ? 'Show ' + label : 'Hide ' + label"
+        (click)="toggleVisibility()"
+      >
+        <mat-icon *ngIf="type === 'password'">visibility</mat-icon>
+        <mat-icon *ngIf="type !== 'password'">visibility_off</mat-icon>
+      </button>
+    </div>
+    @if (hint) {
+      <mat-hint>
+        {{ hint }}
+      </mat-hint>
+    }
+  </mat-form-field>
+</div>

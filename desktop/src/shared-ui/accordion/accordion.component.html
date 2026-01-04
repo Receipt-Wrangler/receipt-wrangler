@@ -1,0 +1,32 @@
+<mat-accordion
+  displayMode="flat"
+  [multi]="true"
+>
+  <mat-expansion-panel
+    *ngFor="let panel of panels; let i = index;"
+    hideToggle
+  >
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        <strong>{{ panel.title }} </strong>
+      </mat-panel-title>
+      <mat-panel-description>
+        <ng-container *ngIf="panel.description">
+          {{ panel.description }}
+        </ng-container>
+        <ng-template
+          *ngIf="panel.descriptionTemplate"
+          [ngTemplateOutlet]="$any(panel.descriptionTemplate)"
+          [ngTemplateOutletContext]="{ index: i }"
+        >
+        </ng-template>
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+    <ng-template
+      [ngTemplateOutlet]="panel.content"
+      [ngTemplateOutletContext]="{ index: i }"
+    >
+
+    </ng-template>
+  </mat-expansion-panel>
+</mat-accordion>

@@ -4,102 +4,189 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Receipt Wrangler API is a Go-based backend service for a receipt management and splitting application. It provides OCR-powered receipt scanning, AI-assisted data extraction, email integration, and multi-user support with group management capabilities.
+Receipt Wrangler is a full-stack receipt management and splitting application with OCR-powered scanning, AI-assisted data extraction, and multi-user group management. This is a **monorepo** containing three main components:
 
-## Development Commands
+- **api/** - Go backend service (port 8081)
+- **desktop/** - Angular 19 web interface (port 4200 dev, port 80 production)
+- **mobile/** - Flutter cross-platform mobile app
+- **docker/** - Monolith Docker build configuration
 
-### Building and Running
-- `go build` - Build the application
-- `go run main.go` - Run the application directly
-- `./set-up-dependencies.sh` - Install system dependencies (tesseract, ImageMagick, Python deps)
+Each component has its own CLAUDE.md with detailed component-specific guidance. This file covers monorepo-level architecture and workflows.
 
-### Testing
-- `go test -v ./...` - Run all Go tests with verbose output
-- `go test -coverprofile=coverage.out -covermode=atomic -v ./...` - Run tests with coverage
-- `python3 -m unittest discover -s ./imap-client` - Run Python IMAP client tests
+## Monorepo Architecture
 
-### API Client Generation
-- `./generate-client.sh desktop <output-dir>` - Generate TypeScript Angular client
-- `./generate-client.sh mobile <output-dir>` - Generate Dart Dio client
+### Component Communication
+- **API Contract**: OpenAPI 3.1 specification in `api/swagger.yml` defines the API contract
+- **Client Generation**: API clients are auto-generated from swagger.yml using `api/generate-client.sh`
+  - Desktop: TypeScript Angular client → `desktop/src/open-api/`
+  - Mobile: Dart Dio client → `mobile/api/`
+  - MCP: TypeScript client for MCP integration
+- **Development Flow**: Changes to API → update swagger.yml → regenerate clients → update frontend
 
-## Architecture Overview
+### Technology Stack
+- **Backend**: Go 1.24 with Chi router, GORM ORM, Asynq background jobs
+- **Frontend**: Angular 19 with NGXS state management, Material + Bootstrap UI
+- **Mobile**: Flutter with Provider state management, go_router navigation
+- **Infrastructure**: Docker, nginx, PostgreSQL/MySQL/SQLite
 
-### Core Structure
-- **main.go** - Application entry point, initializes logging, config, database, and starts HTTP server
-- **internal/** - Core application code organized by domain
-- **imap-client/** - Python-based email processing client
+## Docker Deployment
 
-### Key Directories
-- **internal/handlers/** - HTTP request handlers for each API endpoint
-- **internal/repositories/** - Database access layer using GORM
-- **internal/services/** - Business logic layer
-- **internal/models/** - Database models and domain objects
-- **internal/commands/** - Command objects for API requests/responses
-- **internal/routers/** - Route definitions and middleware setup
-- **internal/wranglerasynq/** - Background job processing using Asynq
-- **internal/ai/** - AI client implementations (OpenAI, Gemini, Ollama)
+### Production Build (Monolith)
+The `docker/Dockerfile` builds a single container with both API and web interface:
+- Stage 1: Build Angular desktop app
+- Stage 2: Build Go API and install dependencies (Tesseract, ImageMagick, Python)
+- Final: nginx serves frontend, proxies `/api` to Go backend on port 80
 
-### Database
-- Uses GORM ORM with support for SQLite, MySQL, and PostgreSQL
-- Migrations are handled automatically on startup via `repositories.MakeMigrations()`
-- Test databases are set up in `repositories/main_test.go`
+### Development Build
+The `docker/dev/Dockerfile` includes:
+- All production components plus development tools
+- SSH access for debugging (port 22, password: "development")
+- Documentation site build from receipt-wrangler-doc repo
+- Java runtime for OpenAPI generator
+
+### Build Commands
+```bash
+# Production monolith
+docker build -f docker/Dockerfile -t receipt-wrangler .
+
+# Development container
+docker build -f docker/dev/Dockerfile -t receipt-wrangler-dev .
+```
+
+## API Client Regeneration
+
+When the API swagger.yml changes, regenerate clients:
+
+```bash
+# From api/ directory
+./generate-client.sh desktop ../desktop/src/open-api
+./generate-client.sh mobile ../mobile/api
+./generate-client.sh mcp <output-path>
+```
+
+**IMPORTANT**: Never manually edit generated client code in `desktop/src/open-api/` or `mobile/api/`. Changes will be overwritten.
+
+## Component Development
+
+### Backend Development (api/)
+```bash
+cd api
+go run main.go                    # Run API server
+go test -v ./...                  # Run tests
+./set-up-dependencies.sh          # Install system deps (first time)
+```
+
+See `api/CLAUDE.md` for detailed backend architecture and testing requirements.
+
+### Frontend Development (desktop/)
+```bash
+cd desktop
+npm start                         # Dev server with API proxy (localhost:4200)
+npm test                          # Run tests with coverage
+npm run build                     # Production build
+```
+
+See `desktop/CLAUDE.md` for Angular architecture, NGXS state management, and component structure.
+
+### Mobile Development (mobile/)
+```bash
+cd mobile
+flutter run                       # Run on device/emulator
+flutter test                      # Run tests
+flutter build apk                 # Build Android APK
+flutter build ios                 # Build iOS app
+```
+
+See `mobile/CLAUDE.md` for Flutter architecture, Provider state management, and navigation.
+
+## Critical Cross-Component Considerations
+
+### API Changes Workflow
+1. Modify backend code in `api/internal/`
+2. Update `api/swagger.yml` to reflect API changes
+3. Regenerate clients: `cd api && ./generate-client.sh desktop ../desktop/src/open-api`
+4. Update frontend code to use new client methods
+5. Test integration between components
+
+### Authentication Flow
+- JWT-based authentication with refresh tokens
+- Backend issues tokens in `api/internal/handlers/auth.go`
+- Desktop stores tokens via NGXS persistent storage
+- Mobile uses `flutter_secure_storage` for secure token storage
+- All API endpoints except `/api/auth/login` and `/api/auth/signup` require authentication
+
+### State Management Patterns
+- **Backend**: Service layer handles business logic, repositories handle data access
+- **Desktop**: NGXS store with actions/selectors, persistent storage for auth/preferences
+- **Mobile**: Provider pattern with ChangeNotifier models, models own their state
 
 ### Background Processing
-- Uses Hibiken's Asynq library for background job processing
-- Email processing, OCR, and cleanup tasks run as background jobs
-- Queue configurations defined in `internal/wranglerasynq/`
+- Backend uses Asynq for async jobs (OCR processing, email polling, cleanup)
+- Long-running operations (OCR, AI extraction) run as background jobs
+- Frontend polls for completion or uses WebSocket-like patterns where implemented
 
-### AI Integration
-- Supports multiple AI providers: OpenAI, Google Gemini, and Ollama
-- AI clients implement a common interface defined in `internal/ai/base_client.go`
-- Used for receipt data extraction and processing
+## Version Management
 
-### Configuration
-- Configuration loaded from JSON files in `config/` directory
-- Environment variables override config file settings
-- Sample configuration in `config/config.sample.json`
+Each component has version tagging scripts:
+- `api/tag-version.sh` - Tag API version
+- `desktop/tag-version.sh` - Tag desktop version
+- `mobile/tag-version.sh` - Tag mobile version
 
-## Testing Patterns
+Version is embedded in Docker builds via `VERSION` and `BUILD_DATE` build args.
 
-Each package typically has:
-- `main_test.go` - Test setup and teardown
-- `*_test.go` - Unit tests for specific functionality
-- Test utilities in `internal/utils/testing.go` and `internal/repositories/testing.go`
+## Data Persistence
 
-Tests use dependency injection patterns and mock implementations for external services.
+### Development
+- API defaults to SQLite in `api/sqlite/`
+- Desktop proxy config in `desktop/proxy.conf.json` routes to localhost:8081
+- Mobile configures API base URL in app settings
 
-## Testing Guidelines for Claude
+### Production (Docker)
+- Volumes for persistent data:
+  - `/app/receipt-wrangler-api/data` - Receipt images and uploads
+  - `/app/receipt-wrangler-api/sqlite` - SQLite database
+  - `/app/receipt-wrangler-api/logs` - Application logs
+- nginx serves frontend from `/usr/share/nginx/html`
+- API runs on same container, proxied via nginx
 
-When working with tests in this codebase, follow these critical requirements:
+## Common Pitfalls
 
-### Test Execution Requirements
-- **ALWAYS run tests after writing them** - When asked to write tests, you MUST run them to verify they pass
-- **Report coverage** - Always report the coverage of files impacted by the tests using `go test -coverprofile=coverage.out -covermode=atomic`
-- **Verify all tests pass** - Never consider test writing complete until all tests are verified to pass
+1. **Forgot to regenerate clients**: After API changes, clients are out of sync → regenerate!
+2. **Editing generated code**: Changes to `desktop/src/open-api/` or `mobile/api/` will be lost
+3. **Missing system dependencies**: API requires Tesseract, ImageMagick → run `api/set-up-dependencies.sh`
+4. **Test database cleanup**: Failed Go tests leave `app.db` in test dirs → remove before rerunning
+5. **Port conflicts**: API (8081), desktop dev (4200), docker prod (80) must be available
+6. **CORS in development**: Desktop proxy handles CORS, but mobile needs proper API base URL
 
-### Test Database Cleanup
-- **Failed tests may leave behind `app.db` files** in test directories (e.g., `services/app.db`, `handlers/app.db`)
-- **These MUST be removed** before rerunning tests to avoid conflicts
-- **CRITICAL**: Only remove `app.db` files from test directories, NEVER delete anything from the `sqlite/` directory
-- Example cleanup locations: `internal/services/app.db`, `internal/handlers/app.db`, etc.
+## Project Structure Summary
 
-### Test Workflow
-1. Write tests following existing patterns in the codebase
-2. Run tests to verify they pass: `go test -v ./...`
-3. Generate and report coverage: `go test -coverprofile=coverage.out -covermode=atomic -v ./...`
-4. If tests fail, check for and remove any `app.db` files in test directories
-5. Re-run tests until all pass
-6. Report final coverage results for impacted files
-
-## OCR and Image Processing
-
-- Tesseract OCR integration via `otiai10/gosseract`
-- ImageMagick integration for image processing and format conversion
-- Supports HEIC format conversion to standard image formats
-- Python dependencies for additional image processing capabilities
-
-## API Documentation
-
-- OpenAPI 3.1 specification in `swagger.yml`
-- API serves on port 8081 by default
-- All endpoints require JWT authentication except login/signup
+```
+receipt-wrangler-api/          # Monorepo root
+├── api/                       # Go backend
+│   ├── internal/              # Core application code
+│   │   ├── handlers/          # HTTP handlers
+│   │   ├── services/          # Business logic
+│   │   ├── repositories/      # Database access
+│   │   ├── models/            # Data models
+│   │   └── wranglerasynq/     # Background jobs
+│   ├── swagger.yml            # API specification (source of truth)
+│   └── CLAUDE.md              # Backend-specific guidance
+├── desktop/                   # Angular web app
+│   ├── src/
+│   │   ├── app/               # Application modules
+│   │   ├── store/             # NGXS state management
+│   │   ├── shared-ui/         # Reusable components
+│   │   └── open-api/          # Generated API client (DO NOT EDIT)
+│   └── CLAUDE.md              # Frontend-specific guidance
+├── mobile/                    # Flutter mobile app
+│   ├── lib/
+│   │   ├── models/            # Provider state models
+│   │   ├── groups/            # Group features
+│   │   ├── receipts/          # Receipt features
+│   │   └── shared/            # Shared widgets
+│   ├── api/                   # Generated API client (DO NOT EDIT)
+│   └── CLAUDE.md              # Mobile-specific guidance
+└── docker/                    # Docker build configs
+    ├── Dockerfile             # Production monolith
+    └── dev/Dockerfile         # Development container
+```

@@ -1,0 +1,30 @@
+<app-dialog
+  headerText="About"
+>
+  <div class="mb-3">
+    <app-form-section
+      headerText="Project"
+    >
+      <div class="d-flex flex-column m-2">
+        @for (link of links; track link["url"]) {
+          <span>
+          {{ link.label }}: <a [href]="link.url" target="_blank">{{ link.url }}</a>
+        </span>
+        }
+      </div>
+    </app-form-section>
+  </div>
+  <app-form-section
+    headerText="Build"
+  >
+    <div class="d-flex flex-column m-2">
+      <span>Version: {{ (about | async)?.version || 'unknown' }}</span>
+      @if ((about | async)?.buildDate !== "unknown") {
+        <span>Build Date: {{ ((about | async)?.buildDate | date) || 'unknown' }}</span>
+      } @else {
+        <span>Build Date: unknown</span>
+      }
+
+    </div>
+  </app-form-section>
+</app-dialog>

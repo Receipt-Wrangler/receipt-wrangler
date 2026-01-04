@@ -1,0 +1,317 @@
+/* Modern, clean Receipt Wrangler styles */
+@use "sass:map";
+@use "@angular/material" as mat;
+@use "./variables.scss" as variables;
+@use "material-icons/iconfont/filled.css";
+@use "material-icons/iconfont/outlined.css";
+@use "@fontsource/raleway";
+@use "@fontsource/inter";
+
+@include mat.elevation-classes();
+@include mat.app-background();
+
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+// Modern font stack with better readability
+$font-family: 'Inter', 'Raleway', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+$my-primary: mat.m2-define-palette(variables.$primary-palette);
+$my-accent: mat.m2-define-palette(variables.$accent-palette);
+$my-warn: mat.m2-define-palette(variables.$warn-palette);
+
+$my-typography: mat.m2-define-typography-config(
+  $font-family: $font-family,
+);
+
+$my-theme: mat.m2-define-light-theme(
+    (
+      color: (
+        primary: $my-primary,
+        accent: $my-accent,
+        warn: $my-warn,
+      ),
+      typography: $my-typography,
+    )
+);
+
+@include mat.all-component-themes($my-theme);
+
+.mat-typography {
+  font-family: $font-family !important;
+}
+
+html,
+body {
+  height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: #f8fafc;
+  color: #1e293b;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.content-width {
+  // TODO: Revisit min-width: 75%;
+  width: 100% !important;
+  // emax-width: 100%;
+}
+
+.error-snackbar {
+  color: white;
+
+  .mdc-snackbar__surface {
+    background-color: red !important;
+  }
+
+  .mat-mdc-snack-bar-label {
+    color: white !important;
+  }
+}
+
+.success-snackbar {
+  color: white;
+
+  .mdc-snackbar__surface {
+    background-color: green !important;
+  }
+
+  .mat-mdc-snack-bar-label {
+    color: white !important;
+  }
+}
+
+// Global Style Changes
+hr {
+  color: variables.$mat-drawer-background-color;
+  width: 100%;
+}
+
+ngb-popover-window {
+  box-shadow: variables.$global-shadow;
+}
+
+// Modern Material Design component styling
+.mat-mdc-card {
+  box-shadow: variables.$shadow-md !important;
+  border-radius: variables.$border-radius-lg !important;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background-color: #ffffff;
+  transition: all 0.2s ease-in-out;
+  
+  &:hover {
+    box-shadow: variables.$shadow-lg !important;
+    transform: translateY(-1px);
+  }
+}
+
+.mat-mdc-raised-button {
+  box-shadow: variables.$shadow-sm !important;
+  border-radius: variables.$border-radius-md !important;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+  
+  &:hover {
+    box-shadow: variables.$shadow-md !important;
+    transform: translateY(-1px);
+  }
+}
+
+.mat-mdc-dialog-container .mdc-dialog__surface {
+  box-shadow: variables.$shadow-xl !important;
+  border-radius: variables.$border-radius-xl !important;
+}
+
+.mat-datepicker-content {
+  box-shadow: variables.$shadow-lg !important;
+  border-radius: variables.$border-radius-lg !important;
+}
+
+.mdc-switch__shadow {
+  box-shadow: variables.$shadow-sm !important;
+}
+
+
+.mat-mdc-fab {
+  box-shadow: variables.$shadow-lg !important;
+  transition: all 0.2s ease-in-out;
+  
+  &:hover {
+    box-shadow: variables.$shadow-xl !important;
+    transform: scale(1.05);
+  }
+}
+
+.mat-mdc-raised-button.mat-primary {
+  color: white !important;
+}
+
+.json-string {
+  white-space: normal !important;
+}
+
+// Modern typography improvements
+h1, h2, h3, h4, h5, h6 {
+  margin: 0 !important;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: #0f172a;
+}
+
+h1 {
+  font-size: 2.25rem;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 1.875rem;
+  line-height: 1.3;
+}
+
+h3 {
+  font-size: 1.5rem;
+  line-height: 1.4;
+}
+
+// Modern form inputs
+.mat-mdc-form-field {
+  .mat-mdc-text-field-wrapper {
+    border-radius: variables.$border-radius-md !important;
+  }
+  
+  .mat-mdc-form-field-focus-overlay {
+    border-radius: variables.$border-radius-md !important;
+  }
+}
+
+// Enhanced cards
+.dashboard-card {
+  width: 100%;
+  height: 100%;
+}
+
+// Utility classes for consistent spacing
+.space-y-1 > * + * {
+  margin-top: variables.$spacing-xs;
+}
+
+.space-y-2 > * + * {
+  margin-top: variables.$spacing-sm;
+}
+
+.space-y-4 > * + * {
+  margin-top: variables.$spacing-md;
+}
+
+.space-y-6 > * + * {
+  margin-top: variables.$spacing-lg;
+}
+
+.space-x-2 > * + * {
+  margin-left: variables.$spacing-sm;
+}
+
+.space-x-4 > * + * {
+  margin-left: variables.$spacing-md;
+}
+
+// Modern dialog styling
+.mat-mdc-dialog-container {
+  .mdc-dialog__surface {
+    background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    backdrop-filter: blur(8px);
+  }
+}
+
+// Modern snackbar styling  
+.mat-mdc-snack-bar-container {
+  border-radius: variables.$border-radius-lg !important;
+  box-shadow: variables.$shadow-xl !important;
+  backdrop-filter: blur(8px);
+  
+  .mdc-snackbar__surface {
+    border-radius: variables.$border-radius-lg !important;
+  }
+}
+
+// Modern progress bar
+.mat-mdc-progress-bar {
+  height: 3px !important;
+  
+  .mdc-linear-progress__buffer {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+  }
+  
+  .mdc-linear-progress__primary-bar {
+    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%) !important;
+  }
+}
+
+// Modern tooltips
+.mat-mdc-tooltip {
+  border-radius: variables.$border-radius-md !important;
+  background-color: #1e293b !important;
+  color: white !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  box-shadow: variables.$shadow-lg !important;
+}
+
+// Enhanced focus states
+.mat-mdc-button:focus,
+.mat-mdc-raised-button:focus,
+.mat-mdc-icon-button:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.5) !important;
+  outline-offset: 2px !important;
+}
+
+// Modern scrollbar styling
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(248, 250, 252, 0.5);
+  border-radius: variables.$border-radius-md;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+  border-radius: variables.$border-radius-md;
+  transition: all 0.2s ease-in-out;
+  
+  &:hover {
+    background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+  }
+}
+
+// Form button bar spacing - prevent fixed button bar from covering content
+// Target content containers when they contain an active form button bar
+.drawer-content:has(app-form-button-bar.form-button-bar-active) {
+  padding-bottom: 160px; // Account for backdrop (80px) + content (72px) + margins
+}
+
+// Alternative approach using descendant selector for broader browser support
+.drawer-content:has(.form-button-bar-active) {
+  padding-bottom: 160px;
+}
+
+// Responsive spacing for mobile
+@media (max-width: 768px) {
+  .drawer-content:has(app-form-button-bar.form-button-bar-active) {
+    padding-bottom: 180px; // More space on mobile
+  }
+  
+  .drawer-content:has(.form-button-bar-active) {
+    padding-bottom: 180px;
+  }
+}
+

@@ -1,0 +1,9 @@
+@use "../../variables" as variables;
+
+.avatar {
+  width: 50px;
+  height: 50px;
+  color: white;
+  border-radius: 50px;
+  box-shadow: variables.$global-shadow;
+}

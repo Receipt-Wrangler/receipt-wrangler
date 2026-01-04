@@ -1,0 +1,12 @@
+<app-accordion
+  [panels]="accordionPanels"
+></app-accordion>
+
+<ng-template
+  #emailUploadDetails
+  let-index="index"
+>
+  <app-receipt-processing-settings-child-system-task-accordion
+    [childTasks]="childTasks[index].childSystemTasks ?? []"
+  ></app-receipt-processing-settings-child-system-task-accordion>
+</ng-template>

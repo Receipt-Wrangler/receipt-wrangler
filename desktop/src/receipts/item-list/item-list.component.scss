@@ -1,0 +1,183 @@
+@use "../../variables.scss" as variables;
+
+app-item-list {
+  .item-list-container {
+    position: relative;
+  }
+
+  // Sticky Accordion Header
+  .sticky-accordion-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    
+    .accordion-header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding-right: 16px;
+      
+      .header-total {
+        font-size: 0.9rem;
+        color: #666;
+      }
+    }
+    
+    // Override default Material expansion panel header styles
+    .mat-expansion-panel-header-title {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: #333;
+    }
+    
+    .mat-expansion-panel-header-description {
+      flex: 1;
+    }
+    
+    // Add blue accent when items are present
+    &.has-items {
+      border-bottom: 2px solid #1976d2;
+    }
+  }
+
+  // Items List
+  .item-form-container:nth-child(even) {
+    background-color: #efefef;
+  }
+
+  .item-form-container:nth-child(odd) {
+    background-color: #f6f6f6;
+  }
+
+  .item-row {
+    transition: all 0.2s ease;
+    
+    &:not(:last-child) {
+      border-bottom: 1px solid #e0e0e0;
+      padding-bottom: 8px;
+    }
+    
+    &:not(:first-child) {
+      padding-top: 8px;
+    }
+    
+    &:hover {
+      transform: translateX(4px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .mat-expansion-panel-body {
+    padding: 16px;
+  }
+
+  .item-row .item-form-container {
+    margin-bottom: 0 !important;
+  }
+
+  // Animations
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes itemAdded {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .item-added {
+    animation: itemAdded 0.3s ease-out;
+  }
+
+  // Responsive adjustments
+  @media (max-width: 768px) {
+    .sticky-accordion-header {
+      .accordion-header-content {
+        flex-direction: column;
+        gap: 8px;
+        align-items: center;
+      }
+    }
+    
+    .add-form-actions {
+      justify-content: center !important;
+    }
+    
+    .keyboard-shortcuts-legend {
+      .shortcuts-grid {
+        flex-direction: column;
+        gap: 12px;
+        
+        .shortcut-item {
+          justify-content: center;
+          
+          kbd {
+            min-width: 140px;
+            text-align: center;
+          }
+        }
+      }
+    }
+  }
+  
+  // Small mobile screens
+  @media (max-width: 480px) {
+    .keyboard-shortcuts-legend {
+      padding: 10px 12px;
+      
+      .legend-title {
+        font-size: 0.85rem;
+      }
+      
+      .shortcuts-grid {
+        .shortcut-item {
+          kbd {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+          }
+          
+          .shortcut-action {
+            font-size: 0.8rem;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Global keyboard shortcut hint
+.keyboard-hint {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  
+  &.show {
+    opacity: 1;
+  }
+}

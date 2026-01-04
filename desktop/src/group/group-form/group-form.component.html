@@ -1,0 +1,88 @@
+<app-form
+  [formConfig]="formConfig"
+  [form]="form"
+  [formTemplate]="formTemplate"
+  [bottomSpacing]="true"
+  [canEdit]="canEdit"
+  [editButtonRouterLink]="[editLink]"
+  [editButtonQueryParams]="{tab: 'details'}"
+  (submitted)="submit()"
+></app-form>
+
+<ng-template #formTemplate>
+  <div class="w-100">
+    <app-audit-detail-section
+      [data]="originalGroup"
+      [formMode]="formConfig.mode"
+    ></app-audit-detail-section>
+    <app-form-section headerText="Group Details" [indent]="true">
+      <app-input
+        label="Group Name"
+        [readonly]="formConfig.mode | inputReadonly"
+        [inputFormControl]="form | formGet : 'name'"
+      ></app-input>
+      <app-select
+        label="Status"
+        optionValueKey="value"
+        optionDisplayKey="displayValue"
+        [inputFormControl]="form | formGet : 'status'"
+        [options]="groupStatusOptions"
+      ></app-select>
+    </app-form-section>
+    <app-form-section
+      headerText="Group Members"
+      [headerButtonsTemplate]="buttonTemplate"
+      [indent]="true"
+    >
+      <app-table
+        [columns]="columns"
+        [dataSource]="dataSource"
+        [displayedColumns]="displayedColumns"
+        (sorted)="sortName($event)"
+      >
+      </app-table>
+    </app-form-section>
+  </div>
+</ng-template>
+
+<ng-template #buttonTemplate>
+  <app-button
+    *ngIf="!(formConfig.mode | inputReadonly)"
+    matButtonType="iconButton"
+    icon="add"
+    color="accent"
+    tooltip="Add User to Group"
+    (clicked)="addGroupMemberClicked()"
+  ></app-button>
+</ng-template>
+
+<ng-template #headerButtonsTemplate>
+  <app-edit-button
+    *ngIf="formConfig.mode | inputReadonly"
+    [disabled]="!(originalGroup?.id ?? 0 | groupRole : groupRole.Owner)"
+    [buttonRouterLink]="[editLink]"
+  ></app-edit-button>
+</ng-template>
+
+<ng-template #nameCell let-element="element">
+  {{ (element.userId | user)?.displayName }}
+</ng-template>
+
+<ng-template #groupRoleCell let-element="element">
+  {{ element.groupRole | status }}
+</ng-template>
+
+<ng-template #actionsCell let-index="index">
+  <div class="d-flex">
+    <app-edit-button
+      tooltip="Edit group member"
+      color="accent"
+      (clicked)="editGroupMemberClicked(index)"
+    ></app-edit-button>
+    <app-delete-button
+      tooltip="Remove group member"
+      [disabled]="disableDeleteButton"
+      (clicked)="removeGroupMember(index)"
+    ></app-delete-button>
+  </div>
+</ng-template>

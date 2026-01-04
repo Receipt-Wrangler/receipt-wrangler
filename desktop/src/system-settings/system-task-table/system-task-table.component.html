@@ -1,0 +1,28 @@
+<app-table-header headerText="System Tasks">
+  <app-button
+    matButtonType="iconButton"
+    icon="refresh"
+    color="accent"
+    tooltip="Refresh System Tasks"
+    (clicked)="refresh()"
+  ></app-button>
+</app-table-header>
+<app-task-table [expandedRowTemplate]="expandedRowTemplate"></app-task-table>
+
+<ng-template
+  #expandedRowTemplate
+  let-element="element"
+>
+  <ng-container *ngIf="element.associatedEntityType === AssociatedEntityType.SystemEmail">
+    <app-system-email-child-system-task
+      [childTasks]="element.childSystemTasks ?? []"
+      [allReceiptProcessingSettings]="allReceiptProcessingSettings"
+    ></app-system-email-child-system-task>
+  </ng-container>
+
+  <ng-container *ngIf="element.associatedEntityType === AssociatedEntityType.ReceiptProcessingSettings">
+    <app-receipt-processing-settings-child-system-task-accordion
+      [childTasks]="element.childSystemTasks ?? []"
+    ></app-receipt-processing-settings-child-system-task-accordion>
+  </ng-container>
+</ng-template>

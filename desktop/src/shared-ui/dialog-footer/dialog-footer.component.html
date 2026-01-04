@@ -1,0 +1,20 @@
+<div class="d-flex justify-content-end align-items-center">
+  <app-submit-button
+    [tooltip]="submitButtonTooltip"
+    [disabled]="
+      disableWhenProgressBarIsShown ? (showProgressBar | async) ?? false : false
+    "
+    [type]="submitButtonType"
+    (clicked)="submitClicked.emit()"
+  ></app-submit-button>
+  <app-cancel-button
+    [disabled]="
+      disableWhenProgressBarIsShown ? (showProgressBar | async) ?? false : false
+    "
+    (clicked)="cancelClicked.emit()"
+  ></app-cancel-button>
+  <ng-container
+    *ngIf="additionalButtonsTemplate"
+    [ngTemplateOutlet]="additionalButtonsTemplate"
+  ></ng-container>
+</div>

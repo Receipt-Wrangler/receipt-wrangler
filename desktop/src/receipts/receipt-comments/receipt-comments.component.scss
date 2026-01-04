@@ -1,0 +1,13 @@
+@use "../../variables.scss" as variables;
+
+.reply-button {
+  color: variables.$basic-gray !important;
+}
+
+.content-margin {
+  margin-left: 50px;
+}
+
+.reply-container {
+  width: 77.5rem;
+}

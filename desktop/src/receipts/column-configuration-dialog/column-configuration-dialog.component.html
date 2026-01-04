@@ -1,0 +1,46 @@
+<app-dialog headerText="Configure Table Columns">
+  <div class="column-config-content">
+    <p class="description">
+      Select which columns to display and drag to reorder them. At least one column must remain visible.
+    </p>
+
+    <div class="column-list" cdkDropList (cdkDropListDropped)="drop($event)">
+      <div
+        class="column-item"
+        *ngFor="let column of columns"
+        cdkDrag
+        [class.disabled]="!column.visible"
+      >
+        <div class="drag-handle" cdkDragHandle>
+          <mat-icon>drag_handle</mat-icon>
+        </div>
+
+        <mat-checkbox
+          [checked]="column.visible"
+          [disabled]="!canToggleOff(column)"
+          (change)="toggleColumnVisibility(column)"
+          class="column-checkbox"
+        >
+          {{ column.displayName }}
+        </mat-checkbox>
+      </div>
+    </div>
+  </div>
+
+  <app-dialog-footer
+    submitButtonTooltip="Save column configuration"
+    [additionalButtonsTemplate]="resetButton"
+    (submitClicked)="saveConfiguration()"
+    (cancelClicked)="cancel()"
+  ></app-dialog-footer>
+</app-dialog>
+
+<ng-template #resetButton>
+  <app-button
+    matButtonType="iconButton"
+    icon="restart_alt"
+    color="accent"
+    tooltip="Reset column configuration"
+    (clicked)="resetToDefaults()"
+  ></app-button>
+</ng-template>

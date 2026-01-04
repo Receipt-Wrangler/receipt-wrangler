@@ -1,0 +1,123 @@
+@use "../../variables.scss" as variables;
+
+app-item-add-form {
+  // Inline Add Form
+  .inline-add-form {
+    animation: slideIn 0.2s ease-out;
+    margin-bottom: 16px;
+    
+    .add-form-card {
+      border: 2px solid #1976d2;
+      box-shadow: 0 4px 8px rgba(25, 118, 210, 0.2);
+    }
+    
+    .add-form-fields {
+      margin-bottom: 16px;
+    }
+    
+    .add-form-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    
+    .keyboard-shortcuts-legend {
+      margin-top: 12px;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      
+      .legend-title {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #495057;
+        
+        .legend-icon {
+          font-size: 1rem;
+        }
+      }
+      
+      .shortcuts-grid {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        flex-wrap: wrap;
+        
+        .shortcut-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          
+          kbd {
+            background: linear-gradient(135deg, #fff 0%, #f1f3f4 100%);
+            color: #1976d2;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            border: 1px solid #ccc;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+            transition: all 0.2s ease;
+            
+            &:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            }
+          }
+          
+          .shortcut-action {
+            color: #495057;
+            font-size: 0.85rem;
+            font-weight: 500;
+            white-space: nowrap;
+          }
+        }
+      }
+    }
+  }
+
+  // Animation keyframes
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  // Responsive adjustments
+  @media (max-width: 768px) {
+    .inline-add-form {
+      .add-form-actions {
+        justify-content: center;
+      }
+      
+      .keyboard-shortcuts-legend {
+        .shortcuts-grid {
+          gap: 12px;
+          
+          .shortcut-item {
+            font-size: 0.8rem;
+            
+            kbd {
+              padding: 3px 8px;
+              font-size: 0.7rem;
+            }
+          }
+        }
+      }
+    }
+  }
+}

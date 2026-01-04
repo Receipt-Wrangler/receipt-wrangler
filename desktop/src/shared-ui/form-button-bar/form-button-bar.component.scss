@@ -1,0 +1,142 @@
+@use "../../variables.scss" as variables;
+
+.modern-form-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.form-bar-backdrop {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(to top, rgba(248, 250, 252, 0.95) 0%, rgba(248, 250, 252, 0.8) 50%, transparent 100%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.form-bar-container {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 variables.$spacing-lg;
+}
+
+.form-bar-content {
+  display: flex;
+  align-items: center;
+  padding: variables.$spacing-lg;
+  margin-bottom: variables.$spacing-md;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: variables.$border-radius-2xl;
+  box-shadow: variables.$shadow-xl;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: auto;
+  transition: all 0.3s ease-in-out;
+  min-height: 72px; // Consistent height
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  }
+}
+
+// Enhanced button styling within the bar
+:host ::ng-deep {
+  .form-bar-content {
+    // Override any margin classes on child elements
+    > * {
+      margin-bottom: 0 !important;
+      margin-top: 0 !important;
+    }
+    
+    .mat-mdc-button,
+    .mat-mdc-raised-button,
+    .mat-mdc-icon-button {
+      margin: 0 variables.$spacing-xs !important;
+      transition: all 0.2s ease-in-out;
+      
+      &:hover {
+        transform: translateY(-1px) scale(1.02);
+      }
+    }
+    
+    .mat-mdc-raised-button {
+      box-shadow: variables.$shadow-md !important;
+      
+      &:hover {
+        box-shadow: variables.$shadow-lg !important;
+      }
+      
+      &.mat-primary {
+        background: linear-gradient(135deg, #27b1ff 0%, #009efa 100%);
+        color: white;
+        font-weight: 600;
+        
+        &:hover {
+          background: linear-gradient(135deg, #009efa 0%, #0086d4 100%);
+        }
+      }
+    }
+    
+    .mat-mdc-icon-button {
+      border-radius: variables.$border-radius-xl !important;
+      width: 48px;
+      height: 48px;
+      
+      &:hover {
+        background-color: rgba(39, 177, 255, 0.1);
+      }
+    }
+  }
+}
+
+// Animation for form bar appearance
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modern-form-bar {
+  animation: slideUp 0.3s ease-out;
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .form-bar-container {
+    padding: 0 variables.$spacing-md;
+  }
+  
+  .form-bar-content {
+    padding: variables.$spacing-md;
+    margin-bottom: variables.$spacing-sm;
+    flex-direction: column;
+    gap: variables.$spacing-md;
+    
+    &.justify-content-between {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+  
+  :host ::ng-deep .form-bar-content {
+    .mat-mdc-button,
+    .mat-mdc-raised-button {
+      min-width: 120px;
+    }
+  }
+  
+}

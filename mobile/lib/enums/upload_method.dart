@@ -1,0 +1,1 @@
+enum UploadMethod { camera, gallery }

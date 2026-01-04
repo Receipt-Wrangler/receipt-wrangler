@@ -1,0 +1,10 @@
+<app-button
+  matButtonType="iconButton"
+  icon="edit"
+  [color]="color"
+  [tooltip]="tooltip ? tooltip : 'Edit'"
+  [disabled]="disabled"
+  [buttonRouterLink]="buttonRouterLink"
+  [buttonQueryParams]="buttonQueryParams"
+  (clicked)="clicked.emit()"
+></app-button>

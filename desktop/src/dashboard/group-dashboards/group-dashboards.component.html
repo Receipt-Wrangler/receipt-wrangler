@@ -1,0 +1,33 @@
+<div class="d-flex align-items-center">
+  <h1>{{ ((selectedGroupId | async) ?? "" | group)?.name }} Dashboards</h1>
+  <app-add-button (clicked)="openDashboardDialog(true)"></app-add-button>
+
+  <ng-container *ngIf="selectedDashboardId | async">
+    <app-edit-button
+      *ngIf="selectedGroupId | async"
+      color="accent"
+      (clicked)="openDashboardDialog()"
+    ></app-edit-button>
+    <app-delete-button color="warn" (clicked)="openDeleteConfirmationDialog()">
+    </app-delete-button>
+  </ng-container>
+</div>
+<div class="mb-2">
+  <mat-chip-listbox>
+    <mat-chip-option
+      *ngFor="let dashboard of dashboards"
+      [selected]="dashboard?.id?.toString() == (selectedDashboardId | async)"
+      [selectable]="false"
+      [routerLink]="[dashboard.id]"
+      (click)="setSelectedDashboardId(dashboard.id)"
+      >{{ dashboard.name }}</mat-chip-option
+    >
+  </mat-chip-listbox>
+</div>
+
+<ng-container *ngIf="selectedDashboardId | async">
+  <router-outlet></router-outlet>
+</ng-container>
+<ng-container *ngIf="!(selectedDashboardId | async) && !dashboards?.length">
+  <p>Click on the + button to add a dashboard to this group.</p>
+</ng-container>

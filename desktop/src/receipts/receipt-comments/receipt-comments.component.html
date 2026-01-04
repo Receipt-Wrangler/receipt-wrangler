@@ -1,0 +1,108 @@
+@if (mode !== formMode.view) {
+  <div class="mb-2">
+    <app-card>
+      <strong header class="mb-3">Leave a Comment</strong>
+      <div content class="w-100">
+        <app-textarea
+          label="Comment"
+          [inputFormControl]="newCommentFormControl"
+        ></app-textarea>
+        <ng-container
+          [ngTemplateOutlet]="add"
+        ></ng-container>
+      </div>
+    </app-card>
+  </div>
+}
+
+@if (commentsArray.length > 0) {
+  <app-card>
+    <div
+      content *ngFor="let comment of commentsArray.controls; let index = index"
+    >
+      <ng-container
+        [ngTemplateOutlet]="commentDisplay"
+        [ngTemplateOutletContext]="{
+          commentControl: comment,
+          commentIndex: index
+        }"
+      ></ng-container>
+      <div
+        class="d-flex content-margin"
+        [ngClass]="{
+          'mb-2': mode === formMode.edit
+        }"
+      >
+      </div>
+    </div>
+  </app-card>
+} @else if (comments.length === 0 && mode === formMode.view) {
+  <div>No comments for this receipt</div>
+}
+
+<ng-template
+  #commentDisplay
+  let-commentControl="commentControl"
+  let-commentIndex="commentIndex"
+>
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="d-flex align-items-center">
+      <app-avatar
+        class="me-2"
+        [user]="commentControl?.value?.userId?.toString() ?? '' | user"
+      ></app-avatar>
+      <div class="d-flex flex-column">
+        <div>
+          <strong>
+            {{
+              (commentControl?.value?.userId?.toString() ?? "" | user)
+                ?.displayName
+            }}
+          </strong>
+          <ng-container
+            [ngTemplateOutlet]="dateWrapper"
+            [ngTemplateOutletContext]="{
+              commentIndex: commentIndex,
+            }"
+          ></ng-container>
+        </div>
+        <span>{{ commentControl?.value?.comment }}</span>
+      </div>
+    </div>
+    <ng-container
+      *ngIf="
+        commentControl?.value?.userId?.toString() === (loggedInUserId | async)
+         && (mode === formMode.add || mode === formMode.edit)
+      "
+    >
+      <app-delete-button
+        (clicked)="deleteComment(commentIndex)"
+      ></app-delete-button>
+    </ng-container>
+  </div>
+</ng-template>
+
+<ng-template
+  #dateWrapper
+  let-commentIndex="commentIndex"
+>
+  <ng-template
+    [ngTemplateOutlet]="date"
+    [ngTemplateOutletContext]="{
+      comment: comments[commentIndex]
+    }"
+  ></ng-template>
+</ng-template>
+
+<ng-template #date let-comment="comment">
+  <small *ngIf="comment?.updatedAt">
+    <span> - </span>
+    {{ comment?.updatedAt | date : "medium" }}
+  </small>
+</ng-template>
+
+<ng-template #add>
+  <div class="d-flex justify-content-end">
+    <app-button buttonText="Comment" (clicked)="addComment()"></app-button>
+  </div>
+</ng-template>

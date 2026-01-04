@@ -1,0 +1,53 @@
+<app-dialog
+  headerText="Import"
+  [actionsTemplate]="actionsTemplate"
+>
+  <form [formGroup]="form">
+    <app-upload-image
+      [acceptFileTypes]="acceptedFileTypes"
+      [multiple]="false"
+      (fileLoaded)="fileLoaded($event)"
+    ></app-upload-image>
+    <app-select
+      label="Import Type"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+      [inputFormControl]="form | formGet: 'importType'"
+      [options]="importTypeOptions"
+    ></app-select>
+    <div
+      *ngIf="fileContents"
+      @fadeInOut
+      class="d-flex flex-column"
+    >
+      <h3 class="text-dark">File Contents</h3>
+      <div
+        class="json-container"
+        [innerHtml]="fileContents"
+      ></div>
+    </div>
+  </form>
+  <app-dialog-footer
+    submitButtonTooltip="Import"
+    (submitClicked)="submit()"
+    (cancelClicked)="closeDialog()"
+  ></app-dialog-footer>
+</app-dialog>
+
+<ng-template #actionsTemplate>
+  <div class="d-flex">
+    <app-button
+      class="me-2"
+      matButtonType="iconButton"
+      tooltip="Upload File"
+      icon="upload"
+      (clicked)="openFileUploadDialog()">
+    </app-button>
+    <app-delete-button
+      *ngIf="fileContents"
+      tooltip="Remove file"
+      @fadeInOut
+      (clicked)="clearFileContents()"
+    ></app-delete-button>
+  </div>
+</ng-template>

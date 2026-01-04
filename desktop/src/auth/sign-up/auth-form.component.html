@@ -1,0 +1,72 @@
+@if (isLoading) {
+  <div class="loading-container" @fadeInOut>
+    <img src="assets/branding/loading.gif" class="loading-gif">
+    <div class="loading-text">Loading...</div>
+  </div>
+} @else {
+  <div class="auth-container" @fadeIn>
+    <div class="auth-card">
+      <!-- Logo and Welcome -->
+      <div class="logo-section">
+        <img src="assets/branding/logo-large.svg" alt="Receipt Wrangler" class="logo">
+        <h1 class="welcome-text">
+          {{ (isSignUp | async) ? 'Join us!' : 'Hey there!' }}
+          <span class="wave">👋</span>
+        </h1>
+        <p class="subtitle">
+          {{ (isSignUp | async) ? 'Create your account to get started' : 'Welcome back, ready to wrangle some receipts?' }}
+        </p>
+      </div>
+
+      <!-- Form -->
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <!-- Form Fields -->
+        <div class="form-fields">
+          <ng-container *ngIf="isSignUp | async">
+            <app-input
+              appearance="outline"
+              label="Display Name"
+              [inputFormControl]="form | formGet : 'displayname'"
+            ></app-input>
+          </ng-container>
+
+          <app-input
+            appearance="outline"
+            label="Username"
+            [inputFormControl]="form | formGet : 'username'"
+          ></app-input>
+
+          <app-input
+            appearance="outline"
+            label="Password"
+            type="password"
+            [showVisibilityEye]="true"
+            [inputFormControl]="form | formGet : 'password'"
+          ></app-input>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <div class="primary-action w-100">
+            <app-button
+              buttonClass="w-100"
+              matButtonType="matRaisedButton"
+              type="submit"
+              [buttonText]="primaryButtonText"
+            ></app-button>
+          </div>
+
+          <div class="secondary-action" *appFeature="'enableLocalSignUp'">
+            <app-button
+              buttonClass="w-100"
+              matButtonType="matRaisedButton"
+              type="button"
+              [buttonText]="secondaryButtonText"
+              [routerLink]="secondaryButtonRouterLink"
+            ></app-button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+}

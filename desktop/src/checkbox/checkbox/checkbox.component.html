@@ -1,0 +1,11 @@
+<div class="d-flex align-items-center">
+  <mat-checkbox
+    [ngClass]="{
+      'pe-none': readonly,
+    }"
+    [formControl]="inputFormControl"
+    (keydown)="handleKeydown($event)"
+  >{{ label }}
+  </mat-checkbox>
+  <app-help-icon [helpText]="helpText"></app-help-icon>
+</div>

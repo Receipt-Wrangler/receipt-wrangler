@@ -1,0 +1,20 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+app-submit-button {
+  .mat-success-icon {
+    color: map.get(variables.$success-palette, 800);
+  }
+
+  .mat-success-icon:hover {
+    background-color: map.get(variables.$success-palette, 50);
+  }
+
+  .mat-success-icon:active {
+    background-color: map.get(variables.$success-palette, 100);
+  }
+
+  .mat-success-full {
+    background-color: map.get(variables.$success-palette, 800) !important;
+  }
+}

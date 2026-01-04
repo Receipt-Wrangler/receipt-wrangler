@@ -1,0 +1,21 @@
+<app-dialog [headerText]="headerText">
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="d-flex">
+      <app-user-autocomplete
+        class="me-2"
+        label="User"
+        [inputFormControl]="form | formGet : 'userId'"
+        [usersToOmit]="usersToOmit"
+      ></app-user-autocomplete>
+      <app-select
+        class="me-1"
+        label="Role"
+        optionValueKey="value"
+        optionDisplayKey="displayValue"
+        [options]="roleOptions"
+        [inputFormControl]="form | formGet : 'groupRole'"
+      ></app-select>
+    </div>
+    <app-dialog-footer (cancelClicked)="closeModal()"></app-dialog-footer>
+  </form>
+</app-dialog>

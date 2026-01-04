@@ -1,0 +1,22 @@
+<app-dialog
+  headerText="Filter API Keys"
+>
+  <form
+    [formGroup]="form"
+    (ngSubmit)="submit()"
+  >
+    <app-select
+      label="API Keys to View"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+      [inputFormControl]="form | formGet: 'associatedApiKeys'"
+      [options]="associatedApiKeyOptions"
+    ></app-select>
+  </form>
+
+  <app-dialog-footer
+    submitButtonTooltip="Apply filter"
+    (submitClicked)="submit()"
+    (cancelClicked)="cancel()"
+  ></app-dialog-footer>
+</app-dialog>

@@ -1,0 +1,282 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+app-sidebar {
+  height: 100%;
+
+  .drawer-content {
+    max-width: 100%;
+    background-color: #f8fafc;
+  }
+
+  .drawer-container {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: variables.$shadow-sm;
+  }
+
+  .cursor-pointer {
+    cursor: pointer;
+  }
+
+  .add-button-rotated {
+    transform: rotate(45deg) !important;
+    border-radius: variables.$border-radius-xl !important;
+    background-color: map.get(variables.$primary-palette, 500) !important;
+    color: white !important;
+    box-shadow: variables.$shadow-lg !important;
+
+    .mat-mdc-button-persistent-ripple {
+      border-radius: variables.$border-radius-lg !important;
+    }
+  }
+
+  .add-button {
+    background: linear-gradient(135deg, map.get(variables.$primary-palette, 500) 0%, map.get(variables.$primary-palette, 600) 100%);
+    color: white;
+    height: 56px;
+    width: 56px;
+    z-index: 1;
+    border-radius: variables.$border-radius-xl !important;
+    box-shadow: variables.$shadow-lg !important;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform, box-shadow;
+    
+    &:hover {
+      transform: scale(1.05);
+      box-shadow: variables.$shadow-xl !important;
+    }
+  }
+
+  @keyframes add-buttons-slide-open {
+    from {
+      transform: scaleY(0) translateY(-10px);
+      opacity: 0;
+    }
+    to {
+      transform: scaleY(1) translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes add-buttons-slide-closed {
+    from {
+      transform: scaleY(1) translateY(0);
+      opacity: 1;
+    }
+    to {
+      transform: scaleY(0) translateY(-10px);
+      opacity: 0;
+    }
+  }
+
+  .add-button-container-expanded {
+    display: flex !important;
+    flex-direction: column;
+    animation-name: add-buttons-slide-open;
+    animation-duration: 0.4s;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    animation-fill-mode: forwards;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-bottom-left-radius: variables.$border-radius-xl;
+    border-bottom-right-radius: variables.$border-radius-xl;
+    box-shadow: variables.$shadow-md;
+    padding: variables.$spacing-sm 0;
+    transform-origin: top center;
+    will-change: transform, opacity;
+  }
+
+  .add-button-close {
+    animation-name: add-buttons-slide-closed;
+    animation-duration: 0.3s;
+    animation-delay: 0.15s; // Wait for sub-buttons to start closing
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    animation-fill-mode: forwards;
+    transform-origin: top center;
+    will-change: transform, opacity;
+
+    // Staggered closing animations for sub-buttons (reverse order)
+    .add-sub-button-1, .add-sub-button-2, .add-sub-button-3 {
+      opacity: 1;
+      transform: translateY(0);
+      animation-name: sub-button-disappear;
+      animation-duration: 0.25s;
+      animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      animation-fill-mode: forwards;
+      will-change: transform, opacity;
+      backface-visibility: hidden;
+    }
+
+    // Reverse stagger: close from bottom to top
+    .add-sub-button-3 {
+      animation-delay: 0s; // Close first (bottom button)
+    }
+    
+    .add-sub-button-2 {
+      animation-delay: 0.05s; // Close second (middle button)
+    }
+    
+    .add-sub-button-1 {
+      animation-delay: 0.1s; // Close last (top button)
+    }
+  }
+
+  .add-buttons-container {
+    display: none;
+    position: relative;
+    top: -20px;
+    z-index: 0;
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+  }
+
+  .add-sub-button {
+    color: variables.$basic-gray;
+    border-radius: variables.$border-radius-lg !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    margin: variables.$spacing-xs;
+    will-change: transform, background-color, color;
+    backface-visibility: hidden;
+    
+    &:hover {
+      background-color: map.get(variables.$primary-palette, 50);
+      color: map.get(variables.$primary-palette, 600);
+      transform: translateY(-1px);
+    }
+  }
+
+  // Staggered animation for sub-buttons
+  .add-button-container-expanded {
+    .add-sub-button-1, .add-sub-button-2, .add-sub-button-3 {
+      opacity: 0;
+      transform: translateY(10px);
+      animation-name: sub-button-appear;
+      animation-duration: 0.3s;
+      animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      animation-fill-mode: forwards;
+      will-change: transform, opacity;
+      backface-visibility: hidden;
+    }
+    
+    .add-sub-button-1 {
+      animation-delay: 0.1s;
+    }
+    
+    .add-sub-button-2 {
+      animation-delay: 0.15s;
+    }
+    
+    .add-sub-button-3 {
+      animation-delay: 0.2s;
+    }
+  }
+
+  @keyframes sub-button-appear {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes sub-button-disappear {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+
+  .active-sub-button {
+    color: map.get(variables.$primary-palette, 600) !important;
+    background-color: map.get(variables.$primary-palette, 100) !important;
+  }
+
+  @keyframes active-dot-active {
+    from {
+      opacity: 0;
+      transform: scaleY(0);
+    }
+    to {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+  }
+
+  @keyframes active-dot-spread {
+    from {
+      opacity: 0.3;
+      transform: scaleY(0.5);
+    }
+    to {
+      opacity: 0.7;
+      transform: scaleY(0.8);
+    }
+  }
+
+  @keyframes active-dot-revert {
+    from {
+      opacity: 0.7;
+      transform: scaleY(0.8);
+    }
+    to {
+      opacity: 0;
+      transform: scaleY(0);
+    }
+  }
+
+  .active-dot {
+    position: absolute;
+    left: -12px;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(135deg, map.get(variables.$primary-palette, 500) 0%, map.get(variables.$primary-palette, 600) 100%);
+    border-radius: 0 4px 4px 0;
+    box-shadow: variables.$shadow-lg;
+    transition: all 0.3s ease-in-out;
+    opacity: 0;
+    transform: scaleY(0);
+  }
+
+  .group-avatar-container {
+    position: relative;
+    padding: variables.$spacing-xs;
+    border-radius: variables.$border-radius-xl;
+    transition: all 0.2s ease-in-out;
+    
+    .active-dot {
+      animation-name: active-dot-revert;
+      animation-duration: 0.5s;
+      animation-fill-mode: forwards;
+    }
+
+    // Selected group gets subtle background
+    &:has(.active-group) {
+      background-color: rgba(map.get(variables.$primary-palette, 500), 0.08);
+      box-shadow: variables.$shadow-sm;
+    }
+  }
+
+  .group-avatar-container:hover {
+    .active-dot {
+      animation-name: active-dot-spread;
+      animation-duration: 0.2s;
+      animation-fill-mode: forwards;
+    }
+  }
+
+  .active-group {
+    opacity: 1 !important;
+    transform: scaleY(1) !important;
+    animation-name: active-dot-active !important;
+    animation-duration: 0.3s;
+    animation-fill-mode: forwards;
+  }
+}

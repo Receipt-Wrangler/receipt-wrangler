@@ -1,0 +1,70 @@
+@use "../../variables.scss" as variables;
+
+app-base-table {
+  .table-container {
+    border-radius: variables.$border-radius-xl !important;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+    overflow: hidden;
+    box-shadow: variables.$shadow-md;
+  }
+  
+  .mat-mdc-table {
+    background-color: transparent;
+    border-radius: 0;
+    
+    .mat-mdc-header-row {
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+      
+      .mat-mdc-header-cell {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.875rem;
+        letter-spacing: 0.025em;
+        text-transform: uppercase;
+        padding: variables.$spacing-lg variables.$spacing-md;
+        border-bottom: none;
+      }
+    }
+    
+    .mat-mdc-row {
+      transition: all 0.2s ease-in-out;
+      border-bottom: none !important;
+      
+      &:hover {
+        background-color: rgba(59, 130, 246, 0.02);
+        transform: scale(1.001);
+      }
+      
+      .mat-mdc-cell {
+        padding: variables.$spacing-lg variables.$spacing-md;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+        color: #475569;
+        font-size: 0.875rem;
+      }
+    }
+    
+    // Keep border on last row cells for consistent appearance
+  }
+  
+  .mat-mdc-paginator {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    color: #64748b;
+    
+    .mat-mdc-select {
+      border-radius: variables.$border-radius-md;
+    }
+    
+    .mat-mdc-icon-button {
+      border-radius: variables.$border-radius-md;
+      transition: all 0.2s ease-in-out;
+      
+      &:hover {
+        background-color: rgba(59, 130, 246, 0.1);
+        transform: scale(1.05);
+      }
+    }
+  }
+}

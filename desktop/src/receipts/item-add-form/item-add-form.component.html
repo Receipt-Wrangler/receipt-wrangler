@@ -1,0 +1,88 @@
+<div class="inline-add-form" #addForm>
+  <app-card cardStyle="w-100 mb-2 add-form-card">
+    <div content>
+      <div class="row g-0 add-form-fields">
+        <app-input
+          #nameInput
+          label="Name"
+          class="col"
+          [inputFormControl]="newItemFormGroup | formGet : 'name'"
+          (keydown.enter)="onNameEnter($event)"
+          (keydown.escape)="onCancel()"
+        >
+        </app-input>
+        <app-input
+          #amountInput
+          label="Amount"
+          class="col"
+          type="text"
+          [isCurrency]="true"
+          [inputFormControl]="newItemFormGroup | formGet : 'amount'"
+          [readonly]="mode | inputReadonly"
+          (keydown.enter)="onAmountEnter($event)"
+          (keydown.escape)="onCancel()"
+        >
+        </app-input>
+
+        @if (!selectedGroup?.groupReceiptSettings?.hideItemCategories) {
+          <app-category-autocomplete
+            #categoryInput
+            [categories]="categories"
+            [inputFormControl]="newItemFormGroup | formGet : 'categories'"
+            [readonly]="mode | inputReadonly"
+            (keydown.enter)="onCategoryEnter($event)"
+            (keydown.escape)="onCancel()"
+          ></app-category-autocomplete>
+        }
+
+        @if (!selectedGroup?.groupReceiptSettings?.hideItemTags) {
+          <app-tag-autocomplete
+            #tagInput
+            [tags]="tags"
+            [inputFormControl]="newItemFormGroup | formGet : 'tags'"
+            [readonly]="mode | inputReadonly"
+            (keydown.enter)="onTagEnter($event)"
+            (keydown.escape)="onCancel()"
+          ></app-tag-autocomplete>
+        }
+      </div>
+      <div class="add-form-actions">
+        <app-button
+          matButtonType="basic"
+          [buttonText]="'Add Item'"
+          color="primary"
+          (clicked)="onSubmitAndContinue()"
+          [disabled]="!newItemFormGroup.valid"
+        ></app-button>
+        <app-button
+          matButtonType="basic"
+          [buttonText]="'Add & Done'"
+          color="accent"
+          (clicked)="onSubmitAndFinish()"
+          [disabled]="!newItemFormGroup.valid"
+        ></app-button>
+        <app-button
+          matButtonType="basic"
+          [buttonText]="'Cancel'"
+          (clicked)="onCancel()"
+        ></app-button>
+      </div>
+
+      <!-- Keyboard Shortcuts Legend -->
+      <div class="keyboard-shortcuts-legend">
+        <div class="legend-title">
+          <span class="legend-icon">⌨️</span>
+          <span>Keyboard Shortcuts</span>
+        </div>
+        <div class="shortcuts-grid">
+          @for (shortcut of displayShortcuts; track shortcut.keys) {
+            <div class="shortcut-item">
+              <kbd>{{ shortcut.keys }}</kbd>
+              <span class="shortcut-action" [title]="shortcut.description">{{ shortcut.action }}</span>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </app-card>
+</div>

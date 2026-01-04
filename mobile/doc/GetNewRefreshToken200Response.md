@@ -1,0 +1,28 @@
+# openapi.model.GetNewRefreshToken200Response
+
+## Load the model package
+```dart
+import 'package:openapi/api.dart';
+```
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**jwt** | **String** | JWT token | 
+**refreshToken** | **String** | Refresh token | 
+**userId** | **int** | User foreign key | [default to 0]
+**userRole** | [**UserRole**](UserRole.md) |  | 
+**displayName** | **String** | Display name | [default to '']
+**defaultAvatarColor** | **String** | Default avatar color | [default to '']
+**username** | **String** | User's username used to login | [default to '']
+**iss** | **String** | Issuer | [default to '']
+**sub** | **String** | Subject | [optional] [default to '']
+**aud** | **List<String>** | Audience | [optional] [default to const []]
+**exp** | **int** | Expiration time | [default to 0]
+**nbf** | **int** | Not before | [optional] [default to 0]
+**iat** | **int** | Issued at | [optional] [default to 0]
+**jti** | **String** | JWT ID | [optional] [default to '']
+
+[[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
+
+

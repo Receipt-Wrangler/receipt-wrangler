@@ -1,0 +1,54 @@
+<app-form
+  [formConfig]="formConfig"
+  [form]="form"
+  [formTemplate]="formTemplate"
+  [bottomSpacing]="true"
+  [canEdit]="canEdit"
+  [editButtonRouterLink]="[editLink]"
+  [editButtonQueryParams]="{tab: 'receipt-settings'}"
+  (submitted)="submit()"
+></app-form>
+
+<ng-template
+  #formTemplate
+>
+  <app-audit-detail-section
+    [data]="originalGroup"
+  ></app-audit-detail-section>
+  <app-form-section
+    headerText="Settings"
+  >
+    <app-checkbox
+      label="Hide Images"
+      [inputFormControl]="form | formGet: 'hideImages'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Hide Receipt Categories"
+      [inputFormControl]="form | formGet: 'hideReceiptCategories'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Hide Receipt Tags"
+      [inputFormControl]="form | formGet: 'hideReceiptTags'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Hide Item Categories"
+      [inputFormControl]="form | formGet: 'hideItemCategories'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Hide Item Tags"
+      [inputFormControl]="form | formGet: 'hideItemTags'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Hide Share Categories"
+      [inputFormControl]="form | formGet: 'hideShareCategories'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Hide Share Tags"
+      [inputFormControl]="form | formGet: 'hideShareTags'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Hide Comments"
+      [inputFormControl]="form | formGet: 'hideComments'"
+    ></app-checkbox>
+  </app-form-section>
+</ng-template>

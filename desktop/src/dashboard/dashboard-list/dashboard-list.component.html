@@ -1,0 +1,66 @@
+<cdk-virtual-scroll-viewport
+  [itemSize]="67"
+  role="list"
+  class="default-size scroll-container"
+>
+  <mat-list>
+    @if (items.length === 0) {
+      <mat-list-item class="item-size" *ngIf="items?.length === 0">
+        {{ noItemFoundText }}
+      </mat-list-item>
+    } @else {
+      <mat-list-item
+        *cdkVirtualFor="let item of items; let i = index"
+        role="link"
+        class="border-bottom border-gray-200"
+        [ngClass]="{
+        'cursor-pointer item-link': buildRouterLinkString(item),
+        'border-top': i === 0,
+        }"
+        [style.height.px]="itemSize"
+        [routerLink]="buildRouterLinkString(item) ? [buildRouterLinkString(item)] : null"
+      >
+        <div matListItemTitle>
+          <ng-template
+            [ngTemplateOutlet]="itemHeaderTemplate"
+            [ngTemplateOutletContext]="{ item: item }"
+          ></ng-template>
+        </div>
+        <div matListItemLine>
+          <ng-template
+            [ngTemplateOutlet]="itemLineTemplate"
+            [ngTemplateOutletContext]="{ item: item }"
+          ></ng-template>
+        </div>
+
+        @if (itemLineTemplate2) {
+          <div matListItemLine>
+            <ng-template
+              [ngTemplateOutlet]="itemLineTemplate2"
+              [ngTemplateOutletContext]="{ item: item }"
+            ></ng-template>
+          </div>
+        }
+
+        @if (itemAvatarTemplate) {
+          <div matListItemAvatar>
+            <ng-template
+              [ngTemplateOutlet]="itemAvatarTemplate"
+              [ngTemplateOutletContext]="{ item: item }"
+            ></ng-template>
+          </div>
+        }
+
+        @if (itemMetaTemplate) {
+          <div matListItemMeta>
+            <ng-template
+              [ngTemplateOutlet]="itemMetaTemplate"
+              [ngTemplateOutletContext]="{ item: item }"
+            ></ng-template>
+          </div>
+        }
+
+      </mat-list-item>
+    }
+  </mat-list>
+</cdk-virtual-scroll-viewport>

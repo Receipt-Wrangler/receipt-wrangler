@@ -1,0 +1,125 @@
+<mat-drawer-container class="h-100">
+  <mat-drawer
+    *ngIf="isLoggedIn | async"
+    mode="side"
+    [opened]="isSidebarOpen | async"
+  >
+    <div
+      class="drawer-container d-flex flex-column align-items-center pt-3 ps-3 pe-3"
+    >
+      <app-avatar
+        class="cursor-pointer"
+        [user]="(loggedInUser | async) ?? $any({})"
+        [matMenuTriggerFor]="menu"
+      ></app-avatar>
+      <button
+        mat-fab
+        class="add-button mt-2"
+        (click)="toggleAddButtonExpanded()"
+        [ngClass]="{
+          'add-button-rotated mt-4': addButtonExpanded,
+          'mb-2': !addButtonExpanded
+        }"
+      >
+        <mat-icon>add</mat-icon>
+      </button>
+      <div
+        class="add-buttons-container"
+        [ngClass]="{
+          'add-button-container-expanded': this.addButtonExpanded,
+          'add-buttons-close': this.addButtonExpanded === false
+        }"
+      >
+        <!-- <button
+          mat-icon-button
+          routerLinkActive="active-sub-button"
+          matTooltip="Add User"
+          type="button"
+          color="accent"
+        >
+          <mat-icon>person</mat-icon>
+        </button> -->
+        <button
+          class="mt-4 mb-1 add-sub-button-1"
+          mat-icon-button
+          routerLinkActive="active-sub-button"
+          matTooltip="Add Receipt"
+          type="button"
+          color="accent"
+          [routerLink]="['/receipts/add']"
+        >
+          <mat-icon>article</mat-icon>
+        </button>
+        <app-quick-scan-button class="mb-1 add-sub-button-2"></app-quick-scan-button>
+        <button
+          class="mb-1 add-sub-button-3"
+          mat-icon-button
+          routerLinkActive="active-sub-button"
+          matTooltip="Add Group"
+          type="button"
+          color="accent"
+          [routerLink]="['/groups/create']"
+        >
+          <mat-icon>group</mat-icon>
+        </button>
+      </div>
+      <hr/>
+      <div *ngFor="let group of groups | async" class="p-2">
+        <ng-container
+          [ngTemplateOutlet]="groupAvatar"
+          [ngTemplateOutletContext]="{ group: group }"
+        ></ng-container>
+      </div>
+    </div>
+
+    <mat-menu #menu="matMenu">
+      <button *appRole="'ADMIN'" [routerLink]="['/users']" mat-menu-item>
+        Manage Users
+      </button>
+      <button [routerLink]="['/categories']" mat-menu-item>
+        Manage Categories
+      </button>
+      <button [routerLink]="['/tags']" mat-menu-item>Manage Tags</button>
+      <button [routerLink]="['/groups']" mat-menu-item>Manage Groups</button>
+      <button [routerLink]="['/custom-fields']" mat-menu-item>Manage Custom Fields</button>
+      <button mat-menu-item [routerLink]="['/settings/user-profile/view']">
+        User Settings
+      </button>
+      <button *appRole="'ADMIN'" [routerLink]="['/system-settings/settings/view']" mat-menu-item>
+        System Settings
+      </button>
+      <button *appRole="'ADMIN'" mat-menu-item (click)="openImportDialog()">
+        Imports
+      </button>
+      <button mat-menu-item (click)="openAboutDialog()">About</button>
+      <button mat-menu-item (click)="logout()">Logout</button>
+    </mat-menu>
+  </mat-drawer>
+  <mat-drawer-content class="drawer-content">
+    <app-header class="d-block sticky-top"></app-header>
+    <div
+      [ngClass]="{
+      'p-4': isLoggedIn | async,
+      }"
+      class="d-block"
+    >
+      <router-outlet></router-outlet>
+    </div>
+  </mat-drawer-content>
+</mat-drawer-container>
+
+<ng-template #groupAvatar let-group="group">
+  <div class="d-flex align-items-center group-avatar-container">
+    <div
+      [ngClass]="{
+        'active-group': (selectedGroupId | async) === group?.id?.toString()
+      }"
+      class="active-dot"
+    ></div>
+    <app-avatar
+      class="cursor-pointer"
+      [group]="group"
+      (click)="groupClicked(group.id)"
+    ></app-avatar>
+  </div>
+</ng-template>

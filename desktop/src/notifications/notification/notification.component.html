@@ -1,0 +1,12 @@
+<div class="d-flex align-items-center">
+  <a class="notification" [routerLink]="[link]">
+    <div class="w-100">
+      <div class="w-100 d-flex flex-column">
+        <strong>{{ notification.title }}</strong>
+        <div>{{ parsedBody }}</div>
+        <small>{{ notification.createdAt | date }}</small>
+      </div>
+    </div>
+  </a>
+  <app-cancel-button (clicked)="deleteNotification()"></app-cancel-button>
+</div>

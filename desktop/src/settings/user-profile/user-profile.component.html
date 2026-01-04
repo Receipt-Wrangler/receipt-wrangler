@@ -1,0 +1,29 @@
+<app-form
+  [form]="form"
+  [formConfig]="formConfig"
+  [formTemplate]="formTemplate"
+  [editButtonRouterLink]="['/settings/user-profile/edit']"
+  [editButtonQueryParams]="{tab: 'user-profile'}"
+  (submitted)="submit()"
+></app-form>
+
+<ng-template #formTemplate>
+  <app-form-section headerText="User Details">
+    <app-input
+      label="Username"
+      [inputFormControl]="form | formGet : 'username'"
+      [readonly]="true"
+      [matTooltip]="formConfig.mode === formMode.edit ? usernameTooltip : ''"
+    ></app-input>
+    <app-input
+      label="Displayname"
+      [inputFormControl]="form | formGet : 'displayName'"
+      [readonly]="formConfig.mode | inputReadonly"
+    ></app-input>
+    <app-color-picker
+      label="Default avatar color"
+      [inputFormControl]="form | formGet : 'defaultAvatarColor'"
+      [readonly]="formConfig.mode | inputReadonly"
+    ></app-color-picker>
+  </app-form-section>
+</ng-template>

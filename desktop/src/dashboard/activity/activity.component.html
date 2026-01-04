@@ -1,0 +1,56 @@
+<app-card cardStyle="dashboard-card">
+  <ng-container header>
+    <h3> {{ widget.name }}</h3>
+  </ng-container>
+  <div content>
+    <app-dashboard-list
+      noItemFoundText="No activities found"
+      [items]="activities"
+      [itemSize]="80"
+      [itemAvatarTemplate]="itemAvatarTemplate"
+      [itemHeaderTemplate]="itemHeaderTemplate"
+      [itemLineTemplate]="itemLineTemplate"
+      [itemMetaTemplate]="itemMetaTemplate"
+      [buildRouterLinkString]="buildItemRouterLinkString"
+      (endOfListReached)="endOfListReached()"
+    ></app-dashboard-list>
+  </div>
+</app-card>
+
+<ng-template #itemHeaderTemplate let-item=item>
+  <strong>
+    {{ item.type | systemTaskType }}
+  </strong>
+  @if (group?.isAllGroup) {
+    in {{ (item.groupId | group)?.name }}
+  }
+</ng-template>
+
+<ng-template #itemLineTemplate let-item=item>
+  Done by {{ (item.ranByUserId | user)?.displayName ?? "System" }}
+</ng-template>
+
+<ng-template #itemAvatarTemplate let-item=item>
+  <app-date-block [date]="item.startedAt"></app-date-block>
+</ng-template>
+
+<ng-template #itemMetaTemplate let-item=item>
+  <app-status-chip
+    class="aligned-content"
+    [customStatus]="item.status | titlecase"
+    [customStatusColor]="item.status === SystemTaskStatus.Succeeded ? 'green' : 'red'"
+  ></app-status-chip>
+  <div class="aligned-content ms-2">
+    {{ item.startedAt | duration }}
+  </div>
+  @if (item.canBeRestarted && !ranActivities[item.id] && (groupId | groupRole: GroupRole.Editor)) {
+    <app-button
+      class="aligned-content"
+      matButtonType="iconButton"
+      icon="refresh"
+      (clicked)="onRefreshButtonClick(item.id)"
+    ></app-button>
+  }
+</ng-template>
+
+

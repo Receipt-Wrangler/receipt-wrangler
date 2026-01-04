@@ -1,0 +1,21 @@
+<div class="mb-3 form-section-header" [ngClass]="{ 'mx-3': indent }">
+  <div class="d-flex align-items-center">
+    <div class="d-flex flex-column">
+      <strong> {{ headerText }}</strong>
+      @if (subtitle) {
+        <small>{{ subtitle }}</small>
+      }
+    </div>
+
+    <div class="ms-1">
+      <ng-container
+        *ngIf="headerButtonsTemplate"
+        [ngTemplateOutlet]="headerButtonsTemplate"
+      >
+      </ng-container>
+    </div>
+  </div>
+</div>
+<div [ngClass]="{ 'mx-3': indent }">
+  <ng-content></ng-content>
+</div>

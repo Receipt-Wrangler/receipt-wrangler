@@ -1,0 +1,19 @@
+<mat-form-field class="w-100">
+  <mat-label>{{ label }}</mat-label>
+  <div class="d-flex align-items-center">
+    <input
+      #nativeInput
+      matInput
+      [readonly]="readonly"
+      [formControl]="inputFormControl"
+    />
+    <input
+      class="w-25"
+      type="color"
+      [value]="inputFormControl.value"
+      [readOnly]="readonly"
+      (click)="handleClick($event)"
+      (change)="colorSelected($event)"
+    />
+  </div>
+</mat-form-field>

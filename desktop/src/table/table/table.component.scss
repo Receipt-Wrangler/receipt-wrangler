@@ -1,0 +1,43 @@
+@use "../../variables.scss" as variables;
+
+:host {
+  display: block;
+  border-radius: variables.$border-radius-xl;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  background-color: #ffffff;
+  overflow: hidden;
+  box-shadow: variables.$shadow-md;
+}
+
+// Consistent table row borders
+.mat-mdc-table {
+  .mat-mdc-row {
+    border-bottom: none !important;
+    
+    .mat-mdc-cell {
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+    }
+  }
+  
+  // Keep border on last row cells for consistent appearance
+}
+
+tr.example-detail-row {
+  height: 0;
+}
+
+tr.expanded-row:not(.example-expanded-row):hover {
+  background: whitesmoke;
+}
+
+tr.expanded-row:not(.example-expanded-row):active {
+  background: #efefef;
+}
+
+.expanded-row td {
+  border-bottom-width: 0;
+}
+
+.expanded-row-content {
+  overflow: hidden;
+}

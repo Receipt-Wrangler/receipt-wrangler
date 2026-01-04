@@ -1,0 +1,49 @@
+app-filtered-receipts {
+  .amount-info {
+    font-weight: 600;
+    margin-right: 8px;
+  }
+
+  .paid-by-info {
+    color: #666;
+    font-size: 0.9em;
+
+    .user-name {
+      font-weight: 500;
+      color: #333;
+      max-width: 150px;
+      display: inline-block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: top;
+    }
+  }
+
+  .date-info {
+    color: #888;
+    font-size: 0.85em;
+    font-weight: 400;
+    padding-left: 8px; // Align with content above
+  }
+
+  // Ensure proper spacing between lines
+  .mat-mdc-list-item-unscoped-content {
+    .mat-mdc-list-item-line {
+      margin-bottom: 2px;
+    }
+  }
+
+  // Responsive adjustments
+  @media (max-width: 768px) {
+    .user-name {
+      max-width: 100px !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .user-name {
+      max-width: 80px !important;
+    }
+  }
+}

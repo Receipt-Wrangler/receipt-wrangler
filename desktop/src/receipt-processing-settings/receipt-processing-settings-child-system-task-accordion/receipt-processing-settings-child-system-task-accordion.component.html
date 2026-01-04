@@ -1,0 +1,67 @@
+<app-accordion [panels]="accordionPanels"></app-accordion>
+
+<ng-template #ocrProcessingDetails let-index="index">
+  <ng-template
+    [ngTemplateOutlet]="dates"
+    [ngTemplateOutletContext]="{ index: index }"
+  ></ng-template>
+  <span class="d-flex flex-column w-25">
+    {{ childTasks[index].resultDescription }}
+  </span>
+</ng-template>
+
+
+<ng-template #promptGenerationDetails let-index="index">
+  <ng-template
+    [ngTemplateOutlet]="dates"
+    [ngTemplateOutletContext]="{ index: index }"
+  ></ng-template>
+  <span class="d-flex flex-column w-25">
+    {{ childTasks[index].resultDescription }}
+  </span>
+</ng-template>
+
+<ng-template
+  #chatCompletionDetails
+  let-index="index"
+>
+  <ng-template
+    [ngTemplateOutlet]="dates"
+    [ngTemplateOutletContext]="{ index: index }"
+  ></ng-template>
+  <app-pretty-json
+    [json]="childTasks[index].resultDescription"
+  ></app-pretty-json>
+</ng-template>
+
+<ng-template
+  #receiptUploadedDetails
+  let-index="index"
+>
+  <ng-template
+    [ngTemplateOutlet]="dates"
+    [ngTemplateOutletContext]="{ index: index }"
+  ></ng-template>
+  <app-pretty-json
+    [json]="childTasks[index].resultDescription"
+  ></app-pretty-json>
+</ng-template>
+
+<ng-template #statusIcon let-index="index">
+  <app-status-icon
+    class="status-icon-margin"
+    [taskStatus]="childTasks[index].status || SystemTaskStatus.Failed"
+  ></app-status-icon>
+</ng-template>
+
+<ng-template #dates let-index="index">
+  <div class="d-flex flex-column">
+    <div class="d-flex">
+      Started at: {{ childTasks[index].startedAt | date: 'medium' }}
+    </div>
+    <div class="d-flex">
+      Ended at: {{ childTasks[index].endedAt | date: 'medium' }}
+    </div>
+  </div>
+  <br>
+</ng-template>

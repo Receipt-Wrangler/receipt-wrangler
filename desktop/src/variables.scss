@@ -1,0 +1,122 @@
+@use "sass:map";
+
+$basic-gray: #64748b;
+
+$mat-drawer-background-color: #fafafa;
+
+$primary-palette: (
+  50: #ccecff,
+  100: #bbe6ff,
+  200: #a4deff,
+  300: #85d2ff,
+  400: #5dc4ff,
+  500: #27b1ff,
+  600: #009efa,
+  700: #0086d4,
+  800: #0072b4,
+  900: #006199,
+  // ... continues to 900
+  contrast:
+  (
+    50: rgba(black, 0.87),
+    100: rgba(black, 0.87),
+    200: rgba(black, 0.87),
+    300: white,
+    // ... continues to 900
+  ),
+);
+
+// Sophisticated slate accent palette - perfect complement to bright blue
+$accent-palette: (
+  50: #f8fafc,
+  100: #f1f5f9,
+  200: #e2e8f0,
+  300: #cbd5e1,
+  400: #94a3b8,
+  500: #64748b,
+  600: #475569,
+  700: #334155,
+  800: #1e293b,
+  900: #0f172a,
+  contrast:
+  (
+    50: rgba(black, 0.87),
+    100: rgba(black, 0.87),
+    200: rgba(black, 0.87),
+    300: rgba(black, 0.87),
+    400: rgba(black, 0.87),
+    500: white,
+    600: white,
+    700: white,
+    800: white,
+    900: white,
+  ),
+);
+
+$warn-palette: (
+  50: #f5cfcf,
+  100: #f2bfbf,
+  200: #eea9a9,
+  300: #e88c8c,
+  400: #e06666,
+  500: #d63333,
+  600: #bc2626,
+  700: #a02020,
+  800: #881b1b,
+  900: #731717,
+  // ... continues to 900
+  contrast:
+  (
+    50: rgba(black, 0.87),
+    100: rgba(black, 0.87),
+    200: rgba(black, 0.87),
+    300: white,
+    // ... continues to 900
+  ),
+);
+
+$success-palette: (
+  50: #e8f5e9,
+  100: #c8e6c9,
+  200: #a5d6a7,
+  300: #81c784,
+  400: #66bb6a,
+  500: #4caf50,
+  600: #43a047,
+  700: #388e3c,
+  800: #2e7d32,
+  900: #1b5e20,
+  // ... continues to 900
+  contrast:
+  (
+    50: rgba(black, 0.87),
+    100: rgba(black, 0.87),
+    200: rgba(black, 0.87),
+    300: white,
+    // ... continues to 900
+  ),
+);
+
+// Modern, layered shadow system
+$global-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+$shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+$shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+$shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+// Modern spacing system
+$spacing-xs: 0.25rem; // 4px
+$spacing-sm: 0.5rem; // 8px
+$spacing-md: 1rem; // 16px
+$spacing-lg: 1.5rem; // 24px
+$spacing-xl: 2rem; // 32px
+$spacing-2xl: 3rem; // 48px
+
+// Border radius system
+$border-radius-sm: 0.25rem;
+$border-radius-md: 0.375rem;
+$border-radius-lg: 0.5rem;
+$border-radius-xl: 0.75rem;
+$border-radius-2xl: 1rem;
+
+$success-green: #10b981;

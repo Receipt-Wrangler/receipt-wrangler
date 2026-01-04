@@ -1,0 +1,96 @@
+.column-config-content {
+  min-width: 400px;
+  max-width: 500px;
+  
+  .description {
+    margin-bottom: 16px;
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 14px;
+  }
+}
+
+.column-list {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fafafa;
+  padding: 8px;
+  margin-bottom: 16px;
+  
+  .column-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    margin: 4px 0;
+    background: white;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      border-color: #e0e0e0;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    &.disabled {
+      opacity: 0.6;
+      background: #f5f5f5;
+    }
+    
+    &.cdk-drag-preview {
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      border-color: #2196f3;
+    }
+    
+    &.cdk-drag-placeholder {
+      opacity: 0.3;
+    }
+    
+    .drag-handle {
+      cursor: grab;
+      color: #666;
+      margin-right: 12px;
+      display: flex;
+      align-items: center;
+      
+      &:active {
+        cursor: grabbing;
+      }
+      
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+    }
+    
+    .column-checkbox {
+      flex: 1;
+      
+      ::ng-deep .mat-checkbox-label {
+        font-size: 14px;
+      }
+    }
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 16px;
+  
+  .reset-button {
+    color: #666;
+  }
+}
+
+.cdk-drop-list-dragging .column-item:not(.cdk-drag-placeholder) {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.cdk-drop-list {
+  .column-item {
+    &.cdk-drag-animating {
+      transition: transform 300ms cubic-bezier(0, 0, 0.2, 1);
+    }
+  }
+}
