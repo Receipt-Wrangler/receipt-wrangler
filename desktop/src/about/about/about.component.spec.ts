@@ -1,10 +1,10 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { NgxsModule } from "@ngxs/store";
-import { AboutState } from "../../store/about.state";
+import { provideStore } from "@ngxs/store";
 
 import { AboutComponent } from "./about.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { AboutState } from "../../store/about.state";
 
 describe("AboutComponent", () => {
   let component: AboutComponent;
@@ -12,9 +12,13 @@ describe("AboutComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [AboutComponent, NgxsModule.forRoot([AboutState])],
-    providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
-})
+      imports: [AboutComponent],
+      providers: [
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting(),
+        provideStore([AboutState])
+      ]
+    })
       .compileComponents();
 
     fixture = TestBed.createComponent(AboutComponent);

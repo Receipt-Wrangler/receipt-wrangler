@@ -18,9 +18,9 @@
     headerText="Build"
   >
     <div class="d-flex flex-column m-2">
-      <span>Version: {{ (about | async)?.version || 'unknown' }}</span>
-      @if ((about | async)?.buildDate !== "unknown") {
-        <span>Build Date: {{ ((about | async)?.buildDate | date) || 'unknown' }}</span>
+      <span>Version: {{ about()?.version || 'unknown' }}</span>
+      @if (about()?.buildDate !== "unknown") {
+        <span>Build Date: {{ (about()?.buildDate | date) || 'unknown' }}</span>
       } @else {
         <span>Build Date: unknown</span>
       }
