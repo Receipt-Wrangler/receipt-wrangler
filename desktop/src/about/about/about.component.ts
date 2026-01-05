@@ -1,11 +1,9 @@
 import { CommonModule } from "@angular/common";
-import { Component } from "@angular/core";
-import { Select } from "@ngxs/store";
-import { Observable } from "rxjs";
+import { Component, inject } from "@angular/core";
+import { Store } from "@ngxs/store";
 import { About } from "../../open-api/index";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { AboutState } from "../../store/about.state";
-import { StoreModule } from "../../store/store.module";
 
 interface Link {
   url: string;
@@ -16,14 +14,14 @@ interface Link {
     selector: "app-about",
     imports: [
         CommonModule,
-        SharedUiModule,
-        StoreModule
+        SharedUiModule
     ],
     templateUrl: "./about.component.html",
     styleUrl: "./about.component.scss"
 })
 export class AboutComponent {
-  @Select(AboutState.about) public about!: Observable<About>;
+  private store = inject(Store);
+  public about = this.store.selectSignal(AboutState.about);
 
   public links: Link[] = [
     {
