@@ -24,6 +24,7 @@ api/systemTask.service.ts
 api/tag.service.ts
 api/user.service.ts
 api/userPreferences.service.ts
+api/widget.service.ts
 configuration.ts
 encoder.ts
 git_push.sh
@@ -44,6 +45,7 @@ model/bulkStatusUpdateCommand.ts
 model/bulkUserDeleteCommand.ts
 model/category.ts
 model/categoryView.ts
+model/chartGrouping.ts
 model/checkEmailConnectivityCommand.ts
 model/checkReceiptProcessingSettingsConnectivityCommand.ts
 model/claims.ts
@@ -88,6 +90,9 @@ model/pagedData.ts
 model/pagedDataDataInner.ts
 model/pagedGroupRequestCommand.ts
 model/pagedRequestCommand.ts
+model/pieChartData.ts
+model/pieChartDataCommand.ts
+model/pieChartDataPoint.ts
 model/prompt.ts
 model/queueName.ts
 model/receipt.ts

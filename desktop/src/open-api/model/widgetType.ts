@@ -9,11 +9,12 @@
  */
 
 
-export type WidgetType = 'GROUP_SUMMARY' | 'FILTERED_RECEIPTS' | 'GROUP_ACTIVITY';
+export type WidgetType = 'GROUP_SUMMARY' | 'FILTERED_RECEIPTS' | 'GROUP_ACTIVITY' | 'PIE_CHART';
 
 export const WidgetType = {
     GroupSummary: 'GROUP_SUMMARY' as WidgetType,
     FilteredReceipts: 'FILTERED_RECEIPTS' as WidgetType,
-    GroupActivity: 'GROUP_ACTIVITY' as WidgetType
+    GroupActivity: 'GROUP_ACTIVITY' as WidgetType,
+    PieChart: 'PIE_CHART' as WidgetType
 };
 

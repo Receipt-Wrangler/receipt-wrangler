@@ -1,0 +1,30 @@
+<app-card cardStyle="dashboard-card">
+  <ng-container header>
+    <div class="d-flex justify-content-between align-items-center">
+      <h3>
+        {{ widget.name || 'Pie Chart' }}
+      </h3>
+      <span class="badge bg-secondary">{{ getChartGroupingLabel() }}</span>
+    </div>
+  </ng-container>
+  <ng-container content>
+    <div class="pie-chart-container">
+      @if (isLoading) {
+        <div class="loading-container">
+          <span>Loading...</span>
+        </div>
+      } @else if (!hasData) {
+        <div class="no-data-container">
+          <span>No data available</span>
+        </div>
+      } @else {
+        <canvas
+          baseChart
+          [data]="pieChartData"
+          [options]="pieChartOptions"
+          type="pie"
+        ></canvas>
+      }
+    </div>
+  </ng-container>
+</app-card>

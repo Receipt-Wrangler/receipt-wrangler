@@ -119,6 +119,7 @@ export interface PagedDataDataInner {
     ranByUserId?: number;
     receiptId?: number;
     resultDescription?: string;
+    apiKeyId?: string;
     childSystemTasks?: Array<SystemTask>;
     aiType?: AiType;
     /**

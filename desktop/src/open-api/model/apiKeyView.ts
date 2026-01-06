@@ -50,9 +50,5 @@ export interface ApiKeyView {
      * When the API key was last used
      */
     lastUsedAt?: string;
-    /**
-     * When the API key was revoked
-     */
-    revokedAt?: string;
 }
 

@@ -31,6 +31,7 @@ export interface SystemTask {
     receiptId?: number;
     groupId?: number;
     resultDescription?: string;
+    apiKeyId?: string;
     childSystemTasks?: Array<SystemTask>;
 }
 export namespace SystemTask {

@@ -26,6 +26,10 @@ export interface ReceiptPagedRequestCommand {
     orderBy?: string;
     sortDirection?: SortDirection;
     filter?: ReceiptPagedRequestFilter;
+    /**
+     * Whether to include all receipt associations (receiptItems, comments, customFields, imageFiles, etc.)
+     */
+    fullReceipts?: boolean;
 }
 export namespace ReceiptPagedRequestCommand {
 }
