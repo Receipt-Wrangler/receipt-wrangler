@@ -9,22 +9,13 @@
   </ng-container>
   <ng-container content>
     <div class="pie-chart-container">
-      @if (isLoading) {
-        <div class="loading-container">
-          <span>Loading...</span>
-        </div>
-      } @else if (!hasData) {
-        <div class="no-data-container">
-          <span>No data available</span>
-        </div>
-      } @else {
-        <canvas
-          baseChart
-          [data]="pieChartData"
-          [options]="pieChartOptions"
-          type="pie"
-        ></canvas>
-      }
+      <app-pie-chart-ui
+        [chartData]="pieChartData"
+        [chartOptions]="pieChartOptions"
+        [isLoading]="isLoading"
+        [hasData]="hasData"
+        height="300px"
+      ></app-pie-chart-ui>
     </div>
   </ng-container>
 </app-card>

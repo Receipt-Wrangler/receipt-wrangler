@@ -1,7 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { Component, Input, OnInit, OnChanges, SimpleChanges } from "@angular/core";
 import { ChartConfiguration, ChartData } from "chart.js";
-import { NgChartsModule } from "ng2-charts";
 import { take, tap } from "rxjs";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { ChartGrouping, PieChartData, PieChartDataCommand, Widget, WidgetService } from "../../open-api";
@@ -11,7 +10,7 @@ import { ChartGrouping, PieChartData, PieChartDataCommand, Widget, WidgetService
   templateUrl: "./pie-chart.component.html",
   styleUrls: ["./pie-chart.component.scss"],
   standalone: true,
-  imports: [CommonModule, SharedUiModule, NgChartsModule]
+  imports: [CommonModule, SharedUiModule]
 })
 export class PieChartComponent implements OnInit, OnChanges {
   @Input() public widget!: Widget;

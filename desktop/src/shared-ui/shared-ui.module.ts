@@ -60,6 +60,7 @@ import { SystemTaskTypePipe } from "./task-table/system-task-type.pipe";
 import { TaskTableComponent } from "./task-table/task-table.component";
 import { EditableListComponent } from './editable-list/editable-list.component';
 import { IconAutocompleteComponent } from './icon-autocomplete/icon-autocomplete.component';
+import { PieChartUiComponent } from './pie-chart/pie-chart.component';
 
 @NgModule({
   declarations: [
@@ -127,6 +128,7 @@ import { IconAutocompleteComponent } from './icon-autocomplete/icon-autocomplete
     MatMenuModule,
     TableModule,
     UserAutocompleteModule,
+    PieChartUiComponent,
   ],
   exports: [
     AddButtonComponent,
@@ -165,6 +167,7 @@ import { IconAutocompleteComponent } from './icon-autocomplete/icon-autocomplete
     QueueStartMenuComponent,
     EditableListComponent,
     IconAutocompleteComponent,
+    PieChartUiComponent,
   ],
   providers: [CurrencyPipe],
 })
