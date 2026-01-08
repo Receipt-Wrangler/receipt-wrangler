@@ -9,6 +9,7 @@ part of 'widget_type.dart';
 const WidgetType _$GROUP_SUMMARY = const WidgetType._('GROUP_SUMMARY');
 const WidgetType _$FILTERED_RECEIPTS = const WidgetType._('FILTERED_RECEIPTS');
 const WidgetType _$GROUP_ACTIVITY = const WidgetType._('GROUP_ACTIVITY');
+const WidgetType _$PIE_CHART = const WidgetType._('PIE_CHART');
 
 WidgetType _$valueOf(String name) {
   switch (name) {
@@ -18,6 +19,8 @@ WidgetType _$valueOf(String name) {
       return _$FILTERED_RECEIPTS;
     case 'GROUP_ACTIVITY':
       return _$GROUP_ACTIVITY;
+    case 'PIE_CHART':
+      return _$PIE_CHART;
     default:
       throw new ArgumentError(name);
   }
@@ -28,6 +31,7 @@ final BuiltSet<WidgetType> _$values =
   _$GROUP_SUMMARY,
   _$FILTERED_RECEIPTS,
   _$GROUP_ACTIVITY,
+  _$PIE_CHART,
 ]);
 
 class _$WidgetTypeMeta {
@@ -35,6 +39,7 @@ class _$WidgetTypeMeta {
   WidgetType get GROUP_SUMMARY => _$GROUP_SUMMARY;
   WidgetType get FILTERED_RECEIPTS => _$FILTERED_RECEIPTS;
   WidgetType get GROUP_ACTIVITY => _$GROUP_ACTIVITY;
+  WidgetType get PIE_CHART => _$PIE_CHART;
   WidgetType valueOf(String name) => _$valueOf(name);
   BuiltSet<WidgetType> get values => _$values;
 }
@@ -51,11 +56,13 @@ class _$WidgetTypeSerializer implements PrimitiveSerializer<WidgetType> {
     'GROUP_SUMMARY': 'GROUP_SUMMARY',
     'FILTERED_RECEIPTS': 'FILTERED_RECEIPTS',
     'GROUP_ACTIVITY': 'GROUP_ACTIVITY',
+    'PIE_CHART': 'PIE_CHART',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'GROUP_SUMMARY': 'GROUP_SUMMARY',
     'FILTERED_RECEIPTS': 'FILTERED_RECEIPTS',
     'GROUP_ACTIVITY': 'GROUP_ACTIVITY',
+    'PIE_CHART': 'PIE_CHART',
   };
 
   @override

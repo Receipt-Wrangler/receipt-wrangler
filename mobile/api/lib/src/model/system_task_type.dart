@@ -33,6 +33,8 @@ class SystemTaskType extends EnumClass {
   static const SystemTaskType RECEIPT_UPDATED = _$RECEIPT_UPDATED;
   @BuiltValueEnumConst(wireName: r'PROMPT_GENERATED')
   static const SystemTaskType PROMPT_GENERATED = _$PROMPT_GENERATED;
+  @BuiltValueEnumConst(wireName: r'API_KEY_DELETED')
+  static const SystemTaskType API_KEY_DELETED = _$API_KEY_DELETED;
 
   static Serializer<SystemTaskType> get serializer => _$systemTaskTypeSerializer;
 

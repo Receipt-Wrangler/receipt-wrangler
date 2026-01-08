@@ -17,7 +17,12 @@ import 'package:openapi/src/model/date.dart';
 import 'package:openapi/src/model/about.dart';
 import 'package:openapi/src/model/activity.dart';
 import 'package:openapi/src/model/ai_type.dart';
+import 'package:openapi/src/model/api_key_filter.dart';
+import 'package:openapi/src/model/api_key_result.dart';
+import 'package:openapi/src/model/api_key_scope.dart';
+import 'package:openapi/src/model/api_key_view.dart';
 import 'package:openapi/src/model/app_data.dart';
+import 'package:openapi/src/model/associated_api_keys.dart';
 import 'package:openapi/src/model/associated_entity_type.dart';
 import 'package:openapi/src/model/associated_group.dart';
 import 'package:openapi/src/model/base_model.dart';
@@ -25,6 +30,7 @@ import 'package:openapi/src/model/bulk_status_update_command.dart';
 import 'package:openapi/src/model/bulk_user_delete_command.dart';
 import 'package:openapi/src/model/category.dart';
 import 'package:openapi/src/model/category_view.dart';
+import 'package:openapi/src/model/chart_grouping.dart';
 import 'package:openapi/src/model/check_email_connectivity_command.dart';
 import 'package:openapi/src/model/check_receipt_processing_settings_connectivity_command.dart';
 import 'package:openapi/src/model/claims.dart';
@@ -63,10 +69,14 @@ import 'package:openapi/src/model/magic_fill_command.dart';
 import 'package:openapi/src/model/notification.dart';
 import 'package:openapi/src/model/ocr_engine.dart';
 import 'package:openapi/src/model/paged_activity_request_command.dart';
+import 'package:openapi/src/model/paged_api_key_request_command.dart';
 import 'package:openapi/src/model/paged_data.dart';
 import 'package:openapi/src/model/paged_data_data_inner.dart';
 import 'package:openapi/src/model/paged_group_request_command.dart';
 import 'package:openapi/src/model/paged_request_command.dart';
+import 'package:openapi/src/model/pie_chart_data.dart';
+import 'package:openapi/src/model/pie_chart_data_command.dart';
+import 'package:openapi/src/model/pie_chart_data_point.dart';
 import 'package:openapi/src/model/prompt.dart';
 import 'package:openapi/src/model/queue_name.dart';
 import 'package:openapi/src/model/receipt.dart';
@@ -91,6 +101,7 @@ import 'package:openapi/src/model/token_pair.dart';
 import 'package:openapi/src/model/update_group_receipt_settings_command.dart';
 import 'package:openapi/src/model/update_group_settings_command.dart';
 import 'package:openapi/src/model/update_profile_command.dart';
+import 'package:openapi/src/model/upsert_api_key_command.dart';
 import 'package:openapi/src/model/upsert_category_command.dart';
 import 'package:openapi/src/model/upsert_comment_command.dart';
 import 'package:openapi/src/model/upsert_custom_field_command.dart';
@@ -122,7 +133,12 @@ part 'serializers.g.dart';
   About,
   Activity,
   AiType,
+  ApiKeyFilter,
+  ApiKeyResult,
+  ApiKeyScope,
+  ApiKeyView,
   AppData,
+  AssociatedApiKeys,
   AssociatedEntityType,
   AssociatedGroup,
   BaseModel,$BaseModel,
@@ -130,6 +146,7 @@ part 'serializers.g.dart';
   BulkUserDeleteCommand,
   Category,
   CategoryView,
+  ChartGrouping,
   CheckEmailConnectivityCommand,
   CheckReceiptProcessingSettingsConnectivityCommand,
   Claims,
@@ -168,10 +185,14 @@ part 'serializers.g.dart';
   Notification,
   OcrEngine,
   PagedActivityRequestCommand,
+  PagedApiKeyRequestCommand,
   PagedData,
   PagedDataDataInner,
   PagedGroupRequestCommand,
   PagedRequestCommand,$PagedRequestCommand,
+  PieChartData,
+  PieChartDataCommand,
+  PieChartDataPoint,
   Prompt,
   QueueName,
   Receipt,
@@ -196,6 +217,7 @@ part 'serializers.g.dart';
   UpdateGroupReceiptSettingsCommand,
   UpdateGroupSettingsCommand,
   UpdateProfileCommand,
+  UpsertApiKeyCommand,
   UpsertCategoryCommand,
   UpsertCommentCommand,
   UpsertCustomFieldCommand,

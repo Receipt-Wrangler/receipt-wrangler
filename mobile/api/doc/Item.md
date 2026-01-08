@@ -10,13 +10,14 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **isTaxed** | **bool** | Is taxed (not used) | [optional] 
 **amount** | **String** | Amount the item costs | 
-**chargedToUserId** | **int** | User foreign key | 
+**chargedToUserId** | **int** | User foreign key | [optional] 
 **createdAt** | **String** |  | [optional] 
 **createdBy** | **int** |  | [optional] 
 **id** | **int** |  | [optional] 
 **name** | **String** | Item name | 
 **receiptId** | **int** | Receipt foreign key | 
 **status** | [**ItemStatus**](ItemStatus.md) |  | 
+**linkedItems** | [**BuiltList&lt;Item&gt;**](Item.md) | Items linked to this item (for sharing) | [optional] 
 **categories** | [**BuiltList&lt;Category&gt;**](Category.md) | Categories associated to the item | [optional] 
 **tags** | [**BuiltList&lt;Tag&gt;**](Tag.md) | Tags associated to the item | [optional] 
 **updatedAt** | **String** |  | [optional] 

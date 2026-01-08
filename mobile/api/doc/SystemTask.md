@@ -23,6 +23,7 @@ Name | Type | Description | Notes
 **receiptId** | **int** |  | [optional] 
 **groupId** | **int** |  | [optional] 
 **resultDescription** | **String** |  | [optional] 
+**apiKeyId** | **String** |  | [optional] 
 **childSystemTasks** | [**BuiltList&lt;SystemTask&gt;**](SystemTask.md) |  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

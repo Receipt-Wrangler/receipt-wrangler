@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:receipt_wrangler_mobile/groups/widgets/dashboard_widgets/group_activities.dart';
 import 'package:receipt_wrangler_mobile/groups/widgets/dashboard_widgets/group_summary.dart';
+import 'package:receipt_wrangler_mobile/groups/widgets/dashboard_widgets/pie_chart.dart';
 
 import 'dashboard_widgets/filtered_receipts.dart';
 
@@ -76,6 +77,11 @@ class _GroupDashboard extends State<GroupDashboard> {
             break;
           case api.WidgetType.GROUP_ACTIVITY:
             widgets.add(GroupActivities(
+              dashboardWidget: widget,
+            ));
+            break;
+          case api.WidgetType.PIE_CHART:
+            widgets.add(DashboardPieChart(
               dashboardWidget: widget,
             ));
             break;

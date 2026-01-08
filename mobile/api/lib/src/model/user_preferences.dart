@@ -2,13 +2,13 @@
 // AUTO-GENERATED FILE, DO NOT MODIFY!
 //
 
-import 'package:built_collection/built_collection.dart';
-import 'package:built_value/built_value.dart';
-import 'package:built_value/serializer.dart';
 // ignore_for_file: unused_element
 import 'package:openapi/src/model/base_model.dart';
 import 'package:openapi/src/model/receipt_status.dart';
+import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/user_shortcut.dart';
+import 'package:built_value/built_value.dart';
+import 'package:built_value/serializer.dart';
 
 part 'user_preferences.g.dart';
 
@@ -16,19 +16,18 @@ part 'user_preferences.g.dart';
 ///
 /// Properties:
 /// * [id] - User preferences id
-/// * [createdAt]
-/// * [createdBy]
+/// * [createdAt] 
+/// * [createdBy] 
 /// * [createdByString] - Created by entity's name
-/// * [updatedAt]
+/// * [updatedAt] 
 /// * [userId] - User foreign key
 /// * [quickScanDefaultGroupId] - Group foreign key
 /// * [quickScanDefaultPaidById] - User foreign key
 /// * [quickScanDefaultStatus] - Default quick scan status
 /// * [showLargeImagePreviews] - Whether to show large image previews
-/// * [userShortcuts]
+/// * [userShortcuts] 
 @BuiltValue()
-abstract class UserPreferences
-    implements BaseModel, Built<UserPreferences, UserPreferencesBuilder> {
+abstract class UserPreferences implements BaseModel, Built<UserPreferences, UserPreferencesBuilder> {
   /// Default quick scan status
   @BuiltValueField(wireName: r'quickScanDefaultStatus')
   ReceiptStatus? get quickScanDefaultStatus;
@@ -55,25 +54,22 @@ abstract class UserPreferences
 
   UserPreferences._();
 
-  factory UserPreferences([void updates(UserPreferencesBuilder b)]) =
-      _$UserPreferences;
+  factory UserPreferences([void updates(UserPreferencesBuilder b)]) = _$UserPreferences;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(UserPreferencesBuilder b) => b
-    ..quickScanDefaultStatus = ReceiptStatus.OPEN
-    ..createdBy = 0
-    ..quickScanDefaultGroupId = 0
-    ..quickScanDefaultPaidById = 0
-    ..createdByString = ''
-    ..updatedAt = '';
+      ..quickScanDefaultStatus = 'OPEN'
+      ..createdBy = 0
+      ..quickScanDefaultGroupId = 0
+      ..quickScanDefaultPaidById = 0
+      ..createdByString = ''
+      ..updatedAt = '';
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<UserPreferences> get serializer =>
-      _$UserPreferencesSerializer();
+  static Serializer<UserPreferences> get serializer => _$UserPreferencesSerializer();
 }
 
-class _$UserPreferencesSerializer
-    implements PrimitiveSerializer<UserPreferences> {
+class _$UserPreferencesSerializer implements PrimitiveSerializer<UserPreferences> {
   @override
   final Iterable<Type> types = const [UserPreferences, _$UserPreferences];
 
@@ -164,9 +160,7 @@ class _$UserPreferencesSerializer
     UserPreferences object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -286,3 +280,4 @@ class _$UserPreferencesSerializer
     return result.build();
   }
 }
+

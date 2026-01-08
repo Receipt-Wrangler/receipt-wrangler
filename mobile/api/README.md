@@ -47,14 +47,14 @@ Please follow the [installation procedure](#installation--usage) and then run th
 import 'package:openapi/openapi.dart';
 
 
-final api = Openapi().getAuthApi();
-final LogoutCommand logoutCommand = ; // LogoutCommand | Refresh token body for clients that don't use cookies
+final api = Openapi().getApiKeyApi();
+final UpsertApiKeyCommand upsertApiKeyCommand = ; // UpsertApiKeyCommand | API key details
 
 try {
-    final response = await api.getNewRefreshToken(logoutCommand);
+    final response = await api.createApiKey(upsertApiKeyCommand);
     print(response);
 } catch on DioException (e) {
-    print("Exception when calling AuthApi->getNewRefreshToken: $e\n");
+    print("Exception when calling ApiKeyApi->createApiKey: $e\n");
 }
 
 ```
@@ -65,6 +65,10 @@ All URIs are relative to */api*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+[*ApiKeyApi*](doc/ApiKeyApi.md) | [**createApiKey**](doc/ApiKeyApi.md#createapikey) | **POST** /apiKey/ | Create API key
+[*ApiKeyApi*](doc/ApiKeyApi.md) | [**deleteApiKey**](doc/ApiKeyApi.md#deleteapikey) | **DELETE** /apiKey/{id} | Delete API key
+[*ApiKeyApi*](doc/ApiKeyApi.md) | [**getPagedApiKeys**](doc/ApiKeyApi.md#getpagedapikeys) | **POST** /apiKey/paged | Get paged API keys
+[*ApiKeyApi*](doc/ApiKeyApi.md) | [**updateApiKey**](doc/ApiKeyApi.md#updateapikey) | **PUT** /apiKey/{id} | Update API key
 [*AuthApi*](doc/AuthApi.md) | [**getNewRefreshToken**](doc/AuthApi.md#getnewrefreshtoken) | **POST** /token/ | Get fresh tokens
 [*AuthApi*](doc/AuthApi.md) | [**login**](doc/AuthApi.md#login) | **POST** /login/ | Login
 [*AuthApi*](doc/AuthApi.md) | [**logout**](doc/AuthApi.md#logout) | **POST** /logout/ | Logout
@@ -163,6 +167,7 @@ Class | Method | HTTP request | Description
 [*UserApi*](doc/UserApi.md) | [**updateUserProfile**](doc/UserApi.md#updateuserprofile) | **PUT** /user/updateUserProfile | Update user profile
 [*UserPreferencesApi*](doc/UserPreferencesApi.md) | [**getUserPreferences**](doc/UserPreferencesApi.md#getuserpreferences) | **GET** /userPreferences | Get user preferences
 [*UserPreferencesApi*](doc/UserPreferencesApi.md) | [**updateUserPreferences**](doc/UserPreferencesApi.md#updateuserpreferences) | **PUT** /userPreferences | Update user preferences
+[*WidgetApi*](doc/WidgetApi.md) | [**getPieChartData**](doc/WidgetApi.md#getpiechartdata) | **POST** /widget/pieChart/{groupId} | Get pie chart data
 
 
 ## Documentation For Models
@@ -170,7 +175,12 @@ Class | Method | HTTP request | Description
  - [About](doc/About.md)
  - [Activity](doc/Activity.md)
  - [AiType](doc/AiType.md)
+ - [ApiKeyFilter](doc/ApiKeyFilter.md)
+ - [ApiKeyResult](doc/ApiKeyResult.md)
+ - [ApiKeyScope](doc/ApiKeyScope.md)
+ - [ApiKeyView](doc/ApiKeyView.md)
  - [AppData](doc/AppData.md)
+ - [AssociatedApiKeys](doc/AssociatedApiKeys.md)
  - [AssociatedEntityType](doc/AssociatedEntityType.md)
  - [AssociatedGroup](doc/AssociatedGroup.md)
  - [BaseModel](doc/BaseModel.md)
@@ -178,6 +188,7 @@ Class | Method | HTTP request | Description
  - [BulkUserDeleteCommand](doc/BulkUserDeleteCommand.md)
  - [Category](doc/Category.md)
  - [CategoryView](doc/CategoryView.md)
+ - [ChartGrouping](doc/ChartGrouping.md)
  - [CheckEmailConnectivityCommand](doc/CheckEmailConnectivityCommand.md)
  - [CheckReceiptProcessingSettingsConnectivityCommand](doc/CheckReceiptProcessingSettingsConnectivityCommand.md)
  - [Claims](doc/Claims.md)
@@ -216,10 +227,14 @@ Class | Method | HTTP request | Description
  - [Notification](doc/Notification.md)
  - [OcrEngine](doc/OcrEngine.md)
  - [PagedActivityRequestCommand](doc/PagedActivityRequestCommand.md)
+ - [PagedApiKeyRequestCommand](doc/PagedApiKeyRequestCommand.md)
  - [PagedData](doc/PagedData.md)
  - [PagedDataDataInner](doc/PagedDataDataInner.md)
  - [PagedGroupRequestCommand](doc/PagedGroupRequestCommand.md)
  - [PagedRequestCommand](doc/PagedRequestCommand.md)
+ - [PieChartData](doc/PieChartData.md)
+ - [PieChartDataCommand](doc/PieChartDataCommand.md)
+ - [PieChartDataPoint](doc/PieChartDataPoint.md)
  - [Prompt](doc/Prompt.md)
  - [QueueName](doc/QueueName.md)
  - [Receipt](doc/Receipt.md)
@@ -244,6 +259,7 @@ Class | Method | HTTP request | Description
  - [UpdateGroupReceiptSettingsCommand](doc/UpdateGroupReceiptSettingsCommand.md)
  - [UpdateGroupSettingsCommand](doc/UpdateGroupSettingsCommand.md)
  - [UpdateProfileCommand](doc/UpdateProfileCommand.md)
+ - [UpsertApiKeyCommand](doc/UpsertApiKeyCommand.md)
  - [UpsertCategoryCommand](doc/UpsertCategoryCommand.md)
  - [UpsertCommentCommand](doc/UpsertCommentCommand.md)
  - [UpsertCustomFieldCommand](doc/UpsertCustomFieldCommand.md)
@@ -277,6 +293,12 @@ Authentication schemes defined for the API:
 ### bearerAuth
 
 - **Type**: HTTP Bearer Token authentication (JWT)
+
+### apiKeyAuth
+
+- **Type**: API key
+- **API key parameter name**: Authorization
+- **Location**: HTTP header
 
 
 ## Author
