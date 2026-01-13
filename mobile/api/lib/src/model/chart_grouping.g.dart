@@ -44,7 +44,8 @@ abstract class _$ChartGroupingMixin {
   _$ChartGroupingMeta get ChartGrouping => const _$ChartGroupingMeta();
 }
 
-Serializer<ChartGrouping> _$chartGroupingSerializer = new _$ChartGroupingSerializer();
+Serializer<ChartGrouping> _$chartGroupingSerializer =
+    new _$ChartGroupingSerializer();
 
 class _$ChartGroupingSerializer implements PrimitiveSerializer<ChartGrouping> {
   static const Map<String, Object> _toWire = const <String, Object>{

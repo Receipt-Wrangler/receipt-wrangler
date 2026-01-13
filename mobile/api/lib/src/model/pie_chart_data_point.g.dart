@@ -16,7 +16,8 @@ class _$PieChartDataPoint extends PieChartDataPoint {
           [void Function(PieChartDataPointBuilder)? updates]) =>
       (new PieChartDataPointBuilder()..update(updates))._build();
 
-  _$PieChartDataPoint._({required this.label, required this.value}) : super._() {
+  _$PieChartDataPoint._({required this.label, required this.value})
+      : super._() {
     BuiltValueNullFieldError.checkNotNull(label, r'PieChartDataPoint', 'label');
     BuiltValueNullFieldError.checkNotNull(value, r'PieChartDataPoint', 'value');
   }

@@ -20,6 +20,8 @@ class _$SystemTask extends SystemTask {
   @override
   final String? startedAt;
   @override
+  final String? apiKeyId;
+  @override
   final String? resultDescription;
   @override
   final SystemTaskType? type;
@@ -50,6 +52,7 @@ class _$SystemTask extends SystemTask {
       this.groupId,
       this.childSystemTasks,
       this.startedAt,
+      this.apiKeyId,
       this.resultDescription,
       this.type,
       this.receiptId,
@@ -83,6 +86,7 @@ class _$SystemTask extends SystemTask {
         groupId == other.groupId &&
         childSystemTasks == other.childSystemTasks &&
         startedAt == other.startedAt &&
+        apiKeyId == other.apiKeyId &&
         resultDescription == other.resultDescription &&
         type == other.type &&
         receiptId == other.receiptId &&
@@ -104,6 +108,7 @@ class _$SystemTask extends SystemTask {
     _$hash = $jc(_$hash, groupId.hashCode);
     _$hash = $jc(_$hash, childSystemTasks.hashCode);
     _$hash = $jc(_$hash, startedAt.hashCode);
+    _$hash = $jc(_$hash, apiKeyId.hashCode);
     _$hash = $jc(_$hash, resultDescription.hashCode);
     _$hash = $jc(_$hash, type.hashCode);
     _$hash = $jc(_$hash, receiptId.hashCode);
@@ -127,6 +132,7 @@ class _$SystemTask extends SystemTask {
           ..add('groupId', groupId)
           ..add('childSystemTasks', childSystemTasks)
           ..add('startedAt', startedAt)
+          ..add('apiKeyId', apiKeyId)
           ..add('resultDescription', resultDescription)
           ..add('type', type)
           ..add('receiptId', receiptId)
@@ -174,6 +180,10 @@ class SystemTaskBuilder
   String? _startedAt;
   String? get startedAt => _$this._startedAt;
   set startedAt(covariant String? startedAt) => _$this._startedAt = startedAt;
+
+  String? _apiKeyId;
+  String? get apiKeyId => _$this._apiKeyId;
+  set apiKeyId(covariant String? apiKeyId) => _$this._apiKeyId = apiKeyId;
 
   String? _resultDescription;
   String? get resultDescription => _$this._resultDescription;
@@ -231,6 +241,7 @@ class SystemTaskBuilder
       _groupId = $v.groupId;
       _childSystemTasks = $v.childSystemTasks?.toBuilder();
       _startedAt = $v.startedAt;
+      _apiKeyId = $v.apiKeyId;
       _resultDescription = $v.resultDescription;
       _type = $v.type;
       _receiptId = $v.receiptId;
@@ -271,6 +282,7 @@ class SystemTaskBuilder
               groupId: groupId,
               childSystemTasks: _childSystemTasks?.build(),
               startedAt: startedAt,
+              apiKeyId: apiKeyId,
               resultDescription: resultDescription,
               type: type,
               receiptId: receiptId,

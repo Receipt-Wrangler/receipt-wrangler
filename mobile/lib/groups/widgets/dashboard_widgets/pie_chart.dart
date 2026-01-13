@@ -34,11 +34,13 @@ class _DashboardPieChartState extends State<DashboardPieChart> {
 
     // Extract chart grouping from configuration
     api.ChartGrouping chartGrouping = api.ChartGrouping.CATEGORIES;
-    if (config != null) {
+    if (config != null && config.containsKey('chartGrouping')) {
       var chartGroupingValue = config['chartGrouping'];
       if (chartGroupingValue != null) {
         try {
-          chartGrouping = api.ChartGrouping.valueOf(chartGroupingValue.toString());
+          // JsonObject wraps the value, use asString to extract it
+          var groupingString = chartGroupingValue.asString;
+          chartGrouping = api.ChartGrouping.valueOf(groupingString);
         } catch (_) {
           // Default to categories if parsing fails
         }
@@ -58,16 +60,21 @@ class _DashboardPieChartState extends State<DashboardPieChart> {
 
   String _getChartGroupingLabel() {
     var config = widget.dashboardWidget.configuration;
-    if (config != null) {
+    if (config != null && config.containsKey('chartGrouping')) {
       var chartGroupingValue = config['chartGrouping'];
       if (chartGroupingValue != null) {
-        switch (chartGroupingValue.toString()) {
-          case 'CATEGORIES':
-            return 'By Categories';
-          case 'TAGS':
-            return 'By Tags';
-          case 'PAIDBY':
-            return 'By Paid By';
+        try {
+          var groupingString = chartGroupingValue.asString;
+          switch (groupingString) {
+            case 'CATEGORIES':
+              return 'By Categories';
+            case 'TAGS':
+              return 'By Tags';
+            case 'PAIDBY':
+              return 'By Paid By';
+          }
+        } catch (_) {
+          // Ignore parsing errors
         }
       }
     }

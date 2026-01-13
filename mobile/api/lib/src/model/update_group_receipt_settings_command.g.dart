@@ -20,6 +20,10 @@ class _$UpdateGroupReceiptSettingsCommand
   final bool? hideItemTags;
   @override
   final bool? hideComments;
+  @override
+  final bool? hideShareCategories;
+  @override
+  final bool? hideShareTags;
 
   factory _$UpdateGroupReceiptSettingsCommand(
           [void Function(UpdateGroupReceiptSettingsCommandBuilder)? updates]) =>
@@ -32,7 +36,9 @@ class _$UpdateGroupReceiptSettingsCommand
       this.hideReceiptTags,
       this.hideItemCategories,
       this.hideItemTags,
-      this.hideComments})
+      this.hideComments,
+      this.hideShareCategories,
+      this.hideShareTags})
       : super._();
 
   @override
@@ -53,7 +59,9 @@ class _$UpdateGroupReceiptSettingsCommand
         hideReceiptTags == other.hideReceiptTags &&
         hideItemCategories == other.hideItemCategories &&
         hideItemTags == other.hideItemTags &&
-        hideComments == other.hideComments;
+        hideComments == other.hideComments &&
+        hideShareCategories == other.hideShareCategories &&
+        hideShareTags == other.hideShareTags;
   }
 
   @override
@@ -65,6 +73,8 @@ class _$UpdateGroupReceiptSettingsCommand
     _$hash = $jc(_$hash, hideItemCategories.hashCode);
     _$hash = $jc(_$hash, hideItemTags.hashCode);
     _$hash = $jc(_$hash, hideComments.hashCode);
+    _$hash = $jc(_$hash, hideShareCategories.hashCode);
+    _$hash = $jc(_$hash, hideShareTags.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -77,7 +87,9 @@ class _$UpdateGroupReceiptSettingsCommand
           ..add('hideReceiptTags', hideReceiptTags)
           ..add('hideItemCategories', hideItemCategories)
           ..add('hideItemTags', hideItemTags)
-          ..add('hideComments', hideComments))
+          ..add('hideComments', hideComments)
+          ..add('hideShareCategories', hideShareCategories)
+          ..add('hideShareTags', hideShareTags))
         .toString();
   }
 }
@@ -115,6 +127,16 @@ class UpdateGroupReceiptSettingsCommandBuilder
   bool? get hideComments => _$this._hideComments;
   set hideComments(bool? hideComments) => _$this._hideComments = hideComments;
 
+  bool? _hideShareCategories;
+  bool? get hideShareCategories => _$this._hideShareCategories;
+  set hideShareCategories(bool? hideShareCategories) =>
+      _$this._hideShareCategories = hideShareCategories;
+
+  bool? _hideShareTags;
+  bool? get hideShareTags => _$this._hideShareTags;
+  set hideShareTags(bool? hideShareTags) =>
+      _$this._hideShareTags = hideShareTags;
+
   UpdateGroupReceiptSettingsCommandBuilder() {
     UpdateGroupReceiptSettingsCommand._defaults(this);
   }
@@ -128,6 +150,8 @@ class UpdateGroupReceiptSettingsCommandBuilder
       _hideItemCategories = $v.hideItemCategories;
       _hideItemTags = $v.hideItemTags;
       _hideComments = $v.hideComments;
+      _hideShareCategories = $v.hideShareCategories;
+      _hideShareTags = $v.hideShareTags;
       _$v = null;
     }
     return this;
@@ -156,7 +180,9 @@ class UpdateGroupReceiptSettingsCommandBuilder
             hideReceiptTags: hideReceiptTags,
             hideItemCategories: hideItemCategories,
             hideItemTags: hideItemTags,
-            hideComments: hideComments);
+            hideComments: hideComments,
+            hideShareCategories: hideShareCategories,
+            hideShareTags: hideShareTags);
     replace(_$result);
     return _$result;
   }
