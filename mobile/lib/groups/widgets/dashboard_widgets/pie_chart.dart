@@ -16,7 +16,7 @@ class DashboardPieChart extends StatefulWidget {
 }
 
 class _DashboardPieChartState extends State<DashboardPieChart> {
-  late Future<api.Response<api.PieChartData>> _pieChartFuture;
+  late Future _pieChartFuture;
   bool _isInitialized = false;
 
   @override
@@ -83,14 +83,15 @@ class _DashboardPieChartState extends State<DashboardPieChart> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<api.Response<api.PieChartData>>(
+    return FutureBuilder(
       future: _pieChartFuture,
       builder: (context, snapshot) {
         bool isLoading = snapshot.connectionState != ConnectionState.done;
         List<PieChartDataPoint> data = [];
 
         if (snapshot.hasData && snapshot.data?.data != null) {
-          data = snapshot.data!.data!.data.map((point) {
+          api.PieChartData pieChartData = snapshot.data!.data!;
+          data = pieChartData.data.map((point) {
             return PieChartDataPoint(
               label: point.label,
               value: point.value,
