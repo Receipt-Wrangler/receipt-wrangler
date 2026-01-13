@@ -31,7 +31,7 @@ class FormItem {
       formId: Uuid().v4(),
       name: item.name,
       amount: item.amount,
-      chargedToUserId: item.chargedToUserId,
+      chargedToUserId: item.chargedToUserId ?? 0,
       receiptId: item.receiptId,
       status: item.status,
       categories: item.categories?.toList() ?? [],
