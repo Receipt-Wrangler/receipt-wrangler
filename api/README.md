@@ -1,8 +1,5 @@
 [![Build](https://github.com/Noah231515/receipt-wrangler-api/actions/workflows/docker-image.yml/badge.svg)](https://github.com/Noah231515/receipt-wrangler-api/actions/workflows/docker-image.yml) [![codecov](https://codecov.io/gh/Receipt-Wrangler/receipt-wrangler-api/graph/badge.svg?token=EUQMLBEKPK)](https://codecov.io/gh/Receipt-Wrangler/receipt-wrangler-api)
-
 # Receipt Wrangler API
-
-The Receipt Wrangler API powers the backend services for Receipt Wrangler, a free and open-source receipt management and splitting application.
 
 ## Overview
 

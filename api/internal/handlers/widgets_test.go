@@ -273,14 +273,15 @@ func TestGetPieChartData_InvalidChartGrouping(t *testing.T) {
 	}
 
 	// Verify error response contains validation error
-	var errorResponse structs.ValidatorError
+	// The response is a map[string]string, not a ValidatorError struct
+	var errorResponse map[string]string
 	err = json.Unmarshal(w.Body.Bytes(), &errorResponse)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
 
-	if _, exists := errorResponse.Errors["chartGrouping"]; !exists {
+	if _, exists := errorResponse["chartGrouping"]; !exists {
 		utils.PrintTestError(t, "missing chartGrouping error", "expected chartGrouping validation error")
 	}
 }
@@ -360,7 +361,7 @@ func TestGetPieChartData_WithFilter(t *testing.T) {
 		Filter: commands.ReceiptPagedRequestFilter{
 			Status: commands.PagedRequestField{
 				Value:     []interface{}{"OPEN"},
-				Operation: commands.EQUALS,
+				Operation: commands.CONTAINS,
 			},
 		},
 	}

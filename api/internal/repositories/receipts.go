@@ -577,7 +577,7 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 }
 
 func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.ReceiptPagedRequestCommand) (*gorm.DB, error) {
-	query := db.Model(models.Receipt{})
+	query := repository.GetDB().Model(models.Receipt{})
 	// Name
 	if pagedRequest.Filter.Name.Value != nil {
 		name := pagedRequest.Filter.Name.Value.(string)

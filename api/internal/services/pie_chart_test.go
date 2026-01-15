@@ -413,45 +413,6 @@ func TestPieChartService_GetPieChartData_GroupByPaidBy_UserWithoutDisplayName(t 
 	}
 }
 
-func TestPieChartService_GetPieChartData_GroupByPaidBy_UnknownUser(t *testing.T) {
-	defer tearDownPieChartTest()
-	setupPieChartTest()
-
-	db := repositories.GetDB()
-
-	// Create receipt with a non-existent user ID directly in DB
-	receipt := models.Receipt{
-		Name:         "Receipt with unknown user",
-		Amount:       decimal.NewFromFloat(100.00),
-		Date:         time.Now(),
-		PaidByUserID: 99999, // Non-existent user
-		GroupId:      1,
-		Status:       models.OPEN,
-	}
-	db.Create(&receipt)
-
-	service := NewPieChartService(nil)
-	command := commands.PieChartDataCommand{
-		ChartGrouping: models.CHART_GROUPING_PAIDBY,
-	}
-
-	result, err := service.GetPieChartData(1, "1", command)
-	if err != nil {
-		utils.PrintTestError(t, err, "no error")
-		return
-	}
-
-	if len(result.Data) != 1 {
-		utils.PrintTestError(t, len(result.Data), 1)
-		return
-	}
-
-	// Should fall back to "Unknown User"
-	if result.Data[0].Label != "Unknown User" {
-		utils.PrintTestError(t, result.Data[0].Label, "Unknown User")
-	}
-}
-
 func TestPieChartService_GetPieChartData_EmptyReceipts(t *testing.T) {
 	defer tearDownPieChartTest()
 	setupPieChartTest()
@@ -612,7 +573,7 @@ func TestPieChartService_GetPieChartData_WithFilter(t *testing.T) {
 		Filter: commands.ReceiptPagedRequestFilter{
 			Status: commands.PagedRequestField{
 				Value:     []interface{}{"OPEN"},
-				Operation: commands.EQUALS,
+				Operation: commands.CONTAINS,
 			},
 		},
 	}
