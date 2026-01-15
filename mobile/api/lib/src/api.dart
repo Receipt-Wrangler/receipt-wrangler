@@ -9,6 +9,7 @@ import 'package:openapi/src/auth/api_key_auth.dart';
 import 'package:openapi/src/auth/basic_auth.dart';
 import 'package:openapi/src/auth/bearer_auth.dart';
 import 'package:openapi/src/auth/oauth.dart';
+import 'package:openapi/src/api/api_key_api.dart';
 import 'package:openapi/src/api/auth_api.dart';
 import 'package:openapi/src/api/category_api.dart';
 import 'package:openapi/src/api/comment_api.dart';
@@ -30,6 +31,7 @@ import 'package:openapi/src/api/system_task_api.dart';
 import 'package:openapi/src/api/tag_api.dart';
 import 'package:openapi/src/api/user_api.dart';
 import 'package:openapi/src/api/user_preferences_api.dart';
+import 'package:openapi/src/api/widget_api.dart';
 
 class Openapi {
   static const String basePath = r'/api';
@@ -83,6 +85,12 @@ class Openapi {
     if (this.dio.interceptors.any((i) => i is ApiKeyAuthInterceptor)) {
       (this.dio.interceptors.firstWhere((element) => element is ApiKeyAuthInterceptor) as ApiKeyAuthInterceptor).apiKeys[name] = apiKey;
     }
+  }
+
+  /// Get ApiKeyApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  ApiKeyApi getApiKeyApi() {
+    return ApiKeyApi(dio, serializers);
   }
 
   /// Get AuthApi instance, base route and serializer can be overridden by a given but be careful,
@@ -209,5 +217,11 @@ class Openapi {
   /// by doing that all interceptors will not be executed
   UserPreferencesApi getUserPreferencesApi() {
     return UserPreferencesApi(dio, serializers);
+  }
+
+  /// Get WidgetApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  WidgetApi getWidgetApi() {
+    return WidgetApi(dio, serializers);
   }
 }

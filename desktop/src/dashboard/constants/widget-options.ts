@@ -13,5 +13,9 @@ export const widgetTypeOptions: FormOption[] = [
   {
     value: WidgetType.GroupActivity,
     displayValue: "Activity",
+  },
+  {
+    value: WidgetType.PieChart,
+    displayValue: "Pie Chart",
   }
 ];

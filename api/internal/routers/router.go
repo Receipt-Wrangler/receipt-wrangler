@@ -133,5 +133,9 @@ func BuildRootRouter() *chi.Mux {
 	apiKeyRouter := BuildApiKeyRouter()
 	rootRouter.Mount("/api/apiKey", apiKeyRouter)
 
+	// Widget router
+	widgetRouter := BuildWidgetRouter()
+	rootRouter.Mount("/api/widget", widgetRouter)
+
 	return rootRouter
 }

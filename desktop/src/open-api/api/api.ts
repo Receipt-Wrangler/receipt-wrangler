@@ -42,4 +42,6 @@ export * from './user.service';
 import { UserService } from './user.service';
 export * from './userPreferences.service';
 import { UserPreferencesService } from './userPreferences.service';
-export const APIS = [ApiKeyService, AuthService, CategoryService, CommentService, CustomFieldService, DashboardService, ExportService, FeatureConfigService, GroupsService, ImportService, NotificationsService, PromptService, ReceiptService, ReceiptImageService, ReceiptProcessingSettingsService, SearchService, SystemEmailService, SystemSettingsService, SystemTaskService, TagService, UserService, UserPreferencesService];
+export * from './widget.service';
+import { WidgetService } from './widget.service';
+export const APIS = [ApiKeyService, AuthService, CategoryService, CommentService, CustomFieldService, DashboardService, ExportService, FeatureConfigService, GroupsService, ImportService, NotificationsService, PromptService, ReceiptService, ReceiptImageService, ReceiptProcessingSettingsService, SearchService, SystemEmailService, SystemSettingsService, SystemTaskService, TagService, UserService, UserPreferencesService, WidgetService];

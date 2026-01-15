@@ -12,6 +12,10 @@ export class WidgetTypePipe implements PipeTransform {
         return "Filtered Receipts";
       case WidgetType.GroupSummary:
         return "Group Summary";
+      case WidgetType.GroupActivity:
+        return "Activity";
+      case WidgetType.PieChart:
+        return "Pie Chart";
     }
 
     return "";

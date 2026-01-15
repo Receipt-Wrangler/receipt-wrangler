@@ -14,6 +14,7 @@ const AssociatedEntityType _$SYSTEM_EMAIL =
 const AssociatedEntityType _$RECEIPT_PROCESSING_SETTINGS =
     const AssociatedEntityType._('RECEIPT_PROCESSING_SETTINGS');
 const AssociatedEntityType _$PROMPT = const AssociatedEntityType._('PROMPT');
+const AssociatedEntityType _$API_KEY = const AssociatedEntityType._('API_KEY');
 
 AssociatedEntityType _$valueOf(String name) {
   switch (name) {
@@ -27,6 +28,8 @@ AssociatedEntityType _$valueOf(String name) {
       return _$RECEIPT_PROCESSING_SETTINGS;
     case 'PROMPT':
       return _$PROMPT;
+    case 'API_KEY':
+      return _$API_KEY;
     default:
       throw new ArgumentError(name);
   }
@@ -39,6 +42,7 @@ final BuiltSet<AssociatedEntityType> _$values =
   _$SYSTEM_EMAIL,
   _$RECEIPT_PROCESSING_SETTINGS,
   _$PROMPT,
+  _$API_KEY,
 ]);
 
 class _$AssociatedEntityTypeMeta {
@@ -49,6 +53,7 @@ class _$AssociatedEntityTypeMeta {
   AssociatedEntityType get RECEIPT_PROCESSING_SETTINGS =>
       _$RECEIPT_PROCESSING_SETTINGS;
   AssociatedEntityType get PROMPT => _$PROMPT;
+  AssociatedEntityType get API_KEY => _$API_KEY;
   AssociatedEntityType valueOf(String name) => _$valueOf(name);
   BuiltSet<AssociatedEntityType> get values => _$values;
 }
@@ -70,6 +75,7 @@ class _$AssociatedEntityTypeSerializer
     'SYSTEM_EMAIL': 'SYSTEM_EMAIL',
     'RECEIPT_PROCESSING_SETTINGS': 'RECEIPT_PROCESSING_SETTINGS',
     'PROMPT': 'PROMPT',
+    'API_KEY': 'API_KEY',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'NOOP_ENTITY_TYPE': 'NOOP_ENTITY_TYPE',
@@ -77,6 +83,7 @@ class _$AssociatedEntityTypeSerializer
     'SYSTEM_EMAIL': 'SYSTEM_EMAIL',
     'RECEIPT_PROCESSING_SETTINGS': 'RECEIPT_PROCESSING_SETTINGS',
     'PROMPT': 'PROMPT',
+    'API_KEY': 'API_KEY',
   };
 
   @override

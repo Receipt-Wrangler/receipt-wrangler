@@ -55,6 +55,11 @@ class ReceiptImageApi {
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
             'type': 'http',
             'scheme': 'bearer',
             'name': 'bearerAuth',
@@ -157,6 +162,11 @@ class ReceiptImageApi {
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
             'type': 'http',
             'scheme': 'bearer',
             'name': 'bearerAuth',
@@ -211,6 +221,11 @@ class ReceiptImageApi {
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
             'type': 'http',
             'scheme': 'bearer',
             'name': 'bearerAuth',
@@ -289,6 +304,11 @@ class ReceiptImageApi {
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
             'type': 'http',
             'scheme': 'bearer',
             'name': 'bearerAuth',
@@ -372,6 +392,11 @@ class ReceiptImageApi {
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
             'type': 'http',
             'scheme': 'bearer',
             'name': 'bearerAuth',
@@ -484,6 +509,11 @@ class ReceiptImageApi {
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
             'type': 'http',
             'scheme': 'bearer',
             'name': 'bearerAuth',

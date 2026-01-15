@@ -18,6 +18,7 @@ part 'receipt_paged_request_command.g.dart';
 /// * [orderBy] - field to order on
 /// * [sortDirection] 
 /// * [filter] 
+/// * [fullReceipts] - Whether to include all receipt associations (receiptItems, comments, customFields, imageFiles, etc.)
 @BuiltValue()
 abstract class ReceiptPagedRequestCommand implements Built<ReceiptPagedRequestCommand, ReceiptPagedRequestCommandBuilder> {
   /// Page number
@@ -38,6 +39,10 @@ abstract class ReceiptPagedRequestCommand implements Built<ReceiptPagedRequestCo
 
   @BuiltValueField(wireName: r'filter')
   ReceiptPagedRequestFilter? get filter;
+
+  /// Whether to include all receipt associations (receiptItems, comments, customFields, imageFiles, etc.)
+  @BuiltValueField(wireName: r'fullReceipts')
+  bool? get fullReceipts;
 
   ReceiptPagedRequestCommand._();
 
@@ -91,6 +96,13 @@ class _$ReceiptPagedRequestCommandSerializer implements PrimitiveSerializer<Rece
       yield serializers.serialize(
         object.filter,
         specifiedType: const FullType(ReceiptPagedRequestFilter),
+      );
+    }
+    if (object.fullReceipts != null) {
+      yield r'fullReceipts';
+      yield serializers.serialize(
+        object.fullReceipts,
+        specifiedType: const FullType(bool),
       );
     }
   }
@@ -150,6 +162,13 @@ class _$ReceiptPagedRequestCommandSerializer implements PrimitiveSerializer<Rece
             specifiedType: const FullType(ReceiptPagedRequestFilter),
           ) as ReceiptPagedRequestFilter;
           result.filter.replace(valueDes);
+          break;
+        case r'fullReceipts':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.fullReceipts = valueDes;
           break;
         default:
           unhandled.add(key);

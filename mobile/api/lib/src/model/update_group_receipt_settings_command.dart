@@ -17,6 +17,8 @@ part 'update_group_receipt_settings_command.g.dart';
 /// * [hideItemCategories] - Hide receipt item categories
 /// * [hideItemTags] - Hide receipt item tags
 /// * [hideComments] - Hide receipt comments
+/// * [hideShareCategories] - Hide share categories
+/// * [hideShareTags] - Hide share tags
 @BuiltValue()
 abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupReceiptSettingsCommand, UpdateGroupReceiptSettingsCommandBuilder> {
   /// Hide receipt images
@@ -42,6 +44,14 @@ abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupRec
   /// Hide receipt comments
   @BuiltValueField(wireName: r'hideComments')
   bool? get hideComments;
+
+  /// Hide share categories
+  @BuiltValueField(wireName: r'hideShareCategories')
+  bool? get hideShareCategories;
+
+  /// Hide share tags
+  @BuiltValueField(wireName: r'hideShareTags')
+  bool? get hideShareTags;
 
   UpdateGroupReceiptSettingsCommand._();
 
@@ -105,6 +115,20 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
       yield r'hideComments';
       yield serializers.serialize(
         object.hideComments,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.hideShareCategories != null) {
+      yield r'hideShareCategories';
+      yield serializers.serialize(
+        object.hideShareCategories,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.hideShareTags != null) {
+      yield r'hideShareTags';
+      yield serializers.serialize(
+        object.hideShareTags,
         specifiedType: const FullType(bool),
       );
     }
@@ -172,6 +196,20 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
             specifiedType: const FullType(bool),
           ) as bool;
           result.hideComments = valueDes;
+          break;
+        case r'hideShareCategories':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.hideShareCategories = valueDes;
+          break;
+        case r'hideShareTags':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.hideShareTags = valueDes;
           break;
         default:
           unhandled.add(key);

@@ -42,6 +42,7 @@ Name | Type | Description | Notes
 **ranByUserId** | **int** |  | [optional] 
 **receiptId** | **int** |  | [optional] 
 **resultDescription** | **String** |  | [optional] 
+**apiKeyId** | **String** |  | [optional] 
 **childSystemTasks** | [**BuiltList&lt;SystemTask&gt;**](SystemTask.md) |  | [optional] 
 **aiType** | [**AiType**](AiType.md) |  | [optional] 
 **url** | **String** | URL for custom endpoints | [optional] 

@@ -63,6 +63,7 @@ dependencies:
   currency_textfield: ^5.0.0+1
   money2: ^6.0.3
   flutter_svg: ^2.0.16
+  fl_chart: ^0.69.2
 
 dev_dependencies:
   flutter_test:

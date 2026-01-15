@@ -21,6 +21,8 @@ class AssociatedEntityType extends EnumClass {
   static const AssociatedEntityType RECEIPT_PROCESSING_SETTINGS = _$RECEIPT_PROCESSING_SETTINGS;
   @BuiltValueEnumConst(wireName: r'PROMPT')
   static const AssociatedEntityType PROMPT = _$PROMPT;
+  @BuiltValueEnumConst(wireName: r'API_KEY')
+  static const AssociatedEntityType API_KEY = _$API_KEY;
 
   static Serializer<AssociatedEntityType> get serializer => _$associatedEntityTypeSerializer;
 

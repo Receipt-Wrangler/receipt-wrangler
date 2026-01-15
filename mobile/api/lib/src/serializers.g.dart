@@ -12,13 +12,19 @@ Serializers _$serializers = (new Serializers().toBuilder()
       ..add(About.serializer)
       ..add(Activity.serializer)
       ..add(AiType.serializer)
+      ..add(ApiKeyFilter.serializer)
+      ..add(ApiKeyResult.serializer)
+      ..add(ApiKeyScope.serializer)
+      ..add(ApiKeyView.serializer)
       ..add(AppData.serializer)
+      ..add(AssociatedApiKeys.serializer)
       ..add(AssociatedEntityType.serializer)
       ..add(AssociatedGroup.serializer)
       ..add(BulkStatusUpdateCommand.serializer)
       ..add(BulkUserDeleteCommand.serializer)
       ..add(Category.serializer)
       ..add(CategoryView.serializer)
+      ..add(ChartGrouping.serializer)
       ..add(CheckEmailConnectivityCommand.serializer)
       ..add(CheckReceiptProcessingSettingsConnectivityCommand.serializer)
       ..add(Claims.serializer)
@@ -57,9 +63,13 @@ Serializers _$serializers = (new Serializers().toBuilder()
       ..add(Notification.serializer)
       ..add(OcrEngine.serializer)
       ..add(PagedActivityRequestCommand.serializer)
+      ..add(PagedApiKeyRequestCommand.serializer)
       ..add(PagedData.serializer)
       ..add(PagedDataDataInner.serializer)
       ..add(PagedGroupRequestCommand.serializer)
+      ..add(PieChartData.serializer)
+      ..add(PieChartDataCommand.serializer)
+      ..add(PieChartDataPoint.serializer)
       ..add(Prompt.serializer)
       ..add(QueueName.serializer)
       ..add(Receipt.serializer)
@@ -84,6 +94,7 @@ Serializers _$serializers = (new Serializers().toBuilder()
       ..add(UpdateGroupReceiptSettingsCommand.serializer)
       ..add(UpdateGroupSettingsCommand.serializer)
       ..add(UpdateProfileCommand.serializer)
+      ..add(UpsertApiKeyCommand.serializer)
       ..add(UpsertCategoryCommand.serializer)
       ..add(UpsertCommentCommand.serializer)
       ..add(UpsertCustomFieldCommand.serializer)
@@ -127,12 +138,6 @@ Serializers _$serializers = (new Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(Tag)]),
           () => new ListBuilder<Tag>())
       ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(Category)]),
-          () => new ListBuilder<Category>())
-      ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(Tag)]),
-          () => new ListBuilder<Tag>())
-      ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(CustomFieldOption)]),
           () => new ListBuilder<CustomFieldOption>())
       ..addBuilderFactory(
@@ -154,8 +159,20 @@ Serializers _$serializers = (new Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(GroupMember)]),
           () => new ListBuilder<GroupMember>())
       ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(Item)]),
+          () => new ListBuilder<Item>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(Category)]),
+          () => new ListBuilder<Category>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(Tag)]),
+          () => new ListBuilder<Tag>())
+      ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(PagedDataDataInner)]),
           () => new ListBuilder<PagedDataDataInner>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(PieChartDataPoint)]),
+          () => new ListBuilder<PieChartDataPoint>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(String)]),
           () => new ListBuilder<String>())
@@ -190,6 +207,9 @@ Serializers _$serializers = (new Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(UpsertTagCommand)]),
           () => new ListBuilder<UpsertTagCommand>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(UpsertItemCommand)]),
+          () => new ListBuilder<UpsertItemCommand>())
       ..addBuilderFactory(
           const FullType(
               BuiltList, const [const FullType(UpsertCategoryCommand)]),

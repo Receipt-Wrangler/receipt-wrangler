@@ -31,6 +31,7 @@ part 'system_task.g.dart';
 /// * [receiptId] 
 /// * [groupId] 
 /// * [resultDescription] 
+/// * [apiKeyId] 
 /// * [childSystemTasks] 
 @BuiltValue()
 abstract class SystemTask implements BaseModel, Built<SystemTask, SystemTaskBuilder> {
@@ -42,7 +43,7 @@ abstract class SystemTask implements BaseModel, Built<SystemTask, SystemTaskBuil
 
   @BuiltValueField(wireName: r'associatedEntityType')
   AssociatedEntityType? get associatedEntityType;
-  // enum associatedEntityTypeEnum {  NOOP_ENTITY_TYPE,  RECEIPT,  SYSTEM_EMAIL,  RECEIPT_PROCESSING_SETTINGS,  PROMPT,  };
+  // enum associatedEntityTypeEnum {  NOOP_ENTITY_TYPE,  RECEIPT,  SYSTEM_EMAIL,  RECEIPT_PROCESSING_SETTINGS,  PROMPT,  API_KEY,  };
 
   @BuiltValueField(wireName: r'groupId')
   int? get groupId;
@@ -53,12 +54,15 @@ abstract class SystemTask implements BaseModel, Built<SystemTask, SystemTaskBuil
   @BuiltValueField(wireName: r'startedAt')
   String? get startedAt;
 
+  @BuiltValueField(wireName: r'apiKeyId')
+  String? get apiKeyId;
+
   @BuiltValueField(wireName: r'resultDescription')
   String? get resultDescription;
 
   @BuiltValueField(wireName: r'type')
   SystemTaskType? get type;
-  // enum typeEnum {  OCR_PROCESSING,  CHAT_COMPLETION,  MAGIC_FILL,  QUICK_SCAN,  EMAIL_READ,  EMAIL_UPLOAD,  SYSTEM_EMAIL_CONNECTIVITY_CHECK,  RECEIPT_PROCESSING_SETTINGS_CONNECTIVITY_CHECK,  RECEIPT_UPLOADED,  RECEIPT_UPDATED,  PROMPT_GENERATED,  };
+  // enum typeEnum {  OCR_PROCESSING,  CHAT_COMPLETION,  MAGIC_FILL,  QUICK_SCAN,  EMAIL_READ,  EMAIL_UPLOAD,  SYSTEM_EMAIL_CONNECTIVITY_CHECK,  RECEIPT_PROCESSING_SETTINGS_CONNECTIVITY_CHECK,  RECEIPT_UPLOADED,  RECEIPT_UPDATED,  PROMPT_GENERATED,  API_KEY_DELETED,  };
 
   @BuiltValueField(wireName: r'receiptId')
   int? get receiptId;
@@ -107,6 +111,13 @@ class _$SystemTaskSerializer implements PrimitiveSerializer<SystemTask> {
       yield r'startedAt';
       yield serializers.serialize(
         object.startedAt,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.apiKeyId != null) {
+      yield r'apiKeyId';
+      yield serializers.serialize(
+        object.apiKeyId,
         specifiedType: const FullType(String),
       );
     }
@@ -240,6 +251,13 @@ class _$SystemTaskSerializer implements PrimitiveSerializer<SystemTask> {
             specifiedType: const FullType(String),
           ) as String;
           result.startedAt = valueDes;
+          break;
+        case r'apiKeyId':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.apiKeyId = valueDes;
           break;
         case r'type':
           final valueDes = serializers.deserialize(

@@ -127,6 +127,43 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /widget/pieChart/{groupId}:
+    parameters:
+      - in: path
+        name: groupId
+        schema:
+          type: integer
+        required: true
+        description: Id of group to get pie chart data for
+    post:
+      tags:
+        - Widget
+      summary: Get pie chart data
+      description: This will get pie chart data for a group based on the specified grouping
+      operationId: getPieChartData
+      requestBody:
+        description: Pie chart data request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PieChartDataCommand"
+      responses:
+        200:
+          description: The pie chart data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PieChartData"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /category/{categoryName}:
     parameters:
       - in: path
@@ -2729,6 +2766,13 @@ components:
         - "GROUP_SUMMARY"
         - "FILTERED_RECEIPTS"
         - "GROUP_ACTIVITY"
+        - "PIE_CHART"
+    ChartGrouping:
+      type: string
+      enum:
+        - "CATEGORIES"
+        - "TAGS"
+        - "PAIDBY"
     AiType:
       type: string
       enum:
@@ -4951,3 +4995,37 @@ components:
         errorMsg:
           type: string
           description: Error message
+    PieChartDataPoint:
+      type: object
+      required:
+        - label
+        - value
+      properties:
+        label:
+          type: string
+          description: Label for the pie chart slice
+        value:
+          type: number
+          format: double
+          description: Value for the pie chart slice
+    PieChartData:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PieChartDataPoint"
+          description: Array of pie chart data points
+    PieChartDataCommand:
+      type: object
+      required:
+        - chartGrouping
+      properties:
+        chartGrouping:
+          $ref: "#/components/schemas/ChartGrouping"
+          description: What to group the pie chart by
+        filter:
+          $ref: "#/components/schemas/ReceiptPagedRequestFilter"
+          description: Optional filter for receipts

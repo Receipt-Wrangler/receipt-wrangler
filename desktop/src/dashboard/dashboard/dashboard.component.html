@@ -20,6 +20,12 @@
             [groupId]="selectedDashboard?.groupId"
           ></app-activity>
         </ng-container>
+        <ng-container *ngSwitchCase="widgetType.PieChart">
+          <app-pie-chart
+            [widget]="widget"
+            [groupId]="selectedDashboard?.groupId"
+          ></app-pie-chart>
+        </ng-container>
       </ng-container>
     </div>
   </div>

@@ -6,11 +6,12 @@ import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { ReceiptFilterComponent } from "src/shared-ui/receipt-filter/receipt-filter.component";
 import { BaseFormComponent } from "../../form/index";
-import { Dashboard, DashboardService, Widget, WidgetType } from "../../open-api";
+import { ChartGrouping, Dashboard, DashboardService, Widget, WidgetType } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { EditableListComponent } from "../../shared-ui/editable-list/editable-list.component";
 import { GroupState } from "../../store";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
+import { chartGroupingOptions } from "../constants/chart-grouping-options";
 import { widgetTypeOptions } from "../constants/widget-options";
 
 @UntilDestroy()
@@ -79,6 +80,13 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
           configuration: buildReceiptFilterForm(widget.configuration, this),
         });
         break;
+      case WidgetType.PieChart:
+        formGroup = this.formBuilder.group({
+          name: [widget.name, Validators.required],
+          widgetType: [widget.widgetType, Validators.required],
+          configuration: this.buildPieChartConfigForm(widget.configuration),
+        });
+        break;
       default:
         formGroup = this.formBuilder.group({
           name: [widget.name, Validators.required],
@@ -93,7 +101,11 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
         untilDestroyed(this),
         tap((widgetType: WidgetType) => {
           if (widgetType === WidgetType.FilteredReceipts) {
+            formGroup.removeControl("configuration");
             formGroup.addControl("configuration", buildReceiptFilterForm({}, this));
+          } else if (widgetType === WidgetType.PieChart) {
+            formGroup.removeControl("configuration");
+            formGroup.addControl("configuration", this.buildPieChartConfigForm({}));
           } else {
             formGroup.removeControl("configuration");
           }
@@ -101,6 +113,13 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
       ).subscribe();
 
     return formGroup;
+  }
+
+  private buildPieChartConfigForm(config: any): FormGroup {
+    return this.formBuilder.group({
+      chartGrouping: [config?.chartGrouping ?? ChartGrouping.Categories, Validators.required],
+      filter: buildReceiptFilterForm(config?.filter ?? {}, this),
+    });
   }
 
   public submit(): void {
@@ -235,4 +254,5 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
 
   protected readonly WidgetType = WidgetType;
   protected readonly widgetTypeOptions = widgetTypeOptions;
+  protected readonly chartGroupingOptions = chartGroupingOptions;
 }

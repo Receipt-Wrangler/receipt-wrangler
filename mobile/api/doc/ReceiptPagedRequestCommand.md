@@ -13,6 +13,7 @@ Name | Type | Description | Notes
 **orderBy** | **String** | field to order on | [optional] 
 **sortDirection** | [**SortDirection**](SortDirection.md) |  | [optional] 
 **filter** | [**ReceiptPagedRequestFilter**](ReceiptPagedRequestFilter.md) |  | [optional] 
+**fullReceipts** | **bool** | Whether to include all receipt associations (receiptItems, comments, customFields, imageFiles, etc.) | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

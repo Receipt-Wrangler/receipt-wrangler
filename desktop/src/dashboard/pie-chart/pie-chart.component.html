@@ -1,0 +1,21 @@
+<app-card cardStyle="dashboard-card">
+  <ng-container header>
+    <div class="d-flex justify-content-between align-items-center">
+      <h3>
+        {{ widget.name || 'Pie Chart' }}
+      </h3>
+      <span class="badge bg-secondary">{{ getChartGroupingLabel() }}</span>
+    </div>
+  </ng-container>
+  <ng-container content>
+    <div class="pie-chart-container">
+      <app-pie-chart-ui
+        [chartData]="pieChartData"
+        [chartOptions]="pieChartOptions"
+        [isLoading]="isLoading"
+        [hasData]="hasData"
+        height="300px"
+      ></app-pie-chart-ui>
+    </div>
+  </ng-container>
+</app-card>

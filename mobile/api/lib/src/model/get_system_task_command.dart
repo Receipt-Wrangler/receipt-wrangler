@@ -28,7 +28,7 @@ abstract class GetSystemTaskCommand implements PagedRequestCommand, Built<GetSys
 
   @BuiltValueField(wireName: r'associatedEntityType')
   AssociatedEntityType? get associatedEntityType;
-  // enum associatedEntityTypeEnum {  NOOP_ENTITY_TYPE,  RECEIPT,  SYSTEM_EMAIL,  RECEIPT_PROCESSING_SETTINGS,  PROMPT,  };
+  // enum associatedEntityTypeEnum {  NOOP_ENTITY_TYPE,  RECEIPT,  SYSTEM_EMAIL,  RECEIPT_PROCESSING_SETTINGS,  PROMPT,  API_KEY,  };
 
   GetSystemTaskCommand._();
 

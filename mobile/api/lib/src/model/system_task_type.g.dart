@@ -24,6 +24,8 @@ const SystemTaskType _$RECEIPT_UPDATED =
     const SystemTaskType._('RECEIPT_UPDATED');
 const SystemTaskType _$PROMPT_GENERATED =
     const SystemTaskType._('PROMPT_GENERATED');
+const SystemTaskType _$API_KEY_DELETED =
+    const SystemTaskType._('API_KEY_DELETED');
 
 SystemTaskType _$valueOf(String name) {
   switch (name) {
@@ -49,6 +51,8 @@ SystemTaskType _$valueOf(String name) {
       return _$RECEIPT_UPDATED;
     case 'PROMPT_GENERATED':
       return _$PROMPT_GENERATED;
+    case 'API_KEY_DELETED':
+      return _$API_KEY_DELETED;
     default:
       throw new ArgumentError(name);
   }
@@ -67,6 +71,7 @@ final BuiltSet<SystemTaskType> _$values =
   _$RECEIPT_UPLOADED,
   _$RECEIPT_UPDATED,
   _$PROMPT_GENERATED,
+  _$API_KEY_DELETED,
 ]);
 
 class _$SystemTaskTypeMeta {
@@ -84,6 +89,7 @@ class _$SystemTaskTypeMeta {
   SystemTaskType get RECEIPT_UPLOADED => _$RECEIPT_UPLOADED;
   SystemTaskType get RECEIPT_UPDATED => _$RECEIPT_UPDATED;
   SystemTaskType get PROMPT_GENERATED => _$PROMPT_GENERATED;
+  SystemTaskType get API_KEY_DELETED => _$API_KEY_DELETED;
   SystemTaskType valueOf(String name) => _$valueOf(name);
   BuiltSet<SystemTaskType> get values => _$values;
 }
@@ -111,6 +117,7 @@ class _$SystemTaskTypeSerializer
     'RECEIPT_UPLOADED': 'RECEIPT_UPLOADED',
     'RECEIPT_UPDATED': 'RECEIPT_UPDATED',
     'PROMPT_GENERATED': 'PROMPT_GENERATED',
+    'API_KEY_DELETED': 'API_KEY_DELETED',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'OCR_PROCESSING': 'OCR_PROCESSING',
@@ -125,6 +132,7 @@ class _$SystemTaskTypeSerializer
     'RECEIPT_UPLOADED': 'RECEIPT_UPLOADED',
     'RECEIPT_UPDATED': 'RECEIPT_UPDATED',
     'PROMPT_GENERATED': 'PROMPT_GENERATED',
+    'API_KEY_DELETED': 'API_KEY_DELETED',
   };
 
   @override

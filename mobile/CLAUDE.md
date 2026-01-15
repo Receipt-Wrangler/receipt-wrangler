@@ -72,6 +72,47 @@ Uses `flutter_form_builder` for complex forms with validation. Receipt forms sup
 
 ## Development Notes
 
+### Flutter SDK Setup (Claude Code Environment)
+
+When working in the Claude Code environment, Flutter may not be pre-installed or may be an outdated version. To install the latest Flutter SDK:
+
+```bash
+# Download and extract Flutter SDK (Linux)
+cd /tmp && rm -rf flutter && \
+curl -sL https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.38.6-stable.tar.xz -o flutter.tar.xz && \
+tar xf flutter.tar.xz && rm flutter.tar.xz
+
+# Fix git safe directory warning
+git config --global --add safe.directory /tmp/flutter
+
+# Add Flutter to PATH for the session
+export PATH="/tmp/flutter/bin:$PATH"
+
+# Verify installation
+flutter --version
+```
+
+To find the latest stable Flutter version, visit: https://docs.flutter.dev/release/archive
+
+After installing Flutter, you can run standard commands:
+```bash
+cd /home/user/receipt-wrangler/mobile
+flutter pub get      # Install dependencies
+flutter analyze      # Check for errors (recommended before building)
+flutter build apk    # Build Android APK (requires Android SDK)
+```
+
+**Note:** The environment may not have Android SDK installed, so `flutter build` commands may fail. However, `flutter analyze` will verify that the code compiles correctly.
+
+### Regenerating API Client Models
+
+After regenerating the API client with `generate-client.sh`, you need to run build_runner to generate the `.g.dart` files:
+
+```bash
+cd /home/user/receipt-wrangler/mobile/api
+flutter pub run build_runner build --delete-conflicting-outputs
+```
+
 ### Testing
 The project includes unit tests for generated API models. Run tests with `flutter test`.
 

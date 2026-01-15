@@ -24,6 +24,8 @@ part 'group_receipt_settings.g.dart';
 /// * [hideItemCategories] - Hide receipt item categories
 /// * [hideItemTags] - Hide receipt item tags
 /// * [hideComments] - Hide receipt comments
+/// * [hideShareCategories] - Hide share categories
+/// * [hideShareTags] - Hide share tags
 @BuiltValue()
 abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSettings, GroupReceiptSettingsBuilder> {
   /// Hide receipt tags
@@ -42,6 +44,10 @@ abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSett
   @BuiltValueField(wireName: r'hideItemCategories')
   bool? get hideItemCategories;
 
+  /// Hide share tags
+  @BuiltValueField(wireName: r'hideShareTags')
+  bool? get hideShareTags;
+
   /// Hide receipt images
   @BuiltValueField(wireName: r'hideImages')
   bool? get hideImages;
@@ -53,6 +59,10 @@ abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSett
   /// Hide receipt comments
   @BuiltValueField(wireName: r'hideComments')
   bool? get hideComments;
+
+  /// Hide share categories
+  @BuiltValueField(wireName: r'hideShareCategories')
+  bool? get hideShareCategories;
 
   GroupReceiptSettings._();
 
@@ -80,6 +90,25 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
     GroupReceiptSettings object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
+    yield r'groupId';
+    yield serializers.serialize(
+      object.groupId,
+      specifiedType: const FullType(int),
+    );
+    if (object.hideImages != null) {
+      yield r'hideImages';
+      yield serializers.serialize(
+        object.hideImages,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.hideComments != null) {
+      yield r'hideComments';
+      yield serializers.serialize(
+        object.hideComments,
+        specifiedType: const FullType(bool),
+      );
+    }
     if (object.hideReceiptTags != null) {
       yield r'hideReceiptTags';
       yield serializers.serialize(
@@ -106,11 +135,6 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
         specifiedType: const FullType(int),
       );
     }
-    yield r'groupId';
-    yield serializers.serialize(
-      object.groupId,
-      specifiedType: const FullType(int),
-    );
     if (object.hideItemCategories != null) {
       yield r'hideItemCategories';
       yield serializers.serialize(
@@ -118,10 +142,10 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
         specifiedType: const FullType(bool),
       );
     }
-    if (object.hideImages != null) {
-      yield r'hideImages';
+    if (object.hideShareTags != null) {
+      yield r'hideShareTags';
       yield serializers.serialize(
-        object.hideImages,
+        object.hideShareTags,
         specifiedType: const FullType(bool),
       );
     }
@@ -137,18 +161,18 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
         specifiedType: const FullType(bool),
       );
     }
-    if (object.hideComments != null) {
-      yield r'hideComments';
-      yield serializers.serialize(
-        object.hideComments,
-        specifiedType: const FullType(bool),
-      );
-    }
     if (object.createdByString != null) {
       yield r'createdByString';
       yield serializers.serialize(
         object.createdByString,
         specifiedType: const FullType(String),
+      );
+    }
+    if (object.hideShareCategories != null) {
+      yield r'hideShareCategories';
+      yield serializers.serialize(
+        object.hideShareCategories,
+        specifiedType: const FullType(bool),
       );
     }
     if (object.updatedAt != null) {
@@ -181,6 +205,27 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
+        case r'groupId':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.groupId = valueDes;
+          break;
+        case r'hideImages':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.hideImages = valueDes;
+          break;
+        case r'hideComments':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.hideComments = valueDes;
+          break;
         case r'hideReceiptTags':
           final valueDes = serializers.deserialize(
             value,
@@ -209,13 +254,6 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
           ) as int;
           result.createdBy = valueDes;
           break;
-        case r'groupId':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.groupId = valueDes;
-          break;
         case r'hideItemCategories':
           final valueDes = serializers.deserialize(
             value,
@@ -223,12 +261,12 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
           ) as bool;
           result.hideItemCategories = valueDes;
           break;
-        case r'hideImages':
+        case r'hideShareTags':
           final valueDes = serializers.deserialize(
             value,
             specifiedType: const FullType(bool),
           ) as bool;
-          result.hideImages = valueDes;
+          result.hideShareTags = valueDes;
           break;
         case r'id':
           final valueDes = serializers.deserialize(
@@ -244,19 +282,19 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
           ) as bool;
           result.hideItemTags = valueDes;
           break;
-        case r'hideComments':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(bool),
-          ) as bool;
-          result.hideComments = valueDes;
-          break;
         case r'createdByString':
           final valueDes = serializers.deserialize(
             value,
             specifiedType: const FullType(String),
           ) as String;
           result.createdByString = valueDes;
+          break;
+        case r'hideShareCategories':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.hideShareCategories = valueDes;
           break;
         case r'updatedAt':
           final valueDes = serializers.deserialize(

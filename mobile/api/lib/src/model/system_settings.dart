@@ -2,30 +2,30 @@
 // AUTO-GENERATED FILE, DO NOT MODIFY!
 //
 
-import 'package:built_collection/built_collection.dart';
-import 'package:built_value/built_value.dart';
-import 'package:built_value/serializer.dart';
 // ignore_for_file: unused_element
 import 'package:openapi/src/model/base_model.dart';
-import 'package:openapi/src/model/currency_separator.dart';
+import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/currency_symbol_position.dart';
 import 'package:openapi/src/model/task_queue_configuration.dart';
+import 'package:openapi/src/model/currency_separator.dart';
+import 'package:built_value/built_value.dart';
+import 'package:built_value/serializer.dart';
 
 part 'system_settings.g.dart';
 
 /// SystemSettings
 ///
 /// Properties:
-/// * [id]
-/// * [createdAt]
-/// * [createdBy]
+/// * [id] 
+/// * [createdAt] 
+/// * [createdBy] 
 /// * [createdByString] - Created by entity's name
-/// * [updatedAt]
+/// * [updatedAt] 
 /// * [enableLocalSignUp] - Whether local sign up is enabled
 /// * [currencyDisplay] - Currency display
-/// * [currencyThousandthsSeparator]
-/// * [currencyDecimalSeparator]
-/// * [currencySymbolPosition]
+/// * [currencyThousandthsSeparator] 
+/// * [currencyDecimalSeparator] 
+/// * [currencySymbolPosition] 
 /// * [currencyHideDecimalPlaces] - Whether to hide decimal places
 /// * [debugOcr] - Debug OCR
 /// * [numWorkers] - Number of workers to use
@@ -33,10 +33,9 @@ part 'system_settings.g.dart';
 /// * [receiptProcessingSettingsId] - Receipt processing settings foreign key
 /// * [fallbackReceiptProcessingSettingsId] - Fallback receipt processing settings foreign key
 /// * [taskConcurrency] - Concurrency for task worker
-/// * [taskQueueConfigurations]
+/// * [taskQueueConfigurations] 
 @BuiltValue()
-abstract class SystemSettings
-    implements BaseModel, Built<SystemSettings, SystemSettingsBuilder> {
+abstract class SystemSettings implements BaseModel, Built<SystemSettings, SystemSettingsBuilder> {
   @BuiltValueField(wireName: r'currencyThousandthsSeparator')
   CurrencySeparator? get currencyThousandthsSeparator;
   // enum currencyThousandthsSeparatorEnum {  ,,  .,  };
@@ -90,29 +89,26 @@ abstract class SystemSettings
 
   SystemSettings._();
 
-  factory SystemSettings([void updates(SystemSettingsBuilder b)]) =
-      _$SystemSettings;
+  factory SystemSettings([void updates(SystemSettingsBuilder b)]) = _$SystemSettings;
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(SystemSettingsBuilder b) => b
-    ..currencyDisplay = '\$'
-    ..currencyHideDecimalPlaces = false
-    ..debugOcr = false
-    ..createdBy = 0
-    ..taskConcurrency = 10
-    ..emailPollingInterval = 1800
-    ..numWorkers = 1
-    ..enableLocalSignUp = false
-    ..createdByString = ''
-    ..updatedAt = '';
+      ..currencyDisplay = '\$'
+      ..currencyHideDecimalPlaces = false
+      ..debugOcr = false
+      ..createdBy = 0
+      ..taskConcurrency = 10
+      ..emailPollingInterval = 1800
+      ..numWorkers = 1
+      ..enableLocalSignUp = false
+      ..createdByString = ''
+      ..updatedAt = '';
 
   @BuiltValueSerializer(custom: true)
-  static Serializer<SystemSettings> get serializer =>
-      _$SystemSettingsSerializer();
+  static Serializer<SystemSettings> get serializer => _$SystemSettingsSerializer();
 }
 
-class _$SystemSettingsSerializer
-    implements PrimitiveSerializer<SystemSettings> {
+class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> {
   @override
   final Iterable<Type> types = const [SystemSettings, _$SystemSettings];
 
@@ -228,8 +224,7 @@ class _$SystemSettingsSerializer
     yield r'taskQueueConfigurations';
     yield serializers.serialize(
       object.taskQueueConfigurations,
-      specifiedType:
-          const FullType(BuiltList, [FullType(TaskQueueConfiguration)]),
+      specifiedType: const FullType(BuiltList, [FullType(TaskQueueConfiguration)]),
     );
     if (object.createdByString != null) {
       yield r'createdByString';
@@ -253,9 +248,7 @@ class _$SystemSettingsSerializer
     SystemSettings object, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    return _serializeProperties(serializers, object,
-            specifiedType: specifiedType)
-        .toList();
+    return _serializeProperties(serializers, object, specifiedType: specifiedType).toList();
   }
 
   void _deserializeProperties(
@@ -378,8 +371,7 @@ class _$SystemSettingsSerializer
         case r'taskQueueConfigurations':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType:
-                const FullType(BuiltList, [FullType(TaskQueueConfiguration)]),
+            specifiedType: const FullType(BuiltList, [FullType(TaskQueueConfiguration)]),
           ) as BuiltList<TaskQueueConfiguration>;
           result.taskQueueConfigurations.replace(valueDes);
           break;
@@ -425,3 +417,4 @@ class _$SystemSettingsSerializer
     return result.build();
   }
 }
+

@@ -17,6 +17,8 @@ class _$ReceiptPagedRequestCommand extends ReceiptPagedRequestCommand {
   final SortDirection? sortDirection;
   @override
   final ReceiptPagedRequestFilter? filter;
+  @override
+  final bool? fullReceipts;
 
   factory _$ReceiptPagedRequestCommand(
           [void Function(ReceiptPagedRequestCommandBuilder)? updates]) =>
@@ -27,7 +29,8 @@ class _$ReceiptPagedRequestCommand extends ReceiptPagedRequestCommand {
       required this.pageSize,
       this.orderBy,
       this.sortDirection,
-      this.filter})
+      this.filter,
+      this.fullReceipts})
       : super._() {
     BuiltValueNullFieldError.checkNotNull(
         page, r'ReceiptPagedRequestCommand', 'page');
@@ -52,7 +55,8 @@ class _$ReceiptPagedRequestCommand extends ReceiptPagedRequestCommand {
         pageSize == other.pageSize &&
         orderBy == other.orderBy &&
         sortDirection == other.sortDirection &&
-        filter == other.filter;
+        filter == other.filter &&
+        fullReceipts == other.fullReceipts;
   }
 
   @override
@@ -63,6 +67,7 @@ class _$ReceiptPagedRequestCommand extends ReceiptPagedRequestCommand {
     _$hash = $jc(_$hash, orderBy.hashCode);
     _$hash = $jc(_$hash, sortDirection.hashCode);
     _$hash = $jc(_$hash, filter.hashCode);
+    _$hash = $jc(_$hash, fullReceipts.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -74,7 +79,8 @@ class _$ReceiptPagedRequestCommand extends ReceiptPagedRequestCommand {
           ..add('pageSize', pageSize)
           ..add('orderBy', orderBy)
           ..add('sortDirection', sortDirection)
-          ..add('filter', filter))
+          ..add('filter', filter)
+          ..add('fullReceipts', fullReceipts))
         .toString();
   }
 }
@@ -107,6 +113,10 @@ class ReceiptPagedRequestCommandBuilder
   set filter(ReceiptPagedRequestFilterBuilder? filter) =>
       _$this._filter = filter;
 
+  bool? _fullReceipts;
+  bool? get fullReceipts => _$this._fullReceipts;
+  set fullReceipts(bool? fullReceipts) => _$this._fullReceipts = fullReceipts;
+
   ReceiptPagedRequestCommandBuilder() {
     ReceiptPagedRequestCommand._defaults(this);
   }
@@ -119,6 +129,7 @@ class ReceiptPagedRequestCommandBuilder
       _orderBy = $v.orderBy;
       _sortDirection = $v.sortDirection;
       _filter = $v.filter?.toBuilder();
+      _fullReceipts = $v.fullReceipts;
       _$v = null;
     }
     return this;
@@ -149,7 +160,8 @@ class ReceiptPagedRequestCommandBuilder
                   pageSize, r'ReceiptPagedRequestCommand', 'pageSize'),
               orderBy: orderBy,
               sortDirection: sortDirection,
-              filter: _filter?.build());
+              filter: _filter?.build(),
+              fullReceipts: fullReceipts);
     } catch (_) {
       late String _$failedField;
       try {
