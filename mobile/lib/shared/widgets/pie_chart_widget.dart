@@ -10,6 +10,7 @@ class PieChartWidget extends StatelessWidget {
     this.isLoading = false,
     this.noDataMessage = 'No data available',
     this.loadingMessage = 'Loading...',
+    this.formatValue,
   });
 
   /// List of data points to display in the chart
@@ -26,6 +27,9 @@ class PieChartWidget extends StatelessWidget {
 
   /// Message to display while loading
   final String loadingMessage;
+
+  /// Optional callback to format the value for display in the legend
+  final String Function(double value)? formatValue;
 
   /// Default colors for the pie chart slices
   static const List<Color> defaultColors = [
@@ -132,6 +136,7 @@ class PieChartWidget extends StatelessWidget {
           final index = entry.key;
           final item = entry.value;
           final color = defaultColors[index % defaultColors.length];
+          final formattedValue = formatValue != null ? formatValue!(item.value) : null;
 
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
@@ -147,10 +152,23 @@ class PieChartWidget extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    item.label,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.label,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (formattedValue != null)
+                        Text(
+                          formattedValue,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
+                                fontSize: 10,
+                              ),
+                        ),
+                    ],
                   ),
                 ),
               ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:receipt_wrangler_mobile/shared/widgets/pie_chart_widget.dart';
+import 'package:receipt_wrangler_mobile/utils/currency.dart';
 import 'package:receipt_wrangler_mobile/utils/group.dart';
 
 import '../../../client/client.dart';
@@ -130,6 +131,7 @@ class _DashboardPieChartState extends State<DashboardPieChart> {
                 data: data,
                 isLoading: isLoading,
                 height: 250,
+                formatValue: (value) => formatCurrency(context, value.toString()) ?? '',
               ),
             ),
           ],

@@ -1,10 +1,13 @@
+import { CurrencyPipe } from "@angular/common";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA, SimpleChange } from "@angular/core";
 import { ComponentFixture, TestBed, fakeAsync, tick } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
+import { Store } from "@ngxs/store";
 import { of, throwError } from "rxjs";
-import { ChartGrouping, PieChartData, Widget, WidgetService, WidgetType } from "../../open-api";
+import { ChartGrouping, CurrencySeparator, CurrencySymbolPosition, PieChartData, Widget, WidgetService, WidgetType } from "../../open-api";
+import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 
 import { PieChartComponent } from "./pie-chart.component";
@@ -31,9 +34,21 @@ describe("PieChartComponent", () => {
     ],
   };
 
+  const mockSystemSettingsState = {
+    currencyDisplay: "$",
+    currencyDecimalSeparator: CurrencySeparator.Period,
+    currencyThousandthsSeparator: CurrencySeparator.Comma,
+    currencySymbolPosition: CurrencySymbolPosition.Start,
+    currencyHideDecimalPlaces: false,
+  };
+
   beforeEach(async () => {
     const widgetServiceMock = {
       getPieChartData: jest.fn(),
+    };
+
+    const storeMock = {
+      selectSnapshot: jest.fn().mockReturnValue(mockSystemSettingsState),
     };
 
     await TestBed.configureTestingModule({
@@ -41,6 +56,9 @@ describe("PieChartComponent", () => {
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
         { provide: WidgetService, useValue: widgetServiceMock },
+        { provide: Store, useValue: storeMock },
+        CustomCurrencyPipe,
+        CurrencyPipe,
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),
       ],
@@ -324,6 +342,11 @@ describe("PieChartComponent", () => {
   });
 
   describe("pieChartOptions", () => {
+    beforeEach(fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+    }));
+
     it("should have responsive set to true", () => {
       expect(component.pieChartOptions?.responsive).toBe(true);
     });
@@ -354,7 +377,12 @@ describe("PieChartComponent", () => {
   });
 
   describe("tooltip callback", () => {
-    it("should format tooltip label correctly", () => {
+    beforeEach(fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+    }));
+
+    it("should format tooltip label correctly with custom currency", () => {
       const labelCallback =
         component.pieChartOptions?.plugins?.tooltip?.callbacks?.label;
       expect(labelCallback).toBeDefined();
@@ -402,6 +430,11 @@ describe("PieChartComponent", () => {
   });
 
   describe("datalabels formatter", () => {
+    beforeEach(fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+    }));
+
     it("should format percentage correctly for large slices", () => {
       const formatter =
         component.pieChartOptions?.plugins?.datalabels?.formatter;
