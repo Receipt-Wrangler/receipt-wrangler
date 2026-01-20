@@ -1,6 +1,8 @@
 package services
 
 import (
+	"sort"
+
 	"gorm.io/gorm"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
@@ -146,6 +148,11 @@ func (service PieChartService) groupByPaidBy(receipts []models.Receipt) ([]struc
 		})
 	}
 
+	// Sort alphabetically by label for consistent ordering
+	sort.Slice(dataPoints, func(i, j int) bool {
+		return dataPoints[i].Label < dataPoints[j].Label
+	})
+
 	return dataPoints, nil
 }
 
@@ -158,5 +165,11 @@ func (service PieChartService) convertToDataPoints(amounts map[string]decimal.De
 			Value: floatVal,
 		})
 	}
+
+	// Sort alphabetically by label for consistent ordering
+	sort.Slice(dataPoints, func(i, j int) bool {
+		return dataPoints[i].Label < dataPoints[j].Label
+	})
+
 	return dataPoints
 }

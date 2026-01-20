@@ -239,8 +239,7 @@ describe("PieChartComponent", () => {
       fixture.detectChanges();
       tick();
 
-      // Data is sorted alphabetically, "Category B" comes before "Unknown"
-      expect(component.pieChartData.labels).toEqual(["Category B", "Unknown"]);
+      expect(component.pieChartData.labels).toEqual(["Unknown", "Category B"]);
     }));
 
     it("should handle data points with missing values", fakeAsync(() => {
@@ -592,8 +591,7 @@ describe("PieChartComponent", () => {
       fixture.detectChanges();
       tick();
 
-      // Data is sorted alphabetically by label: "Some" before "Zero"
-      expect(component.pieChartData.datasets[0].data).toEqual([100, 0]);
+      expect(component.pieChartData.datasets[0].data).toEqual([0, 100]);
       expect(component.hasData).toBe(true);
     }));
 
@@ -642,8 +640,7 @@ describe("PieChartComponent", () => {
       fixture.detectChanges();
       tick();
 
-      // Data is sorted alphabetically: "Émojis 🎉" before "日本語"
-      expect(component.pieChartData.labels).toEqual(["Émojis 🎉", "日本語"]);
+      expect(component.pieChartData.labels).toEqual(["日本語", "Émojis 🎉"]);
     }));
   });
 });

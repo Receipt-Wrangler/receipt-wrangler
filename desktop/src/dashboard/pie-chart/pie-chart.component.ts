@@ -141,16 +141,8 @@ export class PieChartComponent implements OnInit, OnChanges {
     }
 
     this.hasData = true;
-
-    // Sort data alphabetically by label for consistent colors and orientation
-    const sortedData = [...data.data].sort((a, b) => {
-      const labelA = (a.label || "Unknown").toLowerCase();
-      const labelB = (b.label || "Unknown").toLowerCase();
-      return labelA.localeCompare(labelB);
-    });
-
-    const labels = sortedData.map((point) => point.label || "Unknown");
-    const values = sortedData.map((point) => point.value || 0);
+    const labels = data.data.map((point) => point.label || "Unknown");
+    const values = data.data.map((point) => point.value || 0);
 
     this.pieChartData = {
       labels: labels,
