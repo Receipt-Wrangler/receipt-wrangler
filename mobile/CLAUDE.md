@@ -114,7 +114,9 @@ flutter pub run build_runner build --delete-conflicting-outputs
 ```
 
 ### Testing
-The project includes unit tests for generated API models. Run tests with `flutter test`.
+The main app currently does not have a `test/` directory with unit tests.
+
+**Important:** The `api/test/` directory contains auto-generated tests for the OpenAPI client models. These tests are generated and should be ignored - they have known failures due to test configuration issues (invalid base URL). Do not run or fix these tests as they will be overwritten when the API client is regenerated.
 
 ### Build Configuration
 - Android configuration in `android/` directory
