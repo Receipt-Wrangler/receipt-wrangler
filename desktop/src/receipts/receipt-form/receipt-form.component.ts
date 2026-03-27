@@ -548,6 +548,18 @@ export class ReceiptFormComponent implements OnInit {
       }
     });
 
+    const receiptItems = magicReceipt.receiptItems;
+    if (receiptItems && receiptItems.length > 0) {
+      this.receiptItemsFormArray.clear();
+      const receiptIdStr = this.originalReceipt?.id?.toString();
+      receiptItems.forEach((item) => {
+        this.receiptItemsFormArray.push(
+          buildItemForm(item, receiptIdStr, false, this.syncAmountWithItems)
+        );
+      });
+      validKeys.push("receiptItems");
+    }
+
     if (validKeys.length > 0) {
       const successString = `Magic fill successfully filled ${validKeys.join(
         ", "

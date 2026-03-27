@@ -11,7 +11,7 @@ import { of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
 import { PipesModule } from "src/pipes/pipes.module";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
-import { ApiModule, ReceiptImageService, ReceiptStatus } from "../../open-api";
+import { ApiModule, ItemStatus, ReceiptImageService, ReceiptStatus } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { QueueMode } from "../../services/receipt-queue.service";
 import { StoreModule } from "../../store/store.module";
@@ -220,6 +220,282 @@ describe("ReceiptFormComponent", () => {
     expect(snackbarSpy).toHaveBeenCalledWith(
       "Could not find any values to fill! Try reuploading a clearer image."
     );
+  });
+
+  it("should patch receiptItems from magic fill response", () => {
+    component.images = [{ id: 1 } as any];
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    component.carouselComponent = {
+      currentlyShownImageIndex: 0,
+    } as any;
+
+    const magicReceipt = {
+      name: "",
+      amount: "0",
+      date: "0001-01-01T00:00:00Z",
+      receiptItems: [
+        { name: "Item 1", amount: "10.50", status: ItemStatus.Open, receiptId: 0 },
+        { name: "Item 2", amount: "5.25", status: ItemStatus.Open, receiptId: 0 },
+      ],
+    } as any;
+
+    jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+
+    const snackbarSpy = jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "success"
+    ).mockReturnValue(undefined);
+
+    component.magicFill();
+
+    expect(component.receiptItemsFormArray.length).toEqual(2);
+    expect(component.receiptItemsFormArray.at(0).value.name).toEqual("Item 1");
+    expect(component.receiptItemsFormArray.at(0).value.amount).toEqual("10.50");
+    expect(component.receiptItemsFormArray.at(1).value.name).toEqual("Item 2");
+    expect(component.receiptItemsFormArray.at(1).value.amount).toEqual("5.25");
+    expect(snackbarSpy).toHaveBeenCalledWith(
+      "Magic fill successfully filled receiptItems from selected image!",
+      { duration: 10000 }
+    );
+  });
+
+  it("should not patch receiptItems when array is empty", () => {
+    component.images = [{ id: 1 } as any];
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    component.carouselComponent = {
+      currentlyShownImageIndex: 0,
+    } as any;
+
+    const magicReceipt = {
+      name: "magic",
+      amount: "10.00",
+      date: "0001-01-01T00:00:00Z",
+      receiptItems: [],
+    } as any;
+
+    jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+
+    jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "success"
+    ).mockReturnValue(undefined);
+
+    component.magicFill();
+
+    expect(component.receiptItemsFormArray.length).toEqual(0);
+  });
+
+  it("should not patch receiptItems when undefined", () => {
+    component.images = [{ id: 1 } as any];
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    component.carouselComponent = {
+      currentlyShownImageIndex: 0,
+    } as any;
+
+    const magicReceipt = {
+      name: "magic",
+      amount: "10.00",
+      date: "0001-01-01T00:00:00Z",
+    } as any;
+
+    jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+
+    jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "success"
+    ).mockReturnValue(undefined);
+
+    component.magicFill();
+
+    expect(component.receiptItemsFormArray.length).toEqual(0);
+  });
+
+  it("should patch receiptItems alongside all other fields", () => {
+    Date.prototype.getTimezoneOffset = () => 240;
+    component.images = [{ id: 1 } as any];
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    component.carouselComponent = {
+      currentlyShownImageIndex: 0,
+    } as any;
+    component.categories = [
+      { id: 1, name: "category" } as any,
+    ];
+    component.tags = [
+      { id: 1, name: "tag" } as any,
+    ];
+
+    const magicReceipt = {
+      name: "Full Receipt",
+      amount: "25.75",
+      date: "2023-08-05T00:00:00.000Z",
+      categories: [{ id: 1 } as any],
+      tags: [{ id: 1 } as any],
+      receiptItems: [
+        { name: "Item A", amount: "15.00", status: ItemStatus.Open, receiptId: 0 },
+        { name: "Item B", amount: "10.75", status: ItemStatus.Open, receiptId: 0 },
+      ],
+    } as any;
+
+    jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+
+    const snackbarSpy = jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "success"
+    ).mockReturnValue(undefined);
+
+    component.magicFill();
+
+    const receiptValue = component.form.getRawValue();
+    expect(receiptValue.name).toEqual("Full Receipt");
+    expect(receiptValue.amount).toEqual("25.75");
+    expect(receiptValue.categories).toEqual([component.categories[0]]);
+    expect(receiptValue.tags).toEqual([component.tags[0]]);
+    expect(component.receiptItemsFormArray.length).toEqual(2);
+    expect(snackbarSpy).toHaveBeenCalledWith(
+      "Magic fill successfully filled name, amount, date, categories, tags, receiptItems from selected image!",
+      { duration: 10000 }
+    );
+  });
+
+  it("should build item forms with isShare=false so chargedToUserId is not required", () => {
+    component.images = [{ id: 1 } as any];
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    component.carouselComponent = {
+      currentlyShownImageIndex: 0,
+    } as any;
+
+    const magicReceipt = {
+      name: "",
+      amount: "0",
+      date: "0001-01-01T00:00:00Z",
+      receiptItems: [
+        { name: "Item 1", amount: "10.00", status: ItemStatus.Open, receiptId: 0 },
+      ],
+    } as any;
+
+    jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+
+    jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "success"
+    ).mockReturnValue(undefined);
+
+    component.magicFill();
+
+    const itemForm = component.receiptItemsFormArray.at(0);
+    const chargedToUserIdControl = itemForm.get("chargedToUserId");
+    chargedToUserIdControl?.setValue(null);
+    expect(chargedToUserIdControl?.valid).toBe(true);
+  });
+
+  it("should clear existing items before patching new ones from magic fill", () => {
+    component.images = [{ id: 1 } as any];
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    component.carouselComponent = {
+      currentlyShownImageIndex: 0,
+    } as any;
+
+    // Pre-populate with an existing item
+    const { buildItemForm } = require("../utils/form.utils");
+    component.receiptItemsFormArray.push(
+      buildItemForm({ name: "Existing", amount: "5.00", status: ItemStatus.Open, receiptId: 0 })
+    );
+    expect(component.receiptItemsFormArray.length).toEqual(1);
+
+    const magicReceipt = {
+      name: "",
+      amount: "0",
+      date: "0001-01-01T00:00:00Z",
+      receiptItems: [
+        { name: "New Item 1", amount: "10.00", status: ItemStatus.Open, receiptId: 0 },
+        { name: "New Item 2", amount: "20.00", status: ItemStatus.Open, receiptId: 0 },
+      ],
+    } as any;
+
+    jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+
+    jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "success"
+    ).mockReturnValue(undefined);
+
+    component.magicFill();
+
+    expect(component.receiptItemsFormArray.length).toEqual(2);
+    expect(component.receiptItemsFormArray.at(0).value.name).toEqual("New Item 1");
+    expect(component.receiptItemsFormArray.at(1).value.name).toEqual("New Item 2");
+  });
+
+  it("should patch item categories and tags from magic fill", () => {
+    component.images = [{ id: 1 } as any];
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    component.carouselComponent = {
+      currentlyShownImageIndex: 0,
+    } as any;
+
+    const itemCategory = { id: 1, name: "Food" };
+    const itemTag = { id: 2, name: "Lunch" };
+
+    const magicReceipt = {
+      name: "",
+      amount: "0",
+      date: "0001-01-01T00:00:00Z",
+      receiptItems: [
+        {
+          name: "Sandwich",
+          amount: "8.50",
+          status: ItemStatus.Open,
+          receiptId: 0,
+          categories: [itemCategory],
+          tags: [itemTag],
+        },
+      ],
+    } as any;
+
+    jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+
+    jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "success"
+    ).mockReturnValue(undefined);
+
+    component.magicFill();
+
+    const itemForm = component.receiptItemsFormArray.at(0);
+    const categoriesArray = itemForm.get("categories") as any;
+    const tagsArray = itemForm.get("tags") as any;
+    expect(categoriesArray.length).toEqual(1);
+    expect(categoriesArray.at(0).value).toEqual(itemCategory);
+    expect(tagsArray.length).toEqual(1);
+    expect(tagsArray.at(0).value).toEqual(itemTag);
   });
 
   it("should set queue data when there is no data", () => {
