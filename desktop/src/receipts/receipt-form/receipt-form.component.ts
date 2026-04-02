@@ -514,6 +514,8 @@ export class ReceiptFormComponent implements OnInit {
       date: "0001-01-01T00:00:00Z",
       categories: null,
       tags: null,
+      status: "",
+      paidByUserId: 0,
     } as any;
     const validKeys: string[] = [];
     Object.keys(keysWithDefaults).forEach((key) => {
@@ -558,6 +560,19 @@ export class ReceiptFormComponent implements OnInit {
         );
       });
       validKeys.push("receiptItems");
+    }
+
+    const customFields = magicReceipt.customFields;
+    if (customFields && customFields.length > 0) {
+      this.customFieldsFormArray.clear();
+      customFields.forEach((cf) => {
+        this.customFieldsFormArray.push(this.buildCustomOptionFormGroup(cf));
+      });
+      this.customFieldsStatefulMenuItems = this.customFieldsStatefulMenuItems.map((item) => ({
+        ...item,
+        selected: customFields.some((cf) => cf.customFieldId?.toString() === item.value),
+      }));
+      validKeys.push("customFields");
     }
 
     if (validKeys.length > 0) {
