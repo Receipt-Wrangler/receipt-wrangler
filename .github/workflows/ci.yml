@@ -8,7 +8,7 @@ on:
       - 'api/**'
       - 'desktop/**'
       - 'docker/**'
-      - '.github/workflows/**'
+      - '.github/workflows/ci.yml'
 
 concurrency:
   group: docker-build-${{ github.ref }}
