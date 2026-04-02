@@ -515,7 +515,6 @@ export class ReceiptFormComponent implements OnInit {
       categories: null,
       tags: null,
       status: "",
-      paidByUserId: 0,
     } as any;
     const validKeys: string[] = [];
     Object.keys(keysWithDefaults).forEach((key) => {
@@ -542,6 +541,13 @@ export class ReceiptFormComponent implements OnInit {
               date: value,
             });
             break;
+          case "status":
+            if (Object.values(ReceiptStatus).includes(value as ReceiptStatus)) {
+              this.patchMagicValue(key, magicReceipt);
+            } else {
+              return;
+            }
+            break;
           default:
             this.patchMagicValue(key, magicReceipt);
         }
@@ -549,6 +555,12 @@ export class ReceiptFormComponent implements OnInit {
         validKeys.push(key);
       }
     });
+
+    const paidByUserId = magicReceipt.paidByUserId;
+    if (paidByUserId && paidByUserId > 0) {
+      this.form.patchValue({ paidByUserId });
+      validKeys.push("paidByUserId");
+    }
 
     const receiptItems = magicReceipt.receiptItems;
     if (receiptItems && receiptItems.length > 0) {
@@ -564,15 +576,19 @@ export class ReceiptFormComponent implements OnInit {
 
     const customFields = magicReceipt.customFields;
     if (customFields && customFields.length > 0) {
-      this.customFieldsFormArray.clear();
-      customFields.forEach((cf) => {
-        this.customFieldsFormArray.push(this.buildCustomOptionFormGroup(cf));
-      });
-      this.customFieldsStatefulMenuItems = this.customFieldsStatefulMenuItems.map((item) => ({
-        ...item,
-        selected: customFields.some((cf) => cf.customFieldId?.toString() === item.value),
-      }));
-      validKeys.push("customFields");
+      const validCustomFieldIds = new Set(this.customFields.map((cf) => cf.id));
+      const validCustomFields = customFields.filter((cf) => validCustomFieldIds.has(cf.customFieldId));
+      if (validCustomFields.length > 0) {
+        this.customFieldsFormArray.clear();
+        validCustomFields.forEach((cf) => {
+          this.customFieldsFormArray.push(this.buildCustomOptionFormGroup(cf));
+        });
+        this.customFieldsStatefulMenuItems = this.customFieldsStatefulMenuItems.map((item) => ({
+          ...item,
+          selected: validCustomFields.some((cf) => cf.customFieldId?.toString() === item.value),
+        }));
+        validKeys.push("customFields");
+      }
     }
 
     if (validKeys.length > 0) {
@@ -608,6 +624,7 @@ export class ReceiptFormComponent implements OnInit {
       value.map((foundItem) => foundItem.id)?.includes(item.id)
     );
     const itemsFormArray = this.form.get(formKey) as FormArray;
+    itemsFormArray.clear();
     itemsToPush.forEach((c) => {
       itemsFormArray.push(this.formBuilder.control(c));
     });

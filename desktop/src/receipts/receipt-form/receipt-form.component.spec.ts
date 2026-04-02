@@ -55,6 +55,36 @@ describe("ReceiptFormComponent", () => {
     fixture.detectChanges();
   });
 
+  function setupMagicFillTest(): void {
+    component.images = [{ id: 1 } as any];
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    component.carouselComponent = {
+      currentlyShownImageIndex: 0,
+    } as any;
+  }
+
+  function mockMagicFillReceipt(magicReceipt: any): jest.SpyInstance {
+    return jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+  }
+
+  function mockSnackbarSuccess(): jest.SpyInstance {
+    return jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "success"
+    ).mockReturnValue(undefined);
+  }
+
+  function mockSnackbarError(): jest.SpyInstance {
+    return jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "error"
+    ).mockReturnValue(undefined);
+  }
+
   it("should create", () => {
     expect(component).toBeTruthy();
   });
@@ -84,12 +114,7 @@ describe("ReceiptFormComponent", () => {
   it("should patch magic fill values correctly", () => {
     // Mock timezone offset to be EST
     Date.prototype.getTimezoneOffset = () => 240;
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
     component.categories = [
       { id: 1, name: "category" } as any,
       { id: 2, name: "category2" } as any,
@@ -111,15 +136,8 @@ describe("ReceiptFormComponent", () => {
       ],
     } as any;
 
-    const receiptImageServiceSpy = jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    const snackbarSpy = jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    const receiptImageServiceSpy = mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -139,12 +157,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should not patch magic fill values if they are the defaults", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     const originalData = {
       name: "a different name",
@@ -160,10 +173,7 @@ describe("ReceiptFormComponent", () => {
       date: "0001-01-01T00:00:00Z",
     } as any;
 
-    const receiptImageServiceSpy = jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
+    const receiptImageServiceSpy = mockMagicFillReceipt(magicReceipt);
 
     component.magicFill();
 
@@ -177,12 +187,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should not patch any values when they are all default values and pop error snackbar", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     const originalData = {
       name: "a different name",
@@ -198,15 +203,8 @@ describe("ReceiptFormComponent", () => {
       date: "0001-01-01T00:00:00Z",
     } as any;
 
-    const receiptImageServiceSpy = jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    const snackbarSpy = jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "error"
-    ).mockReturnValue(undefined);
+    const receiptImageServiceSpy = mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarError();
 
     component.magicFill();
 
@@ -223,12 +221,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should patch receiptItems from magic fill response", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     const magicReceipt = {
       name: "",
@@ -240,15 +233,8 @@ describe("ReceiptFormComponent", () => {
       ],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    const snackbarSpy = jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -264,12 +250,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should not patch receiptItems when array is empty", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     const magicReceipt = {
       name: "magic",
@@ -278,15 +259,8 @@ describe("ReceiptFormComponent", () => {
       receiptItems: [],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -294,12 +268,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should not patch receiptItems when undefined", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     const magicReceipt = {
       name: "magic",
@@ -307,29 +276,17 @@ describe("ReceiptFormComponent", () => {
       date: "0001-01-01T00:00:00Z",
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
 
     component.magicFill();
 
     expect(component.receiptItemsFormArray.length).toEqual(0);
   });
 
-  it("should patch receiptItems alongside all other fields", () => {
+  it("should patch receiptItems alongside other basic fields", () => {
     Date.prototype.getTimezoneOffset = () => 240;
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
     component.categories = [
       { id: 1, name: "category" } as any,
     ];
@@ -349,15 +306,8 @@ describe("ReceiptFormComponent", () => {
       ],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    const snackbarSpy = jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -374,12 +324,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should build item forms with isShare=false so chargedToUserId is not required", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     const magicReceipt = {
       name: "",
@@ -390,15 +335,8 @@ describe("ReceiptFormComponent", () => {
       ],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -409,12 +347,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should clear existing items before patching new ones from magic fill", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     // Pre-populate with an existing item
     const { buildItemForm } = require("../utils/form.utils");
@@ -433,15 +366,8 @@ describe("ReceiptFormComponent", () => {
       ],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -451,12 +377,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should patch item categories and tags from magic fill", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     const itemCategory = { id: 1, name: "Food" };
     const itemTag = { id: 2, name: "Lunch" };
@@ -477,15 +398,8 @@ describe("ReceiptFormComponent", () => {
       ],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -498,13 +412,8 @@ describe("ReceiptFormComponent", () => {
     expect(tagsArray.at(0).value).toEqual(itemTag);
   });
 
-  it("should patch status from magic fill when non-empty", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+  it("should patch status from magic fill when valid", () => {
+    setupMagicFillTest();
 
     const magicReceipt = {
       name: "",
@@ -513,15 +422,8 @@ describe("ReceiptFormComponent", () => {
       status: ReceiptStatus.Resolved,
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    const snackbarSpy = jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -533,12 +435,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should not patch status when empty", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     const magicReceipt = {
       name: "magic",
@@ -547,28 +444,37 @@ describe("ReceiptFormComponent", () => {
       status: "",
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
 
     component.magicFill();
 
     expect(component.form.getRawValue().status).toEqual(ReceiptStatus.Open);
   });
 
-  it("should patch paidByUserId from magic fill when non-zero", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
+  it("should not patch invalid status values", () => {
+    setupMagicFillTest();
+
+    const magicReceipt = {
+      name: "",
+      amount: "0",
+      date: "0001-01-01T00:00:00Z",
+      status: "COMPLETE",
     } as any;
+
+    mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarError();
+
+    component.magicFill();
+
+    expect(component.form.getRawValue().status).toEqual(ReceiptStatus.Open);
+    expect(snackbarSpy).toHaveBeenCalledWith(
+      "Could not find any values to fill! Try reuploading a clearer image."
+    );
+  });
+
+  it("should patch paidByUserId from magic fill when non-zero", () => {
+    setupMagicFillTest();
 
     const magicReceipt = {
       name: "",
@@ -577,15 +483,8 @@ describe("ReceiptFormComponent", () => {
       paidByUserId: 42,
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    const snackbarSpy = jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -597,12 +496,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should not patch paidByUserId when zero", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     component.form.patchValue({ paidByUserId: 99 });
 
@@ -613,15 +507,8 @@ describe("ReceiptFormComponent", () => {
       paidByUserId: 0,
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -629,12 +516,11 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should patch customFields from magic fill", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
+    component.customFields = [
+      { id: 10, name: "Vendor" } as any,
+      { id: 20, name: "Notes" } as any,
+    ];
     component.customFieldsStatefulMenuItems = [
       { value: "10", displayValue: "Vendor", selected: false },
       { value: "20", displayValue: "Notes", selected: false },
@@ -649,15 +535,8 @@ describe("ReceiptFormComponent", () => {
       ],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    const snackbarSpy = jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -673,12 +552,7 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should not patch customFields when array is empty", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
 
     const magicReceipt = {
       name: "magic",
@@ -687,15 +561,8 @@ describe("ReceiptFormComponent", () => {
       customFields: [],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -703,12 +570,11 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should clear existing customFields before patching new ones from magic fill", () => {
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
+    component.customFields = [
+      { id: 10, name: "Vendor" } as any,
+      { id: 20, name: "Notes" } as any,
+    ];
     component.customFieldsStatefulMenuItems = [
       { value: "10", displayValue: "Vendor", selected: true },
       { value: "20", displayValue: "Notes", selected: false },
@@ -729,15 +595,8 @@ describe("ReceiptFormComponent", () => {
       ],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
 
     component.magicFill();
 
@@ -748,19 +607,133 @@ describe("ReceiptFormComponent", () => {
     expect(component.customFieldsStatefulMenuItems[1].selected).toBe(true);
   });
 
+  it("should filter out invalid customFieldIds from magic fill", () => {
+    setupMagicFillTest();
+    component.customFields = [
+      { id: 10, name: "Vendor" } as any,
+    ];
+    component.customFieldsStatefulMenuItems = [
+      { value: "10", displayValue: "Vendor", selected: false },
+    ];
+
+    const magicReceipt = {
+      name: "",
+      amount: "0",
+      date: "0001-01-01T00:00:00Z",
+      customFields: [
+        { customFieldId: 10, receiptId: 0, stringValue: "Valid" },
+        { customFieldId: 999, receiptId: 0, stringValue: "Invalid" },
+      ],
+    } as any;
+
+    mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarSuccess();
+
+    component.magicFill();
+
+    expect(component.customFieldsFormArray.length).toEqual(1);
+    expect(component.customFieldsFormArray.at(0).value.customFieldId).toEqual(10);
+    expect(component.customFieldsFormArray.at(0).value.stringValue).toEqual("Valid");
+    expect(component.customFieldsStatefulMenuItems[0].selected).toBe(true);
+    expect(snackbarSpy).toHaveBeenCalledWith(
+      "Magic fill successfully filled customFields from selected image!",
+      { duration: 10000 }
+    );
+  });
+
+  it("should not patch customFields when all IDs are invalid", () => {
+    setupMagicFillTest();
+    component.customFields = [
+      { id: 10, name: "Vendor" } as any,
+    ];
+    component.customFieldsStatefulMenuItems = [
+      { value: "10", displayValue: "Vendor", selected: false },
+    ];
+
+    const magicReceipt = {
+      name: "magic",
+      amount: "0",
+      date: "0001-01-01T00:00:00Z",
+      customFields: [
+        { customFieldId: 888, receiptId: 0, stringValue: "Bad" },
+        { customFieldId: 999, receiptId: 0, stringValue: "Also Bad" },
+      ],
+    } as any;
+
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
+
+    component.magicFill();
+
+    expect(component.customFieldsFormArray.length).toEqual(0);
+    expect(component.customFieldsStatefulMenuItems[0].selected).toBe(false);
+  });
+
+  it("should clear categories on repeated magic fill", () => {
+    setupMagicFillTest();
+    component.categories = [
+      { id: 1, name: "Food" } as any,
+      { id: 2, name: "Travel" } as any,
+    ];
+
+    // First magic fill with category 1
+    mockMagicFillReceipt({
+      name: "First", amount: "10", date: "2024-01-01T00:00:00.000Z",
+      categories: [{ id: 1 }],
+    } as any);
+    mockSnackbarSuccess();
+    component.magicFill();
+    expect(component.form.get("categories")?.value).toEqual([component.categories[0]]);
+
+    // Second magic fill with category 2
+    mockMagicFillReceipt({
+      name: "Second", amount: "20", date: "2024-02-01T00:00:00.000Z",
+      categories: [{ id: 2 }],
+    } as any);
+    component.magicFill();
+
+    // Should have only category 2, not both
+    expect(component.form.get("categories")?.value).toEqual([component.categories[1]]);
+  });
+
+  it("should clear tags on repeated magic fill", () => {
+    setupMagicFillTest();
+    component.tags = [
+      { id: 1, name: "Work" } as any,
+      { id: 2, name: "Personal" } as any,
+    ];
+
+    // First magic fill with tag 1
+    mockMagicFillReceipt({
+      name: "First", amount: "10", date: "2024-01-01T00:00:00.000Z",
+      tags: [{ id: 1 }],
+    } as any);
+    mockSnackbarSuccess();
+    component.magicFill();
+    expect(component.form.get("tags")?.value).toEqual([component.tags[0]]);
+
+    // Second magic fill with tag 2
+    mockMagicFillReceipt({
+      name: "Second", amount: "20", date: "2024-02-01T00:00:00.000Z",
+      tags: [{ id: 2 }],
+    } as any);
+    component.magicFill();
+
+    // Should have only tag 2, not both
+    expect(component.form.get("tags")?.value).toEqual([component.tags[1]]);
+  });
+
   it("should patch all fields together from magic fill", () => {
     Date.prototype.getTimezoneOffset = () => 240;
-    component.images = [{ id: 1 } as any];
-    component.ngOnInit();
-    component.mode = FormMode.edit;
-    component.carouselComponent = {
-      currentlyShownImageIndex: 0,
-    } as any;
+    setupMagicFillTest();
     component.categories = [
       { id: 1, name: "category" } as any,
     ];
     component.tags = [
       { id: 1, name: "tag" } as any,
+    ];
+    component.customFields = [
+      { id: 5, name: "Vendor" } as any,
     ];
     component.customFieldsStatefulMenuItems = [
       { value: "5", displayValue: "Vendor", selected: false },
@@ -782,15 +755,8 @@ describe("ReceiptFormComponent", () => {
       ],
     } as any;
 
-    jest.spyOn(
-      TestBed.inject(ReceiptImageService),
-      "magicFillReceipt"
-    ).mockReturnValue(of(magicReceipt));
-
-    const snackbarSpy = jest.spyOn(
-      TestBed.inject(SnackbarService),
-      "success"
-    ).mockReturnValue(undefined);
+    mockMagicFillReceipt(magicReceipt);
+    const snackbarSpy = mockSnackbarSuccess();
 
     component.magicFill();
 
