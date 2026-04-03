@@ -213,15 +213,6 @@ func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// Set the format to JPEG once, the setting is retained across frames.
-	if err := mw.SetImageFormat("jpeg"); err != nil {
-		return nil, err
-	}
-
-	if err := mw.SetCompressionQuality(95); err != nil {
-		return nil, err
-	}
-
 	// Must be after reading the image.
 	// Flatten image and remove alpha channel, to prevent alpha turning black in jpg
 	if err := mw.SetImageAlphaChannel(0); err != nil {
@@ -229,6 +220,9 @@ func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 	}
 
 	numPages := int(mw.GetNumberImages())
+	if numPages == 0 {
+		return nil, errors.New("PDF contains no pages")
+	}
 
 	finalImage := imagick.NewMagickWand()
 	defer finalImage.Destroy()
