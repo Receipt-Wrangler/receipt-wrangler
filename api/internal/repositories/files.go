@@ -191,6 +191,10 @@ func (repository FileRepository) ConvertHeicToJpg(bytes []byte) ([]byte, error) 
 		return nil, err
 	}
 
+	if err := mw.SetCompressionQuality(95); err != nil {
+		return nil, err
+	}
+
 	return mw.GetImageBlob()
 }
 
@@ -218,58 +222,34 @@ func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// Must be *after* ReadImageFile
+	// Must be after reading the image.
 	// Flatten image and remove alpha channel, to prevent alpha turning black in jpg
 	if err := mw.SetImageAlphaChannel(0); err != nil {
 		return nil, err
 	}
 
-	// Find out how many images/pages we've got in a pdf.
 	numPages := int(mw.GetNumberImages())
 
-	// Create a new wand to store the final long image.
 	finalImage := imagick.NewMagickWand()
 	defer finalImage.Destroy()
 
-	// Iterate over each page, processing it as needed.
 	for i := 0; i < numPages; i++ {
 		mw.SetIteratorIndex(i)
-
-		// Get the current image as a MagickWand.
-		// This is done because AddImage() expects a MagickWand, not a blob.
 		currImage := mw.GetImage()
 
-		// Add the current image to the finalImage wand.
 		if err := finalImage.AddImage(currImage); err != nil {
 			currImage.Destroy()
 			return nil, fmt.Errorf("failed to add PDF page %d: %w", i, err)
 		}
 
-		// Destroy the current image object as it's no longer needed.
 		currImage.Destroy()
 	}
 
-	// Now, we will append all the images stored in finalImage vertically.
-	// Resetting the wand is necessary for AppendImages to work.
 	finalImage.ResetIterator()
 	combinedImage := finalImage.AppendImages(true)
+	defer combinedImage.Destroy()
 
-	tempFilePath, err := repository.BuildTempFilePath("jpg")
-	if err != nil {
-		return nil, err
-	}
-
-	if err := combinedImage.WriteImage(tempFilePath); err != nil {
-		return nil, err
-	}
-
-	bytes, err = utils.ReadFile(tempFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	os.Remove(tempFilePath)
-	return bytes, nil
+	return combinedImage.GetImageBlob()
 }
 
 func (repository FileRepository) WriteTempFile(data []byte) (string, error) {
