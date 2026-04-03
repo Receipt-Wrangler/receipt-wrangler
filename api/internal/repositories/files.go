@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"receipt-wrangler/api/internal/constants"
@@ -199,12 +198,23 @@ func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 	mw := imagick.NewMagickWand()
 	defer mw.Destroy()
 
+	// Set resolution before reading the PDF so ImageMagick rasterizes at
+	// 300 DPI instead of the default 72 DPI, preserving quality for OCR
+	// and AI vision model processing.
+	if err := mw.SetResolution(300, 300); err != nil {
+		return nil, err
+	}
+
 	if err := mw.ReadImageBlob(bytes); err != nil {
 		return nil, err
 	}
 
 	// Set the format to JPEG once, the setting is retained across frames.
 	if err := mw.SetImageFormat("jpeg"); err != nil {
+		return nil, err
+	}
+
+	if err := mw.SetCompressionQuality(95); err != nil {
 		return nil, err
 	}
 
@@ -231,7 +241,8 @@ func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 
 		// Add the current image to the finalImage wand.
 		if err := finalImage.AddImage(currImage); err != nil {
-			log.Fatal(err) // Handle the error appropriately
+			currImage.Destroy()
+			return nil, fmt.Errorf("failed to add PDF page %d: %w", i, err)
 		}
 
 		// Destroy the current image object as it's no longer needed.
