@@ -104,6 +104,26 @@
       }"
     ></ng-template>
 
+    @if (customFields.length > 0) {
+      @for (cfControl of getCustomFieldsArray().controls; track cfControl; let i = $index) {
+        <ng-template
+          [ngTemplateOutlet]="customFieldFilterRow"
+          [ngTemplateOutletContext]="{ index: i }"
+        ></ng-template>
+      }
+
+      @if (getCustomFieldsArray().length < customFields.length) {
+        <div class="d-flex justify-content-start mt-2 mb-2">
+          <app-button
+            matButtonType="basic"
+            icon="add"
+            label="Add Custom Field Filter"
+            (clicked)="addCustomFieldFilter()"
+          ></app-button>
+        </div>
+      }
+    }
+
     <ng-template
       [ngTemplateOutlet]="footerTemplate() ?? defaultFooter"
     ></ng-template>
@@ -145,7 +165,7 @@
         <div class="d-flex w-50 align-items-center">
           <div class="w-50">
             <app-input
-              *ngIf="type === 'text' || type === 'number'"
+              *ngIf="type === 'text' || type === 'number' || type === 'currency'"
               [label]="'Start ' + label"
               [isCurrency]="isCurrency"
               [inputFormControl]="parentForm | formGet : basePath +  fieldName + '.value.0'"
@@ -168,7 +188,7 @@
           </span>
           <div class="w-50">
             <app-input
-              *ngIf="type === 'text' || type === 'number'"
+              *ngIf="type === 'text' || type === 'number' || type === 'currency'"
               [label]="'End ' + label"
               [isCurrency]="isCurrency"
               [inputFormControl]="parentForm | formGet : basePath +  fieldName + '.value.1'"
@@ -228,7 +248,7 @@
       </div>
     } @else {
       <app-input
-        *ngIf="type === 'text' || type === 'number'"
+        *ngIf="type === 'text' || type === 'number' || type === 'currency'"
         class="w-50"
         [label]="label"
         [isCurrency]="isCurrency"
@@ -270,6 +290,69 @@
         [addEmptyOption]="true"
       ></app-select>
     }
+  </div>
+</ng-template>
+
+<ng-template #customFieldFilterRow let-index="index">
+  <div class="d-flex align-items-start">
+    <app-select
+      class="w-25 me-2"
+      label="Custom Field"
+      [inputFormControl]="parentForm | formGet : basePath + 'customFields.' + index + '.customFieldId'"
+      [options]="getAvailableCustomFields(index)"
+      optionValueKey="id"
+      optionDisplayKey="name"
+      [addEmptyOption]="true"
+    ></app-select>
+
+    @if (getSelectedCustomField(index); as selectedField) {
+      @switch (getFilterType(selectedField)) {
+        @case ('boolean') {
+          <app-select
+            class="w-25"
+            [label]="selectedField.name"
+            [inputFormControl]="parentForm | formGet : basePath + 'customFields.' + index + '.value'"
+            [options]="booleanOptions"
+            optionValueKey="value"
+            optionDisplayKey="displayValue"
+            [addEmptyOption]="true"
+          ></app-select>
+          <app-select
+            class="ms-2 w-25"
+            label="Operation"
+            [inputFormControl]="parentForm | formGet : basePath + 'customFields.' + index + '.operation'"
+            [options]="getFilterType(selectedField) | operations: false"
+            [optionsDisplayArray]="getFilterType(selectedField) | operations: true"
+            [addEmptyOption]="true"
+          ></app-select>
+        }
+        @default {
+          <ng-template
+            [ngTemplateOutlet]="filterField"
+            [ngTemplateOutletContext]="{
+              label: selectedField.name,
+              fieldName: 'customFields.' + index,
+              type: getFilterType(selectedField),
+              isCurrency: getFilterType(selectedField) === 'currency',
+              options: selectedField.type === 'SELECT' ? selectedField.options : undefined,
+              optionFilterKey: 'value',
+              optionDisplayKey: 'value',
+              optionValueKey: 'id',
+              multiple: selectedField.type === 'SELECT'
+            }"
+          ></ng-template>
+        }
+      }
+    }
+
+    <app-button
+      class="ms-2 mt-1"
+      matButtonType="iconButton"
+      icon="close"
+      color="warn"
+      tooltip="Remove filter"
+      (clicked)="removeCustomFieldFilter(index)"
+    ></app-button>
   </div>
 </ng-template>
 

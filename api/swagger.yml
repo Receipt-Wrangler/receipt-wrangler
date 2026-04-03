@@ -360,6 +360,26 @@ paths:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
   /customField/:
+    get:
+      tags:
+        - CustomField
+      summary: Get all custom fields
+      description: This will return all custom fields
+      operationId: getAllCustomFields
+      responses:
+        200:
+          description: All custom fields
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomField"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
     post:
       tags:
         - CustomField
@@ -3765,6 +3785,20 @@ components:
           $ref: "#/components/schemas/PagedRequestField"
         createdAt:
           $ref: "#/components/schemas/PagedRequestField"
+        customFields:
+          type: array
+          items:
+            $ref: "#/components/schemas/CustomFieldFilter"
+    CustomFieldFilter:
+      type: object
+      properties:
+        customFieldId:
+          type: integer
+          description: ID of the custom field to filter by
+        operation:
+          $ref: "#/components/schemas/FilterOperation"
+        value:
+          description: Filter value - type depends on the custom field type
     PagedRequestField:
       type: object
       description: "Contains two keys: operation of type FilterOperation and value which can a different type depending on the field."

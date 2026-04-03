@@ -115,4 +115,46 @@ describe("OperationsPipe", () => {
       "WITHIN_CURRENT_MONTH"
     ]);
   });
+
+  it("should return options for boolean", () => {
+    const pipe = new OperationsPipe();
+
+    const result = pipe.transform("boolean", true);
+
+    expect(result).toEqual(["Equals"]);
+  });
+
+  it("should return value options for boolean", () => {
+    const pipe = new OperationsPipe();
+
+    const result = pipe.transform("boolean", false);
+
+    expect(result).toEqual(["EQUALS"]);
+  });
+
+  it("should return options for currency (same as number)", () => {
+    const pipe = new OperationsPipe();
+
+    const result = pipe.transform("currency", true);
+
+    expect(result).toEqual([
+      "Equals",
+      "Greater than",
+      "Less than",
+      "Between"
+    ]);
+  });
+
+  it("should return value options for currency", () => {
+    const pipe = new OperationsPipe();
+
+    const result = pipe.transform("currency", false);
+
+    expect(result).toEqual([
+      "EQUALS",
+      "GREATER_THAN",
+      "LESS_THAN",
+      "BETWEEN"
+    ]);
+  });
 });

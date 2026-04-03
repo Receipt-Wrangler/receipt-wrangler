@@ -22,6 +22,7 @@ export * from './comment';
 export * from './currencySeparator';
 export * from './currencySymbolPosition';
 export * from './customField';
+export * from './customFieldFilter';
 export * from './customFieldOption';
 export * from './customFieldType';
 export * from './customFieldValue';

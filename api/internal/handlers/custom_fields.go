@@ -13,6 +13,35 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+func GetAllCustomFields(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage: "Error retrieving custom fields",
+		Writer:       w,
+		Request:      r,
+		UserRole:     models.USER,
+		ResponseType: constants.ApplicationJson,
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			customFieldsRepository := repositories.NewCustomFieldRepository(nil)
+			customFields, err := customFieldsRepository.GetAllCustomFields()
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(&customFields)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
+
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
 func GetPagedCustomFields(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
 		ErrorMessage: "Error getting custom fields",

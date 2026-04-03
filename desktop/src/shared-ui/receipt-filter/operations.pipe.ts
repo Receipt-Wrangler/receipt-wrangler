@@ -1,5 +1,6 @@
 import { Pipe, PipeTransform } from "@angular/core";
 import {
+  booleanOperationOptions,
   dateOperationOptions,
   listOperationOptions,
   numberOperationOptions,
@@ -40,6 +41,12 @@ export class OperationsPipe implements PipeTransform {
 
       case "users":
         return usersOperationOptions.map((option) => this.getDisplayValue(option, display));
+
+      case "boolean":
+        return booleanOperationOptions.map((option) => this.getDisplayValue(option, display));
+
+      case "currency":
+        return numberOperationOptions.map((option) => this.getDisplayValue(option, display));
 
       default:
         return [];

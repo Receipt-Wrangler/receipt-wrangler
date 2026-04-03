@@ -53,6 +53,7 @@ model/comment.ts
 model/currencySeparator.ts
 model/currencySymbolPosition.ts
 model/customField.ts
+model/customFieldFilter.ts
 model/customFieldOption.ts
 model/customFieldType.ts
 model/customFieldValue.ts

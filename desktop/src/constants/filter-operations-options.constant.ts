@@ -19,3 +19,7 @@ export const textOperationOptions = Object.values(FilterOperation).filter(
 export const usersOperationOptions = Object.values(FilterOperation).filter(
   (k) => k === "CONTAINS" && k !== FilterOperation.WithinCurrentMonth && !!k
 );
+
+export const booleanOperationOptions = Object.values(FilterOperation).filter(
+  (k) => k === "EQUALS" && !!k
+);

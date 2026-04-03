@@ -1,9 +1,15 @@
 import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
 import { untilDestroyed } from "@ngneat/until-destroy";
 import { distinctUntilChanged, pairwise, startWith, tap } from "rxjs";
-import { FilterOperation } from "../open-api/index";
+import { CustomFieldFilter, FilterOperation } from "../open-api/index";
 
 export function buildReceiptFilterForm(filter: any, thisContext: any): FormGroup {
+  const customFieldsArray = new FormArray(
+    (filter?.customFields || []).map((cf: CustomFieldFilter) =>
+      buildCustomFieldFilterFormGroup(cf)
+    )
+  );
+
   const formGroup = new FormGroup({
     date: buildFieldFormGroup(
       filter?.date?.value,
@@ -58,6 +64,7 @@ export function buildReceiptFilterForm(filter: any, thisContext: any): FormGroup
       thisContext,
       filter?.createdAt?.operation === FilterOperation.Between
     ),
+    customFields: customFieldsArray,
   });
 
   listenForBetweenOperation(formGroup, "amount", thisContext);
@@ -65,11 +72,32 @@ export function buildReceiptFilterForm(filter: any, thisContext: any): FormGroup
   listenForBetweenOperation(formGroup, "resolvedDate", thisContext);
   listenForBetweenOperation(formGroup, "createdAt", thisContext);
 
-
   return formGroup;
 }
 
-function listenForBetweenOperation(form: FormGroup, key: string, thisContext: any): void {
+export function buildCustomFieldFilterFormGroup(cf?: CustomFieldFilter): FormGroup {
+  const formBuilder = new FormBuilder();
+  const isBetween = cf?.operation === FilterOperation.Between;
+  const isArray = Array.isArray(cf?.value);
+
+  let valueControl: AbstractControl;
+  if (isBetween) {
+    const arr = cf?.value as any[];
+    valueControl = formBuilder.array([arr?.[0] ?? null, arr?.[1] ?? null]);
+  } else if (isArray) {
+    valueControl = formBuilder.array(cf?.value ?? []);
+  } else {
+    valueControl = formBuilder.control(cf?.value ?? null);
+  }
+
+  return formBuilder.group({
+    customFieldId: formBuilder.control(cf?.customFieldId ?? null),
+    operation: formBuilder.control(cf?.operation ?? null),
+    value: valueControl,
+  });
+}
+
+export function listenForBetweenOperation(form: FormGroup, key: string, thisContext: any): void {
   updateValidatorsOnOperationChange(true, form, key, null, form.get(key)?.get("operation")?.value);
 
   form

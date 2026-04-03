@@ -330,6 +330,269 @@ func TestShouldBuildGormFilterQuery(t *testing.T) {
 	}
 }
 
+func TestShouldBuildGormFilterQueryWithCustomFieldTextFilter(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	db := GetDB()
+	textField := models.CustomField{Name: "Text Field", Type: models.TEXT}
+	db.Create(&textField)
+
+	repository := NewReceiptRepository(nil)
+
+	pagedRequest := commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{OrderBy: "created_at"},
+		Filter: commands.ReceiptPagedRequestFilter{
+			CustomFields: []commands.CustomFieldFilter{
+				{CustomFieldId: textField.ID, Operation: commands.CONTAINS, Value: "test"},
+			},
+		},
+	}
+
+	query, err := repository.BuildGormFilterQuery(pagedRequest)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if query == nil {
+		utils.PrintTestError(t, "Query should not be nil", nil)
+	}
+}
+
+func TestShouldBuildGormFilterQueryWithCustomFieldDateFilter(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	db := GetDB()
+	dateField := models.CustomField{Name: "Date Field", Type: models.DATE}
+	db.Create(&dateField)
+
+	repository := NewReceiptRepository(nil)
+
+	pagedRequest := commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{OrderBy: "created_at"},
+		Filter: commands.ReceiptPagedRequestFilter{
+			CustomFields: []commands.CustomFieldFilter{
+				{CustomFieldId: dateField.ID, Operation: commands.GREATER_THAN, Value: "2024-01-01"},
+			},
+		},
+	}
+
+	query, err := repository.BuildGormFilterQuery(pagedRequest)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if query == nil {
+		utils.PrintTestError(t, "Query should not be nil", nil)
+	}
+}
+
+func TestShouldBuildGormFilterQueryWithCustomFieldCurrencyBetween(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	db := GetDB()
+	currencyField := models.CustomField{Name: "Currency Field", Type: models.CURRENCY}
+	db.Create(&currencyField)
+
+	repository := NewReceiptRepository(nil)
+
+	pagedRequest := commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{OrderBy: "created_at"},
+		Filter: commands.ReceiptPagedRequestFilter{
+			CustomFields: []commands.CustomFieldFilter{
+				{CustomFieldId: currencyField.ID, Operation: commands.BETWEEN, Value: []interface{}{10.0, 100.0}},
+			},
+		},
+	}
+
+	query, err := repository.BuildGormFilterQuery(pagedRequest)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if query == nil {
+		utils.PrintTestError(t, "Query should not be nil", nil)
+	}
+}
+
+func TestShouldBuildGormFilterQueryWithCustomFieldBooleanFilter(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	db := GetDB()
+	boolField := models.CustomField{Name: "Bool Field", Type: models.BOOLEAN}
+	db.Create(&boolField)
+
+	repository := NewReceiptRepository(nil)
+
+	pagedRequest := commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{OrderBy: "created_at"},
+		Filter: commands.ReceiptPagedRequestFilter{
+			CustomFields: []commands.CustomFieldFilter{
+				{CustomFieldId: boolField.ID, Operation: commands.EQUALS, Value: true},
+			},
+		},
+	}
+
+	query, err := repository.BuildGormFilterQuery(pagedRequest)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if query == nil {
+		utils.PrintTestError(t, "Query should not be nil", nil)
+	}
+}
+
+func TestShouldBuildGormFilterQueryWithCustomFieldSelectFilter(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	db := GetDB()
+	selectField := models.CustomField{Name: "Select Field", Type: models.SELECT}
+	db.Create(&selectField)
+
+	opt1 := models.CustomFieldOption{Value: "Option 1", CustomFieldId: selectField.ID}
+	opt2 := models.CustomFieldOption{Value: "Option 2", CustomFieldId: selectField.ID}
+	db.Create(&opt1)
+	db.Create(&opt2)
+
+	repository := NewReceiptRepository(nil)
+
+	pagedRequest := commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{OrderBy: "created_at"},
+		Filter: commands.ReceiptPagedRequestFilter{
+			CustomFields: []commands.CustomFieldFilter{
+				{CustomFieldId: selectField.ID, Operation: commands.CONTAINS, Value: []interface{}{float64(opt1.ID), float64(opt2.ID)}},
+			},
+		},
+	}
+
+	query, err := repository.BuildGormFilterQuery(pagedRequest)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if query == nil {
+		utils.PrintTestError(t, "Query should not be nil", nil)
+	}
+}
+
+func TestShouldBuildGormFilterQueryWithMultipleCustomFieldFilters(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	db := GetDB()
+	textField := models.CustomField{Name: "Text Field", Type: models.TEXT}
+	dateField := models.CustomField{Name: "Date Field", Type: models.DATE}
+	db.Create(&textField)
+	db.Create(&dateField)
+
+	repository := NewReceiptRepository(nil)
+
+	pagedRequest := commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{OrderBy: "created_at"},
+		Filter: commands.ReceiptPagedRequestFilter{
+			Name: commands.PagedRequestField{
+				Operation: commands.CONTAINS,
+				Value:     "receipt",
+			},
+			CustomFields: []commands.CustomFieldFilter{
+				{CustomFieldId: textField.ID, Operation: commands.EQUALS, Value: "exact match"},
+				{CustomFieldId: dateField.ID, Operation: commands.LESS_THAN, Value: "2025-12-31"},
+			},
+		},
+	}
+
+	query, err := repository.BuildGormFilterQuery(pagedRequest)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if query == nil {
+		utils.PrintTestError(t, "Query should not be nil", nil)
+	}
+}
+
+func TestShouldBuildGormFilterQueryWithEmptyCustomFields(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	repository := NewReceiptRepository(nil)
+
+	pagedRequest := commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{OrderBy: "created_at"},
+		Filter: commands.ReceiptPagedRequestFilter{
+			CustomFields: []commands.CustomFieldFilter{},
+		},
+	}
+
+	query, err := repository.BuildGormFilterQuery(pagedRequest)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if query == nil {
+		utils.PrintTestError(t, "Query should not be nil", nil)
+	}
+}
+
+func TestShouldSkipCustomFieldFilterWithInvalidId(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	repository := NewReceiptRepository(nil)
+
+	pagedRequest := commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{OrderBy: "created_at"},
+		Filter: commands.ReceiptPagedRequestFilter{
+			CustomFields: []commands.CustomFieldFilter{
+				{CustomFieldId: 99999, Operation: commands.EQUALS, Value: "test"},
+			},
+		},
+	}
+
+	query, err := repository.BuildGormFilterQuery(pagedRequest)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if query == nil {
+		utils.PrintTestError(t, "Query should not be nil", nil)
+	}
+}
+
+func TestGetCustomFieldValueColumn(t *testing.T) {
+	if getCustomFieldValueColumn(models.TEXT) != "string_value" {
+		utils.PrintTestError(t, getCustomFieldValueColumn(models.TEXT), "string_value")
+	}
+	if getCustomFieldValueColumn(models.DATE) != "date_value" {
+		utils.PrintTestError(t, getCustomFieldValueColumn(models.DATE), "date_value")
+	}
+	if getCustomFieldValueColumn(models.SELECT) != "select_value" {
+		utils.PrintTestError(t, getCustomFieldValueColumn(models.SELECT), "select_value")
+	}
+	if getCustomFieldValueColumn(models.CURRENCY) != "currency_value" {
+		utils.PrintTestError(t, getCustomFieldValueColumn(models.CURRENCY), "currency_value")
+	}
+	if getCustomFieldValueColumn(models.BOOLEAN) != "boolean_value" {
+		utils.PrintTestError(t, getCustomFieldValueColumn(models.BOOLEAN), "boolean_value")
+	}
+	if getCustomFieldValueColumn("INVALID") != "" {
+		utils.PrintTestError(t, getCustomFieldValueColumn("INVALID"), "")
+	}
+}
+
 // Helper functions
 func createTestItems() {
 	db := GetDB()

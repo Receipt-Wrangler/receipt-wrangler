@@ -130,19 +130,30 @@ func (command *ReceiptPagedRequestCommand) LoadDataFromRequest(w http.ResponseWr
 		command.Filter.ResolvedDate.Value = ""
 	}
 
+	if command.Filter.CustomFields == nil {
+		command.Filter.CustomFields = make([]CustomFieldFilter, 0)
+	}
+
 	return nil
 }
 
 type ReceiptPagedRequestFilter struct {
-	Date         PagedRequestField `json:"date"`
-	Amount       PagedRequestField `json:"amount"`
-	Name         PagedRequestField `json:"name"`
-	PaidBy       PagedRequestField `json:"paidBy"`
-	Categories   PagedRequestField `json:"categories"`
-	Tags         PagedRequestField `json:"Tags"`
-	Status       PagedRequestField `json:"status"`
-	ResolvedDate PagedRequestField `json:"resolvedDate"`
-	CreatedAt    PagedRequestField `json:"createdAt"`
+	Date         PagedRequestField   `json:"date"`
+	Amount       PagedRequestField   `json:"amount"`
+	Name         PagedRequestField   `json:"name"`
+	PaidBy       PagedRequestField   `json:"paidBy"`
+	Categories   PagedRequestField   `json:"categories"`
+	Tags         PagedRequestField   `json:"Tags"`
+	Status       PagedRequestField   `json:"status"`
+	ResolvedDate PagedRequestField   `json:"resolvedDate"`
+	CreatedAt    PagedRequestField   `json:"createdAt"`
+	CustomFields []CustomFieldFilter `json:"customFields"`
+}
+
+type CustomFieldFilter struct {
+	CustomFieldId uint            `json:"customFieldId"`
+	Operation     FilterOperation `json:"operation"`
+	Value         interface{}     `json:"value"`
 }
 
 type PagedRequestField struct {

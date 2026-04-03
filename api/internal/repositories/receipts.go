@@ -690,6 +690,37 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 		)
 	}
 
+	// Custom Fields
+	if len(pagedRequest.Filter.CustomFields) > 0 {
+		customFieldIds := make([]uint, len(pagedRequest.Filter.CustomFields))
+		for i, cf := range pagedRequest.Filter.CustomFields {
+			customFieldIds[i] = cf.CustomFieldId
+		}
+
+		var customFields []models.CustomField
+		err := db.Where("id IN ?", customFieldIds).Find(&customFields).Error
+		if err != nil {
+			return nil, err
+		}
+
+		typeMap := make(map[uint]models.CustomFieldType)
+		for _, cf := range customFields {
+			typeMap[cf.ID] = cf.Type
+		}
+
+		for _, cfFilter := range pagedRequest.Filter.CustomFields {
+			fieldType, exists := typeMap[cfFilter.CustomFieldId]
+			if !exists {
+				continue
+			}
+			valueColumn := getCustomFieldValueColumn(fieldType)
+			if valueColumn == "" {
+				continue
+			}
+			query = repository.buildCustomFieldFilterQuery(query, cfFilter, valueColumn)
+		}
+	}
+
 	return query, nil
 }
 
@@ -731,6 +762,75 @@ func (repository ReceiptRepository) buildFilterQuery(runningQuery *gorm.DB, valu
 		endOfToday := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, now.Location())
 
 		return runningQuery.Where(fmt.Sprintf("%v >= ? AND %v <= ?", fieldName, fieldName), beginningOfMonth, endOfToday)
+	}
+
+	return runningQuery
+}
+
+func getCustomFieldValueColumn(fieldType models.CustomFieldType) string {
+	switch fieldType {
+	case models.TEXT:
+		return "string_value"
+	case models.DATE:
+		return "date_value"
+	case models.SELECT:
+		return "select_value"
+	case models.CURRENCY:
+		return "currency_value"
+	case models.BOOLEAN:
+		return "boolean_value"
+	default:
+		return ""
+	}
+}
+
+func (repository ReceiptRepository) buildCustomFieldFilterQuery(
+	runningQuery *gorm.DB,
+	cfFilter commands.CustomFieldFilter,
+	valueColumn string,
+) *gorm.DB {
+	baseSubQuery := db.Table("custom_field_values").
+		Select("receipt_id").
+		Where("custom_field_id = ?", cfFilter.CustomFieldId)
+
+	switch cfFilter.Operation {
+	case commands.EQUALS:
+		return runningQuery.Where("id IN (?)",
+			baseSubQuery.Where(fmt.Sprintf("%s = ?", valueColumn), cfFilter.Value))
+
+	case commands.CONTAINS:
+		if valueColumn == "string_value" {
+			searchValue := fmt.Sprintf("%%%v%%", cfFilter.Value)
+			return runningQuery.Where("id IN (?)",
+				baseSubQuery.Where(fmt.Sprintf("%s LIKE ?", valueColumn), searchValue))
+		}
+		return runningQuery.Where("id IN (?)",
+			baseSubQuery.Where(fmt.Sprintf("%s IN ?", valueColumn), cfFilter.Value))
+
+	case commands.GREATER_THAN:
+		return runningQuery.Where("id IN (?)",
+			baseSubQuery.Where(fmt.Sprintf("%s > ?", valueColumn), cfFilter.Value))
+
+	case commands.LESS_THAN:
+		return runningQuery.Where("id IN (?)",
+			baseSubQuery.Where(fmt.Sprintf("%s < ?", valueColumn), cfFilter.Value))
+
+	case commands.BETWEEN:
+		arrayValue, ok := cfFilter.Value.([]interface{})
+		if !ok || len(arrayValue) != 2 {
+			return runningQuery
+		}
+		return runningQuery.Where("id IN (?)",
+			baseSubQuery.Where(fmt.Sprintf("%s >= ? AND %s <= ?", valueColumn, valueColumn),
+				arrayValue[0], arrayValue[1]))
+
+	case commands.WITHIN_CURRENT_MONTH:
+		now := time.Now()
+		beginningOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		endOfToday := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, now.Location())
+		return runningQuery.Where("id IN (?)",
+			baseSubQuery.Where(fmt.Sprintf("%s >= ? AND %s <= ?", valueColumn, valueColumn),
+				beginningOfMonth, endOfToday))
 	}
 
 	return runningQuery

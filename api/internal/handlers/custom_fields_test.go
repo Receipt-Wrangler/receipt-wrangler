@@ -602,3 +602,77 @@ func TestDeleteCustomFieldHandlerWithNonExistentId(t *testing.T) {
 		utils.PrintTestError(t, status, http.StatusOK)
 	}
 }
+
+func TestGetAllCustomFieldsHandler(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+	setupCustomFieldHandlerTest()
+
+	req, rr := createCustomFieldHandlerTestRequest(
+		"GET",
+		"/api/customField/",
+		"",
+	)
+
+	GetAllCustomFields(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		utils.PrintTestError(t, status, http.StatusOK)
+	}
+
+	var customFields []models.CustomField
+	err := json.Unmarshal(rr.Body.Bytes(), &customFields)
+	if err != nil {
+		utils.PrintTestError(t, err.Error(), nil)
+		return
+	}
+
+	if len(customFields) != 4 {
+		utils.PrintTestError(t, len(customFields), 4)
+		return
+	}
+
+	// Verify SELECT type has options preloaded
+	var selectField *models.CustomField
+	for i := range customFields {
+		if customFields[i].Type == models.SELECT {
+			selectField = &customFields[i]
+			break
+		}
+	}
+
+	if selectField == nil {
+		utils.PrintTestError(t, "Expected to find SELECT type custom field", nil)
+		return
+	}
+
+	if len(selectField.Options) != 2 {
+		utils.PrintTestError(t, len(selectField.Options), 2)
+	}
+}
+
+func TestGetAllCustomFieldsHandlerEmpty(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+
+	req, rr := createCustomFieldHandlerTestRequest(
+		"GET",
+		"/api/customField/",
+		"",
+	)
+
+	GetAllCustomFields(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		utils.PrintTestError(t, status, http.StatusOK)
+	}
+
+	var customFields []models.CustomField
+	err := json.Unmarshal(rr.Body.Bytes(), &customFields)
+	if err != nil {
+		utils.PrintTestError(t, err.Error(), nil)
+		return
+	}
+
+	if len(customFields) != 0 {
+		utils.PrintTestError(t, len(customFields), 0)
+	}
+}

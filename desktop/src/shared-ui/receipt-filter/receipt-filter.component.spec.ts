@@ -12,7 +12,7 @@ import { PipesModule } from "src/pipes/pipes.module";
 import { SetReceiptFilter } from "src/store/receipt-table.actions";
 import { defaultReceiptFilter, } from "src/store/receipt-table.state";
 import { InputModule } from "../../input";
-import { CategoryService, FilterOperation, ReceiptStatus, TagService } from "../../open-api";
+import { CategoryService, CustomFieldService, CustomFieldType, FilterOperation, ReceiptStatus, TagService } from "../../open-api";
 import { StoreModule } from "../../store/store.module";
 import { applyFormCommand } from "../../utils/index";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
@@ -69,6 +69,7 @@ describe("ReceiptFilterComponent", () => {
       operation: FilterOperation.GreaterThan,
       value: "2023-01-06",
     },
+    customFields: [],
   };
 
   beforeEach(() => {
@@ -84,6 +85,7 @@ describe("ReceiptFilterComponent", () => {
         ReactiveFormsModule],
       providers: [
         CategoryService,
+        CustomFieldService,
         TagService,
         {
           provide: MatDialogRef,
@@ -120,6 +122,9 @@ describe("ReceiptFilterComponent", () => {
     jest.spyOn(TestBed.inject(TagService), "getAllTags").mockReturnValue(
       of([]) as any
     );
+    jest.spyOn(TestBed.inject(CustomFieldService), "getAllCustomFields").mockReturnValue(
+      of([]) as any
+    );
 
     const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
 
@@ -134,6 +139,9 @@ describe("ReceiptFilterComponent", () => {
       of([]) as any
     );
     jest.spyOn(TestBed.inject(TagService), "getAllTags").mockReturnValue(
+      of([]) as any
+    );
+    jest.spyOn(TestBed.inject(CustomFieldService), "getAllCustomFields").mockReturnValue(
       of([]) as any
     );
     store.reset({
@@ -155,6 +163,9 @@ describe("ReceiptFilterComponent", () => {
       of([]) as any
     );
     jest.spyOn(TestBed.inject(TagService), "getAllTags").mockReturnValue(
+      of([]) as any
+    );
+    jest.spyOn(TestBed.inject(CustomFieldService), "getAllCustomFields").mockReturnValue(
       of([]) as any
     );
     store.reset({
@@ -201,5 +212,113 @@ describe("ReceiptFilterComponent", () => {
     component.cancelButtonClicked();
 
     expect(dialogRefSpy).toHaveBeenCalledWith(false);
+  });
+
+  it("should add and remove custom field filters", () => {
+    jest.spyOn(TestBed.inject(CategoryService), "getAllCategories").mockReturnValue(
+      of([]) as any
+    );
+    jest.spyOn(TestBed.inject(TagService), "getAllTags").mockReturnValue(
+      of([]) as any
+    );
+    jest.spyOn(TestBed.inject(CustomFieldService), "getAllCustomFields").mockReturnValue(
+      of([
+        { id: 1, name: "Text Field", type: CustomFieldType.Text, options: [] },
+        { id: 2, name: "Date Field", type: CustomFieldType.Date, options: [] },
+      ]) as any
+    );
+
+    const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
+    component.parentForm = buildReceiptFilterForm({}, noopComponent);
+    component.ngOnInit();
+
+    expect(component.getCustomFieldsArray().length).toBe(0);
+
+    component.addCustomFieldFilter();
+    expect(component.getCustomFieldsArray().length).toBe(1);
+
+    component.addCustomFieldFilter();
+    expect(component.getCustomFieldsArray().length).toBe(2);
+
+    component.removeCustomFieldFilter(0);
+    expect(component.getCustomFieldsArray().length).toBe(1);
+  });
+
+  it("should get available custom fields excluding used ones", () => {
+    jest.spyOn(TestBed.inject(CategoryService), "getAllCategories").mockReturnValue(
+      of([]) as any
+    );
+    jest.spyOn(TestBed.inject(TagService), "getAllTags").mockReturnValue(
+      of([]) as any
+    );
+    jest.spyOn(TestBed.inject(CustomFieldService), "getAllCustomFields").mockReturnValue(
+      of([
+        { id: 1, name: "Field 1", type: CustomFieldType.Text, options: [] },
+        { id: 2, name: "Field 2", type: CustomFieldType.Date, options: [] },
+      ]) as any
+    );
+
+    const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
+    component.parentForm = buildReceiptFilterForm({}, noopComponent);
+    component.ngOnInit();
+
+    component.addCustomFieldFilter();
+    component.getCustomFieldsArray().at(0).get("customFieldId")?.setValue(1);
+
+    const available = component.getAvailableCustomFields(1);
+    expect(available.length).toBe(1);
+    expect(available[0].id).toBe(2);
+  });
+
+  it("should map custom field types to filter types", () => {
+    expect(component.getFilterType({ type: CustomFieldType.Text } as any)).toBe("text");
+    expect(component.getFilterType({ type: CustomFieldType.Date } as any)).toBe("date");
+    expect(component.getFilterType({ type: CustomFieldType.Currency } as any)).toBe("currency");
+    expect(component.getFilterType({ type: CustomFieldType.Boolean } as any)).toBe("boolean");
+    expect(component.getFilterType({ type: CustomFieldType.Select } as any)).toBe("list");
+  });
+
+  it("should strip incomplete custom field filters on submit", () => {
+    const storeRefSpy = jest.spyOn(store, "dispatch").mockReturnValue(of(undefined));
+
+    const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
+    component.parentForm = buildReceiptFilterForm({}, noopComponent);
+
+    component.addCustomFieldFilter();
+    // Leave the filter row incomplete (no customFieldId)
+
+    component.submitButtonClicked();
+
+    const dispatchedFilter = (storeRefSpy.mock.calls[0][0] as SetReceiptFilter).data;
+    expect((dispatchedFilter as any).customFields.length).toBe(0);
+  });
+
+  it("should reset custom field filters on reset", () => {
+    jest.spyOn(TestBed.inject(CategoryService), "getAllCategories").mockReturnValue(
+      of([]) as any
+    );
+    jest.spyOn(TestBed.inject(TagService), "getAllTags").mockReturnValue(
+      of([]) as any
+    );
+    jest.spyOn(TestBed.inject(CustomFieldService), "getAllCustomFields").mockReturnValue(
+      of([]) as any
+    );
+
+    const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
+    component.parentForm = buildReceiptFilterForm({
+      customFields: [
+        { customFieldId: 1, operation: FilterOperation.Equals, value: "test" },
+      ],
+    }, noopComponent);
+    component.ngOnInit();
+
+    component.formCommand.subscribe((formCommand) => {
+      applyFormCommand(component.parentForm, formCommand);
+    });
+
+    expect(component.getCustomFieldsArray().length).toBe(1);
+
+    component.resetFilter();
+    expect(component.getCustomFieldsArray().length).toBe(0);
   });
 });

@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { CustomFieldFilter } from './customFieldFilter';
 
 
 export interface ReceiptPagedRequestFilter { 
@@ -46,5 +47,6 @@ export interface ReceiptPagedRequestFilter {
      * Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
      */
     createdAt?: object;
+    customFields?: Array<CustomFieldFilter>;
 }
 

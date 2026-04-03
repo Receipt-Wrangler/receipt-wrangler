@@ -545,3 +545,55 @@ func TestShouldDeleteCustomFieldWithOptions(t *testing.T) {
 		utils.PrintTestError(t, "Custom field options should be deleted", nil)
 	}
 }
+
+func TestShouldGetAllCustomFields(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+	setupCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+
+	customFields, err := repository.GetAllCustomFields()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(customFields) != 4 {
+		utils.PrintTestError(t, len(customFields), 4)
+		return
+	}
+
+	// Verify options are preloaded for SELECT type
+	var selectField *models.CustomField
+	for i := range customFields {
+		if customFields[i].Type == models.SELECT {
+			selectField = &customFields[i]
+			break
+		}
+	}
+
+	if selectField == nil {
+		utils.PrintTestError(t, "Expected to find SELECT type custom field", nil)
+		return
+	}
+
+	if len(selectField.Options) != 2 {
+		utils.PrintTestError(t, len(selectField.Options), 2)
+	}
+}
+
+func TestShouldGetAllCustomFieldsEmpty(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+
+	customFields, err := repository.GetAllCustomFields()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(customFields) != 0 {
+		utils.PrintTestError(t, len(customFields), 0)
+	}
+}

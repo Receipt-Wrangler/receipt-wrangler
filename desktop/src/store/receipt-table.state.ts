@@ -42,6 +42,7 @@ export const defaultReceiptFilter = {
     operation: null,
     value: null,
   },
+  customFields: [],
 } as ReceiptPagedRequestFilter;
 
 // TODO: look into fixing date equals
@@ -79,6 +80,9 @@ export class ReceiptTableState {
     const filter: any = state.filter;
 
     Object.keys(filter).forEach((key) => {
+      if (key === "customFields") {
+        return;
+      }
       const stringValue = filter[key]?.value?.toString();
       const operationValue = filter[key]?.operation?.toString();
       if (stringValue?.length > 0 && stringValue !== "0") {
@@ -87,6 +91,11 @@ export class ReceiptTableState {
         filtersApplied += 1;
       }
     });
+
+    const customFields = filter.customFields || [];
+    filtersApplied += customFields.filter((cf: any) =>
+      cf.customFieldId != null && cf.operation != null && cf.value != null
+    ).length;
 
     return filtersApplied;
   }

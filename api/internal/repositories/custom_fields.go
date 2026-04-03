@@ -19,6 +19,18 @@ func NewCustomFieldRepository(tx *gorm.DB) CustomFieldRepository {
 	return repository
 }
 
+func (repository CustomFieldRepository) GetAllCustomFields() ([]models.CustomField, error) {
+	db := repository.GetDB()
+	var customFields []models.CustomField
+
+	err := db.Model(&models.CustomField{}).Preload("Options").Find(&customFields).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return customFields, nil
+}
+
 func (repository CustomFieldRepository) GetPagedCustomFields(
 	pagedRequestCommand commands.PagedRequestCommand,
 ) ([]models.CustomField, int64, error) {
