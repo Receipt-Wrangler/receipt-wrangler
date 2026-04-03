@@ -249,6 +249,16 @@ func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 	combinedImage := finalImage.AppendImages(true)
 	defer combinedImage.Destroy()
 
+	// Format and quality must be set on combinedImage directly because
+	// AppendImages returns a new wand that doesn't inherit these settings.
+	if err := combinedImage.SetImageFormat("jpeg"); err != nil {
+		return nil, err
+	}
+
+	if err := combinedImage.SetCompressionQuality(95); err != nil {
+		return nil, err
+	}
+
 	return combinedImage.GetImageBlob()
 }
 
