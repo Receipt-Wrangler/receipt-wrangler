@@ -192,12 +192,29 @@ func (repository FileRepository) ConvertHeicToJpg(bytes []byte) ([]byte, error) 
 		return nil, err
 	}
 
+	// Preserve image quality for vision model OCR accuracy
+	if err := mw.SetImageCompressionQuality(95); err != nil {
+		return nil, err
+	}
+
 	return mw.GetImageBlob()
 }
 
 func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 	mw := imagick.NewMagickWand()
 	defer mw.Destroy()
+
+	// Set resolution BEFORE reading the PDF — ImageMagick defaults to 72 DPI
+	// which destroys OCR accuracy for vision models. 300 DPI matches typical
+	// scanner output and preserves text clarity. See issue #529.
+	if err := mw.SetResolution(300, 300); err != nil {
+		return nil, err
+	}
+
+	// Set high JPEG quality to minimize lossy compression artifacts
+	if err := mw.SetCompressionQuality(95); err != nil {
+		return nil, err
+	}
 
 	if err := mw.ReadImageBlob(bytes); err != nil {
 		return nil, err
