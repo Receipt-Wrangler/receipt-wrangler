@@ -1,7 +1,7 @@
 import { Injectable } from "@angular/core";
-import { Action, createSelector, Selector, State, StateContext } from "@ngxs/store";
+import { Action, Selector, State, StateContext } from "@ngxs/store";
 import { SystemTaskTableInterface } from "src/interfaces/system-task-table.interface";
-import { FilterOperation, SortDirection } from "../open-api";
+import { FilterOperation, SortDirection, SystemTaskPagedRequestFilter } from "../open-api";
 import {
   ResetSystemTaskFilter,
   SetOrderBy,
@@ -11,7 +11,7 @@ import {
   SetSystemTaskFilter,
 } from "./system-task-table.state.actions";
 
-export const defaultSystemTaskFilter = {
+export const defaultSystemTaskFilter: SystemTaskPagedRequestFilter = {
   type: {
     operation: null,
     value: [],
@@ -42,27 +42,29 @@ export const defaultSystemTaskFilter = {
     pageSize: 50,
     orderBy: "started_at",
     sortDirection: "desc" as SortDirection,
-    filter: defaultSystemTaskFilter,
+    filter: JSON.parse(JSON.stringify(defaultSystemTaskFilter)),
   },
 })
 @Injectable()
 export class SystemTaskTableState {
-  static get state() {
-    return createSelector([this], (state: SystemTaskTableInterface) => {
-      return state;
-    });
+  @Selector()
+  static state(state: SystemTaskTableInterface): SystemTaskTableInterface {
+    return state;
   }
 
-  static get page() {
-    return createSelector([this], (state: SystemTaskTableInterface) => {
-      return state.page;
-    });
+  @Selector()
+  static page(state: SystemTaskTableInterface): number {
+    return state.page;
   }
 
-  static get pageSize() {
-    return createSelector([this], (state: SystemTaskTableInterface) => {
-      return state.pageSize;
-    });
+  @Selector()
+  static pageSize(state: SystemTaskTableInterface): number {
+    return state.pageSize;
+  }
+
+  @Selector()
+  static filter(state: SystemTaskTableInterface): SystemTaskPagedRequestFilter {
+    return state.filter;
   }
 
   @Selector()
@@ -138,7 +140,7 @@ export class SystemTaskTableState {
   @Action(ResetSystemTaskFilter)
   resetFilter({ patchState }: StateContext<SystemTaskTableInterface>) {
     patchState({
-      filter: defaultSystemTaskFilter,
+      filter: JSON.parse(JSON.stringify(defaultSystemTaskFilter)),
     });
   }
 }

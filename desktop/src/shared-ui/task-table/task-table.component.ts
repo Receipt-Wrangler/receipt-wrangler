@@ -3,7 +3,7 @@ import { PageEvent } from "@angular/material/paginator";
 import { Sort } from "@angular/material/sort";
 import { MatTableDataSource } from "@angular/material/table";
 import { take, tap } from "rxjs";
-import { AssociatedEntityType, GetSystemTaskCommand, SystemTask, SystemTaskService, SystemTaskType } from "../../open-api";
+import { AssociatedEntityType, GetSystemTaskCommand, SystemTask, SystemTaskPagedRequestFilter, SystemTaskService, SystemTaskType } from "../../open-api";
 import { BaseTableService } from "../../services/base-table.service";
 import { TABLE_SERVICE_INJECTION_TOKEN } from "../../services/injection-tokens/table-service";
 import { TableColumn } from "../../table/table-column.interface";
@@ -53,7 +53,7 @@ export class TaskTableComponent implements OnInit, AfterViewInit {
   }
 
   public getTableData(): void {
-    const pagedCommand = this.tableService.getPagedRequestCommand() as any;
+    const pagedCommand = this.tableService.getPagedRequestCommand() as ReturnType<BaseTableService["getPagedRequestCommand"]> & { filter?: SystemTaskPagedRequestFilter };
     const getSystemTaskCommand: GetSystemTaskCommand = {
       page: pagedCommand.page,
       pageSize: pagedCommand.pageSize,

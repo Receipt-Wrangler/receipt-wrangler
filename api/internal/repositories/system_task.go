@@ -75,26 +75,30 @@ func (repository SystemTaskRepository) GetPagedSystemTasks(command commands.GetS
 
 	// StartedAt filter
 	if filter.StartedAt.Value != nil {
-		var startedAt interface{}
 		isBetweenOperation := filter.StartedAt.Operation == commands.BETWEEN
 		if isBetweenOperation {
-			startedAt = filter.StartedAt.Value.([]interface{})
+			startedAt := filter.StartedAt.Value.([]interface{})
+			query = repository.BuildFilterQuery(query, startedAt, filter.StartedAt.Operation, "started_at", true)
 		} else {
-			startedAt = filter.StartedAt.Value.(string)
+			startedAt := filter.StartedAt.Value.(string)
+			if len(startedAt) > 0 {
+				query = repository.BuildFilterQuery(query, startedAt, filter.StartedAt.Operation, "started_at", false)
+			}
 		}
-		query = repository.BuildFilterQuery(query, startedAt, filter.StartedAt.Operation, "started_at", isBetweenOperation)
 	}
 
 	// EndedAt filter
 	if filter.EndedAt.Value != nil {
-		var endedAt interface{}
 		isBetweenOperation := filter.EndedAt.Operation == commands.BETWEEN
 		if isBetweenOperation {
-			endedAt = filter.EndedAt.Value.([]interface{})
+			endedAt := filter.EndedAt.Value.([]interface{})
+			query = repository.BuildFilterQuery(query, endedAt, filter.EndedAt.Operation, "ended_at", true)
 		} else {
-			endedAt = filter.EndedAt.Value.(string)
+			endedAt := filter.EndedAt.Value.(string)
+			if len(endedAt) > 0 {
+				query = repository.BuildFilterQuery(query, endedAt, filter.EndedAt.Operation, "ended_at", false)
+			}
 		}
-		query = repository.BuildFilterQuery(query, endedAt, filter.EndedAt.Operation, "ended_at", isBetweenOperation)
 	}
 
 	query.Count(&count)

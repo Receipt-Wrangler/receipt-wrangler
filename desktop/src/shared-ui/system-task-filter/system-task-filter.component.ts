@@ -1,15 +1,17 @@
 import { Component, Input, OnInit, output } from "@angular/core";
 import { FormControl, FormGroup } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
+import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { endOfDay, startOfMonth } from "date-fns";
 import { take, tap } from "rxjs";
 import { FormCommand } from "../../form/index";
-import { FilterOperation, SystemTaskType } from "../../open-api";
+import { FilterOperation, SystemTaskStatus, SystemTaskType } from "../../open-api";
 import { SetSystemTaskFilter } from "../../store/system-task-table.state.actions";
 import { OperationsPipe } from "../receipt-filter/operations.pipe";
 import { SystemTaskTypePipe } from "../task-table/system-task-type.pipe";
 
+@UntilDestroy()
 @Component({
   selector: "app-system-task-filter",
   templateUrl: "./system-task-filter.component.html",
@@ -29,8 +31,8 @@ export class SystemTaskFilterComponent implements OnInit {
   public systemTaskTypeOptions: { value: string; displayValue: string }[] = [];
 
   public systemTaskStatusOptions: { value: string; displayValue: string }[] = [
-    { value: "SUCCEEDED", displayValue: "Succeeded" },
-    { value: "FAILED", displayValue: "Failed" },
+    { value: SystemTaskStatus.Succeeded, displayValue: "Succeeded" },
+    { value: SystemTaskStatus.Failed, displayValue: "Failed" },
   ];
 
   private operationsPipe = new OperationsPipe();
@@ -123,7 +125,9 @@ export class SystemTaskFilterComponent implements OnInit {
       const operationControl = this.parentForm.get(`${fieldName}.operation`);
 
       if (valueControl && operationControl) {
-        valueControl.valueChanges.subscribe(value => {
+        valueControl.valueChanges.pipe(
+          untilDestroyed(this)
+        ).subscribe(value => {
           const hasValue = this.hasFieldValue(value, type);
 
           if (hasValue) {

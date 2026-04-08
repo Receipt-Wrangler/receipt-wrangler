@@ -1,4 +1,5 @@
 import { SortDirection } from "@angular/material/sort";
+import { SystemTaskPagedRequestFilter } from "../open-api";
 
 export class SetPage {
   static readonly type = "[SystemTaskTableComponent] Set Page";
@@ -27,7 +28,7 @@ export class SetSortDirection {
 export class SetSystemTaskFilter {
   static readonly type = "[SystemTaskTableComponent] Set System Task Filter";
 
-  constructor(public data: any) {}
+  constructor(public data: SystemTaskPagedRequestFilter) {}
 }
 
 export class ResetSystemTaskFilter {

@@ -53,7 +53,7 @@ export class SystemTaskTableComponent implements OnInit {
   }
 
   public filterButtonClicked(): void {
-    const filter = this.store.selectSnapshot(SystemTaskTableState.filterData).filter as any;
+    const filter = this.store.selectSnapshot(SystemTaskTableState.filter);
 
     const dialogRef = this.matDialog.open(SystemTaskFilterComponent, {
       minWidth: "75%",
