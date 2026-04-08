@@ -2,7 +2,8 @@ import { Injectable } from "@angular/core";
 import { Sort } from "@angular/material/sort";
 import { Store } from "@ngxs/store";
 import { Observable } from "rxjs";
-import { PagedRequestCommand, SortDirection } from "src/open-api";
+import { SortDirection } from "src/open-api";
+import { SystemTaskTableInterface } from "../interfaces/system-task-table.interface";
 import { SystemTaskTableState } from "../store/system-task-table.state";
 import { SetOrderBy, SetPage, SetPageSize, SetSortDirection } from "../store/system-task-table.state.actions";
 import { BaseTableService } from "./base-table.service";
@@ -19,7 +20,7 @@ export class SystemTaskTableService extends BaseTableService {
   }
 
 
-  public getPagedRequestCommand(): PagedRequestCommand {
+  public getPagedRequestCommand(): SystemTaskTableInterface {
     return this.store.selectSnapshot(SystemTaskTableState.state);
   }
 

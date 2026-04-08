@@ -1,5 +1,24 @@
 <app-table-header headerText="System Tasks">
   <app-button
+    class="me-2 filter-button"
+    icon="filter_alt"
+    matButtonType="iconButton"
+    tooltip="Filter System Tasks"
+    color="accent"
+    matBadgeColor="accent"
+    [matBadgeContent]="numFiltersApplied()"
+    (clicked)="filterButtonClicked()"
+  ></app-button>
+  <app-button
+    *ngIf="(numFiltersApplied() ?? 0) > 0"
+    class="me-2"
+    icon="restart_alt"
+    matButtonType="iconButton"
+    tooltip="Reset filter"
+    color="accent"
+    (clicked)="resetFilterButtonClicked()"
+  ></app-button>
+  <app-button
     matButtonType="iconButton"
     icon="refresh"
     color="accent"

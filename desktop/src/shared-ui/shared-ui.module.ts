@@ -48,6 +48,7 @@ import { QueueStartMenuComponent } from "./queue-start-menu/queue-start-menu.com
 import { QuickScanButtonComponent } from "./quick-scan-button/quick-scan-button.component";
 import { OperationsPipe } from "./receipt-filter/operations.pipe";
 import { ReceiptFilterComponent } from "./receipt-filter/receipt-filter.component";
+import { SystemTaskFilterComponent } from "./system-task-filter/system-task-filter.component";
 import { StatusChipComponent } from "./status-chip/status-chip.component";
 import { StatusIconComponent } from "./status-icon/status-icon.component";
 import { StatusSelectComponent } from "./status-select/status-select.component";
@@ -83,6 +84,7 @@ import { PieChartUiComponent } from './pie-chart/pie-chart.component';
     HelpIconComponent,
     OperationsPipe,
     ReceiptFilterComponent,
+    SystemTaskFilterComponent,
     StatusChipComponent,
     StatusSelectComponent,
     SubmitButtonComponent,
@@ -150,6 +152,7 @@ import { PieChartUiComponent } from './pie-chart/pie-chart.component';
     OperationsPipe,
     QuickScanButtonComponent,
     ReceiptFilterComponent,
+    SystemTaskFilterComponent,
     StatusChipComponent,
     StatusSelectComponent,
     SubmitButtonComponent,

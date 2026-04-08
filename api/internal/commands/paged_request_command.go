@@ -145,6 +145,14 @@ type ReceiptPagedRequestFilter struct {
 	CreatedAt    PagedRequestField `json:"createdAt"`
 }
 
+type SystemTaskPagedRequestFilter struct {
+	Type        PagedRequestField `json:"type"`
+	Status      PagedRequestField `json:"status"`
+	StartedAt   PagedRequestField `json:"startedAt"`
+	EndedAt     PagedRequestField `json:"endedAt"`
+	RanByUserId PagedRequestField `json:"ranByUserId"`
+}
+
 type PagedRequestField struct {
 	Operation FilterOperation `json:"operation"`
 	Value     interface{}

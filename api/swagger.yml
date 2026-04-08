@@ -4678,6 +4678,21 @@ components:
           description: Associated entity id
         associatedEntityType:
           $ref: "#/components/schemas/AssociatedEntityType"
+        filter:
+          $ref: "#/components/schemas/SystemTaskPagedRequestFilter"
+    SystemTaskPagedRequestFilter:
+      type: object
+      properties:
+        type:
+          $ref: "#/components/schemas/PagedRequestField"
+        status:
+          $ref: "#/components/schemas/PagedRequestField"
+        startedAt:
+          $ref: "#/components/schemas/PagedRequestField"
+        endedAt:
+          $ref: "#/components/schemas/PagedRequestField"
+        ranByUserId:
+          $ref: "#/components/schemas/PagedRequestField"
     ReceiptProcessingSettings:
       allOf:
         - $ref: "#/components/schemas/BaseModel"

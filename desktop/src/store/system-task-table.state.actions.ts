@@ -23,3 +23,13 @@ export class SetSortDirection {
 
   constructor(public sortDirection: SortDirection) {}
 }
+
+export class SetSystemTaskFilter {
+  static readonly type = "[SystemTaskTableComponent] Set System Task Filter";
+
+  constructor(public data: any) {}
+}
+
+export class ResetSystemTaskFilter {
+  static readonly type = "[SystemTaskTableComponent] Reset System Task Filter";
+}

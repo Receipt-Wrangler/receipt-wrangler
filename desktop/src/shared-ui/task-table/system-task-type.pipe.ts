@@ -31,6 +31,8 @@ export class SystemTaskTypePipe implements PipeTransform {
         return "Prompt Generated";
       case "RECEIPT_UPDATED":
         return "Updated Receipt";
+      case "API_KEY_DELETED":
+        return "API Key Deleted";
     }
     return "";
   }

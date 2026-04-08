@@ -46,6 +46,57 @@ func (repository SystemTaskRepository) GetPagedSystemTasks(command commands.GetS
 		query = query.Where("associated_entity_type = ?", command.AssociatedEntityType)
 	}
 
+	// Apply filters
+	filter := command.Filter
+
+	// Type filter
+	if filter.Type.Value != nil {
+		types := filter.Type.Value.([]interface{})
+		if len(types) > 0 {
+			query = repository.BuildFilterQuery(query, types, filter.Type.Operation, "type", true)
+		}
+	}
+
+	// Status filter
+	if filter.Status.Value != nil {
+		statuses := filter.Status.Value.([]interface{})
+		if len(statuses) > 0 {
+			query = repository.BuildFilterQuery(query, statuses, filter.Status.Operation, "status", true)
+		}
+	}
+
+	// RanByUserId filter
+	if filter.RanByUserId.Value != nil {
+		users := filter.RanByUserId.Value.([]interface{})
+		if len(users) > 0 {
+			query = repository.BuildFilterQuery(query, users, filter.RanByUserId.Operation, "ran_by_user_id", true)
+		}
+	}
+
+	// StartedAt filter
+	if filter.StartedAt.Value != nil {
+		var startedAt interface{}
+		isBetweenOperation := filter.StartedAt.Operation == commands.BETWEEN
+		if isBetweenOperation {
+			startedAt = filter.StartedAt.Value.([]interface{})
+		} else {
+			startedAt = filter.StartedAt.Value.(string)
+		}
+		query = repository.BuildFilterQuery(query, startedAt, filter.StartedAt.Operation, "started_at", isBetweenOperation)
+	}
+
+	// EndedAt filter
+	if filter.EndedAt.Value != nil {
+		var endedAt interface{}
+		isBetweenOperation := filter.EndedAt.Operation == commands.BETWEEN
+		if isBetweenOperation {
+			endedAt = filter.EndedAt.Value.([]interface{})
+		} else {
+			endedAt = filter.EndedAt.Value.(string)
+		}
+		query = repository.BuildFilterQuery(query, endedAt, filter.EndedAt.Operation, "ended_at", isBetweenOperation)
+	}
+
 	query.Count(&count)
 
 	query = repository.Sort(query, command.OrderBy, command.SortDirection)
