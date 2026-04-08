@@ -624,10 +624,12 @@ export class ReceiptFormComponent implements OnInit {
       value.map((foundItem) => foundItem.id)?.includes(item.id)
     );
     const itemsFormArray = this.form.get(formKey) as FormArray;
-    itemsFormArray.clear();
-    itemsToPush.forEach((c) => {
-      itemsFormArray.push(this.formBuilder.control(c));
-    });
+    if (itemsToPush.length > 0) {
+      itemsFormArray.clear();
+      itemsToPush.forEach((c) => {
+        itemsFormArray.push(this.formBuilder.control(c));
+      });
+    }
   }
 
   private formatMagicFilledDate(date: string): Date {

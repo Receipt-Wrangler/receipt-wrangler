@@ -15,6 +15,7 @@ import { ApiModule, ItemStatus, ReceiptImageService, ReceiptStatus } from "../..
 import { SnackbarService } from "../../services";
 import { QueueMode } from "../../services/receipt-queue.service";
 import { StoreModule } from "../../store/store.module";
+import { buildItemForm } from "../utils/form.utils";
 import { ReceiptFormComponent } from "./receipt-form.component";
 
 describe("ReceiptFormComponent", () => {
@@ -350,7 +351,6 @@ describe("ReceiptFormComponent", () => {
     setupMagicFillTest();
 
     // Pre-populate with an existing item
-    const { buildItemForm } = require("../utils/form.utils");
     component.receiptItemsFormArray.push(
       buildItemForm({ name: "Existing", amount: "5.00", status: ItemStatus.Open, receiptId: 0 })
     );
@@ -667,6 +667,72 @@ describe("ReceiptFormComponent", () => {
 
     expect(component.customFieldsFormArray.length).toEqual(0);
     expect(component.customFieldsStatefulMenuItems[0].selected).toBe(false);
+  });
+
+  it("should not clear existing categories when AI returns unrecognized category IDs", () => {
+    setupMagicFillTest();
+    component.categories = [
+      { id: 1, name: "Groceries" } as any,
+      { id: 2, name: "Dining" } as any,
+    ];
+
+    // Pre-populate with existing categories via a valid magic fill first
+    mockMagicFillReceipt({
+      name: "Setup", amount: "5", date: "2024-01-01T00:00:00.000Z",
+      categories: [{ id: 1 }, { id: 2 }],
+    } as any);
+    mockSnackbarSuccess();
+    component.magicFill();
+
+    const categoriesArray = component.form.get("categories") as any;
+    expect(categoriesArray.length).toEqual(2);
+
+    const magicReceipt = {
+      name: "Test", amount: "10", date: "2024-01-01T00:00:00.000Z",
+      categories: [{ id: 99 }],
+    } as any;
+
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
+
+    component.magicFill();
+
+    // Existing categories should be preserved since AI returned no valid matches
+    expect(categoriesArray.length).toEqual(2);
+    expect(categoriesArray.value).toEqual([component.categories[0], component.categories[1]]);
+  });
+
+  it("should not clear existing tags when AI returns unrecognized tag IDs", () => {
+    setupMagicFillTest();
+    component.tags = [
+      { id: 1, name: "Work" } as any,
+      { id: 2, name: "Personal" } as any,
+    ];
+
+    // Pre-populate with existing tags via a valid magic fill first
+    mockMagicFillReceipt({
+      name: "Setup", amount: "5", date: "2024-01-01T00:00:00.000Z",
+      tags: [{ id: 1 }],
+    } as any);
+    mockSnackbarSuccess();
+    component.magicFill();
+
+    const tagsArray = component.form.get("tags") as any;
+    expect(tagsArray.length).toEqual(1);
+
+    const magicReceipt = {
+      name: "Test", amount: "10", date: "2024-01-01T00:00:00.000Z",
+      tags: [{ id: 999 }],
+    } as any;
+
+    mockMagicFillReceipt(magicReceipt);
+    mockSnackbarSuccess();
+
+    component.magicFill();
+
+    // Existing tags should be preserved since AI returned no valid matches
+    expect(tagsArray.length).toEqual(1);
+    expect(tagsArray.value).toEqual([component.tags[0]]);
   });
 
   it("should clear categories on repeated magic fill", () => {
