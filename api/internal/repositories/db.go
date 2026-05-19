@@ -85,9 +85,9 @@ func Connect() error {
 func MakeMigrations() error {
 	err := db.AutoMigrate(
 		&models.RefreshToken{},
-		&models.User{},
 		&models.AppRole{},
 		&models.AppRolePermission{},
+		&models.User{},
 		&models.CustomField{},
 		&models.CustomFieldValue{},
 		&models.CustomFieldOption{},
