@@ -85,6 +85,8 @@ func Connect() error {
 func MakeMigrations() error {
 	err := db.AutoMigrate(
 		&models.RefreshToken{},
+		&models.AppRole{},
+		&models.AppRolePermission{},
 		&models.User{},
 		&models.CustomField{},
 		&models.CustomFieldValue{},
@@ -95,6 +97,10 @@ func MakeMigrations() error {
 		&models.Tag{},
 		&models.Category{},
 		&models.Group{},
+		&models.GroupRoleDefinition{},
+		&models.GroupRolePermission{},
+		&models.GroupRoleCategoryGrant{},
+		&models.GroupRoleTagGrant{},
 		&models.GroupMember{},
 		&models.Comment{},
 		&models.Notification{},
