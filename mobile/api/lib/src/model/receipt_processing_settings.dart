@@ -27,6 +27,7 @@ part 'receipt_processing_settings.g.dart';
 /// * [key] - Key for endpoints that require authentication
 /// * [model] - LLM model
 /// * [isVisionModel] - Is vision model
+/// * [enforceJsonResponseFormat] - Enforce JSON response format on the LLM provider. Disable if the provider does not support this flag.
 /// * [ocrEngine] 
 /// * [prompt] 
 /// * [promptId] - Prompt foreign key
@@ -59,6 +60,10 @@ abstract class ReceiptProcessingSettings implements BaseModel, Built<ReceiptProc
   /// LLM model
   @BuiltValueField(wireName: r'model')
   String? get model;
+
+  /// Enforce JSON response format on the LLM provider. Disable if the provider does not support this flag.
+  @BuiltValueField(wireName: r'enforceJsonResponseFormat')
+  bool? get enforceJsonResponseFormat;
 
   @BuiltValueField(wireName: r'prompt')
   Prompt? get prompt;
@@ -170,6 +175,13 @@ class _$ReceiptProcessingSettingsSerializer implements PrimitiveSerializer<Recei
       object.id,
       specifiedType: const FullType(int),
     );
+    if (object.enforceJsonResponseFormat != null) {
+      yield r'enforceJsonResponseFormat';
+      yield serializers.serialize(
+        object.enforceJsonResponseFormat,
+        specifiedType: const FullType(bool),
+      );
+    }
     if (object.prompt != null) {
       yield r'prompt';
       yield serializers.serialize(
@@ -297,6 +309,13 @@ class _$ReceiptProcessingSettingsSerializer implements PrimitiveSerializer<Recei
             specifiedType: const FullType(int),
           ) as int;
           result.id = valueDes;
+          break;
+        case r'enforceJsonResponseFormat':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.enforceJsonResponseFormat = valueDes;
           break;
         case r'prompt':
           final valueDes = serializers.deserialize(

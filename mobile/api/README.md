@@ -107,6 +107,7 @@ Class | Method | HTTP request | Description
 [*NotificationsApi*](doc/NotificationsApi.md) | [**deleteNotificationById**](doc/NotificationsApi.md#deletenotificationbyid) | **DELETE** /notifications/{notificationId} | Delete notification by id
 [*NotificationsApi*](doc/NotificationsApi.md) | [**getNotificationCount**](doc/NotificationsApi.md#getnotificationcount) | **GET** /notifications/notificationCount | Notification count
 [*NotificationsApi*](doc/NotificationsApi.md) | [**getNotificationsForuser**](doc/NotificationsApi.md#getnotificationsforuser) | **GET** /notifications/ | Get all user notifications
+[*PermissionApi*](doc/PermissionApi.md) | [**getPermissions**](doc/PermissionApi.md#getpermissions) | **GET** /permission | List all permission descriptors
 [*PromptApi*](doc/PromptApi.md) | [**createDefaultPrompt**](doc/PromptApi.md#createdefaultprompt) | **POST** /prompt/createDefaultPrompt | Create default prompt
 [*PromptApi*](doc/PromptApi.md) | [**createPrompt**](doc/PromptApi.md#createprompt) | **POST** /prompt/ | Create prompt
 [*PromptApi*](doc/PromptApi.md) | [**deletePromptById**](doc/PromptApi.md#deletepromptbyid) | **DELETE** /prompt/{id} | Delete prompt by id
@@ -156,6 +157,7 @@ Class | Method | HTTP request | Description
 [*UserApi*](doc/UserApi.md) | [**bulkDeleteUsers**](doc/UserApi.md#bulkdeleteusers) | **DELETE** /user/bulk | Bulk delete users
 [*UserApi*](doc/UserApi.md) | [**convertDummyUserById**](doc/UserApi.md#convertdummyuserbyid) | **POST** /user/{userId}/convertDummyUserToNormalUser | Converts dummy user
 [*UserApi*](doc/UserApi.md) | [**createUser**](doc/UserApi.md#createuser) | **POST** /user | Create user
+[*UserApi*](doc/UserApi.md) | [**deleteAccount**](doc/UserApi.md#deleteaccount) | **POST** /user/deleteAccount | Delete own account
 [*UserApi*](doc/UserApi.md) | [**deleteUserById**](doc/UserApi.md#deleteuserbyid) | **DELETE** /user/{userId} | Delete user
 [*UserApi*](doc/UserApi.md) | [**getAmountOwedForUser**](doc/UserApi.md#getamountowedforuser) | **GET** /user/amountOwedForUser | Get amount owed for user
 [*UserApi*](doc/UserApi.md) | [**getAppData**](doc/UserApi.md#getappdata) | **GET** /user/appData | Get app data
@@ -200,6 +202,7 @@ Class | Method | HTTP request | Description
  - [CustomFieldType](doc/CustomFieldType.md)
  - [CustomFieldValue](doc/CustomFieldValue.md)
  - [Dashboard](doc/Dashboard.md)
+ - [DeleteAccountCommand](doc/DeleteAccountCommand.md)
  - [EncodedImage](doc/EncodedImage.md)
  - [ExportFormat](doc/ExportFormat.md)
  - [FeatureConfig](doc/FeatureConfig.md)
@@ -232,6 +235,9 @@ Class | Method | HTTP request | Description
  - [PagedDataDataInner](doc/PagedDataDataInner.md)
  - [PagedGroupRequestCommand](doc/PagedGroupRequestCommand.md)
  - [PagedRequestCommand](doc/PagedRequestCommand.md)
+ - [Permission](doc/Permission.md)
+ - [PermissionDescriptor](doc/PermissionDescriptor.md)
+ - [PermissionScope](doc/PermissionScope.md)
  - [PieChartData](doc/PieChartData.md)
  - [PieChartDataCommand](doc/PieChartDataCommand.md)
  - [PieChartDataPoint](doc/PieChartDataPoint.md)

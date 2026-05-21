@@ -20,6 +20,7 @@ import 'package:openapi/src/api/feature_config_api.dart';
 import 'package:openapi/src/api/groups_api.dart';
 import 'package:openapi/src/api/import_api.dart';
 import 'package:openapi/src/api/notifications_api.dart';
+import 'package:openapi/src/api/permission_api.dart';
 import 'package:openapi/src/api/prompt_api.dart';
 import 'package:openapi/src/api/receipt_api.dart';
 import 'package:openapi/src/api/receipt_image_api.dart';
@@ -151,6 +152,12 @@ class Openapi {
   /// by doing that all interceptors will not be executed
   NotificationsApi getNotificationsApi() {
     return NotificationsApi(dio, serializers);
+  }
+
+  /// Get PermissionApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  PermissionApi getPermissionApi() {
+    return PermissionApi(dio, serializers);
   }
 
   /// Get PromptApi instance, base route and serializer can be overridden by a given but be careful,

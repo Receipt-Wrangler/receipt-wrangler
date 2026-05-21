@@ -12,6 +12,7 @@ Method | HTTP request | Description
 [**bulkDeleteUsers**](UserApi.md#bulkdeleteusers) | **DELETE** /user/bulk | Bulk delete users
 [**convertDummyUserById**](UserApi.md#convertdummyuserbyid) | **POST** /user/{userId}/convertDummyUserToNormalUser | Converts dummy user
 [**createUser**](UserApi.md#createuser) | **POST** /user | Create user
+[**deleteAccount**](UserApi.md#deleteaccount) | **POST** /user/deleteAccount | Delete own account
 [**deleteUserById**](UserApi.md#deleteuserbyid) | **DELETE** /user/{userId} | Delete user
 [**getAmountOwedForUser**](UserApi.md#getamountowedforuser) | **GET** /user/amountOwedForUser | Get amount owed for user
 [**getAppData**](UserApi.md#getappdata) | **GET** /user/appData | Get app data
@@ -147,6 +148,52 @@ try {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **user** | [**User**](User.md)| User to create | 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **deleteAccount**
+> deleteAccount(deleteAccountCommand)
+
+Delete own account
+
+This will delete the currently logged in user's account after verifying their password
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getUserApi();
+final DeleteAccountCommand deleteAccountCommand = ; // DeleteAccountCommand | Password confirmation for account deletion
+
+try {
+    api.deleteAccount(deleteAccountCommand);
+} catch on DioException (e) {
+    print('Exception when calling UserApi->deleteAccount: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **deleteAccountCommand** | [**DeleteAccountCommand**](DeleteAccountCommand.md)| Password confirmation for account deletion | 
 
 ### Return type
 

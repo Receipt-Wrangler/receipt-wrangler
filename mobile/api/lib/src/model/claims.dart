@@ -83,7 +83,7 @@ abstract class Claims implements Built<Claims, ClaimsBuilder> {
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(ClaimsBuilder b) => b
       ..userId = 0
-      ..userRole = UserRole.USER
+      ..userRole = 'USER'
       ..displayName = ''
       ..defaultAvatarColor = ''
       ..username = ''
