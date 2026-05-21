@@ -58,7 +58,7 @@ abstract class UserPreferences implements BaseModel, Built<UserPreferences, User
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(UserPreferencesBuilder b) => b
-      ..quickScanDefaultStatus = 'OPEN'
+      ..quickScanDefaultStatus = ReceiptStatus.OPEN
       ..createdBy = 0
       ..quickScanDefaultGroupId = 0
       ..quickScanDefaultPaidById = 0
