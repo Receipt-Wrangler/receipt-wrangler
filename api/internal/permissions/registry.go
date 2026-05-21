@@ -58,6 +58,10 @@ const (
 
 	AppImportsRun = "app.imports.run"
 
+	AppGroupsCreate         = "app.groups.create"
+	AppGroupsRead           = "app.groups.read"
+	AppGroupsUpdateSettings = "app.groups.update-settings"
+
 	AppApiKeysCreate    = "app.api-keys.create"
 	AppApiKeysRead      = "app.api-keys.read"
 	AppApiKeysUpdate    = "app.api-keys.update"
@@ -76,6 +80,7 @@ const (
 	GroupReceiptsUpdate    = "group.receipts.update"
 	GroupReceiptsDelete    = "group.receipts.delete"
 	GroupReceiptsDuplicate = "group.receipts.duplicate"
+	GroupReceiptsMagicFill = "group.receipts.magic-fill"
 
 	GroupCommentsCreate = "group.comments.create"
 	GroupCommentsDelete = "group.comments.delete"
@@ -89,6 +94,8 @@ const (
 
 	GroupActivitiesRead  = "group.activities.read"
 	GroupActivitiesRerun = "group.activities.rerun"
+
+	GroupEmailPoll = "group.email.poll"
 )
 
 var registry = []Descriptor{
@@ -133,6 +140,10 @@ var registry = []Descriptor{
 	{AppSystemTasksRead, "Read System Tasks", "Inspect the system-wide activity log.", "System", ScopeApp},
 	{AppImportsRun, "Import Configuration", "Restore or seed the system from a configuration export.", "System", ScopeApp},
 
+	{AppGroupsCreate, "Create Groups", "Create new groups.", "Group Management", ScopeApp},
+	{AppGroupsRead, "Read All Groups", "List and look up groups across the system, including ones the calling user is not a member of.", "Group Management", ScopeApp},
+	{AppGroupsUpdateSettings, "Update Group System Settings", "Edit system-level settings on any group (separate from per-group ownership editing).", "Group Management", ScopeApp},
+
 	{AppApiKeysCreate, "Create API Keys", "Issue API keys for the calling user.", "Security", ScopeApp},
 	{AppApiKeysRead, "Read API Keys", "List the calling user's API keys.", "Security", ScopeApp},
 	{AppApiKeysUpdate, "Update API Keys", "Edit the calling user's API keys.", "Security", ScopeApp},
@@ -149,6 +160,7 @@ var registry = []Descriptor{
 	{GroupReceiptsUpdate, "Update Receipts", "Edit receipts and update status in bulk.", "Receipts", ScopeGroup},
 	{GroupReceiptsDelete, "Delete Receipts", "Remove receipts.", "Receipts", ScopeGroup},
 	{GroupReceiptsDuplicate, "Duplicate Receipts", "Create a copy of an existing receipt.", "Receipts", ScopeGroup},
+	{GroupReceiptsMagicFill, "Magic Fill Receipts", "Run AI-powered data extraction on a receipt image to pre-fill receipt fields.", "Receipts", ScopeGroup},
 
 	{GroupCommentsCreate, "Create Comments", "Add comments to receipts.", "Receipts", ScopeGroup},
 	{GroupCommentsDelete, "Delete Comments", "Remove comments.", "Receipts", ScopeGroup},
@@ -162,6 +174,8 @@ var registry = []Descriptor{
 
 	{GroupActivitiesRead, "Read Activities", "View the activity feed for the group.", "Activity", ScopeGroup},
 	{GroupActivitiesRerun, "Rerun Activities", "Re-execute a failed or stale activity.", "Activity", ScopeGroup},
+
+	{GroupEmailPoll, "Poll Inbound Email", "Trigger an inbound email poll for the group's inbox.", "Group", ScopeGroup},
 }
 
 func All() []Descriptor {

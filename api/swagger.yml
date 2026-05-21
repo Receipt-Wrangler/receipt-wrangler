@@ -2839,6 +2839,9 @@ components:
         - "app.system-emails.delete"
         - "app.system-tasks.read"
         - "app.imports.run"
+        - "app.groups.create"
+        - "app.groups.read"
+        - "app.groups.update-settings"
         - "app.api-keys.create"
         - "app.api-keys.read"
         - "app.api-keys.update"
@@ -2853,6 +2856,7 @@ components:
         - "group.receipts.update"
         - "group.receipts.delete"
         - "group.receipts.duplicate"
+        - "group.receipts.magic-fill"
         - "group.comments.create"
         - "group.comments.delete"
         - "group.dashboards.create"
@@ -2862,6 +2866,7 @@ components:
         - "group.widgets.read"
         - "group.activities.read"
         - "group.activities.rerun"
+        - "group.email.poll"
     PermissionScope:
       description: Whether a permission applies app-wide or within a single group.
       type: string

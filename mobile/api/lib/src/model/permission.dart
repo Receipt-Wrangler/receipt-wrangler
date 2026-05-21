@@ -108,6 +108,15 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'app.imports.run')
   static const Permission appPeriodImportsPeriodRun = _$appPeriodImportsPeriodRun;
   /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.groups.create')
+  static const Permission appPeriodGroupsPeriodCreate = _$appPeriodGroupsPeriodCreate;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.groups.read')
+  static const Permission appPeriodGroupsPeriodRead = _$appPeriodGroupsPeriodRead;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.groups.update-settings')
+  static const Permission appPeriodGroupsPeriodUpdateSettings = _$appPeriodGroupsPeriodUpdateSettings;
+  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'app.api-keys.create')
   static const Permission appPeriodApiKeysPeriodCreate = _$appPeriodApiKeysPeriodCreate;
   /// All permission keys the API recognizes.
@@ -150,6 +159,9 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'group.receipts.duplicate')
   static const Permission groupPeriodReceiptsPeriodDuplicate = _$groupPeriodReceiptsPeriodDuplicate;
   /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'group.receipts.magic-fill')
+  static const Permission groupPeriodReceiptsPeriodMagicFill = _$groupPeriodReceiptsPeriodMagicFill;
+  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.comments.create')
   static const Permission groupPeriodCommentsPeriodCreate = _$groupPeriodCommentsPeriodCreate;
   /// All permission keys the API recognizes.
@@ -176,6 +188,9 @@ class Permission extends EnumClass {
   /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.activities.rerun')
   static const Permission groupPeriodActivitiesPeriodRerun = _$groupPeriodActivitiesPeriodRerun;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'group.email.poll')
+  static const Permission groupPeriodEmailPeriodPoll = _$groupPeriodEmailPeriodPoll;
 
   static Serializer<Permission> get serializer => _$permissionSerializer;
 

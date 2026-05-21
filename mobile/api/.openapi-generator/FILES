@@ -293,7 +293,3 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/permission_api_test.dart
-test/permission_descriptor_test.dart
-test/permission_scope_test.dart
-test/permission_test.dart
