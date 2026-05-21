@@ -17,6 +17,7 @@ part 'update_group_settings_command.g.dart';
 /// Properties:
 /// * [systemEmailId] - System email foreign key
 /// * [emailIntegrationEnabled] - Whether email integration is enabled
+/// * [emailBodyProcessingEnabled] - Whether email body text processing is enabled (opt-in, default false)
 /// * [subjectLineRegexes] - Subject line regexes
 /// * [emailWhiteList] - Email white list
 /// * [emailDefaultReceiptStatus] - Default receipt status
@@ -32,6 +33,10 @@ abstract class UpdateGroupSettingsCommand implements Built<UpdateGroupSettingsCo
   /// Whether email integration is enabled
   @BuiltValueField(wireName: r'emailIntegrationEnabled')
   bool? get emailIntegrationEnabled;
+
+  /// Whether email body text processing is enabled (opt-in, default false)
+  @BuiltValueField(wireName: r'emailBodyProcessingEnabled')
+  bool? get emailBodyProcessingEnabled;
 
   /// Subject line regexes
   @BuiltValueField(wireName: r'subjectLineRegexes')
@@ -90,6 +95,13 @@ class _$UpdateGroupSettingsCommandSerializer implements PrimitiveSerializer<Upda
       yield r'emailIntegrationEnabled';
       yield serializers.serialize(
         object.emailIntegrationEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.emailBodyProcessingEnabled != null) {
+      yield r'emailBodyProcessingEnabled';
+      yield serializers.serialize(
+        object.emailBodyProcessingEnabled,
         specifiedType: const FullType(bool),
       );
     }
@@ -167,6 +179,13 @@ class _$UpdateGroupSettingsCommandSerializer implements PrimitiveSerializer<Upda
             specifiedType: const FullType(bool),
           ) as bool;
           result.emailIntegrationEnabled = valueDes;
+          break;
+        case r'emailBodyProcessingEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.emailBodyProcessingEnabled = valueDes;
           break;
         case r'subjectLineRegexes':
           final valueDes = serializers.deserialize(

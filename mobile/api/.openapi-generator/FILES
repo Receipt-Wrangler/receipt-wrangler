@@ -35,6 +35,7 @@ doc/CustomFieldType.md
 doc/CustomFieldValue.md
 doc/Dashboard.md
 doc/DashboardApi.md
+doc/DeleteAccountCommand.md
 doc/EncodedImage.md
 doc/ExportApi.md
 doc/ExportFormat.md
@@ -72,6 +73,10 @@ doc/PagedData.md
 doc/PagedDataDataInner.md
 doc/PagedGroupRequestCommand.md
 doc/PagedRequestCommand.md
+doc/Permission.md
+doc/PermissionApi.md
+doc/PermissionDescriptor.md
+doc/PermissionScope.md
 doc/PieChartData.md
 doc/PieChartDataCommand.md
 doc/PieChartDataPoint.md
@@ -149,6 +154,7 @@ lib/src/api/feature_config_api.dart
 lib/src/api/groups_api.dart
 lib/src/api/import_api.dart
 lib/src/api/notifications_api.dart
+lib/src/api/permission_api.dart
 lib/src/api/prompt_api.dart
 lib/src/api/receipt_api.dart
 lib/src/api/receipt_image_api.dart
@@ -197,6 +203,7 @@ lib/src/model/custom_field_type.dart
 lib/src/model/custom_field_value.dart
 lib/src/model/dashboard.dart
 lib/src/model/date.dart
+lib/src/model/delete_account_command.dart
 lib/src/model/encoded_image.dart
 lib/src/model/export_format.dart
 lib/src/model/feature_config.dart
@@ -229,6 +236,9 @@ lib/src/model/paged_data.dart
 lib/src/model/paged_data_data_inner.dart
 lib/src/model/paged_group_request_command.dart
 lib/src/model/paged_request_command.dart
+lib/src/model/permission.dart
+lib/src/model/permission_descriptor.dart
+lib/src/model/permission_scope.dart
 lib/src/model/pie_chart_data.dart
 lib/src/model/pie_chart_data_command.dart
 lib/src/model/pie_chart_data_point.dart
@@ -283,16 +293,3 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/api_key_api_test.dart
-test/api_key_filter_test.dart
-test/api_key_result_test.dart
-test/api_key_scope_test.dart
-test/api_key_view_test.dart
-test/associated_api_keys_test.dart
-test/chart_grouping_test.dart
-test/paged_api_key_request_command_test.dart
-test/pie_chart_data_command_test.dart
-test/pie_chart_data_point_test.dart
-test/pie_chart_data_test.dart
-test/upsert_api_key_command_test.dart
-test/widget_api_test.dart

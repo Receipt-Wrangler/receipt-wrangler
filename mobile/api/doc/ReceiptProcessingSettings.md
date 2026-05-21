@@ -20,6 +20,7 @@ Name | Type | Description | Notes
 **key** | **String** | Key for endpoints that require authentication | [optional] 
 **model** | **String** | LLM model | [optional] 
 **isVisionModel** | **bool** | Is vision model | [optional] 
+**enforceJsonResponseFormat** | **bool** | Enforce JSON response format on the LLM provider. Disable if the provider does not support this flag. | [optional] 
 **ocrEngine** | [**OcrEngine**](OcrEngine.md) |  | [optional] 
 **prompt** | [**Prompt**](Prompt.md) |  | [optional] 
 **promptId** | **int** | Prompt foreign key | [optional] 

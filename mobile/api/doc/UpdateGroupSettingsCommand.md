@@ -10,6 +10,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **systemEmailId** | **int** | System email foreign key | 
 **emailIntegrationEnabled** | **bool** | Whether email integration is enabled | [optional] 
+**emailBodyProcessingEnabled** | **bool** | Whether email body text processing is enabled (opt-in, default false) | [optional] 
 **subjectLineRegexes** | [**BuiltList&lt;SubjectLineRegex&gt;**](SubjectLineRegex.md) | Subject line regexes | 
 **emailWhiteList** | [**BuiltList&lt;GroupSettingsWhiteListEmail&gt;**](GroupSettingsWhiteListEmail.md) | Email white list | 
 **emailDefaultReceiptStatus** | [**ReceiptStatus**](ReceiptStatus.md) | Default receipt status | [optional] 

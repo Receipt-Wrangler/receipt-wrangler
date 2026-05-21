@@ -75,6 +75,9 @@ import 'package:openapi/src/model/paged_data.dart';
 import 'package:openapi/src/model/paged_data_data_inner.dart';
 import 'package:openapi/src/model/paged_group_request_command.dart';
 import 'package:openapi/src/model/paged_request_command.dart';
+import 'package:openapi/src/model/permission.dart';
+import 'package:openapi/src/model/permission_descriptor.dart';
+import 'package:openapi/src/model/permission_scope.dart';
 import 'package:openapi/src/model/pie_chart_data.dart';
 import 'package:openapi/src/model/pie_chart_data_command.dart';
 import 'package:openapi/src/model/pie_chart_data_point.dart';
@@ -192,6 +195,9 @@ part 'serializers.g.dart';
   PagedDataDataInner,
   PagedGroupRequestCommand,
   PagedRequestCommand,$PagedRequestCommand,
+  Permission,
+  PermissionDescriptor,
+  PermissionScope,
   PieChartData,
   PieChartDataCommand,
   PieChartDataPoint,
@@ -285,6 +291,10 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Tag)]),
         () => ListBuilder<Tag>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(PermissionDescriptor)]),
+        () => ListBuilder<PermissionDescriptor>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(UserView)]),

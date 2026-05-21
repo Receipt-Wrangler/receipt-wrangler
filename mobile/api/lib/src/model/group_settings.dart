@@ -20,6 +20,7 @@ part 'group_settings.g.dart';
 /// * [id] - Group settings id
 /// * [groupId] - Group foreign key
 /// * [emailIntegrationEnabled] - Whether email integration is enabled
+/// * [emailBodyProcessingEnabled] - Whether email body text processing is enabled (opt-in, default false)
 /// * [systemEmailId] - System email foreign key
 /// * [systemEmail] 
 /// * [emailToRead] - Email to read
@@ -47,6 +48,10 @@ abstract class GroupSettings implements Built<GroupSettings, GroupSettingsBuilde
   /// Whether email integration is enabled
   @BuiltValueField(wireName: r'emailIntegrationEnabled')
   bool? get emailIntegrationEnabled;
+
+  /// Whether email body text processing is enabled (opt-in, default false)
+  @BuiltValueField(wireName: r'emailBodyProcessingEnabled')
+  bool? get emailBodyProcessingEnabled;
 
   /// System email foreign key
   @BuiltValueField(wireName: r'systemEmailId')
@@ -136,6 +141,13 @@ class _$GroupSettingsSerializer implements PrimitiveSerializer<GroupSettings> {
       yield r'emailIntegrationEnabled';
       yield serializers.serialize(
         object.emailIntegrationEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.emailBodyProcessingEnabled != null) {
+      yield r'emailBodyProcessingEnabled';
+      yield serializers.serialize(
+        object.emailBodyProcessingEnabled,
         specifiedType: const FullType(bool),
       );
     }
@@ -280,6 +292,13 @@ class _$GroupSettingsSerializer implements PrimitiveSerializer<GroupSettings> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.emailIntegrationEnabled = valueDes;
+          break;
+        case r'emailBodyProcessingEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.emailBodyProcessingEnabled = valueDes;
           break;
         case r'systemEmailId':
           final valueDes = serializers.deserialize(

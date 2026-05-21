@@ -13,6 +13,7 @@ api/featureConfig.service.ts
 api/groups.service.ts
 api/import.service.ts
 api/notifications.service.ts
+api/permission.service.ts
 api/prompt.service.ts
 api/receipt.service.ts
 api/receiptImage.service.ts
@@ -91,6 +92,9 @@ model/pagedData.ts
 model/pagedDataDataInner.ts
 model/pagedGroupRequestCommand.ts
 model/pagedRequestCommand.ts
+model/permission.ts
+model/permissionDescriptor.ts
+model/permissionScope.ts
 model/pieChartData.ts
 model/pieChartDataCommand.ts
 model/pieChartDataPoint.ts
