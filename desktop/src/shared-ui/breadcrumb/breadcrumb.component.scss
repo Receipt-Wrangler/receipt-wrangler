@@ -1,0 +1,41 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: variables.$spacing-sm;
+  font-size: 13px;
+  color: map.get(variables.$accent-palette, 500);
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: variables.$spacing-xs;
+  color: map.get(variables.$accent-palette, 500);
+  font-weight: 500;
+  text-decoration: none;
+
+  &.current {
+    color: map.get(variables.$accent-palette, 900);
+    font-weight: 600;
+  }
+}
+
+a.crumb:hover {
+  color: map.get(variables.$primary-palette, 600);
+  text-decoration: none;
+}
+
+.crumb-icon,
+.separator {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+
+.separator {
+  opacity: 0.6;
+}

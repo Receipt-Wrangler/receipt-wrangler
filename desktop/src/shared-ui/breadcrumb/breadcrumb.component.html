@@ -1,0 +1,26 @@
+<nav class="breadcrumb" aria-label="Breadcrumb">
+  @for (item of items(); track $index; let last = $last) {
+    @if (item.routerLink && !last) {
+      <a class="crumb" [routerLink]="item.routerLink">
+        @if (item.icon) {
+          <mat-icon class="crumb-icon" aria-hidden="true">{{ item.icon }}</mat-icon>
+        }
+        {{ item.label }}
+      </a>
+    } @else {
+      <span
+        class="crumb"
+        [class.current]="last"
+        [attr.aria-current]="last ? 'page' : null"
+      >
+        @if (item.icon) {
+          <mat-icon class="crumb-icon" aria-hidden="true">{{ item.icon }}</mat-icon>
+        }
+        {{ item.label }}
+      </span>
+    }
+    @if (!last) {
+      <mat-icon class="separator" aria-hidden="true">chevron_right</mat-icon>
+    }
+  }
+</nav>

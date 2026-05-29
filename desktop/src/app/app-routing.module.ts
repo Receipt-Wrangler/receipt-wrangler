@@ -83,6 +83,15 @@ const routes: Routes = [
         },
       },
       {
+        path: "roles",
+        loadChildren: () =>
+          import("../roles/roles.module").then((m) => m.RolesModule),
+        canActivate: [AuthGuard],
+        data: {
+          role: UserRole.Admin,
+        },
+      },
+      {
         path: "",
         redirectTo: "/auth/login",
         pathMatch: "full",
