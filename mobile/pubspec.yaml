@@ -68,6 +68,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -90,6 +92,7 @@ flutter:
     - assets/branding/loading.gif
     - assets/branding/logo-large.svg
     - assets/icons/split.svg
+    - assets/test/sample.png
   fonts:
     - family: Raleway
       fonts:

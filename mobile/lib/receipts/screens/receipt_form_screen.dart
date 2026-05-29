@@ -23,6 +23,7 @@ class ReceiptFormScreen extends StatefulWidget {
 
 class _ReceiptFormScreen extends State<ReceiptFormScreen> {
   late final Future<List<dynamic>> _coordinatedFuture = _loadData();
+  bool _errorHandled = false;
 
   Future<List<dynamic>> _loadData() async {
     var customFieldModel = Provider.of<CustomFieldModel>(context, listen: false);
@@ -87,9 +88,17 @@ class _ReceiptFormScreen extends State<ReceiptFormScreen> {
             receiptModel.setReceipt(receiptData, false);
           }
 
-          if (isReady && snapshot.hasError) {
-            showErrorSnackbar(context, 'Failed to load receipt');
-            context.go('/');
+          if (isReady && snapshot.hasError && !_errorHandled) {
+            _errorHandled = true;
+            // showSnackBar and context.go cannot run during build — both
+            // mutate framework state (ScaffoldMessenger, Navigator).
+            // Defer to the next frame and gate on a flag so the sticky
+            // error snapshot doesn't re-fire on subsequent rebuilds.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              showErrorSnackbar(context, 'Failed to load receipt');
+              context.go('/');
+            });
           }
 
           var showChild = isReady && !customFieldModel.isLoading;

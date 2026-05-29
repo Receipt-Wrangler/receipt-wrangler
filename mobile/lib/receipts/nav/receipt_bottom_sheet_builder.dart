@@ -1,5 +1,4 @@
 import 'package:built_collection/built_collection.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
@@ -13,6 +12,7 @@ import 'package:rxdart/rxdart.dart';
 import '../../client/client.dart';
 import '../../models/auth_model.dart';
 import '../../models/custom_field_model.dart';
+import '../../models/loading_model.dart';
 import '../../models/receipt_model.dart';
 import '../../shared/widgets/bottom_submit_button.dart';
 import '../../utils/date.dart';
@@ -324,22 +324,38 @@ class ReceiptBottomSheetBuilder {
   }
 
   Future<void> addReceipt(api.UpsertReceiptCommand receiptToAdd) async {
-    var receiptResponse = await OpenApiClient.client
+    final receiptResponse = await OpenApiClient.client
         .getReceiptApi()
         .createReceipt(upsertReceiptCommand: receiptToAdd);
-    showSuccessSnackbar(context, "Receipt added successfully");
+    final newReceiptId = receiptResponse.data!.id;
 
-    var images = receiptModel.imagesToUploadBehaviorSubject.value;
-    List<Future<Response<api.FileDataView?>>> imageFutures = [];
-
-    for (var image in images) {
-      var future = OpenApiClient.client.getReceiptImageApi().uploadReceiptImage(
-          file: image.multipartFile, receiptId: receiptResponse.data!.id);
-      imageFutures.add(future);
+    final images = receiptModel.imagesToUploadBehaviorSubject.value;
+    if (images.isNotEmpty) {
+      final imageFutures = images.map(
+        (image) => OpenApiClient.client
+            .getReceiptImageApi()
+            .uploadReceiptImage(
+                file: image.multipartFile, receiptId: newReceiptId),
+      );
+      try {
+        await Future.wait(imageFutures);
+      } catch (e) {
+        // Receipt was created server-side, but at least one image upload
+        // failed. Surface a partial-failure message and still navigate so
+        // the user can see the receipt and retry the uploads from there
+        // -- otherwise they'd think nothing happened and might re-submit.
+        showErrorSnackbar(
+          context,
+          "Receipt added, but one or more images failed to upload. "
+          "Open the receipt to retry.",
+        );
+        context.go("/receipts/$newReceiptId/view");
+        return;
+      }
     }
-    await Future.wait(imageFutures);
 
-    context.go("/receipts/${receiptResponse.data!.id}/view");
+    showSuccessSnackbar(context, "Receipt added successfully");
+    context.go("/receipts/$newReceiptId/view");
   }
 
   Future<void> updateReceipt(api.UpsertReceiptCommand receiptToUpdate) async {
@@ -358,19 +374,47 @@ class ReceiptBottomSheetBuilder {
     if (isEditingBasedOnFullPath(fullPath)) {
       return BottomSubmitButton(
         onPressed: () async {
-          if (receiptModel.receiptFormKey.currentState!.saveAndValidate()) {
-            try {
-              var receiptToUpdate = buildReceiptUpsertCommand();
-
-              if (formState == WranglerFormState.add) {
-                await addReceipt(receiptToUpdate);
-              } else if (formState == WranglerFormState.edit) {
-                await updateReceipt(receiptToUpdate);
-              }
-            } catch (e) {
-              handleApiError(context, e);
-              print(e);
+          final loadingModel =
+              Provider.of<LoadingModel>(context, listen: false);
+          // Synchronous re-entrancy guard. BottomSubmitButton's
+          // Consumer<LoadingModel> only swaps onPressed to null on
+          // the FRAME AFTER notifyListeners, so a rapid double-tap
+          // can race past the disabled state -- both taps fire
+          // onPressed and we get duplicate POSTs. Reading isLoading
+          // here closes that window: the first tap sets it true
+          // synchronously, the second tap reads true and returns.
+          if (loadingModel.isLoading) {
+            return;
+          }
+          // Defensive null check: the form key reference is now stable
+          // (receipt_form.dart's `formKey` getter reads from the model
+          // every build), but a future regression that detaches the
+          // FormBuilder from the model's current key would surface here
+          // as a null currentState. Short-circuit to a no-op tap rather
+          // than crashing with "Null check operator used on a null value".
+          // Note: local name is `state` to avoid shadowing the outer
+          // `formState` field (WranglerFormState) used inside this closure.
+          final state = receiptModel.receiptFormKey.currentState;
+          if (state == null || !state.saveAndValidate()) {
+            return;
+          }
+          // The Consumer rebuild + spinner is still useful UX -- it
+          // shows in-flight state to the user. The finally always
+          // runs (even on API throw) so the button re-enables for
+          // retry.
+          loadingModel.setIsLoading(true);
+          try {
+            final receiptToUpdate = buildReceiptUpsertCommand();
+            if (formState == WranglerFormState.add) {
+              await addReceipt(receiptToUpdate);
+            } else if (formState == WranglerFormState.edit) {
+              await updateReceipt(receiptToUpdate);
             }
+          } catch (e) {
+            handleApiError(context, e);
+            print(e);
+          } finally {
+            loadingModel.setIsLoading(false);
           }
         },
       );

@@ -29,12 +29,34 @@ class _ReceiptBottomNav extends State<ReceiptBottomNav> {
 
   void updateModifiedReceipt() {
     var formState = getFormStateFromContext(context);
-    receiptModel.receiptFormKey.currentState!.save();
-    var form = {...receiptModel.receiptFormKey.currentState!.value};
+    // Defensive null check: the only current caller already guards on
+    // `currentState != null` (build()'s onDestinationSelected, line 138),
+    // but bare `!` here is the same inconsistency the receipt-submit
+    // handler had at receipt_bottom_sheet_builder.dart:389 -- a future
+    // refactor that calls this from a non-guarded path would crash with
+    // "Null check operator used on a null value". No-op when the form
+    // isn't currently attached to the model's key.
+    final state = receiptModel.receiptFormKey.currentState;
+    if (state == null) {
+      return;
+    }
+    state.save();
+    var form = {...state.value};
     var date = "";
 
     if (formState == WranglerFormState.view) {
-      date = convertDateFormatForForm(form["date"]);
+      // The view-mode date field is registered under "dateDisplay" rather
+      // than "date" (see receipt_form.dart:97-110) so the read-only
+      // String value doesn't collide with the edit-mode DateTime value
+      // FormBuilder would otherwise reuse from its instant-value map.
+      // Fall back to "date" for older snapshots that still set it, and
+      // bail out cleanly if neither is present rather than letting
+      // convertDateFormatForForm crash on null.
+      final rawDate = form["dateDisplay"] ?? form["date"];
+      if (rawDate == null) {
+        return;
+      }
+      date = convertDateFormatForForm(rawDate);
     } else {
       try {
         date = formatDate(zuluDateFormat, form["date"] as DateTime);

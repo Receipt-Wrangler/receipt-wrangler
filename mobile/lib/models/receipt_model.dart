@@ -53,6 +53,20 @@ class ReceiptModel extends ChangeNotifier {
   GlobalKey<FormBuilderState> get quickActionsFormKey => _quickActionsFormKey;
 
   void setReceipt(Receipt receipt, bool notify) {
+    // Only regenerate the form key when we're loading a *different* receipt
+    // (or moving from the default-id-0 placeholder to a real one).
+    // `ReceiptFormScreen.build()` (receipt_form_screen.dart:88) calls
+    // setReceipt unconditionally on every screen rebuild after the
+    // FutureBuilder resolves. If we regen the GlobalKey every time, the
+    // FormBuilder gets a new key on each parent rebuild and Flutter tears
+    // down + remounts the entire form -- which makes the submit handler's
+    // `currentState` go null between taps ("Null check operator used on a
+    // null value" at receipt_bottom_sheet_builder.dart:389) and breaks
+    // dropdown interactions whose state is wiped mid-tap. Regenerating
+    // the key is only needed when the receipt identity actually changes,
+    // so the FormBuilderField initialValues get re-read for the new data.
+    final isNewReceipt = _receipt.id != receipt.id;
+
     _receipt = receipt;
 
     _modifiedReceipt = receipt;
@@ -66,7 +80,9 @@ class ReceiptModel extends ChangeNotifier {
     _imagesToUploadBehaviorSubject =
         BehaviorSubject<List<UploadMultipartFileData>>.seeded([]);
 
-    _receiptFormKey = GlobalKey<FormBuilderState>();
+    if (isNewReceipt) {
+      _receiptFormKey = GlobalKey<FormBuilderState>();
+    }
 
     if (notify) {
       notifyListeners();

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -19,9 +17,16 @@ void showErrorSnackbar(BuildContext context, String message,
 }
 
 void showApiErrorSnackbar(BuildContext context, DioException error) {
-  var errorObject = jsonDecode(error.response.toString() ?? "{}");
+  String? message;
+  final data = error.response?.data;
+  if (data is Map) {
+    final raw = data['errorMsg'];
+    if (raw is String && raw.isNotEmpty) {
+      message = raw;
+    }
+  }
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(errorObject["errorMsg"] ?? 'An error occurred'),
+    content: Text(message ?? 'An error occurred'),
     backgroundColor: Colors.red,
   ));
 }

@@ -43,6 +43,7 @@ The `docker/dev/Dockerfile` includes:
 - SSH access for debugging (port 22, password: "development")
 - Documentation site build from receipt-wrangler-doc repo
 - Java runtime for OpenAPI generator
+- Flutter SDK at `/opt/flutter` (on `PATH` via `ENV` and `/root/.bashrc`) with Linux desktop enabled and the `mobile/` pub cache warmed, plus `xvfb` + `libsecret-1-dev` so `mobile/run-e2e.sh` works out of the box
 
 ### Build Commands
 ```bash
