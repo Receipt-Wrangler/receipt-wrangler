@@ -8,6 +8,7 @@ import { PipesModule } from "src/pipes/pipes.module";
 import { ButtonModule } from "../button";
 import { InputModule } from "../input";
 import { SharedUiModule } from "../shared-ui/shared-ui.module";
+import { TableModule } from "../table/table.module";
 import { TextareaModule } from "../textarea/textarea.module";
 import { RoleFormComponent } from "./role-form/role-form.component";
 import { RoleListComponent } from "./role-list/role-list.component";
@@ -25,6 +26,7 @@ import { RolesRoutingModule } from "./roles-routing.module";
     ReactiveFormsModule,
     RouterModule,
     SharedUiModule,
+    TableModule,
     TextareaModule,
     RolesRoutingModule,
   ],

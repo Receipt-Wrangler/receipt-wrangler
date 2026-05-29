@@ -95,15 +95,26 @@ describe("RoleListComponent", () => {
     const { component, fixture } = await setup([]);
     expect(component.roleCount()).toBe(0);
     expect(fixture.nativeElement.querySelector(".empty-state")).toBeTruthy();
-    expect(fixture.nativeElement.querySelector(".roles-table")).toBeNull();
+    expect(fixture.nativeElement.querySelector("app-table")).toBeNull();
   });
 
-  it("loads roles and renders a row each with a single Type chip", async () => {
+  it("renders the table fed with a row per role when roles are present", async () => {
     const { component, fixture } = await setup();
     expect(component.roleCount()).toBe(2);
-    expect(fixture.nativeElement.querySelectorAll(".roles-table tbody tr").length).toBe(2);
-    expect(fixture.nativeElement.querySelectorAll(".chip.scope-app").length).toBe(1);
-    expect(fixture.nativeElement.querySelectorAll(".chip.scope-group").length).toBe(1);
+    expect(fixture.nativeElement.querySelector(".empty-state")).toBeNull();
+    expect(fixture.nativeElement.querySelector("app-table")).toBeTruthy();
+    expect(component.dataSource().data.length).toBe(2);
+  });
+
+  it("builds five table columns once the view initializes", async () => {
+    const { component } = await setup();
+    expect(component.columns().map((c) => c.matColumnDef)).toEqual([
+      "role",
+      "type",
+      "permissions",
+      "members",
+      "actions",
+    ]);
   });
 
   it("computes per-type counts for the filter tabs", async () => {
@@ -115,12 +126,14 @@ describe("RoleListComponent", () => {
     const { component } = await setup();
     component.setFilter("group");
     expect(component.filteredRoles().map((r) => r.name)).toEqual(["Group Manager"]);
+    expect(component.dataSource().data.length).toBe(1);
 
     component.setFilter("app");
     expect(component.filteredRoles().map((r) => r.name)).toEqual(["Administrator"]);
 
     component.setFilter("all");
     expect(component.filteredRoles().length).toBe(2);
+    expect(component.dataSource().data.length).toBe(2);
   });
 
   it("uses the role's own scope total as the meter denominator", async () => {

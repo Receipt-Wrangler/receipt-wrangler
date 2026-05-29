@@ -1,8 +1,18 @@
-import { Component, computed, inject, signal } from "@angular/core";
+import {
+  AfterViewInit,
+  Component,
+  TemplateRef,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { MatTableDataSource } from "@angular/material/table";
 import { Router } from "@angular/router";
 import { EMPTY, catchError, take, tap } from "rxjs";
 import { Role, RoleService, PermissionService } from "../../open-api";
+import { TableColumn } from "../../table/table-column.interface";
 import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
 import { FilterTab } from "../../shared-ui/filter-bar/filter-tab.interface";
 import {
@@ -25,10 +35,26 @@ const SCOPE_ICON: Record<RoleScope, { icon: string; color: string; tint: string 
   styleUrl: "./role-list.component.scss",
   standalone: false,
 })
-export class RoleListComponent {
+export class RoleListComponent implements AfterViewInit {
   private readonly permissionService = inject(PermissionService);
   private readonly roleService = inject(RoleService);
   private readonly router = inject(Router);
+
+  private readonly roleCellTemplate = viewChild.required<TemplateRef<any>>("roleCell");
+  private readonly typeCellTemplate = viewChild.required<TemplateRef<any>>("typeCell");
+  private readonly permissionsCellTemplate =
+    viewChild.required<TemplateRef<any>>("permissionsCell");
+  private readonly membersCellTemplate = viewChild.required<TemplateRef<any>>("membersCell");
+  private readonly actionsCellTemplate = viewChild.required<TemplateRef<any>>("actionsCell");
+
+  public readonly columns = signal<TableColumn[]>([]);
+  public readonly displayedColumns = signal<string[]>([
+    "role",
+    "type",
+    "permissions",
+    "members",
+    "actions",
+  ]);
 
   public readonly crumbs: BreadcrumbItem[] = [
     { label: "Admin" },
@@ -65,6 +91,10 @@ export class RoleListComponent {
     ];
   });
 
+  public readonly dataSource = computed(
+    () => new MatTableDataSource(this.filteredRoles()),
+  );
+
   // Per-scope permission totals from the registry — the denominator for each
   // role's meter (a role's bar is relative to its own scope's total).
   private readonly scopeTotals = signal<Record<RoleScope, number>>({ app: 0, group: 0 });
@@ -72,6 +102,41 @@ export class RoleListComponent {
   constructor() {
     this.loadScopeTotals();
     this.loadRoles();
+  }
+
+  public ngAfterViewInit(): void {
+    this.columns.set([
+      {
+        columnHeader: "Role",
+        matColumnDef: "role",
+        sortable: false,
+        template: this.roleCellTemplate(),
+      },
+      {
+        columnHeader: "Type",
+        matColumnDef: "type",
+        sortable: false,
+        template: this.typeCellTemplate(),
+      },
+      {
+        columnHeader: "Permissions",
+        matColumnDef: "permissions",
+        sortable: false,
+        template: this.permissionsCellTemplate(),
+      },
+      {
+        columnHeader: "Members",
+        matColumnDef: "members",
+        sortable: false,
+        template: this.membersCellTemplate(),
+      },
+      {
+        columnHeader: "",
+        matColumnDef: "actions",
+        sortable: false,
+        template: this.actionsCellTemplate(),
+      },
+    ]);
   }
 
   public setFilter(filter: string): void {

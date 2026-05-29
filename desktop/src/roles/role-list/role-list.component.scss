@@ -96,64 +96,7 @@ app-filter-bar {
   }
 }
 
-/* ---------- Table ---------- */
-.table-wrap {
-  overflow: auto;
-}
-
-.roles-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-  border: 1px solid $border;
-  border-radius: variables.$border-radius-lg;
-  overflow: hidden;
-  box-shadow: variables.$shadow-md;
-
-  th,
-  td {
-    padding: 15px 18px;
-    text-align: left;
-    font-size: 14px;
-    border-bottom: 1px solid map.get(variables.$accent-palette, 100);
-    vertical-align: middle;
-  }
-
-  th {
-    background: map.get(variables.$accent-palette, 50);
-    font-weight: 600;
-    color: $fg-muted;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  tr:last-child td {
-    border-bottom: 0;
-  }
-
-  tbody tr {
-    transition: background 0.15s ease;
-  }
-
-  tbody tr:hover {
-    background: map.get(variables.$accent-palette, 50);
-  }
-
-  .col-scope {
-    width: 200px;
-  }
-  .col-perms {
-    width: 140px;
-  }
-  .col-members {
-    width: 150px;
-  }
-  .col-actions {
-    width: 60px;
-  }
-}
-
+/* ---------- Table cell contents ---------- */
 .role-name {
   display: flex;
   align-items: center;

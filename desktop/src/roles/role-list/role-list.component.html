@@ -40,101 +40,86 @@
       (valueChange)="setFilter($event)"
     ></app-filter-bar>
 
-    <div class="table-wrap">
-      <table class="roles-table">
-        <thead>
-          <tr>
-            <th>Role</th>
-            <th class="col-scope">Type</th>
-            <th class="col-perms">Permissions</th>
-            <th class="col-members">Members</th>
-            <th class="col-actions"></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (role of filteredRoles(); track role.id) {
-            <tr>
-              <td>
-                <div class="role-name">
-                  <span
-                    class="role-icon"
-                    [style.background]="role.iconTint"
-                    [style.color]="role.iconColor"
-                  >
-                    <mat-icon>{{ role.icon }}</mat-icon>
-                  </span>
-                  <div>
-                    <div class="nm">
-                      {{ role.name }}
-                      @if (role.isSystem) {
-                        <span class="badge-lock"
-                          ><mat-icon>lock</mat-icon>System</span
-                        >
-                      }
-                    </div>
-                    <div class="ds">{{ role.description }}</div>
-                  </div>
-                </div>
-              </td>
-              <td>
-                @if (role.scope === "app") {
-                  <span class="chip scope-app"
-                    ><mat-icon>apps</mat-icon>Application</span
-                  >
-                } @else {
-                  <span class="chip scope-group"
-                    ><mat-icon>workspaces</mat-icon>Group</span
-                  >
-                }
-              </td>
-              <td>
-                <div class="perm-count">
-                  {{ role.permissionCount }} <span>of {{ scopeTotal(role) }}</span>
-                </div>
-                <div class="perm-bar">
-                  @for (segment of meter(role); track $index) {
-                    <i [ngClass]="segment"></i>
-                  }
-                </div>
-              </td>
-              <td>
-                @if (role.userCount === 0) {
-                  <span class="no-users">No users</span>
-                } @else {
-                  <div class="user-stack">
-                    @for (member of role.members.slice(0, 3); track member.name) {
-                      <span class="avatar" [style.background]="member.color">{{
-                        initials(member.name)
-                      }}</span>
-                    }
-                    @if (role.userCount > 3) {
-                      <span class="more">+{{ role.userCount - 3 }}</span>
-                    }
-                  </div>
-                }
-              </td>
-              <td>
-                <div class="row-actions">
-                  <app-button
-                    matButtonType="iconButton"
-                    color="accent"
-                    [icon]="role.isSystem ? 'visibility' : 'edit'"
-                    [tooltip]="role.isSystem ? 'View' : 'Edit'"
-                    (clicked)="editRole(role)"
-                  ></app-button>
-                  <app-button
-                    matButtonType="iconButton"
-                    color="accent"
-                    icon="more_vert"
-                    tooltip="More actions"
-                    (clicked)="openRoleMenu(role)"
-                  ></app-button>
-                </div>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+    <app-table
+      [columns]="columns()"
+      [displayedColumns]="displayedColumns()"
+      [dataSource]="dataSource()"
+    ></app-table>
   }
 </div>
+
+<ng-template #roleCell let-role="element">
+  <div class="role-name">
+    <span
+      class="role-icon"
+      [style.background]="role.iconTint"
+      [style.color]="role.iconColor"
+    >
+      <mat-icon>{{ role.icon }}</mat-icon>
+    </span>
+    <div>
+      <div class="nm">
+        {{ role.name }}
+        @if (role.isSystem) {
+          <span class="badge-lock"><mat-icon>lock</mat-icon>System</span>
+        }
+      </div>
+      <div class="ds">{{ role.description }}</div>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #typeCell let-role="element">
+  @if (role.scope === "app") {
+    <span class="chip scope-app"><mat-icon>apps</mat-icon>Application</span>
+  } @else {
+    <span class="chip scope-group"><mat-icon>workspaces</mat-icon>Group</span>
+  }
+</ng-template>
+
+<ng-template #permissionsCell let-role="element">
+  <div class="perm-count">
+    {{ role.permissionCount }} <span>of {{ scopeTotal(role) }}</span>
+  </div>
+  <div class="perm-bar">
+    @for (segment of meter(role); track $index) {
+      <i [ngClass]="segment"></i>
+    }
+  </div>
+</ng-template>
+
+<ng-template #membersCell let-role="element">
+  @if (role.userCount === 0) {
+    <span class="no-users">No users</span>
+  } @else {
+    <div class="user-stack">
+      @for (member of role.members.slice(0, 3); track member.name) {
+        <span class="avatar" [style.background]="member.color">{{
+          initials(member.name)
+        }}</span>
+      }
+      @if (role.userCount > 3) {
+        <span class="more">+{{ role.userCount - 3 }}</span>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #actionsCell let-role="element">
+  <div class="row-actions">
+    <app-button
+      matButtonType="iconButton"
+      color="accent"
+      [icon]="role.isSystem ? 'visibility' : 'edit'"
+      [tooltip]="role.isSystem ? 'View' : 'Edit'"
+      (clicked)="editRole(role)"
+    ></app-button>
+    <app-button
+      matButtonType="iconButton"
+      color="accent"
+      icon="more_vert"
+      tooltip="More actions"
+      (clicked)="openRoleMenu(role)"
+    ></app-button>
+  </div>
+</ng-template>
