@@ -4,17 +4,12 @@ import { Router } from "@angular/router";
 import { EMPTY, catchError, take, tap } from "rxjs";
 import { Role, RoleService, PermissionService } from "../../open-api";
 import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
+import { FilterTab } from "../../shared-ui/filter-bar/filter-tab.interface";
 import {
   RoleListFilter,
   RoleListItem,
   RoleScope,
 } from "./role-list-item.interface";
-
-interface RoleFilterTab {
-  id: RoleListFilter;
-  label: string;
-  icon: string;
-}
 
 // A role carries no icon of its own; pick a sensible default per scope. These
 // are inline style values, so the violet "group" accent is a literal (matching
@@ -40,12 +35,6 @@ export class RoleListComponent {
     { label: "Roles" },
   ];
 
-  public readonly filterTabs: RoleFilterTab[] = [
-    { id: "all", label: "All roles", icon: "list" },
-    { id: "app", label: "Application", icon: "apps" },
-    { id: "group", label: "Group", icon: "workspaces" },
-  ];
-
   public readonly roles = signal<RoleListItem[]>([]);
   public readonly roleCount = computed(() => this.roles().length);
 
@@ -67,6 +56,15 @@ export class RoleListComponent {
     };
   });
 
+  public readonly filterTabs = computed<FilterTab[]>(() => {
+    const counts = this.counts();
+    return [
+      { value: "all", label: "All roles", icon: "list", count: counts.all },
+      { value: "app", label: "Application", icon: "apps", count: counts.app },
+      { value: "group", label: "Group", icon: "workspaces", count: counts.group },
+    ];
+  });
+
   // Per-scope permission totals from the registry — the denominator for each
   // role's meter (a role's bar is relative to its own scope's total).
   private readonly scopeTotals = signal<Record<RoleScope, number>>({ app: 0, group: 0 });
@@ -76,8 +74,8 @@ export class RoleListComponent {
     this.loadRoles();
   }
 
-  public setFilter(filter: RoleListFilter): void {
-    this.filter.set(filter);
+  public setFilter(filter: string): void {
+    this.filter.set(filter as RoleListFilter);
   }
 
   /** Ten meter segments; filled ones tagged with the role's scope for color. */

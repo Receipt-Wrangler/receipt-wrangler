@@ -45,57 +45,10 @@ $group-accent-bar: #a78bfa;
   }
 }
 
-/* ---------- Type filter tabs ---------- */
-.scope-tabs {
-  display: inline-flex;
-  background: map.get(variables.$accent-palette, 100);
-  border-radius: 9px;
-  padding: 4px;
-  gap: 4px;
+/* ---------- Type filter ---------- */
+app-filter-bar {
+  display: inline-block;
   margin-bottom: variables.$spacing-lg;
-}
-
-.scope-tab {
-  border: 0;
-  background: transparent;
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 6px;
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: map.get(variables.$accent-palette, 600);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  transition: all 0.15s ease;
-
-  mat-icon {
-    font-size: 17px;
-    width: 17px;
-    height: 17px;
-  }
-
-  &.active {
-    background: #fff;
-    color: map.get(variables.$primary-palette, 700);
-    box-shadow: variables.$shadow-sm;
-  }
-
-  .pill {
-    font-size: 11px;
-    background: map.get(variables.$accent-palette, 200);
-    color: map.get(variables.$accent-palette, 600);
-    border-radius: 9999px;
-    padding: 1px 7px;
-    font-weight: 600;
-  }
-
-  &.active .pill {
-    background: map.get(variables.$primary-palette, 100);
-    color: map.get(variables.$primary-palette, 700);
-  }
 }
 
 /* ---------- Empty state ---------- */

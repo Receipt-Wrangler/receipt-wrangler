@@ -34,20 +34,11 @@
       ></app-button>
     </div>
   } @else {
-    <div class="scope-tabs">
-      @for (tab of filterTabs; track tab.id) {
-        <button
-          type="button"
-          class="scope-tab"
-          [class.active]="filter() === tab.id"
-          (click)="setFilter(tab.id)"
-        >
-          <mat-icon>{{ tab.icon }}</mat-icon>
-          {{ tab.label }}
-          <span class="pill">{{ counts()[tab.id] }}</span>
-        </button>
-      }
-    </div>
+    <app-filter-bar
+      [tabs]="filterTabs()"
+      [value]="filter()"
+      (valueChange)="setFilter($event)"
+    ></app-filter-bar>
 
     <div class="table-wrap">
       <table class="roles-table">

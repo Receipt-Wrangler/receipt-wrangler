@@ -106,6 +106,9 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
 - **Form fields:** `app-input`, `app-textarea`, `app-select`, `app-checkbox`, grouped with
   `app-form-section`; bind via the `formGet` pipe.
 - **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`.
+- **Simple filters:** the segmented `app-filter-bar` (`src/shared-ui/filter-bar/`) — pass `FilterTab[]`
+  (`{ value, label, icon?, count? }`) and two-way bind the selected `value`.
+- **Breadcrumbs:** `app-breadcrumb` with `BreadcrumbItem[]`.
 If a design appears to require a new pattern, confirm with the user before diverging.
 
 ## Signals & Zoneless Change Detection
