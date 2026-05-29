@@ -1,6 +1,11 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
-import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  Input,
+  provideZonelessChangeDetection,
+} from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { Router, RouterModule } from "@angular/router";
@@ -37,6 +42,14 @@ const GROUP_DESCRIPTORS: PermissionDescriptor[] = [
   { key: "group.widgets.read", label: "Read widgets", description: "", category: "Widgets", scope: "GROUP" },
 ];
 
+// Stubbed because its `onlyIcon` input trips Angular's on*-event security check
+// when treated as an unknown element under CUSTOM_ELEMENTS_SCHEMA.
+@Component({ selector: "app-submit-button", template: "", standalone: false })
+class StubSubmitButtonComponent {
+  @Input() onlyIcon = false;
+  @Input() buttonText = "";
+}
+
 const ALL_DESCRIPTORS: PermissionDescriptor[] = [...APP_DESCRIPTORS, ...GROUP_DESCRIPTORS];
 
 const APP_KEYS = APP_DESCRIPTORS.map((d) => d.key);
@@ -55,7 +68,7 @@ async function setup(
   TestBed.resetTestingModule();
   const snackbar = { success: jest.fn(), error: jest.fn() };
   await TestBed.configureTestingModule({
-    declarations: [RoleFormComponent],
+    declarations: [RoleFormComponent, StubSubmitButtonComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule, PipesModule, ReactiveFormsModule, RouterModule.forRoot([])],
     providers: [

@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl, FormGroup, Validators } from "@angular/forms";
 import { Router } from "@angular/router";
 import { catchError, EMPTY, take, tap } from "rxjs";
+import { FormMode } from "../../enums/form-mode.enum";
 import { SnackbarService } from "../../services/snackbar.service";
 import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
 import {
@@ -55,6 +56,7 @@ export class RoleFormComponent {
   ];
 
   public readonly roleTypes = ROLE_TYPES;
+  public readonly formMode = FormMode;
 
   public readonly form = new FormGroup({
     name: new FormControl<string>("", { nonNullable: true, validators: [Validators.required] }),

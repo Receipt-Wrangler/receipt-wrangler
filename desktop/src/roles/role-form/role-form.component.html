@@ -5,229 +5,245 @@
     <div>
       <h1>Create a Role</h1>
       <div class="sub">
-        Choose what it applies to, start from a template, then tweak until it fits.
+        Choose what it applies to, start from a template, then tweak until it
+        fits.
       </div>
-    </div>
-    <div class="rw-tools">
-      <app-button
-        buttonText="Cancel"
-        matButtonType="basic"
-        [buttonRouterLink]="['/roles']"
-      ></app-button>
-      <app-button
-        buttonText="Save Role"
-        icon="check"
-        color="primary"
-        matButtonType="matRaisedButton"
-        (clicked)="submit()"
-      ></app-button>
     </div>
   </div>
 
-  <div class="rw-editor">
-    <div class="rw-editor-main">
-      <!-- Role type -->
-      <div class="rw-card rw-form-section">
-        <h2>Role type</h2>
-        <div class="hint">
-          A role applies to either the application or a group — not both.
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <div class="rw-editor">
+      <div class="rw-editor-main">
+        <!-- Role type -->
+        <div class="rw-card rw-form-section">
+          <h2>Role type</h2>
+          <div class="hint">
+            A role applies to either the application or a group — not both.
+          </div>
+          <div class="rw-typegrid">
+            @for (t of roleTypes; track t.id) {
+              <button
+                type="button"
+                class="rw-typecard"
+                [class.active]="type() === t.id"
+                (click)="pickType(t.id)"
+              >
+                <span
+                  class="tic"
+                  [style.background]="t.tint"
+                  [style.color]="t.color"
+                >
+                  <mat-icon>{{ t.icon }}</mat-icon>
+                </span>
+                <div class="tbody">
+                  <div class="tnm">{{ t.name }}</div>
+                  <div class="tds">{{ t.description }}</div>
+                </div>
+                <span class="rw-radio" [class.on]="type() === t.id">
+                  <mat-icon>check</mat-icon>
+                </span>
+              </button>
+            }
+          </div>
         </div>
-        <div class="rw-typegrid">
-          @for (t of roleTypes; track t.id) {
-            <button
-              type="button"
-              class="rw-typecard"
-              [class.active]="type() === t.id"
-              (click)="pickType(t.id)"
-            >
-              <span class="tic" [style.background]="t.tint" [style.color]="t.color">
-                <mat-icon>{{ t.icon }}</mat-icon>
-              </span>
-              <div class="tbody">
-                <div class="tnm">{{ t.name }}</div>
-                <div class="tds">{{ t.description }}</div>
-              </div>
-              <span class="rw-radio" [class.on]="type() === t.id">
-                <mat-icon>check</mat-icon>
-              </span>
-            </button>
-          }
-        </div>
-      </div>
 
-      <!-- Details -->
-      <div class="rw-card rw-form-section">
-        <h2>Details</h2>
-        <div class="hint">
-          A clear name and description help admins pick the right role later.
-        </div>
-        <form [formGroup]="form">
+        <!-- Details -->
+        <div class="rw-card rw-form-section">
+          <h2>Details</h2>
+          <div class="hint">
+            A clear name and description help admins pick the right role later.
+          </div>
           <div class="rw-field">
             <app-input
               label="Role Name"
-              [inputFormControl]="form | formGet : 'name'"
+              [inputFormControl]="form | formGet: 'name'"
             ></app-input>
           </div>
           <div class="rw-field">
             <app-textarea
               label="Description"
-              [inputFormControl]="form | formGet : 'description'"
+              [inputFormControl]="form | formGet: 'description'"
             ></app-textarea>
           </div>
-        </form>
-      </div>
-
-      <!-- Start from a template -->
-      <div class="rw-card rw-form-section">
-        <h2>Start from a template</h2>
-        <div class="hint">
-          Pick a starting point for this {{ typeMeta().name.toLowerCase() }} — you can
-          change any permission afterward.
         </div>
-        <div class="rw-presets">
-          @for (p of presets(); track p.id) {
-            <button
-              type="button"
-              class="rw-preset"
-              [class.active]="selectedPreset() === p.id"
-              (click)="pickPreset(p)"
+
+        <!-- Start from a template -->
+        <div class="rw-card rw-form-section">
+          <h2>Start from a template</h2>
+          <div class="hint">
+            Pick a starting point for this {{ typeMeta().name.toLowerCase() }} —
+            you can change any permission afterward.
+          </div>
+          <div class="rw-presets">
+            @for (p of presets(); track p.id) {
+              <button
+                type="button"
+                class="rw-preset"
+                [class.active]="selectedPreset() === p.id"
+                (click)="pickPreset(p)"
+              >
+                <span
+                  class="pic"
+                  [style.background]="p.tint"
+                  [style.color]="p.color"
+                >
+                  <mat-icon>{{ p.icon }}</mat-icon>
+                </span>
+                <div class="pnm">{{ p.name }}</div>
+                <div class="pds">{{ p.description }}</div>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Permissions -->
+        <div class="rw-card rw-form-section">
+          <div class="rw-perm-header">
+            <div>
+              <h2>Permissions</h2>
+              <div class="hint hint-inline">
+                Flip a whole group on, or expand to fine-tune.
+              </div>
+            </div>
+            <span
+              class="rw-chip"
+              [style.background]="typeMeta().tint"
+              [style.color]="typeMeta().color"
             >
-              <span class="pic" [style.background]="p.tint" [style.color]="p.color">
-                <mat-icon>{{ p.icon }}</mat-icon>
-              </span>
-              <div class="pnm">{{ p.name }}</div>
-              <div class="pds">{{ p.description }}</div>
-            </button>
+              <mat-icon>{{ typeMeta().icon }}</mat-icon>
+              {{ typeMeta().name }}
+            </span>
+          </div>
+
+          @for (group of resourceGroups(); track group.resourceKey) {
+            <div class="rw-acc">
+              <div class="rw-acc-head" (click)="togglePanel(group.resourceKey)">
+                <span class="rw-acc-ic" [class.on]="onCount(group) > 0">
+                  <mat-icon>{{ group.icon }}</mat-icon>
+                </span>
+                <div class="rw-acc-text">
+                  <div class="rw-acc-title">{{ group.name }}</div>
+                  <div class="rw-acc-sub">
+                    {{ group.resourceKey }} ·
+                    {{ group.rows.length }} permission{{
+                      group.rows.length === 1 ? "" : "s"
+                    }}
+                  </div>
+                </div>
+                <span class="rw-acc-count" [class.none]="onCount(group) === 0">
+                  {{
+                    onCount(group) === 0
+                      ? "None"
+                      : onCount(group) + " of " + group.rows.length
+                  }}
+                </span>
+                <button
+                  type="button"
+                  class="rw-switch"
+                  [class.on]="isAllOn(group)"
+                  [attr.aria-pressed]="isAllOn(group)"
+                  [attr.aria-label]="
+                    'Toggle all ' + group.name + ' permissions'
+                  "
+                  (click)="
+                    $event.stopPropagation(); toggleAll(group, !isAllOn(group))
+                  "
+                ></button>
+                <mat-icon class="rw-acc-chevron">
+                  {{
+                    isPanelOpen(group.resourceKey)
+                      ? "expand_less"
+                      : "expand_more"
+                  }}
+                </mat-icon>
+              </div>
+
+              @if (isPanelOpen(group.resourceKey)) {
+                <div class="rw-acc-body">
+                  @for (row of group.rows; track row.key) {
+                    <div class="rw-perm-row">
+                      <div class="pl">
+                        <span class="t">{{ row.label }}</span>
+                        <span class="k">{{ row.key }}</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="rw-switch"
+                        [class.on]="isGranted(row.key)"
+                        [attr.aria-pressed]="isGranted(row.key)"
+                        [attr.aria-label]="'Toggle ' + row.label"
+                        (click)="toggle(row.key)"
+                      ></button>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
           }
         </div>
       </div>
 
-      <!-- Permissions -->
-      <div class="rw-card rw-form-section">
-        <div class="rw-perm-header">
-          <div>
-            <h2>Permissions</h2>
-            <div class="hint hint-inline">
-              Flip a whole group on, or expand to fine-tune.
-            </div>
-          </div>
-          <span
-            class="rw-chip"
-            [style.background]="typeMeta().tint"
-            [style.color]="typeMeta().color"
-          >
-            <mat-icon>{{ typeMeta().icon }}</mat-icon>
-            {{ typeMeta().name }}
-          </span>
-        </div>
-
-        @for (group of resourceGroups(); track group.resourceKey) {
-          <div class="rw-acc">
-            <div class="rw-acc-head" (click)="togglePanel(group.resourceKey)">
-              <span
-                class="rw-acc-ic"
-                [class.on]="onCount(group) > 0"
-              >
-                <mat-icon>{{ group.icon }}</mat-icon>
-              </span>
-              <div class="rw-acc-text">
-                <div class="rw-acc-title">{{ group.name }}</div>
-                <div class="rw-acc-sub">
-                  {{ group.resourceKey }} · {{ group.rows.length }}
-                  permission{{ group.rows.length === 1 ? "" : "s" }}
-                </div>
-              </div>
-              <span class="rw-acc-count" [class.none]="onCount(group) === 0">
-                {{
-                  onCount(group) === 0
-                    ? "None"
-                    : onCount(group) + " of " + group.rows.length
-                }}
-              </span>
-              <button
-                type="button"
-                class="rw-switch"
-                [class.on]="isAllOn(group)"
-                [attr.aria-pressed]="isAllOn(group)"
-                [attr.aria-label]="'Toggle all ' + group.name + ' permissions'"
-                (click)="$event.stopPropagation(); toggleAll(group, !isAllOn(group))"
-              ></button>
-              <mat-icon class="rw-acc-chevron">
-                {{ isPanelOpen(group.resourceKey) ? "expand_less" : "expand_more" }}
-              </mat-icon>
-            </div>
-
-            @if (isPanelOpen(group.resourceKey)) {
-              <div class="rw-acc-body">
-                @for (row of group.rows; track row.key) {
-                  <div class="rw-perm-row">
-                    <div class="pl">
-                      <span class="t">{{ row.label }}</span>
-                      <span class="k">{{ row.key }}</span>
-                    </div>
-                    <button
-                      type="button"
-                      class="rw-switch"
-                      [class.on]="isGranted(row.key)"
-                      [attr.aria-pressed]="isGranted(row.key)"
-                      [attr.aria-label]="'Toggle ' + row.label"
-                      (click)="toggle(row.key)"
-                    ></button>
-                  </div>
-                }
-              </div>
-            }
-          </div>
-        }
-      </div>
-    </div>
-
-    <!-- Summary side panel -->
-    <div class="rw-side">
-      <div class="rw-card rw-side-card">
-        <h3>Summary</h3>
-        <div class="rw-summary-stat">
-          <span class="big">{{ granted().size }}</span>
-          <span class="lbl">
-            of {{ scopeTotal() }} {{ typeMeta().name.toLowerCase() }} permissions
-            granted
-          </span>
-        </div>
-        <div class="rw-mini-bar">
-          <i
-            [style.width.%]="scopeTotal() ? (granted().size / scopeTotal()) * 100 : 0"
-            [style.background]="scopeColor()"
-          ></i>
-        </div>
-        <div class="rw-summary-split">
-          <div class="rw-summary-row">
-            <span class="lhs">
-              <span class="dot" [style.background]="scopeColor()"></span>
-              {{ typeMeta().name }}
+      <!-- Summary side panel -->
+      <div class="rw-side">
+        <div class="rw-card rw-side-card">
+          <h3>Summary</h3>
+          <div class="rw-summary-stat">
+            <span class="big">{{ granted().size }}</span>
+            <span class="lbl">
+              of {{ scopeTotal() }}
+              {{ typeMeta().name.toLowerCase() }} permissions granted
             </span>
-            <strong>{{ granted().size }}</strong>
+          </div>
+          <div class="rw-mini-bar">
+            <i
+              [style.width.%]="
+                scopeTotal() ? (granted().size / scopeTotal()) * 100 : 0
+              "
+              [style.background]="scopeColor()"
+            ></i>
+          </div>
+          <div class="rw-summary-split">
+            <div class="rw-summary-row">
+              <span class="lhs">
+                <span class="dot" [style.background]="scopeColor()"></span>
+                {{ typeMeta().name }}
+              </span>
+              <strong>{{ granted().size }}</strong>
+            </div>
+          </div>
+          <div class="rw-summary-preset">
+            <span
+              class="rw-acc-ic"
+              [style.background]="activePreset().tint"
+              [style.color]="activePreset().color"
+            >
+              <mat-icon>{{ activePreset().icon }}</mat-icon>
+            </span>
+            <span class="rw-summary-preset-text">
+              Based on <strong>{{ activePreset().name }}</strong>
+            </span>
           </div>
         </div>
-        <div class="rw-summary-preset">
-          <span
-            class="rw-acc-ic"
-            [style.background]="activePreset().tint"
-            [style.color]="activePreset().color"
-          >
-            <mat-icon>{{ activePreset().icon }}</mat-icon>
-          </span>
-          <span class="rw-summary-preset-text">
-            Based on <strong>{{ activePreset().name }}</strong>
+        <div class="rw-side-note">
+          <mat-icon>info</mat-icon>
+          <span>
+            People are given this role from
+            <a routerLink="/users">Manage Users</a>, not here.
           </span>
         </div>
       </div>
-      <div class="rw-side-note">
-        <mat-icon>info</mat-icon>
-        <span>
-          People are given this role from
-          <a routerLink="/users">Manage Users</a>, not here.
-        </span>
-      </div>
     </div>
-  </div>
+
+    <app-form-button-bar [mode]="formMode.add">
+      <app-button
+        buttonText="Cancel"
+        matButtonType="basic"
+        [buttonRouterLink]="['/roles']"
+      ></app-button>
+      <app-submit-button
+        [onlyIcon]="false"
+        buttonText="Save Role"
+      ></app-submit-button>
+    </app-form-button-bar>
+  </form>
 </div>

@@ -31,7 +31,9 @@ $ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .rw-content {
-  padding: 28px 32px;
+  // Extra bottom padding so the fixed floating save bar never overlaps the
+  // last content (summary panel / final accordion).
+  padding: 28px 32px 96px;
 }
 
 // ----- Page header -----
