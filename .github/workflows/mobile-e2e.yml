@@ -1,0 +1,269 @@
+---
+name: E2E - Mobile (Android + iOS)
+
+# Runs the Flutter integration_test suite on a full Android emulator AND
+# on an iOS Simulator, in parallel against the demo backend. The two
+# jobs are independent -- neither has `needs:` on the other and both are
+# `continue-on-error: true`, so a failure in one does not stop or fail
+# the other. Still advisory while the iOS suite stabilizes; once the
+# remaining `skip: true` specs are unblocked, flip the
+# continue-on-error flags to make this gating.
+#
+# Triggers:
+#   pull_request to main  -- run during PR review so reviewers can see
+#                            mobile e2e results before merging.
+#   push to main          -- post-merge verification after the PR lands.
+#   push to tech/mobile-e2e -- iteration on the e2e setup itself.
+#   workflow_dispatch     -- manual trigger from the Actions tab.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, tech/mobile-e2e]
+  workflow_dispatch:
+
+# Least-privilege GITHUB_TOKEN: this workflow only reads the repo source. It
+# never opens PRs, writes commits, or interacts with packages/releases. Scoping
+# to `contents: read` shrinks the blast radius if a third-party action in the
+# chain is ever compromised. Addresses CodeQL alerts on the default permissions
+# set (codeql/actions-missing-workflow-permissions).
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-e2e:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # No subsequent step needs to push or use the auth token; leaving the
+          # credential helper untouched after checkout avoids any chance of a
+          # later step inheriting write access to the repo.
+          persist-credentials: false
+
+      # Nested KVM on GitHub-hosted ubuntu runners needs the /dev/kvm device
+      # to be readable by the runner user. This udev rule makes it so.
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Pinned to the same version as docker/dev/Dockerfile FLUTTER_VERSION.
+      # Keep in sync when bumping either side.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        working-directory: ./mobile
+        run: flutter pub get
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api-34-google_apis-x86_64-pixel_6_pro-v1
+
+      # The first `flutter build apk` of a fresh runner triggers ~3 min
+      # of cascading SDK installs (NDK 27.0.12077973, SDK Platform 31,
+      # CMake 3.22.1) plus all Gradle dep downloads. None of that lands
+      # under ~/.gradle/caches alone, so we cache the SDK install paths
+      # too. Versions are pinned by mobile/android/app/build.gradle
+      # (NDK) and resolved transitively by AGP (CMake/Platform 31); when
+      # any android/**/*.gradle* or pubspec.lock changes, the key
+      # invalidates and a fresh install repopulates the cache.
+      - name: Gradle + Android SDK cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            mobile/android/.gradle
+            /usr/local/lib/android/sdk/ndk/27.0.12077973
+            /usr/local/lib/android/sdk/cmake/3.22.1
+            /usr/local/lib/android/sdk/platforms/android-31
+          key: linux-android-build-${{ hashFiles('mobile/pubspec.lock', 'mobile/android/**/*.gradle', 'mobile/android/**/*.gradle.kts', 'mobile/android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            linux-android-build-
+
+      # First run creates the AVD and boots once so a warm snapshot exists in
+      # the cache. Skipped after a cache hit.
+      - name: Create AVD + warm snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          # Without `profile`, avdmanager creates a headless AVD that boots at
+          # 320x640 logical px (density 160) — too narrow for the receipt form,
+          # which overflows by 36 px in that envelope. tester.setSurfaceSize is
+          # observably ignored by IntegrationTestWidgetsFlutterBinding running
+          # via flutter drive on a real device, so we have to fix the device
+          # itself. pixel_6_pro is 411x914 logical (modern phone), well within
+          # the form's needed width with headroom for layout drift.
+          # NOTE: must be identical between this step and the test step below
+          # so they share the cached AVD.
+          profile: pixel_6_pro
+          cores: 4
+          ram-size: 4096M
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          script: echo "AVD created"
+
+      - name: Warm up demo backend
+        run: |
+          curl -fsSL --max-time 60 "$E2E_BASE_URL" > /dev/null || true
+          curl -fsSL --max-time 60 "$E2E_BASE_URL/api/featureConfig" > /dev/null || true
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+
+      # Delegate to mobile/run-e2e-android.sh -- same script developers run
+      # locally. It auto-attaches to the emulator-runner-booted emulator-5554,
+      # builds a JSON-safe --dart-define-from-file payload via python3, and
+      # runs one `flutter drive` per spec wrapped in `timeout 600`. Between
+      # specs it force-stops + uninstalls io.receiptwrangler and pkills leaked
+      # dartvm processes (flutter drive's own uninstall targets the wrong
+      # applicationId and leaves the vmservice port owned, hanging the next
+      # spec's launch otherwise).
+      #
+      # The script gates its source of api/dev/switch-to-sqlite.sh on all four
+      # E2E_* creds being unset, so the secrets passed in env: here are NOT
+      # clobbered by the dev defaults.
+      #
+      # android-emulator-runner's `script:` is parsed by src/script-parser.ts,
+      # which splits on \n and runs each line as a separate `sh -c`. The
+      # folded scalar (`>-`) below collapses newlines to spaces, so the
+      # parser still sees one logical line. Inside that line we invoke the
+      # runner script, whose `#!/usr/bin/env bash` shebang gives the per-spec
+      # for-loop a real bash interpreter -- immune to whatever the
+      # script-parser does that killed the previous inline loop with
+      # `exit code null` on the first iteration.
+      #
+      # 12 specs below match the prior inline list -- no scope change.
+      - name: Run Flutter integration tests on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          E2E_MOBILE_BASE_URL: ${{ secrets.E2E_BASE_URL }}/api
+          E2E_ADMIN_USERNAME: ${{ secrets.E2E_ADMIN_USERNAME }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_USER_USERNAME: ${{ secrets.E2E_USER_USERNAME }}
+          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          # Must match the AVD-warm step's profile so the cached AVD applies.
+          profile: pixel_6_pro
+          cores: 4
+          ram-size: 4096M
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save
+          disable-animations: true
+          working-directory: ./mobile
+          script: >-
+            ./run-e2e-android.sh
+            integration_test/smoke_login_test.dart
+            integration_test/receipt_add_test.dart
+            integration_test/receipt_add_gallery_test.dart
+            integration_test/receipt_add_share_test.dart
+            integration_test/receipt_add_consecutive_test.dart
+            integration_test/receipt_add_double_submit_test.dart
+            integration_test/receipt_add_partial_image_test.dart
+            integration_test/receipt_add_custom_field_test.dart
+            integration_test/receipt_edit_test.dart
+            integration_test/receipt_view_to_groups_navigation_test.dart
+            integration_test/quick_scan_test.dart
+            integration_test/quick_scan_disabled_test.dart
+
+  ios-e2e:
+    # macos-14 ships Xcode 15.4 + iOS 17.0/17.2/17.4/17.5/18.1/18.2
+    # simulators preinstalled; xcrun simctl is on PATH out of the box.
+    # Free for public repos, so the 10x macOS multiplier doesn't apply.
+    runs-on: macos-14
+    continue-on-error: true
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # No subsequent step needs to push or use the auth token; leaving the
+          # credential helper untouched after checkout avoids any chance of a
+          # later step inheriting write access to the repo.
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        working-directory: ./mobile
+        run: flutter pub get
+
+      # gtimeout (used by run-e2e-ios.sh both to cap simctl bootstatus and to
+      # wrap each per-spec flutter drive) lives in GNU coreutils. The current
+      # macos-14-arm64 image does NOT preinstall coreutils -- prior intel
+      # macos-14 images did, which is why an older revision of this workflow
+      # assumed it was on PATH. Install it explicitly so the runner script's
+      # `command -v gtimeout` dep check passes. Install is ~10s; not worth
+      # caching.
+      - name: Install coreutils (gtimeout)
+        run: brew install coreutils
+
+      - name: Warm up demo backend
+        run: |
+          curl -fsSL --max-time 60 "$E2E_BASE_URL" > /dev/null || true
+          curl -fsSL --max-time 60 "$E2E_BASE_URL/api/featureConfig" > /dev/null || true
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+
+      # Delegate to mobile/run-e2e-ios.sh -- same script developers run
+      # locally. It resolves the iPhone 15 simulator UDID, boots if not
+      # already booted (with a 5-minute bootstatus cap), builds a JSON-safe
+      # --dart-define-from-file payload via python3, and runs one
+      # `flutter drive` per spec wrapped in `gtimeout 600`. Between specs
+      # it terminates + uninstalls io.receiptwrangler and `pkill`s leaked
+      # dart isolates to dodge the iOS vmservice-hang flake class
+      # (flutter#129246, #136222, #153433).
+      #
+      # The script gates its source of api/dev/switch-to-sqlite.sh on
+      # E2E_ADMIN_USERNAME being unset, so the secrets passed in env: here
+      # are NOT clobbered by the dev defaults that file would export.
+      #
+      # The 5 spec paths below match what the previous inline loop ran.
+      - name: Run Flutter integration tests on iOS
+        working-directory: ./mobile
+        env:
+          E2E_MOBILE_BASE_URL: ${{ secrets.E2E_BASE_URL }}/api
+          E2E_ADMIN_USERNAME: ${{ secrets.E2E_ADMIN_USERNAME }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+          E2E_USER_USERNAME: ${{ secrets.E2E_USER_USERNAME }}
+          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+        run: |
+          ./run-e2e-ios.sh \
+            integration_test/smoke_login_test.dart \
+            integration_test/receipt_add_test.dart \
+            integration_test/receipt_add_gallery_test.dart \
+            integration_test/receipt_add_share_test.dart \
+            integration_test/quick_scan_disabled_test.dart

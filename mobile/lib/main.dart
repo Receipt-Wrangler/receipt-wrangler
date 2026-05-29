@@ -46,7 +46,17 @@ void main() async {
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   await GlobalSharedPreferences.initialize();
 
-  runApp(MultiProvider(
+  runApp(buildApp());
+}
+
+/// Builds the production widget tree (providers + root app widget).
+/// Extracted from `main()` so integration tests can pump it directly via
+/// `tester.pumpWidget(buildApp())` instead of calling `main()`. Each call
+/// returns a fresh tree — the `GoRouter` lives inside `_ReceiptWrangler`
+/// as a per-`State` `late final` field, so test #N never inherits test
+/// #N-1's router location.
+Widget buildApp() {
+  return MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => AuthModel()),
       ChangeNotifierProvider(create: (_) => CategoryModel()),
@@ -63,110 +73,111 @@ void main() async {
       ChangeNotifierProvider(create: (_) => UserPreferencesModel()),
     ],
     child: const ReceiptWrangler(),
-  ));
+  );
 }
 
-// GoRouter configuration
-final _router = GoRouter(
-  routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const ScreenWrapper(child: Home()),
-      redirect: (context, state) {
-        return unprotectedRouteRedirect(context, "/groups");
-      },
-    ),
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const ScreenWrapper(child: AuthScreen()),
-      redirect: (context, state) {
-        return unprotectedRouteRedirect(context, "/groups");
-      },
-    ),
-    ShellRoute(
+GoRouter _buildAppRouter() {
+  return GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const ScreenWrapper(child: Home()),
+        redirect: (context, state) {
+          return unprotectedRouteRedirect(context, "/groups");
+        },
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const ScreenWrapper(child: AuthScreen()),
+        redirect: (context, state) {
+          return unprotectedRouteRedirect(context, "/groups");
+        },
+      ),
+      ShellRoute(
+          builder: (context, state, child) {
+            return ScreenWrapper(
+              appBarWidget: const GroupSelectAppBar(),
+              bottomNavigationBarWidget: const GroupSelectBottomNav(),
+              child: child,
+            );
+          },
+          routes: [
+            GoRoute(
+                path: "/groups",
+                builder: (context, state) => const GroupSelect()),
+          ]),
+      ShellRoute(
+          builder: (context, state, child) {
+            EdgeInsets? padding;
+            if (state.fullPath == '/groups/:groupId/receipts') {
+              padding = const EdgeInsets.all(0);
+            }
+            return ScreenWrapper(
+              appBarWidget: const GroupAppBar(),
+              bottomNavigationBarWidget: const GroupBottomNav(),
+              bodyPadding: padding,
+              child: child,
+            );
+          },
+          routes: [
+            GoRoute(
+              path: '/groups/:groupId/dashboards',
+              builder: (context, state) => const GroupDashboards(),
+            ),
+            GoRoute(
+              path: '/groups/:groupId/receipts',
+              builder: (context, state) => const GroupReceiptsScreen(),
+            ),
+          ]),
+      GoRoute(
+        path: '/receipts/add',
+        redirect: (context, state) {
+          Provider.of<ReceiptModel>(context, listen: false).resetModel();
+          return null;
+        },
+        builder: (context, state) => const ReceiptFormScreen(),
+      ),
+      GoRoute(
+        path: '/receipts/:receiptId/view',
+        builder: (context, state) => const ReceiptFormScreen(),
+      ),
+      GoRoute(
+        path: '/receipts/:receiptId/edit',
+        builder: (context, state) => const ReceiptFormScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const UserProfileScreen(),
+      ),
+      ShellRoute(
         builder: (context, state, child) {
+          var searchModel = Provider.of<SearchModel>(context, listen: false);
+          searchModel.searchTermBehaviorSubject.add("");
+          searchModel.setSearchResults([], notify: false);
+
+          var extra = state.extra as Map<String, dynamic>;
+          var from = extra["from"];
+
           return ScreenWrapper(
-            appBarWidget: const GroupSelectAppBar(),
-            bottomNavigationBarWidget: const GroupSelectBottomNav(),
+            appBarWidget: SearchAppBar(),
+            bodyPadding: const EdgeInsets.all(0),
+            bottomNavigationBarWidget: from == fromGroupBottomNav
+                ? const GroupBottomNav()
+                : const GroupSelectBottomNav(),
             child: child,
+            bottomSheetWidget: const WranglerSearchBar(),
           );
         },
         routes: [
           GoRoute(
-              path: "/groups",
-              builder: (context, state) => const GroupSelect()),
-        ]),
-    ShellRoute(
-        builder: (context, state, child) {
-          EdgeInsets? padding;
-          if (state.fullPath == '/groups/:groupId/receipts') {
-            padding = const EdgeInsets.all(0);
-          }
-          return ScreenWrapper(
-            appBarWidget: const GroupAppBar(),
-            bottomNavigationBarWidget: const GroupBottomNav(),
-            bodyPadding: padding,
-            child: child,
-          );
-        },
-        routes: [
-          GoRoute(
-            path: '/groups/:groupId/dashboards',
-            builder: (context, state) => const GroupDashboards(),
+            path: '/search',
+            builder: (context, state) => const SearchScreen(),
           ),
-          GoRoute(
-            path: '/groups/:groupId/receipts',
-            builder: (context, state) => const GroupReceiptsScreen(),
-          ),
-        ]),
-    GoRoute(
-      path: '/receipts/add',
-      redirect: (context, state) {
-        Provider.of<ReceiptModel>(context, listen: false).resetModel();
-        return null;
-      },
-      builder: (context, state) => const ReceiptFormScreen(),
-    ),
-    GoRoute(
-      path: '/receipts/:receiptId/view',
-      builder: (context, state) => const ReceiptFormScreen(),
-    ),
-    GoRoute(
-      path: '/receipts/:receiptId/edit',
-      builder: (context, state) => const ReceiptFormScreen(),
-    ),
-    GoRoute(
-      path: '/profile',
-      builder: (context, state) => const UserProfileScreen(),
-    ),
-    ShellRoute(
-      builder: (context, state, child) {
-        var searchModel = Provider.of<SearchModel>(context, listen: false);
-        searchModel.searchTermBehaviorSubject.add("");
-        searchModel.setSearchResults([], notify: false);
-
-        var extra = state.extra as Map<String, dynamic>;
-        var from = extra["from"];
-
-        return ScreenWrapper(
-          appBarWidget: SearchAppBar(),
-          bodyPadding: const EdgeInsets.all(0),
-          bottomNavigationBarWidget: from == fromGroupBottomNav
-              ? const GroupBottomNav()
-              : const GroupSelectBottomNav(),
-          child: child,
-          bottomSheetWidget: const WranglerSearchBar(),
-        );
-      },
-      routes: [
-        GoRoute(
-          path: '/search',
-          builder: (context, state) => const SearchScreen(),
-        ),
-      ],
-    )
-  ],
-);
+        ],
+      )
+    ],
+  );
+}
 
 class ReceiptWrangler extends StatefulWidget {
   const ReceiptWrangler({super.key});
@@ -180,6 +191,11 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
   Timer? _refreshTimer;
   late Future<bool> _initFuture;
   bool _initialized = false;
+
+  // GoRouter held per-State instance so each `pumpWidget(buildApp())` in
+  // tests gets a fresh router starting at '/'. As a top-level `final` it
+  // would be initialized once per isolate and leak location across tests.
+  late final GoRouter _router = _buildAppRouter();
 
   late final authModel = Provider.of<AuthModel>(context, listen: false);
   late final groupModel = Provider.of<GroupModel>(context, listen: false);
@@ -238,7 +254,7 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
     }
   }
 
-  Widget _buildRouter() {
+  Widget _buildMaterialApp() {
     return MaterialApp.router(
       color: Colors.white,
       debugShowCheckedModeBanner: false,
@@ -283,7 +299,7 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
       future: _initFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.done) {
-          return _buildRouter();
+          return _buildMaterialApp();
         }
 
         return const CircularLoadingProgress();

@@ -27,12 +27,12 @@ class _GroupAppBar extends State<GroupAppBar> {
 
   @override
   Widget build(BuildContext context) {
-    var groupId = getGroupId(context) ?? "";
-    var group =
+    final groupId = getGroupId(context);
+    final group =
         Provider.of<GroupModel>(context, listen: false).getGroupById(groupId);
 
     return TopAppBar(
-      titleText: getGroupTitleText(group as api.Group),
+      titleText: group == null ? 'Receipts' : getGroupTitleText(group),
       leadingArrowRedirect: "/groups",
     );
   }

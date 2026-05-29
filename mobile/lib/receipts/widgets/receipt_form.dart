@@ -94,8 +94,17 @@ class _ReceiptForm extends State<ReceiptForm> {
     if (formState == WranglerFormState.view) {
       var formattedDate =
           formatDate(defaultDateFormat, DateTime.parse(modifiedReceipt.date));
+      // NOTE: distinct field name from the edit-mode picker below.
+      // Both used to be named "date", which made FormBuilder's
+      // internal value map collide across mode transitions: the
+      // TextField stored a String there, then the DateTimePicker
+      // would re-register and FormBuilder's `setValue(_instantValue[name])`
+      // would feed that String into a `setValue(DateTime?)` call,
+      // throwing `type 'String' is not a subtype of type 'DateTime?'
+      // of 'value'`. The view-mode field is read-only and not part of
+      // save, so it's safe to use a separate name.
       return FormBuilderTextField(
-          name: "date",
+          name: "dateDisplay",
           decoration: const InputDecoration(labelText: "Date"),
           initialValue: formattedDate,
           readOnly: true);
