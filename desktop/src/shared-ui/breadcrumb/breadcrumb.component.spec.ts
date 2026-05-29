@@ -19,9 +19,9 @@ describe("BreadcrumbComponent", () => {
     component = fixture.componentInstance;
   });
 
-  it("creates", () => {
+  it("creates", async () => {
     fixture.componentRef.setInput("items", [{ label: "Admin" }]);
-    fixture.detectChanges();
+    await fixture.whenStable();
     expect(component).toBeTruthy();
   });
 

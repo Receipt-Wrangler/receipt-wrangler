@@ -5,6 +5,7 @@
 $fg-muted: map.get(variables.$accent-palette, 500);
 $fg-strong: map.get(variables.$accent-palette, 900);
 $border: rgba(0, 0, 0, 0.06);
+
 // Violet "Group" scope accent — intentionally outside the brand palette (the
 // design uses it to distinguish group scope from the primary/app scope).
 $group-accent-bg: #ede9fe;

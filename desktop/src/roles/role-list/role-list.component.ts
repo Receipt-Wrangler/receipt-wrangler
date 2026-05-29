@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { take, tap } from "rxjs";
+import { EMPTY, catchError, take, tap } from "rxjs";
 import { PermissionService } from "../../open-api";
 import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
 import { RoleListItem } from "./role-list-item.interface";
@@ -66,8 +66,12 @@ export class RoleListComponent {
       .getPermissions()
       .pipe(
         take(1),
-        takeUntilDestroyed(),
         tap((permissions) => this.totalPermissions.set(permissions.length)),
+        catchError(() => {
+          this.totalPermissions.set(0);
+          return EMPTY;
+        }),
+        takeUntilDestroyed(),
       )
       .subscribe();
   }
