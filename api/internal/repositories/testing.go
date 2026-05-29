@@ -136,6 +136,29 @@ func CreateTestCategories() {
 	db.Create(&category3)
 }
 
+func CreateTestRoles() {
+	db := GetDB()
+
+	appRole := models.AppRole{
+		Name:        "Test App Role",
+		Description: "test app role",
+		Permissions: []models.AppRolePermission{
+			{Permission: "app.users.create"},
+		},
+	}
+
+	groupRole := models.GroupRoleDefinition{
+		Name:        "Test Group Role",
+		Description: "test group role",
+		Permissions: []models.GroupRolePermission{
+			{Permission: "group.receipts.create"},
+		},
+	}
+
+	db.Create(&appRole)
+	db.Create(&groupRole)
+}
+
 func TruncateTestDb() {
 	db := GetDB()
 

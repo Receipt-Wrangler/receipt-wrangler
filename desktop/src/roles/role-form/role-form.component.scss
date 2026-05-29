@@ -1,0 +1,579 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+// ----- Token map (design --rw-* -> variables.scss) -----
+$primary-50: map.get(variables.$primary-palette, 50);
+$primary-100: map.get(variables.$primary-palette, 100);
+$primary-300: map.get(variables.$primary-palette, 300);
+$primary-400: map.get(variables.$primary-palette, 400);
+$primary-500: map.get(variables.$primary-palette, 500);
+$primary-600: map.get(variables.$primary-palette, 600);
+$primary-700: map.get(variables.$primary-palette, 700);
+
+$slate-50: map.get(variables.$accent-palette, 50);
+$slate-100: map.get(variables.$accent-palette, 100);
+$slate-200: map.get(variables.$accent-palette, 200);
+$slate-300: map.get(variables.$accent-palette, 300);
+$slate-400: map.get(variables.$accent-palette, 400);
+$slate-500: map.get(variables.$accent-palette, 500);
+$slate-600: map.get(variables.$accent-palette, 600);
+$slate-700: map.get(variables.$accent-palette, 700);
+$slate-900: map.get(variables.$accent-palette, 900);
+
+$warn-500: map.get(variables.$warn-palette, 500);
+
+$border: rgba(0, 0, 0, 0.06);
+$focus-halo: rgba(39, 177, 255, 0.12);
+$ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+:host {
+  display: block;
+}
+
+.rw-content {
+  padding: 28px 32px;
+}
+
+// ----- Page header -----
+.rw-page-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+
+  h1 {
+    font-size: 28px;
+    line-height: 1.2;
+  }
+
+  .sub {
+    color: $slate-500;
+    font-size: 14px;
+    margin-top: 4px;
+  }
+}
+
+.rw-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: none;
+}
+
+// ----- Card -----
+.rw-card {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 8px;
+  box-shadow: variables.$shadow-md;
+}
+
+// ----- Editor grid -----
+.rw-editor {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.rw-form-section {
+  padding: 22px 24px;
+
+  & + .rw-form-section {
+    margin-top: 18px;
+  }
+
+  h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: $slate-900;
+    margin-bottom: 4px;
+    letter-spacing: 0;
+  }
+
+  .hint {
+    font-size: 13px;
+    color: $slate-500;
+    margin-bottom: 18px;
+
+    &.hint-inline {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.rw-field {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+// ----- Role type cards -----
+.rw-typegrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.rw-typecard {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  text-align: left;
+  border: 2px solid $slate-200;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.15s $ease;
+  position: relative;
+
+  &:hover {
+    border-color: $slate-300;
+    background: $slate-50;
+  }
+
+  &.active {
+    border-color: $primary-500;
+    background: $primary-50;
+    box-shadow: 0 0 0 3px $focus-halo;
+  }
+
+  .tic {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+
+    mat-icon {
+      font-size: 23px;
+      width: 23px;
+      height: 23px;
+      line-height: 23px;
+    }
+  }
+
+  .tbody {
+    flex: 1;
+  }
+
+  .tnm {
+    font-weight: 600;
+    font-size: 15px;
+    color: $slate-900;
+  }
+
+  .tds {
+    font-size: 12.5px;
+    color: $slate-500;
+    line-height: 1.45;
+    margin-top: 3px;
+  }
+}
+
+.rw-radio {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid $slate-300;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  transition: all 0.12s $ease;
+
+  mat-icon {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+    line-height: 15px;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+
+  &.on {
+    background: $primary-500;
+    border-color: $primary-500;
+
+    mat-icon {
+      opacity: 1;
+    }
+  }
+}
+
+// ----- Presets -----
+.rw-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.rw-preset {
+  text-align: left;
+  border: 2px solid $slate-200;
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.15s $ease;
+
+  &:hover {
+    border-color: $slate-300;
+    background: $slate-50;
+  }
+
+  &.active {
+    border-color: $primary-500;
+    background: $primary-50;
+    box-shadow: 0 0 0 3px $focus-halo;
+  }
+
+  .pic {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+
+    mat-icon {
+      font-size: 19px;
+      width: 19px;
+      height: 19px;
+      line-height: 19px;
+    }
+  }
+
+  .pnm {
+    font-weight: 600;
+    font-size: 14px;
+    color: $slate-900;
+  }
+
+  .pds {
+    font-size: 12px;
+    color: $slate-500;
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+}
+
+// ----- Permissions header -----
+.rw-perm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.rw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+
+  mat-icon {
+    font-size: 13px;
+    width: 13px;
+    height: 13px;
+    line-height: 13px;
+  }
+}
+
+// ----- Accordions -----
+.rw-acc {
+  border: 1px solid $slate-200;
+  border-radius: 10px;
+  overflow: hidden;
+
+  & + .rw-acc {
+    margin-top: 12px;
+  }
+}
+
+.rw-acc-head {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 15px 18px;
+  cursor: pointer;
+  background: #fff;
+  transition: background 0.15s $ease;
+
+  &:hover {
+    background: $slate-50;
+  }
+}
+
+.rw-acc-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: $slate-100;
+  color: $slate-500;
+
+  &.on {
+    background: $primary-50;
+    color: $primary-700;
+  }
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+  }
+}
+
+.rw-acc-text {
+  flex: 1;
+}
+
+.rw-acc-title {
+  font-weight: 600;
+  font-size: 14.5px;
+  color: $slate-900;
+}
+
+.rw-acc-sub {
+  font-size: 12.5px;
+  color: $slate-500;
+  margin-top: 1px;
+}
+
+.rw-acc-count {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: $primary-700;
+  background: $primary-50;
+  border-radius: 9999px;
+  padding: 3px 11px;
+
+  &.none {
+    color: $slate-500;
+    background: $slate-100;
+  }
+}
+
+.rw-acc-chevron {
+  color: $slate-400;
+}
+
+.rw-acc-body {
+  padding: 4px 18px 18px 67px;
+  background: $slate-50;
+  border-top: 1px solid $slate-100;
+}
+
+.rw-perm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 0;
+  border-bottom: 1px solid $slate-200;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  .pl {
+    display: flex;
+    flex-direction: column;
+
+    .t {
+      font-size: 13.5px;
+      font-weight: 500;
+      color: $slate-700;
+    }
+
+    .k {
+      font-size: 11.5px;
+      color: $slate-400;
+      font-family: ui-monospace, monospace;
+      margin-top: 1px;
+    }
+  }
+}
+
+// ----- Toggle switch -----
+.rw-switch {
+  width: 40px;
+  height: 23px;
+  border-radius: 9999px;
+  background: $slate-300;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.18s $ease;
+  flex: none;
+  border: 0;
+  padding: 0;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 19px;
+    height: 19px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: variables.$shadow-sm;
+    transition: transform 0.18s $ease;
+  }
+
+  &.on {
+    background: $primary-500;
+
+    &::after {
+      transform: translateX(17px);
+    }
+  }
+}
+
+// ----- Summary side panel -----
+.rw-side {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rw-side-card {
+  padding: 20px;
+
+  h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    color: $slate-900;
+  }
+}
+
+.rw-summary-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+
+  .big {
+    font-size: 34px;
+    font-weight: 700;
+    color: $slate-900;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .lbl {
+    font-size: 13px;
+    color: $slate-500;
+  }
+}
+
+.rw-mini-bar {
+  height: 7px;
+  border-radius: 4px;
+  background: $slate-100;
+  overflow: hidden;
+  margin-top: 16px;
+  display: flex;
+
+  i {
+    height: 100%;
+    display: block;
+  }
+}
+
+.rw-summary-split {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  margin-top: 18px;
+}
+
+.rw-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+
+  .lhs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: $slate-700;
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+}
+
+.rw-summary-preset {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid $slate-100;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+
+  .rw-acc-ic {
+    width: 30px;
+    height: 30px;
+
+    mat-icon {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+      line-height: 17px;
+    }
+  }
+
+  .rw-summary-preset-text {
+    color: $slate-500;
+
+    strong {
+      color: $slate-900;
+      font-weight: 600;
+    }
+  }
+}
+
+.rw-side-note {
+  font-size: 12.5px;
+  color: $slate-500;
+  line-height: 1.5;
+  padding: 0 4px;
+  display: flex;
+  gap: 8px;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+    color: $slate-400;
+    margin-top: 1px;
+  }
+}

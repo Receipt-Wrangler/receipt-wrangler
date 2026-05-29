@@ -5,17 +5,12 @@
     <div class="titles">
       <h1>Roles</h1>
       <p class="subtitle">
-        {{ roleCount() }} roles control what people can do across the app and
-        within groups. Assign roles to people from
+        {{ roleCount() }} roles define what people can do — each applies to
+        either the application or a group. Assign roles to people from
         <a [routerLink]="['/users']">Manage Users</a>.
       </p>
     </div>
     <div class="tools">
-      <app-button
-        matButtonType="basic"
-        icon="filter_alt"
-        buttonText="Filter"
-      ></app-button>
       <app-button
         icon="add"
         buttonText="Add Role"
@@ -39,19 +34,34 @@
       ></app-button>
     </div>
   } @else {
+    <div class="scope-tabs">
+      @for (tab of filterTabs; track tab.id) {
+        <button
+          type="button"
+          class="scope-tab"
+          [class.active]="filter() === tab.id"
+          (click)="setFilter(tab.id)"
+        >
+          <mat-icon>{{ tab.icon }}</mat-icon>
+          {{ tab.label }}
+          <span class="pill">{{ counts()[tab.id] }}</span>
+        </button>
+      }
+    </div>
+
     <div class="table-wrap">
       <table class="roles-table">
         <thead>
           <tr>
             <th>Role</th>
-            <th class="col-scope">Scope</th>
+            <th class="col-scope">Type</th>
             <th class="col-perms">Permissions</th>
             <th class="col-members">Members</th>
             <th class="col-actions"></th>
           </tr>
         </thead>
         <tbody>
-          @for (role of roles(); track role.id) {
+          @for (role of filteredRoles(); track role.id) {
             <tr>
               <td>
                 <div class="role-name">
@@ -76,22 +86,19 @@
                 </div>
               </td>
               <td>
-                <div class="scope-chips">
-                  @if (role.scopes.includes("app")) {
-                    <span class="chip scope-app"
-                      ><mat-icon>apps</mat-icon>Application</span
-                    >
-                  }
-                  @if (role.scopes.includes("group")) {
-                    <span class="chip scope-group"
-                      ><mat-icon>workspaces</mat-icon>Group</span
-                    >
-                  }
-                </div>
+                @if (role.scope === "app") {
+                  <span class="chip scope-app"
+                    ><mat-icon>apps</mat-icon>Application</span
+                  >
+                } @else {
+                  <span class="chip scope-group"
+                    ><mat-icon>workspaces</mat-icon>Group</span
+                  >
+                }
               </td>
               <td>
                 <div class="perm-count">
-                  {{ role.appCount + role.groupCount }} <span>granted</span>
+                  {{ role.permissionCount }} <span>of {{ scopeTotal(role) }}</span>
                 </div>
                 <div class="perm-bar">
                   @for (segment of meter(role); track $index) {

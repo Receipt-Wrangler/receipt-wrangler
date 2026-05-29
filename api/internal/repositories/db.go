@@ -121,8 +121,19 @@ func MakeMigrations() error {
 		&models.Pepper{},
 		&models.ApiKey{},
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	// AutoMigrate does not drop columns. Group roles are now global, so drop the
+	// legacy per-group column on existing databases to avoid not-null insert failures.
+	if db.Migrator().HasColumn(&models.GroupRoleDefinition{}, "group_id") {
+		if err := db.Migrator().DropColumn(&models.GroupRoleDefinition{}, "group_id"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func GetDB() *gorm.DB {
