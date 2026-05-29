@@ -79,12 +79,13 @@ test.describe('roles', () => {
     await expect(appRow().first()).toBeVisible();
     await expect(groupRow().first()).toBeVisible();
 
-    // Filtering to Application hides the group role and vice versa.
-    await page.getByRole('button', { name: 'Application' }).click();
+    // Filtering to Application hides the group role and vice versa. The filter
+    // bar renders its options as ARIA tabs.
+    await page.getByRole('tab', { name: 'Application' }).click();
     await expect(appRow().first()).toBeVisible();
     await expect(groupRow()).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Group' }).click();
+    await page.getByRole('tab', { name: 'Group' }).click();
     await expect(groupRow().first()).toBeVisible();
     await expect(appRow()).toHaveCount(0);
   });
