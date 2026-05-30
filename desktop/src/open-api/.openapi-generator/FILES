@@ -18,6 +18,7 @@ api/prompt.service.ts
 api/receipt.service.ts
 api/receiptImage.service.ts
 api/receiptProcessingSettings.service.ts
+api/role.service.ts
 api/search.service.ts
 api/systemEmail.service.ts
 api/systemSettings.service.ts
@@ -106,6 +107,7 @@ model/receiptPagedRequestFilter.ts
 model/receiptProcessingSettings.ts
 model/receiptStatus.ts
 model/resetPasswordCommand.ts
+model/role.ts
 model/searchResult.ts
 model/signUpCommand.ts
 model/sortDirection.ts
@@ -135,6 +137,7 @@ model/upsertItemCommand.ts
 model/upsertPromptCommand.ts
 model/upsertReceiptCommand.ts
 model/upsertReceiptProcessingSettingsCommand.ts
+model/upsertRoleCommand.ts
 model/upsertSystemEmailCommand.ts
 model/upsertSystemSettingsCommand.ts
 model/upsertTagCommand.ts

@@ -94,6 +94,23 @@ Receipt Wrangler Desktop is an Angular 19 application with modular architecture 
 - Angular style guide followed for component organization
 - Lazy loading for feature modules to optimize bundle size
 
+### Use Established Patterns (do not invent one-offs)
+New UI MUST reuse the application's established patterns and shared components rather than
+inventing a divergent, one-off implementation of something the app already standardizes — **unless
+the user explicitly confirms the divergence**. Examples of standards to follow:
+- **Form actions:** the floating save bar fixed to the bottom of the page — `<app-form>` (which wraps
+  `app-form-button-bar` + `app-submit-button`), or, for bespoke layouts, a plain
+  `<form (ngSubmit)="...">` ending in a standalone `<app-form-button-bar [mode]="...">` containing an
+  `<app-submit-button>` (see `src/receipts/receipt-form/` for the bespoke-layout precedent). Do NOT
+  place Save/Cancel buttons in the page header.
+- **Form fields:** `app-input`, `app-textarea`, `app-select`, `app-checkbox`, grouped with
+  `app-form-section`; bind via the `formGet` pipe.
+- **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`.
+- **Simple filters:** the segmented `app-filter-bar` (`src/shared-ui/filter-bar/`) — pass `FilterTab[]`
+  (`{ value, label, icon?, count? }`) and two-way bind the selected `value`.
+- **Breadcrumbs:** `app-breadcrumb` with `BreadcrumbItem[]`.
+If a design appears to require a new pattern, confirm with the user before diverging.
+
 ## Signals & Zoneless Change Detection
 
 This application uses Angular's signal-based reactivity model with zoneless change detection (`provideZonelessChangeDetection()`). All new code MUST follow these patterns.

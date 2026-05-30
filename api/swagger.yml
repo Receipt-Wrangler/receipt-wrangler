@@ -2728,6 +2728,54 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /role:
+    get:
+      tags:
+        - Role
+      summary: List all roles
+      description: Returns the full pool of roles, both app-scoped and group-scoped.
+      operationId: getRoles
+      responses:
+        200:
+          description: All roles in the system
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+    post:
+      tags:
+        - Role
+      summary: Create role
+      description: This will create an app-scoped or group-scoped role.
+      operationId: createRole
+      requestBody:
+        description: Role to create
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertRoleCommand"
+      responses:
+        200:
+          description: The created role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
 components:
   securitySchemes:
     bearerAuth:
@@ -2857,6 +2905,7 @@ components:
         - "group.receipts.delete"
         - "group.receipts.duplicate"
         - "group.receipts.magic-fill"
+        - "group.receipts.quick-scan"
         - "group.comments.create"
         - "group.comments.delete"
         - "group.dashboards.create"
@@ -2895,6 +2944,47 @@ components:
           description: Logical grouping for the role editor UI (e.g., "User Management", "Receipts").
         scope:
           $ref: "#/components/schemas/PermissionScope"
+    Role:
+      type: object
+      required:
+        - id
+        - name
+        - scope
+        - isSystem
+        - permissions
+      properties:
+        id:
+          type: integer
+          format: uint64
+        name:
+          type: string
+        description:
+          type: string
+        scope:
+          $ref: "#/components/schemas/PermissionScope"
+        isSystem:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+    UpsertRoleCommand:
+      type: object
+      required:
+        - name
+        - scope
+        - permissions
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        scope:
+          $ref: "#/components/schemas/PermissionScope"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
     SortDirection:
       type: string
       enum:

@@ -141,5 +141,9 @@ func BuildRootRouter() *chi.Mux {
 	permissionRouter := BuildPermissionRouter()
 	rootRouter.Mount("/api/permission", permissionRouter)
 
+	// Role router
+	roleRouter := BuildRoleRouter()
+	rootRouter.Mount("/api/role", roleRouter)
+
 	return rootRouter
 }

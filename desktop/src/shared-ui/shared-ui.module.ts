@@ -28,6 +28,7 @@ import { AuditDetailSectionComponent } from "./audit-detail-section/audit-detail
 import { BackButtonComponent } from "./back-button/back-button.component";
 import { BaseTableComponent } from "./base-table/base-table.component";
 import { BreadcrumbComponent } from "./breadcrumb/breadcrumb.component";
+import { FilterBarComponent } from "./filter-bar/filter-bar.component";
 import { CancelButtonComponent } from "./cancel-button/cancel-button.component";
 import { CardComponent } from "./card/card.component";
 import { ConfirmationDialogComponent } from "./confirmation-dialog/confirmation-dialog.component";
@@ -70,6 +71,7 @@ import { PieChartUiComponent } from './pie-chart/pie-chart.component';
     AddButtonComponent,
     BackButtonComponent,
     BreadcrumbComponent,
+    FilterBarComponent,
     CancelButtonComponent,
     CardComponent,
     ConfirmationDialogComponent,
@@ -140,6 +142,7 @@ import { PieChartUiComponent } from './pie-chart/pie-chart.component';
     AddButtonComponent,
     BackButtonComponent,
     BreadcrumbComponent,
+    FilterBarComponent,
     CancelButtonComponent,
     CardComponent,
     ConfirmationDialogComponent,

@@ -81,6 +81,7 @@ const (
 	GroupReceiptsDelete    = "group.receipts.delete"
 	GroupReceiptsDuplicate = "group.receipts.duplicate"
 	GroupReceiptsMagicFill = "group.receipts.magic-fill"
+	GroupReceiptsQuickScan = "group.receipts.quick-scan"
 
 	GroupCommentsCreate = "group.comments.create"
 	GroupCommentsDelete = "group.comments.delete"
@@ -155,12 +156,13 @@ var registry = []Descriptor{
 	{GroupDelete, "Delete Group", "Permanently delete the group.", "Group", ScopeGroup},
 	{GroupExportOcr, "Export OCR Text", "Bulk-export OCR text for all receipts in the group.", "Group", ScopeGroup},
 
-	{GroupReceiptsCreate, "Create Receipts", "Upload images and create receipts (including Quick Scan).", "Receipts", ScopeGroup},
+	{GroupReceiptsCreate, "Create Receipts", "Upload images and create receipts.", "Receipts", ScopeGroup},
 	{GroupReceiptsRead, "Read Receipts", "Read, list, and export receipts.", "Receipts", ScopeGroup},
 	{GroupReceiptsUpdate, "Update Receipts", "Edit receipts and update status in bulk.", "Receipts", ScopeGroup},
 	{GroupReceiptsDelete, "Delete Receipts", "Remove receipts.", "Receipts", ScopeGroup},
 	{GroupReceiptsDuplicate, "Duplicate Receipts", "Create a copy of an existing receipt.", "Receipts", ScopeGroup},
 	{GroupReceiptsMagicFill, "Magic Fill Receipts", "Run AI-powered data extraction on a receipt image to pre-fill receipt fields.", "Receipts", ScopeGroup},
+	{GroupReceiptsQuickScan, "Quick Scan Receipts", "Use the Quick Scan flow to rapidly capture and create receipts.", "Receipts", ScopeGroup},
 
 	{GroupCommentsCreate, "Create Comments", "Add comments to receipts.", "Receipts", ScopeGroup},
 	{GroupCommentsDelete, "Delete Comments", "Remove comments.", "Receipts", ScopeGroup},

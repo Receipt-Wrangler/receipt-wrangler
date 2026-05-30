@@ -1,159 +1,167 @@
+import { CommonModule } from "@angular/common";
+import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { RouterModule } from "@angular/router";
+import { Router, RouterModule } from "@angular/router";
 import { of, throwError } from "rxjs";
-import { ButtonModule } from "../../button";
-import { PermissionService } from "../../open-api";
+import {
+  ApiModule,
+  PermissionDescriptor,
+  PermissionService,
+  Role,
+  RoleService,
+} from "../../open-api";
 import { RoleListComponent } from "./role-list.component";
-import { RoleListItem } from "./role-list-item.interface";
 
-describe("RoleListComponent", () => {
-  let component: RoleListComponent;
-  let fixture: ComponentFixture<RoleListComponent>;
-  let permissionService: { getPermissions: jest.Mock };
+const DESCRIPTORS: PermissionDescriptor[] = [
+  { key: "app.users.create", label: "", description: "", category: "Users", scope: "APP" },
+  { key: "app.users.read", label: "", description: "", category: "Users", scope: "APP" },
+  { key: "group.view", label: "", description: "", category: "Group", scope: "GROUP" },
+  { key: "group.receipts.read", label: "", description: "", category: "Receipts", scope: "GROUP" },
+  { key: "group.receipts.create", label: "", description: "", category: "Receipts", scope: "GROUP" },
+];
 
-  const buildRole = (overrides: Partial<RoleListItem> = {}): RoleListItem => ({
-    id: "role-1",
+const ROLES: Role[] = [
+  {
+    id: 1,
     name: "Administrator",
     description: "Full access",
-    scopes: ["app", "group"],
-    appCount: 10,
-    groupCount: 5,
-    members: [],
-    userCount: 0,
+    scope: "APP",
     isSystem: true,
-    icon: "shield_person",
-    iconColor: "#27b1ff",
-    iconTint: "#ccecff",
-    ...overrides,
-  });
+    permissions: ["app.users.create", "app.users.read"],
+  },
+  {
+    id: 2,
+    name: "Group Manager",
+    description: "Runs groups",
+    scope: "GROUP",
+    isSystem: false,
+    permissions: ["group.view", "group.receipts.read"],
+  },
+];
 
-  beforeEach(async () => {
-    permissionService = { getPermissions: jest.fn().mockReturnValue(of([])) };
+async function setup(
+  roles: Role[] = ROLES,
+  permissions: PermissionDescriptor[] | "error" = DESCRIPTORS,
+): Promise<{
+  component: RoleListComponent;
+  fixture: ComponentFixture<RoleListComponent>;
+  navigateSpy: jest.SpyInstance;
+}> {
+  TestBed.resetTestingModule();
+  await TestBed.configureTestingModule({
+    declarations: [RoleListComponent],
+    schemas: [CUSTOM_ELEMENTS_SCHEMA],
+    imports: [ApiModule, CommonModule, RouterModule.forRoot([])],
+    providers: [
+      provideZonelessChangeDetection(),
+      provideHttpClient(withInterceptorsFromDi()),
+      provideHttpClientTesting(),
+    ],
+  }).compileComponents();
 
-    await TestBed.configureTestingModule({
-      declarations: [RoleListComponent],
-      schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [ButtonModule, RouterModule.forRoot([])],
-      providers: [
-        provideZonelessChangeDetection(),
-        { provide: PermissionService, useValue: permissionService },
-      ],
-    }).compileComponents();
+  jest.spyOn(TestBed.inject(RoleService), "getRoles").mockReturnValue(of(roles) as any);
+  jest
+    .spyOn(TestBed.inject(PermissionService), "getPermissions")
+    .mockReturnValue(
+      permissions === "error"
+        ? (throwError(() => new Error("boom")) as any)
+        : (of(permissions) as any),
+    );
 
-    fixture = TestBed.createComponent(RoleListComponent);
-    component = fixture.componentInstance;
-    await fixture.whenStable();
-  });
+  const router = TestBed.inject(Router);
+  const navigateSpy = jest.spyOn(router, "navigate").mockResolvedValue(true);
 
-  it("creates", () => {
+  const fixture = TestBed.createComponent(RoleListComponent);
+  const component = fixture.componentInstance;
+  await fixture.whenStable();
+  return { component, fixture, navigateSpy };
+}
+
+describe("RoleListComponent", () => {
+  it("creates", async () => {
+    const { component } = await setup();
     expect(component).toBeTruthy();
   });
 
-  it("renders the breadcrumb and the page title", () => {
+  it("renders the breadcrumb and the page title", async () => {
+    const { fixture } = await setup();
     expect(fixture.nativeElement.querySelector("app-breadcrumb")).toBeTruthy();
-    expect(fixture.nativeElement.querySelector("h1")?.textContent).toContain(
-      "Roles",
-    );
+    expect(fixture.nativeElement.querySelector("h1")?.textContent).toContain("Roles");
   });
 
-  it("shows the empty state and no table when there are no roles", () => {
+  it("shows the empty state and no table when there are no roles", async () => {
+    const { component, fixture } = await setup([]);
     expect(component.roleCount()).toBe(0);
     expect(fixture.nativeElement.querySelector(".empty-state")).toBeTruthy();
-    expect(fixture.nativeElement.querySelector(".roles-table")).toBeNull();
+    expect(fixture.nativeElement.querySelector("app-table")).toBeNull();
   });
 
-  it("loads the permission total on init for the meter denominator", () => {
-    expect(permissionService.getPermissions).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not throw and keeps the empty state when getPermissions fails", async () => {
-    permissionService.getPermissions.mockReturnValue(
-      throwError(() => new Error("boom")),
-    );
-
-    const errorFixture = TestBed.createComponent(RoleListComponent);
-    await errorFixture.whenStable();
-
-    expect(permissionService.getPermissions).toHaveBeenCalled();
-    expect(errorFixture.componentInstance).toBeTruthy();
-    expect(errorFixture.nativeElement.querySelector(".empty-state")).toBeTruthy();
-  });
-
-  it("renders the table with rows when roles are present", async () => {
-    component.roles.set([buildRole()]);
-    await fixture.whenStable();
-
+  it("renders the table fed with a row per role when roles are present", async () => {
+    const { component, fixture } = await setup();
+    expect(component.roleCount()).toBe(2);
     expect(fixture.nativeElement.querySelector(".empty-state")).toBeNull();
-    expect(
-      fixture.nativeElement.querySelectorAll(".roles-table tbody tr").length,
-    ).toBe(1);
-    expect(component.roleCount()).toBe(1);
+    expect(fixture.nativeElement.querySelector("app-table")).toBeTruthy();
+    expect(component.dataSource().data.length).toBe(2);
   });
 
-  describe("interactions", () => {
-    let role: RoleListItem;
-
-    beforeEach(async () => {
-      role = buildRole();
-      component.roles.set([role]);
-      await fixture.whenStable();
-    });
-
-    it("invokes addRole when the Add Role button is clicked", () => {
-      const addRoleSpy = jest.spyOn(component, "addRole");
-      const addButton = Array.from(
-        fixture.nativeElement.querySelectorAll("button"),
-      ).find((button) =>
-        (button as HTMLElement).textContent?.includes("Add Role"),
-      ) as HTMLButtonElement;
-
-      addButton.click();
-
-      expect(addRoleSpy).toHaveBeenCalled();
-    });
-
-    it("invokes editRole with the role when the edit action is clicked", () => {
-      const editRoleSpy = jest.spyOn(component, "editRole");
-      const actionButtons =
-        fixture.nativeElement.querySelectorAll(".row-actions button");
-
-      (actionButtons[0] as HTMLButtonElement).click();
-
-      expect(editRoleSpy).toHaveBeenCalledWith(role);
-    });
-
-    it("invokes openRoleMenu with the role when the more action is clicked", () => {
-      const openRoleMenuSpy = jest.spyOn(component, "openRoleMenu");
-      const actionButtons =
-        fixture.nativeElement.querySelectorAll(".row-actions button");
-
-      (actionButtons[1] as HTMLButtonElement).click();
-
-      expect(openRoleMenuSpy).toHaveBeenCalledWith(role);
-    });
+  it("builds five table columns once the view initializes", async () => {
+    const { component } = await setup();
+    expect(component.columns().map((c) => c.matColumnDef)).toEqual([
+      "role",
+      "type",
+      "permissions",
+      "members",
+      "actions",
+    ]);
   });
 
-  describe("meter", () => {
-    it("returns ten segments with the filled ones flagged app/group", async () => {
-      permissionService.getPermissions.mockReturnValue(of(new Array(20).fill({})));
-      // Re-create so the total is loaded from the new mock value.
-      fixture = TestBed.createComponent(RoleListComponent);
-      component = fixture.componentInstance;
-      await fixture.whenStable();
-
-      const segments = component.meter(buildRole({ appCount: 10, groupCount: 0 }));
-      expect(segments.length).toBe(10);
-      // 10 of 20 permissions granted -> ~5 filled segments, app-dominant.
-      expect(segments.filter((s) => s === "app").length).toBe(5);
-      expect(segments.filter((s) => s === null).length).toBe(5);
-    });
+  it("computes per-type counts for the filter tabs", async () => {
+    const { component } = await setup();
+    expect(component.counts()).toEqual({ all: 2, app: 1, group: 1 });
   });
 
-  describe("initials", () => {
-    it("returns up to two uppercased initials", () => {
-      expect(component.initials("Noah Hall")).toBe("NH");
-      expect(component.initials("dana")).toBe("D");
-    });
+  it("filters rows by the selected type", async () => {
+    const { component } = await setup();
+    component.setFilter("group");
+    expect(component.filteredRoles().map((r) => r.name)).toEqual(["Group Manager"]);
+    expect(component.dataSource().data.length).toBe(1);
+
+    component.setFilter("app");
+    expect(component.filteredRoles().map((r) => r.name)).toEqual(["Administrator"]);
+
+    component.setFilter("all");
+    expect(component.filteredRoles().length).toBe(2);
+    expect(component.dataSource().data.length).toBe(2);
+  });
+
+  it("uses the role's own scope total as the meter denominator", async () => {
+    const { component } = await setup();
+    const appRole = component.roles().find((r) => r.scope === "app")!;
+    const groupRole = component.roles().find((r) => r.scope === "group")!;
+
+    expect(component.scopeTotal(appRole)).toBe(2); // two APP descriptors
+    expect(component.scopeTotal(groupRole)).toBe(3); // three GROUP descriptors
+    expect(component.meter(appRole).length).toBe(10);
+    expect(component.meter(appRole).filter((s) => s === "app").length).toBe(10); // 2 of 2
+  });
+
+  it("navigates to the create page from Add Role", async () => {
+    const { component, navigateSpy } = await setup();
+    component.addRole();
+    expect(navigateSpy).toHaveBeenCalledWith(["/roles/new"]);
+  });
+
+  it("does not crash when the permission registry errors", async () => {
+    const { component } = await setup(ROLES, "error");
+    expect(component).toBeTruthy();
+    expect(component.roleCount()).toBe(2);
+  });
+
+  it("returns up to two uppercased initials", async () => {
+    const { component } = await setup();
+    expect(component.initials("Noah Hall")).toBe("NH");
+    expect(component.initials("dana")).toBe("D");
   });
 });
