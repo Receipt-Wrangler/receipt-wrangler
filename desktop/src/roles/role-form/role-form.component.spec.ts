@@ -9,7 +9,7 @@ import {
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { Router, RouterModule } from "@angular/router";
-import { of, throwError } from "rxjs";
+import { isObservable, Observable, of, Subject, throwError } from "rxjs";
 import {
   ApiModule,
   PermissionDescriptor,
@@ -63,7 +63,10 @@ interface SetupResult {
 }
 
 async function setup(
-  descriptors: PermissionDescriptor[] | "error" = ALL_DESCRIPTORS,
+  descriptors:
+    | PermissionDescriptor[]
+    | "error"
+    | Observable<PermissionDescriptor[]> = ALL_DESCRIPTORS,
 ): Promise<SetupResult> {
   TestBed.resetTestingModule();
   const snackbar = { success: jest.fn(), error: jest.fn() };
@@ -79,14 +82,16 @@ async function setup(
     ],
   }).compileComponents();
 
+  const permissionSource =
+    descriptors === "error"
+      ? throwError(() => new Error("boom"))
+      : isObservable(descriptors)
+        ? descriptors
+        : of(descriptors);
   const permissionService = TestBed.inject(PermissionService);
   jest
     .spyOn(permissionService, "getPermissions")
-    .mockReturnValue(
-      descriptors === "error"
-        ? (throwError(() => new Error("boom")) as any)
-        : (of(descriptors) as any),
-    );
+    .mockReturnValue(permissionSource as any);
 
   const createdRole: Role = {
     id: 1,
@@ -262,6 +267,47 @@ describe("RoleFormComponent", () => {
     component.submit();
     expect(component.lastPayload).toBeNull();
     expect(createRoleSpy).not.toHaveBeenCalled();
+  });
+
+  it("guards against duplicate submits while a create is in flight", async () => {
+    const { component, createRoleSpy } = await setup();
+    const pending = new Subject<Role>();
+    createRoleSpy.mockReturnValue(pending as any);
+    component.form.controls.name.setValue("App Admin");
+
+    component.submit();
+    expect(component.submitting()).toBe(true);
+
+    component.submit();
+
+    expect(createRoleSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces an error and clears the in-flight flag when create fails", async () => {
+    const { component, createRoleSpy, navigateSpy, snackbar } = await setup();
+    createRoleSpy.mockReturnValue(throwError(() => new Error("boom")) as any);
+    component.form.controls.name.setValue("App Admin");
+
+    component.submit();
+
+    expect(snackbar.error).toHaveBeenCalled();
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(component.submitting()).toBe(false);
+  });
+
+  it("rehydrates a preset selected before the permission registry resolves", async () => {
+    const permissions$ = new Subject<PermissionDescriptor[]>();
+    const { component } = await setup(permissions$);
+
+    const admin = component.presets().find((p) => p.id === "admin")!;
+    component.pickPreset(admin);
+    // Registry is still empty, so the preset resolves to nothing yet.
+    expect(component.granted().size).toBe(0);
+
+    permissions$.next(APP_DESCRIPTORS);
+    permissions$.complete();
+
+    expect([...component.granted()].sort()).toEqual([...APP_KEYS].sort());
   });
 
   it("does not crash when the permission registry errors", async () => {

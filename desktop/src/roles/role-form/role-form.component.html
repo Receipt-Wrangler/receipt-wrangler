@@ -117,7 +117,17 @@
 
           @for (group of resourceGroups(); track group.resourceKey) {
             <div class="rw-acc">
-              <div class="rw-acc-head" (click)="togglePanel(group.resourceKey)">
+              <div
+                class="rw-acc-head"
+                role="button"
+                tabindex="0"
+                [attr.aria-expanded]="isPanelOpen(group.resourceKey)"
+                (click)="togglePanel(group.resourceKey)"
+                (keydown.enter)="togglePanel(group.resourceKey)"
+                (keydown.space)="
+                  $event.preventDefault(); togglePanel(group.resourceKey)
+                "
+              >
                 <span class="rw-acc-ic" [class.on]="onCount(group) > 0">
                   <mat-icon>{{ group.icon }}</mat-icon>
                 </span>

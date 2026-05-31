@@ -95,6 +95,7 @@ Receipt Wrangler Desktop is an Angular 19 application with modular architecture 
 - Lazy loading for feature modules to optimize bundle size
 
 ### Use Established Patterns (do not invent one-offs)
+
 New UI MUST reuse the application's established patterns and shared components rather than
 inventing a divergent, one-off implementation of something the app already standardizes — **unless
 the user explicitly confirms the divergence**. Examples of standards to follow:

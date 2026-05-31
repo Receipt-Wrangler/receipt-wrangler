@@ -45,6 +45,19 @@ func TestUpsertRoleCommandMissingName(t *testing.T) {
 	}
 }
 
+func TestUpsertRoleCommandWhitespaceName(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:        "   ",
+		Scope:       permissions.ScopeApp,
+		Permissions: []string{permissions.AppUsersCreate},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["name"]; !ok {
+		t.Errorf("expected name error, got %+v", vErr.Errors)
+	}
+}
+
 func TestUpsertRoleCommandBadScope(t *testing.T) {
 	command := UpsertRoleCommand{
 		Name:        "Bad Scope",

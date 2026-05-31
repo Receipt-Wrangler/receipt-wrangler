@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -34,7 +36,7 @@ func (command *UpsertRoleCommand) Validate() structs.ValidatorError {
 	errors := make(map[string]string)
 	vErr := structs.ValidatorError{}
 
-	if len(command.Name) == 0 {
+	if len(strings.TrimSpace(command.Name)) == 0 {
 		errors["name"] = "Name is required"
 	}
 

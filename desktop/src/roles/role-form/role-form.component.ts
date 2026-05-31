@@ -2,7 +2,7 @@ import { Component, computed, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl, FormGroup, Validators } from "@angular/forms";
 import { Router } from "@angular/router";
-import { catchError, EMPTY, take, tap } from "rxjs";
+import { catchError, EMPTY, finalize, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { SnackbarService } from "../../services/snackbar.service";
 import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
@@ -68,6 +68,7 @@ export class RoleFormComponent {
   public readonly granted = signal<Set<string>>(new Set<string>());
   public readonly selectedPreset = signal<string>(CUSTOM_PRESET_ID);
   public readonly openPanels = signal<Record<string, boolean>>({});
+  public readonly submitting = signal<boolean>(false);
 
   /** Last assembled payload — exposed for tests. */
   public lastPayload: UpsertRoleCommand | null = null;
@@ -148,7 +149,15 @@ export class RoleFormComponent {
         catchError(() => EMPTY),
         takeUntilDestroyed(),
       )
-      .subscribe((descriptors) => this.registry.set(descriptors));
+      .subscribe((descriptors) => {
+        this.registry.set(descriptors);
+        // If a non-custom preset was selected before the permission registry
+        // resolved, its grant set was computed against an empty scope. Rehydrate
+        // it now that the descriptors are available.
+        if (this.selectedPreset() !== CUSTOM_PRESET_ID) {
+          this.granted.set(this.activePreset().resolve(this.scopeKeys()));
+        }
+      });
   }
 
   // ----- Per-resource helpers -----
@@ -218,7 +227,7 @@ export class RoleFormComponent {
 
   public submit(): void {
     this.form.markAllAsTouched();
-    if (this.form.invalid) {
+    if (this.form.invalid || this.submitting()) {
       return;
     }
 
@@ -230,6 +239,7 @@ export class RoleFormComponent {
     };
 
     this.lastPayload = payload;
+    this.submitting.set(true);
 
     this.roleService
       .createRole(payload)
@@ -239,6 +249,11 @@ export class RoleFormComponent {
           this.snackbar.success(`Role "${role.name}" created`);
           this.router.navigate(["/roles"]);
         }),
+        catchError(() => {
+          this.snackbar.error("Failed to create role");
+          return EMPTY;
+        }),
+        finalize(() => this.submitting.set(false)),
       )
       .subscribe();
   }

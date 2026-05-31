@@ -29,7 +29,7 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 		perms = []string{}
 	}
 
-	err := repositories.GetDB().Transaction(func(tx *gorm.DB) error {
+	err := service.GetDB().Transaction(func(tx *gorm.DB) error {
 		roleRepository := repositories.NewRoleRepository(tx)
 
 		if command.Scope == permissions.ScopeApp {
@@ -74,6 +74,6 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 }
 
 func (service RoleService) GetRoles() ([]structs.RoleView, error) {
-	roleRepository := repositories.NewRoleRepository(nil)
+	roleRepository := repositories.NewRoleRepository(service.GetDB())
 	return roleRepository.GetAllRoles()
 }
