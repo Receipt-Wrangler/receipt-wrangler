@@ -1,9 +1,12 @@
 package repositories
 
 import (
+	"errors"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/utils"
 	"testing"
+
+	"gorm.io/gorm"
 )
 
 func TestNewRoleRepository(t *testing.T) {
@@ -55,6 +58,92 @@ func TestCreateGroupRolePersistsPermissions(t *testing.T) {
 
 	if len(role.Permissions) != 1 {
 		utils.PrintTestError(t, len(role.Permissions), 1)
+	}
+}
+
+func TestUpdateAppRolePersistsChanges(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	created, err := repository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	updated, err := repository.UpdateAppRole(created.ID, "Renamed Role", "New description", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if updated.Name != "Renamed Role" {
+		utils.PrintTestError(t, updated.Name, "Renamed Role")
+	}
+
+	if updated.Description != "New description" {
+		utils.PrintTestError(t, updated.Description, "New description")
+	}
+}
+
+func TestUpdateGroupRolePersistsChanges(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	created, err := repository.CreateGroupRole("Group Role", "Description", []string{permissions.GroupReceiptsCreate})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	updated, err := repository.UpdateGroupRole(created.ID, "Renamed Group Role", "New description", []string{permissions.GroupReceiptsRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if updated.Name != "Renamed Group Role" {
+		utils.PrintTestError(t, updated.Name, "Renamed Group Role")
+	}
+
+	if updated.Description != "New description" {
+		utils.PrintTestError(t, updated.Description, "New description")
+	}
+}
+
+func TestUpdateAppRoleReplacesPermissions(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	created, err := repository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate, permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	updated, err := repository.UpdateAppRole(created.ID, "App Role", "Description", []string{permissions.AppUsersDelete})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(updated.Permissions) != 1 {
+		utils.PrintTestError(t, len(updated.Permissions), 1)
+		return
+	}
+
+	if updated.Permissions[0].Permission != permissions.AppUsersDelete {
+		utils.PrintTestError(t, updated.Permissions[0].Permission, permissions.AppUsersDelete)
+	}
+}
+
+func TestGetAppRoleByIdNotFoundReturnsError(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	_, err := repository.GetAppRoleById(999)
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		utils.PrintTestError(t, err, gorm.ErrRecordNotFound)
 	}
 }
 

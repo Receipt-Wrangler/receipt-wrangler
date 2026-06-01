@@ -168,8 +168,13 @@ export class RoleListComponent implements AfterViewInit {
     this.router.navigate(["/roles/new"]);
   }
 
-  // TODO: open the edit/view-role flow once it exists (separate slice).
-  public editRole(_role: RoleListItem): void {}
+  // Opens the role for editing (or, for system roles, a read-only view). The
+  // scope disambiguates app/group roles, which have independent id sequences.
+  public editRole(role: RoleListItem): void {
+    this.router.navigate(["/roles", role.id, "edit"], {
+      queryParams: { scope: role.scope },
+    });
+  }
 
   // TODO: open the per-role actions menu once those actions exist.
   public openRoleMenu(_role: RoleListItem): void {}

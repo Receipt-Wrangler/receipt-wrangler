@@ -162,6 +162,9 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'group.receipts.magic-fill')
   static const Permission groupPeriodReceiptsPeriodMagicFill = _$groupPeriodReceiptsPeriodMagicFill;
   /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'group.receipts.quick-scan')
+  static const Permission groupPeriodReceiptsPeriodQuickScan = _$groupPeriodReceiptsPeriodQuickScan;
+  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.comments.create')
   static const Permission groupPeriodCommentsPeriodCreate = _$groupPeriodCommentsPeriodCreate;
   /// All permission keys the API recognizes.

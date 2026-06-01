@@ -153,6 +153,28 @@ describe("RoleListComponent", () => {
     expect(navigateSpy).toHaveBeenCalledWith(["/roles/new"]);
   });
 
+  it("navigates to the edit page with the role scope", async () => {
+    const { component, navigateSpy } = await setup();
+    const groupRole = component.roles().find((r) => r.scope === "group")!;
+
+    component.editRole(groupRole);
+
+    expect(navigateSpy).toHaveBeenCalledWith(["/roles", groupRole.id, "edit"], {
+      queryParams: { scope: "group" },
+    });
+  });
+
+  it("routes system roles through the same edit/view path", async () => {
+    const { component, navigateSpy } = await setup();
+    const systemRole = component.roles().find((r) => r.isSystem)!;
+
+    component.editRole(systemRole);
+
+    expect(navigateSpy).toHaveBeenCalledWith(["/roles", systemRole.id, "edit"], {
+      queryParams: { scope: "app" },
+    });
+  });
+
   it("does not crash when the permission registry errors", async () => {
     const { component } = await setup(ROLES, "error");
     expect(component).toBeTruthy();

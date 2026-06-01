@@ -98,4 +98,29 @@ test.describe('roles', () => {
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page).toHaveURL(/\/roles$/);
   });
+
+  test('edit a role updates its name, with the type locked', async ({ page }) => {
+    const original = uniqueName('edit');
+    await createRole(page, { name: original, type: 'app', template: 'Read Only' });
+
+    await page.goto('/roles');
+    const row = page.getByRole('row').filter({ hasText: original }).first();
+    await expect(row).toBeVisible();
+    // The row's edit action is the mat-icon "edit" inside the action cell.
+    await row.locator('button:has(mat-icon:has-text("edit"))').click();
+
+    await expect(page).toHaveURL(/\/roles\/\d+\/edit/);
+    await expect(page.getByLabel('Role Name')).toHaveValue(original);
+    // The role type can't be switched once the role exists.
+    await expect(page.getByRole('button', { name: /Application role/ })).toBeDisabled();
+
+    const renamed = `${original}-renamed`;
+    await page.getByLabel('Role Name').fill(renamed);
+    await page.getByRole('button', { name: 'Save Role' }).click();
+
+    await expect(page).toHaveURL(/\/roles$/);
+    await expect(
+      page.getByRole('row').filter({ hasText: renamed }).first(),
+    ).toBeVisible();
+  });
 });

@@ -92,6 +92,8 @@ doc/ReceiptProcessingSettings.md
 doc/ReceiptProcessingSettingsApi.md
 doc/ReceiptStatus.md
 doc/ResetPasswordCommand.md
+doc/Role.md
+doc/RoleApi.md
 doc/SearchApi.md
 doc/SearchResult.md
 doc/SignUpCommand.md
@@ -126,6 +128,7 @@ doc/UpsertItemCommand.md
 doc/UpsertPromptCommand.md
 doc/UpsertReceiptCommand.md
 doc/UpsertReceiptProcessingSettingsCommand.md
+doc/UpsertRoleCommand.md
 doc/UpsertSystemEmailCommand.md
 doc/UpsertSystemSettingsCommand.md
 doc/UpsertTagCommand.md
@@ -159,6 +162,7 @@ lib/src/api/prompt_api.dart
 lib/src/api/receipt_api.dart
 lib/src/api/receipt_image_api.dart
 lib/src/api/receipt_processing_settings_api.dart
+lib/src/api/role_api.dart
 lib/src/api/search_api.dart
 lib/src/api/system_email_api.dart
 lib/src/api/system_settings_api.dart
@@ -250,6 +254,7 @@ lib/src/model/receipt_paged_request_filter.dart
 lib/src/model/receipt_processing_settings.dart
 lib/src/model/receipt_status.dart
 lib/src/model/reset_password_command.dart
+lib/src/model/role.dart
 lib/src/model/search_result.dart
 lib/src/model/sign_up_command.dart
 lib/src/model/sort_direction.dart
@@ -279,6 +284,7 @@ lib/src/model/upsert_item_command.dart
 lib/src/model/upsert_prompt_command.dart
 lib/src/model/upsert_receipt_command.dart
 lib/src/model/upsert_receipt_processing_settings_command.dart
+lib/src/model/upsert_role_command.dart
 lib/src/model/upsert_system_email_command.dart
 lib/src/model/upsert_system_settings_command.dart
 lib/src/model/upsert_tag_command.dart
@@ -293,3 +299,6 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
+test/role_api_test.dart
+test/role_test.dart
+test/upsert_role_command_test.dart

@@ -1,9 +1,9 @@
 <div class="rw-content">
-  <app-breadcrumb [items]="breadcrumbs"></app-breadcrumb>
+  <app-breadcrumb [items]="breadcrumbs()"></app-breadcrumb>
 
   <div class="rw-page-title">
     <div>
-      <h1>Create a Role</h1>
+      <h1>{{ title() }}</h1>
       <div class="sub">
         Choose what it applies to, start from a template, then tweak until it
         fits.
@@ -18,7 +18,11 @@
         <div class="rw-card rw-form-section">
           <h2>Role type</h2>
           <div class="hint">
-            A role applies to either the application or a group — not both.
+            @if (isTypeLocked()) {
+              A role's type can't be changed after it's created.
+            } @else {
+              A role applies to either the application or a group — not both.
+            }
           </div>
           <div class="rw-typegrid">
             @for (t of roleTypes; track t.id) {
@@ -26,6 +30,8 @@
                 type="button"
                 class="rw-typecard"
                 [class.active]="type() === t.id"
+                [class.locked]="isTypeLocked()"
+                [disabled]="isTypeLocked()"
                 (click)="pickType(t.id)"
               >
                 <span
@@ -234,16 +240,18 @@
       </div>
     </div>
 
-    <app-form-button-bar [mode]="formMode.add">
+    <app-form-button-bar [mode]="mode()">
       <app-button
-        buttonText="Cancel"
+        [buttonText]="isViewMode() ? 'Back' : 'Cancel'"
         matButtonType="basic"
         [buttonRouterLink]="['/roles']"
       ></app-button>
-      <app-submit-button
-        [onlyIcon]="false"
-        buttonText="Save Role"
-      ></app-submit-button>
+      @if (!isViewMode()) {
+        <app-submit-button
+          [onlyIcon]="false"
+          buttonText="Save Role"
+        ></app-submit-button>
+      }
     </app-form-button-bar>
   </form>
 </div>
