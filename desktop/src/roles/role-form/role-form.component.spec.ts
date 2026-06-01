@@ -146,6 +146,9 @@ async function setup(
   const fixture = TestBed.createComponent(RoleFormComponent);
   const component = fixture.componentInstance;
   await fixture.whenStable();
+  // Flush the view-mode form.disable()/enable() effect so tests reading
+  // component.form.disabled observe the finalized state.
+  TestBed.flushEffects();
   return { component, fixture, createRoleSpy, updateRoleSpy, navigateSpy, snackbar };
 }
 
@@ -407,6 +410,18 @@ describe("RoleFormComponent", () => {
 
       expect(snackbar.error).toHaveBeenCalled();
       expect(navigateSpy).toHaveBeenCalledWith(["/roles"]);
+    });
+
+    it("redirects to the list when the scope query param is missing", async () => {
+      const { component, navigateSpy, snackbar } = await setup(ALL_DESCRIPTORS, {
+        routeId: "7",
+        roles: [EDITABLE_APP_ROLE],
+      });
+
+      // Without a scope the role can't be identified unambiguously.
+      expect(snackbar.error).toHaveBeenCalled();
+      expect(navigateSpy).toHaveBeenCalledWith(["/roles"]);
+      expect(component.isEditMode()).toBe(false);
     });
   });
 

@@ -169,7 +169,11 @@ func resolveMissingRoleError(roleRepository repositories.RoleRepository, otherSc
 		return ErrRoleTypeMismatch
 	}
 
-	return ErrRoleNotFound
+	if errors.Is(otherErr, gorm.ErrRecordNotFound) {
+		return ErrRoleNotFound
+	}
+
+	return otherErr
 }
 
 func (service RoleService) GetRoles() ([]structs.RoleView, error) {

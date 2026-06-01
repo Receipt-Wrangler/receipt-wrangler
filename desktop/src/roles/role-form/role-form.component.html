@@ -86,6 +86,7 @@
                 type="button"
                 class="rw-preset"
                 [class.active]="selectedPreset() === p.id"
+                [disabled]="isViewMode()"
                 (click)="pickPreset(p)"
               >
                 <span
@@ -147,6 +148,7 @@
                   type="button"
                   class="rw-switch"
                   [class.on]="isAllOn(group)"
+                  [disabled]="isViewMode()"
                   [attr.aria-pressed]="isAllOn(group)"
                   [attr.aria-label]="
                     'Toggle all ' + group.name + ' permissions'
@@ -176,6 +178,7 @@
                         type="button"
                         class="rw-switch"
                         [class.on]="isGranted(row.key)"
+                        [disabled]="isViewMode()"
                         [attr.aria-pressed]="isGranted(row.key)"
                         [attr.aria-label]="'Toggle ' + row.label"
                         (click)="toggle(row.key)"
@@ -194,7 +197,9 @@
         <div class="rw-card rw-side-card">
           <h3>Summary</h3>
           <div class="rw-summary-stat">
-            <span class="big">{{ granted().size }}</span>
+            <span class="big" data-testid="granted-permission-count">{{
+              granted().size
+            }}</span>
             <span class="lbl">
               of {{ scopeTotal() }}
               {{ typeMeta().name.toLowerCase() }} permissions granted

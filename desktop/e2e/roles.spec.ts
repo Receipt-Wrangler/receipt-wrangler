@@ -41,14 +41,14 @@ async function createRole(
   await expect(page).toHaveURL(/\/roles$/);
 }
 
-// Opens a role's editor from the list. Icon buttons expose no accessible name
-// (Material's mat-icon is aria-hidden and matTooltip sets no label), so target
-// the icon ligature text — the same approach receipts.spec.ts uses.
+// Opens a role's editor from the list. The edit icon button has no accessible
+// name (Material's mat-icon is aria-hidden and matTooltip sets no label), so it
+// carries a data-testid.
 async function openRoleEditor(page: Page, name: string) {
   await page.goto('/roles');
   const row = page.getByRole('row').filter({ hasText: name }).first();
   await expect(row).toBeVisible();
-  await row.locator('button:has(mat-icon:has-text("edit"))').click();
+  await row.getByTestId('role-edit').click();
   await expect(page).toHaveURL(/\/roles\/\d+\/edit/);
   // The form populates from getRoles(); wait for the name before asserting more.
   await expect(page.getByLabel('Role Name')).toHaveValue(name);
@@ -56,7 +56,7 @@ async function openRoleEditor(page: Page, name: string) {
 
 // The summary panel's granted-permission count (driven by granted().size).
 async function grantedCount(page: Page): Promise<number> {
-  return Number((await page.locator('.rw-summary-stat .big').innerText()).trim());
+  return Number((await page.getByTestId('granted-permission-count').innerText()).trim());
 }
 
 // The submit button lives in a fixed bottom bar and carries a matTooltip

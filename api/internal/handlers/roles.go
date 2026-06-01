@@ -93,7 +93,10 @@ func UpdateRole(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id, err := utils.StringToUint(chi.URLParam(r, "roleId"))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				structs.WriteValidatorErrorResponse(w, structs.ValidatorError{
+					Errors: map[string]string{"roleId": "Invalid role id"},
+				}, http.StatusBadRequest)
+				return 0, nil
 			}
 
 			command := commands.UpsertRoleCommand{}

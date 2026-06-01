@@ -9,6 +9,7 @@ import (
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -258,7 +259,7 @@ func TestShouldNotChangeRoleType(t *testing.T) {
 	}
 
 	body := `{"name": "App Role", "scope": "GROUP", "permissions": ["group.receipts.create"]}`
-	w := updateRoleRequest("1", body, adminContext())
+	w := updateRoleRequest(strconv.FormatUint(uint64(created.ID), 10), body, adminContext())
 
 	if w.Result().StatusCode != 400 {
 		utils.PrintTestError(t, w.Result().StatusCode, 400)
@@ -293,7 +294,18 @@ func TestShouldNotUpdateSystemRole(t *testing.T) {
 	}
 
 	body := `{"name": "Renamed System Role", "scope": "APP", "permissions": ["app.users.read"]}`
-	w := updateRoleRequest("1", body, adminContext())
+	w := updateRoleRequest(strconv.FormatUint(uint64(systemRole.ID), 10), body, adminContext())
+
+	if w.Result().StatusCode != 400 {
+		utils.PrintTestError(t, w.Result().StatusCode, 400)
+	}
+}
+
+func TestShouldReturnBadRequestForInvalidRoleId(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	body := `{"name": "Role", "scope": "APP", "permissions": ["app.users.read"]}`
+	w := updateRoleRequest("abc", body, adminContext())
 
 	if w.Result().StatusCode != 400 {
 		utils.PrintTestError(t, w.Result().StatusCode, 400)

@@ -181,9 +181,17 @@ export class RoleFormComponent {
 
     const id = this.route.snapshot.paramMap.get("id");
     if (id) {
+      // Scope is required to identify a role: app and group roles have
+      // independent id sequences, so an id alone is ambiguous.
+      const scope = this.route.snapshot.queryParamMap.get("scope");
+      if (!scope) {
+        this.snackbar.error("Role type is required to edit a role");
+        this.router.navigate(["/roles"]);
+        return;
+      }
       this.mode.set(FormMode.edit);
       this.roleId.set(Number(id));
-      this.loadRole(id, this.route.snapshot.queryParamMap.get("scope"));
+      this.loadRole(id, scope);
     }
   }
 
@@ -221,7 +229,7 @@ export class RoleFormComponent {
 
   private scopeMatches(scope: PermissionScope, scopeParam: string | null): boolean {
     if (!scopeParam) {
-      return true;
+      return false;
     }
     const normalized = scope === PermissionScope.Group ? "group" : "app";
     return normalized === scopeParam;
