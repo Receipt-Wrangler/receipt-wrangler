@@ -152,6 +152,92 @@ func TestShouldGetRoles(t *testing.T) {
 	}
 }
 
+func getPagedRolesRequest(body string, claims *validator.ValidatedClaims) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api", strings.NewReader(body))
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claims))
+
+	GetPagedRoles(w, r)
+	return w
+}
+
+func TestShouldGetPagedRoles(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+	pagedData := structs.PagedData{}
+
+	body := `{"page": 1, "pageSize": 50, "orderBy": "name", "sortDirection": "asc"}`
+	w := getPagedRolesRequest(body, adminContext())
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+		return
+	}
+
+	err := json.Unmarshal(w.Body.Bytes(), &pagedData)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if pagedData.TotalCount != 2 {
+		utils.PrintTestError(t, pagedData.TotalCount, 2)
+	}
+	if len(pagedData.Data) != 2 {
+		utils.PrintTestError(t, len(pagedData.Data), 2)
+	}
+}
+
+func TestShouldGetPagedRolesFilteredByScope(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+	pagedData := structs.PagedData{}
+
+	body := `{"page": 1, "pageSize": 50, "orderBy": "name", "sortDirection": "asc", "filter": {"scope": "APP"}}`
+	w := getPagedRolesRequest(body, adminContext())
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+		return
+	}
+
+	err := json.Unmarshal(w.Body.Bytes(), &pagedData)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if pagedData.TotalCount != 1 {
+		utils.PrintTestError(t, pagedData.TotalCount, 1)
+	}
+	if len(pagedData.Data) != 1 {
+		utils.PrintTestError(t, len(pagedData.Data), 1)
+	}
+}
+
+func TestShouldNotGetPagedRolesDueToRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+
+	body := `{"page": 1, "pageSize": 50, "orderBy": "name", "sortDirection": "asc"}`
+	w := getPagedRolesRequest(body, userContext())
+
+	if w.Result().StatusCode != 403 {
+		utils.PrintTestError(t, w.Result().StatusCode, 403)
+	}
+}
+
+func TestShouldNotGetPagedRolesDueToValidation(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	body := `{"page": 0, "pageSize": 50, "sortDirection": "asc"}`
+	w := getPagedRolesRequest(body, adminContext())
+
+	if w.Result().StatusCode != 400 {
+		utils.PrintTestError(t, w.Result().StatusCode, 400)
+	}
+}
+
 func updateRoleRequest(roleId string, body string, claims *validator.ValidatedClaims) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api", strings.NewReader(body))

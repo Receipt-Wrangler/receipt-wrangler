@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"errors"
+	"receipt-wrangler/api/internal/commands"
+	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/utils"
 	"testing"
@@ -178,5 +180,232 @@ func TestGetAllRolesReturnsBothScopes(t *testing.T) {
 	}
 	if len(groupRole.Permissions) != 1 || groupRole.Permissions[0] != permissions.GroupReceiptsCreate {
 		utils.PrintTestError(t, groupRole.Permissions, []string{permissions.GroupReceiptsCreate})
+	}
+}
+
+func TestGetPagedRolesReturnsBothScopesOrderedByName(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	if _, err := repository.CreateAppRole("Beta App", "", []string{permissions.AppUsersRead}); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if _, err := repository.CreateGroupRole("Alpha Group", "", []string{permissions.GroupReceiptsCreate, permissions.GroupReceiptsRead}); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if _, err := repository.CreateAppRole("Zeta App", "", nil); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	command := commands.PagedRoleRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{
+			Page:          1,
+			PageSize:      25,
+			OrderBy:       "name",
+			SortDirection: commands.ASCENDING,
+		},
+	}
+
+	roles, count, err := repository.GetPagedRoles(command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if count != 3 {
+		utils.PrintTestError(t, count, 3)
+	}
+	if len(roles) != 3 {
+		utils.PrintTestError(t, len(roles), 3)
+		return
+	}
+
+	// Ordered by name ascending across both scopes (union).
+	expectedOrder := []string{"Alpha Group", "Beta App", "Zeta App"}
+	for i, name := range expectedOrder {
+		if roles[i].Name != name {
+			utils.PrintTestError(t, roles[i].Name, name)
+		}
+	}
+
+	if roles[0].Scope != permissions.ScopeGroup {
+		utils.PrintTestError(t, roles[0].Scope, permissions.ScopeGroup)
+	}
+	if len(roles[0].Permissions) != 2 {
+		utils.PrintTestError(t, len(roles[0].Permissions), 2)
+	}
+	if roles[1].Scope != permissions.ScopeApp {
+		utils.PrintTestError(t, roles[1].Scope, permissions.ScopeApp)
+	}
+	// A role with no permissions yields an empty (non-nil) slice.
+	if roles[2].Permissions == nil || len(roles[2].Permissions) != 0 {
+		utils.PrintTestError(t, roles[2].Permissions, []string{})
+	}
+}
+
+func TestGetPagedRolesFiltersByScope(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	if _, err := repository.CreateAppRole("App One", "", nil); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if _, err := repository.CreateAppRole("App Two", "", nil); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if _, err := repository.CreateGroupRole("Group One", "", nil); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	appCommand := commands.PagedRoleRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{Page: 1, PageSize: 25, OrderBy: "name"},
+		Filter:              commands.RoleFilter{Scope: permissions.ScopeApp},
+	}
+	appRoles, appCount, err := repository.GetPagedRoles(appCommand)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if appCount != 2 || len(appRoles) != 2 {
+		utils.PrintTestError(t, appCount, 2)
+	}
+	for _, role := range appRoles {
+		if role.Scope != permissions.ScopeApp {
+			utils.PrintTestError(t, role.Scope, permissions.ScopeApp)
+		}
+	}
+
+	groupCommand := commands.PagedRoleRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{Page: 1, PageSize: 25, OrderBy: "name"},
+		Filter:              commands.RoleFilter{Scope: permissions.ScopeGroup},
+	}
+	groupRoles, groupCount, err := repository.GetPagedRoles(groupCommand)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if groupCount != 1 || len(groupRoles) != 1 {
+		utils.PrintTestError(t, groupCount, 1)
+		return
+	}
+	if groupRoles[0].Scope != permissions.ScopeGroup {
+		utils.PrintTestError(t, groupRoles[0].Scope, permissions.ScopeGroup)
+	}
+}
+
+func TestGetPagedRolesPaginates(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	for _, name := range []string{"Role A", "Role B", "Role C"} {
+		if _, err := repository.CreateAppRole(name, "", nil); err != nil {
+			utils.PrintTestError(t, err, nil)
+			return
+		}
+	}
+
+	command := commands.PagedRoleRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{
+			Page:          2,
+			PageSize:      1,
+			OrderBy:       "name",
+			SortDirection: commands.ASCENDING,
+		},
+	}
+
+	roles, count, err := repository.GetPagedRoles(command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Count is the full total, independent of the page size.
+	if count != 3 {
+		utils.PrintTestError(t, count, 3)
+	}
+	if len(roles) != 1 {
+		utils.PrintTestError(t, len(roles), 1)
+		return
+	}
+	if roles[0].Name != "Role B" {
+		utils.PrintTestError(t, roles[0].Name, "Role B")
+	}
+}
+
+func TestGetPagedRolesIncludesAssignedCount(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	role, err := repository.CreateAppRole("Assigned Role", "", nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	user := models.User{Username: "assigned-user", Password: "password", DisplayName: "Assigned User", AppRoleID: &role.ID}
+	if err := repository.GetDB().Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	command := commands.PagedRoleRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{Page: 1, PageSize: 25, OrderBy: "name"},
+		Filter:              commands.RoleFilter{Scope: permissions.ScopeApp},
+	}
+
+	roles, _, err := repository.GetPagedRoles(command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if len(roles) != 1 {
+		utils.PrintTestError(t, len(roles), 1)
+		return
+	}
+	if roles[0].AssignedCount != 1 {
+		utils.PrintTestError(t, roles[0].AssignedCount, 1)
+	}
+}
+
+func TestGetPagedRolesInvalidOrderByDefaultsToName(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	if _, err := repository.CreateAppRole("Bravo", "", nil); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if _, err := repository.CreateAppRole("Alpha", "", nil); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	command := commands.PagedRoleRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{
+			Page:          1,
+			PageSize:      25,
+			OrderBy:       "id; DROP TABLE app_roles",
+			SortDirection: commands.ASCENDING,
+		},
+	}
+
+	roles, _, err := repository.GetPagedRoles(command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if len(roles) != 2 {
+		utils.PrintTestError(t, len(roles), 2)
+		return
+	}
+	// Falls back to ordering by name.
+	if roles[0].Name != "Alpha" {
+		utils.PrintTestError(t, roles[0].Name, "Alpha")
 	}
 }

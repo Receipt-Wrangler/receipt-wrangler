@@ -8,29 +8,32 @@
  * Do not edit the class manually.
  */
 import { CustomFieldValue } from './customFieldValue';
-import { Comment } from './comment';
 import { Group } from './group';
 import { GroupMember } from './groupMember';
 import { Category } from './category';
-import { Receipt } from './receipt';
 import { Activity } from './activity';
 import { ReceiptProcessingSettings } from './receiptProcessingSettings';
-import { CustomFieldType } from './customFieldType';
 import { Item } from './item';
 import { GroupReceiptSettings } from './groupReceiptSettings';
 import { SystemTaskStatus } from './systemTaskStatus';
 import { OcrEngine } from './ocrEngine';
 import { CustomFieldOption } from './customFieldOption';
 import { SystemTask } from './systemTask';
+import { GroupSettings } from './groupSettings';
+import { Permission } from './permission';
+import { TagView } from './tagView';
+import { FileData } from './fileData';
+import { PermissionScope } from './permissionScope';
+import { Comment } from './comment';
+import { Receipt } from './receipt';
+import { CustomFieldType } from './customFieldType';
+import { Role } from './role';
 import { AiType } from './aiType';
 import { CustomField } from './customField';
-import { GroupSettings } from './groupSettings';
 import { AssociatedEntityType } from './associatedEntityType';
 import { Prompt } from './prompt';
 import { SystemEmail } from './systemEmail';
-import { TagView } from './tagView';
 import { Tag } from './tag';
-import { FileData } from './fileData';
 
 
 export interface PagedDataDataInner { 
@@ -62,9 +65,6 @@ export interface PagedDataDataInner {
      * Files associated to receipt
      */
     imageFiles?: Array<FileData>;
-    /**
-     * Custom Field name
-     */
     name: string;
     /**
      * User paid foreign key
@@ -88,9 +88,6 @@ export interface PagedDataDataInner {
      * Created by entity\'s name
      */
     createdByString?: string;
-    /**
-     * Custom Field description
-     */
     description?: string;
     prompt: Prompt;
     groupSettings?: GroupSettings;
@@ -169,6 +166,13 @@ export interface PagedDataDataInner {
     useStartTLS?: boolean;
     canBeRestarted?: boolean;
     options?: Array<CustomFieldOption>;
+    scope: PermissionScope;
+    isSystem: boolean;
+    permissions: Array<Permission>;
+    /**
+     * Number of users or group members currently assigned this role
+     */
+    assignedCount?: number;
 }
 export namespace PagedDataDataInner {
 }

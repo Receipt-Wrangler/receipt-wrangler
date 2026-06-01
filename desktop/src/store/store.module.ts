@@ -18,6 +18,7 @@ import { PromptTableState } from "./prompt-table.state";
 import { ReceiptProcessingSettingsTableState } from "./receipt-processing-settings-table.state";
 import { ReceiptProcessingSettingsTaskTableState } from "./receipt-processing-settings-task-table.state";
 import { ReceiptTableState } from "./receipt-table.state";
+import { RoleTableState } from "./role-table.state";
 import { SystemEmailTableState } from "./system-email-table.state";
 import { SystemEmailTaskTableState } from "./system-email-task-table.state";
 import { SystemSettingsState } from "./system-settings.state";
@@ -44,6 +45,7 @@ import { UserState } from "./user.state";
       ReceiptProcessingSettingsTableState,
       ReceiptProcessingSettingsTaskTableState,
       ReceiptTableState,
+      RoleTableState,
       SystemEmailTableState,
       SystemEmailTaskTableState,
       SystemSettingsState,
@@ -69,6 +71,7 @@ import { UserState } from "./user.state";
         "receiptProcessingSettingsTable",
         "receiptProcessingSettingsTaskTable",
         "receiptTable",
+        "roleTable",
         "systemEmailTable",
         "systemEmailTaskTable",
         "systemSettings",

@@ -13,6 +13,7 @@ func BuildRoleRouter() *chi.Mux {
 	roleRouter.Use(middleware.UnifiedAuthMiddleware)
 
 	roleRouter.Get("/", handlers.GetRoles)
+	roleRouter.Post("/getPagedRoles", handlers.GetPagedRoles)
 	roleRouter.Post("/", handlers.CreateRole)
 	roleRouter.Put("/{roleId}", handlers.UpdateRole)
 	roleRouter.Delete("/{roleId}", handlers.DeleteRole)

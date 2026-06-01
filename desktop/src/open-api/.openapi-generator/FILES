@@ -93,6 +93,7 @@ model/pagedData.ts
 model/pagedDataDataInner.ts
 model/pagedGroupRequestCommand.ts
 model/pagedRequestCommand.ts
+model/pagedRoleRequestCommand.ts
 model/permission.ts
 model/permissionDescriptor.ts
 model/permissionScope.ts
@@ -108,6 +109,7 @@ model/receiptProcessingSettings.ts
 model/receiptStatus.ts
 model/resetPasswordCommand.ts
 model/role.ts
+model/roleFilter.ts
 model/searchResult.ts
 model/signUpCommand.ts
 model/sortDirection.ts

@@ -2776,6 +2776,34 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /role/getPagedRoles:
+    post:
+      tags:
+        - Role
+      summary: Get paged roles
+      description: Returns a page of roles across both scopes, with optional scope filtering.
+      operationId: getPagedRoles
+      requestBody:
+        description: Paging, sorting, and filtering data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PagedRoleRequestCommand"
+      responses:
+        200:
+          description: Paged roles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedData"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /role/{roleId}:
     parameters:
       - in: path
@@ -3985,6 +4013,18 @@ components:
           properties:
             filter:
               $ref: "#/components/schemas/GroupFilter"
+    PagedRoleRequestCommand:
+      allOf:
+        - $ref: "#/components/schemas/PagedRequestCommand"
+        - type: object
+          properties:
+            filter:
+              $ref: "#/components/schemas/RoleFilter"
+    RoleFilter:
+      type: object
+      properties:
+        scope:
+          $ref: "#/components/schemas/PermissionScope"
     PagedActivityRequestCommand:
       allOf:
         - $ref: "#/components/schemas/PagedRequestCommand"
@@ -4095,6 +4135,7 @@ components:
               - $ref: "#/components/schemas/SystemEmail"
               - $ref: "#/components/schemas/Activity"
               - $ref: "#/components/schemas/CustomField"
+              - $ref: "#/components/schemas/Role"
         totalCount:
           type: integer
     FeatureConfig:

@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/structs"
@@ -212,6 +213,178 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 	}
 
 	return roles, nil
+}
+
+// roleUnionRow is the row shape scanned from the app/group role union derived
+// table. Scope is the literal "APP"/"GROUP" tag added per side of the union.
+type roleUnionRow struct {
+	ID          uint
+	Name        string
+	Description string
+	IsSystem    bool
+	Scope       string
+}
+
+// roleUnionSQL unions the two role tables into a single result set so a page can
+// span both app- and group-scoped roles. The id sequences are independent, so a
+// row is identified by the (id, scope) pair.
+const roleUnionSQL = "SELECT id, name, description, is_system, 'APP' AS scope FROM app_roles " +
+	"UNION ALL " +
+	"SELECT id, name, description, is_system, 'GROUP' AS scope FROM group_role_definitions"
+
+// GetPagedRoles returns a page of roles across both scopes, ordered and counted
+// at the database level. The page rows are then enriched with their permissions
+// and assignment counts in a second pass.
+func (repository RoleRepository) GetPagedRoles(command commands.PagedRoleRequestCommand) ([]structs.RoleView, int64, error) {
+	db := repository.GetDB()
+
+	orderBy := command.OrderBy
+	if !repository.isValidColumn(orderBy) {
+		orderBy = "name"
+	}
+
+	buildUnionQuery := func() *gorm.DB {
+		query := db.Table("(?) as roles", gorm.Expr(roleUnionSQL))
+		if command.Filter.Scope != "" {
+			query = query.Where("scope = ?", command.Filter.Scope)
+		}
+		return query
+	}
+
+	var count int64
+	err := buildUnionQuery().Count(&count).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query := repository.Sort(buildUnionQuery(), orderBy, command.SortDirection)
+	query = query.Scopes(repository.Paginate(command.Page, command.PageSize))
+
+	var rows []roleUnionRow
+	err = query.Scan(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	roleViews, err := repository.buildRoleViews(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return roleViews, count, nil
+}
+
+// isValidColumn whitelists the columns of the role union derived table that may
+// be used for ordering (guards against unknown-column errors / injection).
+func (repository RoleRepository) isValidColumn(orderBy string) bool {
+	return orderBy == "name" ||
+		orderBy == "description" ||
+		orderBy == "is_system" ||
+		orderBy == "scope"
+}
+
+// buildRoleViews enriches the page's union rows with their permissions and
+// assignment counts, preserving the order of the rows.
+func (repository RoleRepository) buildRoleViews(rows []roleUnionRow) ([]structs.RoleView, error) {
+	appRoleIds := make([]uint, 0, len(rows))
+	groupRoleIds := make([]uint, 0, len(rows))
+	for _, row := range rows {
+		if row.Scope == string(permissions.ScopeGroup) {
+			groupRoleIds = append(groupRoleIds, row.ID)
+		} else {
+			appRoleIds = append(appRoleIds, row.ID)
+		}
+	}
+
+	appPermissions, err := repository.getAppRolePermissions(appRoleIds)
+	if err != nil {
+		return nil, err
+	}
+
+	groupPermissions, err := repository.getGroupRolePermissions(groupRoleIds)
+	if err != nil {
+		return nil, err
+	}
+
+	appRoleCounts, err := repository.countAppRoleAssignments()
+	if err != nil {
+		return nil, err
+	}
+
+	groupRoleCounts, err := repository.countGroupRoleAssignments()
+	if err != nil {
+		return nil, err
+	}
+
+	roleViews := make([]structs.RoleView, 0, len(rows))
+	for _, row := range rows {
+		scope := permissions.ScopeApp
+		perms := appPermissions[row.ID]
+		assignedCount := appRoleCounts[row.ID]
+		if row.Scope == string(permissions.ScopeGroup) {
+			scope = permissions.ScopeGroup
+			perms = groupPermissions[row.ID]
+			assignedCount = groupRoleCounts[row.ID]
+		}
+
+		if perms == nil {
+			perms = []string{}
+		}
+
+		roleViews = append(roleViews, structs.RoleView{
+			Id:            row.ID,
+			Name:          row.Name,
+			Description:   row.Description,
+			Scope:         scope,
+			IsSystem:      row.IsSystem,
+			Permissions:   perms,
+			AssignedCount: assignedCount,
+		})
+	}
+
+	return roleViews, nil
+}
+
+// getAppRolePermissions returns a map of app role id -> permission strings for
+// the given role ids, in a single query.
+func (repository RoleRepository) getAppRolePermissions(roleIds []uint) (map[uint][]string, error) {
+	result := make(map[uint][]string)
+	if len(roleIds) == 0 {
+		return result, nil
+	}
+
+	var permissionRows []models.AppRolePermission
+	err := repository.GetDB().Where("app_role_id IN ?", roleIds).Find(&permissionRows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range permissionRows {
+		result[row.AppRoleID] = append(result[row.AppRoleID], row.Permission)
+	}
+
+	return result, nil
+}
+
+// getGroupRolePermissions returns a map of group role id -> permission strings
+// for the given role ids, in a single query.
+func (repository RoleRepository) getGroupRolePermissions(roleIds []uint) (map[uint][]string, error) {
+	result := make(map[uint][]string)
+	if len(roleIds) == 0 {
+		return result, nil
+	}
+
+	var permissionRows []models.GroupRolePermission
+	err := repository.GetDB().Where("group_role_id IN ?", roleIds).Find(&permissionRows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range permissionRows {
+		result[row.GroupRoleID] = append(result[row.GroupRoleID], row.Permission)
+	}
+
+	return result, nil
 }
 
 // roleAssignmentCount is the row shape returned by the grouped assignment-count
