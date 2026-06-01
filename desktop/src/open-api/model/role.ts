@@ -18,6 +18,10 @@ export interface Role {
     scope: PermissionScope;
     isSystem: boolean;
     permissions: Array<Permission>;
+    /**
+     * Number of users or group members currently assigned this role
+     */
+    assignedCount?: number;
 }
 export namespace Role {
 }

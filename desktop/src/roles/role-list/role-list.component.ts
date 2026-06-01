@@ -1,6 +1,7 @@
 import {
   AfterViewInit,
   Component,
+  DestroyRef,
   TemplateRef,
   computed,
   inject,
@@ -8,12 +9,20 @@ import {
   viewChild,
 } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { MatDialog } from "@angular/material/dialog";
 import { MatTableDataSource } from "@angular/material/table";
 import { Router } from "@angular/router";
 import { EMPTY, catchError, take, tap } from "rxjs";
-import { Role, RoleService, PermissionService } from "../../open-api";
+import {
+  PermissionScope,
+  Role,
+  RoleService,
+  PermissionService,
+} from "../../open-api";
+import { SnackbarService } from "../../services";
 import { TableColumn } from "../../table/table-column.interface";
 import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
+import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { FilterTab } from "../../shared-ui/filter-bar/filter-tab.interface";
 import {
   RoleListFilter,
@@ -39,6 +48,9 @@ export class RoleListComponent implements AfterViewInit {
   private readonly permissionService = inject(PermissionService);
   private readonly roleService = inject(RoleService);
   private readonly router = inject(Router);
+  private readonly matDialog = inject(MatDialog);
+  private readonly snackbarService = inject(SnackbarService);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly roleCellTemplate = viewChild.required<TemplateRef<any>>("roleCell");
   private readonly typeCellTemplate = viewChild.required<TemplateRef<any>>("typeCell");
@@ -154,16 +166,6 @@ export class RoleListComponent implements AfterViewInit {
     return this.scopeTotals()[role.scope];
   }
 
-  /** Up-to-two-letter initials for a member avatar. */
-  public initials(name: string): string {
-    return (name || "?")
-      .split(" ")
-      .map((part) => part[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-  }
-
   public addRole(): void {
     this.router.navigate(["/roles/new"]);
   }
@@ -176,8 +178,73 @@ export class RoleListComponent implements AfterViewInit {
     });
   }
 
-  // TODO: open the per-role actions menu once those actions exist.
-  public openRoleMenu(_role: RoleListItem): void {}
+  // A role can be deleted only when it is not a system role and nobody is
+  // assigned to it. Assigned roles must be unassigned before deletion.
+  public canDelete(role: RoleListItem): boolean {
+    return !role.isSystem && role.userCount === 0;
+  }
+
+  public deleteRole(role: RoleListItem): void {
+    // Defensive: the button gates this via [disabled], but guard programmatic
+    // calls so a non-deletable role never opens the confirmation or hits the API.
+    if (!this.canDelete(role)) {
+      this.disabledDeleteClicked(role);
+      return;
+    }
+
+    const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
+    dialogRef.componentInstance.headerText = "Delete Role";
+    dialogRef.componentInstance.dialogContent = `Are you sure you want to delete the role: ${role.name}?`;
+
+    dialogRef
+      .afterClosed()
+      .pipe(
+        take(1),
+        tap((result) => {
+          if (result) {
+            this.callDeleteApi(role);
+          }
+        }),
+      )
+      .subscribe();
+  }
+
+  // Explains why the delete button is disabled when a disabled button is
+  // clicked. We intentionally do not reveal who the role is assigned to.
+  public disabledDeleteClicked(role: RoleListItem): void {
+    if (role.isSystem) {
+      this.snackbarService.info(
+        `Cannot delete ${role.name} because it is a system role.`,
+      );
+    } else if (role.userCount > 0) {
+      this.snackbarService.info(
+        `Cannot delete ${role.name} because it is currently assigned.`,
+      );
+    }
+  }
+
+  private callDeleteApi(role: RoleListItem): void {
+    this.roleService
+      .deleteRole(this.toScopeEnum(role.scope), Number(role.id))
+      .pipe(
+        take(1),
+        tap(() => {
+          this.snackbarService.success("Role deleted successfully");
+          this.loadRoles();
+        }),
+        catchError(() => {
+          this.snackbarService.error("Failed to delete role");
+          return EMPTY;
+        }),
+      )
+      .subscribe();
+  }
+
+  // The view-model scope ('app'/'group') maps to the API's PermissionScope
+  // enum ('APP'/'GROUP') — the inverse of the mapping in toListItem.
+  private toScopeEnum(scope: RoleScope): PermissionScope {
+    return scope === "group" ? PermissionScope.Group : PermissionScope.App;
+  }
 
   private loadRoles(): void {
     this.roleService
@@ -186,7 +253,7 @@ export class RoleListComponent implements AfterViewInit {
         take(1),
         tap((roles) => this.roles.set(roles.map((role) => this.toListItem(role)))),
         catchError(() => EMPTY),
-        takeUntilDestroyed(),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe();
   }
@@ -200,8 +267,7 @@ export class RoleListComponent implements AfterViewInit {
       description: role.description ?? "",
       scope,
       permissionCount: role.permissions?.length ?? 0,
-      members: [],
-      userCount: 0,
+      userCount: role.assignedCount ?? 0,
       isSystem: role.isSystem,
       icon: visual.icon,
       iconColor: visual.color,

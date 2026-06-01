@@ -1,5 +1,6 @@
 <div class="d-flex justify-content-end align-items-center">
   <app-submit-button
+    data-testid="dialog-submit-button"
     [tooltip]="submitButtonTooltip()"
     [disabled]="
       disableWhenProgressBarIsShown() ? showProgressBar() ?? false : false

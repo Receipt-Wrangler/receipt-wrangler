@@ -2816,6 +2816,35 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+    delete:
+      tags:
+        - Role
+      summary: Delete role
+      description: >-
+        Deletes an app-scoped or group-scoped role. The scope query parameter
+        disambiguates the role id, since app and group role ids overlap. A role
+        cannot be deleted while it is assigned to any user or group member, and
+        system roles cannot be deleted.
+      operationId: deleteRole
+      parameters:
+        - in: query
+          name: scope
+          required: true
+          schema:
+            $ref: "#/components/schemas/PermissionScope"
+          description: Scope of the role to delete
+      responses:
+        200:
+          $ref: "#/components/responses/Ok"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
 components:
   securitySchemes:
     bearerAuth:
@@ -3010,6 +3039,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Permission"
+        assignedCount:
+          type: integer
+          description: Number of users or group members currently assigned this role
     UpsertRoleCommand:
       type: object
       required:

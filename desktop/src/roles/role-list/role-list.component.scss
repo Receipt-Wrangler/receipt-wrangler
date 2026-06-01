@@ -221,34 +221,10 @@ app-filter-bar {
   font-size: 13px;
 }
 
-.user-stack {
-  display: inline-flex;
-  align-items: center;
-
-  .avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-weight: 600;
-    font-size: 11px;
-    border: 2px solid #fff;
-    margin-left: -8px;
-
-    &:first-child {
-      margin-left: 0;
-    }
-  }
-
-  .more {
-    margin-left: variables.$spacing-sm;
-    font-size: 13px;
-    color: $fg-muted;
-    font-weight: 500;
-  }
+.user-count {
+  font-size: 13px;
+  color: $fg-muted;
+  font-weight: 500;
 }
 
 .row-actions {
