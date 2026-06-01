@@ -110,6 +110,7 @@
     <app-button
       matButtonType="iconButton"
       color="accent"
+      data-testid="role-edit"
       [icon]="role.isSystem ? 'visibility' : 'edit'"
       [tooltip]="role.isSystem ? 'View' : 'Edit'"
       (clicked)="editRole(role)"

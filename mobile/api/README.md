@@ -135,6 +135,9 @@ Class | Method | HTTP request | Description
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**getPagedProcessingSettings**](doc/ReceiptProcessingSettingsApi.md#getpagedprocessingsettings) | **POST** /receiptProcessingSettings/getPagedProcessingSettings | Gets paged processing settings
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**getReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#getreceiptprocessingsettingsbyid) | **GET** /receiptProcessingSettings/{id} | Get receipt processing settings by id
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**updateReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#updatereceiptprocessingsettingsbyid) | **PUT** /receiptProcessingSettings/{id} | Update receipt processing settings by id
+[*RoleApi*](doc/RoleApi.md) | [**createRole**](doc/RoleApi.md#createrole) | **POST** /role | Create role
+[*RoleApi*](doc/RoleApi.md) | [**getRoles**](doc/RoleApi.md#getroles) | **GET** /role | List all roles
+[*RoleApi*](doc/RoleApi.md) | [**updateRole**](doc/RoleApi.md#updaterole) | **PUT** /role/{roleId} | Update role
 [*SearchApi*](doc/SearchApi.md) | [**receiptSearch**](doc/SearchApi.md#receiptsearch) | **GET** /search/ | Receipt Search
 [*SystemEmailApi*](doc/SystemEmailApi.md) | [**checkSystemEmailConnectivity**](doc/SystemEmailApi.md#checksystememailconnectivity) | **POST** /systemEmail/checkConnectivity | Check system email connectivity
 [*SystemEmailApi*](doc/SystemEmailApi.md) | [**createSystemEmail**](doc/SystemEmailApi.md#createsystememail) | **POST** /systemEmail/ | Create system email
@@ -249,6 +252,7 @@ Class | Method | HTTP request | Description
  - [ReceiptProcessingSettings](doc/ReceiptProcessingSettings.md)
  - [ReceiptStatus](doc/ReceiptStatus.md)
  - [ResetPasswordCommand](doc/ResetPasswordCommand.md)
+ - [Role](doc/Role.md)
  - [SearchResult](doc/SearchResult.md)
  - [SignUpCommand](doc/SignUpCommand.md)
  - [SortDirection](doc/SortDirection.md)
@@ -278,6 +282,7 @@ Class | Method | HTTP request | Description
  - [UpsertPromptCommand](doc/UpsertPromptCommand.md)
  - [UpsertReceiptCommand](doc/UpsertReceiptCommand.md)
  - [UpsertReceiptProcessingSettingsCommand](doc/UpsertReceiptProcessingSettingsCommand.md)
+ - [UpsertRoleCommand](doc/UpsertRoleCommand.md)
  - [UpsertSystemEmailCommand](doc/UpsertSystemEmailCommand.md)
  - [UpsertSystemSettingsCommand](doc/UpsertSystemSettingsCommand.md)
  - [UpsertTagCommand](doc/UpsertTagCommand.md)

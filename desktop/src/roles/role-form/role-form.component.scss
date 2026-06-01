@@ -144,6 +144,16 @@ $ease: cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 0 0 3px $focus-halo;
   }
 
+  // The type can't be changed once a role exists: dim the unselected card and
+  // drop the affordance, keeping the active one prominent.
+  &.locked {
+    cursor: default;
+
+    &:not(.active) {
+      opacity: 0.55;
+    }
+  }
+
   .tic {
     width: 42px;
     height: 42px;

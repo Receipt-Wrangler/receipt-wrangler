@@ -1,7 +1,7 @@
-import { Component, computed, signal } from "@angular/core";
+import { Component, DestroyRef, computed, effect, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormControl, FormGroup, Validators } from "@angular/forms";
-import { Router } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 import { catchError, EMPTY, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { SnackbarService } from "../../services/snackbar.service";
@@ -49,12 +49,6 @@ export interface RoleResourceGroup {
   standalone: false,
 })
 export class RoleFormComponent {
-  public readonly breadcrumbs: BreadcrumbItem[] = [
-    { label: "Admin" },
-    { label: "Roles", routerLink: "/roles" },
-    { label: "New Role" },
-  ];
-
   public readonly roleTypes = ROLE_TYPES;
   public readonly formMode = FormMode;
 
@@ -64,10 +58,34 @@ export class RoleFormComponent {
   });
 
   // ----- State signals -----
+  public readonly mode = signal<FormMode>(FormMode.add);
+  private readonly roleId = signal<number | null>(null);
   public readonly type = signal<RoleType>("app");
   public readonly granted = signal<Set<string>>(new Set<string>());
   public readonly selectedPreset = signal<string>(CUSTOM_PRESET_ID);
   public readonly openPanels = signal<Record<string, boolean>>({});
+
+  // ----- Mode-derived state -----
+  public readonly isEditMode = computed<boolean>(() => this.mode() === FormMode.edit);
+  public readonly isViewMode = computed<boolean>(() => this.mode() === FormMode.view);
+  /** The role type is fixed once a role exists — locked in both edit and view. */
+  public readonly isTypeLocked = computed<boolean>(() => this.mode() !== FormMode.add);
+
+  public readonly title = computed<string>(() => {
+    if (this.isViewMode()) {
+      return "View a Role";
+    }
+    return this.isEditMode() ? "Edit a Role" : "Create a Role";
+  });
+
+  public readonly breadcrumbs = computed<BreadcrumbItem[]>(() => {
+    const last = this.isViewMode() ? "View Role" : this.isEditMode() ? "Edit Role" : "New Role";
+    return [
+      { label: "Admin" },
+      { label: "Roles", routerLink: "/roles" },
+      { label: last },
+    ];
+  });
 
   /** Last assembled payload — exposed for tests. */
   public lastPayload: UpsertRoleCommand | null = null;
@@ -139,7 +157,9 @@ export class RoleFormComponent {
     private readonly permissionService: PermissionService,
     private readonly roleService: RoleService,
     private readonly router: Router,
+    private readonly route: ActivatedRoute,
     private readonly snackbar: SnackbarService,
+    private readonly destroyRef: DestroyRef,
   ) {
     this.permissionService
       .getPermissions()
@@ -149,6 +169,70 @@ export class RoleFormComponent {
         takeUntilDestroyed(),
       )
       .subscribe((descriptors) => this.registry.set(descriptors));
+
+    // A view-mode role is read-only; keep the reactive form in sync with that.
+    effect(() => {
+      if (this.isViewMode()) {
+        this.form.disable({ emitEvent: false });
+      } else {
+        this.form.enable({ emitEvent: false });
+      }
+    });
+
+    const id = this.route.snapshot.paramMap.get("id");
+    if (id) {
+      // Scope is required to identify a role: app and group roles have
+      // independent id sequences, so an id alone is ambiguous.
+      const scope = this.route.snapshot.queryParamMap.get("scope");
+      if (!scope) {
+        this.snackbar.error("Role type is required to edit a role");
+        this.router.navigate(["/roles"]);
+        return;
+      }
+      this.mode.set(FormMode.edit);
+      this.roleId.set(Number(id));
+      this.loadRole(id, scope);
+    }
+  }
+
+  private loadRole(id: string, scope: string | null): void {
+    this.roleService
+      .getRoles()
+      .pipe(
+        take(1),
+        catchError(() => {
+          this.snackbar.error("Unable to load role");
+          this.router.navigate(["/roles"]);
+          return EMPTY;
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((roles) => {
+        const role = roles.find(
+          (candidate) =>
+            String(candidate.id) === id && this.scopeMatches(candidate.scope, scope),
+        );
+
+        if (!role) {
+          this.snackbar.error("Role not found");
+          this.router.navigate(["/roles"]);
+          return;
+        }
+
+        // System roles are immutable — open them read-only.
+        this.mode.set(role.isSystem ? FormMode.view : FormMode.edit);
+        this.form.patchValue({ name: role.name, description: role.description ?? "" });
+        this.type.set(role.scope === PermissionScope.Group ? "group" : "app");
+        this.granted.set(new Set(role.permissions));
+      });
+  }
+
+  private scopeMatches(scope: PermissionScope, scopeParam: string | null): boolean {
+    if (!scopeParam) {
+      return false;
+    }
+    const normalized = scope === PermissionScope.Group ? "group" : "app";
+    return normalized === scopeParam;
   }
 
   // ----- Per-resource helpers -----
@@ -171,7 +255,8 @@ export class RoleFormComponent {
 
   // ----- Actions -----
   public pickType(type: RoleType): void {
-    if (type === this.type()) {
+    // The type is fixed once the role exists.
+    if (this.isTypeLocked() || type === this.type()) {
       return;
     }
     this.type.set(type);
@@ -181,11 +266,17 @@ export class RoleFormComponent {
   }
 
   public pickPreset(preset: RolePreset): void {
+    if (this.isViewMode()) {
+      return;
+    }
     this.selectedPreset.set(preset.id);
     this.granted.set(preset.resolve(this.scopeKeys()));
   }
 
   public toggle(key: string): void {
+    if (this.isViewMode()) {
+      return;
+    }
     const next = new Set(this.granted());
     if (next.has(key)) {
       next.delete(key);
@@ -197,6 +288,9 @@ export class RoleFormComponent {
   }
 
   public toggleAll(group: RoleResourceGroup, on: boolean): void {
+    if (this.isViewMode()) {
+      return;
+    }
     const next = new Set(this.granted());
     for (const row of group.rows) {
       if (on) {
@@ -217,6 +311,10 @@ export class RoleFormComponent {
   }
 
   public submit(): void {
+    if (this.isViewMode()) {
+      return;
+    }
+
     this.form.markAllAsTouched();
     if (this.form.invalid) {
       return;
@@ -231,12 +329,19 @@ export class RoleFormComponent {
 
     this.lastPayload = payload;
 
-    this.roleService
-      .createRole(payload)
+    const roleId = this.roleId();
+    const request$ =
+      this.isEditMode() && roleId !== null
+        ? this.roleService.updateRole(roleId, payload)
+        : this.roleService.createRole(payload);
+
+    request$
       .pipe(
         take(1),
         tap((role) => {
-          this.snackbar.success(`Role "${role.name}" created`);
+          this.snackbar.success(
+            `Role "${role.name}" ${this.isEditMode() ? "updated" : "created"}`,
+          );
           this.router.navigate(["/roles"]);
         }),
       )

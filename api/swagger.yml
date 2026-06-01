@@ -2776,6 +2776,46 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /role/{roleId}:
+    parameters:
+      - in: path
+        name: roleId
+        schema:
+          type: integer
+        required: true
+        description: Id of the role to update
+    put:
+      tags:
+        - Role
+      summary: Update role
+      description: >-
+        Updates an existing app-scoped or group-scoped role. A role's type
+        cannot be changed: the scope in the request must match the existing
+        role's scope. System roles cannot be modified.
+      operationId: updateRole
+      requestBody:
+        description: Role to update
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertRoleCommand"
+      responses:
+        200:
+          description: The updated role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
 components:
   securitySchemes:
     bearerAuth:
@@ -2792,6 +2832,8 @@ components:
       description: Request was successfully processed
     BadRequest:
       description: The request was malformed
+    NotFound:
+      description: The requested resource was not found
     Forbidden:
       description: The request was not allowed
     Unauthorized:

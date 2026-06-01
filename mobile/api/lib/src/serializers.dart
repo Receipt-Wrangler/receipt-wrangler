@@ -89,6 +89,7 @@ import 'package:openapi/src/model/receipt_paged_request_filter.dart';
 import 'package:openapi/src/model/receipt_processing_settings.dart';
 import 'package:openapi/src/model/receipt_status.dart';
 import 'package:openapi/src/model/reset_password_command.dart';
+import 'package:openapi/src/model/role.dart';
 import 'package:openapi/src/model/search_result.dart';
 import 'package:openapi/src/model/sign_up_command.dart';
 import 'package:openapi/src/model/sort_direction.dart';
@@ -118,6 +119,7 @@ import 'package:openapi/src/model/upsert_item_command.dart';
 import 'package:openapi/src/model/upsert_prompt_command.dart';
 import 'package:openapi/src/model/upsert_receipt_command.dart';
 import 'package:openapi/src/model/upsert_receipt_processing_settings_command.dart';
+import 'package:openapi/src/model/upsert_role_command.dart';
 import 'package:openapi/src/model/upsert_system_email_command.dart';
 import 'package:openapi/src/model/upsert_system_settings_command.dart';
 import 'package:openapi/src/model/upsert_tag_command.dart';
@@ -209,6 +211,7 @@ part 'serializers.g.dart';
   ReceiptProcessingSettings,
   ReceiptStatus,
   ResetPasswordCommand,
+  Role,
   SearchResult,
   SignUpCommand,
   SortDirection,
@@ -238,6 +241,7 @@ part 'serializers.g.dart';
   UpsertPromptCommand,
   UpsertReceiptCommand,
   UpsertReceiptProcessingSettingsCommand,
+  UpsertRoleCommand,
   UpsertSystemEmailCommand,
   UpsertSystemSettingsCommand,
   UpsertTagCommand,
@@ -261,6 +265,30 @@ Serializers serializers = (_$serializers.toBuilder()
         () => ListBuilder<Group>(),
       )
       ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Notification)]),
+        () => ListBuilder<Notification>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Receipt)]),
+        () => ListBuilder<Receipt>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Role)]),
+        () => ListBuilder<Role>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Category)]),
+        () => ListBuilder<Category>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Tag)]),
+        () => ListBuilder<Tag>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(PermissionDescriptor)]),
+        () => ListBuilder<PermissionDescriptor>(),
+      )
+      ..addBuilderFactory(
         const FullType(BuiltList, [FullType(SearchResult)]),
         () => ListBuilder<SearchResult>(),
       )
@@ -275,26 +303,6 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(int)]),
         () => ListBuilder<int>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(Notification)]),
-        () => ListBuilder<Notification>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(Receipt)]),
-        () => ListBuilder<Receipt>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(Category)]),
-        () => ListBuilder<Category>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(Tag)]),
-        () => ListBuilder<Tag>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(PermissionDescriptor)]),
-        () => ListBuilder<PermissionDescriptor>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(UserView)]),

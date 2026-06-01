@@ -14,6 +14,7 @@ func BuildRoleRouter() *chi.Mux {
 
 	roleRouter.Get("/", handlers.GetRoles)
 	roleRouter.Post("/", handlers.CreateRole)
+	roleRouter.Put("/{roleId}", handlers.UpdateRole)
 
 	return roleRouter
 }

@@ -1,9 +1,9 @@
 <div class="rw-content">
-  <app-breadcrumb [items]="breadcrumbs"></app-breadcrumb>
+  <app-breadcrumb [items]="breadcrumbs()"></app-breadcrumb>
 
   <div class="rw-page-title">
     <div>
-      <h1>Create a Role</h1>
+      <h1>{{ title() }}</h1>
       <div class="sub">
         Choose what it applies to, start from a template, then tweak until it
         fits.
@@ -18,7 +18,11 @@
         <div class="rw-card rw-form-section">
           <h2>Role type</h2>
           <div class="hint">
-            A role applies to either the application or a group — not both.
+            @if (isTypeLocked()) {
+              A role's type can't be changed after it's created.
+            } @else {
+              A role applies to either the application or a group — not both.
+            }
           </div>
           <div class="rw-typegrid">
             @for (t of roleTypes; track t.id) {
@@ -26,6 +30,8 @@
                 type="button"
                 class="rw-typecard"
                 [class.active]="type() === t.id"
+                [class.locked]="isTypeLocked()"
+                [disabled]="isTypeLocked()"
                 (click)="pickType(t.id)"
               >
                 <span
@@ -80,6 +86,7 @@
                 type="button"
                 class="rw-preset"
                 [class.active]="selectedPreset() === p.id"
+                [disabled]="isViewMode()"
                 (click)="pickPreset(p)"
               >
                 <span
@@ -141,6 +148,7 @@
                   type="button"
                   class="rw-switch"
                   [class.on]="isAllOn(group)"
+                  [disabled]="isViewMode()"
                   [attr.aria-pressed]="isAllOn(group)"
                   [attr.aria-label]="
                     'Toggle all ' + group.name + ' permissions'
@@ -170,6 +178,7 @@
                         type="button"
                         class="rw-switch"
                         [class.on]="isGranted(row.key)"
+                        [disabled]="isViewMode()"
                         [attr.aria-pressed]="isGranted(row.key)"
                         [attr.aria-label]="'Toggle ' + row.label"
                         (click)="toggle(row.key)"
@@ -188,7 +197,9 @@
         <div class="rw-card rw-side-card">
           <h3>Summary</h3>
           <div class="rw-summary-stat">
-            <span class="big">{{ granted().size }}</span>
+            <span class="big" data-testid="granted-permission-count">{{
+              granted().size
+            }}</span>
             <span class="lbl">
               of {{ scopeTotal() }}
               {{ typeMeta().name.toLowerCase() }} permissions granted
@@ -234,16 +245,18 @@
       </div>
     </div>
 
-    <app-form-button-bar [mode]="formMode.add">
+    <app-form-button-bar [mode]="mode()">
       <app-button
-        buttonText="Cancel"
+        [buttonText]="isViewMode() ? 'Back' : 'Cancel'"
         matButtonType="basic"
         [buttonRouterLink]="['/roles']"
       ></app-button>
-      <app-submit-button
-        [onlyIcon]="false"
-        buttonText="Save Role"
-      ></app-submit-button>
+      @if (!isViewMode()) {
+        <app-submit-button
+          [onlyIcon]="false"
+          buttonText="Save Role"
+        ></app-submit-button>
+      }
     </app-form-button-bar>
   </form>
 </div>
