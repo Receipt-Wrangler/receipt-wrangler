@@ -269,4 +269,18 @@ describe("RoleListComponent", () => {
       "Cannot delete Busy because it is currently assigned.",
     );
   });
+
+  it("shows an error and does not reload when delete fails", async () => {
+    const { component, roleService, snackbar } = await setup();
+    const reloadSpy = jest.spyOn(roleService, "getRoles");
+    const callsBefore = reloadSpy.mock.calls.length;
+    (roleService.deleteRole as jest.Mock).mockReturnValueOnce(
+      throwError(() => new Error("boom")) as any,
+    );
+
+    component.deleteRole(listItem({ id: "5", scope: "group" }));
+
+    expect(snackbar.error).toHaveBeenCalledWith("Failed to delete role");
+    expect(reloadSpy.mock.calls.length).toBe(callsBefore);
+  });
 });

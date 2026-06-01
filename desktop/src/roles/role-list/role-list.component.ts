@@ -185,6 +185,13 @@ export class RoleListComponent implements AfterViewInit {
   }
 
   public deleteRole(role: RoleListItem): void {
+    // Defensive: the button gates this via [disabled], but guard programmatic
+    // calls so a non-deletable role never opens the confirmation or hits the API.
+    if (!this.canDelete(role)) {
+      this.disabledDeleteClicked(role);
+      return;
+    }
+
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
     dialogRef.componentInstance.headerText = "Delete Role";
     dialogRef.componentInstance.dialogContent = `Are you sure you want to delete the role: ${role.name}?`;
@@ -224,6 +231,10 @@ export class RoleListComponent implements AfterViewInit {
         tap(() => {
           this.snackbarService.success("Role deleted successfully");
           this.loadRoles();
+        }),
+        catchError(() => {
+          this.snackbarService.error("Failed to delete role");
+          return EMPTY;
         }),
       )
       .subscribe();

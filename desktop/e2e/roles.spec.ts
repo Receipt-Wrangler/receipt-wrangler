@@ -68,7 +68,7 @@ async function deleteRole(page: Page, name: string) {
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  await dialog.locator('button:has(mat-icon:has-text("done"))').click();
+  await dialog.getByTestId('dialog-submit-button').click();
 
   await expect(page.getByRole('row').filter({ hasText: name })).toHaveCount(0);
 }
@@ -92,7 +92,7 @@ async function cleanupRole(page: Page, name: string) {
     }
     await del.click();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('button:has(mat-icon:has-text("done"))').click();
+    await dialog.getByTestId('dialog-submit-button').click();
     await expect(dialog).toHaveCount(0);
   }
 }
