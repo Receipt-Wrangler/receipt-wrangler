@@ -165,6 +165,16 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		return nil, err
 	}
 
+	appRoleCounts, err := repository.countAppRoleAssignments()
+	if err != nil {
+		return nil, err
+	}
+
+	groupRoleCounts, err := repository.countGroupRoleAssignments()
+	if err != nil {
+		return nil, err
+	}
+
 	roles := make([]structs.RoleView, 0, len(appRoles)+len(groupRoles))
 
 	for _, role := range appRoles {
@@ -174,12 +184,13 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		}
 
 		roles = append(roles, structs.RoleView{
-			Id:          role.ID,
-			Name:        role.Name,
-			Description: role.Description,
-			Scope:       permissions.ScopeApp,
-			IsSystem:    role.IsSystem,
-			Permissions: perms,
+			Id:            role.ID,
+			Name:          role.Name,
+			Description:   role.Description,
+			Scope:         permissions.ScopeApp,
+			IsSystem:      role.IsSystem,
+			Permissions:   perms,
+			AssignedCount: appRoleCounts[role.ID],
 		})
 	}
 
@@ -190,14 +201,106 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		}
 
 		roles = append(roles, structs.RoleView{
-			Id:          role.ID,
-			Name:        role.Name,
-			Description: role.Description,
-			Scope:       permissions.ScopeGroup,
-			IsSystem:    role.IsSystem,
-			Permissions: perms,
+			Id:            role.ID,
+			Name:          role.Name,
+			Description:   role.Description,
+			Scope:         permissions.ScopeGroup,
+			IsSystem:      role.IsSystem,
+			Permissions:   perms,
+			AssignedCount: groupRoleCounts[role.ID],
 		})
 	}
 
 	return roles, nil
+}
+
+// roleAssignmentCount is the row shape returned by the grouped assignment-count
+// queries: a role id and the number of users/members assigned to it.
+type roleAssignmentCount struct {
+	ID    uint
+	Count int
+}
+
+// countAppRoleAssignments returns a map of app role id -> number of users
+// currently assigned that role, in a single grouped query (avoids N+1).
+func (repository RoleRepository) countAppRoleAssignments() (map[uint]int, error) {
+	db := repository.GetDB()
+
+	var rows []roleAssignmentCount
+	err := db.Model(&models.User{}).
+		Select("app_role_id as id, count(*) as count").
+		Where("app_role_id IS NOT NULL").
+		Group("app_role_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	counts := make(map[uint]int, len(rows))
+	for _, row := range rows {
+		counts[row.ID] = row.Count
+	}
+
+	return counts, nil
+}
+
+// countGroupRoleAssignments returns a map of group role id -> number of group
+// members currently assigned that role, in a single grouped query.
+func (repository RoleRepository) countGroupRoleAssignments() (map[uint]int, error) {
+	db := repository.GetDB()
+
+	var rows []roleAssignmentCount
+	err := db.Model(&models.GroupMember{}).
+		Select("group_role_id as id, count(*) as count").
+		Where("group_role_id IS NOT NULL").
+		Group("group_role_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	counts := make(map[uint]int, len(rows))
+	for _, row := range rows {
+		counts[row.ID] = row.Count
+	}
+
+	return counts, nil
+}
+
+func (repository RoleRepository) CountUsersWithAppRole(id uint) (int64, error) {
+	db := repository.GetDB()
+
+	var count int64
+	err := db.Model(&models.User{}).Where("app_role_id = ?", id).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (repository RoleRepository) CountGroupMembersWithGroupRole(id uint) (int64, error) {
+	db := repository.GetDB()
+
+	var count int64
+	err := db.Model(&models.GroupMember{}).Where("group_role_id = ?", id).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// DeleteAppRole deletes the app role and its permissions (children cascade via
+// the AppRolePermission OnDelete:CASCADE constraint).
+func (repository RoleRepository) DeleteAppRole(id uint) error {
+	db := repository.GetDB()
+	return db.Delete(&models.AppRole{}, id).Error
+}
+
+// DeleteGroupRole deletes the group role and its permissions and resource
+// grants (children cascade via their OnDelete:CASCADE constraints).
+func (repository RoleRepository) DeleteGroupRole(id uint) error {
+	db := repository.GetDB()
+	return db.Delete(&models.GroupRoleDefinition{}, id).Error
 }

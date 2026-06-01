@@ -11,9 +11,11 @@ import (
 )
 
 var (
-	ErrRoleNotFound        = errors.New("role not found")
-	ErrRoleTypeMismatch    = errors.New("role type cannot be changed")
-	ErrSystemRoleImmutable = errors.New("system roles cannot be modified")
+	ErrRoleNotFound          = errors.New("role not found")
+	ErrRoleTypeMismatch      = errors.New("role type cannot be changed")
+	ErrSystemRoleImmutable   = errors.New("system roles cannot be modified")
+	ErrSystemRoleUndeletable = errors.New("system roles cannot be deleted")
+	ErrRoleAssigned          = errors.New("role is assigned and cannot be deleted")
 )
 
 type RoleService struct {
@@ -179,4 +181,57 @@ func resolveMissingRoleError(roleRepository repositories.RoleRepository, otherSc
 func (service RoleService) GetRoles() ([]structs.RoleView, error) {
 	roleRepository := repositories.NewRoleRepository(nil)
 	return roleRepository.GetAllRoles()
+}
+
+// DeleteRole deletes an app- or group-scoped role. The scope disambiguates the
+// id (app and group role ids overlap). System roles cannot be deleted, and a
+// role cannot be deleted while it is assigned to any user or group member.
+func (service RoleService) DeleteRole(id uint, scope permissions.Scope) error {
+	return repositories.GetDB().Transaction(func(tx *gorm.DB) error {
+		roleRepository := repositories.NewRoleRepository(tx)
+
+		if scope == permissions.ScopeApp {
+			existing, txErr := roleRepository.GetAppRoleById(id)
+			if errors.Is(txErr, gorm.ErrRecordNotFound) {
+				return resolveMissingRoleError(roleRepository, permissions.ScopeGroup, id)
+			}
+			if txErr != nil {
+				return txErr
+			}
+			if existing.IsSystem {
+				return ErrSystemRoleUndeletable
+			}
+
+			count, txErr := roleRepository.CountUsersWithAppRole(id)
+			if txErr != nil {
+				return txErr
+			}
+			if count > 0 {
+				return ErrRoleAssigned
+			}
+
+			return roleRepository.DeleteAppRole(id)
+		}
+
+		existing, txErr := roleRepository.GetGroupRoleById(id)
+		if errors.Is(txErr, gorm.ErrRecordNotFound) {
+			return resolveMissingRoleError(roleRepository, permissions.ScopeApp, id)
+		}
+		if txErr != nil {
+			return txErr
+		}
+		if existing.IsSystem {
+			return ErrSystemRoleUndeletable
+		}
+
+		count, txErr := roleRepository.CountGroupMembersWithGroupRole(id)
+		if txErr != nil {
+			return txErr
+		}
+		if count > 0 {
+			return ErrRoleAssigned
+		}
+
+		return roleRepository.DeleteGroupRole(id)
+	})
 }

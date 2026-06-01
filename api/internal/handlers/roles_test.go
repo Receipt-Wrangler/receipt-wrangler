@@ -322,3 +322,215 @@ func TestShouldReturnNotFoundForMissingRole(t *testing.T) {
 		utils.PrintTestError(t, w.Result().StatusCode, 404)
 	}
 }
+
+func deleteRoleRequest(roleId string, scope string, claims *validator.ValidatedClaims) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("DELETE", "/api?scope="+scope, nil)
+
+	ctx := chi.NewRouteContext()
+	ctx.URLParams.Add("roleId", roleId)
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, ctx))
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claims))
+
+	DeleteRole(w, r)
+	return w
+}
+
+func TestShouldDeleteAppRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+
+	w := deleteRoleRequest("1", "APP", adminContext())
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+		return
+	}
+
+	roleRepository := repositories.NewRoleRepository(nil)
+	if _, err := roleRepository.GetAppRoleById(1); err == nil {
+		utils.PrintTestError(t, "app role still exists", "app role should be deleted")
+	}
+}
+
+func TestShouldDeleteGroupRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+
+	w := deleteRoleRequest("1", "GROUP", adminContext())
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+		return
+	}
+
+	roleRepository := repositories.NewRoleRepository(nil)
+	if _, err := roleRepository.GetGroupRoleById(1); err == nil {
+		utils.PrintTestError(t, "group role still exists", "group role should be deleted")
+	}
+}
+
+func TestShouldNotDeleteRoleDueToRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+
+	w := deleteRoleRequest("1", "APP", userContext())
+
+	if w.Result().StatusCode != 403 {
+		utils.PrintTestError(t, w.Result().StatusCode, 403)
+	}
+}
+
+func TestShouldReturnBadRequestForInvalidDeleteRoleId(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	w := deleteRoleRequest("abc", "APP", adminContext())
+
+	if w.Result().StatusCode != 400 {
+		utils.PrintTestError(t, w.Result().StatusCode, 400)
+	}
+}
+
+func TestShouldReturnBadRequestForInvalidDeleteScope(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+
+	for _, scope := range []string{"", "BOGUS"} {
+		w := deleteRoleRequest("1", scope, adminContext())
+		if w.Result().StatusCode != 400 {
+			utils.PrintTestError(t, w.Result().StatusCode, 400)
+		}
+	}
+}
+
+func TestShouldReturnNotFoundForMissingDeleteRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	w := deleteRoleRequest("999", "APP", adminContext())
+
+	if w.Result().StatusCode != 404 {
+		utils.PrintTestError(t, w.Result().StatusCode, 404)
+	}
+}
+
+func TestShouldNotDeleteRoleDueToScopeMismatch(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	roleRepository := repositories.NewRoleRepository(nil)
+	created, err := roleRepository.CreateAppRole("App Role", "desc", []string{permissions.AppUsersCreate})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Deleting an app role id under the GROUP scope is a type mismatch, not a delete.
+	w := deleteRoleRequest(strconv.FormatUint(uint64(created.ID), 10), "GROUP", adminContext())
+
+	if w.Result().StatusCode != 400 {
+		utils.PrintTestError(t, w.Result().StatusCode, 400)
+		return
+	}
+
+	if _, err := roleRepository.GetAppRoleById(created.ID); err != nil {
+		utils.PrintTestError(t, err, "app role should be untouched")
+	}
+}
+
+func TestShouldNotDeleteSystemRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	db := repositories.GetDB()
+	systemRole := models.AppRole{
+		Name:        "System Role",
+		Description: "system role",
+		IsSystem:    true,
+		Permissions: []models.AppRolePermission{
+			{Permission: permissions.AppUsersCreate},
+		},
+	}
+	if err := db.Create(&systemRole).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	w := deleteRoleRequest(strconv.FormatUint(uint64(systemRole.ID), 10), "APP", adminContext())
+
+	if w.Result().StatusCode != 400 {
+		utils.PrintTestError(t, w.Result().StatusCode, 400)
+		return
+	}
+
+	roleRepository := repositories.NewRoleRepository(nil)
+	if _, err := roleRepository.GetAppRoleById(systemRole.ID); err != nil {
+		utils.PrintTestError(t, err, "system role should be untouched")
+	}
+}
+
+func TestShouldNotDeleteAssignedAppRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	roleRepository := repositories.NewRoleRepository(nil)
+	created, err := roleRepository.CreateAppRole("App Role", "desc", []string{permissions.AppUsersCreate})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	db := repositories.GetDB()
+	user := models.User{Username: "assigned-user", Password: "password", AppRoleID: &created.ID}
+	if err := db.Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	w := deleteRoleRequest(strconv.FormatUint(uint64(created.ID), 10), "APP", adminContext())
+
+	if w.Result().StatusCode != 400 {
+		utils.PrintTestError(t, w.Result().StatusCode, 400)
+		return
+	}
+
+	if _, err := roleRepository.GetAppRoleById(created.ID); err != nil {
+		utils.PrintTestError(t, err, "assigned app role should be untouched")
+	}
+}
+
+func TestShouldNotDeleteAssignedGroupRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	roleRepository := repositories.NewRoleRepository(nil)
+	created, err := roleRepository.CreateGroupRole("Group Role", "desc", []string{permissions.GroupReceiptsCreate})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	db := repositories.GetDB()
+	user := models.User{Username: "member-user", Password: "password"}
+	if err := db.Table("users").Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	group := models.Group{Name: "Test Group"}
+	if err := db.Create(&group).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	member := models.GroupMember{
+		UserID:      user.ID,
+		GroupID:     group.ID,
+		GroupRole:   models.OWNER,
+		GroupRoleID: &created.ID,
+	}
+	if err := db.Create(&member).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	w := deleteRoleRequest(strconv.FormatUint(uint64(created.ID), 10), "GROUP", adminContext())
+
+	if w.Result().StatusCode != 400 {
+		utils.PrintTestError(t, w.Result().StatusCode, 400)
+		return
+	}
+
+	if _, err := roleRepository.GetGroupRoleById(created.ID); err != nil {
+		utils.PrintTestError(t, err, "assigned group role should be untouched")
+	}
+}

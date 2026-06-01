@@ -3,16 +3,36 @@ import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http"
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { MatDialog } from "@angular/material/dialog";
 import { Router, RouterModule } from "@angular/router";
 import { of, throwError } from "rxjs";
 import {
   ApiModule,
   PermissionDescriptor,
+  PermissionScope,
   PermissionService,
   Role,
   RoleService,
 } from "../../open-api";
+import { SnackbarService } from "../../services";
 import { RoleListComponent } from "./role-list.component";
+import { RoleListItem, RoleScope } from "./role-list-item.interface";
+
+function listItem(overrides: Partial<RoleListItem> = {}): RoleListItem {
+  return {
+    id: "1",
+    name: "Some Role",
+    description: "",
+    scope: "app" as RoleScope,
+    permissionCount: 0,
+    userCount: 0,
+    isSystem: false,
+    icon: "apps",
+    iconColor: "",
+    iconTint: "",
+    ...overrides,
+  };
+}
 
 const DESCRIPTORS: PermissionDescriptor[] = [
   { key: "app.users.create", label: "", description: "", category: "Users", scope: "APP" },
@@ -44,11 +64,22 @@ const ROLES: Role[] = [
 async function setup(
   roles: Role[] = ROLES,
   permissions: PermissionDescriptor[] | "error" = DESCRIPTORS,
+  confirmResult = true,
 ): Promise<{
   component: RoleListComponent;
   fixture: ComponentFixture<RoleListComponent>;
   navigateSpy: jest.SpyInstance;
+  roleService: RoleService;
+  snackbar: SnackbarService;
+  dialogRef: { componentInstance: any; afterClosed: jest.Mock };
 }> {
+  const dialogRef = {
+    componentInstance: {} as any,
+    afterClosed: jest.fn().mockReturnValue(of(confirmResult)),
+  };
+  const matDialogMock = { open: jest.fn().mockReturnValue(dialogRef) };
+  const snackbarMock = { info: jest.fn(), success: jest.fn(), error: jest.fn() };
+
   TestBed.resetTestingModule();
   await TestBed.configureTestingModule({
     declarations: [RoleListComponent],
@@ -58,10 +89,14 @@ async function setup(
       provideZonelessChangeDetection(),
       provideHttpClient(withInterceptorsFromDi()),
       provideHttpClientTesting(),
+      { provide: MatDialog, useValue: matDialogMock },
+      { provide: SnackbarService, useValue: snackbarMock },
     ],
   }).compileComponents();
 
-  jest.spyOn(TestBed.inject(RoleService), "getRoles").mockReturnValue(of(roles) as any);
+  const roleService = TestBed.inject(RoleService);
+  jest.spyOn(roleService, "getRoles").mockReturnValue(of(roles) as any);
+  jest.spyOn(roleService, "deleteRole").mockReturnValue(of({}) as any);
   jest
     .spyOn(TestBed.inject(PermissionService), "getPermissions")
     .mockReturnValue(
@@ -76,7 +111,14 @@ async function setup(
   const fixture = TestBed.createComponent(RoleListComponent);
   const component = fixture.componentInstance;
   await fixture.whenStable();
-  return { component, fixture, navigateSpy };
+  return {
+    component,
+    fixture,
+    navigateSpy,
+    roleService,
+    snackbar: TestBed.inject(SnackbarService),
+    dialogRef,
+  };
 }
 
 describe("RoleListComponent", () => {
@@ -181,9 +223,50 @@ describe("RoleListComponent", () => {
     expect(component.roleCount()).toBe(2);
   });
 
-  it("returns up to two uppercased initials", async () => {
+  it("populates the member count from the role's assigned count", async () => {
+    const { component } = await setup([
+      { ...ROLES[1], id: 5, assignedCount: 3 },
+    ]);
+    expect(component.roles()[0].userCount).toBe(3);
+  });
+
+  it("allows deletion only for unassigned, non-system roles", async () => {
     const { component } = await setup();
-    expect(component.initials("Noah Hall")).toBe("NH");
-    expect(component.initials("dana")).toBe("D");
+    expect(component.canDelete(listItem())).toBe(true);
+    expect(component.canDelete(listItem({ isSystem: true }))).toBe(false);
+    expect(component.canDelete(listItem({ userCount: 2 }))).toBe(false);
+  });
+
+  it("deletes a role with its scope after confirmation, then reloads", async () => {
+    const { component, roleService } = await setup();
+    const reloadSpy = jest.spyOn(roleService, "getRoles");
+    const callsBefore = reloadSpy.mock.calls.length;
+
+    component.deleteRole(listItem({ id: "5", scope: "group" }));
+
+    expect(roleService.deleteRole).toHaveBeenCalledWith(PermissionScope.Group, 5);
+    expect(reloadSpy.mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  it("does not delete when the confirmation is cancelled", async () => {
+    const { component, roleService } = await setup(ROLES, DESCRIPTORS, false);
+
+    component.deleteRole(listItem({ id: "5", scope: "app" }));
+
+    expect(roleService.deleteRole).not.toHaveBeenCalled();
+  });
+
+  it("explains why a disabled delete is blocked without revealing assignees", async () => {
+    const { component, snackbar } = await setup();
+
+    component.disabledDeleteClicked(listItem({ name: "Sys", isSystem: true }));
+    expect(snackbar.info).toHaveBeenCalledWith(
+      "Cannot delete Sys because it is a system role.",
+    );
+
+    component.disabledDeleteClicked(listItem({ name: "Busy", userCount: 4 }));
+    expect(snackbar.info).toHaveBeenCalledWith(
+      "Cannot delete Busy because it is currently assigned.",
+    );
   });
 });

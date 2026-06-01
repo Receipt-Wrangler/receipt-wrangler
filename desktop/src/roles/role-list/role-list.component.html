@@ -92,16 +92,9 @@
   @if (role.userCount === 0) {
     <span class="no-users">No users</span>
   } @else {
-    <div class="user-stack">
-      @for (member of role.members.slice(0, 3); track member.name) {
-        <span class="avatar" [style.background]="member.color">{{
-          initials(member.name)
-        }}</span>
-      }
-      @if (role.userCount > 3) {
-        <span class="more">+{{ role.userCount - 3 }}</span>
-      }
-    </div>
+    <span class="user-count"
+      >{{ role.userCount }} {{ role.userCount === 1 ? "user" : "users" }}</span
+    >
   }
 </ng-template>
 
@@ -115,12 +108,18 @@
       [tooltip]="role.isSystem ? 'View' : 'Edit'"
       (clicked)="editRole(role)"
     ></app-button>
-    <app-button
-      matButtonType="iconButton"
-      color="accent"
-      icon="more_vert"
-      tooltip="More actions"
-      (clicked)="openRoleMenu(role)"
-    ></app-button>
+    <app-delete-button
+      data-testid="role-delete"
+      [tooltip]="
+        role.isSystem
+          ? 'System roles cannot be deleted'
+          : role.userCount > 0
+            ? 'Role is assigned and cannot be deleted'
+            : 'Delete'
+      "
+      [disabled]="!canDelete(role)"
+      (clicked)="deleteRole(role)"
+      (click)="disabledDeleteClicked(role)"
+    ></app-delete-button>
   </div>
 </ng-template>

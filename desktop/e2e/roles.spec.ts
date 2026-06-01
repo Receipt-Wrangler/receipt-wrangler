@@ -11,15 +11,18 @@ function uniqueName(tag: string) {
 
 type RoleType = 'app' | 'group';
 
-// NOTE: there is no delete-role flow yet (no endpoint/UI), so created roles can't
-// be cleaned up. Tests therefore use unique names and assert that the *specific*
-// role they created appears — never absolute row/count totals — so they stay
-// correct as roles accumulate on the shared DB. Add an afterEach cleanup here
-// once a delete flow exists.
+// Roles created during a test are tracked here and removed in afterEach so the
+// shared DB does not accumulate test data. The array is reset per test; under
+// Playwright's worker model each worker runs its tests sequentially, so this
+// module-level state is safe. Tests still use unique names and assert on the
+// *specific* role they created (never absolute totals) to stay parallel-safe.
+let createdRoles: string[] = [];
+
 async function createRole(
   page: Page,
   opts: { name: string; type: RoleType; template: string },
 ) {
+  createdRoles.push(opts.name);
   await page.goto('/roles');
   // Header "Add Role" button (the empty-state one, if present, is identical).
   await page.getByRole('button', { name: 'Add Role' }).first().click();
@@ -54,6 +57,46 @@ async function openRoleEditor(page: Page, name: string) {
   await expect(page.getByLabel('Role Name')).toHaveValue(name);
 }
 
+// Deletes a role from the list by name and asserts the row is gone. The delete
+// icon button has no accessible name, so it carries a data-testid. The
+// confirmation dialog's confirm button is the icon-only "done" submit button.
+async function deleteRole(page: Page, name: string) {
+  await page.goto('/roles');
+  const row = page.getByRole('row').filter({ hasText: name }).first();
+  await expect(row).toBeVisible();
+  await row.getByTestId('role-delete').click();
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.locator('button:has(mat-icon:has-text("done"))').click();
+
+  await expect(page.getByRole('row').filter({ hasText: name })).toHaveCount(0);
+}
+
+// Best-effort cleanup: removes every list row whose name contains `name`
+// (catches renamed variants, e.g. "<name>-renamed"). Skips rows whose delete is
+// disabled (system/assigned) and stops once none remain.
+async function cleanupRole(page: Page, name: string) {
+  for (let i = 0; i < 20; i++) {
+    await page.goto('/roles');
+    // The table renders only after getRoles() resolves; wait for it before
+    // counting so a not-yet-loaded list isn't mistaken for "already gone".
+    await expect(page.locator('app-table')).toBeVisible();
+    const rows = page.getByRole('row').filter({ hasText: name });
+    if ((await rows.count()) === 0) {
+      return;
+    }
+    const del = rows.first().getByTestId('role-delete');
+    if (await del.isDisabled()) {
+      return;
+    }
+    await del.click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('button:has(mat-icon:has-text("done"))').click();
+    await expect(dialog).toHaveCount(0);
+  }
+}
+
 // The summary panel's granted-permission count (driven by granted().size).
 async function grantedCount(page: Page): Promise<number> {
   return Number((await page.getByTestId('granted-permission-count').innerText()).trim());
@@ -71,7 +114,14 @@ async function saveRole(page: Page) {
 
 test.describe('roles', () => {
   test.beforeEach(async ({ page }) => {
+    createdRoles = [];
     await stubTokenRefresh(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    for (const name of createdRoles) {
+      await cleanupRole(page, name);
+    }
   });
 
   test('create an application role and see it in the table', async ({ page }) => {
@@ -186,6 +236,18 @@ test.describe('roles', () => {
     const row = page.getByRole('row').filter({ hasText: renamed }).first();
     await expect(row).toBeVisible();
     await expect(row).toContainText('Group');
+  });
+
+  test('create a role then delete it removes it from the table', async ({ page }) => {
+    const name = uniqueName('delete');
+    await createRole(page, { name, type: 'app', template: 'Read Only' });
+
+    // A freshly created, unassigned role is deletable.
+    await page.goto('/roles');
+    const row = page.getByRole('row').filter({ hasText: name }).first();
+    await expect(row.getByTestId('role-delete')).toBeEnabled();
+
+    await deleteRole(page, name);
   });
 
   test('cancelling an edit discards changes', async ({ page }) => {
