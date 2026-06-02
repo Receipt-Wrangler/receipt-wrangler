@@ -25,7 +25,7 @@ func (command *PagedRoleRequestCommand) LoadDataFromRequest(w http.ResponseWrite
 		return err
 	}
 
-	err = json.Unmarshal(bytes, &command)
+	err = json.Unmarshal(bytes, command)
 	if err != nil {
 		return err
 	}

@@ -338,6 +338,58 @@ func TestGetPagedRolesPaginates(t *testing.T) {
 	}
 }
 
+// When an app role and a group role share a name, ordering by name alone leaves
+// the tie unresolved; the (scope, id) tie-breaker must keep page boundaries
+// deterministic so no row is skipped or duplicated across pages.
+func TestGetPagedRolesStableOrderingOnTiedNames(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	if _, err := repository.CreateAppRole("Dup", "", nil); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if _, err := repository.CreateGroupRole("Dup", "", nil); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	pageCommand := func(page int) commands.PagedRoleRequestCommand {
+		return commands.PagedRoleRequestCommand{
+			PagedRequestCommand: commands.PagedRequestCommand{
+				Page:          page,
+				PageSize:      1,
+				OrderBy:       "name",
+				SortDirection: commands.ASCENDING,
+			},
+		}
+	}
+
+	firstPage, count, err := repository.GetPagedRoles(pageCommand(1))
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 2 {
+		utils.PrintTestError(t, count, 2)
+	}
+	// 'APP' < 'GROUP', so the app role is the first of the two tied "Dup" rows.
+	if len(firstPage) != 1 || firstPage[0].Scope != permissions.ScopeApp {
+		utils.PrintTestError(t, firstPage, "first page: the APP-scoped Dup role")
+		return
+	}
+
+	secondPage, _, err := repository.GetPagedRoles(pageCommand(2))
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	// The second page must be the *other* tied row — never a repeat of page 1.
+	if len(secondPage) != 1 || secondPage[0].Scope != permissions.ScopeGroup {
+		utils.PrintTestError(t, secondPage, "second page: the GROUP-scoped Dup role")
+	}
+}
+
 func TestGetPagedRolesIncludesAssignedCount(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)

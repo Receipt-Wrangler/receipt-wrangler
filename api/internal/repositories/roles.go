@@ -166,12 +166,12 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		return nil, err
 	}
 
-	appRoleCounts, err := repository.countAppRoleAssignments()
+	appRoleCounts, err := repository.countAppRoleAssignments(nil)
 	if err != nil {
 		return nil, err
 	}
 
-	groupRoleCounts, err := repository.countGroupRoleAssignments()
+	groupRoleCounts, err := repository.countGroupRoleAssignments(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,12 @@ func (repository RoleRepository) GetPagedRoles(command commands.PagedRoleRequest
 		return nil, 0, err
 	}
 
+	// Append a deterministic tie-breaker: ordering by the sort column alone leaves
+	// tied rows (e.g. an app role and a group role with the same name) in an
+	// unspecified order, which can skip or duplicate rows across LIMIT/OFFSET
+	// pages. The (scope, id) pair uniquely identifies a row in the union.
 	query := repository.Sort(buildUnionQuery(), orderBy, command.SortDirection)
+	query = query.Order("scope").Order("id")
 	query = query.Scopes(repository.Paginate(command.Page, command.PageSize))
 
 	var rows []roleUnionRow
@@ -306,12 +311,12 @@ func (repository RoleRepository) buildRoleViews(rows []roleUnionRow) ([]structs.
 		return nil, err
 	}
 
-	appRoleCounts, err := repository.countAppRoleAssignments()
+	appRoleCounts, err := repository.countAppRoleAssignments(appRoleIds)
 	if err != nil {
 		return nil, err
 	}
 
-	groupRoleCounts, err := repository.countGroupRoleAssignments()
+	groupRoleCounts, err := repository.countGroupRoleAssignments(groupRoleIds)
 	if err != nil {
 		return nil, err
 	}
@@ -395,16 +400,24 @@ type roleAssignmentCount struct {
 }
 
 // countAppRoleAssignments returns a map of app role id -> number of users
-// currently assigned that role, in a single grouped query (avoids N+1).
-func (repository RoleRepository) countAppRoleAssignments() (map[uint]int, error) {
-	db := repository.GetDB()
+// currently assigned that role, in a single grouped query (avoids N+1). A nil
+// roleIds counts every role; a non-nil slice scopes the count to those ids (so a
+// page request doesn't scan the whole users table).
+func (repository RoleRepository) countAppRoleAssignments(roleIds []uint) (map[uint]int, error) {
+	if roleIds != nil && len(roleIds) == 0 {
+		return map[uint]int{}, nil
+	}
 
-	var rows []roleAssignmentCount
-	err := db.Model(&models.User{}).
+	query := repository.GetDB().Model(&models.User{}).
 		Select("app_role_id as id, count(*) as count").
 		Where("app_role_id IS NOT NULL").
-		Group("app_role_id").
-		Scan(&rows).Error
+		Group("app_role_id")
+	if roleIds != nil {
+		query = query.Where("app_role_id IN ?", roleIds)
+	}
+
+	var rows []roleAssignmentCount
+	err := query.Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -418,16 +431,23 @@ func (repository RoleRepository) countAppRoleAssignments() (map[uint]int, error)
 }
 
 // countGroupRoleAssignments returns a map of group role id -> number of group
-// members currently assigned that role, in a single grouped query.
-func (repository RoleRepository) countGroupRoleAssignments() (map[uint]int, error) {
-	db := repository.GetDB()
+// members currently assigned that role, in a single grouped query. A nil
+// roleIds counts every role; a non-nil slice scopes the count to those ids.
+func (repository RoleRepository) countGroupRoleAssignments(roleIds []uint) (map[uint]int, error) {
+	if roleIds != nil && len(roleIds) == 0 {
+		return map[uint]int{}, nil
+	}
 
-	var rows []roleAssignmentCount
-	err := db.Model(&models.GroupMember{}).
+	query := repository.GetDB().Model(&models.GroupMember{}).
 		Select("group_role_id as id, count(*) as count").
 		Where("group_role_id IS NOT NULL").
-		Group("group_role_id").
-		Scan(&rows).Error
+		Group("group_role_id")
+	if roleIds != nil {
+		query = query.Where("group_role_id IN ?", roleIds)
+	}
+
+	var rows []roleAssignmentCount
+	err := query.Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
