@@ -10,16 +10,28 @@ import {
 } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
+import { PageEvent } from "@angular/material/paginator";
+import { Sort } from "@angular/material/sort";
 import { MatTableDataSource } from "@angular/material/table";
 import { Router } from "@angular/router";
+import { Store } from "@ngxs/store";
 import { EMPTY, catchError, take, tap } from "rxjs";
 import {
+  PagedRoleRequestCommand,
   PermissionScope,
   Role,
   RoleService,
   PermissionService,
 } from "../../open-api";
 import { SnackbarService } from "../../services";
+import { RoleTableState } from "../../store/role-table.state";
+import {
+  SetOrderBy,
+  SetPage,
+  SetPageSize,
+  SetScope,
+  SetSortDirection,
+} from "../../store/role-table.state.actions";
 import { TableColumn } from "../../table/table-column.interface";
 import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
 import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
@@ -50,6 +62,7 @@ export class RoleListComponent implements AfterViewInit {
   private readonly router = inject(Router);
   private readonly matDialog = inject(MatDialog);
   private readonly snackbarService = inject(SnackbarService);
+  private readonly store = inject(Store);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly roleCellTemplate = viewChild.required<TemplateRef<any>>("roleCell");
@@ -59,53 +72,41 @@ export class RoleListComponent implements AfterViewInit {
   private readonly membersCellTemplate = viewChild.required<TemplateRef<any>>("membersCell");
   private readonly actionsCellTemplate = viewChild.required<TemplateRef<any>>("actionsCell");
 
+  // Both are populated together in ngAfterViewInit (the cell templates aren't
+  // available earlier). They must stay empty until then: the paged table renders
+  // on first paint, and MatTable errors if displayedColumns references a column
+  // whose matColumnDef hasn't been registered yet.
   public readonly columns = signal<TableColumn[]>([]);
-  public readonly displayedColumns = signal<string[]>([
-    "role",
-    "type",
-    "permissions",
-    "members",
-    "actions",
-  ]);
+  public readonly displayedColumns = signal<string[]>([]);
 
   public readonly crumbs: BreadcrumbItem[] = [
     { label: "Admin" },
     { label: "Roles" },
   ];
 
-  public readonly roles = signal<RoleListItem[]>([]);
-  public readonly roleCount = computed(() => this.roles().length);
+  // Server-side paged table state. Paging fields come from the shared `state`
+  // selector; the scope filter (which backs the filter bar) is exposed
+  // separately and is mapped to the API scope when building the request.
+  public readonly state = this.store.selectSignal(RoleTableState.state);
+  public readonly filter = this.store.selectSignal(RoleTableState.scope);
 
-  public readonly filter = signal<RoleListFilter>("all");
-  public readonly filteredRoles = computed(() => {
-    const filter = this.filter();
-    if (filter === "all") {
-      return this.roles();
-    }
-    return this.roles().filter((role) => role.scope === filter);
-  });
+  public readonly dataSource = signal(new MatTableDataSource<RoleListItem>([]));
+  public readonly totalCount = signal(0);
 
-  public readonly counts = computed(() => {
-    const roles = this.roles();
-    return {
-      all: roles.length,
-      app: roles.filter((r) => r.scope === "app").length,
-      group: roles.filter((r) => r.scope === "group").length,
-    };
-  });
-
-  public readonly filterTabs = computed<FilterTab[]>(() => {
-    const counts = this.counts();
-    return [
-      { value: "all", label: "All roles", icon: "list", count: counts.all },
-      { value: "app", label: "Application", icon: "apps", count: counts.app },
-      { value: "group", label: "Group", icon: "workspaces", count: counts.group },
-    ];
-  });
-
-  public readonly dataSource = computed(
-    () => new MatTableDataSource(this.filteredRoles()),
+  // Becomes true after the first response so the empty-state CTA doesn't flash
+  // before the initial page has loaded.
+  private readonly loaded = signal(false);
+  public readonly showEmptyState = computed(
+    () => this.loaded() && this.filter() === "all" && this.totalCount() === 0,
   );
+
+  // The numeric count badges were dropped when the table moved to server-side
+  // paging — a single page can't report per-scope totals.
+  public readonly filterTabs: FilterTab[] = [
+    { value: "all", label: "All roles", icon: "list" },
+    { value: "app", label: "Application", icon: "apps" },
+    { value: "group", label: "Group", icon: "workspaces" },
+  ];
 
   // Per-scope permission totals from the registry — the denominator for each
   // role's meter (a role's bar is relative to its own scope's total).
@@ -117,11 +118,12 @@ export class RoleListComponent implements AfterViewInit {
   }
 
   public ngAfterViewInit(): void {
-    this.columns.set([
+    const state = this.store.selectSnapshot(RoleTableState.state);
+    const columns: TableColumn[] = [
       {
         columnHeader: "Role",
-        matColumnDef: "role",
-        sortable: false,
+        matColumnDef: "name",
+        sortable: true,
         template: this.roleCellTemplate(),
       },
       {
@@ -148,11 +150,35 @@ export class RoleListComponent implements AfterViewInit {
         sortable: false,
         template: this.actionsCellTemplate(),
       },
-    ]);
+    ];
+
+    // Restore the persisted sort indicator on the sortable column.
+    if (state.orderBy) {
+      const column = columns.find((c) => c.matColumnDef === state.orderBy);
+      if (column) {
+        column.defaultSortDirection = state.sortDirection;
+      }
+    }
+
+    this.columns.set(columns);
+    this.displayedColumns.set(["name", "type", "permissions", "members", "actions"]);
   }
 
   public setFilter(filter: string): void {
-    this.filter.set(filter as RoleListFilter);
+    this.store.dispatch(new SetScope(filter as RoleListFilter));
+    this.loadRoles();
+  }
+
+  public updatePageData(pageEvent: PageEvent): void {
+    this.store.dispatch(new SetPage(pageEvent.pageIndex + 1));
+    this.store.dispatch(new SetPageSize(pageEvent.pageSize));
+    this.loadRoles();
+  }
+
+  public sorted(sortState: Sort): void {
+    this.store.dispatch(new SetOrderBy(sortState.active));
+    this.store.dispatch(new SetSortDirection(sortState.direction));
+    this.loadRoles();
   }
 
   /** Ten meter segments; filled ones tagged with the role's scope for color. */
@@ -246,12 +272,43 @@ export class RoleListComponent implements AfterViewInit {
     return scope === "group" ? PermissionScope.Group : PermissionScope.App;
   }
 
+  // Maps the filter-bar scope ('all'/'app'/'group') to the API filter. "all"
+  // omits the scope so the backend returns both scopes.
+  private toScopeFilter(scope: RoleListFilter): PermissionScope | undefined {
+    if (scope === "app") {
+      return PermissionScope.App;
+    }
+    if (scope === "group") {
+      return PermissionScope.Group;
+    }
+    return undefined;
+  }
+
+  private buildRequest(): PagedRoleRequestCommand {
+    const state = this.store.selectSnapshot(RoleTableState.state);
+    const scope = this.store.selectSnapshot(RoleTableState.scope);
+    return {
+      page: state.page,
+      pageSize: state.pageSize,
+      orderBy: state.orderBy,
+      sortDirection: state.sortDirection,
+      filter: { scope: this.toScopeFilter(scope) },
+    };
+  }
+
   private loadRoles(): void {
     this.roleService
-      .getRoles()
+      .getPagedRoles(this.buildRequest())
       .pipe(
         take(1),
-        tap((roles) => this.roles.set(roles.map((role) => this.toListItem(role)))),
+        tap((pagedData) => {
+          const items = (pagedData.data ?? []).map((role) =>
+            this.toListItem(role as Role),
+          );
+          this.dataSource.set(new MatTableDataSource(items));
+          this.totalCount.set(pagedData.totalCount);
+          this.loaded.set(true);
+        }),
         catchError(() => EMPTY),
         takeUntilDestroyed(this.destroyRef),
       )

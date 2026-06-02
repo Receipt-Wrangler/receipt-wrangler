@@ -183,6 +183,11 @@ func (service RoleService) GetRoles() ([]structs.RoleView, error) {
 	return roleRepository.GetAllRoles()
 }
 
+func (service RoleService) GetPagedRoles(command commands.PagedRoleRequestCommand) ([]structs.RoleView, int64, error) {
+	roleRepository := repositories.NewRoleRepository(nil)
+	return roleRepository.GetPagedRoles(command)
+}
+
 // DeleteRole deletes an app- or group-scoped role. The scope disambiguates the
 // id (app and group role ids overlap). System roles cannot be deleted, and a
 // role cannot be deleted while it is assigned to any user or group member.

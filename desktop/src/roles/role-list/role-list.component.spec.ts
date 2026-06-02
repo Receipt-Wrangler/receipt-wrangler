@@ -5,9 +5,11 @@ import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialog } from "@angular/material/dialog";
 import { Router, RouterModule } from "@angular/router";
+import { NgxsModule } from "@ngxs/store";
 import { of, throwError } from "rxjs";
 import {
   ApiModule,
+  PagedRoleRequestCommand,
   PermissionDescriptor,
   PermissionScope,
   PermissionService,
@@ -15,6 +17,7 @@ import {
   RoleService,
 } from "../../open-api";
 import { SnackbarService } from "../../services";
+import { RoleTableState } from "../../store/role-table.state";
 import { RoleListComponent } from "./role-list.component";
 import { RoleListItem, RoleScope } from "./role-list-item.interface";
 
@@ -70,6 +73,7 @@ async function setup(
   fixture: ComponentFixture<RoleListComponent>;
   navigateSpy: jest.SpyInstance;
   roleService: RoleService;
+  getPagedRolesSpy: jest.SpyInstance;
   snackbar: SnackbarService;
   dialogRef: { componentInstance: any; afterClosed: jest.Mock };
 }> {
@@ -84,7 +88,12 @@ async function setup(
   await TestBed.configureTestingModule({
     declarations: [RoleListComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [ApiModule, CommonModule, RouterModule.forRoot([])],
+    imports: [
+      ApiModule,
+      CommonModule,
+      RouterModule.forRoot([]),
+      NgxsModule.forRoot([RoleTableState]),
+    ],
     providers: [
       provideZonelessChangeDetection(),
       provideHttpClient(withInterceptorsFromDi()),
@@ -95,7 +104,15 @@ async function setup(
   }).compileComponents();
 
   const roleService = TestBed.inject(RoleService);
-  jest.spyOn(roleService, "getRoles").mockReturnValue(of(roles) as any);
+  // Simulate the server: a scope filter narrows the returned rows, and
+  // totalCount reflects the (filtered) total.
+  const getPagedRolesSpy = jest
+    .spyOn(roleService, "getPagedRoles")
+    .mockImplementation((command: PagedRoleRequestCommand) => {
+      const scope = command?.filter?.scope;
+      const filtered = scope ? roles.filter((r) => r.scope === scope) : roles;
+      return of({ data: filtered, totalCount: filtered.length }) as any;
+    });
   jest.spyOn(roleService, "deleteRole").mockReturnValue(of({}) as any);
   jest
     .spyOn(TestBed.inject(PermissionService), "getPermissions")
@@ -116,6 +133,7 @@ async function setup(
     fixture,
     navigateSpy,
     roleService,
+    getPagedRolesSpy,
     snackbar: TestBed.inject(SnackbarService),
     dialogRef,
   };
@@ -133,55 +151,99 @@ describe("RoleListComponent", () => {
     expect(fixture.nativeElement.querySelector("h1")?.textContent).toContain("Roles");
   });
 
+  it("requests the first page of roles on init", async () => {
+    const { getPagedRolesSpy } = await setup();
+    expect(getPagedRolesSpy).toHaveBeenCalledTimes(1);
+    const command: PagedRoleRequestCommand = getPagedRolesSpy.mock.calls[0][0];
+    expect(command.page).toBe(1);
+    expect(command.pageSize).toBe(50);
+    expect(command.orderBy).toBe("name");
+    expect(command.filter?.scope).toBeUndefined();
+  });
+
   it("shows the empty state and no table when there are no roles", async () => {
     const { component, fixture } = await setup([]);
-    expect(component.roleCount()).toBe(0);
+    expect(component.totalCount()).toBe(0);
+    expect(component.showEmptyState()).toBe(true);
     expect(fixture.nativeElement.querySelector(".empty-state")).toBeTruthy();
     expect(fixture.nativeElement.querySelector("app-table")).toBeNull();
   });
 
-  it("renders the table fed with a row per role when roles are present", async () => {
+  it("renders the paged table fed with a row per role when roles are present", async () => {
     const { component, fixture } = await setup();
-    expect(component.roleCount()).toBe(2);
+    expect(component.totalCount()).toBe(2);
+    expect(component.showEmptyState()).toBe(false);
     expect(fixture.nativeElement.querySelector(".empty-state")).toBeNull();
     expect(fixture.nativeElement.querySelector("app-table")).toBeTruthy();
     expect(component.dataSource().data.length).toBe(2);
   });
 
-  it("builds five table columns once the view initializes", async () => {
+  it("builds five table columns with a sortable name column", async () => {
     const { component } = await setup();
     expect(component.columns().map((c) => c.matColumnDef)).toEqual([
-      "role",
+      "name",
       "type",
       "permissions",
       "members",
       "actions",
     ]);
+    const nameColumn = component.columns().find((c) => c.matColumnDef === "name");
+    expect(nameColumn?.sortable).toBe(true);
+    // Only the name column is sortable.
+    expect(component.columns().filter((c) => c.sortable).length).toBe(1);
   });
 
-  it("computes per-type counts for the filter tabs", async () => {
+  it("offers all/app/group filter tabs without count badges", async () => {
     const { component } = await setup();
-    expect(component.counts()).toEqual({ all: 2, app: 1, group: 1 });
+    expect(component.filterTabs.map((t) => t.value)).toEqual(["all", "app", "group"]);
+    expect(component.filterTabs.every((t) => t.count === undefined)).toBe(true);
   });
 
-  it("filters rows by the selected type", async () => {
-    const { component } = await setup();
+  it("maps the selected scope to the API filter and reloads", async () => {
+    const { component, getPagedRolesSpy } = await setup();
+
     component.setFilter("group");
-    expect(component.filteredRoles().map((r) => r.name)).toEqual(["Group Manager"]);
-    expect(component.dataSource().data.length).toBe(1);
+    expect(component.filter()).toBe("group");
+    let command: PagedRoleRequestCommand = getPagedRolesSpy.mock.calls.at(-1)![0];
+    expect(command.filter?.scope).toBe(PermissionScope.Group);
+    expect(command.page).toBe(1);
+    expect(component.dataSource().data.map((r) => r.name)).toEqual(["Group Manager"]);
 
     component.setFilter("app");
-    expect(component.filteredRoles().map((r) => r.name)).toEqual(["Administrator"]);
+    command = getPagedRolesSpy.mock.calls.at(-1)![0];
+    expect(command.filter?.scope).toBe(PermissionScope.App);
+    expect(component.dataSource().data.map((r) => r.name)).toEqual(["Administrator"]);
 
     component.setFilter("all");
-    expect(component.filteredRoles().length).toBe(2);
+    command = getPagedRolesSpy.mock.calls.at(-1)![0];
+    expect(command.filter?.scope).toBeUndefined();
     expect(component.dataSource().data.length).toBe(2);
+  });
+
+  it("requests the new page on a paginator change", async () => {
+    const { component, getPagedRolesSpy } = await setup();
+
+    component.updatePageData({ pageIndex: 2, pageSize: 25, length: 100 });
+
+    const command: PagedRoleRequestCommand = getPagedRolesSpy.mock.calls.at(-1)![0];
+    expect(command.page).toBe(3); // pageIndex is 0-based; sent 1-based
+    expect(command.pageSize).toBe(25);
+  });
+
+  it("requests the new ordering on a sort change", async () => {
+    const { component, getPagedRolesSpy } = await setup();
+
+    component.sorted({ active: "name", direction: "desc" });
+
+    const command: PagedRoleRequestCommand = getPagedRolesSpy.mock.calls.at(-1)![0];
+    expect(command.orderBy).toBe("name");
+    expect(command.sortDirection).toBe("desc");
   });
 
   it("uses the role's own scope total as the meter denominator", async () => {
     const { component } = await setup();
-    const appRole = component.roles().find((r) => r.scope === "app")!;
-    const groupRole = component.roles().find((r) => r.scope === "group")!;
+    const appRole = component.dataSource().data.find((r) => r.scope === "app")!;
+    const groupRole = component.dataSource().data.find((r) => r.scope === "group")!;
 
     expect(component.scopeTotal(appRole)).toBe(2); // two APP descriptors
     expect(component.scopeTotal(groupRole)).toBe(3); // three GROUP descriptors
@@ -197,7 +259,7 @@ describe("RoleListComponent", () => {
 
   it("navigates to the edit page with the role scope", async () => {
     const { component, navigateSpy } = await setup();
-    const groupRole = component.roles().find((r) => r.scope === "group")!;
+    const groupRole = component.dataSource().data.find((r) => r.scope === "group")!;
 
     component.editRole(groupRole);
 
@@ -208,7 +270,7 @@ describe("RoleListComponent", () => {
 
   it("routes system roles through the same edit/view path", async () => {
     const { component, navigateSpy } = await setup();
-    const systemRole = component.roles().find((r) => r.isSystem)!;
+    const systemRole = component.dataSource().data.find((r) => r.isSystem)!;
 
     component.editRole(systemRole);
 
@@ -220,14 +282,14 @@ describe("RoleListComponent", () => {
   it("does not crash when the permission registry errors", async () => {
     const { component } = await setup(ROLES, "error");
     expect(component).toBeTruthy();
-    expect(component.roleCount()).toBe(2);
+    expect(component.totalCount()).toBe(2);
   });
 
   it("populates the member count from the role's assigned count", async () => {
     const { component } = await setup([
       { ...ROLES[1], id: 5, assignedCount: 3 },
     ]);
-    expect(component.roles()[0].userCount).toBe(3);
+    expect(component.dataSource().data[0].userCount).toBe(3);
   });
 
   it("allows deletion only for unassigned, non-system roles", async () => {
@@ -238,14 +300,13 @@ describe("RoleListComponent", () => {
   });
 
   it("deletes a role with its scope after confirmation, then reloads", async () => {
-    const { component, roleService } = await setup();
-    const reloadSpy = jest.spyOn(roleService, "getRoles");
-    const callsBefore = reloadSpy.mock.calls.length;
+    const { component, roleService, getPagedRolesSpy } = await setup();
+    const callsBefore = getPagedRolesSpy.mock.calls.length;
 
     component.deleteRole(listItem({ id: "5", scope: "group" }));
 
     expect(roleService.deleteRole).toHaveBeenCalledWith(PermissionScope.Group, 5);
-    expect(reloadSpy.mock.calls.length).toBe(callsBefore + 1);
+    expect(getPagedRolesSpy.mock.calls.length).toBe(callsBefore + 1);
   });
 
   it("does not delete when the confirmation is cancelled", async () => {
@@ -271,9 +332,8 @@ describe("RoleListComponent", () => {
   });
 
   it("shows an error and does not reload when delete fails", async () => {
-    const { component, roleService, snackbar } = await setup();
-    const reloadSpy = jest.spyOn(roleService, "getRoles");
-    const callsBefore = reloadSpy.mock.calls.length;
+    const { component, roleService, snackbar, getPagedRolesSpy } = await setup();
+    const callsBefore = getPagedRolesSpy.mock.calls.length;
     (roleService.deleteRole as jest.Mock).mockReturnValueOnce(
       throwError(() => new Error("boom")) as any,
     );
@@ -281,6 +341,6 @@ describe("RoleListComponent", () => {
     component.deleteRole(listItem({ id: "5", scope: "group" }));
 
     expect(snackbar.error).toHaveBeenCalledWith("Failed to delete role");
-    expect(reloadSpy.mock.calls.length).toBe(callsBefore);
+    expect(getPagedRolesSpy.mock.calls.length).toBe(callsBefore);
   });
 });

@@ -5,7 +5,7 @@
     <div class="titles">
       <h1>Roles</h1>
       <p class="subtitle">
-        {{ roleCount() }} roles define what people can do — each applies to
+        {{ totalCount() }} roles define what people can do — each applies to
         either the application or a group. Assign roles to people from
         <a [routerLink]="['/users']">Manage Users</a>.
       </p>
@@ -19,7 +19,7 @@
     </div>
   </div>
 
-  @if (roles().length === 0) {
+  @if (showEmptyState()) {
     <div class="empty-state">
       <span class="empty-icon"><mat-icon>admin_panel_settings</mat-icon></span>
       <h2>No roles yet</h2>
@@ -35,7 +35,7 @@
     </div>
   } @else {
     <app-filter-bar
-      [tabs]="filterTabs()"
+      [tabs]="filterTabs"
       [value]="filter()"
       (valueChange)="setFilter($event)"
     ></app-filter-bar>
@@ -44,6 +44,12 @@
       [columns]="columns()"
       [displayedColumns]="displayedColumns()"
       [dataSource]="dataSource()"
+      [pagination]="true"
+      [length]="totalCount()"
+      [pageSize]="state().pageSize"
+      [page]="state().page - 1"
+      (sorted)="sorted($event)"
+      (pageChange)="updatePageData($event)"
     ></app-table>
   }
 </div>
