@@ -203,6 +203,25 @@ It currently **coexists with** the legacy `models.UserRole` (`ADMIN`/`USER`) and
 - `commands.UpsertRoleCommand` validates that every permission exists in the registry and matches
   the role's scope. `structs.RoleView` is the read model (includes `assignedCount`).
 
+### Seeded system roles (legacy-equivalent)
+
+- `repositories.SeedSystemRoles` (`repositories/seed_roles.go`) seeds five immutable
+  (`IsSystem = true`) roles on startup — wired into `InitDB`, runs in all deploy envs (it is
+  structural, unlike the bootstrap admin user). Their permission sets reproduce the legacy
+  `UserRole`/`GroupRole` capabilities **exactly**, so upgrading installs see **zero behavior
+  change**: **Legacy Admin** (every app permission), **Legacy User** (the app actions a plain
+  `USER` could do), **Legacy Viewer** / **Legacy Editor** / **Legacy Owner** (the group VIEWER /
+  EDITOR / OWNER tiers; Owner = every group permission). The sets live in
+  `permissions/legacy.go` (`Legacy*Keys()` helpers) and were derived from the actual handler-level
+  gating, not the desktop UI presets.
+- **Seeded only — not assigned and not enforced yet.** No user/member is given these roles here,
+  and group roles are seeded with `IsDefault = false`. Assignment + enforcement are later phases.
+- Idempotent: keyed on role `Name` (a `uniqueIndex`), safe on every boot; a pre-existing
+  same-named role is left untouched.
+- **Known limitation:** because system roles are immutable and seeding skips existing names, a
+  permission added to the registry later will **not** flow into an already-seeded Legacy Admin /
+  Legacy Owner. Re-syncing system roles would need a dedicated reconciliation step (out of scope).
+
 ### Permission checks (`PermissionService`)
 
 - `services/permission.go` exposes four **scope-separated** entry points:
