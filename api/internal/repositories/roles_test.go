@@ -5,6 +5,8 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/utils"
+	"slices"
+	"sort"
 	"testing"
 
 	"gorm.io/gorm"
@@ -198,8 +200,11 @@ func TestGetAppRolePermissions(t *testing.T) {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
-	if len(got) != 2 {
-		utils.PrintTestError(t, got, perms)
+	expected := []string{permissions.AppUsersCreate, permissions.AppUsersRead}
+	sort.Strings(got)
+	sort.Strings(expected)
+	if !slices.Equal(got, expected) {
+		utils.PrintTestError(t, got, expected)
 	}
 
 	// A role with no permissions resolves to an empty (non-nil) slice.

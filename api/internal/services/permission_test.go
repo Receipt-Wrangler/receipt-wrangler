@@ -311,3 +311,67 @@ func TestPermissionCacheInvalidatedOnRoleUpdate(t *testing.T) {
 		t.Error("expected newly granted permission to be allowed after role update")
 	}
 }
+
+func TestPermissionCacheInvalidatedOnRoleDelete(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	// An assigned role can't be deleted (delete guard), and the user->role
+	// lookup is always fresh, so prime the cache directly for an unassigned role
+	// and verify DeleteRole evicts that role's cached permission list.
+	roleRepository := repositories.NewRoleRepository(nil)
+	role, err := roleRepository.CreateAppRole("Deletable Role", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		t.Fatalf("seed role: %v", err)
+	}
+
+	setCachedRolePermissions(permissions.ScopeApp, role.ID, []string{permissions.AppUsersRead}, rolePermissionCacheGen())
+	if _, ok := getCachedRolePermissions(permissions.ScopeApp, role.ID); !ok {
+		t.Fatal("precondition: role permissions should be cached")
+	}
+
+	if err := NewRoleService(nil).DeleteRole(role.ID, permissions.ScopeApp); err != nil {
+		t.Fatalf("DeleteRole: %v", err)
+	}
+
+	if _, ok := getCachedRolePermissions(permissions.ScopeApp, role.ID); ok {
+		t.Error("expected role's cached permissions to be evicted after delete")
+	}
+}
+
+func TestRolePermissionCacheRejectsStaleWrite(t *testing.T) {
+	clearRolePermissionCacheAll()
+
+	// Generation observed before a (simulated) concurrent eviction.
+	staleGen := rolePermissionCacheGen()
+	clearRolePermissionCache(permissions.ScopeApp, 1)
+
+	// A write carrying the pre-eviction generation must be dropped, otherwise a
+	// concurrent miss could resurrect revoked permissions.
+	setCachedRolePermissions(permissions.ScopeApp, 1, []string{permissions.AppUsersRead}, staleGen)
+	if _, ok := getCachedRolePermissions(permissions.ScopeApp, 1); ok {
+		t.Error("expected stale-generation write to be rejected")
+	}
+
+	// A write with the current generation is stored normally.
+	setCachedRolePermissions(permissions.ScopeApp, 1, []string{permissions.AppUsersRead}, rolePermissionCacheGen())
+	if _, ok := getCachedRolePermissions(permissions.ScopeApp, 1); !ok {
+		t.Error("expected current-generation write to be cached")
+	}
+}
+
+func TestHasAppPermissionsMissingUserDenies(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	service := NewPermissionService(nil)
+
+	// A missing/deleted user must deny cleanly, not surface a record-not-found error.
+	got, err := service.HasAppPermissions(99999, permissions.AppUsersRead)
+	if err != nil {
+		t.Fatalf("expected no error for missing user, got %v", err)
+	}
+	if got {
+		t.Error("expected missing user to be denied")
+	}
+}

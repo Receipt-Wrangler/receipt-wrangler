@@ -107,11 +107,15 @@ func validateRequiredPermissions(scope permissions.Scope, required []string) err
 }
 
 // resolveAppPermissions loads the user's current app role permissions. A user
-// with no app role assigned resolves to no permissions (deny).
+// with no app role assigned — or a missing/deleted user — resolves to no
+// permissions (deny) rather than an error.
 func (service PermissionService) resolveAppPermissions(userId uint) ([]string, error) {
 	roleRepository := repositories.NewRoleRepository(service.TX)
 
 	appRoleId, err := roleRepository.GetUserAppRoleId(userId)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return []string{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +153,10 @@ func loadRolePermissions(roleRepository repositories.RoleRepository, scope permi
 		return cached, nil
 	}
 
+	// Capture the eviction generation before reading so a concurrent role
+	// update/delete invalidates this write instead of being undone by it.
+	observedGen := rolePermissionCacheGen()
+
 	var perms []string
 	var err error
 	if scope == permissions.ScopeApp {
@@ -160,6 +168,6 @@ func loadRolePermissions(roleRepository repositories.RoleRepository, scope permi
 		return nil, err
 	}
 
-	setCachedRolePermissions(scope, roleId, perms)
+	setCachedRolePermissions(scope, roleId, perms, observedGen)
 	return perms, nil
 }
