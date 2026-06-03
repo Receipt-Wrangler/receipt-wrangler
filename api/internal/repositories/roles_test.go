@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"errors"
+	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/utils"
 	"testing"
@@ -178,5 +179,148 @@ func TestGetAllRolesReturnsBothScopes(t *testing.T) {
 	}
 	if len(groupRole.Permissions) != 1 || groupRole.Permissions[0] != permissions.GroupReceiptsCreate {
 		utils.PrintTestError(t, groupRole.Permissions, []string{permissions.GroupReceiptsCreate})
+	}
+}
+
+func TestGetAppRolePermissions(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	perms := []string{permissions.AppUsersCreate, permissions.AppUsersRead}
+	role, err := repository.CreateAppRole("App Role", "", perms)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	got, err := repository.GetAppRolePermissions(role.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if len(got) != 2 {
+		utils.PrintTestError(t, got, perms)
+	}
+
+	// A role with no permissions resolves to an empty (non-nil) slice.
+	empty, err := repository.CreateAppRole("Empty Role", "", []string{})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	gotEmpty, err := repository.GetAppRolePermissions(empty.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if gotEmpty == nil || len(gotEmpty) != 0 {
+		utils.PrintTestError(t, gotEmpty, "empty slice")
+	}
+}
+
+func TestGetGroupRolePermissions(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	perms := []string{permissions.GroupReceiptsRead}
+	role, err := repository.CreateGroupRole("Group Role", "", perms)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	got, err := repository.GetGroupRolePermissions(role.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if len(got) != 1 || got[0] != permissions.GroupReceiptsRead {
+		utils.PrintTestError(t, got, perms)
+	}
+}
+
+func TestGetUserAppRoleId(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+	db := GetDB()
+
+	role, err := repository.CreateAppRole("App Role", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	withRole := models.User{Username: "with-role", Password: "password", AppRoleID: &role.ID}
+	if err := db.Create(&withRole).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	gotId, err := repository.GetUserAppRoleId(withRole.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if gotId == nil || *gotId != role.ID {
+		utils.PrintTestError(t, gotId, role.ID)
+	}
+
+	noRole := models.User{Username: "no-role", Password: "password"}
+	if err := db.Create(&noRole).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	gotNil, err := repository.GetUserAppRoleId(noRole.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if gotNil != nil {
+		utils.PrintTestError(t, gotNil, nil)
+	}
+
+	if _, err := repository.GetUserAppRoleId(999); !errors.Is(err, gorm.ErrRecordNotFound) {
+		utils.PrintTestError(t, err, gorm.ErrRecordNotFound)
+	}
+}
+
+func TestGetGroupMemberRoleId(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+	db := GetDB()
+
+	group := models.Group{Name: "role-id-group"}
+	if err := db.Create(&group).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	role, err := repository.CreateGroupRole("Group Role", "", []string{permissions.GroupReceiptsRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	user := models.User{Username: "member", Password: "password"}
+	if err := db.Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	member := models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRole: models.OWNER, GroupRoleID: &role.ID}
+	if err := db.Create(&member).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	gotId, err := repository.GetGroupMemberRoleId(user.ID, group.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if gotId == nil || *gotId != role.ID {
+		utils.PrintTestError(t, gotId, role.ID)
+	}
+
+	// A user who is not a member of the group is a record-not-found.
+	if _, err := repository.GetGroupMemberRoleId(user.ID, 999); !errors.Is(err, gorm.ErrRecordNotFound) {
+		utils.PrintTestError(t, err, gorm.ErrRecordNotFound)
 	}
 }

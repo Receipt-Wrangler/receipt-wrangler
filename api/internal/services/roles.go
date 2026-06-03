@@ -153,6 +153,10 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 		return structs.RoleView{}, err
 	}
 
+	// A role's permission list just changed; drop its cached permissions so the
+	// next permission check resolves the new set.
+	clearRolePermissionCache(command.Scope, id)
+
 	return roleView, nil
 }
 
@@ -187,7 +191,7 @@ func (service RoleService) GetRoles() ([]structs.RoleView, error) {
 // id (app and group role ids overlap). System roles cannot be deleted, and a
 // role cannot be deleted while it is assigned to any user or group member.
 func (service RoleService) DeleteRole(id uint, scope permissions.Scope) error {
-	return repositories.GetDB().Transaction(func(tx *gorm.DB) error {
+	err := repositories.GetDB().Transaction(func(tx *gorm.DB) error {
 		roleRepository := repositories.NewRoleRepository(tx)
 
 		if scope == permissions.ScopeApp {
@@ -234,4 +238,12 @@ func (service RoleService) DeleteRole(id uint, scope permissions.Scope) error {
 
 		return roleRepository.DeleteGroupRole(id)
 	})
+	if err != nil {
+		return err
+	}
+
+	// The role is gone; evict any cached permissions for it.
+	clearRolePermissionCache(scope, id)
+
+	return nil
 }
