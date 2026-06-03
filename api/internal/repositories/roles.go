@@ -291,6 +291,67 @@ func (repository RoleRepository) CountGroupMembersWithGroupRole(id uint) (int64,
 	return count, nil
 }
 
+// GetAppRolePermissions returns the permission strings granted by an app role.
+func (repository RoleRepository) GetAppRolePermissions(appRoleId uint) ([]string, error) {
+	db := repository.GetDB()
+
+	perms := make([]string, 0)
+	err := db.Model(&models.AppRolePermission{}).
+		Where("app_role_id = ?", appRoleId).
+		Pluck("permission", &perms).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return perms, nil
+}
+
+// GetGroupRolePermissions returns the permission strings granted by a group role.
+func (repository RoleRepository) GetGroupRolePermissions(groupRoleId uint) ([]string, error) {
+	db := repository.GetDB()
+
+	perms := make([]string, 0)
+	err := db.Model(&models.GroupRolePermission{}).
+		Where("group_role_id = ?", groupRoleId).
+		Pluck("permission", &perms).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return perms, nil
+}
+
+// GetUserAppRoleId returns the app role id assigned to a user, or nil when the
+// user has no app role. Returns gorm.ErrRecordNotFound if the user is missing.
+func (repository RoleRepository) GetUserAppRoleId(userId uint) (*uint, error) {
+	db := repository.GetDB()
+
+	var user models.User
+	err := db.Select("id", "app_role_id").Where("id = ?", userId).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return user.AppRoleID, nil
+}
+
+// GetGroupMemberRoleId returns the group role id assigned to a user within a
+// group, or nil when the membership has no group role. Returns
+// gorm.ErrRecordNotFound if the user is not a member of the group.
+func (repository RoleRepository) GetGroupMemberRoleId(userId uint, groupId uint) (*uint, error) {
+	db := repository.GetDB()
+
+	var member models.GroupMember
+	err := db.Select("user_id", "group_id", "group_role_id").
+		Where("user_id = ? AND group_id = ?", userId, groupId).
+		First(&member).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return member.GroupRoleID, nil
+}
+
 // DeleteAppRole deletes the app role and its permissions (children cascade via
 // the AppRolePermission OnDelete:CASCADE constraint).
 func (repository RoleRepository) DeleteAppRole(id uint) error {

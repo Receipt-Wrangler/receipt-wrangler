@@ -116,6 +116,20 @@ See `mobile/CLAUDE.md` for Flutter architecture, Provider state management, and 
 - Mobile uses `flutter_secure_storage` for secure token storage
 - All API endpoints except `/api/auth/login` and `/api/auth/signup` require authentication
 
+### Authorization (Roles & Permissions)
+- A configurable role system layers on top of auth: administrators define **app-level** and
+  **group-level** roles from granular permission strings (e.g. `app.users.create`,
+  `group.receipts.read`) and assign them to users / group members.
+- **Backend source of truth** is the hardcoded permission registry plus role CRUD in `api/` —
+  exposed via `GET /api/permission` and `/api/role`, and mirrored in `swagger.yml` (so regenerated
+  clients carry the `Permission` enum and role types). See `api/CLAUDE.md` → "Roles & Permissions".
+- The JWT is treated as a **UI hint**; the server re-checks a user's current permissions from the
+  database, never trusting JWT contents for authorization.
+- **Rollout is additive and in progress:** the new system coexists with the legacy
+  `UserRole`/`GroupRole` enums, which still enforce access today. Backend permission enforcement in
+  handlers and desktop permission-based UI gating are not wired up yet. Desktop currently ships only
+  the admin-gated Manage Roles UI (see `desktop/CLAUDE.md`).
+
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
 - **Desktop**: NGXS store with actions/selectors, persistent storage for auth/preferences

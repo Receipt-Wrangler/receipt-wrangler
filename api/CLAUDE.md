@@ -147,3 +147,86 @@ Tests should cover:
 - OpenAPI 3.1 specification in `swagger.yml`
 - API serves on port 8081 by default
 - All endpoints require JWT authentication except login/signup
+
+## Roles & Permissions
+
+A configurable role/permission system. Administrators can define roles from granular permission
+strings at two scopes — **application** and **group** — and assign them to users / group members.
+It currently **coexists with** the legacy `models.UserRole` (`ADMIN`/`USER`) and `models.GroupRole`
+(`OWNER`/`EDITOR`/`VIEWER`) enums, which are still what actually enforce access today (see
+"Enforcement status" below).
+
+### Permission registry
+
+- `internal/permissions/registry.go` is the **hardcoded source of truth** for every permission.
+  Each entry is a `Descriptor{ Key, Label, Description, Category, Scope }`; `Scope` is `APP` or
+  `GROUP`. Helpers: `All()`, `Get(key)`, `Exists(key)`.
+- **String format:** `scope.domain[.subdomain].action` — e.g. `app.users.create`,
+  `group.receipts.read`. Permissions are **CRUD-granular** (`create`/`read`/`update`/`delete` per
+  domain); distinct non-CRUD actions stand alone (e.g. `app.system-settings.restart-task-server`,
+  `group.activities.rerun`, `group.receipts.duplicate`).
+- Exposed to clients via `GET /permission` (returns the descriptors for the role-editor UI) and
+  mirrored in the `swagger.yml` `Permission` enum. `permissions/registry_test.go` enforces that the
+  registry and the swagger enum stay in sync.
+- **Adding a permission:** add the constant + `Descriptor` in `registry.go`, add the key to the
+  `Permission` enum in `swagger.yml`, then regenerate clients (see "API Client Generation").
+
+### Matcher
+
+- `internal/permissions/matcher.go` is a **pure** matcher over a granted `[]string`:
+  - `HasAll(granted, required...)` — logical AND (the default; a single-permission check is just
+    `HasAll(granted, "x")`).
+  - `HasAny(granted, required...)` — logical OR.
+- Wildcards in a *granted* string are honored: `*` matches anything, a trailing `group.*` matches
+  any deeper key, and a mid-segment `*` matches exactly one segment. Both helpers deny when no
+  required permission is supplied. The `:sub-scope` suffix (e.g. `read:any`) is matched literally —
+  `:any` superset semantics are **not implemented yet**.
+
+### Data model
+
+- **App roles:** `AppRole` + `AppRolePermission` (permission strings in a child table).
+- **Group roles:** `GroupRoleDefinition` + `GroupRolePermission`, plus `GroupRoleCategoryGrant` /
+  `GroupRoleTagGrant` for per-role category/tag visibility.
+- **Assignment:** nullable FKs `User.AppRoleID` and `GroupMember.GroupRoleID` (one app role per
+  user; one group role per group membership). Nullable because they coexist with the legacy enums
+  during rollout.
+- `IsSystem` marks protected, non-editable/non-deletable roles; `IsDefault` (group roles) marks the
+  role auto-assignable to new members.
+
+### Role CRUD
+
+- Data access in `repositories/roles.go`; business logic in `services/roles.go`. Guards: system
+  roles are immutable/undeletable, a role's scope can't be changed (type-mismatch error), and an
+  assigned role can't be deleted.
+- Endpoints (`routers/role.go`, currently gated by `UserRole: models.ADMIN`): `GET /role`,
+  `POST /role`, `PUT /role/{roleId}`, `DELETE /role/{roleId}?scope=APP|GROUP`.
+- `commands.UpsertRoleCommand` validates that every permission exists in the registry and matches
+  the role's scope. `structs.RoleView` is the read model (includes `assignedCount`).
+
+### Permission checks (`PermissionService`)
+
+- `services/permission.go` exposes four **scope-separated** entry points:
+  `HasAppPermissions` / `HasAnyAppPermission` and `HasGroupPermissions` / `HasAnyGroupPermission`
+  (each App/Group pair = AND default + OR variant).
+- Each call **resolves the user's current permissions from the database** (the user's app role for
+  app checks; the group membership's group role for group checks) and matches them with the pure
+  matcher. The **JWT is never trusted for authorization** — permissions are always re-read. A user
+  with no assigned role, or a non-member of the group, resolves to no permissions (deny).
+- Required keys are scope-guarded: passing an `app.*` key to a group check (or an unknown key)
+  returns an error, catching call-site bugs.
+- Backed by a small role-permission cache (`services/permission_cache.go`) keyed by `scope + roleId`
+  and invalidated in `RoleService.UpdateRole` / `DeleteRole`. Only a role's permission *list* is
+  cached; a user's role *assignment* is resolved fresh on every check, so re-assigning a user takes
+  effect immediately.
+
+### Enforcement status
+
+The matcher and `PermissionService` are implemented and unit-tested but are **not yet wired into
+any handler**. Request authorization today still runs through the legacy minimum-role checks in
+`HandleRequest` (`handlers/generic_handler.go`) using `models.UserRole` / `models.GroupRole`.
+Wiring `PermissionService` into the shared handler wrapper is the next phase.
+
+### Tests
+
+`permissions/matcher_test.go`, `permissions/registry_test.go`, `services/permission_test.go`,
+`services/roles_test.go`, `repositories/roles_test.go`.
