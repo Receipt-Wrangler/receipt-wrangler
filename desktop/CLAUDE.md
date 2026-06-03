@@ -63,6 +63,7 @@ Receipt Wrangler Desktop is an Angular 19 application with modular architecture 
 - `src/groups/` - Group management and member administration
 - `src/categories/` and `src/tags/` - Receipt organization features
 - `src/auth/` - Authentication and user management
+- `src/roles/` - Role & permission management (admin-only Manage Roles UI)
 
 #### Shared Infrastructure
 - `src/shared-ui/` - 30+ reusable UI components (buttons, forms, tables, dialogs)
@@ -110,6 +111,23 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   (`{ value, label, icon?, count? }`) and two-way bind the selected `value`.
 - **Breadcrumbs:** `app-breadcrumb` with `BreadcrumbItem[]`.
 If a design appears to require a new pattern, confirm with the user before diverging.
+
+### Roles & Permissions (Manage Roles)
+
+The admin-only **Manage Roles** feature (`src/roles/` — `role-list`, `role-form`, `role-presets`,
+`roles.module`) provides CRUD for the backend's app- and group-scoped roles (see the backend
+"Roles & Permissions" section in `api/CLAUDE.md` for the permission model). It is routed behind the
+global `UserRole.Admin` check in `RoleGuard` (`src/guards/role.guard.ts`).
+
+- Talks to the backend via the **generated** clients in `src/open-api/` — `RoleService` for role
+  CRUD and `PermissionService` (`GET /permission`) to load the permission catalog that populates the
+  role editor's permission picker. `role-presets.ts` holds the role templates. Never hand-edit
+  `src/open-api/` — regenerate it from `swagger.yml` instead.
+- Built on existing shared patterns: `app-breadcrumb` and the segmented `app-filter-bar` (see "Use
+  Established Patterns" above).
+- **Permission-based UI gating is not implemented yet.** There is no `*hasPermission` directive or
+  `permissionService.has(...)` helper; UI access is still gated by the global admin `RoleGuard` and
+  the legacy `UserRole`. When permission-driven gating is added, document the directive/guard here.
 
 ## Signals & Zoneless Change Detection
 
