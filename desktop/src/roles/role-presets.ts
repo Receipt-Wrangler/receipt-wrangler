@@ -101,7 +101,6 @@ const GROUP_MANAGER_KEYS = [
   "group.activities.rerun",
   "group.view",
   "group.update",
-  "group.export-ocr",
 ];
 
 const RECEIPT_EDITOR_KEYS = [

@@ -70,10 +70,9 @@ const (
 )
 
 const (
-	GroupView      = "group.view"
-	GroupUpdate    = "group.update"
-	GroupDelete    = "group.delete"
-	GroupExportOcr = "group.export-ocr"
+	GroupView   = "group.view"
+	GroupUpdate = "group.update"
+	GroupDelete = "group.delete"
 
 	GroupReceiptsCreate    = "group.receipts.create"
 	GroupReceiptsRead      = "group.receipts.read"
@@ -154,7 +153,6 @@ var registry = []Descriptor{
 	{GroupView, "View Group", "See the group, its members, and metadata.", "Group", ScopeGroup},
 	{GroupUpdate, "Update Group", "Edit group name, settings, and receipt-handling configuration.", "Group", ScopeGroup},
 	{GroupDelete, "Delete Group", "Permanently delete the group.", "Group", ScopeGroup},
-	{GroupExportOcr, "Export OCR Text", "Bulk-export OCR text for all receipts in the group.", "Group", ScopeGroup},
 
 	{GroupReceiptsCreate, "Create Receipts", "Upload images and create receipts.", "Receipts", ScopeGroup},
 	{GroupReceiptsRead, "Read Receipts", "Read, list, and export receipts.", "Receipts", ScopeGroup},
