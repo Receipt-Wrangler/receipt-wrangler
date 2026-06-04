@@ -214,13 +214,37 @@ It currently **coexists with** the legacy `models.UserRole` (`ADMIN`/`USER`) and
   EDITOR / OWNER tiers; Owner = every group permission). The sets live in
   `permissions/legacy.go` (`Legacy*Keys()` helpers) and were derived from the actual handler-level
   gating, not the desktop UI presets.
-- **Seeded only — not assigned and not enforced yet.** No user/member is given these roles here,
-  and group roles are seeded with `IsDefault = false`. Assignment + enforcement are later phases.
+- **Seeded only here — not enforced yet.** This step only creates the roles (group roles with
+  `IsDefault = false`); the one-time data migration below assigns them to existing users/members,
+  and enforcement is a later phase.
 - Idempotent: keyed on role `Name` (a `uniqueIndex`), safe on every boot; a pre-existing
-  same-named role is left untouched.
+  same-named role is left untouched. The five role names are shared constants
+  (`repositories/system_role_names.go`, `Legacy*RoleName`) used by both the seeder and the
+  migration.
 - **Known limitation:** because system roles are immutable and seeding skips existing names, a
   permission added to the registry later will **not** flow into an already-seeded Legacy Admin /
   Legacy Owner. Re-syncing system roles would need a dedicated reconciliation step (out of scope).
+
+### Legacy role assignment (one-time data migration)
+
+- A startup data migration back-fills the new role assignments from the legacy enums so existing
+  installs upgrade with **zero behavior change**: each `User.UserRole` maps onto the matching
+  `User.AppRoleID` (`ADMIN` → Legacy Admin, `USER` → Legacy User) and each `GroupMember.GroupRole`
+  onto `GroupMember.GroupRoleID` (`OWNER`/`EDITOR`/`VIEWER` → Legacy Owner/Editor/Viewer). Lives in
+  `repositories/data_migrations.go` (`assignLegacyEquivalentRoles`).
+- **Tracking:** one-time data migrations are recorded in a `data_migrations` ledger
+  (`models.DataMigration`, keyed by unique `name`) — distinct from GORM schema AutoMigrate. The
+  runner `RunDataMigrations` skips any migration already in the ledger and otherwise runs it **and**
+  writes the ledger row in a single `db.Transaction`, so a failure rolls back and retries next boot.
+  Append new one-time migrations to the `dataMigrations` registry slice.
+- Wired into `InitDB` **after** the bootstrap-admin step (roles must be seeded first, and this order
+  also assigns a fresh install's first admin). `InitDB` is only called from `main.go`, never the
+  test harness, so the migration does not auto-run in tests.
+- Updates are guarded with `... IS NULL`, so a role an admin has already set through the new UI is
+  never overwritten — defense-in-depth on top of the ledger. The migration is one-time over existing
+  rows; per-create assignment for *new* users/members is a separate future slice.
+- Tests: `repositories/data_migrations_test.go` (assignment, idempotency, ledger short-circuit,
+  no-clobber).
 
 ### Permission checks (`PermissionService`)
 
