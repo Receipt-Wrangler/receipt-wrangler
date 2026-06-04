@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -215,6 +217,96 @@ func TestShouldGetPagedReceiptsWithoutFullReceipts(t *testing.T) {
 	}
 
 	// Clean up - no need to explicitly delete as tearDownReceiptsTest() handles it
+}
+
+// receiptGetRequest builds a GET request to target carrying JWT claims for userId.
+func receiptGetRequest(userId uint, target string) (*httptest.ResponseRecorder, *http.Request) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", target, strings.NewReader(""))
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: userId}})
+	return w, r.WithContext(newContext)
+}
+
+func TestGetReceiptsForGroupIdsAllowsWhenMember(t *testing.T) {
+	defer tearDownReceiptsTest()
+	setupReceiptsTest()
+	db := repositories.GetDB()
+	db.Create(&models.Receipt{Name: "Test receipt", GroupId: 1, PaidByUserID: 1})
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+
+	w, r := receiptGetRequest(1, "/api/receipt/group-ids?groupIds=1")
+	GetReceiptsForGroupIds(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+}
+
+func TestGetReceiptsForGroupIdsRejectsWhenNotMember(t *testing.T) {
+	defer tearDownReceiptsTest()
+	setupReceiptsTest()
+	// user 1 is a member of group 1 but holds no role granting receipts.read
+
+	w, r := receiptGetRequest(1, "/api/receipt/group-ids?groupIds=1")
+	GetReceiptsForGroupIds(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestGetReceiptsForGroupIdsRejectsWhenOneGroupNotMember(t *testing.T) {
+	defer tearDownReceiptsTest()
+	setupReceiptsTest()
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+	// user 1 has read in group 1 but is not a member of group 2
+
+	w, r := receiptGetRequest(1, "/api/receipt/group-ids?groupIds=1&groupIds=2")
+	GetReceiptsForGroupIds(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestHasAccessAllowsWhenUserHasGroupPermission(t *testing.T) {
+	defer tearDownReceiptsTest()
+	setupReceiptsTest()
+	db := repositories.GetDB()
+	db.Create(&models.Receipt{Name: "Test receipt", GroupId: 1, PaidByUserID: 1})
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+
+	w, r := receiptGetRequest(1, "/api/receipt/hasAccess?receiptId=1&permission=group.receipts.read")
+	HasAccess(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+}
+
+func TestHasAccessRejectsWhenUserLacksGroupPermission(t *testing.T) {
+	defer tearDownReceiptsTest()
+	setupReceiptsTest()
+	db := repositories.GetDB()
+	db.Create(&models.Receipt{Name: "Test receipt", GroupId: 1, PaidByUserID: 1})
+	// user 1 is a member of group 1 but holds no role granting receipts.read
+
+	w, r := receiptGetRequest(1, "/api/receipt/hasAccess?receiptId=1&permission=group.receipts.read")
+	HasAccess(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestHasAccessRejectsWhenPermissionMissing(t *testing.T) {
+	defer tearDownReceiptsTest()
+	setupReceiptsTest()
+
+	w, r := receiptGetRequest(1, "/api/receipt/hasAccess?receiptId=1")
+	HasAccess(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+func TestHasAccessRejectsAppScopedPermission(t *testing.T) {
+	defer tearDownReceiptsTest()
+	setupReceiptsTest()
+
+	w, r := receiptGetRequest(1, "/api/receipt/hasAccess?receiptId=1&permission=app.account.read")
+	HasAccess(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
 }
 
 func TestReceiptPagedRequestCommandShouldParseFullReceipts(t *testing.T) {

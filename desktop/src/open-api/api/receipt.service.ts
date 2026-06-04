@@ -23,6 +23,8 @@ import { InternalErrorResponse } from '../model/internalErrorResponse';
 // @ts-ignore
 import { PagedData } from '../model/pagedData';
 // @ts-ignore
+import { Permission } from '../model/permission';
+// @ts-ignore
 import { Receipt } from '../model/receipt';
 // @ts-ignore
 import { ReceiptPagedRequestCommand } from '../model/receiptPagedRequestCommand';
@@ -621,16 +623,19 @@ export class ReceiptService {
      * Has access to receipt
      * This will return whether or not the currently logged in user has access to the receipt
      * @param receiptId 
-     * @param groupRole Role required to have access to receipt
+     * @param permission Group permission required to access the receipt
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public hasAccessToReceipt(receiptId: number, groupRole?: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public hasAccessToReceipt(receiptId: number, groupRole?: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public hasAccessToReceipt(receiptId: number, groupRole?: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public hasAccessToReceipt(receiptId: number, groupRole?: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public hasAccessToReceipt(receiptId: number, permission: Permission, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public hasAccessToReceipt(receiptId: number, permission: Permission, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public hasAccessToReceipt(receiptId: number, permission: Permission, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public hasAccessToReceipt(receiptId: number, permission: Permission, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (receiptId === null || receiptId === undefined) {
             throw new Error('Required parameter receiptId was null or undefined when calling hasAccessToReceipt.');
+        }
+        if (permission === null || permission === undefined) {
+            throw new Error('Required parameter permission was null or undefined when calling hasAccessToReceipt.');
         }
 
         let localVarQueryParameters = new HttpParams({encoder: this.encoder});
@@ -638,9 +643,9 @@ export class ReceiptService {
           localVarQueryParameters = this.addToHttpParams(localVarQueryParameters,
             <any>receiptId, 'receiptId');
         }
-        if (groupRole !== undefined && groupRole !== null) {
+        if (permission !== undefined && permission !== null) {
           localVarQueryParameters = this.addToHttpParams(localVarQueryParameters,
-            <any>groupRole, 'groupRole');
+            <any>permission, 'permission');
         }
 
         let localVarHeaders = this.defaultHeaders;

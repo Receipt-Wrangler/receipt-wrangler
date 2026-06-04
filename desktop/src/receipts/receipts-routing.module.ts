@@ -4,7 +4,7 @@ import { FormMode } from "src/enums/form-mode.enum";
 import { GroupRoleGuard } from "src/guards/group-role.guard";
 import { GroupGuard } from "src/guards/group.guard";
 import { receiptGuardGuard } from "src/guards/receipt-guard.guard";
-import { GroupRole } from "../open-api";
+import { GroupRole, Permission } from "../open-api";
 import { categoryResolverFn } from "../resolvers/categories.resolver";
 import { customFieldResolverFn } from "../resolvers/custom-field.resolver";
 import { receiptResolverFn } from "../resolvers/receipt.resolver";
@@ -50,7 +50,7 @@ const routes: Routes = [
     },
     data: {
       mode: FormMode.view,
-      groupRole: GroupRole.Viewer,
+      permission: Permission.GroupReceiptsRead,
     },
     canActivate: [receiptGuardGuard],
   },
@@ -65,7 +65,7 @@ const routes: Routes = [
     },
     data: {
       mode: FormMode.edit,
-      groupRole: GroupRole.Editor,
+      permission: Permission.GroupReceiptsUpdate,
     },
     canActivate: [receiptGuardGuard],
   },

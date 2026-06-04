@@ -12,10 +12,10 @@ export const receiptGuardGuard: CanActivateFn = (route, state) => {
   const store: Store = inject(Store);
 
   const receiptId: number = Number.parseInt(route.params["id"]);
-  const role = route.data["groupRole"];
+  const permission = route.data["permission"];
   let result = false;
 
-  return receiptService.hasAccessToReceipt(receiptId, role).pipe(
+  return receiptService.hasAccessToReceipt(receiptId, permission).pipe(
     take(1),
     tap(() => {
       result = true;

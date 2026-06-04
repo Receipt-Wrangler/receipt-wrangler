@@ -975,10 +975,11 @@ paths:
             type: integer
           required: true
         - in: query
-          name: groupRole
+          name: permission
+          required: true
           schema:
-            type: string
-          description: Role required to have access to receipt
+            $ref: "#/components/schemas/Permission"
+          description: Group permission required to access the receipt
       responses:
         200:
           $ref: "#/components/responses/Ok"

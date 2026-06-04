@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -429,16 +428,22 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 		ResponseType: constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
-			groupService := services.NewGroupService(nil)
+			permissionService := services.NewPermissionService(nil)
 
 			receiptId := r.URL.Query().Get("receiptId")
 			if len(receiptId) == 0 {
 				return http.StatusBadRequest, errors.New("receiptId required")
 			}
 
-			groupRole := r.URL.Query().Get("groupRole")
-			if len(groupRole) == 0 {
-				return http.StatusBadRequest, errors.New("groupRole required")
+			permission := r.URL.Query().Get("permission")
+			if len(permission) == 0 {
+				return http.StatusBadRequest, errors.New("permission required")
+			}
+
+			// The probe answers a group-scoped question, so only group permissions
+			// are meaningful here; reject typos and app-scoped keys up front.
+			if descriptor, ok := permissions.Get(permission); !ok || descriptor.Scope != permissions.ScopeGroup {
+				return http.StatusBadRequest, errors.New("invalid group permission")
 			}
 
 			receiptRepository := repositories.NewReceiptRepository(nil)
@@ -447,18 +452,12 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 				return http.StatusBadRequest, err
 			}
 
-			validatedGroupRole, err := models.GroupRole(groupRole).Value()
+			hasAccess, err := permissionService.HasGroupPermissions(token.UserId, receipt.GroupId, permission)
 			if err != nil {
-				return http.StatusBadRequest, err
+				return http.StatusInternalServerError, err
 			}
-
-			err = groupService.ValidateGroupRole(
-				models.GroupRole(validatedGroupRole),
-				fmt.Sprint(receipt.GroupId),
-				fmt.Sprint(token.UserId),
-			)
-			if err != nil {
-				return http.StatusForbidden, err
+			if !hasAccess {
+				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
 			}
 
 			w.WriteHeader(200)
