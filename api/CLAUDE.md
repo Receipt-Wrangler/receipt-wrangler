@@ -154,8 +154,8 @@ A configurable role/permission system. Administrators can define roles from gran
 strings at two scopes — **application** and **group** — and assign them to users / group members.
 **Handlers now enforce these permissions** (see "Enforcement status" below). The legacy
 `models.UserRole` (`ADMIN`/`USER`) and `models.GroupRole` (`OWNER`/`EDITOR`/`VIEWER`) enums still
-exist — used by the JWT, the legacy-role data migration, the `GroupMember` model, and the
-`HasAccess` probe endpoint — but no longer gate handler access.
+exist — used by the JWT, the legacy-role data migration, and the `GroupMember` model — but no
+longer gate handler access.
 
 ### Permission registry
 
