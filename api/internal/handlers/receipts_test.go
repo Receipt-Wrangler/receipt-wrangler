@@ -94,6 +94,8 @@ func TestShouldGetPagedReceiptsWithFullReceipts(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
 	r = r.WithContext(newContext)
 
+	grantAllGroupPerms(t, 1, 1)
+
 	GetPagedReceiptsForGroup(w, r)
 
 	var pagedData structs.PagedData
@@ -179,6 +181,8 @@ func TestShouldGetPagedReceiptsWithoutFullReceipts(t *testing.T) {
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
 	r = r.WithContext(newContext)
+
+	grantAllGroupPerms(t, 1, 1)
 
 	GetPagedReceiptsForGroup(w, r)
 

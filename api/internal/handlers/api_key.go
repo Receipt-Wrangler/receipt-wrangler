@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -14,10 +15,11 @@ import (
 
 func CreateApiKey(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error creating API key",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error creating API key",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppApiKeysCreate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpsertApiKeyCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -60,10 +62,11 @@ func CreateApiKey(w http.ResponseWriter, r *http.Request) {
 
 func GetPagedApiKeys(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving API keys.",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error retrieving API keys.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppApiKeysRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.PagedApiKeyRequestCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -111,9 +114,10 @@ func GetPagedApiKeys(w http.ResponseWriter, r *http.Request) {
 
 func UpdateApiKey(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating API key",
-		Writer:       w,
-		Request:      r,
+		ErrorMessage:   "Error updating API key",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppApiKeysUpdate},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			// URL decode the ID parameter in case it was encoded by the frontend
@@ -150,9 +154,10 @@ func UpdateApiKey(w http.ResponseWriter, r *http.Request) {
 
 func DeleteApiKey(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting API key",
-		Writer:       w,
-		Request:      r,
+		ErrorMessage:   "Error deleting API key",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppApiKeysDelete},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			// URL decode the ID parameter in case it was encoded by the frontend
@@ -163,8 +168,15 @@ func DeleteApiKey(w http.ResponseWriter, r *http.Request) {
 			token := structs.GetClaims(r)
 			apiKeyService := services.NewApiKeyService(nil)
 
-			isAdmin := token.UserRole == "ADMIN"
-			err := apiKeyService.DeleteApiKey(id, token.UserId, isAdmin)
+			// Whether the caller may delete API keys belonging to other users is
+			// resolved from the database, never trusted from the JWT.
+			permissionService := services.NewPermissionService(nil)
+			canDeleteAny, err := permissionService.HasAppPermissions(token.UserId, permissions.AppApiKeysDeleteAny)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			err = apiKeyService.DeleteApiKey(id, token.UserId, canDeleteAny)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

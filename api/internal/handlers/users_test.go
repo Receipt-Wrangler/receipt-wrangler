@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -195,6 +196,8 @@ func TestDeleteAccountShouldFailWithWrongPassword(t *testing.T) {
 	})
 	r = r.WithContext(ctx)
 
+	grantAppPerms(t, user.ID, permissions.AppAccountDelete)
+
 	DeleteAccount(w, r)
 
 	if w.Result().StatusCode != http.StatusUnauthorized {
@@ -221,6 +224,8 @@ func TestDeleteAccountShouldSucceedWithCorrectPassword(t *testing.T) {
 		CustomClaims: &structs.Claims{UserId: user.ID, UserRole: models.USER},
 	})
 	r = r.WithContext(ctx)
+
+	grantAppPerms(t, user.ID, permissions.AppAccountDelete)
 
 	DeleteAccount(w, r)
 
@@ -262,6 +267,8 @@ func TestDeleteAccountShouldPreventLastAdminDeletion(t *testing.T) {
 	})
 	r = r.WithContext(ctx)
 
+	grantAppPerms(t, user.ID, permissions.AppAccountDelete)
+
 	DeleteAccount(w, r)
 
 	if w.Result().StatusCode != http.StatusBadRequest {
@@ -280,8 +287,11 @@ func TestDeleteAccountShouldPreventLastAdminDeletion(t *testing.T) {
 // GetAmountOwedForUser tests
 // ---------------------------------------------------------------------------
 
-func setupAmountOwedTest() {
+func setupAmountOwedTest(t *testing.T) {
 	repositories.CreateTestGroupWithUsers()
+	// GetAmountOwedForUser is gated on group.receipts.read; authorize user 1 in
+	// group 1 (the group the positive cases query).
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
 }
 
 func createReceiptWithItems(
@@ -390,7 +400,7 @@ func assertOwed(t *testing.T, result map[uint]decimal.Decimal, otherUserId uint,
 
 func TestGetAmountOwedForUserReturnsForbiddenWhenCallerNotInGroup(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 4 is only in Group 2; calling with groupId=1 must be rejected.
 	w, _ := callGetAmountOwed(4, "1", nil)
@@ -404,7 +414,7 @@ func TestGetAmountOwedForUserReturnsForbiddenWhenCallerNotInGroup(t *testing.T) 
 
 func TestGetAmountOwedForUserEmptyResultWhenNoReceiptsExist(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	w, result := callGetAmountOwed(1, "1", nil)
 
@@ -419,7 +429,7 @@ func TestGetAmountOwedForUserEmptyResultWhenNoReceiptsExist(t *testing.T) {
 
 func TestGetAmountOwedForUserExcludesItemsChargedToPayer(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Self-charged", 10, 1, 1, []commands.UpsertItemCommand{
 		chargedItem("only item", 10, 1),
@@ -440,7 +450,7 @@ func TestGetAmountOwedForUserExcludesItemsChargedToPayer(t *testing.T) {
 
 func TestGetAmountOwedForUserCallerChargedOnOthersReceipt(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 2 paid; item charged to user 1.
 	createReceiptWithItems(t, "Lunch", 10, 2, 1, []commands.UpsertItemCommand{
@@ -458,7 +468,7 @@ func TestGetAmountOwedForUserCallerChargedOnOthersReceipt(t *testing.T) {
 
 func TestGetAmountOwedForUserCallerPaidForOthersItem(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 1 paid; item charged to user 2.
 	createReceiptWithItems(t, "Lunch", 10, 1, 1, []commands.UpsertItemCommand{
@@ -478,7 +488,7 @@ func TestGetAmountOwedForUserCallerPaidForOthersItem(t *testing.T) {
 
 func TestGetAmountOwedForUserMultipleItemsSameUserSum(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Groceries", 30, 2, 1, []commands.UpsertItemCommand{
 		chargedItem("apples", 10, 1),
@@ -497,7 +507,7 @@ func TestGetAmountOwedForUserMultipleItemsSameUserSum(t *testing.T) {
 
 func TestGetAmountOwedForUserItemsChargedToMultipleUsersExcludesSelf(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Dinner", 30, 1, 1, []commands.UpsertItemCommand{
 		chargedItem("steak (user 2)", 10, 2),
@@ -520,7 +530,7 @@ func TestGetAmountOwedForUserItemsChargedToMultipleUsersExcludesSelf(t *testing.
 
 func TestGetAmountOwedForUserNetCancellationAcrossTwoReceipts(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 2 paid $10, item charged to user 1 → caller owes 10.
 	createReceiptWithItems(t, "Lunch", 10, 2, 1, []commands.UpsertItemCommand{
@@ -544,7 +554,7 @@ func TestGetAmountOwedForUserNetCancellationAcrossTwoReceipts(t *testing.T) {
 
 func TestGetAmountOwedForUserNegativeReceiptCallerCharged(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 2 received a $50 refund; item -$50 charged to user 1.
 	// Semantics: user 2 owes the refund share back to user 1 → negative entry.
@@ -563,7 +573,7 @@ func TestGetAmountOwedForUserNegativeReceiptCallerCharged(t *testing.T) {
 
 func TestGetAmountOwedForUserNegativeReceiptCallerPaid(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 1 received a $50 refund; item -$50 charged to user 2.
 	// Semantics: caller must pass user 2's share of the refund → positive entry.
@@ -582,7 +592,7 @@ func TestGetAmountOwedForUserNegativeReceiptCallerPaid(t *testing.T) {
 
 func TestGetAmountOwedForUserRefundCancelsOriginalDebt(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// Original purchase: user 2 paid $50, item charged to user 1 → caller owes 50.
 	createReceiptWithItems(t, "Original", 50, 2, 1, []commands.UpsertItemCommand{
@@ -604,7 +614,7 @@ func TestGetAmountOwedForUserRefundCancelsOriginalDebt(t *testing.T) {
 
 func TestGetAmountOwedForUserMixedSignItemsInOneReceipt(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 2 paid; one $20 item charged to user 1 and one -$20 item charged to user 1.
 	// Net contribution to user 1's debt to user 2 is zero.
@@ -626,7 +636,7 @@ func TestGetAmountOwedForUserMixedSignItemsInOneReceipt(t *testing.T) {
 
 func TestGetAmountOwedForUserZeroAmountItemContributesZero(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Free sample", 0, 2, 1, []commands.UpsertItemCommand{
 		chargedItem("free item", 0, 1),
@@ -648,7 +658,7 @@ func TestGetAmountOwedForUserZeroAmountItemContributesZero(t *testing.T) {
 
 func TestGetAmountOwedForUserExcludesResolvedItems(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Mixed statuses", 20, 2, 1, []commands.UpsertItemCommand{
 		chargedItemWithStatus("counted", 10, 1, models.ITEM_OPEN),
@@ -666,7 +676,7 @@ func TestGetAmountOwedForUserExcludesResolvedItems(t *testing.T) {
 
 func TestGetAmountOwedForUserExcludesDraftItems(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Draft mix", 20, 2, 1, []commands.UpsertItemCommand{
 		chargedItemWithStatus("counted", 10, 1, models.ITEM_OPEN),
@@ -686,7 +696,7 @@ func TestGetAmountOwedForUserExcludesDraftItems(t *testing.T) {
 
 func TestGetAmountOwedForUserAllGroupAggregatesAcrossMemberships(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	db := repositories.GetDB()
 	// Make user 1 a member of Group 2 as well so the all-group covers both groups.
@@ -698,6 +708,7 @@ func TestGetAmountOwedForUserAllGroupAggregatesAcrossMemberships(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create all-group: %v", err)
 	}
+	grantGroupPerms(t, 1, allGroup.ID, permissions.GroupReceiptsRead)
 
 	// Group 1: user 2 paid $10, item charged to user 1 → caller owes user 2.
 	createReceiptWithItems(t, "G1 receipt", 10, 2, 1, []commands.UpsertItemCommand{
@@ -722,7 +733,7 @@ func TestGetAmountOwedForUserAllGroupAggregatesAcrossMemberships(t *testing.T) {
 
 func TestGetAmountOwedForUserReceiptIdsWithoutGroupId(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	receipt := createReceiptWithItems(t, "Lunch", 10, 2, 1, []commands.UpsertItemCommand{
 		chargedItem("burger", 10, 1),
@@ -740,10 +751,12 @@ func TestGetAmountOwedForUserReceiptIdsWithoutGroupId(t *testing.T) {
 
 func TestGetAmountOwedForUserReceiptIdsCombinedWithGroupId(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	db := repositories.GetDB()
 	db.Create(&models.GroupMember{GroupID: 2, UserID: 1})
+	// The out-of-group receipt is in group 2; authorize the caller there too.
+	grantGroupPerms(t, 1, 2, permissions.GroupReceiptsRead)
 
 	// In-group receipt (groupId path).
 	createReceiptWithItems(t, "G1 receipt", 10, 2, 1, []commands.UpsertItemCommand{

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
-	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -15,12 +15,12 @@ import (
 func ExportAllReceiptsFromGroup(w http.ResponseWriter, r *http.Request) {
 	groupId := chi.URLParam(r, "groupId")
 	handler := structs.Handler{
-		ErrorMessage: "Error exporting receipts",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationZip,
-		GroupId:      groupId,
-		GroupRole:    models.VIEWER,
+		ErrorMessage:     "Error exporting receipts",
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationZip,
+		GroupId:          groupId,
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			pagedRequest := commands.ReceiptPagedRequestCommand{}
 			err := pagedRequest.LoadDataFromRequest(w, r)
@@ -70,12 +70,12 @@ func ExportReceiptsById(w http.ResponseWriter, r *http.Request) {
 	receiptIds := r.Form["receiptIds"]
 
 	handler := structs.Handler{
-		ErrorMessage: "Error exporting receipts",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationZip,
-		ReceiptIds:   receiptIds,
-		GroupRole:    models.VIEWER,
+		ErrorMessage:     "Error exporting receipts",
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationZip,
+		ReceiptIds:       receiptIds,
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			if err != nil {
 				return http.StatusInternalServerError, err

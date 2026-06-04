@@ -152,9 +152,10 @@ Tests should cover:
 
 A configurable role/permission system. Administrators can define roles from granular permission
 strings at two scopes — **application** and **group** — and assign them to users / group members.
-It currently **coexists with** the legacy `models.UserRole` (`ADMIN`/`USER`) and `models.GroupRole`
-(`OWNER`/`EDITOR`/`VIEWER`) enums, which are still what actually enforce access today (see
-"Enforcement status" below).
+**Handlers now enforce these permissions** (see "Enforcement status" below). The legacy
+`models.UserRole` (`ADMIN`/`USER`) and `models.GroupRole` (`OWNER`/`EDITOR`/`VIEWER`) enums still
+exist — used by the JWT, the legacy-role data migration, the `GroupMember` model, and the
+`HasAccess` probe endpoint — but no longer gate handler access.
 
 ### Permission registry
 
@@ -264,12 +265,38 @@ It currently **coexists with** the legacy `models.UserRole` (`ADMIN`/`USER`) and
 
 ### Enforcement status
 
-The matcher and `PermissionService` are implemented and unit-tested but are **not yet wired into
-any handler**. Request authorization today still runs through the legacy minimum-role checks in
-`HandleRequest` (`handlers/generic_handler.go`) using `models.UserRole` / `models.GroupRole`.
-Wiring `PermissionService` into the shared handler wrapper is the next phase.
+Authorization is enforced centrally in `HandleRequest` (`handlers/generic_handler.go`) via the
+`PermissionService`. Each handler declares its requirement on the `structs.Handler` it builds:
+
+- `AppPermissions []string` — app-scoped permissions the caller must hold (logical AND).
+- `GroupPermissions []string` — group-scoped permissions the caller must hold (AND) in **each**
+  group resolved from `GroupId` / `GroupIds`, or from `ReceiptId` / `ReceiptIds` (the receipt's
+  group is looked up automatically).
+- `OrAppPermissions []string` — an app-scoped fallback; holding **any** of them bypasses the group
+  check (e.g. an administrator viewing a group they aren't a member of). Replaces the old
+  `OrUserRole`.
+
+`HandleRequest` resolves the caller's effective permissions from the database (never the JWT) and
+denies with `403` on any failure. The legacy `UserRole` / `GroupRole` / `OrUserRole` handler fields
+and their checks have been **removed**. Every authenticated endpoint that previously had a legacy
+role gate now has an equivalent permission gate; endpoints that touch only the caller's own data
+(notifications, user preferences, own profile/claims/app-data, API keys, group lists) are gated by
+dedicated self-service permissions (`app.notifications.*`, `app.user-preferences.*`,
+`app.account.*`, `app.receipts.search`) included in the Legacy User set so existing users are
+unaffected. Two endpoints are intentionally **not** permission-gated: the username-availability
+lookup (used pre-auth during signup) and `ConvertToJpg` (a stateless image utility with no stored
+resource to scope against). The role/permission management endpoints (`/role`, `/permission`) are
+gated by `app.roles.*`.
+
+**Known follow-up (not yet implemented):** nothing assigns a modern role when a user signs up, is
+created by an admin, or is added to a group — only the one-time startup migration back-fills
+**existing** users/members. Until per-create assignment lands, an account created after that
+migration resolves to no permissions and is denied. Wiring per-create role assignment is the
+required next slice.
 
 ### Tests
 
-`permissions/matcher_test.go`, `permissions/registry_test.go`, `services/permission_test.go`,
-`services/roles_test.go`, `repositories/roles_test.go`.
+`permissions/matcher_test.go`, `permissions/registry_test.go`, `permissions/legacy_test.go`,
+`services/permission_test.go`, `services/roles_test.go`, `repositories/roles_test.go`, and the
+handler authorization tests in `handlers/generic_handler_test.go` (with shared helpers in
+`handlers/auth_test_helpers_test.go`).

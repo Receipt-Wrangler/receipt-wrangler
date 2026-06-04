@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -114,6 +115,8 @@ func TestCreateApiKey_Success(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
 	r = createJWTContext(r, 1, models.USER)
 
+	grantAllAppPerms(t, 1)
+
 	CreateApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusOK {
@@ -162,6 +165,8 @@ func TestCreateApiKey_MinimalFields(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
 	r = createJWTContext(r, 1, models.USER)
 
+	grantAllAppPerms(t, 1)
+
 	CreateApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusOK {
@@ -175,6 +180,8 @@ func TestCreateApiKey_AllValidScopes(t *testing.T) {
 	createTestPepper()
 
 	scopes := []string{"r", "w", "rw"}
+
+	grantAllAppPerms(t, 1)
 
 	for _, scope := range scopes {
 		command := commands.UpsertApiKeyCommand{
@@ -244,6 +251,8 @@ func TestCreateApiKey_ValidationErrors(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for name, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
@@ -267,6 +276,8 @@ func TestCreateApiKey_MalformedJSON(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
 	r = createJWTContext(r, 1, models.USER)
 
+	grantAllAppPerms(t, 1)
+
 	CreateApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusInternalServerError {
@@ -281,6 +292,8 @@ func TestCreateApiKey_EmptyBody(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
 	r = createJWTContext(r, 1, models.USER)
+
+	grantAllAppPerms(t, 1)
 
 	CreateApiKey(w, r)
 
@@ -305,6 +318,8 @@ func TestCreateApiKey_AsAdmin(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
 	r = createJWTContext(r, 1, models.ADMIN)
+
+	grantAllAppPerms(t, 1)
 
 	CreateApiKey(w, r)
 
@@ -336,6 +351,8 @@ func TestGetPagedApiKeys_Success(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 1, models.USER)
+
+	grantAllAppPerms(t, 1)
 
 	GetPagedApiKeys(w, r)
 
@@ -381,6 +398,8 @@ func TestGetPagedApiKeys_AdminViewAll(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 1, models.ADMIN)
 
+	grantAllAppPerms(t, 1)
+
 	GetPagedApiKeys(w, r)
 
 	if w.Result().StatusCode != http.StatusOK {
@@ -421,6 +440,8 @@ func TestGetPagedApiKeys_UserCannotViewAll(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 1, models.USER)
 
+	grantAllAppPerms(t, 1)
+
 	GetPagedApiKeys(w, r)
 
 	if w.Result().StatusCode != http.StatusBadRequest {
@@ -458,6 +479,8 @@ func TestGetPagedApiKeys_Pagination(t *testing.T) {
 			expected: 2,
 		},
 	}
+
+	grantAllAppPerms(t, 1)
 
 	for name, test := range tests {
 		command := commands.PagedApiKeyRequestCommand{
@@ -502,6 +525,8 @@ func TestGetPagedApiKeys_Sorting(t *testing.T) {
 
 	validColumns := []string{"name", "description", "created_at", "updated_at"}
 	sortDirections := []commands.SortDirection{commands.ASCENDING, commands.DESCENDING}
+
+	grantAllAppPerms(t, 1)
 
 	for _, column := range validColumns {
 		for _, direction := range sortDirections {
@@ -595,6 +620,8 @@ func TestGetPagedApiKeys_ValidationErrors(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for name, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
@@ -632,6 +659,8 @@ func TestGetPagedApiKeys_InvalidOrderByColumn(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 1, models.USER)
 
+	grantAllAppPerms(t, 1)
+
 	GetPagedApiKeys(w, r)
 
 	if w.Result().StatusCode != http.StatusInternalServerError {
@@ -647,6 +676,8 @@ func TestGetPagedApiKeys_MalformedJSON(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 1, models.USER)
 
+	grantAllAppPerms(t, 1)
+
 	GetPagedApiKeys(w, r)
 
 	if w.Result().StatusCode != http.StatusInternalServerError {
@@ -661,6 +692,8 @@ func TestGetPagedApiKeys_EmptyBody(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 1, models.USER)
+
+	grantAllAppPerms(t, 1)
 
 	GetPagedApiKeys(w, r)
 
@@ -689,6 +722,8 @@ func TestGetPagedApiKeys_EmptyDatabase(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 1, models.USER)
+
+	grantAllAppPerms(t, 1)
 
 	GetPagedApiKeys(w, r)
 
@@ -734,6 +769,8 @@ func TestGetPagedApiKeys_DifferentUsers(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 1, models.USER)
 
+	grantAllAppPerms(t, 1)
+
 	GetPagedApiKeys(w, r)
 
 	var response1 structs.PagedData
@@ -744,6 +781,8 @@ func TestGetPagedApiKeys_DifferentUsers(t *testing.T) {
 	w = httptest.NewRecorder()
 	r = httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 2, models.USER)
+
+	grantAllAppPerms(t, 2)
 
 	GetPagedApiKeys(w, r)
 
@@ -786,6 +825,8 @@ func TestUpdateApiKey_Success(t *testing.T) {
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-1")
 
+	grantAllAppPerms(t, 1)
+
 	UpdateApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusOK {
@@ -816,6 +857,8 @@ func TestUpdateApiKey_MinimalFields(t *testing.T) {
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-1")
 
+	grantAllAppPerms(t, 1)
+
 	UpdateApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusOK {
@@ -830,6 +873,8 @@ func TestUpdateApiKey_AllValidScopes(t *testing.T) {
 	createTestApiKeysForHandlerTests()
 
 	scopes := []string{"r", "w", "rw"}
+
+	grantAllAppPerms(t, 1)
 
 	for i, scope := range scopes {
 		keyId := fmt.Sprintf("handler-key-%d", (i%2)+1) // Alternate between key-1 and key-2
@@ -908,6 +953,8 @@ func TestUpdateApiKey_ValidationErrors(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for name, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
@@ -944,6 +991,8 @@ func TestUpdateApiKey_MalformedJSON(t *testing.T) {
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-1")
 
+	grantAllAppPerms(t, 1)
+
 	UpdateApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusInternalServerError {
@@ -965,6 +1014,8 @@ func TestUpdateApiKey_EmptyBody(t *testing.T) {
 	chi.URLParam(r, "id")
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-1")
+
+	grantAllAppPerms(t, 1)
 
 	UpdateApiKey(w, r)
 
@@ -995,6 +1046,8 @@ func TestUpdateApiKey_NonExistentKey(t *testing.T) {
 	chi.URLParam(r, "id")
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "non-existent-key")
+
+	grantAllAppPerms(t, 1)
 
 	UpdateApiKey(w, r)
 
@@ -1027,6 +1080,8 @@ func TestUpdateApiKey_WrongUser(t *testing.T) {
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-3")
 
+	grantAllAppPerms(t, 1)
+
 	UpdateApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusInternalServerError {
@@ -1057,6 +1112,8 @@ func TestUpdateApiKey_AsAdmin(t *testing.T) {
 	chi.URLParam(r, "id")
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-1")
+
+	grantAllAppPerms(t, 1)
 
 	UpdateApiKey(w, r)
 
@@ -1090,6 +1147,8 @@ func TestUpdateApiKey_UserUpdatingOwnKey(t *testing.T) {
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-3")
 
+	grantAllAppPerms(t, 2)
+
 	UpdateApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusOK {
@@ -1119,6 +1178,8 @@ func TestUpdateApiKey_EmptyKeyId(t *testing.T) {
 	chi.URLParam(r, "id")
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "")
+
+	grantAllAppPerms(t, 1)
 
 	UpdateApiKey(w, r)
 
@@ -1177,6 +1238,8 @@ func TestUpdateApiKey_URLEncodedId(t *testing.T) {
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", encodedKeyId)
 
+	grantAllAppPerms(t, 1)
+
 	UpdateApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusOK {
@@ -1199,6 +1262,8 @@ func TestDeleteApiKey_Success(t *testing.T) {
 	chi.URLParam(r, "id")
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-1")
+
+	grantAllAppPerms(t, 1)
 
 	DeleteApiKey(w, r)
 
@@ -1223,6 +1288,8 @@ func TestDeleteApiKey_AdminCanDeleteAnyKey(t *testing.T) {
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-3")
 
+	grantAllAppPerms(t, 1)
+
 	DeleteApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusOK {
@@ -1246,6 +1313,8 @@ func TestDeleteApiKey_UserCannotDeleteOtherUsersKey(t *testing.T) {
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "handler-key-3")
 
+	grantAppPerms(t, 1, permissions.AppApiKeysDelete)
+
 	DeleteApiKey(w, r)
 
 	if w.Result().StatusCode != http.StatusInternalServerError {
@@ -1267,6 +1336,8 @@ func TestDeleteApiKey_NonExistentKey(t *testing.T) {
 	chi.URLParam(r, "id")
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", "non-existent-key")
+
+	grantAllAppPerms(t, 1)
 
 	DeleteApiKey(w, r)
 
@@ -1314,6 +1385,8 @@ func TestDeleteApiKey_URLEncodedId(t *testing.T) {
 	chi.URLParam(r, "id")
 	rctx := chi.RouteContext(r.Context())
 	rctx.URLParams.Add("id", encodedKeyId)
+
+	grantAllAppPerms(t, 1)
 
 	DeleteApiKey(w, r)
 

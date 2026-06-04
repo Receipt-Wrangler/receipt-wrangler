@@ -60,6 +60,8 @@ func TestShouldCreateASystemEmail(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	AddSystemEmail(w, r)
 
 	if w.Result().StatusCode != http.StatusOK {
@@ -86,6 +88,8 @@ func TestShouldNotCreateASystemEmailDueToMissingEncryptionKey(t *testing.T) {
 
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	AddSystemEmail(w, r)
 
@@ -145,6 +149,8 @@ func TestShouldNotAllowUserToCreateInvalidSystemEmail(t *testing.T) {
 			expect: http.StatusBadRequest,
 		},
 	}
+
+	grantAllAppPerms(t, 1)
 
 	for _, test := range tests {
 		bytes, _ := json.Marshal(test.input)
@@ -226,6 +232,8 @@ func TestShouldReturn500WithMalformedPagedRequestCommand(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for name, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
@@ -272,6 +280,8 @@ func TestShouldAllowUserToGetSystemEmails(t *testing.T) {
 	db.Create(&systemEmail)
 
 	repositories.CreateTestUser()
+
+	grantAllAppPerms(t, 1)
 
 	GetAllSystemEmails(w, r)
 
@@ -325,6 +335,8 @@ func TestShouldNotGetSystemEmailByIdDueToBadId(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	GetSystemEmailById(w, r)
 
 	if w.Result().StatusCode != expectedStatusCode {
@@ -355,6 +367,8 @@ func TestShouldGetSystemEmailById(t *testing.T) {
 
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	GetSystemEmailById(w, r)
 
@@ -434,6 +448,8 @@ func TestShouldNotAllowUserToUpdateInvalidSystemEmail(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for _, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
@@ -488,6 +504,8 @@ func TestShouldNotDeleteEmailWithBadId(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	DeleteSystemEmail(w, r)
 
 	if w.Result().StatusCode != expectedStatusCode {
@@ -512,6 +530,8 @@ func TestShouldDeleteEmail(t *testing.T) {
 
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	DeleteSystemEmail(w, r)
 
@@ -615,6 +635,8 @@ func TestShouldNotAllowCheckInvalidConnectivityCommand(t *testing.T) {
 			expect: http.StatusInternalServerError,
 		},
 	}
+
+	grantAllAppPerms(t, 1)
 
 	for name, test := range tests {
 		bytes, _ := json.Marshal(test.input)

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
-	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -17,12 +17,12 @@ func CreateDashboard(w http.ResponseWriter, r *http.Request) {
 	vErr, err := command.LoadDataFromRequestAndValidate(w, r)
 
 	handler := structs.Handler{
-		ErrorMessage: "Error adding dashboard",
-		Writer:       w,
-		Request:      r,
-		GroupId:      command.GroupId,
-		GroupRole:    models.VIEWER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error adding dashboard",
+		Writer:           w,
+		Request:          r,
+		GroupId:          command.GroupId,
+		GroupPermissions: []string{permissions.GroupDashboardsCreate},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			if err != nil {
 				return http.StatusInternalServerError, err
@@ -60,12 +60,12 @@ func GetDashboardsForUser(w http.ResponseWriter, r *http.Request) {
 	groupId := chi.URLParam(r, "groupId")
 
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving dashboards",
-		Writer:       w,
-		Request:      r,
-		GroupId:      groupId,
-		GroupRole:    models.VIEWER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error retrieving dashboards",
+		Writer:           w,
+		Request:          r,
+		GroupId:          groupId,
+		GroupPermissions: []string{permissions.GroupDashboardsRead},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			dashboardRepository := repositories.NewDashboardRepository(nil)
 			token := structs.GetClaims(r)
@@ -112,12 +112,12 @@ func UpdateDashboard(w http.ResponseWriter, r *http.Request) {
 	stringGroupId := utils.UintToString(dashboard.GroupID)
 
 	handler := structs.Handler{
-		ErrorMessage: "Error updating dashboard",
-		Writer:       w,
-		Request:      r,
-		GroupId:      stringGroupId,
-		GroupRole:    models.VIEWER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error updating dashboard",
+		Writer:           w,
+		Request:          r,
+		GroupId:          stringGroupId,
+		GroupPermissions: []string{permissions.GroupDashboardsUpdate},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 
@@ -174,12 +174,12 @@ func DeleteDashboard(w http.ResponseWriter, r *http.Request) {
 	stringDashboardId := utils.UintToString(dashboard.GroupID)
 
 	handler := structs.Handler{
-		ErrorMessage: "Error deleteing dashboard",
-		Writer:       w,
-		Request:      r,
-		GroupId:      stringDashboardId,
-		GroupRole:    models.VIEWER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error deleteing dashboard",
+		Writer:           w,
+		Request:          r,
+		GroupId:          stringDashboardId,
+		GroupPermissions: []string{permissions.GroupDashboardsDelete},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 

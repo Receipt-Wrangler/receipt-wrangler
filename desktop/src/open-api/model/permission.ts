@@ -12,7 +12,7 @@
 /**
  * All permission keys the API recognizes.
  */
-export type Permission = 'app.users.create' | 'app.users.read' | 'app.users.update' | 'app.users.delete' | 'app.prompts.create' | 'app.prompts.read' | 'app.prompts.update' | 'app.prompts.delete' | 'app.categories.create' | 'app.categories.read' | 'app.categories.update' | 'app.categories.delete' | 'app.tags.create' | 'app.tags.read' | 'app.tags.update' | 'app.tags.delete' | 'app.custom-fields.create' | 'app.custom-fields.read' | 'app.custom-fields.delete' | 'app.system-settings.read' | 'app.system-settings.update' | 'app.system-settings.restart-task-server' | 'app.receipt-processing-settings.create' | 'app.receipt-processing-settings.read' | 'app.receipt-processing-settings.update' | 'app.receipt-processing-settings.delete' | 'app.system-emails.create' | 'app.system-emails.read' | 'app.system-emails.update' | 'app.system-emails.delete' | 'app.system-tasks.read' | 'app.imports.run' | 'app.groups.create' | 'app.groups.read' | 'app.groups.update-settings' | 'app.api-keys.create' | 'app.api-keys.read' | 'app.api-keys.update' | 'app.api-keys.delete' | 'app.api-keys.delete-any' | 'group.view' | 'group.update' | 'group.delete' | 'group.receipts.create' | 'group.receipts.read' | 'group.receipts.update' | 'group.receipts.delete' | 'group.receipts.duplicate' | 'group.receipts.magic-fill' | 'group.receipts.quick-scan' | 'group.comments.create' | 'group.comments.delete' | 'group.dashboards.create' | 'group.dashboards.read' | 'group.dashboards.update' | 'group.dashboards.delete' | 'group.widgets.read' | 'group.activities.read' | 'group.activities.rerun' | 'group.email.poll';
+export type Permission = 'app.users.create' | 'app.users.read' | 'app.users.update' | 'app.users.delete' | 'app.prompts.create' | 'app.prompts.read' | 'app.prompts.update' | 'app.prompts.delete' | 'app.categories.create' | 'app.categories.read' | 'app.categories.update' | 'app.categories.delete' | 'app.tags.create' | 'app.tags.read' | 'app.tags.update' | 'app.tags.delete' | 'app.custom-fields.create' | 'app.custom-fields.read' | 'app.custom-fields.delete' | 'app.system-settings.read' | 'app.system-settings.update' | 'app.system-settings.restart-task-server' | 'app.receipt-processing-settings.create' | 'app.receipt-processing-settings.read' | 'app.receipt-processing-settings.update' | 'app.receipt-processing-settings.delete' | 'app.system-emails.create' | 'app.system-emails.read' | 'app.system-emails.update' | 'app.system-emails.delete' | 'app.system-tasks.read' | 'app.imports.run' | 'app.groups.create' | 'app.groups.read' | 'app.groups.update-settings' | 'app.api-keys.create' | 'app.api-keys.read' | 'app.api-keys.update' | 'app.api-keys.delete' | 'app.api-keys.delete-any' | 'app.roles.create' | 'app.roles.read' | 'app.roles.update' | 'app.roles.delete' | 'app.notifications.read' | 'app.notifications.delete' | 'app.user-preferences.read' | 'app.user-preferences.update' | 'app.account.read' | 'app.account.update' | 'app.account.delete' | 'app.receipts.search' | 'group.view' | 'group.update' | 'group.delete' | 'group.receipts.create' | 'group.receipts.read' | 'group.receipts.update' | 'group.receipts.delete' | 'group.receipts.duplicate' | 'group.receipts.magic-fill' | 'group.receipts.quick-scan' | 'group.comments.create' | 'group.comments.delete' | 'group.dashboards.create' | 'group.dashboards.read' | 'group.dashboards.update' | 'group.dashboards.delete' | 'group.widgets.read' | 'group.activities.read' | 'group.activities.rerun' | 'group.email.poll';
 
 export const Permission = {
     AppUsersCreate: 'app.users.create' as Permission,
@@ -55,6 +55,18 @@ export const Permission = {
     AppApiKeysUpdate: 'app.api-keys.update' as Permission,
     AppApiKeysDelete: 'app.api-keys.delete' as Permission,
     AppApiKeysDeleteAny: 'app.api-keys.delete-any' as Permission,
+    AppRolesCreate: 'app.roles.create' as Permission,
+    AppRolesRead: 'app.roles.read' as Permission,
+    AppRolesUpdate: 'app.roles.update' as Permission,
+    AppRolesDelete: 'app.roles.delete' as Permission,
+    AppNotificationsRead: 'app.notifications.read' as Permission,
+    AppNotificationsDelete: 'app.notifications.delete' as Permission,
+    AppUserPreferencesRead: 'app.user-preferences.read' as Permission,
+    AppUserPreferencesUpdate: 'app.user-preferences.update' as Permission,
+    AppAccountRead: 'app.account.read' as Permission,
+    AppAccountUpdate: 'app.account.update' as Permission,
+    AppAccountDelete: 'app.account.delete' as Permission,
+    AppReceiptsSearch: 'app.receipts.search' as Permission,
     GroupView: 'group.view' as Permission,
     GroupUpdate: 'group.update' as Permission,
     GroupDelete: 'group.delete' as Permission,

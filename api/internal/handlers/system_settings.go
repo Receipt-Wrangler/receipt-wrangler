@@ -5,7 +5,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	config "receipt-wrangler/api/internal/env"
-	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -14,11 +14,11 @@ import (
 
 func GetSystemSettings(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting system settings",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting system settings",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppSystemSettingsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			systemSettingsRepository := repositories.NewSystemSettingsRepository(nil)
 			systemSettings, err := systemSettingsRepository.GetSystemSettings()
@@ -43,11 +43,11 @@ func GetSystemSettings(w http.ResponseWriter, r *http.Request) {
 
 func UpdateSystemSettings(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating system settings",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error updating system settings",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppSystemSettingsUpdate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			systemSettingsRepository := repositories.NewSystemSettingsRepository(nil)
 			command := commands.UpsertSystemSettingsCommand{}
@@ -97,10 +97,10 @@ func UpdateSystemSettings(w http.ResponseWriter, r *http.Request) {
 
 func RestartTaskServer(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error restarting task server, please restart the entire application",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error restarting task server, please restart the entire application",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppSystemSettingsRestartTaskServer},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			err := wranglerasynq.RestartEmbeddedAsynqServer()
 			if err != nil {

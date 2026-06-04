@@ -50,6 +50,8 @@ func TestShouldGetSystemSettingsWhenThereAreNoSettings(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	GetSystemSettings(w, r)
 
 	if w.Result().StatusCode != expectedStatusCode {
@@ -70,6 +72,8 @@ func TestShouldGetSystemSettingsWhenThereAreExistingSettings(t *testing.T) {
 
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	GetSystemSettings(w, r)
 
@@ -217,6 +221,8 @@ func TestShouldValidateUpsertSystemSettingsCommand(t *testing.T) {
 			expect: http.StatusOK,
 		},
 	}
+
+	grantAllAppPerms(t, 1)
 
 	for _, test := range tests {
 		bytes, _ := json.Marshal(test.input)

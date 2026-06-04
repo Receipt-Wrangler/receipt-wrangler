@@ -83,6 +83,8 @@ func TestGetPieChartData_Success_Categories(t *testing.T) {
 	})
 	r = r.WithContext(newContext)
 
+	grantAllGroupPerms(t, 1, 1)
+
 	GetPieChartData(w, r)
 
 	if w.Result().StatusCode != 200 {
@@ -146,6 +148,8 @@ func TestGetPieChartData_Success_Tags(t *testing.T) {
 	})
 	r = r.WithContext(newContext)
 
+	grantAllGroupPerms(t, 1, 1)
+
 	GetPieChartData(w, r)
 
 	if w.Result().StatusCode != 200 {
@@ -203,6 +207,8 @@ func TestGetPieChartData_Success_PaidBy(t *testing.T) {
 		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
 	})
 	r = r.WithContext(newContext)
+
+	grantAllGroupPerms(t, 1, 1)
 
 	GetPieChartData(w, r)
 
@@ -264,6 +270,8 @@ func TestGetPieChartData_InvalidChartGrouping(t *testing.T) {
 	})
 	r = r.WithContext(newContext)
 
+	grantAllGroupPerms(t, 1, 1)
+
 	GetPieChartData(w, r)
 
 	// Should return 400 Bad Request for validation error
@@ -317,6 +325,8 @@ func TestGetPieChartData_EmptyReceipts(t *testing.T) {
 		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
 	})
 	r = r.WithContext(newContext)
+
+	grantAllGroupPerms(t, 1, 1)
 
 	GetPieChartData(w, r)
 
@@ -387,6 +397,8 @@ func TestGetPieChartData_WithFilter(t *testing.T) {
 	})
 	r = r.WithContext(newContext)
 
+	grantAllGroupPerms(t, 1, 1)
+
 	GetPieChartData(w, r)
 
 	if w.Result().StatusCode != 200 {
@@ -432,6 +444,8 @@ func TestGetPieChartData_InvalidJSON(t *testing.T) {
 	})
 	r = r.WithContext(newContext)
 
+	grantAllGroupPerms(t, 1, 1)
+
 	GetPieChartData(w, r)
 
 	// Should return 500 Internal Server Error for JSON parse error
@@ -459,6 +473,8 @@ func TestGetPieChartData_EmptyBody(t *testing.T) {
 		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
 	})
 	r = r.WithContext(newContext)
+
+	grantAllGroupPerms(t, 1, 1)
 
 	GetPieChartData(w, r)
 
@@ -506,6 +522,8 @@ func TestGetPieChartData_AdminUser(t *testing.T) {
 		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN},
 	})
 	r = r.WithContext(newContext)
+
+	grantAllGroupPerms(t, 1, 1)
 
 	GetPieChartData(w, r)
 
@@ -569,6 +587,8 @@ func TestGetPieChartData_ResponseFormat(t *testing.T) {
 		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
 	})
 	r = r.WithContext(newContext)
+
+	grantAllGroupPerms(t, 1, 1)
 
 	GetPieChartData(w, r)
 

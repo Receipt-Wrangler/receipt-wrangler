@@ -96,6 +96,8 @@ func TestShouldNotAllowAdminToGetSystemTasksWithInvalidCommand(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for _, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
