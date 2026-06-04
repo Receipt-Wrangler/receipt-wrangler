@@ -19,7 +19,6 @@ func BuildGroupRouter() *chi.Mux {
 	groupRouter.With(middleware.CanDeleteGroup).Delete("/{groupId}", handlers.DeleteGroup)
 	groupRouter.Post("/{groupId}/pollGroupEmail", handlers.PollGroupEmail)
 	groupRouter.Post("/getPagedGroups", handlers.GetPagedGroups)
-	groupRouter.Get("/{groupId}/ocrText", handlers.GetOcrTextForGroup)
 
 	return groupRouter
 }

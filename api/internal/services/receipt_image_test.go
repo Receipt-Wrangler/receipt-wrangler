@@ -380,10 +380,3 @@ func TestGetReceiptFromReceiptImageId_MissingImage(t *testing.T) {
 		t.Fatal("expected FileData-not-found error")
 	}
 }
-
-// ReadAllReceiptImagesForGroup spins up multiple goroutines that each
-// instantiate an OcrService. That path needs tesseract + a proper OCR
-// engine configured. Skipped in favor of integration coverage.
-func TestReadAllReceiptImagesForGroup_SkippedByDefault(t *testing.T) {
-	t.Skip("Requires tesseract + OcrService wiring; covered by integration tests")
-}

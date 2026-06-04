@@ -142,6 +142,10 @@ func InitDB() error {
 		}
 	}
 
+	if err := SeedSystemRoles(); err != nil {
+		return err
+	}
+
 	if config.GetDeployEnv() != "test" {
 		userRepository := NewUserRepository(nil)
 		err := userRepository.CreateUserIfNoneExist()

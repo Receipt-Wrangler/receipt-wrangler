@@ -3,10 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
@@ -15,7 +12,6 @@ import (
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"receipt-wrangler/api/internal/wranglerasynq"
-	"strings"
 
 	"github.com/hibiken/asynq"
 
@@ -476,59 +472,3 @@ func DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
-func GetOcrTextForGroup(w http.ResponseWriter, r *http.Request) {
-	groupId := chi.URLParam(r, "groupId")
-	handler := structs.Handler{
-		ErrorMessage: "Error getting ocr text.",
-		Writer:       w,
-		Request:      r,
-		GroupId:      groupId,
-		GroupRole:    models.OWNER,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationZip,
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			token := structs.GetClaims(r)
-			zipFilename := "results.zip"
-
-			ocrResults, err := services.ReadAllReceiptImagesForGroup(groupId, utils.UintToString(token.UserId))
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			fileRepository := repositories.NewFileRepository(nil)
-			tempFilenames := []string{}
-
-			for i, exportResults := range ocrResults {
-				filename := strings.Split(exportResults.Filename, ".")[0] + "-" + fmt.Sprint(i) + ".txt"
-				tempPath := filepath.Join(fileRepository.GetTempDirectoryPath(), filename)
-				err := os.WriteFile(tempPath, []byte(exportResults.OcrText), 0600)
-				defer os.Remove(tempPath)
-				if err != nil {
-					return http.StatusInternalServerError, err
-				}
-
-				tempFilenames = append(tempFilenames, filename)
-			}
-
-			zipPath, err := fileRepository.CreateZipFromTempFiles(zipFilename, tempFilenames)
-			defer os.Remove(zipPath)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			bytes, err := utils.ReadFile(zipPath)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			w.Header().Set("Content-Disposition", "attachment; filename="+zipFilename)
-
-			w.WriteHeader(http.StatusOK)
-			w.Write(bytes)
-
-			return 0, nil
-		},
-	}
-
-	HandleRequest(handler)
-}
