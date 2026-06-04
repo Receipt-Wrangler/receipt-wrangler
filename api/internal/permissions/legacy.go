@@ -1,5 +1,7 @@
 package permissions
 
+import "slices"
+
 // Legacy role permission sets.
 //
 // These reproduce the capabilities of the legacy models.UserRole (ADMIN/USER)
@@ -70,17 +72,16 @@ func LegacyGroupViewerKeys() []string {
 
 // LegacyGroupEditorKeys returns the legacy GroupRole EDITOR permissions: every
 // viewer permission plus the editor-only receipt and activity actions.
-// LegacyGroupViewerKeys returns a fresh slice on each call, so the append
-// cannot alias or mutate the viewer set.
+// slices.Concat allocates a fresh slice, so the viewer set is never aliased.
 func LegacyGroupEditorKeys() []string {
-	return append(LegacyGroupViewerKeys(),
+	return slices.Concat(LegacyGroupViewerKeys(), []string{
 		GroupReceiptsCreate,
 		GroupReceiptsUpdate,
 		GroupReceiptsDelete,
 		GroupReceiptsDuplicate,
 		GroupReceiptsQuickScan,
 		GroupActivitiesRerun,
-	)
+	})
 }
 
 // LegacyGroupOwnerKeys returns every group-scope permission. It mirrors the
