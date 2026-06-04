@@ -183,14 +183,31 @@ func TestRunDataMigrationsDoesNotClobberExistingAssignment(t *testing.T) {
 	}
 	db := GetDB()
 
-	customRole, err := NewRoleRepository(nil).CreateAppRole("Custom Role", "", []string{permissions.AppUsersRead})
+	roleRepository := NewRoleRepository(nil)
+	customAppRole, err := roleRepository.CreateAppRole("Custom Role", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	customGroupRole, err := roleRepository.CreateGroupRole("Custom Group Role", "", []string{permissions.GroupReceiptsRead})
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
 
-	admin := models.User{Username: "admin", Password: "password", UserRole: models.ADMIN, AppRoleID: &customRole.ID}
+	admin := models.User{Username: "admin", Password: "password", UserRole: models.ADMIN, AppRoleID: &customAppRole.ID}
 	if err := db.Create(&admin).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	group := models.Group{Name: "no-clobber-group"}
+	if err := db.Create(&group).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	member := models.GroupMember{GroupID: group.ID, UserID: admin.ID, GroupRole: models.OWNER, GroupRoleID: &customGroupRole.ID}
+	if err := db.Create(&member).Error; err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
@@ -200,6 +217,41 @@ func TestRunDataMigrationsDoesNotClobberExistingAssignment(t *testing.T) {
 		return
 	}
 
-	// The IS NULL guard leaves the administrator's existing assignment intact.
-	assertAppRoleId(t, reloadUser(t, admin.ID), customRole.ID)
+	// The IS NULL guard leaves an administrator's existing assignments intact,
+	// for both the app role and the group role.
+	assertAppRoleId(t, reloadUser(t, admin.ID), customAppRole.ID)
+	assertGroupRoleId(t, reloadMember(t, admin.ID, group.ID), customGroupRole.ID)
+}
+
+func TestRunDataMigrationsRollsBackOnFailure(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	// Intentionally skip SeedSystemRoles so the migration's first role lookup
+	// fails with ErrRecordNotFound, exercising the error path.
+	admin := models.User{Username: "admin", Password: "password", UserRole: models.ADMIN}
+	if err := db.Create(&admin).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if err := RunDataMigrations(); err == nil {
+		utils.PrintTestError(t, nil, "an error because the legacy roles are not seeded")
+	}
+
+	// The transaction rolls back: no ledger row is written, so the migration
+	// retries on the next boot.
+	var ledgerCount int64
+	if err := db.Model(&models.DataMigration{}).Where("name = ?", assignLegacyEquivalentRolesMigration).Count(&ledgerCount).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if ledgerCount != 0 {
+		utils.PrintTestError(t, ledgerCount, 0)
+	}
+
+	// And no partial assignment persisted.
+	if reloadUser(t, admin.ID).AppRoleID != nil {
+		utils.PrintTestError(t, reloadUser(t, admin.ID).AppRoleID, nil)
+	}
 }

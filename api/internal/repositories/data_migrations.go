@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Name of the one-time migration that assigns the seeded legacy-equivalent roles
@@ -26,26 +27,27 @@ var dataMigrations = []dataMigration{
 }
 
 // RunDataMigrations applies any registered one-time data migrations that have
-// not yet been recorded in the data_migrations ledger. Each migration runs in
-// its own transaction together with the ledger insert, so a failure rolls back
-// cleanly and the migration retries on the next boot.
+// not yet been recorded in the data_migrations ledger. Each migration claims its
+// ledger row and runs in the same transaction, so a failure rolls back cleanly
+// and the migration retries on the next boot.
 func RunDataMigrations() error {
 	db := GetDB()
 
 	for _, migration := range dataMigrations {
-		var count int64
-		if err := db.Model(&models.DataMigration{}).Where("name = ?", migration.name).Count(&count).Error; err != nil {
-			return err
-		}
-		if count > 0 {
-			continue
-		}
-
 		err := db.Transaction(func(tx *gorm.DB) error {
-			if err := migration.run(tx); err != nil {
-				return err
+			// Atomically claim the migration. A conflict on the unique name means
+			// it was already applied (or claimed by a concurrent boot), so skip —
+			// this keeps concurrent startups from both running the migration or
+			// failing startup on the unique constraint.
+			claim := tx.Clauses(clause.OnConflict{DoNothing: true}).
+				Create(&models.DataMigration{Name: migration.name, AppliedAt: time.Now()})
+			if claim.Error != nil {
+				return claim.Error
 			}
-			return tx.Create(&models.DataMigration{Name: migration.name, AppliedAt: time.Now()}).Error
+			if claim.RowsAffected == 0 {
+				return nil
+			}
+			return migration.run(tx)
 		})
 		if err != nil {
 			return err
