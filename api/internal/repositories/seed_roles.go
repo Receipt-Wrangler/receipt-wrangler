@@ -23,8 +23,8 @@ func SeedSystemRoles() error {
 		description string
 		permissions []string
 	}{
-		{"Legacy Admin", "Legacy administrator equivalent: full application access.", permissions.LegacyAppAdminKeys()},
-		{"Legacy User", "Legacy standard user equivalent.", permissions.LegacyAppUserKeys()},
+		{LegacyAdminRoleName, "Legacy administrator equivalent: full application access.", permissions.LegacyAppAdminKeys()},
+		{LegacyUserRoleName, "Legacy standard user equivalent.", permissions.LegacyAppUserKeys()},
 	}
 	for _, role := range appRoles {
 		if err := seedAppRole(db, role.name, role.description, role.permissions); err != nil {
@@ -37,9 +37,9 @@ func SeedSystemRoles() error {
 		description string
 		permissions []string
 	}{
-		{"Legacy Viewer", "Legacy group viewer equivalent.", permissions.LegacyGroupViewerKeys()},
-		{"Legacy Editor", "Legacy group editor equivalent.", permissions.LegacyGroupEditorKeys()},
-		{"Legacy Owner", "Legacy group owner equivalent: full group access.", permissions.LegacyGroupOwnerKeys()},
+		{LegacyViewerRoleName, "Legacy group viewer equivalent.", permissions.LegacyGroupViewerKeys()},
+		{LegacyEditorRoleName, "Legacy group editor equivalent.", permissions.LegacyGroupEditorKeys()},
+		{LegacyOwnerRoleName, "Legacy group owner equivalent: full group access.", permissions.LegacyGroupOwnerKeys()},
 	}
 	for _, role := range groupRoles {
 		if err := seedGroupRole(db, role.name, role.description, role.permissions); err != nil {

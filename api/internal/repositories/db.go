@@ -120,6 +120,7 @@ func MakeMigrations() error {
 		&models.GroupReceiptSettings{},
 		&models.Pepper{},
 		&models.ApiKey{},
+		&models.DataMigration{},
 	)
 
 	return err
@@ -152,6 +153,12 @@ func InitDB() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// Runs after the bootstrap admin is created so a fresh install's first user
+	// is assigned its legacy-equivalent role by the same one-time migration.
+	if err := RunDataMigrations(); err != nil {
+		return err
 	}
 
 	return nil
