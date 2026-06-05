@@ -3,7 +3,7 @@ import { TestBed } from "@angular/core/testing";
 import { CanActivateFn } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { Observable, of, take, tap } from "rxjs";
-import { ApiModule, GroupRole, ReceiptService } from "../open-api";
+import { ApiModule, Permission, ReceiptService } from "../open-api";
 import { receiptGuardGuard } from "./receipt-guard.guard";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -33,7 +33,7 @@ describe("receiptGuardGuard", () => {
     );
     const route: any = {
       data: {
-        groupRole: GroupRole.Viewer,
+        permission: Permission.GroupReceiptsRead,
       },
       params: {
         id: 1,
@@ -42,7 +42,7 @@ describe("receiptGuardGuard", () => {
 
     executeGuard(route, {} as any);
 
-    expect(spy).toHaveBeenCalledWith(1, GroupRole.Viewer);
+    expect(spy).toHaveBeenCalledWith(1, Permission.GroupReceiptsRead);
   });
 
   it("should allow the user through", (done) => {
@@ -51,7 +51,7 @@ describe("receiptGuardGuard", () => {
     );
     const route: any = {
       data: {
-        groupRole: GroupRole.Viewer,
+        permission: Permission.GroupReceiptsRead,
       },
       params: {
         id: 1,

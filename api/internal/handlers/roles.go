@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
-	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -16,11 +15,11 @@ import (
 
 func GetRoles(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving roles",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error retrieving roles",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppRolesRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			roleService := services.NewRoleService(nil)
 			roles, err := roleService.GetRoles()
@@ -45,11 +44,11 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 
 func CreateRole(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error creating role",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error creating role",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppRolesCreate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpsertRoleCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -86,11 +85,11 @@ func CreateRole(w http.ResponseWriter, r *http.Request) {
 
 func UpdateRole(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating role",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error updating role",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppRolesUpdate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id, err := utils.StringToUint(chi.URLParam(r, "roleId"))
 			if err != nil {
@@ -151,11 +150,11 @@ func UpdateRole(w http.ResponseWriter, r *http.Request) {
 
 func DeleteRole(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting role",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error deleting role",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppRolesDelete},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id, err := utils.StringToUint(chi.URLParam(r, "roleId"))
 			if err != nil {

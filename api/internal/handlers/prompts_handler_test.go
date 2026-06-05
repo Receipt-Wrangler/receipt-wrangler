@@ -93,6 +93,8 @@ func TestShouldNotGetPagedPromptsWithBadRequest(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for name, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
@@ -140,6 +142,8 @@ func TestShouldNotAllowAdminToGetPromptByIdWithBadId(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	GetPromptById(w, r)
 
 	if w.Result().StatusCode != http.StatusInternalServerError {
@@ -163,6 +167,8 @@ func TestShouldAllowAdminToGetPromptById(t *testing.T) {
 
 	db := repositories.GetDB()
 	db.Create(&models.Prompt{})
+
+	grantAllAppPerms(t, 1)
 
 	GetPromptById(w, r)
 
@@ -200,6 +206,8 @@ func TestShouldNotAllowAdminToUpdatePromptByIdWithBadId(t *testing.T) {
 
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	UpdatePromptById(w, r)
 
@@ -279,6 +287,8 @@ func TestShouldNotAllowUserToUpdateInvalidPrompt(t *testing.T) {
 			expect: http.StatusOK,
 		},
 	}
+
+	grantAllAppPerms(t, 1)
 
 	for _, test := range tests {
 		bytes, _ := json.Marshal(test.input)
@@ -388,6 +398,8 @@ func TestShouldNotAllowAdminToCreateInvalidPrompt(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for _, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
@@ -435,6 +447,8 @@ func TestShouldNotAllowAdminToDeletePromptWithBadId(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	DeletePromptById(w, r)
 
 	if w.Result().StatusCode != http.StatusInternalServerError {
@@ -458,6 +472,8 @@ func TestShouldDeletePromptById(t *testing.T) {
 
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	DeletePromptById(w, r)
 
@@ -493,6 +509,8 @@ func TestShouldCreateDefaultPrompt(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	CreateDefaultPrompt(w, r)
 
 	if w.Result().StatusCode != expectedStatus {
@@ -513,6 +531,10 @@ func TestShouldNotAllowToCreateDuplicateDefaultPrompts(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
+	// The first CreateDefaultPrompt must succeed so the second one collides; the
+	// 500 under test is the duplicate error, not an authorization failure.
 	CreateDefaultPrompt(w, r)
 	CreateDefaultPrompt(w2, r)
 

@@ -7,6 +7,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"strconv"
@@ -18,12 +19,49 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Role-management handlers are now permission-gated (app.roles.*). adminContext
+// returns claims for user 2 and ensures that user actually holds the role
+// permissions in the database (the JWT role itself is no longer trusted).
+// userContext returns claims for a different user that holds no role, so
+// "due to role" cases are rejected with 403.
 func adminContext() *validator.ValidatedClaims {
+	ensureRoleAdmin(2)
 	return &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}}
 }
 
 func userContext() *validator.ValidatedClaims {
-	return &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.USER}}
+	return &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 3, UserRole: models.USER}}
+}
+
+// ensureRoleAdmin idempotently gives userId an app role granting every app.roles
+// permission, so role-management handlers authorize the user. It creates a single
+// reusable "Role Admin" role within the test's (truncated) database.
+func ensureRoleAdmin(userId uint) {
+	services.ClearRolePermissionCacheForTests()
+	db := repositories.GetDB()
+
+	var role models.AppRole
+	if err := db.Where("name = ?", "Role Admin").First(&role).Error; err != nil {
+		roleRepository := repositories.NewRoleRepository(nil)
+		created, cErr := roleRepository.CreateAppRole("Role Admin", "", []string{
+			permissions.AppRolesCreate,
+			permissions.AppRolesRead,
+			permissions.AppRolesUpdate,
+			permissions.AppRolesDelete,
+		})
+		if cErr != nil {
+			panic(cErr)
+		}
+		role = created
+	}
+
+	var count int64
+	db.Model(&models.User{}).Where("id = ?", userId).Count(&count)
+	if count == 0 {
+		db.Create(&models.User{BaseModel: models.BaseModel{ID: userId}, Username: "role-admin", Password: "password", AppRoleID: &role.ID})
+	} else {
+		db.Model(&models.User{}).Where("id = ?", userId).Update("app_role_id", role.ID)
+	}
 }
 
 func TestShouldCreateAppRole(t *testing.T) {
@@ -147,8 +185,10 @@ func TestShouldGetRoles(t *testing.T) {
 		return
 	}
 
-	if len(roles) != 2 {
-		utils.PrintTestError(t, len(roles), 2)
+	// CreateTestRoles seeds two roles; adminContext adds the "Role Admin" role
+	// that authorizes this request, so GetRoles returns three.
+	if len(roles) != 3 {
+		utils.PrintTestError(t, len(roles), 3)
 	}
 }
 

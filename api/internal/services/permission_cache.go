@@ -82,3 +82,11 @@ func clearRolePermissionCacheAll() {
 	rolePermissionCacheGeneration++
 	rolePermissionCache = map[rolePermissionCacheEntry][]string{}
 }
+
+// ClearRolePermissionCacheForTests empties the entire role-permission cache. It
+// is exported so tests in other packages (e.g. handler tests) can keep cases
+// independent: a truncated test database reuses role ids across cases, which
+// would otherwise return another case's cached permissions.
+func ClearRolePermissionCacheForTests() {
+	clearRolePermissionCacheAll()
+}

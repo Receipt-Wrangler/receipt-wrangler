@@ -36,6 +36,8 @@ func TestShouldNotAllowAdminToUpdateGroupSettingsIdWithBadId(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	UpdateGroupSettings(w, r)
 
 	if w.Result().StatusCode != http.StatusInternalServerError {
@@ -100,6 +102,8 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommands(t *testing.T) {
 
 	db.Create(&models.Prompt{})
 	db.Create(&models.Prompt{})
+
+	grantAllAppPerms(t, 1)
 
 	id := uint(1)
 	badId := uint(0)
@@ -194,6 +198,8 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommands(t *testing.T) {
 
 func TestShouldTestUpdateGroupSettingsWithVariousCommandsAsAdmin(t *testing.T) {
 	defer tearDownGroupTests()
+
+	grantAllAppPerms(t, 1)
 
 	tests := map[string]struct {
 		input    commands.PagedGroupRequestCommand

@@ -121,6 +121,8 @@ func TestGetPagedCustomFieldsHandler(t *testing.T) {
 		string(pagedRequestJSON),
 	)
 
+	grantAllAppPerms(t, 1)
+
 	// Call the handler
 	GetPagedCustomFields(rr, req)
 
@@ -186,6 +188,8 @@ func TestGetPagedCustomFieldsHandlerWithPagination(t *testing.T) {
 		"/api/customField/getPagedCustomFields",
 		string(pagedRequestJSON),
 	)
+
+	grantAllAppPerms(t, 1)
 
 	// Call the handler
 	GetPagedCustomFields(rr, req)
@@ -266,6 +270,8 @@ func TestGetPagedCustomFieldsHandlerWithTypeOrdering(t *testing.T) {
 		string(pagedRequestJSON),
 	)
 
+	grantAllAppPerms(t, 1)
+
 	// Call the handler
 	GetPagedCustomFields(rr, req)
 
@@ -311,6 +317,8 @@ func TestGetPagedCustomFieldsHandlerWithInvalidOrderBy(t *testing.T) {
 		string(pagedRequestJSON),
 	)
 
+	grantAllAppPerms(t, 1)
+
 	// Call the handler
 	GetPagedCustomFields(rr, req)
 
@@ -343,6 +351,8 @@ func TestGetPagedCustomFieldsHandlerWithInvalidBody(t *testing.T) {
 		"{invalid json",
 	)
 
+	grantAllAppPerms(t, 1)
+
 	// Call the handler
 	GetPagedCustomFields(rr, req)
 
@@ -362,6 +372,8 @@ func TestGetPagedCustomFieldsHandlerWithEmptyBody(t *testing.T) {
 		"/api/customField/getPagedCustomFields",
 		"",
 	)
+
+	grantAllAppPerms(t, 1)
 
 	// Call the handler
 	GetPagedCustomFields(rr, req)
@@ -392,6 +404,8 @@ func TestGetCustomFieldByIdHandler(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
 	chiCtx := chi.RouteContext(req.Context())
 	chiCtx.URLParams.Add("id", utils.UintToString(customField.ID))
+
+	grantAllAppPerms(t, 1)
 
 	// Call the handler
 	GetCustomFieldById(rr, req)
@@ -438,6 +452,8 @@ func TestGetCustomFieldByIdHandlerWithInvalidId(t *testing.T) {
 	chiCtx := chi.RouteContext(req.Context())
 	chiCtx.URLParams.Add("id", "invalid")
 
+	grantAllAppPerms(t, 1)
+
 	// Call the handler
 	GetCustomFieldById(rr, req)
 
@@ -477,6 +493,8 @@ func TestGetCustomFieldByIdHandlerWithNonExistentId(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
 	chiCtx := chi.RouteContext(req.Context())
 	chiCtx.URLParams.Add("id", nonExistentId)
+
+	grantAllAppPerms(t, 1)
 
 	// Call the handler
 	GetCustomFieldById(rr, req)
@@ -522,6 +540,8 @@ func TestDeleteCustomFieldHandler(t *testing.T) {
 	chiCtx := chi.RouteContext(req.Context())
 	chiCtx.URLParams.Add("id", utils.UintToString(customFieldId))
 
+	grantAllAppPerms(t, 1)
+
 	// Call the handler
 	DeleteCustomField(rr, req)
 
@@ -553,6 +573,8 @@ func TestDeleteCustomFieldHandlerWithInvalidId(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
 	chiCtx := chi.RouteContext(req.Context())
 	chiCtx.URLParams.Add("id", "invalid")
+
+	grantAllAppPerms(t, 1)
 
 	// Call the handler
 	DeleteCustomField(rr, req)
@@ -593,6 +615,8 @@ func TestDeleteCustomFieldHandlerWithNonExistentId(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
 	chiCtx := chi.RouteContext(req.Context())
 	chiCtx.URLParams.Add("id", nonExistentId)
+
+	grantAllAppPerms(t, 1)
 
 	// Call the handler
 	DeleteCustomField(rr, req)

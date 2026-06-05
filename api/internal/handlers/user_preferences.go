@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -11,10 +12,11 @@ import (
 
 func GetUserPreferences(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving user prefernces",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error retrieving user prefernces",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUserPreferencesRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			userPreferencesRepository := repositories.NewUserPreferencesRepository(nil)
 			token := structs.GetClaims(r)
@@ -41,10 +43,11 @@ func GetUserPreferences(w http.ResponseWriter, r *http.Request) {
 
 func UpdateUserPreferences(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating user prefernces",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error updating user prefernces",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUserPreferencesUpdate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			userPreferences := models.UserPrefernces{}
 			userPreferences.LoadDataFromRequest(w, r)

@@ -16,6 +16,7 @@ import (
 )
 
 func TestShouldGetAllPermissions(t *testing.T) {
+	defer tearDownGenericHandlerTest()
 	reader := strings.NewReader("")
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/api/permission", reader)
@@ -26,6 +27,8 @@ func TestShouldGetAllPermissions(t *testing.T) {
 		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
 	)
 	r = r.WithContext(newContext)
+
+	grantAppPerms(t, 1, permissions.AppRolesRead)
 
 	GetPermissions(w, r)
 

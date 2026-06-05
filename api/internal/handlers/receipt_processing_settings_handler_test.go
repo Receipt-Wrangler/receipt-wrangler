@@ -95,6 +95,8 @@ func TestShouldNotGetReceiptProcessingSettingsWithBadRequest(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for name, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
@@ -215,6 +217,8 @@ func TestShouldTestValidAndInvalidCreateReceiptProcessingSettingCommands(t *test
 		db := repositories.GetDB()
 		db.Create(&models.Prompt{})
 
+		grantAllAppPerms(t, 1)
+
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
 		w := httptest.NewRecorder()
@@ -265,6 +269,8 @@ func TestShouldNotReceiptProcessingSettingsByIdDueToBadId(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	GetReceiptProcessingSettingsById(w, r)
 
 	if w.Result().StatusCode != expectedStatusCode {
@@ -293,6 +299,8 @@ func TestShouldGetReceiptProcessingSettingsById(t *testing.T) {
 
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	GetReceiptProcessingSettingsById(w, r)
 
@@ -333,6 +341,8 @@ func TestShouldNotUpdateReceiptProcessingSettingsByIdDueToBadId(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	UpdateReceiptProcessingSettingsById(w, r)
 
 	if w.Result().StatusCode != expectedStatusCode {
@@ -354,6 +364,8 @@ func TestShouldTestValidAndInvalidUpdateReceiptProcessingSettingCommands(t *test
 		},
 		PromptId: 1,
 	})
+
+	grantAllAppPerms(t, 1)
 
 	tests := map[string]struct {
 		input  commands.UpsertReceiptProcessingSettingsCommand
@@ -512,6 +524,8 @@ func TestShouldNotDeleteReceiptProcessingSettingsByIdDueToBadId(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 1)
+
 	DeleteReceiptProcessingSettingsById(w, r)
 
 	if w.Result().StatusCode != expectedStatusCode {
@@ -540,6 +554,8 @@ func TestShouldDeleteReceiptProcessingSettingsById(t *testing.T) {
 
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	DeleteReceiptProcessingSettingsById(w, r)
 
@@ -585,6 +601,8 @@ func TestShouldNotCheckReceiptProcessingSettingsConnectivityWithBadRequest(t *te
 		Key:         key,
 		PromptId:    1,
 	})
+
+	grantAllAppPerms(t, 1)
 
 	tests := map[string]struct {
 		input  commands.CheckReceiptProcessingSettingsCommand

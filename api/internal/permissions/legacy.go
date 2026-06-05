@@ -47,6 +47,14 @@ func LegacyAppUserKeys() []string {
 		AppApiKeysRead,
 		AppApiKeysUpdate,
 		AppApiKeysDelete,
+		AppNotificationsRead,
+		AppNotificationsDelete,
+		AppUserPreferencesRead,
+		AppUserPreferencesUpdate,
+		AppAccountRead,
+		AppAccountUpdate,
+		AppAccountDelete,
+		AppReceiptsSearch,
 	}
 }
 

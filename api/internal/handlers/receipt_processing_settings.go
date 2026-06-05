@@ -5,6 +5,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -15,11 +16,11 @@ import (
 
 func GetPagedReceiptProcessingSettings(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting receipt processing settings",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting receipt processing settings",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppReceiptProcessingSettingsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.PagedRequestCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -64,11 +65,11 @@ func GetPagedReceiptProcessingSettings(w http.ResponseWriter, r *http.Request) {
 
 func CreateReceiptProcessingSettings(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error creating receipt processing settings",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error creating receipt processing settings",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppReceiptProcessingSettingsCreate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpsertReceiptProcessingSettingsCommand{}
 
@@ -106,11 +107,11 @@ func CreateReceiptProcessingSettings(w http.ResponseWriter, r *http.Request) {
 
 func GetReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting receipt processing settings",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting receipt processing settings",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppReceiptProcessingSettingsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 
@@ -137,11 +138,11 @@ func GetReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request) {
 
 func UpdateReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating receipt processing settings",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error updating receipt processing settings",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppReceiptProcessingSettingsUpdate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			updateKey := r.URL.Query().Get("updateKey") == "true"
@@ -182,11 +183,11 @@ func UpdateReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request)
 
 func DeleteReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting receipt processing settings",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error deleting receipt processing settings",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppReceiptProcessingSettingsDelete},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 
@@ -206,11 +207,11 @@ func DeleteReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request)
 
 func CheckReceiptProcessingSettingsConnectivity(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error checking connectivity",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error checking connectivity",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppReceiptProcessingSettingsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			command := commands.CheckReceiptProcessingSettingsCommand{}

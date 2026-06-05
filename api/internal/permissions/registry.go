@@ -67,6 +67,23 @@ const (
 	AppApiKeysUpdate    = "app.api-keys.update"
 	AppApiKeysDelete    = "app.api-keys.delete"
 	AppApiKeysDeleteAny = "app.api-keys.delete-any"
+
+	AppRolesCreate = "app.roles.create"
+	AppRolesRead   = "app.roles.read"
+	AppRolesUpdate = "app.roles.update"
+	AppRolesDelete = "app.roles.delete"
+
+	AppNotificationsRead   = "app.notifications.read"
+	AppNotificationsDelete = "app.notifications.delete"
+
+	AppUserPreferencesRead   = "app.user-preferences.read"
+	AppUserPreferencesUpdate = "app.user-preferences.update"
+
+	AppAccountRead   = "app.account.read"
+	AppAccountUpdate = "app.account.update"
+	AppAccountDelete = "app.account.delete"
+
+	AppReceiptsSearch = "app.receipts.search"
 )
 
 const (
@@ -149,6 +166,23 @@ var registry = []Descriptor{
 	{AppApiKeysUpdate, "Update API Keys", "Edit the calling user's API keys.", "Security", ScopeApp},
 	{AppApiKeysDelete, "Delete API Keys", "Revoke the calling user's API keys.", "Security", ScopeApp},
 	{AppApiKeysDeleteAny, "Delete Any API Key", "Revoke API keys belonging to other users.", "Security", ScopeApp},
+
+	{AppRolesCreate, "Create Roles", "Create new app or group roles.", "Access Control", ScopeApp},
+	{AppRolesRead, "Read Roles", "List roles and view the permission catalog.", "Access Control", ScopeApp},
+	{AppRolesUpdate, "Update Roles", "Edit existing roles.", "Access Control", ScopeApp},
+	{AppRolesDelete, "Delete Roles", "Remove roles.", "Access Control", ScopeApp},
+
+	{AppNotificationsRead, "Read Notifications", "View your own notifications and unread count.", "Account", ScopeApp},
+	{AppNotificationsDelete, "Delete Notifications", "Dismiss your own notifications.", "Account", ScopeApp},
+
+	{AppUserPreferencesRead, "Read User Preferences", "View your own user preferences.", "Account", ScopeApp},
+	{AppUserPreferencesUpdate, "Update User Preferences", "Edit your own user preferences.", "Account", ScopeApp},
+
+	{AppAccountRead, "Read Own Account", "Read your own profile, claims, groups, and app bootstrap data.", "Account", ScopeApp},
+	{AppAccountUpdate, "Update Own Account", "Edit your own profile.", "Account", ScopeApp},
+	{AppAccountDelete, "Delete Own Account", "Delete your own account.", "Account", ScopeApp},
+
+	{AppReceiptsSearch, "Search Receipts", "Search across receipts you can access.", "Receipts", ScopeApp},
 
 	{GroupView, "View Group", "See the group, its members, and metadata.", "Group", ScopeGroup},
 	{GroupUpdate, "Update Group", "Edit group name, settings, and receipt-handling configuration.", "Group", ScopeGroup},

@@ -237,6 +237,8 @@ func TestShouldRunHandlerWithDifferentInputs(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for name, test := range tests {
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)

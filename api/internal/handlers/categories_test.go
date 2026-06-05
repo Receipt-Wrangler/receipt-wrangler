@@ -36,6 +36,8 @@ func TestShouldGetAllCategories(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.USER}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 2)
+
 	GetAllCategories(w, r)
 
 	err := json.Unmarshal(w.Body.Bytes(), &categories)
@@ -69,6 +71,8 @@ func TestShouldCreateCategory(t *testing.T) {
 
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.USER}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	CreateCategory(w, r)
 
@@ -111,6 +115,8 @@ func TestShouldUpdateCategoryIfAdmin(t *testing.T) {
 	r = r.WithContext(routeContext)
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	UpdateCategory(w, r)
 
@@ -175,6 +181,8 @@ func TestShouldDeleteCategoryIfAdmin(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 2)
+
 	DeleteCategory(w, r)
 
 	db := repositories.GetDB()
@@ -229,6 +237,8 @@ func TestShouldGetCategoryNameCountIfAdmin(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 2)
+
 	GetCategoryNameCount(w, r)
 
 	err := json.Unmarshal(w.Body.Bytes(), &resultCount)
@@ -264,6 +274,8 @@ func TestShouldGetCategoryNameCountIfAdmin2(t *testing.T) {
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}})
 	r = r.WithContext(newContext)
 
+	grantAllAppPerms(t, 2)
+
 	GetCategoryNameCount(w, r)
 
 	err := json.Unmarshal(w.Body.Bytes(), &resultCount)
@@ -298,6 +310,8 @@ func TestShouldGetCategoryNameCountAsUser(t *testing.T) {
 	r = r.WithContext(routeContext)
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.USER}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	GetCategoryNameCount(w, r)
 
