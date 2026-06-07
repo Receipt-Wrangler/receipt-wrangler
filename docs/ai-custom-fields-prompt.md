@@ -6,7 +6,7 @@ extraction prompt. To make the AI actually populate custom fields, the prompt
 must instruct it to return values. Add a block like the following to the prompt
 (it pairs with the `@customFields` variable):
 
-```
+```text
 Custom fields: from the list below, extract a value for each custom field where
 the receipt clearly provides one. Return them in a "customFields" array. Each
 entry MUST contain the field's "customFieldId" and exactly ONE typed value
@@ -24,6 +24,7 @@ Custom fields to populate: @customFields
 ```
 
 ## Notes
+
 - Custom-field values are NOT run through `UpsertReceiptCommand.Validate`, so the
   prompt must return well-typed values keyed by a valid `customFieldId`. The
   persistence path saves `Receipt.CustomFields []CustomFieldValue` via GORM
