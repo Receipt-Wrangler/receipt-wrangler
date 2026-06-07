@@ -466,7 +466,7 @@ func (service ReceiptProcessingService) buildPrompt(
 		return "", systemTaskCommand, err
 	}
 
-	templateVariableMap, err := service.buildTemplateVariableMap(ocrText)
+	templateVariableMap, err := service.buildTemplateVariableMap(ocrText, prompt.Prompt)
 	if err != nil {
 		systemTaskCommand.Status = models.SYSTEM_TASK_FAILED
 		systemTaskCommand.ResultDescription = err.Error()
@@ -489,7 +489,7 @@ func (service ReceiptProcessingService) buildPrompt(
 	return realPrompt, systemTaskCommand, nil
 }
 
-func (service ReceiptProcessingService) buildTemplateVariableMap(ocrText string) (map[structs.PromptTemplateVariable]string, error) {
+func (service ReceiptProcessingService) buildTemplateVariableMap(ocrText string, promptText string) (map[structs.PromptTemplateVariable]string, error) {
 	result := make(map[structs.PromptTemplateVariable]string)
 
 	categoriesString, err := service.getCategoriesString()
@@ -502,18 +502,23 @@ func (service ReceiptProcessingService) buildTemplateVariableMap(ocrText string)
 		return result, err
 	}
 
-	customFieldsString, err := service.getCustomFieldsString()
-	if err != nil {
-		return result, err
-	}
-
 	currentYearString := utils.UintToString(uint(time.Now().Year()))
 
 	result[structs.CATEGORIES] = categoriesString
 	result[structs.TAGS] = tagsString
-	result[structs.CUSTOM_FIELDS] = customFieldsString
 	result[structs.OCR_TEXT] = ocrText
 	result[structs.CURRENT_YEAR] = currentYearString
+
+	// Only hit the database for custom fields when the prompt actually uses the
+	// variable, avoiding an extra query (plus the Options preload) on every
+	// prompt build for the common case of prompts that don't reference it.
+	if strings.Contains(promptText, string(structs.CUSTOM_FIELDS)) {
+		customFieldsString, err := service.getCustomFieldsString()
+		if err != nil {
+			return result, err
+		}
+		result[structs.CUSTOM_FIELDS] = customFieldsString
+	}
 
 	return result, nil
 }
@@ -550,7 +555,7 @@ func (service ReceiptProcessingService) getTagsString() (string, error) {
 
 func (service ReceiptProcessingService) getCustomFieldsString() (string, error) {
 	customFieldRepository := repositories.NewCustomFieldRepository(nil)
-	customFields, err := customFieldRepository.GetAllCustomFields("id, name, type, description")
+	customFields, err := customFieldRepository.GetAllCustomFields()
 	if err != nil {
 		return "", err
 	}

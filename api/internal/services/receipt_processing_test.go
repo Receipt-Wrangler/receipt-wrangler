@@ -14,6 +14,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
 
@@ -527,17 +528,29 @@ func TestBuildPrompt_InterpolatesCustomFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// The @customFields variable must be substituted (no literal token left)
-	// and the substituted JSON must include the seeded field's name and type
-	// so the model knows what to extract.
-	if strings.Contains(realPrompt, "@customFields") {
+	// The @customFields token must be substituted (no literal token left).
+	if strings.Contains(realPrompt, string(structs.CUSTOM_FIELDS)) {
 		t.Errorf("expected @customFields to be substituted, got: %q", realPrompt)
 	}
-	if !strings.Contains(realPrompt, "\"VAT\"") {
-		t.Errorf("expected custom field name in prompt, got: %q", realPrompt)
+	// Parse the interpolated JSON rather than asserting on exact formatting:
+	// the prompt was "customFields=<json>", so everything after '=' is the
+	// serialised custom-field list.
+	_, jsonPart, found := strings.Cut(realPrompt, "=")
+	if !found {
+		t.Fatalf("could not locate interpolated JSON in prompt: %q", realPrompt)
 	}
-	if !strings.Contains(realPrompt, "CURRENCY") {
-		t.Errorf("expected custom field type in prompt, got: %q", realPrompt)
+	var fields []models.CustomField
+	if err := json.Unmarshal([]byte(strings.TrimSpace(jsonPart)), &fields); err != nil {
+		t.Fatalf("interpolated custom fields not valid JSON: %v (%q)", err, jsonPart)
+	}
+	if len(fields) != 1 {
+		t.Fatalf("expected 1 custom field, got %d", len(fields))
+	}
+	if fields[0].Name != "VAT" {
+		t.Errorf("expected field name VAT, got %q", fields[0].Name)
+	}
+	if fields[0].Type != models.CURRENCY {
+		t.Errorf("expected field type CURRENCY, got %q", fields[0].Type)
 	}
 	if cmd.Status != models.SYSTEM_TASK_SUCCEEDED {
 		t.Errorf("expected SUCCEEDED, got: %s", cmd.Status)
