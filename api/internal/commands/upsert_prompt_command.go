@@ -42,7 +42,7 @@ func (command *UpsertPromptCommand) Validate() structs.ValidatorError {
 		templateVariables := regex.FindAllString(command.Prompt, -1)
 		for i := 0; i < len(templateVariables); i++ {
 			variable := templateVariables[i]
-			if variable != string(structs.CATEGORIES) && variable != string(structs.TAGS) && variable != string(structs.OCR_TEXT) && variable != string(structs.CURRENT_YEAR) {
+			if variable != string(structs.CATEGORIES) && variable != string(structs.TAGS) && variable != string(structs.OCR_TEXT) && variable != string(structs.CURRENT_YEAR) && variable != string(structs.CUSTOM_FIELDS) {
 				errorMap["prompt"] = "Invalid template variables found"
 			}
 		}
