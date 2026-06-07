@@ -47,6 +47,18 @@ func (repository CustomFieldRepository) GetPagedCustomFields(
 	return customFields, count, nil
 }
 
+func (repository CustomFieldRepository) GetAllCustomFields(querySelect string) ([]models.CustomField, error) {
+	db := repository.GetDB()
+	var customFields []models.CustomField
+
+	err := db.Table("custom_fields").Select(querySelect).Preload("Options").Find(&customFields).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return customFields, nil
+}
+
 func (repository CustomFieldRepository) CreateCustomField(
 	command commands.UpsertCustomFieldCommand,
 	createdBy *uint,

@@ -502,10 +502,16 @@ func (service ReceiptProcessingService) buildTemplateVariableMap(ocrText string)
 		return result, err
 	}
 
+	customFieldsString, err := service.getCustomFieldsString()
+	if err != nil {
+		return result, err
+	}
+
 	currentYearString := utils.UintToString(uint(time.Now().Year()))
 
 	result[structs.CATEGORIES] = categoriesString
 	result[structs.TAGS] = tagsString
+	result[structs.CUSTOM_FIELDS] = customFieldsString
 	result[structs.OCR_TEXT] = ocrText
 	result[structs.CURRENT_YEAR] = currentYearString
 
@@ -540,4 +546,19 @@ func (service ReceiptProcessingService) getTagsString() (string, error) {
 	}
 
 	return string(tagsBytes), nil
+}
+
+func (service ReceiptProcessingService) getCustomFieldsString() (string, error) {
+	customFieldRepository := repositories.NewCustomFieldRepository(nil)
+	customFields, err := customFieldRepository.GetAllCustomFields("id, name, type, description")
+	if err != nil {
+		return "", err
+	}
+
+	customFieldsBytes, err := json.Marshal(customFields)
+	if err != nil {
+		return "", err
+	}
+
+	return string(customFieldsBytes), nil
 }
