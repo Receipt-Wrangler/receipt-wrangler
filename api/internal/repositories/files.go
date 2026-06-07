@@ -13,7 +13,6 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -199,22 +198,29 @@ func (repository FileRepository) ConvertHeicToJpg(bytes []byte) ([]byte, error) 
 	return mw.GetImageBlob()
 }
 
-// pdfRasterizationDpi returns the DPI used to rasterize PDFs into images,
-// read from the PDF_DPI environment variable. It falls back to 300 when the
-// variable is unset, unparseable, or non-positive. 300 DPI is a common
+// pdfRasterizationDpi returns the DPI used to rasterize PDFs into images. It is
+// configured via the PdfDpi system setting; when unset (0) or out of the
+// supported range it falls back to defaultPdfDpi. 300 DPI is a common
 // document-scanning resolution that preserves small receipt text for OCR and
-// vision models while keeping output sizes reasonable.
-func pdfRasterizationDpi() float64 {
-	const defaultDpi = 300.0
-	raw := os.Getenv("PDF_DPI")
-	if raw == "" {
-		return defaultDpi
+// vision models while keeping output sizes and memory use reasonable.
+const (
+	defaultPdfDpi = 300.0
+	minPdfDpi     = 72.0
+	maxPdfDpi     = 1200.0
+)
+
+func (repository FileRepository) pdfRasterizationDpi() float64 {
+	systemSettingsRepository := NewSystemSettingsRepository(repository.DB)
+	systemSettings, err := systemSettingsRepository.GetSystemSettings()
+	if err != nil {
+		return defaultPdfDpi
 	}
-	parsed, err := strconv.ParseFloat(raw, 64)
-	if err != nil || parsed <= 0 {
-		return defaultDpi
+
+	dpi := float64(systemSettings.PdfDpi)
+	if dpi < minPdfDpi || dpi > maxPdfDpi {
+		return defaultPdfDpi
 	}
-	return parsed
+	return dpi
 }
 
 func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
@@ -225,8 +231,8 @@ func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 	// rasterizes them at a default of 72 DPI unless a resolution is set BEFORE
 	// the blob is read, which produces low-resolution images that degrade OCR
 	// and vision-model accuracy. Set the rasterization density first; it is
-	// configurable via the PDF_DPI env var (default 300).
-	dpi := pdfRasterizationDpi()
+	// configurable via the PdfDpi system setting (default 300).
+	dpi := repository.pdfRasterizationDpi()
 	if err := mw.SetResolution(dpi, dpi); err != nil {
 		return nil, err
 	}
@@ -326,6 +332,10 @@ func (repository FileRepository) WriteTempFile(data []byte) (string, error) {
 
 func (repository FileRepository) BuildTempFilePath(fileType string) (string, error) {
 	tempPath := repository.GetTempDirectoryPath()
+	// Ensure the temp directory exists before returning a path under it.
+	// ConvertPdfToJpg writes here directly, and on a fresh checkout/runtime the
+	// directory may not exist yet, which would fail the subsequent write.
+	utils.MakeDirectory(tempPath)
 
 	filename, err := utils.GetRandomString(10)
 	if err != nil {

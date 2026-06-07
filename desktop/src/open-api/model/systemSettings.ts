@@ -60,6 +60,7 @@ export interface SystemSettings {
      * Concurrency for task worker
      */
     taskConcurrency?: number;
+    pdfDpi?: number;
     taskQueueConfigurations: Array<TaskQueueConfiguration>;
 }
 export namespace SystemSettings {

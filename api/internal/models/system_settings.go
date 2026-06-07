@@ -16,5 +16,6 @@ type SystemSettings struct {
 	FallbackReceiptProcessingSettings   ReceiptProcessingSettings `json:"-"`
 	FallbackReceiptProcessingSettingsId *uint                     `json:"fallbackReceiptProcessingSettingsId"`
 	TaskConcurrency                     int                       `json:"taskConcurrency" gorm:"default:10"`
+	PdfDpi                              int                       `json:"pdfDpi" gorm:"default:300"`
 	TaskQueueConfigurations             []TaskQueueConfiguration  `json:"taskQueueConfigurations"`
 }

@@ -49,6 +49,7 @@ export interface UpsertSystemSettingsCommand {
      * Concurrency for task worker
      */
     taskConcurrency: number;
+    pdfDpi?: number;
     taskQueueConfigurations?: Array<UpsertTaskQueueConfiguration>;
 }
 export namespace UpsertSystemSettingsCommand {

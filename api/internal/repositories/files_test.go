@@ -3,6 +3,8 @@ package repositories
 import (
 	"archive/zip"
 	"bytes"
+	"image"
+	_ "image/jpeg"
 	"io"
 	"os"
 	"path/filepath"
@@ -537,52 +539,68 @@ func TestConvertPdfToJpg_InvalidBytes(t *testing.T) {
 	}
 }
 
-func TestPdfRasterizationDpi_DefaultsTo300(t *testing.T) {
-	t.Setenv("PDF_DPI", "")
-	if got := pdfRasterizationDpi(); got != 300 {
+func TestPdfRasterizationDpi_DefaultsWhenUnset(t *testing.T) {
+	defer TruncateTestDb()
+	setPdfDpiSetting(t, 0)
+	repository := NewFileRepository(nil)
+	if got := repository.pdfRasterizationDpi(); got != 300 {
 		utils.PrintTestError(t, got, 300)
 	}
 }
 
-func TestPdfRasterizationDpi_HonorsEnv(t *testing.T) {
-	t.Setenv("PDF_DPI", "150")
-	if got := pdfRasterizationDpi(); got != 150 {
+func TestPdfRasterizationDpi_HonorsSetting(t *testing.T) {
+	defer TruncateTestDb()
+	setPdfDpiSetting(t, 150)
+	repository := NewFileRepository(nil)
+	if got := repository.pdfRasterizationDpi(); got != 150 {
 		utils.PrintTestError(t, got, 150)
 	}
 }
 
-func TestPdfRasterizationDpi_FallsBackOnInvalid(t *testing.T) {
-	for _, bad := range []string{"abc", "0", "-100"} {
-		t.Setenv("PDF_DPI", bad)
-		if got := pdfRasterizationDpi(); got != 300 {
+func TestPdfRasterizationDpi_FallsBackOnOutOfRange(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewFileRepository(nil)
+	for _, bad := range []int{10, 5000, -100} {
+		setPdfDpiSetting(t, bad)
+		if got := repository.pdfRasterizationDpi(); got != 300 {
 			utils.PrintTestError(t, got, 300)
 		}
 	}
 }
 
-// Higher DPI must rasterize the same PDF into a physically larger image than
-// the previous hard-coded 72-DPI default, proving the resolution is applied
-// before ReadImageBlob. We compare encoded JPEG byte length as a proxy for
-// pixel dimensions; a 300-DPI raster of the same page is reliably larger.
+func decodeDimensions(t *testing.T, jpg []byte) (int, int) {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(jpg))
+	if err != nil {
+		utils.PrintTestError(t, err, "decodable JPEG")
+	}
+	return cfg.Width, cfg.Height
+}
+
 func TestConvertPdfToJpg_HigherDpiProducesLargerImage(t *testing.T) {
+	defer TruncateTestDb()
 	t.Setenv("BASE_PATH", testBasePath())
 	repository := NewFileRepository(nil)
 	pdf := makePdfFromJpg(t, readTestJpgBytes(t))
 
-	t.Setenv("PDF_DPI", "72")
+	setPdfDpiSetting(t, 72)
 	low, err := repository.ConvertPdfToJpg(pdf)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
 
-	t.Setenv("PDF_DPI", "300")
+	setPdfDpiSetting(t, 300)
 	high, err := repository.ConvertPdfToJpg(pdf)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
 
-	if !(len(high) > len(low)) {
-		utils.PrintTestError(t, len(high), "greater than "+utils.UintToString(uint(len(low))))
+	// Compare actual pixel dimensions, not encoded byte length: byte length is
+	// not a reliable proxy (JPEG compression varies across versions/settings).
+	lowW, lowH := decodeDimensions(t, low)
+	highW, highH := decodeDimensions(t, high)
+	if !(highW > lowW && highH > lowH) {
+		utils.PrintTestError(t, []int{highW, highH},
+			"dimensions greater than ("+utils.UintToString(uint(lowW))+"x"+utils.UintToString(uint(lowH))+")")
 	}
 }
 
@@ -850,5 +868,16 @@ func TestShouldValidateZipFilesInput(t *testing.T) {
 				utils.PrintTestError(t, "empty data", "non-empty zip data")
 			}
 		}
+	}
+}
+
+// setPdfDpiSetting seeds the singleton SystemSettings row with the given PdfDpi
+// so pdfRasterizationDpi() reads it during tests.
+func setPdfDpiSetting(t *testing.T, dpi int) {
+	db := GetDB()
+	db.Exec("DELETE FROM system_settings")
+	settings := models.SystemSettings{PdfDpi: dpi}
+	if err := db.Create(&settings).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
 	}
 }

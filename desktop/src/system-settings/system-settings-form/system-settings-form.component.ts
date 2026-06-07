@@ -136,6 +136,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       currencyHideDecimalPlaces: [this.originalSystemSettings.currencyHideDecimalPlaces],
       receiptProcessingSettingsId: [this.originalSystemSettings?.receiptProcessingSettingsId],
       fallbackReceiptProcessingSettingsId: [this.originalSystemSettings?.fallbackReceiptProcessingSettingsId],
+      pdfDpi: [this.originalSystemSettings?.pdfDpi, [Validators.min(72), Validators.max(1200)]],
       taskConcurrency: [this.originalSystemSettings?.taskConcurrency, [Validators.min(0), Validators.required]],
       taskQueueConfigurations: this.formBuilder.array(this.buildAsynqQueueConfigurations())
     });
@@ -218,6 +219,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
     const formValue = this.form.getRawValue();
     formValue["emailPollingInterval"] = Number.parseInt(formValue["emailPollingInterval"]);
     formValue["taskConcurrency"] = Number.parseInt(formValue["taskConcurrency"]);
+    formValue["pdfDpi"] = Number.parseInt(formValue["pdfDpi"]);
     (formValue["taskQueueConfigurations"] as Array<any>).forEach(config => {
       config.priority = Number.parseInt(config.priority);
     });
