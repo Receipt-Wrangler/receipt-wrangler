@@ -162,7 +162,11 @@ class ImapClient:
                 "(")  # Fixes case when date comes back in utc , so (UTC) is appended
             parsed = datetime.datetime.strptime(
                 date_parts[0].strip(), "%a, %d %b %Y %H:%M:%S %z")
-            utc_date = parsed.replace(tzinfo=datetime.timezone.utc)
+            # Convert to UTC (not relabel): strptime with %z yields an aware
+            # datetime at the header's offset, so astimezone shifts the instant
+            # correctly. Using replace(tzinfo=utc) would keep the wall-clock time
+            # and silently move the instant for non-UTC offsets (e.g. +0530).
+            utc_date = parsed.astimezone(datetime.timezone.utc)
             return utc_date.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         except (ValueError, IndexError):
             return now_str
@@ -186,15 +190,13 @@ class ImapClient:
             # Only treat genuine attachments as receipts. Skip inline/embedded
             # images: forwarded e-receipts (Uber, Amazon, etc.) embed logos,
             # map tiles, spacers and tracking pixels as
-            # `Content-Disposition: inline` and/or with a `Content-ID`. Without
+            # `Content-Disposition: inline`. Without
             # this, every embedded image becomes its own receipt (a single
             # forwarded Uber email produced 5). With body processing enabled
             # the real receipt is the rendered email body, so inline images
             # should not be ingested as attachments. Mirrors the
             # Content-Disposition handling already used in _get_body_text.
             if 'attachment' not in content_disposition.lower():
-                continue
-            if part.get('Content-ID') is not None:
                 continue
 
             filename = part.get_filename()
@@ -203,13 +205,17 @@ class ImapClient:
             logging.info(f"Filename: {filename} mime_type: {mime_type}")
 
             if filename and len(filename) > 0 and self.valid_mime_type(mime_type):
-                filePath = os.path.join(base_path, "temp", filename)
+                # Sanitize: the filename comes from untrusted email content and
+                # is used in a path join, so strip any directory components to
+                # prevent path traversal (e.g. "../../etc/...").
+                safe_filename = os.path.basename(filename)
+                filePath = os.path.join(base_path, "temp", safe_filename)
                 with open(filePath, 'wb') as f:
                     f.write(part.get_payload(decode=True))
 
                 size = os.path.getsize(filePath)
                 data = {
-                    "filename": filename,
+                    "filename": safe_filename,
                     "fileType": mime_type,
                     "size": size,
                 }

@@ -1,4 +1,5 @@
 import unittest
+import datetime
 from email.message import Message
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -39,6 +40,49 @@ class TestShouldSetUpClientCorrectly(unittest.TestCase):
         date = 'Wed, 20 Oct 2021 10:30:00 +0000'
         result = self.client.get_formatted_date(date)
         self.assertEqual(result, '2021-10-20T10:30:00.000000Z')
+
+    def test_get_formatted_date_converts_non_utc_offset(self):
+        # +0530 must be CONVERTED to UTC (05:00 - 5:30 = 23:30 prev day),
+        # not merely relabeled as UTC.
+        date = 'Wed, 20 Oct 2021 05:00:00 +0530'
+        result = self.client.get_formatted_date(date)
+        self.assertEqual(result, '2021-10-19T23:30:00.000000Z')
+
+    def test_get_formatted_date_handles_utc_suffix(self):
+        date = 'Wed, 20 Oct 2021 10:30:00 +0000 (UTC)'
+        result = self.client.get_formatted_date(date)
+        self.assertEqual(result, '2021-10-20T10:30:00.000000Z')
+
+    @patch('imap_client.datetime')
+    def test_get_formatted_date_none_falls_back_to_now(self, mock_dt):
+        fixed = datetime.datetime(2022, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc)
+        mock_dt.datetime.now.return_value = fixed
+        mock_dt.timezone.utc = datetime.timezone.utc
+        self.assertEqual(self.client.get_formatted_date(None), '2022-01-02T03:04:05.000000Z')
+
+    @patch('imap_client.datetime')
+    def test_get_formatted_date_empty_falls_back_to_now(self, mock_dt):
+        fixed = datetime.datetime(2022, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc)
+        mock_dt.datetime.now.return_value = fixed
+        mock_dt.timezone.utc = datetime.timezone.utc
+        self.assertEqual(self.client.get_formatted_date(''), '2022-01-02T03:04:05.000000Z')
+
+    @patch('imap_client.datetime')
+    def test_get_formatted_date_malformed_falls_back_to_now(self, mock_dt):
+        fixed = datetime.datetime(2022, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc)
+        mock_dt.datetime.now.return_value = fixed
+        mock_dt.datetime.strptime = datetime.datetime.strptime
+        mock_dt.timezone.utc = datetime.timezone.utc
+        self.assertEqual(self.client.get_formatted_date('not a date'), '2022-01-02T03:04:05.000000Z')
+
+    def test_get_formatted_to_or_from_data_missing_header(self):
+        message = Message()
+        self.assertEqual(
+            self.client._get_formatted_to_or_from_data(message, 'From'),
+            {'name': None, 'email': None})
+        self.assertEqual(
+            self.client._get_formatted_to_or_from_data(message, 'To'),
+            {'name': None, 'email': None})
 
     def test_valid_mime_type(self):
         mime_type = 'image/jpeg'
