@@ -498,6 +498,52 @@ func TestBuildPrompt_InterpolatesVariables(t *testing.T) {
 	}
 }
 
+func TestBuildPrompt_InterpolatesCustomFields(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	db := repositories.GetDB()
+
+	customField := models.CustomField{
+		Name:        "VAT",
+		Type:        models.CURRENCY,
+		Description: "VAT amount",
+	}
+	if err := db.Create(&customField).Error; err != nil {
+		t.Fatalf("seed custom field: %v", err)
+	}
+
+	prompt := models.Prompt{
+		Name:   "bpcf",
+		Prompt: "customFields=@customFields",
+	}
+	if err := db.Create(&prompt).Error; err != nil {
+		t.Fatalf("seed prompt: %v", err)
+	}
+
+	service := ReceiptProcessingService{
+		ReceiptProcessingSettings: models.ReceiptProcessingSettings{PromptId: prompt.ID},
+	}
+	realPrompt, cmd, err := service.buildPrompt(service.ReceiptProcessingSettings, "ocr")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// The @customFields variable must be substituted (no literal token left)
+	// and the substituted JSON must include the seeded field's name and type
+	// so the model knows what to extract.
+	if strings.Contains(realPrompt, "@customFields") {
+		t.Errorf("expected @customFields to be substituted, got: %q", realPrompt)
+	}
+	if !strings.Contains(realPrompt, "\"VAT\"") {
+		t.Errorf("expected custom field name in prompt, got: %q", realPrompt)
+	}
+	if !strings.Contains(realPrompt, "CURRENCY") {
+		t.Errorf("expected custom field type in prompt, got: %q", realPrompt)
+	}
+	if cmd.Status != models.SYSTEM_TASK_SUCCEEDED {
+		t.Errorf("expected SUCCEEDED, got: %s", cmd.Status)
+	}
+}
+
 func TestBuildPrompt_InvalidPromptId(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
