@@ -13,6 +13,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -198,9 +199,37 @@ func (repository FileRepository) ConvertHeicToJpg(bytes []byte) ([]byte, error) 
 	return mw.GetImageBlob()
 }
 
+// pdfRasterizationDpi returns the DPI used to rasterize PDFs into images,
+// read from the PDF_DPI environment variable. It falls back to 300 when the
+// variable is unset, unparseable, or non-positive. 300 DPI is a common
+// document-scanning resolution that preserves small receipt text for OCR and
+// vision models while keeping output sizes reasonable.
+func pdfRasterizationDpi() float64 {
+	const defaultDpi = 300.0
+	raw := os.Getenv("PDF_DPI")
+	if raw == "" {
+		return defaultDpi
+	}
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil || parsed <= 0 {
+		return defaultDpi
+	}
+	return parsed
+}
+
 func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 	mw := imagick.NewMagickWand()
 	defer mw.Destroy()
+
+	// PDFs are vector documents with no inherent pixel resolution. ImageMagick
+	// rasterizes them at a default of 72 DPI unless a resolution is set BEFORE
+	// the blob is read, which produces low-resolution images that degrade OCR
+	// and vision-model accuracy. Set the rasterization density first; it is
+	// configurable via the PDF_DPI env var (default 300).
+	dpi := pdfRasterizationDpi()
+	if err := mw.SetResolution(dpi, dpi); err != nil {
+		return nil, err
+	}
 
 	if err := mw.ReadImageBlob(bytes); err != nil {
 		return nil, err
