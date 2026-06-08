@@ -3,6 +3,7 @@ import email
 import logging
 import os
 import re
+import ssl
 from html.parser import HTMLParser
 from io import StringIO
 from mailbox import Message
@@ -54,11 +55,23 @@ class ImapClient:
         self.email_whitelist = email_whitelist or []
 
     def connect(self):
+        # When connecting to a self-signed mail server (e.g. an internal
+        # homelab Dovecot), certificate verification will fail with an
+        # "unknown ca" alert. IMAP_TLS_SKIP_VERIFY=true disables verification
+        # for these trusted internal hosts. It defaults to off so public
+        # servers are still verified normally.
+        skip_verify = os.environ.get("IMAP_TLS_SKIP_VERIFY", "").lower() in ("1", "true", "yes")
+        ssl_context = None
+        if skip_verify:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
         if self.use_starttls:
             self.client = IMAPClient(self.host, self.port, ssl=False)
-            self.client.starttls()
+            self.client.starttls(ssl_context=ssl_context)
         else:
-            self.client = IMAPClient(self.host, self.port)
+            self.client = IMAPClient(self.host, self.port, ssl_context=ssl_context)
 
         self.client.login(self.username, self.password)
 
