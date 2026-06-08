@@ -104,6 +104,55 @@ func TestCreateUserAssignsDefaultAppRole(t *testing.T) {
 	}
 }
 
+func TestCreateUserHonorsExplicitRole(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	userRepository := NewUserRepository(nil)
+	roleRepository := NewRoleRepository(nil)
+
+	// A bootstrap user already occupies the "first user" slot, so the count-based
+	// fallback would make the next account a USER. An explicit ADMIN role on the
+	// command (the admin-create path) must override that.
+	if _, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "bootstrap", DisplayName: "b", Password: "a really secure password",
+	}); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	admin, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "explicit-admin", DisplayName: "a", Password: "a really secure password",
+		UserRole: models.ADMIN,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if admin.UserRole != models.ADMIN {
+		utils.PrintTestError(t, admin.UserRole, models.ADMIN)
+	}
+
+	// An explicit ADMIN must also resolve to the Legacy Admin modern role.
+	legacyAdminId, err := roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if admin.AppRoleID == nil || legacyAdminId == nil || *admin.AppRoleID != *legacyAdminId {
+		utils.PrintTestError(t, admin.AppRoleID, legacyAdminId)
+	}
+}
+
 func TestCreateUserLeavesAppRoleNilWhenUnseeded(t *testing.T) {
 	defer TruncateTestDb()
 

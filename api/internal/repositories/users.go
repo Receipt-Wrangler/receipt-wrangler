@@ -29,6 +29,7 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 		DisplayName:        userData.DisplayName,
 		Password:           userData.Password,
 		IsDummyUser:        userData.IsDummyUser,
+		UserRole:           userData.UserRole,
 		DefaultAvatarColor: "#27b1ff",
 	}
 
