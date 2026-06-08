@@ -127,13 +127,13 @@ test.describe('group creation assigns the default group role (user)', () => {
 });
 
 // Deletes a group from the list by name. The delete button is an icon-only
-// control (no accessible name), so it is located by its "delete" mat-icon; the
-// confirmation dialog's confirm button carries a data-testid.
+// control (no accessible name), so it carries a data-testid; the confirmation
+// dialog's confirm button likewise carries a data-testid.
 async function deleteGroupByName(page: Page, name: string) {
   await page.goto('/groups');
   const row = page.getByRole('row').filter({ hasText: name }).first();
   await expect(row).toBeVisible();
-  await row.locator('button:has(mat-icon:has-text("delete"))').click();
+  await row.getByTestId('group-delete').click();
 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();

@@ -365,7 +365,10 @@ func TestSetDefaultAppRoleClearsOthers(t *testing.T) {
 
 	// Exactly one app role is the default.
 	var count int64
-	GetDB().Model(&models.AppRole{}).Where("is_default = ?", true).Count(&count)
+	if err := GetDB().Model(&models.AppRole{}).Where("is_default = ?", true).Count(&count).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
 	if count != 1 {
 		utils.PrintTestError(t, count, 1)
 	}
@@ -405,7 +408,10 @@ func TestSetDefaultGroupRoleClearsOthers(t *testing.T) {
 	}
 
 	var count int64
-	GetDB().Model(&models.GroupRoleDefinition{}).Where("is_default = ?", true).Count(&count)
+	if err := GetDB().Model(&models.GroupRoleDefinition{}).Where("is_default = ?", true).Count(&count).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
 	if count != 1 {
 		utils.PrintTestError(t, count, 1)
 	}

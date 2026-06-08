@@ -272,12 +272,18 @@ func TestEnsureDefaultRolesIsIdempotent(t *testing.T) {
 	}
 
 	var appDefaults int64
-	GetDB().Model(&models.AppRole{}).Where("is_default = ?", true).Count(&appDefaults)
+	if err := GetDB().Model(&models.AppRole{}).Where("is_default = ?", true).Count(&appDefaults).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
 	if appDefaults != 1 {
 		utils.PrintTestError(t, appDefaults, 1)
 	}
 	var groupDefaults int64
-	GetDB().Model(&models.GroupRoleDefinition{}).Where("is_default = ?", true).Count(&groupDefaults)
+	if err := GetDB().Model(&models.GroupRoleDefinition{}).Where("is_default = ?", true).Count(&groupDefaults).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
 	if groupDefaults != 1 {
 		utils.PrintTestError(t, groupDefaults, 1)
 	}
@@ -322,5 +328,16 @@ func TestEnsureDefaultRolesPreservesCustomDefault(t *testing.T) {
 	legacyUser, ok := findRole(roles, LegacyUserRoleName)
 	if !ok || legacyUser.IsDefault {
 		utils.PrintTestError(t, "Legacy User became default", "Legacy User not default")
+	}
+}
+
+func TestEnsureDefaultRolesErrorsWhenLegacyRoleMissing(t *testing.T) {
+	defer TruncateTestDb()
+
+	// No roles seeded, so the legacy default roles do not exist. EnsureDefaultRoles
+	// must fail loudly rather than silently leaving no default (which would lock out
+	// every account created afterward).
+	if err := EnsureDefaultRoles(); err == nil {
+		utils.PrintTestError(t, "no error", "error: legacy role not found")
 	}
 }

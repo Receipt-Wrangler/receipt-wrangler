@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"fmt"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 
@@ -134,9 +135,16 @@ func ensureDefaultAppRole(db *gorm.DB) error {
 		return nil
 	}
 
-	return db.Model(&models.AppRole{}).
+	result := db.Model(&models.AppRole{}).
 		Where("name = ?", LegacyUserRoleName).
-		Update("is_default", true).Error
+		Update("is_default", true)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("legacy app role %q not found; cannot set default", LegacyUserRoleName)
+	}
+	return nil
 }
 
 // ensureDefaultGroupRole sets the Legacy Owner role as the default group role
@@ -150,7 +158,14 @@ func ensureDefaultGroupRole(db *gorm.DB) error {
 		return nil
 	}
 
-	return db.Model(&models.GroupRoleDefinition{}).
+	result := db.Model(&models.GroupRoleDefinition{}).
 		Where("name = ?", LegacyOwnerRoleName).
-		Update("is_default", true).Error
+		Update("is_default", true)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("legacy group role %q not found; cannot set default", LegacyOwnerRoleName)
+	}
+	return nil
 }
