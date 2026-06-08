@@ -14,4 +14,5 @@ type UserView struct {
 	UpdatedAt          time.Time       `json:"updatedAt"`
 	Username           string          `json:"username"`
 	UserRole           models.UserRole `json:"userRole"`
+	AppRoleID          *uint           `json:"appRoleId"`
 }

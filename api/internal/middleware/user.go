@@ -96,8 +96,11 @@ func ValidateUserData(roleRequired bool) (mw func(http.Handler) http.Handler) {
 			}
 
 			if roleRequired {
-				if len(userData.UserRole) == 0 {
-					err.Errors["userRole"] = "User Role is required"
+				// A role can be specified either as the modern app role id (what the
+				// desktop now sends) or the legacy UserRole enum (still used by some
+				// callers, e.g. the e2e seed script). Require at least one.
+				if userData.AppRoleID == nil && len(userData.UserRole) == 0 {
+					err.Errors["appRoleId"] = "A role is required"
 				}
 			}
 

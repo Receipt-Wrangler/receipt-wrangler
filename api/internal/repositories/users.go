@@ -45,28 +45,40 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 		repository.SetTransaction(tx)
 		userPreferencesRepository := NewUserPreferencesRepository(tx)
 
-		userRole := user.UserRole
-
-		if len(userRole) == 0 {
-			var usrCnt int64
-			tx.Model(models.User{}).Count(&usrCnt)
-			if usrCnt == 0 {
-				user.UserRole = models.ADMIN
-			} else {
-				user.UserRole = models.USER
+		if userData.AppRoleID != nil {
+			// The admin-protected create endpoint chose a modern app role
+			// explicitly. Honor it and derive the transitional legacy enum from
+			// the chosen role so legacy-enum readers stay correct.
+			roleRepository := NewRoleRepository(tx)
+			legacyRole, roleErr := roleRepository.DeriveLegacyUserRole(*userData.AppRoleID)
+			if roleErr != nil {
+				repository.ClearTransaction()
+				return roleErr
 			}
-		}
+			user.AppRoleID = userData.AppRoleID
+			user.UserRole = legacyRole
+		} else {
+			if len(user.UserRole) == 0 {
+				var usrCnt int64
+				tx.Model(models.User{}).Count(&usrCnt)
+				if usrCnt == 0 {
+					user.UserRole = models.ADMIN
+				} else {
+					user.UserRole = models.USER
+				}
+			}
 
-		// Assign the modern app role so the account is not locked out under
-		// permission enforcement: Legacy Admin for admins (the first/bootstrap
-		// user is never the configurable default), the configurable default app
-		// role otherwise.
-		appRoleId, roleErr := repository.resolveAppRoleId(tx, user.UserRole)
-		if roleErr != nil {
-			repository.ClearTransaction()
-			return roleErr
+			// Assign the modern app role so the account is not locked out under
+			// permission enforcement: Legacy Admin for admins (the first/bootstrap
+			// user is never the configurable default), the configurable default
+			// app role otherwise.
+			appRoleId, roleErr := repository.resolveAppRoleId(tx, user.UserRole)
+			if roleErr != nil {
+				repository.ClearTransaction()
+				return roleErr
+			}
+			user.AppRoleID = appRoleId
 		}
-		user.AppRoleID = appRoleId
 
 		err = repository.GetDB().Create(&user).Error
 
@@ -121,6 +133,33 @@ func (repository UserRepository) resolveAppRoleId(tx *gorm.DB, userRole models.U
 		return roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
 	}
 	return roleRepository.GetDefaultAppRoleId()
+}
+
+// UpdateUser updates the editable fields of a user. When the command supplies a
+// modern app role id it is honored and the legacy UserRole enum is derived from
+// it (a transitional bridge for code that still reads User.UserRole). The app
+// role column is only written when an id is supplied, so callers that omit it
+// never clear an existing assignment.
+func (repository UserRepository) UpdateUser(id string, command commands.SignUpCommand) error {
+	db := repository.GetDB()
+
+	updates := map[string]interface{}{
+		"username":     command.Username,
+		"display_name": command.DisplayName,
+		"user_role":    command.UserRole,
+	}
+
+	if command.AppRoleID != nil {
+		roleRepository := NewRoleRepository(repository.TX)
+		legacyRole, err := roleRepository.DeriveLegacyUserRole(*command.AppRoleID)
+		if err != nil {
+			return err
+		}
+		updates["app_role_id"] = *command.AppRoleID
+		updates["user_role"] = legacyRole
+	}
+
+	return db.Table("users").Where("id = ?", id).Updates(updates).Error
 }
 
 func (repository UserRepository) CreateUserIfNoneExist() error {

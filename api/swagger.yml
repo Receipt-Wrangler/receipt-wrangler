@@ -3476,6 +3476,11 @@ components:
         groupRole:
           type: string
           $ref: "#/components/schemas/GroupRole"
+        groupRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: Id of the modern group role assigned to the member
         updatedAt:
           type: string
           x-go-name: UpdatedAt
@@ -3499,6 +3504,11 @@ components:
         groupRole:
           type: string
           $ref: "#/components/schemas/GroupRole"
+        groupRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: Id of the modern group role to assign to the member
         userId:
           type: integer
           description: User compound primary key
@@ -3862,6 +3872,11 @@ components:
           type: string
           $ref: "#/components/schemas/UserRole"
           description: User's role
+        appRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: Id of the modern app role assigned to the user
         lastLoginDate:
           type: string
       description: User in the system
@@ -3901,6 +3916,11 @@ components:
           type: string
           $ref: "#/components/schemas/UserRole"
           description: User's role
+        appRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: Id of the modern app role assigned to the user
       description: User in the system
       x-go-package: receipt-wrangler/api/internal/models
     UpdateProfileCommand:
@@ -3969,6 +3989,11 @@ components:
           type: string
           $ref: "#/components/schemas/UserRole"
           description: User's role
+        appRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: Id of the modern app role to assign to the user
     BulkStatusUpdateCommand:
       required:
         - status

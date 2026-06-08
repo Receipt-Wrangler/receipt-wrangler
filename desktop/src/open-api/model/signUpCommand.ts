@@ -31,6 +31,10 @@ export interface SignUpCommand {
      * User\'s role
      */
     userRole?: UserRole;
+    /**
+     * Id of the modern app role to assign to the user
+     */
+    appRoleId?: number;
 }
 export namespace SignUpCommand {
 }

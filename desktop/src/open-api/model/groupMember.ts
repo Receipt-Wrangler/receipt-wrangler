@@ -20,6 +20,10 @@ export interface GroupMember {
      */
     groupId: number;
     groupRole: GroupRole;
+    /**
+     * Id of the modern group role assigned to the member
+     */
+    groupRoleId?: number;
     updatedAt?: string;
     /**
      * User compound primary key

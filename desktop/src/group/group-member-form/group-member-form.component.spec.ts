@@ -1,7 +1,9 @@
+import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
-import { MatDialogRef } from "@angular/material/dialog";
+import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { NgxsModule, Store } from "@ngxs/store";
 import { PipesModule } from "../../pipes";
 import { AuthState } from "../../store";
@@ -18,6 +20,7 @@ describe("GroupMemberFormComponent", () => {
         NgxsModule.forRoot([AuthState]),
         PipesModule,
         ReactiveFormsModule,
+        MatDialogModule,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
@@ -25,6 +28,8 @@ describe("GroupMemberFormComponent", () => {
           provide: MatDialogRef,
           useValue: {},
         },
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting(),
       ],
     }).compileComponents();
 

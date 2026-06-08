@@ -77,6 +77,30 @@ func (repository GroupRepository) isValidColumn(orderBy string) bool {
 		orderBy == "updated_at"
 }
 
+// buildGroupMemberFromCommand maps an upsert command to a GroupMember. When the
+// command supplies a modern group role id it is honored and the legacy GroupRole
+// enum is derived from it (a transitional bridge for code that still reads
+// GroupMember.GroupRole, e.g. the desktop group table); otherwise the legacy
+// role on the command is used as-is.
+func buildGroupMemberFromCommand(roleRepository RoleRepository, command commands.UpsertGroupMemberCommand) (models.GroupMember, error) {
+	groupMember := models.GroupMember{
+		UserID:    command.UserID,
+		GroupID:   command.GroupID,
+		GroupRole: command.GroupRole,
+	}
+
+	if command.GroupRoleID != nil {
+		legacyRole, err := roleRepository.DeriveLegacyGroupRole(*command.GroupRoleID)
+		if err != nil {
+			return models.GroupMember{}, err
+		}
+		groupMember.GroupRoleID = command.GroupRoleID
+		groupMember.GroupRole = legacyRole
+	}
+
+	return groupMember, nil
+}
+
 func (repository GroupRepository) CreateGroup(command commands.UpsertGroupCommand, userId uint) (models.Group, error) {
 	// TODO: move hooks on delete to repository func
 	db := repository.GetDB()
@@ -86,12 +110,11 @@ func (repository GroupRepository) CreateGroup(command commands.UpsertGroupComman
 	groupToCreate.Name = command.Name
 	groupToCreate.Status = command.Status
 	groupToCreate.IsAllGroup = command.IsAllGroup
+	memberRoleRepository := NewRoleRepository(nil)
 	for i := 0; i < len(command.GroupMembers); i++ {
-		groupMemberCommand := command.GroupMembers[i]
-		groupMember := models.GroupMember{
-			UserID:    groupMemberCommand.UserID,
-			GroupID:   groupMemberCommand.GroupID,
-			GroupRole: groupMemberCommand.GroupRole,
+		groupMember, err := buildGroupMemberFromCommand(memberRoleRepository, command.GroupMembers[i])
+		if err != nil {
+			return models.Group{}, err
 		}
 
 		groupToCreate.GroupMembers = append(groupToCreate.GroupMembers, groupMember)
@@ -177,12 +200,11 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 	}
 	groupToUpdate.ID = uint(u64Id)
 
+	memberRoleRepository := NewRoleRepository(nil)
 	for i := 0; i < len(command.GroupMembers); i++ {
-		groupMemberCommand := command.GroupMembers[i]
-		groupMember := models.GroupMember{
-			UserID:    groupMemberCommand.UserID,
-			GroupID:   groupMemberCommand.GroupID,
-			GroupRole: groupMemberCommand.GroupRole,
+		groupMember, err := buildGroupMemberFromCommand(memberRoleRepository, command.GroupMembers[i])
+		if err != nil {
+			return models.Group{}, err
 		}
 		groupToUpdate.GroupMembers = append(groupToUpdate.GroupMembers, groupMember)
 	}

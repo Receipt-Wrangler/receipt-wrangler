@@ -1,0 +1,55 @@
+<app-dialog [headerText]="role.name">
+  <div class="role-preview">
+    <div class="meta">
+      <span class="chip" [class.group]="isGroup()">
+        <mat-icon>{{ scopeIcon() }}</mat-icon>
+        {{ scopeLabel() }}
+      </span>
+      @if (role.isSystem) {
+        <span class="chip system"><mat-icon>verified</mat-icon> System</span>
+      }
+      @if (role.isDefault) {
+        <span class="chip default"><mat-icon>star</mat-icon> Default</span>
+      }
+    </div>
+
+    @if (role.description) {
+      <p class="description">{{ role.description }}</p>
+    }
+
+    <div class="summary">
+      {{ permissionCount() }} permission{{ permissionCount() === 1 ? "" : "s" }}
+    </div>
+
+    @if (groups().length === 0) {
+      <p class="empty">This role grants no permissions.</p>
+    } @else {
+      @for (group of groups(); track group.resourceKey) {
+        <div class="group">
+          <div class="group-head">
+            <mat-icon>{{ group.icon }}</mat-icon>
+            <span class="group-name">{{ group.name }}</span>
+            <span class="group-sub">{{ group.resourceKey }}</span>
+          </div>
+          <div class="rows">
+            @for (row of group.rows; track row.key) {
+              <div class="row">
+                <div class="row-main">
+                  <span class="row-label">{{ row.label }}</span>
+                  <span class="row-key">{{ row.key }}</span>
+                </div>
+                @if (row.description) {
+                  <span class="row-desc">{{ row.description }}</span>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
+    }
+
+    <div class="actions">
+      <button mat-stroked-button mat-dialog-close>Close</button>
+    </div>
+  </div>
+</app-dialog>

@@ -248,7 +248,9 @@ longer gate handler access.
   app role otherwise), and `GroupRepository.CreateGroup` sets the creator's `GroupMember.GroupRoleID`
   to the default group role. Both are **best-effort**: if the role can't be resolved (e.g. an
   unseeded test DB), the FK is left `nil` rather than failing creation. Members added to *existing*
-  groups are a separate future slice.
+  groups (and explicit role choices in the admin user/group-member forms) are assigned via the
+  modern-role authoring flow — see "Modern role assignment in authoring flows" under "Enforcement
+  status".
 
 ### Legacy role assignment (one-time data migration)
 
@@ -316,8 +318,20 @@ gated by `app.roles.*`.
 **Per-create role assignment (done):** a new account (signup or admin-create) is assigned the
 default app role, and a group's creator is assigned the default group role, via the default-role
 wiring (see "Default roles" above), so accounts created after the one-time migration are no longer
-locked out. **Remaining follow-up:** members *added to an existing group* still get no modern group
-role — that is the next slice (group member-role assignment UI).
+locked out.
+
+**Modern role assignment in authoring flows (done):** admin user-create/update and group-member
+create/update now assign **modern roles directly**. `SignUpCommand` gained `AppRoleID` and
+`UpsertGroupMemberCommand` gained `GroupRoleID`; `UserRepository.CreateUser`/`UpdateUser` and
+`GroupRepository.CreateGroup`/`UpdateGroup` honor them when present. Because legacy-enum readers
+still exist (the JWT, the legacy data migration, the desktop group table's owner gating), the
+legacy `UserRole`/`GroupRole` is **derived from the chosen modern role** as a transitional bridge:
+`RoleRepository.DeriveLegacyUserRole` (`Legacy Admin → ADMIN`, else `USER`) and
+`DeriveLegacyGroupRole` (`Legacy Owner/Editor/Viewer → OWNER/EDITOR/VIEWER`, else least-privilege
+`VIEWER`). Delete these derivations once the remaining legacy-enum readers are migrated. The
+admin create endpoint's role-required validation (`middleware.ValidateUserData`) accepts **either**
+`appRoleId` or the legacy `userRole`. Public `SignUp` strips both a caller-supplied `UserRole` and
+`AppRoleID` so a sign-up can never self-assign a role.
 
 ### Tests
 

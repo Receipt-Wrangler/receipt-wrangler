@@ -19,13 +19,26 @@
         [inputFormControl]="form | formGet : 'password'"
         [showVisibilityEye]="true"
       ></app-input>
-      <app-select
-        label="User Role"
-        optionValueKey="value"
-        optionDisplayKey="displayValue"
-        [inputFormControl]="form | formGet : 'userRole'"
-        [options]="userRoleOptions"
-      ></app-select>
+      <div class="d-flex align-items-center">
+        <app-select
+          class="flex-grow-1"
+          label="App Role"
+          optionValueKey="id"
+          optionDisplayKey="name"
+          [inputFormControl]="form | formGet : 'appRoleId'"
+          [options]="appRoleOptions()"
+        ></app-select>
+        <app-button
+          class="ms-1"
+          data-testid="role-preview"
+          matButtonType="iconButton"
+          icon="visibility"
+          color="accent"
+          tooltip="Preview role"
+          [disabled]="!selectedRole()"
+          (clicked)="previewRole()"
+        ></app-button>
+      </div>
       <app-checkbox
         label="Is Dummy User?"
         [helpText]="isDummerUserHelpText"

@@ -491,3 +491,107 @@ func TestGetAllRolesReturnsIsDefault(t *testing.T) {
 		utils.PrintTestError(t, "Default App IsDefault", true)
 	}
 }
+
+func TestDeriveLegacyUserRole(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	repository := NewRoleRepository(nil)
+
+	legacyAdminId, err := repository.GetAppRoleIdByName(LegacyAdminRoleName)
+	if err != nil || legacyAdminId == nil {
+		utils.PrintTestError(t, err, "legacy admin id")
+		return
+	}
+	role, err := repository.DeriveLegacyUserRole(*legacyAdminId)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if role != models.ADMIN {
+		utils.PrintTestError(t, role, models.ADMIN)
+	}
+
+	legacyUserId, err := repository.GetAppRoleIdByName(LegacyUserRoleName)
+	if err != nil || legacyUserId == nil {
+		utils.PrintTestError(t, err, "legacy user id")
+		return
+	}
+	role, err = repository.DeriveLegacyUserRole(*legacyUserId)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if role != models.USER {
+		utils.PrintTestError(t, role, models.USER)
+	}
+
+	// A custom (non-system) app role maps to the least-privilege USER.
+	custom, err := repository.CreateAppRole("Auditor", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	role, err = repository.DeriveLegacyUserRole(custom.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if role != models.USER {
+		utils.PrintTestError(t, role, models.USER)
+	}
+}
+
+func TestDeriveLegacyGroupRole(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	repository := NewRoleRepository(nil)
+
+	cases := []struct {
+		roleName string
+		expected models.GroupRole
+	}{
+		{LegacyOwnerRoleName, models.OWNER},
+		{LegacyEditorRoleName, models.EDITOR},
+		{LegacyViewerRoleName, models.VIEWER},
+	}
+	for _, c := range cases {
+		var groupRole models.GroupRoleDefinition
+		if err := GetDB().Select("id").Where("name = ?", c.roleName).First(&groupRole).Error; err != nil {
+			utils.PrintTestError(t, err, nil)
+			return
+		}
+		derived, err := repository.DeriveLegacyGroupRole(groupRole.ID)
+		if err != nil {
+			utils.PrintTestError(t, err, nil)
+			return
+		}
+		if derived != c.expected {
+			utils.PrintTestError(t, derived, c.expected)
+		}
+	}
+
+	// A custom (non-system) group role maps to the least-privilege VIEWER.
+	custom, err := repository.CreateGroupRole("Auditors", "", []string{permissions.GroupReceiptsRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	derived, err := repository.DeriveLegacyGroupRole(custom.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if derived != models.VIEWER {
+		utils.PrintTestError(t, derived, models.VIEWER)
+	}
+}
