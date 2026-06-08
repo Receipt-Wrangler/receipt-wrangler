@@ -108,10 +108,21 @@ func (repository GroupRepository) CreateGroup(command commands.UpsertGroupComman
 			return txErr
 		}
 
+		// Assign the creator the modern default group role so the membership is
+		// not locked out under permission enforcement. Best-effort: nil when no
+		// default is seeded (e.g. an unseeded test database).
+		roleRepository := NewRoleRepository(tx)
+		defaultGroupRoleId, txErr := roleRepository.GetDefaultGroupRoleId()
+		if txErr != nil {
+			repository.ClearTransaction()
+			return txErr
+		}
+
 		groupMember := models.GroupMember{
-			UserID:    userId,
-			GroupID:   groupToCreate.ID,
-			GroupRole: models.OWNER,
+			UserID:      userId,
+			GroupID:     groupToCreate.ID,
+			GroupRole:   models.OWNER,
+			GroupRoleID: defaultGroupRoleId,
 		}
 
 		txErr = tx.Model(&groupMember).Create(&groupMember).Error

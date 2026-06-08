@@ -45,6 +45,19 @@ $group-accent-bar: #a78bfa;
   }
 }
 
+/* ---------- Default-role selectors ---------- */
+.default-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: variables.$spacing-lg;
+  margin-bottom: variables.$spacing-md;
+
+  app-select {
+    flex: 1 1 280px;
+    max-width: 360px;
+  }
+}
+
 /* ---------- Type filter ---------- */
 app-filter-bar {
   display: inline-block;
@@ -147,6 +160,25 @@ app-filter-bar {
     font-size: 15px;
     width: 15px;
     height: 15px;
+  }
+}
+
+.badge-default {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: map.get(variables.$primary-palette, 50);
+  color: map.get(variables.$primary-palette, 800);
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
   }
 }
 

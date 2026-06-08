@@ -574,3 +574,71 @@ func TestShouldNotDeleteAssignedGroupRole(t *testing.T) {
 		utils.PrintTestError(t, err, "assigned group role should be untouched")
 	}
 }
+
+func setDefaultRoleRequest(roleId string, scope string, claims *validator.ValidatedClaims) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("PUT", "/api?scope="+scope, nil)
+
+	ctx := chi.NewRouteContext()
+	ctx.URLParams.Add("roleId", roleId)
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, ctx))
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claims))
+
+	SetDefaultRole(w, r)
+	return w
+}
+
+func TestShouldSetDefaultRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+	role := structs.RoleView{}
+
+	w := setDefaultRoleRequest("1", "APP", adminContext())
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+		return
+	}
+
+	if err := json.Unmarshal(w.Body.Bytes(), &role); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if !role.IsDefault {
+		utils.PrintTestError(t, role.IsDefault, true)
+	}
+}
+
+func TestShouldNotSetDefaultRoleDueToRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+
+	w := setDefaultRoleRequest("1", "APP", userContext())
+
+	if w.Result().StatusCode != 403 {
+		utils.PrintTestError(t, w.Result().StatusCode, 403)
+	}
+}
+
+func TestShouldReturnBadRequestForInvalidSetDefaultScope(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestRoles()
+
+	for _, scope := range []string{"", "BOGUS"} {
+		w := setDefaultRoleRequest("1", scope, adminContext())
+		if w.Result().StatusCode != 400 {
+			utils.PrintTestError(t, w.Result().StatusCode, 400)
+		}
+	}
+}
+
+func TestShouldReturnNotFoundForMissingSetDefaultRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	w := setDefaultRoleRequest("999", "APP", adminContext())
+
+	if w.Result().StatusCode != 404 {
+		utils.PrintTestError(t, w.Result().StatusCode, 404)
+	}
+}

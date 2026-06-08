@@ -9,6 +9,7 @@ import {
   viewChild,
 } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { FormControl } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { MatTableDataSource } from "@angular/material/table";
 import { Router } from "@angular/router";
@@ -107,6 +108,25 @@ export class RoleListComponent implements AfterViewInit {
     () => new MatTableDataSource(this.filteredRoles()),
   );
 
+  // Options for the two "default role" selectors: roles of each scope, valued by
+  // id and displayed by name.
+  public readonly appRoleOptions = computed(() =>
+    this.roles()
+      .filter((role) => role.scope === "app")
+      .map((role) => ({ id: Number(role.id), name: role.name })),
+  );
+  public readonly groupRoleOptions = computed(() =>
+    this.roles()
+      .filter((role) => role.scope === "group")
+      .map((role) => ({ id: Number(role.id), name: role.name })),
+  );
+
+  // The two default-role selectors. Exactly one role per scope is the default,
+  // so there is no empty option. Values are patched from the server with
+  // emitEvent:false; a genuine user selection drives setDefaultRole.
+  public readonly defaultAppRoleControl = new FormControl<number | null>(null);
+  public readonly defaultGroupRoleControl = new FormControl<number | null>(null);
+
   // Per-scope permission totals from the registry — the denominator for each
   // role's meter (a role's bar is relative to its own scope's total).
   private readonly scopeTotals = signal<Record<RoleScope, number>>({ app: 0, group: 0 });
@@ -114,6 +134,16 @@ export class RoleListComponent implements AfterViewInit {
   constructor() {
     this.loadScopeTotals();
     this.loadRoles();
+
+    // A user picking a different role in either selector makes it the new default
+    // for that scope. Programmatic sync from the server uses emitEvent:false, so
+    // those updates do not re-trigger the API call.
+    this.defaultAppRoleControl.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe((roleId) => this.onDefaultChange("app", roleId));
+    this.defaultGroupRoleControl.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe((roleId) => this.onDefaultChange("group", roleId));
   }
 
   public ngAfterViewInit(): void {
@@ -246,16 +276,60 @@ export class RoleListComponent implements AfterViewInit {
     return scope === "group" ? PermissionScope.Group : PermissionScope.App;
   }
 
+  // Makes the chosen role the default for its scope, then reloads so every
+  // selector and the Default badges reflect the server (setting one default
+  // clears the previous one). A null value (no selection) is ignored.
+  private onDefaultChange(scope: RoleScope, roleId: number | null): void {
+    if (roleId == null) {
+      return;
+    }
+
+    this.roleService
+      .setDefaultRole(this.toScopeEnum(scope), roleId)
+      .pipe(
+        take(1),
+        tap(() => {
+          this.snackbarService.success("Default role updated");
+          this.loadRoles();
+        }),
+        catchError(() => {
+          this.snackbarService.error("Failed to update default role");
+          // Revert the selector to the server's current default.
+          this.loadRoles();
+          return EMPTY;
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe();
+  }
+
   private loadRoles(): void {
     this.roleService
       .getRoles()
       .pipe(
         take(1),
-        tap((roles) => this.roles.set(roles.map((role) => this.toListItem(role)))),
+        tap((roles) => {
+          this.roles.set(roles.map((role) => this.toListItem(role)));
+          this.syncDefaultControls();
+        }),
         catchError(() => EMPTY),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe();
+  }
+
+  // Patches the two selectors to the server's current default per scope without
+  // emitting (so it never re-triggers setDefaultRole).
+  private syncDefaultControls(): void {
+    const appDefault = this.roles().find((role) => role.scope === "app" && role.isDefault);
+    const groupDefault = this.roles().find((role) => role.scope === "group" && role.isDefault);
+
+    this.defaultAppRoleControl.setValue(appDefault ? Number(appDefault.id) : null, {
+      emitEvent: false,
+    });
+    this.defaultGroupRoleControl.setValue(groupDefault ? Number(groupDefault.id) : null, {
+      emitEvent: false,
+    });
   }
 
   private toListItem(role: Role): RoleListItem {
@@ -268,6 +342,7 @@ export class RoleListComponent implements AfterViewInit {
       scope,
       permissionCount: role.permissions?.length ?? 0,
       userCount: role.assignedCount ?? 0,
+      isDefault: role.isDefault,
       isSystem: role.isSystem,
       icon: visual.icon,
       iconColor: visual.color,

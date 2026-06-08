@@ -7,6 +7,7 @@ import { RouterModule } from "@angular/router";
 import { PipesModule } from "src/pipes/pipes.module";
 import { ButtonModule } from "../button";
 import { InputModule } from "../input";
+import { SelectModule } from "../select/select.module";
 import { SharedUiModule } from "../shared-ui/shared-ui.module";
 import { TableModule } from "../table/table.module";
 import { TextareaModule } from "../textarea/textarea.module";
@@ -25,6 +26,7 @@ import { RolesRoutingModule } from "./roles-routing.module";
     PipesModule,
     ReactiveFormsModule,
     RouterModule,
+    SelectModule,
     SharedUiModule,
     TableModule,
     TextareaModule,

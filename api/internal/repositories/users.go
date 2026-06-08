@@ -29,6 +29,7 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 		DisplayName:        userData.DisplayName,
 		Password:           userData.Password,
 		IsDummyUser:        userData.IsDummyUser,
+		UserRole:           userData.UserRole,
 		DefaultAvatarColor: "#27b1ff",
 	}
 
@@ -55,6 +56,17 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 				user.UserRole = models.USER
 			}
 		}
+
+		// Assign the modern app role so the account is not locked out under
+		// permission enforcement: Legacy Admin for admins (the first/bootstrap
+		// user is never the configurable default), the configurable default app
+		// role otherwise.
+		appRoleId, roleErr := repository.resolveAppRoleId(tx, user.UserRole)
+		if roleErr != nil {
+			repository.ClearTransaction()
+			return roleErr
+		}
+		user.AppRoleID = appRoleId
 
 		err = repository.GetDB().Create(&user).Error
 
@@ -95,6 +107,20 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 	}
 
 	return user, nil
+}
+
+// resolveAppRoleId picks the modern app role for a newly-created user: the
+// Legacy Admin role for admins (so the first/bootstrap admin is never assigned
+// the configurable default and locked out of administration) and the
+// configurable default app role for everyone else. Returns nil when the role
+// can't be resolved (e.g. an unseeded test database), leaving the user without
+// a modern role rather than failing creation.
+func (repository UserRepository) resolveAppRoleId(tx *gorm.DB, userRole models.UserRole) (*uint, error) {
+	roleRepository := NewRoleRepository(tx)
+	if userRole == models.ADMIN {
+		return roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
+	}
+	return roleRepository.GetDefaultAppRoleId()
 }
 
 func (repository UserRepository) CreateUserIfNoneExist() error {

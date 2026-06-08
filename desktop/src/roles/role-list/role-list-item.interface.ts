@@ -13,6 +13,7 @@ export interface RoleListItem {
   scope: RoleScope;
   permissionCount: number;
   userCount: number;
+  isDefault: boolean;
   isSystem: boolean;
   icon: string;
   iconColor: string;

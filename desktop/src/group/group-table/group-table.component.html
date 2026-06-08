@@ -60,6 +60,7 @@
     ></app-edit-button>
     <app-delete-button
       *ngIf="element.id | groupRole : groupRole.Owner"
+      data-testid="group-delete"
       tooltip="Delete Group"
       [disabled]="groups()?.length === 1"
       (clicked)="deleteGroup(index)"

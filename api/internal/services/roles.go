@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"receipt-wrangler/api/internal/commands"
+	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
@@ -16,6 +17,7 @@ var (
 	ErrSystemRoleImmutable   = errors.New("system roles cannot be modified")
 	ErrSystemRoleUndeletable = errors.New("system roles cannot be deleted")
 	ErrRoleAssigned          = errors.New("role is assigned and cannot be deleted")
+	ErrRoleIsDefault         = errors.New("the default role cannot be deleted")
 )
 
 type RoleService struct {
@@ -115,6 +117,7 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 				Name:        role.Name,
 				Description: role.Description,
 				Scope:       permissions.ScopeApp,
+				IsDefault:   role.IsDefault,
 				IsSystem:    role.IsSystem,
 				Permissions: perms,
 			}
@@ -143,6 +146,7 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			Name:        role.Name,
 			Description: role.Description,
 			Scope:       permissions.ScopeGroup,
+			IsDefault:   role.IsDefault,
 			IsSystem:    role.IsSystem,
 			Permissions: perms,
 		}
@@ -206,6 +210,10 @@ func (service RoleService) DeleteRole(id uint, scope permissions.Scope) error {
 				return ErrSystemRoleUndeletable
 			}
 
+			if existing.IsDefault {
+				return ErrRoleIsDefault
+			}
+
 			count, txErr := roleRepository.CountUsersWithAppRole(id)
 			if txErr != nil {
 				return txErr
@@ -228,6 +236,10 @@ func (service RoleService) DeleteRole(id uint, scope permissions.Scope) error {
 			return ErrSystemRoleUndeletable
 		}
 
+		if existing.IsDefault {
+			return ErrRoleIsDefault
+		}
+
 		count, txErr := roleRepository.CountGroupMembersWithGroupRole(id)
 		if txErr != nil {
 			return txErr
@@ -246,4 +258,93 @@ func (service RoleService) DeleteRole(id uint, scope permissions.Scope) error {
 	clearRolePermissionCache(scope, id)
 
 	return nil
+}
+
+// SetDefaultRole makes the given role the default for its scope (the role
+// assigned to new accounts for APP, or to group creators for GROUP), clearing
+// the previous default. The scope disambiguates the id (app and group role ids
+// overlap). System roles are allowed — the seeded legacy roles are the initial
+// defaults. The role's permission list is unchanged, so no cache eviction is
+// needed.
+func (service RoleService) SetDefaultRole(id uint, scope permissions.Scope) (structs.RoleView, error) {
+	var roleView structs.RoleView
+
+	err := repositories.GetDB().Transaction(func(tx *gorm.DB) error {
+		roleRepository := repositories.NewRoleRepository(tx)
+
+		if scope == permissions.ScopeApp {
+			existing, txErr := roleRepository.GetAppRoleById(id)
+			if errors.Is(txErr, gorm.ErrRecordNotFound) {
+				return resolveMissingRoleError(roleRepository, permissions.ScopeGroup, id)
+			}
+			if txErr != nil {
+				return txErr
+			}
+
+			if txErr := roleRepository.SetDefaultAppRole(id); txErr != nil {
+				return txErr
+			}
+
+			roleView = appRoleToView(existing, true)
+			return nil
+		}
+
+		existing, txErr := roleRepository.GetGroupRoleById(id)
+		if errors.Is(txErr, gorm.ErrRecordNotFound) {
+			return resolveMissingRoleError(roleRepository, permissions.ScopeApp, id)
+		}
+		if txErr != nil {
+			return txErr
+		}
+
+		if txErr := roleRepository.SetDefaultGroupRole(id); txErr != nil {
+			return txErr
+		}
+
+		roleView = groupRoleToView(existing, true)
+		return nil
+	})
+	if err != nil {
+		return structs.RoleView{}, err
+	}
+
+	return roleView, nil
+}
+
+// appRoleToView builds the read model for an app role, overriding IsDefault with
+// the post-update value (the loaded row predates the flag change).
+func appRoleToView(role models.AppRole, isDefault bool) structs.RoleView {
+	perms := make([]string, 0, len(role.Permissions))
+	for _, permission := range role.Permissions {
+		perms = append(perms, permission.Permission)
+	}
+
+	return structs.RoleView{
+		Id:          role.ID,
+		Name:        role.Name,
+		Description: role.Description,
+		Scope:       permissions.ScopeApp,
+		IsDefault:   isDefault,
+		IsSystem:    role.IsSystem,
+		Permissions: perms,
+	}
+}
+
+// groupRoleToView builds the read model for a group role, overriding IsDefault
+// with the post-update value.
+func groupRoleToView(role models.GroupRoleDefinition, isDefault bool) structs.RoleView {
+	perms := make([]string, 0, len(role.Permissions))
+	for _, permission := range role.Permissions {
+		perms = append(perms, permission.Permission)
+	}
+
+	return structs.RoleView{
+		Id:          role.ID,
+		Name:        role.Name,
+		Description: role.Description,
+		Scope:       permissions.ScopeGroup,
+		IsDefault:   isDefault,
+		IsSystem:    role.IsSystem,
+		Permissions: perms,
+	}
 }

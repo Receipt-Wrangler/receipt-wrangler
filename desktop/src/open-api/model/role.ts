@@ -16,6 +16,10 @@ export interface Role {
     name: string;
     description?: string;
     scope: PermissionScope;
+    /**
+     * Whether this role is the default for its scope — assigned to new accounts (APP) or to group creators (GROUP). Exactly one role per scope is the default.
+     */
+    isDefault: boolean;
     isSystem: boolean;
     permissions: Array<Permission>;
     /**

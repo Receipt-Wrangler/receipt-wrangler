@@ -208,3 +208,136 @@ func TestSeedSystemRolesPreservesExisting(t *testing.T) {
 		utils.PrintTestError(t, role.Permissions, []string{permissions.AppUsersRead})
 	}
 }
+
+func TestEnsureDefaultRolesSetsLegacyDefaults(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	repository := NewRoleRepository(nil)
+	roles, err := repository.GetAllRoles()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	appDefaults := 0
+	groupDefaults := 0
+	for _, role := range roles {
+		if !role.IsDefault {
+			continue
+		}
+		if role.Scope == permissions.ScopeApp {
+			appDefaults++
+			if role.Name != LegacyUserRoleName {
+				utils.PrintTestError(t, role.Name, LegacyUserRoleName)
+			}
+		} else {
+			groupDefaults++
+			if role.Name != LegacyOwnerRoleName {
+				utils.PrintTestError(t, role.Name, LegacyOwnerRoleName)
+			}
+		}
+	}
+
+	if appDefaults != 1 {
+		utils.PrintTestError(t, appDefaults, 1)
+	}
+	if groupDefaults != 1 {
+		utils.PrintTestError(t, groupDefaults, 1)
+	}
+}
+
+func TestEnsureDefaultRolesIsIdempotent(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var appDefaults int64
+	if err := GetDB().Model(&models.AppRole{}).Where("is_default = ?", true).Count(&appDefaults).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if appDefaults != 1 {
+		utils.PrintTestError(t, appDefaults, 1)
+	}
+	var groupDefaults int64
+	if err := GetDB().Model(&models.GroupRoleDefinition{}).Where("is_default = ?", true).Count(&groupDefaults).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if groupDefaults != 1 {
+		utils.PrintTestError(t, groupDefaults, 1)
+	}
+}
+
+func TestEnsureDefaultRolesPreservesCustomDefault(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// An administrator picked a custom app role as the default before this runs.
+	repository := NewRoleRepository(nil)
+	custom, err := repository.CreateAppRole("Custom Default", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := repository.SetDefaultAppRole(custom.ID); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	roles, err := repository.GetAllRoles()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// The custom default must be preserved; Legacy User must not be promoted.
+	customRole, ok := findRole(roles, "Custom Default")
+	if !ok || !customRole.IsDefault {
+		utils.PrintTestError(t, "Custom Default not default", "default preserved")
+	}
+	legacyUser, ok := findRole(roles, LegacyUserRoleName)
+	if !ok || legacyUser.IsDefault {
+		utils.PrintTestError(t, "Legacy User became default", "Legacy User not default")
+	}
+}
+
+func TestEnsureDefaultRolesErrorsWhenLegacyRoleMissing(t *testing.T) {
+	defer TruncateTestDb()
+
+	// No roles seeded, so the legacy default roles do not exist. EnsureDefaultRoles
+	// must fail loudly rather than silently leaving no default (which would lock out
+	// every account created afterward).
+	if err := EnsureDefaultRoles(); err == nil {
+		utils.PrintTestError(t, "no error", "error: legacy role not found")
+	}
+}
