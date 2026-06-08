@@ -191,18 +191,21 @@ longer gate handler access.
 - **Assignment:** nullable FKs `User.AppRoleID` and `GroupMember.GroupRoleID` (one app role per
   user; one group role per group membership). Nullable because they coexist with the legacy enums
   during rollout.
-- `IsSystem` marks protected, non-editable/non-deletable roles; `IsDefault` (group roles) marks the
-  role auto-assignable to new members.
+- `IsSystem` marks protected, non-editable/non-deletable roles; `IsDefault` (on **both** `AppRole`
+  and `GroupRoleDefinition`) marks the single default role for that scope — the role assigned to new
+  accounts (app) or to group creators (group). See "Default roles" below.
 
 ### Role CRUD
 
 - Data access in `repositories/roles.go`; business logic in `services/roles.go`. Guards: system
-  roles are immutable/undeletable, a role's scope can't be changed (type-mismatch error), and an
-  assigned role can't be deleted.
-- Endpoints (`routers/role.go`, currently gated by `UserRole: models.ADMIN`): `GET /role`,
-  `POST /role`, `PUT /role/{roleId}`, `DELETE /role/{roleId}?scope=APP|GROUP`.
+  roles are immutable/undeletable, a role's scope can't be changed (type-mismatch error), an
+  assigned role can't be deleted, and the **default role for a scope can't be deleted**
+  (`ErrRoleIsDefault`) — pick another default first.
+- Endpoints (`routers/role.go`, gated by `app.roles.*`): `GET /role`, `POST /role`,
+  `PUT /role/{roleId}`, `PUT /role/{roleId}/default?scope=APP|GROUP` (make this role the scope's
+  default; allowed on system roles; gated by `app.roles.update`), `DELETE /role/{roleId}?scope=APP|GROUP`.
 - `commands.UpsertRoleCommand` validates that every permission exists in the registry and matches
-  the role's scope. `structs.RoleView` is the read model (includes `assignedCount`).
+  the role's scope. `structs.RoleView` is the read model (includes `assignedCount` and `isDefault`).
 
 ### Seeded system roles (legacy-equivalent)
 
@@ -215,9 +218,9 @@ longer gate handler access.
   EDITOR / OWNER tiers; Owner = every group permission). The sets live in
   `permissions/legacy.go` (`Legacy*Keys()` helpers) and were derived from the actual handler-level
   gating, not the desktop UI presets.
-- **Seeded only here — not enforced yet.** This step only creates the roles (group roles with
-  `IsDefault = false`); the one-time data migration below assigns them to existing users/members,
-  and enforcement is a later phase.
+- `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
+  separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
+  the roles to existing users/members, and enforcement is wired in `HandleRequest`.
 - Idempotent: keyed on role `Name` (a `uniqueIndex`), safe on every boot; a pre-existing
   same-named role is left untouched. The five role names are shared constants
   (`repositories/system_role_names.go`, `Legacy*RoleName`) used by both the seeder and the
@@ -225,6 +228,27 @@ longer gate handler access.
 - **Known limitation:** because system roles are immutable and seeding skips existing names, a
   permission added to the registry later will **not** flow into an already-seeded Legacy Admin /
   Legacy Owner. Re-syncing system roles would need a dedicated reconciliation step (out of scope).
+
+### Default roles
+
+- Exactly one app role and one group role are the **default** (`IsDefault = true`): the role assigned
+  to a new account on signup/admin-create, and to a group's creator on group creation. This is a
+  required invariant — there is always exactly one default per scope.
+- `repositories.EnsureDefaultRoles` (`repositories/seed_roles.go`) enforces it on every boot,
+  immediately after `SeedSystemRoles` in `InitDB`: if a scope has **no** default, it flags the
+  legacy-equivalent role (**Legacy User** for app, **Legacy Owner** for group), so upgrades and fresh
+  installs behave exactly as before. It only acts when no default exists, so it never overrides a
+  default an admin chose, and it self-heals dev DBs created before the `app_roles.is_default` column.
+- Admins change the default via `PUT /role/{roleId}/default?scope=…`
+  (`RoleService.SetDefaultRole` → `SetDefaultAppRole`/`SetDefaultGroupRole`), which clears the prior
+  default and sets the new one in one transaction. System roles are eligible (the legacy defaults are
+  system roles). The current default cannot be deleted (`ErrRoleIsDefault`).
+- **Per-create assignment** uses the defaults: `UserRepository.CreateUser` sets `User.AppRoleID`
+  (Legacy Admin for an `ADMIN`-resolved user so the bootstrap admin is never locked out; the default
+  app role otherwise), and `GroupRepository.CreateGroup` sets the creator's `GroupMember.GroupRoleID`
+  to the default group role. Both are **best-effort**: if the role can't be resolved (e.g. an
+  unseeded test DB), the FK is left `nil` rather than failing creation. Members added to *existing*
+  groups are a separate future slice.
 
 ### Legacy role assignment (one-time data migration)
 
@@ -243,7 +267,8 @@ longer gate handler access.
   test harness, so the migration does not auto-run in tests.
 - Updates are guarded with `... IS NULL`, so a role an admin has already set through the new UI is
   never overwritten — defense-in-depth on top of the ledger. The migration is one-time over existing
-  rows; per-create assignment for *new* users/members is a separate future slice.
+  rows; per-create assignment for *new* users / group creators is handled by the default-role wiring
+  (see "Default roles" above).
 - Tests: `repositories/data_migrations_test.go` (assignment, idempotency, ledger short-circuit,
   no-clobber).
 
@@ -288,15 +313,16 @@ lookup (used pre-auth during signup) and `ConvertToJpg` (a stateless image utili
 resource to scope against). The role/permission management endpoints (`/role`, `/permission`) are
 gated by `app.roles.*`.
 
-**Known follow-up (not yet implemented):** nothing assigns a modern role when a user signs up, is
-created by an admin, or is added to a group — only the one-time startup migration back-fills
-**existing** users/members. Until per-create assignment lands, an account created after that
-migration resolves to no permissions and is denied. Wiring per-create role assignment is the
-required next slice.
+**Per-create role assignment (done):** a new account (signup or admin-create) is assigned the
+default app role, and a group's creator is assigned the default group role, via the default-role
+wiring (see "Default roles" above), so accounts created after the one-time migration are no longer
+locked out. **Remaining follow-up:** members *added to an existing group* still get no modern group
+role — that is the next slice (group member-role assignment UI).
 
 ### Tests
 
 `permissions/matcher_test.go`, `permissions/registry_test.go`, `permissions/legacy_test.go`,
-`services/permission_test.go`, `services/roles_test.go`, `repositories/roles_test.go`, and the
-handler authorization tests in `handlers/generic_handler_test.go` (with shared helpers in
-`handlers/auth_test_helpers_test.go`).
+`services/permission_test.go`, `services/roles_test.go`, `repositories/roles_test.go`,
+`repositories/seed_roles_test.go` (default-role seeding), the per-create assignment tests in
+`repositories/users_test.go` / `repositories/groups_test.go`, and the handler authorization tests in
+`handlers/generic_handler_test.go` (with shared helpers in `handlers/auth_test_helpers_test.go`).

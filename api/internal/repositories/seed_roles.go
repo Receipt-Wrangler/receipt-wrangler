@@ -102,3 +102,55 @@ func seedGroupRole(db *gorm.DB, name string, description string, perms []string)
 
 	return db.Create(&role).Error
 }
+
+// EnsureDefaultRoles guarantees that exactly one app role and one group role are
+// flagged as the default — the role newly-created accounts (app) and group
+// creators (group) are assigned. It is the single source of truth for "the
+// default role": the legacy-equivalent roles (Legacy User / Legacy Owner) are
+// the seeded defaults so upgrading installs behave exactly as before.
+//
+// It only acts when a scope has no default yet, so it is idempotent and never
+// overrides a default an administrator has set through the UI. Run on every boot
+// after SeedSystemRoles (a fresh database self-heals on the next boot, and an
+// existing dev database that predates the IsDefault column gets backfilled).
+func EnsureDefaultRoles() error {
+	db := GetDB()
+
+	if err := ensureDefaultAppRole(db); err != nil {
+		return err
+	}
+
+	return ensureDefaultGroupRole(db)
+}
+
+// ensureDefaultAppRole sets the Legacy User role as the default app role when no
+// app role is currently flagged default.
+func ensureDefaultAppRole(db *gorm.DB) error {
+	var count int64
+	if err := db.Model(&models.AppRole{}).Where("is_default = ?", true).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	return db.Model(&models.AppRole{}).
+		Where("name = ?", LegacyUserRoleName).
+		Update("is_default", true).Error
+}
+
+// ensureDefaultGroupRole sets the Legacy Owner role as the default group role
+// when no group role is currently flagged default.
+func ensureDefaultGroupRole(db *gorm.DB) error {
+	var count int64
+	if err := db.Model(&models.GroupRoleDefinition{}).Where("is_default = ?", true).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	return db.Model(&models.GroupRoleDefinition{}).
+		Where("name = ?", LegacyOwnerRoleName).
+		Update("is_default", true).Error
+}

@@ -193,6 +193,12 @@ func DeleteRole(w http.ResponseWriter, r *http.Request) {
 					}, http.StatusBadRequest)
 					return 0, nil
 				}
+				if errors.Is(err, services.ErrRoleIsDefault) {
+					structs.WriteValidatorErrorResponse(w, structs.ValidatorError{
+						Errors: map[string]string{"role": "The default role cannot be deleted; choose another default first"},
+					}, http.StatusBadRequest)
+					return 0, nil
+				}
 				if errors.Is(err, services.ErrRoleNotFound) {
 					utils.WriteCustomErrorResponse(w, "Role not found", http.StatusNotFound)
 					return 0, nil
@@ -201,6 +207,61 @@ func DeleteRole(w http.ResponseWriter, r *http.Request) {
 			}
 
 			w.WriteHeader(http.StatusOK)
+
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+func SetDefaultRole(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage:   "Error setting default role",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppRolesUpdate},
+		ResponseType:   constants.ApplicationJson,
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			id, err := utils.StringToUint(chi.URLParam(r, "roleId"))
+			if err != nil {
+				structs.WriteValidatorErrorResponse(w, structs.ValidatorError{
+					Errors: map[string]string{"roleId": "Invalid role id"},
+				}, http.StatusBadRequest)
+				return 0, nil
+			}
+
+			scope := permissions.Scope(r.URL.Query().Get("scope"))
+			if scope != permissions.ScopeApp && scope != permissions.ScopeGroup {
+				structs.WriteValidatorErrorResponse(w, structs.ValidatorError{
+					Errors: map[string]string{"scope": "Scope must be either APP or GROUP"},
+				}, http.StatusBadRequest)
+				return 0, nil
+			}
+
+			roleService := services.NewRoleService(nil)
+			updatedRole, err := roleService.SetDefaultRole(id, scope)
+			if err != nil {
+				if errors.Is(err, services.ErrRoleTypeMismatch) {
+					structs.WriteValidatorErrorResponse(w, structs.ValidatorError{
+						Errors: map[string]string{"scope": "Role type cannot be changed"},
+					}, http.StatusBadRequest)
+					return 0, nil
+				}
+				if errors.Is(err, services.ErrRoleNotFound) {
+					utils.WriteCustomErrorResponse(w, "Role not found", http.StatusNotFound)
+					return 0, nil
+				}
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(&updatedRole)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
 
 			return 0, nil
 		},

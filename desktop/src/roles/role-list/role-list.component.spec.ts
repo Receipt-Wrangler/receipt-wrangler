@@ -26,6 +26,7 @@ function listItem(overrides: Partial<RoleListItem> = {}): RoleListItem {
     scope: "app" as RoleScope,
     permissionCount: 0,
     userCount: 0,
+    isDefault: false,
     isSystem: false,
     icon: "apps",
     iconColor: "",
@@ -48,6 +49,7 @@ const ROLES: Role[] = [
     name: "Administrator",
     description: "Full access",
     scope: "APP",
+    isDefault: true,
     isSystem: true,
     permissions: ["app.users.create", "app.users.read"],
   },
@@ -56,6 +58,7 @@ const ROLES: Role[] = [
     name: "Group Manager",
     description: "Runs groups",
     scope: "GROUP",
+    isDefault: true,
     isSystem: false,
     permissions: ["group.view", "group.receipts.read"],
   },
@@ -97,6 +100,7 @@ async function setup(
   const roleService = TestBed.inject(RoleService);
   jest.spyOn(roleService, "getRoles").mockReturnValue(of(roles) as any);
   jest.spyOn(roleService, "deleteRole").mockReturnValue(of({}) as any);
+  jest.spyOn(roleService, "setDefaultRole").mockReturnValue(of({}) as any);
   jest
     .spyOn(TestBed.inject(PermissionService), "getPermissions")
     .mockReturnValue(
@@ -282,5 +286,60 @@ describe("RoleListComponent", () => {
 
     expect(snackbar.error).toHaveBeenCalledWith("Failed to delete role");
     expect(reloadSpy.mock.calls.length).toBe(callsBefore);
+  });
+
+  it("preselects each default selector from the role marked default for its scope", async () => {
+    const { component } = await setup();
+    // ROLES marks the APP role (id 1) and the GROUP role (id 2) as default.
+    expect(component.defaultAppRoleControl.value).toBe(1);
+    expect(component.defaultGroupRoleControl.value).toBe(2);
+  });
+
+  it("offers each scope's roles as options for its selector", async () => {
+    const { component } = await setup();
+    expect(component.appRoleOptions()).toEqual([{ id: 1, name: "Administrator" }]);
+    expect(component.groupRoleOptions()).toEqual([{ id: 2, name: "Group Manager" }]);
+  });
+
+  it("sets the new default for the scope and reloads when a selector changes", async () => {
+    const roles: Role[] = [
+      { ...ROLES[0], id: 1, isDefault: true },
+      { ...ROLES[0], id: 9, name: "Restricted", isDefault: false, isSystem: false },
+    ];
+    const { component, roleService, snackbar } = await setup(roles);
+    const reloadSpy = jest.spyOn(roleService, "getRoles");
+    const callsBefore = reloadSpy.mock.calls.length;
+
+    component.defaultAppRoleControl.setValue(9);
+
+    expect(roleService.setDefaultRole).toHaveBeenCalledWith(PermissionScope.App, 9);
+    expect(snackbar.success).toHaveBeenCalledWith("Default role updated");
+    expect(reloadSpy.mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  it("does not call the API when syncing selectors from the server", async () => {
+    const { roleService } = await setup();
+    // The constructor loads roles and patches the selectors with emitEvent:false,
+    // so no set-default request is made just from rendering.
+    expect(roleService.setDefaultRole).not.toHaveBeenCalled();
+  });
+
+  it("shows an error and reverts the selector when setting the default fails", async () => {
+    const roles: Role[] = [
+      { ...ROLES[0], id: 1, isDefault: true },
+      { ...ROLES[0], id: 9, name: "Restricted", isDefault: false, isSystem: false },
+    ];
+    const { component, roleService, snackbar } = await setup(roles);
+    const reloadSpy = jest.spyOn(roleService, "getRoles");
+    const callsBefore = reloadSpy.mock.calls.length;
+    (roleService.setDefaultRole as jest.Mock).mockReturnValueOnce(
+      throwError(() => new Error("boom")) as any,
+    );
+
+    component.defaultAppRoleControl.setValue(9);
+
+    expect(snackbar.error).toHaveBeenCalledWith("Failed to update default role");
+    // Reloaded to revert the selector to the server's current default.
+    expect(reloadSpy.mock.calls.length).toBe(callsBefore + 1);
   });
 });

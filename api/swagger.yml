@@ -2822,6 +2822,47 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /role/{roleId}/default:
+    parameters:
+      - in: path
+        name: roleId
+        schema:
+          type: integer
+        required: true
+        description: Id of the role to make the default for its scope
+    put:
+      tags:
+        - Role
+      summary: Set default role
+      description: >-
+        Makes the role the default for its scope — the role assigned to new
+        accounts (APP) or to group creators (GROUP) — clearing the previous
+        default. The scope query parameter disambiguates the role id, since app
+        and group role ids overlap. System roles may be made default.
+      operationId: setDefaultRole
+      parameters:
+        - in: query
+          name: scope
+          required: true
+          schema:
+            $ref: "#/components/schemas/PermissionScope"
+          description: Scope of the role to make default
+      responses:
+        200:
+          description: The updated role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
 components:
   securitySchemes:
     bearerAuth:
@@ -3009,6 +3050,7 @@ components:
         - id
         - name
         - scope
+        - isDefault
         - isSystem
         - permissions
       properties:
@@ -3021,6 +3063,12 @@ components:
           type: string
         scope:
           $ref: "#/components/schemas/PermissionScope"
+        isDefault:
+          type: boolean
+          description: >-
+            Whether this role is the default for its scope — assigned to new
+            accounts (APP) or to group creators (GROUP). Exactly one role per
+            scope is the default.
         isSystem:
           type: boolean
         permissions:

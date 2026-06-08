@@ -124,6 +124,7 @@ async function setup(
     id: 1,
     name: "Created",
     scope: "APP",
+    isDefault: false,
     isSystem: false,
     permissions: [],
   };
@@ -134,7 +135,7 @@ async function setup(
   const updateRoleSpy = jest
     .spyOn(roleService, "updateRole")
     .mockImplementation((_id: number, command: any) =>
-      of({ id: 1, isSystem: false, ...command } as Role) as any,
+      of({ id: 1, isDefault: false, isSystem: false, ...command } as Role) as any,
     );
   jest
     .spyOn(roleService, "getRoles")
@@ -157,6 +158,7 @@ const EDITABLE_APP_ROLE: Role = {
   name: "App Manager",
   description: "Manages the app",
   scope: "APP",
+  isDefault: false,
   isSystem: false,
   permissions: ["app.users.create", "app.users.read"],
 };
@@ -166,6 +168,7 @@ const SYSTEM_APP_ROLE: Role = {
   name: "Administrator",
   description: "Built in",
   scope: "APP",
+  isDefault: false,
   isSystem: true,
   permissions: ["app.users.create"],
 };
@@ -388,6 +391,7 @@ describe("RoleFormComponent", () => {
         id: 7,
         name: "Group Role 7",
         scope: "GROUP",
+        isDefault: false,
         isSystem: false,
         permissions: ["group.view"],
       };

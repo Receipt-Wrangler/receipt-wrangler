@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"errors"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/structs"
@@ -188,6 +189,7 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 			Name:          role.Name,
 			Description:   role.Description,
 			Scope:         permissions.ScopeApp,
+			IsDefault:     role.IsDefault,
 			IsSystem:      role.IsSystem,
 			Permissions:   perms,
 			AssignedCount: appRoleCounts[role.ID],
@@ -205,6 +207,7 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 			Name:          role.Name,
 			Description:   role.Description,
 			Scope:         permissions.ScopeGroup,
+			IsDefault:     role.IsDefault,
 			IsSystem:      role.IsSystem,
 			Permissions:   perms,
 			AssignedCount: groupRoleCounts[role.ID],
@@ -364,4 +367,82 @@ func (repository RoleRepository) DeleteAppRole(id uint) error {
 func (repository RoleRepository) DeleteGroupRole(id uint) error {
 	db := repository.GetDB()
 	return db.Delete(&models.GroupRoleDefinition{}, id).Error
+}
+
+// SetDefaultAppRole makes the given app role the single default: it clears the
+// flag on every other app role, then sets it on id. Callers run this inside a
+// transaction so the "exactly one default" invariant holds atomically.
+func (repository RoleRepository) SetDefaultAppRole(id uint) error {
+	db := repository.GetDB()
+
+	err := db.Model(&models.AppRole{}).Where("id <> ?", id).Update("is_default", false).Error
+	if err != nil {
+		return err
+	}
+
+	return db.Model(&models.AppRole{}).Where("id = ?", id).Update("is_default", true).Error
+}
+
+// SetDefaultGroupRole makes the given group role the single default: it clears
+// the flag on every other group role, then sets it on id.
+func (repository RoleRepository) SetDefaultGroupRole(id uint) error {
+	db := repository.GetDB()
+
+	err := db.Model(&models.GroupRoleDefinition{}).Where("id <> ?", id).Update("is_default", false).Error
+	if err != nil {
+		return err
+	}
+
+	return db.Model(&models.GroupRoleDefinition{}).Where("id = ?", id).Update("is_default", true).Error
+}
+
+// GetAppRoleIdByName returns the id of the app role with the given name, or nil
+// when no such role exists (e.g. an unseeded test database).
+func (repository RoleRepository) GetAppRoleIdByName(name string) (*uint, error) {
+	db := repository.GetDB()
+
+	var role models.AppRole
+	err := db.Select("id").Where("name = ?", name).First(&role).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &role.ID, nil
+}
+
+// GetDefaultAppRoleId returns the id of the default app role, or nil when none
+// is flagged default (e.g. an unseeded test database).
+func (repository RoleRepository) GetDefaultAppRoleId() (*uint, error) {
+	db := repository.GetDB()
+
+	var role models.AppRole
+	err := db.Select("id").Where("is_default = ?", true).First(&role).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &role.ID, nil
+}
+
+// GetDefaultGroupRoleId returns the id of the default group role, or nil when
+// none is flagged default (e.g. an unseeded test database).
+func (repository RoleRepository) GetDefaultGroupRoleId() (*uint, error) {
+	db := repository.GetDB()
+
+	var role models.GroupRoleDefinition
+	err := db.Select("id").Where("is_default = ?", true).First(&role).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &role.ID, nil
 }

@@ -329,3 +329,159 @@ func TestGetGroupMemberRoleId(t *testing.T) {
 		utils.PrintTestError(t, err, gorm.ErrRecordNotFound)
 	}
 }
+
+func TestSetDefaultAppRoleClearsOthers(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	first, err := repository.CreateAppRole("First", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	second, err := repository.CreateAppRole("Second", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if err := repository.SetDefaultAppRole(first.ID); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := repository.SetDefaultAppRole(second.ID); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	defaultId, err := repository.GetDefaultAppRoleId()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if defaultId == nil || *defaultId != second.ID {
+		utils.PrintTestError(t, defaultId, second.ID)
+	}
+
+	// Exactly one app role is the default.
+	var count int64
+	GetDB().Model(&models.AppRole{}).Where("is_default = ?", true).Count(&count)
+	if count != 1 {
+		utils.PrintTestError(t, count, 1)
+	}
+}
+
+func TestSetDefaultGroupRoleClearsOthers(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	first, err := repository.CreateGroupRole("First", "", []string{permissions.GroupReceiptsRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	second, err := repository.CreateGroupRole("Second", "", []string{permissions.GroupReceiptsRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if err := repository.SetDefaultGroupRole(first.ID); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := repository.SetDefaultGroupRole(second.ID); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	defaultId, err := repository.GetDefaultGroupRoleId()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if defaultId == nil || *defaultId != second.ID {
+		utils.PrintTestError(t, defaultId, second.ID)
+	}
+
+	var count int64
+	GetDB().Model(&models.GroupRoleDefinition{}).Where("is_default = ?", true).Count(&count)
+	if count != 1 {
+		utils.PrintTestError(t, count, 1)
+	}
+}
+
+func TestGetDefaultAppRoleIdNilWhenUnset(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	if _, err := repository.CreateAppRole("Role", "", []string{permissions.AppUsersRead}); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	id, err := repository.GetDefaultAppRoleId()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if id != nil {
+		utils.PrintTestError(t, id, nil)
+	}
+}
+
+func TestGetAppRoleIdByName(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	created, err := repository.CreateAppRole("Named Role", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	id, err := repository.GetAppRoleIdByName("Named Role")
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if id == nil || *id != created.ID {
+		utils.PrintTestError(t, id, created.ID)
+	}
+
+	// An unknown name resolves to nil, not an error.
+	missing, err := repository.GetAppRoleIdByName("Nope")
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if missing != nil {
+		utils.PrintTestError(t, missing, nil)
+	}
+}
+
+func TestGetAllRolesReturnsIsDefault(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	role, err := repository.CreateAppRole("Default App", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := repository.SetDefaultAppRole(role.ID); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	roles, err := repository.GetAllRoles()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	found, ok := findRole(roles, "Default App")
+	if !ok || !found.IsDefault {
+		utils.PrintTestError(t, "Default App IsDefault", true)
+	}
+}

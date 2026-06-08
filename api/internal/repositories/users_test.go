@@ -53,6 +53,74 @@ func TestShouldCreateNonAdminUserWithGroup(t *testing.T) {
 	validateGroup(t, group, 2, 2)
 }
 
+func TestCreateUserAssignsDefaultAppRole(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	userRepository := NewUserRepository(nil)
+	roleRepository := NewRoleRepository(nil)
+
+	// The first user becomes ADMIN and must get the Legacy Admin role (never the
+	// configurable default), so the bootstrap admin is never locked out.
+	admin, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "admin", DisplayName: "admin", Password: "a really secure password",
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	legacyAdminId, err := roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if admin.AppRoleID == nil || legacyAdminId == nil || *admin.AppRoleID != *legacyAdminId {
+		utils.PrintTestError(t, admin.AppRoleID, legacyAdminId)
+	}
+
+	// Subsequent users become USER and must get the configurable default app role.
+	user, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "user", DisplayName: "user", Password: "a really secure password",
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	defaultId, err := roleRepository.GetDefaultAppRoleId()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if user.AppRoleID == nil || defaultId == nil || *user.AppRoleID != *defaultId {
+		utils.PrintTestError(t, user.AppRoleID, defaultId)
+	}
+}
+
+func TestCreateUserLeavesAppRoleNilWhenUnseeded(t *testing.T) {
+	defer TruncateTestDb()
+
+	userRepository := NewUserRepository(nil)
+	created, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "noroles", DisplayName: "n", Password: "a really secure password",
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if created.AppRoleID != nil {
+		utils.PrintTestError(t, created.AppRoleID, nil)
+	}
+}
+
 func TestShouldReturnErrorWhenCreatingUserWithDuplicateUsername(t *testing.T) {
 	defer TruncateTestDb()
 	CreateTestUser()

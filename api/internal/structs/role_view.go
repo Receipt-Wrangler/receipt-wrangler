@@ -7,6 +7,7 @@ type RoleView struct {
 	Name          string            `json:"name"`
 	Description   string            `json:"description"`
 	Scope         permissions.Scope `json:"scope"`
+	IsDefault     bool              `json:"isDefault"`
 	IsSystem      bool              `json:"isSystem"`
 	Permissions   []string          `json:"permissions"`
 	AssignedCount int               `json:"assignedCount"`

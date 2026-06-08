@@ -15,6 +15,7 @@ func BuildRoleRouter() *chi.Mux {
 	roleRouter.Get("/", handlers.GetRoles)
 	roleRouter.Post("/", handlers.CreateRole)
 	roleRouter.Put("/{roleId}", handlers.UpdateRole)
+	roleRouter.Put("/{roleId}/default", handlers.SetDefaultRole)
 	roleRouter.Delete("/{roleId}", handlers.DeleteRole)
 
 	return roleRouter

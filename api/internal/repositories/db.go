@@ -147,6 +147,12 @@ func InitDB() error {
 		return err
 	}
 
+	// Must run after the roles are seeded and before the bootstrap admin /
+	// data migration so the default app and group roles exist for assignment.
+	if err := EnsureDefaultRoles(); err != nil {
+		return err
+	}
+
 	if config.GetDeployEnv() != "test" {
 		userRepository := NewUserRepository(nil)
 		err := userRepository.CreateUserIfNoneExist()

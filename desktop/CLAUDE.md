@@ -125,6 +125,12 @@ global `UserRole.Admin` check in `RoleGuard` (`src/guards/role.guard.ts`).
   `src/open-api/` — regenerate it from `swagger.yml` instead.
 - Built on existing shared patterns: `app-breadcrumb` and the segmented `app-filter-bar` (see "Use
   Established Patterns" above).
+- **Default roles:** the role-list page shows two `app-select` controls above the filter bar —
+  "Default application role" and "Default group role". Each is pre-selected from the role flagged
+  `isDefault` for its scope and, on change, calls `RoleService.setDefaultRole(scope, roleId)` then
+  reloads (setting one default clears the previous one). The default role per scope is what new
+  accounts / group creators receive (see `api/CLAUDE.md` → "Default roles"); the current default
+  cannot be deleted. Default rows also carry a "Default" badge next to the System badge.
 - **Permission-based UI gating is not implemented yet.** There is no `*hasPermission` directive or
   `permissionService.has(...)` helper; UI access is still gated by the global admin `RoleGuard` and
   the legacy `UserRole`. When permission-driven gating is added, document the directive/guard here.

@@ -47,6 +47,63 @@ func TestShouldCreateGroupSuccessfully(t *testing.T) {
 	}
 }
 
+func TestCreateGroupAssignsDefaultGroupRole(t *testing.T) {
+	defer teardownGroupTest()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	CreateTestUser()
+
+	groupRepository := setupGroupRepository()
+	created, err := groupRepository.CreateGroup(commands.UpsertGroupCommand{Name: "test"}, 1)
+	if err != nil {
+		utils.PrintTestError(t, err, "Expected no error")
+		return
+	}
+
+	if len(created.GroupMembers) != 1 {
+		utils.PrintTestError(t, len(created.GroupMembers), 1)
+		return
+	}
+
+	member := created.GroupMembers[0]
+	roleRepository := NewRoleRepository(nil)
+	defaultId, err := roleRepository.GetDefaultGroupRoleId()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if member.GroupRoleID == nil || defaultId == nil || *member.GroupRoleID != *defaultId {
+		utils.PrintTestError(t, member.GroupRoleID, defaultId)
+	}
+}
+
+func TestCreateGroupLeavesGroupRoleNilWhenUnseeded(t *testing.T) {
+	defer teardownGroupTest()
+	CreateTestUser()
+
+	groupRepository := setupGroupRepository()
+	created, err := groupRepository.CreateGroup(commands.UpsertGroupCommand{Name: "test"}, 1)
+	if err != nil {
+		utils.PrintTestError(t, err, "Expected no error")
+		return
+	}
+
+	if len(created.GroupMembers) != 1 {
+		utils.PrintTestError(t, len(created.GroupMembers), 1)
+		return
+	}
+	if created.GroupMembers[0].GroupRoleID != nil {
+		utils.PrintTestError(t, created.GroupMembers[0].GroupRoleID, nil)
+	}
+}
+
 func TestShouldGetGroupById(t *testing.T) {
 	defer teardownGroupTest()
 	CreateTestGroup()

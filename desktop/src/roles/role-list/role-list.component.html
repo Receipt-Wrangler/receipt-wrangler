@@ -34,6 +34,25 @@
       ></app-button>
     </div>
   } @else {
+    <div class="default-roles">
+      <app-select
+        label="Default application role"
+        optionValueKey="id"
+        optionDisplayKey="name"
+        hint="Assigned to new accounts when they sign up."
+        [options]="appRoleOptions()"
+        [inputFormControl]="defaultAppRoleControl"
+      ></app-select>
+      <app-select
+        label="Default group role"
+        optionValueKey="id"
+        optionDisplayKey="name"
+        hint="Assigned to the creator when a group is created."
+        [options]="groupRoleOptions()"
+        [inputFormControl]="defaultGroupRoleControl"
+      ></app-select>
+    </div>
+
     <app-filter-bar
       [tabs]="filterTabs()"
       [value]="filter()"
@@ -60,6 +79,9 @@
     <div>
       <div class="nm">
         {{ role.name }}
+        @if (role.isDefault) {
+          <span class="badge-default"><mat-icon>star</mat-icon>Default</span>
+        }
         @if (role.isSystem) {
           <span class="badge-lock"><mat-icon>lock</mat-icon>System</span>
         }
