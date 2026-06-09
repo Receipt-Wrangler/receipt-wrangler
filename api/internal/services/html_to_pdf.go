@@ -190,7 +190,13 @@ func writeTempHtml(html string) (string, func(), error) {
 // are harmless — PDF generation still succeeds — so they are dropped here while
 // any other chromedp error is still surfaced to the normal log.
 func filteredChromedpErrorf(format string, args ...interface{}) {
+	// Fast path: the noisy line is identifiable from the format string alone,
+	// so skip the Sprintf allocation when we are going to drop it anyway.
+	if strings.Contains(format, "could not unmarshal event") {
+		return
+	}
 	msg := fmt.Sprintf(format, args...)
+	// Defensive: also drop it if the text only materialises after formatting.
 	if strings.Contains(msg, "could not unmarshal event") {
 		return
 	}
