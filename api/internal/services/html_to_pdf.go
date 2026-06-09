@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/chromedp/cdproto/network"
@@ -87,7 +89,10 @@ func (service HtmlToPdfService) Render(html string) ([]byte, commands.UpsertSyst
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancelAlloc()
 
-	browserCtx, cancelBrowser := chromedp.NewContext(allocCtx)
+	browserCtx, cancelBrowser := chromedp.NewContext(
+		allocCtx,
+		chromedp.WithErrorf(filteredChromedpErrorf),
+	)
 	defer cancelBrowser()
 
 	timeoutCtx, cancelTimeout := context.WithTimeout(browserCtx, htmlToPdfTimeout)
@@ -175,4 +180,19 @@ func writeTempHtml(html string) (string, func(), error) {
 		return "", func() {}, err
 	}
 	return htmlPath, cleanup, nil
+}
+
+
+// filteredChromedpErrorf is the chromedp error logger. Newer Chrome builds emit
+// CDP network events whose enum values (e.g. an IPAddressSpace of "Loopback")
+// are not yet known to the pinned cdproto version, so chromedp fails to
+// unmarshal them and logs "could not unmarshal event" on every render. These
+// are harmless — PDF generation still succeeds — so they are dropped here while
+// any other chromedp error is still surfaced to the normal log.
+func filteredChromedpErrorf(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	if strings.Contains(msg, "could not unmarshal event") {
+		return
+	}
+	logging.LogStd(logging.LOG_LEVEL_ERROR, msg)
 }
