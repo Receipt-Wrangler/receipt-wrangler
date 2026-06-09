@@ -95,8 +95,14 @@ class ImapClient:
 
         results = []
         for message_id, data in response.items():
-            formatted_data = self._get_formatted_message_data(
-                data)
+            # Process each message independently: a single malformed message
+            # must not abort the whole poll (which would drop every fetched
+            # message and re-raise to the Go caller as exit status 1).
+            try:
+                formatted_data = self._get_formatted_message_data(data)
+            except Exception as e:
+                logging.error(f"Skipping message {message_id}: {e}")
+                continue
             if len(formatted_data) > 0:
                 formatted_data[message_id] = message_id
                 results.append(formatted_data)
@@ -104,7 +110,11 @@ class ImapClient:
         return results
 
     def _get_formatted_message_data(self, data):
-        message_data = email.message_from_bytes(data[b"RFC822"])
+        raw_rfc822 = data.get(b"RFC822") if data else None
+        if not raw_rfc822:
+            logging.warning("Skipping message with empty RFC822 payload")
+            return {}
+        message_data = email.message_from_bytes(raw_rfc822)
 
         from_data = self._get_formatted_to_or_from_data(message_data, "From")
         if from_data["email"] is None:
@@ -193,9 +203,13 @@ class ImapClient:
             logging.info(f"Filename: {filename} mime_type: {mime_type}")
 
             if len(filename) > 0 and self.valid_mime_type(mime_type):
+                payload = part.get_payload(decode=True)
+                if payload is None:
+                    logging.warning(f"Skipping attachment with undecodable payload: {filename}")
+                    continue
                 filePath = os.path.join(base_path, "temp", filename)
                 with open(filePath, 'wb') as f:
-                    f.write(part.get_payload(decode=True))
+                    f.write(payload)
 
                 size = os.path.getsize(filePath)
                 data = {
