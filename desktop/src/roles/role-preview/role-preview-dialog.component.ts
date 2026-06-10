@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
-import { Component, Inject, computed, signal } from "@angular/core";
-import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { Component, Inject, computed, inject } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
 import { MatButtonModule } from "@angular/material/button";
 import {
   MAT_DIALOG_DATA,
@@ -9,7 +9,7 @@ import {
   MatDialogRef,
 } from "@angular/material/dialog";
 import { MatIconModule } from "@angular/material/icon";
-import { catchError, EMPTY, take } from "rxjs";
+import { catchError, of } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants/dialog.constant";
 import {
   PermissionDescriptor,
@@ -64,7 +64,15 @@ interface PreviewGroup {
 export class RolePreviewDialogComponent {
   public readonly role: Role;
 
-  private readonly registry = signal<PermissionDescriptor[]>([]);
+  // The role already carries its permission keys; the registry only supplies
+  // human-readable labels/descriptions, so a failed load degrades gracefully to
+  // the raw keys (via the fallback labels in `groups`).
+  private readonly registry = toSignal(
+    inject(PermissionService)
+      .getPermissions()
+      .pipe(catchError(() => of([] as PermissionDescriptor[]))),
+    { initialValue: [] as PermissionDescriptor[] },
+  );
 
   public readonly isGroup = computed<boolean>(
     () => this.role.scope === PermissionScope.Group,
@@ -113,23 +121,8 @@ export class RolePreviewDialogComponent {
     return [...groups.values()];
   });
 
-  constructor(
-    @Inject(MAT_DIALOG_DATA) data: RolePreviewDialogData,
-    permissionService: PermissionService,
-  ) {
+  constructor(@Inject(MAT_DIALOG_DATA) data: RolePreviewDialogData) {
     this.role = data.role;
-
-    // The role already carries its permission keys; the registry only supplies
-    // human-readable labels/descriptions, so a failed load degrades gracefully
-    // to the raw keys.
-    permissionService
-      .getPermissions()
-      .pipe(
-        take(1),
-        catchError(() => EMPTY),
-        takeUntilDestroyed(),
-      )
-      .subscribe((descriptors) => this.registry.set(descriptors));
   }
 }
 

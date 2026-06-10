@@ -1,5 +1,5 @@
-import { Component, DestroyRef, Input, OnInit, computed, signal } from "@angular/core";
-import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { Component, DestroyRef, Input, OnInit, computed, effect, inject, signal } from "@angular/core";
+import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { UntilDestroy } from "@ngneat/until-destroy";
@@ -32,18 +32,38 @@ export class UserFormComponent implements OnInit {
     private tokenRefreshService: TokenRefreshService,
     private userService: UserService,
     private userValidators: UserValidators,
-    private roleService: RoleService,
     private matDialog: MatDialog,
     private destroyRef: DestroyRef,
     public matDialogRef: MatDialogRef<UserFormComponent>
-  ) {}
+  ) {
+    // Pre-select the configured default app role on the add form once the roles
+    // resolve. Syncing a derived value into the reactive form is an imperative
+    // side effect, so an effect() is the sanctioned tool here.
+    effect(() => {
+      const roles = this.roles();
+      if (!this.user && this.form.get("appRoleId")?.value == null) {
+        const defaultRole = roles.find(
+          (role) => role.scope === PermissionScope.App && role.isDefault
+        );
+        if (defaultRole) {
+          this.form.get("appRoleId")?.setValue(defaultRole.id);
+        }
+      }
+    });
+  }
 
   public form: FormGroup = new FormGroup({});
 
   // The full app-role list, the selector options and the currently-selected role
   // (for the preview button) are derived reactively so they update once the roles
-  // load asynchronously.
-  private readonly roles = signal<Role[]>([]);
+  // load asynchronously. Degrade gracefully if the roles can't be read: the
+  // selector is simply empty rather than erroring.
+  private readonly roles = toSignal(
+    inject(RoleService)
+      .getRoles()
+      .pipe(catchError(() => of([] as Role[]))),
+    { initialValue: [] as Role[] }
+  );
   public readonly appRoleOptions = computed<Role[]>(() =>
     this.roles().filter((role) => role.scope === PermissionScope.App)
   );
@@ -54,36 +74,10 @@ export class UserFormComponent implements OnInit {
 
   public ngOnInit(): void {
     this.initForm();
-    this.loadRoles();
     this.listenToAppRoleChanges();
     if (!this.user) {
       this.listenToIsDummyChanges();
     }
-  }
-
-  private loadRoles(): void {
-    this.roleService
-      .getRoles()
-      // Degrade gracefully if the roles can't be read: leave the selector empty
-      // rather than erroring.
-      .pipe(
-        take(1),
-        catchError(() => of([] as Role[])),
-        takeUntilDestroyed(this.destroyRef)
-      )
-      .subscribe((roles) => {
-        this.roles.set(roles);
-        // New users default to the configured default app role; an existing
-        // user's role is already pre-filled from the loaded user.
-        if (!this.user && this.form.get("appRoleId")?.value == null) {
-          const defaultRole = roles.find(
-            (role) => role.scope === PermissionScope.App && role.isDefault
-          );
-          if (defaultRole) {
-            this.form.get("appRoleId")?.setValue(defaultRole.id);
-          }
-        }
-      });
   }
 
   private listenToAppRoleChanges(): void {

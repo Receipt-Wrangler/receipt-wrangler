@@ -49,7 +49,7 @@ test.describe('assigning modern roles (admin)', () => {
     // Assign a different app role, then save.
     await roleSelect.click();
     await page.getByRole('option', { name: 'Legacy Admin', exact: true }).click();
-    await dialog.getByLabel('Displayname').press('Enter');
+    await dialog.locator('app-submit-button button').click();
 
     // The dialog closes on success and the new user appears in the list.
     await expect(dialog).toBeHidden();

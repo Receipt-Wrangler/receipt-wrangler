@@ -3993,7 +3993,10 @@ components:
           type: integer
           format: uint64
           nullable: true
-          description: Id of the modern app role to assign to the user
+          description: >-
+            Id of the modern app role to assign. Honored by admin user creation;
+            ignored on public sign-up, where any caller-supplied value is stripped
+            server-side.
     BulkStatusUpdateCommand:
       required:
         - status

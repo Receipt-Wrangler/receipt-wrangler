@@ -2,7 +2,7 @@ import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { MAT_DIALOG_DATA } from "@angular/material/dialog";
-import { of } from "rxjs";
+import { of, throwError } from "rxjs";
 import {
   PermissionDescriptor,
   PermissionScope,
@@ -44,8 +44,10 @@ describe("RolePreviewDialogComponent", () => {
 
   let fixture: ComponentFixture<RolePreviewDialogComponent>;
   let component: RolePreviewDialogComponent;
+  let getPermissionsMock: jest.Mock;
 
   beforeEach(async () => {
+    getPermissionsMock = jest.fn().mockReturnValue(of(descriptors));
     await TestBed.configureTestingModule({
       imports: [RolePreviewDialogComponent, NoopAnimationsModule],
       providers: [
@@ -56,7 +58,7 @@ describe("RolePreviewDialogComponent", () => {
         },
         {
           provide: PermissionService,
-          useValue: { getPermissions: () => of(descriptors) },
+          useValue: { getPermissions: getPermissionsMock },
         },
       ],
     }).compileComponents();
@@ -90,5 +92,29 @@ describe("RolePreviewDialogComponent", () => {
     await fixture.whenStable();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? "";
     expect(text).toContain("Auditor");
+  });
+
+  it("still renders the role's permissions when the registry fails to load", async () => {
+    // The role carries its own permission keys; only the human-readable
+    // labels/descriptions come from the registry, so a failed load must
+    // degrade gracefully rather than blank the dialog or throw.
+    getPermissionsMock.mockReturnValue(throwError(() => new Error("boom")));
+
+    const failedFixture = TestBed.createComponent(RolePreviewDialogComponent);
+    const failedComponent = failedFixture.componentInstance;
+    await failedFixture.whenStable();
+
+    expect(failedComponent).toBeTruthy();
+    expect(failedComponent.permissionCount()).toBe(2);
+
+    const groups = failedComponent.groups();
+    expect(groups.length).toBe(1);
+    expect(groups[0].rows.length).toBe(2);
+    // Labels fall back to the humanised action; registry-supplied descriptions
+    // are absent because the registry never loaded.
+    expect(groups[0].rows.map((row) => row.label)).toEqual(
+      expect.arrayContaining(["Read", "Create"])
+    );
+    expect(groups[0].rows.every((row) => row.description === "")).toBe(true);
   });
 });

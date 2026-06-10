@@ -211,7 +211,7 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 		txErr := tx.Session(&gorm.Session{FullSaveAssociations: true}).Model(&groupToUpdate).Omit("ID", "is_all_group").Updates(&groupToUpdate).Error
-		if err != nil {
+		if txErr != nil {
 			return txErr
 		}
 

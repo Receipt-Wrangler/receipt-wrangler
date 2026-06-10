@@ -32,7 +32,7 @@ export interface SignUpCommand {
      */
     userRole?: UserRole;
     /**
-     * Id of the modern app role to assign to the user
+     * Id of the modern app role to assign. Honored by admin user creation; ignored on public sign-up, where any caller-supplied value is stripped server-side.
      */
     appRoleId?: number;
 }
