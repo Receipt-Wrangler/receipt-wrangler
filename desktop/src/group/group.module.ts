@@ -47,7 +47,6 @@ import { GroupTabsComponent } from "./group-tabs/group-tabs.component";
     CheckboxModule,
     CommonModule,
     DirectivesModule,
-    PipesModule,
     GroupRoutingModule,
     InputModule,
     MatCardModule,

@@ -25,13 +25,9 @@ import { UserFormComponent } from "../user-form/user-form.component";
     standalone: false
 })
 export class UserListComponent implements AfterViewInit {
+  protected readonly Permission = Permission;
+
   userId = this.store.selectSignal(AuthState.userId);
-
-  protected readonly canCreateUsers = this.store.selectSignal(AuthState.hasAppPermission(Permission.AppUsersCreate));
-
-  protected readonly canUpdateUsers = this.store.selectSignal(AuthState.hasAppPermission(Permission.AppUsersUpdate));
-
-  protected readonly canDeleteUsers = this.store.selectSignal(AuthState.hasAppPermission(Permission.AppUsersDelete));
 
   public readonly usernameCell = viewChild.required<TemplateRef<any>>("usernameCell");
 

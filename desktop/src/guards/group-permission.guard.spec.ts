@@ -1,3 +1,4 @@
+import { provideZonelessChangeDetection } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { ActivatedRouteSnapshot, CanActivateFn, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
@@ -16,6 +17,7 @@ describe("groupPermissionGuard", () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [NgxsModule.forRoot([AuthState, GroupState])],
+      providers: [provideZonelessChangeDetection()],
     });
 
     store = TestBed.inject(Store);

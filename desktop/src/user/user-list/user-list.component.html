@@ -1,15 +1,17 @@
 <div class="d-flex flex-column">
   <app-table-header headerText="Users">
     <div class="d-flex gap-2">
+      <ng-container *hasAppPermission="Permission.AppUsersDelete">
+        <app-button
+          *ngIf="hasSelectedUsers"
+          buttonText="Delete Selected"
+          color="warn"
+          icon="delete"
+          (clicked)="bulkDeleteUsers()"
+        ></app-button>
+      </ng-container>
       <app-button
-        *ngIf="hasSelectedUsers && canDeleteUsers()"
-        buttonText="Delete Selected"
-        color="warn"
-        icon="delete"
-        (clicked)="bulkDeleteUsers()"
-      ></app-button>
-      <app-button
-        *ngIf="canCreateUsers()"
+        *hasAppPermission="Permission.AppUsersCreate"
         buttonText="Create User"
         (clicked)="openUserFormDialog()"
       ></app-button>
@@ -48,7 +50,7 @@
 <ng-template #actionsCell let-element="element" let-index="index">
   <div class="d-flex align-items-center">
     <app-button
-      *ngIf="canUpdateUsers()"
+      *hasAppPermission="Permission.AppUsersUpdate"
       matButtonType="iconButton"
       icon="edit"
       tooltip="Edit User"
@@ -56,26 +58,30 @@
       (clicked)="openUserFormDialog(element)"
     ></app-button>
     <app-button
-      *ngIf="canUpdateUsers()"
+      *hasAppPermission="Permission.AppUsersUpdate"
       matButtonType="iconButton"
       icon="password"
       tooltip="Set password"
       color="accent"
       (clicked)="openResetPasswordDialog(element)"
     ></app-button>
-    <app-button
-      *ngIf="element.isDummyUser && canUpdateUsers()"
-      matButtonType="iconButton"
-      icon="person"
-      color="accent"
-      tooltip="Convert to normal user"
-      (clicked)="openDummyUserConversionDialog(element)"
-    >
-    </app-button>
-    <app-delete-button
-      *ngIf="userId() !== element.id.toString() && canDeleteUsers()"
-      data-testid="user-delete"
-      (clicked)="deleteUser(index)"
-    ></app-delete-button>
+    <ng-container *hasAppPermission="Permission.AppUsersUpdate">
+      <app-button
+        *ngIf="element.isDummyUser"
+        matButtonType="iconButton"
+        icon="person"
+        color="accent"
+        tooltip="Convert to normal user"
+        (clicked)="openDummyUserConversionDialog(element)"
+      >
+      </app-button>
+    </ng-container>
+    <ng-container *hasAppPermission="Permission.AppUsersDelete">
+      <app-delete-button
+        *ngIf="userId() !== element.id.toString()"
+        data-testid="user-delete"
+        (clicked)="deleteUser(index)"
+      ></app-delete-button>
+    </ng-container>
   </div>
 </ng-template>

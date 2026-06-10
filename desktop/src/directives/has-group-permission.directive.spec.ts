@@ -1,4 +1,4 @@
-import { Component } from "@angular/core";
+import { Component, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { NgxsModule, Store } from "@ngxs/store";
 import { AuthState } from "../store/auth.state";
@@ -24,6 +24,7 @@ describe("HasGroupPermissionDirective", () => {
     await TestBed.configureTestingModule({
       declarations: [HostComponent, HasGroupPermissionDirective],
       imports: [NgxsModule.forRoot([AuthState])],
+      providers: [provideZonelessChangeDetection()],
     }).compileComponents();
 
     store = TestBed.inject(Store);

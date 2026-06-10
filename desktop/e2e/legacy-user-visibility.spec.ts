@@ -32,24 +32,24 @@ test.describe('Legacy User visibility', () => {
   test('categories: can add, cannot edit or delete', async ({ page }) => {
     await page.goto('/categories');
     // Legacy User holds app.categories.create.
-    await expect(page.locator('app-add-button')).toBeVisible();
+    await expect(page.getByTestId('category-add')).toBeVisible();
     // ...but not app.categories.update / .delete — those row actions never render.
-    await expect(page.locator('app-edit-button')).toHaveCount(0);
-    await expect(page.locator('app-delete-button')).toHaveCount(0);
+    await expect(page.getByTestId('category-edit')).toHaveCount(0);
+    await expect(page.getByTestId('category-delete')).toHaveCount(0);
   });
 
   test('tags: can add, cannot edit or delete', async ({ page }) => {
     await page.goto('/tags');
-    await expect(page.locator('app-add-button')).toBeVisible();
-    await expect(page.locator('app-edit-button')).toHaveCount(0);
-    await expect(page.locator('app-delete-button')).toHaveCount(0);
+    await expect(page.getByTestId('tag-add')).toBeVisible();
+    await expect(page.getByTestId('tag-edit')).toHaveCount(0);
+    await expect(page.getByTestId('tag-delete')).toHaveCount(0);
   });
 
   test('custom fields: can add, cannot delete', async ({ page }) => {
     await page.goto('/custom-fields');
     // Custom fields have no update permission — only create (held) and delete (not).
-    await expect(page.locator('app-add-button')).toBeVisible();
-    await expect(page.locator('app-delete-button')).toHaveCount(0);
+    await expect(page.getByTestId('custom-field-add')).toBeVisible();
+    await expect(page.getByTestId('custom-field-delete')).toHaveCount(0);
   });
 });
 

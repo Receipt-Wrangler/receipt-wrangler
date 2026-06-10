@@ -1,6 +1,7 @@
 <app-table-header [headerText]="headerText">
   <app-add-button
     *hasAppPermission="Permission.AppTagsCreate"
+    data-testid="tag-add"
     tooltip="Add tag"
     (clicked)="openAddDialog()"
   >
@@ -33,11 +34,13 @@
 <ng-template #actionsCell let-element="element" let-index="index">
   <app-edit-button
     *hasAppPermission="Permission.AppTagsUpdate"
+    data-testid="tag-edit"
     color="accent"
     (clicked)="openEditDialog(element)"
   ></app-edit-button>
   <app-delete-button
     *hasAppPermission="Permission.AppTagsDelete"
+    data-testid="tag-delete"
     (clicked)="openDeleteConfirmationDialog(element)"
   ></app-delete-button>
 </ng-template>
