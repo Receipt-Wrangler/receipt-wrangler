@@ -31,7 +31,6 @@ func countScope(scope Scope) int {
 
 func TestLegacyAppUserKeys(t *testing.T) {
 	expected := []string{
-		AppUsersRead,
 		AppCategoriesCreate,
 		AppCategoriesRead,
 		AppTagsCreate,
@@ -82,6 +81,15 @@ func TestLegacyAppUserExcludesReadAnyApiKeys(t *testing.T) {
 	// "view all API keys" permission.
 	if slices.Contains(LegacyAppUserKeys(), AppApiKeysReadAny) {
 		utilPrint(t, "Legacy User contains "+AppApiKeysReadAny, "absent")
+	}
+}
+
+func TestLegacyAppUserExcludesUsersRead(t *testing.T) {
+	// app.users.read gates only the admin "Manage Users" listing (GET /user/),
+	// which no client calls. Legacy User must NOT hold it, so normal users don't
+	// reach the admin Users page.
+	if slices.Contains(LegacyAppUserKeys(), AppUsersRead) {
+		utilPrint(t, "Legacy User contains "+AppUsersRead, "absent")
 	}
 }
 

@@ -217,7 +217,10 @@ longer gate handler access.
   `USER` could do), **Legacy Viewer** / **Legacy Editor** / **Legacy Owner** (the group VIEWER /
   EDITOR / OWNER tiers; Owner = every group permission). The sets live in
   `permissions/legacy.go` (`Legacy*Keys()` helpers) and were derived from the actual handler-level
-  gating, not the desktop UI presets.
+  gating, not the desktop UI presets. **One deliberate exception:** `app.users.read` is omitted from
+  Legacy User — it gates only the admin `GET /user/` listing, which no client calls (user dropdowns read
+  from AppData via `app.account.read`), so granting it would only expose the admin "Manage Users" page to
+  normal users. Removing it keeps normal users off that page with zero functional loss.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.

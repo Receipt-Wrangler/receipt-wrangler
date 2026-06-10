@@ -33,9 +33,13 @@ func LegacyAppAdminKeys() []string {
 // held: actions whose handlers were gated to USER or left ungated (available to
 // any authenticated user). Intentionally a fixed subset, so it must NOT grow
 // automatically as new permissions are added.
+//
+// app.users.read is deliberately excluded: it gates only GET /user/ (the admin
+// "Manage Users" listing), which no client calls — every user dropdown reads
+// users from AppData (gated by app.account.read). Granting it would expose the
+// admin Users page to normal users without giving them any capability they use.
 func LegacyAppUserKeys() []string {
 	return []string{
-		AppUsersRead,
 		AppCategoriesCreate,
 		AppCategoriesRead,
 		AppTagsCreate,

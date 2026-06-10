@@ -2,13 +2,14 @@
   <app-table-header headerText="Users">
     <div class="d-flex gap-2">
       <app-button
-        *ngIf="hasSelectedUsers"
+        *ngIf="hasSelectedUsers && canDeleteUsers()"
         buttonText="Delete Selected"
         color="warn"
         icon="delete"
         (clicked)="bulkDeleteUsers()"
       ></app-button>
       <app-button
+        *ngIf="canCreateUsers()"
         buttonText="Create User"
         (clicked)="openUserFormDialog()"
       ></app-button>
@@ -47,6 +48,7 @@
 <ng-template #actionsCell let-element="element" let-index="index">
   <div class="d-flex align-items-center">
     <app-button
+      *ngIf="canUpdateUsers()"
       matButtonType="iconButton"
       icon="edit"
       tooltip="Edit User"
@@ -54,6 +56,7 @@
       (clicked)="openUserFormDialog(element)"
     ></app-button>
     <app-button
+      *ngIf="canUpdateUsers()"
       matButtonType="iconButton"
       icon="password"
       tooltip="Set password"
@@ -61,7 +64,7 @@
       (clicked)="openResetPasswordDialog(element)"
     ></app-button>
     <app-button
-      *ngIf="element.isDummyUser"
+      *ngIf="element.isDummyUser && canUpdateUsers()"
       matButtonType="iconButton"
       icon="person"
       color="accent"
@@ -70,7 +73,7 @@
     >
     </app-button>
     <app-delete-button
-      *ngIf="userId() !== element.id.toString()"
+      *ngIf="userId() !== element.id.toString() && canDeleteUsers()"
       data-testid="user-delete"
       (clicked)="deleteUser(index)"
     ></app-delete-button>
