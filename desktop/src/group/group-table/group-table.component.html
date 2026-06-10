@@ -53,6 +53,7 @@
   <div class="d-flex">
     <app-edit-button
       *hasGroupPermission="{ groupId: element.id, permission: Permission.GroupUpdate, orApp: [Permission.AppGroupsUpdateSettings] }"
+      data-testid="group-edit"
       color="accent"
       tooltip="Edit group"
       [buttonRouterLink]="[element | groupTableEditButton: appPermissions() : groupPermissions()]"
