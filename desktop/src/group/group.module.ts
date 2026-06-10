@@ -13,6 +13,7 @@ import { TableModule } from "src/table/table.module";
 import { UserAutocompleteModule } from "src/user-autocomplete/user-autocomplete.module";
 import { AutocompleteModule } from "../autocomplete/autocomplete.module";
 import { ButtonModule } from "../button";
+import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { GroupDetailsComponent } from "./group-details/group-details.component";
 import { GroupFormComponent } from "./group-form/group-form.component";
@@ -45,6 +46,7 @@ import { GroupTabsComponent } from "./group-tabs/group-tabs.component";
     ButtonModule,
     CheckboxModule,
     CommonModule,
+    DirectivesModule,
     PipesModule,
     GroupRoutingModule,
     InputModule,

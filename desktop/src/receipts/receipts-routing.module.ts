@@ -1,10 +1,10 @@
 import { NgModule } from "@angular/core";
 import { RouterModule, Routes } from "@angular/router";
 import { FormMode } from "src/enums/form-mode.enum";
-import { GroupRoleGuard } from "src/guards/group-role.guard";
+import { groupPermissionGuard } from "src/guards/group-permission.guard";
 import { GroupGuard } from "src/guards/group.guard";
 import { receiptGuardGuard } from "src/guards/receipt-guard.guard";
-import { GroupRole, Permission } from "../open-api";
+import { Permission } from "../open-api";
 import { categoryResolverFn } from "../resolvers/categories.resolver";
 import { customFieldResolverFn } from "../resolvers/custom-field.resolver";
 import { receiptResolverFn } from "../resolvers/receipt.resolver";
@@ -35,9 +35,9 @@ const routes: Routes = [
     },
     data: {
       mode: FormMode.add,
-      groupRole: GroupRole.Editor,
+      groupPermission: Permission.GroupReceiptsCreate,
     },
-    canActivate: [GroupRoleGuard],
+    canActivate: [groupPermissionGuard],
   },
   {
     path: ":id/view",

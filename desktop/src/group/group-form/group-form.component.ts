@@ -1,4 +1,4 @@
-import {AfterViewInit, Component, OnInit, signal, TemplateRef, input, viewChild} from "@angular/core";
+import {AfterViewInit, Component, OnInit, Signal, signal, TemplateRef, input, viewChild} from "@angular/core";
 import {FormArray, FormBuilder, FormGroup, Validators} from "@angular/forms";
 import {MatDialog} from "@angular/material/dialog";
 import {Sort} from "@angular/material/sort";
@@ -14,9 +14,9 @@ import {FormConfig} from "src/interfaces/form-config.interface";
 import {TableColumn} from "src/table/table-column.interface";
 import {TableComponent} from "src/table/table/table.component";
 import {SortByDisplayName} from "src/utils/sort-by-displayname";
-import {Group, GroupMember, GroupRole, GroupsService, GroupStatus} from "../../open-api";
+import {Group, GroupMember, GroupRole, GroupsService, GroupStatus, Permission} from "../../open-api";
 import {SnackbarService} from "../../services";
-import {AddGroup, UpdateGroup} from "../../store";
+import {AddGroup, AuthState, UpdateGroup} from "../../store";
 import {GroupMemberFormComponent} from "../group-member-form/group-member-form.component";
 import {buildGroupMemberForm} from "../utils/group-member.utils";
 
@@ -61,6 +61,8 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
 
   public groupStatusOptions = GROUP_STATUS_OPTIONS;
 
+  public canManageMembers: Signal<boolean> = signal(false);
+
   public dataSource = signal(new MatTableDataSource<GroupMember>([]));
 
   constructor(
@@ -80,6 +82,9 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
     this.formConfig = this.activatedRoute.snapshot.data["formConfig"];
     if (this.originalGroup) {
       this.editLink = `/groups/${this.originalGroup.id}/details/edit`;
+      this.canManageMembers = this.store.selectSignal(
+        AuthState.hasGroupPermission(this.originalGroup.id, Permission.GroupUpdate)
+      );
     }
     this.initForm();
   }

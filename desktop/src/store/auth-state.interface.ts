@@ -10,4 +10,6 @@ export interface AuthStateInterface {
   defaultAvatarColor?: string;
   userPreferences?: UserPreferences;
   icons?: Icon[];
+  appPermissions?: string[];
+  groupPermissions?: { [groupId: number]: string[] };
 }

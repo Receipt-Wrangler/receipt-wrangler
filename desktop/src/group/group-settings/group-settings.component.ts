@@ -5,7 +5,7 @@ import { Store } from "@ngxs/store";
 import { switchMap, take, tap } from "rxjs";
 import { BaseFormComponent } from "src/form/base-form/base-form.component";
 import { FormMode } from "../../enums/form-mode.enum";
-import { Group, GroupsService, UserRole } from "../../open-api";
+import { Group, GroupsService, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, UpdateGroup } from "../../store";
 
@@ -37,7 +37,7 @@ export class GroupSettingsComponent
   }
 
   public ngOnInit(): void {
-    this.canEditEmailSettings = this.store.selectSnapshot(AuthState.hasRole(UserRole.Admin));
+    this.canEditEmailSettings = this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppGroupsUpdateSettings));
     this.setFormConfigFromRoute(this.activatedRoute);
     if (!this.canEditEmailSettings) {
       this.formConfig.mode = FormMode.view;

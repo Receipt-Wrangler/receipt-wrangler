@@ -68,6 +68,23 @@ func TestLegacyAppUserKeys(t *testing.T) {
 	}
 }
 
+func TestLegacyAppAdminIncludesReadAnyApiKeys(t *testing.T) {
+	// Legacy Admin is every app permission, so a newly added app permission such
+	// as app.api-keys.read-any must flow into it automatically (upgrade keeps the
+	// admin's "view all API keys" ability).
+	if !slices.Contains(LegacyAppAdminKeys(), AppApiKeysReadAny) {
+		utilPrint(t, "Legacy Admin missing "+AppApiKeysReadAny, "present")
+	}
+}
+
+func TestLegacyAppUserExcludesReadAnyApiKeys(t *testing.T) {
+	// Legacy User is a fixed subset and must NOT grant the privileged
+	// "view all API keys" permission.
+	if slices.Contains(LegacyAppUserKeys(), AppApiKeysReadAny) {
+		utilPrint(t, "Legacy User contains "+AppApiKeysReadAny, "absent")
+	}
+}
+
 func TestLegacyGroupViewerKeys(t *testing.T) {
 	expected := []string{
 		GroupView,

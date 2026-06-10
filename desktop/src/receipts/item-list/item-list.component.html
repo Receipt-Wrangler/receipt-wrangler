@@ -32,7 +32,7 @@
               <span class="header-total">
                 Total: {{ getTotalAmount() | customCurrency }}
               </span>
-              @if (originalReceipt?.groupId | groupRole : groupRole.Editor) {
+              @if (canEdit()) {
                 <app-add-button
                   tooltip="Add Item (Ctrl+I)"
                   [disabled]="mode === formMode.view"
@@ -52,16 +52,12 @@
                     matButtonType="iconButton"
                     icon="call_split"
                     tooltip="Split Item"
-                    [disabled]="
-                      !(originalReceipt?.groupId | groupRole : groupRole.Editor)
-                    "
+                    [disabled]="!canEdit()"
                     (clicked)="splitItem(itemData)"
                   ></app-button>
                   <app-delete-button
                     tooltip="Remove Item"
-                    [disabled]="
-                      !(originalReceipt?.groupId | groupRole : groupRole.Editor)
-                    "
+                    [disabled]="!canEdit()"
                     (clicked)="removeItem(itemData)"
                   ></app-delete-button>
                 }

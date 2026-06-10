@@ -23,8 +23,8 @@ import {
   CustomFieldValue,
   FileDataView,
   Group,
-  GroupRole,
   Item,
+  Permission,
   Receipt,
   ReceiptImageService,
   ReceiptService,
@@ -100,7 +100,19 @@ export class ReceiptFormComponent implements OnInit {
 
   public formMode = FormMode;
 
-  public groupRole = GroupRole;
+  protected readonly Permission = Permission;
+
+  /**
+   * Reactive gate for editing the receipt: holds `group.receipts.create` (add
+   * mode) / `group.receipts.update` (view/edit mode) for the receipt's group.
+   * Reassigned in `ngOnInit` once the group id + mode are known (mirrors the
+   * `selectSignal` reassignment used elsewhere); deny-by-default until then.
+   */
+  public canEditReceipt: Signal<boolean> = signal(false);
+
+  public canMagicFill: Signal<boolean> = signal(false);
+
+  public canDuplicate: Signal<boolean> = signal(false);
 
   public selectedGroup = signal<Group | undefined>(undefined);
 
@@ -203,6 +215,7 @@ export class ReceiptFormComponent implements OnInit {
         });
         this.setCancelLink();
         this.initForm();
+        this.setReceiptPermissions();
         this.getImageFiles();
         this.setHeaderText();
         this.setShowLargeImagePreview();
@@ -316,6 +329,30 @@ export class ReceiptFormComponent implements OnInit {
       GroupState.selectedGroupId
     );
     this.cancelLink = `/receipts/group/${selectedGroupId}`;
+  }
+
+  private setReceiptPermissions(): void {
+    // In add mode there is no saved receipt yet, so gate against the selected
+    // group (the same group the route guard checked + the form's groupId seed);
+    // otherwise gate against the receipt's own group.
+    const groupId =
+      this.mode === FormMode.add
+        ? Number.parseInt(this.store.selectSnapshot(GroupState.selectedGroupId))
+        : (this.originalReceipt?.groupId ?? 0);
+    const editPermission =
+      this.mode === FormMode.add
+        ? Permission.GroupReceiptsCreate
+        : Permission.GroupReceiptsUpdate;
+
+    this.canEditReceipt = this.store.selectSignal(
+      AuthState.hasGroupPermission(groupId, editPermission)
+    );
+    this.canMagicFill = this.store.selectSignal(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsMagicFill)
+    );
+    this.canDuplicate = this.store.selectSignal(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsDuplicate)
+    );
   }
 
   private initForm(): void {

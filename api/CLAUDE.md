@@ -315,6 +315,20 @@ lookup (used pre-auth during signup) and `ConvertToJpg` (a stateless image utili
 resource to scope against). The role/permission management endpoints (`/role`, `/permission`) are
 gated by `app.roles.*`.
 
+**Effective permissions on AppData (desktop UI gating):** `GetAppData` (`services/auth.go`) includes the
+caller's resolved permissions so the desktop can gate UI with them — `AppPermissions []string` and
+`GroupPermissions map[uint][]string` (keyed by group id) — built via
+`PermissionService.GetAppPermissionsForUser` / `GetGroupPermissionsForUser` (thin exported wrappers over
+the cached `resolveAppPermissions` / `resolveGroupPermissions`). The JWT still carries only the legacy
+`UserRole` and remains a thin UI hint; the server keeps re-checking real permissions from the DB on every
+request.
+
+**`app.api-keys.read-any` (Security):** listing *all* users' API keys (`GetPagedApiKeys` with
+`associatedApiKeys=ALL`) requires `app.api-keys.read-any`, checked in the handler body via the
+`PermissionService` — the legacy `token.UserRole == ADMIN` check in
+`commands/paged_api_key_request_command.go` was removed. Legacy Admin auto-includes the new permission
+(its set is every app permission); Legacy User does not.
+
 **Per-create role assignment (done):** a new account (signup or admin-create) is assigned the
 default app role, and a group's creator is assigned the default group role, via the default-role
 wiring (see "Default roles" above), so accounts created after the one-time migration are no longer

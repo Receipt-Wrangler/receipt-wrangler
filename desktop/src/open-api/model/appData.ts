@@ -13,6 +13,7 @@ import { Category } from './category';
 import { Claims } from './claims';
 import { CurrencySeparator } from './currencySeparator';
 import { FeatureConfig } from './featureConfig';
+import { Permission } from './permission';
 import { UserView } from './userView';
 import { Icon } from './icon';
 import { Tag } from './tag';
@@ -64,6 +65,14 @@ export interface AppData {
      * Icons in the system
      */
     icons: Array<Icon>;
+    /**
+     * The calling user\'s effective app-level permissions.
+     */
+    appPermissions: Array<Permission>;
+    /**
+     * The calling user\'s effective group-level permissions, keyed by group id.
+     */
+    groupPermissions: { [key: string]: Array<Permission>; };
 }
 export namespace AppData {
 }

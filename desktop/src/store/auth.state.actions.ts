@@ -19,6 +19,15 @@ export class SetIcons {
   constructor(public icons: Icon[]) {}
 }
 
+export class SetPermissions {
+  static readonly type = "[Auth] Set Permissions";
+
+  constructor(
+    public appPermissions: string[],
+    public groupPermissions: { [groupId: number]: string[] }
+  ) {}
+}
+
 export class Logout {
   static readonly type = "[Auth] Logout";
 }

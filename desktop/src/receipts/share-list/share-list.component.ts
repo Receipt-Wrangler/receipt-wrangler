@@ -3,6 +3,7 @@ import {
   Input,
   OnChanges,
   OnInit,
+  Signal,
   SimpleChanges,
   ViewEncapsulation,
   input,
@@ -17,8 +18,8 @@ import { Store } from "@ngxs/store";
 import { RECEIPT_ITEM_STATUS_OPTIONS } from "src/constants/receipt-status-options";
 import { FormMode } from "src/enums/form-mode.enum";
 import { InputComponent } from "../../input";
-import { Category, Group, GroupRole, Item, ItemStatus, Receipt, Tag, User } from "../../open-api";
-import { UserState } from "../../store";
+import { Category, Group, Item, ItemStatus, Permission, Receipt, Tag, User } from "../../open-api";
+import { AuthState, UserState } from "../../store";
 import { buildItemForm } from "../utils/form.utils";
 
 export interface ItemData {
@@ -76,7 +77,14 @@ export class ShareListComponent implements OnInit, OnChanges {
 
   public formMode = FormMode;
 
-  public groupRole = GroupRole;
+  protected readonly Permission = Permission;
+
+  /**
+   * Reactive gate for editing shares: holds `group.receipts.update` for the
+   * receipt's group. Reassigned in `ngOnInit` once the receipt is resolved;
+   * deny-by-default until then.
+   */
+  public canEdit: Signal<boolean> = signal(false);
 
   public itemStatusOptions = RECEIPT_ITEM_STATUS_OPTIONS;
 
@@ -97,6 +105,12 @@ export class ShareListComponent implements OnInit, OnChanges {
   public ngOnInit(): void {
     this.originalReceipt = this.activatedRoute.snapshot.data["receipt"];
     this.mode = this.activatedRoute.snapshot.data["mode"];
+    this.canEdit = this.store.selectSignal(
+      AuthState.hasGroupPermission(
+        this.originalReceipt?.groupId ?? 0,
+        Permission.GroupReceiptsUpdate
+      )
+    );
     this.setUserItemMap();
   }
 

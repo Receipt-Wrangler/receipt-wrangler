@@ -20,19 +20,18 @@ import {
   BulkStatusUpdateCommand,
   Category,
   Group,
-  GroupRole,
   GroupsService,
   PagedDataDataInner,
+  Permission,
   Receipt,
   ReceiptService,
   ReceiptStatus,
   Tag,
 } from "../../open-api";
-import { GroupRolePipe } from "../../pipes/group-role.pipe";
 import { SnackbarService } from "../../services";
 import { ReceiptExportService } from "../../services/receipt-export.service";
 import { ReceiptFilterComponent } from "../../shared-ui/receipt-filter/receipt-filter.component";
-import { GroupState } from "../../store";
+import { AuthState, GroupState } from "../../store";
 import { applyFormCommand } from "../../utils/index";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { BulkStatusUpdateComponent } from "../bulk-resolve-dialog/bulk-status-update-dialog.component";
@@ -43,7 +42,6 @@ import { ColumnConfigurationDialogComponent } from "../column-configuration-dial
   selector: "app-receipts-table",
   templateUrl: "./receipts-table.component.html",
   styleUrls: ["./receipts-table.component.scss"],
-  providers: [GroupRolePipe],
   animations: [fadeInOut],
   encapsulation: ViewEncapsulation.None,
   host: DEFAULT_HOST_CLASS,
@@ -52,7 +50,6 @@ import { ColumnConfigurationDialogComponent } from "../column-configuration-dial
 export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   constructor(
     private activatedRoute: ActivatedRoute,
-    private groupPipe: GroupRolePipe,
     private groupsService: GroupsService,
     private matDialog: MatDialog,
     private receiptExportService: ReceiptExportService,
@@ -108,8 +105,6 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   public groupId: string = "0";
 
-  public groupRole = GroupRole;
-
   public dataSource = signal(new MatTableDataSource<PagedDataDataInner>([]));
 
   public displayedColumns = signal<string[]>([]);
@@ -162,7 +157,9 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   }
 
   private setCanEdit(): void {
-    this.canEdit = this.groupPipe.transform(this.groupId, GroupRole.Editor);
+    this.canEdit = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(Number.parseInt(this.groupId), Permission.GroupReceiptsUpdate)
+    );
   }
 
   private setHeaderText(): void {

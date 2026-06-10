@@ -5,7 +5,7 @@
         tooltip="Create API Key"
         (clicked)="openCreateApiKeyDialog()"
       ></app-add-button>
-      <ng-container *ngIf="isAdmin">
+      <ng-container *ngIf="canViewAll">
         <app-button
           matButtonType="iconButton"
           icon="filter_alt"
@@ -55,12 +55,13 @@
 <ng-template #actionsCell let-element="element" let-index="index">
   <div class="d-flex">
     <app-edit-button
-      *ngIf="isOwner(element)"
+      *ngIf="canEdit(element)"
       color="accent"
       tooltip="Edit API Key"
       (clicked)="openEditDialog(element)"
     ></app-edit-button>
     <app-delete-button
+      *ngIf="canDelete(element)"
       tooltip="Delete API Key"
       (clicked)="deleteApiKey(element)"
     ></app-delete-button>

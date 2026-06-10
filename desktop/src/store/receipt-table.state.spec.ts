@@ -1,7 +1,6 @@
 import { TestBed } from "@angular/core/testing";
 import { NgxsModule, Store } from "@ngxs/store";
 import { DEFAULT_RECEIPT_TABLE_COLUMNS, ReceiptTableInterface } from "src/interfaces";
-import { GroupRolePipe } from "src/pipes/group-role.pipe";
 import { FilterOperation, ReceiptPagedRequestFilter, ReceiptStatus } from "../open-api";
 import { ResetReceiptFilter, SetPage, SetPageSize, SetReceiptFilter, SetReceiptFilterData, } from "./receipt-table.actions";
 import { defaultReceiptFilter, ReceiptTableState } from "./receipt-table.state";
@@ -12,7 +11,6 @@ describe("ReceiptTableState", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [GroupRolePipe],
       imports: [NgxsModule.forRoot([ReceiptTableState])],
     }).compileComponents();
 

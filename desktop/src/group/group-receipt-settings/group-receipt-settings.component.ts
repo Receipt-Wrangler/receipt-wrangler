@@ -5,10 +5,9 @@ import { Store } from "@ngxs/store";
 import { switchMap, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { BaseFormComponent } from "../../form/index";
-import { Group, GroupRole, GroupsService } from "../../open-api/index";
+import { Group, GroupsService, Permission } from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
-import { UpdateGroup } from "../../store/index";
-import { GroupUtil } from "../../utils/index";
+import { AuthState, UpdateGroup } from "../../store/index";
 
 @Component({
     selector: "app-group-receipt-settings",
@@ -26,7 +25,6 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
   constructor(
     private activatedRoute: ActivatedRoute,
     private formBuilder: FormBuilder,
-    private groupUtil: GroupUtil,
     private groupsService: GroupsService,
     private router: Router,
     private snackbarService: SnackbarService,
@@ -39,7 +37,9 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
     this.setFormConfigFromRoute(this.activatedRoute);
     this.setOriginalGroup();
     this.initForm();
-    this.canEdit = this.groupUtil.hasGroupAccess(this.originalGroup.id, GroupRole.Owner, false, false);
+    this.canEdit = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(this.originalGroup.id, Permission.GroupUpdate)
+    );
   }
 
   private initForm(): void {

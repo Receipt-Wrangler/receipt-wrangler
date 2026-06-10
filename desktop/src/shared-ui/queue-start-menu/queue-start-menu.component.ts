@@ -1,9 +1,8 @@
 import { Component, OnInit, input } from "@angular/core";
 import { Store } from "@ngxs/store";
-import { GroupRole, Receipt } from "../../open-api/index";
-import { GroupRolePipe } from "../../pipes/group-role.pipe";
+import { Permission, Receipt } from "../../open-api/index";
 import { QueueMode, ReceiptQueueService } from "../../services/receipt-queue.service";
-import { GroupState } from "../../store/index";
+import { AuthState, GroupState } from "../../store/index";
 
 @Component({
     selector: "app-queue-start-menu",
@@ -31,7 +30,6 @@ export class QueueStartMenuComponent implements OnInit {
   constructor(
     private receiptQueueService: ReceiptQueueService,
     private store: Store,
-    private groupRolePipe: GroupRolePipe
   ) {}
 
   public ngOnInit(): void {
@@ -40,7 +38,9 @@ export class QueueStartMenuComponent implements OnInit {
 
   private setCanEdit(): void {
     const groupId = this.store.selectSnapshot(GroupState.selectedGroupId);
-    this.canEdit = this.groupRolePipe.transform(groupId, GroupRole.Editor);
+    this.canEdit = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(Number.parseInt(groupId), Permission.GroupReceiptsUpdate)
+    );
   }
 
   private getReceiptIds(): string[] {

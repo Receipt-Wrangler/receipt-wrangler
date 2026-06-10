@@ -58,6 +58,20 @@ func (service PermissionService) HasAnyGroupPermission(userId uint, groupId uint
 	return service.checkGroup(userId, groupId, permissions.HasAny, required...)
 }
 
+// GetAppPermissionsForUser returns the user's effective app-level permissions,
+// resolved from the database (the JWT is never trusted). A user with no app role
+// — or a missing/deleted user — resolves to an empty slice (deny).
+func (service PermissionService) GetAppPermissionsForUser(userId uint) ([]string, error) {
+	return service.resolveAppPermissions(userId)
+}
+
+// GetGroupPermissionsForUser returns the user's effective group-level
+// permissions for a group, resolved from the database. A non-member, or a
+// member whose membership has no group role, resolves to an empty slice (deny).
+func (service PermissionService) GetGroupPermissionsForUser(userId uint, groupId uint) ([]string, error) {
+	return service.resolveGroupPermissions(userId, groupId)
+}
+
 func (service PermissionService) checkApp(userId uint, match matcher, required ...string) (bool, error) {
 	if err := validateRequiredPermissions(permissions.ScopeApp, required); err != nil {
 		return false, err

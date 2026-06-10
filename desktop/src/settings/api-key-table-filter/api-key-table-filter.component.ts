@@ -3,6 +3,9 @@ import { FormBuilder } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { BaseFormComponent } from "../../form";
+import { FormOption } from "../../interfaces/form-option.interface";
+import { AssociatedApiKeys, Permission } from "../../open-api";
+import { AuthState } from "../../store";
 import { ApiKeyTableState } from "../../store/api-key-table.state";
 import { SetFilter } from "../../store/api-key-table.state.actions";
 import { associatedApiKeyOptions } from "./associated-api-key-options";
@@ -22,10 +25,23 @@ export class ApiKeyTableFilterComponent extends BaseFormComponent implements OnI
     super();
   }
 
-  protected readonly associatedApiKeyOptions = associatedApiKeyOptions;
+  protected associatedApiKeyOptions: FormOption[] = associatedApiKeyOptions;
 
   public ngOnInit(): void {
+    this.initOptions();
     this.initForm();
+  }
+
+  private initOptions(): void {
+    const canViewAll = this.store.selectSnapshot(
+      AuthState.hasAppPermission(Permission.AppApiKeysReadAny)
+    );
+
+    this.associatedApiKeyOptions = canViewAll
+      ? associatedApiKeyOptions
+      : associatedApiKeyOptions.filter(
+        (option) => option.value !== AssociatedApiKeys.All
+      );
   }
 
   private initForm(): void {

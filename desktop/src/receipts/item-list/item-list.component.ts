@@ -6,6 +6,7 @@ import {
   OnChanges,
   OnDestroy,
   OnInit,
+  Signal,
   SimpleChanges,
   ViewEncapsulation,
   input,
@@ -18,9 +19,11 @@ import { FormArray, FormGroup } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { MatExpansionPanel } from "@angular/material/expansion";
 import { ActivatedRoute } from "@angular/router";
+import { Store } from "@ngxs/store";
 import { FormMode } from "src/enums/form-mode.enum";
 import { InputComponent } from "../../input";
-import { Category, Group, GroupRole, Item, Receipt, Tag } from "../../open-api";
+import { Category, Group, Item, Permission, Receipt, Tag } from "../../open-api";
+import { AuthState } from "../../store";
 import { KeyboardShortcutService } from "../../services/keyboard-shortcut.service";
 import { Subject, takeUntil } from "rxjs";
 import { KEYBOARD_SHORTCUT_ACTIONS } from "../../constants/keyboard-shortcuts.constant";
@@ -78,7 +81,14 @@ export class ItemListComponent implements OnInit, OnChanges, OnDestroy {
 
   public formMode = FormMode;
 
-  public groupRole = GroupRole;
+  protected readonly Permission = Permission;
+
+  /**
+   * Reactive gate for editing items: holds `group.receipts.update` for the
+   * receipt's group. Reassigned in `ngOnInit` once the receipt is resolved;
+   * deny-by-default until then.
+   */
+  public canEdit: Signal<boolean> = signal(false);
 
 
   private destroy$ = new Subject<void>();
@@ -90,12 +100,19 @@ export class ItemListComponent implements OnInit, OnChanges, OnDestroy {
   constructor(
     private activatedRoute: ActivatedRoute,
     private keyboardShortcutService: KeyboardShortcutService,
-    private matDialog: MatDialog
+    private matDialog: MatDialog,
+    private store: Store
   ) {}
 
   public ngOnInit(): void {
     this.originalReceipt = this.activatedRoute.snapshot.data["receipt"];
     this.mode = this.activatedRoute.snapshot.data["mode"];
+    this.canEdit = this.store.selectSignal(
+      AuthState.hasGroupPermission(
+        this.originalReceipt?.groupId ?? 0,
+        Permission.GroupReceiptsUpdate
+      )
+    );
     this.setItems();
     this.setupKeyboardShortcuts();
   }

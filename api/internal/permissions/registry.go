@@ -64,6 +64,7 @@ const (
 
 	AppApiKeysCreate    = "app.api-keys.create"
 	AppApiKeysRead      = "app.api-keys.read"
+	AppApiKeysReadAny   = "app.api-keys.read-any"
 	AppApiKeysUpdate    = "app.api-keys.update"
 	AppApiKeysDelete    = "app.api-keys.delete"
 	AppApiKeysDeleteAny = "app.api-keys.delete-any"
@@ -163,6 +164,7 @@ var registry = []Descriptor{
 
 	{AppApiKeysCreate, "Create API Keys", "Issue API keys for the calling user.", "Security", ScopeApp},
 	{AppApiKeysRead, "Read API Keys", "List the calling user's API keys.", "Security", ScopeApp},
+	{AppApiKeysReadAny, "Read Any API Key", "List API keys belonging to other users.", "Security", ScopeApp},
 	{AppApiKeysUpdate, "Update API Keys", "Edit the calling user's API keys.", "Security", ScopeApp},
 	{AppApiKeysDelete, "Delete API Keys", "Revoke the calling user's API keys.", "Security", ScopeApp},
 	{AppApiKeysDeleteAny, "Delete Any API Key", "Revoke API keys belonging to other users.", "Security", ScopeApp},

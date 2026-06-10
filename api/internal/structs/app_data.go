@@ -18,4 +18,6 @@ type AppData struct {
 	Users                        []UserView                    `json:"users"`
 	FeatureConfig                FeatureConfig                 `json:"featureConfig"`
 	Icons                        []Icon                        `json:"icons"`
+	AppPermissions               []string                      `json:"appPermissions"`
+	GroupPermissions             map[uint][]string             `json:"groupPermissions"`
 }

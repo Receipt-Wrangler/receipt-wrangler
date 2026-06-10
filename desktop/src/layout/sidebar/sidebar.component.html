@@ -75,10 +75,10 @@
       </div>
 
       <mat-menu #menu="matMenu">
-        <button *appRole="'ADMIN'" [routerLink]="['/users']" mat-menu-item>
+        <button *hasAppPermission="Permission.AppUsersRead" [routerLink]="['/users']" mat-menu-item>
           Manage Users
         </button>
-        <button *appRole="'ADMIN'" [routerLink]="['/roles']" mat-menu-item>
+        <button *hasAppPermission="Permission.AppRolesRead" [routerLink]="['/roles']" mat-menu-item>
           Manage Roles
         </button>
         <button [routerLink]="['/categories']" mat-menu-item>
@@ -90,10 +90,12 @@
         <button mat-menu-item [routerLink]="['/settings/user-profile/view']">
           User Settings
         </button>
-        <button *appRole="'ADMIN'" [routerLink]="['/system-settings/settings/view']" mat-menu-item>
-          System Settings
-        </button>
-        <button *appRole="'ADMIN'" mat-menu-item (click)="openImportDialog()">
+        @if (canViewSystemSettings()) {
+          <button [routerLink]="['/system-settings']" mat-menu-item>
+            System Settings
+          </button>
+        }
+        <button *hasAppPermission="Permission.AppImportsRun" mat-menu-item (click)="openImportDialog()">
           Imports
         </button>
         <button mat-menu-item (click)="openAboutDialog()">About</button>

@@ -12,7 +12,6 @@ import { PipesModule } from "../../pipes/index";
 import { SnackbarService } from "../../services";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { StoreModule } from "../../store/store.module";
-import { GroupUtil } from "../../utils";
 import { GroupReceiptSettingsComponent } from "./group-receipt-settings.component";
 
 describe("GroupReceiptSettingsComponent", () => {
@@ -49,7 +48,6 @@ describe("GroupReceiptSettingsComponent", () => {
         { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
         Store,
         SnackbarService,
-        GroupUtil,
         {
           provide: ActivatedRoute,
           useValue: {

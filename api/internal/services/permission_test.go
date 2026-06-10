@@ -5,6 +5,8 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"slices"
+	"sort"
 	"testing"
 )
 
@@ -374,4 +376,96 @@ func TestHasAppPermissionsMissingUserDenies(t *testing.T) {
 	if got {
 		t.Error("expected missing user to be denied")
 	}
+}
+
+func TestGetAppPermissionsForUser(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	granted := []string{permissions.AppUsersRead, permissions.AppUsersCreate}
+	userId, _ := seedUserWithAppRole(t, "appperms-user", granted)
+	service := NewPermissionService(nil)
+
+	got, err := service.GetAppPermissionsForUser(userId)
+	if err != nil {
+		t.Fatalf("GetAppPermissionsForUser: %v", err)
+	}
+	if !slices.Equal(sortedCopy(got), sortedCopy(granted)) {
+		t.Errorf("GetAppPermissionsForUser = %v, want %v", got, granted)
+	}
+}
+
+func TestGetAppPermissionsForUserNoRole(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+	db := repositories.GetDB()
+
+	user := models.User{Username: "appperms-no-role", Password: "password"}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	service := NewPermissionService(nil)
+	got, err := service.GetAppPermissionsForUser(user.ID)
+	if err != nil {
+		t.Fatalf("GetAppPermissionsForUser: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty permissions for user with no app role, got %v", got)
+	}
+}
+
+func TestGetAppPermissionsForUserMissingUser(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	service := NewPermissionService(nil)
+	got, err := service.GetAppPermissionsForUser(99999)
+	if err != nil {
+		t.Fatalf("expected no error for missing user, got %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty permissions for missing user, got %v", got)
+	}
+}
+
+func TestGetGroupPermissionsForUser(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	granted := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate}
+	userId, groupId, _ := seedMemberWithGroupRole(t, "groupperms-user", granted)
+	service := NewPermissionService(nil)
+
+	got, err := service.GetGroupPermissionsForUser(userId, groupId)
+	if err != nil {
+		t.Fatalf("GetGroupPermissionsForUser: %v", err)
+	}
+	if !slices.Equal(sortedCopy(got), sortedCopy(granted)) {
+		t.Errorf("GetGroupPermissionsForUser = %v, want %v", got, granted)
+	}
+}
+
+func TestGetGroupPermissionsForUserNonMember(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	// Seed a member of one group, then resolve a different group the user is not in.
+	userId, _, _ := seedMemberWithGroupRole(t, "groupperms-nonmember", []string{permissions.GroupReceiptsRead})
+	service := NewPermissionService(nil)
+
+	got, err := service.GetGroupPermissionsForUser(userId, 999)
+	if err != nil {
+		t.Fatalf("GetGroupPermissionsForUser: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty permissions for non-member, got %v", got)
+	}
+}
+
+// sortedCopy returns a sorted copy of keys, leaving the input untouched.
+func sortedCopy(keys []string) []string {
+	out := append([]string(nil), keys...)
+	sort.Strings(out)
+	return out
 }

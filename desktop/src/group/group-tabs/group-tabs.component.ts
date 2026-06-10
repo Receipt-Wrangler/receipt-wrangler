@@ -1,7 +1,8 @@
 import { Component } from "@angular/core";
 import { Store } from "@ngxs/store";
 import { TabConfig } from "src/shared-ui/tabs/tab-config.interface";
-import { FeatureConfigState } from "../../store";
+import { Permission } from "../../open-api";
+import { AuthState, FeatureConfigState } from "../../store";
 
 @Component({
     selector: "app-group-tabs",
@@ -35,7 +36,10 @@ export class GroupTabsComponent {
     const hasAiPoweredReceipts = this.store.selectSnapshot(
       FeatureConfigState.hasFeature("aiPoweredReceipts")
     );
-    if (hasAiPoweredReceipts) {
+    const canUpdateSettings = this.store.selectSnapshot(
+      AuthState.hasAppPermission(Permission.AppGroupsUpdateSettings)
+    );
+    if (hasAiPoweredReceipts && canUpdateSettings) {
       this.tabs.push({
         label: "Group AI Settings",
         routerLink: "settings/view",

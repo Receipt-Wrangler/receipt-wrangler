@@ -3,7 +3,6 @@ import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatMenuModule } from "@angular/material/menu";
-import { GroupRolePipe } from "../../pipes/group-role.pipe";
 import { QueueMode, ReceiptQueueService } from "../../services/receipt-queue.service";
 import { StoreModule } from "../../store/store.module";
 
@@ -15,14 +14,13 @@ describe("QueueStartMenuComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [QueueStartMenuComponent, GroupRolePipe],
+      declarations: [QueueStartMenuComponent],
       imports: [
         StoreModule,
         MatMenuModule,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
-        GroupRolePipe,
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),
       ]

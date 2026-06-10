@@ -1,5 +1,9 @@
 <app-table-header headerText="Custom Fields">
-  <app-add-button (clicked)="openCustomFieldDialog()" tooltip="Add custom field">
+  <app-add-button
+    *hasAppPermission="Permission.AppCustomFieldsCreate"
+    (clicked)="openCustomFieldDialog()"
+    tooltip="Add custom field"
+  >
   </app-add-button>
 </app-table-header>
 <div class="table-container">
@@ -30,7 +34,7 @@
 
 <ng-template #actionsCell let-element="element" let-index="index">
   <app-delete-button
-    *appRole="'ADMIN'"
+    *hasAppPermission="Permission.AppCustomFieldsDelete"
     tooltip="Delete custom field"
     (clicked)="openDeleteConfirmationDialog(element)"
   >
