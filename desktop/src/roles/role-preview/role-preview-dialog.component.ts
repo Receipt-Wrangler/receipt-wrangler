@@ -140,6 +140,11 @@ export function openRolePreviewDialog(
 ): MatDialogRef<RolePreviewDialogComponent> {
   return dialog.open(RolePreviewDialogComponent, {
     ...DEFAULT_DIALOG_CONFIG,
+    // Focus the dialog container, not the trailing "Close" button. The preview's
+    // only tabbable control sits at the bottom of a long, scrollable content
+    // area, so the default "first-tabbable" focus would scroll it into view and
+    // open the dialog at the bottom.
+    autoFocus: "dialog",
     data: { role } as RolePreviewDialogData,
   });
 }
