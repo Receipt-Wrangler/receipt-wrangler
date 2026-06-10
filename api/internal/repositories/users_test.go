@@ -3,6 +3,7 @@ package repositories
 import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/utils"
 	"testing"
 )
@@ -150,6 +151,176 @@ func TestCreateUserHonorsExplicitRole(t *testing.T) {
 	}
 	if admin.AppRoleID == nil || legacyAdminId == nil || *admin.AppRoleID != *legacyAdminId {
 		utils.PrintTestError(t, admin.AppRoleID, legacyAdminId)
+	}
+}
+
+func TestCreateUserHonorsExplicitAppRole(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	userRepository := NewUserRepository(nil)
+	roleRepository := NewRoleRepository(nil)
+
+	legacyAdminId, err := roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
+	if err != nil || legacyAdminId == nil {
+		utils.PrintTestError(t, err, "legacy admin id")
+		return
+	}
+
+	// A bootstrap user already occupies the first-user slot, so the count-based
+	// fallback would make the next account a USER. An explicit modern app role id
+	// (the admin-create path) must win and set both the modern role and a derived
+	// legacy enum.
+	if _, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "bootstrap", DisplayName: "b", Password: "a really secure password",
+	}); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	admin, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "modern-admin", DisplayName: "a", Password: "a really secure password",
+		AppRoleID: legacyAdminId,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if admin.AppRoleID == nil || *admin.AppRoleID != *legacyAdminId {
+		utils.PrintTestError(t, admin.AppRoleID, legacyAdminId)
+	}
+	if admin.UserRole != models.ADMIN {
+		utils.PrintTestError(t, admin.UserRole, models.ADMIN)
+	}
+
+	// A custom (non-system) app role resolves to the least-privilege USER enum.
+	custom, err := roleRepository.CreateAppRole("Auditor", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	auditor, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "auditor", DisplayName: "a", Password: "a really secure password",
+		AppRoleID: &custom.ID,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if auditor.AppRoleID == nil || *auditor.AppRoleID != custom.ID {
+		utils.PrintTestError(t, auditor.AppRoleID, custom.ID)
+	}
+	if auditor.UserRole != models.USER {
+		utils.PrintTestError(t, auditor.UserRole, models.USER)
+	}
+}
+
+func TestUpdateUserAssignsAppRoleAndDerivesLegacyEnum(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	userRepository := NewUserRepository(nil)
+	roleRepository := NewRoleRepository(nil)
+
+	created, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "user", DisplayName: "u", Password: "a really secure password",
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	legacyAdminId, err := roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
+	if err != nil || legacyAdminId == nil {
+		utils.PrintTestError(t, err, "legacy admin id")
+		return
+	}
+
+	err = userRepository.UpdateUser(utils.UintToString(created.ID), commands.SignUpCommand{
+		Username: "user", DisplayName: "u", AppRoleID: legacyAdminId,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	var updated models.User
+	if err := GetDB().First(&updated, created.ID).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if updated.AppRoleID == nil || *updated.AppRoleID != *legacyAdminId {
+		utils.PrintTestError(t, updated.AppRoleID, legacyAdminId)
+	}
+	if updated.UserRole != models.ADMIN {
+		utils.PrintTestError(t, updated.UserRole, models.ADMIN)
+	}
+}
+
+func TestUpdateUserPreservesAppRoleWhenIdOmitted(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	userRepository := NewUserRepository(nil)
+
+	// First user → Legacy Admin app role.
+	created, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "admin", DisplayName: "a", Password: "a really secure password",
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	originalRoleId := created.AppRoleID
+	if originalRoleId == nil {
+		utils.PrintTestError(t, originalRoleId, "an app role id")
+		return
+	}
+
+	// An update that omits the app role id (e.g. a display-name-only edit) must
+	// not clear the existing assignment.
+	err = userRepository.UpdateUser(utils.UintToString(created.ID), commands.SignUpCommand{
+		Username: "admin", DisplayName: "renamed", UserRole: models.ADMIN,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	var updated models.User
+	if err := GetDB().First(&updated, created.ID).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if updated.AppRoleID == nil || *updated.AppRoleID != *originalRoleId {
+		utils.PrintTestError(t, updated.AppRoleID, originalRoleId)
+	}
+	if updated.DisplayName != "renamed" {
+		utils.PrintTestError(t, updated.DisplayName, "renamed")
 	}
 }
 

@@ -17,6 +17,10 @@ export interface UpsertGroupMemberCommand {
     groupId: number;
     groupRole: GroupRole;
     /**
+     * Id of the modern group role to assign to the member
+     */
+    groupRoleId?: number;
+    /**
      * User compound primary key
      */
     userId: number;

@@ -104,11 +104,13 @@ describe("GroupFormComponent", () => {
     const result = [
       {
         userId: 2,
+        groupRoleId: null,
         groupId: 1,
         groupRole: GroupRole.Owner,
       },
       {
         userId: 3,
+        groupRoleId: null,
         groupId: 1,
         groupRole: GroupRole.Owner,
       },
@@ -159,6 +161,7 @@ describe("GroupFormComponent", () => {
     const route = TestBed.inject(ActivatedRoute);
     const result = {
       userId: 1,
+      groupRoleId: null,
       groupId: 1,
       groupRole: GroupRole.Viewer,
     };
@@ -254,11 +257,13 @@ describe("GroupFormComponent", () => {
       groupMembers: [
         {
           userId: 2,
+          groupRoleId: 10,
           groupId: 1,
           groupRole: GroupRole.Owner,
         },
         {
           userId: 1,
+          groupRoleId: 11,
           groupId: 1,
           groupRole: GroupRole.Viewer,
         },
@@ -285,6 +290,7 @@ describe("GroupFormComponent", () => {
     component.groupMembers.push(
       new FormGroup({
         userId: new FormControl(3),
+        groupRoleId: new FormControl(12),
         groupId: new FormControl(1),
         groupRole: new FormControl(GroupRole.Editor),
       })
@@ -307,16 +313,19 @@ describe("GroupFormComponent", () => {
         groupMembers: [
           {
             userId: 2,
+            groupRoleId: 10,
             groupId: 1,
             groupRole: GroupRole.Owner,
           },
           {
             userId: 1,
+            groupRoleId: 11,
             groupId: 1,
             groupRole: GroupRole.Viewer,
           },
           {
             userId: 3,
+            groupRoleId: 12,
             groupId: 1,
             groupRole: GroupRole.Editor,
           },

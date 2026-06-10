@@ -104,6 +104,116 @@ func TestCreateGroupLeavesGroupRoleNilWhenUnseeded(t *testing.T) {
 	}
 }
 
+func TestCreateGroupHonorsMemberGroupRoleId(t *testing.T) {
+	defer teardownGroupTest()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	CreateTestUser() // creator, id 1
+
+	db := GetDB()
+	member := models.User{Username: "member", DisplayName: "m", Password: "p"}
+	db.Create(&member)
+
+	var editor models.GroupRoleDefinition
+	if err := db.Select("id").Where("name = ?", LegacyEditorRoleName).First(&editor).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	groupRepository := setupGroupRepository()
+	created, err := groupRepository.CreateGroup(commands.UpsertGroupCommand{
+		Name: "test",
+		GroupMembers: []commands.UpsertGroupMemberCommand{
+			{UserID: member.ID, GroupRoleID: &editor.ID},
+		},
+	}, 1)
+	if err != nil {
+		utils.PrintTestError(t, err, "Expected no error")
+		return
+	}
+
+	// The added member (not the creator/owner) must carry the chosen modern group
+	// role and a legacy enum derived from it.
+	var added *models.GroupMember
+	for i := range created.GroupMembers {
+		if created.GroupMembers[i].UserID == member.ID {
+			added = &created.GroupMembers[i]
+		}
+	}
+	if added == nil {
+		utils.PrintTestError(t, "member not found", "member present")
+		return
+	}
+	if added.GroupRoleID == nil || *added.GroupRoleID != editor.ID {
+		utils.PrintTestError(t, added.GroupRoleID, editor.ID)
+	}
+	if added.GroupRole != models.EDITOR {
+		utils.PrintTestError(t, added.GroupRole, models.EDITOR)
+	}
+}
+
+func TestUpdateGroupHonorsMemberGroupRoleId(t *testing.T) {
+	defer teardownGroupTest()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	CreateTestUser() // creator, id 1
+
+	db := GetDB()
+	member := models.User{Username: "member", DisplayName: "m", Password: "p"}
+	db.Create(&member)
+
+	groupRepository := setupGroupRepository()
+	created, err := groupRepository.CreateGroup(commands.UpsertGroupCommand{Name: "test"}, 1)
+	if err != nil {
+		utils.PrintTestError(t, err, "Expected no error")
+		return
+	}
+
+	var viewer models.GroupRoleDefinition
+	if err := db.Select("id").Where("name = ?", LegacyViewerRoleName).First(&viewer).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	_, err = groupRepository.UpdateGroup(commands.UpsertGroupCommand{
+		Name:   "test",
+		Status: models.GROUP_ACTIVE,
+		GroupMembers: []commands.UpsertGroupMemberCommand{
+			{UserID: member.ID, GroupID: created.ID, GroupRoleID: &viewer.ID},
+		},
+	}, utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "Expected no error")
+		return
+	}
+
+	var stored models.GroupMember
+	if err := db.Where("group_id = ? AND user_id = ?", created.ID, member.ID).First(&stored).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if stored.GroupRoleID == nil || *stored.GroupRoleID != viewer.ID {
+		utils.PrintTestError(t, stored.GroupRoleID, viewer.ID)
+	}
+	if stored.GroupRole != models.VIEWER {
+		utils.PrintTestError(t, stored.GroupRole, models.VIEWER)
+	}
+}
+
 func TestShouldGetGroupById(t *testing.T) {
 	defer teardownGroupTest()
 	CreateTestGroup()

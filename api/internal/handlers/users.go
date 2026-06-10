@@ -100,12 +100,11 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		Request:        r,
 		AppPermissions: []string{permissions.AppUsersUpdate},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			db := repositories.GetDB()
 			id := chi.URLParam(r, "id")
 			bodyData := r.Context().Value("user").(commands.SignUpCommand)
 
-			//TODO: Move to repo
-			err := db.Table("users").Select("username", "display_name", "user_role").Where("id = ?", id).Updates(&bodyData).Error
+			userRepository := repositories.NewUserRepository(nil)
+			err := userRepository.UpdateUser(id, bodyData)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

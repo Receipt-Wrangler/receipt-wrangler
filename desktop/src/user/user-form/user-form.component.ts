@@ -1,13 +1,13 @@
-import { Component, Input, OnInit } from "@angular/core";
+import { Component, DestroyRef, Input, OnInit, computed, effect, inject, signal } from "@angular/core";
+import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
-import { MatDialogRef } from "@angular/material/dialog";
+import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { catchError, defer, iif, of, startWith, switchMap, take, tap, } from "rxjs";
-import { USER_ROLE_OPTIONS } from "src/group/role-options";
-import { FormOption } from "src/interfaces/form-option.interface";
 import { UserValidators } from "src/validators/user-validators";
-import { User, UserService } from "../../open-api";
+import { PermissionScope, Role, RoleService, User, UserService } from "../../open-api";
+import { openRolePreviewDialog } from "../../roles/role-preview/role-preview-dialog.component";
 import { SnackbarService, TokenRefreshService } from "../../services";
 import { AddUser, AuthState, UpdateUser } from "../../store";
 
@@ -32,18 +32,61 @@ export class UserFormComponent implements OnInit {
     private tokenRefreshService: TokenRefreshService,
     private userService: UserService,
     private userValidators: UserValidators,
+    private matDialog: MatDialog,
+    private destroyRef: DestroyRef,
     public matDialogRef: MatDialogRef<UserFormComponent>
-  ) {}
+  ) {
+    // Pre-select the configured default app role on the add form once the roles
+    // resolve. Syncing a derived value into the reactive form is an imperative
+    // side effect, so an effect() is the sanctioned tool here.
+    effect(() => {
+      const roles = this.roles();
+      if (!this.user && this.form.get("appRoleId")?.value == null) {
+        const defaultRole = roles.find(
+          (role) => role.scope === PermissionScope.App && role.isDefault
+        );
+        if (defaultRole) {
+          this.form.get("appRoleId")?.setValue(defaultRole.id);
+        }
+      }
+    });
+  }
 
   public form: FormGroup = new FormGroup({});
 
-  public userRoleOptions: FormOption[] = USER_ROLE_OPTIONS;
+  // The full app-role list, the selector options and the currently-selected role
+  // (for the preview button) are derived reactively so they update once the roles
+  // load asynchronously. Degrade gracefully if the roles can't be read: the
+  // selector is simply empty rather than erroring.
+  private readonly roles = toSignal(
+    inject(RoleService)
+      .getRoles()
+      .pipe(catchError(() => of([] as Role[]))),
+    { initialValue: [] as Role[] }
+  );
+  public readonly appRoleOptions = computed<Role[]>(() =>
+    this.roles().filter((role) => role.scope === PermissionScope.App)
+  );
+  private readonly selectedAppRoleId = signal<number | null>(null);
+  public readonly selectedRole = computed<Role | null>(
+    () => this.roles().find((role) => role.id === this.selectedAppRoleId()) ?? null
+  );
 
   public ngOnInit(): void {
     this.initForm();
+    this.listenToAppRoleChanges();
     if (!this.user) {
       this.listenToIsDummyChanges();
     }
+  }
+
+  private listenToAppRoleChanges(): void {
+    const control = this.form.get("appRoleId");
+    control?.valueChanges
+      .pipe(startWith(control.value), takeUntilDestroyed(this.destroyRef))
+      .subscribe((id) =>
+        this.selectedAppRoleId.set(id == null ? null : Number(id))
+      );
   }
 
   private listenToIsDummyChanges(): void {
@@ -75,7 +118,7 @@ export class UserFormComponent implements OnInit {
         Validators.required,
         this.userValidators.uniqueUsername(0, this.user?.username ?? ""),
       ],
-      userRole: [this.user?.userRole ?? "", Validators.required],
+      appRoleId: [this.user?.appRoleId ?? null, Validators.required],
       isDummyUser: [false],
     });
 
@@ -86,6 +129,13 @@ export class UserFormComponent implements OnInit {
       );
     } else {
       this.form.get("isDummyUser")?.disable();
+    }
+  }
+
+  public previewRole(): void {
+    const role = this.selectedRole();
+    if (role) {
+      openRolePreviewDialog(this.matDialog, role);
     }
   }
 

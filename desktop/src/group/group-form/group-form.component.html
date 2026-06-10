@@ -48,6 +48,7 @@
 <ng-template #buttonTemplate>
   <app-button
     *ngIf="!(formConfig.mode | inputReadonly)"
+    data-testid="add-group-member"
     matButtonType="iconButton"
     icon="add"
     color="accent"

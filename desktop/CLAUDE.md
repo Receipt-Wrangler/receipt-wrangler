@@ -131,6 +131,22 @@ global `UserRole.Admin` check in `RoleGuard` (`src/guards/role.guard.ts`).
   reloads (setting one default clears the previous one). The default role per scope is what new
   accounts / group creators receive (see `api/CLAUDE.md` → "Default roles"); the current default
   cannot be deleted. Default rows also carry a "Default" badge next to the System badge.
+- **Modern role assignment in authoring forms:** the user add/edit form (`src/user/user-form/`) and
+  the group-member add/edit form (`src/group/group-member-form/`) assign **modern roles** — an
+  `app-select` of `RoleService.getRoles()` filtered to the `APP` / `GROUP` scope, bound to
+  `appRoleId` / `groupRoleId` (not the legacy enums). Add forms pre-select the configured default
+  role. Each selector has a Preview icon button (`data-testid="role-preview"`) that opens the shared
+  **`RolePreviewDialogComponent`** (`src/roles/role-preview/`, standalone, opened via
+  `openRolePreviewDialog(dialog, role)`) — a read-only dialog rendering the role's scope, description
+  and permissions (grouped by resource using the `role-presets.ts` helpers). The `getRoles()` calls
+  use `catchError` so a non-admin who lacks `app.roles.read` (handled in the gating PR) gets an empty
+  selector rather than an error.
+- **Group-member legacy bridge:** `group-form` (loaded by every group view, including non-admins)
+  deliberately does **not** call `getRoles()` — to avoid 403-driven logout for non-admins. Instead
+  the group-member dialog keeps the legacy `groupRole` in sync on submit
+  (`legacyGroupRoleFromRole` in `group-member.utils.ts`, mirroring the backend's name→enum mapping),
+  so `group-form`'s "keep an owner" check and its `groupRole | status` member-table column keep
+  working without reading roles. Remove this bridge when the legacy enum is retired.
 - **Permission-based UI gating is not implemented yet.** There is no `*hasPermission` directive or
   `permissionService.has(...)` helper; UI access is still gated by the global admin `RoleGuard` and
   the legacy `UserRole`. When permission-driven gating is added, document the directive/guard here.

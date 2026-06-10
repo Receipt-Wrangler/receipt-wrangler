@@ -1,12 +1,12 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule, Validators } from "@angular/forms";
-import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
+import { MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
-import { of } from "rxjs";
-import { ApiModule, User, UserRole, UserService } from "../../open-api";
+import { of, throwError } from "rxjs";
+import { ApiModule, PermissionScope, Role, RoleService, User, UserRole, UserService } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService, TokenRefreshService } from "../../services";
 import { AddUser, AuthState, UpdateUser, UserState } from "../../store";
@@ -14,11 +14,34 @@ import { UserFormComponent } from "./user-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
 describe("UserFormComponent", () => {
+  const defaultAppRole: Role = {
+    id: 7,
+    name: "Legacy User",
+    description: "Standard user",
+    scope: PermissionScope.App,
+    isDefault: true,
+    isSystem: true,
+    permissions: [],
+  };
+
+  // A group role is included to confirm the selector filters to app roles only.
+  const groupRole: Role = {
+    id: 8,
+    name: "Legacy Owner",
+    description: "Group owner",
+    scope: PermissionScope.Group,
+    isDefault: true,
+    isSystem: true,
+    permissions: [],
+  };
+
   let component: UserFormComponent;
   let fixture: ComponentFixture<UserFormComponent>;
   let store: Store;
+  let getRolesMock: jest.Mock;
 
   beforeEach(async () => {
+    getRolesMock = jest.fn().mockReturnValue(of([] as Role[]));
     await TestBed.configureTestingModule({
     declarations: [UserFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -29,12 +52,14 @@ describe("UserFormComponent", () => {
         MatSnackBarModule,
         ApiModule],
     providers: [
+        provideZonelessChangeDetection(),
         {
             provide: MatDialogRef,
             useValue: {
                 close: () => { },
             },
         },
+        { provide: RoleService, useValue: { getRoles: getRolesMock } },
         SnackbarService,
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),
@@ -44,8 +69,18 @@ describe("UserFormComponent", () => {
     store = TestBed.inject(Store);
     fixture = TestBed.createComponent(UserFormComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await fixture.whenStable();
   });
+
+  // Creates and initialises a fresh component after the role mock is configured;
+  // the roles toSignal subscribes at construction, so the mock must be set first.
+  async function createWithRoles(roles$: any): Promise<UserFormComponent> {
+    getRolesMock.mockReturnValue(roles$);
+    const freshFixture = TestBed.createComponent(UserFormComponent);
+    const freshComponent = freshFixture.componentInstance;
+    await freshFixture.whenStable();
+    return freshComponent;
+  }
 
   it("should create", () => {
     expect(component).toBeTruthy();
@@ -57,7 +92,7 @@ describe("UserFormComponent", () => {
     expect(component.form.value).toEqual({
       displayName: "",
       username: "",
-      userRole: "",
+      appRoleId: null,
       password: "",
       isDummyUser: false,
     });
@@ -70,6 +105,7 @@ describe("UserFormComponent", () => {
       username: "Waffle guy",
       isDummyUser: false,
       userRole: UserRole.Admin,
+      appRoleId: 5,
     } as User;
 
     component.user = user;
@@ -78,7 +114,7 @@ describe("UserFormComponent", () => {
     expect(component.form.value).toEqual({
       displayName: "Pizza man",
       username: "Waffle guy",
-      userRole: UserRole.Admin,
+      appRoleId: 5,
     });
     expect(component.form.get("isDummyUser")?.value).toEqual(false);
   });
@@ -114,6 +150,7 @@ describe("UserFormComponent", () => {
       username: "Waffle guy",
       isDummyUser: false,
       userRole: UserRole.Admin,
+      appRoleId: 5,
     } as User;
 
     component.user = user;
@@ -126,7 +163,7 @@ describe("UserFormComponent", () => {
       {
         displayName: "Pizza man",
         username: "Waffle guy",
-        userRole: UserRole.Admin,
+        appRoleId: 5,
       } as User,
     );
 
@@ -173,6 +210,7 @@ describe("UserFormComponent", () => {
       username: "Waffle guy",
       isDummyUser: false,
       userRole: UserRole.Admin,
+      appRoleId: 5,
     } as User;
 
     component.user = user;
@@ -185,7 +223,7 @@ describe("UserFormComponent", () => {
       {
         displayName: "Pizza man",
         username: "Waffle guy",
-        userRole: UserRole.Admin,
+        appRoleId: 5,
       } as User,
     );
 
@@ -213,6 +251,7 @@ describe("UserFormComponent", () => {
       username: "Waffle guy",
       isDummyUser: false,
       userRole: UserRole.Admin,
+      appRoleId: 5,
     } as User;
 
     const userServiceSpy = jest.spyOn(TestBed.inject(UserService), "createUser");
@@ -229,7 +268,7 @@ describe("UserFormComponent", () => {
       username: "Waffle guy",
       isDummyUser: false,
       password: "Dough boy",
-      userRole: UserRole.Admin,
+      appRoleId: 5,
     });
 
     component.submit();
@@ -238,7 +277,7 @@ describe("UserFormComponent", () => {
       displayName: "Pizza man",
       username: "Waffle guy",
       isDummyUser: false,
-      userRole: UserRole.Admin,
+      appRoleId: 5,
       password: "Dough boy",
     } as any);
 
@@ -285,5 +324,36 @@ describe("UserFormComponent", () => {
     const isDummyUserField = component.form.get("isDummyUser");
 
     expect(isDummyUserField?.disabled).toEqual(true);
+  });
+
+  it("defaults to the configured default app role on add", async () => {
+    const freshComponent = await createWithRoles(of([groupRole, defaultAppRole]));
+
+    expect(freshComponent.appRoleOptions().map((role) => role.id)).toEqual([7]);
+    expect(freshComponent.form.get("appRoleId")?.value).toBe(7);
+    expect(freshComponent.selectedRole()).toEqual(defaultAppRole);
+  });
+
+  it("leaves the selector empty when roles fail to load", async () => {
+    const freshComponent = await createWithRoles(
+      throwError(() => new Error("forbidden"))
+    );
+
+    expect(freshComponent).toBeTruthy();
+    expect(freshComponent.appRoleOptions()).toEqual([]);
+    expect(freshComponent.form.get("appRoleId")?.value).toBeNull();
+  });
+
+  it("opens the preview dialog for the selected role", async () => {
+    const freshComponent = await createWithRoles(of([defaultAppRole]));
+
+    const openSpy = jest
+      .spyOn(TestBed.inject(MatDialog), "open")
+      .mockReturnValue({ afterClosed: () => of(undefined) } as any);
+
+    freshComponent.previewRole();
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(openSpy.mock.calls[0][1]?.data?.role).toEqual(defaultAppRole);
   });
 });

@@ -8,4 +8,5 @@ type SignUpCommand struct {
 	DisplayName string          `json:"displayName"`
 	IsDummyUser bool            `json:"isDummyUser"`
 	UserRole    models.UserRole `json:"userRole"`
+	AppRoleID   *uint           `json:"appRoleId"`
 }

@@ -71,6 +71,7 @@
     </app-button>
     <app-delete-button
       *ngIf="userId() !== element.id.toString()"
+      data-testid="user-delete"
       (clicked)="deleteUser(index)"
     ></app-delete-button>
   </div>

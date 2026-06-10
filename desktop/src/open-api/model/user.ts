@@ -42,6 +42,10 @@ export interface User {
      * User\'s role
      */
     userRole: UserRole;
+    /**
+     * Id of the modern app role assigned to the user
+     */
+    appRoleId?: number;
     lastLoginDate?: string;
 }
 export namespace User {
