@@ -6,7 +6,7 @@ import {MatTableDataSource} from "@angular/material/table";
 import {ActivatedRoute, Router} from "@angular/router";
 import {UntilDestroy, untilDestroyed} from "@ngneat/until-destroy";
 import {Store} from "@ngxs/store";
-import {startWith, take, tap} from "rxjs";
+import {map, startWith, switchMap, take, tap} from "rxjs";
 import {DEFAULT_HOST_CLASS} from "src/constants";
 import {GROUP_STATUS_OPTIONS} from "src/constants/receipt-status-options";
 import {FormMode} from "src/enums/form-mode.enum";
@@ -15,7 +15,7 @@ import {TableColumn} from "src/table/table-column.interface";
 import {TableComponent} from "src/table/table/table.component";
 import {SortByDisplayName} from "src/utils/sort-by-displayname";
 import {Group, GroupMember, GroupRole, GroupsService, GroupStatus, Permission} from "../../open-api";
-import {SnackbarService} from "../../services";
+import {AppInitService, SnackbarService} from "../../services";
 import {AddGroup, AuthState, UpdateGroup} from "../../store";
 import {GroupMemberFormComponent} from "../group-member-form/group-member-form.component";
 import {buildGroupMemberForm} from "../utils/group-member.utils";
@@ -73,7 +73,8 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
     private store: Store,
     private activatedRoute: ActivatedRoute,
     private matDialog: MatDialog,
-    private sortByDisplayName: SortByDisplayName
+    private sortByDisplayName: SortByDisplayName,
+    private appInitService: AppInitService
   ) {
   }
 
@@ -261,8 +262,13 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
         tap(() => {
           this.snackbarService.success("Group successfully created");
         }),
-        tap((group: Group) => {
+        switchMap((group: Group) => {
           this.store.dispatch(new AddGroup(group));
+          // Reload app data so the group creator's permissions for the new
+          // group load before navigating into the permission-gated group route.
+          return this.appInitService.getAppData().pipe(map(() => group));
+        }),
+        tap((group: Group) => {
           this.navigateToGroupDetails(group.id);
         })
       )
@@ -277,6 +283,13 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
         tap((group: Group) => {
           this.snackbarService.success("Group successfully updated");
           this.store.dispatch(new UpdateGroup(group));
+        }),
+        switchMap((group: Group) =>
+          // Reload app data so any membership/role changes affecting the current
+          // user are reflected in permissions before navigating into the group.
+          this.appInitService.getAppData().pipe(map(() => group))
+        ),
+        tap((group: Group) => {
           this.navigateToGroupDetails(group.id);
         })
       )

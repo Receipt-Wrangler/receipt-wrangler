@@ -19,6 +19,7 @@ import { ButtonModule } from "../../button";
 import { InputModule } from "../../input";
 import { ApiModule, Group, GroupRole, GroupsService, GroupStatus } from "../../open-api";
 import { AddGroup, UpdateGroup } from "../../store";
+import { AppInitService } from "../../services";
 import { GroupMemberFormComponent } from "../group-member-form/group-member-form.component";
 import { buildGroupMemberForm } from "../utils/group-member.utils";
 import { GroupFormComponent } from "./group-form.component";
@@ -196,6 +197,7 @@ describe("GroupFormComponent", () => {
     const createSpy = jest.spyOn(TestBed.inject(GroupsService), "createGroup");
     const storeSpy = jest.spyOn(TestBed.inject(Store), "dispatch");
     const routerSpy = jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    jest.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
 
     const group: Group = {
       id: 1,
@@ -248,6 +250,7 @@ describe("GroupFormComponent", () => {
     const updateSpy = jest.spyOn(TestBed.inject(GroupsService), "updateGroup");
     const storeSpy = jest.spyOn(TestBed.inject(Store), "dispatch");
     const routerSpy = jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    jest.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
 
     const group: Group = {
       id: 1,
