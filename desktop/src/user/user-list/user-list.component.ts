@@ -9,7 +9,7 @@ import { DEFAULT_DIALOG_CONFIG } from "src/constants/dialog.constant";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
-import { BulkUserDeleteCommand, User, UserService } from "../../open-api";
+import { BulkUserDeleteCommand, Permission, User, UserService } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, RemoveUser, RemoveUsers, UserState } from "../../store";
 import { DummyUserConversionDialogComponent } from "../dummy-user-conversion-dialog/dummy-user-conversion-dialog.component";
@@ -25,6 +25,8 @@ import { UserFormComponent } from "../user-form/user-form.component";
     standalone: false
 })
 export class UserListComponent implements AfterViewInit {
+  protected readonly Permission = Permission;
+
   userId = this.store.selectSignal(AuthState.userId);
 
   public readonly usernameCell = viewChild.required<TemplateRef<any>>("usernameCell");

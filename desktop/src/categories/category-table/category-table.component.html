@@ -1,5 +1,10 @@
 <app-table-header [headerText]="headerText">
-  <app-add-button tooltip="Add category" (clicked)="openAddDialog()">
+  <app-add-button
+    *hasAppPermission="Permission.AppCategoriesCreate"
+    data-testid="category-add"
+    tooltip="Add category"
+    (clicked)="openAddDialog()"
+  >
   </app-add-button>
 </app-table-header>
 <div class="table-container">
@@ -28,12 +33,14 @@
 
 <ng-template #actionsCell let-element="element" let-index="index">
   <app-edit-button
-    *appRole="'ADMIN'"
+    *hasAppPermission="Permission.AppCategoriesUpdate"
+    data-testid="category-edit"
     color="accent"
     (clicked)="openEditDialog(element)"
   ></app-edit-button>
   <app-delete-button
-    *appRole="'ADMIN'"
+    *hasAppPermission="Permission.AppCategoriesDelete"
+    data-testid="category-delete"
     (clicked)="openDeleteConfirmationDialog(element)"
   ></app-delete-button>
 </ng-template>

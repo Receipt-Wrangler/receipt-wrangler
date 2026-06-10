@@ -1,10 +1,11 @@
 import { Injectable } from "@angular/core";
 import { Action, createSelector, Selector, State, StateContext } from "@ngxs/store";
 
+import { hasAll, hasAny } from "../utils/permission.utils";
 import { Icon, UserPreferences } from "../open-api";
 import { User } from "../open-api/model/user";
 import { AuthStateInterface } from "./auth-state.interface";
-import { Logout, SetAuthState, SetIcons, SetUserPreferences } from "./auth.state.actions";
+import { Logout, SetAuthState, SetIcons, SetPermissions, SetUserPreferences } from "./auth.state.actions";
 
 @State<AuthStateInterface>({
   name: "auth",
@@ -65,6 +66,46 @@ export class AuthState {
     });
   }
 
+  @Selector()
+  static appPermissions(state: AuthStateInterface): string[] {
+    return state.appPermissions ?? [];
+  }
+
+  @Selector()
+  static groupPermissions(state: AuthStateInterface): {
+    [groupId: number]: string[];
+  } {
+    return state.groupPermissions ?? {};
+  }
+
+  static hasAppPermission(permission: string) {
+    return createSelector([AuthState], (state: AuthStateInterface) => {
+      return hasAll(state.appPermissions ?? [], permission);
+    });
+  }
+
+  static hasAnyAppPermission(permissions: string[]) {
+    return createSelector([AuthState], (state: AuthStateInterface) => {
+      return hasAny(state.appPermissions ?? [], ...permissions);
+    });
+  }
+
+  static hasGroupPermission(
+    groupId: number,
+    permission: string,
+    orAppPermissions: string[] = []
+  ) {
+    return createSelector([AuthState], (state: AuthStateInterface) => {
+      if (
+        orAppPermissions.length > 0 &&
+        hasAny(state.appPermissions ?? [], ...orAppPermissions)
+      ) {
+        return true;
+      }
+      return hasAll(state.groupPermissions?.[groupId] ?? [], permission);
+    });
+  }
+
   @Action(SetAuthState)
   setAuthState(
     { getState, patchState }: StateContext<AuthStateInterface>,
@@ -82,6 +123,17 @@ export class AuthState {
     });
   }
 
+  @Action(SetPermissions)
+  setPermissions(
+    { patchState }: StateContext<AuthStateInterface>,
+    { appPermissions, groupPermissions }: SetPermissions
+  ) {
+    patchState({
+      appPermissions,
+      groupPermissions,
+    });
+  }
+
   @Action(Logout)
   logout({ getState, patchState }: StateContext<AuthStateInterface>) {
     patchState({
@@ -92,6 +144,8 @@ export class AuthState {
       username: "",
       userRole: undefined,
       userPreferences: undefined,
+      appPermissions: undefined,
+      groupPermissions: undefined,
     });
   }
 

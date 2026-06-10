@@ -1,8 +1,9 @@
 import { NgModule } from "@angular/core";
 import { RouterModule, Routes } from "@angular/router";
+import { appPermissionGuard } from "src/guards/app-permission.guard";
 import { AuthGuard } from "src/guards/auth.guard";
 import { SidebarComponent } from "src/layout/sidebar/sidebar.component";
-import { UserRole } from "../open-api";
+import { Permission } from "../open-api";
 
 // set up dashboard
 const routes: Routes = [
@@ -68,27 +69,33 @@ const routes: Routes = [
         path: "system-settings",
         loadChildren: () =>
           import("../system-settings/system-settings.module").then((m) => m.SystemSettingsModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
         data: {
-          role: UserRole.Admin,
+          appPermissions: [
+            Permission.AppSystemSettingsRead,
+            Permission.AppPromptsRead,
+            Permission.AppReceiptProcessingSettingsRead,
+            Permission.AppSystemEmailsRead,
+            Permission.AppSystemTasksRead,
+          ],
         },
       },
       {
         path: "users",
         loadChildren: () =>
           import("../user/user.module").then((m) => m.UserModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
         data: {
-          role: UserRole.Admin,
+          appPermissions: [Permission.AppUsersRead],
         },
       },
       {
         path: "roles",
         loadChildren: () =>
           import("../roles/roles.module").then((m) => m.RolesModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
         data: {
-          role: UserRole.Admin,
+          appPermissions: [Permission.AppRolesRead],
         },
       },
       {

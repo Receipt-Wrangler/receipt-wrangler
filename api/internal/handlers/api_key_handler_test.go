@@ -396,8 +396,11 @@ func TestGetPagedApiKeys_AdminViewAll(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-	r = createJWTContext(r, 1, models.ADMIN)
+	// JWT carries a plain USER role; authorization comes from the modern role
+	// resolved from the database, not the JWT.
+	r = createJWTContext(r, 1, models.USER)
 
+	// Seed the Legacy Admin role, which grants app.api-keys.read-any.
 	grantAllAppPerms(t, 1)
 
 	GetPagedApiKeys(w, r)
@@ -440,12 +443,14 @@ func TestGetPagedApiKeys_UserCannotViewAll(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	r = createJWTContext(r, 1, models.USER)
 
-	grantAllAppPerms(t, 1)
+	// Legacy User holds app.api-keys.read (passes the handler's generic gate) but
+	// NOT app.api-keys.read-any, so requesting ALL must be forbidden.
+	grantAppPerms(t, 1, permissions.LegacyAppUserKeys()...)
 
 	GetPagedApiKeys(w, r)
 
-	if w.Result().StatusCode != http.StatusBadRequest {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusBadRequest)
+	if w.Result().StatusCode != http.StatusForbidden {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
 	}
 }
 

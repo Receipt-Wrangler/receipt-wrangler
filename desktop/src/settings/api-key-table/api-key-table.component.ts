@@ -5,7 +5,7 @@ import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { TableComponent } from "src/table/table/table.component";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS } from "../../constants";
-import { ApiKeyService, ApiKeyView, AssociatedApiKeys, UserRole } from "../../open-api";
+import { ApiKeyService, ApiKeyView, AssociatedApiKeys, Permission } from "../../open-api";
 import { BaseTableService } from "../../services/base-table.service";
 import { SnackbarService } from "../../services/snackbar.service";
 import { BaseTableComponent } from "../../shared-ui/base-table/base-table.component";
@@ -47,7 +47,9 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
 
   private readonly table = viewChild.required(TableComponent);
 
-  public isAdmin = false;
+  protected readonly Permission = Permission;
+
+  public canViewAll = false;
 
   public tableHeaderText = signal("My API Keys");
 
@@ -64,7 +66,7 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
   }
 
   public ngOnInit(): void {
-    this.isAdmin = this.store.selectSnapshot(AuthState.hasRole(UserRole.Admin));
+    this.canViewAll = this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppApiKeysReadAny));
     this.currentUserId = this.store.selectSnapshot(AuthState.userId);
     this.listenForFilterChanges();
   }
@@ -145,6 +147,20 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
 
   public isOwner(apiKey: ApiKeyView): boolean {
     return apiKey.userId?.toString() === this.currentUserId;
+  }
+
+  public canEdit(apiKey: ApiKeyView): boolean {
+    return this.isOwner(apiKey) &&
+      this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppApiKeysUpdate));
+  }
+
+  public canDelete(apiKey: ApiKeyView): boolean {
+    if (this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppApiKeysDeleteAny))) {
+      return true;
+    }
+
+    return this.isOwner(apiKey) &&
+      this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppApiKeysDelete));
   }
 
   public openFilterDialog(): void {

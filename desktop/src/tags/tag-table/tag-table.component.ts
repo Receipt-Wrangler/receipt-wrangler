@@ -10,7 +10,7 @@ import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/c
 import { TagTableState } from "src/store/tag-table.state";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
-import { PagedDataDataInner, PagedRequestCommand, TagService, TagView } from "../../open-api";
+import { PagedDataDataInner, PagedRequestCommand, Permission, TagService, TagView } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { SetOrderBy, SetPage, SetPageSize, SetSortDirection } from "../../store/tag-table.state.actions";
 import { TagFormComponent } from "../tag-form/tag-form.component";
@@ -33,6 +33,8 @@ export class TagTableComponent implements OnInit, AfterViewInit {
   public readonly table = viewChild.required(TableComponent);
 
   public tagTableState = this.store.selectSignal(TagTableState.state);
+
+  protected readonly Permission = Permission;
 
   constructor(
     private matDialog: MatDialog,

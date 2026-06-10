@@ -224,6 +224,21 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 		return appData, err
 	}
 
+	permissionService := NewPermissionService(nil)
+	appPermissions, err := permissionService.GetAppPermissionsForUser(userId)
+	if err != nil {
+		return appData, err
+	}
+
+	groupPermissions := make(map[uint][]string, len(groups))
+	for _, group := range groups {
+		perms, err := permissionService.GetGroupPermissionsForUser(userId, group.ID)
+		if err != nil {
+			return appData, err
+		}
+		groupPermissions[group.ID] = perms
+	}
+
 	appData.About = about
 	appData.Groups = groups
 	appData.Users = users
@@ -237,6 +252,8 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 	appData.CurrencySymbolPosition = systemSettings.CurrencySymbolPosition
 	appData.CurrencyHideDecimalPlaces = systemSettings.CurrencyHideDecimalPlaces
 	appData.Icons = structs.Icons
+	appData.AppPermissions = appPermissions
+	appData.GroupPermissions = groupPermissions
 
 	if r != nil {
 		claims := structs.GetClaims(r)

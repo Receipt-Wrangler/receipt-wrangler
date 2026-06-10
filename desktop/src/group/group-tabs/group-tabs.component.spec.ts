@@ -2,7 +2,8 @@ import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { NgxsModule, Store } from "@ngxs/store";
-import { FeatureConfigState } from "../../store";
+import { Permission } from "../../open-api";
+import { AuthState, FeatureConfigState } from "../../store";
 import { GroupTabsComponent } from "./group-tabs.component";
 
 describe("GroupTabsComponent", () => {
@@ -12,7 +13,7 @@ describe("GroupTabsComponent", () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       declarations: [GroupTabsComponent],
-      imports: [ReactiveFormsModule, NgxsModule.forRoot([FeatureConfigState])],
+      imports: [ReactiveFormsModule, NgxsModule.forRoot([FeatureConfigState, AuthState])],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });
     fixture = TestBed.createComponent(GroupTabsComponent);
@@ -48,6 +49,9 @@ describe("GroupTabsComponent", () => {
       featureConfig: {
         aiPoweredReceipts: true,
       },
+      auth: {
+        appPermissions: [Permission.AppGroupsUpdateSettings],
+      },
     });
     component.ngOnInit();
 
@@ -66,6 +70,33 @@ describe("GroupTabsComponent", () => {
         label: "Group AI Settings",
         routerLink: "settings/view",
         name: "settings",
+      },
+    ]);
+  });
+
+  it("does not init the group settings tab without the update-settings permission", () => {
+    const store = TestBed.inject(Store);
+    store.reset({
+      ...store.snapshot(),
+      featureConfig: {
+        aiPoweredReceipts: true,
+      },
+      auth: {
+        appPermissions: [],
+      },
+    });
+    component.ngOnInit();
+
+    expect(component.tabs).toEqual([
+      {
+        label: "Group Details",
+        routerLink: "details/view",
+        name: "details"
+      },
+      {
+        label: "Group Receipt Settings",
+        routerLink: "receipt-settings/view",
+        name: "receipt-settings",
       },
     ]);
   });

@@ -9,6 +9,7 @@ import { SelectModule } from "src/select/select.module";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
 import { TableModule } from "src/table/table.module";
 import { ButtonModule } from "../button";
+import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { DummyUserConversionDialogComponent } from "./dummy-user-conversion-dialog/dummy-user-conversion-dialog.component";
 import { ResetPasswordComponent } from "./reset-password/reset-password.component";
@@ -27,6 +28,7 @@ import { UserRoutingModule } from "./user-routing.module";
     ButtonModule,
     CheckboxModule,
     CommonModule,
+    DirectivesModule,
     InputModule,
     MatDialogModule,
     MatTableModule,

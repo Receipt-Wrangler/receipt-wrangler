@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"receipt-wrangler/api/internal/commands"
@@ -81,6 +82,20 @@ func GetPagedApiKeys(w http.ResponseWriter, r *http.Request) {
 			}
 
 			token := structs.GetClaims(r)
+
+			// Viewing every user's API keys requires a dedicated permission,
+			// resolved from the database (never trusted from the JWT).
+			if command.ApiKeyFilter.AssociatedApiKeys == commands.ASSOCIATED_API_KEYS_ALL {
+				permissionService := services.NewPermissionService(nil)
+				canReadAny, err := permissionService.HasAppPermissions(token.UserId, permissions.AppApiKeysReadAny)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				if !canReadAny {
+					return http.StatusForbidden, errors.New("user is unauthorized to view all API keys")
+				}
+			}
+
 			userIdString := utils.UintToString(token.UserId)
 			apiKeyService := services.NewApiKeyService(nil)
 

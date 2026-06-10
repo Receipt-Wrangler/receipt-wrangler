@@ -2,13 +2,13 @@ import { inject } from "@angular/core";
 import { ResolveFn } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { map, take } from "rxjs";
-import { PagedRequestCommand, SystemEmail, SystemEmailService, UserRole } from "../../open-api";
+import { PagedRequestCommand, Permission, SystemEmail, SystemEmailService } from "../../open-api";
 import { AuthState } from "../../store";
 
 export const systemEmailsResolver: ResolveFn<SystemEmail[]> = (route, state) => {
   const store = inject(Store);
-  const isAdmin = store.selectSnapshot(AuthState.hasRole(UserRole.Admin));
-  if (isAdmin) {
+  const canRead = store.selectSnapshot(AuthState.hasAppPermission(Permission.AppSystemEmailsRead));
+  if (canRead) {
     const systemEmailService = inject(SystemEmailService);
     const command: PagedRequestCommand = {
       page: 1,

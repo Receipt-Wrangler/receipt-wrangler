@@ -1,10 +1,10 @@
 import { NgModule } from "@angular/core";
 import { RouterModule, Routes } from "@angular/router";
 import { FormMode } from "src/enums/form-mode.enum";
-import { GroupRoleGuard } from "src/guards/group-role.guard";
+import { appPermissionGuard } from "src/guards/app-permission.guard";
+import { groupPermissionGuard } from "src/guards/group-permission.guard";
 import { FormConfig } from "src/interfaces/form-config.interface";
-import { RoleGuard } from "../guards/role.guard";
-import { GroupRole, UserRole } from "../open-api";
+import { Permission } from "../open-api";
 import { promptsResolver } from "../prompt/prompts.resolver";
 import { GroupDetailsComponent } from "./group-details/group-details.component";
 import { GroupFormComponent } from "./group-form/group-form.component";
@@ -41,9 +41,11 @@ const routes: Routes = [
         mode: FormMode.view,
         headerText: "View Group",
       } as FormConfig,
-      groupRole: GroupRole.Viewer,
+      groupPermission: Permission.GroupView,
+      orAppPermissions: [Permission.AppGroupsRead],
+      useRouteGroupId: true,
     },
-    canActivate: [GroupRoleGuard],
+    canActivate: [groupPermissionGuard],
     children: [
       {
         path: "details/view",
@@ -56,13 +58,13 @@ const routes: Routes = [
             mode: FormMode.view,
             headerText: "View Group",
           } as FormConfig,
-          groupRole: GroupRole.Viewer,
           entityType: "Details",
           setHeaderText: true,
-          allowAdminOverride: true,
+          groupPermission: Permission.GroupView,
+          orAppPermissions: [Permission.AppGroupsRead],
           useRouteGroupId: true,
         },
-        canActivate: [GroupRoleGuard],
+        canActivate: [groupPermissionGuard],
       },
       {
         path: "details/edit",
@@ -76,10 +78,10 @@ const routes: Routes = [
           } as FormConfig,
           entityType: "Details",
           setHeaderText: true,
-          groupRole: GroupRole.Owner,
+          groupPermission: Permission.GroupUpdate,
           useRouteGroupId: true,
         },
-        canActivate: [GroupRoleGuard],
+        canActivate: [groupPermissionGuard],
       },
       {
         path: "receipt-settings/view",
@@ -92,13 +94,13 @@ const routes: Routes = [
             mode: FormMode.view,
             headerText: "View Group Receipt Settings",
           } as FormConfig,
-          groupRole: GroupRole.Viewer,
+          groupPermission: Permission.GroupView,
+          orAppPermissions: [Permission.AppGroupsRead],
           entityType: "Receipt Settings",
           setHeaderText: true,
           useRouteGroupId: true,
-          allowAdminOverride: true,
         },
-        canActivate: [GroupRoleGuard],
+        canActivate: [groupPermissionGuard],
       },
       {
         path: "receipt-settings/edit",
@@ -111,12 +113,12 @@ const routes: Routes = [
             mode: FormMode.edit,
             headerText: "Edit Group Receipt Settings",
           } as FormConfig,
-          groupRole: GroupRole.Owner,
+          groupPermission: Permission.GroupUpdate,
           entityType: "Receipt Settings",
           setHeaderText: true,
           useRouteGroupId: true,
         },
-        canActivate: [GroupRoleGuard],
+        canActivate: [groupPermissionGuard],
       },
       {
         path: "settings/view",
@@ -132,10 +134,9 @@ const routes: Routes = [
           } as FormConfig,
           setHeaderText: true,
           entityType: "Settings",
-          groupRole: GroupRole.Viewer,
-          allowAdminOverride: true,
+          appPermissions: [Permission.AppGroupsUpdateSettings],
         },
-        canActivate: [GroupRoleGuard],
+        canActivate: [appPermissionGuard],
       },
       {
         path: "settings/edit",
@@ -151,9 +152,9 @@ const routes: Routes = [
           } as FormConfig,
           setHeaderText: true,
           entityType: "Settings",
-          role: UserRole.Admin
+          appPermissions: [Permission.AppGroupsUpdateSettings],
         },
-        canActivate: [RoleGuard],
+        canActivate: [appPermissionGuard],
       },
     ],
   },

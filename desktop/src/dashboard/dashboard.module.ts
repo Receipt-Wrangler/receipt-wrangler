@@ -10,6 +10,7 @@ import { PipesModule } from "src/pipes/pipes.module";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
 import { AvatarModule } from "../avatar/index";
 import { ButtonModule } from "../button/index";
+import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { SelectModule } from "../select/select.module";
 import { SystemTaskTypePipe } from "../shared-ui/task-table/system-task-type.pipe";
@@ -39,6 +40,7 @@ import { WidgetTypePipe } from "./widget-type.pipe";
     CheckboxModule,
     CommonModule,
     DashboardRoutingModule,
+    DirectivesModule,
     InputModule,
     MatCardModule,
     MatChipsModule,

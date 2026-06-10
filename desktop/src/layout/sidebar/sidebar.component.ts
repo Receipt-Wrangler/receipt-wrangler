@@ -8,7 +8,7 @@ import { SetPage } from "src/store/receipt-table.actions";
 import { AboutComponent } from "../../about/about/about.component";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants";
 import { ImportFormComponent } from "../../import/import-form/import-form.component";
-import { AuthService, Group, GroupStatus } from "../../open-api";
+import { AuthService, Group, GroupStatus, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, GroupState, Logout, SetSelectedGroupId } from "../../store";
 
@@ -40,6 +40,18 @@ export class SidebarComponent {
 
   public groups = computed(() =>
     this.allGroups().filter((g: Group) => g.status !== GroupStatus.Archived)
+  );
+
+  protected readonly Permission = Permission;
+
+  protected readonly canViewSystemSettings = this.store.selectSignal(
+    AuthState.hasAnyAppPermission([
+      Permission.AppSystemSettingsRead,
+      Permission.AppPromptsRead,
+      Permission.AppReceiptProcessingSettingsRead,
+      Permission.AppSystemEmailsRead,
+      Permission.AppSystemTasksRead,
+    ])
   );
 
   public addButtonExpanded: boolean | null = null;

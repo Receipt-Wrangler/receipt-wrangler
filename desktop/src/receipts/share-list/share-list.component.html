@@ -76,7 +76,7 @@
             Total amount owed: {{ userTotalData.total | customCurrency }} 
             ({{ userTotalData.percentage }}% of total)
           </span>
-          @if (originalReceipt?.groupId | groupRole : groupRole.Editor) {
+          @if (canEdit()) {
             <div>
               <app-add-button
                 tooltip="Add Share"
@@ -118,9 +118,7 @@
             @if (!(mode | inputReadonly)) {
               <app-delete-button
                 tooltip="Remove Share"
-                [disabled]="
-              !(originalReceipt?.groupId | groupRole : groupRole.Editor)
-            "
+                [disabled]="!canEdit()"
                 (clicked)="removeItem(itemData)"
               ></app-delete-button>
             }

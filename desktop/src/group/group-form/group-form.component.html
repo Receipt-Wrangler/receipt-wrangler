@@ -60,7 +60,7 @@
 <ng-template #headerButtonsTemplate>
   <app-edit-button
     *ngIf="formConfig.mode | inputReadonly"
-    [disabled]="!(originalGroup?.id ?? 0 | groupRole : groupRole.Owner)"
+    [disabled]="!canManageMembers()"
     [buttonRouterLink]="[editLink]"
   ></app-edit-button>
 </ng-template>

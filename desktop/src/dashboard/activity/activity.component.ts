@@ -4,9 +4,9 @@ import { take, tap } from "rxjs";
 import {
   Activity,
   Group,
-  GroupRole,
   PagedActivityRequestCommand,
   PagedDataDataInner,
+  Permission,
   SystemTaskService,
   SystemTaskStatus,
   Widget
@@ -41,7 +41,7 @@ export class ActivityComponent implements OnInit {
 
   protected readonly SystemTaskStatus = SystemTaskStatus;
 
-  protected readonly GroupRole = GroupRole;
+  protected readonly Permission = Permission;
 
   constructor(
     private systemTaskService: SystemTaskService,

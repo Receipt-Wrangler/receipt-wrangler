@@ -7,7 +7,7 @@ import { take, tap } from "rxjs";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { TableComponent } from "src/table/table/table.component";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS } from "../../constants";
-import { AssociatedGroup, Group, GroupRole, GroupsService, UserRole } from "../../open-api";
+import { AssociatedGroup, Group, GroupsService, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { BaseTableService } from "../../services/base-table.service";
 import { BaseTableComponent } from "../../shared-ui/base-table/base-table.component";
@@ -46,9 +46,11 @@ export class GroupTableComponent extends BaseTableComponent<Group> implements On
 
   private readonly table = viewChild.required(TableComponent);
 
-  public groupRole = GroupRole;
+  protected readonly Permission = Permission;
 
-  public isAdmin = false;
+  public readonly appPermissions = this.store.selectSignal(AuthState.appPermissions);
+
+  public readonly groupPermissions = this.store.selectSignal(AuthState.groupPermissions);
 
   public tableHeaderText = signal("My Groups");
 
@@ -63,7 +65,6 @@ export class GroupTableComponent extends BaseTableComponent<Group> implements On
   }
 
   public ngOnInit(): void {
-    this.isAdmin = this.store.selectSnapshot(AuthState.hasRole(UserRole.Admin));
     this.listenForFilterChanges();
   }
 

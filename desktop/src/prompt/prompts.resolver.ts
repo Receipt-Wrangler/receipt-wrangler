@@ -2,14 +2,14 @@ import { inject } from "@angular/core";
 import { ResolveFn } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { map } from "rxjs";
-import { PagedRequestCommand, Prompt, PromptService, UserRole } from "../open-api";
+import { PagedRequestCommand, Permission, Prompt, PromptService } from "../open-api";
 import { AuthState } from "../store";
 
 export const promptsResolver: ResolveFn<Prompt[]> = (route, state) => {
   const store = inject(Store);
-  const isAdmin = store.selectSnapshot(AuthState.hasRole(UserRole.Admin));
+  const canRead = store.selectSnapshot(AuthState.hasAppPermission(Permission.AppPromptsRead));
 
-  if (isAdmin) {
+  if (canRead) {
     const promptService = inject(PromptService);
     const command: PagedRequestCommand = {
       page: 1,

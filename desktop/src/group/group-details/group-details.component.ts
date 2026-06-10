@@ -1,7 +1,8 @@
 import { Component, OnInit } from "@angular/core";
 import { ActivatedRoute } from "@angular/router";
-import { Group, GroupRole } from "../../open-api";
-import { GroupUtil } from "../../utils";
+import { Store } from "@ngxs/store";
+import { Group, Permission } from "../../open-api";
+import { AuthState } from "../../store";
 
 @Component({
     selector: "app-group-details",
@@ -15,7 +16,7 @@ export class GroupDetailsComponent implements OnInit {
   public group!: Group;
 
   constructor(
-    private groupUtil: GroupUtil,
+    private store: Store,
     private activatedRoute: ActivatedRoute
   ) {
   }
@@ -23,6 +24,8 @@ export class GroupDetailsComponent implements OnInit {
 
   public ngOnInit(): void {
     this.group = this.activatedRoute.snapshot.data["group"];
-    this.canEdit = this.groupUtil.hasGroupAccess(this.group.id, GroupRole.Owner, false);
+    this.canEdit = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(this.group.id, Permission.GroupUpdate)
+    );
   }
 }

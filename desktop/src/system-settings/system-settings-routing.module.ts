@@ -1,7 +1,10 @@
 import { NgModule } from "@angular/core";
 import { RouterModule, Routes } from "@angular/router";
 import { FormMode } from "../enums/form-mode.enum";
+import { appPermissionGuard } from "../guards/app-permission.guard";
+import { systemSettingsLandingGuard } from "../guards/system-settings-landing.guard";
 import { FormConfig } from "../interfaces";
+import { Permission } from "../open-api";
 import { PromptFormComponent } from "../prompt/prompt-form/prompt-form.component";
 import { PromptTableComponent } from "../prompt/prompt-table/prompt-table.component";
 import { promptResolver } from "../prompt/prompt.resolver";
@@ -26,7 +29,8 @@ import { SystemTaskTableComponent } from "./system-task-table/system-task-table.
 const routes: Routes = [
   {
     path: "",
-    redirectTo: "system-emails",
+    canActivate: [systemSettingsLandingGuard],
+    children: [],
     pathMatch: "full",
   },
   {
@@ -36,6 +40,10 @@ const routes: Routes = [
       {
         path: "system-emails",
         component: SystemEmailTableComponent,
+        canActivate: [appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppSystemEmailsRead],
+        },
         resolve: {
           allGroups: allGroupsResolver,
         }
@@ -43,6 +51,10 @@ const routes: Routes = [
       {
         path: "prompts",
         component: PromptTableComponent,
+        canActivate: [appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppPromptsRead],
+        },
         resolve: {
           allGroups: allGroupsResolver,
           allReceiptProcessingSettings: allReceiptProcessingSettingsResolver,
@@ -51,6 +63,10 @@ const routes: Routes = [
       {
         path: "receipt-processing-settings",
         component: ReceiptProcessingSettingsTableComponent,
+        canActivate: [appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppReceiptProcessingSettingsRead],
+        },
         resolve: {
           systemSettings: systemSettingsResolver,
         }
@@ -58,6 +74,10 @@ const routes: Routes = [
       {
         path: "system-tasks",
         component: SystemTaskTableComponent,
+        canActivate: [appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppSystemTasksRead],
+        },
         resolve: {
           prompts: promptsResolver,
           allReceiptProcessingSettings: allReceiptProcessingSettingsResolver,
@@ -66,11 +86,13 @@ const routes: Routes = [
       {
         path: "settings/view",
         component: SystemSettingsFormComponent,
+        canActivate: [appPermissionGuard],
         data: {
           formConfig: {
             mode: FormMode.view,
             headerText: "View System Settings",
           } as FormConfig,
+          appPermissions: [Permission.AppSystemSettingsRead],
         },
         resolve: {
           allReceiptProcessingSettings: allReceiptProcessingSettingsResolver,
@@ -80,11 +102,13 @@ const routes: Routes = [
       {
         path: "settings/edit",
         component: SystemSettingsFormComponent,
+        canActivate: [appPermissionGuard],
         data: {
           formConfig: {
             mode: FormMode.edit,
             headerText: "Edit System Settings",
           } as FormConfig,
+          appPermissions: [Permission.AppSystemSettingsUpdate],
         },
         resolve: {
           allReceiptProcessingSettings: allReceiptProcessingSettingsResolver,
@@ -96,22 +120,26 @@ const routes: Routes = [
   {
     path: "prompts/create",
     component: PromptFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
       formConfig: {
         mode: FormMode.add,
         headerText: "Create Prompt",
       } as FormConfig,
+      appPermissions: [Permission.AppPromptsCreate],
     },
   },
   {
     path: "prompts/:id/view",
     component: PromptFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
       formConfig: {
         mode: FormMode.view,
         headerText: "View Prompt",
       } as FormConfig,
       setHeaderText: true,
+      appPermissions: [Permission.AppPromptsRead],
     },
     resolve: {
       prompt: promptResolver
@@ -120,12 +148,14 @@ const routes: Routes = [
   {
     path: "prompts/:id/edit",
     component: PromptFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
       formConfig: {
         mode: FormMode.edit,
         headerText: "Edit Prompt",
       } as FormConfig,
       setHeaderText: true,
+      appPermissions: [Permission.AppPromptsUpdate],
     },
     resolve: {
       prompt: promptResolver
@@ -134,21 +164,25 @@ const routes: Routes = [
   {
     path: "system-emails/create",
     component: SystemEmailFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
       formConfig: {
         mode: FormMode.add,
         headerText: "Create System Email",
       } as FormConfig,
+      appPermissions: [Permission.AppSystemEmailsCreate],
     }
   },
   {
     path: "system-emails/:id/view",
     component: SystemEmailFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
       formConfig: {
         mode: FormMode.view,
       } as FormConfig,
       setHeaderText: true,
+      appPermissions: [Permission.AppSystemEmailsRead],
     },
     resolve: {
       systemEmail: systemEmailResolver,
@@ -159,11 +193,13 @@ const routes: Routes = [
   {
     path: "system-emails/:id/edit",
     component: SystemEmailFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
       formConfig: {
         mode: FormMode.edit,
       } as FormConfig,
       setHeaderText: true,
+      appPermissions: [Permission.AppSystemEmailsUpdate],
     },
     resolve: {
       systemEmail: systemEmailResolver,
@@ -174,11 +210,13 @@ const routes: Routes = [
   {
     path: "receipt-processing-settings/create",
     component: ReceiptProcessingSettingsFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
       formConfig: {
         mode: FormMode.add,
         headerText: "Create Receipt Processing Settings",
       } as FormConfig,
+      appPermissions: [Permission.AppReceiptProcessingSettingsCreate],
     },
     resolve: {
       prompts: promptsResolver,
@@ -187,11 +225,13 @@ const routes: Routes = [
   {
     path: "receipt-processing-settings/:id/view",
     component: ReceiptProcessingSettingsFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
       formConfig: {
         mode: FormMode.view,
       } as FormConfig,
       setHeaderText: true,
+      appPermissions: [Permission.AppReceiptProcessingSettingsRead],
     },
     resolve: {
       prompts: promptsResolver,
@@ -201,11 +241,13 @@ const routes: Routes = [
   {
     path: "receipt-processing-settings/:id/edit",
     component: ReceiptProcessingSettingsFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
       formConfig: {
         mode: FormMode.edit,
       } as FormConfig,
       setHeaderText: true,
+      appPermissions: [Permission.AppReceiptProcessingSettingsUpdate],
     },
     resolve: {
       prompts: promptsResolver,

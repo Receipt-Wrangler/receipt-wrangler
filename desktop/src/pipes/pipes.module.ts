@@ -5,7 +5,6 @@ import { CustomFieldTypePipe } from "./custom-field-type.pipe";
 import { DurationPipe } from "./duration.pipe";
 import { FormArrayLastPipe } from "./form-array-last.pipe";
 import { FormGetPipe } from "./form-get.pipe";
-import { GroupRolePipe } from "./group-role.pipe";
 import { GroupPipe } from "./group.pipe";
 import { ImagePipe } from "./image.pipe";
 import { InputReadonlyPipe } from "./input-readonly.pipe";
@@ -23,7 +22,6 @@ import { UserPipe } from "./user.pipe";
     FormArrayLastPipe,
     FormGetPipe,
     GroupPipe,
-    GroupRolePipe,
     ImagePipe,
     InputReadonlyPipe,
     MapGetPipe,
@@ -40,7 +38,6 @@ import { UserPipe } from "./user.pipe";
     FormArrayLastPipe,
     FormGetPipe,
     GroupPipe,
-    GroupRolePipe,
     ImagePipe,
     InputReadonlyPipe,
     MapGetPipe,

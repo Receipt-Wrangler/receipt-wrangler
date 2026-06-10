@@ -116,8 +116,8 @@ If a design appears to require a new pattern, confirm with the user before diver
 
 The admin-only **Manage Roles** feature (`src/roles/` — `role-list`, `role-form`, `role-presets`,
 `roles.module`) provides CRUD for the backend's app- and group-scoped roles (see the backend
-"Roles & Permissions" section in `api/CLAUDE.md` for the permission model). It is routed behind the
-global `UserRole.Admin` check in `RoleGuard` (`src/guards/role.guard.ts`).
+"Roles & Permissions" section in `api/CLAUDE.md` for the permission model). The Manage Roles routes are
+gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based UI gating** below).
 
 - Talks to the backend via the **generated** clients in `src/open-api/` — `RoleService` for role
   CRUD and `PermissionService` (`GET /permission`) to load the permission catalog that populates the
@@ -139,17 +139,41 @@ global `UserRole.Admin` check in `RoleGuard` (`src/guards/role.guard.ts`).
   **`RolePreviewDialogComponent`** (`src/roles/role-preview/`, standalone, opened via
   `openRolePreviewDialog(dialog, role)`) — a read-only dialog rendering the role's scope, description
   and permissions (grouped by resource using the `role-presets.ts` helpers). The `getRoles()` calls
-  use `catchError` so a non-admin who lacks `app.roles.read` (handled in the gating PR) gets an empty
-  selector rather than an error.
+  use `catchError` so a non-admin who lacks `app.roles.read` (see **Permission-based UI gating** below)
+  gets an empty selector rather than an error.
 - **Group-member legacy bridge:** `group-form` (loaded by every group view, including non-admins)
   deliberately does **not** call `getRoles()` — to avoid 403-driven logout for non-admins. Instead
   the group-member dialog keeps the legacy `groupRole` in sync on submit
   (`legacyGroupRoleFromRole` in `group-member.utils.ts`, mirroring the backend's name→enum mapping),
   so `group-form`'s "keep an owner" check and its `groupRole | status` member-table column keep
   working without reading roles. Remove this bridge when the legacy enum is retired.
-- **Permission-based UI gating is not implemented yet.** There is no `*hasPermission` directive or
-  `permissionService.has(...)` helper; UI access is still gated by the global admin `RoleGuard` and
-  the legacy `UserRole`. When permission-driven gating is added, document the directive/guard here.
+- **Permission-based UI gating.** The UI gates on the user's effective permissions, mirroring the
+  backend's enforcement. Permissions are delivered on **AppData** (`appPermissions: string[]` and
+  `groupPermissions: { [groupId]: string[] }`) and stored in `AuthState` via the dedicated
+  `SetPermissions` action — dispatched **only** from `setAppData` (`utils/app-data.utill.ts`), never from
+  `TokenRefreshService` (whose claims-only `SetAuthState` must not wipe permissions). They refresh on
+  login + app-init; the server re-checks real permissions on every request, so the stored set is a UI
+  hint (a stale button at worst 403s, handled by the interceptor).
+  - **Matcher:** `src/utils/permission.utils.ts` — `matches`/`hasAll`/`hasAny`, a faithful port of the Go
+    matcher (`api/internal/permissions/matcher.go`) including wildcard semantics, so UI gating === backend.
+  - **Selectors** (`AuthState`): `hasAppPermission(perm)`, `hasAnyAppPermission(perms)`,
+    `hasGroupPermission(groupId, perm, orApp = [])` — the group one applies the `orApp` app-scoped
+    override first, mirroring the backend `OrAppPermissions` (admin-not-a-member) pattern.
+  - **Directives** (`DirectivesModule`, signal/`effect`-driven so they re-render when AppData lands after
+    first paint): `*hasAppPermission="Permission.X"` and
+    `*hasGroupPermission="{ groupId, permission, orApp? }"`. Components expose the generated `Permission`
+    const to reference it in templates.
+  - **Route guards** (`src/guards/`): `appPermissionGuard` (`data: { appPermissions: [...] }`, ANY-of)
+    and `groupPermissionGuard` (`data: { groupPermission, orAppPermissions?, useRouteGroupId? }`).
+    `receiptGuardGuard` is unchanged (server-checked per-receipt access); `system-settings-landing.guard`
+    redirects `/system-settings` to the first tab the user can read.
+  - **Retired** with this migration: `RoleGuard`, `GroupRoleGuard`, the `*appRole` `RoleDirective`, the
+    `groupRole` `GroupRolePipe`, and `GroupUtil.hasGroupAccess`. The **group-member legacy bridge** (see
+    above) and `AuthState.userRole`/`hasRole` are intentionally kept until the backend legacy enum is
+    retired.
+  - **Behavior note:** create actions for categories/tags/custom-fields now gate on the granular
+    `.create` permission, so a normal user (Legacy User holds `.create`) sees the **Add** button;
+    **Edit/Delete** stay admin-only (`.update`/`.delete`).
 
 ## Signals & Zoneless Change Detection
 

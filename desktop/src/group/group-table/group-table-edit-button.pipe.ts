@@ -1,6 +1,6 @@
 import { Pipe, PipeTransform } from "@angular/core";
-import { Group, GroupRole } from "../../open-api";
-import { GroupUtil } from "../../utils/index";
+import { Group, Permission } from "../../open-api";
+import { hasAll, hasAny } from "../../utils/permission.utils";
 
 @Pipe({
     name: "groupTableEditButton",
@@ -8,34 +8,17 @@ import { GroupUtil } from "../../utils/index";
 })
 export class GroupTableEditButtonPipe implements PipeTransform {
 
-  constructor(private groupUtil: GroupUtil) {}
-
-  public transform(group: Group, isAdmin: boolean): {
-    routerLink: string[]
-    queryParams: any
-  } {
-    const isGroupOwner = this.groupUtil.hasGroupAccess(
-      group.id,
-      GroupRole.Owner,
-      false,
-      false
-    );
-
-    if (isGroupOwner) {
-      return {
-        routerLink: [`/groups/${group.id}/details/edit`],
-        queryParams: { tab: "details" }
-      };
-    } else if (isAdmin) {
-      return {
-        routerLink: [`/groups/${group.id}/settings/edit`],
-        queryParams: { tab: "settings" }
-      };
+  public transform(
+    group: Group,
+    appPermissions: string[],
+    groupPermissions: { [id: number]: string[] }
+  ): string {
+    if (hasAll(groupPermissions?.[group.id] ?? [], Permission.GroupUpdate)) {
+      return `/groups/${group.id}/details/edit`;
+    } else if (hasAny(appPermissions, Permission.AppGroupsUpdateSettings)) {
+      return `/groups/${group.id}/settings/edit`;
     } else {
-      return {
-        routerLink: [`/groups/${group.id}/details/view`],
-        queryParams: { tab: "details" }
-      };
+      return `/groups/${group.id}/details/view`;
     }
   }
 }
