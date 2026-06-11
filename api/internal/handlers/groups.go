@@ -40,6 +40,20 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 			}
 
 			token := structs.GetClaims(r)
+
+			// Listing every group in the system requires a dedicated permission,
+			// resolved from the database (never trusted from the JWT).
+			if command.GroupFilter.AssociatedGroup == commands.ASSOCIATED_GROUP_ALL {
+				permissionService := services.NewPermissionService(nil)
+				canReadAll, err := permissionService.HasAppPermissions(token.UserId, permissions.AppGroupsRead)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				if !canReadAll {
+					return http.StatusForbidden, errors.New("user is unauthorized to view all groups")
+				}
+			}
+
 			userIdString := utils.UintToString(token.UserId)
 			groupRepository := repositories.NewGroupRepository(nil)
 

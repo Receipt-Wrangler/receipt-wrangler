@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/utils"
 
@@ -20,15 +21,22 @@ func DeleteUser(userId string) error {
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		// Prevent deleting the last admin
+		// Prevent deleting the last admin. "Administrator" is defined by the
+		// app.users.read permission (the modern replacement for the removed
+		// UserRole == ADMIN check); the count is wildcard-aware via the matcher.
 		var user models.User
 		txErr := tx.Where("id = ?", userId).First(&user).Error
 		if txErr != nil {
 			return txErr
 		}
-		if user.UserRole == models.ADMIN {
-			var adminCount int64
-			txErr = tx.Model(&models.User{}).Where("user_role = ?", models.ADMIN).Count(&adminCount).Error
+		permissionService := NewPermissionService(tx)
+		isAdmin, txErr := permissionService.HasAppPermissions(user.ID, permissions.AppUsersRead)
+		if txErr != nil {
+			return txErr
+		}
+		if isAdmin {
+			roleRepository := repositories.NewRoleRepository(tx)
+			adminCount, txErr := roleRepository.CountUsersWithAppPermission(permissions.AppUsersRead)
 			if txErr != nil {
 				return txErr
 			}

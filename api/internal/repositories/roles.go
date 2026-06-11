@@ -282,6 +282,57 @@ func (repository RoleRepository) CountUsersWithAppRole(id uint) (int64, error) {
 	return count, nil
 }
 
+// appRoleIdsWithPermission returns the ids of every app role whose granted
+// permissions satisfy perm, honoring wildcard grants (e.g. "*", "app.*") via the
+// permission matcher — something a raw SQL equality check on the permission
+// strings could not do.
+func (repository RoleRepository) appRoleIdsWithPermission(perm string) ([]uint, error) {
+	db := repository.GetDB()
+
+	var appRoles []models.AppRole
+	err := db.Preload("Permissions").Find(&appRoles).Error
+	if err != nil {
+		return nil, err
+	}
+
+	roleIds := make([]uint, 0)
+	for _, role := range appRoles {
+		granted := make([]string, 0, len(role.Permissions))
+		for _, permission := range role.Permissions {
+			granted = append(granted, permission.Permission)
+		}
+		if permissions.HasAll(granted, perm) {
+			roleIds = append(roleIds, role.ID)
+		}
+	}
+
+	return roleIds, nil
+}
+
+// CountUsersWithAppPermission returns the number of users whose assigned app role
+// grants perm (wildcard-aware via appRoleIdsWithPermission). It defines the
+// "admin" population in place of the removed legacy UserRole enum — e.g. counting
+// holders of app.users.read to guard against deleting the last administrator.
+func (repository RoleRepository) CountUsersWithAppPermission(perm string) (int64, error) {
+	db := repository.GetDB()
+
+	roleIds, err := repository.appRoleIdsWithPermission(perm)
+	if err != nil {
+		return 0, err
+	}
+	if len(roleIds) == 0 {
+		return 0, nil
+	}
+
+	var count int64
+	err = db.Model(&models.User{}).Where("app_role_id IN ?", roleIds).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func (repository RoleRepository) CountGroupMembersWithGroupRole(id uint) (int64, error) {
 	db := repository.GetDB()
 
