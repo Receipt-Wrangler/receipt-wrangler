@@ -62,9 +62,16 @@ void main() {
     // mobile/lib/shared/functions/show_add_menu.dart:50-54). So the
     // gate's verification is implicit: if the bottom sheet opens,
     // the flag is true.
-    await tester.tap(find.text('Add'));
-    await pumpUntilFound(tester, find.text('Quick Scan'));
-    await tester.tap(find.text('Quick Scan'));
+    await tester.tap(find.text('Add').hitTestable());
+    // The add menu's items mount on the sheet slide-in's first frame; a tap
+    // computed then misses (deterministic on iOS: "Offset(595.9, 866.0) ...
+    // would not hit test"). Wait for hittability, then drain the slide-in --
+    // same hardening as addManualReceiptViaUI.
+    await pumpUntilFound(tester, find.text('Quick Scan').hitTestable());
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.tap(find.text('Quick Scan').hitTestable());
 
     // Wait for the bottom sheet to mount. The title "Quick Scan"
     // shows in the sheet header; the gallery upload action shows as

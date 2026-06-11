@@ -328,7 +328,9 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 #### Caveats / things that will bite
 
 - **Three tap-flake patterns** (each cost a debugging session on the Android emulator; recognize them by a
-  "derived an Offset ... that would not hit test on the specified widget" warning followed by a downstream timeout):
+  "derived an Offset ... that would not hit test on the specified widget" warning followed by a downstream timeout).
+  iOS makes pattern 2 **deterministic** where Android only flaked — Cupertino page/popup transitions are slower
+  (~400ms), so any tap site without the hitTestable-wait + drain fails every run on the simulator:
   1. **`tester.ensureVisible` does not pump.** It jumps the scroll position but the widget's global offset only
      updates after a relayout, so an immediate `tap()` computes the stale (off-screen) center. Always
      `await tester.pump(...)` (or `pumpAndSettle`) between `ensureVisible` and `tap`.

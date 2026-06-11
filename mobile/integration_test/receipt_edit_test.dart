@@ -54,11 +54,27 @@ void main() {
       timeout: const Duration(seconds: 10),
     );
     await tester.tap(find.byType(PopupMenuButton<dynamic>));
-    await pumpUntilFound(tester, find.text('Edit'));
-    await tester.tap(find.text('Edit'));
-    // /edit's destination-mounted marker is the form's Name label; the
-    // URL wait was redundant with the widget wait that follows.
-    await pumpUntilFound(tester, find.text('Name'));
+    // The popup scales in; the "Edit" item mounts on the animation's first
+    // frame where a tap computed from its center misses (deterministic on
+    // iOS: "Offset(1184.8, 99.0) ... would not hit test"). Wait for
+    // hittability and drain the open animation -- same hardening as
+    // receipt_cost_split_test._navigateToEdit.
+    await pumpUntilFound(tester, find.text('Edit').hitTestable());
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.tap(find.text('Edit').hitTestable());
+    // /edit's destination-mounted marker: the bottom save button, which only
+    // renders on edit/add paths -- find.text('Name') matches on /view too,
+    // so it cannot prove the navigation happened.
+    await pumpUntilFound(tester, find.byType(BottomSubmitButton));
+
+    // The submit button is built by the screen's bottomSheetBuilder even
+    // while the form body is still the loading spinner (showChild false), so
+    // it proves the ROUTE mounted, not the FORM. Wait for the name field
+    // itself before typing -- on iOS the receipt/customFields load loses the
+    // race and enterText otherwise throws "Bad state: No element".
+    await pumpUntilFound(tester, formField('name'));
 
     // Modify the name field. enterText replaces existing content.
     final newName =
