@@ -6,6 +6,7 @@ import 'package:receipt_wrangler_mobile/client/client.dart';
 import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/models/category_model.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/models/system_settings_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
@@ -33,6 +34,7 @@ class TokenRefreshService {
   late CategoryModel _categoryModel;
   late TagModel _tagModel;
   late SystemSettingsModel _systemSettingsModel;
+  late PermissionsModel _permissionsModel;
 
   bool _initialized = false;
 
@@ -50,6 +52,7 @@ class TokenRefreshService {
     required CategoryModel categoryModel,
     required TagModel tagModel,
     required SystemSettingsModel systemSettingsModel,
+    required PermissionsModel permissionsModel,
   }) {
     _authModel = authModel;
     _groupModel = groupModel;
@@ -58,6 +61,7 @@ class TokenRefreshService {
     _categoryModel = categoryModel;
     _tagModel = tagModel;
     _systemSettingsModel = systemSettingsModel;
+    _permissionsModel = permissionsModel;
     _initialized = true;
   }
 
@@ -138,6 +142,7 @@ class TokenRefreshService {
         _categoryModel,
         _tagModel,
         _systemSettingsModel,
+        _permissionsModel,
         appDataResponse.data as AppData,
       );
     }

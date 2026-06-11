@@ -22,7 +22,7 @@ class _$SubjectLineRegex extends SubjectLineRegex {
 
   factory _$SubjectLineRegex(
           [void Function(SubjectLineRegexBuilder)? updates]) =>
-      (new SubjectLineRegexBuilder()..update(updates))._build();
+      (SubjectLineRegexBuilder()..update(updates))._build();
 
   _$SubjectLineRegex._(
       {required this.id,
@@ -31,20 +31,14 @@ class _$SubjectLineRegex extends SubjectLineRegex {
       this.createdAt,
       this.createdBy,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(id, r'SubjectLineRegex', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        groupSettingsId, r'SubjectLineRegex', 'groupSettingsId');
-    BuiltValueNullFieldError.checkNotNull(regex, r'SubjectLineRegex', 'regex');
-  }
-
+      : super._();
   @override
   SubjectLineRegex rebuild(void Function(SubjectLineRegexBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
   SubjectLineRegexBuilder toBuilder() =>
-      new SubjectLineRegexBuilder()..replace(this);
+      SubjectLineRegexBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -133,7 +127,6 @@ class SubjectLineRegexBuilder
 
   @override
   void replace(SubjectLineRegex other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$SubjectLineRegex;
   }
 
@@ -147,16 +140,17 @@ class SubjectLineRegexBuilder
 
   _$SubjectLineRegex _build() {
     final _$result = _$v ??
-        new _$SubjectLineRegex._(
-            id: BuiltValueNullFieldError.checkNotNull(
-                id, r'SubjectLineRegex', 'id'),
-            groupSettingsId: BuiltValueNullFieldError.checkNotNull(
-                groupSettingsId, r'SubjectLineRegex', 'groupSettingsId'),
-            regex: BuiltValueNullFieldError.checkNotNull(
-                regex, r'SubjectLineRegex', 'regex'),
-            createdAt: createdAt,
-            createdBy: createdBy,
-            updatedAt: updatedAt);
+        _$SubjectLineRegex._(
+          id: BuiltValueNullFieldError.checkNotNull(
+              id, r'SubjectLineRegex', 'id'),
+          groupSettingsId: BuiltValueNullFieldError.checkNotNull(
+              groupSettingsId, r'SubjectLineRegex', 'groupSettingsId'),
+          regex: BuiltValueNullFieldError.checkNotNull(
+              regex, r'SubjectLineRegex', 'regex'),
+          createdAt: createdAt,
+          createdBy: createdBy,
+          updatedAt: updatedAt,
+        );
     replace(_$result);
     return _$result;
   }

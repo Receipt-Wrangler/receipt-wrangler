@@ -22,7 +22,7 @@ class _$GetSystemTaskCommand extends GetSystemTaskCommand {
 
   factory _$GetSystemTaskCommand(
           [void Function(GetSystemTaskCommandBuilder)? updates]) =>
-      (new GetSystemTaskCommandBuilder()..update(updates))._build();
+      (GetSystemTaskCommandBuilder()..update(updates))._build();
 
   _$GetSystemTaskCommand._(
       {this.associatedEntityId,
@@ -31,13 +31,7 @@ class _$GetSystemTaskCommand extends GetSystemTaskCommand {
       required this.pageSize,
       this.orderBy,
       this.sortDirection})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        page, r'GetSystemTaskCommand', 'page');
-    BuiltValueNullFieldError.checkNotNull(
-        pageSize, r'GetSystemTaskCommand', 'pageSize');
-  }
-
+      : super._();
   @override
   GetSystemTaskCommand rebuild(
           void Function(GetSystemTaskCommandBuilder) updates) =>
@@ -45,7 +39,7 @@ class _$GetSystemTaskCommand extends GetSystemTaskCommand {
 
   @override
   GetSystemTaskCommandBuilder toBuilder() =>
-      new GetSystemTaskCommandBuilder()..replace(this);
+      GetSystemTaskCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -140,7 +134,6 @@ class GetSystemTaskCommandBuilder
 
   @override
   void replace(covariant GetSystemTaskCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$GetSystemTaskCommand;
   }
 
@@ -154,15 +147,16 @@ class GetSystemTaskCommandBuilder
 
   _$GetSystemTaskCommand _build() {
     final _$result = _$v ??
-        new _$GetSystemTaskCommand._(
-            associatedEntityId: associatedEntityId,
-            associatedEntityType: associatedEntityType,
-            page: BuiltValueNullFieldError.checkNotNull(
-                page, r'GetSystemTaskCommand', 'page'),
-            pageSize: BuiltValueNullFieldError.checkNotNull(
-                pageSize, r'GetSystemTaskCommand', 'pageSize'),
-            orderBy: orderBy,
-            sortDirection: sortDirection);
+        _$GetSystemTaskCommand._(
+          associatedEntityId: associatedEntityId,
+          associatedEntityType: associatedEntityType,
+          page: BuiltValueNullFieldError.checkNotNull(
+              page, r'GetSystemTaskCommand', 'page'),
+          pageSize: BuiltValueNullFieldError.checkNotNull(
+              pageSize, r'GetSystemTaskCommand', 'pageSize'),
+          orderBy: orderBy,
+          sortDirection: sortDirection,
+        );
     replace(_$result);
     return _$result;
   }

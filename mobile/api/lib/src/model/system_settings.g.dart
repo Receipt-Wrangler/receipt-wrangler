@@ -45,7 +45,7 @@ class _$SystemSettings extends SystemSettings {
   final String? updatedAt;
 
   factory _$SystemSettings([void Function(SystemSettingsBuilder)? updates]) =>
-      (new SystemSettingsBuilder()..update(updates))._build();
+      (SystemSettingsBuilder()..update(updates))._build();
 
   _$SystemSettings._(
       {this.currencyThousandthsSeparator,
@@ -66,21 +66,13 @@ class _$SystemSettings extends SystemSettings {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        taskQueueConfigurations, r'SystemSettings', 'taskQueueConfigurations');
-    BuiltValueNullFieldError.checkNotNull(id, r'SystemSettings', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'SystemSettings', 'createdAt');
-  }
-
+      : super._();
   @override
   SystemSettings rebuild(void Function(SystemSettingsBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  SystemSettingsBuilder toBuilder() =>
-      new SystemSettingsBuilder()..replace(this);
+  SystemSettingsBuilder toBuilder() => SystemSettingsBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -233,8 +225,7 @@ class SystemSettingsBuilder
 
   ListBuilder<TaskQueueConfiguration>? _taskQueueConfigurations;
   ListBuilder<TaskQueueConfiguration> get taskQueueConfigurations =>
-      _$this._taskQueueConfigurations ??=
-          new ListBuilder<TaskQueueConfiguration>();
+      _$this._taskQueueConfigurations ??= ListBuilder<TaskQueueConfiguration>();
   set taskQueueConfigurations(
           covariant ListBuilder<TaskQueueConfiguration>?
               taskQueueConfigurations) =>
@@ -294,7 +285,6 @@ class SystemSettingsBuilder
 
   @override
   void replace(covariant SystemSettings other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$SystemSettings;
   }
 
@@ -310,35 +300,36 @@ class SystemSettingsBuilder
     _$SystemSettings _$result;
     try {
       _$result = _$v ??
-          new _$SystemSettings._(
-              currencyThousandthsSeparator: currencyThousandthsSeparator,
-              currencyDisplay: currencyDisplay,
-              currencyHideDecimalPlaces: currencyHideDecimalPlaces,
-              currencyDecimalSeparator: currencyDecimalSeparator,
-              debugOcr: debugOcr,
-              fallbackReceiptProcessingSettingsId:
-                  fallbackReceiptProcessingSettingsId,
-              receiptProcessingSettingsId: receiptProcessingSettingsId,
-              currencySymbolPosition: currencySymbolPosition,
-              taskConcurrency: taskConcurrency,
-              emailPollingInterval: emailPollingInterval,
-              numWorkers: numWorkers,
-              enableLocalSignUp: enableLocalSignUp,
-              taskQueueConfigurations: taskQueueConfigurations.build(),
-              id: BuiltValueNullFieldError.checkNotNull(
-                  id, r'SystemSettings', 'id'),
-              createdAt: BuiltValueNullFieldError.checkNotNull(
-                  createdAt, r'SystemSettings', 'createdAt'),
-              createdBy: createdBy,
-              createdByString: createdByString,
-              updatedAt: updatedAt);
+          _$SystemSettings._(
+            currencyThousandthsSeparator: currencyThousandthsSeparator,
+            currencyDisplay: currencyDisplay,
+            currencyHideDecimalPlaces: currencyHideDecimalPlaces,
+            currencyDecimalSeparator: currencyDecimalSeparator,
+            debugOcr: debugOcr,
+            fallbackReceiptProcessingSettingsId:
+                fallbackReceiptProcessingSettingsId,
+            receiptProcessingSettingsId: receiptProcessingSettingsId,
+            currencySymbolPosition: currencySymbolPosition,
+            taskConcurrency: taskConcurrency,
+            emailPollingInterval: emailPollingInterval,
+            numWorkers: numWorkers,
+            enableLocalSignUp: enableLocalSignUp,
+            taskQueueConfigurations: taskQueueConfigurations.build(),
+            id: BuiltValueNullFieldError.checkNotNull(
+                id, r'SystemSettings', 'id'),
+            createdAt: BuiltValueNullFieldError.checkNotNull(
+                createdAt, r'SystemSettings', 'createdAt'),
+            createdBy: createdBy,
+            createdByString: createdByString,
+            updatedAt: updatedAt,
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'taskQueueConfigurations';
         taskQueueConfigurations.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'SystemSettings', _$failedField, e.toString());
       }
       rethrow;

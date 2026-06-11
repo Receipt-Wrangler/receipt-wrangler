@@ -25,9 +25,11 @@ class _$UserView extends UserView {
   final String? updatedAt;
   @override
   final UserRole userRole;
+  @override
+  final int? appRoleId;
 
   factory _$UserView([void Function(UserViewBuilder)? updates]) =>
-      (new UserViewBuilder()..update(updates))._build();
+      (UserViewBuilder()..update(updates))._build();
 
   _$UserView._(
       {required this.username,
@@ -38,23 +40,15 @@ class _$UserView extends UserView {
       required this.id,
       required this.isDummyUser,
       this.updatedAt,
-      required this.userRole})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(username, r'UserView', 'username');
-    BuiltValueNullFieldError.checkNotNull(
-        displayName, r'UserView', 'displayName');
-    BuiltValueNullFieldError.checkNotNull(id, r'UserView', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        isDummyUser, r'UserView', 'isDummyUser');
-    BuiltValueNullFieldError.checkNotNull(userRole, r'UserView', 'userRole');
-  }
-
+      required this.userRole,
+      this.appRoleId})
+      : super._();
   @override
   UserView rebuild(void Function(UserViewBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  UserViewBuilder toBuilder() => new UserViewBuilder()..replace(this);
+  UserViewBuilder toBuilder() => UserViewBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -68,7 +62,8 @@ class _$UserView extends UserView {
         id == other.id &&
         isDummyUser == other.isDummyUser &&
         updatedAt == other.updatedAt &&
-        userRole == other.userRole;
+        userRole == other.userRole &&
+        appRoleId == other.appRoleId;
   }
 
   @override
@@ -83,6 +78,7 @@ class _$UserView extends UserView {
     _$hash = $jc(_$hash, isDummyUser.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jc(_$hash, userRole.hashCode);
+    _$hash = $jc(_$hash, appRoleId.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -98,7 +94,8 @@ class _$UserView extends UserView {
           ..add('id', id)
           ..add('isDummyUser', isDummyUser)
           ..add('updatedAt', updatedAt)
-          ..add('userRole', userRole))
+          ..add('userRole', userRole)
+          ..add('appRoleId', appRoleId))
         .toString();
   }
 }
@@ -143,6 +140,10 @@ class UserViewBuilder implements Builder<UserView, UserViewBuilder> {
   UserRole? get userRole => _$this._userRole;
   set userRole(UserRole? userRole) => _$this._userRole = userRole;
 
+  int? _appRoleId;
+  int? get appRoleId => _$this._appRoleId;
+  set appRoleId(int? appRoleId) => _$this._appRoleId = appRoleId;
+
   UserViewBuilder() {
     UserView._defaults(this);
   }
@@ -159,6 +160,7 @@ class UserViewBuilder implements Builder<UserView, UserViewBuilder> {
       _isDummyUser = $v.isDummyUser;
       _updatedAt = $v.updatedAt;
       _userRole = $v.userRole;
+      _appRoleId = $v.appRoleId;
       _$v = null;
     }
     return this;
@@ -166,7 +168,6 @@ class UserViewBuilder implements Builder<UserView, UserViewBuilder> {
 
   @override
   void replace(UserView other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UserView;
   }
 
@@ -180,20 +181,22 @@ class UserViewBuilder implements Builder<UserView, UserViewBuilder> {
 
   _$UserView _build() {
     final _$result = _$v ??
-        new _$UserView._(
-            username: BuiltValueNullFieldError.checkNotNull(
-                username, r'UserView', 'username'),
-            createdAt: createdAt,
-            createdBy: createdBy,
-            defaultAvatarColor: defaultAvatarColor,
-            displayName: BuiltValueNullFieldError.checkNotNull(
-                displayName, r'UserView', 'displayName'),
-            id: BuiltValueNullFieldError.checkNotNull(id, r'UserView', 'id'),
-            isDummyUser: BuiltValueNullFieldError.checkNotNull(
-                isDummyUser, r'UserView', 'isDummyUser'),
-            updatedAt: updatedAt,
-            userRole: BuiltValueNullFieldError.checkNotNull(
-                userRole, r'UserView', 'userRole'));
+        _$UserView._(
+          username: BuiltValueNullFieldError.checkNotNull(
+              username, r'UserView', 'username'),
+          createdAt: createdAt,
+          createdBy: createdBy,
+          defaultAvatarColor: defaultAvatarColor,
+          displayName: BuiltValueNullFieldError.checkNotNull(
+              displayName, r'UserView', 'displayName'),
+          id: BuiltValueNullFieldError.checkNotNull(id, r'UserView', 'id'),
+          isDummyUser: BuiltValueNullFieldError.checkNotNull(
+              isDummyUser, r'UserView', 'isDummyUser'),
+          updatedAt: updatedAt,
+          userRole: BuiltValueNullFieldError.checkNotNull(
+              userRole, r'UserView', 'userRole'),
+          appRoleId: appRoleId,
+        );
     replace(_$result);
     return _$result;
   }

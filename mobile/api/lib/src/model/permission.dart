@@ -123,6 +123,9 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'app.api-keys.read')
   static const Permission appPeriodApiKeysPeriodRead = _$appPeriodApiKeysPeriodRead;
   /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.api-keys.read-any')
+  static const Permission appPeriodApiKeysPeriodReadAny = _$appPeriodApiKeysPeriodReadAny;
+  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'app.api-keys.update')
   static const Permission appPeriodApiKeysPeriodUpdate = _$appPeriodApiKeysPeriodUpdate;
   /// All permission keys the API recognizes.
@@ -132,6 +135,42 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'app.api-keys.delete-any')
   static const Permission appPeriodApiKeysPeriodDeleteAny = _$appPeriodApiKeysPeriodDeleteAny;
   /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.roles.create')
+  static const Permission appPeriodRolesPeriodCreate = _$appPeriodRolesPeriodCreate;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.roles.read')
+  static const Permission appPeriodRolesPeriodRead = _$appPeriodRolesPeriodRead;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.roles.update')
+  static const Permission appPeriodRolesPeriodUpdate = _$appPeriodRolesPeriodUpdate;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.roles.delete')
+  static const Permission appPeriodRolesPeriodDelete = _$appPeriodRolesPeriodDelete;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.notifications.read')
+  static const Permission appPeriodNotificationsPeriodRead = _$appPeriodNotificationsPeriodRead;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.notifications.delete')
+  static const Permission appPeriodNotificationsPeriodDelete = _$appPeriodNotificationsPeriodDelete;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.user-preferences.read')
+  static const Permission appPeriodUserPreferencesPeriodRead = _$appPeriodUserPreferencesPeriodRead;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.user-preferences.update')
+  static const Permission appPeriodUserPreferencesPeriodUpdate = _$appPeriodUserPreferencesPeriodUpdate;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.account.read')
+  static const Permission appPeriodAccountPeriodRead = _$appPeriodAccountPeriodRead;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.account.update')
+  static const Permission appPeriodAccountPeriodUpdate = _$appPeriodAccountPeriodUpdate;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.account.delete')
+  static const Permission appPeriodAccountPeriodDelete = _$appPeriodAccountPeriodDelete;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.receipts.search')
+  static const Permission appPeriodReceiptsPeriodSearch = _$appPeriodReceiptsPeriodSearch;
+  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.view')
   static const Permission groupPeriodView = _$groupPeriodView;
   /// All permission keys the API recognizes.
@@ -140,9 +179,6 @@ class Permission extends EnumClass {
   /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.delete')
   static const Permission groupPeriodDelete = _$groupPeriodDelete;
-  /// All permission keys the API recognizes.
-  @BuiltValueEnumConst(wireName: r'group.export-ocr')
-  static const Permission groupPeriodExportOcr = _$groupPeriodExportOcr;
   /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.receipts.create')
   static const Permission groupPeriodReceiptsPeriodCreate = _$groupPeriodReceiptsPeriodCreate;

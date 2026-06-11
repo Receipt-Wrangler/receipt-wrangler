@@ -24,7 +24,7 @@ class _$UpsertCustomFieldValueCommand extends UpsertCustomFieldValueCommand {
 
   factory _$UpsertCustomFieldValueCommand(
           [void Function(UpsertCustomFieldValueCommandBuilder)? updates]) =>
-      (new UpsertCustomFieldValueCommandBuilder()..update(updates))._build();
+      (UpsertCustomFieldValueCommandBuilder()..update(updates))._build();
 
   _$UpsertCustomFieldValueCommand._(
       {required this.receiptId,
@@ -34,13 +34,7 @@ class _$UpsertCustomFieldValueCommand extends UpsertCustomFieldValueCommand {
       this.selectValue,
       this.currencyValue,
       this.booleanValue})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        receiptId, r'UpsertCustomFieldValueCommand', 'receiptId');
-    BuiltValueNullFieldError.checkNotNull(
-        customFieldId, r'UpsertCustomFieldValueCommand', 'customFieldId');
-  }
-
+      : super._();
   @override
   UpsertCustomFieldValueCommand rebuild(
           void Function(UpsertCustomFieldValueCommandBuilder) updates) =>
@@ -48,7 +42,7 @@ class _$UpsertCustomFieldValueCommand extends UpsertCustomFieldValueCommand {
 
   @override
   UpsertCustomFieldValueCommandBuilder toBuilder() =>
-      new UpsertCustomFieldValueCommandBuilder()..replace(this);
+      UpsertCustomFieldValueCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -148,7 +142,6 @@ class UpsertCustomFieldValueCommandBuilder
 
   @override
   void replace(UpsertCustomFieldValueCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertCustomFieldValueCommand;
   }
 
@@ -162,16 +155,17 @@ class UpsertCustomFieldValueCommandBuilder
 
   _$UpsertCustomFieldValueCommand _build() {
     final _$result = _$v ??
-        new _$UpsertCustomFieldValueCommand._(
-            receiptId: BuiltValueNullFieldError.checkNotNull(
-                receiptId, r'UpsertCustomFieldValueCommand', 'receiptId'),
-            customFieldId: BuiltValueNullFieldError.checkNotNull(customFieldId,
-                r'UpsertCustomFieldValueCommand', 'customFieldId'),
-            stringValue: stringValue,
-            dateValue: dateValue,
-            selectValue: selectValue,
-            currencyValue: currencyValue,
-            booleanValue: booleanValue);
+        _$UpsertCustomFieldValueCommand._(
+          receiptId: BuiltValueNullFieldError.checkNotNull(
+              receiptId, r'UpsertCustomFieldValueCommand', 'receiptId'),
+          customFieldId: BuiltValueNullFieldError.checkNotNull(
+              customFieldId, r'UpsertCustomFieldValueCommand', 'customFieldId'),
+          stringValue: stringValue,
+          dateValue: dateValue,
+          selectValue: selectValue,
+          currencyValue: currencyValue,
+          booleanValue: booleanValue,
+        );
     replace(_$result);
     return _$result;
   }

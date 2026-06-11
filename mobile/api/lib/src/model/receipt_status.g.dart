@@ -26,12 +26,12 @@ ReceiptStatus _$valueOf(String name) {
     case 'empty':
       return _$empty;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
 final BuiltSet<ReceiptStatus> _$values =
-    new BuiltSet<ReceiptStatus>(const <ReceiptStatus>[
+    BuiltSet<ReceiptStatus>(const <ReceiptStatus>[
   _$OPEN,
   _$NEEDS_ATTENTION,
   _$RESOLVED,
@@ -56,7 +56,7 @@ abstract class _$ReceiptStatusMixin {
 }
 
 Serializer<ReceiptStatus> _$receiptStatusSerializer =
-    new _$ReceiptStatusSerializer();
+    _$ReceiptStatusSerializer();
 
 class _$ReceiptStatusSerializer implements PrimitiveSerializer<ReceiptStatus> {
   static const Map<String, Object> _toWire = const <String, Object>{

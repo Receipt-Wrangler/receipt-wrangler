@@ -22,6 +22,7 @@ part 'user.g.dart';
 /// * [isDummyUser] - Is dummy user
 /// * [updatedAt] 
 /// * [userRole] - User's role
+/// * [appRoleId] - Id of the modern app role assigned to the user
 /// * [lastLoginDate] 
 @BuiltValue()
 abstract class User implements Built<User, UserBuilder> {
@@ -61,6 +62,10 @@ abstract class User implements Built<User, UserBuilder> {
   @BuiltValueField(wireName: r'userRole')
   UserRole get userRole;
   // enum userRoleEnum {  ADMIN,  USER,  };
+
+  /// Id of the modern app role assigned to the user
+  @BuiltValueField(wireName: r'appRoleId')
+  int? get appRoleId;
 
   @BuiltValueField(wireName: r'lastLoginDate')
   String? get lastLoginDate;
@@ -148,6 +153,13 @@ class _$UserSerializer implements PrimitiveSerializer<User> {
       object.userRole,
       specifiedType: const FullType(UserRole),
     );
+    if (object.appRoleId != null) {
+      yield r'appRoleId';
+      yield serializers.serialize(
+        object.appRoleId,
+        specifiedType: const FullType(int),
+      );
+    }
     if (object.lastLoginDate != null) {
       yield r'lastLoginDate';
       yield serializers.serialize(
@@ -247,6 +259,13 @@ class _$UserSerializer implements PrimitiveSerializer<User> {
             specifiedType: const FullType(UserRole),
           ) as UserRole;
           result.userRole = valueDes;
+          break;
+        case r'appRoleId':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.appRoleId = valueDes;
           break;
         case r'lastLoginDate':
           final valueDes = serializers.deserialize(

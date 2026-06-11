@@ -84,11 +84,25 @@ void main() {
     // rendered when `customFieldModel.customFields` minus already-added
     // ones is non-empty -- our setUp's `ensureCustomField` makes sure of
     // that. The TextButton.icon's label is the Text 'Add Custom Field'.
-    final addCustomFieldBtn =
-        find.widgetWithText(TextButton, 'Add Custom Field');
+    // Match the label text directly: the button is a `TextButton.icon`, which
+    // builds a private `_TextButtonWithIcon` subclass, so
+    // `find.widgetWithText(TextButton, ...)` matches nothing on this Flutter
+    // version. The button only renders once customFieldModel has loaded the
+    // group's fields (async), so wait for it rather than asserting immediately.
+    final addCustomFieldBtn = find.text('Add Custom Field');
+    await pumpUntilFound(tester, addCustomFieldBtn);
     await tester.ensureVisible(addCustomFieldBtn);
     await tester.tap(addCustomFieldBtn);
+    // The selection modal lists every field; "E2E Notes" sorts last and is
+    // off-screen in the sheet, so scroll it into view before tapping or the
+    // tap lands on empty space and the field is never added. ensureVisible
+    // does a jumpTo on the sheet's ListView WITHOUT pumping -- the item's
+    // global offset only updates after a relayout, so tap() would still
+    // compute the stale off-screen center. Pump frames before tapping.
     await pumpUntilFound(tester, find.text(_testFieldName));
+    await tester.ensureVisible(find.text(_testFieldName));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text(_testFieldName));
 
     // The custom field widget mounts with name `customField_<id>`

@@ -16,12 +16,12 @@ CurrencySeparator _$valueOf(String name) {
     case 'period':
       return _$period;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
 final BuiltSet<CurrencySeparator> _$values =
-    new BuiltSet<CurrencySeparator>(const <CurrencySeparator>[
+    BuiltSet<CurrencySeparator>(const <CurrencySeparator>[
   _$comma,
   _$period,
 ]);
@@ -41,7 +41,7 @@ abstract class _$CurrencySeparatorMixin {
 }
 
 Serializer<CurrencySeparator> _$currencySeparatorSerializer =
-    new _$CurrencySeparatorSerializer();
+    _$CurrencySeparatorSerializer();
 
 class _$CurrencySeparatorSerializer
     implements PrimitiveSerializer<CurrencySeparator> {

@@ -16,11 +16,11 @@ UserRole _$valueOf(String name) {
     case 'USER':
       return _$USER;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
-final BuiltSet<UserRole> _$values = new BuiltSet<UserRole>(const <UserRole>[
+final BuiltSet<UserRole> _$values = BuiltSet<UserRole>(const <UserRole>[
   _$ADMIN,
   _$USER,
 ]);
@@ -38,7 +38,7 @@ abstract class _$UserRoleMixin {
   _$UserRoleMeta get UserRole => const _$UserRoleMeta();
 }
 
-Serializer<UserRole> _$userRoleSerializer = new _$UserRoleSerializer();
+Serializer<UserRole> _$userRoleSerializer = _$UserRoleSerializer();
 
 class _$UserRoleSerializer implements PrimitiveSerializer<UserRole> {
   static const Map<String, Object> _toWire = const <String, Object>{

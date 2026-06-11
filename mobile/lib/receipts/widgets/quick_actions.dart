@@ -26,8 +26,6 @@ class ReceiptQuickActions extends StatefulWidget {
 }
 
 class _ReceiptQuickActions extends State<ReceiptQuickActions> {
-  late final shellContext =
-      Provider.of<ContextModel>(context, listen: false).shellContext;
   late final userModel = Provider.of<UserModel>(context, listen: false);
   late final groupModel = Provider.of<GroupModel>(context, listen: false);
   late final formKey =
@@ -152,8 +150,15 @@ class _ReceiptQuickActions extends State<ReceiptQuickActions> {
   }
 
   void showUserMultiSelect() {
+    // Re-read the shell context at tap time (don't cache a stale snapshot) and
+    // fall back to this widget's own mounted context. The cached shell context
+    // can point at a since-deactivated element, and showModalBottomSheet
+    // dereferences context.widget -> a null-check crash on a defunct element.
+    // Same fix as receipt_form.dart's openQuickActionsBottomSheet.
+    final shell = Provider.of<ContextModel>(context, listen: false).shellContext;
+    final sheetContext = (shell != null && shell.mounted) ? shell : context;
     showMultiselectBottomSheet(
-        shellContext,
+        sheetContext,
         "Select Users",
         "Select",
         getUsersInGroup(userModel, groupModel, widget.groupId.toString()),

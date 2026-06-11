@@ -24,7 +24,7 @@ class _$CustomFieldOption extends CustomFieldOption {
 
   factory _$CustomFieldOption(
           [void Function(CustomFieldOptionBuilder)? updates]) =>
-      (new CustomFieldOptionBuilder()..update(updates))._build();
+      (CustomFieldOptionBuilder()..update(updates))._build();
 
   _$CustomFieldOption._(
       {required this.customFieldId,
@@ -34,21 +34,14 @@ class _$CustomFieldOption extends CustomFieldOption {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        customFieldId, r'CustomFieldOption', 'customFieldId');
-    BuiltValueNullFieldError.checkNotNull(id, r'CustomFieldOption', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'CustomFieldOption', 'createdAt');
-  }
-
+      : super._();
   @override
   CustomFieldOption rebuild(void Function(CustomFieldOptionBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
   CustomFieldOptionBuilder toBuilder() =>
-      new CustomFieldOptionBuilder()..replace(this);
+      CustomFieldOptionBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -148,7 +141,6 @@ class CustomFieldOptionBuilder
 
   @override
   void replace(covariant CustomFieldOption other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$CustomFieldOption;
   }
 
@@ -162,17 +154,18 @@ class CustomFieldOptionBuilder
 
   _$CustomFieldOption _build() {
     final _$result = _$v ??
-        new _$CustomFieldOption._(
-            customFieldId: BuiltValueNullFieldError.checkNotNull(
-                customFieldId, r'CustomFieldOption', 'customFieldId'),
-            value: value,
-            id: BuiltValueNullFieldError.checkNotNull(
-                id, r'CustomFieldOption', 'id'),
-            createdAt: BuiltValueNullFieldError.checkNotNull(
-                createdAt, r'CustomFieldOption', 'createdAt'),
-            createdBy: createdBy,
-            createdByString: createdByString,
-            updatedAt: updatedAt);
+        _$CustomFieldOption._(
+          customFieldId: BuiltValueNullFieldError.checkNotNull(
+              customFieldId, r'CustomFieldOption', 'customFieldId'),
+          value: value,
+          id: BuiltValueNullFieldError.checkNotNull(
+              id, r'CustomFieldOption', 'id'),
+          createdAt: BuiltValueNullFieldError.checkNotNull(
+              createdAt, r'CustomFieldOption', 'createdAt'),
+          createdBy: createdBy,
+          createdByString: createdByString,
+          updatedAt: updatedAt,
+        );
     replace(_$result);
     return _$result;
   }

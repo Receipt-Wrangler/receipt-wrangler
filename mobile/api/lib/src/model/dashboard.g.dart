@@ -25,7 +25,7 @@ class _$Dashboard extends Dashboard {
   final BuiltList<Widget>? widgets;
 
   factory _$Dashboard([void Function(DashboardBuilder)? updates]) =>
-      (new DashboardBuilder()..update(updates))._build();
+      (DashboardBuilder()..update(updates))._build();
 
   _$Dashboard._(
       {this.createdAt,
@@ -36,18 +36,13 @@ class _$Dashboard extends Dashboard {
       required this.userId,
       this.updatedAt,
       this.widgets})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(id, r'Dashboard', 'id');
-    BuiltValueNullFieldError.checkNotNull(name, r'Dashboard', 'name');
-    BuiltValueNullFieldError.checkNotNull(userId, r'Dashboard', 'userId');
-  }
-
+      : super._();
   @override
   Dashboard rebuild(void Function(DashboardBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  DashboardBuilder toBuilder() => new DashboardBuilder()..replace(this);
+  DashboardBuilder toBuilder() => DashboardBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -125,8 +120,7 @@ class DashboardBuilder implements Builder<Dashboard, DashboardBuilder> {
   set updatedAt(String? updatedAt) => _$this._updatedAt = updatedAt;
 
   ListBuilder<Widget>? _widgets;
-  ListBuilder<Widget> get widgets =>
-      _$this._widgets ??= new ListBuilder<Widget>();
+  ListBuilder<Widget> get widgets => _$this._widgets ??= ListBuilder<Widget>();
   set widgets(ListBuilder<Widget>? widgets) => _$this._widgets = widgets;
 
   DashboardBuilder() {
@@ -151,7 +145,6 @@ class DashboardBuilder implements Builder<Dashboard, DashboardBuilder> {
 
   @override
   void replace(Dashboard other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$Dashboard;
   }
 
@@ -167,24 +160,25 @@ class DashboardBuilder implements Builder<Dashboard, DashboardBuilder> {
     _$Dashboard _$result;
     try {
       _$result = _$v ??
-          new _$Dashboard._(
-              createdAt: createdAt,
-              createdBy: createdBy,
-              id: BuiltValueNullFieldError.checkNotNull(id, r'Dashboard', 'id'),
-              name: BuiltValueNullFieldError.checkNotNull(
-                  name, r'Dashboard', 'name'),
-              groupId: groupId,
-              userId: BuiltValueNullFieldError.checkNotNull(
-                  userId, r'Dashboard', 'userId'),
-              updatedAt: updatedAt,
-              widgets: _widgets?.build());
+          _$Dashboard._(
+            createdAt: createdAt,
+            createdBy: createdBy,
+            id: BuiltValueNullFieldError.checkNotNull(id, r'Dashboard', 'id'),
+            name: BuiltValueNullFieldError.checkNotNull(
+                name, r'Dashboard', 'name'),
+            groupId: groupId,
+            userId: BuiltValueNullFieldError.checkNotNull(
+                userId, r'Dashboard', 'userId'),
+            updatedAt: updatedAt,
+            widgets: _widgets?.build(),
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'widgets';
         _widgets?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'Dashboard', _$failedField, e.toString());
       }
       rethrow;

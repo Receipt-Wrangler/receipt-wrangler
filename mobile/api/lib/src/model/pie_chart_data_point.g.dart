@@ -14,21 +14,16 @@ class _$PieChartDataPoint extends PieChartDataPoint {
 
   factory _$PieChartDataPoint(
           [void Function(PieChartDataPointBuilder)? updates]) =>
-      (new PieChartDataPointBuilder()..update(updates))._build();
+      (PieChartDataPointBuilder()..update(updates))._build();
 
-  _$PieChartDataPoint._({required this.label, required this.value})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(label, r'PieChartDataPoint', 'label');
-    BuiltValueNullFieldError.checkNotNull(value, r'PieChartDataPoint', 'value');
-  }
-
+  _$PieChartDataPoint._({required this.label, required this.value}) : super._();
   @override
   PieChartDataPoint rebuild(void Function(PieChartDataPointBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
   PieChartDataPointBuilder toBuilder() =>
-      new PieChartDataPointBuilder()..replace(this);
+      PieChartDataPointBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -84,7 +79,6 @@ class PieChartDataPointBuilder
 
   @override
   void replace(PieChartDataPoint other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$PieChartDataPoint;
   }
 
@@ -98,11 +92,12 @@ class PieChartDataPointBuilder
 
   _$PieChartDataPoint _build() {
     final _$result = _$v ??
-        new _$PieChartDataPoint._(
-            label: BuiltValueNullFieldError.checkNotNull(
-                label, r'PieChartDataPoint', 'label'),
-            value: BuiltValueNullFieldError.checkNotNull(
-                value, r'PieChartDataPoint', 'value'));
+        _$PieChartDataPoint._(
+          label: BuiltValueNullFieldError.checkNotNull(
+              label, r'PieChartDataPoint', 'label'),
+          value: BuiltValueNullFieldError.checkNotNull(
+              value, r'PieChartDataPoint', 'value'),
+        );
     replace(_$result);
     return _$result;
   }

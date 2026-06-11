@@ -11,19 +11,15 @@ class _$LogoutCommand extends LogoutCommand {
   final String refreshToken;
 
   factory _$LogoutCommand([void Function(LogoutCommandBuilder)? updates]) =>
-      (new LogoutCommandBuilder()..update(updates))._build();
+      (LogoutCommandBuilder()..update(updates))._build();
 
-  _$LogoutCommand._({required this.refreshToken}) : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        refreshToken, r'LogoutCommand', 'refreshToken');
-  }
-
+  _$LogoutCommand._({required this.refreshToken}) : super._();
   @override
   LogoutCommand rebuild(void Function(LogoutCommandBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  LogoutCommandBuilder toBuilder() => new LogoutCommandBuilder()..replace(this);
+  LogoutCommandBuilder toBuilder() => LogoutCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -70,7 +66,6 @@ class LogoutCommandBuilder
 
   @override
   void replace(LogoutCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$LogoutCommand;
   }
 
@@ -84,9 +79,10 @@ class LogoutCommandBuilder
 
   _$LogoutCommand _build() {
     final _$result = _$v ??
-        new _$LogoutCommand._(
-            refreshToken: BuiltValueNullFieldError.checkNotNull(
-                refreshToken, r'LogoutCommand', 'refreshToken'));
+        _$LogoutCommand._(
+          refreshToken: BuiltValueNullFieldError.checkNotNull(
+              refreshToken, r'LogoutCommand', 'refreshToken'),
+        );
     replace(_$result);
     return _$result;
   }

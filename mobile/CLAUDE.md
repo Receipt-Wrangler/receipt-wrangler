@@ -32,6 +32,7 @@ The app uses Provider pattern with ChangeNotifier models:
 - **UserModel**: User profile and preferences
 - **CategoryModel**, **TagModel**: Metadata management
 - **SearchModel**: Search functionality with RxDart streams
+- **PermissionsModel**: The caller's effective permissions, used for UI gating (see "Permission-based UI gating")
 
 ### Navigation
 Uses `go_router` with nested shell routes:
@@ -39,6 +40,16 @@ Uses `go_router` with nested shell routes:
 - **Group Context Shell**: `/groups/:groupId/*` with group-specific navigation
 - **Search Shell**: `/search` with search interface
 - Individual routes for receipt forms, viewing, and editing
+
+The receipt form routes (`/receipts/:receiptId/{view,edit}` and the comments variants) use
+`pageBuilder` with `NoTransitionPage(key: state.pageKey, ...)` instead of `builder`. During a
+default transition the outgoing and incoming `ReceiptFormScreen`s coexist for the animation, and
+both attach the same global `receiptFormKey` — a GlobalKey collision that corrupts the form. The
+`NoTransitionPage` makes the swap atomic; `key: state.pageKey` forces a fresh element per
+navigation so the new screen re-fetches rather than reusing the old element. Because the swap
+removes the old page in the same frame, popup-menu items that navigate must capture the router
+and defer the `go` until the menu finishes dismissing (see
+`receipt_app_bar_action_builder.dart`'s `_goAfterMenu`).
 
 ### Core Directory Structure
 - `lib/models/` - Provider-based state management models
@@ -69,6 +80,40 @@ Uses `flutter_form_builder` for complex forms with validation. Receipt forms sup
 - JWT-based authentication with automatic token refresh
 - Centralized client configuration in `OpenApiClient` singleton
 - Secure token storage using `flutter_secure_storage`
+
+### Permission-based UI gating
+
+The mobile app gates UI on the caller's **effective permissions**, mirroring the desktop client
+(`desktop/CLAUDE.md` → "Permission-based UI gating") and the backend's enforcement (`api/CLAUDE.md` →
+"Roles & Permissions"). The JWT carries only the legacy `UserRole` and is a UI hint; the server
+re-checks real permissions on every request, so a stale action at worst returns 403.
+
+- **Delivery & hydration:** permissions arrive on `AppData` (`appPermissions`, and `groupPermissions`
+  keyed by group id) and are stored in **`PermissionsModel`** (`lib/models/permissions_model.dart`)
+  via `setPermissions`, called **only** from `storeAppData` (`lib/utils/auth.dart`) on login and
+  app-init. Token-only refreshes never touch it. The `FutureBuilder` in `main.dart` blocks first
+  paint until app-init completes, so permissions are present before any gated widget builds.
+- **Matcher:** `lib/utils/permission_matcher.dart` (`permissionMatches` / `hasAll` / `hasAny`) is a
+  faithful port of the backend matcher (`api/internal/permissions/matcher.go`) and its desktop twin
+  (`desktop/src/utils/permission.utils.ts`), wildcard semantics included, so UI gating === backend.
+  The generated `Permission` enum is converted to its wire string at hydration (effective
+  permissions are always concrete registry keys, so the enum round-trips safely).
+- **Checks** (`PermissionsModel`): `hasAppPermission(p)`, `hasAnyAppPermission([..])`,
+  `hasGroupPermission(groupId, p, {orApp})` — the group one applies the `orApp` app-scoped override
+  first (the backend `OrAppPermissions` admin-not-a-member pattern) — and
+  `hasGroupPermissionInAnyGroup(p)` for screens with no single current group.
+- **Gating pattern:** read `Provider.of<PermissionsModel>(context, listen: false)` and conditionally
+  render, referencing the generated `Permission` constants. Gating is **widget-level only** — mobile
+  has no permission-scoped routes/screens (admin features live on desktop), so there are no
+  permission route guards.
+- **Current gates:**
+  - `canEditReceipt(permissionsModel, groupId)` (`lib/shared/functions/permissions.dart`) →
+    `group.receipts.update`, used by the receipt-edit popup (`receipt_edit_popup_menu.dart`) and the
+    receipt swipe-to-edit (`receipt_list_item.dart`).
+  - Activity rerun (`group_activity_list_item.dart`) → `group.activities.rerun`.
+  - The add menu (`show_add_menu.dart`) shows "Add Manual Receipt" on `group.receipts.create` and
+    "Quick Scan" on `group.receipts.quick-scan` — per-group when inside a group, or "held in any
+    group" on the group-select / all-groups view, where there is no single current group.
 
 ## Development Notes
 
@@ -122,6 +167,21 @@ cd /home/user/receipt-wrangler/mobile/api
 flutter pub run build_runner build --delete-conflicting-outputs
 ```
 
+**Known dart-dio default-value regressions (re-patch after every regen).** The `dart-dio`
+generator emits invalid `_defaults` initializers for some fields, which `build_runner` then can't
+compile (and it deletes the matching `.g.dart` first, so the package stops building). After
+regenerating, restore these hand-fixes (precedent: commits `fad192a0`, `a2ec7479`):
+
+- `model/claims.dart` — `..userRole = 'USER'` → `..userRole = UserRole.USER` (enum default emitted
+  as a string).
+- `model/user_preferences.dart` — `..quickScanDefaultStatus = 'OPEN'` →
+  `..quickScanDefaultStatus = ReceiptStatus.OPEN`.
+- `model/system_settings.dart` — `..currencyDisplay = '$'` → `..currencyDisplay = r'$'` (a bare `$`
+  in a non-raw string is invalid Dart).
+
+Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
+is otherwise forbidden — these are the documented exception.)
+
 ### Testing
 
 Run tests with `flutter test`. Run a single file with `flutter test test/path/to/file_test.dart`.
@@ -172,7 +232,7 @@ End-to-end tests live in `integration_test/` (sibling of `test/`) and use Flutte
 - **Local Android emulator** via `./run-e2e-android.sh` (macOS, auto-boots an AVD).
 - **Local iOS Simulator** via `./run-e2e-ios.sh` (macOS, auto-boots a sim).
 - **Local Linux desktop** via `./run-e2e.sh` (containers/CI Linux). Originally the primary target; kept for the dev container's headless flow.
-- **CI Android + iOS** via `.github/workflows/mobile-e2e.yml`, currently **advisory** (`continue-on-error: true`). Triggers: `pull_request` against `main`, `push` to `main` (post-merge), `push` to `tech/mobile-e2e` (iteration on the e2e setup itself), and `workflow_dispatch`. Flip the `continue-on-error` flags to make the workflow gating once the two skipped specs (`receipt_comments_test`, `receipt_cost_split_test`) un-skip — they track real product bugs that are separate follow-ups.
+- **CI Android + iOS** via `.github/workflows/mobile-e2e.yml`, currently **advisory** (`continue-on-error: true`). Triggers: `pull_request` against `main`, `push` to `main` (post-merge), `push` to `tech/mobile-e2e` (iteration on the e2e setup itself), and `workflow_dispatch`. The formerly skipped specs (`receipt_comments_test`, `receipt_cost_split_test`) are un-skipped and green — the product bugs they tracked are fixed — so nothing blocks flipping `continue-on-error` once CI demonstrates stability.
 
 Screenshot/video capture on failure is still deferred — see the "Out of scope" note at the bottom of this section.
 
@@ -267,6 +327,23 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 
 #### Caveats / things that will bite
 
+- **Three tap-flake patterns** (each cost a debugging session on the Android emulator; recognize them by a
+  "derived an Offset ... that would not hit test on the specified widget" warning followed by a downstream timeout).
+  iOS makes pattern 2 **deterministic** where Android only flaked — Cupertino page/popup transitions are slower
+  (~400ms), so any tap site without the hitTestable-wait + drain fails every run on the simulator:
+  1. **`tester.ensureVisible` does not pump.** It jumps the scroll position but the widget's global offset only
+     updates after a relayout, so an immediate `tap()` computes the stale (off-screen) center. Always
+     `await tester.pump(...)` (or `pumpAndSettle`) between `ensureVisible` and `tap`.
+  2. **Modal sheets and popup menus mount content on the animation's first frame.** `pumpUntilFound(find.text(...))`
+     returns while the sheet is still sliding in / the popup is still scaling, and the tap lands where the item
+     *was*. Wait on `finder.hitTestable()` and then drain a few frames (`for (...) pump(100ms)`) before tapping —
+     see `addManualReceiptViaUI` and `receipt_cost_split_test._navigateToEdit` for the canonical shape.
+  3. **Snackbars absorb taps on bottom-of-screen buttons.** The root ScaffoldMessenger renders snackbars ABOVE
+     modal bottom sheets, so e.g. "Receipt added successfully" covers a sheet's bottom submit button for ~4s.
+     `pumpUntilFound(tester, button.hitTestable())` resumes exactly when the snackbar departs.
+- **Destination markers must be unique to the destination.** `find.text('Name')` matches on BOTH `/view` and
+  `/edit` receipt forms, so it cannot prove an Edit navigation happened — use `find.byType(BottomSubmitButton)`
+  (only mounted on edit/add paths) instead.
 - **Headless display:** Flutter Linux desktop apps render through GTK and exit immediately without a display. `run-e2e.sh` auto-wraps in `xvfb-run` when `$DISPLAY` is unset. If you see "The log reader stopped unexpectedly, or never started," your display setup isn't working — check `xvfb-run --help` or set `DISPLAY` to a real X server.
 - **`libsecret-1-dev` at build time:** the `flutter_secure_storage_linux` plugin's CMakeLists.txt does a `pkg_check_modules(libsecret-1>=0.18.4)` — if the dev headers aren't installed, the build fails with "The following required packages were not found: libsecret-1". Installed as a prereq above.
 - **`libsecret` at runtime is avoided via mocks.** We don't bring up gnome-keyring + dbus for tests. `installLinuxDesktopMocks()` intercepts the platform channel with an in-memory map. If you ever want to exercise the real storage path (e.g. to reproduce a token-persistence bug), start a dbus session + gnome-keyring-daemon before the test — but don't do that by default; it adds a lot of fragile state.
@@ -278,9 +355,15 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 #### Reference files
 
 - `integration_test/smoke_login_test.dart` — canonical smoke test.
+- `integration_test/permission_add_menu_test.dart` / `permission_receipt_edit_test.dart` — permission-gating coverage (add-menu gate, edit-popup gate, swipe-to-edit gate) using per-spec provisioned users/groups.
 - `integration_test/helpers/env.dart` — dart-define consumption + guards.
 - `integration_test/helpers/pump.dart` — `pumpUntilFound` polling helper.
 - `integration_test/helpers/platform_mocks.dart` — Linux-desktop platform-channel stubs for `permission_handler`, `gal`, `flutter_secure_storage`.
+- `integration_test/helpers/login.dart` / `api.dart` — UI + API login as admin, the shared e2e-user, or arbitrary credentials (`loginAs` / `apiLoginAs`).
+- `integration_test/helpers/permission_fixtures.dart` — admin-API provisioning for permission specs: fresh user + group with a chosen system group role ("Legacy Viewer"/"Legacy Editor"), optional seeded receipt, `addTearDown` cleanup.
+- `integration_test/helpers/feature_flags.dart` — `enableAiPoweredReceiptsForTest()`: toggles the Quick Scan flag by pointing systemSettings at a junk receiptProcessingSettings record, restoring on teardown.
+- `integration_test/helpers/receipt_test_helpers.dart` — `addManualReceiptViaUI` (group-selectable), URL/id extraction, receipt cleanup.
+- `integration_test/helpers/nav.dart` — group-entry and group-receipt navigation helpers.
 - `test_driver/integration_test.dart` — `integrationDriver()` entrypoint that `flutter drive` uses.
 - `run-e2e-android.sh` — Android runner; auto-boots an AVD, runs per-spec `flutter drive` loop with cleanup between specs.
 - `run-e2e-ios.sh` — iOS runner; resolves a simulator UDID by name and boots it, runs per-spec `flutter drive` loop.
@@ -290,7 +373,7 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 
 #### Out of scope (future work)
 
-- Flipping the workflow from advisory (`continue-on-error: true`) to required, once `receipt_comments_test` and `receipt_cost_split_test` un-skip.
+- Flipping the workflow from advisory (`continue-on-error: true`) to required — unblocked now that every spec runs un-skipped; do it after CI demonstrates stability.
 - Screenshot / video artifact capture on failure.
 - `storageState`-style auth warmup across a multi-spec suite.
 - Additional specs (receipt CRUD, group management, logout).

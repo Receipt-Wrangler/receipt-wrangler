@@ -28,7 +28,7 @@ class _$ReceiptPagedRequestFilter extends ReceiptPagedRequestFilter {
 
   factory _$ReceiptPagedRequestFilter(
           [void Function(ReceiptPagedRequestFilterBuilder)? updates]) =>
-      (new ReceiptPagedRequestFilterBuilder()..update(updates))._build();
+      (ReceiptPagedRequestFilterBuilder()..update(updates))._build();
 
   _$ReceiptPagedRequestFilter._(
       {this.date,
@@ -41,7 +41,6 @@ class _$ReceiptPagedRequestFilter extends ReceiptPagedRequestFilter {
       this.resolvedDate,
       this.createdAt})
       : super._();
-
   @override
   ReceiptPagedRequestFilter rebuild(
           void Function(ReceiptPagedRequestFilterBuilder) updates) =>
@@ -49,7 +48,7 @@ class _$ReceiptPagedRequestFilter extends ReceiptPagedRequestFilter {
 
   @override
   ReceiptPagedRequestFilterBuilder toBuilder() =>
-      new ReceiptPagedRequestFilterBuilder()..replace(this);
+      ReceiptPagedRequestFilterBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -163,7 +162,6 @@ class ReceiptPagedRequestFilterBuilder
 
   @override
   void replace(ReceiptPagedRequestFilter other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$ReceiptPagedRequestFilter;
   }
 
@@ -177,16 +175,17 @@ class ReceiptPagedRequestFilterBuilder
 
   _$ReceiptPagedRequestFilter _build() {
     final _$result = _$v ??
-        new _$ReceiptPagedRequestFilter._(
-            date: date,
-            amount: amount,
-            name: name,
-            paidBy: paidBy,
-            categories: categories,
-            tags: tags,
-            status: status,
-            resolvedDate: resolvedDate,
-            createdAt: createdAt);
+        _$ReceiptPagedRequestFilter._(
+          date: date,
+          amount: amount,
+          name: name,
+          paidBy: paidBy,
+          categories: categories,
+          tags: tags,
+          status: status,
+          resolvedDate: resolvedDate,
+          createdAt: createdAt,
+        );
     replace(_$result);
     return _$result;
   }

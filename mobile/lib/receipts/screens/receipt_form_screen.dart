@@ -84,7 +84,24 @@ class _ReceiptFormScreen extends State<ReceiptFormScreen> {
             receiptData = snapshot.data![1] as api.Receipt?;
           }
 
-          if (isReady && receiptData != null) {
+          // Hydrate the model from the fetched receipt only when the model
+          // does not already hold THIS screen's receipt. This builder
+          // re-runs on every screen rebuild (e.g. when a modal bottom sheet
+          // above pops) with the SAME cached `receiptData` snapshot --
+          // re-hydrating unconditionally clobbers in-progress model
+          // mutations: Quick Actions split items were wiped back to the
+          // fetched (empty) item list before the save could read them,
+          // silently losing the entire split. Guarding on receipt identity
+          // (not a hydrate-once flag) still restores consistent data when
+          // something else swaps the model out from under a mounted screen:
+          // the app bar's back arrow calls resetModel() BEFORE navigating
+          // (receipt_app_bar.dart), and the departing form would otherwise
+          // rebuild against the default receipt and trip dropdown
+          // initialValue asserts. Same hazard class as the form-key guard
+          // in receipt_model.dart's setReceipt.
+          if (isReady &&
+              receiptData != null &&
+              receiptModel.receipt.id != receiptData.id) {
             receiptModel.setReceipt(receiptData, false);
           }
 

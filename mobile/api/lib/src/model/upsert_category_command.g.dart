@@ -16,14 +16,10 @@ class _$UpsertCategoryCommand extends UpsertCategoryCommand {
 
   factory _$UpsertCategoryCommand(
           [void Function(UpsertCategoryCommandBuilder)? updates]) =>
-      (new UpsertCategoryCommandBuilder()..update(updates))._build();
+      (UpsertCategoryCommandBuilder()..update(updates))._build();
 
   _$UpsertCategoryCommand._({this.id, required this.name, this.description})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        name, r'UpsertCategoryCommand', 'name');
-  }
-
+      : super._();
   @override
   UpsertCategoryCommand rebuild(
           void Function(UpsertCategoryCommandBuilder) updates) =>
@@ -31,7 +27,7 @@ class _$UpsertCategoryCommand extends UpsertCategoryCommand {
 
   @override
   UpsertCategoryCommandBuilder toBuilder() =>
-      new UpsertCategoryCommandBuilder()..replace(this);
+      UpsertCategoryCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -95,7 +91,6 @@ class UpsertCategoryCommandBuilder
 
   @override
   void replace(UpsertCategoryCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertCategoryCommand;
   }
 
@@ -109,11 +104,12 @@ class UpsertCategoryCommandBuilder
 
   _$UpsertCategoryCommand _build() {
     final _$result = _$v ??
-        new _$UpsertCategoryCommand._(
-            id: id,
-            name: BuiltValueNullFieldError.checkNotNull(
-                name, r'UpsertCategoryCommand', 'name'),
-            description: description);
+        _$UpsertCategoryCommand._(
+          id: id,
+          name: BuiltValueNullFieldError.checkNotNull(
+              name, r'UpsertCategoryCommand', 'name'),
+          description: description,
+        );
     replace(_$result);
     return _$result;
   }

@@ -4,6 +4,7 @@ import 'package:receipt_wrangler_mobile/client/client.dart';
 import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/models/category_model.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_preferences_model.dart';
@@ -48,6 +49,7 @@ Future<void> storeAppData(
     CategoryModel categoryModel,
     TagModel tagModel,
     SystemSettingsModel systemSettingsModel,
+    PermissionsModel permissionsModel,
     AppData appData) async {
   if ((appData.jwt?.isNotEmpty ?? false) &&
       (appData.refreshToken?.isNotEmpty ?? false)) {
@@ -70,4 +72,6 @@ Future<void> storeAppData(
       appData?.currencySymbolPosition ?? CurrencySymbolPosition.END);
   systemSettingsModel.setCurrencyHideDecimalPlaces(
       appData?.currencyHideDecimalPlaces ?? false);
+  permissionsModel.setPermissions(
+      appData.appPermissions, appData.groupPermissions);
 }

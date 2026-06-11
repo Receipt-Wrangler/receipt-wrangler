@@ -1,6 +1,5 @@
 import 'dart:io' show Platform;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:receipt_wrangler_mobile/groups/screens/group_select.dart';
@@ -28,7 +27,34 @@ import 'pump.dart';
 /// location and provider state never leak across `testWidgets`.
 Future<void> loginAsAdmin(WidgetTester tester) async {
   E2eEnv.assertAdmin();
+  await loginAs(
+    tester,
+    username: E2eEnv.adminUsername,
+    password: E2eEnv.adminPassword,
+  );
+}
 
+/// Same flow as [loginAsAdmin] but uses the regular e2e-user credentials.
+/// Use for permission-gating specs that need a non-admin caller — e.g. a
+/// Legacy Viewer / Legacy Editor group member (provisioned over the API)
+/// or a user that belongs to no group at all.
+Future<void> loginAsUser(WidgetTester tester) async {
+  E2eEnv.assertUser();
+  await loginAs(
+    tester,
+    username: E2eEnv.userUsername,
+    password: E2eEnv.userPassword,
+  );
+}
+
+/// Generic login: pumps a fresh app tree and walks the SetHomeserverUrl +
+/// Login screens with [username]/[password], returning once `GroupSelect`
+/// is on screen. [loginAsAdmin] / [loginAsUser] are thin wrappers.
+Future<void> loginAs(
+  WidgetTester tester, {
+  required String username,
+  required String password,
+}) async {
   // Reset persistent state before pumping a fresh app tree.
   //
   // flutter_secure_storage (JWT): iOS keychain entries are scoped to the
@@ -65,8 +91,8 @@ Future<void> loginAsAdmin(WidgetTester tester) async {
   await tester.tap(filledButton('Connect'));
   await pumpUntilFound(tester, find.text('Log In'));
 
-  await tester.enterText(formField('username'), E2eEnv.adminUsername);
-  await tester.enterText(formField('password'), E2eEnv.adminPassword);
+  await tester.enterText(formField('username'), username);
+  await tester.enterText(formField('password'), password);
   await tester.tap(filledButton('Log In'));
 
   await pumpUntilFound(

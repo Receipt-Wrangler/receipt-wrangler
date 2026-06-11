@@ -14,14 +14,10 @@ class _$UpsertCustomFieldOptionCommand extends UpsertCustomFieldOptionCommand {
 
   factory _$UpsertCustomFieldOptionCommand(
           [void Function(UpsertCustomFieldOptionCommandBuilder)? updates]) =>
-      (new UpsertCustomFieldOptionCommandBuilder()..update(updates))._build();
+      (UpsertCustomFieldOptionCommandBuilder()..update(updates))._build();
 
   _$UpsertCustomFieldOptionCommand._({this.value, required this.customFieldId})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        customFieldId, r'UpsertCustomFieldOptionCommand', 'customFieldId');
-  }
-
+      : super._();
   @override
   UpsertCustomFieldOptionCommand rebuild(
           void Function(UpsertCustomFieldOptionCommandBuilder) updates) =>
@@ -29,7 +25,7 @@ class _$UpsertCustomFieldOptionCommand extends UpsertCustomFieldOptionCommand {
 
   @override
   UpsertCustomFieldOptionCommandBuilder toBuilder() =>
-      new UpsertCustomFieldOptionCommandBuilder()..replace(this);
+      UpsertCustomFieldOptionCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -88,7 +84,6 @@ class UpsertCustomFieldOptionCommandBuilder
 
   @override
   void replace(UpsertCustomFieldOptionCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertCustomFieldOptionCommand;
   }
 
@@ -102,10 +97,11 @@ class UpsertCustomFieldOptionCommandBuilder
 
   _$UpsertCustomFieldOptionCommand _build() {
     final _$result = _$v ??
-        new _$UpsertCustomFieldOptionCommand._(
-            value: value,
-            customFieldId: BuiltValueNullFieldError.checkNotNull(customFieldId,
-                r'UpsertCustomFieldOptionCommand', 'customFieldId'));
+        _$UpsertCustomFieldOptionCommand._(
+          value: value,
+          customFieldId: BuiltValueNullFieldError.checkNotNull(customFieldId,
+              r'UpsertCustomFieldOptionCommand', 'customFieldId'),
+        );
     replace(_$result);
     return _$result;
   }

@@ -11,6 +11,7 @@ Name | Type | Description | Notes
 **createdAt** | **String** |  | [optional] 
 **groupId** | **int** | Group compound primary key | 
 **groupRole** | [**GroupRole**](GroupRole.md) |  | 
+**groupRoleId** | **int** | Id of the modern group role assigned to the member | [optional] 
 **updatedAt** | **String** |  | [optional] 
 **userId** | **int** | User compound primary key | 
 

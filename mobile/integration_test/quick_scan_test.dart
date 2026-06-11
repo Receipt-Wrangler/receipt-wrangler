@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 
+import 'helpers/feature_flags.dart';
 import 'helpers/file_selector_mock.dart';
 import 'helpers/form_actions.dart';
 import 'helpers/login.dart';
@@ -43,6 +44,11 @@ void main() {
       // supports Android/iOS in scan.dart.
       skip: Platform.isLinux,
       (tester) async {
+    // Quick Scan is gated on featureConfig.aiPoweredReceipts, which is off by
+    // default on the local backend. Flip it on for this test (restored on
+    // teardown) so the menu item appears and the bottom sheet opens. Must run
+    // before loginAsAdmin so the app fetches the enabled flag at bootstrap.
+    await enableAiPoweredReceiptsForTest();
     await installFileSelectorMock();
     await binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => binding.setSurfaceSize(null));
@@ -56,9 +62,16 @@ void main() {
     // mobile/lib/shared/functions/show_add_menu.dart:50-54). So the
     // gate's verification is implicit: if the bottom sheet opens,
     // the flag is true.
-    await tester.tap(find.text('Add'));
-    await pumpUntilFound(tester, find.text('Quick Scan'));
-    await tester.tap(find.text('Quick Scan'));
+    await tester.tap(find.text('Add').hitTestable());
+    // The add menu's items mount on the sheet slide-in's first frame; a tap
+    // computed then misses (deterministic on iOS: "Offset(595.9, 866.0) ...
+    // would not hit test"). Wait for hittability, then drain the slide-in --
+    // same hardening as addManualReceiptViaUI.
+    await pumpUntilFound(tester, find.text('Quick Scan').hitTestable());
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.tap(find.text('Quick Scan').hitTestable());
 
     // Wait for the bottom sheet to mount. The title "Quick Scan"
     // shows in the sheet header; the gallery upload action shows as

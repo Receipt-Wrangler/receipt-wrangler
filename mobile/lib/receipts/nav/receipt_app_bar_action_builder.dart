@@ -59,14 +59,24 @@ class ReceiptAppBarActionBuilder {
           popupMenuChildren: [
             PopupMenuItem(
               child: Text("Edit"),
-              onTap: () {
-                context.go("/receipts/${receiptModel.receipt.id}/edit");
-              },
+              onTap: () => _goAfterMenu(
+                  "/receipts/${receiptModel.receipt.id}/edit"),
             )
           ]);
     }
 
     return SizedBox.shrink();
+  }
+
+  // A PopupMenuItem invokes onTap *after* it pops the menu route. Navigating
+  // straight from the (now-departing) menu/page context is lost under the
+  // receipt routes' NoTransitionPage swap, which removes the old page in the
+  // same frame. Capture the stable GoRouter up front and navigate once the
+  // menu has finished dismissing so the go isn't clobbered by the pop.
+  void _goAfterMenu(String location) {
+    final router = GoRouter.of(context);
+    Future.delayed(
+        const Duration(milliseconds: 50), () => router.go(location));
   }
 
   Widget _buildCommentsAppBarMenu(String fullPath) {
@@ -76,10 +86,8 @@ class ReceiptAppBarActionBuilder {
           popupMenuChildren: [
             PopupMenuItem(
               child: Text("Edit"),
-              onTap: () {
-                context
-                    .go("/receipts/${receiptModel.receipt.id}/comments/edit");
-              },
+              onTap: () => _goAfterMenu(
+                  "/receipts/${receiptModel.receipt.id}/comments/edit"),
             )
           ]);
     }

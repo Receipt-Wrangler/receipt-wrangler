@@ -26,7 +26,7 @@ class _$UpsertItemCommand extends UpsertItemCommand {
 
   factory _$UpsertItemCommand(
           [void Function(UpsertItemCommandBuilder)? updates]) =>
-      (new UpsertItemCommandBuilder()..update(updates))._build();
+      (UpsertItemCommandBuilder()..update(updates))._build();
 
   _$UpsertItemCommand._(
       {required this.amount,
@@ -37,23 +37,14 @@ class _$UpsertItemCommand extends UpsertItemCommand {
       this.categories,
       this.tags,
       this.linkedItems})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        amount, r'UpsertItemCommand', 'amount');
-    BuiltValueNullFieldError.checkNotNull(name, r'UpsertItemCommand', 'name');
-    BuiltValueNullFieldError.checkNotNull(
-        receiptId, r'UpsertItemCommand', 'receiptId');
-    BuiltValueNullFieldError.checkNotNull(
-        status, r'UpsertItemCommand', 'status');
-  }
-
+      : super._();
   @override
   UpsertItemCommand rebuild(void Function(UpsertItemCommandBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
   UpsertItemCommandBuilder toBuilder() =>
-      new UpsertItemCommandBuilder()..replace(this);
+      UpsertItemCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -126,18 +117,18 @@ class UpsertItemCommandBuilder
 
   ListBuilder<UpsertCategoryCommand>? _categories;
   ListBuilder<UpsertCategoryCommand> get categories =>
-      _$this._categories ??= new ListBuilder<UpsertCategoryCommand>();
+      _$this._categories ??= ListBuilder<UpsertCategoryCommand>();
   set categories(ListBuilder<UpsertCategoryCommand>? categories) =>
       _$this._categories = categories;
 
   ListBuilder<UpsertTagCommand>? _tags;
   ListBuilder<UpsertTagCommand> get tags =>
-      _$this._tags ??= new ListBuilder<UpsertTagCommand>();
+      _$this._tags ??= ListBuilder<UpsertTagCommand>();
   set tags(ListBuilder<UpsertTagCommand>? tags) => _$this._tags = tags;
 
   ListBuilder<UpsertItemCommand>? _linkedItems;
   ListBuilder<UpsertItemCommand> get linkedItems =>
-      _$this._linkedItems ??= new ListBuilder<UpsertItemCommand>();
+      _$this._linkedItems ??= ListBuilder<UpsertItemCommand>();
   set linkedItems(ListBuilder<UpsertItemCommand>? linkedItems) =>
       _$this._linkedItems = linkedItems;
 
@@ -163,7 +154,6 @@ class UpsertItemCommandBuilder
 
   @override
   void replace(UpsertItemCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertItemCommand;
   }
 
@@ -179,19 +169,20 @@ class UpsertItemCommandBuilder
     _$UpsertItemCommand _$result;
     try {
       _$result = _$v ??
-          new _$UpsertItemCommand._(
-              amount: BuiltValueNullFieldError.checkNotNull(
-                  amount, r'UpsertItemCommand', 'amount'),
-              chargedToUserId: chargedToUserId,
-              name: BuiltValueNullFieldError.checkNotNull(
-                  name, r'UpsertItemCommand', 'name'),
-              receiptId: BuiltValueNullFieldError.checkNotNull(
-                  receiptId, r'UpsertItemCommand', 'receiptId'),
-              status: BuiltValueNullFieldError.checkNotNull(
-                  status, r'UpsertItemCommand', 'status'),
-              categories: _categories?.build(),
-              tags: _tags?.build(),
-              linkedItems: _linkedItems?.build());
+          _$UpsertItemCommand._(
+            amount: BuiltValueNullFieldError.checkNotNull(
+                amount, r'UpsertItemCommand', 'amount'),
+            chargedToUserId: chargedToUserId,
+            name: BuiltValueNullFieldError.checkNotNull(
+                name, r'UpsertItemCommand', 'name'),
+            receiptId: BuiltValueNullFieldError.checkNotNull(
+                receiptId, r'UpsertItemCommand', 'receiptId'),
+            status: BuiltValueNullFieldError.checkNotNull(
+                status, r'UpsertItemCommand', 'status'),
+            categories: _categories?.build(),
+            tags: _tags?.build(),
+            linkedItems: _linkedItems?.build(),
+          );
     } catch (_) {
       late String _$failedField;
       try {
@@ -202,7 +193,7 @@ class UpsertItemCommandBuilder
         _$failedField = 'linkedItems';
         _linkedItems?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'UpsertItemCommand', _$failedField, e.toString());
       }
       rethrow;

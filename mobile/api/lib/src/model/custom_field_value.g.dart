@@ -34,7 +34,7 @@ class _$CustomFieldValue extends CustomFieldValue {
 
   factory _$CustomFieldValue(
           [void Function(CustomFieldValueBuilder)? updates]) =>
-      (new CustomFieldValueBuilder()..update(updates))._build();
+      (CustomFieldValueBuilder()..update(updates))._build();
 
   _$CustomFieldValue._(
       {this.dateValue,
@@ -49,23 +49,14 @@ class _$CustomFieldValue extends CustomFieldValue {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        customFieldId, r'CustomFieldValue', 'customFieldId');
-    BuiltValueNullFieldError.checkNotNull(
-        receiptId, r'CustomFieldValue', 'receiptId');
-    BuiltValueNullFieldError.checkNotNull(id, r'CustomFieldValue', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'CustomFieldValue', 'createdAt');
-  }
-
+      : super._();
   @override
   CustomFieldValue rebuild(void Function(CustomFieldValueBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
   CustomFieldValueBuilder toBuilder() =>
-      new CustomFieldValueBuilder()..replace(this);
+      CustomFieldValueBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -209,7 +200,6 @@ class CustomFieldValueBuilder
 
   @override
   void replace(covariant CustomFieldValue other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$CustomFieldValue;
   }
 
@@ -223,23 +213,24 @@ class CustomFieldValueBuilder
 
   _$CustomFieldValue _build() {
     final _$result = _$v ??
-        new _$CustomFieldValue._(
-            dateValue: dateValue,
-            stringValue: stringValue,
-            selectValue: selectValue,
-            currencyValue: currencyValue,
-            customFieldId: BuiltValueNullFieldError.checkNotNull(
-                customFieldId, r'CustomFieldValue', 'customFieldId'),
-            booleanValue: booleanValue,
-            receiptId: BuiltValueNullFieldError.checkNotNull(
-                receiptId, r'CustomFieldValue', 'receiptId'),
-            id: BuiltValueNullFieldError.checkNotNull(
-                id, r'CustomFieldValue', 'id'),
-            createdAt: BuiltValueNullFieldError.checkNotNull(
-                createdAt, r'CustomFieldValue', 'createdAt'),
-            createdBy: createdBy,
-            createdByString: createdByString,
-            updatedAt: updatedAt);
+        _$CustomFieldValue._(
+          dateValue: dateValue,
+          stringValue: stringValue,
+          selectValue: selectValue,
+          currencyValue: currencyValue,
+          customFieldId: BuiltValueNullFieldError.checkNotNull(
+              customFieldId, r'CustomFieldValue', 'customFieldId'),
+          booleanValue: booleanValue,
+          receiptId: BuiltValueNullFieldError.checkNotNull(
+              receiptId, r'CustomFieldValue', 'receiptId'),
+          id: BuiltValueNullFieldError.checkNotNull(
+              id, r'CustomFieldValue', 'id'),
+          createdAt: BuiltValueNullFieldError.checkNotNull(
+              createdAt, r'CustomFieldValue', 'createdAt'),
+          createdBy: createdBy,
+          createdByString: createdByString,
+          updatedAt: updatedAt,
+        );
     replace(_$result);
     return _$result;
   }

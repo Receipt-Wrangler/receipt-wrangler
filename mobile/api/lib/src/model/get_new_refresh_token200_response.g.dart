@@ -12,13 +12,9 @@ class _$GetNewRefreshToken200Response extends GetNewRefreshToken200Response {
 
   factory _$GetNewRefreshToken200Response(
           [void Function(GetNewRefreshToken200ResponseBuilder)? updates]) =>
-      (new GetNewRefreshToken200ResponseBuilder()..update(updates))._build();
+      (GetNewRefreshToken200ResponseBuilder()..update(updates))._build();
 
-  _$GetNewRefreshToken200Response._({required this.anyOf}) : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        anyOf, r'GetNewRefreshToken200Response', 'anyOf');
-  }
-
+  _$GetNewRefreshToken200Response._({required this.anyOf}) : super._();
   @override
   GetNewRefreshToken200Response rebuild(
           void Function(GetNewRefreshToken200ResponseBuilder) updates) =>
@@ -26,7 +22,7 @@ class _$GetNewRefreshToken200Response extends GetNewRefreshToken200Response {
 
   @override
   GetNewRefreshToken200ResponseBuilder toBuilder() =>
-      new GetNewRefreshToken200ResponseBuilder()..replace(this);
+      GetNewRefreshToken200ResponseBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -75,7 +71,6 @@ class GetNewRefreshToken200ResponseBuilder
 
   @override
   void replace(GetNewRefreshToken200Response other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$GetNewRefreshToken200Response;
   }
 
@@ -89,9 +84,10 @@ class GetNewRefreshToken200ResponseBuilder
 
   _$GetNewRefreshToken200Response _build() {
     final _$result = _$v ??
-        new _$GetNewRefreshToken200Response._(
-            anyOf: BuiltValueNullFieldError.checkNotNull(
-                anyOf, r'GetNewRefreshToken200Response', 'anyOf'));
+        _$GetNewRefreshToken200Response._(
+          anyOf: BuiltValueNullFieldError.checkNotNull(
+              anyOf, r'GetNewRefreshToken200Response', 'anyOf'),
+        );
     replace(_$result);
     return _$result;
   }

@@ -303,7 +303,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **hasAccessToReceipt**
-> hasAccessToReceipt(receiptId, groupRole)
+> hasAccessToReceipt(receiptId, permission)
 
 Has access to receipt
 
@@ -319,10 +319,10 @@ import 'package:openapi/api.dart';
 
 final api = Openapi().getReceiptApi();
 final int receiptId = 56; // int | 
-final String groupRole = groupRole_example; // String | Role required to have access to receipt
+final Permission permission = ; // Permission | Group permission required to access the receipt
 
 try {
-    api.hasAccessToReceipt(receiptId, groupRole);
+    api.hasAccessToReceipt(receiptId, permission);
 } catch on DioException (e) {
     print('Exception when calling ReceiptApi->hasAccessToReceipt: $e\n');
 }
@@ -333,7 +333,7 @@ try {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **receiptId** | **int**|  | 
- **groupRole** | **String**| Role required to have access to receipt | [optional] 
+ **permission** | [**Permission**](.md)| Group permission required to access the receipt | 
 
 ### Return type
 

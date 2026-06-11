@@ -18,6 +18,7 @@ import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/models/category_model.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/models/loading_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/models/receipt-list-model.dart';
 import 'package:receipt_wrangler_mobile/models/receipt_model.dart';
 import 'package:receipt_wrangler_mobile/models/search_model.dart';
@@ -64,6 +65,7 @@ Widget buildApp() {
       ChangeNotifierProvider(create: (_) => CustomFieldModel()),
       ChangeNotifierProvider(create: (_) => GroupModel()),
       ChangeNotifierProvider(create: (_) => LoadingModel()),
+      ChangeNotifierProvider(create: (_) => PermissionsModel()),
       ChangeNotifierProvider(create: (_) => ReceiptListModel()),
       ChangeNotifierProvider(create: (_) => ReceiptModel()),
       ChangeNotifierProvider(create: (_) => SearchModel()),
@@ -129,21 +131,33 @@ GoRouter _buildAppRouter() {
               builder: (context, state) => const GroupReceiptsScreen(),
             ),
           ]),
+      // The three receipt routes all render ReceiptFormScreen, whose form uses
+      // a single shared GlobalKey (ReceiptModel.receiptFormKey). A default
+      // animated page transition keeps the outgoing and incoming screens
+      // mounted simultaneously for the duration of the slide, so two
+      // ReceiptForms briefly share that GlobalKey ("a GlobalKey was specified
+      // multiple times"). NoTransitionPage swaps atomically (no overlap), which
+      // also stops a just-departed /receipts/add screen from lingering and
+      // re-rendering itself as a stale "view" (its form state is derived from
+      // the live URL).
       GoRoute(
         path: '/receipts/add',
         redirect: (context, state) {
           Provider.of<ReceiptModel>(context, listen: false).resetModel();
           return null;
         },
-        builder: (context, state) => const ReceiptFormScreen(),
+        pageBuilder: (context, state) => NoTransitionPage(
+            key: state.pageKey, child: const ReceiptFormScreen()),
       ),
       GoRoute(
         path: '/receipts/:receiptId/view',
-        builder: (context, state) => const ReceiptFormScreen(),
+        pageBuilder: (context, state) => NoTransitionPage(
+            key: state.pageKey, child: const ReceiptFormScreen()),
       ),
       GoRoute(
         path: '/receipts/:receiptId/edit',
-        builder: (context, state) => const ReceiptFormScreen(),
+        pageBuilder: (context, state) => NoTransitionPage(
+            key: state.pageKey, child: const ReceiptFormScreen()),
       ),
       GoRoute(
         path: '/profile',
@@ -207,6 +221,8 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
       Provider.of<SystemSettingsModel>(context, listen: false);
   late final userPreferencesModel =
       Provider.of<UserPreferencesModel>(context, listen: false);
+  late final permissionsModel =
+      Provider.of<PermissionsModel>(context, listen: false);
 
   @override
   void initState() {
@@ -243,6 +259,7 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
         categoryModel: categoryModel,
         tagModel: tagModel,
         systemSettingsModel: systemSettingsModel,
+        permissionsModel: permissionsModel,
       );
 
       _initFuture = TokenRefreshService().refreshTokens();

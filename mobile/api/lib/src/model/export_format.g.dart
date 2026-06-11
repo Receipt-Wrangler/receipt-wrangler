@@ -13,12 +13,12 @@ ExportFormat _$valueOf(String name) {
     case 'CSV':
       return _$CSV;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
 final BuiltSet<ExportFormat> _$values =
-    new BuiltSet<ExportFormat>(const <ExportFormat>[
+    BuiltSet<ExportFormat>(const <ExportFormat>[
   _$CSV,
 ]);
 
@@ -34,8 +34,7 @@ abstract class _$ExportFormatMixin {
   _$ExportFormatMeta get ExportFormat => const _$ExportFormatMeta();
 }
 
-Serializer<ExportFormat> _$exportFormatSerializer =
-    new _$ExportFormatSerializer();
+Serializer<ExportFormat> _$exportFormatSerializer = _$ExportFormatSerializer();
 
 class _$ExportFormatSerializer implements PrimitiveSerializer<ExportFormat> {
   static const Map<String, Object> _toWire = const <String, Object>{

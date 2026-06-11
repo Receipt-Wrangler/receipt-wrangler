@@ -16,12 +16,12 @@ GroupStatus _$valueOf(String name) {
     case 'ARCHIVED':
       return _$ARCHIVED;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
 final BuiltSet<GroupStatus> _$values =
-    new BuiltSet<GroupStatus>(const <GroupStatus>[
+    BuiltSet<GroupStatus>(const <GroupStatus>[
   _$ACTIVE,
   _$ARCHIVED,
 ]);
@@ -39,7 +39,7 @@ abstract class _$GroupStatusMixin {
   _$GroupStatusMeta get GroupStatus => const _$GroupStatusMeta();
 }
 
-Serializer<GroupStatus> _$groupStatusSerializer = new _$GroupStatusSerializer();
+Serializer<GroupStatus> _$groupStatusSerializer = _$GroupStatusSerializer();
 
 class _$GroupStatusSerializer implements PrimitiveSerializer<GroupStatus> {
   static const Map<String, Object> _toWire = const <String, Object>{

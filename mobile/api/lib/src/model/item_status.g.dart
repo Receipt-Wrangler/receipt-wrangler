@@ -19,12 +19,11 @@ ItemStatus _$valueOf(String name) {
     case 'DRAFT':
       return _$DRAFT;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
-final BuiltSet<ItemStatus> _$values =
-    new BuiltSet<ItemStatus>(const <ItemStatus>[
+final BuiltSet<ItemStatus> _$values = BuiltSet<ItemStatus>(const <ItemStatus>[
   _$OPEN,
   _$RESOLVED,
   _$DRAFT,
@@ -44,7 +43,7 @@ abstract class _$ItemStatusMixin {
   _$ItemStatusMeta get ItemStatus => const _$ItemStatusMeta();
 }
 
-Serializer<ItemStatus> _$itemStatusSerializer = new _$ItemStatusSerializer();
+Serializer<ItemStatus> _$itemStatusSerializer = _$ItemStatusSerializer();
 
 class _$ItemStatusSerializer implements PrimitiveSerializer<ItemStatus> {
   static const Map<String, Object> _toWire = const <String, Object>{

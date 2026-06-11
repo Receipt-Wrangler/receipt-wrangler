@@ -19,11 +19,11 @@ GroupRole _$valueOf(String name) {
     case 'EDITOR':
       return _$EDITOR;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
-final BuiltSet<GroupRole> _$values = new BuiltSet<GroupRole>(const <GroupRole>[
+final BuiltSet<GroupRole> _$values = BuiltSet<GroupRole>(const <GroupRole>[
   _$OWNER,
   _$VIEWER,
   _$EDITOR,
@@ -43,7 +43,7 @@ abstract class _$GroupRoleMixin {
   _$GroupRoleMeta get GroupRole => const _$GroupRoleMeta();
 }
 
-Serializer<GroupRole> _$groupRoleSerializer = new _$GroupRoleSerializer();
+Serializer<GroupRole> _$groupRoleSerializer = _$GroupRoleSerializer();
 
 class _$GroupRoleSerializer implements PrimitiveSerializer<GroupRole> {
   static const Map<String, Object> _toWire = const <String, Object>{

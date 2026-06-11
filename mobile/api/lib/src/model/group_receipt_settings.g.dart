@@ -38,7 +38,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
 
   factory _$GroupReceiptSettings(
           [void Function(GroupReceiptSettingsBuilder)? updates]) =>
-      (new GroupReceiptSettingsBuilder()..update(updates))._build();
+      (GroupReceiptSettingsBuilder()..update(updates))._build();
 
   _$GroupReceiptSettings._(
       {this.hideReceiptTags,
@@ -55,14 +55,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        groupId, r'GroupReceiptSettings', 'groupId');
-    BuiltValueNullFieldError.checkNotNull(id, r'GroupReceiptSettings', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'GroupReceiptSettings', 'createdAt');
-  }
-
+      : super._();
   @override
   GroupReceiptSettings rebuild(
           void Function(GroupReceiptSettingsBuilder) updates) =>
@@ -70,7 +63,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
 
   @override
   GroupReceiptSettingsBuilder toBuilder() =>
-      new GroupReceiptSettingsBuilder()..replace(this);
+      GroupReceiptSettingsBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -232,7 +225,6 @@ class GroupReceiptSettingsBuilder
 
   @override
   void replace(covariant GroupReceiptSettings other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$GroupReceiptSettings;
   }
 
@@ -246,24 +238,25 @@ class GroupReceiptSettingsBuilder
 
   _$GroupReceiptSettings _build() {
     final _$result = _$v ??
-        new _$GroupReceiptSettings._(
-            hideReceiptTags: hideReceiptTags,
-            hideReceiptCategories: hideReceiptCategories,
-            groupId: BuiltValueNullFieldError.checkNotNull(
-                groupId, r'GroupReceiptSettings', 'groupId'),
-            hideItemCategories: hideItemCategories,
-            hideShareTags: hideShareTags,
-            hideImages: hideImages,
-            hideItemTags: hideItemTags,
-            hideComments: hideComments,
-            hideShareCategories: hideShareCategories,
-            id: BuiltValueNullFieldError.checkNotNull(
-                id, r'GroupReceiptSettings', 'id'),
-            createdAt: BuiltValueNullFieldError.checkNotNull(
-                createdAt, r'GroupReceiptSettings', 'createdAt'),
-            createdBy: createdBy,
-            createdByString: createdByString,
-            updatedAt: updatedAt);
+        _$GroupReceiptSettings._(
+          hideReceiptTags: hideReceiptTags,
+          hideReceiptCategories: hideReceiptCategories,
+          groupId: BuiltValueNullFieldError.checkNotNull(
+              groupId, r'GroupReceiptSettings', 'groupId'),
+          hideItemCategories: hideItemCategories,
+          hideShareTags: hideShareTags,
+          hideImages: hideImages,
+          hideItemTags: hideItemTags,
+          hideComments: hideComments,
+          hideShareCategories: hideShareCategories,
+          id: BuiltValueNullFieldError.checkNotNull(
+              id, r'GroupReceiptSettings', 'id'),
+          createdAt: BuiltValueNullFieldError.checkNotNull(
+              createdAt, r'GroupReceiptSettings', 'createdAt'),
+          createdBy: createdBy,
+          createdByString: createdByString,
+          updatedAt: updatedAt,
+        );
     replace(_$result);
     return _$result;
   }

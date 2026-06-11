@@ -12,13 +12,9 @@ class _$InternalErrorResponse extends InternalErrorResponse {
 
   factory _$InternalErrorResponse(
           [void Function(InternalErrorResponseBuilder)? updates]) =>
-      (new InternalErrorResponseBuilder()..update(updates))._build();
+      (InternalErrorResponseBuilder()..update(updates))._build();
 
-  _$InternalErrorResponse._({required this.errorMsg}) : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        errorMsg, r'InternalErrorResponse', 'errorMsg');
-  }
-
+  _$InternalErrorResponse._({required this.errorMsg}) : super._();
   @override
   InternalErrorResponse rebuild(
           void Function(InternalErrorResponseBuilder) updates) =>
@@ -26,7 +22,7 @@ class _$InternalErrorResponse extends InternalErrorResponse {
 
   @override
   InternalErrorResponseBuilder toBuilder() =>
-      new InternalErrorResponseBuilder()..replace(this);
+      InternalErrorResponseBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -73,7 +69,6 @@ class InternalErrorResponseBuilder
 
   @override
   void replace(InternalErrorResponse other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$InternalErrorResponse;
   }
 
@@ -87,9 +82,10 @@ class InternalErrorResponseBuilder
 
   _$InternalErrorResponse _build() {
     final _$result = _$v ??
-        new _$InternalErrorResponse._(
-            errorMsg: BuiltValueNullFieldError.checkNotNull(
-                errorMsg, r'InternalErrorResponse', 'errorMsg'));
+        _$InternalErrorResponse._(
+          errorMsg: BuiltValueNullFieldError.checkNotNull(
+              errorMsg, r'InternalErrorResponse', 'errorMsg'),
+        );
     replace(_$result);
     return _$result;
   }
