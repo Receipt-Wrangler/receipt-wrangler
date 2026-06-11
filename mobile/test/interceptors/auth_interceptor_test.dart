@@ -6,6 +6,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:openapi/openapi.dart';
 import 'package:receipt_wrangler_mobile/client/client.dart';
 import 'package:receipt_wrangler_mobile/interceptors/auth_interceptor.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/services/token_refresh_service.dart';
 
 import '../helpers/auth_test_helpers.dart';
@@ -111,6 +112,7 @@ void main() {
       categoryModel: MockCategoryModel(),
       tagModel: MockTagModel(),
       systemSettingsModel: MockSystemSettingsModel(),
+      permissionsModel: PermissionsModel(),
     );
 
     interceptor = AuthInterceptor();

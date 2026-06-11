@@ -11,10 +11,9 @@ import 'package:receipt_wrangler_mobile/utils/snackbar.dart';
 
 import '../../constants/colors.dart';
 import '../../extensions/duration.dart';
-import '../../models/auth_model.dart';
 import '../../models/group_model.dart';
+import '../../models/permissions_model.dart';
 import '../../models/user_model.dart';
-import '../../shared/functions/permissions.dart';
 import '../../shared/widgets/list_item_lead.dart';
 import '../../shared/widgets/list_item_trailing_status.dart';
 
@@ -31,7 +30,8 @@ class GroupActivityListItem extends StatefulWidget {
 }
 
 class _GroupActivityListItem extends State<GroupActivityListItem> {
-  late final authModel = Provider.of<AuthModel>(context, listen: false);
+  late final permissionsModel =
+      Provider.of<PermissionsModel>(context, listen: false);
   late final userModel = Provider.of<UserModel>(context, listen: false);
   late final groupModel = Provider.of<GroupModel>(context, listen: false);
   var hasBeenRerun = false;
@@ -129,9 +129,10 @@ class _GroupActivityListItem extends State<GroupActivityListItem> {
 
   @override
   Widget build(BuildContext context) {
-    var canEdit = canEditReceipt(authModel, groupModel, widget.groupId);
+    var canRerun = permissionsModel.hasGroupPermission(
+        widget.groupId, api.Permission.groupPeriodActivitiesPeriodRerun);
     var slideEnabled =
-        canEdit && (widget.activity.canBeRestarted ?? false) && !hasBeenRerun;
+        canRerun && (widget.activity.canBeRestarted ?? false) && !hasBeenRerun;
 
     return SlidableWidget(
         slideEnabled: slideEnabled,

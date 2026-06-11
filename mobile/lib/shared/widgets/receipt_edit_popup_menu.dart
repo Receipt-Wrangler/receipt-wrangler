@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../enums/form_state.dart';
-import '../../models/auth_model.dart';
-import '../../models/group_model.dart';
+import '../../models/permissions_model.dart';
 import '../../utils/forms.dart';
 import '../functions/permissions.dart';
 
@@ -19,10 +18,10 @@ class ReceiptEditPopupMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    late final authModel = Provider.of<AuthModel>(context, listen: false);
-    late final groupModel = Provider.of<GroupModel>(context, listen: false);
+    late final permissionsModel =
+        Provider.of<PermissionsModel>(context, listen: false);
     late final formStateToUse = formState ?? getFormStateFromContext(context);
-    var canEdit = canEditReceipt(authModel, groupModel, groupId);
+    var canEdit = canEditReceipt(permissionsModel, groupId);
 
     if (formStateToUse == WranglerFormState.add) {
       canEdit = true;
@@ -37,7 +36,5 @@ class ReceiptEditPopupMenu extends StatelessWidget {
     } else {
       return const SizedBox.shrink();
     }
-
-    return const SizedBox.shrink();
   }
 }

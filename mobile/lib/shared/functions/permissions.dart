@@ -1,33 +1,11 @@
 import 'package:openapi/openapi.dart';
-import '../../models/auth_model.dart';
-import '../../models/group_model.dart';
 
-bool canEditReceipt(AuthModel authModel, GroupModel groupModel, int groupId) {
-  var userId = authModel.claims?.userId;
-  if (userId == null) {
-    return false;
-  }
+import '../../models/permissions_model.dart';
 
-  var groupRole = getUserRoleInGroup(userId, groupId, groupModel);
-  if (groupRole == null) {
-    return false;
-  }
-
-  return groupRole == GroupRole.EDITOR || groupRole == GroupRole.OWNER;
-}
-
-GroupRole? getUserRoleInGroup(int userId, int groupId, GroupModel groupModel) {
-  var group = groupModel.getGroupById(groupId.toString());
-  if (group == null) {
-    return null;
-  }
-
-  var groupMember = group.groupMembers.firstWhere(
-    (groupMember) => groupMember.userId == userId,
-  );
-  if (groupMember == null) {
-    return null;
-  }
-
-  return groupMember.groupRole;
+/// Whether the current user may edit receipts in [groupId]. Gates on the modern
+/// `group.receipts.update` permission — the legacy GroupRole EDITOR and OWNER
+/// tiers both held it, so this preserves the previous behavior.
+bool canEditReceipt(PermissionsModel permissionsModel, int groupId) {
+  return permissionsModel.hasGroupPermission(
+      groupId, Permission.groupPeriodReceiptsPeriodUpdate);
 }

@@ -12,8 +12,8 @@ import 'package:receipt_wrangler_mobile/utils/currency.dart';
 import 'package:receipt_wrangler_mobile/utils/date.dart';
 
 import '../../constants/colors.dart';
-import '../../models/auth_model.dart';
 import '../../models/group_model.dart';
+import '../../models/permissions_model.dart';
 import '../../shared/functions/permissions.dart';
 import '../../shared/widgets/list_item_trailing_status.dart';
 
@@ -30,7 +30,8 @@ class ReceiptListItem extends StatefulWidget {
 }
 
 class _ReceiptListItem extends State<ReceiptListItem> {
-  late final authModel = Provider.of<AuthModel>(context, listen: false);
+  late final permissionsModel =
+      Provider.of<PermissionsModel>(context, listen: false);
   late final groupModel = Provider.of<GroupModel>(context, listen: false);
 
   Widget getStatusText() {
@@ -115,7 +116,7 @@ class _ReceiptListItem extends State<ReceiptListItem> {
 
   @override
   Widget build(BuildContext context) {
-    var canEdit = canEditReceipt(authModel, groupModel, widget.receipt.groupId);
+    var canEdit = canEditReceipt(permissionsModel, widget.receipt.groupId);
 
     return SlidableWidget(
         slideEnabled: canEdit,

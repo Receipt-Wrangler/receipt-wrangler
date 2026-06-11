@@ -18,6 +18,7 @@ import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/models/category_model.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/models/loading_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/models/receipt-list-model.dart';
 import 'package:receipt_wrangler_mobile/models/receipt_model.dart';
 import 'package:receipt_wrangler_mobile/models/search_model.dart';
@@ -64,6 +65,7 @@ Widget buildApp() {
       ChangeNotifierProvider(create: (_) => CustomFieldModel()),
       ChangeNotifierProvider(create: (_) => GroupModel()),
       ChangeNotifierProvider(create: (_) => LoadingModel()),
+      ChangeNotifierProvider(create: (_) => PermissionsModel()),
       ChangeNotifierProvider(create: (_) => ReceiptListModel()),
       ChangeNotifierProvider(create: (_) => ReceiptModel()),
       ChangeNotifierProvider(create: (_) => SearchModel()),
@@ -207,6 +209,8 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
       Provider.of<SystemSettingsModel>(context, listen: false);
   late final userPreferencesModel =
       Provider.of<UserPreferencesModel>(context, listen: false);
+  late final permissionsModel =
+      Provider.of<PermissionsModel>(context, listen: false);
 
   @override
   void initState() {
@@ -243,6 +247,7 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
         categoryModel: categoryModel,
         tagModel: tagModel,
         systemSettingsModel: systemSettingsModel,
+        permissionsModel: permissionsModel,
       );
 
       _initFuture = TokenRefreshService().refreshTokens();

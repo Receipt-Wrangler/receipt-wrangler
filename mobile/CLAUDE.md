@@ -32,6 +32,7 @@ The app uses Provider pattern with ChangeNotifier models:
 - **UserModel**: User profile and preferences
 - **CategoryModel**, **TagModel**: Metadata management
 - **SearchModel**: Search functionality with RxDart streams
+- **PermissionsModel**: The caller's effective permissions, used for UI gating (see "Permission-based UI gating")
 
 ### Navigation
 Uses `go_router` with nested shell routes:
@@ -69,6 +70,40 @@ Uses `flutter_form_builder` for complex forms with validation. Receipt forms sup
 - JWT-based authentication with automatic token refresh
 - Centralized client configuration in `OpenApiClient` singleton
 - Secure token storage using `flutter_secure_storage`
+
+### Permission-based UI gating
+
+The mobile app gates UI on the caller's **effective permissions**, mirroring the desktop client
+(`desktop/CLAUDE.md` → "Permission-based UI gating") and the backend's enforcement (`api/CLAUDE.md` →
+"Roles & Permissions"). The JWT carries only the legacy `UserRole` and is a UI hint; the server
+re-checks real permissions on every request, so a stale action at worst returns 403.
+
+- **Delivery & hydration:** permissions arrive on `AppData` (`appPermissions`, and `groupPermissions`
+  keyed by group id) and are stored in **`PermissionsModel`** (`lib/models/permissions_model.dart`)
+  via `setPermissions`, called **only** from `storeAppData` (`lib/utils/auth.dart`) on login and
+  app-init. Token-only refreshes never touch it. The `FutureBuilder` in `main.dart` blocks first
+  paint until app-init completes, so permissions are present before any gated widget builds.
+- **Matcher:** `lib/utils/permission_matcher.dart` (`permissionMatches` / `hasAll` / `hasAny`) is a
+  faithful port of the backend matcher (`api/internal/permissions/matcher.go`) and its desktop twin
+  (`desktop/src/utils/permission.utils.ts`), wildcard semantics included, so UI gating === backend.
+  The generated `Permission` enum is converted to its wire string at hydration (effective
+  permissions are always concrete registry keys, so the enum round-trips safely).
+- **Checks** (`PermissionsModel`): `hasAppPermission(p)`, `hasAnyAppPermission([..])`,
+  `hasGroupPermission(groupId, p, {orApp})` — the group one applies the `orApp` app-scoped override
+  first (the backend `OrAppPermissions` admin-not-a-member pattern) — and
+  `hasGroupPermissionInAnyGroup(p)` for screens with no single current group.
+- **Gating pattern:** read `Provider.of<PermissionsModel>(context, listen: false)` and conditionally
+  render, referencing the generated `Permission` constants. Gating is **widget-level only** — mobile
+  has no permission-scoped routes/screens (admin features live on desktop), so there are no
+  permission route guards.
+- **Current gates:**
+  - `canEditReceipt(permissionsModel, groupId)` (`lib/shared/functions/permissions.dart`) →
+    `group.receipts.update`, used by the receipt-edit popup (`receipt_edit_popup_menu.dart`) and the
+    receipt swipe-to-edit (`receipt_list_item.dart`).
+  - Activity rerun (`group_activity_list_item.dart`) → `group.activities.rerun`.
+  - The add menu (`show_add_menu.dart`) shows "Add Manual Receipt" on `group.receipts.create` and
+    "Quick Scan" on `group.receipts.quick-scan` — per-group when inside a group, or "held in any
+    group" on the group-select / all-groups view, where there is no single current group.
 
 ## Development Notes
 
@@ -121,6 +156,21 @@ After regenerating the API client with `generate-client.sh`, you need to run bui
 cd /home/user/receipt-wrangler/mobile/api
 flutter pub run build_runner build --delete-conflicting-outputs
 ```
+
+**Known dart-dio default-value regressions (re-patch after every regen).** The `dart-dio`
+generator emits invalid `_defaults` initializers for some fields, which `build_runner` then can't
+compile (and it deletes the matching `.g.dart` first, so the package stops building). After
+regenerating, restore these hand-fixes (precedent: commits `fad192a0`, `a2ec7479`):
+
+- `model/claims.dart` — `..userRole = 'USER'` → `..userRole = UserRole.USER` (enum default emitted
+  as a string).
+- `model/user_preferences.dart` — `..quickScanDefaultStatus = 'OPEN'` →
+  `..quickScanDefaultStatus = ReceiptStatus.OPEN`.
+- `model/system_settings.dart` — `..currencyDisplay = '$'` → `..currencyDisplay = r'$'` (a bare `$`
+  in a non-raw string is invalid Dart).
+
+Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
+is otherwise forbidden — these are the documented exception.)
 
 ### Testing
 
