@@ -11,19 +11,15 @@ class _$EncodedImage extends EncodedImage {
   final String encodedImage;
 
   factory _$EncodedImage([void Function(EncodedImageBuilder)? updates]) =>
-      (new EncodedImageBuilder()..update(updates))._build();
+      (EncodedImageBuilder()..update(updates))._build();
 
-  _$EncodedImage._({required this.encodedImage}) : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        encodedImage, r'EncodedImage', 'encodedImage');
-  }
-
+  _$EncodedImage._({required this.encodedImage}) : super._();
   @override
   EncodedImage rebuild(void Function(EncodedImageBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  EncodedImageBuilder toBuilder() => new EncodedImageBuilder()..replace(this);
+  EncodedImageBuilder toBuilder() => EncodedImageBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -70,7 +66,6 @@ class EncodedImageBuilder
 
   @override
   void replace(EncodedImage other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$EncodedImage;
   }
 
@@ -84,9 +79,10 @@ class EncodedImageBuilder
 
   _$EncodedImage _build() {
     final _$result = _$v ??
-        new _$EncodedImage._(
-            encodedImage: BuiltValueNullFieldError.checkNotNull(
-                encodedImage, r'EncodedImage', 'encodedImage'));
+        _$EncodedImage._(
+          encodedImage: BuiltValueNullFieldError.checkNotNull(
+              encodedImage, r'EncodedImage', 'encodedImage'),
+        );
     replace(_$result);
     return _$result;
   }

@@ -299,6 +299,3 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/role_api_test.dart
-test/role_test.dart
-test/upsert_role_command_test.dart

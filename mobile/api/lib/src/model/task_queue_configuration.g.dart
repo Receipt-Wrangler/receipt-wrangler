@@ -24,7 +24,7 @@ class _$TaskQueueConfiguration extends TaskQueueConfiguration {
 
   factory _$TaskQueueConfiguration(
           [void Function(TaskQueueConfigurationBuilder)? updates]) =>
-      (new TaskQueueConfigurationBuilder()..update(updates))._build();
+      (TaskQueueConfigurationBuilder()..update(updates))._build();
 
   _$TaskQueueConfiguration._(
       {this.name,
@@ -34,12 +34,7 @@ class _$TaskQueueConfiguration extends TaskQueueConfiguration {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(id, r'TaskQueueConfiguration', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'TaskQueueConfiguration', 'createdAt');
-  }
-
+      : super._();
   @override
   TaskQueueConfiguration rebuild(
           void Function(TaskQueueConfigurationBuilder) updates) =>
@@ -47,7 +42,7 @@ class _$TaskQueueConfiguration extends TaskQueueConfiguration {
 
   @override
   TaskQueueConfigurationBuilder toBuilder() =>
-      new TaskQueueConfigurationBuilder()..replace(this);
+      TaskQueueConfigurationBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -146,7 +141,6 @@ class TaskQueueConfigurationBuilder
 
   @override
   void replace(covariant TaskQueueConfiguration other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$TaskQueueConfiguration;
   }
 
@@ -160,16 +154,17 @@ class TaskQueueConfigurationBuilder
 
   _$TaskQueueConfiguration _build() {
     final _$result = _$v ??
-        new _$TaskQueueConfiguration._(
-            name: name,
-            priority: priority,
-            id: BuiltValueNullFieldError.checkNotNull(
-                id, r'TaskQueueConfiguration', 'id'),
-            createdAt: BuiltValueNullFieldError.checkNotNull(
-                createdAt, r'TaskQueueConfiguration', 'createdAt'),
-            createdBy: createdBy,
-            createdByString: createdByString,
-            updatedAt: updatedAt);
+        _$TaskQueueConfiguration._(
+          name: name,
+          priority: priority,
+          id: BuiltValueNullFieldError.checkNotNull(
+              id, r'TaskQueueConfiguration', 'id'),
+          createdAt: BuiltValueNullFieldError.checkNotNull(
+              createdAt, r'TaskQueueConfiguration', 'createdAt'),
+          createdBy: createdBy,
+          createdByString: createdByString,
+          updatedAt: updatedAt,
+        );
     replace(_$result);
     return _$result;
   }

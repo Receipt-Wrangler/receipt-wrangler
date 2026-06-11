@@ -23,6 +23,8 @@ class _$UpsertReceiptProcessingSettingsCommand
   @override
   final bool? isVisionModel;
   @override
+  final bool? enforceJsonResponseFormat;
+  @override
   final OcrEngine ocrEngine;
   @override
   final int promptId;
@@ -30,7 +32,7 @@ class _$UpsertReceiptProcessingSettingsCommand
   factory _$UpsertReceiptProcessingSettingsCommand(
           [void Function(UpsertReceiptProcessingSettingsCommandBuilder)?
               updates]) =>
-      (new UpsertReceiptProcessingSettingsCommandBuilder()..update(updates))
+      (UpsertReceiptProcessingSettingsCommandBuilder()..update(updates))
           ._build();
 
   _$UpsertReceiptProcessingSettingsCommand._(
@@ -41,19 +43,10 @@ class _$UpsertReceiptProcessingSettingsCommand
       this.key,
       this.model,
       this.isVisionModel,
+      this.enforceJsonResponseFormat,
       required this.ocrEngine,
       required this.promptId})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        name, r'UpsertReceiptProcessingSettingsCommand', 'name');
-    BuiltValueNullFieldError.checkNotNull(
-        aiType, r'UpsertReceiptProcessingSettingsCommand', 'aiType');
-    BuiltValueNullFieldError.checkNotNull(
-        ocrEngine, r'UpsertReceiptProcessingSettingsCommand', 'ocrEngine');
-    BuiltValueNullFieldError.checkNotNull(
-        promptId, r'UpsertReceiptProcessingSettingsCommand', 'promptId');
-  }
-
+      : super._();
   @override
   UpsertReceiptProcessingSettingsCommand rebuild(
           void Function(UpsertReceiptProcessingSettingsCommandBuilder)
@@ -62,7 +55,7 @@ class _$UpsertReceiptProcessingSettingsCommand
 
   @override
   UpsertReceiptProcessingSettingsCommandBuilder toBuilder() =>
-      new UpsertReceiptProcessingSettingsCommandBuilder()..replace(this);
+      UpsertReceiptProcessingSettingsCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -75,6 +68,7 @@ class _$UpsertReceiptProcessingSettingsCommand
         key == other.key &&
         model == other.model &&
         isVisionModel == other.isVisionModel &&
+        enforceJsonResponseFormat == other.enforceJsonResponseFormat &&
         ocrEngine == other.ocrEngine &&
         promptId == other.promptId;
   }
@@ -89,6 +83,7 @@ class _$UpsertReceiptProcessingSettingsCommand
     _$hash = $jc(_$hash, key.hashCode);
     _$hash = $jc(_$hash, model.hashCode);
     _$hash = $jc(_$hash, isVisionModel.hashCode);
+    _$hash = $jc(_$hash, enforceJsonResponseFormat.hashCode);
     _$hash = $jc(_$hash, ocrEngine.hashCode);
     _$hash = $jc(_$hash, promptId.hashCode);
     _$hash = $jf(_$hash);
@@ -106,6 +101,7 @@ class _$UpsertReceiptProcessingSettingsCommand
           ..add('key', key)
           ..add('model', model)
           ..add('isVisionModel', isVisionModel)
+          ..add('enforceJsonResponseFormat', enforceJsonResponseFormat)
           ..add('ocrEngine', ocrEngine)
           ..add('promptId', promptId))
         .toString();
@@ -147,6 +143,11 @@ class UpsertReceiptProcessingSettingsCommandBuilder
   set isVisionModel(bool? isVisionModel) =>
       _$this._isVisionModel = isVisionModel;
 
+  bool? _enforceJsonResponseFormat;
+  bool? get enforceJsonResponseFormat => _$this._enforceJsonResponseFormat;
+  set enforceJsonResponseFormat(bool? enforceJsonResponseFormat) =>
+      _$this._enforceJsonResponseFormat = enforceJsonResponseFormat;
+
   OcrEngine? _ocrEngine;
   OcrEngine? get ocrEngine => _$this._ocrEngine;
   set ocrEngine(OcrEngine? ocrEngine) => _$this._ocrEngine = ocrEngine;
@@ -169,6 +170,7 @@ class UpsertReceiptProcessingSettingsCommandBuilder
       _key = $v.key;
       _model = $v.model;
       _isVisionModel = $v.isVisionModel;
+      _enforceJsonResponseFormat = $v.enforceJsonResponseFormat;
       _ocrEngine = $v.ocrEngine;
       _promptId = $v.promptId;
       _$v = null;
@@ -178,7 +180,6 @@ class UpsertReceiptProcessingSettingsCommandBuilder
 
   @override
   void replace(UpsertReceiptProcessingSettingsCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertReceiptProcessingSettingsCommand;
   }
 
@@ -193,20 +194,22 @@ class UpsertReceiptProcessingSettingsCommandBuilder
 
   _$UpsertReceiptProcessingSettingsCommand _build() {
     final _$result = _$v ??
-        new _$UpsertReceiptProcessingSettingsCommand._(
-            name: BuiltValueNullFieldError.checkNotNull(
-                name, r'UpsertReceiptProcessingSettingsCommand', 'name'),
-            description: description,
-            aiType: BuiltValueNullFieldError.checkNotNull(
-                aiType, r'UpsertReceiptProcessingSettingsCommand', 'aiType'),
-            url: url,
-            key: key,
-            model: model,
-            isVisionModel: isVisionModel,
-            ocrEngine: BuiltValueNullFieldError.checkNotNull(ocrEngine,
-                r'UpsertReceiptProcessingSettingsCommand', 'ocrEngine'),
-            promptId: BuiltValueNullFieldError.checkNotNull(promptId,
-                r'UpsertReceiptProcessingSettingsCommand', 'promptId'));
+        _$UpsertReceiptProcessingSettingsCommand._(
+          name: BuiltValueNullFieldError.checkNotNull(
+              name, r'UpsertReceiptProcessingSettingsCommand', 'name'),
+          description: description,
+          aiType: BuiltValueNullFieldError.checkNotNull(
+              aiType, r'UpsertReceiptProcessingSettingsCommand', 'aiType'),
+          url: url,
+          key: key,
+          model: model,
+          isVisionModel: isVisionModel,
+          enforceJsonResponseFormat: enforceJsonResponseFormat,
+          ocrEngine: BuiltValueNullFieldError.checkNotNull(ocrEngine,
+              r'UpsertReceiptProcessingSettingsCommand', 'ocrEngine'),
+          promptId: BuiltValueNullFieldError.checkNotNull(
+              promptId, r'UpsertReceiptProcessingSettingsCommand', 'promptId'),
+        );
     replace(_$result);
     return _$result;
   }

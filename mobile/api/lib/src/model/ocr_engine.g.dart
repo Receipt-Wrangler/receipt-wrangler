@@ -16,11 +16,11 @@ OcrEngine _$valueOf(String name) {
     case 'EASY_OCR':
       return _$EASY_OCR;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
-final BuiltSet<OcrEngine> _$values = new BuiltSet<OcrEngine>(const <OcrEngine>[
+final BuiltSet<OcrEngine> _$values = BuiltSet<OcrEngine>(const <OcrEngine>[
   _$TESSERACT,
   _$EASY_OCR,
 ]);
@@ -38,7 +38,7 @@ abstract class _$OcrEngineMixin {
   _$OcrEngineMeta get OcrEngine => const _$OcrEngineMeta();
 }
 
-Serializer<OcrEngine> _$ocrEngineSerializer = new _$OcrEngineSerializer();
+Serializer<OcrEngine> _$ocrEngineSerializer = _$OcrEngineSerializer();
 
 class _$OcrEngineSerializer implements PrimitiveSerializer<OcrEngine> {
   static const Map<String, Object> _toWire = const <String, Object>{

@@ -21,6 +21,8 @@ class _$CheckReceiptProcessingSettingsConnectivityCommand
   @override
   final String? model;
   @override
+  final bool? enforceJsonResponseFormat;
+  @override
   final int? numWorkers;
   @override
   final OcrEngine? ocrEngine;
@@ -31,7 +33,7 @@ class _$CheckReceiptProcessingSettingsConnectivityCommand
           [void Function(
                   CheckReceiptProcessingSettingsConnectivityCommandBuilder)?
               updates]) =>
-      (new CheckReceiptProcessingSettingsConnectivityCommandBuilder()
+      (CheckReceiptProcessingSettingsConnectivityCommandBuilder()
             ..update(updates))
           ._build();
 
@@ -42,11 +44,11 @@ class _$CheckReceiptProcessingSettingsConnectivityCommand
       this.url,
       this.key,
       this.model,
+      this.enforceJsonResponseFormat,
       this.numWorkers,
       this.ocrEngine,
       this.promptId})
       : super._();
-
   @override
   CheckReceiptProcessingSettingsConnectivityCommand rebuild(
           void Function(
@@ -56,8 +58,7 @@ class _$CheckReceiptProcessingSettingsConnectivityCommand
 
   @override
   CheckReceiptProcessingSettingsConnectivityCommandBuilder toBuilder() =>
-      new CheckReceiptProcessingSettingsConnectivityCommandBuilder()
-        ..replace(this);
+      CheckReceiptProcessingSettingsConnectivityCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -69,6 +70,7 @@ class _$CheckReceiptProcessingSettingsConnectivityCommand
         url == other.url &&
         key == other.key &&
         model == other.model &&
+        enforceJsonResponseFormat == other.enforceJsonResponseFormat &&
         numWorkers == other.numWorkers &&
         ocrEngine == other.ocrEngine &&
         promptId == other.promptId;
@@ -83,6 +85,7 @@ class _$CheckReceiptProcessingSettingsConnectivityCommand
     _$hash = $jc(_$hash, url.hashCode);
     _$hash = $jc(_$hash, key.hashCode);
     _$hash = $jc(_$hash, model.hashCode);
+    _$hash = $jc(_$hash, enforceJsonResponseFormat.hashCode);
     _$hash = $jc(_$hash, numWorkers.hashCode);
     _$hash = $jc(_$hash, ocrEngine.hashCode);
     _$hash = $jc(_$hash, promptId.hashCode);
@@ -100,6 +103,7 @@ class _$CheckReceiptProcessingSettingsConnectivityCommand
           ..add('url', url)
           ..add('key', key)
           ..add('model', model)
+          ..add('enforceJsonResponseFormat', enforceJsonResponseFormat)
           ..add('numWorkers', numWorkers)
           ..add('ocrEngine', ocrEngine)
           ..add('promptId', promptId))
@@ -137,6 +141,11 @@ class CheckReceiptProcessingSettingsConnectivityCommandBuilder
   String? get model => _$this._model;
   set model(String? model) => _$this._model = model;
 
+  bool? _enforceJsonResponseFormat;
+  bool? get enforceJsonResponseFormat => _$this._enforceJsonResponseFormat;
+  set enforceJsonResponseFormat(bool? enforceJsonResponseFormat) =>
+      _$this._enforceJsonResponseFormat = enforceJsonResponseFormat;
+
   int? _numWorkers;
   int? get numWorkers => _$this._numWorkers;
   set numWorkers(int? numWorkers) => _$this._numWorkers = numWorkers;
@@ -162,6 +171,7 @@ class CheckReceiptProcessingSettingsConnectivityCommandBuilder
       _url = $v.url;
       _key = $v.key;
       _model = $v.model;
+      _enforceJsonResponseFormat = $v.enforceJsonResponseFormat;
       _numWorkers = $v.numWorkers;
       _ocrEngine = $v.ocrEngine;
       _promptId = $v.promptId;
@@ -172,7 +182,6 @@ class CheckReceiptProcessingSettingsConnectivityCommandBuilder
 
   @override
   void replace(CheckReceiptProcessingSettingsConnectivityCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$CheckReceiptProcessingSettingsConnectivityCommand;
   }
 
@@ -188,16 +197,18 @@ class CheckReceiptProcessingSettingsConnectivityCommandBuilder
 
   _$CheckReceiptProcessingSettingsConnectivityCommand _build() {
     final _$result = _$v ??
-        new _$CheckReceiptProcessingSettingsConnectivityCommand._(
-            id: id,
-            name: name,
-            aiType: aiType,
-            url: url,
-            key: key,
-            model: model,
-            numWorkers: numWorkers,
-            ocrEngine: ocrEngine,
-            promptId: promptId);
+        _$CheckReceiptProcessingSettingsConnectivityCommand._(
+          id: id,
+          name: name,
+          aiType: aiType,
+          url: url,
+          key: key,
+          model: model,
+          enforceJsonResponseFormat: enforceJsonResponseFormat,
+          numWorkers: numWorkers,
+          ocrEngine: ocrEngine,
+          promptId: promptId,
+        );
     replace(_$result);
     return _$result;
   }

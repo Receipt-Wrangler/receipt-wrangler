@@ -19,12 +19,12 @@ SortDirection _$valueOf(String name) {
     case 'empty':
       return _$empty;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
 final BuiltSet<SortDirection> _$values =
-    new BuiltSet<SortDirection>(const <SortDirection>[
+    BuiltSet<SortDirection>(const <SortDirection>[
   _$asc,
   _$desc,
   _$empty,
@@ -45,7 +45,7 @@ abstract class _$SortDirectionMixin {
 }
 
 Serializer<SortDirection> _$sortDirectionSerializer =
-    new _$SortDirectionSerializer();
+    _$SortDirectionSerializer();
 
 class _$SortDirectionSerializer implements PrimitiveSerializer<SortDirection> {
   static const Map<String, Object> _toWire = const <String, Object>{

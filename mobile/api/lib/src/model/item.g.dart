@@ -35,7 +35,7 @@ class _$Item extends Item {
   final String? updatedAt;
 
   factory _$Item([void Function(ItemBuilder)? updates]) =>
-      (new ItemBuilder()..update(updates))._build();
+      (ItemBuilder()..update(updates))._build();
 
   _$Item._(
       {this.isTaxed,
@@ -51,19 +51,13 @@ class _$Item extends Item {
       this.categories,
       this.tags,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(amount, r'Item', 'amount');
-    BuiltValueNullFieldError.checkNotNull(name, r'Item', 'name');
-    BuiltValueNullFieldError.checkNotNull(receiptId, r'Item', 'receiptId');
-    BuiltValueNullFieldError.checkNotNull(status, r'Item', 'status');
-  }
-
+      : super._();
   @override
   Item rebuild(void Function(ItemBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  ItemBuilder toBuilder() => new ItemBuilder()..replace(this);
+  ItemBuilder toBuilder() => ItemBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -166,18 +160,18 @@ class ItemBuilder implements Builder<Item, ItemBuilder> {
 
   ListBuilder<Item>? _linkedItems;
   ListBuilder<Item> get linkedItems =>
-      _$this._linkedItems ??= new ListBuilder<Item>();
+      _$this._linkedItems ??= ListBuilder<Item>();
   set linkedItems(ListBuilder<Item>? linkedItems) =>
       _$this._linkedItems = linkedItems;
 
   ListBuilder<Category>? _categories;
   ListBuilder<Category> get categories =>
-      _$this._categories ??= new ListBuilder<Category>();
+      _$this._categories ??= ListBuilder<Category>();
   set categories(ListBuilder<Category>? categories) =>
       _$this._categories = categories;
 
   ListBuilder<Tag>? _tags;
-  ListBuilder<Tag> get tags => _$this._tags ??= new ListBuilder<Tag>();
+  ListBuilder<Tag> get tags => _$this._tags ??= ListBuilder<Tag>();
   set tags(ListBuilder<Tag>? tags) => _$this._tags = tags;
 
   String? _updatedAt;
@@ -211,7 +205,6 @@ class ItemBuilder implements Builder<Item, ItemBuilder> {
 
   @override
   void replace(Item other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$Item;
   }
 
@@ -227,24 +220,24 @@ class ItemBuilder implements Builder<Item, ItemBuilder> {
     _$Item _$result;
     try {
       _$result = _$v ??
-          new _$Item._(
-              isTaxed: isTaxed,
-              amount: BuiltValueNullFieldError.checkNotNull(
-                  amount, r'Item', 'amount'),
-              chargedToUserId: chargedToUserId,
-              createdAt: createdAt,
-              createdBy: createdBy,
-              id: id,
-              name:
-                  BuiltValueNullFieldError.checkNotNull(name, r'Item', 'name'),
-              receiptId: BuiltValueNullFieldError.checkNotNull(
-                  receiptId, r'Item', 'receiptId'),
-              status: BuiltValueNullFieldError.checkNotNull(
-                  status, r'Item', 'status'),
-              linkedItems: _linkedItems?.build(),
-              categories: _categories?.build(),
-              tags: _tags?.build(),
-              updatedAt: updatedAt);
+          _$Item._(
+            isTaxed: isTaxed,
+            amount: BuiltValueNullFieldError.checkNotNull(
+                amount, r'Item', 'amount'),
+            chargedToUserId: chargedToUserId,
+            createdAt: createdAt,
+            createdBy: createdBy,
+            id: id,
+            name: BuiltValueNullFieldError.checkNotNull(name, r'Item', 'name'),
+            receiptId: BuiltValueNullFieldError.checkNotNull(
+                receiptId, r'Item', 'receiptId'),
+            status: BuiltValueNullFieldError.checkNotNull(
+                status, r'Item', 'status'),
+            linkedItems: _linkedItems?.build(),
+            categories: _categories?.build(),
+            tags: _tags?.build(),
+            updatedAt: updatedAt,
+          );
     } catch (_) {
       late String _$failedField;
       try {
@@ -255,8 +248,7 @@ class ItemBuilder implements Builder<Item, ItemBuilder> {
         _$failedField = 'tags';
         _tags?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
-            r'Item', _$failedField, e.toString());
+        throw BuiltValueNestedFieldError(r'Item', _$failedField, e.toString());
       }
       rethrow;
     }

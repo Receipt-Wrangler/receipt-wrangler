@@ -96,7 +96,6 @@ Class | Method | HTTP request | Description
 [*GroupsApi*](doc/GroupsApi.md) | [**deleteGroup**](doc/GroupsApi.md#deletegroup) | **DELETE** /group/{groupId} | Delete group
 [*GroupsApi*](doc/GroupsApi.md) | [**getGroupById**](doc/GroupsApi.md#getgroupbyid) | **GET** /group/{groupId} | Gets a group by Id
 [*GroupsApi*](doc/GroupsApi.md) | [**getGroupsForuser**](doc/GroupsApi.md#getgroupsforuser) | **GET** /group | Get groups for user
-[*GroupsApi*](doc/GroupsApi.md) | [**getOcrTextForGroup**](doc/GroupsApi.md#getocrtextforgroup) | **GET** /group/{groupId}/ocrText | Reads each image in a group and returns the zipped read text
 [*GroupsApi*](doc/GroupsApi.md) | [**getPagedGroups**](doc/GroupsApi.md#getpagedgroups) | **POST** /group/getPagedGroups | Get paged groups
 [*GroupsApi*](doc/GroupsApi.md) | [**pollGroupEmail**](doc/GroupsApi.md#pollgroupemail) | **POST** /group/{groupId}/pollGroupEmail | Poll group email
 [*GroupsApi*](doc/GroupsApi.md) | [**updateGroup**](doc/GroupsApi.md#updategroup) | **PUT** /group/{groupId} | Update a group
@@ -136,7 +135,9 @@ Class | Method | HTTP request | Description
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**getReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#getreceiptprocessingsettingsbyid) | **GET** /receiptProcessingSettings/{id} | Get receipt processing settings by id
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**updateReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#updatereceiptprocessingsettingsbyid) | **PUT** /receiptProcessingSettings/{id} | Update receipt processing settings by id
 [*RoleApi*](doc/RoleApi.md) | [**createRole**](doc/RoleApi.md#createrole) | **POST** /role | Create role
+[*RoleApi*](doc/RoleApi.md) | [**deleteRole**](doc/RoleApi.md#deleterole) | **DELETE** /role/{roleId} | Delete role
 [*RoleApi*](doc/RoleApi.md) | [**getRoles**](doc/RoleApi.md#getroles) | **GET** /role | List all roles
+[*RoleApi*](doc/RoleApi.md) | [**setDefaultRole**](doc/RoleApi.md#setdefaultrole) | **PUT** /role/{roleId}/default | Set default role
 [*RoleApi*](doc/RoleApi.md) | [**updateRole**](doc/RoleApi.md#updaterole) | **PUT** /role/{roleId} | Update role
 [*SearchApi*](doc/SearchApi.md) | [**receiptSearch**](doc/SearchApi.md#receiptsearch) | **GET** /search/ | Receipt Search
 [*SystemEmailApi*](doc/SystemEmailApi.md) | [**checkSystemEmailConnectivity**](doc/SystemEmailApi.md#checksystememailconnectivity) | **POST** /systemEmail/checkConnectivity | Check system email connectivity

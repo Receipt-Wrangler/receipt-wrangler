@@ -14,23 +14,17 @@ class _$MagicFillCommand extends MagicFillCommand {
 
   factory _$MagicFillCommand(
           [void Function(MagicFillCommandBuilder)? updates]) =>
-      (new MagicFillCommandBuilder()..update(updates))._build();
+      (MagicFillCommandBuilder()..update(updates))._build();
 
   _$MagicFillCommand._({required this.imageData, required this.filename})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        imageData, r'MagicFillCommand', 'imageData');
-    BuiltValueNullFieldError.checkNotNull(
-        filename, r'MagicFillCommand', 'filename');
-  }
-
+      : super._();
   @override
   MagicFillCommand rebuild(void Function(MagicFillCommandBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
   MagicFillCommandBuilder toBuilder() =>
-      new MagicFillCommandBuilder()..replace(this);
+      MagicFillCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -63,8 +57,7 @@ class MagicFillCommandBuilder
   _$MagicFillCommand? _$v;
 
   ListBuilder<int>? _imageData;
-  ListBuilder<int> get imageData =>
-      _$this._imageData ??= new ListBuilder<int>();
+  ListBuilder<int> get imageData => _$this._imageData ??= ListBuilder<int>();
   set imageData(ListBuilder<int>? imageData) => _$this._imageData = imageData;
 
   String? _filename;
@@ -87,7 +80,6 @@ class MagicFillCommandBuilder
 
   @override
   void replace(MagicFillCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$MagicFillCommand;
   }
 
@@ -103,17 +95,18 @@ class MagicFillCommandBuilder
     _$MagicFillCommand _$result;
     try {
       _$result = _$v ??
-          new _$MagicFillCommand._(
-              imageData: imageData.build(),
-              filename: BuiltValueNullFieldError.checkNotNull(
-                  filename, r'MagicFillCommand', 'filename'));
+          _$MagicFillCommand._(
+            imageData: imageData.build(),
+            filename: BuiltValueNullFieldError.checkNotNull(
+                filename, r'MagicFillCommand', 'filename'),
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'imageData';
         imageData.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'MagicFillCommand', _$failedField, e.toString());
       }
       rethrow;

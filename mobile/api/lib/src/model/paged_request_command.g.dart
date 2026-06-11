@@ -34,20 +34,14 @@ class _$$PagedRequestCommand extends $PagedRequestCommand {
 
   factory _$$PagedRequestCommand(
           [void Function($PagedRequestCommandBuilder)? updates]) =>
-      (new $PagedRequestCommandBuilder()..update(updates))._build();
+      ($PagedRequestCommandBuilder()..update(updates))._build();
 
   _$$PagedRequestCommand._(
       {required this.page,
       required this.pageSize,
       this.orderBy,
       this.sortDirection})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        page, r'$PagedRequestCommand', 'page');
-    BuiltValueNullFieldError.checkNotNull(
-        pageSize, r'$PagedRequestCommand', 'pageSize');
-  }
-
+      : super._();
   @override
   $PagedRequestCommand rebuild(
           void Function($PagedRequestCommandBuilder) updates) =>
@@ -55,7 +49,7 @@ class _$$PagedRequestCommand extends $PagedRequestCommand {
 
   @override
   $PagedRequestCommandBuilder toBuilder() =>
-      new $PagedRequestCommandBuilder()..replace(this);
+      $PagedRequestCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -130,7 +124,6 @@ class $PagedRequestCommandBuilder
 
   @override
   void replace(covariant $PagedRequestCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$$PagedRequestCommand;
   }
 
@@ -144,13 +137,14 @@ class $PagedRequestCommandBuilder
 
   _$$PagedRequestCommand _build() {
     final _$result = _$v ??
-        new _$$PagedRequestCommand._(
-            page: BuiltValueNullFieldError.checkNotNull(
-                page, r'$PagedRequestCommand', 'page'),
-            pageSize: BuiltValueNullFieldError.checkNotNull(
-                pageSize, r'$PagedRequestCommand', 'pageSize'),
-            orderBy: orderBy,
-            sortDirection: sortDirection);
+        _$$PagedRequestCommand._(
+          page: BuiltValueNullFieldError.checkNotNull(
+              page, r'$PagedRequestCommand', 'page'),
+          pageSize: BuiltValueNullFieldError.checkNotNull(
+              pageSize, r'$PagedRequestCommand', 'pageSize'),
+          orderBy: orderBy,
+          sortDirection: sortDirection,
+        );
     replace(_$result);
     return _$result;
   }

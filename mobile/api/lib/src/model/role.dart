@@ -18,8 +18,10 @@ part 'role.g.dart';
 /// * [name] 
 /// * [description] 
 /// * [scope] 
+/// * [isDefault] - Whether this role is the default for its scope — assigned to new accounts (APP) or to group creators (GROUP). Exactly one role per scope is the default.
 /// * [isSystem] 
 /// * [permissions] 
+/// * [assignedCount] - Number of users or group members currently assigned this role
 @BuiltValue()
 abstract class Role implements Built<Role, RoleBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -35,11 +37,19 @@ abstract class Role implements Built<Role, RoleBuilder> {
   PermissionScope get scope;
   // enum scopeEnum {  APP,  GROUP,  };
 
+  /// Whether this role is the default for its scope — assigned to new accounts (APP) or to group creators (GROUP). Exactly one role per scope is the default.
+  @BuiltValueField(wireName: r'isDefault')
+  bool get isDefault;
+
   @BuiltValueField(wireName: r'isSystem')
   bool get isSystem;
 
   @BuiltValueField(wireName: r'permissions')
   BuiltList<Permission> get permissions;
+
+  /// Number of users or group members currently assigned this role
+  @BuiltValueField(wireName: r'assignedCount')
+  int? get assignedCount;
 
   Role._();
 
@@ -86,6 +96,11 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
       object.scope,
       specifiedType: const FullType(PermissionScope),
     );
+    yield r'isDefault';
+    yield serializers.serialize(
+      object.isDefault,
+      specifiedType: const FullType(bool),
+    );
     yield r'isSystem';
     yield serializers.serialize(
       object.isSystem,
@@ -96,6 +111,13 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
       object.permissions,
       specifiedType: const FullType(BuiltList, [FullType(Permission)]),
     );
+    if (object.assignedCount != null) {
+      yield r'assignedCount';
+      yield serializers.serialize(
+        object.assignedCount,
+        specifiedType: const FullType(int),
+      );
+    }
   }
 
   @override
@@ -147,6 +169,13 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
           ) as PermissionScope;
           result.scope = valueDes;
           break;
+        case r'isDefault':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.isDefault = valueDes;
+          break;
         case r'isSystem':
           final valueDes = serializers.deserialize(
             value,
@@ -160,6 +189,13 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
             specifiedType: const FullType(BuiltList, [FullType(Permission)]),
           ) as BuiltList<Permission>;
           result.permissions.replace(valueDes);
+          break;
+        case r'assignedCount':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.assignedCount = valueDes;
           break;
         default:
           unhandled.add(key);

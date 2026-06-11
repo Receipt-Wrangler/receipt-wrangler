@@ -19,12 +19,12 @@ ApiKeyScope _$valueOf(String name) {
     case 'rw':
       return _$rw;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
 final BuiltSet<ApiKeyScope> _$values =
-    new BuiltSet<ApiKeyScope>(const <ApiKeyScope>[
+    BuiltSet<ApiKeyScope>(const <ApiKeyScope>[
   _$r,
   _$w,
   _$rw,
@@ -44,7 +44,7 @@ abstract class _$ApiKeyScopeMixin {
   _$ApiKeyScopeMeta get ApiKeyScope => const _$ApiKeyScopeMeta();
 }
 
-Serializer<ApiKeyScope> _$apiKeyScopeSerializer = new _$ApiKeyScopeSerializer();
+Serializer<ApiKeyScope> _$apiKeyScopeSerializer = _$ApiKeyScopeSerializer();
 
 class _$ApiKeyScopeSerializer implements PrimitiveSerializer<ApiKeyScope> {
   static const Map<String, Object> _toWire = const <String, Object>{

@@ -12,13 +12,9 @@ class _$PagedRequestFieldValue extends PagedRequestFieldValue {
 
   factory _$PagedRequestFieldValue(
           [void Function(PagedRequestFieldValueBuilder)? updates]) =>
-      (new PagedRequestFieldValueBuilder()..update(updates))._build();
+      (PagedRequestFieldValueBuilder()..update(updates))._build();
 
-  _$PagedRequestFieldValue._({required this.oneOf}) : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        oneOf, r'PagedRequestFieldValue', 'oneOf');
-  }
-
+  _$PagedRequestFieldValue._({required this.oneOf}) : super._();
   @override
   PagedRequestFieldValue rebuild(
           void Function(PagedRequestFieldValueBuilder) updates) =>
@@ -26,7 +22,7 @@ class _$PagedRequestFieldValue extends PagedRequestFieldValue {
 
   @override
   PagedRequestFieldValueBuilder toBuilder() =>
-      new PagedRequestFieldValueBuilder()..replace(this);
+      PagedRequestFieldValueBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -73,7 +69,6 @@ class PagedRequestFieldValueBuilder
 
   @override
   void replace(PagedRequestFieldValue other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$PagedRequestFieldValue;
   }
 
@@ -87,9 +82,10 @@ class PagedRequestFieldValueBuilder
 
   _$PagedRequestFieldValue _build() {
     final _$result = _$v ??
-        new _$PagedRequestFieldValue._(
-            oneOf: BuiltValueNullFieldError.checkNotNull(
-                oneOf, r'PagedRequestFieldValue', 'oneOf'));
+        _$PagedRequestFieldValue._(
+          oneOf: BuiltValueNullFieldError.checkNotNull(
+              oneOf, r'PagedRequestFieldValue', 'oneOf'),
+        );
     replace(_$result);
     return _$result;
   }

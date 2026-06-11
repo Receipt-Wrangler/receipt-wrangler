@@ -93,7 +93,7 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(SystemSettingsBuilder b) => b
-      ..currencyDisplay = '$'
+      ..currencyDisplay = r'$'
       ..currencyHideDecimalPlaces = false
       ..debugOcr = false
       ..createdBy = 0

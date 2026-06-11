@@ -11,16 +11,15 @@ class _$ApiKeyFilter extends ApiKeyFilter {
   final AssociatedApiKeys? associatedApiKeys;
 
   factory _$ApiKeyFilter([void Function(ApiKeyFilterBuilder)? updates]) =>
-      (new ApiKeyFilterBuilder()..update(updates))._build();
+      (ApiKeyFilterBuilder()..update(updates))._build();
 
   _$ApiKeyFilter._({this.associatedApiKeys}) : super._();
-
   @override
   ApiKeyFilter rebuild(void Function(ApiKeyFilterBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  ApiKeyFilterBuilder toBuilder() => new ApiKeyFilterBuilder()..replace(this);
+  ApiKeyFilterBuilder toBuilder() => ApiKeyFilterBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -69,7 +68,6 @@ class ApiKeyFilterBuilder
 
   @override
   void replace(ApiKeyFilter other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$ApiKeyFilter;
   }
 
@@ -82,8 +80,10 @@ class ApiKeyFilterBuilder
   ApiKeyFilter build() => _build();
 
   _$ApiKeyFilter _build() {
-    final _$result =
-        _$v ?? new _$ApiKeyFilter._(associatedApiKeys: associatedApiKeys);
+    final _$result = _$v ??
+        _$ApiKeyFilter._(
+          associatedApiKeys: associatedApiKeys,
+        );
     replace(_$result);
     return _$result;
   }

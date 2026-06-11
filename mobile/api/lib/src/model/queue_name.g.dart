@@ -24,11 +24,11 @@ QueueName _$valueOf(String name) {
     case 'emailReceiptImageCleanup':
       return _$emailReceiptImageCleanup;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
-final BuiltSet<QueueName> _$values = new BuiltSet<QueueName>(const <QueueName>[
+final BuiltSet<QueueName> _$values = BuiltSet<QueueName>(const <QueueName>[
   _$quickScan,
   _$emailPolling,
   _$emailReceiptProcessing,
@@ -50,7 +50,7 @@ abstract class _$QueueNameMixin {
   _$QueueNameMeta get QueueName => const _$QueueNameMeta();
 }
 
-Serializer<QueueName> _$queueNameSerializer = new _$QueueNameSerializer();
+Serializer<QueueName> _$queueNameSerializer = _$QueueNameSerializer();
 
 class _$QueueNameSerializer implements PrimitiveSerializer<QueueName> {
   static const Map<String, Object> _toWire = const <String, Object>{

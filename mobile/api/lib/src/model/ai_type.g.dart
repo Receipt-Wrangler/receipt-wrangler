@@ -22,11 +22,11 @@ AiType _$valueOf(String name) {
     case 'OLLAMA':
       return _$OLLAMA;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
-final BuiltSet<AiType> _$values = new BuiltSet<AiType>(const <AiType>[
+final BuiltSet<AiType> _$values = BuiltSet<AiType>(const <AiType>[
   _$OPEN_AI_CUSTOM,
   _$OPEN_AI,
   _$GEMINI,
@@ -48,7 +48,7 @@ abstract class _$AiTypeMixin {
   _$AiTypeMeta get AiType => const _$AiTypeMeta();
 }
 
-Serializer<AiType> _$aiTypeSerializer = new _$AiTypeSerializer();
+Serializer<AiType> _$aiTypeSerializer = _$AiTypeSerializer();
 
 class _$AiTypeSerializer implements PrimitiveSerializer<AiType> {
   static const Map<String, Object> _toWire = const <String, Object>{

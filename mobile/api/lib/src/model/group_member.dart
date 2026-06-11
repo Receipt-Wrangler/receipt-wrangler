@@ -15,6 +15,7 @@ part 'group_member.g.dart';
 /// * [createdAt] 
 /// * [groupId] - Group compound primary key
 /// * [groupRole] 
+/// * [groupRoleId] - Id of the modern group role assigned to the member
 /// * [updatedAt] 
 /// * [userId] - User compound primary key
 @BuiltValue()
@@ -29,6 +30,10 @@ abstract class GroupMember implements Built<GroupMember, GroupMemberBuilder> {
   @BuiltValueField(wireName: r'groupRole')
   GroupRole get groupRole;
   // enum groupRoleEnum {  OWNER,  VIEWER,  EDITOR,  };
+
+  /// Id of the modern group role assigned to the member
+  @BuiltValueField(wireName: r'groupRoleId')
+  int? get groupRoleId;
 
   @BuiltValueField(wireName: r'updatedAt')
   String? get updatedAt;
@@ -77,6 +82,13 @@ class _$GroupMemberSerializer implements PrimitiveSerializer<GroupMember> {
       object.groupRole,
       specifiedType: const FullType(GroupRole),
     );
+    if (object.groupRoleId != null) {
+      yield r'groupRoleId';
+      yield serializers.serialize(
+        object.groupRoleId,
+        specifiedType: const FullType(int),
+      );
+    }
     if (object.updatedAt != null) {
       yield r'updatedAt';
       yield serializers.serialize(
@@ -132,6 +144,13 @@ class _$GroupMemberSerializer implements PrimitiveSerializer<GroupMember> {
             specifiedType: const FullType(GroupRole),
           ) as GroupRole;
           result.groupRole = valueDes;
+          break;
+        case r'groupRoleId':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.groupRoleId = valueDes;
           break;
         case r'updatedAt':
           final valueDes = serializers.deserialize(

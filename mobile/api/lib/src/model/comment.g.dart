@@ -27,7 +27,7 @@ class _$Comment extends Comment {
   final int userId;
 
   factory _$Comment([void Function(CommentBuilder)? updates]) =>
-      (new CommentBuilder()..update(updates))._build();
+      (CommentBuilder()..update(updates))._build();
 
   _$Comment._(
       {this.additionalInfo,
@@ -39,19 +39,13 @@ class _$Comment extends Comment {
       required this.receiptId,
       this.updatedAt,
       required this.userId})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(comment, r'Comment', 'comment');
-    BuiltValueNullFieldError.checkNotNull(id, r'Comment', 'id');
-    BuiltValueNullFieldError.checkNotNull(receiptId, r'Comment', 'receiptId');
-    BuiltValueNullFieldError.checkNotNull(userId, r'Comment', 'userId');
-  }
-
+      : super._();
   @override
   Comment rebuild(void Function(CommentBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  CommentBuilder toBuilder() => new CommentBuilder()..replace(this);
+  CommentBuilder toBuilder() => CommentBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -163,7 +157,6 @@ class CommentBuilder implements Builder<Comment, CommentBuilder> {
 
   @override
   void replace(Comment other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$Comment;
   }
 
@@ -177,19 +170,20 @@ class CommentBuilder implements Builder<Comment, CommentBuilder> {
 
   _$Comment _build() {
     final _$result = _$v ??
-        new _$Comment._(
-            additionalInfo: additionalInfo,
-            comment: BuiltValueNullFieldError.checkNotNull(
-                comment, r'Comment', 'comment'),
-            commentId: commentId,
-            createdAt: createdAt,
-            createdBy: createdBy,
-            id: BuiltValueNullFieldError.checkNotNull(id, r'Comment', 'id'),
-            receiptId: BuiltValueNullFieldError.checkNotNull(
-                receiptId, r'Comment', 'receiptId'),
-            updatedAt: updatedAt,
-            userId: BuiltValueNullFieldError.checkNotNull(
-                userId, r'Comment', 'userId'));
+        _$Comment._(
+          additionalInfo: additionalInfo,
+          comment: BuiltValueNullFieldError.checkNotNull(
+              comment, r'Comment', 'comment'),
+          commentId: commentId,
+          createdAt: createdAt,
+          createdBy: createdBy,
+          id: BuiltValueNullFieldError.checkNotNull(id, r'Comment', 'id'),
+          receiptId: BuiltValueNullFieldError.checkNotNull(
+              receiptId, r'Comment', 'receiptId'),
+          updatedAt: updatedAt,
+          userId: BuiltValueNullFieldError.checkNotNull(
+              userId, r'Comment', 'userId'),
+        );
     replace(_$result);
     return _$result;
   }

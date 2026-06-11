@@ -25,7 +25,7 @@ class _$Notification extends Notification {
   final int userId;
 
   factory _$Notification([void Function(NotificationBuilder)? updates]) =>
-      (new NotificationBuilder()..update(updates))._build();
+      (NotificationBuilder()..update(updates))._build();
 
   _$Notification._(
       {required this.body,
@@ -36,20 +36,13 @@ class _$Notification extends Notification {
       required this.type,
       this.updatedAt,
       required this.userId})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(body, r'Notification', 'body');
-    BuiltValueNullFieldError.checkNotNull(id, r'Notification', 'id');
-    BuiltValueNullFieldError.checkNotNull(title, r'Notification', 'title');
-    BuiltValueNullFieldError.checkNotNull(type, r'Notification', 'type');
-    BuiltValueNullFieldError.checkNotNull(userId, r'Notification', 'userId');
-  }
-
+      : super._();
   @override
   Notification rebuild(void Function(NotificationBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  NotificationBuilder toBuilder() => new NotificationBuilder()..replace(this);
+  NotificationBuilder toBuilder() => NotificationBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -153,7 +146,6 @@ class NotificationBuilder
 
   @override
   void replace(Notification other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$Notification;
   }
 
@@ -167,20 +159,20 @@ class NotificationBuilder
 
   _$Notification _build() {
     final _$result = _$v ??
-        new _$Notification._(
-            body: BuiltValueNullFieldError.checkNotNull(
-                body, r'Notification', 'body'),
-            createdAt: createdAt,
-            createdBy: createdBy,
-            id: BuiltValueNullFieldError.checkNotNull(
-                id, r'Notification', 'id'),
-            title: BuiltValueNullFieldError.checkNotNull(
-                title, r'Notification', 'title'),
-            type: BuiltValueNullFieldError.checkNotNull(
-                type, r'Notification', 'type'),
-            updatedAt: updatedAt,
-            userId: BuiltValueNullFieldError.checkNotNull(
-                userId, r'Notification', 'userId'));
+        _$Notification._(
+          body: BuiltValueNullFieldError.checkNotNull(
+              body, r'Notification', 'body'),
+          createdAt: createdAt,
+          createdBy: createdBy,
+          id: BuiltValueNullFieldError.checkNotNull(id, r'Notification', 'id'),
+          title: BuiltValueNullFieldError.checkNotNull(
+              title, r'Notification', 'title'),
+          type: BuiltValueNullFieldError.checkNotNull(
+              type, r'Notification', 'type'),
+          updatedAt: updatedAt,
+          userId: BuiltValueNullFieldError.checkNotNull(
+              userId, r'Notification', 'userId'),
+        );
     replace(_$result);
     return _$result;
   }

@@ -24,6 +24,8 @@ Name | Type | Description | Notes
 **currencySymbolPosition** | [**CurrencySymbolPosition**](CurrencySymbolPosition.md) |  | [optional] 
 **currencyHideDecimalPlaces** | **bool** | Whether to hide decimal places | [optional] 
 **icons** | [**BuiltList&lt;Icon&gt;**](Icon.md) | Icons in the system | 
+**appPermissions** | [**BuiltList&lt;Permission&gt;**](Permission.md) | The calling user's effective app-level permissions. | 
+**groupPermissions** | [**BuiltMap&lt;String, BuiltList&lt;Permission&gt;&gt;**](BuiltList.md) | The calling user's effective group-level permissions, keyed by group id. | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

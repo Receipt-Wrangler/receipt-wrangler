@@ -12,13 +12,9 @@ class _$ResetPasswordCommand extends ResetPasswordCommand {
 
   factory _$ResetPasswordCommand(
           [void Function(ResetPasswordCommandBuilder)? updates]) =>
-      (new ResetPasswordCommandBuilder()..update(updates))._build();
+      (ResetPasswordCommandBuilder()..update(updates))._build();
 
-  _$ResetPasswordCommand._({required this.password}) : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        password, r'ResetPasswordCommand', 'password');
-  }
-
+  _$ResetPasswordCommand._({required this.password}) : super._();
   @override
   ResetPasswordCommand rebuild(
           void Function(ResetPasswordCommandBuilder) updates) =>
@@ -26,7 +22,7 @@ class _$ResetPasswordCommand extends ResetPasswordCommand {
 
   @override
   ResetPasswordCommandBuilder toBuilder() =>
-      new ResetPasswordCommandBuilder()..replace(this);
+      ResetPasswordCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -73,7 +69,6 @@ class ResetPasswordCommandBuilder
 
   @override
   void replace(ResetPasswordCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$ResetPasswordCommand;
   }
 
@@ -87,9 +82,10 @@ class ResetPasswordCommandBuilder
 
   _$ResetPasswordCommand _build() {
     final _$result = _$v ??
-        new _$ResetPasswordCommand._(
-            password: BuiltValueNullFieldError.checkNotNull(
-                password, r'ResetPasswordCommand', 'password'));
+        _$ResetPasswordCommand._(
+          password: BuiltValueNullFieldError.checkNotNull(
+              password, r'ResetPasswordCommand', 'password'),
+        );
     replace(_$result);
     return _$result;
   }

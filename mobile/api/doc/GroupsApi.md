@@ -13,7 +13,6 @@ Method | HTTP request | Description
 [**deleteGroup**](GroupsApi.md#deletegroup) | **DELETE** /group/{groupId} | Delete group
 [**getGroupById**](GroupsApi.md#getgroupbyid) | **GET** /group/{groupId} | Gets a group by Id
 [**getGroupsForuser**](GroupsApi.md#getgroupsforuser) | **GET** /group | Get groups for user
-[**getOcrTextForGroup**](GroupsApi.md#getocrtextforgroup) | **GET** /group/{groupId}/ocrText | Reads each image in a group and returns the zipped read text
 [**getPagedGroups**](GroupsApi.md#getpagedgroups) | **POST** /group/getPagedGroups | Get paged groups
 [**pollGroupEmail**](GroupsApi.md#pollgroupemail) | **POST** /group/{groupId}/pollGroupEmail | Poll group email
 [**updateGroup**](GroupsApi.md#updategroup) | **PUT** /group/{groupId} | Update a group
@@ -190,52 +189,6 @@ This endpoint does not need any parameter.
 ### Return type
 
 [**BuiltList&lt;Group&gt;**](Group.md)
-
-### Authorization
-
-[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
-
-### HTTP request headers
-
- - **Content-Type**: Not defined
- - **Accept**: application/json
-
-[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
-
-# **getOcrTextForGroup**
-> getOcrTextForGroup(groupId)
-
-Reads each image in a group and returns the zipped read text
-
-This will get the ocr text, zipped, for each image in a group and one text file per image
-
-### Example
-```dart
-import 'package:openapi/api.dart';
-// TODO Configure API key authorization: apiKeyAuth
-//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
-// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
-//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
-
-final api = Openapi().getGroupsApi();
-final int groupId = 56; // int | Group Id to get ocr text for
-
-try {
-    api.getOcrTextForGroup(groupId);
-} catch on DioException (e) {
-    print('Exception when calling GroupsApi->getOcrTextForGroup: $e\n');
-}
-```
-
-### Parameters
-
-Name | Type | Description  | Notes
-------------- | ------------- | ------------- | -------------
- **groupId** | **int**| Group Id to get ocr text for | 
-
-### Return type
-
-void (empty response body)
 
 ### Authorization
 

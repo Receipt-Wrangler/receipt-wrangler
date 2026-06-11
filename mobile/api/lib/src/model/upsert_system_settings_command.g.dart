@@ -36,7 +36,7 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
 
   factory _$UpsertSystemSettingsCommand(
           [void Function(UpsertSystemSettingsCommandBuilder)? updates]) =>
-      (new UpsertSystemSettingsCommandBuilder()..update(updates))._build();
+      (UpsertSystemSettingsCommandBuilder()..update(updates))._build();
 
   _$UpsertSystemSettingsCommand._(
       {this.enableLocalSignUp,
@@ -52,19 +52,7 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
       this.fallbackReceiptProcessingSettingsId,
       required this.taskConcurrency,
       this.taskQueueConfigurations})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(currencyThousandthsSeparator,
-        r'UpsertSystemSettingsCommand', 'currencyThousandthsSeparator');
-    BuiltValueNullFieldError.checkNotNull(currencyDecimalSeparator,
-        r'UpsertSystemSettingsCommand', 'currencyDecimalSeparator');
-    BuiltValueNullFieldError.checkNotNull(currencySymbolPosition,
-        r'UpsertSystemSettingsCommand', 'currencySymbolPosition');
-    BuiltValueNullFieldError.checkNotNull(currencyHideDecimalPlaces,
-        r'UpsertSystemSettingsCommand', 'currencyHideDecimalPlaces');
-    BuiltValueNullFieldError.checkNotNull(
-        taskConcurrency, r'UpsertSystemSettingsCommand', 'taskConcurrency');
-  }
-
+      : super._();
   @override
   UpsertSystemSettingsCommand rebuild(
           void Function(UpsertSystemSettingsCommandBuilder) updates) =>
@@ -72,7 +60,7 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
 
   @override
   UpsertSystemSettingsCommandBuilder toBuilder() =>
-      new UpsertSystemSettingsCommandBuilder()..replace(this);
+      UpsertSystemSettingsCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -209,7 +197,7 @@ class UpsertSystemSettingsCommandBuilder
   ListBuilder<UpsertTaskQueueConfiguration>? _taskQueueConfigurations;
   ListBuilder<UpsertTaskQueueConfiguration> get taskQueueConfigurations =>
       _$this._taskQueueConfigurations ??=
-          new ListBuilder<UpsertTaskQueueConfiguration>();
+          ListBuilder<UpsertTaskQueueConfiguration>();
   set taskQueueConfigurations(
           ListBuilder<UpsertTaskQueueConfiguration>? taskQueueConfigurations) =>
       _$this._taskQueueConfigurations = taskQueueConfigurations;
@@ -242,7 +230,6 @@ class UpsertSystemSettingsCommandBuilder
 
   @override
   void replace(UpsertSystemSettingsCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertSystemSettingsCommand;
   }
 
@@ -258,39 +245,44 @@ class UpsertSystemSettingsCommandBuilder
     _$UpsertSystemSettingsCommand _$result;
     try {
       _$result = _$v ??
-          new _$UpsertSystemSettingsCommand._(
-              enableLocalSignUp: enableLocalSignUp,
-              currencyDisplay: currencyDisplay,
-              currencyThousandthsSeparator: BuiltValueNullFieldError.checkNotNull(
-                  currencyThousandthsSeparator,
-                  r'UpsertSystemSettingsCommand',
-                  'currencyThousandthsSeparator'),
-              currencyDecimalSeparator: BuiltValueNullFieldError.checkNotNull(
-                  currencyDecimalSeparator,
-                  r'UpsertSystemSettingsCommand',
-                  'currencyDecimalSeparator'),
-              currencySymbolPosition: BuiltValueNullFieldError.checkNotNull(
-                  currencySymbolPosition, r'UpsertSystemSettingsCommand', 'currencySymbolPosition'),
-              currencyHideDecimalPlaces: BuiltValueNullFieldError.checkNotNull(
-                  currencyHideDecimalPlaces,
-                  r'UpsertSystemSettingsCommand',
-                  'currencyHideDecimalPlaces'),
-              debugOcr: debugOcr,
-              numWorkers: numWorkers,
-              emailPollingInterval: emailPollingInterval,
-              receiptProcessingSettingsId: receiptProcessingSettingsId,
-              fallbackReceiptProcessingSettingsId:
-                  fallbackReceiptProcessingSettingsId,
-              taskConcurrency: BuiltValueNullFieldError.checkNotNull(
-                  taskConcurrency, r'UpsertSystemSettingsCommand', 'taskConcurrency'),
-              taskQueueConfigurations: _taskQueueConfigurations?.build());
+          _$UpsertSystemSettingsCommand._(
+            enableLocalSignUp: enableLocalSignUp,
+            currencyDisplay: currencyDisplay,
+            currencyThousandthsSeparator: BuiltValueNullFieldError.checkNotNull(
+                currencyThousandthsSeparator,
+                r'UpsertSystemSettingsCommand',
+                'currencyThousandthsSeparator'),
+            currencyDecimalSeparator: BuiltValueNullFieldError.checkNotNull(
+                currencyDecimalSeparator,
+                r'UpsertSystemSettingsCommand',
+                'currencyDecimalSeparator'),
+            currencySymbolPosition: BuiltValueNullFieldError.checkNotNull(
+                currencySymbolPosition,
+                r'UpsertSystemSettingsCommand',
+                'currencySymbolPosition'),
+            currencyHideDecimalPlaces: BuiltValueNullFieldError.checkNotNull(
+                currencyHideDecimalPlaces,
+                r'UpsertSystemSettingsCommand',
+                'currencyHideDecimalPlaces'),
+            debugOcr: debugOcr,
+            numWorkers: numWorkers,
+            emailPollingInterval: emailPollingInterval,
+            receiptProcessingSettingsId: receiptProcessingSettingsId,
+            fallbackReceiptProcessingSettingsId:
+                fallbackReceiptProcessingSettingsId,
+            taskConcurrency: BuiltValueNullFieldError.checkNotNull(
+                taskConcurrency,
+                r'UpsertSystemSettingsCommand',
+                'taskConcurrency'),
+            taskQueueConfigurations: _taskQueueConfigurations?.build(),
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'taskQueueConfigurations';
         _taskQueueConfigurations?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'UpsertSystemSettingsCommand', _$failedField, e.toString());
       }
       rethrow;

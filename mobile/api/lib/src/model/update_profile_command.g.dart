@@ -14,17 +14,11 @@ class _$UpdateProfileCommand extends UpdateProfileCommand {
 
   factory _$UpdateProfileCommand(
           [void Function(UpdateProfileCommandBuilder)? updates]) =>
-      (new UpdateProfileCommandBuilder()..update(updates))._build();
+      (UpdateProfileCommandBuilder()..update(updates))._build();
 
   _$UpdateProfileCommand._(
       {required this.displayName, required this.defaultAvatarColor})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        displayName, r'UpdateProfileCommand', 'displayName');
-    BuiltValueNullFieldError.checkNotNull(
-        defaultAvatarColor, r'UpdateProfileCommand', 'defaultAvatarColor');
-  }
-
+      : super._();
   @override
   UpdateProfileCommand rebuild(
           void Function(UpdateProfileCommandBuilder) updates) =>
@@ -32,7 +26,7 @@ class _$UpdateProfileCommand extends UpdateProfileCommand {
 
   @override
   UpdateProfileCommandBuilder toBuilder() =>
-      new UpdateProfileCommandBuilder()..replace(this);
+      UpdateProfileCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -89,7 +83,6 @@ class UpdateProfileCommandBuilder
 
   @override
   void replace(UpdateProfileCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpdateProfileCommand;
   }
 
@@ -103,13 +96,14 @@ class UpdateProfileCommandBuilder
 
   _$UpdateProfileCommand _build() {
     final _$result = _$v ??
-        new _$UpdateProfileCommand._(
-            displayName: BuiltValueNullFieldError.checkNotNull(
-                displayName, r'UpdateProfileCommand', 'displayName'),
-            defaultAvatarColor: BuiltValueNullFieldError.checkNotNull(
-                defaultAvatarColor,
-                r'UpdateProfileCommand',
-                'defaultAvatarColor'));
+        _$UpdateProfileCommand._(
+          displayName: BuiltValueNullFieldError.checkNotNull(
+              displayName, r'UpdateProfileCommand', 'displayName'),
+          defaultAvatarColor: BuiltValueNullFieldError.checkNotNull(
+              defaultAvatarColor,
+              r'UpdateProfileCommand',
+              'defaultAvatarColor'),
+        );
     replace(_$result);
     return _$result;
   }
