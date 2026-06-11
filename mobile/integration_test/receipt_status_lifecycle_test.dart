@@ -84,10 +84,10 @@ class _StatusTransition {
 /// taps the bottom submit button, and waits to land back on /view.
 Future<void> _changeStatusViaUI(WidgetTester tester, String optionLabel) async {
   // Open the view-screen overflow menu and pick "Edit". The PopupMenuButton
-  // is gated on `canEditReceipt`, which reads from GroupModel -- on cold-boot
-  // after navigation, the model may not have populated the user's role in the
-  // receipt's group yet, so we pump until the menu button is actually mounted
-  // instead of tapping immediately.
+  // is gated on `canEditReceipt`, which checks the user's group.receipts.update
+  // permission from PermissionsModel -- on cold-boot after navigation,
+  // permissions may not be populated yet, so we pump until the menu button is
+  // actually mounted instead of tapping immediately.
   final menuButton = find.byType(PopupMenuButton<dynamic>);
   await pumpUntilFound(tester, menuButton);
   await tester.tap(menuButton);

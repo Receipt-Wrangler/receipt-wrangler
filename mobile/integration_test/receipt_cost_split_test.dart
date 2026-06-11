@@ -170,8 +170,8 @@ double _toDouble(dynamic v) {
 
 Future<void> _navigateToEdit(WidgetTester tester) async {
   // The ReceiptEditPopupMenu is gated on canEditReceipt(); on cold-boot
-  // after the /view navigation, the GroupModel may not yet know the user's
-  // role in the receipt's group, so the button isn't mounted immediately
+  // after the /view navigation, PermissionsModel may not yet have the user's
+  // group.receipts.update permission, so the button isn't mounted immediately
   // (see receipt_edit_test.dart:50 for the same pattern).
   final menuButton = find.byType(PopupMenuButton<dynamic>);
   await pumpUntilFound(tester, menuButton);

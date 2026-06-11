@@ -60,10 +60,10 @@ void main() {
     // swipe-to-delete slidable) become interactive -- both gate on
     // `formState == edit`. Tap the popup menu's "Edit" item.
     //
-    // The ReceiptEditPopupMenu is gated on canEditReceipt(), which reads
-    // GroupModel; on cold-boot post-navigation, that model may not yet
-    // know the user's role in the receipt's group, so the button isn't
-    // mounted immediately. Same pumpUntilFound pattern as
+    // The ReceiptEditPopupMenu is gated on canEditReceipt(), which checks the
+    // user's group.receipts.update permission from PermissionsModel; on
+    // cold-boot post-navigation, permissions may not be populated yet, so the
+    // button isn't mounted immediately. Same pumpUntilFound pattern as
     // receipt_edit_test.dart:50.
     final menuButton = find.byType(PopupMenuButton<dynamic>);
     await pumpUntilFound(tester, menuButton);
