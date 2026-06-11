@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 
+import 'helpers/feature_flags.dart';
 import 'helpers/file_selector_mock.dart';
 import 'helpers/form_actions.dart';
 import 'helpers/login.dart';
@@ -43,6 +44,11 @@ void main() {
       // supports Android/iOS in scan.dart.
       skip: Platform.isLinux,
       (tester) async {
+    // Quick Scan is gated on featureConfig.aiPoweredReceipts, which is off by
+    // default on the local backend. Flip it on for this test (restored on
+    // teardown) so the menu item appears and the bottom sheet opens. Must run
+    // before loginAsAdmin so the app fetches the enabled flag at bootstrap.
+    await enableAiPoweredReceiptsForTest();
     await installFileSelectorMock();
     await binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => binding.setSurfaceSize(null));

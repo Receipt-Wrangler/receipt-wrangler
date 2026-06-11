@@ -92,8 +92,17 @@ void main() {
     }
     await pumpUntilFound(tester, find.byType(PopupMenuButton));
     await tester.tap(find.byType(PopupMenuButton));
-    await pumpUntilFound(tester, find.text('Upload from Gallery'));
-    await tester.tap(find.text('Upload from Gallery'));
+    // The popup scales in; the menu item mounts on the animation's first
+    // frame where a tap computed from its center misses (observed as
+    // "Offset(1183.4, 112.0) ... would not hit test"). Wait until it's
+    // hittable, then drain the open animation before tapping -- same
+    // hardening as the Edit-popup taps in the cost-split/comments specs.
+    await pumpUntilFound(
+        tester, find.text('Upload from Gallery').hitTestable());
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.tap(find.text('Upload from Gallery').hitTestable());
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
     await tester.tap(find.byIcon(Icons.arrow_back));

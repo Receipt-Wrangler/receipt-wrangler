@@ -131,21 +131,33 @@ GoRouter _buildAppRouter() {
               builder: (context, state) => const GroupReceiptsScreen(),
             ),
           ]),
+      // The three receipt routes all render ReceiptFormScreen, whose form uses
+      // a single shared GlobalKey (ReceiptModel.receiptFormKey). A default
+      // animated page transition keeps the outgoing and incoming screens
+      // mounted simultaneously for the duration of the slide, so two
+      // ReceiptForms briefly share that GlobalKey ("a GlobalKey was specified
+      // multiple times"). NoTransitionPage swaps atomically (no overlap), which
+      // also stops a just-departed /receipts/add screen from lingering and
+      // re-rendering itself as a stale "view" (its form state is derived from
+      // the live URL).
       GoRoute(
         path: '/receipts/add',
         redirect: (context, state) {
           Provider.of<ReceiptModel>(context, listen: false).resetModel();
           return null;
         },
-        builder: (context, state) => const ReceiptFormScreen(),
+        pageBuilder: (context, state) => NoTransitionPage(
+            key: state.pageKey, child: const ReceiptFormScreen()),
       ),
       GoRoute(
         path: '/receipts/:receiptId/view',
-        builder: (context, state) => const ReceiptFormScreen(),
+        pageBuilder: (context, state) => NoTransitionPage(
+            key: state.pageKey, child: const ReceiptFormScreen()),
       ),
       GoRoute(
         path: '/receipts/:receiptId/edit',
-        builder: (context, state) => const ReceiptFormScreen(),
+        pageBuilder: (context, state) => NoTransitionPage(
+            key: state.pageKey, child: const ReceiptFormScreen()),
       ),
       GoRoute(
         path: '/profile',

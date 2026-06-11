@@ -5,6 +5,7 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/slidable_widget.dart';
 
 import 'helpers/api.dart';
@@ -29,20 +30,11 @@ void main() {
     }
   });
 
-  // TODO(comments-second-submit): with the form-key fix in place, this test
-  // gets past navigation and submits the FIRST comment to the API
-  // successfully. The SECOND `_submitComment(secondComment)` call's send-icon
-  // tap reports a hit-test miss and the POST never fires (API returns 1
-  // comment, expected 2). Suspected layout: after the first comment renders
-  // in the list, the bottom-sheet send button gets nudged below the visible
-  // area on the 1280x900 test surface. The pumpUntilFound that gates on
-  // `IconButton.onPressed != null` still hits because the widget exists; the
-  // miss is on the gesture-pump location. Needs either `ensureVisible(sendButton)`
-  // before the second tap, or a different scroll/keyboard handling. Skipping
-  // until investigated -- the bug this PR is unblocking (the null-check at
-  // receipt_bottom_sheet_builder.dart:389) is no longer the issue here.
+  // The second comment's send tap used to miss because the send button gets
+  // nudged below the visible area once the first comment renders in the list.
+  // `_submitComment` now `ensureVisible`s the send button before tapping, so
+  // both submits land. See `_submitComment` below.
   testWidgets('admin can add, view, and delete receipt comments',
-      skip: true,
       (tester) async {
     await binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => binding.setSurfaceSize(null));
@@ -68,10 +60,17 @@ void main() {
     final menuButton = find.byType(PopupMenuButton<dynamic>);
     await pumpUntilFound(tester, menuButton);
     await tester.tap(menuButton);
-    await pumpUntilFound(tester, find.text('Edit'));
-    await tester.tap(find.text('Edit'));
-    // /edit's destination-mounted marker is the form's Name label.
-    await pumpUntilFound(tester, find.text('Name'));
+    // The popup scales in; wait until "Edit" is actually hittable and drain
+    // the open animation so the tap's computed center is its settled position
+    // (same hardening as receipt_cost_split_test._navigateToEdit).
+    await pumpUntilFound(tester, find.text('Edit').hitTestable());
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.tap(find.text('Edit').hitTestable());
+    // /edit's destination-mounted marker: the bottom save button, which only
+    // renders on edit/add paths -- find.text('Name') matches on /view too.
+    await pumpUntilFound(tester, find.byType(BottomSubmitButton));
 
     // The Comments screen is pushed via Navigator (separate from GoRouter)
     // by tapping the "Comments" compact-action button on the edit form
@@ -153,5 +152,17 @@ Future<void> _submitComment(WidgetTester tester, String comment) async {
       (w.icon as Icon).icon == Icons.send &&
       w.onPressed != null);
   await pumpUntilFound(tester, sendButton);
-  await tester.tap(sendButton);
+  // After the first comment renders in the list, the send button can sit below
+  // the visible area; scroll it back on-screen so the tap lands. ensureVisible
+  // jumps the scroll position without relayout -- pump a frame so the tap
+  // computes the post-scroll center, not the stale one.
+  await tester.ensureVisible(sendButton);
+  await tester.pump(const Duration(milliseconds: 100));
+  // The "Receipt added/updated successfully" snackbar lingers over the send
+  // row (bottom of the 900px surface) for ~4s and absorbs taps -- observed as
+  // "Offset(936.0, 872.0) ... would not hit test on the specified widget".
+  // hitTestable() filters the obscured button, so this wait resumes exactly
+  // when the snackbar departs and the tap can land.
+  await pumpUntilFound(tester, sendButton.hitTestable());
+  await tester.tap(sendButton.hitTestable());
 }

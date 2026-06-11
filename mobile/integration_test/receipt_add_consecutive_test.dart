@@ -47,11 +47,13 @@ void main() {
     // Wait for the view screen's app bar (back arrow) to mount fully
     // -- it depends on receiptModel having the loaded receipt's
     // groupId for the back URL.
-    await pumpUntilFound(tester, find.byIcon(Icons.arrow_back));
-    // Two arrow_back icons exist in the view tree (the app bar's
-    // leading button + something in the deeper widget chain). Tap
-    // the first -- in widget order it's the AppBar's leading slot.
-    final backButton = find.byIcon(Icons.arrow_back).first;
+    //
+    // The /view route can leave a stale, offstage ReceiptFormScreen (and a
+    // second, dead back arrow) underneath the visible one on the Android
+    // `flutter drive` target. `.first` would tap the offstage one (a no-op);
+    // `.hitTestable()` selects the single visible/tappable arrow.
+    final backButton = find.byIcon(Icons.arrow_back).hitTestable();
+    await pumpUntilFound(tester, backButton);
     // Tap the back arrow. ReceiptAppBar's onLeadingArrowPressed calls
     // receiptModel.resetModel() BEFORE navigating, so the form's
     // FormBuilderDateTimePicker doesn't try to rebuild with stale
