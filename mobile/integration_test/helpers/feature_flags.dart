@@ -14,19 +14,22 @@ import 'env.dart';
 /// (`api/internal/services/system_settings.go`), so flipping it needs no real
 /// AI provider — we point system settings at a throwaway receipt-processing
 /// record. The AI never runs (and isn't what these tests cover); only the flag
-/// matters. Teardown nulls the pointer and deletes the throwaway record so the
-/// disabled-path spec (`quick_scan_disabled_test`) still sees the flag off.
+/// matters. Teardown restores the pointer to whatever it was before the test
+/// (null on a default local backend, so `quick_scan_disabled_test` still sees
+/// the flag off) and deletes the throwaway record -- always writing null here
+/// would clobber a real AI configuration on non-pristine backends.
 Future<void> enableAiPoweredReceiptsForTest() async {
   final jwt = await apiLogin();
   final promptId = await _ensurePromptId(jwt);
   final rpsId = await _createProcessingSettings(jwt, promptId);
   final settings = await _getSystemSettings(jwt);
+  final originalRpsId = settings['receiptProcessingSettingsId'] as int?;
   await _putSystemSettingsWithRpsId(jwt, settings, rpsId);
 
   addTearDown(() async {
     final j = await apiLogin();
     final current = await _getSystemSettings(j);
-    await _putSystemSettingsWithRpsId(j, current, null);
+    await _putSystemSettingsWithRpsId(j, current, originalRpsId);
     await _deleteProcessingSettings(j, rpsId);
   });
 }

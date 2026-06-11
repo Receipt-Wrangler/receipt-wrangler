@@ -18,6 +18,8 @@ PermissionsModel _modelWith(List<Permission> group7Permissions) {
   return model;
 }
 
+const _menuKey = ValueKey('popup-menu-under-test');
+
 // formState is passed explicitly so the widget never falls back to reading the
 // route (getFormStateFromContext), keeping the test free of a GoRouter.
 Widget _wrap(PermissionsModel model, WranglerFormState formState) {
@@ -26,6 +28,7 @@ Widget _wrap(PermissionsModel model, WranglerFormState formState) {
     child: MaterialApp(
       home: Scaffold(
         body: ReceiptEditPopupMenu(
+          key: _menuKey,
           groupId: 7,
           formState: formState,
           popupMenuChildren: const [
@@ -37,6 +40,13 @@ Widget _wrap(PermissionsModel model, WranglerFormState formState) {
   );
 }
 
+// House style: locate via the keyed widget under test, not a bare type lookup
+// (a second PopupMenuButton elsewhere in the tree would silently match).
+Finder _menuButton() => find.descendant(
+      of: find.byKey(_menuKey),
+      matching: find.byType(PopupMenuButton<dynamic>),
+    );
+
 void main() {
   group('ReceiptEditPopupMenu', () {
     testWidgets('shows the menu when the user can update receipts',
@@ -46,7 +56,7 @@ void main() {
         WranglerFormState.view,
       ));
 
-      expect(find.byType(PopupMenuButton<dynamic>), findsOneWidget);
+      expect(_menuButton(), findsOneWidget);
     });
 
     testWidgets('hides the menu when the user cannot update receipts',
@@ -56,7 +66,7 @@ void main() {
         WranglerFormState.view,
       ));
 
-      expect(find.byType(PopupMenuButton<dynamic>), findsNothing);
+      expect(_menuButton(), findsNothing);
     });
 
     testWidgets('always shows the menu in add form state (creating)',
@@ -67,7 +77,7 @@ void main() {
         WranglerFormState.add,
       ));
 
-      expect(find.byType(PopupMenuButton<dynamic>), findsOneWidget);
+      expect(_menuButton(), findsOneWidget);
     });
   });
 }
