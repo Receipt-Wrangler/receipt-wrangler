@@ -10,7 +10,7 @@ import { NgxsModule, Store } from "@ngxs/store";
 import { FormMode } from "src/enums/form-mode.enum";
 import { PipesModule } from "src/pipes/pipes.module";
 import { InputComponent } from "../../input";
-import { Category, Group, GroupRole, Item, ItemStatus, Receipt, Tag, User } from "../../open-api";
+import { Category, Group, Item, ItemStatus, Receipt, Tag, User } from "../../open-api";
 import { AuthState, UserState } from "../../store/index";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { UserTotalWithPercentagePipe } from "../user-total-with-percentage.pipe";
@@ -56,7 +56,6 @@ describe("ShareListComponent", () => {
   const mockGroup: Group = {
     id: 1,
     name: "Test Group",
-    groupRole: GroupRole.Owner,
   } as any as Group;
 
   const mockActivatedRoute = {

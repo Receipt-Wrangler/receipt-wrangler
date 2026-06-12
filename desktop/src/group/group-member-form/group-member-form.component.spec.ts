@@ -6,7 +6,7 @@ import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, throwError } from "rxjs";
-import { GroupRole, PermissionScope, Role, RoleService } from "../../open-api";
+import { PermissionScope, Role, RoleService } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { AuthState } from "../../store";
 import { GroupMemberFormComponent } from "./group-member-form.component";
@@ -107,7 +107,7 @@ describe("GroupMemberFormComponent", () => {
     expect(openSpy.mock.calls[0][1]?.data?.role).toEqual(defaultGroupRole);
   });
 
-  it("syncs the legacy group role and returns the form on submit", async () => {
+  it("returns the form with the selected modern role on submit", async () => {
     getRolesMock.mockReturnValue(of([defaultGroupRole]));
     await createComponent();
 
@@ -116,8 +116,7 @@ describe("GroupMemberFormComponent", () => {
 
     component.submit();
 
-    // Legacy Owner → OWNER, carried so the parent group form's legacy readers work.
-    expect(component.form.get("groupRole")?.value).toBe(GroupRole.Owner);
+    expect(component.form.get("groupRoleId")?.value).toBe(10);
     expect(dialogRefMock.close).toHaveBeenCalledWith(component.form);
   });
 });

@@ -6,7 +6,7 @@ import { MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dial
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, throwError } from "rxjs";
-import { ApiModule, PermissionScope, Role, RoleService, User, UserRole, UserService } from "../../open-api";
+import { ApiModule, PermissionScope, Role, RoleService, User, UserService } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService, TokenRefreshService } from "../../services";
 import { AddUser, AuthState, UpdateUser, UserState } from "../../store";
@@ -104,7 +104,6 @@ describe("UserFormComponent", () => {
       displayName: "Pizza man",
       username: "Waffle guy",
       isDummyUser: false,
-      userRole: UserRole.Admin,
       appRoleId: 5,
     } as User;
 
@@ -149,7 +148,6 @@ describe("UserFormComponent", () => {
       displayName: "Pizza man",
       username: "Waffle guy",
       isDummyUser: false,
-      userRole: UserRole.Admin,
       appRoleId: 5,
     } as User;
 
@@ -209,7 +207,6 @@ describe("UserFormComponent", () => {
       displayName: "Pizza man",
       username: "Waffle guy",
       isDummyUser: false,
-      userRole: UserRole.Admin,
       appRoleId: 5,
     } as User;
 
@@ -250,7 +247,6 @@ describe("UserFormComponent", () => {
       displayName: "Pizza man",
       username: "Waffle guy",
       isDummyUser: false,
-      userRole: UserRole.Admin,
       appRoleId: 5,
     } as User;
 

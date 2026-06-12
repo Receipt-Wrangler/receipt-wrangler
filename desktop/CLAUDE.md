@@ -141,12 +141,14 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   and permissions (grouped by resource using the `role-presets.ts` helpers). The `getRoles()` calls
   use `catchError` so a non-admin who lacks `app.roles.read` (see **Permission-based UI gating** below)
   gets an empty selector rather than an error.
-- **Group-member legacy bridge:** `group-form` (loaded by every group view, including non-admins)
-  deliberately does **not** call `getRoles()` — to avoid 403-driven logout for non-admins. Instead
-  the group-member dialog keeps the legacy `groupRole` in sync on submit
-  (`legacyGroupRoleFromRole` in `group-member.utils.ts`, mirroring the backend's name→enum mapping),
-  so `group-form`'s "keep an owner" check and its `groupRole | status` member-table column keep
-  working without reading roles. Remove this bridge when the legacy enum is retired.
+- **Member-table role display:** the admin user-list (`src/user/user-list/`) and `group-form`
+  (`src/group/group-form/`, loaded by every group view including non-admins) resolve each user's
+  `appRoleId` / each member's `groupRoleId` to the role **name** via the shared `RoleNamePipe`
+  (`src/pipes/role-name.pipe.ts` — `{{ id | roleName : roles() }}`). Both load roles with
+  `RoleService.getRoles()` wrapped in `catchError`, so a non-admin lacking `app.roles.read` sees a
+  blank name rather than a 403-driven logout. There is no longer any legacy `groupRole` enum sync,
+  and `group-form` no longer enforces a "keep an owner" rule — the backend dropped the owner concept,
+  so group management is governed entirely by `group.*` permissions.
 - **Permission-based UI gating.** The UI gates on the user's effective permissions, mirroring the
   backend's enforcement. Permissions are delivered on **AppData** (`appPermissions: string[]` and
   `groupPermissions: { [groupId]: string[] }`) and stored in `AuthState` via the dedicated
@@ -168,9 +170,9 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     `receiptGuardGuard` is unchanged (server-checked per-receipt access); `system-settings-landing.guard`
     redirects `/system-settings` to the first tab the user can read.
   - **Retired** with this migration: `RoleGuard`, `GroupRoleGuard`, the `*appRole` `RoleDirective`, the
-    `groupRole` `GroupRolePipe`, and `GroupUtil.hasGroupAccess`. The **group-member legacy bridge** (see
-    above) and `AuthState.userRole`/`hasRole` are intentionally kept until the backend legacy enum is
-    retired.
+    `groupRole` `GroupRolePipe`, and `GroupUtil.hasGroupAccess`. The group-member legacy-enum bridge
+    (`legacyGroupRoleFromRole`) and `AuthState.userRole`/`hasRole` are now **removed** as well, since
+    the backend legacy `UserRole`/`GroupRole` enums (and the `userRole`/`groupRole` API fields) are gone.
   - **Behavior note:** create actions for categories/tags/custom-fields now gate on the granular
     `.create` permission, so a normal user (Legacy User holds `.create`) sees the **Add** button;
     **Edit/Delete** stay admin-only (`.update`/`.delete`).

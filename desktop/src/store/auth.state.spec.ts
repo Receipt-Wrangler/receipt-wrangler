@@ -1,6 +1,6 @@
 import { TestBed } from "@angular/core/testing";
 import { NgxsModule, Store } from "@ngxs/store";
-import { Claims, UserRole } from "../open-api";
+import { Claims } from "../open-api";
 import { AuthState } from "./auth.state";
 import { Logout, SetAuthState, SetPermissions } from "./auth.state.actions";
 
@@ -40,7 +40,6 @@ describe("AuthState", () => {
 
     const claims = {
       userId: 5,
-      userRole: UserRole.User,
       displayName: "Tester",
       defaultAvatarColor: "#fff",
       username: "tester",

@@ -11,6 +11,7 @@ import { InputReadonlyPipe } from "./input-readonly.pipe";
 import { MapGetPipe } from "./map-get.pipe";
 import { MapKeyPipe } from "./map-key.pipe";
 import { NamePipe } from "./name.pipe";
+import { RoleNamePipe } from "./role-name.pipe";
 import { StatusPipe } from "./status.pipe";
 import { UserPipe } from "./user.pipe";
 
@@ -27,6 +28,7 @@ import { UserPipe } from "./user.pipe";
     MapGetPipe,
     MapKeyPipe,
     NamePipe,
+    RoleNamePipe,
     StatusPipe,
     UserPipe,
   ],
@@ -43,6 +45,7 @@ import { UserPipe } from "./user.pipe";
     MapGetPipe,
     MapKeyPipe,
     NamePipe,
+    RoleNamePipe,
     StatusPipe,
     UserPipe,
   ],

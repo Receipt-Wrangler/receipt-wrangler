@@ -69,8 +69,8 @@
   {{ (element.userId | user)?.displayName }}
 </ng-template>
 
-<ng-template #groupRoleCell let-element="element">
-  {{ element.groupRole | status }}
+<ng-template #roleCell let-element="element">
+  {{ element.groupRoleId | roleName : roles() }}
 </ng-template>
 
 <ng-template #actionsCell let-index="index">

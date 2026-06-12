@@ -9,9 +9,9 @@ import { AuthState, GroupState } from "../store";
  * optional `route.data['orAppPermissions']` app-scoped fallbacks). On deny,
  * redirects to the group dashboard.
  *
- * Group id resolution mirrors `GroupRoleGuard`: when `route.data['useRouteGroupId']`
- * is set the id comes from the `:id` route param (own or parent), otherwise from
- * the currently selected group in `GroupState`.
+ * Group id resolution: when `route.data['useRouteGroupId']` is set the id comes
+ * from the `:id` route param (own or parent), otherwise from the currently
+ * selected group in `GroupState`.
  */
 export const groupPermissionGuard: CanActivateFn = (route) => {
   const store: Store = inject(Store);

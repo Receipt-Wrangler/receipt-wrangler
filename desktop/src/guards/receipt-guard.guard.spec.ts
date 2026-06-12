@@ -75,9 +75,7 @@ describe("receiptGuardGuard", () => {
   //     of(throwError('')) as any
   //   );
   //   const route: any = {
-  //     data: {
-  //       groupRole: GroupRole.Viewer,
-  //     },
+  //     data: {},
   //     params: {
   //       id: 1,
   //     },
