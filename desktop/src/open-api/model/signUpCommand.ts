@@ -7,7 +7,6 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { UserRole } from './userRole';
 
 
 export interface SignUpCommand { 
@@ -28,15 +27,8 @@ export interface SignUpCommand {
      */
     isDummyUser?: boolean;
     /**
-     * User\'s role
-     */
-    userRole?: UserRole;
-    /**
      * Id of the modern app role to assign. Honored by admin user creation; ignored on public sign-up, where any caller-supplied value is stripped server-side.
      */
     appRoleId?: number;
 }
-export namespace SignUpCommand {
-}
-
 

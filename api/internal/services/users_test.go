@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/utils"
 	"testing"
@@ -25,12 +26,41 @@ func createUserForDeletion(t *testing.T, username string) models.User {
 	if err != nil {
 		t.Fatalf("failed to create user %s: %v", username, err)
 	}
-	// Ensure user is non-admin so the last-admin guard doesn't interfere
-	// with tests that aren't specifically testing admin deletion behavior.
-	// Tests that need admin role should explicitly set it.
-	repositories.GetDB().Model(&models.User{}).Where("id = ?", user.ID).Update("user_role", models.USER)
-	user.UserRole = models.USER
+	// The user is non-admin by default: the test harness seeds no system roles,
+	// so CreateUser leaves AppRoleID nil and the user holds no app permissions.
+	// The last-admin guard (defined by app.users.read) therefore won't interfere
+	// with tests that aren't specifically exercising admin deletion behavior.
+	// Tests that need an admin explicitly assign an admin role via makeUserAdmin.
 	return user
+}
+
+// makeUserAdmin assigns the user an app role granting app.users.read, the modern
+// definition of "administrator" used by the last-admin deletion guard (replacing
+// the removed UserRole == ADMIN check). All admin promotions share a single role
+// named adminRoleName so that several users count as distinct admins; the role is
+// created on first use within a test (the DB is truncated between tests).
+func makeUserAdmin(t *testing.T, userId uint) {
+	t.Helper()
+	const adminRoleName = "Test Admin Role"
+	db := repositories.GetDB()
+	roleRepository := repositories.NewRoleRepository(nil)
+
+	roleId, err := roleRepository.GetAppRoleIdByName(adminRoleName)
+	if err != nil {
+		t.Fatalf("look up admin role: %v", err)
+	}
+	if roleId == nil {
+		role, err := roleRepository.CreateAppRole(adminRoleName, "", []string{permissions.AppUsersRead})
+		if err != nil {
+			t.Fatalf("create admin role: %v", err)
+		}
+		roleId = &role.ID
+	}
+
+	if err := db.Model(&models.User{}).Where("id = ?", userId).Update("app_role_id", *roleId).Error; err != nil {
+		t.Fatalf("assign admin role: %v", err)
+	}
+	clearRolePermissionCacheAll()
 }
 
 func createTestReceiptForDeletion(t *testing.T, name string, paidByUserId uint, groupId uint) models.Receipt {
@@ -84,8 +114,8 @@ func createTestDashboardForDeletion(t *testing.T, userId uint, groupId uint) mod
 	t.Helper()
 	db := repositories.GetDB()
 	dashboard := models.Dashboard{
-		Name:   "test dashboard",
-		UserID: userId,
+		Name:    "test dashboard",
+		UserID:  userId,
 		GroupID: groupId,
 		Widgets: []models.Widget{
 			{
@@ -828,9 +858,7 @@ func TestBulkDeleteUsers(t *testing.T) {
 func TestDeleteUser_ShouldPreventLastAdminDeletion(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	admin := createUserForDeletion(t, "soloadmin")
-
-	db := repositories.GetDB()
-	db.Model(&models.User{}).Where("id = ?", admin.ID).Update("user_role", models.ADMIN)
+	makeUserAdmin(t, admin.ID)
 
 	err := DeleteUser(utils.UintToString(admin.ID))
 	if err == nil {
@@ -848,9 +876,8 @@ func TestDeleteUser_ShouldAllowDeletionWhenMultipleAdmins(t *testing.T) {
 	admin1 := createUserForDeletion(t, "admin1")
 	admin2 := createUserForDeletion(t, "admin2")
 
-	db := repositories.GetDB()
-	db.Model(&models.User{}).Where("id = ?", admin1.ID).Update("user_role", models.ADMIN)
-	db.Model(&models.User{}).Where("id = ?", admin2.ID).Update("user_role", models.ADMIN)
+	makeUserAdmin(t, admin1.ID)
+	makeUserAdmin(t, admin2.ID)
 
 	err := DeleteUser(utils.UintToString(admin1.ID))
 	if err != nil {
@@ -897,9 +924,7 @@ func TestDeleteAccountForUser_ShouldSucceed(t *testing.T) {
 func TestDeleteAccountForUser_ShouldPreventLastAdminDeletion(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	admin := createUserForDeletion(t, "lastadminacct")
-
-	db := repositories.GetDB()
-	db.Model(&models.User{}).Where("id = ?", admin.ID).Update("user_role", models.ADMIN)
+	makeUserAdmin(t, admin.ID)
 
 	statusCode, err := DeleteAccountForUser(admin.ID, "password")
 	if err == nil {

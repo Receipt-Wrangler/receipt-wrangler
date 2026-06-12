@@ -9,7 +9,6 @@ import 'package:openapi/api.dart';
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **groupId** | **int** | Group compound primary key | 
-**groupRole** | [**GroupRole**](GroupRole.md) |  | 
 **groupRoleId** | **int** | Id of the modern group role to assign to the member | [optional] 
 **userId** | **int** | User compound primary key | 
 

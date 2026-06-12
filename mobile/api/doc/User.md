@@ -17,7 +17,6 @@ Name | Type | Description | Notes
 **id** | **int** |  | 
 **isDummyUser** | **bool** | Is dummy user | 
 **updatedAt** | **String** |  | [optional] 
-**userRole** | [**UserRole**](UserRole.md) | User's role | 
 **appRoleId** | **int** | Id of the modern app role assigned to the user | [optional] 
 **lastLoginDate** | **String** |  | [optional] 
 

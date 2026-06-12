@@ -22,7 +22,7 @@ func TestShouldCreateAdminUserWithGroup(t *testing.T) {
 		utils.PrintTestError(t, err, "no error")
 	}
 
-	validateUser(t, createdUser, userToCreate, models.ADMIN, 1)
+	validateUser(t, createdUser, userToCreate, true, 1)
 
 	var group models.Group
 	db.Table("groups").Where("id = 1").Preload("GroupMembers").First(&group)
@@ -46,7 +46,7 @@ func TestShouldCreateNonAdminUserWithGroup(t *testing.T) {
 		utils.PrintTestError(t, err, "no error")
 	}
 
-	validateUser(t, createdUser, userToCreate, models.USER, 2)
+	validateUser(t, createdUser, userToCreate, false, 2)
 
 	var group models.Group
 	db.Table("groups").Where("id = 2").Preload("GroupMembers").First(&group)
@@ -105,55 +105,6 @@ func TestCreateUserAssignsDefaultAppRole(t *testing.T) {
 	}
 }
 
-func TestCreateUserHonorsExplicitRole(t *testing.T) {
-	defer TruncateTestDb()
-
-	if err := SeedSystemRoles(); err != nil {
-		utils.PrintTestError(t, err, nil)
-		return
-	}
-	if err := EnsureDefaultRoles(); err != nil {
-		utils.PrintTestError(t, err, nil)
-		return
-	}
-
-	userRepository := NewUserRepository(nil)
-	roleRepository := NewRoleRepository(nil)
-
-	// A bootstrap user already occupies the "first user" slot, so the count-based
-	// fallback would make the next account a USER. An explicit ADMIN role on the
-	// command (the admin-create path) must override that.
-	if _, err := userRepository.CreateUser(commands.SignUpCommand{
-		Username: "bootstrap", DisplayName: "b", Password: "a really secure password",
-	}); err != nil {
-		utils.PrintTestError(t, err, "no error")
-		return
-	}
-
-	admin, err := userRepository.CreateUser(commands.SignUpCommand{
-		Username: "explicit-admin", DisplayName: "a", Password: "a really secure password",
-		UserRole: models.ADMIN,
-	})
-	if err != nil {
-		utils.PrintTestError(t, err, "no error")
-		return
-	}
-
-	if admin.UserRole != models.ADMIN {
-		utils.PrintTestError(t, admin.UserRole, models.ADMIN)
-	}
-
-	// An explicit ADMIN must also resolve to the Legacy Admin modern role.
-	legacyAdminId, err := roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
-	if err != nil {
-		utils.PrintTestError(t, err, nil)
-		return
-	}
-	if admin.AppRoleID == nil || legacyAdminId == nil || *admin.AppRoleID != *legacyAdminId {
-		utils.PrintTestError(t, admin.AppRoleID, legacyAdminId)
-	}
-}
-
 func TestCreateUserHonorsExplicitAppRole(t *testing.T) {
 	defer TruncateTestDb()
 
@@ -177,8 +128,7 @@ func TestCreateUserHonorsExplicitAppRole(t *testing.T) {
 
 	// A bootstrap user already occupies the first-user slot, so the count-based
 	// fallback would make the next account a USER. An explicit modern app role id
-	// (the admin-create path) must win and set both the modern role and a derived
-	// legacy enum.
+	// (the admin-create path) must win and set the modern role FK.
 	if _, err := userRepository.CreateUser(commands.SignUpCommand{
 		Username: "bootstrap", DisplayName: "b", Password: "a really secure password",
 	}); err != nil {
@@ -197,11 +147,8 @@ func TestCreateUserHonorsExplicitAppRole(t *testing.T) {
 	if admin.AppRoleID == nil || *admin.AppRoleID != *legacyAdminId {
 		utils.PrintTestError(t, admin.AppRoleID, legacyAdminId)
 	}
-	if admin.UserRole != models.ADMIN {
-		utils.PrintTestError(t, admin.UserRole, models.ADMIN)
-	}
 
-	// A custom (non-system) app role resolves to the least-privilege USER enum.
+	// A custom (non-system) app role is honored as-is on the modern FK.
 	custom, err := roleRepository.CreateAppRole("Auditor", "", []string{permissions.AppUsersRead})
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
@@ -218,12 +165,9 @@ func TestCreateUserHonorsExplicitAppRole(t *testing.T) {
 	if auditor.AppRoleID == nil || *auditor.AppRoleID != custom.ID {
 		utils.PrintTestError(t, auditor.AppRoleID, custom.ID)
 	}
-	if auditor.UserRole != models.USER {
-		utils.PrintTestError(t, auditor.UserRole, models.USER)
-	}
 }
 
-func TestUpdateUserAssignsAppRoleAndDerivesLegacyEnum(t *testing.T) {
+func TestUpdateUserAssignsAppRole(t *testing.T) {
 	defer TruncateTestDb()
 
 	if err := SeedSystemRoles(); err != nil {
@@ -268,9 +212,6 @@ func TestUpdateUserAssignsAppRoleAndDerivesLegacyEnum(t *testing.T) {
 	if updated.AppRoleID == nil || *updated.AppRoleID != *legacyAdminId {
 		utils.PrintTestError(t, updated.AppRoleID, legacyAdminId)
 	}
-	if updated.UserRole != models.ADMIN {
-		utils.PrintTestError(t, updated.UserRole, models.ADMIN)
-	}
 }
 
 func TestUpdateUserPreservesAppRoleWhenIdOmitted(t *testing.T) {
@@ -304,7 +245,7 @@ func TestUpdateUserPreservesAppRoleWhenIdOmitted(t *testing.T) {
 	// An update that omits the app role id (e.g. a display-name-only edit) must
 	// not clear the existing assignment.
 	err = userRepository.UpdateUser(utils.UintToString(created.ID), commands.SignUpCommand{
-		Username: "admin", DisplayName: "renamed", UserRole: models.ADMIN,
+		Username: "admin", DisplayName: "renamed",
 	})
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
@@ -359,6 +300,19 @@ func TestShouldReturnErrorWhenCreatingUserWithDuplicateUsername(t *testing.T) {
 
 func TestShouldBeFirstAdminToLogin(t *testing.T) {
 	defer TruncateTestDb()
+
+	// IsFirstAdminToLogin identifies administrators by the modern app-role
+	// permission (app.users.read), so the system roles must be seeded for the first
+	// user to resolve to the Legacy Admin role.
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
 	userToCreate := commands.SignUpCommand{
 		Username:    "test",
 		DisplayName: "test",
@@ -370,7 +324,7 @@ func TestShouldBeFirstAdminToLogin(t *testing.T) {
 		utils.PrintTestError(t, err, "no error")
 	}
 
-	validateUser(t, createdUser, userToCreate, models.ADMIN, 1)
+	validateUser(t, createdUser, userToCreate, true, 1)
 
 	firstAdminToLogin, err := userRepository.IsFirstAdminToLogin()
 
@@ -381,6 +335,19 @@ func TestShouldBeFirstAdminToLogin(t *testing.T) {
 
 func TestShouldNotBeFirstAdminToLogin(t *testing.T) {
 	defer TruncateTestDb()
+
+	// IsFirstAdminToLogin identifies administrators by the modern app-role
+	// permission (app.users.read), so the system roles must be seeded for the first
+	// user to resolve to the Legacy Admin role.
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
 	userToCreate := commands.SignUpCommand{
 		Username:    "test",
 		DisplayName: "test",
@@ -392,7 +359,7 @@ func TestShouldNotBeFirstAdminToLogin(t *testing.T) {
 		utils.PrintTestError(t, err, "no error")
 	}
 
-	validateUser(t, createdUser, userToCreate, models.ADMIN, 1)
+	validateUser(t, createdUser, userToCreate, true, 1)
 
 	userRepository.UpdateUserLastLoginDate(1)
 
@@ -402,7 +369,13 @@ func TestShouldNotBeFirstAdminToLogin(t *testing.T) {
 	}
 }
 
-func validateUser(t *testing.T, createdUser models.User, userToCreate commands.SignUpCommand, role models.UserRole, id uint) {
+// validateUser asserts the freshly-created user's invariants, including the
+// modern app-role FK (the legacy UserRole enum was removed). isFirstUser selects
+// the expected role: the bootstrap admin is assigned Legacy Admin, every later
+// account the configurable default app role. resolveAppRoleId leaves the FK nil
+// in an unseeded test database, so the helper resolves the same expected id via
+// the repository getters and matches that (nil == nil when roles aren't seeded).
+func validateUser(t *testing.T, createdUser models.User, userToCreate commands.SignUpCommand, isFirstUser bool, id uint) {
 	if createdUser.ID != id {
 		utils.PrintTestError(t, createdUser.ID, id)
 	}
@@ -412,9 +385,31 @@ func validateUser(t *testing.T, createdUser models.User, userToCreate commands.S
 	if createdUser.DefaultAvatarColor != "#27b1ff" {
 		utils.PrintTestError(t, createdUser.DefaultAvatarColor, "#27b1ff")
 	}
-	if createdUser.UserRole != role {
-		utils.PrintTestError(t, createdUser.UserRole, models.ADMIN)
+
+	roleRepository := NewRoleRepository(nil)
+	var expectedRoleId *uint
+	var err error
+	if isFirstUser {
+		expectedRoleId, err = roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
+	} else {
+		expectedRoleId, err = roleRepository.GetDefaultAppRoleId()
 	}
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !uintPtrEqual(createdUser.AppRoleID, expectedRoleId) {
+		utils.PrintTestError(t, createdUser.AppRoleID, expectedRoleId)
+	}
+}
+
+// uintPtrEqual reports whether two *uint point to the same value (both nil counts
+// as equal).
+func uintPtrEqual(a *uint, b *uint) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 func validateGroup(t *testing.T, group models.Group, id uint, userId uint) {

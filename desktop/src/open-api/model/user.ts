@@ -7,7 +7,6 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { UserRole } from './userRole';
 
 
 /**
@@ -39,16 +38,9 @@ export interface User {
     isDummyUser: boolean;
     updatedAt?: string;
     /**
-     * User\'s role
-     */
-    userRole: UserRole;
-    /**
      * Id of the modern app role assigned to the user
      */
     appRoleId?: number;
     lastLoginDate?: string;
 }
-export namespace User {
-}
-
 

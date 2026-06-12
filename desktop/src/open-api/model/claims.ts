@@ -7,7 +7,6 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { UserRole } from './userRole';
 
 
 export interface Claims { 
@@ -15,10 +14,6 @@ export interface Claims {
      * User foreign key
      */
     userId: number;
-    /**
-     * User\'s role
-     */
-    userRole: UserRole;
     /**
      * Display name
      */
@@ -60,7 +55,4 @@ export interface Claims {
      */
     jti?: string;
 }
-export namespace Claims {
-}
-
 

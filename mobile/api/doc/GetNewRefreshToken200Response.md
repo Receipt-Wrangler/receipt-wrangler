@@ -11,7 +11,6 @@ Name | Type | Description | Notes
 **jwt** | **String** | JWT token | 
 **refreshToken** | **String** | Refresh token | 
 **userId** | **int** | User foreign key | [default to 0]
-**userRole** | [**UserRole**](UserRole.md) | User's role | [default to 'USER']
 **displayName** | **String** | Display name | [default to '']
 **defaultAvatarColor** | **String** | Default avatar color | [default to '']
 **username** | **String** | User's username used to login | [default to '']

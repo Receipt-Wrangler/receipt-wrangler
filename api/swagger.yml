@@ -2919,12 +2919,6 @@ components:
       enum:
         - "ACTIVE"
         - "ARCHIVED"
-    GroupRole:
-      type: string
-      enum:
-        - "OWNER"
-        - "VIEWER"
-        - "EDITOR"
     FilterOperation:
       type: string
       enum:
@@ -2935,11 +2929,6 @@ components:
         - BETWEEN
         - WITHIN_CURRENT_MONTH
         - ""
-    UserRole:
-      type: string
-      enum:
-        - ADMIN
-        - USER
     Permission:
       description: All permission keys the API recognizes.
       type: string
@@ -3464,7 +3453,6 @@ components:
     GroupMember:
       required:
         - groupId
-        - groupRole
         - userId
       type: object
       properties:
@@ -3474,9 +3462,6 @@ components:
           type: integer
           description: Group compound primary key
           format: uint64
-        groupRole:
-          type: string
-          $ref: "#/components/schemas/GroupRole"
         groupRoleId:
           type: integer
           format: uint64
@@ -3494,7 +3479,6 @@ components:
     UpsertGroupMemberCommand:
       required:
         - groupId
-        - groupRole
         - userId
       type: object
       properties:
@@ -3502,9 +3486,6 @@ components:
           type: integer
           description: Group compound primary key
           format: uint64
-        groupRole:
-          type: string
-          $ref: "#/components/schemas/GroupRole"
         groupRoleId:
           type: integer
           format: uint64
@@ -3837,7 +3818,6 @@ components:
         - username
         - displayName
         - isDummyUser
-        - userRole
         - id
       type: object
       properties:
@@ -3869,10 +3849,6 @@ components:
         updatedAt:
           type: string
           x-go-name: UpdatedAt
-        userRole:
-          type: string
-          $ref: "#/components/schemas/UserRole"
-          description: User's role
         appRoleId:
           type: integer
           format: uint64
@@ -3887,7 +3863,6 @@ components:
         - username
         - displayName
         - isDummyUser
-        - userRole
         - id
       type: object
       properties:
@@ -3913,10 +3888,6 @@ components:
           description: Is dummy user
         updatedAt:
           type: string
-        userRole:
-          type: string
-          $ref: "#/components/schemas/UserRole"
-          description: User's role
         appRoleId:
           type: integer
           format: uint64
@@ -3986,10 +3957,6 @@ components:
         isDummyUser:
           type: boolean
           description: Whether the user is a dummy user
-        userRole:
-          type: string
-          $ref: "#/components/schemas/UserRole"
-          description: User's role
         appRoleId:
           type: integer
           format: uint64
@@ -4643,7 +4610,6 @@ components:
       type: object
       required:
         - userId
-        - userRole
         - displayName
         - defaultAvatarColor
         - username
@@ -4654,11 +4620,6 @@ components:
           type: integer
           description: User foreign key
           default: 0
-        userRole:
-          type: string
-          $ref: "#/components/schemas/UserRole"
-          description: User's role
-          default: USER
         displayName:
           type: string
           description: Display name

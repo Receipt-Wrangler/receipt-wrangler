@@ -65,42 +65,52 @@ func RunDataMigrations() error {
 // Updates are guarded by "... IS NULL" so an assignment an administrator has
 // already made through the new role UI is never overwritten.
 func assignLegacyEquivalentRoles(tx *gorm.DB) error {
+	// The legacy UserRole / GroupRole enums have been removed from the Go models,
+	// but the physical user_role / group_role columns are intentionally retained on
+	// existing installs (GORM never drops them) so this back-fill can read them. The
+	// values are matched as plain strings, and each loop is guarded by HasColumn so
+	// fresh installs — which never create the columns — skip cleanly instead of
+	// failing with "no such column".
 	appRoleByLegacy := []struct {
-		legacyRole models.UserRole
+		legacyRole string
 		roleName   string
 	}{
-		{models.ADMIN, LegacyAdminRoleName},
-		{models.USER, LegacyUserRoleName},
+		{"ADMIN", LegacyAdminRoleName},
+		{"USER", LegacyUserRoleName},
 	}
-	for _, mapping := range appRoleByLegacy {
-		var role models.AppRole
-		if err := tx.Where("name = ?", mapping.roleName).First(&role).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&models.User{}).
-			Where("user_role = ? AND app_role_id IS NULL", mapping.legacyRole).
-			Update("app_role_id", role.ID).Error; err != nil {
-			return err
+	if tx.Migrator().HasColumn(&models.User{}, "user_role") {
+		for _, mapping := range appRoleByLegacy {
+			var role models.AppRole
+			if err := tx.Where("name = ?", mapping.roleName).First(&role).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&models.User{}).
+				Where("user_role = ? AND app_role_id IS NULL", mapping.legacyRole).
+				Update("app_role_id", role.ID).Error; err != nil {
+				return err
+			}
 		}
 	}
 
 	groupRoleByLegacy := []struct {
-		legacyRole models.GroupRole
+		legacyRole string
 		roleName   string
 	}{
-		{models.OWNER, LegacyOwnerRoleName},
-		{models.EDITOR, LegacyEditorRoleName},
-		{models.VIEWER, LegacyViewerRoleName},
+		{"OWNER", LegacyOwnerRoleName},
+		{"EDITOR", LegacyEditorRoleName},
+		{"VIEWER", LegacyViewerRoleName},
 	}
-	for _, mapping := range groupRoleByLegacy {
-		var role models.GroupRoleDefinition
-		if err := tx.Where("name = ?", mapping.roleName).First(&role).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&models.GroupMember{}).
-			Where("group_role = ? AND group_role_id IS NULL", mapping.legacyRole).
-			Update("group_role_id", role.ID).Error; err != nil {
-			return err
+	if tx.Migrator().HasColumn(&models.GroupMember{}, "group_role") {
+		for _, mapping := range groupRoleByLegacy {
+			var role models.GroupRoleDefinition
+			if err := tx.Where("name = ?", mapping.roleName).First(&role).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&models.GroupMember{}).
+				Where("group_role = ? AND group_role_id IS NULL", mapping.legacyRole).
+				Update("group_role_id", role.ID).Error; err != nil {
+				return err
+			}
 		}
 	}
 

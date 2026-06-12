@@ -79,7 +79,7 @@ func TestGetPieChartData_Success_Categories(t *testing.T) {
 
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 
@@ -144,7 +144,7 @@ func TestGetPieChartData_Success_Tags(t *testing.T) {
 
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 
@@ -204,7 +204,7 @@ func TestGetPieChartData_Success_PaidBy(t *testing.T) {
 
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 
@@ -266,7 +266,7 @@ func TestGetPieChartData_InvalidChartGrouping(t *testing.T) {
 
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 
@@ -322,7 +322,7 @@ func TestGetPieChartData_EmptyReceipts(t *testing.T) {
 
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 
@@ -393,7 +393,7 @@ func TestGetPieChartData_WithFilter(t *testing.T) {
 
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 
@@ -440,7 +440,7 @@ func TestGetPieChartData_InvalidJSON(t *testing.T) {
 
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 
@@ -470,7 +470,7 @@ func TestGetPieChartData_EmptyBody(t *testing.T) {
 
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 
@@ -519,7 +519,7 @@ func TestGetPieChartData_AdminUser(t *testing.T) {
 
 	// Add JWT context with ADMIN role
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 
@@ -584,7 +584,7 @@ func TestGetPieChartData_ResponseFormat(t *testing.T) {
 
 	// Add JWT context
 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: 1},
 	})
 	r = r.WithContext(newContext)
 

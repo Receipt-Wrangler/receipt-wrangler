@@ -24,8 +24,6 @@ class _$UserView extends UserView {
   @override
   final String? updatedAt;
   @override
-  final UserRole userRole;
-  @override
   final int? appRoleId;
 
   factory _$UserView([void Function(UserViewBuilder)? updates]) =>
@@ -40,7 +38,6 @@ class _$UserView extends UserView {
       required this.id,
       required this.isDummyUser,
       this.updatedAt,
-      required this.userRole,
       this.appRoleId})
       : super._();
   @override
@@ -62,7 +59,6 @@ class _$UserView extends UserView {
         id == other.id &&
         isDummyUser == other.isDummyUser &&
         updatedAt == other.updatedAt &&
-        userRole == other.userRole &&
         appRoleId == other.appRoleId;
   }
 
@@ -77,7 +73,6 @@ class _$UserView extends UserView {
     _$hash = $jc(_$hash, id.hashCode);
     _$hash = $jc(_$hash, isDummyUser.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
-    _$hash = $jc(_$hash, userRole.hashCode);
     _$hash = $jc(_$hash, appRoleId.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -94,7 +89,6 @@ class _$UserView extends UserView {
           ..add('id', id)
           ..add('isDummyUser', isDummyUser)
           ..add('updatedAt', updatedAt)
-          ..add('userRole', userRole)
           ..add('appRoleId', appRoleId))
         .toString();
   }
@@ -136,10 +130,6 @@ class UserViewBuilder implements Builder<UserView, UserViewBuilder> {
   String? get updatedAt => _$this._updatedAt;
   set updatedAt(String? updatedAt) => _$this._updatedAt = updatedAt;
 
-  UserRole? _userRole;
-  UserRole? get userRole => _$this._userRole;
-  set userRole(UserRole? userRole) => _$this._userRole = userRole;
-
   int? _appRoleId;
   int? get appRoleId => _$this._appRoleId;
   set appRoleId(int? appRoleId) => _$this._appRoleId = appRoleId;
@@ -159,7 +149,6 @@ class UserViewBuilder implements Builder<UserView, UserViewBuilder> {
       _id = $v.id;
       _isDummyUser = $v.isDummyUser;
       _updatedAt = $v.updatedAt;
-      _userRole = $v.userRole;
       _appRoleId = $v.appRoleId;
       _$v = null;
     }
@@ -193,8 +182,6 @@ class UserViewBuilder implements Builder<UserView, UserViewBuilder> {
           isDummyUser: BuiltValueNullFieldError.checkNotNull(
               isDummyUser, r'UserView', 'isDummyUser'),
           updatedAt: updatedAt,
-          userRole: BuiltValueNullFieldError.checkNotNull(
-              userRole, r'UserView', 'userRole'),
           appRoleId: appRoleId,
         );
     replace(_$result);

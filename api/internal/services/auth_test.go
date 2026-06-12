@@ -162,13 +162,14 @@ func TestGenerateRefreshTokenCorrectly(t *testing.T) {
 
 func TestShouldLogInUserCorrectly(t *testing.T) {
 	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
 	expectedDisplayname := "Another displayname"
 	expectedUsername := "Another username"
 	password := "Password"
 
 	userRepository := repositories.NewUserRepository(nil)
 
-	_, err := userRepository.CreateUser(commands.SignUpCommand{
+	createdUser, err := userRepository.CreateUser(commands.SignUpCommand{
 		Username:    expectedUsername,
 		Password:    password,
 		DisplayName: expectedDisplayname,
@@ -176,6 +177,20 @@ func TestShouldLogInUserCorrectly(t *testing.T) {
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
+
+	// "First admin to login" is now defined by the app.users.read permission
+	// (the modern replacement for the removed UserRole == ADMIN check), so the
+	// user must hold an admin role for the firstAdminToLogin path to be exercised.
+	roleRepository := repositories.NewRoleRepository(nil)
+	adminRole, err := roleRepository.CreateAppRole("Login Admin Role", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if err := repositories.GetDB().Model(&models.User{}).
+		Where("id = ?", createdUser.ID).Update("app_role_id", adminRole.ID).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	ClearRolePermissionCacheForTests()
 
 	user, firstAdminToLogin, err := LoginUser(commands.LoginCommand{
 		Username: expectedUsername,
@@ -443,7 +458,6 @@ func TestGetAppData_WithRequestPopulatesClaims(t *testing.T) {
 		UserId:      user.ID,
 		Username:    user.Username,
 		Displayname: user.DisplayName,
-		UserRole:    models.ADMIN,
 	}
 	validatedClaims := &validator.ValidatedClaims{CustomClaims: customClaims}
 

@@ -47,7 +47,7 @@ func TestShouldNotAllowUserToDeleteUser(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -72,7 +72,7 @@ func TestShouldNotAllowUserToResetPassword(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -97,7 +97,7 @@ func TestShouldNotAllowUserToConvertUser(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -122,7 +122,7 @@ func TestShouldNotAllowUserToCreateUser(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -147,7 +147,7 @@ func TestShouldNotAllowUserToUpdateUser(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -158,7 +158,7 @@ func TestShouldNotAllowUserToUpdateUser(t *testing.T) {
 	}
 }
 
-func createTestUser(t *testing.T, username string, password string, role models.UserRole) models.User {
+func createTestUser(t *testing.T, username string, password string) models.User {
 	userRepository := repositories.NewUserRepository(nil)
 	user, err := userRepository.CreateUser(commands.SignUpCommand{
 		Username:    username,
@@ -167,12 +167,6 @@ func createTestUser(t *testing.T, username string, password string, role models.
 	})
 	if err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
-	}
-
-	if role != "" {
-		db := repositories.GetDB()
-		db.Model(&models.User{}).Where("id = ?", user.ID).Update("user_role", role)
-		user.UserRole = role
 	}
 
 	return user
@@ -184,7 +178,7 @@ func TestDeleteAccountShouldFailWithWrongPassword(t *testing.T) {
 	db := repositories.GetDB()
 	db.Create(&models.SystemEmail{})
 
-	user := createTestUser(t, "testuser", "correctpassword", models.USER)
+	user := createTestUser(t, "testuser", "correctpassword")
 
 	w := httptest.NewRecorder()
 	reader := strings.NewReader("")
@@ -192,7 +186,7 @@ func TestDeleteAccountShouldFailWithWrongPassword(t *testing.T) {
 
 	ctx := context.WithValue(r.Context(), "deleteAccountCommand", commands.DeleteAccountCommand{Password: "wrongpassword"})
 	ctx = context.WithValue(ctx, jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: user.ID, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: user.ID},
 	})
 	r = r.WithContext(ctx)
 
@@ -212,8 +206,9 @@ func TestDeleteAccountShouldSucceedWithCorrectPassword(t *testing.T) {
 	db.Create(&models.SystemEmail{})
 
 	// Create a second admin so this user is not the only admin
-	createTestUser(t, "adminuser", "adminpass", models.ADMIN)
-	user := createTestUser(t, "testuser", "correctpassword", models.USER)
+	adminUser := createTestUser(t, "adminuser", "adminpass")
+	grantAppPerms(t, adminUser.ID, permissions.AppUsersRead)
+	user := createTestUser(t, "testuser", "correctpassword")
 
 	w := httptest.NewRecorder()
 	reader := strings.NewReader("")
@@ -221,7 +216,7 @@ func TestDeleteAccountShouldSucceedWithCorrectPassword(t *testing.T) {
 
 	ctx := context.WithValue(r.Context(), "deleteAccountCommand", commands.DeleteAccountCommand{Password: "correctpassword"})
 	ctx = context.WithValue(ctx, jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: user.ID, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: user.ID},
 	})
 	r = r.WithContext(ctx)
 
@@ -247,12 +242,18 @@ func TestDeleteAccountShouldPreventLastAdminDeletion(t *testing.T) {
 	db := repositories.GetDB()
 	db.Create(&models.SystemEmail{})
 
-	// This user will be the only admin (first user created gets ADMIN role)
-	user := createTestUser(t, "onlyadmin", "adminpassword", models.ADMIN)
+	// This user will be the only admin. "Administrator" is defined by the
+	// modern app.users.read permission (see services.DeleteAccount), so grant
+	// it the admin permission alongside the self-service delete permission.
+	user := createTestUser(t, "onlyadmin", "adminpassword")
+	grantAppPerms(t, user.ID, permissions.AppUsersRead, permissions.AppAccountDelete)
 
 	// Ensure no other admins exist
-	var adminCount int64
-	db.Model(&models.User{}).Where("user_role = ?", models.ADMIN).Count(&adminCount)
+	roleRepository := repositories.NewRoleRepository(nil)
+	adminCount, err := roleRepository.CountUsersWithAppPermission(permissions.AppUsersRead)
+	if err != nil {
+		t.Fatalf("count admins: %v", err)
+	}
 	if adminCount != 1 {
 		t.Fatalf("Expected exactly 1 admin, got %d", adminCount)
 	}
@@ -263,11 +264,9 @@ func TestDeleteAccountShouldPreventLastAdminDeletion(t *testing.T) {
 
 	ctx := context.WithValue(r.Context(), "deleteAccountCommand", commands.DeleteAccountCommand{Password: "adminpassword"})
 	ctx = context.WithValue(ctx, jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: user.ID, UserRole: models.ADMIN},
+		CustomClaims: &structs.Claims{UserId: user.ID},
 	})
 	r = r.WithContext(ctx)
-
-	grantAppPerms(t, user.ID, permissions.AppAccountDelete)
 
 	DeleteAccount(w, r)
 
@@ -355,7 +354,7 @@ func callGetAmountOwed(callerUserId uint, groupId string, receiptIds []string) (
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	ctx := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: callerUserId, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: callerUserId},
 	})
 	r = r.WithContext(ctx)
 

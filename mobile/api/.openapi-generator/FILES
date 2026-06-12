@@ -50,7 +50,6 @@ doc/Group.md
 doc/GroupFilter.md
 doc/GroupMember.md
 doc/GroupReceiptSettings.md
-doc/GroupRole.md
 doc/GroupSettings.md
 doc/GroupSettingsWhiteListEmail.md
 doc/GroupStatus.md
@@ -138,7 +137,6 @@ doc/User.md
 doc/UserApi.md
 doc/UserPreferences.md
 doc/UserPreferencesApi.md
-doc/UserRole.md
 doc/UserShortcut.md
 doc/UserView.md
 doc/Widget.md
@@ -220,7 +218,6 @@ lib/src/model/group.dart
 lib/src/model/group_filter.dart
 lib/src/model/group_member.dart
 lib/src/model/group_receipt_settings.dart
-lib/src/model/group_role.dart
 lib/src/model/group_settings.dart
 lib/src/model/group_settings_white_list_email.dart
 lib/src/model/group_status.dart
@@ -292,7 +289,6 @@ lib/src/model/upsert_task_queue_configuration.dart
 lib/src/model/upsert_widget_command.dart
 lib/src/model/user.dart
 lib/src/model/user_preferences.dart
-lib/src/model/user_role.dart
 lib/src/model/user_shortcut.dart
 lib/src/model/user_view.dart
 lib/src/model/widget.dart

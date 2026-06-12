@@ -12,8 +12,6 @@ class _$GroupMember extends GroupMember {
   @override
   final int groupId;
   @override
-  final GroupRole groupRole;
-  @override
   final int? groupRoleId;
   @override
   final String? updatedAt;
@@ -26,7 +24,6 @@ class _$GroupMember extends GroupMember {
   _$GroupMember._(
       {this.createdAt,
       required this.groupId,
-      required this.groupRole,
       this.groupRoleId,
       this.updatedAt,
       required this.userId})
@@ -44,7 +41,6 @@ class _$GroupMember extends GroupMember {
     return other is GroupMember &&
         createdAt == other.createdAt &&
         groupId == other.groupId &&
-        groupRole == other.groupRole &&
         groupRoleId == other.groupRoleId &&
         updatedAt == other.updatedAt &&
         userId == other.userId;
@@ -55,7 +51,6 @@ class _$GroupMember extends GroupMember {
     var _$hash = 0;
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, groupId.hashCode);
-    _$hash = $jc(_$hash, groupRole.hashCode);
     _$hash = $jc(_$hash, groupRoleId.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jc(_$hash, userId.hashCode);
@@ -68,7 +63,6 @@ class _$GroupMember extends GroupMember {
     return (newBuiltValueToStringHelper(r'GroupMember')
           ..add('createdAt', createdAt)
           ..add('groupId', groupId)
-          ..add('groupRole', groupRole)
           ..add('groupRoleId', groupRoleId)
           ..add('updatedAt', updatedAt)
           ..add('userId', userId))
@@ -86,10 +80,6 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
   int? _groupId;
   int? get groupId => _$this._groupId;
   set groupId(int? groupId) => _$this._groupId = groupId;
-
-  GroupRole? _groupRole;
-  GroupRole? get groupRole => _$this._groupRole;
-  set groupRole(GroupRole? groupRole) => _$this._groupRole = groupRole;
 
   int? _groupRoleId;
   int? get groupRoleId => _$this._groupRoleId;
@@ -112,7 +102,6 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
     if ($v != null) {
       _createdAt = $v.createdAt;
       _groupId = $v.groupId;
-      _groupRole = $v.groupRole;
       _groupRoleId = $v.groupRoleId;
       _updatedAt = $v.updatedAt;
       _userId = $v.userId;
@@ -140,8 +129,6 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
           createdAt: createdAt,
           groupId: BuiltValueNullFieldError.checkNotNull(
               groupId, r'GroupMember', 'groupId'),
-          groupRole: BuiltValueNullFieldError.checkNotNull(
-              groupRole, r'GroupMember', 'groupRole'),
           groupRoleId: groupRoleId,
           updatedAt: updatedAt,
           userId: BuiltValueNullFieldError.checkNotNull(

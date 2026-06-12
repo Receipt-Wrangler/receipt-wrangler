@@ -67,7 +67,7 @@ func seedReceiptImagePipeline(t *testing.T, url string) (models.User, models.Gro
 	if err := db.Create(&group).Error; err != nil {
 		t.Fatalf("seed group: %v", err)
 	}
-	member := models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRole: models.OWNER}
+	member := models.GroupMember{GroupID: group.ID, UserID: user.ID}
 	if err := db.Create(&member).Error; err != nil {
 		t.Fatalf("seed group member: %v", err)
 	}

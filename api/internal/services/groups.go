@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"os"
@@ -159,23 +158,6 @@ func (service GroupService) DeleteGroup(groupId string, allowAllGroupDelete bool
 	})
 	if err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (service GroupService) ValidateGroupRole(role models.GroupRole, groupId string, userId string) error {
-	groupMap := models.BuildGroupMap()
-
-	groupMemberRepository := repositories.NewGroupMemberRepository(service.TX)
-	groupMember, err := groupMemberRepository.GetGroupMemberByUserIdAndGroupId(userId, groupId)
-	if err != nil {
-		return err
-	}
-
-	var hasAccess = groupMap[groupMember.GroupRole] >= groupMap[role]
-	if !hasAccess {
-		return errors.New("user does not have access to this group")
 	}
 
 	return nil

@@ -12,7 +12,6 @@ type User struct {
 	IsDummyUser        bool       `json:"isDummyUser"`
 	Password           string     `gorm:"not null"`
 	Username           string     `gorm:"not null; uniqueIndex"`
-	UserRole           UserRole   `gorm:"default:'USER'" json:"userRole"`
 	LastLoginDate      *time.Time `json:"lastLoginDate"`
 	AppRoleID          *uint      `gorm:"index" json:"appRoleId"`
 	AppRole            *AppRole   `gorm:"foreignKey:AppRoleID;constraint:OnDelete:RESTRICT" json:"appRole,omitempty"`

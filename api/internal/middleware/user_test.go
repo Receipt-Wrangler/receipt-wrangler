@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/commands"
-	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/utils"
 	"testing"
@@ -34,22 +33,6 @@ func TestValidateUserDataAllowsModernAppRoleId(t *testing.T) {
 		Password:    "password",
 		DisplayName: "Modern",
 		AppRoleID:   &appRoleId,
-	}, true)
-
-	if w.Result().StatusCode != http.StatusOK {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
-	}
-}
-
-// The legacy enum is still accepted (e.g. the e2e seed script posts userRole).
-func TestValidateUserDataAllowsLegacyUserRole(t *testing.T) {
-	defer repositories.TruncateTable(repositories.GetDB(), "users")
-
-	w := runValidateUserData(commands.SignUpCommand{
-		Username:    "legacy",
-		Password:    "password",
-		DisplayName: "Legacy",
-		UserRole:    models.USER,
 	}, true)
 
 	if w.Result().StatusCode != http.StatusOK {

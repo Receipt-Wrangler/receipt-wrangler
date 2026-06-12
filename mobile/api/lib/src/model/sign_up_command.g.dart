@@ -16,8 +16,6 @@ class _$SignUpCommand extends SignUpCommand {
   @override
   final bool? isDummyUser;
   @override
-  final UserRole? userRole;
-  @override
   final int? appRoleId;
 
   factory _$SignUpCommand([void Function(SignUpCommandBuilder)? updates]) =>
@@ -28,7 +26,6 @@ class _$SignUpCommand extends SignUpCommand {
       required this.password,
       this.displayName,
       this.isDummyUser,
-      this.userRole,
       this.appRoleId})
       : super._();
   @override
@@ -46,7 +43,6 @@ class _$SignUpCommand extends SignUpCommand {
         password == other.password &&
         displayName == other.displayName &&
         isDummyUser == other.isDummyUser &&
-        userRole == other.userRole &&
         appRoleId == other.appRoleId;
   }
 
@@ -57,7 +53,6 @@ class _$SignUpCommand extends SignUpCommand {
     _$hash = $jc(_$hash, password.hashCode);
     _$hash = $jc(_$hash, displayName.hashCode);
     _$hash = $jc(_$hash, isDummyUser.hashCode);
-    _$hash = $jc(_$hash, userRole.hashCode);
     _$hash = $jc(_$hash, appRoleId.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -70,7 +65,6 @@ class _$SignUpCommand extends SignUpCommand {
           ..add('password', password)
           ..add('displayName', displayName)
           ..add('isDummyUser', isDummyUser)
-          ..add('userRole', userRole)
           ..add('appRoleId', appRoleId))
         .toString();
   }
@@ -96,10 +90,6 @@ class SignUpCommandBuilder
   bool? get isDummyUser => _$this._isDummyUser;
   set isDummyUser(bool? isDummyUser) => _$this._isDummyUser = isDummyUser;
 
-  UserRole? _userRole;
-  UserRole? get userRole => _$this._userRole;
-  set userRole(UserRole? userRole) => _$this._userRole = userRole;
-
   int? _appRoleId;
   int? get appRoleId => _$this._appRoleId;
   set appRoleId(int? appRoleId) => _$this._appRoleId = appRoleId;
@@ -115,7 +105,6 @@ class SignUpCommandBuilder
       _password = $v.password;
       _displayName = $v.displayName;
       _isDummyUser = $v.isDummyUser;
-      _userRole = $v.userRole;
       _appRoleId = $v.appRoleId;
       _$v = null;
     }
@@ -144,7 +133,6 @@ class SignUpCommandBuilder
               password, r'SignUpCommand', 'password'),
           displayName: displayName,
           isDummyUser: isDummyUser,
-          userRole: userRole,
           appRoleId: appRoleId,
         );
     replace(_$result);

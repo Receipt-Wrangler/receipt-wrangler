@@ -91,7 +91,6 @@ func createCustomFieldHandlerTestRequest(method, url string, body string) (*http
 		UserId:      1,
 		Username:    "testuser",
 		Displayname: "Test User",
-		UserRole:    models.ADMIN,
 	}
 
 	// Set the JWT context

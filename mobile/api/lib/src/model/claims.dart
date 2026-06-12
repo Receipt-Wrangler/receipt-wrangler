@@ -4,7 +4,6 @@
 
 // ignore_for_file: unused_element
 import 'package:built_collection/built_collection.dart';
-import 'package:openapi/src/model/user_role.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -14,7 +13,6 @@ part 'claims.g.dart';
 ///
 /// Properties:
 /// * [userId] - User foreign key
-/// * [userRole] - User's role
 /// * [displayName] - Display name
 /// * [defaultAvatarColor] - Default avatar color
 /// * [username] - User's username used to login
@@ -30,11 +28,6 @@ abstract class Claims implements Built<Claims, ClaimsBuilder> {
   /// User foreign key
   @BuiltValueField(wireName: r'userId')
   int get userId;
-
-  /// User's role
-  @BuiltValueField(wireName: r'userRole')
-  UserRole get userRole;
-  // enum userRoleEnum {  ADMIN,  USER,  };
 
   /// Display name
   @BuiltValueField(wireName: r'displayName')
@@ -83,7 +76,6 @@ abstract class Claims implements Built<Claims, ClaimsBuilder> {
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(ClaimsBuilder b) => b
       ..userId = 0
-      ..userRole = UserRole.USER
       ..displayName = ''
       ..defaultAvatarColor = ''
       ..username = ''
@@ -115,11 +107,6 @@ class _$ClaimsSerializer implements PrimitiveSerializer<Claims> {
     yield serializers.serialize(
       object.userId,
       specifiedType: const FullType(int),
-    );
-    yield r'userRole';
-    yield serializers.serialize(
-      object.userRole,
-      specifiedType: const FullType(UserRole),
     );
     yield r'displayName';
     yield serializers.serialize(
@@ -210,13 +197,6 @@ class _$ClaimsSerializer implements PrimitiveSerializer<Claims> {
             specifiedType: const FullType(int),
           ) as int;
           result.userId = valueDes;
-          break;
-        case r'userRole':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(UserRole),
-          ) as UserRole;
-          result.userRole = valueDes;
           break;
         case r'displayName':
           final valueDes = serializers.deserialize(

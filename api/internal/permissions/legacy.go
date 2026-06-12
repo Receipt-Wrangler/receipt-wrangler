@@ -4,11 +4,10 @@ import "slices"
 
 // Legacy role permission sets.
 //
-// These reproduce the capabilities of the legacy models.UserRole (ADMIN/USER)
-// and models.GroupRole (VIEWER/EDITOR/OWNER) enums as granular permission
-// strings, so the seeded "Legacy *" system roles match the old enforcement
-// exactly. They were derived from the actual handler-level role gating, not the
-// desktop UI presets.
+// These reproduce the capabilities of the historical app roles (ADMIN/USER) and
+// group roles (VIEWER/EDITOR/OWNER) as granular permission strings, so the
+// seeded "Legacy *" system roles match the old enforcement exactly. They were
+// derived from the actual handler-level role gating, not the desktop UI presets.
 
 // scopeKeys returns every registry key for the given scope. Used so the
 // "everything in this scope" legacy roles (admin / owner) stay complete as the
@@ -24,12 +23,12 @@ func scopeKeys(scope Scope) []string {
 }
 
 // LegacyAppAdminKeys returns every app-scope permission. It mirrors the legacy
-// UserRole ADMIN, which could perform every application-level action.
+// ADMIN app role, which could perform every application-level action.
 func LegacyAppAdminKeys() []string {
 	return scopeKeys(ScopeApp)
 }
 
-// LegacyAppUserKeys returns the app-scope permissions a legacy UserRole USER
+// LegacyAppUserKeys returns the app-scope permissions a legacy USER app role
 // held: actions whose handlers were gated to USER or left ungated (available to
 // any authenticated user). Intentionally a fixed subset, so it must NOT grow
 // automatically as new permissions are added.
@@ -62,8 +61,8 @@ func LegacyAppUserKeys() []string {
 	}
 }
 
-// LegacyGroupViewerKeys returns the group-scope permissions a legacy GroupRole
-// VIEWER held. This is the exact legacy match: a viewer could do more than
+// LegacyGroupViewerKeys returns the group-scope permissions a legacy VIEWER
+// group role held. This is the exact legacy match: a viewer could do more than
 // read (comment, manage their own dashboards, magic-fill, poll email).
 func LegacyGroupViewerKeys() []string {
 	return []string{
@@ -82,7 +81,7 @@ func LegacyGroupViewerKeys() []string {
 	}
 }
 
-// LegacyGroupEditorKeys returns the legacy GroupRole EDITOR permissions: every
+// LegacyGroupEditorKeys returns the legacy EDITOR group role permissions: every
 // viewer permission plus the editor-only receipt and activity actions.
 // slices.Concat allocates a fresh slice, so the viewer set is never aliased.
 func LegacyGroupEditorKeys() []string {
@@ -97,7 +96,7 @@ func LegacyGroupEditorKeys() []string {
 }
 
 // LegacyGroupOwnerKeys returns every group-scope permission. It mirrors the
-// legacy GroupRole OWNER, the top of the group hierarchy, which could perform
+// legacy OWNER group role, the top of the group hierarchy, which could perform
 // every group-level action.
 func LegacyGroupOwnerKeys() []string {
 	return scopeKeys(ScopeGroup)

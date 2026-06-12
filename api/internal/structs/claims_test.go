@@ -14,7 +14,6 @@ func TestClaims_Validate_Success(t *testing.T) {
 		UserId:             1,
 		Username:           "testuser",
 		Displayname:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#FF0000",
 		ApiKeyScope:        models.API_KEY_SCOPE_READ,
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -31,7 +30,6 @@ func TestClaims_Validate_AllValidFields(t *testing.T) {
 		UserId:             123,
 		Username:           "fulluser",
 		Displayname:        "Full Display Name",
-		UserRole:           models.USER,
 		DefaultAvatarColor: "#00FF00",
 		ApiKeyScope:        models.API_KEY_SCOPE_READ_WRITE,
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -48,7 +46,6 @@ func TestClaims_Validate_MissingUserId(t *testing.T) {
 		UserId:             0, // Invalid - should be > 0
 		Username:           "testuser",
 		Displayname:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#FF0000",
 		ApiKeyScope:        models.API_KEY_SCOPE_READ,
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -70,7 +67,6 @@ func TestClaims_Validate_MissingUsername(t *testing.T) {
 		UserId:             1,
 		Username:           "", // Invalid - should not be empty
 		Displayname:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#FF0000",
 		ApiKeyScope:        models.API_KEY_SCOPE_READ,
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -92,7 +88,6 @@ func TestClaims_Validate_MissingDisplayname(t *testing.T) {
 		UserId:             1,
 		Username:           "testuser",
 		Displayname:        "", // Invalid - should not be empty
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#FF0000",
 		ApiKeyScope:        models.API_KEY_SCOPE_READ,
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -109,66 +104,11 @@ func TestClaims_Validate_MissingDisplayname(t *testing.T) {
 	}
 }
 
-func TestClaims_Validate_InvalidUserRole(t *testing.T) {
-	claims := Claims{
-		UserId:             1,
-		Username:           "testuser",
-		Displayname:        "Test User",
-		UserRole:           models.UserRole("INVALID_ROLE"), // Invalid role
-		DefaultAvatarColor: "#FF0000",
-		ApiKeyScope:        models.API_KEY_SCOPE_READ,
-		RegisteredClaims:   jwt.RegisteredClaims{},
-	}
-
-	err := claims.Validate(context.Background())
-	if err == nil {
-		utils.PrintTestError(t, err, "an error for invalid user role")
-	}
-
-	expectedMsg := "invalid user role: INVALID_ROLE"
-	if err.Error() != expectedMsg {
-		utils.PrintTestError(t, err.Error(), expectedMsg)
-	}
-}
-
-func TestClaims_Validate_ValidUserRoles(t *testing.T) {
-	// Test ADMIN role
-	claimsAdmin := Claims{
-		UserId:             1,
-		Username:           "admin",
-		Displayname:        "Admin User",
-		UserRole:           models.ADMIN,
-		DefaultAvatarColor: "#FF0000",
-		RegisteredClaims:   jwt.RegisteredClaims{},
-	}
-
-	err := claimsAdmin.Validate(context.Background())
-	if err != nil {
-		utils.PrintTestError(t, err, "no error for ADMIN role")
-	}
-
-	// Test USER role
-	claimsUser := Claims{
-		UserId:             2,
-		Username:           "user",
-		Displayname:        "Regular User",
-		UserRole:           models.USER,
-		DefaultAvatarColor: "#00FF00",
-		RegisteredClaims:   jwt.RegisteredClaims{},
-	}
-
-	err = claimsUser.Validate(context.Background())
-	if err != nil {
-		utils.PrintTestError(t, err, "no error for USER role")
-	}
-}
-
 func TestClaims_Validate_InvalidAvatarColorFormat(t *testing.T) {
 	claims := Claims{
 		UserId:             1,
 		Username:           "testuser",
 		Displayname:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "FF0000", // Invalid - missing #
 		ApiKeyScope:        models.API_KEY_SCOPE_READ,
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -190,7 +130,6 @@ func TestClaims_Validate_InvalidAvatarColorLength(t *testing.T) {
 		UserId:             1,
 		Username:           "testuser",
 		Displayname:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#FF00", // Invalid - too short
 		ApiKeyScope:        models.API_KEY_SCOPE_READ,
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -212,7 +151,6 @@ func TestClaims_Validate_InvalidHexColor(t *testing.T) {
 		UserId:             1,
 		Username:           "testuser",
 		Displayname:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#GGGGGG", // Invalid - G is not a hex digit
 		ApiKeyScope:        models.API_KEY_SCOPE_READ,
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -234,7 +172,6 @@ func TestClaims_Validate_EmptyAvatarColor(t *testing.T) {
 		UserId:             1,
 		Username:           "testuser",
 		Displayname:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "", // Empty should be allowed
 		ApiKeyScope:        models.API_KEY_SCOPE_READ,
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -254,7 +191,6 @@ func TestClaims_Validate_ValidAvatarColors(t *testing.T) {
 			UserId:             1,
 			Username:           "testuser",
 			Displayname:        "Test User",
-			UserRole:           models.ADMIN,
 			DefaultAvatarColor: color,
 			RegisteredClaims:   jwt.RegisteredClaims{},
 		}
@@ -271,7 +207,6 @@ func TestClaims_Validate_InvalidApiKeyScope(t *testing.T) {
 		UserId:             1,
 		Username:           "testuser",
 		Displayname:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#FF0000",
 		ApiKeyScope:        models.ApiKeyScope("invalid_scope"), // Invalid scope
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -296,7 +231,6 @@ func TestClaims_Validate_ValidApiKeyScopes(t *testing.T) {
 			UserId:             1,
 			Username:           "testuser",
 			Displayname:        "Test User",
-			UserRole:           models.ADMIN,
 			DefaultAvatarColor: "#FF0000",
 			ApiKeyScope:        scope,
 			RegisteredClaims:   jwt.RegisteredClaims{},
@@ -314,7 +248,6 @@ func TestClaims_Validate_EmptyApiKeyScope(t *testing.T) {
 		UserId:             1,
 		Username:           "testuser",
 		Displayname:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#FF0000",
 		ApiKeyScope:        "", // Empty should be allowed
 		RegisteredClaims:   jwt.RegisteredClaims{},
@@ -332,7 +265,6 @@ func TestClaims_Validate_AllMinimalFields(t *testing.T) {
 		UserId:           1,
 		Username:         "minimaluser",
 		Displayname:      "Minimal User",
-		UserRole:         models.USER,
 		RegisteredClaims: jwt.RegisteredClaims{},
 		// DefaultAvatarColor and ApiKeyScope are optional and empty
 	}

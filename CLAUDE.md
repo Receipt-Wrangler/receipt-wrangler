@@ -123,12 +123,16 @@ See `mobile/CLAUDE.md` for Flutter architecture, Provider state management, and 
 - **Backend source of truth** is the hardcoded permission registry plus role CRUD in `api/` —
   exposed via `GET /api/permission` and `/api/role`, and mirrored in `swagger.yml` (so regenerated
   clients carry the `Permission` enum and role types). See `api/CLAUDE.md` → "Roles & Permissions".
-- The JWT is treated as a **UI hint**; the server re-checks a user's current permissions from the
-  database, never trusting JWT contents for authorization.
-- **Rollout is additive and in progress:** the new system coexists with the legacy
-  `UserRole`/`GroupRole` enums, which still enforce access today. Backend permission enforcement in
-  handlers and desktop permission-based UI gating are not wired up yet. Desktop currently ships only
-  the admin-gated Manage Roles UI (see `desktop/CLAUDE.md`).
+- The server **never trusts the JWT for authorization** — it re-checks a user's current permissions
+  from the database on every request. The JWT no longer carries any role field.
+- **Backend rollout is complete; desktop is the remaining follow-up.** Handlers fully enforce the
+  permission system, and the legacy `UserRole`/`GroupRole` enums have been **removed from the
+  backend** (Go types, model fields, JWT role claim, and the `userRole`/`groupRole` API fields are
+  all gone; only the physical `user_role`/`group_role` DB columns are retained for the one-time
+  upgrade migration). Desktop still consumes the old role fields (user-list role column, group-form
+  owner gating, auth-state role selectors), so migrating it to permission-based gating — and
+  regenerating against the slimmed contract — is the next phase. See `api/CLAUDE.md` →
+  "Roles & Permissions" and `desktop/CLAUDE.md`.
 
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access

@@ -3,7 +3,6 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:openapi/src/model/group_role.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -13,7 +12,6 @@ part 'upsert_group_member_command.g.dart';
 ///
 /// Properties:
 /// * [groupId] - Group compound primary key
-/// * [groupRole] 
 /// * [groupRoleId] - Id of the modern group role to assign to the member
 /// * [userId] - User compound primary key
 @BuiltValue()
@@ -21,10 +19,6 @@ abstract class UpsertGroupMemberCommand implements Built<UpsertGroupMemberComman
   /// Group compound primary key
   @BuiltValueField(wireName: r'groupId')
   int get groupId;
-
-  @BuiltValueField(wireName: r'groupRole')
-  GroupRole get groupRole;
-  // enum groupRoleEnum {  OWNER,  VIEWER,  EDITOR,  };
 
   /// Id of the modern group role to assign to the member
   @BuiltValueField(wireName: r'groupRoleId')
@@ -61,11 +55,6 @@ class _$UpsertGroupMemberCommandSerializer implements PrimitiveSerializer<Upsert
     yield serializers.serialize(
       object.groupId,
       specifiedType: const FullType(int),
-    );
-    yield r'groupRole';
-    yield serializers.serialize(
-      object.groupRole,
-      specifiedType: const FullType(GroupRole),
     );
     if (object.groupRoleId != null) {
       yield r'groupRoleId';
@@ -108,13 +97,6 @@ class _$UpsertGroupMemberCommandSerializer implements PrimitiveSerializer<Upsert
             specifiedType: const FullType(int),
           ) as int;
           result.groupId = valueDes;
-          break;
-        case r'groupRole':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(GroupRole),
-          ) as GroupRole;
-          result.groupRole = valueDes;
           break;
         case r'groupRoleId':
           final valueDes = serializers.deserialize(

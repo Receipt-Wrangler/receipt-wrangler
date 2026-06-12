@@ -140,7 +140,7 @@ func TestCreateGroupHonorsMemberGroupRoleId(t *testing.T) {
 	}
 
 	// The added member (not the creator/owner) must carry the chosen modern group
-	// role and a legacy enum derived from it.
+	// role on its FK.
 	var added *models.GroupMember
 	for i := range created.GroupMembers {
 		if created.GroupMembers[i].UserID == member.ID {
@@ -153,9 +153,6 @@ func TestCreateGroupHonorsMemberGroupRoleId(t *testing.T) {
 	}
 	if added.GroupRoleID == nil || *added.GroupRoleID != editor.ID {
 		utils.PrintTestError(t, added.GroupRoleID, editor.ID)
-	}
-	if added.GroupRole != models.EDITOR {
-		utils.PrintTestError(t, added.GroupRole, models.EDITOR)
 	}
 }
 
@@ -208,9 +205,6 @@ func TestUpdateGroupHonorsMemberGroupRoleId(t *testing.T) {
 	}
 	if stored.GroupRoleID == nil || *stored.GroupRoleID != viewer.ID {
 		utils.PrintTestError(t, stored.GroupRoleID, viewer.ID)
-	}
-	if stored.GroupRole != models.VIEWER {
-		utils.PrintTestError(t, stored.GroupRole, models.VIEWER)
 	}
 }
 

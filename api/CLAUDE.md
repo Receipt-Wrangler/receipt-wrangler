@@ -153,9 +153,14 @@ Tests should cover:
 A configurable role/permission system. Administrators can define roles from granular permission
 strings at two scopes — **application** and **group** — and assign them to users / group members.
 **Handlers now enforce these permissions** (see "Enforcement status" below). The legacy
-`models.UserRole` (`ADMIN`/`USER`) and `models.GroupRole` (`OWNER`/`EDITOR`/`VIEWER`) enums still
-exist — used by the JWT, the legacy-role data migration, and the `GroupMember` model — but no
-longer gate handler access.
+`models.UserRole` (`ADMIN`/`USER`) and `models.GroupRole` (`OWNER`/`EDITOR`/`VIEWER`) enums have
+been **removed from the backend** — the Go types, the `User.UserRole`/`GroupMember.GroupRole` model
+fields, the `Claims.userRole` JWT field, and the `DeriveLegacy*` shims are all gone. "Admin" is now
+defined by the app permission `app.users.read` (the seeded **Legacy Admin** role grants it; **Legacy
+User** omits it). The only legacy remnant is the **physical** `user_role`/`group_role` DB columns,
+intentionally retained on existing installs so the one-time data migration can still back-fill from
+them (see "Legacy role assignment" below); GORM never drops them and fresh installs never create
+them.
 
 ### Permission registry
 
@@ -189,8 +194,9 @@ longer gate handler access.
 - **Group roles:** `GroupRoleDefinition` + `GroupRolePermission`, plus `GroupRoleCategoryGrant` /
   `GroupRoleTagGrant` for per-role category/tag visibility.
 - **Assignment:** nullable FKs `User.AppRoleID` and `GroupMember.GroupRoleID` (one app role per
-  user; one group role per group membership). Nullable because they coexist with the legacy enums
-  during rollout.
+  user; one group role per group membership). Nullable because per-create assignment is best-effort
+  (the FK is left `nil` rather than failing creation when no role can be resolved, e.g. an unseeded
+  test DB) and because the one-time migration back-fills pre-existing rows that start `nil`.
 - `IsSystem` marks protected, non-editable/non-deletable roles; `IsDefault` (on **both** `AppRole`
   and `GroupRoleDefinition`) marks the single default role for that scope — the role assigned to new
   accounts (app) or to group creators (group). See "Default roles" below.
@@ -211,11 +217,11 @@ longer gate handler access.
 
 - `repositories.SeedSystemRoles` (`repositories/seed_roles.go`) seeds five immutable
   (`IsSystem = true`) roles on startup — wired into `InitDB`, runs in all deploy envs (it is
-  structural, unlike the bootstrap admin user). Their permission sets reproduce the legacy
-  `UserRole`/`GroupRole` capabilities **exactly**, so upgrading installs see **zero behavior
-  change**: **Legacy Admin** (every app permission), **Legacy User** (the app actions a plain
-  `USER` could do), **Legacy Viewer** / **Legacy Editor** / **Legacy Owner** (the group VIEWER /
-  EDITOR / OWNER tiers; Owner = every group permission). The sets live in
+  structural, unlike the bootstrap admin user). Their permission sets reproduce the capabilities of
+  the historical `ADMIN`/`USER` app roles and `OWNER`/`EDITOR`/`VIEWER` group roles **exactly**, so
+  upgrading installs see **zero behavior change**: **Legacy Admin** (every app permission), **Legacy
+  User** (the app actions a plain `USER` could do), **Legacy Viewer** / **Legacy Editor** / **Legacy
+  Owner** (the group VIEWER / EDITOR / OWNER tiers; Owner = every group permission). The sets live in
   `permissions/legacy.go` (`Legacy*Keys()` helpers) and were derived from the actual handler-level
   gating, not the desktop UI presets. **One deliberate exception:** `app.users.read` is omitted from
   Legacy User — it gates only the admin `GET /user/` listing, which no client calls (user dropdowns read
@@ -247,9 +253,10 @@ longer gate handler access.
   default and sets the new one in one transaction. System roles are eligible (the legacy defaults are
   system roles). The current default cannot be deleted (`ErrRoleIsDefault`).
 - **Per-create assignment** uses the defaults: `UserRepository.CreateUser` sets `User.AppRoleID`
-  (Legacy Admin for an `ADMIN`-resolved user so the bootstrap admin is never locked out; the default
-  app role otherwise), and `GroupRepository.CreateGroup` sets the creator's `GroupMember.GroupRoleID`
-  to the default group role. Both are **best-effort**: if the role can't be resolved (e.g. an
+  (Legacy Admin for the first user — `isAdmin := usrCnt == 0`, resolved by `resolveAppRoleId(tx,
+  isAdmin)` — so the bootstrap admin is never locked out; the default app role otherwise), and
+  `GroupRepository.CreateGroup` sets the creator's `GroupMember.GroupRoleID` to the default group
+  role. Both are **best-effort**: if the role can't be resolved (e.g. an
   unseeded test DB), the FK is left `nil` rather than failing creation. Members added to *existing*
   groups (and explicit role choices in the admin user/group-member forms) are assigned via the
   modern-role authoring flow — see "Modern role assignment in authoring flows" under "Enforcement
@@ -257,11 +264,17 @@ longer gate handler access.
 
 ### Legacy role assignment (one-time data migration)
 
-- A startup data migration back-fills the new role assignments from the legacy enums so existing
-  installs upgrade with **zero behavior change**: each `User.UserRole` maps onto the matching
-  `User.AppRoleID` (`ADMIN` → Legacy Admin, `USER` → Legacy User) and each `GroupMember.GroupRole`
-  onto `GroupMember.GroupRoleID` (`OWNER`/`EDITOR`/`VIEWER` → Legacy Owner/Editor/Viewer). Lives in
-  `repositories/data_migrations.go` (`assignLegacyEquivalentRoles`).
+- A startup data migration back-fills the new role assignments from the legacy role values so
+  existing installs upgrade with **zero behavior change**: each user's `user_role` maps onto the
+  matching `User.AppRoleID` (`ADMIN` → Legacy Admin, `USER` → Legacy User) and each member's
+  `group_role` onto `GroupMember.GroupRoleID` (`OWNER`/`EDITOR`/`VIEWER` → Legacy
+  Owner/Editor/Viewer). Lives in `repositories/data_migrations.go` (`assignLegacyEquivalentRoles`).
+- **Reads the retained physical columns, not Go fields.** The `UserRole`/`GroupRole` Go struct
+  fields were removed, so the migration matches the `user_role`/`group_role` values as plain strings
+  and **guards each back-fill loop with `tx.Migrator().HasColumn(...)`** — upgrading installs keep
+  the physical columns (GORM never drops them) so the back-fill runs, while fresh installs never
+  create them so the guard skips cleanly instead of erroring with "no such column". There is
+  deliberately **no drop-column migration**, to preserve this upgrade path.
 - **Tracking:** one-time data migrations are recorded in a `data_migrations` ledger
   (`models.DataMigration`, keyed by unique `name`) — distinct from GORM schema AutoMigrate. The
   runner `RunDataMigrations` skips any migration already in the ledger and otherwise runs it **and**
@@ -275,7 +288,9 @@ longer gate handler access.
   rows; per-create assignment for *new* users / group creators is handled by the default-role wiring
   (see "Default roles" above).
 - Tests: `repositories/data_migrations_test.go` (assignment, idempotency, ledger short-circuit,
-  no-clobber).
+  no-clobber, and the `HasColumn`-guard skip path when the legacy columns are absent). The tests
+  seed the legacy columns via raw `ALTER TABLE ... ADD COLUMN` DDL since AutoMigrate no longer
+  creates them.
 
 ### Permission checks (`PermissionService`)
 
@@ -322,9 +337,9 @@ gated by `app.roles.*`.
 caller's resolved permissions so the desktop can gate UI with them — `AppPermissions []string` and
 `GroupPermissions map[uint][]string` (keyed by group id) — built via
 `PermissionService.GetAppPermissionsForUser` / `GetGroupPermissionsForUser` (thin exported wrappers over
-the cached `resolveAppPermissions` / `resolveGroupPermissions`). The JWT still carries only the legacy
-`UserRole` and remains a thin UI hint; the server keeps re-checking real permissions from the DB on every
-request.
+the cached `resolveAppPermissions` / `resolveGroupPermissions`). The JWT no longer carries any role
+field at all (it holds only identity claims); the server always re-checks real permissions from the
+DB on every request.
 
 **`app.api-keys.read-any` (Security):** listing *all* users' API keys (`GetPagedApiKeys` with
 `associatedApiKeys=ALL`) requires `app.api-keys.read-any`, checked in the handler body via the
@@ -338,17 +353,13 @@ wiring (see "Default roles" above), so accounts created after the one-time migra
 locked out.
 
 **Modern role assignment in authoring flows (done):** admin user-create/update and group-member
-create/update now assign **modern roles directly**. `SignUpCommand` gained `AppRoleID` and
-`UpsertGroupMemberCommand` gained `GroupRoleID`; `UserRepository.CreateUser`/`UpdateUser` and
-`GroupRepository.CreateGroup`/`UpdateGroup` honor them when present. Because legacy-enum readers
-still exist (the JWT, the legacy data migration, the desktop group table's owner gating), the
-legacy `UserRole`/`GroupRole` is **derived from the chosen modern role** as a transitional bridge:
-`RoleRepository.DeriveLegacyUserRole` (`Legacy Admin → ADMIN`, else `USER`) and
-`DeriveLegacyGroupRole` (`Legacy Owner/Editor/Viewer → OWNER/EDITOR/VIEWER`, else least-privilege
-`VIEWER`). Delete these derivations once the remaining legacy-enum readers are migrated. The
-admin create endpoint's role-required validation (`middleware.ValidateUserData`) accepts **either**
-`appRoleId` or the legacy `userRole`. Public `SignUp` strips both a caller-supplied `UserRole` and
-`AppRoleID` so a sign-up can never self-assign a role.
+create/update assign **modern roles directly**. `SignUpCommand` carries `AppRoleID` and
+`UpsertGroupMemberCommand` carries `GroupRoleID`; `UserRepository.CreateUser`/`UpdateUser` and
+`GroupRepository.CreateGroup`/`UpdateGroup` honor them when present. The legacy-enum bridge has been
+**removed**: `DeriveLegacyUserRole`/`DeriveLegacyGroupRole` are deleted and no `UserRole`/`GroupRole`
+is derived or written anymore. The admin create endpoint's role-required validation
+(`middleware.ValidateUserData`) now accepts **only** `appRoleId`. Public `SignUp` strips a
+caller-supplied `AppRoleID` so a sign-up can never self-assign a role.
 
 ### Tests
 
