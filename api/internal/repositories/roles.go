@@ -286,6 +286,13 @@ func (repository RoleRepository) CountUsersWithAppRole(id uint) (int64, error) {
 // permissions satisfy perm, honoring wildcard grants (e.g. "*", "app.*") via the
 // permission matcher — something a raw SQL equality check on the permission
 // strings could not do.
+//
+// TODO: this scans every app role in memory to run the wildcard-aware match. App
+// roles are a small, admin-defined set and the callers (the last-admin delete
+// guard and the first-admin-login check) are infrequent, so this is fine today.
+// If app-role counts ever grow large, cache the reverse permission->roleIds
+// lookup (invalidated on role changes, mirroring services/permission_cache.go)
+// instead of scanning on every call.
 func (repository RoleRepository) appRoleIdsWithPermission(perm string) ([]uint, error) {
 	db := repository.GetDB()
 
