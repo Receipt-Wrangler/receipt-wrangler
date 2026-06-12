@@ -29,7 +29,7 @@ func TestShouldNotAllowUserToGetSystemSettings(t *testing.T) {
 
 	expectedStatusCode := http.StatusForbidden
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	GetSystemSettings(w, r)
@@ -47,7 +47,7 @@ func TestShouldGetSystemSettingsWhenThereAreNoSettings(t *testing.T) {
 
 	expectedStatusCode := http.StatusOK
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	grantAllAppPerms(t, 1)
@@ -70,7 +70,7 @@ func TestShouldGetSystemSettingsWhenThereAreExistingSettings(t *testing.T) {
 	db := repositories.GetDB()
 	db.Create(&models.SystemSettings{})
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	grantAllAppPerms(t, 1)
@@ -230,7 +230,7 @@ func TestShouldValidateUpsertSystemSettingsCommand(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api", reader)
 
-		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 		r = r.WithContext(newContext)
 
 		UpdateSystemSettings(w, r)

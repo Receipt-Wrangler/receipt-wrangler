@@ -26,11 +26,11 @@ import (
 // "due to role" cases are rejected with 403.
 func adminContext() *validator.ValidatedClaims {
 	ensureRoleAdmin(2)
-	return &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}}
+	return &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}}
 }
 
 func userContext() *validator.ValidatedClaims {
-	return &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 3, UserRole: models.USER}}
+	return &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 3}}
 }
 
 // ensureRoleAdmin idempotently gives userId an app role granting every app.roles
@@ -555,7 +555,6 @@ func TestShouldNotDeleteAssignedGroupRole(t *testing.T) {
 	member := models.GroupMember{
 		UserID:      user.ID,
 		GroupID:     group.ID,
-		GroupRole:   models.OWNER,
 		GroupRoleID: &created.ID,
 	}
 	if err := db.Create(&member).Error; err != nil {

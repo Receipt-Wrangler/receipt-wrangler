@@ -10,8 +10,6 @@ class _$UpsertGroupMemberCommand extends UpsertGroupMemberCommand {
   @override
   final int groupId;
   @override
-  final GroupRole groupRole;
-  @override
   final int? groupRoleId;
   @override
   final int userId;
@@ -21,10 +19,7 @@ class _$UpsertGroupMemberCommand extends UpsertGroupMemberCommand {
       (UpsertGroupMemberCommandBuilder()..update(updates))._build();
 
   _$UpsertGroupMemberCommand._(
-      {required this.groupId,
-      required this.groupRole,
-      this.groupRoleId,
-      required this.userId})
+      {required this.groupId, this.groupRoleId, required this.userId})
       : super._();
   @override
   UpsertGroupMemberCommand rebuild(
@@ -40,7 +35,6 @@ class _$UpsertGroupMemberCommand extends UpsertGroupMemberCommand {
     if (identical(other, this)) return true;
     return other is UpsertGroupMemberCommand &&
         groupId == other.groupId &&
-        groupRole == other.groupRole &&
         groupRoleId == other.groupRoleId &&
         userId == other.userId;
   }
@@ -49,7 +43,6 @@ class _$UpsertGroupMemberCommand extends UpsertGroupMemberCommand {
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, groupId.hashCode);
-    _$hash = $jc(_$hash, groupRole.hashCode);
     _$hash = $jc(_$hash, groupRoleId.hashCode);
     _$hash = $jc(_$hash, userId.hashCode);
     _$hash = $jf(_$hash);
@@ -60,7 +53,6 @@ class _$UpsertGroupMemberCommand extends UpsertGroupMemberCommand {
   String toString() {
     return (newBuiltValueToStringHelper(r'UpsertGroupMemberCommand')
           ..add('groupId', groupId)
-          ..add('groupRole', groupRole)
           ..add('groupRoleId', groupRoleId)
           ..add('userId', userId))
         .toString();
@@ -75,10 +67,6 @@ class UpsertGroupMemberCommandBuilder
   int? _groupId;
   int? get groupId => _$this._groupId;
   set groupId(int? groupId) => _$this._groupId = groupId;
-
-  GroupRole? _groupRole;
-  GroupRole? get groupRole => _$this._groupRole;
-  set groupRole(GroupRole? groupRole) => _$this._groupRole = groupRole;
 
   int? _groupRoleId;
   int? get groupRoleId => _$this._groupRoleId;
@@ -96,7 +84,6 @@ class UpsertGroupMemberCommandBuilder
     final $v = _$v;
     if ($v != null) {
       _groupId = $v.groupId;
-      _groupRole = $v.groupRole;
       _groupRoleId = $v.groupRoleId;
       _userId = $v.userId;
       _$v = null;
@@ -122,8 +109,6 @@ class UpsertGroupMemberCommandBuilder
         _$UpsertGroupMemberCommand._(
           groupId: BuiltValueNullFieldError.checkNotNull(
               groupId, r'UpsertGroupMemberCommand', 'groupId'),
-          groupRole: BuiltValueNullFieldError.checkNotNull(
-              groupRole, r'UpsertGroupMemberCommand', 'groupRole'),
           groupRoleId: groupRoleId,
           userId: BuiltValueNullFieldError.checkNotNull(
               userId, r'UpsertGroupMemberCommand', 'userId'),

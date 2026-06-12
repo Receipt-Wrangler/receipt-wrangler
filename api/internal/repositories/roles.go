@@ -282,6 +282,64 @@ func (repository RoleRepository) CountUsersWithAppRole(id uint) (int64, error) {
 	return count, nil
 }
 
+// appRoleIdsWithPermission returns the ids of every app role whose granted
+// permissions satisfy perm, honoring wildcard grants (e.g. "*", "app.*") via the
+// permission matcher — something a raw SQL equality check on the permission
+// strings could not do.
+//
+// TODO: this scans every app role in memory to run the wildcard-aware match. App
+// roles are a small, admin-defined set and the callers (the last-admin delete
+// guard and the first-admin-login check) are infrequent, so this is fine today.
+// If app-role counts ever grow large, cache the reverse permission->roleIds
+// lookup (invalidated on role changes, mirroring services/permission_cache.go)
+// instead of scanning on every call.
+func (repository RoleRepository) appRoleIdsWithPermission(perm string) ([]uint, error) {
+	db := repository.GetDB()
+
+	var appRoles []models.AppRole
+	err := db.Preload("Permissions").Find(&appRoles).Error
+	if err != nil {
+		return nil, err
+	}
+
+	roleIds := make([]uint, 0)
+	for _, role := range appRoles {
+		granted := make([]string, 0, len(role.Permissions))
+		for _, permission := range role.Permissions {
+			granted = append(granted, permission.Permission)
+		}
+		if permissions.HasAll(granted, perm) {
+			roleIds = append(roleIds, role.ID)
+		}
+	}
+
+	return roleIds, nil
+}
+
+// CountUsersWithAppPermission returns the number of users whose assigned app role
+// grants perm (wildcard-aware via appRoleIdsWithPermission). It defines the
+// "admin" population in place of the removed legacy UserRole enum — e.g. counting
+// holders of app.users.read to guard against deleting the last administrator.
+func (repository RoleRepository) CountUsersWithAppPermission(perm string) (int64, error) {
+	db := repository.GetDB()
+
+	roleIds, err := repository.appRoleIdsWithPermission(perm)
+	if err != nil {
+		return 0, err
+	}
+	if len(roleIds) == 0 {
+		return 0, nil
+	}
+
+	var count int64
+	err = db.Model(&models.User{}).Where("app_role_id IN ?", roleIds).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func (repository RoleRepository) CountGroupMembersWithGroupRole(id uint) (int64, error) {
 	db := repository.GetDB()
 
@@ -445,48 +503,4 @@ func (repository RoleRepository) GetDefaultGroupRoleId() (*uint, error) {
 	}
 
 	return &role.ID, nil
-}
-
-// DeriveLegacyUserRole maps a modern app role onto the legacy UserRole enum.
-// This is a transitional bridge: while user authoring assigns modern roles, code
-// that still reads User.UserRole (the JWT, the legacy data migration) needs a
-// sensible value. The Legacy Admin system role maps to ADMIN; every other role
-// (including custom roles) maps to the least-privilege USER. Removed once the
-// remaining legacy-enum readers are migrated.
-func (repository RoleRepository) DeriveLegacyUserRole(appRoleId uint) (models.UserRole, error) {
-	db := repository.GetDB()
-
-	var role models.AppRole
-	err := db.Select("name").First(&role, appRoleId).Error
-	if err != nil {
-		return "", err
-	}
-
-	if role.Name == LegacyAdminRoleName {
-		return models.ADMIN, nil
-	}
-	return models.USER, nil
-}
-
-// DeriveLegacyGroupRole maps a modern group role onto the legacy GroupRole enum.
-// Transitional bridge (see DeriveLegacyUserRole): the Legacy Owner/Editor/Viewer
-// system roles map 1:1 onto OWNER/EDITOR/VIEWER; every other role (including
-// custom roles) maps to the least-privilege VIEWER.
-func (repository RoleRepository) DeriveLegacyGroupRole(groupRoleId uint) (models.GroupRole, error) {
-	db := repository.GetDB()
-
-	var role models.GroupRoleDefinition
-	err := db.Select("name").First(&role, groupRoleId).Error
-	if err != nil {
-		return "", err
-	}
-
-	switch role.Name {
-	case LegacyOwnerRoleName:
-		return models.OWNER, nil
-	case LegacyEditorRoleName:
-		return models.EDITOR, nil
-	default:
-		return models.VIEWER, nil
-	}
 }

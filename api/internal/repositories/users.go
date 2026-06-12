@@ -3,6 +3,7 @@ package repositories
 import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"time"
@@ -29,7 +30,6 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 		DisplayName:        userData.DisplayName,
 		Password:           userData.Password,
 		IsDummyUser:        userData.IsDummyUser,
-		UserRole:           userData.UserRole,
 		DefaultAvatarColor: "#27b1ff",
 	}
 
@@ -47,32 +47,18 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 
 		if userData.AppRoleID != nil {
 			// The admin-protected create endpoint chose a modern app role
-			// explicitly. Honor it and derive the transitional legacy enum from
-			// the chosen role so legacy-enum readers stay correct.
-			roleRepository := NewRoleRepository(tx)
-			legacyRole, roleErr := roleRepository.DeriveLegacyUserRole(*userData.AppRoleID)
-			if roleErr != nil {
-				repository.ClearTransaction()
-				return roleErr
-			}
+			// explicitly. Honor it.
 			user.AppRoleID = userData.AppRoleID
-			user.UserRole = legacyRole
 		} else {
-			if len(user.UserRole) == 0 {
-				var usrCnt int64
-				tx.Model(models.User{}).Count(&usrCnt)
-				if usrCnt == 0 {
-					user.UserRole = models.ADMIN
-				} else {
-					user.UserRole = models.USER
-				}
-			}
-
 			// Assign the modern app role so the account is not locked out under
-			// permission enforcement: Legacy Admin for admins (the first/bootstrap
-			// user is never the configurable default), the configurable default
-			// app role otherwise.
-			appRoleId, roleErr := repository.resolveAppRoleId(tx, user.UserRole)
+			// permission enforcement: Legacy Admin for the first/bootstrap user
+			// (an administrator, so it is never the configurable default), the
+			// configurable default app role otherwise.
+			var usrCnt int64
+			tx.Model(models.User{}).Count(&usrCnt)
+			isAdmin := usrCnt == 0
+
+			appRoleId, roleErr := repository.resolveAppRoleId(tx, isAdmin)
 			if roleErr != nil {
 				repository.ClearTransaction()
 				return roleErr
@@ -122,41 +108,32 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 }
 
 // resolveAppRoleId picks the modern app role for a newly-created user: the
-// Legacy Admin role for admins (so the first/bootstrap admin is never assigned
-// the configurable default and locked out of administration) and the
-// configurable default app role for everyone else. Returns nil when the role
-// can't be resolved (e.g. an unseeded test database), leaving the user without
-// a modern role rather than failing creation.
-func (repository UserRepository) resolveAppRoleId(tx *gorm.DB, userRole models.UserRole) (*uint, error) {
+// Legacy Admin role for an administrator (the first/bootstrap user, so it is
+// never assigned the configurable default and locked out of administration) and
+// the configurable default app role for everyone else. Returns nil when the role
+// can't be resolved (e.g. an unseeded test database), leaving the user without a
+// modern role rather than failing creation.
+func (repository UserRepository) resolveAppRoleId(tx *gorm.DB, isAdmin bool) (*uint, error) {
 	roleRepository := NewRoleRepository(tx)
-	if userRole == models.ADMIN {
+	if isAdmin {
 		return roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
 	}
 	return roleRepository.GetDefaultAppRoleId()
 }
 
-// UpdateUser updates the editable fields of a user. When the command supplies a
-// modern app role id it is honored and the legacy UserRole enum is derived from
-// it (a transitional bridge for code that still reads User.UserRole). The app
-// role column is only written when an id is supplied, so callers that omit it
-// never clear an existing assignment.
+// UpdateUser updates the editable fields of a user. The app role column is only
+// written when an id is supplied, so callers that omit it never clear an existing
+// assignment.
 func (repository UserRepository) UpdateUser(id string, command commands.SignUpCommand) error {
 	db := repository.GetDB()
 
 	updates := map[string]interface{}{
 		"username":     command.Username,
 		"display_name": command.DisplayName,
-		"user_role":    command.UserRole,
 	}
 
 	if command.AppRoleID != nil {
-		roleRepository := NewRoleRepository(repository.TX)
-		legacyRole, err := roleRepository.DeriveLegacyUserRole(*command.AppRoleID)
-		if err != nil {
-			return err
-		}
 		updates["app_role_id"] = *command.AppRoleID
-		updates["user_role"] = legacyRole
 	}
 
 	return db.Table("users").Where("id = ?", id).Updates(updates).Error
@@ -214,15 +191,27 @@ func (repository UserRepository) UpdateUserLastLoginDate(userId uint) (time.Time
 	return now, nil
 }
 
+// IsFirstAdminToLogin reports whether no administrator has logged in yet, where
+// "administrator" is any user whose app role grants app.users.read (the modern
+// replacement for the removed UserRole == ADMIN check). Returns true when no such
+// user has a last_login_date.
 func (repository UserRepository) IsFirstAdminToLogin() (bool, error) {
-	foundUser := models.User{}
+	roleRepository := NewRoleRepository(repository.TX)
+	adminRoleIds, err := roleRepository.appRoleIdsWithPermission(permissions.AppUsersRead)
+	if err != nil {
+		return false, err
+	}
+	if len(adminRoleIds) == 0 {
+		return true, nil
+	}
 
-	err := repository.
+	foundUser := models.User{}
+	err = repository.
 		GetDB().
 		Limit(1).
 		Select("id").
 		Model(models.User{}).
-		Where("user_role = ? AND last_login_date IS NOT NULL", models.ADMIN).
+		Where("app_role_id IN ? AND last_login_date IS NOT NULL", adminRoleIds).
 		Find(&foundUser).
 		Error
 

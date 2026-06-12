@@ -55,7 +55,6 @@ import 'package:openapi/src/model/group.dart';
 import 'package:openapi/src/model/group_filter.dart';
 import 'package:openapi/src/model/group_member.dart';
 import 'package:openapi/src/model/group_receipt_settings.dart';
-import 'package:openapi/src/model/group_role.dart';
 import 'package:openapi/src/model/group_settings.dart';
 import 'package:openapi/src/model/group_settings_white_list_email.dart';
 import 'package:openapi/src/model/group_status.dart';
@@ -127,7 +126,6 @@ import 'package:openapi/src/model/upsert_task_queue_configuration.dart';
 import 'package:openapi/src/model/upsert_widget_command.dart';
 import 'package:openapi/src/model/user.dart';
 import 'package:openapi/src/model/user_preferences.dart';
-import 'package:openapi/src/model/user_role.dart';
 import 'package:openapi/src/model/user_shortcut.dart';
 import 'package:openapi/src/model/user_view.dart';
 import 'package:openapi/src/model/widget.dart';
@@ -177,7 +175,6 @@ part 'serializers.g.dart';
   GroupFilter,
   GroupMember,
   GroupReceiptSettings,
-  GroupRole,
   GroupSettings,
   GroupSettingsWhiteListEmail,
   GroupStatus,
@@ -249,7 +246,6 @@ part 'serializers.g.dart';
   UpsertWidgetCommand,
   User,
   UserPreferences,
-  UserRole,
   UserShortcut,
   UserView,
   Widget,

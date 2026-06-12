@@ -3,7 +3,6 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:openapi/src/model/user_role.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -20,7 +19,6 @@ part 'user_view.g.dart';
 /// * [id] 
 /// * [isDummyUser] - Is dummy user
 /// * [updatedAt] 
-/// * [userRole] - User's role
 /// * [appRoleId] - Id of the modern app role assigned to the user
 @BuiltValue()
 abstract class UserView implements Built<UserView, UserViewBuilder> {
@@ -51,11 +49,6 @@ abstract class UserView implements Built<UserView, UserViewBuilder> {
 
   @BuiltValueField(wireName: r'updatedAt')
   String? get updatedAt;
-
-  /// User's role
-  @BuiltValueField(wireName: r'userRole')
-  UserRole get userRole;
-  // enum userRoleEnum {  ADMIN,  USER,  };
 
   /// Id of the modern app role assigned to the user
   @BuiltValueField(wireName: r'appRoleId')
@@ -132,11 +125,6 @@ class _$UserViewSerializer implements PrimitiveSerializer<UserView> {
         specifiedType: const FullType(String),
       );
     }
-    yield r'userRole';
-    yield serializers.serialize(
-      object.userRole,
-      specifiedType: const FullType(UserRole),
-    );
     if (object.appRoleId != null) {
       yield r'appRoleId';
       yield serializers.serialize(
@@ -222,13 +210,6 @@ class _$UserViewSerializer implements PrimitiveSerializer<UserView> {
             specifiedType: const FullType(String),
           ) as String;
           result.updatedAt = valueDes;
-          break;
-        case r'userRole':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(UserRole),
-          ) as UserRole;
-          result.userRole = valueDes;
           break;
         case r'appRoleId':
           final valueDes = serializers.deserialize(

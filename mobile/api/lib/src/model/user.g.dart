@@ -26,8 +26,6 @@ class _$User extends User {
   @override
   final String? updatedAt;
   @override
-  final UserRole userRole;
-  @override
   final int? appRoleId;
   @override
   final String? lastLoginDate;
@@ -45,7 +43,6 @@ class _$User extends User {
       required this.id,
       required this.isDummyUser,
       this.updatedAt,
-      required this.userRole,
       this.appRoleId,
       this.lastLoginDate})
       : super._();
@@ -69,7 +66,6 @@ class _$User extends User {
         id == other.id &&
         isDummyUser == other.isDummyUser &&
         updatedAt == other.updatedAt &&
-        userRole == other.userRole &&
         appRoleId == other.appRoleId &&
         lastLoginDate == other.lastLoginDate;
   }
@@ -86,7 +82,6 @@ class _$User extends User {
     _$hash = $jc(_$hash, id.hashCode);
     _$hash = $jc(_$hash, isDummyUser.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
-    _$hash = $jc(_$hash, userRole.hashCode);
     _$hash = $jc(_$hash, appRoleId.hashCode);
     _$hash = $jc(_$hash, lastLoginDate.hashCode);
     _$hash = $jf(_$hash);
@@ -105,7 +100,6 @@ class _$User extends User {
           ..add('id', id)
           ..add('isDummyUser', isDummyUser)
           ..add('updatedAt', updatedAt)
-          ..add('userRole', userRole)
           ..add('appRoleId', appRoleId)
           ..add('lastLoginDate', lastLoginDate))
         .toString();
@@ -152,10 +146,6 @@ class UserBuilder implements Builder<User, UserBuilder> {
   String? get updatedAt => _$this._updatedAt;
   set updatedAt(String? updatedAt) => _$this._updatedAt = updatedAt;
 
-  UserRole? _userRole;
-  UserRole? get userRole => _$this._userRole;
-  set userRole(UserRole? userRole) => _$this._userRole = userRole;
-
   int? _appRoleId;
   int? get appRoleId => _$this._appRoleId;
   set appRoleId(int? appRoleId) => _$this._appRoleId = appRoleId;
@@ -181,7 +171,6 @@ class UserBuilder implements Builder<User, UserBuilder> {
       _id = $v.id;
       _isDummyUser = $v.isDummyUser;
       _updatedAt = $v.updatedAt;
-      _userRole = $v.userRole;
       _appRoleId = $v.appRoleId;
       _lastLoginDate = $v.lastLoginDate;
       _$v = null;
@@ -217,8 +206,6 @@ class UserBuilder implements Builder<User, UserBuilder> {
           isDummyUser: BuiltValueNullFieldError.checkNotNull(
               isDummyUser, r'User', 'isDummyUser'),
           updatedAt: updatedAt,
-          userRole: BuiltValueNullFieldError.checkNotNull(
-              userRole, r'User', 'userRole'),
           appRoleId: appRoleId,
           lastLoginDate: lastLoginDate,
         );

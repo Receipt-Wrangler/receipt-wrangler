@@ -28,11 +28,10 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 
 			userData := r.Context().Value("signUpCommand").(commands.SignUpCommand)
 			// Public sign-up must never let the caller choose their own role: the
-			// role is decided by CreateUser (first user becomes ADMIN, everyone
-			// else USER). Only the admin-protected POST /user endpoint may set a
-			// role explicitly, so strip both the legacy enum and the modern app
-			// role id from the caller-supplied command.
-			userData.UserRole = ""
+			// role is decided by CreateUser (the first user becomes the bootstrap
+			// admin, everyone else gets the default app role). Only the
+			// admin-protected POST /user endpoint may set a role explicitly, so
+			// strip the caller-supplied app role id from the command.
 			userData.AppRoleID = nil
 			userRepository := repositories.NewUserRepository(nil)
 			_, err = userRepository.CreateUser(userData)

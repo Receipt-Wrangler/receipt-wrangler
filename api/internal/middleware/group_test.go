@@ -32,7 +32,7 @@ func createUserAndGroup() {
 	db.Create(&user)
 
 	groupMembers := make([]models.GroupMember, 1)
-	groupMembers = append(groupMembers, models.GroupMember{UserID: user.ID, GroupRole: models.OWNER})
+	groupMembers = append(groupMembers, models.GroupMember{UserID: user.ID})
 
 	group := models.Group{
 		Name:         "Test",
@@ -64,132 +64,6 @@ func teardownGroupTest() {
 	repositories.TruncateTable(db, "users")
 }
 
-func TestValidateGroupeRoleShouldAuthorize1(t *testing.T) {
-	defer teardownGroupTest()
-	fakeHandler, r, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.VIEWER)
-
-	mw := ValidateGroupRole(models.VIEWER)
-	handler := mw(fakeHandler)
-	handler.ServeHTTP(w, r)
-
-	if w.Result().StatusCode != 200 {
-		utils.PrintTestError(t, w.Result().StatusCode, 200)
-	}
-}
-
-func TestValidateGroupeRoleShouldAuthorize2(t *testing.T) {
-	defer teardownGroupTest()
-	fakeHandler, r, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.EDITOR)
-
-	mw := ValidateGroupRole(models.VIEWER)
-	handler := mw(fakeHandler)
-	handler.ServeHTTP(w, r)
-
-	if w.Result().StatusCode != 200 {
-		utils.PrintTestError(t, w.Result().StatusCode, 200)
-	}
-}
-
-func TestValidateGroupeRoleShouldAuthorize3(t *testing.T) {
-	defer teardownGroupTest()
-	fakeHandler, r, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.OWNER)
-
-	mw := ValidateGroupRole(models.VIEWER)
-	handler := mw(fakeHandler)
-	handler.ServeHTTP(w, r)
-
-	if w.Result().StatusCode != 200 {
-		utils.PrintTestError(t, w.Result().StatusCode, 200)
-	}
-}
-
-func TestValidateGroupeRoleShouldAuthorize4(t *testing.T) {
-	defer teardownGroupTest()
-	fakeHandler, r, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.OWNER)
-
-	mw := ValidateGroupRole(models.EDITOR)
-	handler := mw(fakeHandler)
-	handler.ServeHTTP(w, r)
-
-	if w.Result().StatusCode != 200 {
-		utils.PrintTestError(t, w.Result().StatusCode, 200)
-	}
-}
-
-func TestValidateGroupeRoleShouldAuthorize5(t *testing.T) {
-	defer teardownGroupTest()
-	fakeHandler, r, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.EDITOR)
-
-	mw := ValidateGroupRole(models.EDITOR)
-	handler := mw(fakeHandler)
-	handler.ServeHTTP(w, r)
-
-	if w.Result().StatusCode != 200 {
-		utils.PrintTestError(t, w.Result().StatusCode, 200)
-	}
-}
-
-func TestValidateGroupeRoleShouldAuthorize6(t *testing.T) {
-	defer teardownGroupTest()
-	fakeHandler, r, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.OWNER)
-
-	mw := ValidateGroupRole(models.OWNER)
-	handler := mw(fakeHandler)
-	handler.ServeHTTP(w, r)
-
-	if w.Result().StatusCode != 200 {
-		utils.PrintTestError(t, w.Result().StatusCode, 200)
-	}
-}
-
-func TestValidateGroupeRoleShouldDeny1(t *testing.T) {
-	defer teardownGroupTest()
-	fakeHandler, r, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.VIEWER)
-
-	mw := ValidateGroupRole(models.OWNER)
-	handler := mw(fakeHandler)
-	handler.ServeHTTP(w, r)
-
-	if w.Result().StatusCode != 403 {
-		utils.PrintTestError(t, w.Result().StatusCode, 403)
-	}
-}
-
-func TestValidateGroupeRoleShouldDeny2(t *testing.T) {
-	defer teardownGroupTest()
-	fakeHandler, r, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.EDITOR)
-
-	mw := ValidateGroupRole(models.OWNER)
-	handler := mw(fakeHandler)
-	handler.ServeHTTP(w, r)
-
-	if w.Result().StatusCode != 403 {
-		utils.PrintTestError(t, w.Result().StatusCode, 403)
-	}
-}
-
-func TestValidateGroupeRoleShouldDeny3(t *testing.T) {
-	defer teardownGroupTest()
-	fakeHandler, r, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.VIEWER)
-
-	mw := ValidateGroupRole(models.EDITOR)
-	handler := mw(fakeHandler)
-	handler.ServeHTTP(w, r)
-
-	if w.Result().StatusCode != 403 {
-		utils.PrintTestError(t, w.Result().StatusCode, 403)
-	}
-}
-
 func TestCanDeleteGroupShouldReject1(t *testing.T) {
 	defer teardownGroupTest()
 	fakeHandler, r, w := groupSetup()
@@ -204,9 +78,8 @@ func TestCanDeleteGroupShouldReject1(t *testing.T) {
 func TestCanDeleteGroupShouldReject2(t *testing.T) {
 	defer teardownGroupTest()
 	fakeHandler, _, w := groupSetup()
-	repositories.GetDB().Model(models.GroupMember{}).Where("group_id = ? AND user_id = ?", "1", "1").Update("group_role", models.OWNER)
 	groupMembers := make([]models.GroupMember, 1)
-	groupMembers = append(groupMembers, models.GroupMember{UserID: 1, GroupRole: models.OWNER})
+	groupMembers = append(groupMembers, models.GroupMember{UserID: 1})
 
 	group := models.Group{
 		Name:         "Another group",

@@ -3,7 +3,6 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:openapi/src/model/user_role.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -16,7 +15,6 @@ part 'sign_up_command.g.dart';
 /// * [password] - User's password
 /// * [displayName] - User's displayname
 /// * [isDummyUser] - Whether the user is a dummy user
-/// * [userRole] - User's role
 /// * [appRoleId] - Id of the modern app role to assign. Honored by admin user creation; ignored on public sign-up, where any caller-supplied value is stripped server-side.
 @BuiltValue()
 abstract class SignUpCommand implements Built<SignUpCommand, SignUpCommandBuilder> {
@@ -35,11 +33,6 @@ abstract class SignUpCommand implements Built<SignUpCommand, SignUpCommandBuilde
   /// Whether the user is a dummy user
   @BuiltValueField(wireName: r'isDummyUser')
   bool? get isDummyUser;
-
-  /// User's role
-  @BuiltValueField(wireName: r'userRole')
-  UserRole? get userRole;
-  // enum userRoleEnum {  ADMIN,  USER,  };
 
   /// Id of the modern app role to assign. Honored by admin user creation; ignored on public sign-up, where any caller-supplied value is stripped server-side.
   @BuiltValueField(wireName: r'appRoleId')
@@ -90,13 +83,6 @@ class _$SignUpCommandSerializer implements PrimitiveSerializer<SignUpCommand> {
       yield serializers.serialize(
         object.isDummyUser,
         specifiedType: const FullType(bool),
-      );
-    }
-    if (object.userRole != null) {
-      yield r'userRole';
-      yield serializers.serialize(
-        object.userRole,
-        specifiedType: const FullType(UserRole),
       );
     }
     if (object.appRoleId != null) {
@@ -156,13 +142,6 @@ class _$SignUpCommandSerializer implements PrimitiveSerializer<SignUpCommand> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.isDummyUser = valueDes;
-          break;
-        case r'userRole':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(UserRole),
-          ) as UserRole;
-          result.userRole = valueDes;
           break;
         case r'appRoleId':
           final valueDes = serializers.deserialize(

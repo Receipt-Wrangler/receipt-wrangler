@@ -52,7 +52,7 @@ func seedMemberWithGroupRole(t *testing.T, username string, perms []string) (uin
 		t.Fatalf("seed user: %v", err)
 	}
 
-	member := models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRole: models.OWNER, GroupRoleID: &role.ID}
+	member := models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRoleID: &role.ID}
 	if err := db.Create(&member).Error; err != nil {
 		t.Fatalf("seed group member: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestHasGroupPermissionsNoGroupRoleDenies(t *testing.T) {
 		t.Fatalf("seed user: %v", err)
 	}
 	// Member with no GroupRoleID assigned (legacy membership mid-transition).
-	member := models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRole: models.OWNER}
+	member := models.GroupMember{GroupID: group.ID, UserID: user.ID}
 	if err := db.Create(&member).Error; err != nil {
 		t.Fatalf("seed group member: %v", err)
 	}

@@ -488,7 +488,6 @@ func TestApiKeyService_GetClaimsFromApiKey_Success(t *testing.T) {
 		Username:           "testuser",
 		Password:           "hashedpassword",
 		DisplayName:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#FF0000",
 	}
 	repositories.GetDB().Create(&user)
@@ -542,10 +541,6 @@ func TestApiKeyService_GetClaimsFromApiKey_Success(t *testing.T) {
 		utils.PrintTestError(t, customClaims.Displayname, user.DisplayName)
 	}
 
-	if customClaims.UserRole != user.UserRole {
-		utils.PrintTestError(t, customClaims.UserRole, user.UserRole)
-	}
-
 	if customClaims.DefaultAvatarColor != user.DefaultAvatarColor {
 		utils.PrintTestError(t, customClaims.DefaultAvatarColor, user.DefaultAvatarColor)
 	}
@@ -588,7 +583,6 @@ func TestApiKeyService_GetClaimsFromApiKey_AllFieldsPopulated(t *testing.T) {
 		Username:           "fulluser",
 		Password:           "hashedpassword",
 		DisplayName:        "Full Test User",
-		UserRole:           models.USER,
 		DefaultAvatarColor: "#00FF00",
 	}
 	repositories.GetDB().Create(&user)
@@ -639,10 +633,6 @@ func TestApiKeyService_GetClaimsFromApiKey_AllFieldsPopulated(t *testing.T) {
 
 	if customClaims.Displayname != "Full Test User" {
 		utils.PrintTestError(t, customClaims.Displayname, "Full Test User")
-	}
-
-	if customClaims.UserRole != models.USER {
-		utils.PrintTestError(t, customClaims.UserRole, models.USER)
 	}
 
 	if customClaims.DefaultAvatarColor != "#00FF00" {

@@ -35,9 +35,9 @@ func TestShouldNotAllowUserToSignUpIfDisabled(t *testing.T) {
 }
 
 // Public sign-up must never honor a caller-supplied role: the role is decided by
-// CreateUser (first user ADMIN, everyone else USER). An existing user occupies
-// the first-user slot here, so an attacker supplying UserRole=ADMIN (or a modern
-// AppRoleID) must still end up a USER with no caller-chosen app role.
+// CreateUser, not the request body. An existing user occupies the first-user slot
+// here, so an attacker supplying a modern AppRoleID must still end up with no
+// caller-chosen app role.
 func TestSignUpStripsCallerSuppliedRole(t *testing.T) {
 	defer teardownSignUpTests()
 	db := repositories.GetDB()
@@ -49,7 +49,6 @@ func TestSignUpStripsCallerSuppliedRole(t *testing.T) {
 		Username:    "escalate",
 		Password:    "password",
 		DisplayName: "Escalate",
-		UserRole:    models.ADMIN,
 		AppRoleID:   &escalateRoleId,
 	}
 	w := httptest.NewRecorder()
@@ -67,9 +66,6 @@ func TestSignUpStripsCallerSuppliedRole(t *testing.T) {
 	if err := db.Where("username = ?", "escalate").First(&created).Error; err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
-	}
-	if created.UserRole != models.USER {
-		utils.PrintTestError(t, created.UserRole, models.USER)
 	}
 	// The caller-supplied AppRoleID was stripped, so no app role is assigned (no
 	// roles are seeded in this test, so the default path resolves to nil) — and

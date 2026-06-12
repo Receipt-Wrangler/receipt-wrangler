@@ -23,7 +23,6 @@ func newRefreshUser(t *testing.T) models.User {
 		Username:           "refresh-user",
 		Password:           "hashedpassword",
 		DisplayName:        "Refresh User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#00FF00",
 	}
 	if err := repositories.GetDB().Create(&user).Error; err != nil {
@@ -346,4 +345,3 @@ func TestRevokeRefreshToken_UsesContextValue(t *testing.T) {
 		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
 	}
 }
-

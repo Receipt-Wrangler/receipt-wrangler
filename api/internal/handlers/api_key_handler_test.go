@@ -35,14 +35,13 @@ func createTestPepper() {
 }
 
 // Helper function to create JWT context for tests
-func createJWTContext(r *http.Request, userId uint, userRole models.UserRole) *http.Request {
+func createJWTContext(r *http.Request, userId uint) *http.Request {
 	newContext := context.WithValue(
 		r.Context(),
 		jwtmiddleware.ContextKey{},
 		&validator.ValidatedClaims{
 			CustomClaims: &structs.Claims{
-				UserId:   userId,
-				UserRole: userRole,
+				UserId: userId,
 			},
 		},
 	)
@@ -113,7 +112,7 @@ func TestCreateApiKey_Success(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -163,7 +162,7 @@ func TestCreateApiKey_MinimalFields(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -194,7 +193,7 @@ func TestCreateApiKey_AllValidScopes(t *testing.T) {
 		reader := strings.NewReader(string(bytes))
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api/api-keys", reader)
-		r = createJWTContext(r, 1, models.USER)
+		r = createJWTContext(r, 1)
 
 		CreateApiKey(w, r)
 
@@ -258,7 +257,7 @@ func TestCreateApiKey_ValidationErrors(t *testing.T) {
 		reader := strings.NewReader(string(bytes))
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api/api-keys", reader)
-		r = createJWTContext(r, 1, models.USER)
+		r = createJWTContext(r, 1)
 
 		CreateApiKey(w, r)
 
@@ -274,7 +273,7 @@ func TestCreateApiKey_MalformedJSON(t *testing.T) {
 	reader := strings.NewReader("{invalid json")
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -291,7 +290,7 @@ func TestCreateApiKey_EmptyBody(t *testing.T) {
 	reader := strings.NewReader("")
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -317,7 +316,7 @@ func TestCreateApiKey_AsAdmin(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys", reader)
-	r = createJWTContext(r, 1, models.ADMIN)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -350,7 +349,7 @@ func TestGetPagedApiKeys_Success(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -398,7 +397,7 @@ func TestGetPagedApiKeys_AdminViewAll(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
 	// JWT carries a plain USER role; authorization comes from the modern role
 	// resolved from the database, not the JWT.
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	// Seed the Legacy Admin role, which grants app.api-keys.read-any.
 	grantAllAppPerms(t, 1)
@@ -441,7 +440,7 @@ func TestGetPagedApiKeys_UserCannotViewAll(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	// Legacy User holds app.api-keys.read (passes the handler's generic gate) but
 	// NOT app.api-keys.read-any, so requesting ALL must be forbidden.
@@ -504,7 +503,7 @@ func TestGetPagedApiKeys_Pagination(t *testing.T) {
 		reader := strings.NewReader(string(bytes))
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-		r = createJWTContext(r, 1, models.USER)
+		r = createJWTContext(r, 1)
 
 		GetPagedApiKeys(w, r)
 
@@ -551,7 +550,7 @@ func TestGetPagedApiKeys_Sorting(t *testing.T) {
 			reader := strings.NewReader(string(bytes))
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-			r = createJWTContext(r, 1, models.USER)
+			r = createJWTContext(r, 1)
 
 			GetPagedApiKeys(w, r)
 
@@ -632,7 +631,7 @@ func TestGetPagedApiKeys_ValidationErrors(t *testing.T) {
 		reader := strings.NewReader(string(bytes))
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-		r = createJWTContext(r, 1, models.USER)
+		r = createJWTContext(r, 1)
 
 		GetPagedApiKeys(w, r)
 
@@ -662,7 +661,7 @@ func TestGetPagedApiKeys_InvalidOrderByColumn(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -679,7 +678,7 @@ func TestGetPagedApiKeys_MalformedJSON(t *testing.T) {
 	reader := strings.NewReader("{invalid json")
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -696,7 +695,7 @@ func TestGetPagedApiKeys_EmptyBody(t *testing.T) {
 	reader := strings.NewReader("")
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -726,7 +725,7 @@ func TestGetPagedApiKeys_EmptyDatabase(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -772,7 +771,7 @@ func TestGetPagedApiKeys_DifferentUsers(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	grantAllAppPerms(t, 1)
 
@@ -785,7 +784,7 @@ func TestGetPagedApiKeys_DifferentUsers(t *testing.T) {
 	reader = strings.NewReader(string(bytes))
 	w = httptest.NewRecorder()
 	r = httptest.NewRequest("POST", "/api/api-keys/paged", reader)
-	r = createJWTContext(r, 2, models.USER)
+	r = createJWTContext(r, 2)
 
 	grantAllAppPerms(t, 2)
 
@@ -821,7 +820,7 @@ func TestUpdateApiKey_Success(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/api-keys/handler-key-1", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	// Add URL parameter for key ID
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
@@ -854,7 +853,7 @@ func TestUpdateApiKey_MinimalFields(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/api-keys/handler-key-1", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -894,7 +893,7 @@ func TestUpdateApiKey_AllValidScopes(t *testing.T) {
 		reader := strings.NewReader(string(bytes))
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("PUT", fmt.Sprintf("/api/api-keys/%s", keyId), reader)
-		r = createJWTContext(r, 1, models.USER)
+		r = createJWTContext(r, 1)
 
 		ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 		r = r.WithContext(ctx)
@@ -965,7 +964,7 @@ func TestUpdateApiKey_ValidationErrors(t *testing.T) {
 		reader := strings.NewReader(string(bytes))
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("PUT", "/api/api-keys/handler-key-1", reader)
-		r = createJWTContext(r, 1, models.USER)
+		r = createJWTContext(r, 1)
 
 		ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 		r = r.WithContext(ctx)
@@ -988,7 +987,7 @@ func TestUpdateApiKey_MalformedJSON(t *testing.T) {
 	reader := strings.NewReader("{invalid json")
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/api-keys/handler-key-1", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1012,7 +1011,7 @@ func TestUpdateApiKey_EmptyBody(t *testing.T) {
 	reader := strings.NewReader("")
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/api-keys/handler-key-1", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1044,7 +1043,7 @@ func TestUpdateApiKey_NonExistentKey(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/api-keys/non-existent-key", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1077,7 +1076,7 @@ func TestUpdateApiKey_WrongUser(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/api-keys/handler-key-3", reader) // handler-key-3 belongs to user 2
-	r = createJWTContext(r, 1, models.USER)                                // But user 1 is making the request
+	r = createJWTContext(r, 1)                                             // But user 1 is making the request
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1110,7 +1109,7 @@ func TestUpdateApiKey_AsAdmin(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/api-keys/handler-key-1", reader)
-	r = createJWTContext(r, 1, models.ADMIN)
+	r = createJWTContext(r, 1)
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1144,7 +1143,7 @@ func TestUpdateApiKey_UserUpdatingOwnKey(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/api-keys/handler-key-3", reader)
-	r = createJWTContext(r, 2, models.USER) // User 2 updating their own key
+	r = createJWTContext(r, 2) // User 2 updating their own key
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1176,7 +1175,7 @@ func TestUpdateApiKey_EmptyKeyId(t *testing.T) {
 	reader := strings.NewReader(string(bytes))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/api-keys/", reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1235,7 +1234,7 @@ func TestUpdateApiKey_URLEncodedId(t *testing.T) {
 	// URL encode the key ID as the frontend would do
 	encodedKeyId := "cFU4ckxyWWI3UEVYbDFvVUczTWJDLU5sWlFkUTltR1ZNcE9DOUpNZ1pSZz0%3D"
 	r := httptest.NewRequest("PUT", "/api/api-keys/"+encodedKeyId, reader)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1260,7 +1259,7 @@ func TestDeleteApiKey_Success(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("DELETE", "/api/api-keys/handler-key-1", nil)
-	r = createJWTContext(r, 1, models.USER) // User 1 deleting their own key
+	r = createJWTContext(r, 1) // User 1 deleting their own key
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1285,7 +1284,7 @@ func TestDeleteApiKey_AdminCanDeleteAnyKey(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("DELETE", "/api/api-keys/handler-key-3", nil)
-	r = createJWTContext(r, 1, models.ADMIN) // Admin deleting another user's key
+	r = createJWTContext(r, 1) // Admin deleting another user's key
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1310,7 +1309,7 @@ func TestDeleteApiKey_UserCannotDeleteOtherUsersKey(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("DELETE", "/api/api-keys/handler-key-3", nil)
-	r = createJWTContext(r, 1, models.USER) // User 1 trying to delete User 2's key
+	r = createJWTContext(r, 1) // User 1 trying to delete User 2's key
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1334,7 +1333,7 @@ func TestDeleteApiKey_NonExistentKey(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("DELETE", "/api/api-keys/non-existent-key", nil)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)
@@ -1383,7 +1382,7 @@ func TestDeleteApiKey_URLEncodedId(t *testing.T) {
 	// URL encode the key ID as the frontend would do
 	encodedKeyId := "cFU4ckxyWWI3UEVYbDFvVUczTWJDLU5sWlFkUTltR1ZNcE9DOUpNZ1pSZz0%3D"
 	r := httptest.NewRequest("DELETE", "/api/api-keys/"+encodedKeyId, nil)
-	r = createJWTContext(r, 1, models.USER)
+	r = createJWTContext(r, 1)
 
 	ctx := context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext())
 	r = r.WithContext(ctx)

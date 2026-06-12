@@ -10,8 +10,6 @@ class _$Claims extends Claims {
   @override
   final int userId;
   @override
-  final UserRole userRole;
-  @override
   final String displayName;
   @override
   final String defaultAvatarColor;
@@ -37,7 +35,6 @@ class _$Claims extends Claims {
 
   _$Claims._(
       {required this.userId,
-      required this.userRole,
       required this.displayName,
       required this.defaultAvatarColor,
       required this.username,
@@ -61,7 +58,6 @@ class _$Claims extends Claims {
     if (identical(other, this)) return true;
     return other is Claims &&
         userId == other.userId &&
-        userRole == other.userRole &&
         displayName == other.displayName &&
         defaultAvatarColor == other.defaultAvatarColor &&
         username == other.username &&
@@ -78,7 +74,6 @@ class _$Claims extends Claims {
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, userId.hashCode);
-    _$hash = $jc(_$hash, userRole.hashCode);
     _$hash = $jc(_$hash, displayName.hashCode);
     _$hash = $jc(_$hash, defaultAvatarColor.hashCode);
     _$hash = $jc(_$hash, username.hashCode);
@@ -97,7 +92,6 @@ class _$Claims extends Claims {
   String toString() {
     return (newBuiltValueToStringHelper(r'Claims')
           ..add('userId', userId)
-          ..add('userRole', userRole)
           ..add('displayName', displayName)
           ..add('defaultAvatarColor', defaultAvatarColor)
           ..add('username', username)
@@ -118,10 +112,6 @@ class ClaimsBuilder implements Builder<Claims, ClaimsBuilder> {
   int? _userId;
   int? get userId => _$this._userId;
   set userId(int? userId) => _$this._userId = userId;
-
-  UserRole? _userRole;
-  UserRole? get userRole => _$this._userRole;
-  set userRole(UserRole? userRole) => _$this._userRole = userRole;
 
   String? _displayName;
   String? get displayName => _$this._displayName;
@@ -172,7 +162,6 @@ class ClaimsBuilder implements Builder<Claims, ClaimsBuilder> {
     final $v = _$v;
     if ($v != null) {
       _userId = $v.userId;
-      _userRole = $v.userRole;
       _displayName = $v.displayName;
       _defaultAvatarColor = $v.defaultAvatarColor;
       _username = $v.username;
@@ -208,8 +197,6 @@ class ClaimsBuilder implements Builder<Claims, ClaimsBuilder> {
           _$Claims._(
             userId: BuiltValueNullFieldError.checkNotNull(
                 userId, r'Claims', 'userId'),
-            userRole: BuiltValueNullFieldError.checkNotNull(
-                userRole, r'Claims', 'userRole'),
             displayName: BuiltValueNullFieldError.checkNotNull(
                 displayName, r'Claims', 'displayName'),
             defaultAvatarColor: BuiltValueNullFieldError.checkNotNull(

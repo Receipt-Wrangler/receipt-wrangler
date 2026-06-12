@@ -72,7 +72,6 @@ model/group.ts
 model/groupFilter.ts
 model/groupMember.ts
 model/groupReceiptSettings.ts
-model/groupRole.ts
 model/groupSettings.ts
 model/groupSettingsWhiteListEmail.ts
 model/groupStatus.ts
@@ -145,7 +144,6 @@ model/upsertTaskQueueConfiguration.ts
 model/upsertWidgetCommand.ts
 model/user.ts
 model/userPreferences.ts
-model/userRole.ts
 model/userShortcut.ts
 model/userView.ts
 model/widget.ts

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
-	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -24,7 +23,7 @@ func TestShouldGetAllPermissions(t *testing.T) {
 	newContext := context.WithValue(
 		r.Context(),
 		jwtmiddleware.ContextKey{},
-		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 	)
 	r = r.WithContext(newContext)
 

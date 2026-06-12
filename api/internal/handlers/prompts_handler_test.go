@@ -29,7 +29,7 @@ func TestShouldNotAllowUserToGetPrompts(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	GetPagedPrompts(w, r)
@@ -101,7 +101,7 @@ func TestShouldNotGetPagedPromptsWithBadRequest(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api", reader)
 
-		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 		r = r.WithContext(newContext)
 
 		GetPagedPrompts(w, r)
@@ -118,7 +118,7 @@ func TestShouldNotAllowUserToGetPromptById(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	GetPromptById(w, r)
@@ -139,7 +139,7 @@ func TestShouldNotAllowAdminToGetPromptByIdWithBadId(t *testing.T) {
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 	r = r.WithContext(routeContext)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	grantAllAppPerms(t, 1)
@@ -162,7 +162,7 @@ func TestShouldAllowAdminToGetPromptById(t *testing.T) {
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 	r = r.WithContext(routeContext)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	db := repositories.GetDB()
@@ -183,7 +183,7 @@ func TestShouldNotAllowUserToUpdatePromptById(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	UpdatePromptById(w, r)
@@ -204,7 +204,7 @@ func TestShouldNotAllowAdminToUpdatePromptByIdWithBadId(t *testing.T) {
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 	r = r.WithContext(routeContext)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	grantAllAppPerms(t, 1)
@@ -301,7 +301,7 @@ func TestShouldNotAllowUserToUpdateInvalidPrompt(t *testing.T) {
 		routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 		r = r.WithContext(routeContext)
 
-		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 		r = r.WithContext(newContext)
 
 		UpdatePromptById(w, r)
@@ -318,7 +318,7 @@ func TestShouldNotAllowUserToCreatePrompt(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	CreatePrompt(w, r)
@@ -406,7 +406,7 @@ func TestShouldNotAllowAdminToCreateInvalidPrompt(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api", reader)
 
-		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 		r = r.WithContext(newContext)
 
 		CreatePrompt(w, r)
@@ -423,7 +423,7 @@ func TestShouldNotAllowUserToDeletePromptById(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	DeletePromptById(w, r)
@@ -444,7 +444,7 @@ func TestShouldNotAllowAdminToDeletePromptWithBadId(t *testing.T) {
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 	r = r.WithContext(routeContext)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	grantAllAppPerms(t, 1)
@@ -470,7 +470,7 @@ func TestShouldDeletePromptById(t *testing.T) {
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 	r = r.WithContext(routeContext)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	grantAllAppPerms(t, 1)
@@ -488,7 +488,7 @@ func TestShouldNotAllowUserToCreateDefaultPrompt(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	CreateDefaultPrompt(w, r)
@@ -506,7 +506,7 @@ func TestShouldCreateDefaultPrompt(t *testing.T) {
 
 	expectedStatus := http.StatusOK
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	grantAllAppPerms(t, 1)
@@ -528,7 +528,7 @@ func TestShouldNotAllowToCreateDuplicateDefaultPrompts(t *testing.T) {
 
 	expectedStatus := http.StatusInternalServerError
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	grantAllAppPerms(t, 1)

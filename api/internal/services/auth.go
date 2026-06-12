@@ -7,6 +7,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	config "receipt-wrangler/api/internal/env"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -53,7 +54,15 @@ func LoginUser(loginAttempt commands.LoginCommand) (models.User, bool, error) {
 
 	userRepository := repositories.NewUserRepository(nil)
 
-	if dbUser.UserRole == models.ADMIN {
+	// "Administrator" is defined by the app.users.read permission (the modern
+	// replacement for the removed UserRole == ADMIN check), resolved from the
+	// database rather than the JWT.
+	permissionService := NewPermissionService(nil)
+	isAdmin, err := permissionService.HasAppPermissions(dbUser.ID, permissions.AppUsersRead)
+	if err != nil {
+		return models.User{}, false, err
+	}
+	if isAdmin {
 		firstAdminToLogin, err = userRepository.IsFirstAdminToLogin()
 		if err != nil {
 			return models.User{}, false, err
@@ -112,7 +121,6 @@ func GenerateJWT(userId uint) (string, string, structs.Claims, error) {
 		Displayname:        user.DisplayName,
 		UserId:             user.ID,
 		Username:           user.Username,
-		UserRole:           user.UserRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "https://receiptWrangler.io",
 			Audience:  []string{"https://receiptWrangler.io"},
@@ -137,7 +145,6 @@ func GenerateJWT(userId uint) (string, string, structs.Claims, error) {
 		Displayname:        user.DisplayName,
 		UserId:             user.ID,
 		Username:           user.Username,
-		UserRole:           user.UserRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "https://receiptWrangler.io",
 			Audience:  []string{"https://receiptWrangler.io"},

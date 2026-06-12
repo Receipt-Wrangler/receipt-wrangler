@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -45,13 +46,11 @@ func createAdminUser(t *testing.T, username, password string) models.User {
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
-	// CreateUser auto-promotes the first user to ADMIN; subsequent users
-	// default to USER. Force ADMIN explicitly for non-first users so the
-	// caller gets a predictable role.
-	if user.UserRole != models.ADMIN {
-		repositories.GetDB().Model(&models.User{}).Where("id = ?", user.ID).Update("user_role", models.ADMIN)
-		user.UserRole = models.ADMIN
-	}
+	// "Administrator" is now defined by the modern app.users.read permission
+	// (see IsFirstAdminToLogin): the first-admin login branch that seeds the
+	// default prompt keys off it. The handlers test DB does not seed system
+	// roles, so grant the admin permission explicitly.
+	grantAppPerms(t, user.ID, permissions.AppUsersRead)
 	return user
 }
 
