@@ -18,7 +18,7 @@ import { UserAutocompleteModule } from "src/user-autocomplete/user-autocomplete.
 import { ButtonModule } from "../../button";
 import { InputModule } from "../../input";
 import { ApiModule, Group, GroupsService, GroupStatus } from "../../open-api";
-import { AddGroup, UpdateGroup } from "../../store";
+import { AddGroup, AuthState, UpdateGroup } from "../../store";
 import { AppInitService } from "../../services";
 import { GroupMemberFormComponent } from "../group-member-form/group-member-form.component";
 import { buildGroupMemberForm } from "../utils/group-member.utils";
@@ -39,7 +39,7 @@ describe("GroupFormComponent", () => {
         MatCardModule,
         MatDialogModule,
         MatSnackBarModule,
-        NgxsModule.forRoot([]),
+        NgxsModule.forRoot([AuthState]),
         NoopAnimationsModule,
         PipesModule,
         ReactiveFormsModule,

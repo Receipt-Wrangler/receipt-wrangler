@@ -4,13 +4,14 @@ import { MatDialog } from "@angular/material/dialog";
 import { MatTableDataSource } from "@angular/material/table";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
-import { catchError, of, take, tap } from "rxjs";
+import { take, tap } from "rxjs";
 import { DEFAULT_HOST_CLASS } from "src/constants";
 import { DEFAULT_DIALOG_CONFIG } from "src/constants/dialog.constant";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
 import { BulkUserDeleteCommand, Permission, Role, RoleService, User, UserService } from "../../open-api";
+import { loadAssignableRoles } from "../../roles/role-loading.util";
 import { SnackbarService } from "../../services";
 import { AuthState, RemoveUser, RemoveUsers, UserState } from "../../store";
 import { DummyUserConversionDialogComponent } from "../dummy-user-conversion-dialog/dummy-user-conversion-dialog.component";
@@ -50,13 +51,11 @@ export class UserListComponent implements AfterViewInit {
 
   public dataSource = signal(new MatTableDataSource<User>([]));
 
-  // Roles load best-effort so the table can resolve each user's appRoleId to a
-  // role name. If app.roles.read is denied the list stays empty and the cell
-  // renders blank rather than erroring.
+  // Roles resolve each user's appRoleId to a role name. The request is skipped
+  // unless the caller holds app.roles.read (otherwise the 403 would log them
+  // out — see loadAssignableRoles); the cell then renders blank.
   public readonly roles = toSignal(
-    inject(RoleService)
-      .getRoles()
-      .pipe(catchError(() => of([] as Role[]))),
+    loadAssignableRoles(inject(Store), inject(RoleService)),
     { initialValue: [] as Role[] }
   );
 

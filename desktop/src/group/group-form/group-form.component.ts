@@ -7,7 +7,7 @@ import {MatTableDataSource} from "@angular/material/table";
 import {ActivatedRoute, Router} from "@angular/router";
 import {UntilDestroy, untilDestroyed} from "@ngneat/until-destroy";
 import {Store} from "@ngxs/store";
-import {catchError, map, of, startWith, switchMap, take, tap} from "rxjs";
+import {map, startWith, switchMap, take, tap} from "rxjs";
 import {DEFAULT_HOST_CLASS} from "src/constants";
 import {GROUP_STATUS_OPTIONS} from "src/constants/receipt-status-options";
 import {FormMode} from "src/enums/form-mode.enum";
@@ -16,6 +16,7 @@ import {TableColumn} from "src/table/table-column.interface";
 import {TableComponent} from "src/table/table/table.component";
 import {SortByDisplayName} from "src/utils/sort-by-displayname";
 import {Group, GroupMember, GroupsService, GroupStatus, Permission, Role, RoleService} from "../../open-api";
+import {loadAssignableRoles} from "../../roles/role-loading.util";
 import {AppInitService, SnackbarService} from "../../services";
 import {AddGroup, AuthState, UpdateGroup} from "../../store";
 import {GroupMemberFormComponent} from "../group-member-form/group-member-form.component";
@@ -58,13 +59,12 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
 
   public editLink: string = "";
 
-  // Roles load best-effort so the member table can resolve each member's
-  // groupRoleId to a role name; empty (and a blank cell) if app.roles.read is
-  // denied, mirroring the group-member form's selector.
+  // Roles resolve each member's groupRoleId to a role name. group-form is
+  // rendered for every group member (including non-admins), so the request is
+  // skipped entirely unless the caller holds app.roles.read — otherwise the 403
+  // would log them out (see loadAssignableRoles). Non-holders see a blank name.
   public readonly roles = toSignal(
-    inject(RoleService)
-      .getRoles()
-      .pipe(catchError(() => of([] as Role[]))),
+    loadAssignableRoles(inject(Store), inject(RoleService)),
     { initialValue: [] as Role[] }
   );
 
