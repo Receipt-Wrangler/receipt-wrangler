@@ -61,9 +61,13 @@ Map<String, String> _auth(String jwt) => {'Cookie': 'jwt=$jwt'};
 
 String _unique() => DateTime.now().microsecondsSinceEpoch.toString();
 
-/// Resolves the id of a system group role by name (e.g. "Legacy Viewer",
-/// "Legacy Editor", "Legacy Owner") via `GET /role`.
-Future<int> groupRoleIdByName(String name, {required String jwt}) async {
+/// Resolves the id of a system role by [name] within [scope] (`APP` or `GROUP`)
+/// via `GET /role`.
+Future<int> _roleIdByName(
+  String name,
+  String scope, {
+  required String jwt,
+}) async {
   final res = await http
       .get(Uri.parse('${E2eEnv.baseUrl}/role'), headers: _auth(jwt))
       .timeout(const Duration(seconds: 10));
@@ -72,14 +76,24 @@ Future<int> groupRoleIdByName(String name, {required String jwt}) async {
   }
   final roles = (jsonDecode(res.body) as List).cast<Map<String, dynamic>>();
   final match = roles.firstWhere(
-    (r) => r['name'] == name && r['scope'] == 'GROUP',
+    (r) => r['name'] == name && r['scope'] == scope,
     orElse: () => throw StateError(
-      'No GROUP role named "$name". Available: '
-      '${roles.where((r) => r['scope'] == 'GROUP').map((r) => r['name']).toList()}',
+      'No $scope role named "$name". Available: '
+      '${roles.where((r) => r['scope'] == scope).map((r) => r['name']).toList()}',
     ),
   );
   return match['id'] as int;
 }
+
+/// Resolves the id of a system group role by name (e.g. "Legacy Viewer",
+/// "Legacy Editor", "Legacy Owner") via `GET /role`.
+Future<int> groupRoleIdByName(String name, {required String jwt}) =>
+    _roleIdByName(name, 'GROUP', jwt: jwt);
+
+/// Resolves the id of a system app role by name (e.g. "Legacy User",
+/// "Legacy Admin") via `GET /role`.
+Future<int> appRoleIdByName(String name, {required String jwt}) =>
+    _roleIdByName(name, 'APP', jwt: jwt);
 
 /// Resolves a user's id by username via `GET /user/` (admin only).
 Future<int> userIdByUsername(String username, {required String jwt}) async {
@@ -98,15 +112,17 @@ Future<int> userIdByUsername(String username, {required String jwt}) async {
   return match['id'] as int;
 }
 
-/// Creates a regular (USER-role) account and returns its id. The default app
-/// role (Legacy User) carries no group permissions, so the user only gets the
-/// group permissions a fixture grants it.
+/// Creates a regular account assigned the Legacy User app role and returns its
+/// id. Legacy User carries no group permissions, so the user only gets the
+/// group permissions a fixture grants it. The admin create endpoint requires an
+/// `appRoleId`, so we resolve Legacy User (the default app role) by name.
 Future<int> createUser({
   required String username,
   required String password,
   required String displayName,
   required String jwt,
 }) async {
+  final appRoleId = await appRoleIdByName('Legacy User', jwt: jwt);
   final res = await http
       .post(
         Uri.parse('${E2eEnv.baseUrl}/user/'),
@@ -115,7 +131,7 @@ Future<int> createUser({
           'username': username,
           'password': password,
           'displayName': displayName,
-          'userRole': 'USER',
+          'appRoleId': appRoleId,
           'isDummyUser': false,
         }),
       )
