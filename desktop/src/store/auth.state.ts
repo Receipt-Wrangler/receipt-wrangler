@@ -27,11 +27,6 @@ export class AuthState {
   }
 
   @Selector()
-  static userRole(state: AuthStateInterface): string {
-    return state.userRole ?? "";
-  }
-
-  @Selector()
   static isLoggedIn(state: AuthStateInterface): boolean {
     return !AuthState.isTokenExpired(state);
   }
@@ -58,12 +53,6 @@ export class AuthState {
       id: Number(state.userId) ?? "",
       username: state.username ?? "",
     } as User;
-  }
-
-  static hasRole(role: string) {
-    return createSelector([AuthState], (state: AuthStateInterface) => {
-      return state.userRole === role;
-    });
   }
 
   @Selector()
@@ -119,7 +108,6 @@ export class AuthState {
       expirationDate: claims?.exp?.toString(),
       userId: claims?.userId?.toString(),
       username: claims?.username,
-      userRole: claims?.userRole,
     });
   }
 
@@ -142,7 +130,6 @@ export class AuthState {
       expirationDate: "",
       userId: "",
       username: "",
-      userRole: undefined,
       userPreferences: undefined,
       appPermissions: undefined,
       groupPermissions: undefined,

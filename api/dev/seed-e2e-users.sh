@@ -5,13 +5,13 @@
 # Why this exists:
 #   - The API auto-creates a default `admin/admin` user on first startup
 #     (repositories/db.go -> CreateUserIfNoneExist) outside `deployEnv=test`.
-#   - The mobile e2e tests need `e2e-admin` (role ADMIN) and `e2e-user`
-#     (role USER) to log in. These are NOT auto-seeded.
+#   - The e2e tests need `e2e-admin` (the Legacy Admin app role) and `e2e-user`
+#     (the Legacy User app role) to log in. These are NOT auto-seeded.
 #   - The UI signup path is gated on `enableLocalSignUp`, which is `false`
-#     locally, AND would assign USER role anyway because the auto-admin
-#     already occupies the "first user = ADMIN" slot in CreateUser.
-#   - The admin-protected POST /user/ endpoint accepts an explicit `userRole`
-#     and creates whatever you ask for, so we use it to seed both.
+#     locally, AND would assign the default (Legacy User) app role anyway.
+#   - The admin-protected POST /user/ endpoint takes an explicit `appRoleId`
+#     (the legacy `userRole` enum was removed), so we resolve the seeded
+#     "Legacy Admin" / "Legacy User" app-role ids and create both.
 #
 # Usage:
 #   cd api && ./dev/seed-e2e-users.sh
@@ -71,6 +71,30 @@ if [[ -z "$jwt" ]]; then
   exit 1
 fi
 
+echo "==> resolving app-role ids"
+roles_json="$(curl -fsS --max-time 10 "$api_base_url/role" -H "Authorization: Bearer $jwt")"
+
+# resolve_app_role_id <role-name> -> prints the id of the APP-scoped role
+resolve_app_role_id() {
+  printf '%s' "$roles_json" | python3 -c '
+import json, sys
+name = sys.argv[1]
+for r in json.load(sys.stdin):
+    if r.get("scope") == "APP" and r.get("name") == name:
+        print(r["id"]); break
+' "$1"
+}
+
+legacy_admin_role_id="$(resolve_app_role_id "Legacy Admin")"
+legacy_user_role_id="$(resolve_app_role_id "Legacy User")"
+
+if [[ -z "$legacy_admin_role_id" || -z "$legacy_user_role_id" ]]; then
+  echo "could not resolve 'Legacy Admin' / 'Legacy User' app-role ids" >&2
+  echo "roles: $roles_json" >&2
+  exit 1
+fi
+echo "    Legacy Admin id=$legacy_admin_role_id, Legacy User id=$legacy_user_role_id"
+
 echo "==> fetching existing users"
 existing_users_json="$(curl -fsS --max-time 10 \
   "$api_base_url/user/" \
@@ -81,21 +105,22 @@ existing_usernames="$(printf '%s' "$existing_users_json" \
 
 echo "    existing: $(echo "$existing_usernames" | tr '\n' ' ')"
 
-# create_user_if_missing <username> <password> <displayName> <role>
+# create_user_if_missing <username> <password> <displayName> <appRoleId> <label>
 create_user_if_missing() {
   local username="$1"
   local password="$2"
   local display_name="$3"
-  local role="$4"
+  local app_role_id="$4"
+  local label="$5"
 
   if printf '%s\n' "$existing_usernames" | grep -Fxq "$username"; then
-    printf '==> %-12s (%-5s) ... [exists]\n' "$username" "$role"
+    printf '==> %-12s (%-12s) ... [exists]\n' "$username" "$label"
     return 0
   fi
 
   local body
-  body="$(python3 -c 'import json,sys; print(json.dumps({"username":sys.argv[1],"password":sys.argv[2],"displayName":sys.argv[3],"userRole":sys.argv[4],"isDummyUser":False}))' \
-    "$username" "$password" "$display_name" "$role")"
+  body="$(python3 -c 'import json,sys; print(json.dumps({"username":sys.argv[1],"password":sys.argv[2],"displayName":sys.argv[3],"appRoleId":int(sys.argv[4]),"isDummyUser":False}))' \
+    "$username" "$password" "$display_name" "$app_role_id")"
 
   # Use mktemp instead of /tmp/...$$ -- the PID-based path is predictable and
   # vulnerable to a symlink race on shared machines.
@@ -111,16 +136,16 @@ create_user_if_missing() {
   rm -f "$response_file"
 
   if [[ "$http_code" == "200" ]]; then
-    printf '==> %-12s (%-5s) ... [created]\n' "$username" "$role"
+    printf '==> %-12s (%-12s) ... [created]\n' "$username" "$label"
   else
-    printf '==> %-12s (%-5s) ... [FAILED http %s] %s\n' \
-      "$username" "$role" "$http_code" "$body" >&2
+    printf '==> %-12s (%-12s) ... [FAILED http %s] %s\n' \
+      "$username" "$label" "$http_code" "$body" >&2
     return 1
   fi
 }
 
 rc=0
-create_user_if_missing "$e2e_admin_username" "$e2e_admin_password" "E2E Admin" "ADMIN" || rc=1
-create_user_if_missing "$e2e_user_username"  "$e2e_user_password"  "E2E User"  "USER"  || rc=1
+create_user_if_missing "$e2e_admin_username" "$e2e_admin_password" "E2E Admin" "$legacy_admin_role_id" "Legacy Admin" || rc=1
+create_user_if_missing "$e2e_user_username"  "$e2e_user_password"  "E2E User"  "$legacy_user_role_id"  "Legacy User"  || rc=1
 
 exit $rc

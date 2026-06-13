@@ -125,14 +125,15 @@ See `mobile/CLAUDE.md` for Flutter architecture, Provider state management, and 
   clients carry the `Permission` enum and role types). See `api/CLAUDE.md` → "Roles & Permissions".
 - The server **never trusts the JWT for authorization** — it re-checks a user's current permissions
   from the database on every request. The JWT no longer carries any role field.
-- **Backend rollout is complete; desktop is the remaining follow-up.** Handlers fully enforce the
-  permission system, and the legacy `UserRole`/`GroupRole` enums have been **removed from the
-  backend** (Go types, model fields, JWT role claim, and the `userRole`/`groupRole` API fields are
-  all gone; only the physical `user_role`/`group_role` DB columns are retained for the one-time
-  upgrade migration). Desktop still consumes the old role fields (user-list role column, group-form
-  owner gating, auth-state role selectors), so migrating it to permission-based gating — and
-  regenerating against the slimmed contract — is the next phase. See `api/CLAUDE.md` →
-  "Roles & Permissions" and `desktop/CLAUDE.md`.
+- **Role rollout is complete across backend and desktop.** Handlers fully enforce the permission
+  system, and the legacy `UserRole`/`GroupRole` enums have been **removed from the backend** (Go
+  types, model fields, JWT role claim, and the `userRole`/`groupRole` API fields are all gone; only
+  the physical `user_role`/`group_role` DB columns are retained for the one-time upgrade migration).
+  The **desktop** has likewise dropped every legacy-role consumer: the user-list and group-member
+  tables now resolve `appRoleId`/`groupRoleId` to a role **name** (via a shared `RoleNamePipe`), the
+  group-form "must have an owner" rule is gone (the backend no longer enforces an owner concept), and
+  the `AuthState.userRole`/`hasRole` selectors plus the group-member legacy-enum bridge are removed.
+  See `api/CLAUDE.md` → "Roles & Permissions" and `desktop/CLAUDE.md`.
 
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access

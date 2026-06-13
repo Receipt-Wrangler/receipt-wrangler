@@ -1,4 +1,5 @@
-import {AfterViewInit, Component, OnInit, Signal, signal, TemplateRef, input, viewChild} from "@angular/core";
+import {AfterViewInit, Component, OnInit, Signal, signal, TemplateRef, inject, input, viewChild} from "@angular/core";
+import {toSignal} from "@angular/core/rxjs-interop";
 import {FormArray, FormBuilder, FormGroup, Validators} from "@angular/forms";
 import {MatDialog} from "@angular/material/dialog";
 import {Sort} from "@angular/material/sort";
@@ -14,7 +15,8 @@ import {FormConfig} from "src/interfaces/form-config.interface";
 import {TableColumn} from "src/table/table-column.interface";
 import {TableComponent} from "src/table/table/table.component";
 import {SortByDisplayName} from "src/utils/sort-by-displayname";
-import {Group, GroupMember, GroupRole, GroupsService, GroupStatus, Permission} from "../../open-api";
+import {Group, GroupMember, GroupsService, GroupStatus, Permission, Role, RoleService} from "../../open-api";
+import {loadAssignableRoles} from "../../roles/role-loading.util";
 import {AppInitService, SnackbarService} from "../../services";
 import {AddGroup, AuthState, UpdateGroup} from "../../store";
 import {GroupMemberFormComponent} from "../group-member-form/group-member-form.component";
@@ -31,7 +33,7 @@ import {buildGroupMemberForm} from "../utils/group-member.utils";
 export class GroupFormComponent implements OnInit, AfterViewInit {
   public readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");
 
-  public readonly groupRoleCell = viewChild.required<TemplateRef<any>>("groupRoleCell");
+  public readonly roleCell = viewChild.required<TemplateRef<any>>("roleCell");
 
   public readonly actionsCell = viewChild.required<TemplateRef<any>>("actionsCell");
 
@@ -57,7 +59,14 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
 
   public editLink: string = "";
 
-  public groupRole = GroupRole;
+  // Roles resolve each member's groupRoleId to a role name. group-form is
+  // rendered for every group member (including non-admins), so the request is
+  // skipped entirely unless the caller holds app.roles.read — otherwise the 403
+  // would log them out (see loadAssignableRoles). Non-holders see a blank name.
+  public readonly roles = toSignal(
+    loadAssignableRoles(inject(Store), inject(RoleService)),
+    { initialValue: [] as Role[] }
+  );
 
   public groupStatusOptions = GROUP_STATUS_OPTIONS;
 
@@ -121,8 +130,8 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
       },
       {
         columnHeader: "Group Role",
-        matColumnDef: "groupRole",
-        template: this.groupRoleCell(),
+        matColumnDef: "role",
+        template: this.roleCell(),
         sortable: true,
       },
       {
@@ -132,7 +141,7 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
         sortable: true,
       },
     ];
-    this.displayedColumns = ["name", "groupRole"];
+    this.displayedColumns = ["name", "role"];
 
     if (this.formConfig.mode !== FormMode.view) {
       this.displayedColumns.push("actions");
@@ -232,13 +241,6 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
 
   public submit(): void {
     if (this.form.valid) {
-      const owners = (this.groupMembers.value as GroupMember[]).filter(
-        (gm) => gm.groupRole === GroupRole.Owner
-      );
-      if (owners.length === 0 && this.formConfig.mode !== FormMode.add) {
-        this.snackbarService.error("Group must have at least one owner!");
-        return;
-      }
       switch (this.formConfig.mode) {
         case FormMode.add:
           this.createGroup();

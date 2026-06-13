@@ -4,7 +4,7 @@ import { Router } from "@angular/router";
 import { RouterTestingModule } from "@angular/router/testing";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, Subject, throwError } from "rxjs";
-import { ApiModule, AuthService, Claims, UserRole } from "../open-api";
+import { ApiModule, AuthService, Claims } from "../open-api";
 import { AuthState, Logout, SetAuthState } from "../store";
 import { TokenRefreshService } from "./token-refresh.service";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
@@ -17,7 +17,6 @@ describe("TokenRefreshService", () => {
 
   const mockClaims: Claims = {
     userId: 1,
-    userRole: UserRole.Admin,
     displayName: "Test User",
     defaultAvatarColor: "#CD5C5C",
     username: "testuser",

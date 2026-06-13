@@ -35,8 +35,8 @@
   {{ element.displayName }}
 </ng-template>
 
-<ng-template #userRoleCell let-element="element">
-  {{ element.userRole | status }}
+<ng-template #appRoleCell let-element="element">
+  {{ element.appRoleId | roleName : roles() }}
 </ng-template>
 
 <ng-template #createdAtCell let-element="element">

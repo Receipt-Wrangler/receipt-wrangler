@@ -17,8 +17,8 @@ import { TableModule } from "src/table/table.module";
 import { UserAutocompleteModule } from "src/user-autocomplete/user-autocomplete.module";
 import { ButtonModule } from "../../button";
 import { InputModule } from "../../input";
-import { ApiModule, Group, GroupRole, GroupsService, GroupStatus } from "../../open-api";
-import { AddGroup, UpdateGroup } from "../../store";
+import { ApiModule, Group, GroupsService, GroupStatus } from "../../open-api";
+import { AddGroup, AuthState, UpdateGroup } from "../../store";
 import { AppInitService } from "../../services";
 import { GroupMemberFormComponent } from "../group-member-form/group-member-form.component";
 import { buildGroupMemberForm } from "../utils/group-member.utils";
@@ -39,7 +39,7 @@ describe("GroupFormComponent", () => {
         MatCardModule,
         MatDialogModule,
         MatSnackBarModule,
-        NgxsModule.forRoot([]),
+        NgxsModule.forRoot([AuthState]),
         NoopAnimationsModule,
         PipesModule,
         ReactiveFormsModule,
@@ -86,7 +86,7 @@ describe("GroupFormComponent", () => {
     formGroup.patchValue({
       userId: "2",
       groupId: "1",
-      groupRole: GroupRole.Viewer,
+      groupRoleId: 10,
     });
     jest.spyOn(matDialog, "open").mockReturnValue({
       afterClosed: () => of(formGroup),
@@ -107,13 +107,11 @@ describe("GroupFormComponent", () => {
         userId: 2,
         groupRoleId: null,
         groupId: 1,
-        groupRole: GroupRole.Owner,
       },
       {
         userId: 3,
         groupRoleId: null,
         groupId: 1,
-        groupRole: GroupRole.Owner,
       },
     ];
     const matDialog = TestBed.inject(MatDialog);
@@ -121,7 +119,6 @@ describe("GroupFormComponent", () => {
     formGroup.patchValue({
       userId: 3,
       groupId: 1,
-      groupRole: GroupRole.Owner,
     });
     jest.spyOn(matDialog, "open").mockReturnValue({
       afterClosed: () => of(formGroup),
@@ -137,12 +134,10 @@ describe("GroupFormComponent", () => {
           {
             userId: 2,
             groupId: 1,
-            groupRole: GroupRole.Owner,
           },
           {
             userId: 1,
             groupId: 1,
-            groupRole: GroupRole.Viewer,
           },
         ],
       },
@@ -164,7 +159,6 @@ describe("GroupFormComponent", () => {
       userId: 1,
       groupRoleId: null,
       groupId: 1,
-      groupRole: GroupRole.Viewer,
     };
 
     route.snapshot.data = {
@@ -176,7 +170,6 @@ describe("GroupFormComponent", () => {
           {
             userId: 2,
             groupId: 1,
-            groupRole: GroupRole.Owner,
           },
           result,
         ],
@@ -262,13 +255,11 @@ describe("GroupFormComponent", () => {
           userId: 2,
           groupRoleId: 10,
           groupId: 1,
-          groupRole: GroupRole.Owner,
         },
         {
           userId: 1,
           groupRoleId: 11,
           groupId: 1,
-          groupRole: GroupRole.Viewer,
         },
       ],
       isAllGroup: false,
@@ -295,7 +286,6 @@ describe("GroupFormComponent", () => {
         userId: new FormControl(3),
         groupRoleId: new FormControl(12),
         groupId: new FormControl(1),
-        groupRole: new FormControl(GroupRole.Editor),
       })
     );
 
@@ -318,19 +308,16 @@ describe("GroupFormComponent", () => {
             userId: 2,
             groupRoleId: 10,
             groupId: 1,
-            groupRole: GroupRole.Owner,
           },
           {
             userId: 1,
             groupRoleId: 11,
             groupId: 1,
-            groupRole: GroupRole.Viewer,
           },
           {
             userId: 3,
             groupRoleId: 12,
             groupId: 1,
-            groupRole: GroupRole.Editor,
           },
         ],
       } as Group
@@ -341,5 +328,34 @@ describe("GroupFormComponent", () => {
         tab: "details",
       }
     });
+  });
+
+  it("submits in edit mode even when no member holds an owner role", () => {
+    // The legacy "must have at least one owner" guard was removed with the
+    // group-role enums; the backend no longer enforces an owner, so the client
+    // must save a non-owner-only membership without blocking.
+    const updateSpy = jest.spyOn(TestBed.inject(GroupsService), "updateGroup");
+    jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    jest.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
+
+    const route = TestBed.inject(ActivatedRoute);
+    route.snapshot.data = {
+      group: {
+        id: 1,
+        name: "test",
+        status: GroupStatus.Active,
+        groupMembers: [{ userId: 2, groupRoleId: 11, groupId: 1 }],
+      },
+      formConfig: { mode: FormMode.edit },
+    };
+
+    component.ngOnInit();
+    component.ngAfterViewInit();
+
+    updateSpy.mockReturnValue(of({ id: 1 } as Group));
+
+    component.submit();
+
+    expect(updateSpy).toHaveBeenCalled();
   });
 });

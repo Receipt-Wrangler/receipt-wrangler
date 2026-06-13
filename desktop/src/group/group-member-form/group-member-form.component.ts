@@ -7,7 +7,7 @@ import { catchError, of, startWith } from "rxjs";
 import { GroupMember, PermissionScope, Role, RoleService } from "../../open-api";
 import { openRolePreviewDialog } from "../../roles/role-preview/role-preview-dialog.component";
 import { AuthState } from "../../store";
-import { buildGroupMemberForm, legacyGroupRoleFromRole } from "../utils/group-member.utils";
+import { buildGroupMemberForm } from "../utils/group-member.utils";
 
 @Component({
     selector: "app-group-member-form",
@@ -106,14 +106,6 @@ export class GroupMemberFormComponent implements OnInit {
 
   public submit(): void {
     if (this.form.valid) {
-      // Keep the legacy enum in sync with the chosen modern role so the parent
-      // group form's member table and "keep an owner" check (which still read
-      // the legacy enum) work for newly assigned members. The backend re-derives
-      // it authoritatively on save.
-      const role = this.selectedRole();
-      if (role) {
-        this.form.get("groupRole")?.setValue(legacyGroupRoleFromRole(role));
-      }
       this.matDialogRef.close(this.form);
     }
   }

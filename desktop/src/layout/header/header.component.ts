@@ -4,7 +4,7 @@ import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { LayoutState } from "src/store/layout.state";
 import { ToggleIsSidebarOpen } from "src/store/layout.state.actions";
-import { AuthService, GroupRole, NotificationsService } from "../../open-api";
+import { AuthService, NotificationsService } from "../../open-api";
 import { AuthState, GroupState } from "../../store";
 
 @Component({
@@ -44,8 +44,6 @@ export class HeaderComponent {
     const group = this.store.selectSnapshot(GroupState.getGroupById(groupId));
     return group?.name as string ?? "";
   });
-
-  public groupRoleEnum = GroupRole;
 
   public notificationCount = signal<number | undefined>(undefined);
 

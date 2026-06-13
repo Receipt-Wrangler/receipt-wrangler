@@ -1,4 +1,5 @@
-import { AfterViewInit, Component, signal, TemplateRef, viewChild } from "@angular/core";
+import { AfterViewInit, Component, inject, signal, TemplateRef, viewChild } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
 import { MatTableDataSource } from "@angular/material/table";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
@@ -9,7 +10,8 @@ import { DEFAULT_DIALOG_CONFIG } from "src/constants/dialog.constant";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
-import { BulkUserDeleteCommand, Permission, User, UserService } from "../../open-api";
+import { BulkUserDeleteCommand, Permission, Role, RoleService, User, UserService } from "../../open-api";
+import { loadAssignableRoles } from "../../roles/role-loading.util";
 import { SnackbarService } from "../../services";
 import { AuthState, RemoveUser, RemoveUsers, UserState } from "../../store";
 import { DummyUserConversionDialogComponent } from "../dummy-user-conversion-dialog/dummy-user-conversion-dialog.component";
@@ -33,7 +35,7 @@ export class UserListComponent implements AfterViewInit {
 
   public readonly displaynameCell = viewChild.required<TemplateRef<any>>("displayNameCell");
 
-  public readonly userRoleCell = viewChild.required<TemplateRef<any>>("userRoleCell");
+  public readonly appRoleCell = viewChild.required<TemplateRef<any>>("appRoleCell");
 
   public readonly createdAtCell = viewChild.required<TemplateRef<any>>("createdAtCell");
 
@@ -48,6 +50,14 @@ export class UserListComponent implements AfterViewInit {
   public columns: TableColumn[] = [];
 
   public dataSource = signal(new MatTableDataSource<User>([]));
+
+  // Roles resolve each user's appRoleId to a role name. The request is skipped
+  // unless the caller holds app.roles.read (otherwise the 403 would log them
+  // out — see loadAssignableRoles); the cell then renders blank.
+  public readonly roles = toSignal(
+    loadAssignableRoles(inject(Store), inject(RoleService)),
+    { initialValue: [] as Role[] }
+  );
 
   public hasSelectedUsers: boolean = false;
 
@@ -85,8 +95,8 @@ export class UserListComponent implements AfterViewInit {
       },
       {
         columnHeader: "Role",
-        matColumnDef: "userRole",
-        template: this.userRoleCell(),
+        matColumnDef: "appRole",
+        template: this.appRoleCell(),
         sortable: true,
       },
       {
@@ -113,7 +123,7 @@ export class UserListComponent implements AfterViewInit {
       "select",
       "username",
       "displayName",
-      "userRole",
+      "appRole",
       "createdAt",
       "updatedAt",
       "actions",
