@@ -22,6 +22,10 @@ Receipt Wrangler API is a Go-based backend service for a receipt management and 
 - `./generate-client.sh desktop <output-dir>` - Generate TypeScript Angular client
 - `./generate-client.sh mobile <output-dir>` - Generate Dart Dio client
 
+### Go Toolchain
+- Requires **Go 1.25+** (the MCP `github.com/modelcontextprotocol/go-sdk` sets a 1.25 minimum).
+  Docker images and CI containers use `golang:1.25-trixie`.
+
 ## Architecture Overview
 
 ### Core Structure
@@ -147,3 +151,33 @@ Tests should cover:
 - OpenAPI 3.1 specification in `swagger.yml`
 - API serves on port 8081 by default
 - All endpoints require JWT authentication except login/signup
+
+## MCP Server & OAuth 2.1
+
+Receipt Wrangler can expose a remote **Model Context Protocol** server so clients such as
+Claude can read a user's data. It is **off by default** and Go-native (no separate service).
+
+- **Enable**: set `MCP_ENABLED=true`. Set `MCP_PUBLIC_URL` to the externally reachable origin
+  (e.g. `https://receipts.example.com`) used to build the OAuth issuer/metadata/redirect URLs;
+  defaults to `http://localhost:8081` in dev.
+- **Endpoints** (mounted at the server root in `routers.BuildRootRouter` → `mountMcpRoutes`,
+  gated by `MCP_ENABLED`):
+  - `/.well-known/oauth-protected-resource` + `/.well-known/oauth-authorization-server` —
+    OAuth discovery (RFC 9728 / RFC 8414)
+  - `/oauth/register` (Dynamic Client Registration, RFC 7591), `/oauth/authorize`
+    (login form backed by `services.LoginUser`), `/oauth/token` (authorization_code +
+    refresh_token grants, PKCE S256)
+  - `/mcp` — Streamable HTTP MCP endpoint, guarded by bearer-token auth (401 +
+    `WWW-Authenticate` advertising the protected-resource metadata)
+- **Auth model**: the OAuth access token **is** a normal Receipt Wrangler access JWT minted by
+  `services.GenerateJWT`, so it is validated by the same `services.InitTokenValidator` the REST
+  API uses. No parallel token system.
+- **Packages**: `internal/oauth/` (authorization server) and `internal/mcp/`
+  (server + read-only tools). Tools call the service/repository layer in-process with the
+  authenticated user's claims and enforce the same group-scoped authorization as the REST
+  handlers. v1 tools are read-only: `search_receipts`, `get_receipt`, `list_groups`,
+  `list_categories`, `list_tags`, `list_dashboards`.
+- **Storage**: `models.OAuthClient` + `models.OAuthAuthorizationCode` (registered in
+  `MakeMigrations`). Refresh tokens reuse the existing `models.RefreshToken` flow.
+- **Production**: `docker/default.conf` proxies the new root paths to the backend; the `/mcp`
+  location disables buffering and raises the read timeout for SSE streams.

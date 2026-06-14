@@ -16,7 +16,7 @@ RUN npm install
 RUN npm run build
 
 # Setup API
-FROM golang:1.24-trixie
+FROM golang:1.25-trixie
 
 # Define build arguments
 ARG VERSION

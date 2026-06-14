@@ -22,4 +22,7 @@ const (
 	ChromiumBinaryPath             EnvironmentVariable = "CHROMIUM_BINARY_PATH"
 	ChromiumSandbox                EnvironmentVariable = "CHROMIUM_SANDBOX"
 	ChromiumAllowExternalResources EnvironmentVariable = "CHROMIUM_ALLOW_EXTERNAL_RESOURCES"
+
+	McpEnabled   EnvironmentVariable = "MCP_ENABLED"
+	McpPublicUrl EnvironmentVariable = "MCP_PUBLIC_URL"
 )

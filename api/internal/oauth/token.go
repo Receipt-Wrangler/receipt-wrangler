@@ -1,0 +1,131 @@
+package oauth
+
+import (
+	"context"
+	"net/http"
+	"receipt-wrangler/api/internal/logging"
+	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/structs"
+	"receipt-wrangler/api/internal/utils"
+
+	"github.com/auth0/go-jwt-middleware/v2/validator"
+)
+
+// Token handles POST /oauth/token for the authorization_code and refresh_token
+// grants. Both ultimately mint a standard Receipt Wrangler access JWT via
+// services.GenerateJWT, so the issued access token is validated by the same
+// machinery the REST API uses.
+func Token(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "Malformed request body")
+		return
+	}
+
+	switch r.PostForm.Get("grant_type") {
+	case "authorization_code":
+		handleAuthorizationCodeGrant(w, r)
+	case "refresh_token":
+		handleRefreshTokenGrant(w, r)
+	default:
+		writeOAuthError(w, http.StatusBadRequest, "unsupported_grant_type", "Unsupported grant_type")
+	}
+}
+
+func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request) {
+	code := r.PostForm.Get("code")
+	clientId := r.PostForm.Get("client_id")
+	redirectUri := r.PostForm.Get("redirect_uri")
+	codeVerifier := r.PostForm.Get("code_verifier")
+
+	if len(code) == 0 || len(codeVerifier) == 0 {
+		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "code and code_verifier are required")
+		return
+	}
+
+	authCode, err := consumeAuthorizationCode(code)
+	if err != nil {
+		writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "Invalid or expired authorization code")
+		return
+	}
+
+	if authCode.ClientId != clientId || authCode.RedirectUri != redirectUri {
+		writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "client_id or redirect_uri mismatch")
+		return
+	}
+
+	if !verifyPkceS256(codeVerifier, authCode.CodeChallenge) {
+		writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "PKCE verification failed")
+		return
+	}
+
+	issueTokenResponse(w, authCode.UserId, authCode.Scope)
+}
+
+func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request) {
+	refreshToken := r.PostForm.Get("refresh_token")
+	if len(refreshToken) == 0 {
+		writeOAuthError(w, http.StatusBadRequest, "invalid_request", "refresh_token is required")
+		return
+	}
+
+	userId, err := rotateRefreshToken(refreshToken)
+	if err != nil {
+		writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "Invalid or expired refresh token")
+		return
+	}
+
+	issueTokenResponse(w, userId, readScope)
+}
+
+// rotateRefreshToken validates a refresh token JWT, then atomically verifies it
+// exists in the database and is unused and marks it used, mirroring the
+// existing single-use refresh flow (middleware.RevokeRefreshToken). It returns
+// the owning user id on success.
+func rotateRefreshToken(refreshTokenString string) (uint, error) {
+	tokenValidator, err := services.InitTokenValidator()
+	if err != nil {
+		return 0, err
+	}
+
+	validated, err := tokenValidator.ValidateToken(context.Background(), refreshTokenString)
+	if err != nil {
+		return 0, err
+	}
+
+	claims := validated.(*validator.ValidatedClaims).CustomClaims.(*structs.Claims)
+
+	var dbToken models.RefreshToken
+	hashedToken := utils.Sha256Hash([]byte(refreshTokenString))
+	db := repositories.GetDB()
+
+	if err := db.Where("token = ? AND is_used = ?", hashedToken, false).First(&dbToken).Error; err != nil {
+		return 0, err
+	}
+
+	if err := db.Model(&dbToken).Update("is_used", true).Error; err != nil {
+		return 0, err
+	}
+
+	return claims.UserId, nil
+}
+
+// issueTokenResponse mints a fresh access + refresh JWT pair for the user and
+// writes the OAuth token response.
+func issueTokenResponse(w http.ResponseWriter, userId uint, scope string) {
+	accessToken, refreshToken, _, err := services.GenerateJWT(userId)
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to generate token for MCP client: "+err.Error())
+		writeOAuthError(w, http.StatusInternalServerError, "server_error", "Failed to issue token")
+		return
+	}
+
+	writeJson(w, http.StatusOK, map[string]interface{}{
+		"access_token":  accessToken,
+		"token_type":    "Bearer",
+		"expires_in":    accessTokenExpiresIn,
+		"refresh_token": refreshToken,
+		"scope":         scopeOrDefault(scope),
+	})
+}

@@ -4,7 +4,9 @@ import (
 	"receipt-wrangler/api/internal/corspolicy"
 	config "receipt-wrangler/api/internal/env"
 	"receipt-wrangler/api/internal/logging"
+	"receipt-wrangler/api/internal/mcp"
 	"receipt-wrangler/api/internal/middleware"
+	"receipt-wrangler/api/internal/oauth"
 	"receipt-wrangler/api/internal/services"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v2"
@@ -137,5 +139,28 @@ func BuildRootRouter() *chi.Mux {
 	widgetRouter := BuildWidgetRouter()
 	rootRouter.Mount("/api/widget", widgetRouter)
 
+	// MCP server + OAuth 2.1 authorization endpoints (opt-in via MCP_ENABLED).
+	// These are mounted at the server root because the OAuth discovery
+	// documents must live at well-known root paths.
+	if config.GetMcpEnabled() {
+		mountMcpRoutes(rootRouter)
+	}
+
 	return rootRouter
+}
+
+// mountMcpRoutes wires the MCP Streamable HTTP endpoint and the self-hosted
+// OAuth 2.1 authorization-server endpoints used by MCP clients such as Claude.
+func mountMcpRoutes(rootRouter *chi.Mux) {
+	rootRouter.Get("/.well-known/oauth-protected-resource", oauth.ProtectedResourceMetadata)
+	rootRouter.Get("/.well-known/oauth-authorization-server", oauth.AuthorizationServerMetadata)
+
+	rootRouter.Post("/oauth/register", oauth.Register)
+	rootRouter.Get("/oauth/authorize", oauth.AuthorizeForm)
+	rootRouter.Post("/oauth/authorize", oauth.Authorize)
+	rootRouter.Post("/oauth/token", oauth.Token)
+
+	mcpHandler := mcp.NewHandler()
+	rootRouter.Handle("/mcp", mcpHandler)
+	rootRouter.Handle("/mcp/*", mcpHandler)
 }

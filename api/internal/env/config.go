@@ -122,6 +122,28 @@ func parseBoolEnv(name constants.EnvironmentVariable, defaultValue bool) bool {
 	return enabled
 }
 
+// GetMcpEnabled reports whether the MCP server and its OAuth 2.1
+// authorization endpoints should be mounted. Defaults to false so existing
+// deployments are unaffected until an operator explicitly opts in via
+// MCP_ENABLED=true.
+func GetMcpEnabled() bool {
+	return parseBoolEnv(constants.McpEnabled, false)
+}
+
+// GetMcpPublicUrl returns the externally reachable origin (scheme + host,
+// no trailing slash) used to build the OAuth issuer, resource, metadata, and
+// redirect URLs advertised to MCP clients such as Claude. BASE_PATH is a
+// filesystem path prefix, not an origin, so it cannot be reused here. In dev
+// it defaults to the API's local address.
+func GetMcpPublicUrl() string {
+	url := os.Getenv(string(constants.McpPublicUrl))
+	if len(url) == 0 {
+		return "http://localhost:8081"
+	}
+
+	return strings.TrimRight(url, "/")
+}
+
 func SetConfigs() error {
 	setEnv()
 	setBasePath()
