@@ -38,13 +38,14 @@ func AuthorizeForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	renderLogin(w, http.StatusOK, loginFormData{
-		ClientId:      client.ClientId,
-		ClientName:    client.ClientName,
-		RedirectUri:   redirectUri,
-		State:         state,
-		Scope:         scopeOrDefault(query.Get("scope")),
-		CodeChallenge: query.Get("code_challenge"),
-		Resource:      query.Get("resource"),
+		ClientId:            client.ClientId,
+		ClientName:          client.ClientName,
+		RedirectUri:         redirectUri,
+		State:               state,
+		Scope:               scopeOrDefault(query.Get("scope")),
+		CodeChallenge:       query.Get("code_challenge"),
+		CodeChallengeMethod: "S256",
+		Resource:            query.Get("resource"),
 	})
 }
 
@@ -67,19 +68,27 @@ func Authorize(w http.ResponseWriter, r *http.Request) {
 	resource := r.PostForm.Get("resource")
 	scope := scopeOrDefault(r.PostForm.Get("scope"))
 
-	if r.PostForm.Get("code_challenge_method") == "plain" || len(codeChallenge) == 0 {
+	// Apply the same PKCE and resource validation as the GET path so a client
+	// cannot skip it by POSTing directly with a weaker/malformed request.
+	if r.PostForm.Get("code_challenge_method") != "S256" || len(codeChallenge) == 0 {
 		redirectWithError(w, r, redirectUri, state, "invalid_request", "PKCE with code_challenge_method=S256 is required")
 		return
 	}
 
+	if len(resource) > 0 && resource != mcpResourceUrl() {
+		redirectWithError(w, r, redirectUri, state, "invalid_target", "Unknown resource indicator")
+		return
+	}
+
 	formData := loginFormData{
-		ClientId:      client.ClientId,
-		ClientName:    client.ClientName,
-		RedirectUri:   redirectUri,
-		State:         state,
-		Scope:         scope,
-		CodeChallenge: codeChallenge,
-		Resource:      resource,
+		ClientId:            client.ClientId,
+		ClientName:          client.ClientName,
+		RedirectUri:         redirectUri,
+		State:               state,
+		Scope:               scope,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: "S256",
+		Resource:            resource,
 	}
 
 	user, _, err := services.LoginUser(commands.LoginCommand{

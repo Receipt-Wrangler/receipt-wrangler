@@ -21,7 +21,9 @@ func run(m *testing.M) (code int, err error) {
 	defer teardown()
 	repositories.SetUpTestEnv()
 	repositories.InitTestDb()
-	repositories.MakeMigrations()
+	if err := repositories.MakeMigrations(); err != nil {
+		return 1, err
+	}
 	return m.Run(), nil
 }
 

@@ -3,6 +3,7 @@ package oauth
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"receipt-wrangler/api/internal/logging"
 )
 
@@ -30,6 +31,13 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for _, redirectUri := range request.RedirectUris {
+		if !isValidRedirectUri(redirectUri) {
+			writeOAuthError(w, http.StatusBadRequest, "invalid_redirect_uri", "redirect_uri must be an absolute http(s) URL without a fragment: "+redirectUri)
+			return
+		}
+	}
+
 	client, err := createClient(request.ClientName, request.RedirectUris)
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to register OAuth client: "+err.Error())
@@ -45,4 +53,20 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		"grant_types":                []string{"authorization_code", "refresh_token"},
 		"response_types":             []string{"code"},
 	})
+}
+
+// isValidRedirectUri reports whether redirectUri is an absolute http(s) URL with
+// a host and no fragment, so only sane values are ever persisted and later used
+// as authorization redirect targets.
+func isValidRedirectUri(redirectUri string) bool {
+	parsed, err := url.Parse(redirectUri)
+	if err != nil {
+		return false
+	}
+
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+
+	return parsed.Host != "" && parsed.Fragment == ""
 }

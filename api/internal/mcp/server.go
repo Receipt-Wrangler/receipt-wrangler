@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/http"
 	config "receipt-wrangler/api/internal/env"
+	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -47,23 +48,29 @@ func NewHandler() http.Handler {
 		return server
 	}, nil)
 
+	// Build the JWT validator once rather than per request; it is immutable and
+	// sits on the auth critical path for every MCP call.
+	tokenValidator, err := services.InitTokenValidator()
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_FATAL, "Failed to initialize MCP token validator: "+err.Error())
+	}
+
 	options := &auth.RequireBearerTokenOptions{
 		ResourceMetadataURL: config.GetMcpPublicUrl() + "/.well-known/oauth-protected-resource",
 		Scopes:              []string{mcpReadScope},
 	}
 
-	return auth.RequireBearerToken(verifyToken, options)(streamable)
-}
-
-// verifyToken validates a bearer access token using the same validator the REST
-// API uses, and returns its claims for downstream tool handlers. A validation
-// failure is wrapped in auth.ErrInvalidToken so the middleware responds 401.
-func verifyToken(ctx context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
-	tokenValidator, err := services.InitTokenValidator()
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", auth.ErrInvalidToken, err)
+	verifier := func(ctx context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
+		return verifyToken(ctx, tokenValidator, token)
 	}
 
+	return auth.RequireBearerToken(verifier, options)(streamable)
+}
+
+// verifyToken validates a bearer access token with the provided validator and
+// returns its claims for downstream tool handlers. A validation failure is
+// wrapped in auth.ErrInvalidToken so the middleware responds 401.
+func verifyToken(ctx context.Context, tokenValidator *validator.Validator, token string) (*auth.TokenInfo, error) {
 	validated, err := tokenValidator.ValidateToken(ctx, token)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", auth.ErrInvalidToken, err)

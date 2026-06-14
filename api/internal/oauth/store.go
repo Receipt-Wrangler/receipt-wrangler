@@ -2,12 +2,9 @@ package oauth
 
 import (
 	"encoding/json"
-	"errors"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 // createClient persists a dynamically registered OAuth client and returns it.
@@ -96,30 +93,28 @@ func createAuthorizationCode(
 	return code, nil
 }
 
-// consumeAuthorizationCode atomically loads and marks an authorization code as
-// used. It returns an error if the code is unknown, already used, or expired,
-// so a redeemed or replayed code can never be exchanged twice.
-func consumeAuthorizationCode(code string) (models.OAuthAuthorizationCode, error) {
+// getAuthorizationCode loads an authorization code without consuming it, so the
+// caller can validate the client binding and PKCE before the code is burned. A
+// missing code is reported as gorm.ErrRecordNotFound.
+func getAuthorizationCode(code string) (models.OAuthAuthorizationCode, error) {
 	var authCode models.OAuthAuthorizationCode
+	err := repositories.GetDB().Where("code = ?", code).First(&authCode).Error
+	return authCode, err
+}
 
-	err := repositories.GetDB().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("code = ?", code).First(&authCode).Error; err != nil {
-			return err
-		}
-
-		if authCode.Used {
-			return errors.New("authorization code already used")
-		}
-
-		if time.Now().After(authCode.ExpiresAt) {
-			return errors.New("authorization code expired")
-		}
-
-		return tx.Model(&authCode).Update("used", true).Error
-	})
-	if err != nil {
-		return models.OAuthAuthorizationCode{}, err
+// markAuthorizationCodeUsed atomically marks an unused, unexpired code as used
+// and reports whether it succeeded. The used/expiry checks live in the UPDATE's
+// WHERE clause so that check-and-set is a single atomic statement: concurrent
+// redemptions of the same code can never both observe it as unused, and a
+// replayed code affects zero rows.
+func markAuthorizationCodeUsed(code string) (bool, error) {
+	result := repositories.GetDB().
+		Model(&models.OAuthAuthorizationCode{}).
+		Where("code = ? AND used = ? AND expires_at > ?", code, false, time.Now()).
+		Update("used", true)
+	if result.Error != nil {
+		return false, result.Error
 	}
 
-	return authCode, nil
+	return result.RowsAffected == 1, nil
 }

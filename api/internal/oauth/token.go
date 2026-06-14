@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
@@ -44,7 +45,10 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authCode, err := consumeAuthorizationCode(code)
+	// Load the code and validate the client binding and PKCE BEFORE consuming
+	// it, so a mismatched or forged redemption attempt cannot burn a valid code
+	// out from under the legitimate client.
+	authCode, err := getAuthorizationCode(code)
 	if err != nil {
 		writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "Invalid or expired authorization code")
 		return
@@ -57,6 +61,18 @@ func handleAuthorizationCodeGrant(w http.ResponseWriter, r *http.Request) {
 
 	if !verifyPkceS256(codeVerifier, authCode.CodeChallenge) {
 		writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "PKCE verification failed")
+		return
+	}
+
+	// Atomically consume the code. A losing race (or a replayed/expired code)
+	// affects zero rows and is rejected here, guaranteeing single use.
+	consumed, err := markAuthorizationCodeUsed(code)
+	if err != nil {
+		writeOAuthError(w, http.StatusInternalServerError, "server_error", "Failed to redeem authorization code")
+		return
+	}
+	if !consumed {
+		writeOAuthError(w, http.StatusBadRequest, "invalid_grant", "Invalid or expired authorization code")
 		return
 	}
 
@@ -96,16 +112,20 @@ func rotateRefreshToken(refreshTokenString string) (uint, error) {
 
 	claims := validated.(*validator.ValidatedClaims).CustomClaims.(*structs.Claims)
 
-	var dbToken models.RefreshToken
 	hashedToken := utils.Sha256Hash([]byte(refreshTokenString))
-	db := repositories.GetDB()
 
-	if err := db.Where("token = ? AND is_used = ?", hashedToken, false).First(&dbToken).Error; err != nil {
-		return 0, err
+	// Atomically mark the stored token used via the WHERE clause so two
+	// concurrent refreshes of the same token cannot both succeed. A zero
+	// row count means the token is unknown or already used.
+	result := repositories.GetDB().
+		Model(&models.RefreshToken{}).
+		Where("token = ? AND is_used = ?", hashedToken, false).
+		Update("is_used", true)
+	if result.Error != nil {
+		return 0, result.Error
 	}
-
-	if err := db.Model(&dbToken).Update("is_used", true).Error; err != nil {
-		return 0, err
+	if result.RowsAffected != 1 {
+		return 0, errors.New("refresh token is invalid or already used")
 	}
 
 	return claims.UserId, nil

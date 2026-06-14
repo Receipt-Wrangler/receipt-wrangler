@@ -115,6 +115,23 @@ func TestRegisterRequiresRedirectUri(t *testing.T) {
 	}
 }
 
+func TestRegisterRejectsInvalidRedirectUri(t *testing.T) {
+	invalid := []string{
+		`{"redirect_uris":["not-a-url"]}`,
+		`{"redirect_uris":["ftp://example.com/cb"]}`,
+		`{"redirect_uris":["https://example.com/cb#frag"]}`,
+		`{"redirect_uris":["https://good.example.com/cb","javascript:alert(1)"]}`,
+	}
+
+	for _, body := range invalid {
+		recorder := httptest.NewRecorder()
+		Register(recorder, httptest.NewRequest(http.MethodPost, "/oauth/register", strings.NewReader(body)))
+		if recorder.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 for invalid redirect_uri in %s, got %d", body, recorder.Code)
+		}
+	}
+}
+
 // postAuthorize submits the login form with the given credentials against a
 // freshly registered client and returns the recorder.
 func postAuthorize(t *testing.T, client models.OAuthClient, redirectUri string, username string, password string, codeChallenge string) *httptest.ResponseRecorder {
@@ -190,6 +207,35 @@ func TestAuthorizeRejectsBadCredentials(t *testing.T) {
 	}
 }
 
+func TestAuthorizeRejectsNonS256Pkce(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	createTestUserWithPassword(t, "grace", "password")
+	client, _ := createClient("Claude", []string{testRedirectUri})
+
+	form := url.Values{}
+	form.Set("username", "grace")
+	form.Set("password", "password")
+	form.Set("client_id", client.ClientId)
+	form.Set("redirect_uri", testRedirectUri)
+	form.Set("state", "xyz")
+	form.Set("code_challenge", "plaintext-challenge")
+	form.Set("code_challenge_method", "plain")
+
+	request := httptest.NewRequest(http.MethodPost, "/oauth/authorize", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recorder := httptest.NewRecorder()
+	Authorize(recorder, request)
+
+	if recorder.Code != http.StatusFound {
+		t.Fatalf("expected a redirect with an error, got %d", recorder.Code)
+	}
+	location, _ := url.Parse(recorder.Header().Get("Location"))
+	if location.Query().Get("error") != "invalid_request" {
+		t.Errorf("expected invalid_request error for non-S256 PKCE, got %q", location.Query().Get("error"))
+	}
+}
+
 func TestAuthorizeRejectsUnregisteredRedirect(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
@@ -252,6 +298,44 @@ func TestTokenAuthorizationCodeGrant(t *testing.T) {
 	replay := postToken(t, form)
 	if replay.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 when replaying a used code, got %d", replay.Code)
+	}
+}
+
+func TestTokenMismatchedClientDoesNotBurnCode(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := createTestUserWithPassword(t, "heidi", "password")
+	client, _ := createClient("Claude", []string{testRedirectUri})
+
+	verifier := "the-real-code-verifier-value-1234567890"
+	code, err := createAuthorizationCode(client.ClientId, user.ID, testRedirectUri, challengeFor(verifier), readScope, "")
+	if err != nil {
+		t.Fatalf("failed to create authorization code: %v", err)
+	}
+
+	// An attacker redeems with the wrong client_id; this must be rejected and
+	// must NOT consume the code.
+	badForm := url.Values{}
+	badForm.Set("grant_type", "authorization_code")
+	badForm.Set("code", code)
+	badForm.Set("client_id", "someone-elses-client")
+	badForm.Set("redirect_uri", testRedirectUri)
+	badForm.Set("code_verifier", verifier)
+
+	if recorder := postToken(t, badForm); recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for client mismatch, got %d", recorder.Code)
+	}
+
+	// The legitimate client can still redeem the un-burned code.
+	goodForm := url.Values{}
+	goodForm.Set("grant_type", "authorization_code")
+	goodForm.Set("code", code)
+	goodForm.Set("client_id", client.ClientId)
+	goodForm.Set("redirect_uri", testRedirectUri)
+	goodForm.Set("code_verifier", verifier)
+
+	if recorder := postToken(t, goodForm); recorder.Code != http.StatusOK {
+		t.Fatalf("legitimate client could not redeem the code after a mismatched attempt: %d (%s)", recorder.Code, recorder.Body.String())
 	}
 }
 

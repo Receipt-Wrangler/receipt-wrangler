@@ -6,14 +6,15 @@ import "html/template"
 // the POST can rebuild the authorization request after the user authenticates.
 // ErrorMessage is non-empty when re-rendering after a failed login attempt.
 type loginFormData struct {
-	ClientId      string
-	RedirectUri   string
-	State         string
-	Scope         string
-	CodeChallenge string
-	Resource      string
-	ClientName    string
-	ErrorMessage  string
+	ClientId            string
+	RedirectUri         string
+	State               string
+	Scope               string
+	CodeChallenge       string
+	CodeChallengeMethod string
+	Resource            string
+	ClientName          string
+	ErrorMessage        string
 }
 
 // loginTemplate renders the minimal, dependency-free login page shown at the
@@ -50,6 +51,7 @@ var loginTemplate = template.Must(template.New("login").Parse(`<!DOCTYPE html>
     <input type="hidden" name="state" value="{{.State}}">
     <input type="hidden" name="scope" value="{{.Scope}}">
     <input type="hidden" name="code_challenge" value="{{.CodeChallenge}}">
+    <input type="hidden" name="code_challenge_method" value="{{.CodeChallengeMethod}}">
     <input type="hidden" name="resource" value="{{.Resource}}">
     <button type="submit">Authorize</button>
   </form>

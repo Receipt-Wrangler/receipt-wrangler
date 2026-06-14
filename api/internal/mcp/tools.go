@@ -79,21 +79,17 @@ func handleSearchReceipts(ctx context.Context, req *mcpsdk.CallToolRequest, in s
 		limit = maxSearchResults
 	}
 
-	// Scope to the user's groups exactly like handlers.Search.
+	// Scope to the user's groups exactly like handlers.Search, then delegate
+	// the query to the repository layer.
 	groupMemberRepository := repositories.NewGroupMemberRepository(nil)
 	groupIds, err := groupMemberRepository.GetGroupIdsByUserId(utils.UintToString(claims.UserId))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	db := repositories.GetDB()
-	query := db.Table("receipts").Where("group_id IN ?", groupIds)
-	if len(in.Query) > 0 {
-		query = query.Where("name LIKE ?", "%"+in.Query+"%")
-	}
-
-	var receipts []models.Receipt
-	if err := query.Limit(limit).Order("date desc").Find(&receipts).Error; err != nil {
+	receiptRepository := repositories.NewReceiptRepository(nil)
+	receipts, err := receiptRepository.SearchReceiptsByGroupIds(groupIds, in.Query, limit)
+	if err != nil {
 		return nil, nil, err
 	}
 

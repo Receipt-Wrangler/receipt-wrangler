@@ -43,7 +43,12 @@ func TestVerifyTokenAcceptsValidJwt(t *testing.T) {
 		t.Fatalf("failed to generate jwt: %v", err)
 	}
 
-	info, err := verifyToken(context.Background(), accessToken, nil)
+	tokenValidator, err := services.InitTokenValidator()
+	if err != nil {
+		t.Fatalf("failed to init validator: %v", err)
+	}
+
+	info, err := verifyToken(context.Background(), tokenValidator, accessToken)
 	if err != nil {
 		t.Fatalf("verifyToken rejected a valid token: %v", err)
 	}
@@ -79,7 +84,12 @@ func TestHandlerAcceptsIssuedToken(t *testing.T) {
 }
 
 func TestVerifyTokenRejectsInvalidJwt(t *testing.T) {
-	_, err := verifyToken(context.Background(), "not-a-real-token", nil)
+	tokenValidator, err := services.InitTokenValidator()
+	if err != nil {
+		t.Fatalf("failed to init validator: %v", err)
+	}
+
+	_, err = verifyToken(context.Background(), tokenValidator, "not-a-real-token")
 	if err == nil {
 		t.Fatalf("expected an error for an invalid token")
 	}
@@ -138,13 +148,13 @@ func TestGetReceiptEnforcesGroupAccess(t *testing.T) {
 	member := createUser(t, "member")
 	outsider := createUser(t, "outsider")
 
-	const groupId = uint(1)
-	if err := repositories.GetDB().Create(&models.Group{Name: "g1"}).Error; err != nil {
+	group := models.Group{Name: "g1"}
+	if err := repositories.GetDB().Create(&group).Error; err != nil {
 		t.Fatalf("failed to create group: %v", err)
 	}
-	addGroupMember(t, member.ID, groupId, models.VIEWER)
+	addGroupMember(t, member.ID, group.ID, models.VIEWER)
 
-	receipt := createReceiptInGroup(t, "Lunch", groupId, member.ID)
+	receipt := createReceiptInGroup(t, "Lunch", group.ID, member.ID)
 	receiptId := utils.UintToString(receipt.ID)
 
 	// A member of the group can read the receipt.
@@ -171,15 +181,19 @@ func TestSearchReceiptsScopesToUserGroups(t *testing.T) {
 
 	user := createUser(t, "searcher")
 
-	const memberGroup = uint(1)
-	const otherGroup = uint(2)
-	repositories.GetDB().Create(&models.Group{Name: "mine"})
-	repositories.GetDB().Create(&models.Group{Name: "theirs"})
-	addGroupMember(t, user.ID, memberGroup, models.VIEWER)
+	memberGroup := models.Group{Name: "mine"}
+	otherGroup := models.Group{Name: "theirs"}
+	if err := repositories.GetDB().Create(&memberGroup).Error; err != nil {
+		t.Fatalf("failed to create member group: %v", err)
+	}
+	if err := repositories.GetDB().Create(&otherGroup).Error; err != nil {
+		t.Fatalf("failed to create other group: %v", err)
+	}
+	addGroupMember(t, user.ID, memberGroup.ID, models.VIEWER)
 
-	createReceiptInGroup(t, "Coffee shop", memberGroup, user.ID)
-	createReceiptInGroup(t, "Coffee beans", memberGroup, user.ID)
-	createReceiptInGroup(t, "Coffee elsewhere", otherGroup, user.ID)
+	createReceiptInGroup(t, "Coffee shop", memberGroup.ID, user.ID)
+	createReceiptInGroup(t, "Coffee beans", memberGroup.ID, user.ID)
+	createReceiptInGroup(t, "Coffee elsewhere", otherGroup.ID, user.ID)
 
 	_, out, err := handleSearchReceipts(context.Background(), requestForUser(user.ID), searchReceiptsInput{Query: "Coffee"})
 	if err != nil {
@@ -194,7 +208,7 @@ func TestSearchReceiptsScopesToUserGroups(t *testing.T) {
 		t.Errorf("expected 2 receipts from the user's group, got %d", len(results))
 	}
 	for _, result := range results {
-		if result.GroupID != memberGroup {
+		if result.GroupID != memberGroup.ID {
 			t.Errorf("search returned a receipt from group %d outside the user's groups", result.GroupID)
 		}
 	}
