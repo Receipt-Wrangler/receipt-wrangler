@@ -343,6 +343,23 @@ them.
   set. Both short-circuit on unrestricted resources and on **admin bypass** — `userBypassesGrants`
   treats a holder of `app.categories.read` / `app.tags.read` as exempt (they can already see the
   whole pool), keeping their view consistent with the global lists.
+- **Receipt enforcement wiring:** every receipt surface that returns or accepts categories/tags is
+  gated. **Reads** strip via `FilterReceiptCategoriesTags` (receipt-, item-, and linked-item-level):
+  `GetReceipt`, `GetPagedReceiptsForGroup`, `GetReceiptsForGroupIds`, the pie-chart service, and both
+  CSV export handlers; `DuplicateReceipt` strips the source before copying. **Writes**
+  (`CreateReceipt` / `UpdateReceipt`) call `enforceReceiptGrantSelection` — existing ids must be in
+  the caller's grants (else 403) and a new-by-name category/tag requires `app.categories.create` /
+  `app.tags.create`. **List/pie/export filters** are narrowed by `IntersectReceiptFilterWithGrants`
+  so a restricted user can't probe receipt existence via a hidden category/tag filter. Search returns
+  no categories/tags (`SearchResult` omits them), so it needs no filtering.
+- **Update preserves hidden associations:** `UpdateReceipt` does a full association *replace*, so a
+  restricted user's submission (missing the categories/tags they can't see) would drop them.
+  `MergeHiddenReceiptCategoriesTags` re-adds the receipt-level hidden categories/tags before the
+  replace (and runs *after* the selection check, which would otherwise reject them); the response is
+  then stripped so the user still doesn't see them. **Known limitation:** this merge is
+  **receipt-level only** — receipt items have no stable id across an update (they are deleted and
+  recreated), so hidden *item-level* categories/tags cannot be matched back and are dropped when a
+  restricted user edits a receipt. Closing that needs item identity (a separate change).
 
 ### Enforcement status
 

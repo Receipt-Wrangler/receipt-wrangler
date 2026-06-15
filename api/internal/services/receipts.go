@@ -255,6 +255,14 @@ func (service ReceiptService) DuplicateReceipt(
 
 	systemTaskCommand.GroupId = &receipt.GroupId
 
+	// Strip categories/tags the duplicating user cannot see so they are not
+	// copied onto the new receipt.
+	permissionService := NewPermissionService(nil)
+	err = permissionService.FilterReceiptCategoriesTagsForReceipt(userId, &receipt)
+	if err != nil {
+		return models.Receipt{}, err
+	}
+
 	copier.Copy(&newReceipt, receipt)
 
 	newReceipt.ID = 0

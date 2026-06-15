@@ -1,6 +1,7 @@
 package services
 
 import (
+	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
@@ -220,6 +221,143 @@ func TestValidateCategoryTagSelection(t *testing.T) {
 	}
 	if !ok {
 		t.Error("expected tag selection allowed when tags unrestricted")
+	}
+}
+
+func TestFilterReceiptStripsItemCategories(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	cat1 := makeCategory(t, "Groceries")
+	cat2 := makeCategory(t, "Utilities")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-item-strip", []uint{cat1}, nil)
+
+	receipts := []models.Receipt{{
+		GroupId: groupId,
+		ReceiptItems: []models.Item{{
+			Categories: []models.Category{categoryWithId(cat1), categoryWithId(cat2)},
+			LinkedItems: []models.Item{{
+				Categories: []models.Category{categoryWithId(cat1), categoryWithId(cat2)},
+			}},
+		}},
+	}}
+
+	service := NewPermissionService(nil)
+	if err := service.FilterReceiptCategoriesTags(userId, receipts); err != nil {
+		t.Fatalf("FilterReceiptCategoriesTags: %v", err)
+	}
+
+	item := receipts[0].ReceiptItems[0]
+	if len(item.Categories) != 1 || item.Categories[0].ID != cat1 {
+		t.Errorf("expected item categories stripped to cat1, got %v", item.Categories)
+	}
+	if len(item.LinkedItems[0].Categories) != 1 || item.LinkedItems[0].Categories[0].ID != cat1 {
+		t.Errorf("expected linked-item categories stripped to cat1, got %v", item.LinkedItems[0].Categories)
+	}
+}
+
+func TestMergeHiddenReceiptCategoriesTags(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	allowedCat := makeCategory(t, "Groceries")
+	hiddenCat := makeCategory(t, "Salary")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-merge", []uint{allowedCat}, nil)
+
+	// The current receipt has both an allowed and a hidden category; the user's
+	// submitted command only carries the allowed one (they couldn't see hidden).
+	currentCategories := []models.Category{
+		{BaseModel: models.BaseModel{ID: allowedCat}, Name: "Groceries"},
+		{BaseModel: models.BaseModel{ID: hiddenCat}, Name: "Salary"},
+	}
+	command := commands.UpsertReceiptCommand{
+		GroupId:    groupId,
+		Categories: []commands.UpsertCategoryCommand{{Id: &allowedCat, Name: "Groceries"}},
+	}
+
+	service := NewPermissionService(nil)
+	if err := service.MergeHiddenReceiptCategoriesTags(userId, groupId, currentCategories, nil, &command); err != nil {
+		t.Fatalf("MergeHiddenReceiptCategoriesTags: %v", err)
+	}
+
+	// The hidden category must be re-added so the update does not drop it.
+	foundHidden := false
+	for _, category := range command.Categories {
+		if category.Id != nil && *category.Id == hiddenCat {
+			foundHidden = true
+		}
+	}
+	if !foundHidden {
+		t.Errorf("expected hidden category to be merged back, got %v", command.Categories)
+	}
+	if len(command.Categories) != 2 {
+		t.Errorf("expected 2 categories after merge, got %d", len(command.Categories))
+	}
+}
+
+func TestMergeHiddenReceiptCategoriesTagsUnrestrictedNoOp(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	cat1 := makeCategory(t, "Groceries")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-merge-open", nil, nil)
+
+	currentCategories := []models.Category{{BaseModel: models.BaseModel{ID: cat1}, Name: "Groceries"}}
+	command := commands.UpsertReceiptCommand{GroupId: groupId}
+
+	service := NewPermissionService(nil)
+	if err := service.MergeHiddenReceiptCategoriesTags(userId, groupId, currentCategories, nil, &command); err != nil {
+		t.Fatalf("MergeHiddenReceiptCategoriesTags: %v", err)
+	}
+
+	// Unrestricted users hide nothing, so nothing is merged back.
+	if len(command.Categories) != 0 {
+		t.Errorf("expected no merge for unrestricted user, got %v", command.Categories)
+	}
+}
+
+func TestIntersectReceiptFilterWithGrants(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	allowedCat := makeCategory(t, "Groceries")
+	hiddenCat := makeCategory(t, "Salary")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-filter", []uint{allowedCat}, nil)
+
+	service := NewPermissionService(nil)
+
+	// Mixed filter -> only the allowed id remains.
+	filter := commands.ReceiptPagedRequestFilter{
+		Categories: commands.PagedRequestField{
+			Operation: commands.CONTAINS,
+			Value:     []interface{}{float64(allowedCat), float64(hiddenCat)},
+		},
+	}
+	if err := service.IntersectReceiptFilterWithGrants(userId, groupId, &filter); err != nil {
+		t.Fatalf("IntersectReceiptFilterWithGrants: %v", err)
+	}
+	values := filter.Categories.Value.([]interface{})
+	if len(values) != 1 || uint(values[0].(float64)) != allowedCat {
+		t.Errorf("expected filter narrowed to allowed category, got %v", values)
+	}
+
+	// Filter made entirely of disallowed ids -> no-match sentinel (0).
+	filter = commands.ReceiptPagedRequestFilter{
+		Categories: commands.PagedRequestField{
+			Operation: commands.CONTAINS,
+			Value:     []interface{}{float64(hiddenCat)},
+		},
+	}
+	if err := service.IntersectReceiptFilterWithGrants(userId, groupId, &filter); err != nil {
+		t.Fatalf("IntersectReceiptFilterWithGrants: %v", err)
+	}
+	values = filter.Categories.Value.([]interface{})
+	if len(values) != 1 || uint(values[0].(float64)) != 0 {
+		t.Errorf("expected no-match sentinel [0], got %v", values)
 	}
 }
 

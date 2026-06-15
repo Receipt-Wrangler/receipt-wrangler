@@ -1,6 +1,7 @@
 package services
 
 import (
+	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 )
@@ -114,6 +115,154 @@ func (service PermissionService) selectionWithinGrants(
 	return true, nil
 }
 
+// MergeHiddenReceiptCategoriesTags appends to an update command the
+// receipt-level categories/tags that exist on the current receipt but are
+// outside the user's grants (and so were hidden from them on read). Without this
+// a restricted user's full-replace update would silently delete categories/tags
+// they could not see. No-op when the user is unrestricted or bypasses grants.
+//
+// NOTE: this only merges RECEIPT-level associations. Receipt items have no stable
+// id across an update (UpdateReceipt recreates them), so hidden item-level
+// categories/tags cannot be matched back and are not preserved.
+func (service PermissionService) MergeHiddenReceiptCategoriesTags(
+	userId uint,
+	groupId uint,
+	currentCategories []models.Category,
+	currentTags []models.Tag,
+	command *commands.UpsertReceiptCommand,
+) error {
+	bypassCategories, err := service.userBypassesGrants(userId, permissions.AppCategoriesRead)
+	if err != nil {
+		return err
+	}
+	if !bypassCategories {
+		allowed, unrestricted, err := service.GetGroupCategoryIdsForUser(userId, groupId)
+		if err != nil {
+			return err
+		}
+		if !unrestricted {
+			for i := range currentCategories {
+				category := currentCategories[i]
+				if _, ok := allowed[category.ID]; !ok {
+					categoryId := category.ID
+					command.Categories = append(command.Categories, commands.UpsertCategoryCommand{
+						Id:          &categoryId,
+						Name:        category.Name,
+						Description: category.Description,
+					})
+				}
+			}
+		}
+	}
+
+	bypassTags, err := service.userBypassesGrants(userId, permissions.AppTagsRead)
+	if err != nil {
+		return err
+	}
+	if !bypassTags {
+		allowed, unrestricted, err := service.GetGroupTagIdsForUser(userId, groupId)
+		if err != nil {
+			return err
+		}
+		if !unrestricted {
+			for i := range currentTags {
+				tag := currentTags[i]
+				if _, ok := allowed[tag.ID]; !ok {
+					tagId := tag.ID
+					command.Tags = append(command.Tags, commands.UpsertTagCommand{
+						Id:          &tagId,
+						Name:        tag.Name,
+						Description: tag.Description,
+					})
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// IntersectReceiptFilterWithGrants narrows a paged-request category/tag filter to
+// the ids the user may see, so a restricted user cannot probe receipt existence
+// by filtering on a category/tag they have no access to. When a filter is made
+// up entirely of disallowed ids it is forced to a no-match sentinel rather than
+// dropped (dropping would widen the result set). No-op for unrestricted/bypass.
+func (service PermissionService) IntersectReceiptFilterWithGrants(userId uint, groupId uint, filter *commands.ReceiptPagedRequestFilter) error {
+	bypassCategories, err := service.userBypassesGrants(userId, permissions.AppCategoriesRead)
+	if err != nil {
+		return err
+	}
+	if !bypassCategories {
+		allowed, unrestricted, err := service.GetGroupCategoryIdsForUser(userId, groupId)
+		if err != nil {
+			return err
+		}
+		if !unrestricted {
+			intersectFilterFieldWithGrants(&filter.Categories, allowed)
+		}
+	}
+
+	bypassTags, err := service.userBypassesGrants(userId, permissions.AppTagsRead)
+	if err != nil {
+		return err
+	}
+	if !bypassTags {
+		allowed, unrestricted, err := service.GetGroupTagIdsForUser(userId, groupId)
+		if err != nil {
+			return err
+		}
+		if !unrestricted {
+			intersectFilterFieldWithGrants(&filter.Tags, allowed)
+		}
+	}
+
+	return nil
+}
+
+func intersectFilterFieldWithGrants(field *commands.PagedRequestField, allowed map[uint]struct{}) {
+	if field.Value == nil {
+		return
+	}
+	values, ok := field.Value.([]interface{})
+	if !ok || len(values) == 0 {
+		return
+	}
+
+	filtered := make([]interface{}, 0, len(values))
+	for _, value := range values {
+		id, ok := filterValueToUint(value)
+		if !ok {
+			continue
+		}
+		if _, allowedOk := allowed[id]; allowedOk {
+			filtered = append(filtered, value)
+		}
+	}
+
+	if len(filtered) == 0 {
+		// The user filtered entirely by ids they cannot see; force a no-match so
+		// receipt existence is not revealed. Category/tag ids start at 1, so 0
+		// matches nothing.
+		filtered = []interface{}{float64(0)}
+	}
+
+	field.Value = filtered
+}
+
+// filterValueToUint coerces a JSON-decoded filter id (typically float64) to uint.
+func filterValueToUint(value interface{}) (uint, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return uint(typed), true
+	case int:
+		return uint(typed), true
+	case uint:
+		return typed, true
+	default:
+		return 0, false
+	}
+}
+
 // receiptGrantFilter caches a user's bypass flags and per-group allowed sets for
 // the lifetime of one filter pass, so a batch of receipts resolves each group's
 // grants at most once.
@@ -162,13 +311,30 @@ func (filter *receiptGrantFilter) apply(receipt *models.Receipt) error {
 		return err
 	}
 
-	if !filter.bypassCategories && !grants.categoryUnrestricted {
-		receipt.Categories = filterCategoriesBySet(receipt.Categories, grants.categoryAllowed)
-	}
-	if !filter.bypassTags && !grants.tagUnrestricted {
-		receipt.Tags = filterTagsBySet(receipt.Tags, grants.tagAllowed)
+	filter.stripCategoriesTags(&receipt.Categories, &receipt.Tags, grants)
+
+	// Receipt items (and their linked items) carry their own categories/tags —
+	// strip them with the same rule so item-level associations don't leak.
+	for i := range receipt.ReceiptItems {
+		item := &receipt.ReceiptItems[i]
+		filter.stripCategoriesTags(&item.Categories, &item.Tags, grants)
+		for j := range item.LinkedItems {
+			linkedItem := &item.LinkedItems[j]
+			filter.stripCategoriesTags(&linkedItem.Categories, &linkedItem.Tags, grants)
+		}
 	}
 	return nil
+}
+
+// stripCategoriesTags rewrites a categories/tags pair in place to the allowed
+// subset, honoring the per-resource bypass and unrestricted flags.
+func (filter *receiptGrantFilter) stripCategoriesTags(categories *[]models.Category, tags *[]models.Tag, grants receiptGroupGrants) {
+	if !filter.bypassCategories && !grants.categoryUnrestricted {
+		*categories = filterCategoriesBySet(*categories, grants.categoryAllowed)
+	}
+	if !filter.bypassTags && !grants.tagUnrestricted {
+		*tags = filterTagsBySet(*tags, grants.tagAllowed)
+	}
 }
 
 func (filter *receiptGrantFilter) grantsForGroup(groupId uint) (receiptGroupGrants, error) {
