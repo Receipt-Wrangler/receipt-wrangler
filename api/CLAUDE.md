@@ -196,8 +196,9 @@ them.
   with **no** grant rows is **unrestricted** (sees every category/tag); a non-empty grant set
   restricts members to exactly those ids — restriction is opt-in, so legacy/system roles (no grants)
   keep seeing everything and no data migration is needed. Categories/tags are **global** (no
-  `GroupId`); a grant is a per-group-role slice of the global pool. Enforcement of these grants is
-  rolled out in later slices; Phase 1 only persists/returns them through role CRUD.
+  `GroupId`); a grant is a per-group-role slice of the global pool. CRUD persists/returns the grants
+  and `PermissionService` resolves them (see "Category/tag grant resolution" below); wiring the
+  resolved sets into AppData delivery and request enforcement is rolled out in later slices.
 - **Assignment:** nullable FKs `User.AppRoleID` and `GroupMember.GroupRoleID` (one app role per
   user; one group role per group membership). Nullable because per-create assignment is best-effort
   (the FK is left `nil` rather than failing creation when no role can be resolved, e.g. an unseeded
@@ -319,6 +320,22 @@ them.
   and invalidated in `RoleService.UpdateRole` / `DeleteRole`. Only a role's permission *list* is
   cached; a user's role *assignment* is resolved fresh on every check, so re-assigning a user takes
   effect immediately.
+
+### Category/tag grant resolution (`PermissionService`)
+
+- `services/grant.go` resolves a user's allowed category/tag ids for a group:
+  `GetGroupCategoryIdsForUser` / `GetGroupTagIdsForUser` return `(allowedSet, unrestricted, err)`,
+  where **`unrestricted == true` means see-all** (the role grants nothing for that resource) and the
+  set is then `nil`. A non-member, or a member whose group role has no grants, is **unrestricted** —
+  grants only *narrow* access within an already-permitted group; they never *grant* access (the
+  handler permission gate is the access control). Categories and tags are independent (a role may
+  restrict one and not the other). `GetVisibleCategoriesForUser` / `GetVisibleTagsForUser` filter a
+  full category/tag slice to the visible subset (pass-through when unrestricted) — used by AppData.
+- Backed by a grant cache (`services/grant_cache.go`) keyed by **group-role id** (grants are
+  group-only), same generation-counter invalidation as the permission cache, evicted in
+  `RoleService.UpdateRole` / `DeleteRole` for group scope. Only a role's grant *lists* are cached;
+  the user's role *assignment* is resolved fresh each call. A category/tag deleted out from under a
+  cached grant id is benign — a stale id simply never matches a real row when filtering.
 
 ### Enforcement status
 

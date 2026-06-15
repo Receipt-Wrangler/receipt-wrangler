@@ -182,6 +182,12 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 	// next permission check resolves the new set.
 	clearRolePermissionCache(command.Scope, id)
 
+	// Group roles also carry category/tag grants, which the update just
+	// replaced — evict the cached grant sets so enforcement uses the new grants.
+	if command.Scope == permissions.ScopeGroup {
+		clearGroupRoleGrantCache(id)
+	}
+
 	return roleView, nil
 }
 
@@ -315,6 +321,11 @@ func (service RoleService) DeleteRole(id uint, scope permissions.Scope) error {
 
 	// The role is gone; evict any cached permissions for it.
 	clearRolePermissionCache(scope, id)
+
+	// And its cached category/tag grants (group roles only).
+	if scope == permissions.ScopeGroup {
+		clearGroupRoleGrantCache(id)
+	}
 
 	return nil
 }
