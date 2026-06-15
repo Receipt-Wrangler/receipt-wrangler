@@ -336,6 +336,13 @@ them.
   `RoleService.UpdateRole` / `DeleteRole` for group scope. Only a role's grant *lists* are cached;
   the user's role *assignment* is resolved fresh each call. A category/tag deleted out from under a
   cached grant id is benign — a stale id simply never matches a real row when filtering.
+- `services/grant_filter.go` is the **single** shared enforcement mechanism, reused by every read and
+  write surface: `FilterReceiptCategoriesTags` / `FilterReceiptCategoriesTagsForReceipt` strip a
+  receipt's `Categories`/`Tags` in place to the visible subset (resolving each group's grants at most
+  once per pass); `ValidateCategoryTagSelection` checks receipt create/update ids against the allowed
+  set. Both short-circuit on unrestricted resources and on **admin bypass** — `userBypassesGrants`
+  treats a holder of `app.categories.read` / `app.tags.read` as exempt (they can already see the
+  whole pool), keeping their view consistent with the global lists.
 
 ### Enforcement status
 
