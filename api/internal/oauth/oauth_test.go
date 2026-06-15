@@ -236,6 +236,64 @@ func TestAuthorizeRejectsNonS256Pkce(t *testing.T) {
 	}
 }
 
+func TestAuthorizeFormRejectsUnknownResource(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	setPublicUrl(t)
+
+	client, _ := createClient("Claude", []string{testRedirectUri})
+
+	query := url.Values{}
+	query.Set("client_id", client.ClientId)
+	query.Set("redirect_uri", testRedirectUri)
+	query.Set("response_type", "code")
+	query.Set("state", "xyz")
+	query.Set("code_challenge", challengeFor("verifier-123"))
+	query.Set("code_challenge_method", "S256")
+	query.Set("resource", "https://unknown.example.com/mcp")
+
+	recorder := httptest.NewRecorder()
+	AuthorizeForm(recorder, httptest.NewRequest(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil))
+
+	if recorder.Code != http.StatusFound {
+		t.Fatalf("expected redirect with invalid_target, got %d", recorder.Code)
+	}
+	location, _ := url.Parse(recorder.Header().Get("Location"))
+	if location.Query().Get("error") != "invalid_target" {
+		t.Errorf("expected invalid_target, got %q", location.Query().Get("error"))
+	}
+}
+
+func TestAuthorizeRejectsUnknownResourceOnPost(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	setPublicUrl(t)
+
+	createTestUserWithPassword(t, "ivy", "password")
+	client, _ := createClient("Claude", []string{testRedirectUri})
+
+	form := url.Values{}
+	form.Set("username", "ivy")
+	form.Set("password", "password")
+	form.Set("client_id", client.ClientId)
+	form.Set("redirect_uri", testRedirectUri)
+	form.Set("state", "xyz")
+	form.Set("code_challenge", challengeFor("verifier-123"))
+	form.Set("code_challenge_method", "S256")
+	form.Set("resource", "https://unknown.example.com/mcp")
+
+	request := httptest.NewRequest(http.MethodPost, "/oauth/authorize", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recorder := httptest.NewRecorder()
+	Authorize(recorder, request)
+
+	if recorder.Code != http.StatusFound {
+		t.Fatalf("expected redirect with invalid_target, got %d", recorder.Code)
+	}
+	location, _ := url.Parse(recorder.Header().Get("Location"))
+	if location.Query().Get("error") != "invalid_target" {
+		t.Errorf("expected invalid_target, got %q", location.Query().Get("error"))
+	}
+}
+
 func TestAuthorizeRejectsUnregisteredRedirect(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
