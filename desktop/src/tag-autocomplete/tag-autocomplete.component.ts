@@ -20,4 +20,8 @@ export class TagAutocompleteComponent {
   public readonly inputFormControl = input.required<FormControl>();
 
   public readonly readonly = input(false);
+
+  // Whether the user may create a brand-new tag inline. Defaults to true to
+  // preserve existing call sites; gated callers bind it to app.tags.create.
+  public readonly creatable = input(true);
 }

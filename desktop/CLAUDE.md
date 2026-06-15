@@ -125,6 +125,14 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   `src/open-api/` — regenerate it from `swagger.yml` instead.
 - Built on existing shared patterns: `app-breadcrumb` and the segmented `app-filter-bar` (see "Use
   Established Patterns" above).
+- **Category/tag grants (group roles only):** the role editor shows a "Category & tag access" section
+  (gated on `showGrants()` = group scope) with `app-category-autocomplete` / `app-tag-autocomplete`
+  (both fed the full pool via `CategoryService.getAllCategories()` / `TagService.getAllTags()` — the
+  editor is admin-only). Selecting grants restricts members to those categories/tags; **empty = all**.
+  The selections drive `FormArray`s loaded from `role.categoryGrants` / `role.tagGrants` (resolved to
+  pool objects by an effect once the pool arrives) and serialized back as id arrays on
+  `UpsertRoleCommand` for group scope only. The grant pickers pass `[creatable]="false"` (pick from
+  existing, never create). See `api/CLAUDE.md` → "Data model".
 - **Default roles:** the role-list page shows two `app-select` controls above the filter bar —
   "Default application role" and "Default group role". Each is pre-selected from the role flagged
   `isDefault` for its scope and, on change, calls `RoleService.setDefaultRole(scope, roleId)` then
@@ -156,6 +164,13 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   `TokenRefreshService` (whose claims-only `SetAuthState` must not wipe permissions). They refresh on
   login + app-init; the server re-checks real permissions on every request, so the stored set is a UI
   hint (a stale button at worst 403s, handled by the interceptor).
+  - **Category/tag catalogs:** AppData also carries `groupCategories` / `groupTags` (keyed by group
+    id, filtered to the user's grants), stored via `SetGroupCatalog` and read with the
+    `AuthState.groupCategories(groupId)` / `groupTags(groupId)` selectors. The **receipt form** and
+    **receipts-table filters** source their category/tag options from these per-group catalogs (not
+    the global `GET /category` / `GET /tag`, which are now admin-only — the receipt routes no longer
+    use the category/tag resolvers). The receipt form's pickers gate `[creatable]` on
+    `app.categories.create` / `app.tags.create` so restricted users can only pick from the granted set.
   - **Matcher:** `src/utils/permission.utils.ts` — `matches`/`hasAll`/`hasAny`, a faithful port of the Go
     matcher (`api/internal/permissions/matcher.go`) including wildcard semantics, so UI gating === backend.
   - **Selectors** (`AuthState`): `hasAppPermission(perm)`, `hasAnyAppPermission(perms)`,

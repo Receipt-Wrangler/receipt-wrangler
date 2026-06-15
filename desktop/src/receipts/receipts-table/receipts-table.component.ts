@@ -132,9 +132,15 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
     this.setHeaderText();
 
-    const data = this.activatedRoute.snapshot.data;
-    this.categories = data["categories"];
-    this.tags = data["tags"];
+    // Filter options come from the selected group's AppData catalog (filtered to
+    // the user's grants), so a restricted user can't filter by a hidden one.
+    const numericGroupId = Number(this.groupId);
+    this.categories = Number.isNaN(numericGroupId)
+      ? []
+      : this.store.selectSnapshot(AuthState.groupCategories(numericGroupId));
+    this.tags = Number.isNaN(numericGroupId)
+      ? []
+      : this.store.selectSnapshot(AuthState.groupTags(numericGroupId));
     this.getInitialData();
   }
 

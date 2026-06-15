@@ -1,17 +1,21 @@
 import { Component, DestroyRef, computed, effect, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { FormControl, FormGroup, Validators } from "@angular/forms";
+import { FormArray, FormControl, FormGroup, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { catchError, EMPTY, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { SnackbarService } from "../../services/snackbar.service";
 import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
 import {
+  Category,
+  CategoryService,
   Permission,
   PermissionDescriptor,
   PermissionScope,
   PermissionService,
   RoleService,
+  Tag,
+  TagService,
   UpsertRoleCommand,
 } from "../../open-api";
 import {
@@ -64,6 +68,22 @@ export class RoleFormComponent {
   public readonly granted = signal<Set<string>>(new Set<string>());
   public readonly selectedPreset = signal<string>(CUSTOM_PRESET_ID);
   public readonly openPanels = signal<Record<string, boolean>>({});
+
+  // ----- Category/tag grants (group roles only) -----
+  // The full pool an admin picks grants from, and the selected grants. The
+  // autocomplete drives these as FormArrays of the selected category/tag objects.
+  public readonly categoryPool = signal<Category[]>([]);
+  public readonly tagPool = signal<Tag[]>([]);
+  public readonly grantedCategories = new FormArray<FormControl<Category>>([]);
+  public readonly grantedTags = new FormArray<FormControl<Tag>>([]);
+
+  // Grant ids loaded for an existing role, resolved to pool objects by an effect
+  // once the pool arrives (pool and role load independently/asynchronously).
+  private readonly pendingCategoryGrantIds = signal<number[]>([]);
+  private readonly pendingTagGrantIds = signal<number[]>([]);
+
+  /** Grants are a group-role concept; hidden for app roles. */
+  public readonly showGrants = computed<boolean>(() => this.type() === "group");
 
   // ----- Mode-derived state -----
   public readonly isEditMode = computed<boolean>(() => this.mode() === FormMode.edit);
@@ -156,6 +176,8 @@ export class RoleFormComponent {
   constructor(
     private readonly permissionService: PermissionService,
     private readonly roleService: RoleService,
+    private readonly categoryService: CategoryService,
+    private readonly tagService: TagService,
     private readonly router: Router,
     private readonly route: ActivatedRoute,
     private readonly snackbar: SnackbarService,
@@ -170,6 +192,17 @@ export class RoleFormComponent {
       )
       .subscribe((descriptors) => this.registry.set(descriptors));
 
+    // The role editor is admin-only (app.roles.*), so it may read the full
+    // category/tag pool to choose grants from.
+    this.categoryService
+      .getAllCategories()
+      .pipe(take(1), catchError(() => EMPTY), takeUntilDestroyed())
+      .subscribe((categories) => this.categoryPool.set(categories));
+    this.tagService
+      .getAllTags()
+      .pipe(take(1), catchError(() => EMPTY), takeUntilDestroyed())
+      .subscribe((tags) => this.tagPool.set(tags));
+
     // A view-mode role is read-only; keep the reactive form in sync with that.
     effect(() => {
       if (this.isViewMode()) {
@@ -177,6 +210,20 @@ export class RoleFormComponent {
       } else {
         this.form.enable({ emitEvent: false });
       }
+    });
+
+    // Resolve a loaded role's grant ids to pool objects once the pool is
+    // available. Pool and grant ids are stable after load, so this does not
+    // clobber subsequent manual edits.
+    effect(() => {
+      const pool = this.categoryPool();
+      const ids = this.pendingCategoryGrantIds();
+      this.setGrantArray(this.grantedCategories, pool.filter((category) => category.id !== undefined && ids.includes(category.id)));
+    });
+    effect(() => {
+      const pool = this.tagPool();
+      const ids = this.pendingTagGrantIds();
+      this.setGrantArray(this.grantedTags, pool.filter((tag) => tag.id !== undefined && ids.includes(tag.id)));
     });
 
     const id = this.route.snapshot.paramMap.get("id");
@@ -224,7 +271,18 @@ export class RoleFormComponent {
         this.form.patchValue({ name: role.name, description: role.description ?? "" });
         this.type.set(role.scope === PermissionScope.Group ? "group" : "app");
         this.granted.set(new Set(role.permissions));
+        this.pendingCategoryGrantIds.set(role.categoryGrants ?? []);
+        this.pendingTagGrantIds.set(role.tagGrants ?? []);
       });
+  }
+
+  // Replace a grant FormArray's contents with the given option objects, without
+  // emitting (the autocomplete reads the value, not change events, on load).
+  private setGrantArray<T>(array: FormArray, values: T[]): void {
+    array.clear({ emitEvent: false });
+    for (const value of values) {
+      array.push(new FormControl(value), { emitEvent: false });
+    }
   }
 
   private scopeMatches(scope: PermissionScope, scopeParam: string | null): boolean {
@@ -263,6 +321,11 @@ export class RoleFormComponent {
     this.selectedPreset.set(CUSTOM_PRESET_ID);
     this.granted.set(new Set<string>());
     this.openPanels.set({});
+    // Grants only apply to group roles — reset them on a type switch.
+    this.pendingCategoryGrantIds.set([]);
+    this.pendingTagGrantIds.set([]);
+    this.setGrantArray(this.grantedCategories, []);
+    this.setGrantArray(this.grantedTags, []);
   }
 
   public pickPreset(preset: RolePreset): void {
@@ -326,6 +389,16 @@ export class RoleFormComponent {
       scope: this.typeMeta().scope,
       permissions: [...this.granted()] as Permission[],
     };
+
+    // Category/tag grants are only valid on group roles.
+    if (this.showGrants()) {
+      payload.categoryGrants = (this.grantedCategories.value as Category[])
+        .map((category) => category.id)
+        .filter((id): id is number => id !== undefined);
+      payload.tagGrants = (this.grantedTags.value as Tag[])
+        .map((tag) => tag.id)
+        .filter((id): id is number => id !== undefined);
+    }
 
     this.lastPayload = payload;
 
