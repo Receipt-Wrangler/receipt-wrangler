@@ -37,12 +37,18 @@ func LegacyAppAdminKeys() []string {
 // "Manage Users" listing), which no client calls — every user dropdown reads
 // users from AppData (gated by app.account.read). Granting it would expose the
 // admin Users page to normal users without giving them any capability they use.
+//
+// app.categories.read / app.tags.read are deliberately excluded as part of the
+// category/tag grant lock-down: those gate the GLOBAL GET /category, GET /tag and
+// the flat AppData category/tag lists, which return the entire pool. Normal users
+// now receive only the per-group filtered catalogs (AppData groupCategories /
+// groupTags), so granting the global read would leak categories/tags outside
+// their grants. The create permissions are retained so inline category/tag
+// creation in the receipt form still works (the create-permission gate).
 func LegacyAppUserKeys() []string {
 	return []string{
 		AppCategoriesCreate,
-		AppCategoriesRead,
 		AppTagsCreate,
-		AppTagsRead,
 		AppCustomFieldsCreate,
 		AppCustomFieldsRead,
 		AppGroupsCreate,

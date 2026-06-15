@@ -32,9 +32,7 @@ func countScope(scope Scope) int {
 func TestLegacyAppUserKeys(t *testing.T) {
 	expected := []string{
 		AppCategoriesCreate,
-		AppCategoriesRead,
 		AppTagsCreate,
-		AppTagsRead,
 		AppCustomFieldsCreate,
 		AppCustomFieldsRead,
 		AppGroupsCreate,
@@ -90,6 +88,30 @@ func TestLegacyAppUserExcludesUsersRead(t *testing.T) {
 	// reach the admin Users page.
 	if slices.Contains(LegacyAppUserKeys(), AppUsersRead) {
 		utilPrint(t, "Legacy User contains "+AppUsersRead, "absent")
+	}
+}
+
+func TestLegacyAppUserExcludesGlobalCategoryTagRead(t *testing.T) {
+	// app.categories.read / app.tags.read gate the GLOBAL category/tag lists
+	// (GET /category, GET /tag, and the flat AppData arrays). Legacy User must NOT
+	// hold them — normal users receive only the per-group filtered catalogs, so
+	// granting global read would leak categories/tags outside their grants.
+	if slices.Contains(LegacyAppUserKeys(), AppCategoriesRead) {
+		utilPrint(t, "Legacy User contains "+AppCategoriesRead, "absent")
+	}
+	if slices.Contains(LegacyAppUserKeys(), AppTagsRead) {
+		utilPrint(t, "Legacy User contains "+AppTagsRead, "absent")
+	}
+}
+
+func TestLegacyAppUserRetainsCategoryTagCreate(t *testing.T) {
+	// The create permissions are retained so inline category/tag creation in the
+	// receipt form still works (gated on create, per the lock-down rules).
+	if !slices.Contains(LegacyAppUserKeys(), AppCategoriesCreate) {
+		utilPrint(t, "Legacy User missing "+AppCategoriesCreate, "present")
+	}
+	if !slices.Contains(LegacyAppUserKeys(), AppTagsCreate) {
+		utilPrint(t, "Legacy User missing "+AppTagsCreate, "present")
 	}
 }
 

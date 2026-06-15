@@ -529,6 +529,106 @@ func TestGetAppData_PopulatesPermissions(t *testing.T) {
 	}
 }
 
+// GetAppData filters the per-group category catalog to the caller's grants and
+// withholds the flat global list from a non-admin (no app.categories.read).
+func TestGetAppData_GroupCategoriesFilteredByGrants(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+	ClearGroupRoleGrantCacheForTests()
+
+	db := repositories.GetDB()
+	roleRepository := repositories.NewRoleRepository(nil)
+
+	grantedCategory := models.Category{Name: "Groceries"}
+	db.Create(&grantedCategory)
+	hiddenCategory := models.Category{Name: "Salary"}
+	db.Create(&hiddenCategory)
+
+	// Legacy-User-like app role: create but not read.
+	appRole, err := roleRepository.CreateAppRole("AppData User Role", "", []string{permissions.AppCategoriesCreate})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	user := models.User{Username: "appdata-grant-user", Password: "password", AppRoleID: &appRole.ID}
+	if err := db.Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	groupRole, err := roleRepository.CreateGroupRole("AppData Restricted Role", "", []string{permissions.GroupReceiptsRead}, []uint{grantedCategory.ID}, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	group := models.Group{Name: "appdata-grant-group"}
+	if err := db.Create(&group).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if err := db.Create(&models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRoleID: &groupRole.ID}).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	appData, err := GetAppData(user.ID, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	visible := appData.GroupCategories[group.ID]
+	if len(visible) != 1 || visible[0].ID != grantedCategory.ID {
+		utils.PrintTestError(t, visible, []uint{grantedCategory.ID})
+	}
+
+	// A non-admin gets no flat global list.
+	if len(appData.Categories) != 0 {
+		utils.PrintTestError(t, len(appData.Categories), 0)
+	}
+}
+
+// GetAppData gives an admin (app.categories.read) the flat global list, and an
+// unrestricted group's catalog contains every category.
+func TestGetAppData_AdminGetsFlatCategoriesUnrestrictedGroup(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+	ClearGroupRoleGrantCacheForTests()
+
+	db := repositories.GetDB()
+	roleRepository := repositories.NewRoleRepository(nil)
+
+	db.Create(&models.Category{Name: "Groceries"})
+	db.Create(&models.Category{Name: "Salary"})
+
+	appRole, err := roleRepository.CreateAppRole("AppData Admin Role", "", []string{permissions.AppCategoriesRead, permissions.AppTagsRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	user := models.User{Username: "appdata-admin-user", Password: "password", AppRoleID: &appRole.ID}
+	if err := db.Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	groupRole, err := roleRepository.CreateGroupRole("AppData Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	group := models.Group{Name: "appdata-admin-group"}
+	if err := db.Create(&group).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if err := db.Create(&models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRoleID: &groupRole.ID}).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	appData, err := GetAppData(user.ID, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	if len(appData.Categories) != 2 {
+		utils.PrintTestError(t, len(appData.Categories), 2)
+	}
+	if len(appData.GroupCategories[group.ID]) != 2 {
+		utils.PrintTestError(t, len(appData.GroupCategories[group.ID]), 2)
+	}
+}
+
 // GetAppData returns an empty (non-nil) permission set for a user with no
 // assigned app role.
 func TestGetAppData_NoRolePermissionsEmpty(t *testing.T) {

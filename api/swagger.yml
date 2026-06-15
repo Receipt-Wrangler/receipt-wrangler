@@ -4627,6 +4627,26 @@ components:
             type: array
             items:
               $ref: "#/components/schemas/Permission"
+        groupCategories:
+          type: object
+          description: >-
+            The categories the calling user may use in each group, keyed by group
+            id. Filtered to the user's group-role grants (the full pool when
+            unrestricted). Non-admins receive categories only through this map.
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/Category"
+        groupTags:
+          type: object
+          description: >-
+            The tags the calling user may use in each group, keyed by group id.
+            Filtered to the user's group-role grants (the full pool when
+            unrestricted). Non-admins receive tags only through this map.
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/Tag"
     TokenPair:
       type: object
       required:

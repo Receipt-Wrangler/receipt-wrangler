@@ -236,10 +236,13 @@ them.
   User** (the app actions a plain `USER` could do), **Legacy Viewer** / **Legacy Editor** / **Legacy
   Owner** (the group VIEWER / EDITOR / OWNER tiers; Owner = every group permission). The sets live in
   `permissions/legacy.go` (`Legacy*Keys()` helpers) and were derived from the actual handler-level
-  gating, not the desktop UI presets. **One deliberate exception:** `app.users.read` is omitted from
-  Legacy User — it gates only the admin `GET /user/` listing, which no client calls (user dropdowns read
-  from AppData via `app.account.read`), so granting it would only expose the admin "Manage Users" page to
-  normal users. Removing it keeps normal users off that page with zero functional loss.
+  gating, not the desktop UI presets. **Deliberate exceptions** (Legacy User omits these): `app.users.read`
+  — it gates only the admin `GET /user/` listing, which no client calls (user dropdowns read from AppData via
+  `app.account.read`), so granting it would only expose the admin "Manage Users" page to normal users; and
+  `app.categories.read` / `app.tags.read` — omitted as part of the category/tag grant lock-down, since they
+  gate the GLOBAL category/tag lists; normal users now get only the per-group filtered catalogs (the
+  `app.categories.create` / `app.tags.create` permissions are retained for inline creation). See
+  "Category/tag delivery on AppData" below.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.
@@ -400,6 +403,16 @@ caller's resolved permissions so the desktop can gate UI with them — `AppPermi
 the cached `resolveAppPermissions` / `resolveGroupPermissions`). The JWT no longer carries any role
 field at all (it holds only identity claims); the server always re-checks real permissions from the
 DB on every request.
+
+**Category/tag delivery on AppData (grant lock-down):** `GetAppData` also returns `GroupCategories
+map[uint][]Category` and `GroupTags map[uint][]Tag` (keyed by group id) — each group's catalog
+filtered to the caller's grants (the full pool when unrestricted), built via
+`GetVisibleCategoriesForUser` / `GetVisibleTagsForUser`. The flat `Categories` / `Tags` arrays (and
+the global `GET /category` / `GET /tag` endpoints) are **admin-only**: they're populated solely for
+callers holding `app.categories.read` / `app.tags.read`, and empty otherwise. Because
+`LegacyAppUserKeys` no longer grants those reads (only the create permissions remain), normal users
+receive categories/tags **only** through the per-group `GroupCategories` / `GroupTags` maps — the
+desktop receipt form sources its pickers from there.
 
 **`app.api-keys.read-any` (Security):** listing *all* users' API keys (`GetPagedApiKeys` with
 `associatedApiKeys=ALL`) requires `app.api-keys.read-any`, checked in the handler body via the

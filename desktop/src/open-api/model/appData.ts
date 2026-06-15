@@ -73,6 +73,14 @@ export interface AppData {
      * The calling user\'s effective group-level permissions, keyed by group id.
      */
     groupPermissions: { [key: string]: Array<Permission>; };
+    /**
+     * The categories the calling user may use in each group, keyed by group id. Filtered to the user\'s group-role grants (the full pool when unrestricted). Non-admins receive categories only through this map.
+     */
+    groupCategories?: { [key: string]: Array<Category>; };
+    /**
+     * The tags the calling user may use in each group, keyed by group id. Filtered to the user\'s group-role grants (the full pool when unrestricted). Non-admins receive tags only through this map.
+     */
+    groupTags?: { [key: string]: Array<Tag>; };
 }
 export namespace AppData {
 }
