@@ -141,7 +141,7 @@ func (service ReceiptService) QuickScan(
 	groupIdString := utils.UintToString(groupId)
 
 	now := time.Now()
-	receiptCommand, receiptProcessingMetadata, magicFillErr := MagicFillFromImage(magicFillCommand, groupIdString)
+	receiptCommand, receiptProcessingMetadata, magicFillErr := MagicFillFromImage(magicFillCommand, groupIdString, token.UserId)
 	finishedAt := time.Now()
 
 	quickScanSystemTasks, taskErr := systemTaskService.CreateSystemTasksFromMetadata(

@@ -292,7 +292,7 @@ func TestMagicFillFromImage_HappyPath(t *testing.T) {
 	}
 
 	cmd := commands.MagicFillCommand{ImageData: jpg}
-	receipt, _, err := MagicFillFromImage(cmd, utils.UintToString(group.ID))
+	receipt, _, err := MagicFillFromImage(cmd, utils.UintToString(group.ID), 0)
 	if err != nil {
 		t.Fatalf("MagicFillFromImage: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestMagicFillFromImage_InvalidImageData(t *testing.T) {
 	_, group, _ := seedReceiptImagePipeline(t, server.URL)
 
 	cmd := commands.MagicFillCommand{ImageData: []byte("not an image")}
-	_, _, err := MagicFillFromImage(cmd, utils.UintToString(group.ID))
+	_, _, err := MagicFillFromImage(cmd, utils.UintToString(group.ID), 0)
 	if err == nil {
 		t.Fatal("expected invalid file type error")
 	}

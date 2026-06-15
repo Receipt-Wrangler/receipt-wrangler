@@ -360,6 +360,13 @@ them.
   **receipt-level only** — receipt items have no stable id across an update (they are deleted and
   recreated), so hidden *item-level* categories/tags cannot be matched back and are dropped when a
   restricted user edits a receipt. Closing that needs item identity (a separate change).
+- **AI prompt:** `ReceiptProcessingService` carries a `UserId` (the user who triggered processing; 0
+  for system-initiated, e.g. email polling). When set together with a `Group`,
+  `getCategoriesString` / `getTagsString` restrict the candidate categories/tags fed to the model to
+  that user's grants (via `GetVisibleCategoriesForUser` / `GetVisibleTagsForUser`), so a quick scan
+  can't surface or auto-assign a category/tag the user isn't allowed to see. `MagicFillFromImage`
+  takes the triggering `userId` and sets it on the service; system/email processing passes 0 and
+  stays unrestricted (the resulting receipts are covered by read-stripping when any user views them).
 
 ### Enforcement status
 
