@@ -96,3 +96,60 @@ func TestUpsertRoleCommandDuplicatePermission(t *testing.T) {
 		t.Errorf("expected permissions error, got %+v", vErr.Errors)
 	}
 }
+
+func TestUpsertRoleCommandGrantsOnGroupScopeValid(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:           "Restricted Group Role",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		CategoryGrants: []uint{1, 2},
+		TagGrants:      []uint{3},
+	}
+
+	vErr := command.Validate()
+	if len(vErr.Errors) > 0 {
+		t.Errorf("expected no errors, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandGrantsRejectedOnAppScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:           "App Role With Grants",
+		Scope:          permissions.ScopeApp,
+		Permissions:    []string{permissions.AppUsersRead},
+		CategoryGrants: []uint{1},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["grants"]; !ok {
+		t.Errorf("expected grants error, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandDuplicateCategoryGrant(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:           "Dup Category Grant",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		CategoryGrants: []uint{1, 1},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["categoryGrants"]; !ok {
+		t.Errorf("expected categoryGrants error, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandDuplicateTagGrant(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:        "Dup Tag Grant",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReceiptsRead},
+		TagGrants:   []uint{5, 5},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["tagGrants"]; !ok {
+		t.Errorf("expected tagGrants error, got %+v", vErr.Errors)
+	}
+}

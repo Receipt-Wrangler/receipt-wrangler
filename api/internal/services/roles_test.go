@@ -10,6 +10,88 @@ import (
 	"testing"
 )
 
+func TestCreateGroupRoleWithGrantsExposesGrantIds(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	category := models.Category{Name: "Groceries"}
+	repositories.GetDB().Create(&category)
+	tag := models.Tag{Name: "Reimbursable"}
+	repositories.GetDB().Create(&tag)
+
+	service := NewRoleService(nil)
+	command := commands.UpsertRoleCommand{
+		Name:           "Restricted Group Role",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		CategoryGrants: []uint{category.ID},
+		TagGrants:      []uint{tag.ID},
+	}
+
+	roleView, err := service.CreateRole(command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(roleView.CategoryGrants) != 1 || roleView.CategoryGrants[0] != category.ID {
+		utils.PrintTestError(t, roleView.CategoryGrants, []uint{category.ID})
+	}
+	if len(roleView.TagGrants) != 1 || roleView.TagGrants[0] != tag.ID {
+		utils.PrintTestError(t, roleView.TagGrants, []uint{tag.ID})
+	}
+}
+
+func TestCreateGroupRoleRejectsNonExistentGrant(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	service := NewRoleService(nil)
+	command := commands.UpsertRoleCommand{
+		Name:           "Bad Grant Role",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		CategoryGrants: []uint{999999},
+	}
+
+	_, err := service.CreateRole(command)
+	if !errors.Is(err, ErrInvalidGrant) {
+		utils.PrintTestError(t, err, ErrInvalidGrant)
+	}
+}
+
+func TestUpdateGroupRoleServiceReplacesGrants(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	roleRepository := repositories.NewRoleRepository(nil)
+
+	catA := models.Category{Name: "A"}
+	repositories.GetDB().Create(&catA)
+	catB := models.Category{Name: "B"}
+	repositories.GetDB().Create(&catB)
+
+	created, err := roleRepository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{catA.ID}, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	service := NewRoleService(nil)
+	command := commands.UpsertRoleCommand{
+		Name:           "Role",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		CategoryGrants: []uint{catB.ID},
+	}
+
+	roleView, err := service.UpdateRole(created.ID, command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(roleView.CategoryGrants) != 1 || roleView.CategoryGrants[0] != catB.ID {
+		utils.PrintTestError(t, roleView.CategoryGrants, []uint{catB.ID})
+	}
+}
+
 func TestUpdateRolePersistsChanges(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)

@@ -192,7 +192,12 @@ them.
 
 - **App roles:** `AppRole` + `AppRolePermission` (permission strings in a child table).
 - **Group roles:** `GroupRoleDefinition` + `GroupRolePermission`, plus `GroupRoleCategoryGrant` /
-  `GroupRoleTagGrant` for per-role category/tag visibility.
+  `GroupRoleTagGrant` (composite-PK join rows) for per-role category/tag visibility. A group role
+  with **no** grant rows is **unrestricted** (sees every category/tag); a non-empty grant set
+  restricts members to exactly those ids — restriction is opt-in, so legacy/system roles (no grants)
+  keep seeing everything and no data migration is needed. Categories/tags are **global** (no
+  `GroupId`); a grant is a per-group-role slice of the global pool. Enforcement of these grants is
+  rolled out in later slices; Phase 1 only persists/returns them through role CRUD.
 - **Assignment:** nullable FKs `User.AppRoleID` and `GroupMember.GroupRoleID` (one app role per
   user; one group role per group membership). Nullable because per-create assignment is best-effort
   (the FK is left `nil` rather than failing creation when no role can be resolved, e.g. an unseeded
@@ -211,7 +216,14 @@ them.
   `PUT /role/{roleId}`, `PUT /role/{roleId}/default?scope=APP|GROUP` (make this role the scope's
   default; allowed on system roles; gated by `app.roles.update`), `DELETE /role/{roleId}?scope=APP|GROUP`.
 - `commands.UpsertRoleCommand` validates that every permission exists in the registry and matches
-  the role's scope. `structs.RoleView` is the read model (includes `assignedCount` and `isDefault`).
+  the role's scope. It also carries `categoryGrants` / `tagGrants` (category/tag ids): grants are
+  rejected on APP scope and dedup-checked in `Validate()`, and their existence is verified against
+  the DB in `RoleService` (`ErrInvalidGrant` → 400). `repositories/roles.go` syncs grant rows with
+  the same delete-then-insert pattern as permissions (`replaceGroupRoleGrants`, with the nested
+  Category/Tag association `Omit`-ted so only join rows are written), preloads them in
+  `GetGroupRoleById` / `GetAllRoles`, and cascades them on role delete. `structs.RoleView` is the
+  read model (includes `assignedCount`, `isDefault`, and `categoryGrants` / `tagGrants` — empty
+  slices for app roles).
 
 ### Seeded system roles (legacy-equivalent)
 

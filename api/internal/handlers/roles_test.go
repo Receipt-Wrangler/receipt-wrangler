@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
@@ -123,6 +124,62 @@ func TestShouldCreateGroupRole(t *testing.T) {
 
 	if role.Scope != permissions.ScopeGroup {
 		utils.PrintTestError(t, role.Scope, permissions.ScopeGroup)
+	}
+}
+
+func TestShouldCreateGroupRoleWithGrants(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	category := models.Category{Name: "Groceries"}
+	repositories.GetDB().Create(&category)
+	tag := models.Tag{Name: "Reimbursable"}
+	repositories.GetDB().Create(&tag)
+
+	role := structs.RoleView{}
+	body := fmt.Sprintf(
+		`{"name": "Restricted Role", "scope": "GROUP", "permissions": ["group.receipts.read"], "categoryGrants": [%d], "tagGrants": [%d]}`,
+		category.ID, tag.ID,
+	)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api", strings.NewReader(body))
+
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, adminContext())
+	r = r.WithContext(newContext)
+
+	CreateRole(w, r)
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+		return
+	}
+
+	if err := json.Unmarshal(w.Body.Bytes(), &role); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(role.CategoryGrants) != 1 || role.CategoryGrants[0] != category.ID {
+		utils.PrintTestError(t, role.CategoryGrants, []uint{category.ID})
+	}
+	if len(role.TagGrants) != 1 || role.TagGrants[0] != tag.ID {
+		utils.PrintTestError(t, role.TagGrants, []uint{tag.ID})
+	}
+}
+
+func TestShouldNotCreateGroupRoleDueToInvalidGrant(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	reader := strings.NewReader(`{"name": "Bad Grant", "scope": "GROUP", "permissions": ["group.receipts.read"], "categoryGrants": [999999]}`)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api", reader)
+
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, adminContext())
+	r = r.WithContext(newContext)
+
+	CreateRole(w, r)
+
+	if w.Result().StatusCode != 400 {
+		utils.PrintTestError(t, w.Result().StatusCode, 400)
 	}
 }
 
@@ -535,7 +592,7 @@ func TestShouldNotDeleteAssignedAppRole(t *testing.T) {
 func TestShouldNotDeleteAssignedGroupRole(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
-	created, err := roleRepository.CreateGroupRole("Group Role", "desc", []string{permissions.GroupReceiptsCreate})
+	created, err := roleRepository.CreateGroupRole("Group Role", "desc", []string{permissions.GroupReceiptsCreate}, nil, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

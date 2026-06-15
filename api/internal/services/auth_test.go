@@ -498,7 +498,7 @@ func TestGetAppData_PopulatesPermissions(t *testing.T) {
 	}
 
 	groupPerms := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate}
-	groupRole, err := roleRepository.CreateGroupRole("AppData Group Role", "", groupPerms)
+	groupRole, err := roleRepository.CreateGroupRole("AppData Group Role", "", groupPerms, nil, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}

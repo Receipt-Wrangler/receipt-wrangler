@@ -26,6 +26,14 @@ export interface Role {
      * Number of users or group members currently assigned this role
      */
     assignedCount?: number;
+    /**
+     * Category ids a GROUP role restricts its members to. Empty means unrestricted (members may use every category). Always empty for app roles.
+     */
+    categoryGrants?: Array<number>;
+    /**
+     * Tag ids a GROUP role restricts its members to. Empty means unrestricted (members may use every tag). Always empty for app roles.
+     */
+    tagGrants?: Array<number>;
 }
 export namespace Role {
 }
