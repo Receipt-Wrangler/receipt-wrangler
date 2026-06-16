@@ -28,7 +28,7 @@
   </app-form-section>
 </ng-template>
 
-<div class="danger-zone">
+<div class="danger-zone" *hasAppPermission="Permission.AppAccountDelete">
   <strong>Danger Zone</strong>
   <p>Account deletion is irreversible. This will permanently remove all associated data including receipts, group memberships, and preferences.</p>
   <button

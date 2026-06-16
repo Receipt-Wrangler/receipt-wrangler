@@ -7,7 +7,7 @@ import {catchError, of, switchMap, take, tap} from "rxjs";
 import {DEFAULT_DIALOG_CONFIG} from "src/constants/dialog.constant";
 import {FormMode} from "src/enums/form-mode.enum";
 import {FormConfig} from "src/interfaces";
-import {User, UserService} from "../../open-api";
+import {Permission, User, UserService} from "../../open-api";
 import {ClaimsService, SnackbarService, TokenRefreshService} from "../../services";
 import {AuthState, Logout, UpdateUser} from "../../store";
 import {DeleteAccountDialogComponent} from "../delete-account-dialog/delete-account-dialog.component";
@@ -29,6 +29,8 @@ export class UserProfileComponent implements OnInit {
 
   public usernameTooltip: string =
     "Only system admin may change your username.";
+
+  protected readonly Permission = Permission;
 
   constructor(
     private claimsService: ClaimsService,

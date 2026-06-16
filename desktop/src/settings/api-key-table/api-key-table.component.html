@@ -2,6 +2,7 @@
   <app-table-header [headerText]="tableHeaderText()">
     <div class="d-flex align-items-center">
       <app-add-button
+        *ngIf="canCreate"
         tooltip="Create API Key"
         (clicked)="openCreateApiKeyDialog()"
       ></app-add-button>

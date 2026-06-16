@@ -68,6 +68,20 @@ describe("ApiKeyTableComponent", () => {
     });
   });
 
+  describe("canCreate", () => {
+    it("is true when the user holds create", () => {
+      store.dispatch(new SetPermissions([Permission.AppApiKeysCreate], {}));
+      component.ngOnInit();
+      expect(component.canCreate).toBe(true);
+    });
+
+    it("is false without create", () => {
+      store.dispatch(new SetPermissions([Permission.AppApiKeysRead], {}));
+      component.ngOnInit();
+      expect(component.canCreate).toBe(false);
+    });
+  });
+
   describe("per-row gating", () => {
     beforeEach(() => {
       component.ngOnInit();

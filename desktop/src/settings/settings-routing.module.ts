@@ -1,7 +1,9 @@
 import { NgModule } from "@angular/core";
 import { RouterModule, Routes } from "@angular/router";
 import { FormMode } from "src/enums/form-mode.enum";
+import { appPermissionGuard } from "src/guards/app-permission.guard";
 import { FormConfig } from "src/interfaces";
+import { Permission } from "../open-api";
 import { ApiKeysComponent } from "./api-keys/api-keys.component";
 import { SettingsComponent } from "./settings/settings.component";
 import { UserPreferencesComponent } from "./user-preferences/user-preferences.component";
@@ -60,21 +62,25 @@ const routes: Routes = [
       {
         path: "api-keys/view",
         component: ApiKeysComponent,
+        canActivate: [appPermissionGuard],
         data: {
           formConfig: {
             mode: FormMode.view,
             headerText: "View API Keys",
           } as FormConfig,
+          appPermissions: [Permission.AppApiKeysRead],
         },
       },
       {
         path: "api-keys/edit",
         component: ApiKeysComponent,
+        canActivate: [appPermissionGuard],
         data: {
           formConfig: {
             mode: FormMode.edit,
             headerText: "Edit API Keys",
           } as FormConfig,
+          appPermissions: [Permission.AppApiKeysRead],
         },
       },
     ],

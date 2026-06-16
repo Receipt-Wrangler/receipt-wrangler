@@ -51,6 +51,8 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
 
   public canViewAll = false;
 
+  public canCreate = false;
+
   public tableHeaderText = signal("My API Keys");
 
   private currentUserId = "";
@@ -67,6 +69,7 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
 
   public ngOnInit(): void {
     this.canViewAll = this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppApiKeysReadAny));
+    this.canCreate = this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppApiKeysCreate));
     this.currentUserId = this.store.selectSnapshot(AuthState.userId);
     this.listenForFilterChanges();
   }

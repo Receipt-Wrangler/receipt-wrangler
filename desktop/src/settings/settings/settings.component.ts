@@ -1,5 +1,8 @@
 import { Component, OnInit } from "@angular/core";
+import { Store } from "@ngxs/store";
 import { DEFAULT_HOST_CLASS } from "src/constants";
+import { Permission } from "../../open-api";
+import { AuthState } from "../../store";
 import { TabConfig } from "../../shared-ui/tabs/tab-config.interface";
 
 @Component({
@@ -11,6 +14,8 @@ import { TabConfig } from "../../shared-ui/tabs/tab-config.interface";
 })
 export class SettingsComponent implements OnInit {
   public tabs: TabConfig[] = [];
+
+  constructor(private store: Store) {}
 
   public ngOnInit(): void {
     this.initTabs();
@@ -28,11 +33,18 @@ export class SettingsComponent implements OnInit {
         routerLink: "user-preferences/view",
         name: "user-preferences",
       },
-      {
+    ];
+
+    if (
+      this.store.selectSnapshot(
+        AuthState.hasAppPermission(Permission.AppApiKeysRead)
+      )
+    ) {
+      this.tabs.push({
         label: "API Keys",
         routerLink: "api-keys/view",
         name: "api-keys",
-      },
-    ];
+      });
+    }
   }
 }
