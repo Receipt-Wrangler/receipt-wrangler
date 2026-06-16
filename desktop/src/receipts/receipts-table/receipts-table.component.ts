@@ -318,12 +318,10 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     const dialogRef = this.matDialog.open(ReceiptFilterComponent, {
       minWidth: "75%",
       maxWidth: "100%",
-      data: {
-        categories: this.categories,
-        tags: this.tags,
-      },
     });
 
+    dialogRef.componentInstance.categories = this.categories;
+    dialogRef.componentInstance.tags = this.tags;
     dialogRef.componentInstance.parentForm = buildReceiptFilterForm(filter, this);
     dialogRef.componentInstance.headerText = "Filter Receipts";
     const formCommandSubscription = dialogRef.componentInstance.formCommand.subscribe((formCommand) => {

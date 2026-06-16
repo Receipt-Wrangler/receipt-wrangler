@@ -6,10 +6,10 @@ import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { ReceiptFilterComponent } from "src/shared-ui/receipt-filter/receipt-filter.component";
 import { BaseFormComponent } from "../../form/index";
-import { ChartGrouping, Dashboard, DashboardService, Widget, WidgetType } from "../../open-api";
+import { Category, ChartGrouping, Dashboard, DashboardService, Tag, Widget, WidgetType } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { EditableListComponent } from "../../shared-ui/editable-list/editable-list.component";
-import { GroupState } from "../../store";
+import { AuthState, GroupState } from "../../store";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { chartGroupingOptions } from "../constants/chart-grouping-options";
 import { widgetTypeOptions } from "../constants/widget-options";
@@ -35,6 +35,12 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
 
   public originalWidgets: Widget[] = [];
 
+  // Filter options come from the selected group's grant-filtered AppData catalog
+  // (same source as the receipts table), not the admin-only global endpoints.
+  public categories: Category[] = [];
+
+  public tags: Tag[] = [];
+
   public get widgets(): FormArray {
     return this.form.get("widgets") as FormArray;
   }
@@ -52,7 +58,19 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
 
   public ngOnInit(): void {
     this.originalWidgets = Array.from(this.dashboard?.widgets ?? []);
+    this.setCategoryTagPools();
     this.initForm();
+  }
+
+  private setCategoryTagPools(): void {
+    const groupId = Number(this.store.selectSnapshot(GroupState.selectedGroupId));
+    if (Number.isNaN(groupId)) {
+      this.categories = [];
+      this.tags = [];
+      return;
+    }
+    this.categories = this.store.selectSnapshot(AuthState.groupCategories(groupId));
+    this.tags = this.store.selectSnapshot(AuthState.groupTags(groupId));
   }
 
   public initForm(): void {

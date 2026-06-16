@@ -10,7 +10,7 @@ import { Dashboard, DashboardService } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services";
 import { EditableListComponent } from "../../shared-ui/editable-list/editable-list.component";
-import { GroupState } from "../../store";
+import { AuthState, GroupState } from "../../store";
 import { DashboardFormComponent } from "./dashboard-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -24,7 +24,7 @@ describe("DashboardFormComponent", () => {
     declarations: [DashboardFormComponent, EditableListComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [MatSnackBarModule,
-        NgxsModule.forRoot([GroupState]),
+        NgxsModule.forRoot([GroupState, AuthState]),
         PipesModule,
         ReactiveFormsModule],
     providers: [
@@ -56,6 +56,7 @@ describe("DashboardFormComponent", () => {
       groups: {
         selectedGroupId: "1",
       },
+      auth: {},
     });
 
     component.ngOnInit();
@@ -65,6 +66,25 @@ describe("DashboardFormComponent", () => {
       groupId: "1",
       widgets: [],
     });
+  });
+
+  it("sources the filter category/tag pools from the selected group's catalog", () => {
+    const categories = [{ id: 1, name: "Food" }];
+    const tags = [{ id: 2, name: "Reimbursable" }];
+    store.reset({
+      groups: {
+        selectedGroupId: "5",
+      },
+      auth: {
+        groupCategories: { 5: categories },
+        groupTags: { 5: tags },
+      },
+    });
+
+    component.ngOnInit();
+
+    expect(component.categories).toEqual(categories);
+    expect(component.tags).toEqual(tags);
   });
 
   it("should submit valid form", () => {
@@ -86,6 +106,7 @@ describe("DashboardFormComponent", () => {
       groups: {
         selectedGroupId: 1,
       },
+      auth: {},
     });
 
     component.ngOnInit();
