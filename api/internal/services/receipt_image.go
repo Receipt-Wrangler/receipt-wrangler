@@ -104,12 +104,15 @@ func ReadReceiptFromTextOnly(bodyText string, groupId string) (commands.UpsertRe
 	return receiptProcessingService.ReadReceiptText(bodyText)
 }
 
-func MagicFillFromImage(command commands.MagicFillCommand, groupId string) (commands.UpsertReceiptCommand, commands.ReceiptProcessingMetadata, error) {
+func MagicFillFromImage(command commands.MagicFillCommand, groupId string, userId uint) (commands.UpsertReceiptCommand, commands.ReceiptProcessingMetadata, error) {
 	fileRepository := repositories.NewFileRepository(nil)
 	receiptProcessingService, err := NewSystemReceiptProcessingService(nil, groupId)
 	if err != nil {
 		return commands.UpsertReceiptCommand{}, commands.ReceiptProcessingMetadata{}, err
 	}
+	// Restrict the AI prompt's candidate categories/tags to this user's grants
+	// (0 when there is no triggering user, e.g. system processing).
+	receiptProcessingService.UserId = userId
 
 	bytes, err := fileRepository.GetBytesFromImageBytes(command.ImageData)
 	if err != nil {

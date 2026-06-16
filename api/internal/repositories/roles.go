@@ -43,7 +43,7 @@ func (repository RoleRepository) CreateAppRole(name string, description string, 
 	return role, nil
 }
 
-func (repository RoleRepository) CreateGroupRole(name string, description string, perms []string) (models.GroupRoleDefinition, error) {
+func (repository RoleRepository) CreateGroupRole(name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint) (models.GroupRoleDefinition, error) {
 	db := repository.GetDB()
 
 	rolePermissions := make([]models.GroupRolePermission, 0, len(perms))
@@ -62,7 +62,12 @@ func (repository RoleRepository) CreateGroupRole(name string, description string
 		return models.GroupRoleDefinition{}, err
 	}
 
-	return role, nil
+	err = repository.replaceGroupRoleGrants(role.ID, categoryGrantIds, tagGrantIds)
+	if err != nil {
+		return models.GroupRoleDefinition{}, err
+	}
+
+	return repository.GetGroupRoleById(role.ID)
 }
 
 func (repository RoleRepository) GetAppRoleById(id uint) (models.AppRole, error) {
@@ -81,7 +86,10 @@ func (repository RoleRepository) GetGroupRoleById(id uint) (models.GroupRoleDefi
 	db := repository.GetDB()
 
 	var role models.GroupRoleDefinition
-	err := db.Preload("Permissions").First(&role, id).Error
+	err := db.Preload("Permissions").
+		Preload("CategoryGrants").
+		Preload("TagGrants").
+		First(&role, id).Error
 	if err != nil {
 		return models.GroupRoleDefinition{}, err
 	}
@@ -120,7 +128,7 @@ func (repository RoleRepository) UpdateAppRole(id uint, name string, description
 	return repository.GetAppRoleById(id)
 }
 
-func (repository RoleRepository) UpdateGroupRole(id uint, name string, description string, perms []string) (models.GroupRoleDefinition, error) {
+func (repository RoleRepository) UpdateGroupRole(id uint, name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint) (models.GroupRoleDefinition, error) {
 	db := repository.GetDB()
 
 	err := db.Where("group_role_id = ?", id).Delete(&models.GroupRolePermission{}).Error
@@ -148,7 +156,57 @@ func (repository RoleRepository) UpdateGroupRole(id uint, name string, descripti
 		}
 	}
 
+	err = repository.replaceGroupRoleGrants(id, categoryGrantIds, tagGrantIds)
+	if err != nil {
+		return models.GroupRoleDefinition{}, err
+	}
+
 	return repository.GetGroupRoleById(id)
+}
+
+// replaceGroupRoleGrants resets a group role's category and tag grants to exactly
+// the given id sets (delete-all-then-insert, mirroring the permission sync). The
+// nested Category/Tag belongs-to associations are Omit-ted so GORM never tries to
+// upsert a zero-valued category/tag from the grant rows — only the join rows are
+// written.
+func (repository RoleRepository) replaceGroupRoleGrants(groupRoleId uint, categoryGrantIds []uint, tagGrantIds []uint) error {
+	db := repository.GetDB()
+
+	err := db.Where("group_role_id = ?", groupRoleId).Delete(&models.GroupRoleCategoryGrant{}).Error
+	if err != nil {
+		return err
+	}
+
+	err = db.Where("group_role_id = ?", groupRoleId).Delete(&models.GroupRoleTagGrant{}).Error
+	if err != nil {
+		return err
+	}
+
+	if len(categoryGrantIds) > 0 {
+		categoryGrants := make([]models.GroupRoleCategoryGrant, 0, len(categoryGrantIds))
+		for _, categoryId := range categoryGrantIds {
+			categoryGrants = append(categoryGrants, models.GroupRoleCategoryGrant{GroupRoleID: groupRoleId, CategoryID: categoryId})
+		}
+
+		err = db.Omit("Category").Create(&categoryGrants).Error
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(tagGrantIds) > 0 {
+		tagGrants := make([]models.GroupRoleTagGrant, 0, len(tagGrantIds))
+		for _, tagId := range tagGrantIds {
+			tagGrants = append(tagGrants, models.GroupRoleTagGrant{GroupRoleID: groupRoleId, TagID: tagId})
+		}
+
+		err = db.Omit("Tag").Create(&tagGrants).Error
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
@@ -161,7 +219,10 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 	}
 
 	var groupRoles []models.GroupRoleDefinition
-	err = db.Preload("Permissions").Find(&groupRoles).Error
+	err = db.Preload("Permissions").
+		Preload("CategoryGrants").
+		Preload("TagGrants").
+		Find(&groupRoles).Error
 	if err != nil {
 		return nil, err
 	}
@@ -185,14 +246,16 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		}
 
 		roles = append(roles, structs.RoleView{
-			Id:            role.ID,
-			Name:          role.Name,
-			Description:   role.Description,
-			Scope:         permissions.ScopeApp,
-			IsDefault:     role.IsDefault,
-			IsSystem:      role.IsSystem,
-			Permissions:   perms,
-			AssignedCount: appRoleCounts[role.ID],
+			Id:             role.ID,
+			Name:           role.Name,
+			Description:    role.Description,
+			Scope:          permissions.ScopeApp,
+			IsDefault:      role.IsDefault,
+			IsSystem:       role.IsSystem,
+			Permissions:    perms,
+			AssignedCount:  appRoleCounts[role.ID],
+			CategoryGrants: []uint{},
+			TagGrants:      []uint{},
 		})
 	}
 
@@ -203,18 +266,40 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		}
 
 		roles = append(roles, structs.RoleView{
-			Id:            role.ID,
-			Name:          role.Name,
-			Description:   role.Description,
-			Scope:         permissions.ScopeGroup,
-			IsDefault:     role.IsDefault,
-			IsSystem:      role.IsSystem,
-			Permissions:   perms,
-			AssignedCount: groupRoleCounts[role.ID],
+			Id:             role.ID,
+			Name:           role.Name,
+			Description:    role.Description,
+			Scope:          permissions.ScopeGroup,
+			IsDefault:      role.IsDefault,
+			IsSystem:       role.IsSystem,
+			Permissions:    perms,
+			AssignedCount:  groupRoleCounts[role.ID],
+			CategoryGrants: categoryGrantIdsFromRole(role),
+			TagGrants:      tagGrantIdsFromRole(role),
 		})
 	}
 
 	return roles, nil
+}
+
+// categoryGrantIdsFromRole extracts the category-grant ids from a loaded group
+// role's preloaded CategoryGrants, normalized to a non-nil slice.
+func categoryGrantIdsFromRole(role models.GroupRoleDefinition) []uint {
+	ids := make([]uint, 0, len(role.CategoryGrants))
+	for _, grant := range role.CategoryGrants {
+		ids = append(ids, grant.CategoryID)
+	}
+	return ids
+}
+
+// tagGrantIdsFromRole extracts the tag-grant ids from a loaded group role's
+// preloaded TagGrants, normalized to a non-nil slice.
+func tagGrantIdsFromRole(role models.GroupRoleDefinition) []uint {
+	ids := make([]uint, 0, len(role.TagGrants))
+	for _, grant := range role.TagGrants {
+		ids = append(ids, grant.TagID)
+	}
+	return ids
 }
 
 // roleAssignmentCount is the row shape returned by the grouped assignment-count
@@ -380,6 +465,38 @@ func (repository RoleRepository) GetGroupRolePermissions(groupRoleId uint) ([]st
 	}
 
 	return perms, nil
+}
+
+// GetGroupRoleCategoryIds returns the category ids a group role grants its
+// members. An empty result means the role is unrestricted (see all categories).
+func (repository RoleRepository) GetGroupRoleCategoryIds(groupRoleId uint) ([]uint, error) {
+	db := repository.GetDB()
+
+	ids := make([]uint, 0)
+	err := db.Model(&models.GroupRoleCategoryGrant{}).
+		Where("group_role_id = ?", groupRoleId).
+		Pluck("category_id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return ids, nil
+}
+
+// GetGroupRoleTagIds returns the tag ids a group role grants its members. An
+// empty result means the role is unrestricted (see all tags).
+func (repository RoleRepository) GetGroupRoleTagIds(groupRoleId uint) ([]uint, error) {
+	db := repository.GetDB()
+
+	ids := make([]uint, 0)
+	err := db.Model(&models.GroupRoleTagGrant{}).
+		Where("group_role_id = ?", groupRoleId).
+		Pluck("tag_id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return ids, nil
 }
 
 // GetUserAppRoleId returns the app role id assigned to a user, or nil when the

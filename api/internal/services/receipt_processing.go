@@ -20,6 +20,12 @@ type ReceiptProcessingService struct {
 	ReceiptProcessingSettings         models.ReceiptProcessingSettings
 	FallbackReceiptProcessingSettings models.ReceiptProcessingSettings
 	Group                             models.Group
+	// UserId is the user who triggered processing, when there is one (e.g. a
+	// quick scan). 0 means system-initiated (e.g. email polling) with no user
+	// context. When set together with a Group, the candidate categories/tags fed
+	// to the AI prompt are restricted to that user's grants so the model cannot
+	// suggest a category/tag the user is not allowed to see.
+	UserId uint
 }
 
 func NewSystemReceiptProcessingService(tx *gorm.DB, groupId string) (ReceiptProcessingService, error) {
@@ -464,6 +470,16 @@ func (service ReceiptProcessingService) getCategoriesString() (string, error) {
 		return "", err
 	}
 
+	// Restrict the candidate categories to the triggering user's grants (no-op
+	// for system-initiated processing or an unrestricted user).
+	if service.UserId > 0 && service.Group.ID > 0 {
+		permissionService := NewPermissionService(service.TX)
+		categories, err = permissionService.GetVisibleCategoriesForUser(service.UserId, service.Group.ID, categories)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	categoriesBytes, err := json.Marshal(categories)
 	if err != nil {
 		return "", err
@@ -477,6 +493,14 @@ func (service ReceiptProcessingService) getTagsString() (string, error) {
 	tags, err := tagsRepository.GetAllTags("id, name")
 	if err != nil {
 		return "", err
+	}
+
+	if service.UserId > 0 && service.Group.ID > 0 {
+		permissionService := NewPermissionService(service.TX)
+		tags, err = permissionService.GetVisibleTagsForUser(service.UserId, service.Group.ID, tags)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	tagsBytes, err := json.Marshal(tags)

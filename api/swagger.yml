@@ -3068,6 +3068,23 @@ components:
         assignedCount:
           type: integer
           description: Number of users or group members currently assigned this role
+        categoryGrants:
+          type: array
+          description: >-
+            Category ids a GROUP role restricts its members to. Empty means
+            unrestricted (members may use every category). Always empty for app
+            roles.
+          items:
+            type: integer
+            format: uint64
+        tagGrants:
+          type: array
+          description: >-
+            Tag ids a GROUP role restricts its members to. Empty means
+            unrestricted (members may use every tag). Always empty for app roles.
+          items:
+            type: integer
+            format: uint64
     UpsertRoleCommand:
       type: object
       required:
@@ -3085,6 +3102,22 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Permission"
+        categoryGrants:
+          type: array
+          description: >-
+            Category ids to restrict a GROUP role's members to. Only valid on
+            group roles; omit or leave empty for unrestricted access.
+          items:
+            type: integer
+            format: uint64
+        tagGrants:
+          type: array
+          description: >-
+            Tag ids to restrict a GROUP role's members to. Only valid on group
+            roles; omit or leave empty for unrestricted access.
+          items:
+            type: integer
+            format: uint64
     SortDirection:
       type: string
       enum:
@@ -4594,6 +4627,26 @@ components:
             type: array
             items:
               $ref: "#/components/schemas/Permission"
+        groupCategories:
+          type: object
+          description: >-
+            The categories the calling user may use in each group, keyed by group
+            id. Filtered to the user's group-role grants (the full pool when
+            unrestricted). Non-admins receive categories only through this map.
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/Category"
+        groupTags:
+          type: object
+          description: >-
+            The tags the calling user may use in each group, keyed by group id.
+            Filtered to the user's group-role grants (the full pool when
+            unrestricted). Non-admins receive tags only through this map.
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/Tag"
     TokenPair:
       type: object
       required:

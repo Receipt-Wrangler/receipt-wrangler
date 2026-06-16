@@ -238,12 +238,49 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 	}
 
 	groupPermissions := make(map[uint][]string, len(groups))
+	groupCategories := make(map[uint][]models.Category, len(groups))
+	groupTags := make(map[uint][]models.Tag, len(groups))
 	for _, group := range groups {
 		perms, err := permissionService.GetGroupPermissionsForUser(userId, group.ID)
 		if err != nil {
 			return appData, err
 		}
 		groupPermissions[group.ID] = perms
+
+		// Per-group category/tag catalog filtered to the caller's grants
+		// (full pool when unrestricted). This is how non-admins receive
+		// categories/tags now that the flat lists are admin-only.
+		visibleCategories, err := permissionService.GetVisibleCategoriesForUser(userId, group.ID, categories)
+		if err != nil {
+			return appData, err
+		}
+		groupCategories[group.ID] = visibleCategories
+
+		visibleTags, err := permissionService.GetVisibleTagsForUser(userId, group.ID, tags)
+		if err != nil {
+			return appData, err
+		}
+		groupTags[group.ID] = visibleTags
+	}
+
+	// The flat global category/tag lists are only for callers who may read the
+	// whole pool (app.categories.read / app.tags.read — admins, the category/tag
+	// management pages, the role editor). Everyone else receives an empty list
+	// and uses the per-group filtered catalogs above.
+	canReadAllCategories, err := permissionService.HasAppPermissions(userId, permissions.AppCategoriesRead)
+	if err != nil {
+		return appData, err
+	}
+	if !canReadAllCategories {
+		categories = []models.Category{}
+	}
+
+	canReadAllTags, err := permissionService.HasAppPermissions(userId, permissions.AppTagsRead)
+	if err != nil {
+		return appData, err
+	}
+	if !canReadAllTags {
+		tags = []models.Tag{}
 	}
 
 	appData.About = about
@@ -253,6 +290,8 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 	appData.FeatureConfig = featureConfig
 	appData.Categories = categories
 	appData.Tags = tags
+	appData.GroupCategories = groupCategories
+	appData.GroupTags = groupTags
 	appData.CurrencyDisplay = systemSettings.CurrencyDisplay
 	appData.CurrencyThousandthsSeparator = systemSettings.CurrencyThousandthsSeparator
 	appData.CurrencyDecimalSeparator = systemSettings.CurrencyDecimalSeparator

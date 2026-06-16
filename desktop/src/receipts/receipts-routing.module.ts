@@ -5,10 +5,8 @@ import { groupPermissionGuard } from "src/guards/group-permission.guard";
 import { GroupGuard } from "src/guards/group.guard";
 import { receiptGuardGuard } from "src/guards/receipt-guard.guard";
 import { Permission } from "../open-api";
-import { categoryResolverFn } from "../resolvers/categories.resolver";
 import { customFieldResolverFn } from "../resolvers/custom-field.resolver";
 import { receiptResolverFn } from "../resolvers/receipt.resolver";
-import { tagResolverFn } from "../resolvers/tags.resolver";
 import { ReceiptFormComponent } from "./receipt-form/receipt-form.component";
 import { ReceiptsTableComponent } from "./receipts-table/receipts-table.component";
 
@@ -17,10 +15,6 @@ const routes: Routes = [
     path: "group/:groupId",
     component: ReceiptsTableComponent,
     canActivate: [GroupGuard],
-    resolve: {
-      tags: tagResolverFn,
-      categories: categoryResolverFn,
-    },
     data: {
       groupGuardBasePath: `/receipts/group`,
     },
@@ -29,8 +23,6 @@ const routes: Routes = [
     path: "add",
     component: ReceiptFormComponent,
     resolve: {
-      tags: tagResolverFn,
-      categories: categoryResolverFn,
       customFields: customFieldResolverFn,
     },
     data: {
@@ -43,8 +35,6 @@ const routes: Routes = [
     path: ":id/view",
     component: ReceiptFormComponent,
     resolve: {
-      tags: tagResolverFn,
-      categories: categoryResolverFn,
       receipt: receiptResolverFn,
       customFields: customFieldResolverFn,
     },
@@ -58,8 +48,6 @@ const routes: Routes = [
     path: ":id/edit",
     component: ReceiptFormComponent,
     resolve: {
-      tags: tagResolverFn,
-      categories: categoryResolverFn,
       receipt: receiptResolverFn,
       customFields: customFieldResolverFn,
     },

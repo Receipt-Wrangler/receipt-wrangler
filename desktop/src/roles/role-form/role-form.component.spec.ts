@@ -7,7 +7,7 @@ import {
   provideZonelessChangeDetection,
 } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { ReactiveFormsModule } from "@angular/forms";
+import { FormControl, ReactiveFormsModule } from "@angular/forms";
 import {
   ActivatedRoute,
   convertToParamMap,
@@ -302,6 +302,51 @@ describe("RoleFormComponent", () => {
 
     expect(component.lastPayload?.scope).toBe("GROUP");
     expect(component.lastPayload?.permissions).toEqual(["group.view"]);
+  });
+
+  it("shows the grant section only for group roles", async () => {
+    const { component } = await setup();
+    expect(component.showGrants()).toBe(false);
+    component.pickType("group");
+    expect(component.showGrants()).toBe(true);
+  });
+
+  it("includes category and tag grants in a GROUP payload", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.name.setValue("Restricted Role");
+    component.toggle("group.receipts.read");
+
+    // The autocomplete drives these FormArrays; push selected grants directly.
+    component.grantedCategories.push(new FormControl({ id: 10, name: "Groceries" } as any));
+    component.grantedTags.push(new FormControl({ id: 20, name: "Reimbursable" } as any));
+
+    component.submit();
+
+    expect(component.lastPayload?.scope).toBe("GROUP");
+    expect(component.lastPayload?.categoryGrants).toEqual([10]);
+    expect(component.lastPayload?.tagGrants).toEqual([20]);
+  });
+
+  it("omits grants from an APP payload", async () => {
+    const { component } = await setup();
+    component.form.controls.name.setValue("App Role");
+    component.toggle("app.users.read");
+
+    component.submit();
+
+    expect(component.lastPayload?.categoryGrants).toBeUndefined();
+    expect(component.lastPayload?.tagGrants).toBeUndefined();
+  });
+
+  it("resets grants when switching role type", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.grantedCategories.push(new FormControl({ id: 10, name: "Groceries" } as any));
+    expect(component.grantedCategories.length).toBe(1);
+
+    component.pickType("app");
+    expect(component.grantedCategories.length).toBe(0);
   });
 
   it("calls createRole, notifies, and navigates back to the list on submit", async () => {

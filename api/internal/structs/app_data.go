@@ -14,6 +14,8 @@ type AppData struct {
 	CurrencyHideDecimalPlaces    bool                          `json:"currencyHideDecimalPlaces"`
 	Categories                   []models.Category             `json:"categories"`
 	Tags                         []models.Tag                  `json:"tags"`
+	GroupCategories              map[uint][]models.Category     `json:"groupCategories"`
+	GroupTags                    map[uint][]models.Tag          `json:"groupTags"`
 	UserPreferences              models.UserPrefernces         `json:"userPreferences"`
 	Users                        []UserView                    `json:"users"`
 	FeatureConfig                FeatureConfig                 `json:"featureConfig"`

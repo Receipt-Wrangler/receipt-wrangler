@@ -192,7 +192,13 @@ them.
 
 - **App roles:** `AppRole` + `AppRolePermission` (permission strings in a child table).
 - **Group roles:** `GroupRoleDefinition` + `GroupRolePermission`, plus `GroupRoleCategoryGrant` /
-  `GroupRoleTagGrant` for per-role category/tag visibility.
+  `GroupRoleTagGrant` (composite-PK join rows) for per-role category/tag visibility. A group role
+  with **no** grant rows is **unrestricted** (sees every category/tag); a non-empty grant set
+  restricts members to exactly those ids — restriction is opt-in, so legacy/system roles (no grants)
+  keep seeing everything and no data migration is needed. Categories/tags are **global** (no
+  `GroupId`); a grant is a per-group-role slice of the global pool. CRUD persists/returns the grants
+  and `PermissionService` resolves them (see "Category/tag grant resolution" below); wiring the
+  resolved sets into AppData delivery and request enforcement is rolled out in later slices.
 - **Assignment:** nullable FKs `User.AppRoleID` and `GroupMember.GroupRoleID` (one app role per
   user; one group role per group membership). Nullable because per-create assignment is best-effort
   (the FK is left `nil` rather than failing creation when no role can be resolved, e.g. an unseeded
@@ -211,7 +217,14 @@ them.
   `PUT /role/{roleId}`, `PUT /role/{roleId}/default?scope=APP|GROUP` (make this role the scope's
   default; allowed on system roles; gated by `app.roles.update`), `DELETE /role/{roleId}?scope=APP|GROUP`.
 - `commands.UpsertRoleCommand` validates that every permission exists in the registry and matches
-  the role's scope. `structs.RoleView` is the read model (includes `assignedCount` and `isDefault`).
+  the role's scope. It also carries `categoryGrants` / `tagGrants` (category/tag ids): grants are
+  rejected on APP scope and dedup-checked in `Validate()`, and their existence is verified against
+  the DB in `RoleService` (`ErrInvalidGrant` → 400). `repositories/roles.go` syncs grant rows with
+  the same delete-then-insert pattern as permissions (`replaceGroupRoleGrants`, with the nested
+  Category/Tag association `Omit`-ted so only join rows are written), preloads them in
+  `GetGroupRoleById` / `GetAllRoles`, and cascades them on role delete. `structs.RoleView` is the
+  read model (includes `assignedCount`, `isDefault`, and `categoryGrants` / `tagGrants` — empty
+  slices for app roles).
 
 ### Seeded system roles (legacy-equivalent)
 
@@ -223,10 +236,13 @@ them.
   User** (the app actions a plain `USER` could do), **Legacy Viewer** / **Legacy Editor** / **Legacy
   Owner** (the group VIEWER / EDITOR / OWNER tiers; Owner = every group permission). The sets live in
   `permissions/legacy.go` (`Legacy*Keys()` helpers) and were derived from the actual handler-level
-  gating, not the desktop UI presets. **One deliberate exception:** `app.users.read` is omitted from
-  Legacy User — it gates only the admin `GET /user/` listing, which no client calls (user dropdowns read
-  from AppData via `app.account.read`), so granting it would only expose the admin "Manage Users" page to
-  normal users. Removing it keeps normal users off that page with zero functional loss.
+  gating, not the desktop UI presets. **Deliberate exceptions** (Legacy User omits these): `app.users.read`
+  — it gates only the admin `GET /user/` listing, which no client calls (user dropdowns read from AppData via
+  `app.account.read`), so granting it would only expose the admin "Manage Users" page to normal users; and
+  `app.categories.read` / `app.tags.read` — omitted as part of the category/tag grant lock-down, since they
+  gate the GLOBAL category/tag lists; normal users now get only the per-group filtered catalogs (the
+  `app.categories.create` / `app.tags.create` permissions are retained for inline creation). See
+  "Category/tag delivery on AppData" below.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.
@@ -308,6 +324,53 @@ them.
   cached; a user's role *assignment* is resolved fresh on every check, so re-assigning a user takes
   effect immediately.
 
+### Category/tag grant resolution (`PermissionService`)
+
+- `services/grant.go` resolves a user's allowed category/tag ids for a group:
+  `GetGroupCategoryIdsForUser` / `GetGroupTagIdsForUser` return `(allowedSet, unrestricted, err)`,
+  where **`unrestricted == true` means see-all** (the role grants nothing for that resource) and the
+  set is then `nil`. A non-member, or a member whose group role has no grants, is **unrestricted** —
+  grants only *narrow* access within an already-permitted group; they never *grant* access (the
+  handler permission gate is the access control). Categories and tags are independent (a role may
+  restrict one and not the other). `GetVisibleCategoriesForUser` / `GetVisibleTagsForUser` filter a
+  full category/tag slice to the visible subset (pass-through when unrestricted) — used by AppData.
+- Backed by a grant cache (`services/grant_cache.go`) keyed by **group-role id** (grants are
+  group-only), same generation-counter invalidation as the permission cache, evicted in
+  `RoleService.UpdateRole` / `DeleteRole` for group scope. Only a role's grant *lists* are cached;
+  the user's role *assignment* is resolved fresh each call. A category/tag deleted out from under a
+  cached grant id is benign — a stale id simply never matches a real row when filtering.
+- `services/grant_filter.go` is the **single** shared enforcement mechanism, reused by every read and
+  write surface: `FilterReceiptCategoriesTags` / `FilterReceiptCategoriesTagsForReceipt` strip a
+  receipt's `Categories`/`Tags` in place to the visible subset (resolving each group's grants at most
+  once per pass); `ValidateCategoryTagSelection` checks receipt create/update ids against the allowed
+  set. Both short-circuit on unrestricted resources and on **admin bypass** — `userBypassesGrants`
+  treats a holder of `app.categories.read` / `app.tags.read` as exempt (they can already see the
+  whole pool), keeping their view consistent with the global lists.
+- **Receipt enforcement wiring:** every receipt surface that returns or accepts categories/tags is
+  gated. **Reads** strip via `FilterReceiptCategoriesTags` (receipt-, item-, and linked-item-level):
+  `GetReceipt`, `GetPagedReceiptsForGroup`, `GetReceiptsForGroupIds`, the pie-chart service, and both
+  CSV export handlers; `DuplicateReceipt` strips the source before copying. **Writes**
+  (`CreateReceipt` / `UpdateReceipt`) call `enforceReceiptGrantSelection` — existing ids must be in
+  the caller's grants (else 403) and a new-by-name category/tag requires `app.categories.create` /
+  `app.tags.create`. **List/pie/export filters** are narrowed by `IntersectReceiptFilterWithGrants`
+  so a restricted user can't probe receipt existence via a hidden category/tag filter. Search returns
+  no categories/tags (`SearchResult` omits them), so it needs no filtering.
+- **Update preserves hidden associations:** `UpdateReceipt` does a full association *replace*, so a
+  restricted user's submission (missing the categories/tags they can't see) would drop them.
+  `MergeHiddenReceiptCategoriesTags` re-adds the receipt-level hidden categories/tags before the
+  replace (and runs *after* the selection check, which would otherwise reject them); the response is
+  then stripped so the user still doesn't see them. **Known limitation:** this merge is
+  **receipt-level only** — receipt items have no stable id across an update (they are deleted and
+  recreated), so hidden *item-level* categories/tags cannot be matched back and are dropped when a
+  restricted user edits a receipt. Closing that needs item identity (a separate change).
+- **AI prompt:** `ReceiptProcessingService` carries a `UserId` (the user who triggered processing; 0
+  for system-initiated, e.g. email polling). When set together with a `Group`,
+  `getCategoriesString` / `getTagsString` restrict the candidate categories/tags fed to the model to
+  that user's grants (via `GetVisibleCategoriesForUser` / `GetVisibleTagsForUser`), so a quick scan
+  can't surface or auto-assign a category/tag the user isn't allowed to see. `MagicFillFromImage`
+  takes the triggering `userId` and sets it on the service; system/email processing passes 0 and
+  stays unrestricted (the resulting receipts are covered by read-stripping when any user views them).
+
 ### Enforcement status
 
 Authorization is enforced centrally in `HandleRequest` (`handlers/generic_handler.go`) via the
@@ -340,6 +403,16 @@ caller's resolved permissions so the desktop can gate UI with them — `AppPermi
 the cached `resolveAppPermissions` / `resolveGroupPermissions`). The JWT no longer carries any role
 field at all (it holds only identity claims); the server always re-checks real permissions from the
 DB on every request.
+
+**Category/tag delivery on AppData (grant lock-down):** `GetAppData` also returns `GroupCategories
+map[uint][]Category` and `GroupTags map[uint][]Tag` (keyed by group id) — each group's catalog
+filtered to the caller's grants (the full pool when unrestricted), built via
+`GetVisibleCategoriesForUser` / `GetVisibleTagsForUser`. The flat `Categories` / `Tags` arrays (and
+the global `GET /category` / `GET /tag` endpoints) are **admin-only**: they're populated solely for
+callers holding `app.categories.read` / `app.tags.read`, and empty otherwise. Because
+`LegacyAppUserKeys` no longer grants those reads (only the create permissions remain), normal users
+receive categories/tags **only** through the per-group `GroupCategories` / `GroupTags` maps — the
+desktop receipt form sources its pickers from there.
 
 **`app.api-keys.read-any` (Security):** listing *all* users' API keys (`GetPagedApiKeys` with
 `associatedApiKeys=ALL`) requires `app.api-keys.read-any`, checked in the handler body via the

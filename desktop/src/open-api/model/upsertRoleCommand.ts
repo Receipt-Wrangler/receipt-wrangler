@@ -16,6 +16,14 @@ export interface UpsertRoleCommand {
     description?: string;
     scope: PermissionScope;
     permissions: Array<Permission>;
+    /**
+     * Category ids to restrict a GROUP role\'s members to. Only valid on group roles; omit or leave empty for unrestricted access.
+     */
+    categoryGrants?: Array<number>;
+    /**
+     * Tag ids to restrict a GROUP role\'s members to. Only valid on group roles; omit or leave empty for unrestricted access.
+     */
+    tagGrants?: Array<number>;
 }
 export namespace UpsertRoleCommand {
 }

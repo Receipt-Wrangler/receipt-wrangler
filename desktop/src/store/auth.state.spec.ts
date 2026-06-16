@@ -2,13 +2,15 @@ import { TestBed } from "@angular/core/testing";
 import { NgxsModule, Store } from "@ngxs/store";
 import { Claims } from "../open-api";
 import { AuthState } from "./auth.state";
-import { Logout, SetAuthState, SetPermissions } from "./auth.state.actions";
+import { Logout, SetAuthState, SetGroupCatalog, SetPermissions } from "./auth.state.actions";
 
 describe("AuthState", () => {
   let store: Store;
 
   const APP_PERMISSIONS = ["app.users.read", "app.roles.read"];
   const GROUP_PERMISSIONS = { 1: ["group.view", "group.receipts.read"] };
+  const GROUP_CATEGORIES = { 1: [{ id: 10, name: "Groceries" }] };
+  const GROUP_TAGS = { 1: [{ id: 20, name: "Reimbursable" }] };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -33,6 +35,23 @@ describe("AuthState", () => {
     expect(store.selectSnapshot(AuthState.appPermissions)).toEqual([]);
     expect(store.selectSnapshot(AuthState.hasAppPermission("app.users.read"))).toBe(false);
     expect(store.selectSnapshot(AuthState.hasGroupPermission(1, "group.view"))).toBe(false);
+  });
+
+  it("SetGroupCatalog stores per-group categories and tags", () => {
+    store.dispatch(new SetGroupCatalog(GROUP_CATEGORIES as any, GROUP_TAGS as any));
+
+    expect(store.selectSnapshot(AuthState.groupCategories(1))).toEqual(GROUP_CATEGORIES[1]);
+    expect(store.selectSnapshot(AuthState.groupTags(1))).toEqual(GROUP_TAGS[1]);
+    // A group with no catalog resolves to an empty list.
+    expect(store.selectSnapshot(AuthState.groupCategories(999))).toEqual([]);
+  });
+
+  it("Logout clears the group catalog", () => {
+    store.dispatch(new SetGroupCatalog(GROUP_CATEGORIES as any, GROUP_TAGS as any));
+    store.dispatch(new Logout());
+
+    expect(store.selectSnapshot(AuthState.groupCategories(1))).toEqual([]);
+    expect(store.selectSnapshot(AuthState.groupTags(1))).toEqual([]);
   });
 
   it("SetAuthState (claims only) does NOT wipe permissions", () => {

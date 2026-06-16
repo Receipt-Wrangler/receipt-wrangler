@@ -65,6 +65,12 @@ func CreateRole(w http.ResponseWriter, r *http.Request) {
 			roleService := services.NewRoleService(nil)
 			createdRole, err := roleService.CreateRole(command)
 			if err != nil {
+				if errors.Is(err, services.ErrInvalidGrant) {
+					structs.WriteValidatorErrorResponse(w, structs.ValidatorError{
+						Errors: map[string]string{"grants": "One or more category or tag grants do not exist"},
+					}, http.StatusBadRequest)
+					return 0, nil
+				}
 				return http.StatusInternalServerError, err
 			}
 
@@ -128,6 +134,12 @@ func UpdateRole(w http.ResponseWriter, r *http.Request) {
 				}
 				if errors.Is(err, services.ErrRoleNotFound) {
 					utils.WriteCustomErrorResponse(w, "Role not found", http.StatusNotFound)
+					return 0, nil
+				}
+				if errors.Is(err, services.ErrInvalidGrant) {
+					structs.WriteValidatorErrorResponse(w, structs.ValidatorError{
+						Errors: map[string]string{"grants": "One or more category or tag grants do not exist"},
+					}, http.StatusBadRequest)
 					return 0, nil
 				}
 				return http.StatusInternalServerError, err

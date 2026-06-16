@@ -86,6 +86,15 @@ export class ReceiptFormComponent implements OnInit {
 
   public tags: Tag[] = [];
 
+  // Inline category/tag creation is allowed only with the matching app create
+  // permission (the receipt form otherwise restricts users to the granted set).
+  public canCreateCategories = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppCategoriesCreate)
+  );
+  public canCreateTags = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppTagsCreate)
+  );
+
   public customFields: CustomField[] = [];
 
   public customFieldsStatefulMenuItems: StatefulMenuItem[] = [];
@@ -197,8 +206,8 @@ export class ReceiptFormComponent implements OnInit {
       .pipe(untilDestroyed(this))
       .subscribe((data) => {
         this.duplicatedSnackbarRef?.dismiss();
-        this.categories = data["categories"] ?? [];
-        this.tags = data["tags"] ?? [];
+        // categories/tags are sourced per-group from AppData (see
+        // setCategoryTagPoolsForGroup), driven by the group-change listener.
         this.customFields = data["customFields"] ?? [];
         this.originalReceipt = data["receipt"];
         this.editLink = `/receipts/${this.originalReceipt?.id}/edit`;
@@ -406,6 +415,19 @@ export class ReceiptFormComponent implements OnInit {
     this.listenForSyncWithItemsChanges();
   }
 
+  // Source the category/tag pickers from the selected group's AppData catalog
+  // (filtered to the user's grants by the backend). No group selected -> empty.
+  private setCategoryTagPoolsForGroup(groupId: number | string | null | undefined): void {
+    const numericGroupId = Number(groupId);
+    if (!groupId || Number.isNaN(numericGroupId)) {
+      this.categories = [];
+      this.tags = [];
+      return;
+    }
+    this.categories = this.store.selectSnapshot(AuthState.groupCategories(numericGroupId));
+    this.tags = this.store.selectSnapshot(AuthState.groupTags(numericGroupId));
+  }
+
   private listenForSyncWithItemsChanges(): void {
     this.form
       .get("syncAmountWithItems")?.valueChanges.pipe(untilDestroyed(this), tap((sync) => this.toggleAmountSync(sync))).subscribe();
@@ -430,6 +452,7 @@ export class ReceiptFormComponent implements OnInit {
       untilDestroyed(this),
       startWith(this.form.get("groupId")?.value),
       tap((groupId) => {
+        this.setCategoryTagPoolsForGroup(groupId);
         const paidBy = this.form.get("paidByUserId");
         const users = this.store.selectSnapshot(UserState.users);
         if (!groupId) {

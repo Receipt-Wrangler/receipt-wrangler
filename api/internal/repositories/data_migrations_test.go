@@ -268,7 +268,7 @@ func TestRunDataMigrationsDoesNotClobberExistingAssignment(t *testing.T) {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
-	customGroupRole, err := roleRepository.CreateGroupRole("Custom Group Role", "", []string{permissions.GroupReceiptsRead})
+	customGroupRole, err := roleRepository.CreateGroupRole("Custom Group Role", "", []string{permissions.GroupReceiptsRead}, nil, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

@@ -2,10 +2,10 @@ import { Injectable } from "@angular/core";
 import { Action, createSelector, Selector, State, StateContext } from "@ngxs/store";
 
 import { hasAll, hasAny } from "../utils/permission.utils";
-import { Icon, UserPreferences } from "../open-api";
+import { Category, Icon, Tag, UserPreferences } from "../open-api";
 import { User } from "../open-api/model/user";
 import { AuthStateInterface } from "./auth-state.interface";
-import { Logout, SetAuthState, SetIcons, SetPermissions, SetUserPreferences } from "./auth.state.actions";
+import { Logout, SetAuthState, SetGroupCatalog, SetIcons, SetPermissions, SetUserPreferences } from "./auth.state.actions";
 
 @State<AuthStateInterface>({
   name: "auth",
@@ -67,6 +67,18 @@ export class AuthState {
     return state.groupPermissions ?? {};
   }
 
+  static groupCategories(groupId: number) {
+    return createSelector([AuthState], (state: AuthStateInterface): Category[] => {
+      return state.groupCategories?.[groupId] ?? [];
+    });
+  }
+
+  static groupTags(groupId: number) {
+    return createSelector([AuthState], (state: AuthStateInterface): Tag[] => {
+      return state.groupTags?.[groupId] ?? [];
+    });
+  }
+
   static hasAppPermission(permission: string) {
     return createSelector([AuthState], (state: AuthStateInterface) => {
       return hasAll(state.appPermissions ?? [], permission);
@@ -122,6 +134,17 @@ export class AuthState {
     });
   }
 
+  @Action(SetGroupCatalog)
+  setGroupCatalog(
+    { patchState }: StateContext<AuthStateInterface>,
+    { groupCategories, groupTags }: SetGroupCatalog
+  ) {
+    patchState({
+      groupCategories,
+      groupTags,
+    });
+  }
+
   @Action(Logout)
   logout({ getState, patchState }: StateContext<AuthStateInterface>) {
     patchState({
@@ -133,6 +156,8 @@ export class AuthState {
       userPreferences: undefined,
       appPermissions: undefined,
       groupPermissions: undefined,
+      groupCategories: undefined,
+      groupTags: undefined,
     });
   }
 

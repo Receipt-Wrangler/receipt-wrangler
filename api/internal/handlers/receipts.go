@@ -45,6 +45,19 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 				associations = constants.FULL_RECEIPT_ASSOCIATIONS
 			}
 
+			permissionService := services.NewPermissionService(nil)
+
+			// Narrow any category/tag filter to what the caller may see, so a
+			// restricted user cannot probe receipt existence via a hidden filter.
+			uintGroupId, err := utils.StringToUint(groupId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			err = permissionService.IntersectReceiptFilterWithGrants(token.UserId, uintGroupId, &pagedRequest.Filter)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			receipts, count, err := receiptRepository.GetPagedReceiptsByGroupId(
 				token.UserId,
@@ -52,6 +65,12 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 				pagedRequest,
 				associations,
 			)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// Strip categories/tags the caller may not see from the results.
+			err = permissionService.FilterReceiptCategoriesTags(token.UserId, receipts)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -91,8 +110,14 @@ func GetReceiptsForGroupIds(w http.ResponseWriter, r *http.Request) {
 		GroupPermissions: []string{permissions.GroupReceiptsRead},
 		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			token := structs.GetClaims(r)
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			receipts, err := receiptRepository.GetReceiptsByGroupIds(groupIds, "*", clause.Associations)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			err = services.NewPermissionService(nil).FilterReceiptCategoriesTags(token.UserId, receipts)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -140,8 +165,22 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 		GroupPermissions: []string{permissions.GroupReceiptsCreate},
 		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			allowed, denyMessage, err := enforceReceiptGrantSelection(token.UserId, command.GroupId, command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			createdReceipt, err := receiptRepository.CreateReceipt(command, token.UserId, true)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			err = services.NewPermissionService(nil).FilterReceiptCategoriesTagsForReceipt(token.UserId, &createdReceipt)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -250,9 +289,15 @@ func GetReceipt(w http.ResponseWriter, r *http.Request) {
 		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
+			token := structs.GetClaims(r)
 			receiptRepository := repositories.NewReceiptRepository(nil)
 
 			receipt, err := receiptRepository.GetFullyLoadedReceiptById(id)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			err = services.NewPermissionService(nil).FilterReceiptCategoriesTagsForReceipt(token.UserId, &receipt)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -297,7 +342,38 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
+			permissionService := services.NewPermissionService(nil)
+
+			// Load the current receipt to resolve its real group and the
+			// associations the caller may not see.
+			currentReceipt, err := receiptRepository.GetFullyLoadedReceiptById(receiptId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			allowed, denyMessage, err := enforceReceiptGrantSelection(token.UserId, currentReceipt.GroupId, command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
+			// Preserve receipt-level categories/tags the caller cannot see so the
+			// full-replace update does not silently drop them. (Must run AFTER
+			// the selection check, which would otherwise reject the re-added ids.)
+			err = permissionService.MergeHiddenReceiptCategoriesTags(token.UserId, currentReceipt.GroupId, currentReceipt.Categories, currentReceipt.Tags, &command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			updatedReceipt, err := receiptRepository.UpdateReceipt(receiptId, command, token.UserId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			err = permissionService.FilterReceiptCategoriesTagsForReceipt(token.UserId, &updatedReceipt)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

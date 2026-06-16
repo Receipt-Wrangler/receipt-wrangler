@@ -190,6 +190,37 @@
             </div>
           }
         </div>
+
+        <!-- Category & tag grants (group roles only) -->
+        @if (showGrants()) {
+          <div class="rw-card rw-form-section">
+            <div class="rw-perm-header">
+              <div>
+                <h2>Category &amp; tag access</h2>
+                <div class="hint hint-inline">
+                  Limit members to specific categories and tags. Leave empty for
+                  unrestricted access to all of them.
+                </div>
+              </div>
+            </div>
+
+            <app-category-autocomplete
+              class="w-100"
+              [inputFormControl]="$any(grantedCategories)"
+              [categories]="categoryPool()"
+              [creatable]="false"
+              [readonly]="isViewMode()"
+            ></app-category-autocomplete>
+
+            <app-tag-autocomplete
+              class="w-100"
+              [inputFormControl]="$any(grantedTags)"
+              [tags]="tagPool()"
+              [creatable]="false"
+              [readonly]="isViewMode()"
+            ></app-tag-autocomplete>
+          </div>
+        }
       </div>
 
       <!-- Summary side panel -->

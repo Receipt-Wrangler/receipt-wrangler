@@ -6,7 +6,9 @@ import { MatTooltipModule } from "@angular/material/tooltip";
 import { RouterModule } from "@angular/router";
 import { PipesModule } from "src/pipes/pipes.module";
 import { ButtonModule } from "../button";
+import { CategoryAutocompleteComponent } from "../category-autocomplete/category-autocomplete.component";
 import { InputModule } from "../input";
+import { TagAutocompleteComponent } from "../tag-autocomplete/tag-autocomplete.component";
 import { SelectModule } from "../select/select.module";
 import { SharedUiModule } from "../shared-ui/shared-ui.module";
 import { TableModule } from "../table/table.module";
@@ -31,6 +33,8 @@ import { RolesRoutingModule } from "./roles-routing.module";
     TableModule,
     TextareaModule,
     RolesRoutingModule,
+    CategoryAutocompleteComponent,
+    TagAutocompleteComponent,
   ],
 })
 export class RolesModule {}

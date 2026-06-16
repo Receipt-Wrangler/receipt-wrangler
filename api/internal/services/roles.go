@@ -18,6 +18,7 @@ var (
 	ErrSystemRoleUndeletable = errors.New("system roles cannot be deleted")
 	ErrRoleAssigned          = errors.New("role is assigned and cannot be deleted")
 	ErrRoleIsDefault         = errors.New("the default role cannot be deleted")
+	ErrInvalidGrant          = errors.New("a category or tag grant references a non-existent category or tag")
 )
 
 type RoleService struct {
@@ -39,6 +40,8 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 	if perms == nil {
 		perms = []string{}
 	}
+	categoryGrants := normalizeUintSlice(command.CategoryGrants)
+	tagGrants := normalizeUintSlice(command.TagGrants)
 
 	err := repositories.GetDB().Transaction(func(tx *gorm.DB) error {
 		roleRepository := repositories.NewRoleRepository(tx)
@@ -50,29 +53,37 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 			}
 
 			roleView = structs.RoleView{
-				Id:          role.ID,
-				Name:        role.Name,
-				Description: role.Description,
-				Scope:       permissions.ScopeApp,
-				IsSystem:    role.IsSystem,
-				Permissions: perms,
+				Id:             role.ID,
+				Name:           role.Name,
+				Description:    role.Description,
+				Scope:          permissions.ScopeApp,
+				IsSystem:       role.IsSystem,
+				Permissions:    perms,
+				CategoryGrants: []uint{},
+				TagGrants:      []uint{},
 			}
 
 			return nil
 		}
 
-		role, txErr := roleRepository.CreateGroupRole(command.Name, command.Description, perms)
+		if txErr := validateGrantsExist(tx, categoryGrants, tagGrants); txErr != nil {
+			return txErr
+		}
+
+		role, txErr := roleRepository.CreateGroupRole(command.Name, command.Description, perms, categoryGrants, tagGrants)
 		if txErr != nil {
 			return txErr
 		}
 
 		roleView = structs.RoleView{
-			Id:          role.ID,
-			Name:        role.Name,
-			Description: role.Description,
-			Scope:       permissions.ScopeGroup,
-			IsSystem:    role.IsSystem,
-			Permissions: perms,
+			Id:             role.ID,
+			Name:           role.Name,
+			Description:    role.Description,
+			Scope:          permissions.ScopeGroup,
+			IsSystem:       role.IsSystem,
+			Permissions:    perms,
+			CategoryGrants: categoryGrants,
+			TagGrants:      tagGrants,
 		}
 
 		return nil
@@ -91,6 +102,8 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 	if perms == nil {
 		perms = []string{}
 	}
+	categoryGrants := normalizeUintSlice(command.CategoryGrants)
+	tagGrants := normalizeUintSlice(command.TagGrants)
 
 	err := repositories.GetDB().Transaction(func(tx *gorm.DB) error {
 		roleRepository := repositories.NewRoleRepository(tx)
@@ -113,13 +126,15 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			}
 
 			roleView = structs.RoleView{
-				Id:          role.ID,
-				Name:        role.Name,
-				Description: role.Description,
-				Scope:       permissions.ScopeApp,
-				IsDefault:   role.IsDefault,
-				IsSystem:    role.IsSystem,
-				Permissions: perms,
+				Id:             role.ID,
+				Name:           role.Name,
+				Description:    role.Description,
+				Scope:          permissions.ScopeApp,
+				IsDefault:      role.IsDefault,
+				IsSystem:       role.IsSystem,
+				Permissions:    perms,
+				CategoryGrants: []uint{},
+				TagGrants:      []uint{},
 			}
 
 			return nil
@@ -136,19 +151,25 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			return ErrSystemRoleImmutable
 		}
 
-		role, txErr := roleRepository.UpdateGroupRole(id, command.Name, command.Description, perms)
+		if txErr := validateGrantsExist(tx, categoryGrants, tagGrants); txErr != nil {
+			return txErr
+		}
+
+		role, txErr := roleRepository.UpdateGroupRole(id, command.Name, command.Description, perms, categoryGrants, tagGrants)
 		if txErr != nil {
 			return txErr
 		}
 
 		roleView = structs.RoleView{
-			Id:          role.ID,
-			Name:        role.Name,
-			Description: role.Description,
-			Scope:       permissions.ScopeGroup,
-			IsDefault:   role.IsDefault,
-			IsSystem:    role.IsSystem,
-			Permissions: perms,
+			Id:             role.ID,
+			Name:           role.Name,
+			Description:    role.Description,
+			Scope:          permissions.ScopeGroup,
+			IsDefault:      role.IsDefault,
+			IsSystem:       role.IsSystem,
+			Permissions:    perms,
+			CategoryGrants: categoryGrants,
+			TagGrants:      tagGrants,
 		}
 
 		return nil
@@ -161,7 +182,51 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 	// next permission check resolves the new set.
 	clearRolePermissionCache(command.Scope, id)
 
+	// Group roles also carry category/tag grants, which the update just
+	// replaced — evict the cached grant sets so enforcement uses the new grants.
+	if command.Scope == permissions.ScopeGroup {
+		clearGroupRoleGrantCache(id)
+	}
+
 	return roleView, nil
+}
+
+// normalizeUintSlice returns a non-nil slice so empty grant sets serialize as
+// [] rather than null and never alias the caller's nil.
+func normalizeUintSlice(ids []uint) []uint {
+	if ids == nil {
+		return []uint{}
+	}
+	return ids
+}
+
+// validateGrantsExist confirms every category/tag grant id references a real
+// row. Because UpsertRoleCommand.Validate already rejects duplicate grant ids, a
+// matching count means all ids exist. Returns ErrInvalidGrant otherwise.
+func validateGrantsExist(tx *gorm.DB, categoryGrants []uint, tagGrants []uint) error {
+	if len(categoryGrants) > 0 {
+		categoryRepository := repositories.NewCategoryRepository(tx)
+		count, err := categoryRepository.CountByIds(categoryGrants)
+		if err != nil {
+			return err
+		}
+		if int(count) != len(categoryGrants) {
+			return ErrInvalidGrant
+		}
+	}
+
+	if len(tagGrants) > 0 {
+		tagsRepository := repositories.NewTagsRepository(tx)
+		count, err := tagsRepository.CountByIds(tagGrants)
+		if err != nil {
+			return err
+		}
+		if int(count) != len(tagGrants) {
+			return ErrInvalidGrant
+		}
+	}
+
+	return nil
 }
 
 // resolveMissingRoleError distinguishes a genuine not-found from a forbidden
@@ -257,6 +322,11 @@ func (service RoleService) DeleteRole(id uint, scope permissions.Scope) error {
 	// The role is gone; evict any cached permissions for it.
 	clearRolePermissionCache(scope, id)
 
+	// And its cached category/tag grants (group roles only).
+	if scope == permissions.ScopeGroup {
+		clearGroupRoleGrantCache(id)
+	}
+
 	return nil
 }
 
@@ -320,31 +390,46 @@ func appRoleToView(role models.AppRole, isDefault bool) structs.RoleView {
 	}
 
 	return structs.RoleView{
-		Id:          role.ID,
-		Name:        role.Name,
-		Description: role.Description,
-		Scope:       permissions.ScopeApp,
-		IsDefault:   isDefault,
-		IsSystem:    role.IsSystem,
-		Permissions: perms,
+		Id:             role.ID,
+		Name:           role.Name,
+		Description:    role.Description,
+		Scope:          permissions.ScopeApp,
+		IsDefault:      isDefault,
+		IsSystem:       role.IsSystem,
+		Permissions:    perms,
+		CategoryGrants: []uint{},
+		TagGrants:      []uint{},
 	}
 }
 
 // groupRoleToView builds the read model for a group role, overriding IsDefault
-// with the post-update value.
+// with the post-update value. Grant ids are read from the role's preloaded
+// CategoryGrants/TagGrants (GetGroupRoleById preloads them).
 func groupRoleToView(role models.GroupRoleDefinition, isDefault bool) structs.RoleView {
 	perms := make([]string, 0, len(role.Permissions))
 	for _, permission := range role.Permissions {
 		perms = append(perms, permission.Permission)
 	}
 
+	categoryGrants := make([]uint, 0, len(role.CategoryGrants))
+	for _, grant := range role.CategoryGrants {
+		categoryGrants = append(categoryGrants, grant.CategoryID)
+	}
+
+	tagGrants := make([]uint, 0, len(role.TagGrants))
+	for _, grant := range role.TagGrants {
+		tagGrants = append(tagGrants, grant.TagID)
+	}
+
 	return structs.RoleView{
-		Id:          role.ID,
-		Name:        role.Name,
-		Description: role.Description,
-		Scope:       permissions.ScopeGroup,
-		IsDefault:   isDefault,
-		IsSystem:    role.IsSystem,
-		Permissions: perms,
+		Id:             role.ID,
+		Name:           role.Name,
+		Description:    role.Description,
+		Scope:          permissions.ScopeGroup,
+		IsDefault:      isDefault,
+		IsSystem:       role.IsSystem,
+		Permissions:    perms,
+		CategoryGrants: categoryGrants,
+		TagGrants:      tagGrants,
 	}
 }
