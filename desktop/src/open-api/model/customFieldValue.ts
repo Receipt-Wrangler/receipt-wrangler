@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { CustomField } from './customField';
 
 
 export interface CustomFieldValue { 
@@ -26,6 +27,7 @@ export interface CustomFieldValue {
      * Custom Field ID
      */
     customFieldId: number;
+    customField?: CustomField;
     /**
      * Custom Field String Value
      */

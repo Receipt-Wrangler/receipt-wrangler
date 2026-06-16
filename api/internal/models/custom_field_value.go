@@ -9,7 +9,7 @@ type CustomFieldValue struct {
 	BaseModel
 	Receipt       Receipt          `json:"-"`
 	ReceiptId     uint             `json:"receiptId"`
-	CustomField   CustomField      `json:"-"`
+	CustomField   CustomField      `json:"customField"`
 	CustomFieldId uint             `json:"customFieldId"`
 	StringValue   *string          `json:"stringValue"`
 	DateValue     *time.Time       `json:"dateValue"`

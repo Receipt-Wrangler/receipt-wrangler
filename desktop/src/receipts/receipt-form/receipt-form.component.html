@@ -282,17 +282,19 @@
     [disabled]="!canEditReceipt()"
     [buttonRouterLink]="[editLink]"
   ></app-button>
-  <app-filtered-stateful-menu
-    filterLabel="Filter custom fields"
-    matButtonType="iconButton"
-    icon="list_alt"
-    tooltip="Manage custom fields"
-    color="accent"
-    [readonly]="mode | inputReadonly"
-    [items]="customFieldsStatefulMenuItems"
-    [headerText]="(mode | inputReadonly) ? 'View Custom Fields' : 'Edit Custom Fields'"
-    (itemSelected)="customFieldChanged($event)"
-  ></app-filtered-stateful-menu>
+  @if (canManageCustomFields()) {
+    <app-filtered-stateful-menu
+      filterLabel="Filter custom fields"
+      matButtonType="iconButton"
+      icon="list_alt"
+      tooltip="Manage custom fields"
+      color="accent"
+      [readonly]="mode | inputReadonly"
+      [items]="customFieldsStatefulMenuItems"
+      [headerText]="(mode | inputReadonly) ? 'View Custom Fields' : 'Edit Custom Fields'"
+      (itemSelected)="customFieldChanged($event)"
+    ></app-filtered-stateful-menu>
+  }
   <app-button
     *ngIf="mode | inputReadonly"
     class="ms-1"

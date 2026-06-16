@@ -63,6 +63,24 @@ describe("ReceiptFormComponent", () => {
     expect(component).toBeTruthy();
   });
 
+  it("falls back to the receipt's embedded custom field definitions when the catalog is empty", () => {
+    const definition = { id: 7, name: "Project", type: 0 } as any;
+    routeDataSubject.next({
+      mode: FormMode.edit,
+      customFields: [],
+      receipt: {
+        id: 1,
+        name: "R",
+        amount: "1.00",
+        customFields: [{ customFieldId: 7, customField: definition }],
+      } as any,
+    });
+
+    component.ngOnInit();
+
+    expect(component.customFields).toEqual([definition]);
+  });
+
   it("should init form correctly when there is no initial data", () => {
     jest.useFakeTimers();
     const mockedDate = new Date(2020, 0, 1);
