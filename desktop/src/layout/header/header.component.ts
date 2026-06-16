@@ -4,7 +4,7 @@ import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { LayoutState } from "src/store/layout.state";
 import { ToggleIsSidebarOpen } from "src/store/layout.state.actions";
-import { AuthService, NotificationsService } from "../../open-api";
+import { AuthService, NotificationsService, Permission } from "../../open-api";
 import { AuthState, GroupState } from "../../store";
 
 @Component({
@@ -47,6 +47,12 @@ export class HeaderComponent {
 
   public notificationCount = signal<number | undefined>(undefined);
 
+  protected readonly Permission = Permission;
+
+  private readonly canReadNotifications = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppNotificationsRead)
+  );
+
   constructor(
     private authService: AuthService,
     private notificationsService: NotificationsService,
@@ -57,11 +63,16 @@ export class HeaderComponent {
   }
 
   private listenForLoggedInUser(): void {
-    let wasLoggedIn = false;
+    let fetched = false;
     effect(() => {
       const loggedIn = this.isLoggedIn();
-      if (loggedIn && !wasLoggedIn) {
-        wasLoggedIn = true;
+      const canRead = this.canReadNotifications();
+      if (!loggedIn) {
+        fetched = false;
+        return;
+      }
+      if (canRead && !fetched) {
+        fetched = true;
         untracked(() => {
           this.notificationsService.getNotificationCount().pipe(
             take(1),
@@ -70,8 +81,6 @@ export class HeaderComponent {
             })
           ).subscribe();
         });
-      } else if (!loggedIn) {
-        wasLoggedIn = false;
       }
     });
   }
