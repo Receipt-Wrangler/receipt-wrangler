@@ -108,6 +108,23 @@ describe("ColumnConfigurationDialogComponent", () => {
       expect(component.columns[2].matColumnDef).toBe("amount");
     });
 
+    it("does not mutate a frozen (store-sourced) currentColumns array", () => {
+      // The opener passes the NGXS snapshot, which is deep-frozen in dev mode.
+      // Sorting it in place threw "TypeError: 0 is read-only"; we must copy first.
+      mockDialogData.currentColumns = Object.freeze([
+        Object.freeze({ matColumnDef: "amount", visible: true, order: 2 }),
+        Object.freeze({ matColumnDef: "created_at", visible: true, order: 0 }),
+        Object.freeze({ matColumnDef: "name", visible: true, order: 1 })
+      ]) as ReceiptTableColumnConfig[];
+
+      expect(() => component.ngOnInit()).not.toThrow();
+      expect(component.columns.map(col => col.matColumnDef)).toEqual([
+        "created_at",
+        "name",
+        "amount"
+      ]);
+    });
+
     it("should use DEFAULT_RECEIPT_TABLE_COLUMNS when no currentColumns provided", () => {
       mockDialogData.currentColumns = undefined;
 
