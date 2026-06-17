@@ -18,6 +18,8 @@ export class HeaderComponent {
 
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);
 
+  public selectedGroupIdNumber = computed(() => Number(this.selectedGroupId()));
+
   public loggedInUser = this.store.selectSignal(AuthState.loggedInUser);
 
   public showProgressBar = this.store.selectSignal(LayoutState.showProgressBar);

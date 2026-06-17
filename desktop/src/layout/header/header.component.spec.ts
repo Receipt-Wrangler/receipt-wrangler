@@ -11,6 +11,7 @@ import { ToggleIsSidebarOpen } from "src/store/layout.state.actions";
 import { DirectivesModule } from "../../directives/directives.module";
 import { ApiModule, NotificationsService } from "../../open-api";
 import { SetAuthState, SetPermissions } from "../../store/auth.state.actions";
+import { SetSelectedGroupId } from "../../store/group.state.actions";
 import { StoreModule } from "../../store/store.module";
 import { HeaderComponent } from "./header.component";
 
@@ -30,6 +31,14 @@ describe("HeaderComponent", () => {
 
   const bellRendered = (): boolean =>
     !!fixture.nativeElement.querySelector('app-button[icon="notifications"]');
+
+  const dashboardButtonRendered = (): boolean =>
+    !!fixture.nativeElement.querySelector('button[matTooltip="Dashboard"]');
+
+  const selectGroupOne = () => store.dispatch(new SetSelectedGroupId("1"));
+
+  const grantDashboardsRead = () =>
+    store.dispatch(new SetPermissions([], { 1: ["group.dashboards.read"] }));
 
   beforeEach(async () => {
     // StoreModule persists auth (incl. permissions) to localStorage; clear it so
@@ -80,6 +89,23 @@ describe("HeaderComponent", () => {
     await fixture.whenStable();
 
     expect(bellRendered()).toBe(true);
+  });
+
+  it("should hide the dashboard button without group.dashboards.read for the selected group", async () => {
+    logIn();
+    selectGroupOne();
+    await fixture.whenStable();
+
+    expect(dashboardButtonRendered()).toBe(false);
+  });
+
+  it("should show the dashboard button with group.dashboards.read for the selected group", async () => {
+    logIn();
+    selectGroupOne();
+    grantDashboardsRead();
+    await fixture.whenStable();
+
+    expect(dashboardButtonRendered()).toBe(true);
   });
 
   it("should not fetch the notification count without app.notifications.read", async () => {

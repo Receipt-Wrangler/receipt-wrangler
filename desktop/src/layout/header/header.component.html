@@ -14,6 +14,7 @@
         <mat-icon>menu</mat-icon>
       </button>
       <button
+        *hasGroupPermission="{ groupId: selectedGroupIdNumber(), permission: Permission.GroupDashboardsRead }"
         mat-icon-button
         color="accent"
         class="nav-button"
