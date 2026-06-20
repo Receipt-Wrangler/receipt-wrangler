@@ -119,6 +119,12 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   public canEdit: boolean = false;
 
+  public canCreate: boolean = false;
+
+  public canQuickScan: boolean = false;
+
+  public canPollEmail: boolean = false;
+
   public headerText: string = "";
 
   public group?: Group;
@@ -165,8 +171,18 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   }
 
   private setCanEdit(): void {
+    const groupId = Number.parseInt(this.groupId);
     this.canEdit = this.store.selectSnapshot(
-      AuthState.hasGroupPermission(Number.parseInt(this.groupId), Permission.GroupReceiptsUpdate)
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsUpdate)
+    );
+    this.canCreate = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsCreate)
+    );
+    this.canQuickScan = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsQuickScan)
+    );
+    this.canPollEmail = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupEmailPoll)
     );
   }
 

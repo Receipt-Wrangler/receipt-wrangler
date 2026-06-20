@@ -13,7 +13,7 @@ import { SharedUiModule } from "src/shared-ui/shared-ui.module";
 import { LayoutState } from "src/store/layout.state";
 import { DirectivesModule } from "../../directives/directives.module";
 import { ApiModule } from "../../open-api";
-import { AuthState, FeatureConfigState, GroupState } from "../../store";
+import { AuthState, FeatureConfigState, GroupState, SetSelectedGroupId } from "../../store";
 import { SetAuthState, SetPermissions } from "../../store/auth.state.actions";
 import { SidebarComponent } from "./sidebar.component";
 
@@ -41,6 +41,9 @@ describe("SidebarComponent", () => {
 
   const menuText = (): string =>
     overlayContainer.getContainerElement().textContent ?? "";
+
+  const queryTestId = (id: string) =>
+    fixture.debugElement.query(By.css(`[data-testid="${id}"]`));
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -115,5 +118,41 @@ describe("SidebarComponent", () => {
     await openMenu();
 
     expect(menuText()).toContain("User Settings");
+  });
+
+  it("gates the Add Receipt FAB on the selected group's create permission", async () => {
+    login();
+    store.dispatch(new SetSelectedGroupId("5"));
+    store.dispatch(new SetPermissions([], { 5: ["group.receipts.create"] }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(queryTestId("sidebar-add-receipt")).toBeTruthy();
+    // create alone does not reveal Quick Scan.
+    expect(queryTestId("sidebar-quick-scan")).toBeFalsy();
+  });
+
+  it("shows the Quick Scan FAB only with the selected group's quick-scan permission", async () => {
+    login();
+    store.dispatch(new SetSelectedGroupId("5"));
+    store.dispatch(
+      new SetPermissions([], { 5: ["group.receipts.quick-scan"] })
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(queryTestId("sidebar-quick-scan")).toBeTruthy();
+    expect(queryTestId("sidebar-add-receipt")).toBeFalsy();
+  });
+
+  it("hides both FABs when the selected group grants neither permission", async () => {
+    login();
+    store.dispatch(new SetSelectedGroupId("5"));
+    store.dispatch(new SetPermissions([], { 5: [] }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(queryTestId("sidebar-add-receipt")).toBeFalsy();
+    expect(queryTestId("sidebar-quick-scan")).toBeFalsy();
   });
 });

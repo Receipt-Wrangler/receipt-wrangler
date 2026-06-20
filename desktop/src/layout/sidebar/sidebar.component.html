@@ -40,6 +40,8 @@
             <mat-icon>person</mat-icon>
           </button> -->
           <button
+            *hasGroupPermission="{ groupId: selectedGroupIdNumber(), permission: Permission.GroupReceiptsCreate }"
+            data-testid="sidebar-add-receipt"
             class="mt-4 mb-1 add-sub-button-1"
             mat-icon-button
             routerLinkActive="active-sub-button"
@@ -50,7 +52,11 @@
           >
             <mat-icon>article</mat-icon>
           </button>
-          <app-quick-scan-button class="mb-1 add-sub-button-2"></app-quick-scan-button>
+          <app-quick-scan-button
+            *hasGroupPermission="{ groupId: selectedGroupIdNumber(), permission: Permission.GroupReceiptsQuickScan }"
+            data-testid="sidebar-quick-scan"
+            class="mb-1 add-sub-button-2"
+          ></app-quick-scan-button>
           <button
             class="mb-1 add-sub-button-3"
             mat-icon-button

@@ -36,6 +36,11 @@ export class SidebarComponent {
 
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);
 
+  protected readonly selectedGroupIdNumber = computed(() => {
+    const id = Number.parseInt(this.selectedGroupId() ?? "");
+    return Number.isNaN(id) ? 0 : id;
+  });
+
   private allGroups = this.store.selectSignal(GroupState.groups);
 
   public groups = computed(() =>

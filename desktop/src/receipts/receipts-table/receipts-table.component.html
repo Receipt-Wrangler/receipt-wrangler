@@ -1,7 +1,7 @@
 <app-table-header [headerText]="headerText">
   <div class="d-flex align-items-center">
     <app-button
-      *ngIf="canEdit"
+      *ngIf="canCreate"
       class="me-2"
       icon="add"
       matButtonType="iconButton"
@@ -9,7 +9,7 @@
       [buttonRouterLink]="['/receipts/add']"
     ></app-button>
     <app-quick-scan-button
-      *ngIf="canEdit"
+      *ngIf="canQuickScan"
       class="me-2"
       (afterClosed)="getFilteredReceipts()"
     >
@@ -49,7 +49,7 @@
       color="accent"
       (clicked)="resetFilterButtonClicked()"
     ></app-button>
-    <ng-container *ngIf="canEdit && group?.groupSettings?.emailIntegrationEnabled">
+    <ng-container *ngIf="canPollEmail && group?.groupSettings?.emailIntegrationEnabled">
       <app-button
         *appFeature="'aiPoweredReceipts'"
         class="me-2"
