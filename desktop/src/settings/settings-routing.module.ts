@@ -42,7 +42,7 @@ const routes: Routes = [
             mode: FormMode.edit,
             headerText: "Edit User Profile",
           } as FormConfig,
-          appPermissions: [Permission.AppAccountRead],
+          appPermissions: [Permission.AppAccountUpdate],
         },
       },
       {
@@ -66,7 +66,7 @@ const routes: Routes = [
             mode: FormMode.edit,
             headerText: "Edit User Preferences",
           } as FormConfig,
-          appPermissions: [Permission.AppUserPreferencesRead],
+          appPermissions: [Permission.AppUserPreferencesUpdate],
         },
       },
       {

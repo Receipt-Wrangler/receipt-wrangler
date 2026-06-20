@@ -2,6 +2,7 @@
   [form]="form"
   [formConfig]="formConfig"
   [formTemplate]="formTemplate"
+  [canEdit]="canEdit()"
   [editButtonRouterLink]="['/settings/user-profile/edit']"
   [editButtonQueryParams]="{tab: 'user-profile'}"
   (submitted)="submit()"

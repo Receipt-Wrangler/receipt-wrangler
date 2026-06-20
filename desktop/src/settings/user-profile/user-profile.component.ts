@@ -32,6 +32,10 @@ export class UserProfileComponent implements OnInit {
 
   protected readonly Permission = Permission;
 
+  protected readonly canEdit = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppAccountUpdate)
+  );
+
   constructor(
     private claimsService: ClaimsService,
     private formBuilder: FormBuilder,

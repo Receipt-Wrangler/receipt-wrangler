@@ -70,6 +70,16 @@ describe("UserProfileComponent", () => {
     expect(fixture.nativeElement.querySelector(".danger-zone")).toBeTruthy();
   });
 
+  it("gates the edit button on app.account.update", () => {
+    const store = TestBed.inject(Store);
+
+    store.dispatch(new SetPermissions([], {}));
+    expect((component as any).canEdit()).toEqual(false);
+
+    store.dispatch(new SetPermissions([Permission.AppAccountUpdate], {}));
+    expect((component as any).canEdit()).toEqual(true);
+  });
+
   it("should init form correctly", () => {
     const store = TestBed.inject(Store);
     store.reset({
