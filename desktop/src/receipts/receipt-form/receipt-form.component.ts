@@ -544,6 +544,49 @@ export class ReceiptFormComponent implements OnInit {
       }
     });
 
+    const magicReceiptItems = Array.isArray(magicReceipt?.receiptItems)
+      ? magicReceipt.receiptItems
+      : [];
+    let pushedItemCount = 0;
+    const failedItemLabels: string[] = [];
+    let unlabeledFailedCount = 0;
+    magicReceiptItems.forEach((item) => {
+      if (!item) {
+        unlabeledFailedCount += 1;
+        return;
+      }
+      try {
+        this.receiptItemsFormArray.push(
+          buildItemForm(item, this.originalReceipt?.id?.toString(), !!item.chargedToUserId, this.syncAmountWithItems)
+        );
+        pushedItemCount += 1;
+      } catch {
+        const safeName = typeof item.name === "string" ? item.name.trim() : "";
+        const safeAmount = item.amount != null ? String(item.amount) : "";
+        const label = safeName || safeAmount;
+        if (label) {
+          failedItemLabels.push(label);
+        } else {
+          unlabeledFailedCount += 1;
+        }
+      }
+    });
+    if (pushedItemCount > 0) {
+      validKeys.push("receiptItems");
+    }
+    if (pushedItemCount > 0 && (failedItemLabels.length > 0 || unlabeledFailedCount > 0)) {
+      const parts: string[] = [];
+      if (failedItemLabels.length > 0) {
+        parts.push(failedItemLabels.join(", "));
+      }
+      if (unlabeledFailedCount > 0) {
+        parts.push(`${unlabeledFailedCount} unnamed item${unlabeledFailedCount === 1 ? "" : "s"}`);
+      }
+      this.snackbarService.error(
+        `The following receipt items were corrupted: ${parts.join("; ")}`
+      );
+    }
+
     if (validKeys.length > 0) {
       const successString = `Magic fill successfully filled ${validKeys.join(
         ", "
