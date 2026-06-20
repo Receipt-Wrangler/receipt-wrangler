@@ -1,10 +1,10 @@
-import { Component, OnInit, input, output, signal } from "@angular/core";
+import { Component, OnInit, Signal, input, output, signal } from "@angular/core";
 import { FormArray, FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
-import { Comment, CommentService } from "../../open-api";
+import { Comment, CommentService, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState } from "../../store";
 
@@ -21,7 +21,12 @@ export class ReceiptCommentsComponent implements OnInit {
   public internalComments = signal<Comment[]>([]);
   public readonly mode = input.required<FormMode>();
   public readonly receiptId = input<number>();
+  public readonly groupId = input<number>();
   public readonly commentsUpdated = output<FormArray>();
+
+  public canCreateComments!: Signal<boolean>;
+
+  public canDeleteComments!: Signal<boolean>;
 
   public formMode = FormMode;
 
@@ -39,7 +44,18 @@ export class ReceiptCommentsComponent implements OnInit {
 
   public ngOnInit(): void {
     this.internalComments.set(this.comments());
+    this.setCommentPermissions();
     this.initForm();
+  }
+
+  private setCommentPermissions(): void {
+    const groupId = this.groupId() ?? 0;
+    this.canCreateComments = this.store.selectSignal(
+      AuthState.hasGroupPermission(groupId, Permission.GroupCommentsCreate)
+    );
+    this.canDeleteComments = this.store.selectSignal(
+      AuthState.hasGroupPermission(groupId, Permission.GroupCommentsDelete)
+    );
   }
 
   private initForm(): void {
