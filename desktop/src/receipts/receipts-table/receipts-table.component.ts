@@ -123,6 +123,8 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   public group?: Group;
 
+  protected readonly Permission = Permission;
+
   public ngOnInit(): void {
     this.groupId = this.store
       .selectSnapshot(GroupState.selectedGroupId)

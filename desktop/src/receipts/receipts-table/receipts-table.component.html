@@ -155,6 +155,8 @@
       [buttonRouterLink]="['/receipts/' + element.id + '/edit']"
     ></app-edit-button>
     <app-button
+      *hasGroupPermission="{ groupId: element.groupId, permission: Permission.GroupReceiptsDuplicate }"
+      data-testid="receipt-duplicate"
       matButtonType="iconButton"
       icon="file_copy"
       tooltip="Duplicate"
@@ -162,9 +164,10 @@
       (clicked)="duplicateReceipt(element.id)"
     ></app-button>
     <app-button
+      *hasGroupPermission="{ groupId: element.groupId, permission: Permission.GroupReceiptsDelete }"
+      data-testid="receipt-delete"
       matButtonType="iconButton"
       icon="delete"
-      buttonText="hello"
       color="warn"
       tooltip="Delete"
       (clicked)="deleteReceipt(element)"
