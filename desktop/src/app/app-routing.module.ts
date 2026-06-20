@@ -72,7 +72,14 @@ const routes: Routes = [
         path: "settings",
         loadChildren: () =>
           import("../settings/settings.module").then((m) => m.SettingsModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [
+            Permission.AppAccountRead,
+            Permission.AppUserPreferencesRead,
+            Permission.AppApiKeysRead,
+          ],
+        },
       },
       {
         path: "system-settings",

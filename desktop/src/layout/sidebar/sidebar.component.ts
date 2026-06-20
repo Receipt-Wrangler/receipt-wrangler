@@ -54,6 +54,14 @@ export class SidebarComponent {
     ])
   );
 
+  protected readonly canViewUserSettings = this.store.selectSignal(
+    AuthState.hasAnyAppPermission([
+      Permission.AppAccountRead,
+      Permission.AppUserPreferencesRead,
+      Permission.AppApiKeysRead,
+    ])
+  );
+
   public addButtonExpanded: boolean | null = null;
 
   public groupClicked(groupId: number): void {

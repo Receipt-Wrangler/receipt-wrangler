@@ -87,9 +87,11 @@
         <button *hasAppPermission="Permission.AppTagsRead" [routerLink]="['/tags']" mat-menu-item>Manage Tags</button>
         <button *hasAppPermission="Permission.AppGroupsRead" [routerLink]="['/groups']" mat-menu-item>Manage Groups</button>
         <button *hasAppPermission="Permission.AppCustomFieldsRead" [routerLink]="['/custom-fields']" mat-menu-item>Manage Custom Fields</button>
-        <button mat-menu-item [routerLink]="['/settings/user-profile/view']">
-          User Settings
-        </button>
+        @if (canViewUserSettings()) {
+          <button mat-menu-item [routerLink]="['/settings']">
+            User Settings
+          </button>
+        }
         @if (canViewSystemSettings()) {
           <button [routerLink]="['/system-settings']" mat-menu-item>
             System Settings

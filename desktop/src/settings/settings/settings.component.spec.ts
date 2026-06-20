@@ -47,18 +47,58 @@ describe('SettingsComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('hides the API Keys tab without app.api-keys.read', () => {
+  it('renders no tabs when the user can read none of them', () => {
     store.dispatch(new SetPermissions([], {}));
     fixture.detectChanges();
 
-    expect(tabNames()).not.toContain('api-keys');
-    expect(tabNames()).toEqual(['user-profile', 'user-preferences']);
+    expect(tabNames()).toEqual([]);
   });
 
-  it('shows the API Keys tab with app.api-keys.read', () => {
-    store.dispatch(new SetPermissions([Permission.AppApiKeysRead], {}));
+  it('gates the User Profile tab on app.account.read', () => {
+    store.dispatch(new SetPermissions([Permission.AppAccountRead], {}));
     fixture.detectChanges();
 
-    expect(tabNames()).toContain('api-keys');
+    expect(tabNames()).toEqual(['user-profile']);
+  });
+
+  it('gates the User Preferences tab on app.user-preferences.read', () => {
+    store.dispatch(
+      new SetPermissions([Permission.AppUserPreferencesRead], {})
+    );
+    fixture.detectChanges();
+
+    expect(tabNames()).toEqual(['user-preferences']);
+  });
+
+  it('renders the tabs in order when all read permissions are present', () => {
+    store.dispatch(
+      new SetPermissions(
+        [
+          Permission.AppAccountRead,
+          Permission.AppUserPreferencesRead,
+          Permission.AppApiKeysRead,
+        ],
+        {}
+      )
+    );
+    fixture.detectChanges();
+
+    expect(tabNames()).toEqual([
+      'user-profile',
+      'user-preferences',
+      'api-keys',
+    ]);
+  });
+
+  it('hides the API Keys tab without app.api-keys.read', () => {
+    store.dispatch(
+      new SetPermissions(
+        [Permission.AppAccountRead, Permission.AppUserPreferencesRead],
+        {}
+      )
+    );
+    fixture.detectChanges();
+
+    expect(tabNames()).not.toContain('api-keys');
   });
 });

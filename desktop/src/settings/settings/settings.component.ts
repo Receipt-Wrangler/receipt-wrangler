@@ -22,18 +22,31 @@ export class SettingsComponent implements OnInit {
   }
 
   private initTabs(): void {
-    this.tabs = [
-      {
+    this.tabs = [];
+
+    if (
+      this.store.selectSnapshot(
+        AuthState.hasAppPermission(Permission.AppAccountRead)
+      )
+    ) {
+      this.tabs.push({
         label: "User Profile",
         routerLink: "user-profile/view",
         name: "user-profile",
-      },
-      {
+      });
+    }
+
+    if (
+      this.store.selectSnapshot(
+        AuthState.hasAppPermission(Permission.AppUserPreferencesRead)
+      )
+    ) {
+      this.tabs.push({
         label: "User Preferences",
         routerLink: "user-preferences/view",
         name: "user-preferences",
-      },
-    ];
+      });
+    }
 
     if (
       this.store.selectSnapshot(

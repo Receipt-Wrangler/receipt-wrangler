@@ -101,4 +101,19 @@ describe("SidebarComponent", () => {
     expect(text).toContain("Manage Groups");
     expect(text).toContain("Manage Custom Fields");
   });
+
+  it("hides User Settings without any settings read permission", async () => {
+    login();
+    await openMenu();
+
+    expect(menuText()).not.toContain("User Settings");
+  });
+
+  it("shows User Settings with a settings read permission", async () => {
+    login();
+    store.dispatch(new SetPermissions(["app.account.read"], {}));
+    await openMenu();
+
+    expect(menuText()).toContain("User Settings");
+  });
 });
