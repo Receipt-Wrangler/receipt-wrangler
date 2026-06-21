@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:receipt_wrangler_mobile/constants/spacing.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_item_items.dart';
 
 import '../../models/receipt_model.dart';
+import '../../shared/functions/forms.dart';
 
 class ReceiptItemField extends StatefulWidget {
   const ReceiptItemField({super.key, required this.groupId});
@@ -10,32 +12,24 @@ class ReceiptItemField extends StatefulWidget {
   final int groupId;
 
   @override
-  _ReceiptItemFieldState createState() {
-    return _ReceiptItemFieldState();
-  }
+  State<ReceiptItemField> createState() => _ReceiptItemFieldState();
 }
 
 class _ReceiptItemFieldState extends State<ReceiptItemField> {
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Consumer<ReceiptModel>(
       builder: (context, consumerModel, child) {
-        return InputDecorator(
-          decoration: const InputDecoration(labelText: "Shared With"),
-          child: ReceiptItemItems(
-            items: consumerModel.items ?? [],
-            groupId: widget.groupId,
-          ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            buildHeaderText("Items"),
+            textFieldSpacing,
+            ReceiptItemItems(
+              items: consumerModel.items,
+              groupId: widget.groupId,
+            ),
+          ],
         );
       },
     );
