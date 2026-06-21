@@ -63,7 +63,7 @@ class _ReceiptItemItems extends State<ReceiptItemItems> {
 
   String _safeItemAmount(FormItem item) {
     final dynamic raw = item.amount;
-    if (raw is String && raw.isNotEmpty) {
+    if (raw is String && double.tryParse(raw) != null) {
       return raw;
     }
     if (raw is num) {

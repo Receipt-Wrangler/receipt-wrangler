@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/interfaces/form_item.dart';
@@ -13,17 +12,13 @@ import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_item_items.dart
 
 import '../helpers/widget_test_helpers.dart';
 
-class _MockUserView extends Mock implements api.UserView {}
-
-class _MockUserModel extends Mock implements UserModel {}
-
 api.UserView _user({required int id, required String displayName}) {
-  // UserView has many non-nullable fields. Mock the accessors we read so the
-  // test isn't coupled to the full builder graph (mirrors group_app_bar_test).
-  final _MockUserView mock = _MockUserView();
-  when(() => mock.id).thenReturn(id);
-  when(() => mock.displayName).thenReturn(displayName);
-  return mock;
+  return api.UserView((api.UserViewBuilder b) => b
+    ..id = id
+    ..displayName = displayName
+    ..username = 'user-$id'
+    ..userRole = api.UserRole.USER
+    ..isDummyUser = false);
 }
 
 FormItem _formItem({
@@ -47,14 +42,9 @@ FormItem _formItem({
 Future<void> _pumpItems(
   WidgetTester tester, {
   required List<FormItem> items,
-  api.UserView? Function(String id)? userLookup,
+  List<api.UserView> users = const <api.UserView>[],
 }) async {
-  final _MockUserModel userModel = _MockUserModel();
-  when(() => userModel.getUserById(any())).thenAnswer(
-    (invocation) => userLookup == null
-        ? null
-        : userLookup(invocation.positionalArguments.first as String),
-  );
+  final UserModel userModel = UserModel()..setUsers(users);
 
   final GoRouter router = GoRouter(
     initialLocation: '/groups/1/receipts/1/view',
@@ -70,9 +60,7 @@ Future<void> _pumpItems(
 
   await tester.pumpWidget(MultiProvider(
     providers: [
-      // Plain Provider.value avoids ChangeNotifierProvider trying to call
-      // addListener on a mocktail Mock (matches group_app_bar_test).
-      Provider<UserModel>.value(value: userModel),
+      ChangeNotifierProvider<UserModel>.value(value: userModel),
       ChangeNotifierProvider<GroupModel>(create: (_) => GroupModel()),
       ChangeNotifierProvider<ReceiptModel>(create: (_) => ReceiptModel()),
       ChangeNotifierProvider<SystemSettingsModel>(
@@ -86,11 +74,7 @@ Future<void> _pumpItems(
 
 void main() {
   setUpAll(() {
-    registerFallbackValue('');
     registerCustomCurrencyForTests();
-    // Allow Provider<T>.value with mocktail Mocks of ChangeNotifier subclasses
-    // (matches group_app_bar_test setup).
-    Provider.debugCheckInvalidValueType = null;
   });
 
   testWidgets(
@@ -101,15 +85,14 @@ void main() {
         _formItem(name: 'Fries', amount: '5.00', chargedToUserId: 1),
         _formItem(name: 'Salad', amount: '7.50', chargedToUserId: 2),
       ];
-      final Map<int, api.UserView> users = <int, api.UserView>{
-        1: _user(id: 1, displayName: 'Alice'),
-        2: _user(id: 2, displayName: 'Bob'),
-      };
 
       await _pumpItems(
         tester,
         items: items,
-        userLookup: (String id) => users[int.tryParse(id)],
+        users: <api.UserView>[
+          _user(id: 1, displayName: 'Alice'),
+          _user(id: 2, displayName: 'Bob'),
+        ],
       );
 
       expect(find.text('Alice'), findsOneWidget);
@@ -170,12 +153,54 @@ void main() {
       await _pumpItems(
         tester,
         items: items,
-        userLookup: (String id) =>
-            id == '1' ? _user(id: 1, displayName: 'Alice') : null,
+        users: <api.UserView>[_user(id: 1, displayName: 'Alice')],
       );
 
       expect(tester.takeException(), isNull);
       expect(find.text('(unnamed item)'), findsNWidgets(2));
+    },
+  );
+
+  testWidgets(
+    'boundary amounts: zero, negative, and non-numeric render without crashing',
+    (tester) async {
+      final List<FormItem> items = <FormItem>[
+        _formItem(name: 'Free', amount: '0', chargedToUserId: 1),
+        _formItem(name: 'Refund', amount: '-3.50', chargedToUserId: 1),
+        _formItem(name: 'Gibberish', amount: 'not-a-number', chargedToUserId: 1),
+      ];
+
+      await _pumpItems(
+        tester,
+        items: items,
+        users: <api.UserView>[_user(id: 1, displayName: 'Alice')],
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Free'), findsOneWidget);
+      expect(find.text('Refund'), findsOneWidget);
+      expect(find.text('Gibberish'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'unknown user: renders an "Unknown user" panel instead of throwing',
+    (tester) async {
+      // chargedToUserId 99 is not in the seeded UserModel — `_safeGetUser`
+      // must catch the `firstWhere`-without-`orElse` throw inside
+      // UserModel.getUserById and fall back gracefully.
+      final List<FormItem> items = <FormItem>[
+        _formItem(name: 'Burger', amount: '10.00', chargedToUserId: 99),
+      ];
+
+      await _pumpItems(
+        tester,
+        items: items,
+        users: <api.UserView>[_user(id: 1, displayName: 'Alice')],
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Burger'), findsOneWidget);
     },
   );
 }
