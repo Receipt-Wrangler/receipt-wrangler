@@ -16,7 +16,7 @@ describe('SettingsComponent', () => {
   let fixture: ComponentFixture<SettingsComponent>;
   let store: Store;
 
-  const tabNames = () => component.tabs.map((t) => t.name);
+  const tabNames = () => component.tabs().map((t) => t.name);
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({

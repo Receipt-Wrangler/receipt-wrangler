@@ -1,6 +1,6 @@
 import { OverlayContainer } from "@angular/cdk/overlay";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatMenuModule, MatMenuTrigger } from "@angular/material/menu";
 import { MatSidenavModule } from "@angular/material/sidenav";
@@ -29,13 +29,11 @@ describe("SidebarComponent", () => {
     );
 
   const openMenu = async () => {
-    fixture.detectChanges();
     await fixture.whenStable();
     const trigger = fixture.debugElement
       .query(By.directive(MatMenuTrigger))
       .injector.get(MatMenuTrigger);
     trigger.openMenu();
-    fixture.detectChanges();
     await fixture.whenStable();
   };
 
@@ -58,14 +56,13 @@ describe("SidebarComponent", () => {
         RouterTestingModule,
         SharedUiModule,
         ApiModule],
-    providers: [provideHttpClient(withInterceptorsFromDi())]
+    providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi())]
 }).compileComponents();
 
     store = TestBed.inject(Store);
     overlayContainer = TestBed.inject(OverlayContainer);
     fixture = TestBed.createComponent(SidebarComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
   });
 
   it("should create", () => {
@@ -124,7 +121,6 @@ describe("SidebarComponent", () => {
     login();
     store.dispatch(new SetSelectedGroupId("5"));
     store.dispatch(new SetPermissions([], { 5: ["group.receipts.create"] }));
-    fixture.detectChanges();
     await fixture.whenStable();
 
     expect(queryTestId("sidebar-add-receipt")).toBeTruthy();
@@ -138,7 +134,6 @@ describe("SidebarComponent", () => {
     store.dispatch(
       new SetPermissions([], { 5: ["group.receipts.quick-scan"] })
     );
-    fixture.detectChanges();
     await fixture.whenStable();
 
     expect(queryTestId("sidebar-quick-scan")).toBeTruthy();
@@ -149,7 +144,6 @@ describe("SidebarComponent", () => {
     login();
     store.dispatch(new SetSelectedGroupId("5"));
     store.dispatch(new SetPermissions([], { 5: [] }));
-    fixture.detectChanges();
     await fixture.whenStable();
 
     expect(queryTestId("sidebar-add-receipt")).toBeFalsy();

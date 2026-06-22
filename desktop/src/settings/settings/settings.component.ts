@@ -1,4 +1,4 @@
-import { Component, OnInit } from "@angular/core";
+import { Component, computed } from "@angular/core";
 import { Store } from "@ngxs/store";
 import { DEFAULT_HOST_CLASS } from "src/constants";
 import { Permission } from "../../open-api";
@@ -12,52 +12,48 @@ import { TabConfig } from "../../shared-ui/tabs/tab-config.interface";
     host: DEFAULT_HOST_CLASS,
     standalone: false
 })
-export class SettingsComponent implements OnInit {
-  public tabs: TabConfig[] = [];
+export class SettingsComponent {
+  private readonly canReadProfile = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppAccountRead)
+  );
 
-  constructor(private store: Store) {}
+  private readonly canReadPreferences = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppUserPreferencesRead)
+  );
 
-  public ngOnInit(): void {
-    this.initTabs();
-  }
+  private readonly canReadApiKeys = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppApiKeysRead)
+  );
 
-  private initTabs(): void {
-    this.tabs = [];
+  public readonly tabs = computed<TabConfig[]>(() => {
+    const tabs: TabConfig[] = [];
 
-    if (
-      this.store.selectSnapshot(
-        AuthState.hasAppPermission(Permission.AppAccountRead)
-      )
-    ) {
-      this.tabs.push({
+    if (this.canReadProfile()) {
+      tabs.push({
         label: "User Profile",
         routerLink: "user-profile/view",
         name: "user-profile",
       });
     }
 
-    if (
-      this.store.selectSnapshot(
-        AuthState.hasAppPermission(Permission.AppUserPreferencesRead)
-      )
-    ) {
-      this.tabs.push({
+    if (this.canReadPreferences()) {
+      tabs.push({
         label: "User Preferences",
         routerLink: "user-preferences/view",
         name: "user-preferences",
       });
     }
 
-    if (
-      this.store.selectSnapshot(
-        AuthState.hasAppPermission(Permission.AppApiKeysRead)
-      )
-    ) {
-      this.tabs.push({
+    if (this.canReadApiKeys()) {
+      tabs.push({
         label: "API Keys",
         routerLink: "api-keys/view",
         name: "api-keys",
       });
     }
-  }
+
+    return tabs;
+  });
+
+  constructor(private store: Store) {}
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
@@ -13,9 +14,12 @@ import (
 	"receipt-wrangler/api/internal/utils"
 	"strings"
 	"testing"
+	"time"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v2"
 	"github.com/auth0/go-jwt-middleware/v2/validator"
+	"github.com/go-chi/chi/v5"
+	"github.com/shopspring/decimal"
 )
 
 func claimsForUser(userId uint) *validator.ValidatedClaims {
@@ -214,6 +218,177 @@ func TestCreateReceiptAllowedForGrantedCategory(t *testing.T) {
 	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
 
 	CreateReceipt(w, r)
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+	}
+}
+
+// seedCustomField creates a custom field and returns it.
+func seedCustomField(t *testing.T) models.CustomField {
+	t.Helper()
+	field := models.CustomField{Name: "Field", Type: models.TEXT}
+	if err := repositories.GetDB().Create(&field).Error; err != nil {
+		t.Fatalf("seed custom field: %v", err)
+	}
+	return field
+}
+
+// seedReceipt creates a persisted receipt in groupId, optionally attaching a
+// custom field value for customFieldId (0 = none), and returns the receipt id.
+func seedReceipt(t *testing.T, groupId uint, paidByUserId uint, customFieldId uint) uint {
+	t.Helper()
+	receipt := models.Receipt{
+		Name:         "Existing",
+		Amount:       decimal.NewFromInt(5),
+		Date:         time.Now(),
+		GroupId:      groupId,
+		PaidByUserID: paidByUserId,
+		Status:       models.OPEN,
+	}
+	if customFieldId != 0 {
+		receipt.CustomFields = []models.CustomFieldValue{{CustomFieldId: customFieldId}}
+	}
+	if err := repositories.GetDB().Create(&receipt).Error; err != nil {
+		t.Fatalf("seed receipt: %v", err)
+	}
+	return receipt.ID
+}
+
+// updateReceiptRequest builds an UpdateReceipt request for receiptId acting as
+// userId, with the given JSON body.
+func updateReceiptRequest(receiptId uint, userId uint, body string) (*httptest.ResponseRecorder, *http.Request) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("PUT", "/api", strings.NewReader(body))
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", utils.UintToString(receiptId))
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
+
+	return w, r
+}
+
+func TestCreateReceiptDeniedForCustomFieldWithoutAccess(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	userId, groupId := seedRestrictedReceiptCreator(t, nil)
+	field := seedCustomField(t)
+
+	body := fmt.Sprintf(
+		`{"name":"R","amount":"5","date":"2024-01-01T00:00:00Z","groupId":%d,"paidByUserId":%d,"status":"OPEN","customFields":[{"customFieldId":%d}]}`,
+		groupId, userId, field.ID,
+	)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api", strings.NewReader(body))
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
+
+	CreateReceipt(w, r)
+
+	if w.Result().StatusCode != 403 {
+		utils.PrintTestError(t, w.Result().StatusCode, 403)
+	}
+}
+
+func TestCreateReceiptAllowedForCustomFieldWithAccess(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	userId, groupId := seedRestrictedReceiptCreator(t, nil)
+	grantAppPerms(t, userId, permissions.AppCustomFieldsRead)
+	field := seedCustomField(t)
+
+	body := fmt.Sprintf(
+		`{"name":"R","amount":"5","date":"2024-01-01T00:00:00Z","groupId":%d,"paidByUserId":%d,"status":"OPEN","customFields":[{"customFieldId":%d}]}`,
+		groupId, userId, field.ID,
+	)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api", strings.NewReader(body))
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
+
+	CreateReceipt(w, r)
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+	}
+}
+
+func TestUpdateReceiptDeniedWhenAddingCustomFieldWithoutAccess(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	userId, groupId := seedRestrictedReceiptCreator(t, nil)
+	field := seedCustomField(t)
+	receiptId := seedReceipt(t, groupId, userId, 0)
+
+	body := fmt.Sprintf(
+		`{"name":"R","amount":"5","date":"2024-01-01T00:00:00Z","groupId":%d,"paidByUserId":%d,"status":"OPEN","customFields":[{"customFieldId":%d}]}`,
+		groupId, userId, field.ID,
+	)
+	w, r := updateReceiptRequest(receiptId, userId, body)
+
+	UpdateReceipt(w, r)
+
+	if w.Result().StatusCode != 403 {
+		utils.PrintTestError(t, w.Result().StatusCode, 403)
+	}
+}
+
+func TestUpdateReceiptDeniedWhenRemovingCustomFieldWithoutAccess(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	userId, groupId := seedRestrictedReceiptCreator(t, nil)
+	field := seedCustomField(t)
+	receiptId := seedReceipt(t, groupId, userId, field.ID)
+
+	body := fmt.Sprintf(
+		`{"name":"R","amount":"5","date":"2024-01-01T00:00:00Z","groupId":%d,"paidByUserId":%d,"status":"OPEN","customFields":[]}`,
+		groupId, userId,
+	)
+	w, r := updateReceiptRequest(receiptId, userId, body)
+
+	UpdateReceipt(w, r)
+
+	if w.Result().StatusCode != 403 {
+		utils.PrintTestError(t, w.Result().StatusCode, 403)
+	}
+}
+
+func TestUpdateReceiptAllowedWhenEditingCustomFieldValueWithoutAccess(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	userId, groupId := seedRestrictedReceiptCreator(t, nil)
+	field := seedCustomField(t)
+	receiptId := seedReceipt(t, groupId, userId, field.ID)
+
+	// Same custom field set, only the value changes — allowed without read.
+	body := fmt.Sprintf(
+		`{"name":"R","amount":"5","date":"2024-01-01T00:00:00Z","groupId":%d,"paidByUserId":%d,"status":"OPEN","customFields":[{"customFieldId":%d,"stringValue":"edited"}]}`,
+		groupId, userId, field.ID,
+	)
+	w, r := updateReceiptRequest(receiptId, userId, body)
+
+	UpdateReceipt(w, r)
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+	}
+}
+
+func TestUpdateReceiptAllowedWhenChangingCustomFieldsWithAccess(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	userId, groupId := seedRestrictedReceiptCreator(t, nil)
+	grantAppPerms(t, userId, permissions.AppCustomFieldsRead)
+	field := seedCustomField(t)
+	receiptId := seedReceipt(t, groupId, userId, 0)
+
+	// Read holder may add a custom field freely.
+	body := fmt.Sprintf(
+		`{"name":"R","amount":"5","date":"2024-01-01T00:00:00Z","groupId":%d,"paidByUserId":%d,"status":"OPEN","customFields":[{"customFieldId":%d}]}`,
+		groupId, userId, field.ID,
+	)
+	w, r := updateReceiptRequest(receiptId, userId, body)
+
+	UpdateReceipt(w, r)
 
 	if w.Result().StatusCode != 200 {
 		utils.PrintTestError(t, w.Result().StatusCode, 200)

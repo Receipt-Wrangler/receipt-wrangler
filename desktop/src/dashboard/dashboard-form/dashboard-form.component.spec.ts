@@ -83,8 +83,8 @@ describe("DashboardFormComponent", () => {
 
     component.ngOnInit();
 
-    expect(component.categories).toEqual(categories);
-    expect(component.tags).toEqual(tags);
+    expect(component.categories()).toEqual(categories);
+    expect(component.tags()).toEqual(tags);
   });
 
   it("should submit valid form", () => {

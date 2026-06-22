@@ -1,6 +1,6 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
-import { NO_ERRORS_SCHEMA } from "@angular/core";
+import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
@@ -54,7 +54,7 @@ describe("HeaderComponent", () => {
         NgbPopoverModule,
         StoreModule,
     ],
-    providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()],
+    providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()],
     schemas: [NO_ERRORS_SCHEMA],
 }).compileComponents();
 
@@ -126,6 +126,7 @@ describe("HeaderComponent", () => {
 
     logIn();
     grantNotificationsRead();
+    TestBed.flushEffects();
     await fixture.whenStable();
 
     expect(countSpy).toHaveBeenCalledTimes(1);

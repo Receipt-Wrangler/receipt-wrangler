@@ -58,13 +58,13 @@ describe("ApiKeyTableComponent", () => {
     it("is true when the user holds read-any", () => {
       store.dispatch(new SetPermissions([Permission.AppApiKeysReadAny], {}));
       component.ngOnInit();
-      expect(component.canViewAll).toBe(true);
+      expect(component.canViewAll()).toBe(true);
     });
 
     it("is false without read-any", () => {
       store.dispatch(new SetPermissions([Permission.AppApiKeysRead], {}));
       component.ngOnInit();
-      expect(component.canViewAll).toBe(false);
+      expect(component.canViewAll()).toBe(false);
     });
   });
 
@@ -72,13 +72,13 @@ describe("ApiKeyTableComponent", () => {
     it("is true when the user holds create", () => {
       store.dispatch(new SetPermissions([Permission.AppApiKeysCreate], {}));
       component.ngOnInit();
-      expect(component.canCreate).toBe(true);
+      expect(component.canCreate()).toBe(true);
     });
 
     it("is false without create", () => {
       store.dispatch(new SetPermissions([Permission.AppApiKeysRead], {}));
       component.ngOnInit();
-      expect(component.canCreate).toBe(false);
+      expect(component.canCreate()).toBe(false);
     });
   });
 

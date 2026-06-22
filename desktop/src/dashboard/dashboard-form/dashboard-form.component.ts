@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation, viewChildren, viewChild } from "@angular/core";
+import { Component, OnInit, ViewEncapsulation, computed, viewChildren, viewChild } from "@angular/core";
 import { FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
@@ -35,11 +35,26 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
 
   public originalWidgets: Widget[] = [];
 
+  private readonly selectedGroupId = this.store.selectSignal(
+    GroupState.selectedGroupId
+  );
+
   // Filter options come from the selected group's grant-filtered AppData catalog
   // (same source as the receipts table), not the admin-only global endpoints.
-  public categories: Category[] = [];
+  // Derived so they refresh if the selected group changes while the dialog is open.
+  public readonly categories = computed<Category[]>(() => {
+    const groupId = Number(this.selectedGroupId());
+    return Number.isNaN(groupId)
+      ? []
+      : this.store.selectSnapshot(AuthState.groupCategories(groupId));
+  });
 
-  public tags: Tag[] = [];
+  public readonly tags = computed<Tag[]>(() => {
+    const groupId = Number(this.selectedGroupId());
+    return Number.isNaN(groupId)
+      ? []
+      : this.store.selectSnapshot(AuthState.groupTags(groupId));
+  });
 
   public get widgets(): FormArray {
     return this.form.get("widgets") as FormArray;
@@ -58,19 +73,7 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
 
   public ngOnInit(): void {
     this.originalWidgets = Array.from(this.dashboard?.widgets ?? []);
-    this.setCategoryTagPools();
     this.initForm();
-  }
-
-  private setCategoryTagPools(): void {
-    const groupId = Number(this.store.selectSnapshot(GroupState.selectedGroupId));
-    if (Number.isNaN(groupId)) {
-      this.categories = [];
-      this.tags = [];
-      return;
-    }
-    this.categories = this.store.selectSnapshot(AuthState.groupCategories(groupId));
-    this.tags = this.store.selectSnapshot(AuthState.groupTags(groupId));
   }
 
   public initForm(): void {
