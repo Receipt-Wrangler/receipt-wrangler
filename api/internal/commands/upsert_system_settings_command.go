@@ -3,9 +3,11 @@ package commands
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
+	"strings"
 )
 
 type UpsertSystemSettingsCommand struct {
@@ -22,6 +24,8 @@ type UpsertSystemSettingsCommand struct {
 	FallbackReceiptProcessingSettingsId *uint                                 `json:"fallbackReceiptProcessingSettingsId"`
 	TaskConcurrency                     int                                   `json:"taskConcurrency"`
 	TaskQueueConfigurations             []UpsertTaskQueueConfigurationCommand `json:"taskQueueConfigurations"`
+	McpEnabled                          bool                                  `json:"mcpEnabled"`
+	McpPublicUrl                        string                                `json:"mcpPublicUrl"`
 }
 
 func (command *UpsertSystemSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -87,7 +91,26 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 		errorMap["taskQueueConfigurations"] = "Task queue configurations must be provided for all queues"
 	}
 
+	trimmedMcpPublicUrl := strings.TrimSpace(command.McpPublicUrl)
+	if command.McpEnabled && len(trimmedMcpPublicUrl) == 0 {
+		errorMap["mcpPublicUrl"] = "A public URL is required to enable the MCP server"
+	} else if len(trimmedMcpPublicUrl) > 0 && !isValidMcpPublicUrl(trimmedMcpPublicUrl) {
+		errorMap["mcpPublicUrl"] = "MCP public URL must be an absolute origin like https://receipts.example.com"
+	}
+
 	return vErr
+}
+
+// isValidMcpPublicUrl reports whether the value is an absolute http(s) origin.
+// A scheme and host are required; paths/queries/fragments are tolerated here
+// because they are stripped to the bare origin when the URL is consumed.
+func isValidMcpPublicUrl(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+
+	return parsed.Scheme == "http" || parsed.Scheme == "https"
 }
 
 func (command *UpsertSystemSettingsCommand) ToSystemSettings(id uint) (models.SystemSettings, error) {

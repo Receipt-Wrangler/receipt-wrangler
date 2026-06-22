@@ -23,9 +23,10 @@ Each component has its own CLAUDE.md with detailed component-specific guidance. 
   - MCP: TypeScript client for MCP integration
 - **Development Flow**: Changes to API → update swagger.yml → regenerate clients → update frontend
 - **MCP Server**: The Go API also hosts a native, OAuth 2.1-protected **MCP server** (off by
-  default; enable with `MCP_ENABLED=true`) so clients like Claude can read receipts/groups/etc.
-  See `api/CLAUDE.md` → "MCP Server & OAuth 2.1". This is distinct from the generated MCP
-  TypeScript client above.
+  default; enabled and configured at runtime via **System Settings** — `mcpEnabled` /
+  `mcpPublicUrl`, no env var) so clients like Claude can read receipts/groups/etc. It starts and
+  stops live without a restart. See `api/CLAUDE.md` → "MCP Server & OAuth 2.1". This is distinct
+  from the generated MCP TypeScript client above.
 
 ### Technology Stack
 - **Backend**: Go 1.25 with Chi router, GORM ORM, Asynq background jobs

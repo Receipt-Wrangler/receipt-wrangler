@@ -52,6 +52,22 @@ func TestUpsertSystemSettingsCommand_Validate_ValidInputs(t *testing.T) {
 				return cmd
 			}(),
 		},
+		"valid with mcp enabled and a public url": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.McpEnabled = true
+				cmd.McpPublicUrl = "https://receipts.example.com"
+				return cmd
+			}(),
+		},
+		"valid with mcp disabled and no public url": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.McpEnabled = false
+				cmd.McpPublicUrl = ""
+				return cmd
+			}(),
+		},
 	}
 
 	for testName, test := range tests {
@@ -123,6 +139,18 @@ func TestUpsertSystemSettingsCommand_Validate_InvalidInputs(t *testing.T) {
 		"wrong queue config count": {
 			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.TaskQueueConfigurations = []UpsertTaskQueueConfigurationCommand{} },
 			expectedError: "taskQueueConfigurations",
+		},
+		"mcp enabled without a public url": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpEnabled = true; cmd.McpPublicUrl = "" },
+			expectedError: "mcpPublicUrl",
+		},
+		"mcp public url missing scheme": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpPublicUrl = "receipts.example.com" },
+			expectedError: "mcpPublicUrl",
+		},
+		"mcp public url with unsupported scheme": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpPublicUrl = "ftp://receipts.example.com" },
+			expectedError: "mcpPublicUrl",
 		},
 	}
 

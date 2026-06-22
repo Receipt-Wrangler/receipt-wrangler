@@ -2,18 +2,20 @@ package oauth
 
 import (
 	"net/http"
-	config "receipt-wrangler/api/internal/env"
+	"receipt-wrangler/api/internal/services"
 )
 
-// issuer returns the OAuth issuer / public origin (no trailing slash).
+// issuer returns the OAuth issuer / public origin (no trailing slash), read
+// live from System Settings so it tracks runtime configuration changes.
 func issuer() string {
-	return config.GetMcpPublicUrl()
+	return services.GetMcpPublicUrl()
 }
 
-// mcpResourceUrl is the protected resource identifier advertised to clients
-// and echoed back as the RFC 8707 resource indicator.
+// mcpResourceUrl is the protected resource identifier advertised to clients,
+// echoed back as the RFC 8707 resource indicator, and bound as the audience of
+// MCP tokens.
 func mcpResourceUrl() string {
-	return issuer() + "/mcp"
+	return services.GetMcpResourceUrl()
 }
 
 // ProtectedResourceMetadata serves RFC 9728 OAuth 2.0 Protected Resource

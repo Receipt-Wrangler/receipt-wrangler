@@ -50,6 +50,14 @@ export interface UpsertSystemSettingsCommand {
      */
     taskConcurrency: number;
     taskQueueConfigurations?: Array<UpsertTaskQueueConfiguration>;
+    /**
+     * Whether the OAuth 2.1-protected MCP server is enabled
+     */
+    mcpEnabled?: boolean;
+    /**
+     * Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
+     */
+    mcpPublicUrl?: string;
 }
 export namespace UpsertSystemSettingsCommand {
 }

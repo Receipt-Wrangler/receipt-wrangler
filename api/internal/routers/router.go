@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"net/http"
 	"receipt-wrangler/api/internal/corspolicy"
 	config "receipt-wrangler/api/internal/env"
 	"receipt-wrangler/api/internal/logging"
@@ -139,28 +140,47 @@ func BuildRootRouter() *chi.Mux {
 	widgetRouter := BuildWidgetRouter()
 	rootRouter.Mount("/api/widget", widgetRouter)
 
-	// MCP server + OAuth 2.1 authorization endpoints (opt-in via MCP_ENABLED).
-	// These are mounted at the server root because the OAuth discovery
-	// documents must live at well-known root paths.
-	if config.GetMcpEnabled() {
-		mountMcpRoutes(rootRouter)
-	}
+	// MCP server + OAuth 2.1 authorization endpoints. These are mounted at the
+	// server root because the OAuth discovery documents must live at well-known
+	// root paths. Unlike background workers, HTTP routes can only be mounted
+	// once at startup, so rather than re-mounting when the operator toggles the
+	// server, the handlers are always mounted and gated at request time by the
+	// live MCP_ENABLED System Setting (see mcpEnabledMiddleware).
+	mountMcpRoutes(rootRouter)
 
 	return rootRouter
+}
+
+// mcpEnabledMiddleware short-circuits MCP/OAuth requests with a 404 whenever the
+// MCP server is disabled in System Settings, so the always-mounted routes
+// behave as if absent until an admin enables them — no restart required.
+func mcpEnabledMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !services.IsMcpEnabled() {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // mountMcpRoutes wires the MCP Streamable HTTP endpoint and the self-hosted
 // OAuth 2.1 authorization-server endpoints used by MCP clients such as Claude.
 func mountMcpRoutes(rootRouter *chi.Mux) {
-	rootRouter.Get("/.well-known/oauth-protected-resource", oauth.ProtectedResourceMetadata)
-	rootRouter.Get("/.well-known/oauth-authorization-server", oauth.AuthorizationServerMetadata)
-
-	rootRouter.Post("/oauth/register", oauth.Register)
-	rootRouter.Get("/oauth/authorize", oauth.AuthorizeForm)
-	rootRouter.Post("/oauth/authorize", oauth.Authorize)
-	rootRouter.Post("/oauth/token", oauth.Token)
-
 	mcpHandler := mcp.NewHandler()
-	rootRouter.Handle("/mcp", mcpHandler)
-	rootRouter.Handle("/mcp/*", mcpHandler)
+
+	rootRouter.Group(func(r chi.Router) {
+		r.Use(mcpEnabledMiddleware)
+
+		r.Get("/.well-known/oauth-protected-resource", oauth.ProtectedResourceMetadata)
+		r.Get("/.well-known/oauth-authorization-server", oauth.AuthorizationServerMetadata)
+
+		r.Post("/oauth/register", oauth.Register)
+		r.Get("/oauth/authorize", oauth.AuthorizeForm)
+		r.Post("/oauth/authorize", oauth.Authorize)
+		r.Post("/oauth/token", oauth.Token)
+
+		r.Handle("/mcp", mcpHandler)
+		r.Handle("/mcp/*", mcpHandler)
+	})
 }

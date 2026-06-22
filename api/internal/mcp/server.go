@@ -13,8 +13,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	config "receipt-wrangler/api/internal/env"
-	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -24,7 +22,15 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// mcpReadScope is the single read-only scope granted to MCP access tokens.
+// mcpReadScope is the single scope advertised on MCP access tokens.
+//
+// NOTE: this scope is currently DEAD as an authorization control. The bearer
+// middleware requires its presence, but every issued token carries it, so it
+// gates nothing. Read-only behavior is guaranteed structurally by the fact
+// that registerTools only registers read tools (no write/delete tools), not by
+// this scope. The moment a write or delete tool is added, that structural
+// guarantee is gone and real per-tool scope enforcement must be introduced.
+// See the matching note on readScope in internal/oauth/oauth.go.
 const mcpReadScope = "mcp:read"
 
 // claimsKey is the auth.TokenInfo.Extra key under which the verified
@@ -48,29 +54,37 @@ func NewHandler() http.Handler {
 		return server
 	}, nil)
 
-	// Build the JWT validator once rather than per request; it is immutable and
-	// sits on the auth critical path for every MCP call.
-	tokenValidator, err := services.InitTokenValidator()
-	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_FATAL, "Failed to initialize MCP token validator: "+err.Error())
-	}
+	// The public URL — and therefore the token audience and the resource
+	// metadata URL — is a live System Setting, so it is read per request rather
+	// than captured once at startup. This keeps the bearer challenge and the
+	// audience the validator enforces in sync with the current configuration.
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		publicUrl := services.GetMcpPublicUrl()
+		resourceUrl := publicUrl + "/mcp"
 
-	options := &auth.RequireBearerTokenOptions{
-		ResourceMetadataURL: config.GetMcpPublicUrl() + "/.well-known/oauth-protected-resource",
-		Scopes:              []string{mcpReadScope},
-	}
+		options := &auth.RequireBearerTokenOptions{
+			ResourceMetadataURL: publicUrl + "/.well-known/oauth-protected-resource",
+			Scopes:              []string{mcpReadScope},
+		}
 
-	verifier := func(ctx context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
-		return verifyToken(ctx, tokenValidator, token)
-	}
+		verifier := func(ctx context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
+			return verifyToken(ctx, resourceUrl, token)
+		}
 
-	return auth.RequireBearerToken(verifier, options)(streamable)
+		auth.RequireBearerToken(verifier, options)(streamable).ServeHTTP(w, r)
+	})
 }
 
-// verifyToken validates a bearer access token with the provided validator and
+// verifyToken validates a bearer access token against the MCP audience and
 // returns its claims for downstream tool handlers. A validation failure is
-// wrapped in auth.ErrInvalidToken so the middleware responds 401.
-func verifyToken(ctx context.Context, tokenValidator *validator.Validator, token string) (*auth.TokenInfo, error) {
+// wrapped in auth.ErrInvalidToken so the middleware responds 401. The validator
+// is built per call because the MCP audience is derived from a live setting.
+func verifyToken(ctx context.Context, audience string, token string) (*auth.TokenInfo, error) {
+	tokenValidator, err := services.InitMcpTokenValidator(audience)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", auth.ErrInvalidToken, err)
+	}
+
 	validated, err := tokenValidator.ValidateToken(ctx, token)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", auth.ErrInvalidToken, err)

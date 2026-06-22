@@ -34,21 +34,20 @@ func TestNewHandlerRejectsMissingToken(t *testing.T) {
 	}
 }
 
+// testMcpAudience is a fixed MCP resource audience for direct verifyToken
+// tests, decoupled from whatever public URL System Settings resolves to.
+const testMcpAudience = "https://receipts.example.com/mcp"
+
 func TestVerifyTokenAcceptsValidJwt(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
 	user := createUser(t, "tokenuser")
-	accessToken, _, _, err := services.GenerateJWT(user.ID)
+	accessToken, _, _, err := services.GenerateMcpJWT(user.ID, testMcpAudience)
 	if err != nil {
 		t.Fatalf("failed to generate jwt: %v", err)
 	}
 
-	tokenValidator, err := services.InitTokenValidator()
-	if err != nil {
-		t.Fatalf("failed to init validator: %v", err)
-	}
-
-	info, err := verifyToken(context.Background(), tokenValidator, accessToken)
+	info, err := verifyToken(context.Background(), testMcpAudience, accessToken)
 	if err != nil {
 		t.Fatalf("verifyToken rejected a valid token: %v", err)
 	}
@@ -60,11 +59,29 @@ func TestVerifyTokenAcceptsValidJwt(t *testing.T) {
 	}
 }
 
+// TestVerifyTokenRejectsNonMcpAudience proves an MCP token is bound to the MCP
+// audience: a normal REST token (and any other audience) is rejected.
+func TestVerifyTokenRejectsNonMcpAudience(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := createUser(t, "restuser")
+	restToken, _, _, err := services.GenerateJWT(user.ID)
+	if err != nil {
+		t.Fatalf("failed to generate jwt: %v", err)
+	}
+
+	if _, err := verifyToken(context.Background(), testMcpAudience, restToken); err == nil {
+		t.Fatalf("expected a normal REST token to be rejected by the MCP validator")
+	}
+}
+
 func TestHandlerAcceptsIssuedToken(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
 	user := createUser(t, "bearer")
-	accessToken, _, _, err := services.GenerateJWT(user.ID)
+	// The handler reads the audience live from System Settings, so mint with
+	// the same resolved resource URL it will validate against.
+	accessToken, _, _, err := services.GenerateMcpJWT(user.ID, services.GetMcpResourceUrl())
 	if err != nil {
 		t.Fatalf("failed to generate jwt: %v", err)
 	}
@@ -84,12 +101,7 @@ func TestHandlerAcceptsIssuedToken(t *testing.T) {
 }
 
 func TestVerifyTokenRejectsInvalidJwt(t *testing.T) {
-	tokenValidator, err := services.InitTokenValidator()
-	if err != nil {
-		t.Fatalf("failed to init validator: %v", err)
-	}
-
-	_, err = verifyToken(context.Background(), tokenValidator, "not-a-real-token")
+	_, err := verifyToken(context.Background(), testMcpAudience, "not-a-real-token")
 	if err == nil {
 		t.Fatalf("expected an error for an invalid token")
 	}

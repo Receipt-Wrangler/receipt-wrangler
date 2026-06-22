@@ -2,7 +2,6 @@ package env
 
 import (
 	"flag"
-	"net/url"
 	"os"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/logging"
@@ -121,46 +120,6 @@ func parseBoolEnv(name constants.EnvironmentVariable, defaultValue bool) bool {
 		return defaultValue
 	}
 	return enabled
-}
-
-// GetMcpEnabled reports whether the MCP server and its OAuth 2.1
-// authorization endpoints should be mounted. Defaults to false so existing
-// deployments are unaffected until an operator explicitly opts in via
-// MCP_ENABLED=true.
-func GetMcpEnabled() bool {
-	return parseBoolEnv(constants.McpEnabled, false)
-}
-
-// GetMcpPublicUrl returns the externally reachable origin (scheme + host,
-// no trailing slash) used to build the OAuth issuer, resource, metadata, and
-// redirect URLs advertised to MCP clients such as Claude. BASE_PATH is a
-// filesystem path prefix, not an origin, so it cannot be reused here. In dev
-// it defaults to the API's local address.
-func GetMcpPublicUrl() string {
-	const defaultUrl = "http://localhost:8081"
-
-	raw := os.Getenv(string(constants.McpPublicUrl))
-	if len(raw) == 0 {
-		return defaultUrl
-	}
-
-	// MCP_PUBLIC_URL must be a bare origin (scheme + host). Any path, query, or
-	// fragment would corrupt the issuer/metadata/redirect URLs derived from it,
-	// so normalize to scheme://host and fall back to the default on anything
-	// unparseable or missing a scheme/host.
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, string(constants.McpPublicUrl)+
-			" must be an absolute origin like https://host (got "+raw+"); falling back to "+defaultUrl)
-		return defaultUrl
-	}
-
-	if parsed.Path != "" && parsed.Path != "/" || parsed.RawQuery != "" || parsed.Fragment != "" {
-		logging.LogStd(logging.LOG_LEVEL_INFO, string(constants.McpPublicUrl)+
-			" should be a bare origin; ignoring path/query/fragment in "+raw)
-	}
-
-	return parsed.Scheme + "://" + parsed.Host
 }
 
 func SetConfigs() error {

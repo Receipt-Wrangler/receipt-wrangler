@@ -22,7 +22,15 @@ import (
 )
 
 const (
-	// readScope is the only scope granted to MCP tokens in v1 (read-only).
+	// readScope is the only scope granted to MCP tokens in v1.
+	//
+	// NOTE: this scope is currently DEAD as an authorization control. Nothing
+	// gates access on it — read-only behavior is guaranteed structurally by the
+	// fact that internal/mcp only registers read tools (no write/delete tools),
+	// not by checking this scope. The moment a write or delete tool is added,
+	// that structural guarantee is gone and real per-tool scope enforcement
+	// must be introduced here and in internal/mcp. See the matching note on
+	// mcpReadScope in internal/mcp/server.go.
 	readScope = "mcp:read"
 
 	// authCodeTTLSeconds bounds how long an issued authorization code is

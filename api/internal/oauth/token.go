@@ -100,7 +100,11 @@ func handleRefreshTokenGrant(w http.ResponseWriter, r *http.Request) {
 // existing single-use refresh flow (middleware.RevokeRefreshToken). It returns
 // the owning user id on success.
 func rotateRefreshToken(refreshTokenString string) (uint, error) {
-	tokenValidator, err := services.InitTokenValidator()
+	// Validate against the MCP audience, not the normal REST audience. This is
+	// what stops a client from POSTing an MCP refresh token to /api/token to
+	// trade it for a full-access token (and vice versa): each endpoint only
+	// accepts refresh tokens minted for its own audience.
+	tokenValidator, err := services.InitMcpTokenValidator(mcpResourceUrl())
 	if err != nil {
 		return 0, err
 	}
@@ -132,9 +136,11 @@ func rotateRefreshToken(refreshTokenString string) (uint, error) {
 }
 
 // issueTokenResponse mints a fresh access + refresh JWT pair for the user and
-// writes the OAuth token response.
+// writes the OAuth token response. The pair is bound to the MCP resource as its
+// audience (rather than the normal REST audience) so these tokens are accepted
+// only at the MCP endpoints.
 func issueTokenResponse(w http.ResponseWriter, userId uint, scope string) {
-	accessToken, refreshToken, _, err := services.GenerateJWT(userId)
+	accessToken, refreshToken, _, err := services.GenerateMcpJWT(userId, mcpResourceUrl())
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to generate token for MCP client: "+err.Error())
 		writeOAuthError(w, http.StatusInternalServerError, "server_error", "Failed to issue token")

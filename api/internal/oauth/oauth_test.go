@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
@@ -16,9 +15,24 @@ import (
 const testPublicUrl = "https://receipts.example.com"
 const testRedirectUri = "https://claude.ai/api/mcp/auth_callback"
 
+// setPublicUrl enables the MCP server and sets its public URL in System
+// Settings, which is where the OAuth issuer/metadata/audience are now read from
+// at runtime (the env-based config was removed).
 func setPublicUrl(t *testing.T) {
 	t.Helper()
-	t.Setenv(string(constants.McpPublicUrl), testPublicUrl)
+
+	settings, err := repositories.NewSystemSettingsRepository(nil).GetSystemSettings()
+	if err != nil {
+		t.Fatalf("failed to load system settings: %v", err)
+	}
+
+	err = repositories.GetDB().
+		Model(&models.SystemSettings{}).
+		Where("id = ?", settings.ID).
+		Updates(map[string]interface{}{"mcp_enabled": true, "mcp_public_url": testPublicUrl}).Error
+	if err != nil {
+		t.Fatalf("failed to set mcp system settings: %v", err)
+	}
 }
 
 func decodeJson(t *testing.T, body []byte) map[string]interface{} {
@@ -424,9 +438,12 @@ func TestTokenRejectsWrongCodeVerifier(t *testing.T) {
 func TestTokenRefreshGrant(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
+	setPublicUrl(t)
 	user := createTestUserWithPassword(t, "frank", "password")
 
-	_, refreshToken, _, err := services.GenerateJWT(user.ID)
+	// Mint an MCP-audience refresh token; the refresh grant now validates
+	// against the MCP audience, so a normal-audience token would be rejected.
+	_, refreshToken, _, err := services.GenerateMcpJWT(user.ID, mcpResourceUrl())
 	if err != nil {
 		t.Fatalf("failed to generate initial tokens: %v", err)
 	}

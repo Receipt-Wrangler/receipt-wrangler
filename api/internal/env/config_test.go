@@ -27,33 +27,6 @@ func tearDownConfigTests() {
 	os.Unsetenv("DB_FILENAME")
 }
 
-func TestGetMcpPublicUrl(t *testing.T) {
-	tests := []struct {
-		name  string
-		value string
-		want  string
-	}{
-		{"unset falls back to default", "", "http://localhost:8081"},
-		{"clean origin is returned as-is", "https://receipts.example.com", "https://receipts.example.com"},
-		{"trailing slash is trimmed", "https://receipts.example.com/", "https://receipts.example.com"},
-		{"path is stripped to the origin", "https://receipts.example.com/mcp?x=1#y", "https://receipts.example.com"},
-		{"missing scheme falls back to default", "receipts.example.com", "http://localhost:8081"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if test.value == "" {
-				os.Unsetenv("MCP_PUBLIC_URL")
-			} else {
-				t.Setenv("MCP_PUBLIC_URL", test.value)
-			}
-
-			if got := GetMcpPublicUrl(); got != test.want {
-				t.Errorf("GetMcpPublicUrl() = %q, want %q", got, test.want)
-			}
-		})
-	}
-}
 
 func TestShouldGetEmptyDatabaseConfig(t *testing.T) {
 	tearDownConfigTests()
