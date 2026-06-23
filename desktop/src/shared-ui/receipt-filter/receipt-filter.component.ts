@@ -3,11 +3,11 @@ import { FormControl, FormGroup, } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { endOfDay, startOfMonth } from "date-fns";
-import { forkJoin, take, tap } from "rxjs";
+import { take, tap } from "rxjs";
 import { RECEIPT_STATUS_OPTIONS } from "src/constants";
 import { SetReceiptFilter } from "src/store/receipt-table.actions";
 import { FormCommand } from "../../form/index";
-import { Category, CategoryService, FilterOperation, Tag, TagService } from "../../open-api";
+import { Category, FilterOperation, Tag } from "../../open-api";
 import { OperationsPipe } from "./operations.pipe";
 
 @Component({
@@ -39,9 +39,12 @@ export class ReceiptFilterComponent implements OnInit {
 
   public receiptStatusOptions = RECEIPT_STATUS_OPTIONS;
 
-  public categories: Category[] = [];
+  // Sourced from the selected group's grant-filtered AppData catalog by the
+  // caller (set imperatively for the dialog, bound for the inline dashboard use)
+  // rather than the admin-only global GET /category and GET /tag endpoints.
+  @Input() public categories: Category[] = [];
 
-  public tags: Tag[] = [];
+  @Input() public tags: Tag[] = [];
 
   public startOfMonthFormControl = new FormControl(startOfMonth(new Date()));
 
@@ -51,28 +54,14 @@ export class ReceiptFilterComponent implements OnInit {
 
   constructor(
     private store: Store,
-    private dialogRef: MatDialogRef<ReceiptFilterComponent>,
-    private categoryService: CategoryService,
-    private tagService: TagService
+    private dialogRef: MatDialogRef<ReceiptFilterComponent>
   ) {}
 
   public ngOnInit(): void {
     this.startOfMonthFormControl.disable();
     this.endOfTodayFormControl.disable();
 
-    forkJoin([
-      this.categoryService.getAllCategories(),
-      this.tagService.getAllTags(),
-    ])
-      .pipe(
-        take(1),
-        tap(([categories, tags]) => {
-          this.categories = categories;
-          this.tags = tags;
-          this.setupAutoOperationSelection();
-        })
-      )
-      .subscribe();
+    this.setupAutoOperationSelection();
   }
 
   public resetFilter(): void {

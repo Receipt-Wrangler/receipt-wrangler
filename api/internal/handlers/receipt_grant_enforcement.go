@@ -48,6 +48,53 @@ func enforceReceiptGrantSelection(userId uint, groupId uint, command commands.Up
 	return true, "", nil
 }
 
+// enforceReceiptCustomFieldSelection ensures a caller WITHOUT app.custom-fields.read
+// cannot change the SET of custom fields attached to a receipt — they may edit the
+// VALUES of fields already present, but may not add a new custom field id or remove an
+// existing one. Read holders manage the set freely. currentCustomFieldIds is the
+// receipt's existing set (nil/empty on create, so any custom field is an add). Returns
+// (allowed, denyMessage, error); the caller responds 403 with denyMessage when not allowed.
+func enforceReceiptCustomFieldSelection(userId uint, command commands.UpsertReceiptCommand, currentCustomFieldIds []uint) (bool, string, error) {
+	permissionService := services.NewPermissionService(nil)
+
+	canManage, err := permissionService.HasAppPermissions(userId, permissions.AppCustomFieldsRead)
+	if err != nil {
+		return false, "", err
+	}
+	if canManage {
+		return true, "", nil
+	}
+
+	submitted := make(map[uint]struct{}, len(command.CustomFields))
+	for _, customField := range command.CustomFields {
+		submitted[customField.CustomFieldId] = struct{}{}
+	}
+
+	current := make(map[uint]struct{}, len(currentCustomFieldIds))
+	for _, id := range currentCustomFieldIds {
+		current[id] = struct{}{}
+	}
+
+	if !uintSetsEqual(submitted, current) {
+		return false, "You do not have permission to add or remove custom fields", nil
+	}
+
+	return true, "", nil
+}
+
+// uintSetsEqual reports whether two uint sets contain exactly the same ids.
+func uintSetsEqual(a map[uint]struct{}, b map[uint]struct{}) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for id := range a {
+		if _, ok := b[id]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // collectReceiptSelection walks a receipt command (receipt-level, item-level, and
 // linked-item-level) and returns the existing category/tag ids referenced plus
 // whether any new-by-name category/tag is present.

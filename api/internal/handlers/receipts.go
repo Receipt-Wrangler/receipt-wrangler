@@ -174,6 +174,17 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
+			// A new receipt has no existing custom fields, so any custom field present
+			// is an add — blocked unless the caller can manage custom fields.
+			allowed, denyMessage, err = enforceReceiptCustomFieldSelection(token.UserId, command, nil)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			createdReceipt, err := receiptRepository.CreateReceipt(command, token.UserId, true)
 			if err != nil {
@@ -352,6 +363,21 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			}
 
 			allowed, denyMessage, err := enforceReceiptGrantSelection(token.UserId, currentReceipt.GroupId, command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
+			// A caller without custom-field access may edit values but not change which
+			// custom fields are attached to the receipt.
+			currentCustomFieldIds := make([]uint, 0, len(currentReceipt.CustomFields))
+			for _, customField := range currentReceipt.CustomFields {
+				currentCustomFieldIds = append(currentCustomFieldIds, customField.CustomFieldId)
+			}
+			allowed, denyMessage, err = enforceReceiptCustomFieldSelection(token.UserId, command, currentCustomFieldIds)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

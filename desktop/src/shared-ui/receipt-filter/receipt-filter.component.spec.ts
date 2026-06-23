@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { Component, CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef, } from "@angular/material/dialog";
+import { MatDialogModule, MatDialogRef, } from "@angular/material/dialog";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
@@ -12,7 +12,7 @@ import { PipesModule } from "src/pipes/pipes.module";
 import { SetReceiptFilter } from "src/store/receipt-table.actions";
 import { defaultReceiptFilter, } from "src/store/receipt-table.state";
 import { InputModule } from "../../input";
-import { CategoryService, FilterOperation, ReceiptStatus, TagService } from "../../open-api";
+import { Category, FilterOperation, ReceiptStatus, Tag } from "../../open-api";
 import { StoreModule } from "../../store/store.module";
 import { applyFormCommand } from "../../utils/index";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
@@ -83,19 +83,10 @@ describe("ReceiptFilterComponent", () => {
         PipesModule,
         ReactiveFormsModule],
       providers: [
-        CategoryService,
-        TagService,
         {
           provide: MatDialogRef,
           useValue: {
             close: (value: any) => { },
-          },
-        },
-        {
-          provide: MAT_DIALOG_DATA,
-          useValue: {
-            categories: [],
-            tags: [],
           },
         },
         provideHttpClient(withInterceptorsFromDi()),
@@ -113,14 +104,19 @@ describe("ReceiptFilterComponent", () => {
     expect(component).toBeTruthy();
   });
 
-  it("should init form with no default initial data", () => {
-    jest.spyOn(TestBed.inject(CategoryService), "getAllCategories").mockReturnValue(
-      of([]) as any
-    );
-    jest.spyOn(TestBed.inject(TagService), "getAllTags").mockReturnValue(
-      of([]) as any
-    );
+  it("uses the category/tag options provided as inputs", () => {
+    const categories = [{ id: 2, name: "Groceries" }] as Category[];
+    const tags = [{ id: 3, name: "Reimbursable" }] as Tag[];
 
+    component.categories = categories;
+    component.tags = tags;
+    component.ngOnInit();
+
+    expect(component.categories).toBe(categories);
+    expect(component.tags).toBe(tags);
+  });
+
+  it("should init form with no default initial data", () => {
     const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
 
     component.parentForm = buildReceiptFilterForm({}, noopComponent);
@@ -130,12 +126,6 @@ describe("ReceiptFilterComponent", () => {
   });
 
   it("should init form with initial data", () => {
-    jest.spyOn(TestBed.inject(CategoryService), "getAllCategories").mockReturnValue(
-      of([]) as any
-    );
-    jest.spyOn(TestBed.inject(TagService), "getAllTags").mockReturnValue(
-      of([]) as any
-    );
     store.reset({
       receiptTable: {
         filter: filledFilter,
@@ -151,12 +141,6 @@ describe("ReceiptFilterComponent", () => {
   });
 
   it("should reset form", () => {
-    jest.spyOn(TestBed.inject(CategoryService), "getAllCategories").mockReturnValue(
-      of([]) as any
-    );
-    jest.spyOn(TestBed.inject(TagService), "getAllTags").mockReturnValue(
-      of([]) as any
-    );
     store.reset({
       receiptTable: {
         filter: filledFilter,

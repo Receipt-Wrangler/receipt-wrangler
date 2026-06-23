@@ -7,8 +7,9 @@ import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
 import { PipesModule } from "src/pipes/pipes.module";
-import { ApiModule, Comment, CommentService } from "../../open-api";
+import { ApiModule, Comment, CommentService, Permission } from "../../open-api";
 import { AuthState } from "../../store";
+import { SetPermissions } from "../../store/auth.state.actions";
 import { ReceiptCommentsComponent } from "./receipt-comments.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -135,6 +136,42 @@ describe("ReceiptCommentsComponent", () => {
       receiptId: 1,
       comment: "new comment",
     });
+  });
+
+  it("gates comment create/delete on the group comment permissions", () => {
+    store.dispatch(
+      new SetPermissions([], { 5: [Permission.GroupCommentsCreate] })
+    );
+    fixture.componentRef.setInput("groupId", 5);
+
+    component.ngOnInit();
+
+    expect(component.canCreateComments()).toEqual(true);
+    expect(component.canDeleteComments()).toEqual(false);
+  });
+
+  it("grants comment delete only when group.comments.delete is held", () => {
+    store.dispatch(
+      new SetPermissions([], {
+        5: [Permission.GroupCommentsCreate, Permission.GroupCommentsDelete],
+      })
+    );
+    fixture.componentRef.setInput("groupId", 5);
+
+    component.ngOnInit();
+
+    expect(component.canCreateComments()).toEqual(true);
+    expect(component.canDeleteComments()).toEqual(true);
+  });
+
+  it("denies comment create/delete without the permissions", () => {
+    store.dispatch(new SetPermissions([], { 5: [] }));
+    fixture.componentRef.setInput("groupId", 5);
+
+    component.ngOnInit();
+
+    expect(component.canCreateComments()).toEqual(false);
+    expect(component.canDeleteComments()).toEqual(false);
   });
 
   it("should send api call if form is valid and is in edit mode", () => {

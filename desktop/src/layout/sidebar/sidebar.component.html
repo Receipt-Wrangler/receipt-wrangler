@@ -12,9 +12,11 @@
           [user]="loggedInUser() ?? $any({})"
           [matMenuTriggerFor]="menu"
         ></app-avatar>
+        @if (canAddAnything()) {
         <button
           mat-fab
           class="add-button mt-2"
+          data-testid="sidebar-add-fab"
           (click)="toggleAddButtonExpanded()"
           [ngClass]="{
             'add-button-rotated mt-4': addButtonExpanded,
@@ -40,6 +42,8 @@
             <mat-icon>person</mat-icon>
           </button> -->
           <button
+            *hasGroupPermission="{ groupId: selectedGroupIdNumber(), permission: Permission.GroupReceiptsCreate }"
+            data-testid="sidebar-add-receipt"
             class="mt-4 mb-1 add-sub-button-1"
             mat-icon-button
             routerLinkActive="active-sub-button"
@@ -50,8 +54,14 @@
           >
             <mat-icon>article</mat-icon>
           </button>
-          <app-quick-scan-button class="mb-1 add-sub-button-2"></app-quick-scan-button>
+          <app-quick-scan-button
+            *hasGroupPermission="{ groupId: selectedGroupIdNumber(), permission: Permission.GroupReceiptsQuickScan }"
+            data-testid="sidebar-quick-scan"
+            class="mb-1 add-sub-button-2"
+          ></app-quick-scan-button>
           <button
+            *hasAppPermission="Permission.AppGroupsCreate"
+            data-testid="sidebar-add-group"
             class="mb-1 add-sub-button-3"
             mat-icon-button
             routerLinkActive="active-sub-button"
@@ -63,6 +73,7 @@
             <mat-icon>group</mat-icon>
           </button>
         </div>
+        }
         <hr/>
         @for (group of groups(); track group.id) {
           <div class="p-2">
@@ -81,15 +92,17 @@
         <button *hasAppPermission="Permission.AppRolesRead" [routerLink]="['/roles']" mat-menu-item>
           Manage Roles
         </button>
-        <button [routerLink]="['/categories']" mat-menu-item>
+        <button *hasAppPermission="Permission.AppCategoriesRead" [routerLink]="['/categories']" mat-menu-item>
           Manage Categories
         </button>
-        <button [routerLink]="['/tags']" mat-menu-item>Manage Tags</button>
-        <button [routerLink]="['/groups']" mat-menu-item>Manage Groups</button>
-        <button [routerLink]="['/custom-fields']" mat-menu-item>Manage Custom Fields</button>
-        <button mat-menu-item [routerLink]="['/settings/user-profile/view']">
-          User Settings
-        </button>
+        <button *hasAppPermission="Permission.AppTagsRead" [routerLink]="['/tags']" mat-menu-item>Manage Tags</button>
+        <button *hasAppPermission="Permission.AppGroupsRead" [routerLink]="['/groups']" mat-menu-item>Manage Groups</button>
+        <button *hasAppPermission="Permission.AppCustomFieldsRead" [routerLink]="['/custom-fields']" mat-menu-item>Manage Custom Fields</button>
+        @if (canViewUserSettings()) {
+          <button mat-menu-item [routerLink]="['/settings']">
+            User Settings
+          </button>
+        }
         @if (canViewSystemSettings()) {
           <button [routerLink]="['/system-settings']" mat-menu-item>
             System Settings

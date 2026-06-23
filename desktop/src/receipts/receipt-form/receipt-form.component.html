@@ -191,6 +191,7 @@
           >
             <app-receipt-comments
               [receiptId]="originalReceipt?.id"
+              [groupId]="originalReceipt?.groupId"
               [comments]="originalReceipt?.comments ?? []"
               [mode]="mode"
               (commentsUpdated)="updateComments($event)"
@@ -282,17 +283,19 @@
     [disabled]="!canEditReceipt()"
     [buttonRouterLink]="[editLink]"
   ></app-button>
-  <app-filtered-stateful-menu
-    filterLabel="Filter custom fields"
-    matButtonType="iconButton"
-    icon="list_alt"
-    tooltip="Manage custom fields"
-    color="accent"
-    [readonly]="mode | inputReadonly"
-    [items]="customFieldsStatefulMenuItems"
-    [headerText]="(mode | inputReadonly) ? 'View Custom Fields' : 'Edit Custom Fields'"
-    (itemSelected)="customFieldChanged($event)"
-  ></app-filtered-stateful-menu>
+  @if (canManageCustomFields()) {
+    <app-filtered-stateful-menu
+      filterLabel="Filter custom fields"
+      matButtonType="iconButton"
+      icon="list_alt"
+      tooltip="Manage custom fields"
+      color="accent"
+      [readonly]="mode | inputReadonly"
+      [items]="customFieldsStatefulMenuItems"
+      [headerText]="(mode | inputReadonly) ? 'View Custom Fields' : 'Edit Custom Fields'"
+      (itemSelected)="customFieldChanged($event)"
+    ></app-filtered-stateful-menu>
+  }
   <app-button
     *ngIf="mode | inputReadonly"
     class="ms-1"
@@ -427,7 +430,7 @@
     icon="delete"
     tooltip="Remove Image"
     color="warn"
-    [disabled]="(showProgressBar() ?? false)"
+    [disabled]="!canEditReceipt() || (showProgressBar() ?? false)"
     (clicked)="removeImage()"
   ></app-button>
 </ng-template>

@@ -164,6 +164,15 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   `TokenRefreshService` (whose claims-only `SetAuthState` must not wipe permissions). They refresh on
   login + app-init; the server re-checks real permissions on every request, so the stored set is a UI
   hint (a stale button at worst 403s, handled by the interceptor).
+  - **403 handling (`src/interceptors/http-interceptor.ts`).** The backend returns **403 for every
+    access denial** (auth *and* permission — it never uses 401). With a still-valid token a 403 is a
+    permission denial, so the interceptor surfaces it via a **Forbidden toast** (only for
+    user-initiated mutations — non-`GET` — and never in `queueMode`) and **re-throws without logging
+    the user out**. It does **not** refresh/retry on 403: token freshness is handled proactively
+    elsewhere (15-min timer in `app.component.ts`, app-init, and `auth.guard`), and
+    `TokenRefreshService` keeps its own logout-on-refresh-failure path for a truly dead session.
+    Background `GET` 403s propagate silently for callers to handle (e.g. the `getRoles` +
+    `catchError` reads above).
   - **Category/tag catalogs:** AppData also carries `groupCategories` / `groupTags` (keyed by group
     id, filtered to the user's grants), stored via `SetGroupCatalog` and read with the
     `AuthState.groupCategories(groupId)` / `groupTags(groupId)` selectors. The **receipt form** and
@@ -183,14 +192,24 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   - **Route guards** (`src/guards/`): `appPermissionGuard` (`data: { appPermissions: [...] }`, ANY-of)
     and `groupPermissionGuard` (`data: { groupPermission, orAppPermissions?, useRouteGroupId? }`).
     `receiptGuardGuard` is unchanged (server-checked per-receipt access); `system-settings-landing.guard`
-    redirects `/system-settings` to the first tab the user can read.
+    redirects `/system-settings` to the first tab the user can read, and `settings-landing.guard`
+    does the same for `/settings` (the avatar-menu "User Settings" link → first readable of
+    User Profile `app.account.read` / User Preferences `app.user-preferences.read` / API Keys
+    `app.api-keys.read`). The `/settings` shell and each tab route are `appPermissionGuard`-gated on
+    those reads, the in-page tabs render conditionally on the same, and the avatar-menu button is
+    gated by a `hasAnyAppPermission` signal.
   - **Retired** with this migration: `RoleGuard`, `GroupRoleGuard`, the `*appRole` `RoleDirective`, the
     `groupRole` `GroupRolePipe`, and `GroupUtil.hasGroupAccess`. The group-member legacy-enum bridge
     (`legacyGroupRoleFromRole`) and `AuthState.userRole`/`hasRole` are now **removed** as well, since
     the backend legacy `UserRole`/`GroupRole` enums (and the `userRole`/`groupRole` API fields) are gone.
   - **Behavior note:** create actions for categories/tags/custom-fields now gate on the granular
     `.create` permission, so a normal user (Legacy User holds `.create`) sees the **Add** button;
-    **Edit/Delete** stay admin-only (`.update`/`.delete`).
+    **Edit/Delete** stay admin-only (`.update`/`.delete`). **Group creation** follows the same shape:
+    the Create-Group FAB on the groups list (`group-table`), the sidebar speed-dial "Add Group"
+    button, and the `/groups/create` route guard all gate on `app.groups.create`. Note the
+    read/create asymmetry — Legacy User holds `app.groups.create` but **not** `app.groups.read`, so
+    they create via the sidebar FAB (the groups-list page itself is `app.groups.read`-gated and off
+    limits to them), exactly like categories/tags.
 
 ## Signals & Zoneless Change Detection
 

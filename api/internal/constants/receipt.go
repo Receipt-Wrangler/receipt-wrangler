@@ -10,5 +10,7 @@ var FULL_RECEIPT_ASSOCIATIONS = []string{
 	"ReceiptItems.LinkedItems.Tags",
 	"Comments",
 	"CustomFields",
+	"CustomFields.CustomField",
+	"CustomFields.CustomField.Options",
 	"ImageFiles",
 }

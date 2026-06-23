@@ -8,9 +8,11 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, throwError } from "rxjs";
 import { PipesModule } from "src/pipes/pipes.module";
-import { ApiModule, UserService } from "../../open-api";
+import { DirectivesModule } from "../../directives";
+import { ApiModule, Permission, UserService } from "../../open-api";
 import { TokenRefreshService } from "../../services";
 import { AuthState, Logout, UserState } from "../../store";
+import { SetPermissions } from "../../store/auth.state.actions";
 import { UserProfileComponent } from "./user-profile.component";
 import { DeleteAccountDialogComponent } from "../delete-account-dialog/delete-account-dialog.component";
 
@@ -23,6 +25,7 @@ describe("UserProfileComponent", () => {
     declarations: [UserProfileComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
+        DirectivesModule,
         PipesModule,
         MatDialogModule,
         MatSnackBarModule,
@@ -45,6 +48,36 @@ describe("UserProfileComponent", () => {
 
   it("should create", () => {
     expect(component).toBeTruthy();
+  });
+
+  it("hides the delete-account danger zone without app.account.delete", async () => {
+    const store = TestBed.inject(Store);
+    store.dispatch(new SetPermissions([], {}));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector(".danger-zone")).toBeFalsy();
+  });
+
+  it("shows the delete-account danger zone with app.account.delete", async () => {
+    const store = TestBed.inject(Store);
+    store.dispatch(new SetPermissions([Permission.AppAccountDelete], {}));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector(".danger-zone")).toBeTruthy();
+  });
+
+  it("gates the edit button on app.account.update", () => {
+    const store = TestBed.inject(Store);
+
+    store.dispatch(new SetPermissions([], {}));
+    expect((component as any).canEdit()).toEqual(false);
+
+    store.dispatch(new SetPermissions([Permission.AppAccountUpdate], {}));
+    expect((component as any).canEdit()).toEqual(true);
   });
 
   it("should init form correctly", () => {

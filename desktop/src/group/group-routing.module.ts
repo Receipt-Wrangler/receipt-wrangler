@@ -19,11 +19,17 @@ const routes: Routes = [
   {
     path: "",
     component: GroupTableComponent,
+    canActivate: [appPermissionGuard],
+    data: {
+      appPermissions: [Permission.AppGroupsRead],
+    },
   },
   {
     path: "create",
     component: GroupFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
+      appPermissions: [Permission.AppGroupsCreate],
       formConfig: {
         mode: FormMode.add,
         headerText: "Create Group",

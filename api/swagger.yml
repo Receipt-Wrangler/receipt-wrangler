@@ -5293,6 +5293,8 @@ components:
             customFieldId:
               type: integer
               description: Custom Field ID
+            customField:
+              $ref: "#/components/schemas/CustomField"
             stringValue:
               type: string
               description: Custom Field String Value

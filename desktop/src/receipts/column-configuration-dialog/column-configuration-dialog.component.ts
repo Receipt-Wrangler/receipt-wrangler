@@ -40,7 +40,7 @@ export class ColumnConfigurationDialogComponent implements OnInit {
   private initializeColumns(): void {
     const currentColumns = this.data.currentColumns || DEFAULT_RECEIPT_TABLE_COLUMNS;
     
-    this.columns = currentColumns
+    this.columns = [...currentColumns]
       .sort((a, b) => a.order - b.order)
       .map(col => ({
         ...col,

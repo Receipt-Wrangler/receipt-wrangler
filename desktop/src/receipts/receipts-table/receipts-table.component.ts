@@ -119,9 +119,17 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   public canEdit: boolean = false;
 
+  public canCreate: boolean = false;
+
+  public canQuickScan: boolean = false;
+
+  public canPollEmail: boolean = false;
+
   public headerText: string = "";
 
   public group?: Group;
+
+  protected readonly Permission = Permission;
 
   public ngOnInit(): void {
     this.groupId = this.store
@@ -163,8 +171,18 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   }
 
   private setCanEdit(): void {
+    const groupId = Number.parseInt(this.groupId);
     this.canEdit = this.store.selectSnapshot(
-      AuthState.hasGroupPermission(Number.parseInt(this.groupId), Permission.GroupReceiptsUpdate)
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsUpdate)
+    );
+    this.canCreate = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsCreate)
+    );
+    this.canQuickScan = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsQuickScan)
+    );
+    this.canPollEmail = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupEmailPoll)
     );
   }
 
@@ -318,12 +336,10 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     const dialogRef = this.matDialog.open(ReceiptFilterComponent, {
       minWidth: "75%",
       maxWidth: "100%",
-      data: {
-        categories: this.categories,
-        tags: this.tags,
-      },
     });
 
+    dialogRef.componentInstance.categories = this.categories;
+    dialogRef.componentInstance.tags = this.tags;
     dialogRef.componentInstance.parentForm = buildReceiptFilterForm(filter, this);
     dialogRef.componentInstance.headerText = "Filter Receipts";
     const formCommandSubscription = dialogRef.componentInstance.formCommand.subscribe((formCommand) => {

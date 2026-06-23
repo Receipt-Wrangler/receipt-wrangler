@@ -5,7 +5,7 @@ import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
 import { BaseFormComponent } from "../../form/index";
-import { UserPreferencesService, UserShortcut } from "../../open-api";
+import { Permission, UserPreferencesService, UserShortcut } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, SetUserPreferences } from "../../store";
 import { UserShortcutComponent } from "../user-shortcut/user-shortcut.component";
@@ -22,6 +22,10 @@ export class UserPreferencesComponent extends BaseFormComponent implements OnIni
   public formMode = FormMode;
 
   public originalUserShortcuts = signal<UserShortcut[]>([]);
+
+  protected readonly canEdit = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppUserPreferencesUpdate)
+  );
 
   constructor(
     private activatedRoute: ActivatedRoute,

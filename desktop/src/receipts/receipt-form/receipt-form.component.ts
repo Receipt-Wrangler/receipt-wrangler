@@ -95,6 +95,12 @@ export class ReceiptFormComponent implements OnInit {
     AuthState.hasAppPermission(Permission.AppTagsCreate)
   );
 
+  // Adding/removing custom fields on a receipt needs the catalog (app.custom-fields.read);
+  // editing an existing custom field's value is a receipt edit and stays allowed.
+  public canManageCustomFields = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppCustomFieldsRead)
+  );
+
   public customFields: CustomField[] = [];
 
   public customFieldsStatefulMenuItems: StatefulMenuItem[] = [];
@@ -208,8 +214,11 @@ export class ReceiptFormComponent implements OnInit {
         this.duplicatedSnackbarRef?.dismiss();
         // categories/tags are sourced per-group from AppData (see
         // setCategoryTagPoolsForGroup), driven by the group-change listener.
-        this.customFields = data["customFields"] ?? [];
         this.originalReceipt = data["receipt"];
+        // The resolver returns the full catalog only for users who can read it;
+        // otherwise fall back to the definitions embedded on the receipt's own
+        // custom field values so they still render.
+        this.customFields = this.buildCustomFieldPool(data["customFields"] ?? [], this.originalReceipt);
         this.editLink = `/receipts/${this.originalReceipt?.id}/edit`;
         this.mode = data["mode"];
         this.customFieldsStatefulMenuItems = this.customFields.map(c => {
@@ -231,6 +240,27 @@ export class ReceiptFormComponent implements OnInit {
         this.setQueueData();
         document.scrollingElement?.scrollTo(0, 0);
       });
+  }
+
+  // Builds the custom field definition pool used to render values and the manage
+  // menu: the resolver catalog (full, for users who can read it) plus any
+  // definitions embedded on the receipt's own custom field values (so a user
+  // without catalog access can still render the fields already on the receipt),
+  // deduped by id.
+  private buildCustomFieldPool(resolverFields: CustomField[], receipt?: Receipt): CustomField[] {
+    const byId = new Map<number, CustomField>();
+    for (const field of resolverFields) {
+      if (field?.id != null) {
+        byId.set(field.id, field);
+      }
+    }
+    for (const value of receipt?.customFields ?? []) {
+      const definition = value.customField;
+      if (definition?.id != null && !byId.has(definition.id)) {
+        byId.set(definition.id, definition);
+      }
+    }
+    return Array.from(byId.values());
   }
 
   private setQueueData(): void {

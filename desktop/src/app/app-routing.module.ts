@@ -33,19 +33,28 @@ const routes: Routes = [
           import("../categories/categories.module").then(
             (m) => m.CategoriesModule
           ),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppCategoriesRead],
+        },
       },
       {
         path: "tags",
         loadChildren: () =>
           import("../tags/tags.module").then((m) => m.TagsModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppTagsRead],
+        },
       },
       {
         path: "custom-fields",
         loadChildren: () =>
           import("../custom-fields/custom-fields.module").then((m) => m.CustomFieldsModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppCustomFieldsRead],
+        },
       },
       {
         path: "groups",
@@ -63,7 +72,14 @@ const routes: Routes = [
         path: "settings",
         loadChildren: () =>
           import("../settings/settings.module").then((m) => m.SettingsModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [
+            Permission.AppAccountRead,
+            Permission.AppUserPreferencesRead,
+            Permission.AppApiKeysRead,
+          ],
+        },
       },
       {
         path: "system-settings",

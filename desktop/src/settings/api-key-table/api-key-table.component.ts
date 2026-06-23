@@ -49,7 +49,13 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
 
   protected readonly Permission = Permission;
 
-  public canViewAll = false;
+  public readonly canViewAll = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppApiKeysReadAny)
+  );
+
+  public readonly canCreate = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppApiKeysCreate)
+  );
 
   public tableHeaderText = signal("My API Keys");
 
@@ -66,7 +72,6 @@ export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> impleme
   }
 
   public ngOnInit(): void {
-    this.canViewAll = this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppApiKeysReadAny));
     this.currentUserId = this.store.selectSnapshot(AuthState.userId);
     this.listenForFilterChanges();
   }

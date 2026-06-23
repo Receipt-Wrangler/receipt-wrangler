@@ -2,10 +2,11 @@
   <app-table-header [headerText]="tableHeaderText()">
     <div class="d-flex align-items-center">
       <app-add-button
+        *ngIf="canCreate()"
         tooltip="Create API Key"
         (clicked)="openCreateApiKeyDialog()"
       ></app-add-button>
-      <ng-container *ngIf="canViewAll">
+      <ng-container *ngIf="canViewAll()">
         <app-button
           data-testid="api-key-filter"
           matButtonType="iconButton"

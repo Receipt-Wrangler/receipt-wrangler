@@ -458,8 +458,7 @@ func (repository ReceiptRepository) CreateReceipt(
 		return models.Receipt{}, err
 	}
 
-	var fullyLoadedReceipt models.Receipt
-	err = db.Model(models.Receipt{}).Where("id = ?", receipt.ID).Preload(clause.Associations).Find(&fullyLoadedReceipt).Error
+	fullyLoadedReceipt, err := repository.GetFullyLoadedReceiptById(utils.UintToString(receipt.ID))
 	if err != nil {
 		if !createSystemTask {
 			createFailedUpdateSystemTask(systemTask, err)
