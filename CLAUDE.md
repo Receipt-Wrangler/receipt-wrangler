@@ -22,9 +22,14 @@ Each component has its own CLAUDE.md with detailed component-specific guidance. 
   - Mobile: Dart Dio client → `mobile/api/`
   - MCP: TypeScript client for MCP integration
 - **Development Flow**: Changes to API → update swagger.yml → regenerate clients → update frontend
+- **MCP Server**: The Go API also hosts a native, OAuth 2.1-protected **MCP server** (off by
+  default; enabled and configured at runtime via **System Settings** — `mcpEnabled` /
+  `mcpPublicUrl`, no env var) so clients like Claude can read receipts/groups/etc. It starts and
+  stops live without a restart. See `api/CLAUDE.md` → "MCP Server & OAuth 2.1". This is distinct
+  from the generated MCP TypeScript client above.
 
 ### Technology Stack
-- **Backend**: Go 1.24 with Chi router, GORM ORM, Asynq background jobs
+- **Backend**: Go 1.25 with Chi router, GORM ORM, Asynq background jobs
 - **Frontend**: Angular 19 with NGXS state management, Material + Bootstrap UI
 - **Mobile**: Flutter with Provider state management, go_router navigation
 - **Infrastructure**: Docker, nginx, PostgreSQL/MySQL/SQLite

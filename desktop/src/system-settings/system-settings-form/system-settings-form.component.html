@@ -128,6 +128,32 @@
       [inputFormControl]="form | formGet:'currencyHideDecimalPlaces'"
     ></app-checkbox>
   </app-form-section>
+  <app-form-section
+    headerText="MCP Server"
+  >
+    <p class="text-muted mb-3">
+      Exposes Receipt Wrangler as an OAuth 2.1-protected MCP server so clients such as Claude can be
+      connected as a custom connector and read your data (read-only). Toggling this starts or stops the
+      server live, no restart required.
+    </p>
+    <app-checkbox
+      label="Enable MCP Server"
+      [inputFormControl]="form | formGet:'mcpEnabled'"
+      [readonly]="formConfig.mode | inputReadonly"
+    ></app-checkbox>
+    <app-input
+      label="Public URL"
+      hint="Externally reachable origin (scheme + host, no path), e.g. https://receipts.example.com. Used to build the OAuth and connector URLs. Changing it invalidates existing connector tokens."
+      [readonly]="formConfig.mode | inputReadonly"
+      [inputFormControl]="form | formGet:'mcpPublicUrl'"
+    ></app-input>
+    @if ((form | formGet:'mcpEnabled').value && (form | formGet:'mcpPublicUrl').value) {
+      <div class="d-flex flex-column mb-2">
+        <strong>Connector URL</strong>
+        <span>{{ (form | formGet:'mcpPublicUrl').value }}/mcp</span>
+      </div>
+    }
+  </app-form-section>
   <app-form-button-bar
     [mode]="formConfig.mode"
   >

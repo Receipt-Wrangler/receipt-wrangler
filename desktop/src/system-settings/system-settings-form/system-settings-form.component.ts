@@ -137,7 +137,9 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       receiptProcessingSettingsId: [this.originalSystemSettings?.receiptProcessingSettingsId],
       fallbackReceiptProcessingSettingsId: [this.originalSystemSettings?.fallbackReceiptProcessingSettingsId],
       taskConcurrency: [this.originalSystemSettings?.taskConcurrency, [Validators.min(0), Validators.required]],
-      taskQueueConfigurations: this.formBuilder.array(this.buildAsynqQueueConfigurations())
+      taskQueueConfigurations: this.formBuilder.array(this.buildAsynqQueueConfigurations()),
+      mcpEnabled: [this.originalSystemSettings?.mcpEnabled],
+      mcpPublicUrl: [this.originalSystemSettings?.mcpPublicUrl],
     });
 
     if (this.inputReadonlyPipe.transform(this.formConfig.mode)) {
@@ -147,10 +149,13 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       this.form.get("currencyDecimalSeparator")?.disable();
       this.form.get("currencySymbolPosition")?.disable();
       this.form.get("currencyHideDecimalPlaces")?.disable();
+      this.form.get("mcpEnabled")?.disable();
+      this.form.get("mcpPublicUrl")?.disable();
     }
 
     this.listenForReceiptProcessingSettingsChanges();
     this.listenForHideDecimalPlacesChanges();
+    this.listenForMcpEnabledChanges();
   }
 
   // TODO: finish implementing UI for taskQueueConfigurations
@@ -190,6 +195,23 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
           } else {
             this.form.get("currencyDecimalSeparator")?.enable();
           }
+        })
+      )
+      .subscribe();
+  }
+
+  // A public URL is required to enable the MCP server, mirroring the backend
+  // validation. The control's validators are toggled with the enable flag.
+  private listenForMcpEnabledChanges(): void {
+    const mcpPublicUrl = this.form.get("mcpPublicUrl");
+
+    this.form.get("mcpEnabled")?.valueChanges
+      .pipe(
+        startWith(this.form.get("mcpEnabled")?.value),
+        untilDestroyed(this),
+        tap((enabled: boolean) => {
+          mcpPublicUrl?.setValidators(enabled ? [Validators.required] : []);
+          mcpPublicUrl?.updateValueAndValidity({ emitEvent: false });
         })
       )
       .subscribe();

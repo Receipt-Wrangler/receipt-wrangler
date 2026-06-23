@@ -95,7 +95,9 @@ describe("SystemSettingsFormComponent", () => {
         { name: "email_receipt_processing", priority: 1 },
         { name: "email_receipt_image_cleanup", priority: 1 },
         { name: "quick_scan", priority: 1 }
-      ]
+      ],
+      mcpEnabled: null,
+      mcpPublicUrl: null,
     });
   });
 
@@ -116,7 +118,9 @@ describe("SystemSettingsFormComponent", () => {
       taskQueueConfigurations: [{
         name: QueueName.QuickScan,
         priority: 1,
-      }]
+      }],
+      mcpEnabled: true,
+      mcpPublicUrl: "https://receipts.example.com",
     };
 
     component.ngOnInit();
@@ -136,7 +140,9 @@ describe("SystemSettingsFormComponent", () => {
       taskQueueConfigurations: [{
         name: QueueName.QuickScan,
         priority: 1,
-      }]
+      }],
+      mcpEnabled: true,
+      mcpPublicUrl: "https://receipts.example.com",
     });
   });
 
@@ -165,7 +171,9 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: false,
-      taskConcurrency: "12"
+      taskConcurrency: "12",
+      mcpEnabled: true,
+      mcpPublicUrl: "https://receipts.example.com",
     });
 
     // Update the quick_scan queue priority specifically
@@ -196,7 +204,9 @@ describe("SystemSettingsFormComponent", () => {
         { name: 'email_receipt_processing', priority: 1 },
         { name: 'email_receipt_image_cleanup', priority: 1 },
         { name: 'quick_scan', priority: 1 }
-      ]
+      ],
+      mcpEnabled: true,
+      mcpPublicUrl: "https://receipts.example.com",
     });
 
     expect(snackbarServiceSpy).toHaveBeenCalled();

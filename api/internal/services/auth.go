@@ -20,15 +20,37 @@ func customClaims() validator.CustomClaims {
 	return &structs.Claims{}
 }
 
+// jwtIssuer is the issuer stamped on, and required of, every Receipt Wrangler
+// JWT regardless of audience.
+const jwtIssuer = "https://receiptWrangler.io"
+
+// defaultAudience is the audience for normal REST API tokens. MCP tokens use a
+// distinct, runtime-derived audience instead (see GenerateMcpJWT) so an MCP
+// token is rejected everywhere except the MCP endpoints.
+const defaultAudience = "https://receiptWrangler.io"
+
 func InitTokenValidator() (*validator.Validator, error) {
+	return initTokenValidator(defaultAudience)
+}
+
+// InitMcpTokenValidator builds a validator that only accepts tokens carrying
+// the given MCP audience. Because the normal validator requires
+// defaultAudience and our token minting replaces (never appends) the audience,
+// an MCP token fails validation on every REST endpoint and a normal token
+// fails validation on the MCP endpoints.
+func InitMcpTokenValidator(audience string) (*validator.Validator, error) {
+	return initTokenValidator(audience)
+}
+
+func initTokenValidator(audience string) (*validator.Validator, error) {
 	keyFunc := func(ctx context.Context) (interface{}, error) {
 		return []byte(config.GetSecretKey()), nil
 	}
 	jwtValidator, err := validator.New(
 		keyFunc,
 		validator.HS512,
-		"https://receiptWrangler.io",
-		[]string{"https://receiptWrangler.io"},
+		jwtIssuer,
+		[]string{audience},
 		validator.WithCustomClaims(customClaims),
 		validator.WithAllowedClockSkew(30*time.Second),
 	)
@@ -99,6 +121,20 @@ func GetEmptyRefreshTokenCookie() http.Cookie {
 }
 
 func GenerateJWT(userId uint) (string, string, structs.Claims, error) {
+	return generateTokenPair(userId, defaultAudience)
+}
+
+// GenerateMcpJWT mints an access + refresh token pair bound to the given MCP
+// audience instead of the normal REST audience. The audience is set on BOTH
+// tokens: the refresh token matters most, because if it kept the normal
+// audience an MCP client could trade it for a full-access token at /api/token.
+// Replacing (not appending) the audience ensures the resulting tokens are
+// accepted only by the MCP endpoints, which verify this exact audience.
+func GenerateMcpJWT(userId uint, audience string) (string, string, structs.Claims, error) {
+	return generateTokenPair(userId, audience)
+}
+
+func generateTokenPair(userId uint, audience string) (string, string, structs.Claims, error) {
 	db := repositories.GetDB()
 	var user models.User
 
@@ -114,8 +150,8 @@ func GenerateJWT(userId uint) (string, string, structs.Claims, error) {
 		Username:           user.Username,
 		UserRole:           user.UserRole,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "https://receiptWrangler.io",
-			Audience:  []string{"https://receiptWrangler.io"},
+			Issuer:    jwtIssuer,
+			Audience:  []string{audience},
 			ExpiresAt: utils.GetAccessTokenExpiryDate(),
 		},
 	}
@@ -139,8 +175,8 @@ func GenerateJWT(userId uint) (string, string, structs.Claims, error) {
 		Username:           user.Username,
 		UserRole:           user.UserRole,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "https://receiptWrangler.io",
-			Audience:  []string{"https://receiptWrangler.io"},
+			Issuer:    jwtIssuer,
+			Audience:  []string{audience},
 			ExpiresAt: utils.GetRefreshTokenExpiryDate(),
 			ID:        refreshTokenId,
 		},

@@ -8,7 +8,7 @@ on:
 jobs:
   test-api:
     runs-on: ubuntu-latest
-    container: golang:1.24-trixie
+    container: golang:1.25-trixie
     steps:
       - uses: actions/checkout@v4
       - name: Install app dependencies
