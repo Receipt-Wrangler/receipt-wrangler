@@ -12,7 +12,7 @@ import { NgxsModule, Store } from "@ngxs/store";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
 import { LayoutState } from "src/store/layout.state";
 import { DirectivesModule } from "../../directives/directives.module";
-import { ApiModule } from "../../open-api";
+import { ApiModule, Permission } from "../../open-api";
 import { AuthState, FeatureConfigState, GroupState, SetSelectedGroupId } from "../../store";
 import { SetAuthState, SetPermissions } from "../../store/auth.state.actions";
 import { SidebarComponent } from "./sidebar.component";
@@ -148,5 +148,21 @@ describe("SidebarComponent", () => {
 
     expect(queryTestId("sidebar-add-receipt")).toBeFalsy();
     expect(queryTestId("sidebar-quick-scan")).toBeFalsy();
+  });
+
+  it("shows the Add Group FAB with the app group-create permission", async () => {
+    login();
+    store.dispatch(new SetPermissions([Permission.AppGroupsCreate], {}));
+    await fixture.whenStable();
+
+    expect(queryTestId("sidebar-add-group")).toBeTruthy();
+  });
+
+  it("hides the Add Group FAB without the app group-create permission", async () => {
+    login();
+    store.dispatch(new SetPermissions([], {}));
+    await fixture.whenStable();
+
+    expect(queryTestId("sidebar-add-group")).toBeFalsy();
   });
 });

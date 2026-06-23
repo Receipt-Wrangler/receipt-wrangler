@@ -27,7 +27,9 @@ const routes: Routes = [
   {
     path: "create",
     component: GroupFormComponent,
+    canActivate: [appPermissionGuard],
     data: {
+      appPermissions: [Permission.AppGroupsCreate],
       formConfig: {
         mode: FormMode.add,
         headerText: "Create Group",

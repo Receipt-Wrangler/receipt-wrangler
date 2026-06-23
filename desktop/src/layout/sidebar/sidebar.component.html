@@ -58,6 +58,8 @@
             class="mb-1 add-sub-button-2"
           ></app-quick-scan-button>
           <button
+            *hasAppPermission="Permission.AppGroupsCreate"
+            data-testid="sidebar-add-group"
             class="mb-1 add-sub-button-3"
             mat-icon-button
             routerLinkActive="active-sub-button"

@@ -204,7 +204,12 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     the backend legacy `UserRole`/`GroupRole` enums (and the `userRole`/`groupRole` API fields) are gone.
   - **Behavior note:** create actions for categories/tags/custom-fields now gate on the granular
     `.create` permission, so a normal user (Legacy User holds `.create`) sees the **Add** button;
-    **Edit/Delete** stay admin-only (`.update`/`.delete`).
+    **Edit/Delete** stay admin-only (`.update`/`.delete`). **Group creation** follows the same shape:
+    the Create-Group FAB on the groups list (`group-table`), the sidebar speed-dial "Add Group"
+    button, and the `/groups/create` route guard all gate on `app.groups.create`. Note the
+    read/create asymmetry — Legacy User holds `app.groups.create` but **not** `app.groups.read`, so
+    they create via the sidebar FAB (the groups-list page itself is `app.groups.read`-gated and off
+    limits to them), exactly like categories/tags.
 
 ## Signals & Zoneless Change Detection
 

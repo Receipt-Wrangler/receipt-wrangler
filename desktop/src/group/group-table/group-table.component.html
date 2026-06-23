@@ -2,6 +2,8 @@
   <app-table-header [headerText]="tableHeaderText()">
     <div class="d-flex align-items-center">
       <app-add-button
+        *hasAppPermission="Permission.AppGroupsCreate"
+        data-testid="group-create"
         tooltip="Create Group"
         [buttonRouterLink]="['create']"
       ></app-add-button>

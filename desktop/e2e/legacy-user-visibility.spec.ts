@@ -51,6 +51,17 @@ test.describe('Legacy User visibility', () => {
     await expect(page.getByTestId('custom-field-add')).toBeVisible();
     await expect(page.getByTestId('custom-field-delete')).toHaveCount(0);
   });
+
+  test('groups: can reach the create form (holds app.groups.create)', async ({
+    page,
+  }) => {
+    await page.goto('/groups/create');
+    // Legacy User holds app.groups.create (but not app.groups.read, so the
+    // /groups list is off-limits). The newly-added appPermissionGuard on the
+    // create route must therefore admit them rather than redirect.
+    await expect(page).toHaveURL(/\/groups\/create/);
+    await expect(page.getByLabel('Group Name')).toBeVisible();
+  });
 });
 
 // Contrast: an admin (Legacy Admin) holds the corresponding permissions and can
