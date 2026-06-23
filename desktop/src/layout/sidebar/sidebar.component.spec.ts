@@ -165,4 +165,39 @@ describe("SidebarComponent", () => {
 
     expect(queryTestId("sidebar-add-group")).toBeFalsy();
   });
+
+  it("hides the add FAB when the user holds none of the add permissions", async () => {
+    login();
+    store.dispatch(new SetSelectedGroupId("5"));
+    store.dispatch(new SetPermissions([], { 5: [] }));
+    await fixture.whenStable();
+
+    expect(queryTestId("sidebar-add-fab")).toBeFalsy();
+  });
+
+  it("shows the add FAB with the selected group's receipt-create permission", async () => {
+    login();
+    store.dispatch(new SetSelectedGroupId("5"));
+    store.dispatch(new SetPermissions([], { 5: ["group.receipts.create"] }));
+    await fixture.whenStable();
+
+    expect(queryTestId("sidebar-add-fab")).toBeTruthy();
+  });
+
+  it("shows the add FAB with the selected group's quick-scan permission", async () => {
+    login();
+    store.dispatch(new SetSelectedGroupId("5"));
+    store.dispatch(new SetPermissions([], { 5: ["group.receipts.quick-scan"] }));
+    await fixture.whenStable();
+
+    expect(queryTestId("sidebar-add-fab")).toBeTruthy();
+  });
+
+  it("shows the add FAB with the app group-create permission", async () => {
+    login();
+    store.dispatch(new SetPermissions([Permission.AppGroupsCreate], {}));
+    await fixture.whenStable();
+
+    expect(queryTestId("sidebar-add-fab")).toBeTruthy();
+  });
 });

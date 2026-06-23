@@ -12,9 +12,11 @@
           [user]="loggedInUser() ?? $any({})"
           [matMenuTriggerFor]="menu"
         ></app-avatar>
+        @if (canAddAnything()) {
         <button
           mat-fab
           class="add-button mt-2"
+          data-testid="sidebar-add-fab"
           (click)="toggleAddButtonExpanded()"
           [ngClass]="{
             'add-button-rotated mt-4': addButtonExpanded,
@@ -71,6 +73,7 @@
             <mat-icon>group</mat-icon>
           </button>
         </div>
+        }
         <hr/>
         @for (group of groups(); track group.id) {
           <div class="p-2">

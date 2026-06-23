@@ -32,6 +32,12 @@ describe("HeaderComponent", () => {
   const bellRendered = (): boolean =>
     !!fixture.nativeElement.querySelector('app-button[icon="notifications"]');
 
+  const searchbarRendered = (): boolean =>
+    !!fixture.nativeElement.querySelector("app-searchbar");
+
+  const grantReceiptsSearch = () =>
+    store.dispatch(new SetPermissions(["app.receipts.search"], {}));
+
   const dashboardButtonRendered = (): boolean =>
     !!fixture.nativeElement.querySelector('button[matTooltip="Dashboard"]');
 
@@ -89,6 +95,21 @@ describe("HeaderComponent", () => {
     await fixture.whenStable();
 
     expect(bellRendered()).toBe(true);
+  });
+
+  it("should hide the search bar without app.receipts.search", async () => {
+    logIn();
+    await fixture.whenStable();
+
+    expect(searchbarRendered()).toBe(false);
+  });
+
+  it("should show the search bar with app.receipts.search", async () => {
+    logIn();
+    grantReceiptsSearch();
+    await fixture.whenStable();
+
+    expect(searchbarRendered()).toBe(true);
   });
 
   it("should hide the dashboard button without group.dashboards.read for the selected group", async () => {

@@ -49,7 +49,10 @@
       }
     </div>
     <div class="col-auto d-flex align-items-center justify-content-end">
-      <app-searchbar class="receipt-searchbar w-100 me-2"></app-searchbar>
+      <app-searchbar
+        *hasAppPermission="Permission.AppReceiptsSearch"
+        class="receipt-searchbar w-100 me-2"
+      ></app-searchbar>
       <app-button
         *hasAppPermission="Permission.AppNotificationsRead"
         class="ms-4"
