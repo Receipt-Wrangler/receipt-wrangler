@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:openapi/openapi.dart' show Permission;
+import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/constants/search.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_nav.dart';
 import 'package:receipt_wrangler_mobile/utils/group.dart';
 
@@ -21,6 +24,11 @@ class _GroupBottomNav extends State<GroupBottomNav> {
 
   @override
   Widget build(BuildContext context) {
+    final permissionsModel =
+        Provider.of<PermissionsModel>(context, listen: false);
+    final canSearch = permissionsModel
+        .hasAppPermission(Permission.appPeriodReceiptsPeriodSearch);
+
     onDestinationSelected(int indexSelected) {
       var groupId = getGroupId(context);
 
@@ -77,10 +85,14 @@ class _GroupBottomNav extends State<GroupBottomNav> {
         icon: Icon(Icons.receipt),
         label: "Receipts",
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.search),
-        label: "Search",
-      ),
+      // Search is the trailing destination; gating it on app.receipts.search
+      // keeps the earlier indices stable, so the switch/setIndexSelected logic
+      // needs no remap.
+      if (canSearch)
+        const NavigationDestination(
+          icon: Icon(Icons.search),
+          label: "Search",
+        ),
     ];
 
     return BottomNav(
