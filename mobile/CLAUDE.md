@@ -103,10 +103,12 @@ re-checks real permissions on every request, so a stale action at worst returns 
   first (the backend `OrAppPermissions` admin-not-a-member pattern) — and
   `hasGroupPermissionInAnyGroup(p)` for screens with no single current group.
 - **Gating pattern:** read `Provider.of<PermissionsModel>(context, listen: false)` and conditionally
-  render, referencing the generated `Permission` constants. Gating is **widget-level only** — mobile
-  has no permission-scoped routes/screens (admin features live on desktop), so there are no
-  permission route guards.
-- **Current gates:**
+  render, referencing the generated `Permission` constants. Most gating is **widget-level**, but a
+  couple of permission-scoped routes also have **go_router redirects** (see "Route redirects" below) —
+  a `redirect:` callback reads the same `PermissionsModel` from the provider tree (the router is built
+  under the app's `MultiProvider`, exactly like the existing `/receipts/add` redirect), so the check
+  is identical to the widget-level one.
+- **Current widget gates:**
   - `canEditReceipt(permissionsModel, groupId)` (`lib/shared/functions/permissions.dart`) →
     `group.receipts.update`, used by the receipt-edit popup (`receipt_edit_popup_menu.dart`) and the
     receipt swipe-to-edit (`receipt_list_item.dart`).
@@ -114,6 +116,19 @@ re-checks real permissions on every request, so a stale action at worst returns 
   - The add menu (`show_add_menu.dart`) shows "Add Manual Receipt" on `group.receipts.create` and
     "Quick Scan" on `group.receipts.quick-scan` — per-group when inside a group, or "held in any
     group" on the group-select / all-groups view, where there is no single current group.
+  - The **Search** bottom-nav destination (`group_bottom_nav.dart`, `group_select_bottom_nav.dart`) is
+    shown only on `app.receipts.search`. It is the **trailing** destination in both navs, so gating it
+    out doesn't shift the other indices and the `switch`/`setIndexSelected` logic is unchanged.
+- **Route redirects** (`lib/guards/permission-guard.dart`, mirroring the desktop route guards; wired
+  in `main.dart`'s `_buildAppRouter`):
+  - `groupDashboardReadRedirect` on `/groups/:groupId/dashboards` → redirects to that group's
+    `/receipts` when the caller lacks `group.dashboards.read` for the route's group (mirrors desktop's
+    `groupDashboardReadGuard`). Group selection always lands on the dashboards route, so this covers
+    both group entry and the Dashboards tab tap; the Dashboards tab itself stays visible (redirect-only,
+    matching desktop).
+  - `receiptsSearchRedirect` on `/search` → bounces deep links to the originating group's `/receipts`
+    (or `/groups`) when the caller lacks `app.receipts.search`. Defense-in-depth behind the hidden
+    search buttons; it also runs before the search shell's `state.extra as Map` cast.
 
 ## Development Notes
 
@@ -356,11 +371,13 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 
 - `integration_test/smoke_login_test.dart` — canonical smoke test.
 - `integration_test/permission_add_menu_test.dart` / `permission_receipt_edit_test.dart` — permission-gating coverage (add-menu gate, edit-popup gate, swipe-to-edit gate) using per-spec provisioned users/groups.
+- `integration_test/permission_search_test.dart` — search bottom-nav destination gated on `app.receipts.search` (deny via a custom app role minus that permission; allow via a Legacy User).
+- `integration_test/permission_dashboard_redirect_test.dart` — group dashboards route gated on `group.dashboards.read` (deny → redirected to the receipts list via a custom group role minus that permission; allow via a Legacy Viewer). Landing is told apart by `GroupReceiptsList` vs `GroupDashboardWrapper`.
 - `integration_test/helpers/env.dart` — dart-define consumption + guards.
 - `integration_test/helpers/pump.dart` — `pumpUntilFound` polling helper.
 - `integration_test/helpers/platform_mocks.dart` — Linux-desktop platform-channel stubs for `permission_handler`, `gal`, `flutter_secure_storage`.
 - `integration_test/helpers/login.dart` / `api.dart` — UI + API login as admin, the shared e2e-user, or arbitrary credentials (`loginAs` / `apiLoginAs`).
-- `integration_test/helpers/permission_fixtures.dart` — admin-API provisioning for permission specs: fresh user + group with a chosen system group role ("Legacy Viewer"/"Legacy Editor"), optional seeded receipt, `addTearDown` cleanup.
+- `integration_test/helpers/permission_fixtures.dart` — admin-API provisioning for permission specs: fresh user + group with a chosen system group role ("Legacy Viewer"/"Legacy Editor"), optional seeded receipt, `addTearDown` cleanup. Also mints **custom roles** for negative specs: `createRole`/`deleteRole`, `rolePermissionsByName`, and the convenience `provisionUserWithoutAppPermission` / `provisionGroupMemberWithoutPermission` (build a role = a Legacy role **minus one permission**). The backend won't delete an assigned role, so the role-delete teardown is registered **before** the user/group ones — LIFO makes it run last, after the assignments are gone.
 - `integration_test/helpers/feature_flags.dart` — `enableAiPoweredReceiptsForTest()`: toggles the Quick Scan flag by pointing systemSettings at a junk receiptProcessingSettings record, restoring on teardown.
 - `integration_test/helpers/receipt_test_helpers.dart` — `addManualReceiptViaUI` (group-selectable), URL/id extraction, receipt cleanup.
 - `integration_test/helpers/nav.dart` — group-entry and group-receipt navigation helpers.

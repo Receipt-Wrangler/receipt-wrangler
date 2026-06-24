@@ -61,9 +61,9 @@ Map<String, String> _auth(String jwt) => {'Cookie': 'jwt=$jwt'};
 
 String _unique() => DateTime.now().microsecondsSinceEpoch.toString();
 
-/// Resolves the id of a system role by [name] within [scope] (`APP` or `GROUP`)
-/// via `GET /role`.
-Future<int> _roleIdByName(
+/// Fetches the full `RoleView` map for the system role [name] within [scope]
+/// (`APP` or `GROUP`) via `GET /role`.
+Future<Map<String, dynamic>> _findRole(
   String name,
   String scope, {
   required String jwt,
@@ -75,15 +75,31 @@ Future<int> _roleIdByName(
     throw StateError('GET /role failed: HTTP ${res.statusCode}: ${res.body}');
   }
   final roles = (jsonDecode(res.body) as List).cast<Map<String, dynamic>>();
-  final match = roles.firstWhere(
+  return roles.firstWhere(
     (r) => r['name'] == name && r['scope'] == scope,
     orElse: () => throw StateError(
       'No $scope role named "$name". Available: '
       '${roles.where((r) => r['scope'] == scope).map((r) => r['name']).toList()}',
     ),
   );
-  return match['id'] as int;
 }
+
+/// Resolves the id of a system role by [name] within [scope] (`APP` or `GROUP`)
+/// via `GET /role`.
+Future<int> _roleIdByName(String name, String scope, {required String jwt}) async =>
+    (await _findRole(name, scope, jwt: jwt))['id'] as int;
+
+/// Returns the permission strings held by the system role [name] within [scope].
+/// Used by the negative-permission specs to derive a "Legacy role minus one
+/// permission" set — the custom role is then identical to the Legacy baseline
+/// except the single permission under test (robust against registry drift).
+Future<List<String>> rolePermissionsByName(
+  String name,
+  String scope, {
+  required String jwt,
+}) async =>
+    ((await _findRole(name, scope, jwt: jwt))['permissions'] as List)
+        .cast<String>();
 
 /// Resolves the id of a system group role by name (e.g. "Legacy Viewer",
 /// "Legacy Editor", "Legacy Owner") via `GET /role`.
@@ -112,17 +128,20 @@ Future<int> userIdByUsername(String username, {required String jwt}) async {
   return match['id'] as int;
 }
 
-/// Creates a regular account assigned the Legacy User app role and returns its
-/// id. Legacy User carries no group permissions, so the user only gets the
-/// group permissions a fixture grants it. The admin create endpoint requires an
-/// `appRoleId`, so we resolve Legacy User (the default app role) by name.
+/// Creates a regular account and returns its id. The admin create endpoint
+/// requires an `appRoleId`; [appRoleId] assigns a specific app role (e.g. a
+/// custom one minus a permission), defaulting to Legacy User (the default app
+/// role, which carries no group permissions — the user only gets the group
+/// permissions a fixture grants it).
 Future<int> createUser({
   required String username,
   required String password,
   required String displayName,
   required String jwt,
+  int? appRoleId,
 }) async {
-  final appRoleId = await appRoleIdByName('Legacy User', jwt: jwt);
+  final resolvedAppRoleId =
+      appRoleId ?? await appRoleIdByName('Legacy User', jwt: jwt);
   final res = await http
       .post(
         Uri.parse('${E2eEnv.baseUrl}/user/'),
@@ -131,7 +150,7 @@ Future<int> createUser({
           'username': username,
           'password': password,
           'displayName': displayName,
-          'appRoleId': appRoleId,
+          'appRoleId': resolvedAppRoleId,
           'isDummyUser': false,
         }),
       )
@@ -141,6 +160,57 @@ Future<int> createUser({
         'HTTP ${res.statusCode}: ${res.body}');
   }
   return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
+}
+
+/// Creates a custom role via `POST /role/` and returns its id. [scope] is `APP`
+/// or `GROUP`; every entry in [permissions] must belong to that scope (validated
+/// server-side against the registry). Used by the negative-permission specs to
+/// mint a role mirroring a Legacy role minus the single permission under test.
+Future<int> createRole({
+  required String name,
+  required String scope,
+  required List<String> permissions,
+  required String jwt,
+  String description = 'e2e custom role',
+}) async {
+  final res = await http
+      .post(
+        Uri.parse('${E2eEnv.baseUrl}/role/'),
+        headers: _jsonAuth(jwt),
+        body: jsonEncode({
+          'name': name,
+          'description': description,
+          'scope': scope,
+          'permissions': permissions,
+        }),
+      )
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('createRole($name) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
+}
+
+/// Best-effort `DELETE /role/{roleId}?scope=…`. The backend refuses to delete an
+/// *assigned* role, so this must run only after the user/group that reference it
+/// are gone — see the teardown ordering in [provisionUserWithoutAppPermission] /
+/// [provisionGroupMemberWithoutPermission]. Swallows errors like [deleteUser].
+Future<void> deleteRole(
+  int roleId, {
+  required String scope,
+  required String jwt,
+}) async {
+  try {
+    await http
+        .delete(
+          Uri.parse('${E2eEnv.baseUrl}/role/$roleId?scope=$scope'),
+          headers: _auth(jwt),
+        )
+        .timeout(const Duration(seconds: 5));
+  } catch (_) {
+    // best-effort
+  }
 }
 
 /// Best-effort `DELETE /user/{id}`. Swallows errors so a cleanup failure (e.g.
@@ -231,16 +301,21 @@ Future<int> createReceipt({
 /// Provisions a fresh user and (optionally) a fixture group it belongs to,
 /// registering `addTearDown` to delete the group and user afterwards.
 ///
-/// - [roleName] null → user belongs to no group (the add-menu "no permission"
-///   negative case). Non-null → a group is created with the user holding that
-///   system role ("Legacy Viewer" / "Legacy Editor" / "Legacy Owner").
+/// - [groupRoleId] (wins over [roleName]) / [roleName] → a group is created with
+///   the user holding that group role. [groupRoleId] takes an explicit role id
+///   (e.g. a custom role from [createRole]); [roleName] resolves a system role
+///   ("Legacy Viewer" / "Legacy Editor" / "Legacy Owner") by name. Both null →
+///   the user belongs to no group (the add-menu "no permission" negative case).
+/// - [appRoleId] assigns a specific app role (default: Legacy User).
 /// - [withReceipt] seeds one receipt into the group (for the receipt-edit /
-///   swipe gates). Ignored when [roleName] is null.
+///   swipe gates). Ignored when the user belongs to no group.
 ///
 /// Provision BEFORE `loginAs` so the user's permissions hydrate from AppData at
 /// login. The returned [PermFixture] carries the login credentials.
 Future<PermFixture> provisionPermUser({
   String? roleName,
+  int? groupRoleId,
+  int? appRoleId,
   bool withReceipt = false,
 }) async {
   final jwt = await apiLogin(); // admin
@@ -253,21 +328,27 @@ Future<PermFixture> provisionPermUser({
     password: _password,
     displayName: 'Perm $suffix',
     jwt: jwt,
+    appRoleId: appRoleId,
   );
   addTearDown(() async => deleteUser(userId, jwt: await apiLogin()));
+
+  // An explicit group role id wins; otherwise resolve a system role by name.
+  int? resolvedGroupRoleId = groupRoleId;
+  if (resolvedGroupRoleId == null && roleName != null) {
+    resolvedGroupRoleId = await groupRoleIdByName(roleName, jwt: jwt);
+  }
 
   int? groupId;
   String? groupName;
   int? receiptId;
   String? receiptName;
 
-  if (roleName != null) {
-    final roleId = await groupRoleIdByName(roleName, jwt: jwt);
+  if (resolvedGroupRoleId != null) {
     groupName = 'e2e-perm-$suffix';
     groupId = await createGroupWithMember(
       name: groupName,
       memberUserId: userId,
-      groupRoleId: roleId,
+      groupRoleId: resolvedGroupRoleId,
       jwt: jwt,
     );
     addTearDown(() async => deleteGroup(groupId!, jwt: await apiLogin()));
@@ -292,4 +373,58 @@ Future<PermFixture> provisionPermUser({
     receiptId: receiptId,
     receiptName: receiptName,
   );
+}
+
+/// Provisions a user whose APP role is "Legacy User" **minus** [permission],
+/// registering teardown for both the user and the custom role. Use for negative
+/// app-permission specs (e.g. `app.receipts.search`). The user belongs to no
+/// fixture group — the custom app role is the only thing under test.
+///
+/// The custom role is the Legacy User permission set with exactly [permission]
+/// removed, so the only behavioral difference from a Legacy User is that single
+/// missing permission. The backend refuses to delete an assigned role, so the
+/// role-delete teardown is registered **before** [provisionPermUser] — with
+/// LIFO teardown that makes it run **after** the user delete, when the role is
+/// unassigned and deletable.
+Future<PermFixture> provisionUserWithoutAppPermission(String permission) async {
+  final jwt = await apiLogin(); // admin
+  final perms = (await rolePermissionsByName('Legacy User', 'APP', jwt: jwt))
+      .where((p) => p != permission)
+      .toList();
+  final roleId = await createRole(
+    name: 'e2e-app-${_unique()}',
+    scope: 'APP',
+    permissions: perms,
+    jwt: jwt,
+  );
+  addTearDown(() async => deleteRole(roleId, scope: 'APP', jwt: await apiLogin()));
+
+  return provisionPermUser(appRoleId: roleId);
+}
+
+/// Provisions a user in a fixture group whose GROUP role is "Legacy Viewer"
+/// **minus** [permission], registering teardown for the user, group and custom
+/// role. Use for negative group-permission specs (e.g. `group.dashboards.read`).
+///
+/// Same minus-one rationale and LIFO teardown ordering as
+/// [provisionUserWithoutAppPermission]: the role-delete is registered first so
+/// it runs after the group (and its membership) and the user are gone.
+Future<PermFixture> provisionGroupMemberWithoutPermission(
+  String permission, {
+  bool withReceipt = false,
+}) async {
+  final jwt = await apiLogin(); // admin
+  final perms = (await rolePermissionsByName('Legacy Viewer', 'GROUP', jwt: jwt))
+      .where((p) => p != permission)
+      .toList();
+  final roleId = await createRole(
+    name: 'e2e-group-${_unique()}',
+    scope: 'GROUP',
+    permissions: perms,
+    jwt: jwt,
+  );
+  addTearDown(
+      () async => deleteRole(roleId, scope: 'GROUP', jwt: await apiLogin()));
+
+  return provisionPermUser(groupRoleId: roleId, withReceipt: withReceipt);
 }

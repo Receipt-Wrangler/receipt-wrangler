@@ -13,6 +13,7 @@ import 'package:receipt_wrangler_mobile/groups/screens/group_dashboards.dart';
 import 'package:receipt_wrangler_mobile/groups/screens/group_receipts_screen.dart';
 import 'package:receipt_wrangler_mobile/groups/screens/group_select.dart';
 import 'package:receipt_wrangler_mobile/guards/auth-guard.dart';
+import 'package:receipt_wrangler_mobile/guards/permission-guard.dart';
 import 'package:receipt_wrangler_mobile/home/screens/home.dart';
 import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/models/category_model.dart';
@@ -124,6 +125,7 @@ GoRouter _buildAppRouter() {
           routes: [
             GoRoute(
               path: '/groups/:groupId/dashboards',
+              redirect: groupDashboardReadRedirect,
               builder: (context, state) => const GroupDashboards(),
             ),
             GoRoute(
@@ -185,6 +187,7 @@ GoRouter _buildAppRouter() {
         routes: [
           GoRoute(
             path: '/search',
+            redirect: receiptsSearchRedirect,
             builder: (context, state) => const SearchScreen(),
           ),
         ],
