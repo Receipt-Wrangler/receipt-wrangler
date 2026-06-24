@@ -14,6 +14,7 @@ import {
   Router,
   RouterModule,
 } from "@angular/router";
+import { Store } from "@ngxs/store";
 import { of, throwError } from "rxjs";
 import {
   ApiModule,
@@ -21,6 +22,7 @@ import {
   PermissionService,
   Role,
   RoleService,
+  User,
 } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services/snackbar.service";
@@ -74,6 +76,8 @@ interface SetupOptions {
   routeScope?: string;
   /** Roles returned by getRoles() when loading an existing role. */
   roles?: Role[];
+  /** Users returned by the mocked UserState snapshot (paid-by picker pool). */
+  users?: User[];
 }
 
 async function setup(
@@ -108,6 +112,9 @@ async function setup(
       provideHttpClientTesting(),
       { provide: SnackbarService, useValue: snackbar },
       { provide: ActivatedRoute, useValue: activatedRoute },
+      // The paid-by picker reads the user pool via UserState; the component only
+      // calls selectSnapshot(UserState.users), so a thin stub is sufficient.
+      { provide: Store, useValue: { selectSnapshot: () => options.users ?? [] } },
     ],
   }).compileComponents();
 
@@ -349,6 +356,60 @@ describe("RoleFormComponent", () => {
     expect(component.grantedCategories.length).toBe(0);
   });
 
+  it("includes paid-by grants and includeOwn in a GROUP payload", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.name.setValue("Paid-By Role");
+    component.toggle("group.receipts.read");
+
+    // The picker drives this FormArray; push the "their own" sentinel + a user.
+    component.grantedPaidByUsers.push(
+      new FormControl({ id: RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID, displayName: "Their own receipts" } as any),
+    );
+    component.grantedPaidByUsers.push(new FormControl({ id: 42, displayName: "Bob" } as any));
+
+    component.submit();
+
+    expect(component.lastPayload?.scope).toBe("GROUP");
+    expect(component.lastPayload?.includeOwnPaidReceipts).toBe(true);
+    expect(component.lastPayload?.paidByUserGrants).toEqual([42]);
+  });
+
+  it("treats a user-only selection as a pure reviewer (no own)", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.name.setValue("Reviewer Role");
+    component.toggle("group.receipts.read");
+
+    component.grantedPaidByUsers.push(new FormControl({ id: 7, displayName: "Alice" } as any));
+
+    component.submit();
+
+    expect(component.lastPayload?.includeOwnPaidReceipts).toBe(false);
+    expect(component.lastPayload?.paidByUserGrants).toEqual([7]);
+  });
+
+  it("omits paid-by grants from an APP payload", async () => {
+    const { component } = await setup();
+    component.form.controls.name.setValue("App Role");
+    component.toggle("app.users.read");
+
+    component.submit();
+
+    expect(component.lastPayload?.paidByUserGrants).toBeUndefined();
+    expect(component.lastPayload?.includeOwnPaidReceipts).toBeUndefined();
+  });
+
+  it("resets paid-by grants when switching role type", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.grantedPaidByUsers.push(new FormControl({ id: 7, displayName: "Alice" } as any));
+    expect(component.grantedPaidByUsers.length).toBe(1);
+
+    component.pickType("app");
+    expect(component.grantedPaidByUsers.length).toBe(0);
+  });
+
   it("calls createRole, notifies, and navigates back to the list on submit", async () => {
     const { component, createRoleSpy, navigateSpy, snackbar } = await setup();
     component.form.controls.name.setValue("App Admin");
@@ -448,6 +509,32 @@ describe("RoleFormComponent", () => {
 
       expect(component.type()).toBe("group");
       expect(component.form.controls.name.value).toBe("Group Role 7");
+    });
+
+    it("rehydrates paid-by grants and the own toggle on edit", async () => {
+      const paidByGroupRole: Role = {
+        id: 11,
+        name: "Paid-By Group Role",
+        scope: "GROUP",
+        isDefault: false,
+        isSystem: false,
+        permissions: ["group.receipts.read"],
+        paidByUserGrants: [42],
+        includeOwnPaidReceipts: true,
+      };
+      const { component } = await setup(ALL_DESCRIPTORS, {
+        routeId: "11",
+        routeScope: "group",
+        roles: [paidByGroupRole],
+        users: [{ id: 42, username: "bob", displayName: "Bob" } as User],
+      });
+
+      TestBed.flushEffects();
+
+      const selectedIds = (component.grantedPaidByUsers.value as { id: number }[])
+        .map((option) => option.id)
+        .sort((a, b) => a - b);
+      expect(selectedIds).toEqual([RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID, 42].sort((a, b) => a - b));
     });
 
     it("redirects to the list when the role is not found", async () => {

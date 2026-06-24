@@ -220,6 +220,36 @@
               [readonly]="isViewMode()"
             ></app-tag-autocomplete>
           </div>
+
+          <div class="rw-card rw-form-section">
+            <div class="rw-perm-header">
+              <div>
+                <h2>Paid-by visibility</h2>
+                <div class="hint hint-inline">
+                  Limit members to receipts paid by specific people. Pin
+                  &ldquo;Their own receipts&rdquo; to include their own. Leave
+                  empty for access to everyone&rsquo;s receipts.
+                </div>
+              </div>
+            </div>
+
+            <app-autocomlete
+              class="w-100"
+              label="Visible paid-by users"
+              optionFilterKey="displayName"
+              [inputFormControl]="$any(grantedPaidByUsers)"
+              [options]="paidByOptions()"
+              [optionTemplate]="paidByOptionTemplate"
+              [optionChipTemplate]="paidByOptionTemplate"
+              [multiple]="true"
+              [creatable]="false"
+              [readonly]="isViewMode()"
+            ></app-autocomlete>
+
+            <ng-template #paidByOptionTemplate let-option="option"
+              >{{ option.displayName }}
+            </ng-template>
+          </div>
         }
       </div>
 

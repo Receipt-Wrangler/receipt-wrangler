@@ -5,6 +5,7 @@ import { MatIconModule } from "@angular/material/icon";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { RouterModule } from "@angular/router";
 import { PipesModule } from "src/pipes/pipes.module";
+import { AutocompleteModule } from "../autocomplete/autocomplete.module";
 import { ButtonModule } from "../button";
 import { CategoryAutocompleteComponent } from "../category-autocomplete/category-autocomplete.component";
 import { InputModule } from "../input";
@@ -33,6 +34,7 @@ import { RolesRoutingModule } from "./roles-routing.module";
     TableModule,
     TextareaModule,
     RolesRoutingModule,
+    AutocompleteModule,
     CategoryAutocompleteComponent,
     TagAutocompleteComponent,
   ],

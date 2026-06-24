@@ -24,6 +24,14 @@ export interface UpsertRoleCommand {
      * Tag ids to restrict a GROUP role\'s members to. Only valid on group roles; omit or leave empty for unrestricted access.
      */
     tagGrants?: Array<number>;
+    /**
+     * User ids whose receipts a GROUP role\'s members may see (by the receipt\'s \"paid by\" user). Only valid on group roles; omit or leave empty (with includeOwnPaidReceipts false) for unrestricted access.
+     */
+    paidByUserGrants?: Array<number>;
+    /**
+     * Whether to also let each member see receipts they paid for. Only valid on group roles.
+     */
+    includeOwnPaidReceipts?: boolean;
 }
 export namespace UpsertRoleCommand {
 }

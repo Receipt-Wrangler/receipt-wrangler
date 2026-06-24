@@ -2,10 +2,12 @@ import { Component, DestroyRef, computed, effect, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormControl, FormGroup, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
+import { Store } from "@ngxs/store";
 import { catchError, EMPTY, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { SnackbarService } from "../../services/snackbar.service";
 import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
+import { UserState } from "../../store";
 import {
   Category,
   CategoryService,
@@ -17,6 +19,7 @@ import {
   Tag,
   TagService,
   UpsertRoleCommand,
+  User,
 } from "../../open-api";
 import {
   CUSTOM_PRESET_ID,
@@ -43,6 +46,13 @@ export interface RoleResourceGroup {
   name: string;
   icon: string;
   rows: RolePermissionRow[];
+}
+
+// An option in the paid-by visibility picker: either a real user (id > 0) or the
+// pinned "their own receipts" sentinel (id === OWN_PAID_RECEIPTS_OPTION_ID).
+export interface PaidByGrantOption {
+  id: number;
+  displayName: string;
 }
 
 
@@ -81,6 +91,31 @@ export class RoleFormComponent {
   // once the pool arrives (pool and role load independently/asynchronously).
   private readonly pendingCategoryGrantIds = signal<number[]>([]);
   private readonly pendingTagGrantIds = signal<number[]>([]);
+
+  // ----- Paid-by visibility grants (group roles only) -----
+  // The sentinel id of the pinned "their own receipts" option. Real user ids are
+  // positive, so a negative sentinel never collides and is filtered out of the
+  // serialized paidByUserGrants (it maps to includeOwnPaidReceipts instead).
+  public static readonly OWN_PAID_RECEIPTS_OPTION_ID = -1;
+  private readonly ownPaidReceiptsOption: PaidByGrantOption = {
+    id: RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID,
+    displayName: "Their own receipts",
+  };
+
+  // The picker options: the pinned "their own" sentinel first, then every user.
+  // The role editor is admin-only and global (no group context), so it lists all
+  // users — sourced from AppData like every other user picker (read lazily via a
+  // snapshot inside the computed, matching app-user-autocomplete).
+  public readonly paidByOptions = computed<PaidByGrantOption[]>(() => [
+    this.ownPaidReceiptsOption,
+    ...this.store.selectSnapshot(UserState.users).map((user) => ({
+      id: user.id,
+      displayName: user.displayName?.length ? user.displayName : user.username,
+    })),
+  ]);
+  public readonly grantedPaidByUsers = new FormArray<FormControl<PaidByGrantOption>>([]);
+  private readonly pendingPaidByUserGrantIds = signal<number[]>([]);
+  private readonly pendingIncludeOwnPaidReceipts = signal<boolean>(false);
 
   /** Grants are a group-role concept; hidden for app roles. */
   public readonly showGrants = computed<boolean>(() => this.type() === "group");
@@ -182,6 +217,7 @@ export class RoleFormComponent {
     private readonly route: ActivatedRoute,
     private readonly snackbar: SnackbarService,
     private readonly destroyRef: DestroyRef,
+    private readonly store: Store,
   ) {
     this.permissionService
       .getPermissions()
@@ -224,6 +260,22 @@ export class RoleFormComponent {
       const pool = this.tagPool();
       const ids = this.pendingTagGrantIds();
       this.setGrantArray(this.grantedTags, pool.filter((tag) => tag.id !== undefined && ids.includes(tag.id)));
+    });
+
+    // Resolve a loaded role's paid-by config to picker options, prepending the
+    // "their own receipts" sentinel when include-own is set. Filtering the shared
+    // paidByOptions list keeps object references stable so the autocomplete
+    // correctly excludes already-selected options.
+    effect(() => {
+      const options = this.paidByOptions();
+      const ids = this.pendingPaidByUserGrantIds();
+      const includeOwn = this.pendingIncludeOwnPaidReceipts();
+      const selected = options.filter(
+        (option) =>
+          (option.id === RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID && includeOwn) ||
+          (option.id !== RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID && ids.includes(option.id)),
+      );
+      this.setGrantArray(this.grantedPaidByUsers, selected);
     });
 
     const id = this.route.snapshot.paramMap.get("id");
@@ -273,6 +325,8 @@ export class RoleFormComponent {
         this.granted.set(new Set(role.permissions));
         this.pendingCategoryGrantIds.set(role.categoryGrants ?? []);
         this.pendingTagGrantIds.set(role.tagGrants ?? []);
+        this.pendingPaidByUserGrantIds.set(role.paidByUserGrants ?? []);
+        this.pendingIncludeOwnPaidReceipts.set(role.includeOwnPaidReceipts ?? false);
       });
   }
 
@@ -324,8 +378,11 @@ export class RoleFormComponent {
     // Grants only apply to group roles — reset them on a type switch.
     this.pendingCategoryGrantIds.set([]);
     this.pendingTagGrantIds.set([]);
+    this.pendingPaidByUserGrantIds.set([]);
+    this.pendingIncludeOwnPaidReceipts.set(false);
     this.setGrantArray(this.grantedCategories, []);
     this.setGrantArray(this.grantedTags, []);
+    this.setGrantArray(this.grantedPaidByUsers, []);
   }
 
   public pickPreset(preset: RolePreset): void {
@@ -390,7 +447,7 @@ export class RoleFormComponent {
       permissions: [...this.granted()] as Permission[],
     };
 
-    // Category/tag grants are only valid on group roles.
+    // Category/tag/paid-by grants are only valid on group roles.
     if (this.showGrants()) {
       payload.categoryGrants = (this.grantedCategories.value as Category[])
         .map((category) => category.id)
@@ -398,6 +455,16 @@ export class RoleFormComponent {
       payload.tagGrants = (this.grantedTags.value as Tag[])
         .map((tag) => tag.id)
         .filter((id): id is number => id !== undefined);
+
+      // Split the picker's selections into the relative "their own" toggle and
+      // the absolute user-id grants (the sentinel never goes to the backend).
+      const paidBySelections = this.grantedPaidByUsers.value as PaidByGrantOption[];
+      payload.includeOwnPaidReceipts = paidBySelections.some(
+        (option) => option.id === RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID,
+      );
+      payload.paidByUserGrants = paidBySelections
+        .map((option) => option.id)
+        .filter((id) => id !== RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID);
     }
 
     this.lastPayload = payload;
