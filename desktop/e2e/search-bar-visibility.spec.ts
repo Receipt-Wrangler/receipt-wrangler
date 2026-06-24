@@ -21,7 +21,10 @@ import {
 // permission is app.receipts.search) and assigns it to a fresh user. The role
 // still grants Account/Notifications/Groups so the user can load the app.
 
-const NEW_USER_PASSWORD = 'a-really-secure-password';
+// Generated at runtime (no static secret in the repo). uniqueName gives a
+// per-run value; the -Aa1! suffix guarantees upper/lower/digit/symbol in case a
+// password policy is ever added.
+const NEW_USER_PASSWORD = `${uniqueName('pw')}-Aa1!`;
 
 // Session for the provisioned no-search user, written in beforeAll under the
 // git-ignored .auth/ dir and removed in afterAll.
