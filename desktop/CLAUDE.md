@@ -454,6 +454,33 @@ In CI the same spec files run against the demo URL. GitHub secrets populate the 
 - Submit buttons use `<app-button>` rendering `<button>` with visible text — `page.getByRole('button', { name: '...' })` works directly.
 - Error feedback is often a Material snackbar (not inline `<mat-error>`). When asserting errors, locate the snackbar container or its text, not the form.
 
+### Permission-gating specs (provisioned roles/users/groups)
+
+Negative-permission coverage needs an account/role that *lacks* the permission under test, which no
+seeded account provides — so an admin context **provisions a custom role (and user/group) through the
+real UI** in `beforeAll` and **tears it down through the admin API** in `afterAll`. Shared flows live
+in `e2e/helpers/provisioning.ts`: `createRole` (role form — type, preset, category toggles, individual
+toggle-offs), `createUserWithRole`, `createGroupWithMember`, `uniqueName`, and the API-teardown
+helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDeleteRoleByName`.
+
+- An admin `BrowserContext` (`storageState: 'e2e/.auth/admin.json'`) provisions in `beforeAll`. Tests
+  then run **either** as the default e2e-user — for a *group-scoped* member added to a fixture group
+  (Angular re-fetches AppData on every navigation, so a membership added after the saved session still
+  drives the route guards without re-login) — **or** as a freshly-provisioned *custom user* whose
+  session is captured to a git-ignored `e2e/.auth/<name>.json` (wait for the held permission in
+  `localStorage.auth` before saving) and `rmSync`-ed in `afterAll`.
+- **Teardown is API-based, not UI.** The role-list delete button is disabled while a role is assigned,
+  and the UI's *bulk* user-delete dummy-converts a group-owning user (so the role stays assigned and
+  never deletable) — UI teardown leaks roles. `withAdminApi` logs in via `request.newContext` (through
+  the dev-server `/api` proxy) and `DELETE /api/user/{id}` **hard-deletes** (freeing the app-role) /
+  `DELETE /api/group/{id}` frees the group-role assignment, so the role then deletes. **Order:** delete
+  the user/group first, then the role; best-effort `try/catch` so a cleanup error doesn't mask the result.
+- Reference specs: `system-settings-tab-gating.spec.ts` (custom app role + user + storageState — note:
+  its UI teardown leaks roles, the reason the new specs use API teardown), `group-viewer-visibility.spec.ts`
+  (group member with a group role), `search-bar-visibility.spec.ts` (no `app.receipts.search` → header
+  search bar never renders), `dashboard-read-redirect.spec.ts` (no `group.dashboards.read` →
+  `/dashboard/group/:id` redirects to `/receipts/group/:id`; an owner contrast still sees the dashboard).
+
 ## Testing Requirements
 
 **All new code must have accompanying unit tests.**
