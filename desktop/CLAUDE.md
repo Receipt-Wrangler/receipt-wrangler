@@ -133,6 +133,15 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   pool objects by an effect once the pool arrives) and serialized back as id arrays on
   `UpsertRoleCommand` for group scope only. The grant pickers pass `[creatable]="false"` (pick from
   existing, never create). See `api/CLAUDE.md` → "Data model".
+- **Paid-by visibility (group roles only):** the same group-scoped grants section also shows a
+  "Paid-by visibility" picker — a single `app-autocomlete` multi-select over `paidByOptions()` (a
+  pinned **"Their own receipts"** sentinel option, id `OWN_PAID_RECEIPTS_OPTION_ID = -1`, followed by
+  every user from `UserState.users`). On submit the selections split into `includeOwnPaidReceipts`
+  (the sentinel is present) and `paidByUserGrants` (the remaining user ids, sentinel excluded); on
+  edit they rehydrate from `role.paidByUserGrants` / `role.includeOwnPaidReceipts` via an effect that
+  filters the shared `paidByOptions()` (stable references so the autocomplete excludes selected
+  options). Empty = members see every payer's receipts; it restricts which receipts a member can see,
+  not what they can edit. See `api/CLAUDE.md` → "Paid-by visibility enforcement".
 - **Default roles:** the role-list page shows two `app-select` controls above the filter bar —
   "Default application role" and "Default group role". Each is pre-selected from the role flagged
   `isDefault` for its scope and, on change, calls `RoleService.setDefaultRole(scope, roleId)` then
@@ -479,7 +488,10 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   its UI teardown leaks roles, the reason the new specs use API teardown), `group-viewer-visibility.spec.ts`
   (group member with a group role), `search-bar-visibility.spec.ts` (no `app.receipts.search` → header
   search bar never renders), `dashboard-read-redirect.spec.ts` (no `group.dashboards.read` →
-  `/dashboard/group/:id` redirects to `/receipts/group/:id`; an owner contrast still sees the dashboard).
+  `/dashboard/group/:id` redirects to `/receipts/group/:id`; an owner contrast still sees the dashboard),
+  `paid-by-visibility.spec.ts` (a group role limited to "their own receipts" → a hidden-payer receipt
+  `GET` 403s and is absent from the list, the member's own 200s; uses `withApiAs`/`apiCreateReceipt` and
+  the `createRole` `paidByOwn` option in `helpers/provisioning.ts`).
 
 ## Testing Requirements
 

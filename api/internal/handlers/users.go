@@ -130,6 +130,10 @@ func GetAmountOwedForUser(w http.ResponseWriter, r *http.Request) {
 		ReceiptIds:       receiptIds,
 		GroupId:          groupId,
 		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		// Amount-owed is settlement accounting: the totals must be identical for
+		// every member, so it is exempt from the paid-by visibility filter (it
+		// still requires group.receipts.read in each receipt's group).
+		SkipPaidByVisibilityCheck: true,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			if err != nil {
 				return http.StatusInternalServerError, err

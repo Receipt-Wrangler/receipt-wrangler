@@ -54,6 +54,7 @@ func ExportAllReceiptsFromGroup(w http.ResponseWriter, r *http.Request) {
 					groupId,
 					pagedRequest,
 					getExportReceiptAssociations(),
+					permissionService.PaidByListResolver(token.UserId),
 				)
 			if err != nil {
 				return http.StatusInternalServerError, err

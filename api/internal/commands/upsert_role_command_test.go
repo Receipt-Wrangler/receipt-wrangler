@@ -153,3 +153,60 @@ func TestUpsertRoleCommandDuplicateTagGrant(t *testing.T) {
 		t.Errorf("expected tagGrants error, got %+v", vErr.Errors)
 	}
 }
+
+func TestUpsertRoleCommandPaidByGrantsValidOnGroupScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:                   "Paid-By Group Role",
+		Scope:                  permissions.ScopeGroup,
+		Permissions:            []string{permissions.GroupReceiptsRead},
+		PaidByUserGrants:       []uint{1, 2},
+		IncludeOwnPaidReceipts: true,
+	}
+
+	vErr := command.Validate()
+	if len(vErr.Errors) > 0 {
+		t.Errorf("expected no errors, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandPaidByGrantsRejectedOnAppScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:             "App Role With Paid-By",
+		Scope:            permissions.ScopeApp,
+		Permissions:      []string{permissions.AppUsersRead},
+		PaidByUserGrants: []uint{1},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["grants"]; !ok {
+		t.Errorf("expected grants error, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandIncludeOwnRejectedOnAppScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:                   "App Role With Include Own",
+		Scope:                  permissions.ScopeApp,
+		Permissions:            []string{permissions.AppUsersRead},
+		IncludeOwnPaidReceipts: true,
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["grants"]; !ok {
+		t.Errorf("expected grants error, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandDuplicatePaidByGrant(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:             "Dup Paid-By Grant",
+		Scope:            permissions.ScopeGroup,
+		Permissions:      []string{permissions.GroupReceiptsRead},
+		PaidByUserGrants: []uint{7, 7},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["paidByUserGrants"]; !ok {
+		t.Errorf("expected paidByUserGrants error, got %+v", vErr.Errors)
+	}
+}

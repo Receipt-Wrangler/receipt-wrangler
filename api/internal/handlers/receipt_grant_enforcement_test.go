@@ -46,6 +46,8 @@ func seedRestrictedReceiptCreator(t *testing.T, categoryGrantIds []uint) (uint, 
 		[]string{permissions.GroupReceiptsCreate, permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate},
 		categoryGrantIds,
 		nil,
+		nil,
+		false,
 	)
 	if err != nil {
 		t.Fatalf("seed group role: %v", err)

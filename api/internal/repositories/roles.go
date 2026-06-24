@@ -43,7 +43,7 @@ func (repository RoleRepository) CreateAppRole(name string, description string, 
 	return role, nil
 }
 
-func (repository RoleRepository) CreateGroupRole(name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint) (models.GroupRoleDefinition, error) {
+func (repository RoleRepository) CreateGroupRole(name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint, paidByUserGrantIds []uint, includeOwnPaidReceipts bool) (models.GroupRoleDefinition, error) {
 	db := repository.GetDB()
 
 	rolePermissions := make([]models.GroupRolePermission, 0, len(perms))
@@ -52,9 +52,11 @@ func (repository RoleRepository) CreateGroupRole(name string, description string
 	}
 
 	role := models.GroupRoleDefinition{
-		Name:        name,
-		Description: description,
-		Permissions: rolePermissions,
+		Name:                       name,
+		Description:                description,
+		IncludeOwnPaidReceipts:     includeOwnPaidReceipts,
+		PaidByVisibilityRestricted: includeOwnPaidReceipts || len(paidByUserGrantIds) > 0,
+		Permissions:                rolePermissions,
 	}
 
 	err := db.Create(&role).Error
@@ -62,7 +64,7 @@ func (repository RoleRepository) CreateGroupRole(name string, description string
 		return models.GroupRoleDefinition{}, err
 	}
 
-	err = repository.replaceGroupRoleGrants(role.ID, categoryGrantIds, tagGrantIds)
+	err = repository.replaceGroupRoleGrants(role.ID, categoryGrantIds, tagGrantIds, paidByUserGrantIds)
 	if err != nil {
 		return models.GroupRoleDefinition{}, err
 	}
@@ -89,6 +91,7 @@ func (repository RoleRepository) GetGroupRoleById(id uint) (models.GroupRoleDefi
 	err := db.Preload("Permissions").
 		Preload("CategoryGrants").
 		Preload("TagGrants").
+		Preload("PaidByUserGrants").
 		First(&role, id).Error
 	if err != nil {
 		return models.GroupRoleDefinition{}, err
@@ -128,7 +131,7 @@ func (repository RoleRepository) UpdateAppRole(id uint, name string, description
 	return repository.GetAppRoleById(id)
 }
 
-func (repository RoleRepository) UpdateGroupRole(id uint, name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint) (models.GroupRoleDefinition, error) {
+func (repository RoleRepository) UpdateGroupRole(id uint, name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint, paidByUserGrantIds []uint, includeOwnPaidReceipts bool) (models.GroupRoleDefinition, error) {
 	db := repository.GetDB()
 
 	err := db.Where("group_role_id = ?", id).Delete(&models.GroupRolePermission{}).Error
@@ -136,9 +139,13 @@ func (repository RoleRepository) UpdateGroupRole(id uint, name string, descripti
 		return models.GroupRoleDefinition{}, err
 	}
 
+	// Use the map form so false bools persist (GORM's struct Updates skips
+	// zero-value bools, which would leave a toggled-off flag set).
 	err = db.Model(&models.GroupRoleDefinition{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"name":        name,
-		"description": description,
+		"name":                          name,
+		"description":                   description,
+		"include_own_paid_receipts":     includeOwnPaidReceipts,
+		"paid_by_visibility_restricted": includeOwnPaidReceipts || len(paidByUserGrantIds) > 0,
 	}).Error
 	if err != nil {
 		return models.GroupRoleDefinition{}, err
@@ -156,7 +163,7 @@ func (repository RoleRepository) UpdateGroupRole(id uint, name string, descripti
 		}
 	}
 
-	err = repository.replaceGroupRoleGrants(id, categoryGrantIds, tagGrantIds)
+	err = repository.replaceGroupRoleGrants(id, categoryGrantIds, tagGrantIds, paidByUserGrantIds)
 	if err != nil {
 		return models.GroupRoleDefinition{}, err
 	}
@@ -164,12 +171,12 @@ func (repository RoleRepository) UpdateGroupRole(id uint, name string, descripti
 	return repository.GetGroupRoleById(id)
 }
 
-// replaceGroupRoleGrants resets a group role's category and tag grants to exactly
-// the given id sets (delete-all-then-insert, mirroring the permission sync). The
-// nested Category/Tag belongs-to associations are Omit-ted so GORM never tries to
-// upsert a zero-valued category/tag from the grant rows — only the join rows are
-// written.
-func (repository RoleRepository) replaceGroupRoleGrants(groupRoleId uint, categoryGrantIds []uint, tagGrantIds []uint) error {
+// replaceGroupRoleGrants resets a group role's category, tag, and paid-by user
+// grants to exactly the given id sets (delete-all-then-insert, mirroring the
+// permission sync). The nested Category/Tag/User belongs-to associations are
+// Omit-ted so GORM never tries to upsert a zero-valued row from the grant rows —
+// only the join rows are written.
+func (repository RoleRepository) replaceGroupRoleGrants(groupRoleId uint, categoryGrantIds []uint, tagGrantIds []uint, paidByUserGrantIds []uint) error {
 	db := repository.GetDB()
 
 	err := db.Where("group_role_id = ?", groupRoleId).Delete(&models.GroupRoleCategoryGrant{}).Error
@@ -178,6 +185,11 @@ func (repository RoleRepository) replaceGroupRoleGrants(groupRoleId uint, catego
 	}
 
 	err = db.Where("group_role_id = ?", groupRoleId).Delete(&models.GroupRoleTagGrant{}).Error
+	if err != nil {
+		return err
+	}
+
+	err = db.Where("group_role_id = ?", groupRoleId).Delete(&models.GroupRolePaidByUserGrant{}).Error
 	if err != nil {
 		return err
 	}
@@ -206,6 +218,18 @@ func (repository RoleRepository) replaceGroupRoleGrants(groupRoleId uint, catego
 		}
 	}
 
+	if len(paidByUserGrantIds) > 0 {
+		paidByUserGrants := make([]models.GroupRolePaidByUserGrant, 0, len(paidByUserGrantIds))
+		for _, userId := range paidByUserGrantIds {
+			paidByUserGrants = append(paidByUserGrants, models.GroupRolePaidByUserGrant{GroupRoleID: groupRoleId, UserID: userId})
+		}
+
+		err = db.Omit("User").Create(&paidByUserGrants).Error
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -222,6 +246,7 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 	err = db.Preload("Permissions").
 		Preload("CategoryGrants").
 		Preload("TagGrants").
+		Preload("PaidByUserGrants").
 		Find(&groupRoles).Error
 	if err != nil {
 		return nil, err
@@ -246,16 +271,17 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		}
 
 		roles = append(roles, structs.RoleView{
-			Id:             role.ID,
-			Name:           role.Name,
-			Description:    role.Description,
-			Scope:          permissions.ScopeApp,
-			IsDefault:      role.IsDefault,
-			IsSystem:       role.IsSystem,
-			Permissions:    perms,
-			AssignedCount:  appRoleCounts[role.ID],
-			CategoryGrants: []uint{},
-			TagGrants:      []uint{},
+			Id:               role.ID,
+			Name:             role.Name,
+			Description:      role.Description,
+			Scope:            permissions.ScopeApp,
+			IsDefault:        role.IsDefault,
+			IsSystem:         role.IsSystem,
+			Permissions:      perms,
+			AssignedCount:    appRoleCounts[role.ID],
+			CategoryGrants:   []uint{},
+			TagGrants:        []uint{},
+			PaidByUserGrants: []uint{},
 		})
 	}
 
@@ -266,16 +292,18 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		}
 
 		roles = append(roles, structs.RoleView{
-			Id:             role.ID,
-			Name:           role.Name,
-			Description:    role.Description,
-			Scope:          permissions.ScopeGroup,
-			IsDefault:      role.IsDefault,
-			IsSystem:       role.IsSystem,
-			Permissions:    perms,
-			AssignedCount:  groupRoleCounts[role.ID],
-			CategoryGrants: categoryGrantIdsFromRole(role),
-			TagGrants:      tagGrantIdsFromRole(role),
+			Id:                     role.ID,
+			Name:                   role.Name,
+			Description:            role.Description,
+			Scope:                  permissions.ScopeGroup,
+			IsDefault:              role.IsDefault,
+			IsSystem:               role.IsSystem,
+			Permissions:            perms,
+			AssignedCount:          groupRoleCounts[role.ID],
+			CategoryGrants:         categoryGrantIdsFromRole(role),
+			TagGrants:              tagGrantIdsFromRole(role),
+			PaidByUserGrants:       paidByUserGrantIdsFromRole(role),
+			IncludeOwnPaidReceipts: role.IncludeOwnPaidReceipts,
 		})
 	}
 
@@ -298,6 +326,16 @@ func tagGrantIdsFromRole(role models.GroupRoleDefinition) []uint {
 	ids := make([]uint, 0, len(role.TagGrants))
 	for _, grant := range role.TagGrants {
 		ids = append(ids, grant.TagID)
+	}
+	return ids
+}
+
+// paidByUserGrantIdsFromRole extracts the paid-by user-grant ids from a loaded
+// group role's preloaded PaidByUserGrants, normalized to a non-nil slice.
+func paidByUserGrantIdsFromRole(role models.GroupRoleDefinition) []uint {
+	ids := make([]uint, 0, len(role.PaidByUserGrants))
+	for _, grant := range role.PaidByUserGrants {
+		ids = append(ids, grant.UserID)
 	}
 	return ids
 }
@@ -497,6 +535,43 @@ func (repository RoleRepository) GetGroupRoleTagIds(groupRoleId uint) ([]uint, e
 	}
 
 	return ids, nil
+}
+
+// GetGroupRolePaidByUserIds returns the user ids whose receipts a group role
+// lets its members see (the absolute paid-by grants only — the relative "their
+// own" token is on GetGroupRolePaidByConfig). An empty result with include-own
+// false means the role is unrestricted (members see every payer).
+func (repository RoleRepository) GetGroupRolePaidByUserIds(groupRoleId uint) ([]uint, error) {
+	db := repository.GetDB()
+
+	ids := make([]uint, 0)
+	err := db.Model(&models.GroupRolePaidByUserGrant{}).
+		Where("group_role_id = ?", groupRoleId).
+		Pluck("user_id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return ids, nil
+}
+
+// GetGroupRolePaidByConfig returns a group role's two scalar paid-by flags in a
+// single row read: includeOwn (the relative "their own receipts" token) and
+// restricted (whether the role opted into paid-by filtering at all — it stays
+// true after a granted user is deleted and the grant rows cascade away, so a
+// configured role keeps failing closed instead of widening to see-all).
+func (repository RoleRepository) GetGroupRolePaidByConfig(groupRoleId uint) (includeOwn bool, restricted bool, err error) {
+	db := repository.GetDB()
+
+	var role models.GroupRoleDefinition
+	err = db.Select("include_own_paid_receipts", "paid_by_visibility_restricted").
+		Where("id = ?", groupRoleId).
+		First(&role).Error
+	if err != nil {
+		return false, false, err
+	}
+
+	return role.IncludeOwnPaidReceipts, role.PaidByVisibilityRestricted, nil
 }
 
 // GetUserAppRoleId returns the app role id assigned to a user, or nil when the

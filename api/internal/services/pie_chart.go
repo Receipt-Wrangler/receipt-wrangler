@@ -57,6 +57,7 @@ func (service PieChartService) GetPieChartData(
 		groupId,
 		pagedRequest,
 		[]string{"Categories", "Tags"},
+		permissionService.PaidByListResolver(userId),
 	)
 	if err != nil {
 		return structs.PieChartData{}, err

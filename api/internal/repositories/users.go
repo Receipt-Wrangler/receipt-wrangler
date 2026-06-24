@@ -23,6 +23,21 @@ func NewUserRepository(tx *gorm.DB) UserRepository {
 	return repository
 }
 
+// CountByIds returns how many of the given user ids exist. Used to validate that
+// a group role's paid-by user grants reference real users. Duplicate ids in the
+// input are de-duplicated by the IN clause, so callers should pass a unique set.
+func (repository UserRepository) CountByIds(ids []uint) (int64, error) {
+	db := repository.GetDB()
+
+	var count int64
+	err := db.Model(&models.User{}).Where("id IN ?", ids).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (models.User, error) {
 	db := repository.GetDB()
 	user := models.User{

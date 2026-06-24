@@ -199,6 +199,17 @@ them.
   `GroupId`); a grant is a per-group-role slice of the global pool. CRUD persists/returns the grants
   and `PermissionService` resolves them (see "Category/tag grant resolution" below); wiring the
   resolved sets into AppData delivery and request enforcement is rolled out in later slices.
+  - **Paid-by visibility** is a third, **row-level** grant type: `GroupRolePaidByUserGrant`
+    (composite-PK `{GroupRoleID, UserID}`) plus an `IncludeOwnPaidReceipts` bool column on
+    `GroupRoleDefinition`. It restricts **which receipts** a member sees by the receipt's
+    `paid_by_user_id` (vs. category/tag grants, which strip fields off a still-visible receipt). Same
+    opt-in rule: no grant rows **and** `IncludeOwnPaidReceipts == false` ⇒ unrestricted (see every
+    payer). The bool is the relative "their own receipts" token — the member's own id is unioned in at
+    **resolution** time (never stored/cached, since the cache is role-keyed and shared across members),
+    so a role granting only specific users (bool false) is a "pure reviewer" that can't see its
+    holder's own receipts. `UpsertRoleCommand`/`RoleView`/swagger carry `paidByUserGrants` +
+    `includeOwnPaidReceipts`; the granted user ids are existence-validated like category/tag grants
+    (`ErrInvalidGrant`). See "Paid-by visibility enforcement" below.
 - **Assignment:** nullable FKs `User.AppRoleID` and `GroupMember.GroupRoleID` (one app role per
   user; one group role per group membership). Nullable because per-create assignment is best-effort
   (the FK is left `nil` rather than failing creation when no role can be resolved, e.g. an unseeded
@@ -370,6 +381,61 @@ them.
   can't surface or auto-assign a category/tag the user isn't allowed to see. `MagicFillFromImage`
   takes the triggering `userId` and sets it on the service; system/email processing passes 0 and
   stays unrestricted (the resulting receipts are covered by read-stripping when any user views them).
+
+### Paid-by visibility enforcement (`PermissionService`, `services/paid_by_filter.go`)
+
+Row-level visibility by the receipt's `paid_by_user_id`, layered on top of the existing
+group-membership scoping. `GetGroupPaidByUserIdsForUser(userId, groupId)` returns `(allowedSet,
+unrestricted, err)` and returns a **freshly allocated** set (the requesting user's own id is unioned
+in when the role sets `IncludeOwnPaidReceipts`) so it never mutates the role-keyed grant cache. There
+is **no app-level bypass** — every receipt read gates on `group.receipts.read` (the very permission a
+restricted member holds), and an admin who isn't a group member has no group role there so resolves to
+unrestricted.
+
+**Fail closed (`PaidByVisibilityRestricted`).** "Unrestricted" is keyed off a persisted
+`GroupRoleDefinition.PaidByVisibilityRestricted` flag — set on save to `includeOwn || len(paidByUserGrants) > 0`
+— **not** the live grant count. This matters because the `user_id` FK is `ON DELETE CASCADE`: a role
+restricted to only `[X]` (include-own false) would otherwise become *unrestricted* (see-all) once X is
+deleted and its grant row cascades away — a silent privacy widening. With the flag, a configured role
+stays restricted and resolves to an **empty** allowed set → the `IN (0)` sentinel → "see nothing".
+(A user delete does not evict the role grant cache, but that is benign: the deleted user's receipts are
+gone too, and the cached flag stays true.) The flag is internal/derived — not on the API contract.
+
+Because paid-by hides the **whole** receipt (not just fields), enforcement differs by surface:
+
+- **Paged list** (`GetPagedReceiptsByGroupId`): a `PaidByAllowedResolver` is passed in from the
+  handler/service (the repo can't import the service). The WHERE is added **before** the count, so
+  `totalCount` stays correct — single-group adds `paid_by_user_id IN (allowed)` (empty restricted set
+  ⇒ `IN (0)` no-match sentinel); the all-group view builds a per-group **disjunction**
+  `(group_id=G AND paid_by_user_id IN s_G) OR (group_id=G2) …` so each group applies its own role.
+- **Single receipt + dependent reads** (`HandleRequest` chokepoint): the `ReceiptId`/`ReceiptIds`
+  blocks also select `paid_by_user_id`; `enforcePaidByVisibility` denies **403** when any resolved
+  receipt is outside the caller's allowed set. This one place covers `GetReceipt`, image
+  get/download/remove, comments, duplicate-source, update/delete, and the multi-id export (deny if
+  **any** id is hidden). The `HasAccess` probe (the desktop receipt-route guard's check) does its own
+  in-handler check, so it **also** calls `ReceiptPaidByVisible` after its group-permission check —
+  otherwise the guard would admit the member to a hidden receipt that then 403s on fetch.
+- **Search** (`handlers/search.go`): applies the predicate in SQL **before** `Limit(100)` via the
+  shared `ReceiptRepository.ApplyPaidByDisjunction(query, memberGroupIds, resolver)` (the same per-group
+  disjunction the all-group paged read uses). A post-fetch filter would be wrong here: hidden receipts
+  filling the first 100 by date would drop a restricted user's visible matches.
+- **`GetReceiptsForGroupIds`**: `FilterReceiptsByPaidBy` post-filters the returned slice — fine because
+  it has no `LIMIT` (it returns all receipts for the groups). **Pie chart** and **CSV export** pass the
+  resolver through `GetPagedReceiptsByGroupId`.
+- **No request-filter intersection needed** (unlike category/tag grants): the paged query already
+  row-filters on the allowed set, so a caller filtering by a payer they can't see intersects to
+  nothing and can't probe receipt existence.
+- **Scope boundary (intentional):** group totals / splitting / settlement aggregates stay unfiltered
+  (paid-by restricts *browsing*, not the group's accounting — the per-viewer pie chart *is* filtered);
+  write-side (which payer a member may *set*) is unchanged — this is read-visibility only. The
+  settlement endpoint `GetAmountOwedForUser` sets `ReceiptIds` (for the permission gate) but marks the
+  handler `SkipPaidByVisibilityCheck: true`, so the amount-owed total is identical for every member
+  regardless of their paid-by filter — `HandleRequest` honors that flag to skip `enforcePaidByVisibility`
+  while still enforcing `group.receipts.read`. Any future accounting endpoint should set the same flag.
+- Tests: `services/paid_by_filter_test.go`, `repositories/receipts_test.go` (single + all-group
+  disjunction count correctness), `handlers/receipt_paid_by_enforcement_test.go` (single-GET 403),
+  plus the round-trip/validation cases in `repositories/roles_grants_test.go`,
+  `services/roles_test.go`, and `commands/upsert_role_command_test.go`.
 
 ### Enforcement status
 

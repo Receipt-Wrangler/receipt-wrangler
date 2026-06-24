@@ -7,9 +7,23 @@ import "sync"
 // (the role grants every category/tag) — so categories and tags are independent:
 // a role may restrict categories while leaving tags unrestricted, or vice versa.
 // Callers must treat the maps as read-only (they are shared cache state).
+//
+// paidByUserIds / includeOwnPaidReceipts carry the row-level "paid by" visibility
+// filter. paidByUserIds holds ONLY the absolute granted user ids — the relative
+// "their own receipts" token (includeOwnPaidReceipts) is unioned with the
+// requesting user's id at resolution time, never stored here, because this cache
+// is keyed by role id and shared across every member holding that role.
 type grantEntry struct {
-	categoryIds map[uint]struct{}
-	tagIds      map[uint]struct{}
+	categoryIds            map[uint]struct{}
+	tagIds                 map[uint]struct{}
+	paidByUserIds          map[uint]struct{}
+	includeOwnPaidReceipts bool
+	// paidByVisibilityRestricted records whether the role opted into paid-by
+	// filtering. It is the source of truth for "restricted vs unrestricted" — NOT
+	// the paidByUserIds count — so a configured role whose grant rows were removed
+	// (e.g. a granted user was deleted) stays restricted (and resolves to "see
+	// nothing") rather than widening to see-all.
+	paidByVisibilityRestricted bool
 }
 
 // groupRoleGrantCache memoizes a group role's category/tag grant id sets, keyed

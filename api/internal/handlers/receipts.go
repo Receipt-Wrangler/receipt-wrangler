@@ -64,6 +64,7 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 				groupId,
 				pagedRequest,
 				associations,
+				permissionService.PaidByListResolver(token.UserId),
 			)
 			if err != nil {
 				return http.StatusInternalServerError, err
@@ -111,13 +112,22 @@ func GetReceiptsForGroupIds(w http.ResponseWriter, r *http.Request) {
 		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
+			permissionService := services.NewPermissionService(nil)
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			receipts, err := receiptRepository.GetReceiptsByGroupIds(groupIds, "*", clause.Associations)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
 
-			err = services.NewPermissionService(nil).FilterReceiptCategoriesTags(token.UserId, receipts)
+			// Drop receipts hidden by the caller's paid-by visibility filter (this
+			// surface is unpaginated, so removing rows is safe), then strip the
+			// categories/tags they may not see from what remains.
+			receipts, err = permissionService.FilterReceiptsByPaidBy(token.UserId, receipts)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			err = permissionService.FilterReceiptCategoriesTags(token.UserId, receipts)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -559,6 +569,17 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 			if !hasAccess {
+				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
+			}
+
+			// Paid-by visibility narrows access within a permitted group, so the
+			// route guard redirects cleanly instead of admitting the user to a
+			// receipt their group role hides (which would then 403 on fetch).
+			paidByVisible, err := permissionService.ReceiptPaidByVisible(token.UserId, receipt.GroupId, receipt.PaidByUserID)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !paidByVisible {
 				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
 			}
 

@@ -34,6 +34,14 @@ export interface Role {
      * Tag ids a GROUP role restricts its members to. Empty means unrestricted (members may use every tag). Always empty for app roles.
      */
     tagGrants?: Array<number>;
+    /**
+     * User ids whose receipts a GROUP role lets its members see (by the receipt\'s \"paid by\" user). Empty with includeOwnPaidReceipts false means unrestricted (members see every payer\'s receipts). Always empty for app roles.
+     */
+    paidByUserGrants?: Array<number>;
+    /**
+     * Whether a GROUP role lets each member see receipts they paid for. Part of the paid-by visibility filter; always false for app roles.
+     */
+    includeOwnPaidReceipts?: boolean;
 }
 export namespace Role {
 }

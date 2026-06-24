@@ -25,4 +25,12 @@ type Handler struct {
 	AppPermissions   []string
 	GroupPermissions []string
 	OrAppPermissions []string
+
+	// SkipPaidByVisibilityCheck, when true, tells HandleRequest to skip the
+	// row-level "paid by" visibility check for receipts resolved from
+	// ReceiptId/ReceiptIds, while STILL enforcing the group permissions above. Set
+	// it on accounting/settlement endpoints (e.g. amount-owed) whose totals must be
+	// identical for every member regardless of their browse-time paid-by filter —
+	// paid-by restricts browsing, not the group's accounting.
+	SkipPaidByVisibilityCheck bool
 }

@@ -339,6 +339,35 @@ func TestDeleteUser_BasicDeletion(t *testing.T) {
 	assertCount(t, &models.User{}, "id = ?", []interface{}{user.ID}, 0, "user should be deleted")
 }
 
+func TestDeleteUser_WithPaidByGrant(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	user := createUserForDeletion(t, "paidbygrantuser")
+
+	// A group role that grants paid-by visibility of this user's receipts.
+	role, err := repositories.NewRoleRepository(nil).CreateGroupRole(
+		"PaidBy Cascade Role",
+		"",
+		[]string{permissions.GroupReceiptsRead},
+		nil,
+		nil,
+		[]uint{user.ID},
+		false,
+	)
+	if err != nil {
+		t.Fatalf("create group role: %v", err)
+	}
+	assertCount(t, &models.GroupRolePaidByUserGrant{}, "user_id = ?", []interface{}{user.ID}, 1, "paid-by grant should exist before delete")
+
+	if err := DeleteUser(utils.UintToString(user.ID)); err != nil {
+		t.Fatalf("DeleteUser failed: %v", err)
+	}
+
+	// The User FK is OnDelete:CASCADE, so deleting the user removes its paid-by
+	// grant rows without error; the role definition itself survives.
+	assertCount(t, &models.GroupRolePaidByUserGrant{}, "user_id = ?", []interface{}{user.ID}, 0, "paid-by grant should cascade-delete with the user")
+	assertCount(t, &models.GroupRoleDefinition{}, "id = ?", []interface{}{role.ID}, 1, "the group role should survive the user deletion")
+}
+
 func TestDeleteUser_WithReceipts(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	user := createUserForDeletion(t, "receiptuser")
