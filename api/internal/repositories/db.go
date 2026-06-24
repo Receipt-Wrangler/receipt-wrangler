@@ -101,6 +101,7 @@ func MakeMigrations() error {
 		&models.GroupRolePermission{},
 		&models.GroupRoleCategoryGrant{},
 		&models.GroupRoleTagGrant{},
+		&models.GroupRolePaidByUserGrant{},
 		&models.GroupMember{},
 		&models.Comment{},
 		&models.Notification{},

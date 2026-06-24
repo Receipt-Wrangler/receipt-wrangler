@@ -40,6 +40,8 @@ func TestCreateGroupRolePersistsCategoryAndTagGrants(t *testing.T) {
 		[]string{permissions.GroupReceiptsRead},
 		[]uint{cat1, cat2},
 		[]uint{tag1},
+		nil,
+		false,
 	)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
@@ -79,7 +81,7 @@ func TestCreateGroupRoleWithNoGrantsIsUnrestricted(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	role, err := repository.CreateGroupRole("Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil)
+	role, err := repository.CreateGroupRole("Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -104,14 +106,14 @@ func TestUpdateGroupRoleReplacesGrants(t *testing.T) {
 	cat3 := makeTestCategory(t, "Travel")
 	tag1 := makeTestTag(t, "Reimbursable")
 
-	created, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat1, cat2}, []uint{tag1})
+	created, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat1, cat2}, []uint{tag1}, nil, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
 
 	// Replace the grant sets entirely with cat3 and no tags.
-	updated, err := repository.UpdateGroupRole(created.ID, "Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat3}, nil)
+	updated, err := repository.UpdateGroupRole(created.ID, "Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat3}, nil, nil, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -141,7 +143,7 @@ func TestDeleteGroupRoleCascadesGrants(t *testing.T) {
 	cat1 := makeTestCategory(t, "Groceries")
 	tag1 := makeTestTag(t, "Reimbursable")
 
-	created, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat1}, []uint{tag1})
+	created, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat1}, []uint{tag1}, nil, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -198,5 +200,150 @@ func TestCategoryAndTagCountByIds(t *testing.T) {
 	}
 	if tagCount != 1 {
 		utils.PrintTestError(t, tagCount, 1)
+	}
+}
+
+// makeTestUser inserts a user and returns its id.
+func makeTestUser(t *testing.T, username string) uint {
+	user := models.User{Username: username, Password: "x"}
+	if err := GetDB().Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	return user.ID
+}
+
+func TestCreateGroupRolePersistsPaidByGrants(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	payer1 := makeTestUser(t, "payer1")
+	payer2 := makeTestUser(t, "payer2")
+
+	role, err := repository.CreateGroupRole(
+		"Paid-By Role",
+		"",
+		[]string{permissions.GroupReceiptsRead},
+		nil,
+		nil,
+		[]uint{payer1, payer2},
+		true,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(role.PaidByUserGrants) != 2 {
+		utils.PrintTestError(t, len(role.PaidByUserGrants), 2)
+	}
+	if !role.IncludeOwnPaidReceipts {
+		utils.PrintTestError(t, role.IncludeOwnPaidReceipts, true)
+	}
+
+	userIds, err := repository.GetGroupRolePaidByUserIds(role.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	slices.Sort(userIds)
+	expected := []uint{payer1, payer2}
+	slices.Sort(expected)
+	if !slices.Equal(userIds, expected) {
+		utils.PrintTestError(t, userIds, expected)
+	}
+
+	includeOwn, err := repository.GetGroupRoleIncludeOwnPaidReceipts(role.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !includeOwn {
+		utils.PrintTestError(t, includeOwn, true)
+	}
+}
+
+func TestUpdateGroupRolePersistsIncludeOwnToggleOff(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	payer := makeTestUser(t, "toggle-payer")
+
+	created, err := repository.CreateGroupRole("Toggle Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, true)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Toggle include-own OFF and drop the user grant. The map-based update must
+	// persist the false value (a struct update would skip the zero-value bool).
+	updated, err := repository.UpdateGroupRole(created.ID, "Toggle Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if updated.IncludeOwnPaidReceipts {
+		utils.PrintTestError(t, updated.IncludeOwnPaidReceipts, false)
+	}
+	if len(updated.PaidByUserGrants) != 0 {
+		utils.PrintTestError(t, len(updated.PaidByUserGrants), 0)
+	}
+
+	includeOwn, err := repository.GetGroupRoleIncludeOwnPaidReceipts(created.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if includeOwn {
+		utils.PrintTestError(t, includeOwn, false)
+	}
+}
+
+func TestDeleteGroupRoleCascadesPaidByGrants(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	payer := makeTestUser(t, "cascade-payer")
+
+	created, err := repository.CreateGroupRole("Cascade Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if err := repository.DeleteGroupRole(created.ID); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var paidByGrantCount int64
+	GetDB().Model(&models.GroupRolePaidByUserGrant{}).Where("group_role_id = ?", created.ID).Count(&paidByGrantCount)
+	if paidByGrantCount != 0 {
+		utils.PrintTestError(t, paidByGrantCount, 0)
+	}
+}
+
+func TestUserCountByIds(t *testing.T) {
+	defer TruncateTestDb()
+
+	user1 := makeTestUser(t, "count-user1")
+	user2 := makeTestUser(t, "count-user2")
+
+	count, err := NewUserRepository(nil).CountByIds([]uint{user1, user2})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 2 {
+		utils.PrintTestError(t, count, 2)
+	}
+
+	count, err = NewUserRepository(nil).CountByIds([]uint{user1, 999999})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 1 {
+		utils.PrintTestError(t, count, 1)
 	}
 }

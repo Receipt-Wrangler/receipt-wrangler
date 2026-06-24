@@ -135,7 +135,7 @@ func TestFilterReceiptBatchPerGroup(t *testing.T) {
 	db := repositories.GetDB()
 	groupB := models.Group{Name: "group-b"}
 	db.Create(&groupB)
-	roleB, err := repositories.NewRoleRepository(nil).CreateGroupRole("Role B", "", []string{permissions.GroupReceiptsRead}, []uint{catB}, nil)
+	roleB, err := repositories.NewRoleRepository(nil).CreateGroupRole("Role B", "", []string{permissions.GroupReceiptsRead}, []uint{catB}, nil, nil, false)
 	if err != nil {
 		t.Fatalf("create role B: %v", err)
 	}

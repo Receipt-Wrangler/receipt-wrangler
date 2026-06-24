@@ -21,6 +21,15 @@ type UpsertRoleCommand struct {
 	// against the database in the role service.
 	CategoryGrants []uint `json:"categoryGrants"`
 	TagGrants      []uint `json:"tagGrants"`
+	// PaidByUserGrants / IncludeOwnPaidReceipts restrict which receipts members of
+	// a group role may see, by the receipt's "paid by" user. Group-scoped only and
+	// opt-in: an empty set with IncludeOwnPaidReceipts == false means unrestricted
+	// (see every payer's receipts). PaidByUserGrants are user ids (validated to
+	// exist in the role service); IncludeOwnPaidReceipts adds the current member's
+	// own receipts. Selecting only specific users (IncludeOwnPaidReceipts false)
+	// therefore hides the member's own receipts too.
+	PaidByUserGrants       []uint `json:"paidByUserGrants"`
+	IncludeOwnPaidReceipts bool   `json:"includeOwnPaidReceipts"`
 }
 
 func (command *UpsertRoleCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -69,10 +78,12 @@ func (command *UpsertRoleCommand) Validate() structs.ValidatorError {
 		}
 	}
 
-	// Category/tag grants are a group-role concept (they slice the global pool
-	// per group role); they make no sense on an app role.
-	if command.Scope == permissions.ScopeApp && (len(command.CategoryGrants) > 0 || len(command.TagGrants) > 0) {
-		errors["grants"] = "Category and tag grants are only valid on group roles"
+	// Category/tag/paid-by grants are a group-role concept (they slice the global
+	// pool / narrow visibility per group role); they make no sense on an app role.
+	if command.Scope == permissions.ScopeApp &&
+		(len(command.CategoryGrants) > 0 || len(command.TagGrants) > 0 ||
+			len(command.PaidByUserGrants) > 0 || command.IncludeOwnPaidReceipts) {
+		errors["grants"] = "Category, tag, and paid-by grants are only valid on group roles"
 	}
 
 	if hasDuplicateUint(command.CategoryGrants) {
@@ -81,6 +92,10 @@ func (command *UpsertRoleCommand) Validate() structs.ValidatorError {
 
 	if hasDuplicateUint(command.TagGrants) {
 		errors["tagGrants"] = "Duplicate tag grant"
+	}
+
+	if hasDuplicateUint(command.PaidByUserGrants) {
+		errors["paidByUserGrants"] = "Duplicate paid-by user grant"
 	}
 
 	vErr.Errors = errors

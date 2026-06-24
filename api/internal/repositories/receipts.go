@@ -500,11 +500,20 @@ func (repository ReceiptRepository) GetReceiptById(receiptId string) (models.Rec
 	return receipt, nil
 }
 
+// PaidByAllowedResolver returns the paid_by_user_id values a user may see in a
+// group, and whether they are unrestricted (see every payer). It lets the receipt
+// repository apply the role-based "paid by" visibility filter without importing
+// the service layer that resolves grants. Pass a nil resolver to
+// GetPagedReceiptsByGroupId to skip paid-by filtering entirely (internal/system
+// callers).
+type PaidByAllowedResolver func(groupId uint) (allowedUserIds []uint, unrestricted bool, err error)
+
 func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 	userId uint,
 	groupId string,
 	pagedRequest commands.ReceiptPagedRequestCommand,
 	associations []string,
+	paidByResolver PaidByAllowedResolver,
 ) ([]models.Receipt, int64, error) {
 	var receipts []models.Receipt
 	var count int64
@@ -526,15 +535,26 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 	}
 
 	// Filter receipts by group
+	var memberGroupIds []uint
 	if isAllGroup {
 		groupMemberRepository := NewGroupMemberRepository(nil)
-		groupIds, err := groupMemberRepository.GetGroupIdsByUserId(utils.UintToString(userId))
+		memberGroupIds, err = groupMemberRepository.GetGroupIdsByUserId(utils.UintToString(userId))
 		if err != nil {
 			return nil, 0, err
 		}
-		query = query.Where("group_id IN ?", groupIds)
+		query = query.Where("group_id IN ?", memberGroupIds)
 	} else {
 		query = query.Where("group_id = ?", groupId)
+	}
+
+	// Apply role-based "paid by" visibility, AND-ed with the group scope above and
+	// BEFORE the count below so totalCount matches the rows actually returned (a
+	// post-fetch filter would corrupt pagination).
+	if paidByResolver != nil {
+		query, err = repository.applyPaidByVisibility(query, uintGroupId, isAllGroup, memberGroupIds, paidByResolver)
+		if err != nil {
+			return nil, 0, err
+		}
 	}
 
 	// Set order by
@@ -573,6 +593,64 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 	}
 
 	return receipts, count, nil
+}
+
+// applyPaidByVisibility narrows query to the receipts a user may see by the
+// "paid by" user, using resolver to look up each group's allowed set. For a
+// single group it adds a simple paid_by_user_id IN (...) constraint; for the
+// all-group view it builds a per-group disjunction so each group applies its own
+// allowed set (a member may hold a different group role per group). The whole
+// disjunction is AND-ed onto query, preserving the existing group scope and
+// keeping the row count correct.
+func (repository ReceiptRepository) applyPaidByVisibility(
+	query *gorm.DB,
+	uintGroupId uint,
+	isAllGroup bool,
+	memberGroupIds []uint,
+	resolver PaidByAllowedResolver,
+) (*gorm.DB, error) {
+	if !isAllGroup {
+		allowed, unrestricted, err := resolver(uintGroupId)
+		if err != nil {
+			return nil, err
+		}
+		if unrestricted {
+			return query, nil
+		}
+		return query.Where("paid_by_user_id IN ?", paidByInValues(allowed)), nil
+	}
+
+	// All-group: OR each member group's own visibility condition together, then
+	// AND the group as a whole onto the running query.
+	disjunction := repository.GetDB().Session(&gorm.Session{NewDB: true})
+	for _, groupId := range memberGroupIds {
+		allowed, unrestricted, err := resolver(groupId)
+		if err != nil {
+			return nil, err
+		}
+		if unrestricted {
+			disjunction = disjunction.Or("group_id = ?", groupId)
+		} else {
+			groupCondition := repository.GetDB().Session(&gorm.Session{NewDB: true}).
+				Where("group_id = ?", groupId).
+				Where("paid_by_user_id IN ?", paidByInValues(allowed))
+			disjunction = disjunction.Or(groupCondition)
+		}
+	}
+
+	return query.Where(disjunction), nil
+}
+
+// paidByInValues guards the IN clause against an empty restricted set: paid-by
+// user ids start at 1, so 0 matches no receipt, yielding "see nothing" rather
+// than a malformed IN (). A restricted role normally always has at least one id
+// (a grant or the resolved self id), but a role whose only granted user was
+// deleted lands here.
+func paidByInValues(allowedUserIds []uint) []uint {
+	if len(allowedUserIds) == 0 {
+		return []uint{0}
+	}
+	return allowedUserIds
 }
 
 func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.ReceiptPagedRequestCommand) (*gorm.DB, error) {

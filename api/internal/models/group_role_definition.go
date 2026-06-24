@@ -14,7 +14,14 @@ type GroupRoleDefinition struct {
 	IsDefault   bool   `gorm:"not null;default:false" json:"isDefault"`
 	IsSystem    bool   `gorm:"not null;default:false" json:"isSystem"`
 
-	Permissions    []GroupRolePermission    `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"permissions"`
-	CategoryGrants []GroupRoleCategoryGrant `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"categoryGrants"`
-	TagGrants      []GroupRoleTagGrant      `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"tagGrants"`
+	// IncludeOwnPaidReceipts is the relative "their own receipts" token of the
+	// paid-by visibility filter: when true the role lets each member see receipts
+	// they paid for. It is stored separately from PaidByUserGrants because it
+	// resolves to the current member at query time rather than a fixed user id.
+	IncludeOwnPaidReceipts bool `gorm:"not null;default:false" json:"includeOwnPaidReceipts"`
+
+	Permissions      []GroupRolePermission      `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"permissions"`
+	CategoryGrants   []GroupRoleCategoryGrant   `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"categoryGrants"`
+	TagGrants        []GroupRoleTagGrant        `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"tagGrants"`
+	PaidByUserGrants []GroupRolePaidByUserGrant `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"paidByUserGrants"`
 }

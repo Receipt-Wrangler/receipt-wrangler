@@ -498,7 +498,7 @@ func TestGetAppData_PopulatesPermissions(t *testing.T) {
 	}
 
 	groupPerms := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate}
-	groupRole, err := roleRepository.CreateGroupRole("AppData Group Role", "", groupPerms, nil, nil)
+	groupRole, err := roleRepository.CreateGroupRole("AppData Group Role", "", groupPerms, nil, nil, nil, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
@@ -554,7 +554,7 @@ func TestGetAppData_GroupCategoriesFilteredByGrants(t *testing.T) {
 		utils.PrintTestError(t, err, nil)
 	}
 
-	groupRole, err := roleRepository.CreateGroupRole("AppData Restricted Role", "", []string{permissions.GroupReceiptsRead}, []uint{grantedCategory.ID}, nil)
+	groupRole, err := roleRepository.CreateGroupRole("AppData Restricted Role", "", []string{permissions.GroupReceiptsRead}, []uint{grantedCategory.ID}, nil, nil, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
@@ -604,7 +604,7 @@ func TestGetAppData_AdminGetsFlatCategoriesUnrestrictedGroup(t *testing.T) {
 		utils.PrintTestError(t, err, nil)
 	}
 
-	groupRole, err := roleRepository.CreateGroupRole("AppData Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil)
+	groupRole, err := roleRepository.CreateGroupRole("AppData Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}

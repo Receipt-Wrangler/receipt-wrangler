@@ -592,7 +592,7 @@ func TestShouldNotDeleteAssignedAppRole(t *testing.T) {
 func TestShouldNotDeleteAssignedGroupRole(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
-	created, err := roleRepository.CreateGroupRole("Group Role", "desc", []string{permissions.GroupReceiptsCreate}, nil, nil)
+	created, err := roleRepository.CreateGroupRole("Group Role", "desc", []string{permissions.GroupReceiptsCreate}, nil, nil, nil, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

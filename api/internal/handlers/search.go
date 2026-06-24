@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
@@ -36,6 +37,14 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				}
 
 				err = db.Table("receipts").Where("group_id IN ? AND name LIKE ?", groupIds, searchTerm).Limit(100).Order("date desc").Find(&receipts).Error
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+
+				// Drop receipts hidden by the caller's paid-by visibility filter —
+				// SearchResult exposes paidByUserId, so unfiltered results would leak
+				// hidden payers' receipts.
+				receipts, err = services.NewPermissionService(nil).FilterReceiptsByPaidBy(token.UserId, receipts)
 				if err != nil {
 					return http.StatusInternalServerError, err
 				}

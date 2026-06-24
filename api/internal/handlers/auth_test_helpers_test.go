@@ -54,7 +54,7 @@ func grantGroupPerms(t *testing.T, userId uint, groupId uint, perms ...string) {
 	db := repositories.GetDB()
 
 	roleRepository := repositories.NewRoleRepository(nil)
-	role, err := roleRepository.CreateGroupRole(fmt.Sprintf("Test Group Role %d-%d", userId, groupId), "", perms, nil, nil)
+	role, err := roleRepository.CreateGroupRole(fmt.Sprintf("Test Group Role %d-%d", userId, groupId), "", perms, nil, nil, nil, false)
 	if err != nil {
 		t.Fatalf("create group role: %v", err)
 	}

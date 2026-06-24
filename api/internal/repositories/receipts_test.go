@@ -285,7 +285,7 @@ func TestShouldGetPagedReceiptsByGroupId(t *testing.T) {
 		},
 	}
 
-	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil)
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -297,6 +297,133 @@ func TestShouldGetPagedReceiptsByGroupId(t *testing.T) {
 
 	if len(receipts) != 2 {
 		utils.PrintTestError(t, len(receipts), 2)
+	}
+}
+
+func pagedRequestAllReceipts() commands.ReceiptPagedRequestCommand {
+	return commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{
+			Page:          1,
+			PageSize:      50,
+			OrderBy:       "created_at",
+			SortDirection: commands.DESCENDING,
+		},
+	}
+}
+
+func TestGetPagedReceiptsAppliesPaidByVisibilitySingleGroup(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+	createTestReceipts() // group 1: one receipt paid by user 1, one by user 2
+
+	repository := NewReceiptRepository(nil)
+
+	// Restrict visibility to receipts paid by user 1 only.
+	restrictedToUser1 := func(groupId uint) ([]uint, bool, error) {
+		return []uint{1}, false, nil
+	}
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, restrictedToUser1)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 1 {
+		utils.PrintTestError(t, count, 1)
+	}
+	if len(receipts) != 1 || receipts[0].PaidByUserID != 1 {
+		utils.PrintTestError(t, receipts, "only the receipt paid by user 1")
+	}
+
+	// Unrestricted resolver returns everything (count must match).
+	unrestricted := func(groupId uint) ([]uint, bool, error) {
+		return nil, true, nil
+	}
+	_, count, err = repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, unrestricted)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 2 {
+		utils.PrintTestError(t, count, 2)
+	}
+
+	// An empty-but-restricted set sees nothing (the 0 sentinel matches no rows).
+	seeNothing := func(groupId uint) ([]uint, bool, error) {
+		return []uint{}, false, nil
+	}
+	receipts, count, err = repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, seeNothing)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 0 || len(receipts) != 0 {
+		utils.PrintTestError(t, count, 0)
+	}
+}
+
+func TestGetPagedReceiptsAppliesPaidByVisibilityAllGroup(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	group1 := models.Group{Name: "pb-all-g1"}
+	group2 := models.Group{Name: "pb-all-g2"}
+	allGroup := models.Group{Name: "pb-all", IsAllGroup: true}
+	db.Create(&group1)
+	db.Create(&group2)
+	db.Create(&allGroup)
+
+	member := models.User{Username: "pb-all-member", Password: "x"}
+	payer1 := models.User{Username: "pb-all-payer1", Password: "x"}
+	payer2 := models.User{Username: "pb-all-payer2", Password: "x"}
+	db.Create(&member)
+	db.Create(&payer1)
+	db.Create(&payer2)
+
+	db.Create(&models.GroupMember{GroupID: group1.ID, UserID: member.ID})
+	db.Create(&models.GroupMember{GroupID: group2.ID, UserID: member.ID})
+
+	makeReceipt := func(groupId uint, payerId uint, name string) {
+		db.Create(&models.Receipt{
+			Name:         name,
+			Amount:       decimal.NewFromInt(1),
+			Date:         time.Now(),
+			PaidByUserID: payerId,
+			GroupId:      groupId,
+			Status:       models.OPEN,
+		})
+	}
+	makeReceipt(group1.ID, payer1.ID, "g1-p1")
+	makeReceipt(group1.ID, payer2.ID, "g1-p2")
+	makeReceipt(group2.ID, payer1.ID, "g2-p1")
+	makeReceipt(group2.ID, payer2.ID, "g2-p2")
+
+	// Different roles per group: group 1 restricted to payer1; group 2 unrestricted.
+	resolver := func(groupId uint) ([]uint, bool, error) {
+		if groupId == group1.ID {
+			return []uint{payer1.ID}, false, nil
+		}
+		return nil, true, nil
+	}
+
+	repository := NewReceiptRepository(nil)
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(member.ID, utils.UintToString(allGroup.ID), pagedRequestAllReceipts(), nil, resolver)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Visible: g1-p1 (group1 restricted to payer1), g2-p1 + g2-p2 (group2 open).
+	// Hidden: g1-p2. totalCount must match the rows actually returned.
+	if count != 3 {
+		utils.PrintTestError(t, count, 3)
+	}
+	if len(receipts) != 3 {
+		utils.PrintTestError(t, len(receipts), 3)
+	}
+	for _, receipt := range receipts {
+		if receipt.GroupId == group1.ID && receipt.PaidByUserID != payer1.ID {
+			utils.PrintTestError(t, receipt.Name, "group 1 should only show payer1's receipt")
+		}
 	}
 }
 

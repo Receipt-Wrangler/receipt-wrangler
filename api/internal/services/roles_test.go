@@ -58,6 +58,52 @@ func TestCreateGroupRoleRejectsNonExistentGrant(t *testing.T) {
 	}
 }
 
+func TestCreateGroupRoleWithPaidByGrantsExposesGrantIds(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	payer := models.User{Username: "paidby-payer", Password: "x"}
+	repositories.GetDB().Create(&payer)
+
+	service := NewRoleService(nil)
+	command := commands.UpsertRoleCommand{
+		Name:                   "Paid-By Group Role",
+		Scope:                  permissions.ScopeGroup,
+		Permissions:            []string{permissions.GroupReceiptsRead},
+		PaidByUserGrants:       []uint{payer.ID},
+		IncludeOwnPaidReceipts: true,
+	}
+
+	roleView, err := service.CreateRole(command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(roleView.PaidByUserGrants) != 1 || roleView.PaidByUserGrants[0] != payer.ID {
+		utils.PrintTestError(t, roleView.PaidByUserGrants, []uint{payer.ID})
+	}
+	if !roleView.IncludeOwnPaidReceipts {
+		utils.PrintTestError(t, roleView.IncludeOwnPaidReceipts, true)
+	}
+}
+
+func TestCreateGroupRoleRejectsNonExistentPaidByGrant(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	service := NewRoleService(nil)
+	command := commands.UpsertRoleCommand{
+		Name:             "Bad Paid-By Role",
+		Scope:            permissions.ScopeGroup,
+		Permissions:      []string{permissions.GroupReceiptsRead},
+		PaidByUserGrants: []uint{999999},
+	}
+
+	_, err := service.CreateRole(command)
+	if !errors.Is(err, ErrInvalidGrant) {
+		utils.PrintTestError(t, err, ErrInvalidGrant)
+	}
+}
+
 func TestUpdateGroupRoleServiceReplacesGrants(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
@@ -67,7 +113,7 @@ func TestUpdateGroupRoleServiceReplacesGrants(t *testing.T) {
 	catB := models.Category{Name: "B"}
 	repositories.GetDB().Create(&catB)
 
-	created, err := roleRepository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{catA.ID}, nil)
+	created, err := roleRepository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{catA.ID}, nil, nil, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

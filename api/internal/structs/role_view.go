@@ -16,4 +16,10 @@ type RoleView struct {
 	// app roles serialize empty slices.
 	CategoryGrants []uint `json:"categoryGrants"`
 	TagGrants      []uint `json:"tagGrants"`
+	// PaidByUserGrants are the user ids whose receipts a group role lets its
+	// members see; IncludeOwnPaidReceipts adds the member's own receipts. Empty +
+	// false means unrestricted. Always group-scoped; app roles serialize an empty
+	// slice and false.
+	PaidByUserGrants       []uint `json:"paidByUserGrants"`
+	IncludeOwnPaidReceipts bool   `json:"includeOwnPaidReceipts"`
 }
