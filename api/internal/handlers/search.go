@@ -36,15 +36,22 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					return http.StatusInternalServerError, err
 				}
 
-				err = db.Table("receipts").Where("group_id IN ? AND name LIKE ?", groupIds, searchTerm).Limit(100).Order("date desc").Find(&receipts).Error
+				query := db.Table("receipts").Where("group_id IN ? AND name LIKE ?", groupIds, searchTerm)
+
+				// Apply the caller's paid-by visibility in SQL BEFORE the limit —
+				// SearchResult exposes paidByUserId, and a post-fetch filter would drop
+				// visible matches whenever hidden receipts fill the first 100 rows.
+				receiptRepository := repositories.NewReceiptRepository(nil)
+				query, err = receiptRepository.ApplyPaidByDisjunction(
+					query,
+					groupIds,
+					services.NewPermissionService(nil).PaidByListResolver(token.UserId),
+				)
 				if err != nil {
 					return http.StatusInternalServerError, err
 				}
 
-				// Drop receipts hidden by the caller's paid-by visibility filter —
-				// SearchResult exposes paidByUserId, so unfiltered results would leak
-				// hidden payers' receipts.
-				receipts, err = services.NewPermissionService(nil).FilterReceiptsByPaidBy(token.UserId, receipts)
+				err = query.Limit(100).Order("date desc").Find(&receipts).Error
 				if err != nil {
 					return http.StatusInternalServerError, err
 				}

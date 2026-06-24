@@ -67,7 +67,7 @@ func CreateRole(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				if errors.Is(err, services.ErrInvalidGrant) {
 					structs.WriteValidatorErrorResponse(w, structs.ValidatorError{
-						Errors: map[string]string{"grants": "One or more category or tag grants do not exist"},
+						Errors: map[string]string{"grants": "One or more category, tag, or paid-by user grants do not exist"},
 					}, http.StatusBadRequest)
 					return 0, nil
 				}
@@ -138,7 +138,7 @@ func UpdateRole(w http.ResponseWriter, r *http.Request) {
 				}
 				if errors.Is(err, services.ErrInvalidGrant) {
 					structs.WriteValidatorErrorResponse(w, structs.ValidatorError{
-						Errors: map[string]string{"grants": "One or more category or tag grants do not exist"},
+						Errors: map[string]string{"grants": "One or more category, tag, or paid-by user grants do not exist"},
 					}, http.StatusBadRequest)
 					return 0, nil
 				}

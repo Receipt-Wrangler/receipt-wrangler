@@ -386,11 +386,20 @@ them.
 
 Row-level visibility by the receipt's `paid_by_user_id`, layered on top of the existing
 group-membership scoping. `GetGroupPaidByUserIdsForUser(userId, groupId)` returns `(allowedSet,
-unrestricted, err)` with the same empty-grants = see-all rule as the category/tag resolvers, but it
-returns a **freshly allocated** set (the requesting user's own id is unioned in when the role sets
-`IncludeOwnPaidReceipts`) so it never mutates the role-keyed grant cache. There is **no app-level
-bypass** — every receipt read gates on `group.receipts.read` (the very permission a restricted member
-holds), and an admin who isn't a group member has no group role there so resolves to unrestricted.
+unrestricted, err)` and returns a **freshly allocated** set (the requesting user's own id is unioned
+in when the role sets `IncludeOwnPaidReceipts`) so it never mutates the role-keyed grant cache. There
+is **no app-level bypass** — every receipt read gates on `group.receipts.read` (the very permission a
+restricted member holds), and an admin who isn't a group member has no group role there so resolves to
+unrestricted.
+
+**Fail closed (`PaidByVisibilityRestricted`).** "Unrestricted" is keyed off a persisted
+`GroupRoleDefinition.PaidByVisibilityRestricted` flag — set on save to `includeOwn || len(paidByUserGrants) > 0`
+— **not** the live grant count. This matters because the `user_id` FK is `ON DELETE CASCADE`: a role
+restricted to only `[X]` (include-own false) would otherwise become *unrestricted* (see-all) once X is
+deleted and its grant row cascades away — a silent privacy widening. With the flag, a configured role
+stays restricted and resolves to an **empty** allowed set → the `IN (0)` sentinel → "see nothing".
+(A user delete does not evict the role grant cache, but that is benign: the deleted user's receipts are
+gone too, and the cached flag stays true.) The flag is internal/derived — not on the API contract.
 
 Because paid-by hides the **whole** receipt (not just fields), enforcement differs by surface:
 
@@ -406,9 +415,13 @@ Because paid-by hides the **whole** receipt (not just fields), enforcement diffe
   **any** id is hidden). The `HasAccess` probe (the desktop receipt-route guard's check) does its own
   in-handler check, so it **also** calls `ReceiptPaidByVisible` after its group-permission check —
   otherwise the guard would admit the member to a hidden receipt that then 403s on fetch.
-- **Unpaginated surfaces** (`GetReceiptsForGroupIds`, `Search`): `FilterReceiptsByPaidBy` post-filters
-  the returned slice (no `totalCount` to keep consistent). Search returns `paidByUserId`, so it must
-  be filtered. **Pie chart** and **CSV export** pass the resolver through `GetPagedReceiptsByGroupId`.
+- **Search** (`handlers/search.go`): applies the predicate in SQL **before** `Limit(100)` via the
+  shared `ReceiptRepository.ApplyPaidByDisjunction(query, memberGroupIds, resolver)` (the same per-group
+  disjunction the all-group paged read uses). A post-fetch filter would be wrong here: hidden receipts
+  filling the first 100 by date would drop a restricted user's visible matches.
+- **`GetReceiptsForGroupIds`**: `FilterReceiptsByPaidBy` post-filters the returned slice — fine because
+  it has no `LIMIT` (it returns all receipts for the groups). **Pie chart** and **CSV export** pass the
+  resolver through `GetPagedReceiptsByGroupId`.
 - **No request-filter intersection needed** (unlike category/tag grants): the paged query already
   row-filters on the allowed set, so a caller filtering by a payer they can't see intersects to
   nothing and can't probe receipt existence.

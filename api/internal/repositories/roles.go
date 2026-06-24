@@ -52,10 +52,11 @@ func (repository RoleRepository) CreateGroupRole(name string, description string
 	}
 
 	role := models.GroupRoleDefinition{
-		Name:                   name,
-		Description:            description,
-		IncludeOwnPaidReceipts: includeOwnPaidReceipts,
-		Permissions:            rolePermissions,
+		Name:                       name,
+		Description:                description,
+		IncludeOwnPaidReceipts:     includeOwnPaidReceipts,
+		PaidByVisibilityRestricted: includeOwnPaidReceipts || len(paidByUserGrantIds) > 0,
+		Permissions:                rolePermissions,
 	}
 
 	err := db.Create(&role).Error
@@ -138,12 +139,13 @@ func (repository RoleRepository) UpdateGroupRole(id uint, name string, descripti
 		return models.GroupRoleDefinition{}, err
 	}
 
-	// Use the map form so a false includeOwnPaidReceipts persists (GORM's struct
-	// Updates skips zero-value bools, which would leave a toggled-off flag set).
+	// Use the map form so false bools persist (GORM's struct Updates skips
+	// zero-value bools, which would leave a toggled-off flag set).
 	err = db.Model(&models.GroupRoleDefinition{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"name":                      name,
-		"description":               description,
-		"include_own_paid_receipts": includeOwnPaidReceipts,
+		"name":                          name,
+		"description":                   description,
+		"include_own_paid_receipts":     includeOwnPaidReceipts,
+		"paid_by_visibility_restricted": includeOwnPaidReceipts || len(paidByUserGrantIds) > 0,
 	}).Error
 	if err != nil {
 		return models.GroupRoleDefinition{}, err
@@ -567,6 +569,24 @@ func (repository RoleRepository) GetGroupRoleIncludeOwnPaidReceipts(groupRoleId 
 	}
 
 	return includeOwn, nil
+}
+
+// GetGroupRolePaidByVisibilityRestricted returns whether the role opted into
+// paid-by filtering at all. It stays true after a granted user is deleted and the
+// grant rows cascade away, so a configured role keeps failing closed (sees
+// nothing) instead of widening to see-all.
+func (repository RoleRepository) GetGroupRolePaidByVisibilityRestricted(groupRoleId uint) (bool, error) {
+	db := repository.GetDB()
+
+	var restricted bool
+	err := db.Model(&models.GroupRoleDefinition{}).
+		Where("id = ?", groupRoleId).
+		Pluck("paid_by_visibility_restricted", &restricted).Error
+	if err != nil {
+		return false, err
+	}
+
+	return restricted, nil
 }
 
 // GetUserAppRoleId returns the app role id assigned to a user, or nil when the

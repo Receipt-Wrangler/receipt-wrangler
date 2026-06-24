@@ -41,26 +41,30 @@ func (service PermissionService) GetGroupTagIdsForUser(userId uint, groupId uint
 // GetGroupPaidByUserIdsForUser returns the set of "paid by" user ids whose
 // receipts a user may see in a group, plus an "unrestricted" flag. When
 // unrestricted is true the returned set is nil and the caller must treat every
-// payer as allowed (the empty-grants = see-all rule). The role's absolute
-// paid-by grants are combined with the relative "their own receipts" token: when
-// the role sets includeOwnPaidReceipts, the requesting user's own id is unioned
-// into the result. Selecting only specific users (includeOwnPaidReceipts false)
-// therefore excludes the member's own receipts. A non-member, or a member whose
-// group role has no paid-by grants and no include-own, is unrestricted — grants
-// only NARROW visibility within an already-permitted group (the handler
-// permission gate is the access control). The returned map is freshly allocated
-// per call (the requesting user's id may be unioned in), so callers may keep it.
+// payer as allowed. "Unrestricted" is keyed off whether the role opted into
+// paid-by filtering at all (paidByVisibilityRestricted), NOT the current grant
+// count: a role that the admin configured stays restricted even if its grant rows
+// were since removed (e.g. a granted user was deleted and the FK cascade emptied
+// PaidByUserGrants) — it then resolves to an EMPTY allowed set ("see nothing"),
+// failing closed rather than silently widening to see-all. A non-member, or a
+// member whose role never opted in, is unrestricted — grants only NARROW
+// visibility within an already-permitted group (the handler permission gate is
+// the access control). When restricted, the role's absolute grants are combined
+// with the relative "their own receipts" token (the requester's own id is unioned
+// in when includeOwnPaidReceipts). The returned map is freshly allocated per call.
 func (service PermissionService) GetGroupPaidByUserIdsForUser(userId uint, groupId uint) (map[uint]struct{}, bool, error) {
 	entry, err := service.resolveGroupRoleGrants(userId, groupId)
 	if err != nil {
 		return nil, false, err
 	}
-	if entry == nil || (len(entry.paidByUserIds) == 0 && !entry.includeOwnPaidReceipts) {
+	if entry == nil || !entry.paidByVisibilityRestricted {
 		return nil, true, nil
 	}
 
 	// Copy the cached absolute grants (shared, read-only) before unioning in the
-	// per-user "their own" id, so we never mutate cache state.
+	// per-user "their own" id, so we never mutate cache state. The result may be
+	// empty (a configured role whose only granted users were deleted) — that is
+	// the intended "see nothing", enforced by the IN (0) sentinel downstream.
 	allowed := make(map[uint]struct{}, len(entry.paidByUserIds)+1)
 	for id := range entry.paidByUserIds {
 		allowed[id] = struct{}{}
@@ -159,12 +163,17 @@ func loadGroupRoleGrants(roleRepository repositories.RoleRepository, roleId uint
 	if err != nil {
 		return nil, err
 	}
+	paidByVisibilityRestricted, err := roleRepository.GetGroupRolePaidByVisibilityRestricted(roleId)
+	if err != nil {
+		return nil, err
+	}
 
 	entry := &grantEntry{
-		categoryIds:            uintSliceToSet(categoryIds),
-		tagIds:                 uintSliceToSet(tagIds),
-		paidByUserIds:          uintSliceToSet(paidByUserIds),
-		includeOwnPaidReceipts: includeOwnPaidReceipts,
+		categoryIds:                uintSliceToSet(categoryIds),
+		tagIds:                     uintSliceToSet(tagIds),
+		paidByUserIds:              uintSliceToSet(paidByUserIds),
+		includeOwnPaidReceipts:     includeOwnPaidReceipts,
+		paidByVisibilityRestricted: paidByVisibilityRestricted,
 	}
 
 	setCachedGroupRoleGrants(roleId, entry, observedGen)

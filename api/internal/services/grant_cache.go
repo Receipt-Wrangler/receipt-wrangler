@@ -18,6 +18,12 @@ type grantEntry struct {
 	tagIds                 map[uint]struct{}
 	paidByUserIds          map[uint]struct{}
 	includeOwnPaidReceipts bool
+	// paidByVisibilityRestricted records whether the role opted into paid-by
+	// filtering. It is the source of truth for "restricted vs unrestricted" — NOT
+	// the paidByUserIds count — so a configured role whose grant rows were removed
+	// (e.g. a granted user was deleted) stays restricted (and resolves to "see
+	// nothing") rather than widening to see-all.
+	paidByVisibilityRestricted bool
 }
 
 // groupRoleGrantCache memoizes a group role's category/tag grant id sets, keyed

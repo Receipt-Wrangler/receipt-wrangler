@@ -323,6 +323,56 @@ func TestDeleteGroupRoleCascadesPaidByGrants(t *testing.T) {
 	}
 }
 
+func TestGroupRolePaidByVisibilityRestrictedPersists(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+	payer := makeTestUser(t, "restricted-flag-payer")
+
+	assertRestricted := func(roleId uint, want bool, desc string) {
+		got, err := repository.GetGroupRolePaidByVisibilityRestricted(roleId)
+		if err != nil {
+			utils.PrintTestError(t, err, nil)
+			return
+		}
+		if got != want {
+			utils.PrintTestError(t, got, desc)
+		}
+	}
+
+	// Specific-user grant (no include-own) is restricted.
+	usersOnly, err := repository.CreateGroupRole("Users Only", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	assertRestricted(usersOnly.ID, true, "users-only role should be restricted")
+
+	// Include-own only is restricted.
+	ownOnly, err := repository.CreateGroupRole("Own Only", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, true)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	assertRestricted(ownOnly.ID, true, "include-own role should be restricted")
+
+	// Empty paid-by config is NOT restricted (unrestricted = see everyone).
+	open, err := repository.CreateGroupRole("Open", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	assertRestricted(open.ID, false, "empty paid-by config should not be restricted")
+
+	// Updating a restricted role to an empty config clears the flag (map update
+	// persists the false value).
+	_, err = repository.UpdateGroupRole(usersOnly.ID, "Users Only", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	assertRestricted(usersOnly.ID, false, "clearing the paid-by config should clear restricted")
+}
+
 func TestUserCountByIds(t *testing.T) {
 	defer TruncateTestDb()
 

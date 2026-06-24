@@ -20,6 +20,15 @@ type GroupRoleDefinition struct {
 	// resolves to the current member at query time rather than a fixed user id.
 	IncludeOwnPaidReceipts bool `gorm:"not null;default:false" json:"includeOwnPaidReceipts"`
 
+	// PaidByVisibilityRestricted records whether the admin opted into paid-by
+	// filtering at all (any specific user grant OR include-own). It is what keeps a
+	// configured role restricted even after its grant rows are removed — e.g. when a
+	// granted user is deleted and the FK cascade empties PaidByUserGrants. Without
+	// it, "no grants + include-own false" is indistinguishable from "never
+	// configured", which would silently widen a restricted role to see-all. Derived
+	// and set on save; internal only (not exposed on the API).
+	PaidByVisibilityRestricted bool `gorm:"not null;default:false" json:"-"`
+
 	Permissions      []GroupRolePermission      `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"permissions"`
 	CategoryGrants   []GroupRoleCategoryGrant   `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"categoryGrants"`
 	TagGrants        []GroupRoleTagGrant        `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"tagGrants"`

@@ -427,6 +427,66 @@ func TestGetPagedReceiptsAppliesPaidByVisibilityAllGroup(t *testing.T) {
 	}
 }
 
+func TestApplyPaidByDisjunctionFiltersBeforeLimit(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	group := models.Group{Name: "pb-search-grp"}
+	visiblePayer := models.User{Username: "pb-search-visible", Password: "x"}
+	hiddenPayer := models.User{Username: "pb-search-hidden", Password: "x"}
+	db.Create(&group)
+	db.Create(&visiblePayer)
+	db.Create(&hiddenPayer)
+
+	// Hidden receipts are NEWER (sort first by date desc); the visible one is the
+	// oldest, so a limit applied before filtering would drop it.
+	for i := 0; i < 5; i++ {
+		db.Create(&models.Receipt{
+			Name:         "hidden-" + utils.UintToString(uint(i)),
+			Amount:       decimal.NewFromInt(1),
+			Date:         time.Now().Add(time.Duration(i+1) * time.Hour),
+			PaidByUserID: hiddenPayer.ID,
+			GroupId:      group.ID,
+			Status:       models.OPEN,
+		})
+	}
+	db.Create(&models.Receipt{
+		Name:         "visible",
+		Amount:       decimal.NewFromInt(1),
+		Date:         time.Now(),
+		PaidByUserID: visiblePayer.ID,
+		GroupId:      group.ID,
+		Status:       models.OPEN,
+	})
+
+	// The role restricts the group to the visible payer only.
+	resolver := func(groupId uint) ([]uint, bool, error) {
+		return []uint{visiblePayer.ID}, false, nil
+	}
+
+	repository := NewReceiptRepository(nil)
+	query := db.Table("receipts").Where("group_id = ?", group.ID)
+	query, err := repository.ApplyPaidByDisjunction(query, []uint{group.ID}, resolver)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Limit smaller than the hidden count: the visible receipt must still come back
+	// because the paid-by predicate is applied in SQL BEFORE the limit. (If it were
+	// post-filtered, the limit would return 3 hidden rows -> 0 visible.)
+	var receipts []models.Receipt
+	err = query.Limit(3).Order("date desc").Find(&receipts).Error
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(receipts) != 1 || receipts[0].PaidByUserID != visiblePayer.ID {
+		utils.PrintTestError(t, receipts, "only the visible-payer receipt")
+	}
+}
+
 func TestShouldBuildGormFilterQuery(t *testing.T) {
 	defer teardownReceiptTest()
 	setupReceiptTest()

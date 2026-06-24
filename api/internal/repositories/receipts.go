@@ -620,8 +620,20 @@ func (repository ReceiptRepository) applyPaidByVisibility(
 		return query.Where("paid_by_user_id IN ?", paidByInValues(allowed)), nil
 	}
 
-	// All-group: OR each member group's own visibility condition together, then
-	// AND the group as a whole onto the running query.
+	return repository.ApplyPaidByDisjunction(query, memberGroupIds, resolver)
+}
+
+// ApplyPaidByDisjunction AND-s a per-group "paid by" visibility disjunction onto
+// query across memberGroupIds: each group contributes either `group_id = G`
+// (unrestricted) or `(group_id = G AND paid_by_user_id IN (allowed))`, OR-ed
+// together. It is shared by the all-group paged read and by search — both scope
+// receipts to a member's groups and must apply each group's own paid-by role in
+// SQL, BEFORE any LIMIT, so visible rows are not lost to a pre-filter row cap.
+func (repository ReceiptRepository) ApplyPaidByDisjunction(
+	query *gorm.DB,
+	memberGroupIds []uint,
+	resolver PaidByAllowedResolver,
+) (*gorm.DB, error) {
 	disjunction := repository.GetDB().Session(&gorm.Session{NewDB: true})
 	for _, groupId := range memberGroupIds {
 		allowed, unrestricted, err := resolver(groupId)

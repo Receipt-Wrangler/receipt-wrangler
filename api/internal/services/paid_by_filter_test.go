@@ -216,6 +216,49 @@ func TestGetGroupPaidByUserIdsDoesNotMutateCacheAcrossUsers(t *testing.T) {
 	}
 }
 
+// TestGetGroupPaidByUserIdsFailsClosedAfterGrantedUserDeleted guards the
+// privacy-widening fix: a role configured to see only a specific payer must STAY
+// restricted (and resolve to "see nothing") after that payer is deleted and the
+// FK cascade empties the grant rows — it must NOT silently widen to see-all.
+func TestGetGroupPaidByUserIdsFailsClosedAfterGrantedUserDeleted(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	payer := makeUser(t, "pb-cascade-payer")
+	userId, groupId, roleId := seedMemberWithPaidByRole(t, "pb-cascade-member", []uint{payer}, false)
+	service := NewPermissionService(nil)
+
+	// Initially restricted to the granted payer.
+	allowed, unrestricted, err := service.GetGroupPaidByUserIdsForUser(userId, groupId)
+	if err != nil {
+		t.Fatalf("initial resolve: %v", err)
+	}
+	if unrestricted {
+		t.Fatal("expected restricted before the payer is deleted")
+	}
+	if _, ok := allowed[payer]; !ok || len(allowed) != 1 {
+		t.Fatalf("expected allowed {payer}, got %v", allowed)
+	}
+
+	// Delete the granted user; the FK cascade removes the role's paid-by grant row.
+	if err := repositories.GetDB().Delete(&models.User{}, payer).Error; err != nil {
+		t.Fatalf("delete payer: %v", err)
+	}
+	// A user delete does not evict the role's grant cache, so force a fresh load.
+	clearGroupRoleGrantCache(roleId)
+
+	allowed, unrestricted, err = service.GetGroupPaidByUserIdsForUser(userId, groupId)
+	if err != nil {
+		t.Fatalf("re-resolve: %v", err)
+	}
+	if unrestricted {
+		t.Error("a configured role whose only payer was deleted must stay restricted (fail closed), not widen to see-all")
+	}
+	if len(allowed) != 0 {
+		t.Errorf("expected an empty allowed set (see nothing), got %v", allowed)
+	}
+}
+
 func TestReceiptPaidByVisible(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	clearGroupRoleGrantCacheAll()
