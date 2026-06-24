@@ -85,14 +85,23 @@ Uses `flutter_form_builder` for complex forms with validation. Receipt forms sup
 
 The mobile app gates UI on the caller's **effective permissions**, mirroring the desktop client
 (`desktop/CLAUDE.md` → "Permission-based UI gating") and the backend's enforcement (`api/CLAUDE.md` →
-"Roles & Permissions"). The JWT carries only the legacy `UserRole` and is a UI hint; the server
-re-checks real permissions on every request, so a stale action at worst returns 403.
+"Roles & Permissions"). The JWT no longer carries any role field — effective permissions are
+delivered on `AppData` and are a UI hint; the server re-checks real permissions on every request, so
+a stale action at worst returns 403.
 
 - **Delivery & hydration:** permissions arrive on `AppData` (`appPermissions`, and `groupPermissions`
   keyed by group id) and are stored in **`PermissionsModel`** (`lib/models/permissions_model.dart`)
   via `setPermissions`, called **only** from `storeAppData` (`lib/utils/auth.dart`) on login and
   app-init. Token-only refreshes never touch it. The `FutureBuilder` in `main.dart` blocks first
   paint until app-init completes, so permissions are present before any gated widget builds.
+- **Per-group category/tag catalogs:** `AppData` also delivers `groupCategories` / `groupTags` (keyed
+  by group id), each filtered to the caller's group-role grants (the full pool when unrestricted).
+  `storeAppData` indexes them into `CategoryModel` / `TagModel` (`setGroupCategories` /
+  `setGroupTags`); the receipt-form pickers (`category_select_field.dart` / `tag_select_field.dart`,
+  passed the receipt's `groupId`) source options via `categoriesForGroup(groupId)` /
+  `tagsForGroup(groupId)`. **Do not** source the pickers from the flat `categories` / `tags` arrays —
+  those are admin-only (populated only for holders of `app.categories.read` / `app.tags.read`), so a
+  normal user would see an empty picker. Mirrors desktop's per-group AppData catalog selectors.
 - **Matcher:** `lib/utils/permission_matcher.dart` (`permissionMatches` / `hasAll` / `hasAny`) is a
   faithful port of the backend matcher (`api/internal/permissions/matcher.go`) and its desktop twin
   (`desktop/src/utils/permission.utils.ts`), wildcard semantics included, so UI gating === backend.
@@ -112,6 +121,11 @@ re-checks real permissions on every request, so a stale action at worst returns 
   - `canEditReceipt(permissionsModel, groupId)` (`lib/shared/functions/permissions.dart`) →
     `group.receipts.update`, used by the receipt-edit popup (`receipt_edit_popup_menu.dart`) and the
     receipt swipe-to-edit (`receipt_list_item.dart`).
+  - `canCommentCreate` / `canCommentDelete` (same file) → `group.comments.create` /
+    `group.comments.delete`, scoped to the receipt's group. The comment-input bottom sheet
+    (`receipt_comment_screen.dart`) is hidden without create; the swipe-to-delete
+    (`receipt_comments.dart`) is disabled without delete (only in **edit** state — add-state comment
+    removal is a local model edit with no API call, so it stays enabled).
   - Activity rerun (`group_activity_list_item.dart`) → `group.activities.rerun`.
   - The add menu (`show_add_menu.dart`) shows "Add Manual Receipt" on `group.receipts.create` and
     "Quick Scan" on `group.receipts.quick-scan` — per-group when inside a group, or "held in any
@@ -187,12 +201,13 @@ generator emits invalid `_defaults` initializers for some fields, which `build_r
 compile (and it deletes the matching `.g.dart` first, so the package stops building). After
 regenerating, restore these hand-fixes (precedent: commits `fad192a0`, `a2ec7479`):
 
-- `model/claims.dart` — `..userRole = 'USER'` → `..userRole = UserRole.USER` (enum default emitted
-  as a string).
 - `model/user_preferences.dart` — `..quickScanDefaultStatus = 'OPEN'` →
   `..quickScanDefaultStatus = ReceiptStatus.OPEN`.
 - `model/system_settings.dart` — `..currencyDisplay = '$'` → `..currencyDisplay = r'$'` (a bare `$`
   in a non-raw string is invalid Dart).
+
+`model/claims.dart` **no longer** needs a `userRole` patch — the role rework dropped `userRole` from
+the swagger, so `Claims` carries only identity claims and the field is gone from the generated model.
 
 Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
 is otherwise forbidden — these are the documented exception.)
