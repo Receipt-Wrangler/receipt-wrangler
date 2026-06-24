@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:openapi/src/model/base_model.dart';
+import 'package:openapi/src/model/custom_field.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -19,6 +20,7 @@ part 'custom_field_value.g.dart';
 /// * [updatedAt] 
 /// * [receiptId] - Receipt Id
 /// * [customFieldId] - Custom Field ID
+/// * [customField] 
 /// * [stringValue] - Custom Field String Value
 /// * [dateValue] - Custom Field Date Value
 /// * [selectValue] - Custom Field Select Value
@@ -54,6 +56,9 @@ abstract class CustomFieldValue implements BaseModel, Built<CustomFieldValue, Cu
   @BuiltValueField(wireName: r'receiptId')
   int get receiptId;
 
+  @BuiltValueField(wireName: r'customField')
+  CustomField? get customField;
+
   CustomFieldValue._();
 
   factory CustomFieldValue([void updates(CustomFieldValueBuilder b)]) = _$CustomFieldValue;
@@ -87,6 +92,25 @@ class _$CustomFieldValueSerializer implements PrimitiveSerializer<CustomFieldVal
         specifiedType: const FullType(String),
       );
     }
+    if (object.selectValue != null) {
+      yield r'selectValue';
+      yield serializers.serialize(
+        object.selectValue,
+        specifiedType: const FullType(int),
+      );
+    }
+    yield r'customFieldId';
+    yield serializers.serialize(
+      object.customFieldId,
+      specifiedType: const FullType(int),
+    );
+    if (object.customField != null) {
+      yield r'customField';
+      yield serializers.serialize(
+        object.customField,
+        specifiedType: const FullType(CustomField),
+      );
+    }
     yield r'createdAt';
     yield serializers.serialize(
       object.createdAt,
@@ -97,13 +121,6 @@ class _$CustomFieldValueSerializer implements PrimitiveSerializer<CustomFieldVal
       yield serializers.serialize(
         object.stringValue,
         specifiedType: const FullType(String),
-      );
-    }
-    if (object.selectValue != null) {
-      yield r'selectValue';
-      yield serializers.serialize(
-        object.selectValue,
-        specifiedType: const FullType(int),
       );
     }
     if (object.createdBy != null) {
@@ -120,11 +137,6 @@ class _$CustomFieldValueSerializer implements PrimitiveSerializer<CustomFieldVal
         specifiedType: const FullType(String),
       );
     }
-    yield r'customFieldId';
-    yield serializers.serialize(
-      object.customFieldId,
-      specifiedType: const FullType(int),
-    );
     if (object.booleanValue != null) {
       yield r'booleanValue';
       yield serializers.serialize(
@@ -186,6 +198,27 @@ class _$CustomFieldValueSerializer implements PrimitiveSerializer<CustomFieldVal
           ) as String;
           result.dateValue = valueDes;
           break;
+        case r'selectValue':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.selectValue = valueDes;
+          break;
+        case r'customFieldId':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.customFieldId = valueDes;
+          break;
+        case r'customField':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(CustomField),
+          ) as CustomField;
+          result.customField.replace(valueDes);
+          break;
         case r'createdAt':
           final valueDes = serializers.deserialize(
             value,
@@ -200,13 +233,6 @@ class _$CustomFieldValueSerializer implements PrimitiveSerializer<CustomFieldVal
           ) as String;
           result.stringValue = valueDes;
           break;
-        case r'selectValue':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.selectValue = valueDes;
-          break;
         case r'createdBy':
           final valueDes = serializers.deserialize(
             value,
@@ -220,13 +246,6 @@ class _$CustomFieldValueSerializer implements PrimitiveSerializer<CustomFieldVal
             specifiedType: const FullType(String),
           ) as String;
           result.currencyValue = valueDes;
-          break;
-        case r'customFieldId':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(int),
-          ) as int;
-          result.customFieldId = valueDes;
           break;
         case r'booleanValue':
           final valueDes = serializers.deserialize(

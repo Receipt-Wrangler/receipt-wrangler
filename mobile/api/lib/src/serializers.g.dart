@@ -169,6 +169,18 @@ Serializers _$serializers = (Serializers().toBuilder()
           ]),
           () => MapBuilder<String, BuiltList<Permission>>())
       ..addBuilderFactory(
+          const FullType(BuiltMap, const [
+            const FullType(String),
+            const FullType(BuiltList, const [const FullType(Category)])
+          ]),
+          () => MapBuilder<String, BuiltList<Category>>())
+      ..addBuilderFactory(
+          const FullType(BuiltMap, const [
+            const FullType(String),
+            const FullType(BuiltList, const [const FullType(Tag)])
+          ]),
+          () => MapBuilder<String, BuiltList<Tag>>())
+      ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(GroupMember)]),
           () => ListBuilder<GroupMember>())
       ..addBuilderFactory(
@@ -187,8 +199,26 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(Permission)]),
           () => ListBuilder<Permission>())
       ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(Permission)]),
           () => ListBuilder<Permission>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(PieChartDataPoint)]),
           () => ListBuilder<PieChartDataPoint>())

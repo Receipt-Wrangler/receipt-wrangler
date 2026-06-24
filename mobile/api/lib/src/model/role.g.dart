@@ -23,6 +23,14 @@ class _$Role extends Role {
   final BuiltList<Permission> permissions;
   @override
   final int? assignedCount;
+  @override
+  final BuiltList<int>? categoryGrants;
+  @override
+  final BuiltList<int>? tagGrants;
+  @override
+  final BuiltList<int>? paidByUserGrants;
+  @override
+  final bool? includeOwnPaidReceipts;
 
   factory _$Role([void Function(RoleBuilder)? updates]) =>
       (RoleBuilder()..update(updates))._build();
@@ -35,7 +43,11 @@ class _$Role extends Role {
       required this.isDefault,
       required this.isSystem,
       required this.permissions,
-      this.assignedCount})
+      this.assignedCount,
+      this.categoryGrants,
+      this.tagGrants,
+      this.paidByUserGrants,
+      this.includeOwnPaidReceipts})
       : super._();
   @override
   Role rebuild(void Function(RoleBuilder) updates) =>
@@ -55,7 +67,11 @@ class _$Role extends Role {
         isDefault == other.isDefault &&
         isSystem == other.isSystem &&
         permissions == other.permissions &&
-        assignedCount == other.assignedCount;
+        assignedCount == other.assignedCount &&
+        categoryGrants == other.categoryGrants &&
+        tagGrants == other.tagGrants &&
+        paidByUserGrants == other.paidByUserGrants &&
+        includeOwnPaidReceipts == other.includeOwnPaidReceipts;
   }
 
   @override
@@ -69,6 +85,10 @@ class _$Role extends Role {
     _$hash = $jc(_$hash, isSystem.hashCode);
     _$hash = $jc(_$hash, permissions.hashCode);
     _$hash = $jc(_$hash, assignedCount.hashCode);
+    _$hash = $jc(_$hash, categoryGrants.hashCode);
+    _$hash = $jc(_$hash, tagGrants.hashCode);
+    _$hash = $jc(_$hash, paidByUserGrants.hashCode);
+    _$hash = $jc(_$hash, includeOwnPaidReceipts.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -83,7 +103,11 @@ class _$Role extends Role {
           ..add('isDefault', isDefault)
           ..add('isSystem', isSystem)
           ..add('permissions', permissions)
-          ..add('assignedCount', assignedCount))
+          ..add('assignedCount', assignedCount)
+          ..add('categoryGrants', categoryGrants)
+          ..add('tagGrants', tagGrants)
+          ..add('paidByUserGrants', paidByUserGrants)
+          ..add('includeOwnPaidReceipts', includeOwnPaidReceipts))
         .toString();
   }
 }
@@ -126,6 +150,27 @@ class RoleBuilder implements Builder<Role, RoleBuilder> {
   set assignedCount(int? assignedCount) =>
       _$this._assignedCount = assignedCount;
 
+  ListBuilder<int>? _categoryGrants;
+  ListBuilder<int> get categoryGrants =>
+      _$this._categoryGrants ??= ListBuilder<int>();
+  set categoryGrants(ListBuilder<int>? categoryGrants) =>
+      _$this._categoryGrants = categoryGrants;
+
+  ListBuilder<int>? _tagGrants;
+  ListBuilder<int> get tagGrants => _$this._tagGrants ??= ListBuilder<int>();
+  set tagGrants(ListBuilder<int>? tagGrants) => _$this._tagGrants = tagGrants;
+
+  ListBuilder<int>? _paidByUserGrants;
+  ListBuilder<int> get paidByUserGrants =>
+      _$this._paidByUserGrants ??= ListBuilder<int>();
+  set paidByUserGrants(ListBuilder<int>? paidByUserGrants) =>
+      _$this._paidByUserGrants = paidByUserGrants;
+
+  bool? _includeOwnPaidReceipts;
+  bool? get includeOwnPaidReceipts => _$this._includeOwnPaidReceipts;
+  set includeOwnPaidReceipts(bool? includeOwnPaidReceipts) =>
+      _$this._includeOwnPaidReceipts = includeOwnPaidReceipts;
+
   RoleBuilder() {
     Role._defaults(this);
   }
@@ -141,6 +186,10 @@ class RoleBuilder implements Builder<Role, RoleBuilder> {
       _isSystem = $v.isSystem;
       _permissions = $v.permissions.toBuilder();
       _assignedCount = $v.assignedCount;
+      _categoryGrants = $v.categoryGrants?.toBuilder();
+      _tagGrants = $v.tagGrants?.toBuilder();
+      _paidByUserGrants = $v.paidByUserGrants?.toBuilder();
+      _includeOwnPaidReceipts = $v.includeOwnPaidReceipts;
       _$v = null;
     }
     return this;
@@ -175,12 +224,23 @@ class RoleBuilder implements Builder<Role, RoleBuilder> {
                 isSystem, r'Role', 'isSystem'),
             permissions: permissions.build(),
             assignedCount: assignedCount,
+            categoryGrants: _categoryGrants?.build(),
+            tagGrants: _tagGrants?.build(),
+            paidByUserGrants: _paidByUserGrants?.build(),
+            includeOwnPaidReceipts: includeOwnPaidReceipts,
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'permissions';
         permissions.build();
+
+        _$failedField = 'categoryGrants';
+        _categoryGrants?.build();
+        _$failedField = 'tagGrants';
+        _tagGrants?.build();
+        _$failedField = 'paidByUserGrants';
+        _paidByUserGrants?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(r'Role', _$failedField, e.toString());
       }
