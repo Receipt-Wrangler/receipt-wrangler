@@ -122,3 +122,51 @@ func TestGetReceiptAllowedWhenPaidByUnrestricted(t *testing.T) {
 		utils.PrintTestError(t, w.Result().StatusCode, 200)
 	}
 }
+
+// hasAccessRequest builds a GET /hasAccess request (the receipt-route guard's
+// probe) for receiptId + permission, acting as userId.
+func hasAccessRequest(receiptId uint, permission string, userId uint) (*httptest.ResponseRecorder, *http.Request) {
+	w := httptest.NewRecorder()
+	url := "/hasAccess?receiptId=" + utils.UintToString(receiptId) + "&permission=" + permission
+	r := httptest.NewRequest("GET", url, nil)
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
+	return w, r
+}
+
+func TestHasAccessDeniedWhenPaidByHidden(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	payer := models.User{Username: "ha-payer", Password: "x"}
+	repositories.GetDB().Create(&payer)
+	hidden := models.User{Username: "ha-hidden", Password: "x"}
+	repositories.GetDB().Create(&hidden)
+
+	// The member holds group.receipts.read but is paid-by-restricted to payer, so
+	// the guard probe for a hidden-payer receipt must be denied (clean redirect).
+	userId, groupId := seedPaidByRestrictedMember(t, []uint{payer.ID}, false)
+	receiptId := seedReceipt(t, groupId, hidden.ID, 0)
+
+	w, r := hasAccessRequest(receiptId, permissions.GroupReceiptsRead, userId)
+	HasAccess(w, r)
+
+	if w.Result().StatusCode != 403 {
+		utils.PrintTestError(t, w.Result().StatusCode, 403)
+	}
+}
+
+func TestHasAccessAllowedWhenPaidByVisible(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	payer := models.User{Username: "ha-payer-2", Password: "x"}
+	repositories.GetDB().Create(&payer)
+
+	userId, groupId := seedPaidByRestrictedMember(t, []uint{payer.ID}, false)
+	receiptId := seedReceipt(t, groupId, payer.ID, 0)
+
+	w, r := hasAccessRequest(receiptId, permissions.GroupReceiptsRead, userId)
+	HasAccess(w, r)
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+	}
+}

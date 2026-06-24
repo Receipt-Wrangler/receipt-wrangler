@@ -403,7 +403,9 @@ Because paid-by hides the **whole** receipt (not just fields), enforcement diffe
   blocks also select `paid_by_user_id`; `enforcePaidByVisibility` denies **403** when any resolved
   receipt is outside the caller's allowed set. This one place covers `GetReceipt`, image
   get/download/remove, comments, duplicate-source, update/delete, and the multi-id export (deny if
-  **any** id is hidden).
+  **any** id is hidden). The `HasAccess` probe (the desktop receipt-route guard's check) does its own
+  in-handler check, so it **also** calls `ReceiptPaidByVisible` after its group-permission check —
+  otherwise the guard would admit the member to a hidden receipt that then 403s on fetch.
 - **Unpaginated surfaces** (`GetReceiptsForGroupIds`, `Search`): `FilterReceiptsByPaidBy` post-filters
   the returned slice (no `totalCount` to keep consistent). Search returns `paidByUserId`, so it must
   be filtered. **Pie chart** and **CSV export** pass the resolver through `GetPagedReceiptsByGroupId`.

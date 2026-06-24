@@ -572,6 +572,17 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
 			}
 
+			// Paid-by visibility narrows access within a permitted group, so the
+			// route guard redirects cleanly instead of admitting the user to a
+			// receipt their group role hides (which would then 403 on fetch).
+			paidByVisible, err := permissionService.ReceiptPaidByVisible(token.UserId, receipt.GroupId, receipt.PaidByUserID)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !paidByVisible {
+				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
+			}
+
 			w.WriteHeader(200)
 
 			return 0, nil

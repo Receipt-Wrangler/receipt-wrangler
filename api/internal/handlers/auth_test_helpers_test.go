@@ -51,6 +51,11 @@ func grantAppPerms(t *testing.T, userId uint, perms ...string) {
 func grantGroupPerms(t *testing.T, userId uint, groupId uint, perms ...string) {
 	t.Helper()
 	services.ClearRolePermissionCacheForTests()
+	// Also drop the group-role grant cache: a truncated test DB reuses role ids,
+	// so a fresh (grant-less) role here could otherwise resolve to another case's
+	// cached grants — and paid-by visibility now consults that cache on every
+	// receipt read (e.g. the pie chart), wrongly restricting this role's members.
+	services.ClearGroupRoleGrantCacheForTests()
 	db := repositories.GetDB()
 
 	roleRepository := repositories.NewRoleRepository(nil)

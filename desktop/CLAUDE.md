@@ -488,7 +488,10 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   its UI teardown leaks roles, the reason the new specs use API teardown), `group-viewer-visibility.spec.ts`
   (group member with a group role), `search-bar-visibility.spec.ts` (no `app.receipts.search` → header
   search bar never renders), `dashboard-read-redirect.spec.ts` (no `group.dashboards.read` →
-  `/dashboard/group/:id` redirects to `/receipts/group/:id`; an owner contrast still sees the dashboard).
+  `/dashboard/group/:id` redirects to `/receipts/group/:id`; an owner contrast still sees the dashboard),
+  `paid-by-visibility.spec.ts` (a group role limited to "their own receipts" → a hidden-payer receipt
+  `GET` 403s and is absent from the list, the member's own 200s; uses `withApiAs`/`apiCreateReceipt` and
+  the `createRole` `paidByOwn` option in `helpers/provisioning.ts`).
 
 ## Testing Requirements
 

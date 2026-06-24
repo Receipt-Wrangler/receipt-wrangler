@@ -4,7 +4,7 @@ import {
   type Page,
   request as pwRequest,
 } from '@playwright/test';
-import { creds } from './auth';
+import { creds, type Role } from './auth';
 
 // Shared provisioning for permission e2e specs. Roles/users/groups are CREATED
 // through the real app UI (the realistic flow under test); TEARDOWN goes through
@@ -32,6 +32,13 @@ export interface CreateRoleOptions {
    * and the row by its label (e.g. 'Read Dashboards').
    */
   disablePermissions?: { panelKey: string; label: string }[];
+  /**
+   * Group-role paid-by visibility (the "Visible paid-by users" picker). Pin
+   * "Their own receipts" and/or specific users by display name. Leaving both
+   * unset keeps the role unrestricted (members see every payer's receipts).
+   */
+  paidByOwn?: boolean;
+  paidByUsers?: string[];
 }
 
 /**
@@ -63,6 +70,27 @@ export async function createRole(page: Page, opts: CreateRoleOptions): Promise<v
     const subText = new RegExp(`${panelKey.replace(/\./g, '\\.')} \\u00b7`);
     await page.getByText(subText).click();
     await page.getByRole('button', { name: `Toggle ${label}` }).click();
+  }
+
+  if (opts.paidByOwn || (opts.paidByUsers?.length ?? 0) > 0) {
+    // The picker is a multi-select autocomplete; while its panel is open the
+    // listbox shares the field's label, so target the combobox role.
+    const paidByField = page.getByRole('combobox', {
+      name: 'Visible paid-by users',
+    });
+    if (opts.paidByOwn) {
+      await paidByField.click();
+      await page
+        .getByRole('option', { name: 'Their own receipts', exact: true })
+        .click();
+    }
+    for (const displayName of opts.paidByUsers ?? []) {
+      await paidByField.click();
+      await paidByField.fill(displayName);
+      await page.getByRole('option', { name: displayName, exact: true }).click();
+    }
+    // Selecting an option re-opens the panel; close it so Save is clickable.
+    await page.keyboard.press('Escape');
   }
 
   await page.getByRole('button', { name: 'Save Role' }).click();
@@ -138,23 +166,75 @@ const apiBaseUrl = (): string =>
   process.env.E2E_BASE_URL ?? 'http://localhost:4200';
 
 /**
+ * Opens an `APIRequestContext` authenticated as the given e2e [role], runs [fn],
+ * and disposes it. Use to drive API calls AS a specific user — e.g. asserting a
+ * restricted user's request is denied, or admin teardown.
+ */
+export async function withApiAs<T>(
+  role: Role,
+  fn: (api: APIRequestContext) => Promise<T>,
+): Promise<T> {
+  const api = await pwRequest.newContext({ baseURL: apiBaseUrl() });
+  try {
+    const { username, password } = creds(role);
+    const res = await api.post('/api/login', { data: { username, password } });
+    if (!res.ok()) {
+      throw new Error(`${role} API login failed: HTTP ${res.status()}`);
+    }
+    return await fn(api);
+  } finally {
+    await api.dispose();
+  }
+}
+
+/**
  * Opens an admin-authenticated `APIRequestContext`, runs [fn], and disposes it.
  * Use in `afterAll` for best-effort teardown of provisioned roles/users/groups.
  */
 export async function withAdminApi<T>(
   fn: (api: APIRequestContext) => Promise<T>,
 ): Promise<T> {
-  const api = await pwRequest.newContext({ baseURL: apiBaseUrl() });
-  try {
-    const { username, password } = creds('admin');
-    const res = await api.post('/api/login', { data: { username, password } });
-    if (!res.ok()) {
-      throw new Error(`admin API login failed: HTTP ${res.status()}`);
-    }
-    return await fn(api);
-  } finally {
-    await api.dispose();
+  return withApiAs('admin', fn);
+}
+
+/** Returns the id of the user with [username] (via the admin user list). */
+export async function apiGetUserId(
+  api: APIRequestContext,
+  username: string,
+): Promise<number> {
+  const users = (await (await api.get('/api/user/')).json()) as {
+    id: number;
+    username: string;
+  }[];
+  const user = users.find((u) => u.username === username);
+  if (!user) {
+    throw new Error(`user ${username} not found`);
   }
+  return user.id;
+}
+
+/** Creates a minimal OPEN receipt and returns its id. */
+export async function apiCreateReceipt(
+  api: APIRequestContext,
+  opts: { groupId: number | string; paidByUserId: number; name: string },
+): Promise<number> {
+  const res = await api.post('/api/receipt', {
+    data: {
+      name: opts.name,
+      amount: '10.00',
+      date: '2024-01-01T00:00:00Z',
+      groupId: Number(opts.groupId),
+      paidByUserId: opts.paidByUserId,
+      status: 'OPEN',
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `create receipt failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  const receipt = (await res.json()) as { id: number };
+  return receipt.id;
 }
 
 /** Hard-deletes the user with [username] (frees any app-role assignment). */
