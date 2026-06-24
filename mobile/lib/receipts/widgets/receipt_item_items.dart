@@ -206,6 +206,7 @@ class _ReceiptItemItems extends State<ReceiptItemItems> {
           child: CategorySelectField(
               label: "Categories",
               fieldName: categoryName,
+              groupId: widget.groupId,
               initialCategories: initialCategories,
               formState: formState,
               onCategoriesChanged: (categories) {
@@ -223,6 +224,7 @@ class _ReceiptItemItems extends State<ReceiptItemItems> {
             child: TagSelectField(
                 label: "Tags",
                 fieldName: tagName,
+                groupId: widget.groupId,
                 initialTags: initialTags,
                 formState: formState,
                 onTagsChanged: (tags) {

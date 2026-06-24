@@ -15,11 +15,17 @@ class CategorySelectField extends StatefulWidget {
     required this.initialCategories,
     required this.formState,
     required this.onCategoriesChanged,
+    required this.groupId,
   });
 
   final String label;
 
   final String fieldName;
+
+  /// The receipt's group. Options are sourced from the caller's per-group
+  /// catalog for this group (grant-filtered on the backend), not the global
+  /// admin-only list — otherwise non-admins would see an empty picker.
+  final int groupId;
 
   final List<api.Category> initialCategories;
 
@@ -40,7 +46,7 @@ class _CategorySelectField extends State<CategorySelectField> {
         contextModel.shellContext,
         "Select Categories",
         "Select",
-        categoryModel.categories,
+        categoryModel.categoriesForGroup(widget.groupId),
         widget.initialCategories,
         (category) => category.name).then((value) {
       if (value != null) {
