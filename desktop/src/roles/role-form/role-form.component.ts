@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, signal } from "@angular/core";
+import { Component, DestroyRef, Signal, computed, effect, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormControl, FormGroup, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
@@ -102,13 +102,18 @@ export class RoleFormComponent {
     displayName: "Their own receipts",
   };
 
+  // The full user pool, read reactively so the picker repopulates if AppData lands
+  // after the form mounts (a snapshot inside the computed would cache once and drop
+  // granted users on edit). Assigned in the constructor — a field initializer can't
+  // reference this.store before it is set.
+  private usersSignal!: Signal<User[]>;
+
   // The picker options: the pinned "their own" sentinel first, then every user.
   // The role editor is admin-only and global (no group context), so it lists all
-  // users — sourced from AppData like every other user picker (read lazily via a
-  // snapshot inside the computed, matching app-user-autocomplete).
+  // users — sourced from AppData like every other user picker.
   public readonly paidByOptions = computed<PaidByGrantOption[]>(() => [
     this.ownPaidReceiptsOption,
-    ...this.store.selectSnapshot(UserState.users).map((user) => ({
+    ...this.usersSignal().map((user) => ({
       id: user.id,
       displayName: user.displayName?.length ? user.displayName : user.username,
     })),
@@ -219,6 +224,9 @@ export class RoleFormComponent {
     private readonly destroyRef: DestroyRef,
     private readonly store: Store,
   ) {
+    // Reactive user pool for the paid-by picker (see usersSignal above).
+    this.usersSignal = this.store.selectSignal(UserState.users);
+
     this.permissionService
       .getPermissions()
       .pipe(

@@ -634,6 +634,13 @@ func (repository ReceiptRepository) ApplyPaidByDisjunction(
 	memberGroupIds []uint,
 	resolver PaidByAllowedResolver,
 ) (*gorm.DB, error) {
+	// memberGroupIds is the caller's member groups. With none, there is nothing to
+	// see — fail closed explicitly rather than leave the (empty) disjunction as a
+	// silent no-op that adds no predicate, mirroring the single-group IN (0) guard.
+	if len(memberGroupIds) == 0 {
+		return query.Where("1 = 0"), nil
+	}
+
 	disjunction := repository.GetDB().Session(&gorm.Session{NewDB: true})
 	for _, groupId := range memberGroupIds {
 		allowed, unrestricted, err := resolver(groupId)

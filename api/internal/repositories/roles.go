@@ -539,8 +539,8 @@ func (repository RoleRepository) GetGroupRoleTagIds(groupRoleId uint) ([]uint, e
 
 // GetGroupRolePaidByUserIds returns the user ids whose receipts a group role
 // lets its members see (the absolute paid-by grants only — the relative "their
-// own" token is GetGroupRoleIncludeOwnPaidReceipts). An empty result with
-// include-own false means the role is unrestricted (members see every payer).
+// own" token is on GetGroupRolePaidByConfig). An empty result with include-own
+// false means the role is unrestricted (members see every payer).
 func (repository RoleRepository) GetGroupRolePaidByUserIds(groupRoleId uint) ([]uint, error) {
 	db := repository.GetDB()
 
@@ -555,38 +555,23 @@ func (repository RoleRepository) GetGroupRolePaidByUserIds(groupRoleId uint) ([]
 	return ids, nil
 }
 
-// GetGroupRoleIncludeOwnPaidReceipts returns whether a group role lets each
-// member see receipts they paid for (the relative "their own" paid-by token).
-func (repository RoleRepository) GetGroupRoleIncludeOwnPaidReceipts(groupRoleId uint) (bool, error) {
+// GetGroupRolePaidByConfig returns a group role's two scalar paid-by flags in a
+// single row read: includeOwn (the relative "their own receipts" token) and
+// restricted (whether the role opted into paid-by filtering at all — it stays
+// true after a granted user is deleted and the grant rows cascade away, so a
+// configured role keeps failing closed instead of widening to see-all).
+func (repository RoleRepository) GetGroupRolePaidByConfig(groupRoleId uint) (includeOwn bool, restricted bool, err error) {
 	db := repository.GetDB()
 
-	var includeOwn bool
-	err := db.Model(&models.GroupRoleDefinition{}).
+	var role models.GroupRoleDefinition
+	err = db.Select("include_own_paid_receipts", "paid_by_visibility_restricted").
 		Where("id = ?", groupRoleId).
-		Pluck("include_own_paid_receipts", &includeOwn).Error
+		First(&role).Error
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
-	return includeOwn, nil
-}
-
-// GetGroupRolePaidByVisibilityRestricted returns whether the role opted into
-// paid-by filtering at all. It stays true after a granted user is deleted and the
-// grant rows cascade away, so a configured role keeps failing closed (sees
-// nothing) instead of widening to see-all.
-func (repository RoleRepository) GetGroupRolePaidByVisibilityRestricted(groupRoleId uint) (bool, error) {
-	db := repository.GetDB()
-
-	var restricted bool
-	err := db.Model(&models.GroupRoleDefinition{}).
-		Where("id = ?", groupRoleId).
-		Pluck("paid_by_visibility_restricted", &restricted).Error
-	if err != nil {
-		return false, err
-	}
-
-	return restricted, nil
+	return role.IncludeOwnPaidReceipts, role.PaidByVisibilityRestricted, nil
 }
 
 // GetUserAppRoleId returns the app role id assigned to a user, or nil when the

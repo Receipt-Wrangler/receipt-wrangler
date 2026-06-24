@@ -487,6 +487,44 @@ func TestApplyPaidByDisjunctionFiltersBeforeLimit(t *testing.T) {
 	}
 }
 
+func TestApplyPaidByDisjunctionEmptyGroupsFailsClosed(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	group := models.Group{Name: "pb-empty-grp"}
+	payer := models.User{Username: "pb-empty-payer", Password: "x"}
+	db.Create(&group)
+	db.Create(&payer)
+	db.Create(&models.Receipt{
+		Name:         "r",
+		Amount:       decimal.NewFromInt(1),
+		Date:         time.Now(),
+		PaidByUserID: payer.ID,
+		GroupId:      group.ID,
+		Status:       models.OPEN,
+	})
+
+	resolver := func(groupId uint) ([]uint, bool, error) { return nil, true, nil }
+
+	repository := NewReceiptRepository(nil)
+	// No member groups => the helper must fail closed (return zero rows), not leave
+	// the query unfiltered.
+	query, err := repository.ApplyPaidByDisjunction(db.Table("receipts"), []uint{}, resolver)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var receipts []models.Receipt
+	if err := query.Find(&receipts).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if len(receipts) != 0 {
+		utils.PrintTestError(t, len(receipts), 0)
+	}
+}
+
 func TestShouldBuildGormFilterQuery(t *testing.T) {
 	defer teardownReceiptTest()
 	setupReceiptTest()

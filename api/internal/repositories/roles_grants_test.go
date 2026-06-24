@@ -252,7 +252,7 @@ func TestCreateGroupRolePersistsPaidByGrants(t *testing.T) {
 		utils.PrintTestError(t, userIds, expected)
 	}
 
-	includeOwn, err := repository.GetGroupRoleIncludeOwnPaidReceipts(role.ID)
+	includeOwn, _, err := repository.GetGroupRolePaidByConfig(role.ID)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -289,7 +289,7 @@ func TestUpdateGroupRolePersistsIncludeOwnToggleOff(t *testing.T) {
 		utils.PrintTestError(t, len(updated.PaidByUserGrants), 0)
 	}
 
-	includeOwn, err := repository.GetGroupRoleIncludeOwnPaidReceipts(created.ID)
+	includeOwn, _, err := repository.GetGroupRolePaidByConfig(created.ID)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -329,7 +329,7 @@ func TestGroupRolePaidByVisibilityRestrictedPersists(t *testing.T) {
 	payer := makeTestUser(t, "restricted-flag-payer")
 
 	assertRestricted := func(roleId uint, want bool, desc string) {
-		got, err := repository.GetGroupRolePaidByVisibilityRestricted(roleId)
+		_, got, err := repository.GetGroupRolePaidByConfig(roleId)
 		if err != nil {
 			utils.PrintTestError(t, err, nil)
 			return

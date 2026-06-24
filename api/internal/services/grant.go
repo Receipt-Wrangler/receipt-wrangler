@@ -57,7 +57,12 @@ func (service PermissionService) GetGroupPaidByUserIdsForUser(userId uint, group
 	if err != nil {
 		return nil, false, err
 	}
-	if entry == nil || !entry.paidByVisibilityRestricted {
+	// Unrestricted only when the role did NOT opt into paid-by filtering. The
+	// persisted PaidByVisibilityRestricted flag is the primary signal (it survives
+	// grant rows being cascade-deleted when a granted user is deleted), but we also
+	// honor the live grants/include-own so a role whose flag somehow desynced from
+	// its rows still fails closed rather than widening to see-all.
+	if entry == nil || (!entry.paidByVisibilityRestricted && len(entry.paidByUserIds) == 0 && !entry.includeOwnPaidReceipts) {
 		return nil, true, nil
 	}
 
@@ -159,11 +164,7 @@ func loadGroupRoleGrants(roleRepository repositories.RoleRepository, roleId uint
 	if err != nil {
 		return nil, err
 	}
-	includeOwnPaidReceipts, err := roleRepository.GetGroupRoleIncludeOwnPaidReceipts(roleId)
-	if err != nil {
-		return nil, err
-	}
-	paidByVisibilityRestricted, err := roleRepository.GetGroupRolePaidByVisibilityRestricted(roleId)
+	includeOwnPaidReceipts, paidByVisibilityRestricted, err := roleRepository.GetGroupRolePaidByConfig(roleId)
 	if err != nil {
 		return nil, err
 	}

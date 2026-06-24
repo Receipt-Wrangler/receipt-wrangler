@@ -427,7 +427,11 @@ Because paid-by hides the **whole** receipt (not just fields), enforcement diffe
   nothing and can't probe receipt existence.
 - **Scope boundary (intentional):** group totals / splitting / settlement aggregates stay unfiltered
   (paid-by restricts *browsing*, not the group's accounting — the per-viewer pie chart *is* filtered);
-  write-side (which payer a member may *set*) is unchanged — this is read-visibility only.
+  write-side (which payer a member may *set*) is unchanged — this is read-visibility only. The
+  settlement endpoint `GetAmountOwedForUser` sets `ReceiptIds` (for the permission gate) but marks the
+  handler `SkipPaidByVisibilityCheck: true`, so the amount-owed total is identical for every member
+  regardless of their paid-by filter — `HandleRequest` honors that flag to skip `enforcePaidByVisibility`
+  while still enforcing `group.receipts.read`. Any future accounting endpoint should set the same flag.
 - Tests: `services/paid_by_filter_test.go`, `repositories/receipts_test.go` (single + all-group
   disjunction count correctness), `handlers/receipt_paid_by_enforcement_test.go` (single-GET 403),
   plus the round-trip/validation cases in `repositories/roles_grants_test.go`,

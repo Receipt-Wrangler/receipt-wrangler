@@ -259,6 +259,41 @@ func TestGetGroupPaidByUserIdsFailsClosedAfterGrantedUserDeleted(t *testing.T) {
 	}
 }
 
+// TestGetGroupPaidByUserIdsFailsClosedWhenFlagDesynced guards the hardening: even
+// if the persisted PaidByVisibilityRestricted flag is out of sync (false) while
+// grant rows exist, the resolver still treats the role as restricted (fail closed)
+// rather than widening to see-all.
+func TestGetGroupPaidByUserIdsFailsClosedWhenFlagDesynced(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	payer := makeUser(t, "pb-desync-payer")
+	userId, groupId, roleId := seedMemberWithPaidByRole(t, "pb-desync-member", nil, false)
+
+	// Simulate a desync: a grant row exists but the restricted flag was left false
+	// (e.g. a future write path that inserted grants without recomputing the flag).
+	db := repositories.GetDB()
+	if err := db.Create(&models.GroupRolePaidByUserGrant{GroupRoleID: roleId, UserID: payer}).Error; err != nil {
+		t.Fatalf("insert grant row: %v", err)
+	}
+	if err := db.Model(&models.GroupRoleDefinition{}).Where("id = ?", roleId).
+		Update("paid_by_visibility_restricted", false).Error; err != nil {
+		t.Fatalf("force flag false: %v", err)
+	}
+	clearGroupRoleGrantCache(roleId)
+
+	allowed, unrestricted, err := NewPermissionService(nil).GetGroupPaidByUserIdsForUser(userId, groupId)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if unrestricted {
+		t.Error("a role with live grant rows must resolve restricted even if the persisted flag is false")
+	}
+	if _, ok := allowed[payer]; !ok || len(allowed) != 1 {
+		t.Errorf("expected allowed {payer}, got %v", allowed)
+	}
+}
+
 func TestReceiptPaidByVisible(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	clearGroupRoleGrantCacheAll()

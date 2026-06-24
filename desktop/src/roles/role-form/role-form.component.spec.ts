@@ -5,6 +5,7 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   Input,
   provideZonelessChangeDetection,
+  signal,
 } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormControl, ReactiveFormsModule } from "@angular/forms";
@@ -113,8 +114,8 @@ async function setup(
       { provide: SnackbarService, useValue: snackbar },
       { provide: ActivatedRoute, useValue: activatedRoute },
       // The paid-by picker reads the user pool via UserState; the component only
-      // calls selectSnapshot(UserState.users), so a thin stub is sufficient.
-      { provide: Store, useValue: { selectSnapshot: () => options.users ?? [] } },
+      // reads UserState.users reactively via selectSignal, so a thin stub is sufficient.
+      { provide: Store, useValue: { selectSignal: () => signal(options.users ?? []) } },
     ],
   }).compileComponents();
 
