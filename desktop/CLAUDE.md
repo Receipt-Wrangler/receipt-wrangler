@@ -161,7 +161,10 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
 - **Member-table role display:** the admin user-list (`src/user/user-list/`) and `group-form`
   (`src/group/group-form/`, loaded by every group view including non-admins) resolve each user's
   `appRoleId` / each member's `groupRoleId` to the role **name** via the shared `RoleNamePipe`
-  (`src/pipes/role-name.pipe.ts` — `{{ id | roleName : roles() }}`). Both load roles with
+  (`src/pipes/role-name.pipe.ts` — `{{ id | roleName : roles() : scope }}`). The pipe matches on
+  **id _and_ `PermissionScope`** because app- and group-role ids are independent sequences and can
+  collide (e.g. group role `id=1` vs app role `id=1`); callers pass `PermissionScope.App` (user-list)
+  / `PermissionScope.Group` (group-form) so the wrong-scope role is never matched. Both load roles with
   `RoleService.getRoles()` wrapped in `catchError`, so a non-admin lacking `app.roles.read` sees a
   blank name rather than a 403-driven logout. There is no longer any legacy `groupRole` enum sync,
   and `group-form` no longer enforces a "keep an owner" rule — the backend dropped the owner concept,

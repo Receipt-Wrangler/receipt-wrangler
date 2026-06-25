@@ -84,6 +84,25 @@ describe("GroupMemberFormComponent", () => {
     expect(component.selectedRole()).toEqual(defaultGroupRole);
   });
 
+  it("resolves the selected group role when an app role shares its id", async () => {
+    // App and group role ids are independent and can collide. An app role
+    // listed first with the same id must not be returned for the group selection.
+    const collidingAppRole: Role = {
+      id: 10,
+      name: "Some App Role",
+      description: "App role",
+      scope: PermissionScope.App,
+      isDefault: false,
+      isSystem: false,
+      permissions: [],
+    };
+    getRolesMock.mockReturnValue(of([collidingAppRole, defaultGroupRole]));
+    await createComponent();
+
+    expect(component.form.get("groupRoleId")?.value).toBe(10);
+    expect(component.selectedRole()).toEqual(defaultGroupRole);
+  });
+
   it("leaves the selector empty when roles fail to load", async () => {
     getRolesMock.mockReturnValue(throwError(() => new Error("forbidden")));
     await createComponent();

@@ -44,7 +44,10 @@ export class GroupMemberFormComponent implements OnInit {
   );
   private readonly selectedGroupRoleId = signal<number | null>(null);
   public readonly selectedRole = computed<Role | null>(
-    () => this.roles().find((role) => role.id === this.selectedGroupRoleId()) ?? null
+    () =>
+      this.groupRoleOptions().find(
+        (role) => role.id === this.selectedGroupRoleId()
+      ) ?? null
   );
 
   constructor(
