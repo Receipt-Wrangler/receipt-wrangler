@@ -1,3 +1,4 @@
+import 'package:built_collection/built_collection.dart';
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:openapi/openapi.dart';
 import 'package:receipt_wrangler_mobile/client/client.dart';
@@ -62,7 +63,9 @@ Future<void> storeAppData(
   userModel.setUsers(appData.users.toList());
   userPreferencesModel.setUserPreferences(appData.userPreferences);
   categoryModel.setCategories(appData.categories.toList());
+  categoryModel.setGroupCategories(_groupCatalogToMap(appData.groupCategories));
   tagModel.setTags(appData.tags.toList());
+  tagModel.setGroupTags(_groupCatalogToMap(appData.groupTags));
   systemSettingsModel.setCurrencyDisplay(appData.currencyDisplay);
   systemSettingsModel.setCurrencyDecimalSeparator(
       appData?.currencyDecimalSeparator ?? CurrencySeparator.period);
@@ -74,4 +77,19 @@ Future<void> storeAppData(
       appData?.currencyHideDecimalPlaces ?? false);
   permissionsModel.setPermissions(
       appData.appPermissions, appData.groupPermissions);
+}
+
+/// Converts an AppData per-group catalog (`groupCategories` / `groupTags`,
+/// keyed by group-id string) into a `Map<int, List<T>>` the models index by
+/// group id. Entries with an unparseable key are skipped.
+Map<int, List<T>> _groupCatalogToMap<T>(
+    BuiltMap<String, BuiltList<T>>? groupCatalog) {
+  final result = <int, List<T>>{};
+  groupCatalog?.forEach((groupId, items) {
+    final parsedGroupId = int.tryParse(groupId);
+    if (parsedGroupId != null) {
+      result[parsedGroupId] = items.toList();
+    }
+  });
+  return result;
 }

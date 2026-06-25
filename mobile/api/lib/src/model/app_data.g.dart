@@ -43,6 +43,10 @@ class _$AppData extends AppData {
   final BuiltList<Permission> appPermissions;
   @override
   final BuiltMap<String, BuiltList<Permission>> groupPermissions;
+  @override
+  final BuiltMap<String, BuiltList<Category>>? groupCategories;
+  @override
+  final BuiltMap<String, BuiltList<Tag>>? groupTags;
 
   factory _$AppData([void Function(AppDataBuilder)? updates]) =>
       (AppDataBuilder()..update(updates))._build();
@@ -65,7 +69,9 @@ class _$AppData extends AppData {
       this.currencyHideDecimalPlaces,
       required this.icons,
       required this.appPermissions,
-      required this.groupPermissions})
+      required this.groupPermissions,
+      this.groupCategories,
+      this.groupTags})
       : super._();
   @override
   AppData rebuild(void Function(AppDataBuilder) updates) =>
@@ -95,7 +101,9 @@ class _$AppData extends AppData {
         currencyHideDecimalPlaces == other.currencyHideDecimalPlaces &&
         icons == other.icons &&
         appPermissions == other.appPermissions &&
-        groupPermissions == other.groupPermissions;
+        groupPermissions == other.groupPermissions &&
+        groupCategories == other.groupCategories &&
+        groupTags == other.groupTags;
   }
 
   @override
@@ -119,6 +127,8 @@ class _$AppData extends AppData {
     _$hash = $jc(_$hash, icons.hashCode);
     _$hash = $jc(_$hash, appPermissions.hashCode);
     _$hash = $jc(_$hash, groupPermissions.hashCode);
+    _$hash = $jc(_$hash, groupCategories.hashCode);
+    _$hash = $jc(_$hash, groupTags.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -143,7 +153,9 @@ class _$AppData extends AppData {
           ..add('currencyHideDecimalPlaces', currencyHideDecimalPlaces)
           ..add('icons', icons)
           ..add('appPermissions', appPermissions)
-          ..add('groupPermissions', groupPermissions))
+          ..add('groupPermissions', groupPermissions)
+          ..add('groupCategories', groupCategories)
+          ..add('groupTags', groupTags))
         .toString();
   }
 }
@@ -243,6 +255,19 @@ class AppDataBuilder implements Builder<AppData, AppDataBuilder> {
           MapBuilder<String, BuiltList<Permission>>? groupPermissions) =>
       _$this._groupPermissions = groupPermissions;
 
+  MapBuilder<String, BuiltList<Category>>? _groupCategories;
+  MapBuilder<String, BuiltList<Category>> get groupCategories =>
+      _$this._groupCategories ??= MapBuilder<String, BuiltList<Category>>();
+  set groupCategories(
+          MapBuilder<String, BuiltList<Category>>? groupCategories) =>
+      _$this._groupCategories = groupCategories;
+
+  MapBuilder<String, BuiltList<Tag>>? _groupTags;
+  MapBuilder<String, BuiltList<Tag>> get groupTags =>
+      _$this._groupTags ??= MapBuilder<String, BuiltList<Tag>>();
+  set groupTags(MapBuilder<String, BuiltList<Tag>>? groupTags) =>
+      _$this._groupTags = groupTags;
+
   AppDataBuilder() {
     AppData._defaults(this);
   }
@@ -268,6 +293,8 @@ class AppDataBuilder implements Builder<AppData, AppDataBuilder> {
       _icons = $v.icons.toBuilder();
       _appPermissions = $v.appPermissions.toBuilder();
       _groupPermissions = $v.groupPermissions.toBuilder();
+      _groupCategories = $v.groupCategories?.toBuilder();
+      _groupTags = $v.groupTags?.toBuilder();
       _$v = null;
     }
     return this;
@@ -310,6 +337,8 @@ class AppDataBuilder implements Builder<AppData, AppDataBuilder> {
             icons: icons.build(),
             appPermissions: appPermissions.build(),
             groupPermissions: groupPermissions.build(),
+            groupCategories: _groupCategories?.build(),
+            groupTags: _groupTags?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -337,6 +366,10 @@ class AppDataBuilder implements Builder<AppData, AppDataBuilder> {
         appPermissions.build();
         _$failedField = 'groupPermissions';
         groupPermissions.build();
+        _$failedField = 'groupCategories';
+        _groupCategories?.build();
+        _$failedField = 'groupTags';
+        _groupTags?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
             r'AppData', _$failedField, e.toString());

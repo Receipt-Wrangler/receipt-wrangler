@@ -18,6 +18,10 @@ part 'upsert_role_command.g.dart';
 /// * [description] 
 /// * [scope] 
 /// * [permissions] 
+/// * [categoryGrants] - Category ids to restrict a GROUP role's members to. Only valid on group roles; omit or leave empty for unrestricted access.
+/// * [tagGrants] - Tag ids to restrict a GROUP role's members to. Only valid on group roles; omit or leave empty for unrestricted access.
+/// * [paidByUserGrants] - User ids whose receipts a GROUP role's members may see (by the receipt's \"paid by\" user). Only valid on group roles; omit or leave empty (with includeOwnPaidReceipts false) for unrestricted access.
+/// * [includeOwnPaidReceipts] - Whether to also let each member see receipts they paid for. Only valid on group roles.
 @BuiltValue()
 abstract class UpsertRoleCommand implements Built<UpsertRoleCommand, UpsertRoleCommandBuilder> {
   @BuiltValueField(wireName: r'name')
@@ -32,6 +36,22 @@ abstract class UpsertRoleCommand implements Built<UpsertRoleCommand, UpsertRoleC
 
   @BuiltValueField(wireName: r'permissions')
   BuiltList<Permission> get permissions;
+
+  /// Category ids to restrict a GROUP role's members to. Only valid on group roles; omit or leave empty for unrestricted access.
+  @BuiltValueField(wireName: r'categoryGrants')
+  BuiltList<int>? get categoryGrants;
+
+  /// Tag ids to restrict a GROUP role's members to. Only valid on group roles; omit or leave empty for unrestricted access.
+  @BuiltValueField(wireName: r'tagGrants')
+  BuiltList<int>? get tagGrants;
+
+  /// User ids whose receipts a GROUP role's members may see (by the receipt's \"paid by\" user). Only valid on group roles; omit or leave empty (with includeOwnPaidReceipts false) for unrestricted access.
+  @BuiltValueField(wireName: r'paidByUserGrants')
+  BuiltList<int>? get paidByUserGrants;
+
+  /// Whether to also let each member see receipts they paid for. Only valid on group roles.
+  @BuiltValueField(wireName: r'includeOwnPaidReceipts')
+  bool? get includeOwnPaidReceipts;
 
   UpsertRoleCommand._();
 
@@ -78,6 +98,34 @@ class _$UpsertRoleCommandSerializer implements PrimitiveSerializer<UpsertRoleCom
       object.permissions,
       specifiedType: const FullType(BuiltList, [FullType(Permission)]),
     );
+    if (object.categoryGrants != null) {
+      yield r'categoryGrants';
+      yield serializers.serialize(
+        object.categoryGrants,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
+    if (object.tagGrants != null) {
+      yield r'tagGrants';
+      yield serializers.serialize(
+        object.tagGrants,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
+    if (object.paidByUserGrants != null) {
+      yield r'paidByUserGrants';
+      yield serializers.serialize(
+        object.paidByUserGrants,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
+    if (object.includeOwnPaidReceipts != null) {
+      yield r'includeOwnPaidReceipts';
+      yield serializers.serialize(
+        object.includeOwnPaidReceipts,
+        specifiedType: const FullType(bool),
+      );
+    }
   }
 
   @override
@@ -128,6 +176,34 @@ class _$UpsertRoleCommandSerializer implements PrimitiveSerializer<UpsertRoleCom
             specifiedType: const FullType(BuiltList, [FullType(Permission)]),
           ) as BuiltList<Permission>;
           result.permissions.replace(valueDes);
+          break;
+        case r'categoryGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.categoryGrants.replace(valueDes);
+          break;
+        case r'tagGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.tagGrants.replace(valueDes);
+          break;
+        case r'paidByUserGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.paidByUserGrants.replace(valueDes);
+          break;
+        case r'includeOwnPaidReceipts':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.includeOwnPaidReceipts = valueDes;
           break;
         default:
           unhandled.add(key);

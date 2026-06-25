@@ -42,6 +42,8 @@ part 'app_data.g.dart';
 /// * [icons] - Icons in the system
 /// * [appPermissions] - The calling user's effective app-level permissions.
 /// * [groupPermissions] - The calling user's effective group-level permissions, keyed by group id.
+/// * [groupCategories] - The categories the calling user may use in each group, keyed by group id. Filtered to the user's group-role grants (the full pool when unrestricted). Non-admins receive categories only through this map.
+/// * [groupTags] - The tags the calling user may use in each group, keyed by group id. Filtered to the user's group-role grants (the full pool when unrestricted). Non-admins receive tags only through this map.
 @BuiltValue()
 abstract class AppData implements Built<AppData, AppDataBuilder> {
   @BuiltValueField(wireName: r'about')
@@ -111,6 +113,14 @@ abstract class AppData implements Built<AppData, AppDataBuilder> {
   /// The calling user's effective group-level permissions, keyed by group id.
   @BuiltValueField(wireName: r'groupPermissions')
   BuiltMap<String, BuiltList<Permission>> get groupPermissions;
+
+  /// The categories the calling user may use in each group, keyed by group id. Filtered to the user's group-role grants (the full pool when unrestricted). Non-admins receive categories only through this map.
+  @BuiltValueField(wireName: r'groupCategories')
+  BuiltMap<String, BuiltList<Category>>? get groupCategories;
+
+  /// The tags the calling user may use in each group, keyed by group id. Filtered to the user's group-role grants (the full pool when unrestricted). Non-admins receive tags only through this map.
+  @BuiltValueField(wireName: r'groupTags')
+  BuiltMap<String, BuiltList<Tag>>? get groupTags;
 
   AppData._();
 
@@ -237,6 +247,20 @@ class _$AppDataSerializer implements PrimitiveSerializer<AppData> {
       object.groupPermissions,
       specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(Permission)])]),
     );
+    if (object.groupCategories != null) {
+      yield r'groupCategories';
+      yield serializers.serialize(
+        object.groupCategories,
+        specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(Category)])]),
+      );
+    }
+    if (object.groupTags != null) {
+      yield r'groupTags';
+      yield serializers.serialize(
+        object.groupTags,
+        specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(Tag)])]),
+      );
+    }
   }
 
   @override
@@ -385,6 +409,20 @@ class _$AppDataSerializer implements PrimitiveSerializer<AppData> {
             specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(Permission)])]),
           ) as BuiltMap<String, BuiltList<Permission>>;
           result.groupPermissions.replace(valueDes);
+          break;
+        case r'groupCategories':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(Category)])]),
+          ) as BuiltMap<String, BuiltList<Category>>;
+          result.groupCategories.replace(valueDes);
+          break;
+        case r'groupTags':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(Tag)])]),
+          ) as BuiltMap<String, BuiltList<Tag>>;
+          result.groupTags.replace(valueDes);
           break;
         default:
           unhandled.add(key);

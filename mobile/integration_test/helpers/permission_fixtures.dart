@@ -298,6 +298,42 @@ Future<int> createReceipt({
   return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
 }
 
+/// Creates a global category (categories are app-wide; group visibility is via
+/// group-role grants) and returns its id. A group role with no category grants
+/// is unrestricted, so a freshly-created category shows up in every member's
+/// per-group catalog. Used to prove non-admins receive categories via the
+/// per-group `groupCategories` map (not the admin-only flat list).
+Future<int> createCategory({
+  required String name,
+  required String jwt,
+  String description = 'e2e category',
+}) async {
+  final res = await http
+      .post(
+        Uri.parse('${E2eEnv.baseUrl}/category/'),
+        headers: _jsonAuth(jwt),
+        body: jsonEncode({'name': name, 'description': description}),
+      )
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('createCategory($name) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
+}
+
+/// Best-effort `DELETE /category/{id}`. Swallows errors like the other cleanups.
+Future<void> deleteCategory(int categoryId, {required String jwt}) async {
+  try {
+    await http
+        .delete(Uri.parse('${E2eEnv.baseUrl}/category/$categoryId'),
+            headers: _auth(jwt))
+        .timeout(const Duration(seconds: 5));
+  } catch (_) {
+    // best-effort
+  }
+}
+
 /// Provisions a fresh user and (optionally) a fixture group it belongs to,
 /// registering `addTearDown` to delete the group and user afterwards.
 ///

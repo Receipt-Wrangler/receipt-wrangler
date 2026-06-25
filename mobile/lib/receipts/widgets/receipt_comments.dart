@@ -3,6 +3,8 @@ import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/enums/form_state.dart';
 import 'package:receipt_wrangler_mobile/models/auth_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
+import 'package:receipt_wrangler_mobile/shared/functions/permissions.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/slidable_delete_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/slidable_widget.dart';
 import 'package:receipt_wrangler_mobile/utils/snackbar.dart';
@@ -27,8 +29,18 @@ class _ReceiptComments extends State<ReceiptComments> {
   late final formState = widget.formState;
 
   Widget buildWidgetList() {
-    var slideEnabled = formState == WranglerFormState.edit ||
-        formState == WranglerFormState.add;
+    // Add-state comments are local (removed from the in-progress model, no API
+    // call), so swiping stays enabled. Editing an existing receipt, the swipe
+    // issues a real DELETE, so gate it on `group.comments.delete` for the
+    // receipt's group (mirrors the desktop comment gate).
+    var slideEnabled = formState == WranglerFormState.add;
+    if (formState == WranglerFormState.edit) {
+      final receiptModel = Provider.of<ReceiptModel>(context, listen: false);
+      final permissionsModel =
+          Provider.of<PermissionsModel>(context, listen: false);
+      slideEnabled =
+          canCommentDelete(permissionsModel, receiptModel.receipt.groupId);
+    }
 
     return ListView.builder(
       itemCount: widget.comments.length,

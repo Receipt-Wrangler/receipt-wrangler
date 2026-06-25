@@ -35,4 +35,38 @@ void main() {
       expect(canEditReceipt(model, 99), false);
     });
   });
+
+  group('canCommentCreate', () {
+    test('true when the user holds group.comments.create in the group', () {
+      final model =
+          _modelWithGroup(4, [Permission.groupPeriodCommentsPeriodCreate]);
+      expect(canCommentCreate(model, 4), true);
+    });
+
+    test('false when the group does not grant comment create', () {
+      final model =
+          _modelWithGroup(4, [Permission.groupPeriodReceiptsPeriodRead]);
+      expect(canCommentCreate(model, 4), false);
+    });
+
+    test('false for a group the user is not a member of', () {
+      final model =
+          _modelWithGroup(4, [Permission.groupPeriodCommentsPeriodCreate]);
+      expect(canCommentCreate(model, 99), false);
+    });
+  });
+
+  group('canCommentDelete', () {
+    test('true when the user holds group.comments.delete in the group', () {
+      final model =
+          _modelWithGroup(4, [Permission.groupPeriodCommentsPeriodDelete]);
+      expect(canCommentDelete(model, 4), true);
+    });
+
+    test('false when the group only grants comment create', () {
+      final model =
+          _modelWithGroup(4, [Permission.groupPeriodCommentsPeriodCreate]);
+      expect(canCommentDelete(model, 4), false);
+    });
+  });
 }

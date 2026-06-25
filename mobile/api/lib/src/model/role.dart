@@ -22,6 +22,10 @@ part 'role.g.dart';
 /// * [isSystem] 
 /// * [permissions] 
 /// * [assignedCount] - Number of users or group members currently assigned this role
+/// * [categoryGrants] - Category ids a GROUP role restricts its members to. Empty means unrestricted (members may use every category). Always empty for app roles.
+/// * [tagGrants] - Tag ids a GROUP role restricts its members to. Empty means unrestricted (members may use every tag). Always empty for app roles.
+/// * [paidByUserGrants] - User ids whose receipts a GROUP role lets its members see (by the receipt's \"paid by\" user). Empty with includeOwnPaidReceipts false means unrestricted (members see every payer's receipts). Always empty for app roles.
+/// * [includeOwnPaidReceipts] - Whether a GROUP role lets each member see receipts they paid for. Part of the paid-by visibility filter; always false for app roles.
 @BuiltValue()
 abstract class Role implements Built<Role, RoleBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -50,6 +54,22 @@ abstract class Role implements Built<Role, RoleBuilder> {
   /// Number of users or group members currently assigned this role
   @BuiltValueField(wireName: r'assignedCount')
   int? get assignedCount;
+
+  /// Category ids a GROUP role restricts its members to. Empty means unrestricted (members may use every category). Always empty for app roles.
+  @BuiltValueField(wireName: r'categoryGrants')
+  BuiltList<int>? get categoryGrants;
+
+  /// Tag ids a GROUP role restricts its members to. Empty means unrestricted (members may use every tag). Always empty for app roles.
+  @BuiltValueField(wireName: r'tagGrants')
+  BuiltList<int>? get tagGrants;
+
+  /// User ids whose receipts a GROUP role lets its members see (by the receipt's \"paid by\" user). Empty with includeOwnPaidReceipts false means unrestricted (members see every payer's receipts). Always empty for app roles.
+  @BuiltValueField(wireName: r'paidByUserGrants')
+  BuiltList<int>? get paidByUserGrants;
+
+  /// Whether a GROUP role lets each member see receipts they paid for. Part of the paid-by visibility filter; always false for app roles.
+  @BuiltValueField(wireName: r'includeOwnPaidReceipts')
+  bool? get includeOwnPaidReceipts;
 
   Role._();
 
@@ -116,6 +136,34 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
       yield serializers.serialize(
         object.assignedCount,
         specifiedType: const FullType(int),
+      );
+    }
+    if (object.categoryGrants != null) {
+      yield r'categoryGrants';
+      yield serializers.serialize(
+        object.categoryGrants,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
+    if (object.tagGrants != null) {
+      yield r'tagGrants';
+      yield serializers.serialize(
+        object.tagGrants,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
+    if (object.paidByUserGrants != null) {
+      yield r'paidByUserGrants';
+      yield serializers.serialize(
+        object.paidByUserGrants,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
+    if (object.includeOwnPaidReceipts != null) {
+      yield r'includeOwnPaidReceipts';
+      yield serializers.serialize(
+        object.includeOwnPaidReceipts,
+        specifiedType: const FullType(bool),
       );
     }
   }
@@ -196,6 +244,34 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
             specifiedType: const FullType(int),
           ) as int;
           result.assignedCount = valueDes;
+          break;
+        case r'categoryGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.categoryGrants.replace(valueDes);
+          break;
+        case r'tagGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.tagGrants.replace(valueDes);
+          break;
+        case r'paidByUserGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.paidByUserGrants.replace(valueDes);
+          break;
+        case r'includeOwnPaidReceipts':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.includeOwnPaidReceipts = valueDes;
           break;
         default:
           unhandled.add(key);
