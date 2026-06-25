@@ -89,6 +89,7 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: null,
       currencySymbolPosition: null,
       currencyHideDecimalPlaces: null,
+      pdfDpi: null,
       taskConcurrency: null,
       taskQueueConfigurations: [
         { name: "email_polling", priority: 1 },
@@ -114,6 +115,7 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: true,
+      pdfDpi: 300,
       taskConcurrency: 12,
       taskQueueConfigurations: [{
         name: QueueName.QuickScan,
@@ -136,6 +138,7 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: true,
+      pdfDpi: 300,
       taskConcurrency: 12,
       taskQueueConfigurations: [{
         name: QueueName.QuickScan,
@@ -171,6 +174,7 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: false,
+      pdfDpi: "300",
       taskConcurrency: "12",
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
@@ -198,6 +202,7 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: false,
+      pdfDpi: 300,
       taskConcurrency: 12,
       taskQueueConfigurations: [
         { name: 'email_polling', priority: 1 },
