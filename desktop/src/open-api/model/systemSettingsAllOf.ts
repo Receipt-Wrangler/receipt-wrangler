@@ -32,6 +32,7 @@ export interface SystemSettingsAllOf {
      * Email polling interval
      */
     emailPollingInterval?: number;
+    pdfDpi?: number;
     /**
      * Receipt processing settings foreign key
      */

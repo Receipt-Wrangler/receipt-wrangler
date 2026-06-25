@@ -198,9 +198,44 @@ func (repository FileRepository) ConvertHeicToJpg(bytes []byte) ([]byte, error) 
 	return mw.GetImageBlob()
 }
 
+// pdfRasterizationDpi returns the DPI used to rasterize PDFs into images. It is
+// configured via the PdfDpi system setting; when unset (0) or out of the
+// supported range it falls back to defaultPdfDpi. 300 DPI is a common
+// document-scanning resolution that preserves small receipt text for OCR and
+// vision models while keeping output sizes and memory use reasonable.
+const (
+	defaultPdfDpi = 300.0
+	minPdfDpi     = 72.0
+	maxPdfDpi     = 1200.0
+)
+
+func (repository FileRepository) pdfRasterizationDpi() float64 {
+	systemSettingsRepository := NewSystemSettingsRepository(repository.DB)
+	systemSettings, err := systemSettingsRepository.GetSystemSettings()
+	if err != nil {
+		return defaultPdfDpi
+	}
+
+	dpi := float64(systemSettings.PdfDpi)
+	if dpi < minPdfDpi || dpi > maxPdfDpi {
+		return defaultPdfDpi
+	}
+	return dpi
+}
+
 func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
 	mw := imagick.NewMagickWand()
 	defer mw.Destroy()
+
+	// PDFs are vector documents with no inherent pixel resolution. ImageMagick
+	// rasterizes them at a default of 72 DPI unless a resolution is set BEFORE
+	// the blob is read, which produces low-resolution images that degrade OCR
+	// and vision-model accuracy. Set the rasterization density first; it is
+	// configurable via the PdfDpi system setting (default 300).
+	dpi := repository.pdfRasterizationDpi()
+	if err := mw.SetResolution(dpi, dpi); err != nil {
+		return nil, err
+	}
 
 	if err := mw.ReadImageBlob(bytes); err != nil {
 		return nil, err
@@ -297,6 +332,10 @@ func (repository FileRepository) WriteTempFile(data []byte) (string, error) {
 
 func (repository FileRepository) BuildTempFilePath(fileType string) (string, error) {
 	tempPath := repository.GetTempDirectoryPath()
+	// Ensure the temp directory exists before returning a path under it.
+	// ConvertPdfToJpg writes here directly, and on a fresh checkout/runtime the
+	// directory may not exist yet, which would fail the subsequent write.
+	utils.MakeDirectory(tempPath)
 
 	filename, err := utils.GetRandomString(10)
 	if err != nil {

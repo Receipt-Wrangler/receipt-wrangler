@@ -16,5 +16,12 @@ type SystemSettings struct {
 	FallbackReceiptProcessingSettings   ReceiptProcessingSettings `json:"-"`
 	FallbackReceiptProcessingSettingsId *uint                     `json:"fallbackReceiptProcessingSettingsId"`
 	TaskConcurrency                     int                       `json:"taskConcurrency" gorm:"default:10"`
+	PdfDpi                              int                       `json:"pdfDpi" gorm:"default:300"`
 	TaskQueueConfigurations             []TaskQueueConfiguration  `json:"taskQueueConfigurations"`
+	// McpEnabled toggles the OAuth 2.1-protected MCP server live, without a
+	// restart. The routes are always mounted; this gates them at request time.
+	McpEnabled bool `json:"mcpEnabled" gorm:"default:false"`
+	// McpPublicUrl is the externally reachable origin (scheme + host) used to
+	// build the OAuth issuer/metadata/redirect URLs and the MCP token audience.
+	McpPublicUrl string `json:"mcpPublicUrl"`
 }

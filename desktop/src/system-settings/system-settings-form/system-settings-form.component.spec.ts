@@ -89,13 +89,16 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: null,
       currencySymbolPosition: null,
       currencyHideDecimalPlaces: null,
+      pdfDpi: null,
       taskConcurrency: null,
       taskQueueConfigurations: [
         { name: "email_polling", priority: 1 },
         { name: "email_receipt_processing", priority: 1 },
         { name: "email_receipt_image_cleanup", priority: 1 },
         { name: "quick_scan", priority: 1 }
-      ]
+      ],
+      mcpEnabled: null,
+      mcpPublicUrl: null,
     });
   });
 
@@ -112,11 +115,14 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: true,
+      pdfDpi: 300,
       taskConcurrency: 12,
       taskQueueConfigurations: [{
         name: QueueName.QuickScan,
         priority: 1,
-      }]
+      }],
+      mcpEnabled: true,
+      mcpPublicUrl: "https://receipts.example.com",
     };
 
     component.ngOnInit();
@@ -132,11 +138,14 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: true,
+      pdfDpi: 300,
       taskConcurrency: 12,
       taskQueueConfigurations: [{
         name: QueueName.QuickScan,
         priority: 1,
-      }]
+      }],
+      mcpEnabled: true,
+      mcpPublicUrl: "https://receipts.example.com",
     });
   });
 
@@ -165,7 +174,10 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: false,
-      taskConcurrency: "12"
+      pdfDpi: "300",
+      taskConcurrency: "12",
+      mcpEnabled: true,
+      mcpPublicUrl: "https://receipts.example.com",
     });
 
     // Update the quick_scan queue priority specifically
@@ -190,13 +202,16 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: false,
+      pdfDpi: 300,
       taskConcurrency: 12,
       taskQueueConfigurations: [
         { name: 'email_polling', priority: 1 },
         { name: 'email_receipt_processing', priority: 1 },
         { name: 'email_receipt_image_cleanup', priority: 1 },
         { name: 'quick_scan', priority: 1 }
-      ]
+      ],
+      mcpEnabled: true,
+      mcpPublicUrl: "https://receipts.example.com",
     });
 
     expect(snackbarServiceSpy).toHaveBeenCalled();

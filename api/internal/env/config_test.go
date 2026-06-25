@@ -27,6 +27,7 @@ func tearDownConfigTests() {
 	os.Unsetenv("DB_FILENAME")
 }
 
+
 func TestShouldGetEmptyDatabaseConfig(t *testing.T) {
 	tearDownConfigTests()
 

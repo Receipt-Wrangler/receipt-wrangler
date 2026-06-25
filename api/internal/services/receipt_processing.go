@@ -284,7 +284,62 @@ func (service ReceiptProcessingService) processImages(
 func (service ReceiptProcessingService) cleanResponse(response string) string {
 	response = strings.ReplaceAll(response, "```json", "")
 	response = strings.ReplaceAll(response, "```", "")
+	response = stripTrailingCommas(response)
 	return response
+}
+
+// stripTrailingCommas removes trailing commas before } or ] so that output
+// from LLMs that emit them (notably OpenAI gpt-4o) parses under Go's strict
+// encoding/json. It is string-aware: it tracks whether the scan position is
+// inside a JSON string (honoring backslash escapes) and only removes a comma
+// when the comma is outside any string and the next non-whitespace character
+// is a closing brace or bracket. This avoids corrupting values that legitimately
+// contain sequences like ",}" or ",]" inside a quoted string.
+func stripTrailingCommas(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+
+	inString := false
+	escaped := false
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+
+		if inString {
+			b.WriteByte(c)
+			switch {
+			case escaped:
+				escaped = false
+			case c == '\\':
+				escaped = true
+			case c == '"':
+				inString = false
+			}
+			continue
+		}
+
+		if c == '"' {
+			inString = true
+			b.WriteByte(c)
+			continue
+		}
+
+		if c == ',' {
+			// Look ahead past whitespace for a closing brace/bracket.
+			j := i + 1
+			for j < len(s) && (s[j] == ' ' || s[j] == '\t' || s[j] == '\r' || s[j] == '\n') {
+				j++
+			}
+			if j < len(s) && (s[j] == '}' || s[j] == ']') {
+				// Trailing comma: drop it.
+				continue
+			}
+		}
+
+		b.WriteByte(c)
+	}
+
+	return b.String()
 }
 
 // ocrImageResult is the per-image outcome from running OCR. Used by
