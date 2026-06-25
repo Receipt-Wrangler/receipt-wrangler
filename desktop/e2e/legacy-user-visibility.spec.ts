@@ -57,11 +57,28 @@ test.describe('Legacy User visibility', () => {
     page,
   }) => {
     await page.goto('/groups/create');
-    // Legacy User holds app.groups.create (but not app.groups.read, so the
-    // /groups list is off-limits). The newly-added appPermissionGuard on the
-    // create route must therefore admit them rather than redirect.
+    // Legacy User holds app.groups.create, so the create route's
+    // appPermissionGuard admits them rather than redirecting.
     await expect(page).toHaveURL(/\/groups\/create/);
     await expect(page.getByLabel('Group Name')).toBeVisible();
+  });
+
+  test('groups: can open the groups table (own groups) without the all-groups filter', async ({
+    page,
+  }) => {
+    await page.goto('/groups');
+    // The groups-table route is NOT gated on app.groups.read: it lists the
+    // caller's OWN groups (backend GetGroupsForUser is auth-only), so a Legacy
+    // User reaches it instead of being redirected. (Regression fix — the route
+    // used to require app.groups.read, locking normal users out of managing
+    // their own groups.)
+    await expect(page).toHaveURL(/\/groups$/);
+    // The Create Group button renders (app.groups.create, held) — page loaded.
+    await expect(page.getByTestId('group-create')).toBeVisible();
+    // The "all groups" Filter button stays admin-only (app.groups.read) — absent.
+    await expect(
+      page.locator('mat-icon', { hasText: 'filter_alt' }),
+    ).toHaveCount(0);
   });
 
   test('header search bar renders (holds app.receipts.search)', async ({

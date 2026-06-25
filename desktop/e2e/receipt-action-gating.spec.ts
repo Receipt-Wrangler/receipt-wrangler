@@ -18,11 +18,10 @@ import {
 // the edit denial is asserted at the route level, plus an API-403 proves the
 // backend enforces create independently of the hidden UI.
 //
-// Self-contained (not folded into group-viewer-visibility.spec.ts): that file's
-// serial block has a known pre-existing failure ("group row exposes no edit or
-// delete action" — a Legacy User can't load /groups), which would skip every
-// following test in the same block. This spec provisions its own Legacy Viewer
-// group + receipt so the assertions always run.
+// A focused, self-contained spec: it provisions its own Legacy Viewer group +
+// receipt and asserts as e2e-user. Kept separate from
+// group-viewer-visibility.spec.ts (which covers GROUP-level gating) to keep each
+// spec's concern narrow.
 test.describe('Group Viewer is denied receipt write actions', () => {
   test.describe.configure({ mode: 'serial' });
 
