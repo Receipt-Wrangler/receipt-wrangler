@@ -12,6 +12,9 @@ import { DashboardState } from "src/store/dashboard.state";
 import { ButtonModule } from "../../button";
 import { Dashboard, DashboardService } from "../../open-api";
 import { GroupState, SetSelectedDashboardId } from "../../store";
+import { AuthState } from "../../store/auth.state";
+import { SetPermissions } from "../../store/auth.state.actions";
+import { DirectivesModule } from "../../directives/directives.module";
 import { GroupDashboardsComponent } from "./group-dashboards.component";
 
 describe("GroupDashboardsComponent", () => {
@@ -25,9 +28,10 @@ describe("GroupDashboardsComponent", () => {
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [PipesModule,
         MatDialogModule,
-        NgxsModule.forRoot([GroupState, DashboardState]),
+        NgxsModule.forRoot([GroupState, DashboardState, AuthState]),
         PipesModule,
         ButtonModule,
+        DirectivesModule,
         MatSnackBarModule],
       providers: [
         DashboardService,
@@ -167,5 +171,64 @@ describe("GroupDashboardsComponent", () => {
     component.setSelectedDashboardId(1);
 
     expect(storeSpy).toHaveBeenCalledWith(new SetSelectedDashboardId("1"));
+  });
+
+  describe("dashboard CRUD permission gating", () => {
+    const addButton = () =>
+      fixture.nativeElement.querySelector("app-add-button");
+    const editButton = () =>
+      fixture.nativeElement.querySelector("app-edit-button");
+    const deleteButton = () =>
+      fixture.nativeElement.querySelector("app-delete-button");
+
+    // The edit/delete controls only render once a dashboard is selected; seed
+    // the selection so the permission gate is the only variable under test.
+    const selectDashboard = () => {
+      store.reset({
+        ...store.snapshot(),
+        groups: {
+          ...store.snapshot().groups,
+          selectedGroupId: "1",
+          selectedDashboardId: "5",
+        },
+      });
+    };
+
+    const render = async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+
+    it("shows the Add Dashboard button only with group.dashboards.create", async () => {
+      store.dispatch(new SetPermissions([], { 1: ["group.dashboards.read"] }));
+      await render();
+      expect(addButton()).toBeFalsy();
+
+      store.dispatch(new SetPermissions([], { 1: ["group.dashboards.create"] }));
+      await render();
+      expect(addButton()).toBeTruthy();
+    });
+
+    it("shows the Edit Dashboard button only with group.dashboards.update", async () => {
+      selectDashboard();
+      store.dispatch(new SetPermissions([], { 1: ["group.dashboards.read"] }));
+      await render();
+      expect(editButton()).toBeFalsy();
+
+      store.dispatch(new SetPermissions([], { 1: ["group.dashboards.update"] }));
+      await render();
+      expect(editButton()).toBeTruthy();
+    });
+
+    it("shows the Delete Dashboard button only with group.dashboards.delete", async () => {
+      selectDashboard();
+      store.dispatch(new SetPermissions([], { 1: ["group.dashboards.update"] }));
+      await render();
+      expect(deleteButton()).toBeFalsy();
+
+      store.dispatch(new SetPermissions([], { 1: ["group.dashboards.delete"] }));
+      await render();
+      expect(deleteButton()).toBeTruthy();
+    });
   });
 });

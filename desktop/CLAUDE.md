@@ -219,6 +219,12 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     read/create asymmetry — Legacy User holds `app.groups.create` but **not** `app.groups.read`, so
     they create via the sidebar FAB (the groups-list page itself is `app.groups.read`-gated and off
     limits to them), exactly like categories/tags.
+  - **Dashboard CRUD** (`group-dashboards.component.html`): the Add / Edit / Delete dashboard buttons
+    gate on `group.dashboards.create` / `.update` / `.delete` via `*hasGroupPermission` (the group id
+    comes from a `selectedGroupIdNum` computed). Previously ungated — the buttons rendered for every
+    member and 403'd on the backend; now they only render for holders, matching the receipts-table.
+  - **Notification delete** (`notification/notification.component.html`): the per-notification delete
+    control gates on `app.notifications.delete` via `*hasAppPermission`.
 
 ## Signals & Zoneless Change Detection
 
@@ -491,7 +497,22 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   `/dashboard/group/:id` redirects to `/receipts/group/:id`; an owner contrast still sees the dashboard),
   `paid-by-visibility.spec.ts` (a group role limited to "their own receipts" → a hidden-payer receipt
   `GET` 403s and is absent from the list, the member's own 200s; uses `withApiAs`/`apiCreateReceipt` and
-  the `createRole` `paidByOwn` option in `helpers/provisioning.ts`).
+  the `createRole` `paidByOwn` option in `helpers/provisioning.ts`),
+  `dashboard-crud-gating.spec.ts` (a Viewer holding `group.dashboards.read` but not create/update/delete
+  sees no Add/Edit/Delete dashboard buttons; owner contrast does),
+  `comment-gating.spec.ts` (Receipt-Editor-preset members minus `group.comments.create` / `.delete` →
+  no composer / no delete control; uses `apiCreateComment`),
+  `receipt-feature-gating.spec.ts` (Quick Scan / Poll Email / Magic Fill controls hidden for a Viewer —
+  positive contrast is a `test.fixme` because all three also sit behind the `aiPoweredReceipts` feature
+  flag, which is `false` in the dev/CI API),
+  `receipt-action-gating.spec.ts` (a Legacy Viewer sees no duplicate/delete row action, the
+  `/receipts/:id/edit` route redirects, and `POST /api/receipt` **403s** via `withApiAs('user')`).
+  `legacy-user-visibility.spec.ts` likewise carries **API-403** assertions (`DELETE /api/category|tag/:id`)
+  so server enforcement is proven, not just the hidden control. Note: the receipts-table **edit** action
+  is not template-gated (only duplicate/delete are); the edit *route* is guarded, so the edit denial is
+  asserted at the route level, not button absence. (`receipt-action-gating.spec.ts` is a standalone
+  spec rather than an extension of `group-viewer-visibility.spec.ts`, whose serial block has a known
+  pre-existing failure — a Legacy User can't load `/groups` — that would skip any test appended to it.)
 
 ## Testing Requirements
 

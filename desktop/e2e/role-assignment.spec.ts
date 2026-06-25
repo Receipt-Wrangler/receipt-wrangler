@@ -89,3 +89,45 @@ test.describe('assigning modern roles (admin)', () => {
     await expect(dialog).toBeHidden();
   });
 });
+
+// Deny-path contrast: a non-admin who lacks app.roles.read still reaches the
+// group-create form (Legacy User holds app.groups.create), but the role selector
+// degrades to EMPTY instead of erroring. The group-member-form loads roles with
+// RoleService.getRoles() wrapped in catchError(() => of([])), so the background
+// GET /role 403 is swallowed and groupRoleOptions() is empty — the dialog still
+// opens and the page doesn't redirect/crash.
+test.describe('role selector degrades for a non-admin (no app.roles.read)', () => {
+  // Inherits the chromium project's e2e/.auth/user.json (e2e-user = Legacy User,
+  // which lacks app.roles.read).
+  test.beforeEach(async ({ page }) => {
+    await stubTokenRefresh(page);
+  });
+
+  test('the Add Group Member role selector is empty rather than erroring', async ({
+    page,
+  }) => {
+    await page.goto('/groups/create');
+    // Legacy User holds app.groups.create, so the form loads (no redirect).
+    await expect(page).toHaveURL(/\/groups\/create/);
+    await expect(page.getByLabel('Group Name')).toBeVisible();
+
+    await page.getByTestId('add-group-member').click();
+    const dialog = page
+      .getByRole('dialog')
+      .filter({ hasText: 'Add Group Member' });
+    await expect(dialog).toBeVisible();
+
+    // Open the Role select: getRoles() 403'd and was caught, so it has no
+    // options (the empty list is the graceful-degrade path, not an error).
+    await dialog.getByRole('combobox', { name: 'Role' }).click();
+    await expect(page.getByRole('option')).toHaveCount(0);
+
+    // The dialog is still usable (no crash/redirect) — the Preview button is
+    // simply disabled because no role can be selected (app-button binds the
+    // disabled state onto its inner native button).
+    await page.keyboard.press('Escape');
+    await expect(
+      dialog.getByTestId('role-preview').locator('button'),
+    ).toBeDisabled();
+  });
+});

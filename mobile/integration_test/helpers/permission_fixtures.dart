@@ -172,17 +172,28 @@ Future<int> createRole({
   required List<String> permissions,
   required String jwt,
   String description = 'e2e custom role',
+  bool includeOwnPaidReceipts = false,
+  List<int> paidByUserGrants = const [],
 }) async {
+  final body = <String, dynamic>{
+    'name': name,
+    'description': description,
+    'scope': scope,
+    'permissions': permissions,
+  };
+  // Group-role paid-by visibility (group scope only; empty/false = unrestricted,
+  // i.e. members see every payer's receipts). Mirrors the desktop createRole
+  // `paidByOwn` / `paidByUsers` options. Only sent when restricting, so APP-role
+  // creates are unaffected.
+  if (includeOwnPaidReceipts || paidByUserGrants.isNotEmpty) {
+    body['includeOwnPaidReceipts'] = includeOwnPaidReceipts;
+    body['paidByUserGrants'] = paidByUserGrants;
+  }
   final res = await http
       .post(
         Uri.parse('${E2eEnv.baseUrl}/role/'),
         headers: _jsonAuth(jwt),
-        body: jsonEncode({
-          'name': name,
-          'description': description,
-          'scope': scope,
-          'permissions': permissions,
-        }),
+        body: jsonEncode(body),
       )
       .timeout(const Duration(seconds: 10));
   if (res.statusCode != 200) {
@@ -322,12 +333,66 @@ Future<int> createCategory({
   return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
 }
 
+/// Creates a comment on [receiptId] (as the caller behind [jwt]) and returns its
+/// id. Seeds an existing comment so the comment swipe-to-delete gate
+/// (`group.comments.delete`) has something to render.
+Future<int> createComment({
+  required int receiptId,
+  required String jwt,
+  String comment = 'e2e seeded comment',
+}) async {
+  final res = await http
+      .post(
+        Uri.parse('${E2eEnv.baseUrl}/comment/'),
+        headers: _jsonAuth(jwt),
+        body: jsonEncode({'comment': comment, 'receiptId': receiptId}),
+      )
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('createComment($receiptId) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
+}
+
 /// Best-effort `DELETE /category/{id}`. Swallows errors like the other cleanups.
 Future<void> deleteCategory(int categoryId, {required String jwt}) async {
   try {
     await http
         .delete(Uri.parse('${E2eEnv.baseUrl}/category/$categoryId'),
             headers: _auth(jwt))
+        .timeout(const Duration(seconds: 5));
+  } catch (_) {
+    // best-effort
+  }
+}
+
+/// Creates a global tag (the tag analogue of [createCategory]) and returns its
+/// id. Used to prove non-admins receive tags via the per-group `groupTags` map.
+Future<int> createTag({
+  required String name,
+  required String jwt,
+  String description = 'e2e tag',
+}) async {
+  final res = await http
+      .post(
+        Uri.parse('${E2eEnv.baseUrl}/tag/'),
+        headers: _jsonAuth(jwt),
+        body: jsonEncode({'name': name, 'description': description}),
+      )
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('createTag($name) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
+}
+
+/// Best-effort `DELETE /tag/{id}`. Swallows errors like the other cleanups.
+Future<void> deleteTag(int tagId, {required String jwt}) async {
+  try {
+    await http
+        .delete(Uri.parse('${E2eEnv.baseUrl}/tag/$tagId'), headers: _auth(jwt))
         .timeout(const Duration(seconds: 5));
   } catch (_) {
     // best-effort
@@ -438,9 +503,14 @@ Future<PermFixture> provisionUserWithoutAppPermission(String permission) async {
   return provisionPermUser(appRoleId: roleId);
 }
 
-/// Provisions a user in a fixture group whose GROUP role is "Legacy Viewer"
+/// Provisions a user in a fixture group whose GROUP role is [baselineRole]
 /// **minus** [permission], registering teardown for the user, group and custom
 /// role. Use for negative group-permission specs (e.g. `group.dashboards.read`).
+///
+/// [baselineRole] defaults to "Legacy Viewer". Pass "Legacy Editor" when the
+/// scenario needs a permission the Viewer lacks — e.g. the comment-gate specs
+/// reach the edit-state comment screen, which requires `group.receipts.update`
+/// (Viewer is read-only).
 ///
 /// Same minus-one rationale and LIFO teardown ordering as
 /// [provisionUserWithoutAppPermission]: the role-delete is registered first so
@@ -448,9 +518,10 @@ Future<PermFixture> provisionUserWithoutAppPermission(String permission) async {
 Future<PermFixture> provisionGroupMemberWithoutPermission(
   String permission, {
   bool withReceipt = false,
+  String baselineRole = 'Legacy Viewer',
 }) async {
   final jwt = await apiLogin(); // admin
-  final perms = (await rolePermissionsByName('Legacy Viewer', 'GROUP', jwt: jwt))
+  final perms = (await rolePermissionsByName(baselineRole, 'GROUP', jwt: jwt))
       .where((p) => p != permission)
       .toList();
   final roleId = await createRole(
@@ -463,4 +534,78 @@ Future<PermFixture> provisionGroupMemberWithoutPermission(
       () async => deleteRole(roleId, scope: 'GROUP', jwt: await apiLogin()));
 
   return provisionPermUser(groupRoleId: roleId, withReceipt: withReceipt);
+}
+
+/// A [PermFixture] plus the two receipts seeded for a paid-by-visibility spec:
+/// [ownReceiptName] is paid by the member (visible to them) and
+/// [hiddenReceiptName] is paid by the admin (filtered out by the role's
+/// "their own receipts" paid-by grant).
+class PaidByFixture {
+  PaidByFixture({
+    required this.fixture,
+    required this.ownReceiptId,
+    required this.ownReceiptName,
+    required this.hiddenReceiptId,
+    required this.hiddenReceiptName,
+  });
+
+  final PermFixture fixture;
+  final int ownReceiptId;
+  final String ownReceiptName;
+  final int hiddenReceiptId;
+  final String hiddenReceiptName;
+}
+
+/// Provisions a group member whose GROUP role holds the full Legacy Viewer
+/// permission set (so `group.receipts.read` is held — the denial is paid-by, not
+/// a missing permission) but is restricted to **their own receipts** on the
+/// paid-by axis. Seeds two receipts in the group: one paid by the member (own,
+/// visible) and one paid by the admin (hidden). Mirrors the desktop
+/// `paid-by-visibility.spec.ts` provisioning.
+///
+/// Teardown follows the same LIFO ordering as the other negative-permission
+/// fixtures: the role delete is registered before [provisionPermUser]'s
+/// user/group deletes, so it runs last (once the assignment is gone). The seeded
+/// receipts are cascade-deleted with the group.
+Future<PaidByFixture> provisionPaidByOwnMember() async {
+  final jwt = await apiLogin(); // admin
+  final adminId = await userIdByUsername(E2eEnv.adminUsername, jwt: jwt);
+  final viewerPerms =
+      await rolePermissionsByName('Legacy Viewer', 'GROUP', jwt: jwt);
+  final roleId = await createRole(
+    name: 'e2e-paidby-${_unique()}',
+    scope: 'GROUP',
+    permissions: viewerPerms,
+    jwt: jwt,
+    includeOwnPaidReceipts: true,
+  );
+  addTearDown(
+      () async => deleteRole(roleId, scope: 'GROUP', jwt: await apiLogin()));
+
+  final fixture = await provisionPermUser(groupRoleId: roleId);
+
+  final suffix = _unique();
+  final ownReceiptName = 'e2e-paidby-own-$suffix';
+  final hiddenReceiptName = 'e2e-paidby-hidden-$suffix';
+  final seedJwt = await apiLogin();
+  final hiddenReceiptId = await createReceipt(
+    groupId: fixture.groupId!,
+    paidByUserId: adminId,
+    jwt: seedJwt,
+    name: hiddenReceiptName,
+  );
+  final ownReceiptId = await createReceipt(
+    groupId: fixture.groupId!,
+    paidByUserId: fixture.userId,
+    jwt: seedJwt,
+    name: ownReceiptName,
+  );
+
+  return PaidByFixture(
+    fixture: fixture,
+    ownReceiptId: ownReceiptId,
+    ownReceiptName: ownReceiptName,
+    hiddenReceiptId: hiddenReceiptId,
+    hiddenReceiptName: hiddenReceiptName,
+  );
 }

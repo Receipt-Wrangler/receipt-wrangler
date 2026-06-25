@@ -8,5 +8,8 @@
       </div>
     </div>
   </a>
-  <app-cancel-button (clicked)="deleteNotification()"></app-cancel-button>
+  <app-cancel-button
+    *hasAppPermission="Permission.AppNotificationsDelete"
+    (clicked)="deleteNotification()"
+  ></app-cancel-button>
 </div>

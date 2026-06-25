@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { stubTokenRefresh } from './helpers/auth';
+import { uniqueName, withAdminApi, withApiAs } from './helpers/provisioning';
 
 // A "Legacy User" is the app role assigned to converted/normal users; its
 // permission set is canonical and stable. These tests lock in that, post
@@ -96,5 +97,62 @@ test.describe('Admin can reach admin-only areas (contrast)', () => {
     await page.goto('/system-settings');
     // The landing guard redirects to the first tab the admin can read.
     await expect(page).toHaveURL(/\/system-settings\//);
+  });
+});
+
+// The UI hides the category/tag edit/delete row actions for a Legacy User, but
+// the server is the real enforcer: it must 403 a direct DELETE even if the UI is
+// bypassed. An admin context seeds a category and a tag via the API; the Legacy
+// User's DELETE on each must 403; admin teardown removes the survivors.
+test.describe('Legacy User category/tag delete is denied (API 403)', () => {
+  // Runs against the default project user (e2e-user = Legacy User) for the API
+  // assertions; provisioning/teardown go through the admin API.
+  test.describe.configure({ mode: 'serial' });
+
+  let categoryId: number;
+  let tagId: number;
+
+  test.beforeAll(async () => {
+    await withAdminApi(async (api) => {
+      const catRes = await api.post('/api/category/', {
+        data: { name: uniqueName('legacy-del-cat') },
+      });
+      expect(catRes.ok()).toBeTruthy();
+      categoryId = ((await catRes.json()) as { id: number }).id;
+
+      const tagRes = await api.post('/api/tag/', {
+        data: { name: uniqueName('legacy-del-tag') },
+      });
+      expect(tagRes.ok()).toBeTruthy();
+      tagId = ((await tagRes.json()) as { id: number }).id;
+    });
+  });
+
+  test.afterAll(async () => {
+    try {
+      await withAdminApi(async (api) => {
+        // The deletes above are denied, so both resources survive — remove them.
+        await api.delete(`/api/category/${categoryId}`);
+        await api.delete(`/api/tag/${tagId}`);
+      });
+    } catch {
+      // Best-effort cleanup — don't mask a test failure with a cleanup error.
+    }
+  });
+
+  test('DELETE /api/category/:id 403s for a Legacy User', async () => {
+    await withApiAs('user', async (api) => {
+      const res = await api.delete(`/api/category/${categoryId}`);
+      // Legacy User lacks app.categories.delete — the backend 403s.
+      expect(res.status()).toBe(403);
+    });
+  });
+
+  test('DELETE /api/tag/:id 403s for a Legacy User', async () => {
+    await withApiAs('user', async (api) => {
+      const res = await api.delete(`/api/tag/${tagId}`);
+      // Legacy User lacks app.tags.delete — the backend 403s.
+      expect(res.status()).toBe(403);
+    });
   });
 });

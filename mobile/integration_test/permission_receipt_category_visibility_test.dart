@@ -81,4 +81,47 @@ void main() {
       expect(find.text(categoryName), findsWidgets);
     },
   );
+
+  testWidgets(
+    'receipt form: a non-admin sees the group catalog in the tag picker',
+    (tester) async {
+      // Same per-group catalog path as the category picker, for tags
+      // (`groupTags` on AppData, sourced by `tag_select_field.dart`). A global
+      // tag created before login lands in the non-admin's per-group catalog.
+      final adminJwt = await apiLogin();
+      final tagName = 'e2e-tag-${DateTime.now().microsecondsSinceEpoch}';
+      final tagId = await createTag(name: tagName, jwt: adminJwt);
+      addTearDown(() async => deleteTag(tagId, jwt: await apiLogin()));
+
+      final fixture = await provisionPermUser(roleName: 'Legacy Editor');
+      await loginAs(
+        tester,
+        username: fixture.username,
+        password: fixture.password,
+      );
+      await enterGroup(tester, fixture.groupName!);
+
+      await tester.tap(find.text('Add').hitTestable());
+      await pumpUntilFound(
+          tester, find.text('Add Manual Receipt').hitTestable());
+      for (int i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.tap(find.text('Add Manual Receipt').hitTestable());
+      await pumpUntilFound(tester, find.text('Name'));
+
+      await selectDropdown(tester, 'groupId', fixture.groupName!);
+
+      // Open the tag multiselect (placeholder "No Tags selected").
+      final tagField = find.text('No Tags selected');
+      await pumpUntilFound(tester, tagField);
+      await tester.ensureVisible(tagField);
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.tap(tagField);
+
+      // The per-group tag catalog is sourced into the multiselect sheet.
+      await pumpUntilFound(tester, find.text(tagName));
+      expect(find.text(tagName), findsWidgets);
+    },
+  );
 }
