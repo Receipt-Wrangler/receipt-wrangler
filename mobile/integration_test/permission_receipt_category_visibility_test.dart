@@ -32,53 +32,84 @@ void main() {
     }
   });
 
+  // The category and tag picker flows are identical except for the catalog
+  // create/delete helpers, the placeholder text, and the asserted name — so the
+  // shared "non-admin sees the per-group catalog in the picker" flow lives here.
+  // A global catalog item is created BEFORE login so it lands in the non-admin's
+  // AppData catalog; a Legacy Editor (app role Legacy User, no
+  // app.categories.read / app.tags.read) then opens the add-receipt form and the
+  // multiselect, and the item must be offered (it would be empty if the picker
+  // read the flat admin-only list instead of the per-group catalog).
+  Future<void> assertGroupCatalogPicker(
+    WidgetTester tester, {
+    required String namePrefix,
+    required String placeholder,
+    required Future<int> Function({required String name, required String jwt})
+        createFn,
+    required Future<void> Function(int id, {required String jwt}) deleteFn,
+  }) async {
+    final adminJwt = await apiLogin();
+    final itemName = '$namePrefix-${DateTime.now().microsecondsSinceEpoch}';
+    final itemId = await createFn(name: itemName, jwt: adminJwt);
+    addTearDown(() async => deleteFn(itemId, jwt: await apiLogin()));
+
+    final fixture = await provisionPermUser(roleName: 'Legacy Editor');
+    await loginAs(
+      tester,
+      username: fixture.username,
+      password: fixture.password,
+    );
+    await enterGroup(tester, fixture.groupName!);
+
+    // Open the add-receipt form via the bottom-nav Add menu.
+    await tester.tap(find.text('Add').hitTestable());
+    await pumpUntilFound(tester, find.text('Add Manual Receipt').hitTestable());
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.tap(find.text('Add Manual Receipt').hitTestable());
+    await pumpUntilFound(tester, find.text('Name'));
+
+    // Selecting the group makes the picker field visible (gated on the group's
+    // receipt settings) and scopes the picker's source to that group's catalog.
+    await selectDropdown(tester, 'groupId', fixture.groupName!);
+
+    // Open the multiselect via its placeholder chip (a tappable GestureDetector).
+    final field = find.text(placeholder);
+    await pumpUntilFound(tester, field);
+    await tester.ensureVisible(field);
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(field);
+
+    // The per-group catalog is sourced into the multiselect sheet, so the item
+    // is offered. (Empty for a non-admin before the M2 fix.)
+    await pumpUntilFound(tester, find.text(itemName));
+    expect(find.text(itemName), findsWidgets);
+  }
+
   testWidgets(
     'receipt form: a non-admin sees the group catalog in the category picker',
     (tester) async {
-      // A global category exists (unrestricted group roles see the whole pool).
-      // Create it BEFORE login so it lands in the non-admin's AppData catalog.
-      final adminJwt = await apiLogin();
-      final categoryName =
-          'e2e-cat-${DateTime.now().microsecondsSinceEpoch}';
-      final categoryId = await createCategory(name: categoryName, jwt: adminJwt);
-      addTearDown(() async => deleteCategory(categoryId, jwt: await apiLogin()));
-
-      // A Legacy Editor (app role: Legacy User — no app.categories.read) who can
-      // create receipts in the fixture group.
-      final fixture = await provisionPermUser(roleName: 'Legacy Editor');
-      await loginAs(
+      await assertGroupCatalogPicker(
         tester,
-        username: fixture.username,
-        password: fixture.password,
+        namePrefix: 'e2e-cat',
+        placeholder: 'No Categories selected',
+        createFn: createCategory,
+        deleteFn: deleteCategory,
       );
-      await enterGroup(tester, fixture.groupName!);
+    },
+  );
 
-      // Open the add-receipt form via the bottom-nav Add menu.
-      await tester.tap(find.text('Add').hitTestable());
-      await pumpUntilFound(
-          tester, find.text('Add Manual Receipt').hitTestable());
-      for (int i = 0; i < 5; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
-      await tester.tap(find.text('Add Manual Receipt').hitTestable());
-      await pumpUntilFound(tester, find.text('Name'));
-
-      // Selecting the group makes the category field visible (its Visibility is
-      // gated on the group's receipt settings) and scopes the picker's source.
-      await selectDropdown(tester, 'groupId', fixture.groupName!);
-
-      // Open the category multiselect. The field renders the placeholder chip
-      // "No Categories selected" inside a tappable GestureDetector.
-      final categoryField = find.text('No Categories selected');
-      await pumpUntilFound(tester, categoryField);
-      await tester.ensureVisible(categoryField);
-      await tester.pump(const Duration(milliseconds: 200));
-      await tester.tap(categoryField);
-
-      // The per-group catalog is sourced into the multiselect sheet, so the
-      // category is offered. (Empty for a non-admin before the M2 fix.)
-      await pumpUntilFound(tester, find.text(categoryName));
-      expect(find.text(categoryName), findsWidgets);
+  testWidgets(
+    'receipt form: a non-admin sees the group catalog in the tag picker',
+    (tester) async {
+      await assertGroupCatalogPicker(
+        tester,
+        namePrefix: 'e2e-tag',
+        placeholder: 'No Tags selected',
+        createFn: createTag,
+        deleteFn: deleteTag,
+      );
     },
   );
 }

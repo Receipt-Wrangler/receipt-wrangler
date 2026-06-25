@@ -107,3 +107,20 @@ test.describe('Header search bar gating (no app.receipts.search)', () => {
     await expect(page.getByPlaceholder('Search receipts')).toHaveCount(0);
   });
 });
+
+// Positive contrast (same axis, opposite direction): the default e2e-user is a
+// Legacy User, which HOLDS app.receipts.search — so the always-visible header
+// search input renders for them. This proves the gate is selective rather than
+// the bar simply never rendering in this app build.
+test.describe('Header search bar contrast (holds app.receipts.search)', () => {
+  // Inherits the chromium project's e2e/.auth/user.json (e2e-user = Legacy User).
+  test.beforeEach(async ({ page }) => {
+    await stubTokenRefresh(page);
+  });
+
+  test('the search bar renders with app.receipts.search', async ({ page }) => {
+    await page.goto('/groups/create');
+    await expect(page.getByLabel('Group Name')).toBeVisible();
+    await expect(page.getByPlaceholder('Search receipts')).toBeVisible();
+  });
+});

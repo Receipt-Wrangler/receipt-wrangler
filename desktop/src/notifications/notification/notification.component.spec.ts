@@ -6,6 +6,9 @@ import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { ApiModule, NotificationsService } from "../../open-api";
 import { GroupState } from "../../store";
+import { AuthState } from "../../store/auth.state";
+import { SetPermissions } from "../../store/auth.state.actions";
+import { DirectivesModule } from "../../directives/directives.module";
 import { NotificationComponent } from "./notification.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -20,7 +23,8 @@ describe("NotificationComponent", () => {
     declarations: [NotificationComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
-        NgxsModule.forRoot([GroupState]),
+        NgxsModule.forRoot([GroupState, AuthState]),
+        DirectivesModule,
         RouterTestingModule],
     providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 });
@@ -81,5 +85,29 @@ describe("NotificationComponent", () => {
 
     expect(serviceSpy).toHaveBeenCalledWith(1);
     expect(emitterSpy).toHaveBeenCalledWith(1);
+  });
+
+  describe("delete button permission gating", () => {
+    const deleteButton = () =>
+      fixture.nativeElement.querySelector("app-cancel-button");
+
+    const render = async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+
+    it("hides the delete button without app.notifications.delete", async () => {
+      store.dispatch(new SetPermissions(["app.notifications.read"], {}));
+      await render();
+
+      expect(deleteButton()).toBeFalsy();
+    });
+
+    it("shows the delete button with app.notifications.delete", async () => {
+      store.dispatch(new SetPermissions(["app.notifications.delete"], {}));
+      await render();
+
+      expect(deleteButton()).toBeTruthy();
+    });
   });
 });

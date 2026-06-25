@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from "@angular/core";
+import { Component, computed, OnInit, signal } from "@angular/core";
 import { MatDialog } from "@angular/material/dialog";
 import { Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
@@ -8,7 +8,7 @@ import { DEFAULT_DIALOG_CONFIG } from "src/constants";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { DashboardState } from "src/store/dashboard.state";
 import { AddDashboardToGroup, DeleteDashboardFromGroup, UpdateDashBoardForGroup, } from "src/store/dashboard.state.actions";
-import { Dashboard, DashboardService } from "../../open-api";
+import { Dashboard, DashboardService, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { GroupState, SetSelectedDashboardId } from "../../store";
 import { DashboardFormComponent } from "../dashboard-form/dashboard-form.component";
@@ -30,6 +30,15 @@ export class GroupDashboardsComponent implements OnInit {
   ) {}
 
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);
+
+  // Dashboard CRUD buttons gate on the group-scoped permissions via
+  // *hasGroupPermission, which needs a numeric group id (selectedGroupId is a
+  // string). Falls back to 0 (no permissions for a non-existent group → hidden).
+  protected readonly Permission = Permission;
+
+  protected readonly selectedGroupIdNum = computed(
+    () => +(this.selectedGroupId() ?? 0)
+  );
 
   public selectedDashboardId = this.store.selectSignal(GroupState.selectedDashboardId);
 

@@ -17,12 +17,14 @@ import { systemEmailsResolver } from "./resolvers/system-emails.resolver";
 
 const routes: Routes = [
   {
+    // No app-permission guard: the groups table shows the caller's OWN groups
+    // (backend GET /group/ -> GetGroupsForUser is auth-only), exactly like
+    // legacy. The "all groups" filter button is gated on app.groups.read inside
+    // group-table.component.html, and per-row Edit/Delete on group.update /
+    // group.delete — so a non-admin sees their own groups without the admin
+    // all-groups view. The parent shell route already enforces AuthGuard.
     path: "",
     component: GroupTableComponent,
-    canActivate: [appPermissionGuard],
-    data: {
-      appPermissions: [Permission.AppGroupsRead],
-    },
   },
   {
     path: "create",

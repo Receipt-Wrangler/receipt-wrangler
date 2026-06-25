@@ -126,7 +126,9 @@ a stale action at worst returns 403.
     (`receipt_comment_screen.dart`) is hidden without create; the swipe-to-delete
     (`receipt_comments.dart`) is disabled without delete (only in **edit** state — add-state comment
     removal is a local model edit with no API call, so it stays enabled).
-  - Activity rerun (`group_activity_list_item.dart`) → `group.activities.rerun`.
+  - Activity rerun (`group_activity_list_item.dart`) → `group.activities.rerun`. Covered by a widget
+    test (`test/widgets/group_activity_list_item_test.dart`) only — there is **no e2e** for it because
+    a failed activity's `canBeRestarted` backend state isn't deterministically seedable from the API.
   - The add menu (`show_add_menu.dart`) shows "Add Manual Receipt" on `group.receipts.create` and
     "Quick Scan" on `group.receipts.quick-scan` — per-group when inside a group, or "held in any
     group" on the group-select / all-groups view, where there is no single current group.
@@ -143,6 +145,15 @@ a stale action at worst returns 403.
   - `receiptsSearchRedirect` on `/search` → bounces deep links to the originating group's `/receipts`
     (or `/groups`) when the caller lacks `app.receipts.search`. Defense-in-depth behind the hidden
     search buttons; it also runs before the search shell's `state.extra as Map` cast.
+- **403 handling (`lib/interceptors/auth_interceptor.dart`):** the backend returns **403 for both** an
+  expired session and a permission denial (it never sends 401), so the interceptor distinguishes them
+  by **token validity** (mirroring desktop's `http-interceptor.ts`): a 403 with a still-valid token is
+  a permission denial and is surfaced untouched — **no token refresh, no logout** (refreshing can't
+  grant a missing permission, and force-refreshing would burn the one-time refresh token / risk a
+  logout). Only an expired/invalid token triggers a refresh + retry. Token freshness is otherwise kept
+  current proactively (the 15-min timer in `main.dart` and the auth guard on navigation). **Paid-by
+  visibility** rides on this: a group role limited to "their own receipts" gets a server-filtered
+  receipts list, and any stray 403 on a hidden receipt is surfaced without disturbing the session.
 
 ## Development Notes
 
@@ -388,6 +399,9 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - `integration_test/permission_add_menu_test.dart` / `permission_receipt_edit_test.dart` — permission-gating coverage (add-menu gate, edit-popup gate, swipe-to-edit gate) using per-spec provisioned users/groups.
 - `integration_test/permission_search_test.dart` — search bottom-nav destination gated on `app.receipts.search` (deny via a custom app role minus that permission; allow via a Legacy User).
 - `integration_test/permission_dashboard_redirect_test.dart` — group dashboards route gated on `group.dashboards.read` (deny → redirected to the receipts list via a custom group role minus that permission; allow via a Legacy Viewer). Landing is told apart by `GroupReceiptsList` vs `GroupDashboardWrapper`.
+- `integration_test/permission_comments_test.dart` — comment **deny** paths on the edit-state comment screen: `group.comments.create` hidden → no input; `group.comments.delete` hidden → swipe-to-delete disabled. Members are provisioned from the **Legacy Editor** baseline (holds `group.receipts.update`, needed to reach edit state) minus the permission under test, via `provisionGroupMemberWithoutPermission(..., baselineRole: 'Legacy Editor')`.
+- `integration_test/permission_paid_by_visibility_test.dart` — group-role paid-by visibility: a member restricted to "their own receipts" (via `provisionPaidByOwnMember` → `createRole(..., includeOwnPaidReceipts: true)`) sees only their own receipt in the group list; the admin-paid receipt is filtered out server-side. Mirrors desktop `paid-by-visibility.spec.ts` (list axis).
+- `integration_test/permission_receipt_category_visibility_test.dart` — non-admin sees the per-group **category and tag** catalogs in the receipt-form pickers (sourced from `groupCategories` / `groupTags`, not the admin-only flat lists).
 - `integration_test/helpers/env.dart` — dart-define consumption + guards.
 - `integration_test/helpers/pump.dart` — `pumpUntilFound` polling helper.
 - `integration_test/helpers/platform_mocks.dart` — Linux-desktop platform-channel stubs for `permission_handler`, `gal`, `flutter_secure_storage`.

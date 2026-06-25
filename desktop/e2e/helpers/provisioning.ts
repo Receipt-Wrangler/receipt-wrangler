@@ -237,6 +237,27 @@ export async function apiCreateReceipt(
   return receipt.id;
 }
 
+/**
+ * Creates a comment on [receiptId] and returns its id. The comment is owned by
+ * whoever the [api] context is authenticated as (the per-comment delete control
+ * only renders for the logged-in user's own comments).
+ */
+export async function apiCreateComment(
+  api: APIRequestContext,
+  opts: { receiptId: number; comment: string },
+): Promise<number> {
+  const res = await api.post('/api/comment/', {
+    data: { comment: opts.comment, receiptId: opts.receiptId },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `create comment failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  const comment = (await res.json()) as { id: number };
+  return comment.id;
+}
+
 /** Hard-deletes the user with [username] (frees any app-role assignment). */
 export async function apiDeleteUserByName(
   api: APIRequestContext,

@@ -219,6 +219,12 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     read/create asymmetry — Legacy User holds `app.groups.create` but **not** `app.groups.read`, so
     they create via the sidebar FAB (the groups-list page itself is `app.groups.read`-gated and off
     limits to them), exactly like categories/tags.
+  - **Dashboard CRUD** (`group-dashboards.component.html`): the Add / Edit / Delete dashboard buttons
+    gate on `group.dashboards.create` / `.update` / `.delete` via `*hasGroupPermission` (the group id
+    comes from a `selectedGroupIdNum` computed). Previously ungated — the buttons rendered for every
+    member and 403'd on the backend; now they only render for holders, matching the receipts-table.
+  - **Notification delete** (`notification/notification.component.html`): the per-notification delete
+    control gates on `app.notifications.delete` via `*hasAppPermission`.
 
 ## Signals & Zoneless Change Detection
 
@@ -425,10 +431,18 @@ In CI the same spec files run against the demo URL. GitHub secrets populate the 
 
 ### Best practices (follow these when adding new e2e tests)
 
-**Locators — use user-facing, auto-retrying selectors.**
-- Prefer `page.getByRole('button', { name: 'Login' })`, `page.getByLabel('Password')`, `page.getByPlaceholder(...)`, `page.getByText(...)`.
-- Use `page.getByTestId(...)` only when no accessible role/label exists. The codebase has no `data-testid` convention yet — add one on a component only when role/label truly can't identify the element.
-- Avoid raw CSS/XPath (`page.locator('.btn-primary')`) — brittle to refactors.
+**Locators — prefer `data-testid`; auto-retrying selectors only.**
+- **Use `page.getByTestId(...)` as the standard selector.** Icon-only controls (the shared
+  `app-add-button` / `app-edit-button` / `app-delete-button` / `app-cancel-button`, filter/menu icon
+  buttons, etc.) and any element without a stable accessible name **must** carry a `data-testid`. Name
+  it `<resource>-<action>` — e.g. `group-delete`, `comment-delete`, `receipt-duplicate`,
+  `add-group-member`, `dialog-submit-button`. The `data-testid` passes through the shared button
+  components to the host element, so `getByTestId('comment-delete')` resolves it directly.
+- `page.getByRole('button', { name: '...' })` / `page.getByLabel(...)` / `page.getByPlaceholder(...)`
+  remain fine for elements that already have a real accessible name (text buttons, labelled inputs).
+- **Never** use structural CSS chains (`page.locator('app-receipt-comments app-delete-button')`) or raw
+  CSS/XPath (`page.locator('.btn-primary')`) — they're brittle to component-structure refactors. Add a
+  `data-testid` to the control instead.
 
 **Assertions — rely on web-first expects, never `waitForTimeout`.**
 - Use `await expect(locator).toBeVisible()`, `toHaveText()`, `toHaveURL()`, `toHaveCount()` — they auto-retry until `expect.timeout`.
@@ -491,7 +505,22 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   `/dashboard/group/:id` redirects to `/receipts/group/:id`; an owner contrast still sees the dashboard),
   `paid-by-visibility.spec.ts` (a group role limited to "their own receipts" → a hidden-payer receipt
   `GET` 403s and is absent from the list, the member's own 200s; uses `withApiAs`/`apiCreateReceipt` and
-  the `createRole` `paidByOwn` option in `helpers/provisioning.ts`).
+  the `createRole` `paidByOwn` option in `helpers/provisioning.ts`),
+  `dashboard-crud-gating.spec.ts` (a Viewer holding `group.dashboards.read` but not create/update/delete
+  sees no Add/Edit/Delete dashboard buttons; owner contrast does),
+  `comment-gating.spec.ts` (Receipt-Editor-preset members minus `group.comments.create` / `.delete` →
+  no composer / no delete control; uses `apiCreateComment`),
+  `receipt-feature-gating.spec.ts` (Quick Scan / Poll Email / Magic Fill controls hidden for a Viewer —
+  positive contrast is a `test.fixme` because all three also sit behind the `aiPoweredReceipts` feature
+  flag, which is `false` in the dev/CI API),
+  `receipt-action-gating.spec.ts` (a Legacy Viewer sees no duplicate/delete row action, the
+  `/receipts/:id/edit` route redirects, and `POST /api/receipt` **403s** via `withApiAs('user')`).
+  `legacy-user-visibility.spec.ts` likewise carries **API-403** assertions (`DELETE /api/category|tag/:id`)
+  so server enforcement is proven, not just the hidden control. Note: the receipts-table **edit** action
+  is not template-gated (only duplicate/delete are); the edit *route* is guarded, so the edit denial is
+  asserted at the route level, not button absence. (`receipt-action-gating.spec.ts` is a standalone
+  spec rather than an extension of `group-viewer-visibility.spec.ts`, whose serial block has a known
+  pre-existing failure — a Legacy User can't load `/groups` — that would skip any test appended to it.)
 
 ## Testing Requirements
 
