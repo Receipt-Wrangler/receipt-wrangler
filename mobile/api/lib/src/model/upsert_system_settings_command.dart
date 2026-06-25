@@ -27,7 +27,10 @@ part 'upsert_system_settings_command.g.dart';
 /// * [receiptProcessingSettingsId] - Receipt processing settings foreign key
 /// * [fallbackReceiptProcessingSettingsId] - Fallback receipt processing settings foreign key
 /// * [taskConcurrency] - Concurrency for task worker
+/// * [pdfDpi] - DPI used when rasterizing PDFs for OCR/vision processing
 /// * [taskQueueConfigurations] 
+/// * [mcpEnabled] - Whether the OAuth 2.1-protected MCP server is enabled
+/// * [mcpPublicUrl] - Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
 @BuiltValue()
 abstract class UpsertSystemSettingsCommand implements Built<UpsertSystemSettingsCommand, UpsertSystemSettingsCommandBuilder> {
   /// Whether local sign up is enabled
@@ -77,8 +80,20 @@ abstract class UpsertSystemSettingsCommand implements Built<UpsertSystemSettings
   @BuiltValueField(wireName: r'taskConcurrency')
   int get taskConcurrency;
 
+  /// DPI used when rasterizing PDFs for OCR/vision processing
+  @BuiltValueField(wireName: r'pdfDpi')
+  int? get pdfDpi;
+
   @BuiltValueField(wireName: r'taskQueueConfigurations')
   BuiltList<UpsertTaskQueueConfiguration>? get taskQueueConfigurations;
+
+  /// Whether the OAuth 2.1-protected MCP server is enabled
+  @BuiltValueField(wireName: r'mcpEnabled')
+  bool? get mcpEnabled;
+
+  /// Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
+  @BuiltValueField(wireName: r'mcpPublicUrl')
+  String? get mcpPublicUrl;
 
   UpsertSystemSettingsCommand._();
 
@@ -178,11 +193,32 @@ class _$UpsertSystemSettingsCommandSerializer implements PrimitiveSerializer<Ups
       object.taskConcurrency,
       specifiedType: const FullType(int),
     );
+    if (object.pdfDpi != null) {
+      yield r'pdfDpi';
+      yield serializers.serialize(
+        object.pdfDpi,
+        specifiedType: const FullType(int),
+      );
+    }
     if (object.taskQueueConfigurations != null) {
       yield r'taskQueueConfigurations';
       yield serializers.serialize(
         object.taskQueueConfigurations,
         specifiedType: const FullType(BuiltList, [FullType(UpsertTaskQueueConfiguration)]),
+      );
+    }
+    if (object.mcpEnabled != null) {
+      yield r'mcpEnabled';
+      yield serializers.serialize(
+        object.mcpEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.mcpPublicUrl != null) {
+      yield r'mcpPublicUrl';
+      yield serializers.serialize(
+        object.mcpPublicUrl,
+        specifiedType: const FullType(String),
       );
     }
   }
@@ -292,12 +328,33 @@ class _$UpsertSystemSettingsCommandSerializer implements PrimitiveSerializer<Ups
           ) as int;
           result.taskConcurrency = valueDes;
           break;
+        case r'pdfDpi':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.pdfDpi = valueDes;
+          break;
         case r'taskQueueConfigurations':
           final valueDes = serializers.deserialize(
             value,
             specifiedType: const FullType(BuiltList, [FullType(UpsertTaskQueueConfiguration)]),
           ) as BuiltList<UpsertTaskQueueConfiguration>;
           result.taskQueueConfigurations.replace(valueDes);
+          break;
+        case r'mcpEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.mcpEnabled = valueDes;
+          break;
+        case r'mcpPublicUrl':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.mcpPublicUrl = valueDes;
           break;
         default:
           unhandled.add(key);

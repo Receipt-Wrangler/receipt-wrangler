@@ -49,6 +49,9 @@ export interface UpsertSystemSettingsCommand {
      * Concurrency for task worker
      */
     taskConcurrency: number;
+    /**
+     * DPI used when rasterizing PDFs for OCR/vision processing
+     */
     pdfDpi?: number;
     taskQueueConfigurations?: Array<UpsertTaskQueueConfiguration>;
     /**

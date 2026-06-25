@@ -20,7 +20,10 @@ Name | Type | Description | Notes
 **receiptProcessingSettingsId** | **int** | Receipt processing settings foreign key | [optional] 
 **fallbackReceiptProcessingSettingsId** | **int** | Fallback receipt processing settings foreign key | [optional] 
 **taskConcurrency** | **int** | Concurrency for task worker | 
+**pdfDpi** | **int** | DPI used when rasterizing PDFs for OCR/vision processing | [optional] 
 **taskQueueConfigurations** | [**BuiltList&lt;UpsertTaskQueueConfiguration&gt;**](UpsertTaskQueueConfiguration.md) |  | [optional] 
+**mcpEnabled** | **bool** | Whether the OAuth 2.1-protected MCP server is enabled | [optional] 
+**mcpPublicUrl** | **String** | Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

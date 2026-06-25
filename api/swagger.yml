@@ -4965,6 +4965,10 @@ components:
               type: integer
               description: Concurrency for task worker
               default: 10
+            pdfDpi:
+              type: integer
+              description: DPI used when rasterizing PDFs for OCR/vision processing
+              default: 300
             taskQueueConfigurations:
               type: array
               items:
@@ -5018,6 +5022,11 @@ components:
         taskConcurrency:
           type: integer
           description: Concurrency for task worker
+        pdfDpi:
+          type: integer
+          description: DPI used when rasterizing PDFs for OCR/vision processing
+          minimum: 72
+          maximum: 1200
         taskQueueConfigurations:
           type: array
           items:
