@@ -431,10 +431,18 @@ In CI the same spec files run against the demo URL. GitHub secrets populate the 
 
 ### Best practices (follow these when adding new e2e tests)
 
-**Locators — use user-facing, auto-retrying selectors.**
-- Prefer `page.getByRole('button', { name: 'Login' })`, `page.getByLabel('Password')`, `page.getByPlaceholder(...)`, `page.getByText(...)`.
-- Use `page.getByTestId(...)` only when no accessible role/label exists. The codebase has no `data-testid` convention yet — add one on a component only when role/label truly can't identify the element.
-- Avoid raw CSS/XPath (`page.locator('.btn-primary')`) — brittle to refactors.
+**Locators — prefer `data-testid`; auto-retrying selectors only.**
+- **Use `page.getByTestId(...)` as the standard selector.** Icon-only controls (the shared
+  `app-add-button` / `app-edit-button` / `app-delete-button` / `app-cancel-button`, filter/menu icon
+  buttons, etc.) and any element without a stable accessible name **must** carry a `data-testid`. Name
+  it `<resource>-<action>` — e.g. `group-delete`, `comment-delete`, `receipt-duplicate`,
+  `add-group-member`, `dialog-submit-button`. The `data-testid` passes through the shared button
+  components to the host element, so `getByTestId('comment-delete')` resolves it directly.
+- `page.getByRole('button', { name: '...' })` / `page.getByLabel(...)` / `page.getByPlaceholder(...)`
+  remain fine for elements that already have a real accessible name (text buttons, labelled inputs).
+- **Never** use structural CSS chains (`page.locator('app-receipt-comments app-delete-button')`) or raw
+  CSS/XPath (`page.locator('.btn-primary')`) — they're brittle to component-structure refactors. Add a
+  `data-testid` to the control instead.
 
 **Assertions — rely on web-first expects, never `waitForTimeout`.**
 - Use `await expect(locator).toBeVisible()`, `toHaveText()`, `toHaveURL()`, `toHaveCount()` — they auto-retry until `expect.timeout`.

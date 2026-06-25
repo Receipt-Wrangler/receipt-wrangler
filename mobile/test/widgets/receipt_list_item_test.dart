@@ -46,18 +46,26 @@ void main() {
     return model;
   }
 
+  // Key the widget under test so the slidable is located via find.descendant
+  // rather than a brittle bare find.byType (house rule in mobile/CLAUDE.md).
+  const itemKey = ValueKey('receipt-item-under-test');
+
   Widget wrap(List<Permission> groupPermissions) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(
-          value: seededPermissions(group: {groupId: groupPermissions}),
+        // Test-owned notifiers are injected with create: so the provider owns
+        // their lifecycle (mobile/CLAUDE.md).
+        ChangeNotifierProvider(
+          create: (_) => seededPermissions(group: {groupId: groupPermissions}),
         ),
-        ChangeNotifierProvider.value(value: GroupModel()),
-        ChangeNotifierProvider.value(value: userModelWithTester()),
-        ChangeNotifierProvider.value(value: SystemSettingsModel()),
+        ChangeNotifierProvider(create: (_) => GroupModel()),
+        ChangeNotifierProvider(create: (_) => userModelWithTester()),
+        ChangeNotifierProvider(create: (_) => SystemSettingsModel()),
       ],
       child: MaterialApp(
-        home: Scaffold(body: ReceiptListItem(receipt: receiptInGroup())),
+        home: Scaffold(
+          body: ReceiptListItem(key: itemKey, receipt: receiptInGroup()),
+        ),
       ),
     );
   }
@@ -67,14 +75,22 @@ void main() {
     await tester.pumpWidget(wrap(groupPermissions));
     // ListItemLead packs the formatted date into a fixed 50px lead, which
     // overflows the headless test canvas by a few px (it renders fine on a real
-    // device). That's incidental to the swipe-to-edit gate under test, so
-    // consume the layout exception rather than coupling this test to that
-    // sub-widget's pixel layout.
-    tester.takeException();
+    // device) — incidental to the swipe-to-edit gate under test. Consume ONLY
+    // that known overflow; re-fail on any other exception.
+    final exception = tester.takeException();
+    if (exception != null) {
+      expect(exception, isA<FlutterError>());
+      expect(exception.toString(), contains('overflowed'));
+    }
   }
 
   SlidableWidget slidable(WidgetTester tester) =>
-      tester.widget<SlidableWidget>(find.byType(SlidableWidget));
+      tester.widget<SlidableWidget>(
+        find.descendant(
+          of: find.byKey(itemKey),
+          matching: find.byType(SlidableWidget),
+        ),
+      );
 
   group('ReceiptListItem swipe-to-edit gate', () {
     testWidgets('enabled with group.receipts.update', (tester) async {

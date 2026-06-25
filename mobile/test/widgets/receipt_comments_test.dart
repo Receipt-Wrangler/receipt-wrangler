@@ -41,27 +41,34 @@ void main() {
     return model;
   }
 
-  Widget wrap(List<Permission> groupPermissions, List<api.Comment> comments) {
-    final receiptModel = ReceiptModel();
-    receiptModel.setReceipt(
-      getDefaultReceipt().rebuild((b) => b
-        ..id = 1
-        ..groupId = groupId),
-      false,
-    );
+  // Key the widget under test so the slidable is located via find.descendant
+  // rather than a brittle bare find.byType (house rule in mobile/CLAUDE.md).
+  const commentsKey = ValueKey('comments-under-test');
 
+  Widget wrap(List<Permission> groupPermissions, List<api.Comment> comments) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(
-          value: seededPermissions(group: {groupId: groupPermissions}),
+        // Test-owned notifiers are injected with create: so the provider owns
+        // their lifecycle (mobile/CLAUDE.md).
+        ChangeNotifierProvider(
+          create: (_) => seededPermissions(group: {groupId: groupPermissions}),
         ),
-        ChangeNotifierProvider.value(value: receiptModel),
-        ChangeNotifierProvider.value(value: userModelWithTester()),
-        ChangeNotifierProvider.value(value: AuthModel()),
+        ChangeNotifierProvider(
+          create: (_) => ReceiptModel()
+            ..setReceipt(
+              getDefaultReceipt().rebuild((b) => b
+                ..id = 1
+                ..groupId = groupId),
+              false,
+            ),
+        ),
+        ChangeNotifierProvider(create: (_) => userModelWithTester()),
+        ChangeNotifierProvider(create: (_) => AuthModel()),
       ],
       child: MaterialApp(
         home: Scaffold(
           body: ReceiptComments(
+            key: commentsKey,
             comments: comments,
             formState: WranglerFormState.edit,
           ),
@@ -71,7 +78,14 @@ void main() {
   }
 
   SlidableWidget firstSlidable(WidgetTester tester) =>
-      tester.widget<SlidableWidget>(find.byType(SlidableWidget).first);
+      tester.widget<SlidableWidget>(
+        find
+            .descendant(
+              of: find.byKey(commentsKey),
+              matching: find.byType(SlidableWidget),
+            )
+            .first,
+      );
 
   group('ReceiptComments swipe-to-delete gate (edit state)', () {
     testWidgets('enabled with group.comments.delete', (tester) async {

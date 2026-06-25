@@ -182,8 +182,6 @@ test.describe('Receipt comment create/delete gating', () => {
     // The seeded comment (owned by e2e-user) is shown...
     await expect(page.getByText('e2e-user own comment')).toBeVisible();
     // ...but its delete control is gated on group.comments.delete (not held).
-    await expect(page.locator('app-receipt-comments app-delete-button')).toHaveCount(
-      0,
-    );
+    await expect(page.getByTestId('comment-delete')).toHaveCount(0);
   });
 });
