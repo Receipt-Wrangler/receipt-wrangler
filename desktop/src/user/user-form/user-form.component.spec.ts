@@ -330,6 +330,25 @@ describe("UserFormComponent", () => {
     expect(freshComponent.selectedRole()).toEqual(defaultAppRole);
   });
 
+  it("resolves the selected app role when a group role shares its id", async () => {
+    // App and group role ids are independent and can collide. A group role
+    // listed first with the same id must not be returned for the app selection.
+    const collidingGroupRole: Role = {
+      id: 7,
+      name: "Some Group Role",
+      scope: PermissionScope.Group,
+      isDefault: false,
+      isSystem: false,
+      permissions: [],
+    };
+    const freshComponent = await createWithRoles(
+      of([collidingGroupRole, defaultAppRole])
+    );
+
+    expect(freshComponent.form.get("appRoleId")?.value).toBe(7);
+    expect(freshComponent.selectedRole()).toEqual(defaultAppRole);
+  });
+
   it("leaves the selector empty when roles fail to load", async () => {
     const freshComponent = await createWithRoles(
       throwError(() => new Error("forbidden"))

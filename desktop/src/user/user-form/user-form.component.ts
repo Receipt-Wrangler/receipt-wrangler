@@ -69,7 +69,10 @@ export class UserFormComponent implements OnInit {
   );
   private readonly selectedAppRoleId = signal<number | null>(null);
   public readonly selectedRole = computed<Role | null>(
-    () => this.roles().find((role) => role.id === this.selectedAppRoleId()) ?? null
+    () =>
+      this.appRoleOptions().find(
+        (role) => role.id === this.selectedAppRoleId()
+      ) ?? null
   );
 
   public ngOnInit(): void {

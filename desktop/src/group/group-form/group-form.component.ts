@@ -15,7 +15,7 @@ import {FormConfig} from "src/interfaces/form-config.interface";
 import {TableColumn} from "src/table/table-column.interface";
 import {TableComponent} from "src/table/table/table.component";
 import {SortByDisplayName} from "src/utils/sort-by-displayname";
-import {Group, GroupMember, GroupsService, GroupStatus, Permission, Role, RoleService} from "../../open-api";
+import {Group, GroupMember, GroupsService, GroupStatus, Permission, PermissionScope, Role, RoleService} from "../../open-api";
 import {loadAssignableRoles} from "../../roles/role-loading.util";
 import {AppInitService, SnackbarService} from "../../services";
 import {AddGroup, AuthState, UpdateGroup} from "../../store";
@@ -31,6 +31,8 @@ import {buildGroupMemberForm} from "../utils/group-member.utils";
     standalone: false
 })
 export class GroupFormComponent implements OnInit, AfterViewInit {
+  protected readonly PermissionScope = PermissionScope;
+
   public readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");
 
   public readonly roleCell = viewChild.required<TemplateRef<any>>("roleCell");

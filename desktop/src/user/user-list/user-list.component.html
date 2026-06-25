@@ -36,7 +36,7 @@
 </ng-template>
 
 <ng-template #appRoleCell let-element="element">
-  {{ element.appRoleId | roleName : roles() }}
+  {{ element.appRoleId | roleName : roles() : PermissionScope.App }}
 </ng-template>
 
 <ng-template #createdAtCell let-element="element">
