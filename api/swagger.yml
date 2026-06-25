@@ -4965,10 +4965,21 @@ components:
               type: integer
               description: Concurrency for task worker
               default: 10
+            pdfDpi:
+              type: integer
+              description: DPI used when rasterizing PDFs for OCR/vision processing
+              default: 300
             taskQueueConfigurations:
               type: array
               items:
                 $ref: "#/components/schemas/TaskQueueConfiguration"
+            mcpEnabled:
+              type: boolean
+              description: Whether the OAuth 2.1-protected MCP server is enabled
+              default: false
+            mcpPublicUrl:
+              type: string
+              description: Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
     UpsertSystemSettingsCommand:
       type: object
       required:
@@ -5011,10 +5022,21 @@ components:
         taskConcurrency:
           type: integer
           description: Concurrency for task worker
+        pdfDpi:
+          type: integer
+          description: DPI used when rasterizing PDFs for OCR/vision processing
+          minimum: 72
+          maximum: 1200
         taskQueueConfigurations:
           type: array
           items:
             $ref: "#/components/schemas/UpsertTaskQueueConfiguration"
+        mcpEnabled:
+          type: boolean
+          description: Whether the OAuth 2.1-protected MCP server is enabled
+        mcpPublicUrl:
+          type: string
+          description: Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
     CheckEmailConnectivityCommand:
       type: object
       properties:

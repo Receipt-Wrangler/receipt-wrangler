@@ -60,7 +60,19 @@ export interface SystemSettings {
      * Concurrency for task worker
      */
     taskConcurrency?: number;
+    /**
+     * DPI used when rasterizing PDFs for OCR/vision processing
+     */
+    pdfDpi?: number;
     taskQueueConfigurations: Array<TaskQueueConfiguration>;
+    /**
+     * Whether the OAuth 2.1-protected MCP server is enabled
+     */
+    mcpEnabled?: boolean;
+    /**
+     * Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
+     */
+    mcpPublicUrl?: string;
 }
 export namespace SystemSettings {
 }

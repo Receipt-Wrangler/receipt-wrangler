@@ -22,6 +22,10 @@ Receipt Wrangler API is a Go-based backend service for a receipt management and 
 - `./generate-client.sh desktop <output-dir>` - Generate TypeScript Angular client
 - `./generate-client.sh mobile <output-dir>` - Generate Dart Dio client
 
+### Go Toolchain
+- Requires **Go 1.25+** (the MCP `github.com/modelcontextprotocol/go-sdk` sets a 1.25 minimum).
+  Docker images and CI containers use `golang:1.25-trixie`.
+
 ## Architecture Overview
 
 ### Core Structure
@@ -507,3 +511,52 @@ caller-supplied `AppRoleID` so a sign-up can never self-assign a role.
 `repositories/seed_roles_test.go` (default-role seeding), the per-create assignment tests in
 `repositories/users_test.go` / `repositories/groups_test.go`, and the handler authorization tests in
 `handlers/generic_handler_test.go` (with shared helpers in `handlers/auth_test_helpers_test.go`).
+
+## MCP Server & OAuth 2.1
+
+Receipt Wrangler can expose a remote **Model Context Protocol** server so clients such as
+Claude can read a user's data. It is **off by default** and Go-native (no separate service).
+
+- **Configuration (System Settings, not env)**: the enable toggle (`mcpEnabled`) and the public
+  URL (`mcpPublicUrl`) live on `models.SystemSettings` and are edited via the System Settings UI.
+  `mcpPublicUrl` is the externally reachable origin (e.g. `https://receipts.example.com`) used to
+  build the OAuth issuer/metadata/redirect URLs and the MCP token audience; it defaults to
+  `http://localhost:8081` in dev. Both are read **live** (`services.IsMcpEnabled`,
+  `services.GetMcpPublicUrl`/`GetMcpResourceUrl`), so toggling the server on/off or changing the
+  URL takes effect without a restart. (There is no `MCP_ENABLED` / `MCP_PUBLIC_URL` env var.)
+- **Live start/stop**: HTTP routes can only be mounted once at startup, so unlike the background
+  workers (email polling / task server) the MCP routes are **always mounted** in
+  `routers.BuildRootRouter` → `mountMcpRoutes` and gated at request time by `mcpEnabledMiddleware`,
+  which 404s every MCP/OAuth path while `mcpEnabled` is off.
+- **Endpoints** (mounted at the server root):
+  - `/.well-known/oauth-protected-resource` + `/.well-known/oauth-authorization-server` —
+    OAuth discovery (RFC 9728 / RFC 8414)
+  - `/oauth/register` (Dynamic Client Registration, RFC 7591), `/oauth/authorize`
+    (login form backed by `services.LoginUser`), `/oauth/token` (authorization_code +
+    refresh_token grants, PKCE S256)
+  - `/mcp` — Streamable HTTP MCP endpoint, guarded by bearer-token auth (401 +
+    `WWW-Authenticate` advertising the protected-resource metadata)
+- **Auth model**: the OAuth tokens are Receipt Wrangler HS512 JWTs, but **MCP-audience bound**.
+  `services.GenerateMcpJWT` mints the access **and** refresh token with the audience set to the MCP
+  resource URL (`GetMcpResourceUrl`, i.e. `mcpPublicUrl` + `/mcp`) instead of the normal
+  `https://receiptWrangler.io` audience — the audience is *replaced, not appended*. The MCP
+  endpoints verify that exact audience (`services.InitMcpTokenValidator`); the REST API keeps
+  verifying the normal audience (`services.InitTokenValidator`). So an MCP token is rejected
+  everywhere except `/mcp`, and an MCP refresh token can't be traded for a full-access token at
+  `/api/token` (the refresh/rotation path also verifies the MCP audience). Because the audience is
+  derived from a live setting, changing `mcpPublicUrl` intentionally invalidates existing connector
+  tokens.
+- **`mcp:read` scope is currently dead**: the bearer middleware requires it but every token carries
+  it, so it gates nothing. Read-only is guaranteed *structurally* by only registering read tools
+  (see notes on `readScope` in `internal/oauth/oauth.go` and `mcpReadScope` in
+  `internal/mcp/server.go`). Adding any write/delete tool removes that guarantee and requires real
+  per-tool scope enforcement.
+- **Packages**: `internal/oauth/` (authorization server) and `internal/mcp/`
+  (server + read-only tools). Tools call the service/repository layer in-process with the
+  authenticated user's claims and enforce the same group-scoped authorization as the REST
+  handlers. v1 tools are read-only: `search_receipts`, `get_receipt`, `list_groups`,
+  `list_categories`, `list_tags`, `list_dashboards`.
+- **Storage**: `models.OAuthClient` + `models.OAuthAuthorizationCode` (registered in
+  `MakeMigrations`). Refresh tokens reuse the existing `models.RefreshToken` flow.
+- **Production**: `docker/default.conf` proxies the new root paths to the backend; the `/mcp`
+  location disables buffering and raises the read timeout for SSE streams.

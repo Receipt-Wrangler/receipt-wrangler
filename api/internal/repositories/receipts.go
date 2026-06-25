@@ -915,6 +915,27 @@ func (repository ReceiptRepository) GetReceiptsByGroupIds(groupIds []string, que
 	return receipts, nil
 }
 
+// SearchReceiptsByGroupIds returns receipts within the given groups whose name
+// matches nameQuery (a substring match; an empty nameQuery matches all),
+// ordered by most recent date first and capped at limit. Scoping to the
+// caller's group ids is the caller's responsibility.
+func (repository ReceiptRepository) SearchReceiptsByGroupIds(groupIds []uint, nameQuery string, limit int) ([]models.Receipt, error) {
+	db := repository.GetDB()
+	var receipts []models.Receipt
+
+	query := db.Model(models.Receipt{}).Where("group_id IN ?", groupIds)
+	if len(nameQuery) > 0 {
+		query = query.Where("name LIKE ?", "%"+nameQuery+"%")
+	}
+
+	err := query.Order("date desc").Limit(limit).Find(&receipts).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return receipts, nil
+}
+
 func (repository ReceiptRepository) GetReceiptsByIds(ids []string, associations []string) ([]models.Receipt, error) {
 	query := repository.GetDB().Model(models.Receipt{}).Where("id IN ?", ids)
 

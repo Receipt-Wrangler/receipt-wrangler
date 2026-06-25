@@ -3,9 +3,11 @@ package repositories
 import (
 	"fmt"
 	config "receipt-wrangler/api/internal/env"
+	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"
@@ -37,6 +39,17 @@ func BuildSqliteConnectionString(dbConfig structs.DatabaseConfig) (string, error
 	return connectionString, nil
 }
 
+const (
+	// dbConnectMaxAttempts and dbConnectRetryDelay control how long Connect waits
+	// for the database to become reachable before giving up. This lets the API
+	// survive the database not being ready yet at startup (e.g. when containers are
+	// brought up by Docker restart policies or an orchestrator that does not
+	// guarantee start order), instead of exiting fatally on the first connection
+	// error and leaving the container in a broken state.
+	dbConnectMaxAttempts = 10
+	dbConnectRetryDelay  = 3 * time.Second
+)
+
 func Connect() error {
 	dbConfig, err := config.GetDatabaseConfig()
 	if err != nil {
@@ -45,41 +58,63 @@ func Connect() error {
 
 	dbEngine := dbConfig.Engine
 
-	var connectedDb *gorm.DB
+	var dialector gorm.Dialector
 
-	if dbEngine == "mariadb" || dbEngine == "mysql" {
-		connectedDb, err = gorm.Open(mysql.Open(BuildMariaDbConnectionString(dbConfig)), &gorm.Config{})
-		if err != nil {
-			return err
+	// Network-backed engines can be transiently unreachable at startup, so they
+	// get connection retries. Sqlite is file-based — failures there are
+	// configuration problems, not races, and should surface immediately.
+	maxAttempts := dbConnectMaxAttempts
+
+	switch dbEngine {
+	case "mariadb", "mysql":
+		dialector = mysql.Open(BuildMariaDbConnectionString(dbConfig))
+	case "postgresql":
+		dialector = postgres.Open(BuildPostgresqlConnectionString(dbConfig))
+	case "sqlite":
+		connectionString, sqliteErr := BuildSqliteConnectionString(dbConfig)
+		if sqliteErr != nil {
+			return sqliteErr
 		}
-	}
-
-	if dbEngine == "postgresql" {
-		connectedDb, err = gorm.Open(postgres.Open(BuildPostgresqlConnectionString(dbConfig)), &gorm.Config{})
-		if err != nil {
-			return err
-		}
-	}
-
-	if dbEngine == "sqlite" {
-		connectionString, err := BuildSqliteConnectionString(dbConfig)
-		if err != nil {
-			return err
-		}
-
-		connectedDb, err = gorm.Open(sqlite.Open(connectionString), &gorm.Config{})
-		if err != nil {
-			return err
-
-		}
-	}
-
-	if connectedDb == nil {
+		dialector = sqlite.Open(connectionString)
+		maxAttempts = 1
+	default:
 		return fmt.Errorf("database engine of: %s! check your config to make sure it is correct", dbEngine)
+	}
+
+	connectedDb, err := openWithRetry(dialector, maxAttempts)
+	if err != nil {
+		return err
 	}
 
 	db = connectedDb
 	return nil
+}
+
+// openWithRetry opens the database connection, retrying transient failures so the
+// API does not exit fatally when the database is briefly unreachable at startup.
+func openWithRetry(dialector gorm.Dialector, maxAttempts int) (*gorm.DB, error) {
+	var lastErr error
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		connectedDb, err := gorm.Open(dialector, &gorm.Config{})
+		if err == nil {
+			return connectedDb, nil
+		}
+
+		lastErr = err
+		if attempt < maxAttempts {
+			logging.LogStd(
+				logging.LOG_LEVEL_INFO,
+				fmt.Sprintf(
+					"database not ready (attempt %d/%d): %s; retrying in %s",
+					attempt, maxAttempts, err.Error(), dbConnectRetryDelay,
+				),
+			)
+			time.Sleep(dbConnectRetryDelay)
+		}
+	}
+
+	return nil, fmt.Errorf("failed to connect to the database after %d attempts: %w", maxAttempts, lastErr)
 }
 
 func MakeMigrations() error {
@@ -122,6 +157,8 @@ func MakeMigrations() error {
 		&models.Pepper{},
 		&models.ApiKey{},
 		&models.DataMigration{},
+		&models.OAuthClient{},
+		&models.OAuthAuthorizationCode{},
 	)
 
 	return err

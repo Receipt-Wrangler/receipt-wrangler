@@ -1,4 +1,4 @@
-FROM golang:1.24-trixie
+FROM golang:1.25-trixie
 
 # First install curl if not already installed
 RUN apt-get update
