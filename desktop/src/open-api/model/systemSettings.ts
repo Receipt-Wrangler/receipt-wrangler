@@ -60,6 +60,7 @@ export interface SystemSettings {
      * Concurrency for task worker
      */
     taskConcurrency?: number;
+    pdfDpi?: number;
     taskQueueConfigurations: Array<TaskQueueConfiguration>;
     /**
      * Whether the OAuth 2.1-protected MCP server is enabled

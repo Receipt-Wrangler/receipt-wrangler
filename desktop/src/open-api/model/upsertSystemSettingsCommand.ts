@@ -49,6 +49,7 @@ export interface UpsertSystemSettingsCommand {
      * Concurrency for task worker
      */
     taskConcurrency: number;
+    pdfDpi?: number;
     taskQueueConfigurations?: Array<UpsertTaskQueueConfiguration>;
     /**
      * Whether the OAuth 2.1-protected MCP server is enabled

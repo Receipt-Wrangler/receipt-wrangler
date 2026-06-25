@@ -184,3 +184,27 @@ func TestUpsertSystemSettingsCommand_Validate_MultipleErrors(t *testing.T) {
 		utils.PrintTestError(t, len(vErr.Errors), "at least 5")
 	}
 }
+
+func TestUpsertSystemSettingsCommand_Validate_PdfDpi(t *testing.T) {
+	// 0 means "unset / use default" and must be allowed; in-range values pass;
+	// out-of-range values are rejected with a pdfDpi error.
+	validValues := []int{0, 72, 300, 1200}
+	for _, v := range validValues {
+		cmd := validSystemSettingsCommand()
+		cmd.PdfDpi = v
+		vErr := cmd.Validate()
+		if _, ok := vErr.Errors["pdfDpi"]; ok {
+			utils.PrintTestError(t, "pdfDpi error for valid value "+utils.UintToString(uint(v)), "no error")
+		}
+	}
+
+	invalidValues := []int{71, 1201, 5000}
+	for _, v := range invalidValues {
+		cmd := validSystemSettingsCommand()
+		cmd.PdfDpi = v
+		vErr := cmd.Validate()
+		if _, ok := vErr.Errors["pdfDpi"]; !ok {
+			utils.PrintTestError(t, "no pdfDpi error for invalid value "+utils.UintToString(uint(v)), "pdfDpi error")
+		}
+	}
+}

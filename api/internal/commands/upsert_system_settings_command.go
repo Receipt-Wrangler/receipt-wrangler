@@ -23,6 +23,7 @@ type UpsertSystemSettingsCommand struct {
 	ReceiptProcessingSettingsId         *uint                                 `json:"receiptProcessingSettingsId"`
 	FallbackReceiptProcessingSettingsId *uint                                 `json:"fallbackReceiptProcessingSettingsId"`
 	TaskConcurrency                     int                                   `json:"taskConcurrency"`
+	PdfDpi                              int                                   `json:"pdfDpi"`
 	TaskQueueConfigurations             []UpsertTaskQueueConfigurationCommand `json:"taskQueueConfigurations"`
 	McpEnabled                          bool                                  `json:"mcpEnabled"`
 	McpPublicUrl                        string                                `json:"mcpPublicUrl"`
@@ -80,6 +81,10 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 
 	if len(command.CurrencyDecimalSeparator) == 0 {
 		errorMap["currencyDecimalSeparator"] = "Currency decimal separator is required"
+	}
+
+	if command.PdfDpi != 0 && (command.PdfDpi < 72 || command.PdfDpi > 1200) {
+		errorMap["pdfDpi"] = "PDF DPI must be between 72 and 1200"
 	}
 
 	if command.TaskConcurrency < 0 {

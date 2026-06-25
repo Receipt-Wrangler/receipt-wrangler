@@ -57,6 +57,13 @@
       [displayWith]="displayWith.bind(this)"
       [readonly]="(formConfig.mode |  inputReadonly) || !(form | formGet:'receiptProcessingSettingsId').value"
     ></app-autocomlete>
+    <app-input
+      label="PDF rasterization DPI"
+      type="number"
+      hint="Resolution used when converting PDF receipts to images for OCR/AI. Higher values improve quality but increase processing time and memory. Default 300; allowed range 72-1200."
+      [inputFormControl]="form | formGet:'pdfDpi'"
+      [readonly]="formConfig.mode |  inputReadonly"
+    ></app-input>
   </app-form-section>
   <app-form-section
     headerText="Task Server Settings"
