@@ -96,7 +96,6 @@ Class | Method | HTTP request | Description
 [*GroupsApi*](doc/GroupsApi.md) | [**deleteGroup**](doc/GroupsApi.md#deletegroup) | **DELETE** /group/{groupId} | Delete group
 [*GroupsApi*](doc/GroupsApi.md) | [**getGroupById**](doc/GroupsApi.md#getgroupbyid) | **GET** /group/{groupId} | Gets a group by Id
 [*GroupsApi*](doc/GroupsApi.md) | [**getGroupsForuser**](doc/GroupsApi.md#getgroupsforuser) | **GET** /group | Get groups for user
-[*GroupsApi*](doc/GroupsApi.md) | [**getOcrTextForGroup**](doc/GroupsApi.md#getocrtextforgroup) | **GET** /group/{groupId}/ocrText | Reads each image in a group and returns the zipped read text
 [*GroupsApi*](doc/GroupsApi.md) | [**getPagedGroups**](doc/GroupsApi.md#getpagedgroups) | **POST** /group/getPagedGroups | Get paged groups
 [*GroupsApi*](doc/GroupsApi.md) | [**pollGroupEmail**](doc/GroupsApi.md#pollgroupemail) | **POST** /group/{groupId}/pollGroupEmail | Poll group email
 [*GroupsApi*](doc/GroupsApi.md) | [**updateGroup**](doc/GroupsApi.md#updategroup) | **PUT** /group/{groupId} | Update a group
@@ -107,6 +106,7 @@ Class | Method | HTTP request | Description
 [*NotificationsApi*](doc/NotificationsApi.md) | [**deleteNotificationById**](doc/NotificationsApi.md#deletenotificationbyid) | **DELETE** /notifications/{notificationId} | Delete notification by id
 [*NotificationsApi*](doc/NotificationsApi.md) | [**getNotificationCount**](doc/NotificationsApi.md#getnotificationcount) | **GET** /notifications/notificationCount | Notification count
 [*NotificationsApi*](doc/NotificationsApi.md) | [**getNotificationsForuser**](doc/NotificationsApi.md#getnotificationsforuser) | **GET** /notifications/ | Get all user notifications
+[*PermissionApi*](doc/PermissionApi.md) | [**getPermissions**](doc/PermissionApi.md#getpermissions) | **GET** /permission | List all permission descriptors
 [*PromptApi*](doc/PromptApi.md) | [**createDefaultPrompt**](doc/PromptApi.md#createdefaultprompt) | **POST** /prompt/createDefaultPrompt | Create default prompt
 [*PromptApi*](doc/PromptApi.md) | [**createPrompt**](doc/PromptApi.md#createprompt) | **POST** /prompt/ | Create prompt
 [*PromptApi*](doc/PromptApi.md) | [**deletePromptById**](doc/PromptApi.md#deletepromptbyid) | **DELETE** /prompt/{id} | Delete prompt by id
@@ -134,6 +134,11 @@ Class | Method | HTTP request | Description
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**getPagedProcessingSettings**](doc/ReceiptProcessingSettingsApi.md#getpagedprocessingsettings) | **POST** /receiptProcessingSettings/getPagedProcessingSettings | Gets paged processing settings
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**getReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#getreceiptprocessingsettingsbyid) | **GET** /receiptProcessingSettings/{id} | Get receipt processing settings by id
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**updateReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#updatereceiptprocessingsettingsbyid) | **PUT** /receiptProcessingSettings/{id} | Update receipt processing settings by id
+[*RoleApi*](doc/RoleApi.md) | [**createRole**](doc/RoleApi.md#createrole) | **POST** /role | Create role
+[*RoleApi*](doc/RoleApi.md) | [**deleteRole**](doc/RoleApi.md#deleterole) | **DELETE** /role/{roleId} | Delete role
+[*RoleApi*](doc/RoleApi.md) | [**getRoles**](doc/RoleApi.md#getroles) | **GET** /role | List all roles
+[*RoleApi*](doc/RoleApi.md) | [**setDefaultRole**](doc/RoleApi.md#setdefaultrole) | **PUT** /role/{roleId}/default | Set default role
+[*RoleApi*](doc/RoleApi.md) | [**updateRole**](doc/RoleApi.md#updaterole) | **PUT** /role/{roleId} | Update role
 [*SearchApi*](doc/SearchApi.md) | [**receiptSearch**](doc/SearchApi.md#receiptsearch) | **GET** /search/ | Receipt Search
 [*SystemEmailApi*](doc/SystemEmailApi.md) | [**checkSystemEmailConnectivity**](doc/SystemEmailApi.md#checksystememailconnectivity) | **POST** /systemEmail/checkConnectivity | Check system email connectivity
 [*SystemEmailApi*](doc/SystemEmailApi.md) | [**createSystemEmail**](doc/SystemEmailApi.md#createsystememail) | **POST** /systemEmail/ | Create system email
@@ -156,6 +161,7 @@ Class | Method | HTTP request | Description
 [*UserApi*](doc/UserApi.md) | [**bulkDeleteUsers**](doc/UserApi.md#bulkdeleteusers) | **DELETE** /user/bulk | Bulk delete users
 [*UserApi*](doc/UserApi.md) | [**convertDummyUserById**](doc/UserApi.md#convertdummyuserbyid) | **POST** /user/{userId}/convertDummyUserToNormalUser | Converts dummy user
 [*UserApi*](doc/UserApi.md) | [**createUser**](doc/UserApi.md#createuser) | **POST** /user | Create user
+[*UserApi*](doc/UserApi.md) | [**deleteAccount**](doc/UserApi.md#deleteaccount) | **POST** /user/deleteAccount | Delete own account
 [*UserApi*](doc/UserApi.md) | [**deleteUserById**](doc/UserApi.md#deleteuserbyid) | **DELETE** /user/{userId} | Delete user
 [*UserApi*](doc/UserApi.md) | [**getAmountOwedForUser**](doc/UserApi.md#getamountowedforuser) | **GET** /user/amountOwedForUser | Get amount owed for user
 [*UserApi*](doc/UserApi.md) | [**getAppData**](doc/UserApi.md#getappdata) | **GET** /user/appData | Get app data
@@ -200,6 +206,7 @@ Class | Method | HTTP request | Description
  - [CustomFieldType](doc/CustomFieldType.md)
  - [CustomFieldValue](doc/CustomFieldValue.md)
  - [Dashboard](doc/Dashboard.md)
+ - [DeleteAccountCommand](doc/DeleteAccountCommand.md)
  - [EncodedImage](doc/EncodedImage.md)
  - [ExportFormat](doc/ExportFormat.md)
  - [FeatureConfig](doc/FeatureConfig.md)
@@ -212,7 +219,6 @@ Class | Method | HTTP request | Description
  - [GroupFilter](doc/GroupFilter.md)
  - [GroupMember](doc/GroupMember.md)
  - [GroupReceiptSettings](doc/GroupReceiptSettings.md)
- - [GroupRole](doc/GroupRole.md)
  - [GroupSettings](doc/GroupSettings.md)
  - [GroupSettingsWhiteListEmail](doc/GroupSettingsWhiteListEmail.md)
  - [GroupStatus](doc/GroupStatus.md)
@@ -232,6 +238,9 @@ Class | Method | HTTP request | Description
  - [PagedDataDataInner](doc/PagedDataDataInner.md)
  - [PagedGroupRequestCommand](doc/PagedGroupRequestCommand.md)
  - [PagedRequestCommand](doc/PagedRequestCommand.md)
+ - [Permission](doc/Permission.md)
+ - [PermissionDescriptor](doc/PermissionDescriptor.md)
+ - [PermissionScope](doc/PermissionScope.md)
  - [PieChartData](doc/PieChartData.md)
  - [PieChartDataCommand](doc/PieChartDataCommand.md)
  - [PieChartDataPoint](doc/PieChartDataPoint.md)
@@ -243,6 +252,7 @@ Class | Method | HTTP request | Description
  - [ReceiptProcessingSettings](doc/ReceiptProcessingSettings.md)
  - [ReceiptStatus](doc/ReceiptStatus.md)
  - [ResetPasswordCommand](doc/ResetPasswordCommand.md)
+ - [Role](doc/Role.md)
  - [SearchResult](doc/SearchResult.md)
  - [SignUpCommand](doc/SignUpCommand.md)
  - [SortDirection](doc/SortDirection.md)
@@ -272,6 +282,7 @@ Class | Method | HTTP request | Description
  - [UpsertPromptCommand](doc/UpsertPromptCommand.md)
  - [UpsertReceiptCommand](doc/UpsertReceiptCommand.md)
  - [UpsertReceiptProcessingSettingsCommand](doc/UpsertReceiptProcessingSettingsCommand.md)
+ - [UpsertRoleCommand](doc/UpsertRoleCommand.md)
  - [UpsertSystemEmailCommand](doc/UpsertSystemEmailCommand.md)
  - [UpsertSystemSettingsCommand](doc/UpsertSystemSettingsCommand.md)
  - [UpsertTagCommand](doc/UpsertTagCommand.md)
@@ -279,7 +290,6 @@ Class | Method | HTTP request | Description
  - [UpsertWidgetCommand](doc/UpsertWidgetCommand.md)
  - [User](doc/User.md)
  - [UserPreferences](doc/UserPreferences.md)
- - [UserRole](doc/UserRole.md)
  - [UserShortcut](doc/UserShortcut.md)
  - [UserView](doc/UserView.md)
  - [Widget](doc/Widget.md)

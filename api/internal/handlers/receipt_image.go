@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -41,12 +43,12 @@ func UploadReceiptImage(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: Validate size
 	handler := structs.Handler{
-		ErrorMessage: errMessage,
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		ReceiptId:    r.Form.Get("receiptId"),
-		GroupRole:    models.EDITOR,
+		ErrorMessage:     errMessage,
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		ReceiptId:        r.Form.Get("receiptId"),
+		GroupPermissions: []string{permissions.GroupReceiptsUpdate},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			fileBytes := make([]byte, fileHeader.Size)
 
@@ -113,11 +115,12 @@ func GetReceiptImage(w http.ResponseWriter, r *http.Request) {
 	stringReceiptId := utils.UintToString(fileData.ReceiptId)
 
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving image.",
-		ReceiptId:    stringReceiptId,
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error retrieving image.",
+		ReceiptId:        stringReceiptId,
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			var receipt models.Receipt
 			var bytes []byte
@@ -171,12 +174,12 @@ func DownloadReceiptImage(w http.ResponseWriter, r *http.Request) {
 	stringReceiptId := utils.UintToString(fileData.ReceiptId)
 
 	handler := structs.Handler{
-		ErrorMessage: "Error downloading image.",
-		ReceiptId:    stringReceiptId,
-		GroupRole:    models.VIEWER,
-		Writer:       w,
-		Request:      r,
-		ResponseType: "",
+		ErrorMessage:     "Error downloading image.",
+		ReceiptId:        stringReceiptId,
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     "",
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			fileRepository := repositories.NewFileRepository(nil)
 
@@ -210,10 +213,11 @@ func RemoveReceiptImage(w http.ResponseWriter, r *http.Request) {
 	stringReceiptId := utils.UintToString(fileData.ReceiptId)
 
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting image.",
-		ReceiptId:    stringReceiptId,
-		Writer:       w,
-		Request:      r,
+		ErrorMessage:     "Error deleting image.",
+		ReceiptId:        stringReceiptId,
+		GroupPermissions: []string{permissions.GroupReceiptsUpdate},
+		Writer:           w,
+		Request:          r,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			err = db.Delete(fileData).Error
 			if err != nil {
@@ -255,7 +259,7 @@ func MagicFillFromImage(w http.ResponseWriter, r *http.Request) {
 			var endTimer time.Time
 
 			if len(receiptImageId) > 0 {
-				errCode, err := validateReceiptImageAccess(r, models.VIEWER, receiptImageId)
+				errCode, err := validateReceiptImageAccess(r, permissions.GroupReceiptsMagicFill, receiptImageId)
 				if err != nil {
 					return errCode, err
 				}
@@ -307,7 +311,7 @@ func MagicFillFromImage(w http.ResponseWriter, r *http.Request) {
 				}
 
 				startTimer = time.Now()
-				command, metadata, err := services.MagicFillFromImage(magicFillCommand, "")
+				command, metadata, err := services.MagicFillFromImage(magicFillCommand, "", token.UserId)
 				endTimer = time.Now()
 
 				_, taskErr := systemTaskService.CreateSystemTasksFromMetadata(
@@ -346,6 +350,11 @@ func MagicFillFromImage(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
+// ConvertToJpg is a stateless image utility: it converts the caller's own
+// uploaded bytes to a JPG and returns them without reading or writing any stored
+// receipt or group data, so there is no resource to scope a permission against.
+// It is intentionally not permission-gated (authentication is still required by
+// the router).
 func ConvertToJpg(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
 		ErrorMessage: "Error converting image.",
@@ -403,9 +412,9 @@ func ConvertToJpg(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
-func validateReceiptImageAccess(r *http.Request, groupRole models.GroupRole, receiptImageId string) (int, error) {
+func validateReceiptImageAccess(r *http.Request, requiredPermission string, receiptImageId string) (int, error) {
 	token := structs.GetClaims(r)
-	groupService := services.NewGroupService(nil)
+	permissionService := services.NewPermissionService(nil)
 
 	receiptImageIdUint, err := utils.StringToUint(receiptImageId)
 	if err != nil {
@@ -418,9 +427,12 @@ func validateReceiptImageAccess(r *http.Request, groupRole models.GroupRole, rec
 		return http.StatusInternalServerError, err
 	}
 
-	err = groupService.ValidateGroupRole(groupRole, utils.UintToString(receiptImage.Receipt.GroupId), utils.UintToString(token.UserId))
+	hasPermission, err := permissionService.HasGroupPermissions(token.UserId, receiptImage.Receipt.GroupId, requiredPermission)
 	if err != nil {
-		return http.StatusForbidden, err
+		return http.StatusInternalServerError, err
+	}
+	if !hasPermission {
+		return http.StatusForbidden, errors.New("user is unauthorized to access entity")
 	}
 
 	return 0, nil

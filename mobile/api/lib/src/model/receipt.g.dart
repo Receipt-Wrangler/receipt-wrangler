@@ -45,7 +45,7 @@ class _$Receipt extends Receipt {
   final String? createdByString;
 
   factory _$Receipt([void Function(ReceiptBuilder)? updates]) =>
-      (new ReceiptBuilder()..update(updates))._build();
+      (ReceiptBuilder()..update(updates))._build();
 
   _$Receipt._(
       {required this.amount,
@@ -66,30 +66,13 @@ class _$Receipt extends Receipt {
       required this.tags,
       this.updatedAt,
       this.createdByString})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(amount, r'Receipt', 'amount');
-    BuiltValueNullFieldError.checkNotNull(categories, r'Receipt', 'categories');
-    BuiltValueNullFieldError.checkNotNull(comments, r'Receipt', 'comments');
-    BuiltValueNullFieldError.checkNotNull(
-        customFields, r'Receipt', 'customFields');
-    BuiltValueNullFieldError.checkNotNull(date, r'Receipt', 'date');
-    BuiltValueNullFieldError.checkNotNull(groupId, r'Receipt', 'groupId');
-    BuiltValueNullFieldError.checkNotNull(id, r'Receipt', 'id');
-    BuiltValueNullFieldError.checkNotNull(name, r'Receipt', 'name');
-    BuiltValueNullFieldError.checkNotNull(
-        paidByUserId, r'Receipt', 'paidByUserId');
-    BuiltValueNullFieldError.checkNotNull(
-        receiptItems, r'Receipt', 'receiptItems');
-    BuiltValueNullFieldError.checkNotNull(status, r'Receipt', 'status');
-    BuiltValueNullFieldError.checkNotNull(tags, r'Receipt', 'tags');
-  }
-
+      : super._();
   @override
   Receipt rebuild(void Function(ReceiptBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  ReceiptBuilder toBuilder() => new ReceiptBuilder()..replace(this);
+  ReceiptBuilder toBuilder() => ReceiptBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -174,18 +157,18 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
 
   ListBuilder<Category>? _categories;
   ListBuilder<Category> get categories =>
-      _$this._categories ??= new ListBuilder<Category>();
+      _$this._categories ??= ListBuilder<Category>();
   set categories(ListBuilder<Category>? categories) =>
       _$this._categories = categories;
 
   ListBuilder<Comment>? _comments;
   ListBuilder<Comment> get comments =>
-      _$this._comments ??= new ListBuilder<Comment>();
+      _$this._comments ??= ListBuilder<Comment>();
   set comments(ListBuilder<Comment>? comments) => _$this._comments = comments;
 
   ListBuilder<CustomFieldValue>? _customFields;
   ListBuilder<CustomFieldValue> get customFields =>
-      _$this._customFields ??= new ListBuilder<CustomFieldValue>();
+      _$this._customFields ??= ListBuilder<CustomFieldValue>();
   set customFields(ListBuilder<CustomFieldValue>? customFields) =>
       _$this._customFields = customFields;
 
@@ -211,7 +194,7 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
 
   ListBuilder<FileData>? _imageFiles;
   ListBuilder<FileData> get imageFiles =>
-      _$this._imageFiles ??= new ListBuilder<FileData>();
+      _$this._imageFiles ??= ListBuilder<FileData>();
   set imageFiles(ListBuilder<FileData>? imageFiles) =>
       _$this._imageFiles = imageFiles;
 
@@ -225,7 +208,7 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
 
   ListBuilder<Item>? _receiptItems;
   ListBuilder<Item> get receiptItems =>
-      _$this._receiptItems ??= new ListBuilder<Item>();
+      _$this._receiptItems ??= ListBuilder<Item>();
   set receiptItems(ListBuilder<Item>? receiptItems) =>
       _$this._receiptItems = receiptItems;
 
@@ -238,7 +221,7 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
   set status(ReceiptStatus? status) => _$this._status = status;
 
   ListBuilder<Tag>? _tags;
-  ListBuilder<Tag> get tags => _$this._tags ??= new ListBuilder<Tag>();
+  ListBuilder<Tag> get tags => _$this._tags ??= ListBuilder<Tag>();
   set tags(ListBuilder<Tag>? tags) => _$this._tags = tags;
 
   String? _updatedAt;
@@ -282,7 +265,6 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
 
   @override
   void replace(Receipt other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$Receipt;
   }
 
@@ -298,31 +280,32 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
     _$Receipt _$result;
     try {
       _$result = _$v ??
-          new _$Receipt._(
-              amount: BuiltValueNullFieldError.checkNotNull(
-                  amount, r'Receipt', 'amount'),
-              categories: categories.build(),
-              comments: comments.build(),
-              customFields: customFields.build(),
-              createdAt: createdAt,
-              createdBy: createdBy,
-              date: BuiltValueNullFieldError.checkNotNull(
-                  date, r'Receipt', 'date'),
-              groupId: BuiltValueNullFieldError.checkNotNull(
-                  groupId, r'Receipt', 'groupId'),
-              id: BuiltValueNullFieldError.checkNotNull(id, r'Receipt', 'id'),
-              imageFiles: _imageFiles?.build(),
-              name: BuiltValueNullFieldError.checkNotNull(
-                  name, r'Receipt', 'name'),
-              paidByUserId: BuiltValueNullFieldError.checkNotNull(
-                  paidByUserId, r'Receipt', 'paidByUserId'),
-              receiptItems: receiptItems.build(),
-              resolvedDate: resolvedDate,
-              status: BuiltValueNullFieldError.checkNotNull(
-                  status, r'Receipt', 'status'),
-              tags: tags.build(),
-              updatedAt: updatedAt,
-              createdByString: createdByString);
+          _$Receipt._(
+            amount: BuiltValueNullFieldError.checkNotNull(
+                amount, r'Receipt', 'amount'),
+            categories: categories.build(),
+            comments: comments.build(),
+            customFields: customFields.build(),
+            createdAt: createdAt,
+            createdBy: createdBy,
+            date:
+                BuiltValueNullFieldError.checkNotNull(date, r'Receipt', 'date'),
+            groupId: BuiltValueNullFieldError.checkNotNull(
+                groupId, r'Receipt', 'groupId'),
+            id: BuiltValueNullFieldError.checkNotNull(id, r'Receipt', 'id'),
+            imageFiles: _imageFiles?.build(),
+            name:
+                BuiltValueNullFieldError.checkNotNull(name, r'Receipt', 'name'),
+            paidByUserId: BuiltValueNullFieldError.checkNotNull(
+                paidByUserId, r'Receipt', 'paidByUserId'),
+            receiptItems: receiptItems.build(),
+            resolvedDate: resolvedDate,
+            status: BuiltValueNullFieldError.checkNotNull(
+                status, r'Receipt', 'status'),
+            tags: tags.build(),
+            updatedAt: updatedAt,
+            createdByString: createdByString,
+          );
     } catch (_) {
       late String _$failedField;
       try {
@@ -342,7 +325,7 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
         _$failedField = 'tags';
         tags.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'Receipt', _$failedField, e.toString());
       }
       rethrow;

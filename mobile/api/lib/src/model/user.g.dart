@@ -26,12 +26,12 @@ class _$User extends User {
   @override
   final String? updatedAt;
   @override
-  final UserRole userRole;
+  final int? appRoleId;
   @override
   final String? lastLoginDate;
 
   factory _$User([void Function(UserBuilder)? updates]) =>
-      (new UserBuilder()..update(updates))._build();
+      (UserBuilder()..update(updates))._build();
 
   _$User._(
       {this.password,
@@ -43,22 +43,15 @@ class _$User extends User {
       required this.id,
       required this.isDummyUser,
       this.updatedAt,
-      required this.userRole,
+      this.appRoleId,
       this.lastLoginDate})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(username, r'User', 'username');
-    BuiltValueNullFieldError.checkNotNull(displayName, r'User', 'displayName');
-    BuiltValueNullFieldError.checkNotNull(id, r'User', 'id');
-    BuiltValueNullFieldError.checkNotNull(isDummyUser, r'User', 'isDummyUser');
-    BuiltValueNullFieldError.checkNotNull(userRole, r'User', 'userRole');
-  }
-
+      : super._();
   @override
   User rebuild(void Function(UserBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  UserBuilder toBuilder() => new UserBuilder()..replace(this);
+  UserBuilder toBuilder() => UserBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -73,7 +66,7 @@ class _$User extends User {
         id == other.id &&
         isDummyUser == other.isDummyUser &&
         updatedAt == other.updatedAt &&
-        userRole == other.userRole &&
+        appRoleId == other.appRoleId &&
         lastLoginDate == other.lastLoginDate;
   }
 
@@ -89,7 +82,7 @@ class _$User extends User {
     _$hash = $jc(_$hash, id.hashCode);
     _$hash = $jc(_$hash, isDummyUser.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
-    _$hash = $jc(_$hash, userRole.hashCode);
+    _$hash = $jc(_$hash, appRoleId.hashCode);
     _$hash = $jc(_$hash, lastLoginDate.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -107,7 +100,7 @@ class _$User extends User {
           ..add('id', id)
           ..add('isDummyUser', isDummyUser)
           ..add('updatedAt', updatedAt)
-          ..add('userRole', userRole)
+          ..add('appRoleId', appRoleId)
           ..add('lastLoginDate', lastLoginDate))
         .toString();
   }
@@ -153,9 +146,9 @@ class UserBuilder implements Builder<User, UserBuilder> {
   String? get updatedAt => _$this._updatedAt;
   set updatedAt(String? updatedAt) => _$this._updatedAt = updatedAt;
 
-  UserRole? _userRole;
-  UserRole? get userRole => _$this._userRole;
-  set userRole(UserRole? userRole) => _$this._userRole = userRole;
+  int? _appRoleId;
+  int? get appRoleId => _$this._appRoleId;
+  set appRoleId(int? appRoleId) => _$this._appRoleId = appRoleId;
 
   String? _lastLoginDate;
   String? get lastLoginDate => _$this._lastLoginDate;
@@ -178,7 +171,7 @@ class UserBuilder implements Builder<User, UserBuilder> {
       _id = $v.id;
       _isDummyUser = $v.isDummyUser;
       _updatedAt = $v.updatedAt;
-      _userRole = $v.userRole;
+      _appRoleId = $v.appRoleId;
       _lastLoginDate = $v.lastLoginDate;
       _$v = null;
     }
@@ -187,7 +180,6 @@ class UserBuilder implements Builder<User, UserBuilder> {
 
   @override
   void replace(User other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$User;
   }
 
@@ -201,22 +193,22 @@ class UserBuilder implements Builder<User, UserBuilder> {
 
   _$User _build() {
     final _$result = _$v ??
-        new _$User._(
-            password: password,
-            username: BuiltValueNullFieldError.checkNotNull(
-                username, r'User', 'username'),
-            createdAt: createdAt,
-            createdBy: createdBy,
-            defaultAvatarColor: defaultAvatarColor,
-            displayName: BuiltValueNullFieldError.checkNotNull(
-                displayName, r'User', 'displayName'),
-            id: BuiltValueNullFieldError.checkNotNull(id, r'User', 'id'),
-            isDummyUser: BuiltValueNullFieldError.checkNotNull(
-                isDummyUser, r'User', 'isDummyUser'),
-            updatedAt: updatedAt,
-            userRole: BuiltValueNullFieldError.checkNotNull(
-                userRole, r'User', 'userRole'),
-            lastLoginDate: lastLoginDate);
+        _$User._(
+          password: password,
+          username: BuiltValueNullFieldError.checkNotNull(
+              username, r'User', 'username'),
+          createdAt: createdAt,
+          createdBy: createdBy,
+          defaultAvatarColor: defaultAvatarColor,
+          displayName: BuiltValueNullFieldError.checkNotNull(
+              displayName, r'User', 'displayName'),
+          id: BuiltValueNullFieldError.checkNotNull(id, r'User', 'id'),
+          isDummyUser: BuiltValueNullFieldError.checkNotNull(
+              isDummyUser, r'User', 'isDummyUser'),
+          updatedAt: updatedAt,
+          appRoleId: appRoleId,
+          lastLoginDate: lastLoginDate,
+        );
     replace(_$result);
     return _$result;
   }

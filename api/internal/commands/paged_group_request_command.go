@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
@@ -31,13 +30,10 @@ func (command *PagedGroupRequestCommand) LoadDataFromRequest(w http.ResponseWrit
 
 func (command *PagedGroupRequestCommand) Validate(r *http.Request) structs.ValidatorError {
 	vErrs := command.PagedRequestCommand.Validate()
-	token := structs.GetClaims(r)
 
-	if command.GroupFilter.AssociatedGroup == ASSOCIATED_GROUP_ALL &&
-		token.UserRole != models.ADMIN {
-		vErrs.Errors["associatedGroup"] = "Must be an admin to view all groups"
-	}
-
+	// Authorization for the ALL filter (listing every group) is enforced in the
+	// GetPagedGroups handler via the app.groups.read permission, resolved from the
+	// database rather than the JWT.
 	if command.GroupFilter.AssociatedGroup == "" {
 		vErrs.Errors["associatedGroup"] = "Associated group is required"
 	}

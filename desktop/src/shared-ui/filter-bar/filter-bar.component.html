@@ -1,0 +1,20 @@
+<div class="filter-bar" role="tablist">
+  @for (tab of tabs(); track tab.value) {
+    <button
+      type="button"
+      class="filter-tab"
+      role="tab"
+      [class.active]="value() === tab.value"
+      [attr.aria-selected]="value() === tab.value"
+      (click)="select(tab.value)"
+    >
+      @if (tab.icon) {
+        <mat-icon>{{ tab.icon }}</mat-icon>
+      }
+      {{ tab.label }}
+      @if (tab.count !== undefined) {
+        <span class="pill">{{ tab.count }}</span>
+      }
+    </button>
+  }
+</div>

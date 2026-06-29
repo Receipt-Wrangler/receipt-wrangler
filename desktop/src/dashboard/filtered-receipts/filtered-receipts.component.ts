@@ -3,14 +3,12 @@ import { UntilDestroy } from "@ngneat/until-destroy";
 import { take, tap } from "rxjs";
 import { ReceiptFilterService } from "src/services/receipt-filter.service";
 import { Receipt, ReceiptPagedRequestCommand, Widget } from "../../open-api";
-import { GroupRolePipe } from "../../pipes/group-role.pipe";
 
 @UntilDestroy()
 @Component({
   selector: "/app-filtered-receipts",
   templateUrl: "./filtered-receipts.component.html",
   styleUrls: ["./filtered-receipts.component.scss"],
-  providers: [GroupRolePipe],
   standalone: false
 })
 export class FilteredReceiptsComponent implements OnInit {

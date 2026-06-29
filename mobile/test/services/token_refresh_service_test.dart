@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/openapi.dart';
 import 'package:receipt_wrangler_mobile/client/client.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/services/token_refresh_service.dart';
 
 import '../helpers/auth_test_helpers.dart';
@@ -26,6 +27,8 @@ void main() {
   late MockCategoryModel mockCategoryModel;
   late MockTagModel mockTagModel;
   late MockSystemSettingsModel mockSystemSettingsModel;
+  // PermissionsModel has no I/O, so use a real instance (per mobile testing guide).
+  late PermissionsModel permissionsModel;
   late MockOpenapi mockClient;
   late MockAuthApi mockAuthApi;
   late MockUserApi mockUserApi;
@@ -54,6 +57,7 @@ void main() {
     mockCategoryModel = MockCategoryModel();
     mockTagModel = MockTagModel();
     mockSystemSettingsModel = MockSystemSettingsModel();
+    permissionsModel = PermissionsModel();
     mockClient = MockOpenapi();
     mockAuthApi = MockAuthApi();
     mockUserApi = MockUserApi();
@@ -74,6 +78,7 @@ void main() {
       categoryModel: mockCategoryModel,
       tagModel: mockTagModel,
       systemSettingsModel: mockSystemSettingsModel,
+      permissionsModel: permissionsModel,
     );
   });
 
@@ -355,6 +360,10 @@ void main() {
         when(() => mockAppData.currencySymbolPosition)
             .thenReturn(CurrencySymbolPosition.END);
         when(() => mockAppData.currencyHideDecimalPlaces).thenReturn(false);
+        when(() => mockAppData.appPermissions)
+            .thenReturn(BuiltList<Permission>());
+        when(() => mockAppData.groupPermissions)
+            .thenReturn(BuiltMap<String, BuiltList<Permission>>());
 
         when(() => mockUserApi.getAppData()).thenAnswer((_) async => Response(
               data: mockAppData,
@@ -415,6 +424,10 @@ void main() {
         when(() => mockAppData.currencySymbolPosition)
             .thenReturn(CurrencySymbolPosition.END);
         when(() => mockAppData.currencyHideDecimalPlaces).thenReturn(false);
+        when(() => mockAppData.appPermissions)
+            .thenReturn(BuiltList<Permission>());
+        when(() => mockAppData.groupPermissions)
+            .thenReturn(BuiltMap<String, BuiltList<Permission>>());
 
         when(() => mockUserApi.getAppData()).thenAnswer((_) async => Response(
               data: mockAppData,

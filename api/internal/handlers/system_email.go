@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
-	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -15,11 +15,11 @@ import (
 
 func GetAllSystemEmails(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving system emails",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error retrieving system emails",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppSystemEmailsRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			pagedData := structs.PagedData{
 				Data:       []any{},
@@ -70,11 +70,11 @@ func GetAllSystemEmails(w http.ResponseWriter, r *http.Request) {
 
 func GetSystemEmailById(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving system emails",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error retrieving system emails",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppSystemEmailsRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			systemEmailId := chi.URLParam(r, "id")
 			systemEmailRepository := repositories.NewSystemEmailRepository(nil)
@@ -101,11 +101,11 @@ func GetSystemEmailById(w http.ResponseWriter, r *http.Request) {
 
 func AddSystemEmail(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error adding system email",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error adding system email",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppSystemEmailsCreate},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpsertSystemEmailCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -142,11 +142,11 @@ func AddSystemEmail(w http.ResponseWriter, r *http.Request) {
 
 func UpdateSystemEmail(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating system email",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error updating system email",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppSystemEmailsUpdate},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpsertSystemEmailCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -189,10 +189,10 @@ func UpdateSystemEmail(w http.ResponseWriter, r *http.Request) {
 
 func DeleteSystemEmail(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting system email",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error deleting system email",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppSystemEmailsDelete},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			systemEmailRepository := repositories.NewSystemEmailRepository(nil)
@@ -213,10 +213,10 @@ func DeleteSystemEmail(w http.ResponseWriter, r *http.Request) {
 
 func CheckConnectivity(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Could not connect with credentials",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Could not connect with credentials",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppSystemEmailsRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.CheckEmailConnectivityCommand{}
 			token := structs.GetClaims(r)

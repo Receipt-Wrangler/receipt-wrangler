@@ -8,7 +8,6 @@
  * Do not edit the class manually.
  */
 import { Claims } from './claims';
-import { UserRole } from './userRole';
 import { TokenPair } from './tokenPair';
 
 
@@ -25,10 +24,6 @@ export interface GetNewRefreshToken200Response {
      * User foreign key
      */
     userId: number;
-    /**
-     * User\'s role
-     */
-    userRole: UserRole;
     /**
      * Display name
      */
@@ -70,7 +65,4 @@ export interface GetNewRefreshToken200Response {
      */
     jti?: string;
 }
-export namespace GetNewRefreshToken200Response {
-}
-
 

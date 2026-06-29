@@ -10,25 +10,17 @@ class _$UpsertGroupMemberCommand extends UpsertGroupMemberCommand {
   @override
   final int groupId;
   @override
-  final GroupRole groupRole;
+  final int? groupRoleId;
   @override
   final int userId;
 
   factory _$UpsertGroupMemberCommand(
           [void Function(UpsertGroupMemberCommandBuilder)? updates]) =>
-      (new UpsertGroupMemberCommandBuilder()..update(updates))._build();
+      (UpsertGroupMemberCommandBuilder()..update(updates))._build();
 
   _$UpsertGroupMemberCommand._(
-      {required this.groupId, required this.groupRole, required this.userId})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        groupId, r'UpsertGroupMemberCommand', 'groupId');
-    BuiltValueNullFieldError.checkNotNull(
-        groupRole, r'UpsertGroupMemberCommand', 'groupRole');
-    BuiltValueNullFieldError.checkNotNull(
-        userId, r'UpsertGroupMemberCommand', 'userId');
-  }
-
+      {required this.groupId, this.groupRoleId, required this.userId})
+      : super._();
   @override
   UpsertGroupMemberCommand rebuild(
           void Function(UpsertGroupMemberCommandBuilder) updates) =>
@@ -36,14 +28,14 @@ class _$UpsertGroupMemberCommand extends UpsertGroupMemberCommand {
 
   @override
   UpsertGroupMemberCommandBuilder toBuilder() =>
-      new UpsertGroupMemberCommandBuilder()..replace(this);
+      UpsertGroupMemberCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is UpsertGroupMemberCommand &&
         groupId == other.groupId &&
-        groupRole == other.groupRole &&
+        groupRoleId == other.groupRoleId &&
         userId == other.userId;
   }
 
@@ -51,7 +43,7 @@ class _$UpsertGroupMemberCommand extends UpsertGroupMemberCommand {
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, groupId.hashCode);
-    _$hash = $jc(_$hash, groupRole.hashCode);
+    _$hash = $jc(_$hash, groupRoleId.hashCode);
     _$hash = $jc(_$hash, userId.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -61,7 +53,7 @@ class _$UpsertGroupMemberCommand extends UpsertGroupMemberCommand {
   String toString() {
     return (newBuiltValueToStringHelper(r'UpsertGroupMemberCommand')
           ..add('groupId', groupId)
-          ..add('groupRole', groupRole)
+          ..add('groupRoleId', groupRoleId)
           ..add('userId', userId))
         .toString();
   }
@@ -76,9 +68,9 @@ class UpsertGroupMemberCommandBuilder
   int? get groupId => _$this._groupId;
   set groupId(int? groupId) => _$this._groupId = groupId;
 
-  GroupRole? _groupRole;
-  GroupRole? get groupRole => _$this._groupRole;
-  set groupRole(GroupRole? groupRole) => _$this._groupRole = groupRole;
+  int? _groupRoleId;
+  int? get groupRoleId => _$this._groupRoleId;
+  set groupRoleId(int? groupRoleId) => _$this._groupRoleId = groupRoleId;
 
   int? _userId;
   int? get userId => _$this._userId;
@@ -92,7 +84,7 @@ class UpsertGroupMemberCommandBuilder
     final $v = _$v;
     if ($v != null) {
       _groupId = $v.groupId;
-      _groupRole = $v.groupRole;
+      _groupRoleId = $v.groupRoleId;
       _userId = $v.userId;
       _$v = null;
     }
@@ -101,7 +93,6 @@ class UpsertGroupMemberCommandBuilder
 
   @override
   void replace(UpsertGroupMemberCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertGroupMemberCommand;
   }
 
@@ -115,13 +106,13 @@ class UpsertGroupMemberCommandBuilder
 
   _$UpsertGroupMemberCommand _build() {
     final _$result = _$v ??
-        new _$UpsertGroupMemberCommand._(
-            groupId: BuiltValueNullFieldError.checkNotNull(
-                groupId, r'UpsertGroupMemberCommand', 'groupId'),
-            groupRole: BuiltValueNullFieldError.checkNotNull(
-                groupRole, r'UpsertGroupMemberCommand', 'groupRole'),
-            userId: BuiltValueNullFieldError.checkNotNull(
-                userId, r'UpsertGroupMemberCommand', 'userId'));
+        _$UpsertGroupMemberCommand._(
+          groupId: BuiltValueNullFieldError.checkNotNull(
+              groupId, r'UpsertGroupMemberCommand', 'groupId'),
+          groupRoleId: groupRoleId,
+          userId: BuiltValueNullFieldError.checkNotNull(
+              userId, r'UpsertGroupMemberCommand', 'userId'),
+        );
     replace(_$result);
     return _$result;
   }

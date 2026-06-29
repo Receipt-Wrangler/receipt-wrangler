@@ -5,7 +5,9 @@ import { MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule } from "@ngxs/store";
 import { TableModule } from "src/table/table.module";
+import { DirectivesModule } from "../../directives";
 import { ApiModule } from "../../open-api";
+import { AuthState } from "../../store";
 import { UserListComponent } from "./user-list.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -18,9 +20,10 @@ describe("UserListComponent", () => {
     declarations: [UserListComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
+        DirectivesModule,
         MatDialogModule,
         MatSnackBarModule,
-        NgxsModule.forRoot([]),
+        NgxsModule.forRoot([AuthState]),
         TableModule],
     providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 }).compileComponents();

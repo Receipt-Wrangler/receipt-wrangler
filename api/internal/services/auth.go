@@ -7,6 +7,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	config "receipt-wrangler/api/internal/env"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -75,7 +76,15 @@ func LoginUser(loginAttempt commands.LoginCommand) (models.User, bool, error) {
 
 	userRepository := repositories.NewUserRepository(nil)
 
-	if dbUser.UserRole == models.ADMIN {
+	// "Administrator" is defined by the app.users.read permission (the modern
+	// replacement for the removed UserRole == ADMIN check), resolved from the
+	// database rather than the JWT.
+	permissionService := NewPermissionService(nil)
+	isAdmin, err := permissionService.HasAppPermissions(dbUser.ID, permissions.AppUsersRead)
+	if err != nil {
+		return models.User{}, false, err
+	}
+	if isAdmin {
 		firstAdminToLogin, err = userRepository.IsFirstAdminToLogin()
 		if err != nil {
 			return models.User{}, false, err
@@ -148,7 +157,6 @@ func generateTokenPair(userId uint, audience string) (string, string, structs.Cl
 		Displayname:        user.DisplayName,
 		UserId:             user.ID,
 		Username:           user.Username,
-		UserRole:           user.UserRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    jwtIssuer,
 			Audience:  []string{audience},
@@ -173,7 +181,6 @@ func generateTokenPair(userId uint, audience string) (string, string, structs.Cl
 		Displayname:        user.DisplayName,
 		UserId:             user.ID,
 		Username:           user.Username,
-		UserRole:           user.UserRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    jwtIssuer,
 			Audience:  []string{audience},
@@ -260,6 +267,58 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 		return appData, err
 	}
 
+	permissionService := NewPermissionService(nil)
+	appPermissions, err := permissionService.GetAppPermissionsForUser(userId)
+	if err != nil {
+		return appData, err
+	}
+
+	groupPermissions := make(map[uint][]string, len(groups))
+	groupCategories := make(map[uint][]models.Category, len(groups))
+	groupTags := make(map[uint][]models.Tag, len(groups))
+	for _, group := range groups {
+		perms, err := permissionService.GetGroupPermissionsForUser(userId, group.ID)
+		if err != nil {
+			return appData, err
+		}
+		groupPermissions[group.ID] = perms
+
+		// Per-group category/tag catalog filtered to the caller's grants
+		// (full pool when unrestricted). This is how non-admins receive
+		// categories/tags now that the flat lists are admin-only.
+		visibleCategories, err := permissionService.GetVisibleCategoriesForUser(userId, group.ID, categories)
+		if err != nil {
+			return appData, err
+		}
+		groupCategories[group.ID] = visibleCategories
+
+		visibleTags, err := permissionService.GetVisibleTagsForUser(userId, group.ID, tags)
+		if err != nil {
+			return appData, err
+		}
+		groupTags[group.ID] = visibleTags
+	}
+
+	// The flat global category/tag lists are only for callers who may read the
+	// whole pool (app.categories.read / app.tags.read — admins, the category/tag
+	// management pages, the role editor). Everyone else receives an empty list
+	// and uses the per-group filtered catalogs above.
+	canReadAllCategories, err := permissionService.HasAppPermissions(userId, permissions.AppCategoriesRead)
+	if err != nil {
+		return appData, err
+	}
+	if !canReadAllCategories {
+		categories = []models.Category{}
+	}
+
+	canReadAllTags, err := permissionService.HasAppPermissions(userId, permissions.AppTagsRead)
+	if err != nil {
+		return appData, err
+	}
+	if !canReadAllTags {
+		tags = []models.Tag{}
+	}
+
 	appData.About = about
 	appData.Groups = groups
 	appData.Users = users
@@ -267,12 +326,16 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 	appData.FeatureConfig = featureConfig
 	appData.Categories = categories
 	appData.Tags = tags
+	appData.GroupCategories = groupCategories
+	appData.GroupTags = groupTags
 	appData.CurrencyDisplay = systemSettings.CurrencyDisplay
 	appData.CurrencyThousandthsSeparator = systemSettings.CurrencyThousandthsSeparator
 	appData.CurrencyDecimalSeparator = systemSettings.CurrencyDecimalSeparator
 	appData.CurrencySymbolPosition = systemSettings.CurrencySymbolPosition
 	appData.CurrencyHideDecimalPlaces = systemSettings.CurrencyHideDecimalPlaces
 	appData.Icons = structs.Icons
+	appData.AppPermissions = appPermissions
+	appData.GroupPermissions = groupPermissions
 
 	if r != nil {
 		claims := structs.GetClaims(r)

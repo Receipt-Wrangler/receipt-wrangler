@@ -12,6 +12,8 @@ class _$UpdateGroupSettingsCommand extends UpdateGroupSettingsCommand {
   @override
   final bool? emailIntegrationEnabled;
   @override
+  final bool? emailBodyProcessingEnabled;
+  @override
   final BuiltList<SubjectLineRegex> subjectLineRegexes;
   @override
   final BuiltList<GroupSettingsWhiteListEmail> emailWhiteList;
@@ -26,26 +28,19 @@ class _$UpdateGroupSettingsCommand extends UpdateGroupSettingsCommand {
 
   factory _$UpdateGroupSettingsCommand(
           [void Function(UpdateGroupSettingsCommandBuilder)? updates]) =>
-      (new UpdateGroupSettingsCommandBuilder()..update(updates))._build();
+      (UpdateGroupSettingsCommandBuilder()..update(updates))._build();
 
   _$UpdateGroupSettingsCommand._(
       {required this.systemEmailId,
       this.emailIntegrationEnabled,
+      this.emailBodyProcessingEnabled,
       required this.subjectLineRegexes,
       required this.emailWhiteList,
       this.emailDefaultReceiptStatus,
       this.emailDefaultReceiptPaidById,
       this.promptId,
       this.fallbackPromptId})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        systemEmailId, r'UpdateGroupSettingsCommand', 'systemEmailId');
-    BuiltValueNullFieldError.checkNotNull(subjectLineRegexes,
-        r'UpdateGroupSettingsCommand', 'subjectLineRegexes');
-    BuiltValueNullFieldError.checkNotNull(
-        emailWhiteList, r'UpdateGroupSettingsCommand', 'emailWhiteList');
-  }
-
+      : super._();
   @override
   UpdateGroupSettingsCommand rebuild(
           void Function(UpdateGroupSettingsCommandBuilder) updates) =>
@@ -53,7 +48,7 @@ class _$UpdateGroupSettingsCommand extends UpdateGroupSettingsCommand {
 
   @override
   UpdateGroupSettingsCommandBuilder toBuilder() =>
-      new UpdateGroupSettingsCommandBuilder()..replace(this);
+      UpdateGroupSettingsCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -61,6 +56,7 @@ class _$UpdateGroupSettingsCommand extends UpdateGroupSettingsCommand {
     return other is UpdateGroupSettingsCommand &&
         systemEmailId == other.systemEmailId &&
         emailIntegrationEnabled == other.emailIntegrationEnabled &&
+        emailBodyProcessingEnabled == other.emailBodyProcessingEnabled &&
         subjectLineRegexes == other.subjectLineRegexes &&
         emailWhiteList == other.emailWhiteList &&
         emailDefaultReceiptStatus == other.emailDefaultReceiptStatus &&
@@ -74,6 +70,7 @@ class _$UpdateGroupSettingsCommand extends UpdateGroupSettingsCommand {
     var _$hash = 0;
     _$hash = $jc(_$hash, systemEmailId.hashCode);
     _$hash = $jc(_$hash, emailIntegrationEnabled.hashCode);
+    _$hash = $jc(_$hash, emailBodyProcessingEnabled.hashCode);
     _$hash = $jc(_$hash, subjectLineRegexes.hashCode);
     _$hash = $jc(_$hash, emailWhiteList.hashCode);
     _$hash = $jc(_$hash, emailDefaultReceiptStatus.hashCode);
@@ -89,6 +86,7 @@ class _$UpdateGroupSettingsCommand extends UpdateGroupSettingsCommand {
     return (newBuiltValueToStringHelper(r'UpdateGroupSettingsCommand')
           ..add('systemEmailId', systemEmailId)
           ..add('emailIntegrationEnabled', emailIntegrationEnabled)
+          ..add('emailBodyProcessingEnabled', emailBodyProcessingEnabled)
           ..add('subjectLineRegexes', subjectLineRegexes)
           ..add('emailWhiteList', emailWhiteList)
           ..add('emailDefaultReceiptStatus', emailDefaultReceiptStatus)
@@ -114,15 +112,20 @@ class UpdateGroupSettingsCommandBuilder
   set emailIntegrationEnabled(bool? emailIntegrationEnabled) =>
       _$this._emailIntegrationEnabled = emailIntegrationEnabled;
 
+  bool? _emailBodyProcessingEnabled;
+  bool? get emailBodyProcessingEnabled => _$this._emailBodyProcessingEnabled;
+  set emailBodyProcessingEnabled(bool? emailBodyProcessingEnabled) =>
+      _$this._emailBodyProcessingEnabled = emailBodyProcessingEnabled;
+
   ListBuilder<SubjectLineRegex>? _subjectLineRegexes;
   ListBuilder<SubjectLineRegex> get subjectLineRegexes =>
-      _$this._subjectLineRegexes ??= new ListBuilder<SubjectLineRegex>();
+      _$this._subjectLineRegexes ??= ListBuilder<SubjectLineRegex>();
   set subjectLineRegexes(ListBuilder<SubjectLineRegex>? subjectLineRegexes) =>
       _$this._subjectLineRegexes = subjectLineRegexes;
 
   ListBuilder<GroupSettingsWhiteListEmail>? _emailWhiteList;
   ListBuilder<GroupSettingsWhiteListEmail> get emailWhiteList =>
-      _$this._emailWhiteList ??= new ListBuilder<GroupSettingsWhiteListEmail>();
+      _$this._emailWhiteList ??= ListBuilder<GroupSettingsWhiteListEmail>();
   set emailWhiteList(
           ListBuilder<GroupSettingsWhiteListEmail>? emailWhiteList) =>
       _$this._emailWhiteList = emailWhiteList;
@@ -156,6 +159,7 @@ class UpdateGroupSettingsCommandBuilder
     if ($v != null) {
       _systemEmailId = $v.systemEmailId;
       _emailIntegrationEnabled = $v.emailIntegrationEnabled;
+      _emailBodyProcessingEnabled = $v.emailBodyProcessingEnabled;
       _subjectLineRegexes = $v.subjectLineRegexes.toBuilder();
       _emailWhiteList = $v.emailWhiteList.toBuilder();
       _emailDefaultReceiptStatus = $v.emailDefaultReceiptStatus;
@@ -169,7 +173,6 @@ class UpdateGroupSettingsCommandBuilder
 
   @override
   void replace(UpdateGroupSettingsCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpdateGroupSettingsCommand;
   }
 
@@ -185,18 +188,18 @@ class UpdateGroupSettingsCommandBuilder
     _$UpdateGroupSettingsCommand _$result;
     try {
       _$result = _$v ??
-          new _$UpdateGroupSettingsCommand._(
-              systemEmailId: BuiltValueNullFieldError.checkNotNull(
-                  systemEmailId,
-                  r'UpdateGroupSettingsCommand',
-                  'systemEmailId'),
-              emailIntegrationEnabled: emailIntegrationEnabled,
-              subjectLineRegexes: subjectLineRegexes.build(),
-              emailWhiteList: emailWhiteList.build(),
-              emailDefaultReceiptStatus: emailDefaultReceiptStatus,
-              emailDefaultReceiptPaidById: emailDefaultReceiptPaidById,
-              promptId: promptId,
-              fallbackPromptId: fallbackPromptId);
+          _$UpdateGroupSettingsCommand._(
+            systemEmailId: BuiltValueNullFieldError.checkNotNull(
+                systemEmailId, r'UpdateGroupSettingsCommand', 'systemEmailId'),
+            emailIntegrationEnabled: emailIntegrationEnabled,
+            emailBodyProcessingEnabled: emailBodyProcessingEnabled,
+            subjectLineRegexes: subjectLineRegexes.build(),
+            emailWhiteList: emailWhiteList.build(),
+            emailDefaultReceiptStatus: emailDefaultReceiptStatus,
+            emailDefaultReceiptPaidById: emailDefaultReceiptPaidById,
+            promptId: promptId,
+            fallbackPromptId: fallbackPromptId,
+          );
     } catch (_) {
       late String _$failedField;
       try {
@@ -205,7 +208,7 @@ class UpdateGroupSettingsCommandBuilder
         _$failedField = 'emailWhiteList';
         emailWhiteList.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'UpdateGroupSettingsCommand', _$failedField, e.toString());
       }
       rethrow;

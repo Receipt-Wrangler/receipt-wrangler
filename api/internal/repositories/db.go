@@ -120,6 +120,8 @@ func openWithRetry(dialector gorm.Dialector, maxAttempts int) (*gorm.DB, error) 
 func MakeMigrations() error {
 	err := db.AutoMigrate(
 		&models.RefreshToken{},
+		&models.AppRole{},
+		&models.AppRolePermission{},
 		&models.User{},
 		&models.CustomField{},
 		&models.CustomFieldValue{},
@@ -130,6 +132,11 @@ func MakeMigrations() error {
 		&models.Tag{},
 		&models.Category{},
 		&models.Group{},
+		&models.GroupRoleDefinition{},
+		&models.GroupRolePermission{},
+		&models.GroupRoleCategoryGrant{},
+		&models.GroupRoleTagGrant{},
+		&models.GroupRolePaidByUserGrant{},
 		&models.GroupMember{},
 		&models.Comment{},
 		&models.Notification{},
@@ -149,6 +156,7 @@ func MakeMigrations() error {
 		&models.GroupReceiptSettings{},
 		&models.Pepper{},
 		&models.ApiKey{},
+		&models.DataMigration{},
 		&models.OAuthClient{},
 		&models.OAuthAuthorizationCode{},
 	)
@@ -173,12 +181,28 @@ func InitDB() error {
 		}
 	}
 
+	if err := SeedSystemRoles(); err != nil {
+		return err
+	}
+
+	// Must run after the roles are seeded and before the bootstrap admin /
+	// data migration so the default app and group roles exist for assignment.
+	if err := EnsureDefaultRoles(); err != nil {
+		return err
+	}
+
 	if config.GetDeployEnv() != "test" {
 		userRepository := NewUserRepository(nil)
 		err := userRepository.CreateUserIfNoneExist()
 		if err != nil {
 			return err
 		}
+	}
+
+	// Runs after the bootstrap admin is created so a fresh install's first user
+	// is assigned its legacy-equivalent role by the same one-time migration.
+	if err := RunDataMigrations(); err != nil {
+		return err
 	}
 
 	return nil

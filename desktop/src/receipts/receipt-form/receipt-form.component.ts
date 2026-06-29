@@ -23,8 +23,8 @@ import {
   CustomFieldValue,
   FileDataView,
   Group,
-  GroupRole,
   Item,
+  Permission,
   Receipt,
   ReceiptImageService,
   ReceiptService,
@@ -86,6 +86,21 @@ export class ReceiptFormComponent implements OnInit {
 
   public tags: Tag[] = [];
 
+  // Inline category/tag creation is allowed only with the matching app create
+  // permission (the receipt form otherwise restricts users to the granted set).
+  public canCreateCategories = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppCategoriesCreate)
+  );
+  public canCreateTags = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppTagsCreate)
+  );
+
+  // Adding/removing custom fields on a receipt needs the catalog (app.custom-fields.read);
+  // editing an existing custom field's value is a receipt edit and stays allowed.
+  public canManageCustomFields = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppCustomFieldsRead)
+  );
+
   public customFields: CustomField[] = [];
 
   public customFieldsStatefulMenuItems: StatefulMenuItem[] = [];
@@ -100,7 +115,19 @@ export class ReceiptFormComponent implements OnInit {
 
   public formMode = FormMode;
 
-  public groupRole = GroupRole;
+  protected readonly Permission = Permission;
+
+  /**
+   * Reactive gate for editing the receipt: holds `group.receipts.create` (add
+   * mode) / `group.receipts.update` (view/edit mode) for the receipt's group.
+   * Reassigned in `ngOnInit` once the group id + mode are known (mirrors the
+   * `selectSignal` reassignment used elsewhere); deny-by-default until then.
+   */
+  public canEditReceipt: Signal<boolean> = signal(false);
+
+  public canMagicFill: Signal<boolean> = signal(false);
+
+  public canDuplicate: Signal<boolean> = signal(false);
 
   public selectedGroup = signal<Group | undefined>(undefined);
 
@@ -185,10 +212,13 @@ export class ReceiptFormComponent implements OnInit {
       .pipe(untilDestroyed(this))
       .subscribe((data) => {
         this.duplicatedSnackbarRef?.dismiss();
-        this.categories = data["categories"] ?? [];
-        this.tags = data["tags"] ?? [];
-        this.customFields = data["customFields"] ?? [];
+        // categories/tags are sourced per-group from AppData (see
+        // setCategoryTagPoolsForGroup), driven by the group-change listener.
         this.originalReceipt = data["receipt"];
+        // The resolver returns the full catalog only for users who can read it;
+        // otherwise fall back to the definitions embedded on the receipt's own
+        // custom field values so they still render.
+        this.customFields = this.buildCustomFieldPool(data["customFields"] ?? [], this.originalReceipt);
         this.editLink = `/receipts/${this.originalReceipt?.id}/edit`;
         this.mode = data["mode"];
         this.customFieldsStatefulMenuItems = this.customFields.map(c => {
@@ -203,12 +233,34 @@ export class ReceiptFormComponent implements OnInit {
         });
         this.setCancelLink();
         this.initForm();
+        this.setReceiptPermissions();
         this.getImageFiles();
         this.setHeaderText();
         this.setShowLargeImagePreview();
         this.setQueueData();
         document.scrollingElement?.scrollTo(0, 0);
       });
+  }
+
+  // Builds the custom field definition pool used to render values and the manage
+  // menu: the resolver catalog (full, for users who can read it) plus any
+  // definitions embedded on the receipt's own custom field values (so a user
+  // without catalog access can still render the fields already on the receipt),
+  // deduped by id.
+  private buildCustomFieldPool(resolverFields: CustomField[], receipt?: Receipt): CustomField[] {
+    const byId = new Map<number, CustomField>();
+    for (const field of resolverFields) {
+      if (field?.id != null) {
+        byId.set(field.id, field);
+      }
+    }
+    for (const value of receipt?.customFields ?? []) {
+      const definition = value.customField;
+      if (definition?.id != null && !byId.has(definition.id)) {
+        byId.set(definition.id, definition);
+      }
+    }
+    return Array.from(byId.values());
   }
 
   private setQueueData(): void {
@@ -318,6 +370,30 @@ export class ReceiptFormComponent implements OnInit {
     this.cancelLink = `/receipts/group/${selectedGroupId}`;
   }
 
+  private setReceiptPermissions(): void {
+    // In add mode there is no saved receipt yet, so gate against the selected
+    // group (the same group the route guard checked + the form's groupId seed);
+    // otherwise gate against the receipt's own group.
+    const groupId =
+      this.mode === FormMode.add
+        ? Number.parseInt(this.store.selectSnapshot(GroupState.selectedGroupId))
+        : (this.originalReceipt?.groupId ?? 0);
+    const editPermission =
+      this.mode === FormMode.add
+        ? Permission.GroupReceiptsCreate
+        : Permission.GroupReceiptsUpdate;
+
+    this.canEditReceipt = this.store.selectSignal(
+      AuthState.hasGroupPermission(groupId, editPermission)
+    );
+    this.canMagicFill = this.store.selectSignal(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsMagicFill)
+    );
+    this.canDuplicate = this.store.selectSignal(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsDuplicate)
+    );
+  }
+
   private initForm(): void {
     let selectedGroupId: number | string = this.store.selectSnapshot(
       GroupState.selectedGroupId
@@ -369,6 +445,19 @@ export class ReceiptFormComponent implements OnInit {
     this.listenForSyncWithItemsChanges();
   }
 
+  // Source the category/tag pickers from the selected group's AppData catalog
+  // (filtered to the user's grants by the backend). No group selected -> empty.
+  private setCategoryTagPoolsForGroup(groupId: number | string | null | undefined): void {
+    const numericGroupId = Number(groupId);
+    if (!groupId || Number.isNaN(numericGroupId)) {
+      this.categories = [];
+      this.tags = [];
+      return;
+    }
+    this.categories = this.store.selectSnapshot(AuthState.groupCategories(numericGroupId));
+    this.tags = this.store.selectSnapshot(AuthState.groupTags(numericGroupId));
+  }
+
   private listenForSyncWithItemsChanges(): void {
     this.form
       .get("syncAmountWithItems")?.valueChanges.pipe(untilDestroyed(this), tap((sync) => this.toggleAmountSync(sync))).subscribe();
@@ -393,6 +482,7 @@ export class ReceiptFormComponent implements OnInit {
       untilDestroyed(this),
       startWith(this.form.get("groupId")?.value),
       tap((groupId) => {
+        this.setCategoryTagPoolsForGroup(groupId);
         const paidBy = this.form.get("paidByUserId");
         const users = this.store.selectSnapshot(UserState.users);
         if (!groupId) {

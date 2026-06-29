@@ -12,34 +12,28 @@ class _$GroupMember extends GroupMember {
   @override
   final int groupId;
   @override
-  final GroupRole groupRole;
+  final int? groupRoleId;
   @override
   final String? updatedAt;
   @override
   final int userId;
 
   factory _$GroupMember([void Function(GroupMemberBuilder)? updates]) =>
-      (new GroupMemberBuilder()..update(updates))._build();
+      (GroupMemberBuilder()..update(updates))._build();
 
   _$GroupMember._(
       {this.createdAt,
       required this.groupId,
-      required this.groupRole,
+      this.groupRoleId,
       this.updatedAt,
       required this.userId})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(groupId, r'GroupMember', 'groupId');
-    BuiltValueNullFieldError.checkNotNull(
-        groupRole, r'GroupMember', 'groupRole');
-    BuiltValueNullFieldError.checkNotNull(userId, r'GroupMember', 'userId');
-  }
-
+      : super._();
   @override
   GroupMember rebuild(void Function(GroupMemberBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  GroupMemberBuilder toBuilder() => new GroupMemberBuilder()..replace(this);
+  GroupMemberBuilder toBuilder() => GroupMemberBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -47,7 +41,7 @@ class _$GroupMember extends GroupMember {
     return other is GroupMember &&
         createdAt == other.createdAt &&
         groupId == other.groupId &&
-        groupRole == other.groupRole &&
+        groupRoleId == other.groupRoleId &&
         updatedAt == other.updatedAt &&
         userId == other.userId;
   }
@@ -57,7 +51,7 @@ class _$GroupMember extends GroupMember {
     var _$hash = 0;
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, groupId.hashCode);
-    _$hash = $jc(_$hash, groupRole.hashCode);
+    _$hash = $jc(_$hash, groupRoleId.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jc(_$hash, userId.hashCode);
     _$hash = $jf(_$hash);
@@ -69,7 +63,7 @@ class _$GroupMember extends GroupMember {
     return (newBuiltValueToStringHelper(r'GroupMember')
           ..add('createdAt', createdAt)
           ..add('groupId', groupId)
-          ..add('groupRole', groupRole)
+          ..add('groupRoleId', groupRoleId)
           ..add('updatedAt', updatedAt)
           ..add('userId', userId))
         .toString();
@@ -87,9 +81,9 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
   int? get groupId => _$this._groupId;
   set groupId(int? groupId) => _$this._groupId = groupId;
 
-  GroupRole? _groupRole;
-  GroupRole? get groupRole => _$this._groupRole;
-  set groupRole(GroupRole? groupRole) => _$this._groupRole = groupRole;
+  int? _groupRoleId;
+  int? get groupRoleId => _$this._groupRoleId;
+  set groupRoleId(int? groupRoleId) => _$this._groupRoleId = groupRoleId;
 
   String? _updatedAt;
   String? get updatedAt => _$this._updatedAt;
@@ -108,7 +102,7 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
     if ($v != null) {
       _createdAt = $v.createdAt;
       _groupId = $v.groupId;
-      _groupRole = $v.groupRole;
+      _groupRoleId = $v.groupRoleId;
       _updatedAt = $v.updatedAt;
       _userId = $v.userId;
       _$v = null;
@@ -118,7 +112,6 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
 
   @override
   void replace(GroupMember other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$GroupMember;
   }
 
@@ -132,15 +125,15 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
 
   _$GroupMember _build() {
     final _$result = _$v ??
-        new _$GroupMember._(
-            createdAt: createdAt,
-            groupId: BuiltValueNullFieldError.checkNotNull(
-                groupId, r'GroupMember', 'groupId'),
-            groupRole: BuiltValueNullFieldError.checkNotNull(
-                groupRole, r'GroupMember', 'groupRole'),
-            updatedAt: updatedAt,
-            userId: BuiltValueNullFieldError.checkNotNull(
-                userId, r'GroupMember', 'userId'));
+        _$GroupMember._(
+          createdAt: createdAt,
+          groupId: BuiltValueNullFieldError.checkNotNull(
+              groupId, r'GroupMember', 'groupId'),
+          groupRoleId: groupRoleId,
+          updatedAt: updatedAt,
+          userId: BuiltValueNullFieldError.checkNotNull(
+              userId, r'GroupMember', 'userId'),
+        );
     replace(_$result);
     return _$result;
   }

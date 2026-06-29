@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:openapi/openapi.dart';
 import 'package:receipt_wrangler_mobile/client/client.dart';
 import 'package:receipt_wrangler_mobile/interceptors/auth_interceptor.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/services/token_refresh_service.dart';
 
 import '../helpers/auth_test_helpers.dart';
@@ -111,6 +111,7 @@ void main() {
       categoryModel: MockCategoryModel(),
       tagModel: MockTagModel(),
       systemSettingsModel: MockSystemSettingsModel(),
+      permissionsModel: PermissionsModel(),
     );
 
     interceptor = AuthInterceptor();
@@ -210,7 +211,10 @@ void main() {
       expect(handler.resolvedResponse?.statusCode, 200);
     });
 
-    test('attempts refresh on 403 and retries request on success', () async {
+    test('refreshes and retries on a 403 when the token is expired', () async {
+      // The backend returns 403 for an expired session too (it never sends
+      // 401). With an expired token in hand, the interceptor still refreshes
+      // and retries — the recovery path is keyed on token validity, not status.
       final dio = _setUpSuccessfulRetryScenario(
         mockAuthModel: mockAuthModel,
         mockGroupModel: mockGroupModel,
@@ -244,7 +248,35 @@ void main() {
 
       final action = await handler.result.timeout(const Duration(seconds: 5));
       expect(action, 'resolve',
-          reason: 'Should resolve with retried response on 403');
+          reason: 'Should resolve with retried response on an expired-token 403');
+    });
+
+    test(
+        'does not refresh on a 403 when the token is still valid '
+        '(permission denial)', () async {
+      // A valid access token means the 403 is a permission denial, not an
+      // expired session: the interceptor must surface it untouched — no token
+      // refresh (which would burn the one-time refresh token / risk logout) and
+      // no retry (a new token can't grant a missing permission).
+      when(() => mockAuthModel.getJwt()).thenAnswer((_) async => validJwt);
+
+      final requestOptions = RequestOptions(path: '/receipts');
+      final error = DioException(
+        requestOptions: requestOptions,
+        response: Response(
+          statusCode: 403,
+          requestOptions: requestOptions,
+        ),
+      );
+
+      final handler = TestErrorHandler();
+      interceptor.onError(error, handler);
+
+      final action = await handler.result.timeout(const Duration(seconds: 2));
+      expect(action, 'next',
+          reason: 'A permission 403 should pass through without interception');
+      verifyNever(() => mockAuthModel.setTokens(any(), any()));
+      verifyNever(() => mockAuthModel.getRefreshToken());
     });
 
     test('falls through to next when token refresh fails', () async {

@@ -3,7 +3,6 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:openapi/src/model/group_role.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -14,7 +13,7 @@ part 'group_member.g.dart';
 /// Properties:
 /// * [createdAt] 
 /// * [groupId] - Group compound primary key
-/// * [groupRole] 
+/// * [groupRoleId] - Id of the modern group role assigned to the member
 /// * [updatedAt] 
 /// * [userId] - User compound primary key
 @BuiltValue()
@@ -26,9 +25,9 @@ abstract class GroupMember implements Built<GroupMember, GroupMemberBuilder> {
   @BuiltValueField(wireName: r'groupId')
   int get groupId;
 
-  @BuiltValueField(wireName: r'groupRole')
-  GroupRole get groupRole;
-  // enum groupRoleEnum {  OWNER,  VIEWER,  EDITOR,  };
+  /// Id of the modern group role assigned to the member
+  @BuiltValueField(wireName: r'groupRoleId')
+  int? get groupRoleId;
 
   @BuiltValueField(wireName: r'updatedAt')
   String? get updatedAt;
@@ -72,11 +71,13 @@ class _$GroupMemberSerializer implements PrimitiveSerializer<GroupMember> {
       object.groupId,
       specifiedType: const FullType(int),
     );
-    yield r'groupRole';
-    yield serializers.serialize(
-      object.groupRole,
-      specifiedType: const FullType(GroupRole),
-    );
+    if (object.groupRoleId != null) {
+      yield r'groupRoleId';
+      yield serializers.serialize(
+        object.groupRoleId,
+        specifiedType: const FullType(int),
+      );
+    }
     if (object.updatedAt != null) {
       yield r'updatedAt';
       yield serializers.serialize(
@@ -126,12 +127,12 @@ class _$GroupMemberSerializer implements PrimitiveSerializer<GroupMember> {
           ) as int;
           result.groupId = valueDes;
           break;
-        case r'groupRole':
+        case r'groupRoleId':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(GroupRole),
-          ) as GroupRole;
-          result.groupRole = valueDes;
+            specifiedType: const FullType(int),
+          ) as int;
+          result.groupRoleId = valueDes;
           break;
         case r'updatedAt':
           final valueDes = serializers.deserialize(

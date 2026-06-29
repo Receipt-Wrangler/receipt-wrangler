@@ -2,11 +2,13 @@
   <app-table-header [headerText]="tableHeaderText()">
     <div class="d-flex align-items-center">
       <app-add-button
+        *ngIf="canCreate()"
         tooltip="Create API Key"
         (clicked)="openCreateApiKeyDialog()"
       ></app-add-button>
-      <ng-container *ngIf="isAdmin">
+      <ng-container *ngIf="canViewAll()">
         <app-button
+          data-testid="api-key-filter"
           matButtonType="iconButton"
           icon="filter_alt"
           color="accent"
@@ -55,12 +57,15 @@
 <ng-template #actionsCell let-element="element" let-index="index">
   <div class="d-flex">
     <app-edit-button
-      *ngIf="isOwner(element)"
+      *ngIf="canEdit(element)"
+      data-testid="api-key-edit"
       color="accent"
       tooltip="Edit API Key"
       (clicked)="openEditDialog(element)"
     ></app-edit-button>
     <app-delete-button
+      *ngIf="canDelete(element)"
+      data-testid="api-key-delete"
       tooltip="Delete API Key"
       (clicked)="deleteApiKey(element)"
     ></app-delete-button>

@@ -27,7 +27,7 @@ func TestShouldNotAllowUserToGetSystemTasks(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	GetSystemTasks(w, r)
@@ -96,13 +96,15 @@ func TestShouldNotAllowAdminToGetSystemTasksWithInvalidCommand(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for _, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api", reader)
 
-		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 		r = r.WithContext(newContext)
 
 		GetSystemTasks(w, r)

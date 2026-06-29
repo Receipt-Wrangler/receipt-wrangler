@@ -13,20 +13,15 @@ class _$Icon extends Icon {
   final String displayValue;
 
   factory _$Icon([void Function(IconBuilder)? updates]) =>
-      (new IconBuilder()..update(updates))._build();
+      (IconBuilder()..update(updates))._build();
 
-  _$Icon._({required this.value, required this.displayValue}) : super._() {
-    BuiltValueNullFieldError.checkNotNull(value, r'Icon', 'value');
-    BuiltValueNullFieldError.checkNotNull(
-        displayValue, r'Icon', 'displayValue');
-  }
-
+  _$Icon._({required this.value, required this.displayValue}) : super._();
   @override
   Icon rebuild(void Function(IconBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  IconBuilder toBuilder() => new IconBuilder()..replace(this);
+  IconBuilder toBuilder() => IconBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -81,7 +76,6 @@ class IconBuilder implements Builder<Icon, IconBuilder> {
 
   @override
   void replace(Icon other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$Icon;
   }
 
@@ -95,11 +89,11 @@ class IconBuilder implements Builder<Icon, IconBuilder> {
 
   _$Icon _build() {
     final _$result = _$v ??
-        new _$Icon._(
-            value:
-                BuiltValueNullFieldError.checkNotNull(value, r'Icon', 'value'),
-            displayValue: BuiltValueNullFieldError.checkNotNull(
-                displayValue, r'Icon', 'displayValue'));
+        _$Icon._(
+          value: BuiltValueNullFieldError.checkNotNull(value, r'Icon', 'value'),
+          displayValue: BuiltValueNullFieldError.checkNotNull(
+              displayValue, r'Icon', 'displayValue'),
+        );
     replace(_$result);
     return _$result;
   }

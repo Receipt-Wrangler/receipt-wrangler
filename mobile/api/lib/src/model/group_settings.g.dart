@@ -14,6 +14,8 @@ class _$GroupSettings extends GroupSettings {
   @override
   final bool? emailIntegrationEnabled;
   @override
+  final bool? emailBodyProcessingEnabled;
+  @override
   final int? systemEmailId;
   @override
   final SystemEmail? systemEmail;
@@ -43,12 +45,13 @@ class _$GroupSettings extends GroupSettings {
   final String? updatedAt;
 
   factory _$GroupSettings([void Function(GroupSettingsBuilder)? updates]) =>
-      (new GroupSettingsBuilder()..update(updates))._build();
+      (GroupSettingsBuilder()..update(updates))._build();
 
   _$GroupSettings._(
       {required this.id,
       required this.groupId,
       this.emailIntegrationEnabled,
+      this.emailBodyProcessingEnabled,
       this.systemEmailId,
       this.systemEmail,
       this.emailToRead,
@@ -63,17 +66,13 @@ class _$GroupSettings extends GroupSettings {
       this.createdAt,
       this.createdBy,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(id, r'GroupSettings', 'id');
-    BuiltValueNullFieldError.checkNotNull(groupId, r'GroupSettings', 'groupId');
-  }
-
+      : super._();
   @override
   GroupSettings rebuild(void Function(GroupSettingsBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  GroupSettingsBuilder toBuilder() => new GroupSettingsBuilder()..replace(this);
+  GroupSettingsBuilder toBuilder() => GroupSettingsBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -82,6 +81,7 @@ class _$GroupSettings extends GroupSettings {
         id == other.id &&
         groupId == other.groupId &&
         emailIntegrationEnabled == other.emailIntegrationEnabled &&
+        emailBodyProcessingEnabled == other.emailBodyProcessingEnabled &&
         systemEmailId == other.systemEmailId &&
         systemEmail == other.systemEmail &&
         emailToRead == other.emailToRead &&
@@ -104,6 +104,7 @@ class _$GroupSettings extends GroupSettings {
     _$hash = $jc(_$hash, id.hashCode);
     _$hash = $jc(_$hash, groupId.hashCode);
     _$hash = $jc(_$hash, emailIntegrationEnabled.hashCode);
+    _$hash = $jc(_$hash, emailBodyProcessingEnabled.hashCode);
     _$hash = $jc(_$hash, systemEmailId.hashCode);
     _$hash = $jc(_$hash, systemEmail.hashCode);
     _$hash = $jc(_$hash, emailToRead.hashCode);
@@ -128,6 +129,7 @@ class _$GroupSettings extends GroupSettings {
           ..add('id', id)
           ..add('groupId', groupId)
           ..add('emailIntegrationEnabled', emailIntegrationEnabled)
+          ..add('emailBodyProcessingEnabled', emailBodyProcessingEnabled)
           ..add('systemEmailId', systemEmailId)
           ..add('systemEmail', systemEmail)
           ..add('emailToRead', emailToRead)
@@ -163,6 +165,11 @@ class GroupSettingsBuilder
   set emailIntegrationEnabled(bool? emailIntegrationEnabled) =>
       _$this._emailIntegrationEnabled = emailIntegrationEnabled;
 
+  bool? _emailBodyProcessingEnabled;
+  bool? get emailBodyProcessingEnabled => _$this._emailBodyProcessingEnabled;
+  set emailBodyProcessingEnabled(bool? emailBodyProcessingEnabled) =>
+      _$this._emailBodyProcessingEnabled = emailBodyProcessingEnabled;
+
   int? _systemEmailId;
   int? get systemEmailId => _$this._systemEmailId;
   set systemEmailId(int? systemEmailId) =>
@@ -170,7 +177,7 @@ class GroupSettingsBuilder
 
   SystemEmailBuilder? _systemEmail;
   SystemEmailBuilder get systemEmail =>
-      _$this._systemEmail ??= new SystemEmailBuilder();
+      _$this._systemEmail ??= SystemEmailBuilder();
   set systemEmail(SystemEmailBuilder? systemEmail) =>
       _$this._systemEmail = systemEmail;
 
@@ -180,13 +187,13 @@ class GroupSettingsBuilder
 
   ListBuilder<SubjectLineRegex>? _subjectLineRegexes;
   ListBuilder<SubjectLineRegex> get subjectLineRegexes =>
-      _$this._subjectLineRegexes ??= new ListBuilder<SubjectLineRegex>();
+      _$this._subjectLineRegexes ??= ListBuilder<SubjectLineRegex>();
   set subjectLineRegexes(ListBuilder<SubjectLineRegex>? subjectLineRegexes) =>
       _$this._subjectLineRegexes = subjectLineRegexes;
 
   ListBuilder<GroupSettingsWhiteListEmail>? _emailWhiteList;
   ListBuilder<GroupSettingsWhiteListEmail> get emailWhiteList =>
-      _$this._emailWhiteList ??= new ListBuilder<GroupSettingsWhiteListEmail>();
+      _$this._emailWhiteList ??= ListBuilder<GroupSettingsWhiteListEmail>();
   set emailWhiteList(
           ListBuilder<GroupSettingsWhiteListEmail>? emailWhiteList) =>
       _$this._emailWhiteList = emailWhiteList;
@@ -203,7 +210,7 @@ class GroupSettingsBuilder
       _$this._emailDefaultReceiptPaidById = emailDefaultReceiptPaidById;
 
   PromptBuilder? _prompt;
-  PromptBuilder get prompt => _$this._prompt ??= new PromptBuilder();
+  PromptBuilder get prompt => _$this._prompt ??= PromptBuilder();
   set prompt(PromptBuilder? prompt) => _$this._prompt = prompt;
 
   int? _promptId;
@@ -212,7 +219,7 @@ class GroupSettingsBuilder
 
   PromptBuilder? _fallbackPrompt;
   PromptBuilder get fallbackPrompt =>
-      _$this._fallbackPrompt ??= new PromptBuilder();
+      _$this._fallbackPrompt ??= PromptBuilder();
   set fallbackPrompt(PromptBuilder? fallbackPrompt) =>
       _$this._fallbackPrompt = fallbackPrompt;
 
@@ -243,6 +250,7 @@ class GroupSettingsBuilder
       _id = $v.id;
       _groupId = $v.groupId;
       _emailIntegrationEnabled = $v.emailIntegrationEnabled;
+      _emailBodyProcessingEnabled = $v.emailBodyProcessingEnabled;
       _systemEmailId = $v.systemEmailId;
       _systemEmail = $v.systemEmail?.toBuilder();
       _emailToRead = $v.emailToRead;
@@ -264,7 +272,6 @@ class GroupSettingsBuilder
 
   @override
   void replace(GroupSettings other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$GroupSettings;
   }
 
@@ -280,26 +287,28 @@ class GroupSettingsBuilder
     _$GroupSettings _$result;
     try {
       _$result = _$v ??
-          new _$GroupSettings._(
-              id: BuiltValueNullFieldError.checkNotNull(
-                  id, r'GroupSettings', 'id'),
-              groupId: BuiltValueNullFieldError.checkNotNull(
-                  groupId, r'GroupSettings', 'groupId'),
-              emailIntegrationEnabled: emailIntegrationEnabled,
-              systemEmailId: systemEmailId,
-              systemEmail: _systemEmail?.build(),
-              emailToRead: emailToRead,
-              subjectLineRegexes: _subjectLineRegexes?.build(),
-              emailWhiteList: _emailWhiteList?.build(),
-              emailDefaultReceiptStatus: emailDefaultReceiptStatus,
-              emailDefaultReceiptPaidById: emailDefaultReceiptPaidById,
-              prompt: _prompt?.build(),
-              promptId: promptId,
-              fallbackPrompt: _fallbackPrompt?.build(),
-              fallbackPromptId: fallbackPromptId,
-              createdAt: createdAt,
-              createdBy: createdBy,
-              updatedAt: updatedAt);
+          _$GroupSettings._(
+            id: BuiltValueNullFieldError.checkNotNull(
+                id, r'GroupSettings', 'id'),
+            groupId: BuiltValueNullFieldError.checkNotNull(
+                groupId, r'GroupSettings', 'groupId'),
+            emailIntegrationEnabled: emailIntegrationEnabled,
+            emailBodyProcessingEnabled: emailBodyProcessingEnabled,
+            systemEmailId: systemEmailId,
+            systemEmail: _systemEmail?.build(),
+            emailToRead: emailToRead,
+            subjectLineRegexes: _subjectLineRegexes?.build(),
+            emailWhiteList: _emailWhiteList?.build(),
+            emailDefaultReceiptStatus: emailDefaultReceiptStatus,
+            emailDefaultReceiptPaidById: emailDefaultReceiptPaidById,
+            prompt: _prompt?.build(),
+            promptId: promptId,
+            fallbackPrompt: _fallbackPrompt?.build(),
+            fallbackPromptId: fallbackPromptId,
+            createdAt: createdAt,
+            createdBy: createdBy,
+            updatedAt: updatedAt,
+          );
     } catch (_) {
       late String _$failedField;
       try {
@@ -317,7 +326,7 @@ class GroupSettingsBuilder
         _$failedField = 'fallbackPrompt';
         _fallbackPrompt?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'GroupSettings', _$failedField, e.toString());
       }
       rethrow;

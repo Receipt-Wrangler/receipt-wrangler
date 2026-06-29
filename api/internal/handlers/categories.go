@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -15,11 +16,11 @@ import (
 
 func GetAllCategories(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving categories",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.USER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error retrieving categories",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppCategoriesRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			categoriesRepository := repositories.NewCategoryRepository(nil)
 			categories, err := categoriesRepository.GetAllCategories("*")
@@ -44,11 +45,11 @@ func GetAllCategories(w http.ResponseWriter, r *http.Request) {
 
 func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error creating category",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.USER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error creating category",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppCategoriesCreate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			category := models.Category{}
 			err := category.LoadDataFromRequest(w, r)
@@ -79,11 +80,11 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 
 func GetPagedCategories(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving categories",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		UserRole:     models.USER,
+		ErrorMessage:   "Error retrieving categories",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppCategoriesRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			pagedData := structs.PagedData{}
 			pagedRequestCommand := commands.PagedRequestCommand{}
@@ -123,11 +124,11 @@ func GetPagedCategories(w http.ResponseWriter, r *http.Request) {
 
 func UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating category",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error updating category",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppCategoriesUpdate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "categoryId")
 			uintId, err := utils.StringToUint(id)
@@ -166,11 +167,11 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request) {
 
 func DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting category",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error deleting category",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppCategoriesDelete},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "categoryId")
 
@@ -196,11 +197,11 @@ func DeleteCategory(w http.ResponseWriter, r *http.Request) {
 
 func GetCategoryNameCount(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting category count",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.USER,
-		ResponseType: constants.TextPlain,
+		ErrorMessage:   "Error getting category count",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppCategoriesRead},
+		ResponseType:   constants.TextPlain,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			categoryRepository := repositories.NewCategoryRepository(nil)
 			categoryName := chi.URLParam(r, "categoryName")

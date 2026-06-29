@@ -31,7 +31,7 @@ class _$Group extends Group {
   final String? updatedAt;
 
   factory _$Group([void Function(GroupBuilder)? updates]) =>
-      (new GroupBuilder()..update(updates))._build();
+      (GroupBuilder()..update(updates))._build();
 
   _$Group._(
       {this.createdAt,
@@ -45,23 +45,13 @@ class _$Group extends Group {
       required this.isAllGroup,
       required this.status,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        groupReceiptSettings, r'Group', 'groupReceiptSettings');
-    BuiltValueNullFieldError.checkNotNull(
-        groupMembers, r'Group', 'groupMembers');
-    BuiltValueNullFieldError.checkNotNull(id, r'Group', 'id');
-    BuiltValueNullFieldError.checkNotNull(name, r'Group', 'name');
-    BuiltValueNullFieldError.checkNotNull(isAllGroup, r'Group', 'isAllGroup');
-    BuiltValueNullFieldError.checkNotNull(status, r'Group', 'status');
-  }
-
+      : super._();
   @override
   Group rebuild(void Function(GroupBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  GroupBuilder toBuilder() => new GroupBuilder()..replace(this);
+  GroupBuilder toBuilder() => GroupBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -129,19 +119,19 @@ class GroupBuilder implements Builder<Group, GroupBuilder> {
 
   GroupSettingsBuilder? _groupSettings;
   GroupSettingsBuilder get groupSettings =>
-      _$this._groupSettings ??= new GroupSettingsBuilder();
+      _$this._groupSettings ??= GroupSettingsBuilder();
   set groupSettings(GroupSettingsBuilder? groupSettings) =>
       _$this._groupSettings = groupSettings;
 
   GroupReceiptSettingsBuilder? _groupReceiptSettings;
   GroupReceiptSettingsBuilder get groupReceiptSettings =>
-      _$this._groupReceiptSettings ??= new GroupReceiptSettingsBuilder();
+      _$this._groupReceiptSettings ??= GroupReceiptSettingsBuilder();
   set groupReceiptSettings(GroupReceiptSettingsBuilder? groupReceiptSettings) =>
       _$this._groupReceiptSettings = groupReceiptSettings;
 
   ListBuilder<GroupMember>? _groupMembers;
   ListBuilder<GroupMember> get groupMembers =>
-      _$this._groupMembers ??= new ListBuilder<GroupMember>();
+      _$this._groupMembers ??= ListBuilder<GroupMember>();
   set groupMembers(ListBuilder<GroupMember>? groupMembers) =>
       _$this._groupMembers = groupMembers;
 
@@ -194,7 +184,6 @@ class GroupBuilder implements Builder<Group, GroupBuilder> {
 
   @override
   void replace(Group other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$Group;
   }
 
@@ -210,21 +199,21 @@ class GroupBuilder implements Builder<Group, GroupBuilder> {
     _$Group _$result;
     try {
       _$result = _$v ??
-          new _$Group._(
-              createdAt: createdAt,
-              createdBy: createdBy,
-              groupSettings: _groupSettings?.build(),
-              groupReceiptSettings: groupReceiptSettings.build(),
-              groupMembers: groupMembers.build(),
-              id: BuiltValueNullFieldError.checkNotNull(id, r'Group', 'id'),
-              isDefault: isDefault,
-              name:
-                  BuiltValueNullFieldError.checkNotNull(name, r'Group', 'name'),
-              isAllGroup: BuiltValueNullFieldError.checkNotNull(
-                  isAllGroup, r'Group', 'isAllGroup'),
-              status: BuiltValueNullFieldError.checkNotNull(
-                  status, r'Group', 'status'),
-              updatedAt: updatedAt);
+          _$Group._(
+            createdAt: createdAt,
+            createdBy: createdBy,
+            groupSettings: _groupSettings?.build(),
+            groupReceiptSettings: groupReceiptSettings.build(),
+            groupMembers: groupMembers.build(),
+            id: BuiltValueNullFieldError.checkNotNull(id, r'Group', 'id'),
+            isDefault: isDefault,
+            name: BuiltValueNullFieldError.checkNotNull(name, r'Group', 'name'),
+            isAllGroup: BuiltValueNullFieldError.checkNotNull(
+                isAllGroup, r'Group', 'isAllGroup'),
+            status: BuiltValueNullFieldError.checkNotNull(
+                status, r'Group', 'status'),
+            updatedAt: updatedAt,
+          );
     } catch (_) {
       late String _$failedField;
       try {
@@ -235,8 +224,7 @@ class GroupBuilder implements Builder<Group, GroupBuilder> {
         _$failedField = 'groupMembers';
         groupMembers.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
-            r'Group', _$failedField, e.toString());
+        throw BuiltValueNestedFieldError(r'Group', _$failedField, e.toString());
       }
       rethrow;
     }

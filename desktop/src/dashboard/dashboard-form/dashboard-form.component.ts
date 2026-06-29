@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation, viewChildren, viewChild } from "@angular/core";
+import { Component, OnInit, ViewEncapsulation, computed, viewChildren, viewChild } from "@angular/core";
 import { FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
@@ -6,10 +6,10 @@ import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { ReceiptFilterComponent } from "src/shared-ui/receipt-filter/receipt-filter.component";
 import { BaseFormComponent } from "../../form/index";
-import { ChartGrouping, Dashboard, DashboardService, Widget, WidgetType } from "../../open-api";
+import { Category, ChartGrouping, Dashboard, DashboardService, Tag, Widget, WidgetType } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { EditableListComponent } from "../../shared-ui/editable-list/editable-list.component";
-import { GroupState } from "../../store";
+import { AuthState, GroupState } from "../../store";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { chartGroupingOptions } from "../constants/chart-grouping-options";
 import { widgetTypeOptions } from "../constants/widget-options";
@@ -34,6 +34,27 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
   public isAddingWidget: boolean = false;
 
   public originalWidgets: Widget[] = [];
+
+  private readonly selectedGroupId = this.store.selectSignal(
+    GroupState.selectedGroupId
+  );
+
+  // Filter options come from the selected group's grant-filtered AppData catalog
+  // (same source as the receipts table), not the admin-only global endpoints.
+  // Derived so they refresh if the selected group changes while the dialog is open.
+  public readonly categories = computed<Category[]>(() => {
+    const groupId = Number(this.selectedGroupId());
+    return Number.isNaN(groupId)
+      ? []
+      : this.store.selectSnapshot(AuthState.groupCategories(groupId));
+  });
+
+  public readonly tags = computed<Tag[]>(() => {
+    const groupId = Number(this.selectedGroupId());
+    return Number.isNaN(groupId)
+      ? []
+      : this.store.selectSnapshot(AuthState.groupTags(groupId));
+  });
 
   public get widgets(): FormArray {
     return this.form.get("widgets") as FormArray;

@@ -24,6 +24,10 @@ Name | Type | Description | Notes
 **currencySymbolPosition** | [**CurrencySymbolPosition**](CurrencySymbolPosition.md) |  | [optional] 
 **currencyHideDecimalPlaces** | **bool** | Whether to hide decimal places | [optional] 
 **icons** | [**BuiltList&lt;Icon&gt;**](Icon.md) | Icons in the system | 
+**appPermissions** | [**BuiltList&lt;Permission&gt;**](Permission.md) | The calling user's effective app-level permissions. | 
+**groupPermissions** | [**BuiltMap&lt;String, BuiltList&lt;Permission&gt;&gt;**](BuiltList.md) | The calling user's effective group-level permissions, keyed by group id. | 
+**groupCategories** | [**BuiltMap&lt;String, BuiltList&lt;Category&gt;&gt;**](BuiltList.md) | The categories the calling user may use in each group, keyed by group id. Filtered to the user's group-role grants (the full pool when unrestricted). Non-admins receive categories only through this map. | [optional] 
+**groupTags** | [**BuiltMap&lt;String, BuiltList&lt;Tag&gt;&gt;**](BuiltList.md) | The tags the calling user may use in each group, keyed by group id. Filtered to the user's group-role grants (the full pool when unrestricted). Non-admins receive tags only through this map. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

@@ -9,9 +9,11 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	config "receipt-wrangler/api/internal/env"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
+	"slices"
 	"testing"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v2"
@@ -160,13 +162,14 @@ func TestGenerateRefreshTokenCorrectly(t *testing.T) {
 
 func TestShouldLogInUserCorrectly(t *testing.T) {
 	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
 	expectedDisplayname := "Another displayname"
 	expectedUsername := "Another username"
 	password := "Password"
 
 	userRepository := repositories.NewUserRepository(nil)
 
-	_, err := userRepository.CreateUser(commands.SignUpCommand{
+	createdUser, err := userRepository.CreateUser(commands.SignUpCommand{
 		Username:    expectedUsername,
 		Password:    password,
 		DisplayName: expectedDisplayname,
@@ -174,6 +177,20 @@ func TestShouldLogInUserCorrectly(t *testing.T) {
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
+
+	// "First admin to login" is now defined by the app.users.read permission
+	// (the modern replacement for the removed UserRole == ADMIN check), so the
+	// user must hold an admin role for the firstAdminToLogin path to be exercised.
+	roleRepository := repositories.NewRoleRepository(nil)
+	adminRole, err := roleRepository.CreateAppRole("Login Admin Role", "", []string{permissions.AppUsersRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if err := repositories.GetDB().Model(&models.User{}).
+		Where("id = ?", createdUser.ID).Update("app_role_id", adminRole.ID).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	ClearRolePermissionCacheForTests()
 
 	user, firstAdminToLogin, err := LoginUser(commands.LoginCommand{
 		Username: expectedUsername,
@@ -441,7 +458,6 @@ func TestGetAppData_WithRequestPopulatesClaims(t *testing.T) {
 		UserId:      user.ID,
 		Username:    user.Username,
 		Displayname: user.DisplayName,
-		UserRole:    models.ADMIN,
 	}
 	validatedClaims := &validator.ValidatedClaims{CustomClaims: customClaims}
 
@@ -458,5 +474,191 @@ func TestGetAppData_WithRequestPopulatesClaims(t *testing.T) {
 	}
 	if appData.Claims.Username != user.Username {
 		utils.PrintTestError(t, appData.Claims.Username, user.Username)
+	}
+}
+
+// GetAppData populates the caller's effective app and per-group permissions for
+// a user with an assigned app role and a group membership carrying a group role.
+func TestGetAppData_PopulatesPermissions(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+
+	db := repositories.GetDB()
+	roleRepository := repositories.NewRoleRepository(nil)
+
+	appPerms := []string{permissions.AppUsersRead, permissions.AppUsersCreate}
+	appRole, err := roleRepository.CreateAppRole("AppData App Role", "", appPerms)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	user := models.User{Username: "appdata-perms-user", Password: "password", AppRoleID: &appRole.ID}
+	if err := db.Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	groupPerms := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate}
+	groupRole, err := roleRepository.CreateGroupRole("AppData Group Role", "", groupPerms, nil, nil, nil, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	group := models.Group{Name: "appdata-perms-group"}
+	if err := db.Create(&group).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	member := models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRoleID: &groupRole.ID}
+	if err := db.Create(&member).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	appData, err := GetAppData(user.ID, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	if !slices.Equal(sortedCopy(appData.AppPermissions), sortedCopy(appPerms)) {
+		utils.PrintTestError(t, appData.AppPermissions, appPerms)
+	}
+
+	if appData.GroupPermissions == nil {
+		utils.PrintTestError(t, "nil GroupPermissions", "populated map")
+	}
+	if !slices.Equal(sortedCopy(appData.GroupPermissions[group.ID]), sortedCopy(groupPerms)) {
+		utils.PrintTestError(t, appData.GroupPermissions[group.ID], groupPerms)
+	}
+}
+
+// GetAppData filters the per-group category catalog to the caller's grants and
+// withholds the flat global list from a non-admin (no app.categories.read).
+func TestGetAppData_GroupCategoriesFilteredByGrants(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+	ClearGroupRoleGrantCacheForTests()
+
+	db := repositories.GetDB()
+	roleRepository := repositories.NewRoleRepository(nil)
+
+	grantedCategory := models.Category{Name: "Groceries"}
+	db.Create(&grantedCategory)
+	hiddenCategory := models.Category{Name: "Salary"}
+	db.Create(&hiddenCategory)
+
+	// Legacy-User-like app role: create but not read.
+	appRole, err := roleRepository.CreateAppRole("AppData User Role", "", []string{permissions.AppCategoriesCreate})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	user := models.User{Username: "appdata-grant-user", Password: "password", AppRoleID: &appRole.ID}
+	if err := db.Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	groupRole, err := roleRepository.CreateGroupRole("AppData Restricted Role", "", []string{permissions.GroupReceiptsRead}, []uint{grantedCategory.ID}, nil, nil, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	group := models.Group{Name: "appdata-grant-group"}
+	if err := db.Create(&group).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if err := db.Create(&models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRoleID: &groupRole.ID}).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	appData, err := GetAppData(user.ID, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	visible := appData.GroupCategories[group.ID]
+	if len(visible) != 1 || visible[0].ID != grantedCategory.ID {
+		utils.PrintTestError(t, visible, []uint{grantedCategory.ID})
+	}
+
+	// A non-admin gets no flat global list.
+	if len(appData.Categories) != 0 {
+		utils.PrintTestError(t, len(appData.Categories), 0)
+	}
+}
+
+// GetAppData gives an admin (app.categories.read) the flat global list, and an
+// unrestricted group's catalog contains every category.
+func TestGetAppData_AdminGetsFlatCategoriesUnrestrictedGroup(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+	ClearGroupRoleGrantCacheForTests()
+
+	db := repositories.GetDB()
+	roleRepository := repositories.NewRoleRepository(nil)
+
+	db.Create(&models.Category{Name: "Groceries"})
+	db.Create(&models.Category{Name: "Salary"})
+
+	appRole, err := roleRepository.CreateAppRole("AppData Admin Role", "", []string{permissions.AppCategoriesRead, permissions.AppTagsRead})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	user := models.User{Username: "appdata-admin-user", Password: "password", AppRoleID: &appRole.ID}
+	if err := db.Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	groupRole, err := roleRepository.CreateGroupRole("AppData Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	group := models.Group{Name: "appdata-admin-group"}
+	if err := db.Create(&group).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if err := db.Create(&models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRoleID: &groupRole.ID}).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	appData, err := GetAppData(user.ID, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	if len(appData.Categories) != 2 {
+		utils.PrintTestError(t, len(appData.Categories), 2)
+	}
+	if len(appData.GroupCategories[group.ID]) != 2 {
+		utils.PrintTestError(t, len(appData.GroupCategories[group.ID]), 2)
+	}
+}
+
+// GetAppData returns an empty (non-nil) permission set for a user with no
+// assigned app role.
+func TestGetAppData_NoRolePermissionsEmpty(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+
+	userRepository := repositories.NewUserRepository(nil)
+	user, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username:    "appdata-no-role-user",
+		Password:    "Password",
+		DisplayName: "AppData No Role User",
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	appData, err := GetAppData(user.ID, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	// No app role seeded (the test harness does not run SeedSystemRoles), so the
+	// user resolves to no app permissions.
+	if len(appData.AppPermissions) != 0 {
+		utils.PrintTestError(t, appData.AppPermissions, "empty app permissions")
+	}
+	// Each group the user belongs to resolves to an empty (no group role) set.
+	for groupId, perms := range appData.GroupPermissions {
+		if len(perms) != 0 {
+			utils.PrintTestError(t, perms, "empty permissions for group "+utils.UintToString(groupId))
+		}
 	}
 }

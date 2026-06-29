@@ -1,28 +1,16 @@
-import { TestBed } from "@angular/core/testing";
-import { Group, GroupRole } from "../../open-api";
-import { GroupUtil } from "../../utils/index";
+import { Group } from "../../open-api";
 import { GroupTableEditButtonPipe } from "./group-table-edit-button.pipe";
 
 describe("GroupTableEditButtonPipe", () => {
   let pipe: GroupTableEditButtonPipe;
-  let groupUtilMock: jest.Mocked<GroupUtil>;
 
   const mockGroup: Group = {
-    id: "123",
+    id: 123,
     name: "Test Group",
   } as any;
 
   beforeEach(() => {
-    groupUtilMock = { hasGroupAccess: jest.fn() } as unknown as jest.Mocked<GroupUtil>;
-
-    TestBed.configureTestingModule({
-      providers: [
-        GroupTableEditButtonPipe,
-        { provide: GroupUtil, useValue: groupUtilMock }
-      ]
-    });
-
-    pipe = TestBed.inject(GroupTableEditButtonPipe);
+    pipe = new GroupTableEditButtonPipe();
   });
 
   it("should create the pipe", () => {
@@ -30,74 +18,42 @@ describe("GroupTableEditButtonPipe", () => {
   });
 
   describe("transform", () => {
-    it("should return edit route when user is group owner", () => {
-      groupUtilMock.hasGroupAccess.mockReturnValue(true);
-      const isAdmin = false;
+    it("should return the details edit route when the user can update the group", () => {
+      const result = pipe.transform(mockGroup, [], { 123: ["group.update"] });
 
-      const result = pipe.transform(mockGroup, isAdmin);
-
-      expect(result).toEqual({
-        routerLink: [`/groups/${mockGroup.id}/details/edit`],
-        queryParams: { tab: "details" }
-      });
-      expect(groupUtilMock.hasGroupAccess).toHaveBeenCalledWith(
-        mockGroup.id,
-        GroupRole.Owner,
-        false,
-        false
-      );
+      expect(result).toEqual(`/groups/${mockGroup.id}/details/edit`);
     });
 
-    it("should return settings route when user is admin but not owner", () => {
-      groupUtilMock.hasGroupAccess.mockReturnValue(false);
-      const isAdmin = true;
-
-      const result = pipe.transform(mockGroup, isAdmin);
-
-      expect(result).toEqual({
-        routerLink: [`/groups/${mockGroup.id}/settings/edit`],
-        queryParams: { tab: "settings" }
-      });
-      expect(groupUtilMock.hasGroupAccess).toHaveBeenCalledWith(
-        mockGroup.id,
-        GroupRole.Owner,
-        false,
-        false
+    it("should return the settings edit route when the user can only update settings", () => {
+      const result = pipe.transform(
+        mockGroup,
+        ["app.groups.update-settings"],
+        {}
       );
+
+      expect(result).toEqual(`/groups/${mockGroup.id}/settings/edit`);
     });
 
-    it("should return view route when user is neither owner nor admin", () => {
-      groupUtilMock.hasGroupAccess.mockReturnValue(false);
-      const isAdmin = false;
-
-      const result = pipe.transform(mockGroup, isAdmin);
-
-      expect(result).toEqual({
-        routerLink: [`/groups/${mockGroup.id}/details/view`],
-        queryParams: { tab: "details" }
-      });
-      expect(groupUtilMock.hasGroupAccess).toHaveBeenCalledWith(
-        mockGroup.id,
-        GroupRole.Owner,
-        false,
-        false
+    it("should prefer the details edit route when the user has both permissions", () => {
+      const result = pipe.transform(
+        mockGroup,
+        ["app.groups.update-settings"],
+        { 123: ["group.update"] }
       );
+
+      expect(result).toEqual(`/groups/${mockGroup.id}/details/edit`);
     });
 
-    it("should handle undefined group id gracefully", () => {
-      const undefinedGroup: Group = {
-        ...mockGroup,
-        id: undefined
-      } as any;
-      groupUtilMock.hasGroupAccess.mockReturnValue(false);
-      const isAdmin = false;
+    it("should return the view route when the user has neither permission", () => {
+      const result = pipe.transform(mockGroup, [], {});
 
-      const result = pipe.transform(undefinedGroup, isAdmin);
-      
-      expect(result).toEqual({
-        routerLink: ["/groups/undefined/details/view"],
-        queryParams: { tab: "details" }
-      });
+      expect(result).toEqual(`/groups/${mockGroup.id}/details/view`);
+    });
+
+    it("should fall back to the view route when the group has no permission entry", () => {
+      const result = pipe.transform(mockGroup, [], { 456: ["group.update"] });
+
+      expect(result).toEqual(`/groups/${mockGroup.id}/details/view`);
     });
   });
 });

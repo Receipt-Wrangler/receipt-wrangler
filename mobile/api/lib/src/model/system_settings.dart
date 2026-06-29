@@ -33,12 +33,23 @@ part 'system_settings.g.dart';
 /// * [receiptProcessingSettingsId] - Receipt processing settings foreign key
 /// * [fallbackReceiptProcessingSettingsId] - Fallback receipt processing settings foreign key
 /// * [taskConcurrency] - Concurrency for task worker
+/// * [pdfDpi] - DPI used when rasterizing PDFs for OCR/vision processing
 /// * [taskQueueConfigurations] 
+/// * [mcpEnabled] - Whether the OAuth 2.1-protected MCP server is enabled
+/// * [mcpPublicUrl] - Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
 @BuiltValue()
 abstract class SystemSettings implements BaseModel, Built<SystemSettings, SystemSettingsBuilder> {
+  /// Whether the OAuth 2.1-protected MCP server is enabled
+  @BuiltValueField(wireName: r'mcpEnabled')
+  bool? get mcpEnabled;
+
   @BuiltValueField(wireName: r'currencyThousandthsSeparator')
   CurrencySeparator? get currencyThousandthsSeparator;
   // enum currencyThousandthsSeparatorEnum {  ,,  .,  };
+
+  /// DPI used when rasterizing PDFs for OCR/vision processing
+  @BuiltValueField(wireName: r'pdfDpi')
+  int? get pdfDpi;
 
   /// Currency display
   @BuiltValueField(wireName: r'currencyDisplay')
@@ -47,6 +58,10 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
   /// Whether to hide decimal places
   @BuiltValueField(wireName: r'currencyHideDecimalPlaces')
   bool? get currencyHideDecimalPlaces;
+
+  /// Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
+  @BuiltValueField(wireName: r'mcpPublicUrl')
+  String? get mcpPublicUrl;
 
   @BuiltValueField(wireName: r'currencyDecimalSeparator')
   CurrencySeparator? get currencyDecimalSeparator;
@@ -93,7 +108,9 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
 
   @BuiltValueHook(initializeBuilder: true)
   static void _defaults(SystemSettingsBuilder b) => b
-      ..currencyDisplay = '\$'
+      ..mcpEnabled = false
+      ..pdfDpi = 300
+      ..currencyDisplay = r'$'
       ..currencyHideDecimalPlaces = false
       ..debugOcr = false
       ..createdBy = 0
@@ -120,11 +137,25 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
     SystemSettings object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
+    if (object.mcpEnabled != null) {
+      yield r'mcpEnabled';
+      yield serializers.serialize(
+        object.mcpEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
     if (object.currencyThousandthsSeparator != null) {
       yield r'currencyThousandthsSeparator';
       yield serializers.serialize(
         object.currencyThousandthsSeparator,
         specifiedType: const FullType(CurrencySeparator),
+      );
+    }
+    if (object.pdfDpi != null) {
+      yield r'pdfDpi';
+      yield serializers.serialize(
+        object.pdfDpi,
+        specifiedType: const FullType(int),
       );
     }
     if (object.currencyDisplay != null) {
@@ -139,6 +170,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
       yield serializers.serialize(
         object.currencyHideDecimalPlaces,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.mcpPublicUrl != null) {
+      yield r'mcpPublicUrl';
+      yield serializers.serialize(
+        object.mcpPublicUrl,
+        specifiedType: const FullType(String),
       );
     }
     if (object.currencyDecimalSeparator != null) {
@@ -263,12 +301,26 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
+        case r'mcpEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.mcpEnabled = valueDes;
+          break;
         case r'currencyThousandthsSeparator':
           final valueDes = serializers.deserialize(
             value,
             specifiedType: const FullType(CurrencySeparator),
           ) as CurrencySeparator;
           result.currencyThousandthsSeparator = valueDes;
+          break;
+        case r'pdfDpi':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.pdfDpi = valueDes;
           break;
         case r'currencyDisplay':
           final valueDes = serializers.deserialize(
@@ -283,6 +335,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
             specifiedType: const FullType(bool),
           ) as bool;
           result.currencyHideDecimalPlaces = valueDes;
+          break;
+        case r'mcpPublicUrl':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.mcpPublicUrl = valueDes;
           break;
         case r'currencyDecimalSeparator':
           final valueDes = serializers.deserialize(

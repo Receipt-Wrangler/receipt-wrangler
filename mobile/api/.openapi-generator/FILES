@@ -35,6 +35,7 @@ doc/CustomFieldType.md
 doc/CustomFieldValue.md
 doc/Dashboard.md
 doc/DashboardApi.md
+doc/DeleteAccountCommand.md
 doc/EncodedImage.md
 doc/ExportApi.md
 doc/ExportFormat.md
@@ -49,7 +50,6 @@ doc/Group.md
 doc/GroupFilter.md
 doc/GroupMember.md
 doc/GroupReceiptSettings.md
-doc/GroupRole.md
 doc/GroupSettings.md
 doc/GroupSettingsWhiteListEmail.md
 doc/GroupStatus.md
@@ -72,6 +72,10 @@ doc/PagedData.md
 doc/PagedDataDataInner.md
 doc/PagedGroupRequestCommand.md
 doc/PagedRequestCommand.md
+doc/Permission.md
+doc/PermissionApi.md
+doc/PermissionDescriptor.md
+doc/PermissionScope.md
 doc/PieChartData.md
 doc/PieChartDataCommand.md
 doc/PieChartDataPoint.md
@@ -87,6 +91,8 @@ doc/ReceiptProcessingSettings.md
 doc/ReceiptProcessingSettingsApi.md
 doc/ReceiptStatus.md
 doc/ResetPasswordCommand.md
+doc/Role.md
+doc/RoleApi.md
 doc/SearchApi.md
 doc/SearchResult.md
 doc/SignUpCommand.md
@@ -121,6 +127,7 @@ doc/UpsertItemCommand.md
 doc/UpsertPromptCommand.md
 doc/UpsertReceiptCommand.md
 doc/UpsertReceiptProcessingSettingsCommand.md
+doc/UpsertRoleCommand.md
 doc/UpsertSystemEmailCommand.md
 doc/UpsertSystemSettingsCommand.md
 doc/UpsertTagCommand.md
@@ -130,7 +137,6 @@ doc/User.md
 doc/UserApi.md
 doc/UserPreferences.md
 doc/UserPreferencesApi.md
-doc/UserRole.md
 doc/UserShortcut.md
 doc/UserView.md
 doc/Widget.md
@@ -149,10 +155,12 @@ lib/src/api/feature_config_api.dart
 lib/src/api/groups_api.dart
 lib/src/api/import_api.dart
 lib/src/api/notifications_api.dart
+lib/src/api/permission_api.dart
 lib/src/api/prompt_api.dart
 lib/src/api/receipt_api.dart
 lib/src/api/receipt_image_api.dart
 lib/src/api/receipt_processing_settings_api.dart
+lib/src/api/role_api.dart
 lib/src/api/search_api.dart
 lib/src/api/system_email_api.dart
 lib/src/api/system_settings_api.dart
@@ -197,6 +205,7 @@ lib/src/model/custom_field_type.dart
 lib/src/model/custom_field_value.dart
 lib/src/model/dashboard.dart
 lib/src/model/date.dart
+lib/src/model/delete_account_command.dart
 lib/src/model/encoded_image.dart
 lib/src/model/export_format.dart
 lib/src/model/feature_config.dart
@@ -209,7 +218,6 @@ lib/src/model/group.dart
 lib/src/model/group_filter.dart
 lib/src/model/group_member.dart
 lib/src/model/group_receipt_settings.dart
-lib/src/model/group_role.dart
 lib/src/model/group_settings.dart
 lib/src/model/group_settings_white_list_email.dart
 lib/src/model/group_status.dart
@@ -229,6 +237,9 @@ lib/src/model/paged_data.dart
 lib/src/model/paged_data_data_inner.dart
 lib/src/model/paged_group_request_command.dart
 lib/src/model/paged_request_command.dart
+lib/src/model/permission.dart
+lib/src/model/permission_descriptor.dart
+lib/src/model/permission_scope.dart
 lib/src/model/pie_chart_data.dart
 lib/src/model/pie_chart_data_command.dart
 lib/src/model/pie_chart_data_point.dart
@@ -240,6 +251,7 @@ lib/src/model/receipt_paged_request_filter.dart
 lib/src/model/receipt_processing_settings.dart
 lib/src/model/receipt_status.dart
 lib/src/model/reset_password_command.dart
+lib/src/model/role.dart
 lib/src/model/search_result.dart
 lib/src/model/sign_up_command.dart
 lib/src/model/sort_direction.dart
@@ -269,6 +281,7 @@ lib/src/model/upsert_item_command.dart
 lib/src/model/upsert_prompt_command.dart
 lib/src/model/upsert_receipt_command.dart
 lib/src/model/upsert_receipt_processing_settings_command.dart
+lib/src/model/upsert_role_command.dart
 lib/src/model/upsert_system_email_command.dart
 lib/src/model/upsert_system_settings_command.dart
 lib/src/model/upsert_tag_command.dart
@@ -276,23 +289,9 @@ lib/src/model/upsert_task_queue_configuration.dart
 lib/src/model/upsert_widget_command.dart
 lib/src/model/user.dart
 lib/src/model/user_preferences.dart
-lib/src/model/user_role.dart
 lib/src/model/user_shortcut.dart
 lib/src/model/user_view.dart
 lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/api_key_api_test.dart
-test/api_key_filter_test.dart
-test/api_key_result_test.dart
-test/api_key_scope_test.dart
-test/api_key_view_test.dart
-test/associated_api_keys_test.dart
-test/chart_grouping_test.dart
-test/paged_api_key_request_command_test.dart
-test/pie_chart_data_command_test.dart
-test/pie_chart_data_point_test.dart
-test/pie_chart_data_test.dart
-test/upsert_api_key_command_test.dart
-test/widget_api_test.dart

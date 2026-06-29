@@ -16,7 +16,7 @@ Name | Type | Description | Notes
 **id** | **int** |  | 
 **isDummyUser** | **bool** | Is dummy user | 
 **updatedAt** | **String** |  | [optional] 
-**userRole** | [**UserRole**](UserRole.md) | User's role | 
+**appRoleId** | **int** | Id of the modern app role assigned to the user | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

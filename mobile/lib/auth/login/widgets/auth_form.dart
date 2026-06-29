@@ -11,6 +11,7 @@ import 'package:receipt_wrangler_mobile/constants/spacing.dart';
 import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/models/category_model.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_preferences_model.dart';
@@ -98,9 +99,11 @@ class _Login extends State<AuthForm> {
     var tagModel = Provider.of<TagModel>(context, listen: false);
     var systemSettingsModel =
         Provider.of<SystemSettingsModel>(context, listen: false);
+    var permissionsModel =
+        Provider.of<PermissionsModel>(context, listen: false);
 
     await storeAppData(authModel, groupModel, userModel, userPreferencesModel,
-        categoryModel, tagModel, systemSettingsModel, appData);
+        categoryModel, tagModel, systemSettingsModel, permissionsModel, appData);
     registerCustomCurrency(context);
     context.go("/groups");
   }

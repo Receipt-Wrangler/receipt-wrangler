@@ -1,7 +1,7 @@
 import { Component, OnInit, input, output } from "@angular/core";
 import { take, tap } from "rxjs";
 import { ParameterizedDataParser } from "src/utils";
-import { Notification, NotificationsService } from "../../open-api";
+import { Notification, NotificationsService, Permission } from "../../open-api";
 
 @Component({
     selector: "app-notification",
@@ -13,6 +13,8 @@ export class NotificationComponent implements OnInit {
   public readonly notification = input.required<Notification>();
 
   public readonly notificationDeleted = output<number>();
+
+  protected readonly Permission = Permission;
 
   public link?: string;
 

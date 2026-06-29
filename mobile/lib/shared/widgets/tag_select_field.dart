@@ -15,11 +15,17 @@ class TagSelectField extends StatefulWidget {
     required this.initialTags,
     required this.formState,
     required this.onTagsChanged,
+    required this.groupId,
   });
 
   final String label;
 
   final String fieldName;
+
+  /// The receipt's group. Options are sourced from the caller's per-group
+  /// catalog for this group (grant-filtered on the backend), not the global
+  /// admin-only list — otherwise non-admins would see an empty picker.
+  final int groupId;
 
   final List<api.Tag> initialTags;
 
@@ -40,7 +46,7 @@ class _TagSelectField extends State<TagSelectField> {
         contextModel.shellContext,
         "Select Tags",
         "Select",
-        tagModel.tags,
+        tagModel.tagsForGroup(widget.groupId),
         widget.initialTags,
         (tag) => tag.name).then((value) {
       if (value != null) {

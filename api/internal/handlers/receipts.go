@@ -3,12 +3,12 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -24,12 +24,12 @@ import (
 func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 	groupId := chi.URLParam(r, "groupId")
 	handler := structs.Handler{
-		ErrorMessage: "Error getting receipts",
-		Writer:       w,
-		Request:      r,
-		GroupId:      groupId,
-		GroupRole:    models.VIEWER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error getting receipts",
+		Writer:           w,
+		Request:          r,
+		GroupId:          groupId,
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			pagedRequest := commands.ReceiptPagedRequestCommand{}
 			err := pagedRequest.LoadDataFromRequest(w, r)
@@ -45,13 +45,33 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 				associations = constants.FULL_RECEIPT_ASSOCIATIONS
 			}
 
+			permissionService := services.NewPermissionService(nil)
+
+			// Narrow any category/tag filter to what the caller may see, so a
+			// restricted user cannot probe receipt existence via a hidden filter.
+			uintGroupId, err := utils.StringToUint(groupId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			err = permissionService.IntersectReceiptFilterWithGrants(token.UserId, uintGroupId, &pagedRequest.Filter)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			receipts, count, err := receiptRepository.GetPagedReceiptsByGroupId(
 				token.UserId,
 				groupId,
 				pagedRequest,
 				associations,
+				permissionService.PaidByListResolver(token.UserId),
 			)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// Strip categories/tags the caller may not see from the results.
+			err = permissionService.FilterReceiptCategoriesTags(token.UserId, receipts)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -80,49 +100,34 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetReceiptsForGroupIds(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	groupIds := r.Form["groupIds"]
+
 	handler := structs.Handler{
-		ErrorMessage: "Error getting receipts",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error getting receipts",
+		Writer:           w,
+		Request:          r,
+		GroupIds:         groupIds,
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			var err error
-			var receipts []models.Receipt
-			var groupIds []string
-
 			token := structs.GetClaims(r)
-
-			r.ParseForm()
-
-			groupIds, ok := r.Form["groupIds"]
-			if !ok {
+			permissionService := services.NewPermissionService(nil)
+			receiptRepository := repositories.NewReceiptRepository(nil)
+			receipts, err := receiptRepository.GetReceiptsByGroupIds(groupIds, "*", clause.Associations)
+			if err != nil {
 				return http.StatusInternalServerError, err
 			}
 
-			if false {
-
-			} else {
-				groupMemberRepository := repositories.NewGroupMemberRepository(nil)
-				userGroupIds, err := groupMemberRepository.GetGroupIdsByUserId(utils.UintToString(token.UserId))
-				if err != nil {
-					return http.StatusInternalServerError, err
-				}
-				var userGroupIdInterfaces = make([]interface{}, len(userGroupIds))
-				for i := range userGroupIds {
-					userGroupIdInterfaces[i] = userGroupIds[i]
-				}
-
-				// if !utils.Contains(userGroupIdInterfaces, groupIds) {
-				// 	return http.StatusForbidden, errors.New("not allowed to access group")
-				// }
-
-				receiptRepository := repositories.NewReceiptRepository(nil)
-				receipts, err = receiptRepository.GetReceiptsByGroupIds(groupIds, "*", clause.Associations)
-				if err != nil {
-					return http.StatusInternalServerError, err
-				}
+			// Drop receipts hidden by the caller's paid-by visibility filter (this
+			// surface is unpaginated, so removing rows is safe), then strip the
+			// categories/tags they may not see from what remains.
+			receipts, err = permissionService.FilterReceiptsByPaidBy(token.UserId, receipts)
+			if err != nil {
+				return http.StatusInternalServerError, err
 			}
 
+			err = permissionService.FilterReceiptCategoriesTags(token.UserId, receipts)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -163,15 +168,40 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: Clean up to make sure group id is not an all group, and remove middleware sets and checks
 	handler := structs.Handler{
-		ErrorMessage: errMessage,
-		Writer:       w,
-		Request:      r,
-		GroupId:      stringId,
-		GroupRole:    models.EDITOR,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     errMessage,
+		Writer:           w,
+		Request:          r,
+		GroupId:          stringId,
+		GroupPermissions: []string{permissions.GroupReceiptsCreate},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			allowed, denyMessage, err := enforceReceiptGrantSelection(token.UserId, command.GroupId, command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
+			// A new receipt has no existing custom fields, so any custom field present
+			// is an add — blocked unless the caller can manage custom fields.
+			allowed, denyMessage, err = enforceReceiptCustomFieldSelection(token.UserId, command, nil)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			createdReceipt, err := receiptRepository.CreateReceipt(command, token.UserId, true)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			err = services.NewPermissionService(nil).FilterReceiptCategoriesTagsForReceipt(token.UserId, &createdReceipt)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -208,12 +238,12 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler := structs.Handler{
-		ErrorMessage: errMsg,
-		Writer:       w,
-		Request:      r,
-		GroupRole:    models.EDITOR,
-		GroupIds:     groupIds,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     errMsg,
+		Writer:           w,
+		Request:          r,
+		GroupPermissions: []string{permissions.GroupReceiptsQuickScan},
+		GroupIds:         groupIds,
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			if len(vErr.Errors) > 0 {
 				structs.WriteValidatorErrorResponse(w, vErr, http.StatusInternalServerError)
@@ -272,17 +302,23 @@ func GetReceipt(w http.ResponseWriter, r *http.Request) {
 	receiptId := chi.URLParam(r, "id")
 
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving receipt.",
-		Writer:       w,
-		Request:      r,
-		ReceiptId:    receiptId,
-		GroupRole:    models.VIEWER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error retrieving receipt.",
+		Writer:           w,
+		Request:          r,
+		ReceiptId:        receiptId,
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
+			token := structs.GetClaims(r)
 			receiptRepository := repositories.NewReceiptRepository(nil)
 
 			receipt, err := receiptRepository.GetFullyLoadedReceiptById(id)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			err = services.NewPermissionService(nil).FilterReceiptCategoriesTagsForReceipt(token.UserId, &receipt)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -306,12 +342,12 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 	receiptId := chi.URLParam(r, "id")
 
 	handler := structs.Handler{
-		ErrorMessage: "Error updating receipt.",
-		Writer:       w,
-		Request:      r,
-		ReceiptId:    receiptId,
-		GroupRole:    models.EDITOR,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error updating receipt.",
+		Writer:           w,
+		Request:          r,
+		ReceiptId:        receiptId,
+		GroupPermissions: []string{permissions.GroupReceiptsUpdate},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			command := commands.UpsertReceiptCommand{}
@@ -327,7 +363,53 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
+			permissionService := services.NewPermissionService(nil)
+
+			// Load the current receipt to resolve its real group and the
+			// associations the caller may not see.
+			currentReceipt, err := receiptRepository.GetFullyLoadedReceiptById(receiptId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			allowed, denyMessage, err := enforceReceiptGrantSelection(token.UserId, currentReceipt.GroupId, command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
+			// A caller without custom-field access may edit values but not change which
+			// custom fields are attached to the receipt.
+			currentCustomFieldIds := make([]uint, 0, len(currentReceipt.CustomFields))
+			for _, customField := range currentReceipt.CustomFields {
+				currentCustomFieldIds = append(currentCustomFieldIds, customField.CustomFieldId)
+			}
+			allowed, denyMessage, err = enforceReceiptCustomFieldSelection(token.UserId, command, currentCustomFieldIds)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
+			// Preserve receipt-level categories/tags the caller cannot see so the
+			// full-replace update does not silently drop them. (Must run AFTER
+			// the selection check, which would otherwise reject the re-added ids.)
+			err = permissionService.MergeHiddenReceiptCategoriesTags(token.UserId, currentReceipt.GroupId, currentReceipt.Categories, currentReceipt.Tags, &command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			updatedReceipt, err := receiptRepository.UpdateReceipt(receiptId, command, token.UserId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			err = permissionService.FilterReceiptCategoriesTagsForReceipt(token.UserId, &updatedReceipt)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -361,12 +443,12 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler := structs.Handler{
-		ErrorMessage: "Error resolving receipts",
-		Writer:       w,
-		Request:      r,
-		ReceiptIds:   receiptIdStrings,
-		GroupRole:    models.EDITOR,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error resolving receipts",
+		Writer:           w,
+		Request:          r,
+		ReceiptIds:       receiptIdStrings,
+		GroupPermissions: []string{permissions.GroupReceiptsUpdate},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			db := repositories.GetDB()
 			receiptRepository := repositories.NewReceiptRepository(nil)
@@ -458,16 +540,22 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 		ResponseType: constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
-			groupService := services.NewGroupService(nil)
+			permissionService := services.NewPermissionService(nil)
 
 			receiptId := r.URL.Query().Get("receiptId")
 			if len(receiptId) == 0 {
 				return http.StatusBadRequest, errors.New("receiptId required")
 			}
 
-			groupRole := r.URL.Query().Get("groupRole")
-			if len(groupRole) == 0 {
-				return http.StatusBadRequest, errors.New("groupRole required")
+			permission := r.URL.Query().Get("permission")
+			if len(permission) == 0 {
+				return http.StatusBadRequest, errors.New("permission required")
+			}
+
+			// The probe answers a group-scoped question, so only group permissions
+			// are meaningful here; reject typos and app-scoped keys up front.
+			if descriptor, ok := permissions.Get(permission); !ok || descriptor.Scope != permissions.ScopeGroup {
+				return http.StatusBadRequest, errors.New("invalid group permission")
 			}
 
 			receiptRepository := repositories.NewReceiptRepository(nil)
@@ -476,18 +564,23 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 				return http.StatusBadRequest, err
 			}
 
-			validatedGroupRole, err := models.GroupRole(groupRole).Value()
+			hasAccess, err := permissionService.HasGroupPermissions(token.UserId, receipt.GroupId, permission)
 			if err != nil {
-				return http.StatusBadRequest, err
+				return http.StatusInternalServerError, err
+			}
+			if !hasAccess {
+				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
 			}
 
-			err = groupService.ValidateGroupRole(
-				models.GroupRole(validatedGroupRole),
-				fmt.Sprint(receipt.GroupId),
-				fmt.Sprint(token.UserId),
-			)
+			// Paid-by visibility narrows access within a permitted group, so the
+			// route guard redirects cleanly instead of admitting the user to a
+			// receipt their group role hides (which would then 403 on fetch).
+			paidByVisible, err := permissionService.ReceiptPaidByVisible(token.UserId, receipt.GroupId, receipt.PaidByUserID)
 			if err != nil {
-				return http.StatusForbidden, err
+				return http.StatusInternalServerError, err
+			}
+			if !paidByVisible {
+				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
 			}
 
 			w.WriteHeader(200)
@@ -503,12 +596,12 @@ func DeleteReceipt(w http.ResponseWriter, r *http.Request) {
 	receiptId := chi.URLParam(r, "id")
 
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting receipt.",
-		Writer:       w,
-		Request:      r,
-		ReceiptId:    receiptId,
-		GroupRole:    models.EDITOR,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error deleting receipt.",
+		Writer:           w,
+		Request:          r,
+		ReceiptId:        receiptId,
+		GroupPermissions: []string{permissions.GroupReceiptsDelete},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			receiptService := services.NewReceiptService(nil)
@@ -530,12 +623,12 @@ func DuplicateReceipt(w http.ResponseWriter, r *http.Request) {
 	receiptId := chi.URLParam(r, "id")
 
 	handler := structs.Handler{
-		ErrorMessage: "Error duplicating receipt",
-		Writer:       w,
-		Request:      r,
-		ReceiptId:    receiptId,
-		GroupRole:    models.EDITOR,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error duplicating receipt",
+		Writer:           w,
+		Request:          r,
+		ReceiptId:        receiptId,
+		GroupPermissions: []string{permissions.GroupReceiptsDuplicate},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 

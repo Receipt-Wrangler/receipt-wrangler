@@ -1,0 +1,147 @@
+<div class="roles-page">
+  <app-breadcrumb [items]="crumbs"></app-breadcrumb>
+
+  <div class="page-title">
+    <div class="titles">
+      <h1>Roles</h1>
+      <p class="subtitle">
+        {{ roleCount() }} roles define what people can do — each applies to
+        either the application or a group. Assign roles to people from
+        <a [routerLink]="['/users']">Manage Users</a>.
+      </p>
+    </div>
+    <div class="tools">
+      <app-button
+        icon="add"
+        buttonText="Add Role"
+        (clicked)="addRole()"
+      ></app-button>
+    </div>
+  </div>
+
+  @if (roles().length === 0) {
+    <div class="empty-state">
+      <span class="empty-icon"><mat-icon>admin_panel_settings</mat-icon></span>
+      <h2>No roles yet</h2>
+      <p>
+        Create your first role to control what people can do across the app and
+        within groups.
+      </p>
+      <app-button
+        icon="add"
+        buttonText="Add Role"
+        (clicked)="addRole()"
+      ></app-button>
+    </div>
+  } @else {
+    <div class="default-roles">
+      <app-select
+        label="Default application role"
+        optionValueKey="id"
+        optionDisplayKey="name"
+        hint="Assigned to new accounts when they sign up."
+        [options]="appRoleOptions()"
+        [inputFormControl]="defaultAppRoleControl"
+      ></app-select>
+      <app-select
+        label="Default group role"
+        optionValueKey="id"
+        optionDisplayKey="name"
+        hint="Assigned to the creator when a group is created."
+        [options]="groupRoleOptions()"
+        [inputFormControl]="defaultGroupRoleControl"
+      ></app-select>
+    </div>
+
+    <app-filter-bar
+      [tabs]="filterTabs()"
+      [value]="filter()"
+      (valueChange)="setFilter($event)"
+    ></app-filter-bar>
+
+    <app-table
+      [columns]="columns()"
+      [displayedColumns]="displayedColumns()"
+      [dataSource]="dataSource()"
+    ></app-table>
+  }
+</div>
+
+<ng-template #roleCell let-role="element">
+  <div class="role-name">
+    <span
+      class="role-icon"
+      [style.background]="role.iconTint"
+      [style.color]="role.iconColor"
+    >
+      <mat-icon>{{ role.icon }}</mat-icon>
+    </span>
+    <div>
+      <div class="nm">
+        {{ role.name }}
+        @if (role.isDefault) {
+          <span class="badge-default"><mat-icon>star</mat-icon>Default</span>
+        }
+        @if (role.isSystem) {
+          <span class="badge-lock"><mat-icon>lock</mat-icon>System</span>
+        }
+      </div>
+      <div class="ds">{{ role.description }}</div>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #typeCell let-role="element">
+  @if (role.scope === "app") {
+    <span class="chip scope-app"><mat-icon>apps</mat-icon>Application</span>
+  } @else {
+    <span class="chip scope-group"><mat-icon>workspaces</mat-icon>Group</span>
+  }
+</ng-template>
+
+<ng-template #permissionsCell let-role="element">
+  <div class="perm-count">
+    {{ role.permissionCount }} <span>of {{ scopeTotal(role) }}</span>
+  </div>
+  <div class="perm-bar">
+    @for (segment of meter(role); track $index) {
+      <i [ngClass]="segment"></i>
+    }
+  </div>
+</ng-template>
+
+<ng-template #membersCell let-role="element">
+  @if (role.userCount === 0) {
+    <span class="no-users">No users</span>
+  } @else {
+    <span class="user-count"
+      >{{ role.userCount }} {{ role.userCount === 1 ? "user" : "users" }}</span
+    >
+  }
+</ng-template>
+
+<ng-template #actionsCell let-role="element">
+  <div class="row-actions">
+    <app-button
+      matButtonType="iconButton"
+      color="accent"
+      data-testid="role-edit"
+      [icon]="role.isSystem ? 'visibility' : 'edit'"
+      [tooltip]="role.isSystem ? 'View' : 'Edit'"
+      (clicked)="editRole(role)"
+    ></app-button>
+    <app-delete-button
+      data-testid="role-delete"
+      [tooltip]="
+        role.isSystem
+          ? 'System roles cannot be deleted'
+          : role.userCount > 0
+            ? 'Role is assigned and cannot be deleted'
+            : 'Delete'
+      "
+      [disabled]="!canDelete(role)"
+      (clicked)="deleteRole(role)"
+      (click)="disabledDeleteClicked(role)"
+    ></app-delete-button>
+  </div>
+</ng-template>

@@ -4,13 +4,14 @@ import { GroupGuard } from "src/guards/group.guard";
 import { DashboardComponent } from "./dashboard/dashboard.component";
 import { GroupDashboardsComponent } from "./group-dashboards/group-dashboards.component";
 import { dashboardGuard } from "./guards/dashboard.guard";
+import { groupDashboardReadGuard } from "./guards/group-dashboard-read.guard";
 import { dashboardResolverFn } from "./resolvers/dashboard.resolver";
 
 const routes: Routes = [
   {
     path: "group/:groupId",
     component: GroupDashboardsComponent,
-    canActivate: [GroupGuard],
+    canActivate: [GroupGuard, groupDashboardReadGuard],
     data: {
       groupGuardBasePath: "/dashboard/group",
     },

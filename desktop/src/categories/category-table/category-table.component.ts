@@ -10,7 +10,7 @@ import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/c
 import { CategoryTableState } from "src/store/category-table.state";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
-import { CategoryService, CategoryView, PagedDataDataInner, PagedRequestCommand } from "../../open-api";
+import { CategoryService, CategoryView, PagedDataDataInner, PagedRequestCommand, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { SetOrderBy, SetPage, SetPageSize, SetSortDirection } from "../../store/category-table.state.actions";
 import { CategoryForm } from "../category-form/category-form.component";
@@ -33,6 +33,8 @@ export class CategoryTableComponent implements OnInit, AfterViewInit {
   public readonly table = viewChild.required(TableComponent);
 
   public state = this.store.selectSignal(CategoryTableState.state);
+
+  protected readonly Permission = Permission;
 
   constructor(
     private categoryService: CategoryService,

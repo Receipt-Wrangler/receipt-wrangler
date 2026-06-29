@@ -285,7 +285,7 @@ func TestShouldGetPagedReceiptsByGroupId(t *testing.T) {
 		},
 	}
 
-	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil)
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -297,6 +297,231 @@ func TestShouldGetPagedReceiptsByGroupId(t *testing.T) {
 
 	if len(receipts) != 2 {
 		utils.PrintTestError(t, len(receipts), 2)
+	}
+}
+
+func pagedRequestAllReceipts() commands.ReceiptPagedRequestCommand {
+	return commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{
+			Page:          1,
+			PageSize:      50,
+			OrderBy:       "created_at",
+			SortDirection: commands.DESCENDING,
+		},
+	}
+}
+
+func TestGetPagedReceiptsAppliesPaidByVisibilitySingleGroup(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+	createTestReceipts() // group 1: one receipt paid by user 1, one by user 2
+
+	repository := NewReceiptRepository(nil)
+
+	// Restrict visibility to receipts paid by user 1 only.
+	restrictedToUser1 := func(groupId uint) ([]uint, bool, error) {
+		return []uint{1}, false, nil
+	}
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, restrictedToUser1)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 1 {
+		utils.PrintTestError(t, count, 1)
+	}
+	if len(receipts) != 1 || receipts[0].PaidByUserID != 1 {
+		utils.PrintTestError(t, receipts, "only the receipt paid by user 1")
+	}
+
+	// Unrestricted resolver returns everything (count must match).
+	unrestricted := func(groupId uint) ([]uint, bool, error) {
+		return nil, true, nil
+	}
+	_, count, err = repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, unrestricted)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 2 {
+		utils.PrintTestError(t, count, 2)
+	}
+
+	// An empty-but-restricted set sees nothing (the 0 sentinel matches no rows).
+	seeNothing := func(groupId uint) ([]uint, bool, error) {
+		return []uint{}, false, nil
+	}
+	receipts, count, err = repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, seeNothing)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 0 || len(receipts) != 0 {
+		utils.PrintTestError(t, count, 0)
+	}
+}
+
+func TestGetPagedReceiptsAppliesPaidByVisibilityAllGroup(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	group1 := models.Group{Name: "pb-all-g1"}
+	group2 := models.Group{Name: "pb-all-g2"}
+	allGroup := models.Group{Name: "pb-all", IsAllGroup: true}
+	db.Create(&group1)
+	db.Create(&group2)
+	db.Create(&allGroup)
+
+	member := models.User{Username: "pb-all-member", Password: "x"}
+	payer1 := models.User{Username: "pb-all-payer1", Password: "x"}
+	payer2 := models.User{Username: "pb-all-payer2", Password: "x"}
+	db.Create(&member)
+	db.Create(&payer1)
+	db.Create(&payer2)
+
+	db.Create(&models.GroupMember{GroupID: group1.ID, UserID: member.ID})
+	db.Create(&models.GroupMember{GroupID: group2.ID, UserID: member.ID})
+
+	makeReceipt := func(groupId uint, payerId uint, name string) {
+		db.Create(&models.Receipt{
+			Name:         name,
+			Amount:       decimal.NewFromInt(1),
+			Date:         time.Now(),
+			PaidByUserID: payerId,
+			GroupId:      groupId,
+			Status:       models.OPEN,
+		})
+	}
+	makeReceipt(group1.ID, payer1.ID, "g1-p1")
+	makeReceipt(group1.ID, payer2.ID, "g1-p2")
+	makeReceipt(group2.ID, payer1.ID, "g2-p1")
+	makeReceipt(group2.ID, payer2.ID, "g2-p2")
+
+	// Different roles per group: group 1 restricted to payer1; group 2 unrestricted.
+	resolver := func(groupId uint) ([]uint, bool, error) {
+		if groupId == group1.ID {
+			return []uint{payer1.ID}, false, nil
+		}
+		return nil, true, nil
+	}
+
+	repository := NewReceiptRepository(nil)
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(member.ID, utils.UintToString(allGroup.ID), pagedRequestAllReceipts(), nil, resolver)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Visible: g1-p1 (group1 restricted to payer1), g2-p1 + g2-p2 (group2 open).
+	// Hidden: g1-p2. totalCount must match the rows actually returned.
+	if count != 3 {
+		utils.PrintTestError(t, count, 3)
+	}
+	if len(receipts) != 3 {
+		utils.PrintTestError(t, len(receipts), 3)
+	}
+	for _, receipt := range receipts {
+		if receipt.GroupId == group1.ID && receipt.PaidByUserID != payer1.ID {
+			utils.PrintTestError(t, receipt.Name, "group 1 should only show payer1's receipt")
+		}
+	}
+}
+
+func TestApplyPaidByDisjunctionFiltersBeforeLimit(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	group := models.Group{Name: "pb-search-grp"}
+	visiblePayer := models.User{Username: "pb-search-visible", Password: "x"}
+	hiddenPayer := models.User{Username: "pb-search-hidden", Password: "x"}
+	db.Create(&group)
+	db.Create(&visiblePayer)
+	db.Create(&hiddenPayer)
+
+	// Hidden receipts are NEWER (sort first by date desc); the visible one is the
+	// oldest, so a limit applied before filtering would drop it.
+	for i := 0; i < 5; i++ {
+		db.Create(&models.Receipt{
+			Name:         "hidden-" + utils.UintToString(uint(i)),
+			Amount:       decimal.NewFromInt(1),
+			Date:         time.Now().Add(time.Duration(i+1) * time.Hour),
+			PaidByUserID: hiddenPayer.ID,
+			GroupId:      group.ID,
+			Status:       models.OPEN,
+		})
+	}
+	db.Create(&models.Receipt{
+		Name:         "visible",
+		Amount:       decimal.NewFromInt(1),
+		Date:         time.Now(),
+		PaidByUserID: visiblePayer.ID,
+		GroupId:      group.ID,
+		Status:       models.OPEN,
+	})
+
+	// The role restricts the group to the visible payer only.
+	resolver := func(groupId uint) ([]uint, bool, error) {
+		return []uint{visiblePayer.ID}, false, nil
+	}
+
+	repository := NewReceiptRepository(nil)
+	query := db.Table("receipts").Where("group_id = ?", group.ID)
+	query, err := repository.ApplyPaidByDisjunction(query, []uint{group.ID}, resolver)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Limit smaller than the hidden count: the visible receipt must still come back
+	// because the paid-by predicate is applied in SQL BEFORE the limit. (If it were
+	// post-filtered, the limit would return 3 hidden rows -> 0 visible.)
+	var receipts []models.Receipt
+	err = query.Limit(3).Order("date desc").Find(&receipts).Error
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(receipts) != 1 || receipts[0].PaidByUserID != visiblePayer.ID {
+		utils.PrintTestError(t, receipts, "only the visible-payer receipt")
+	}
+}
+
+func TestApplyPaidByDisjunctionEmptyGroupsFailsClosed(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	group := models.Group{Name: "pb-empty-grp"}
+	payer := models.User{Username: "pb-empty-payer", Password: "x"}
+	db.Create(&group)
+	db.Create(&payer)
+	db.Create(&models.Receipt{
+		Name:         "r",
+		Amount:       decimal.NewFromInt(1),
+		Date:         time.Now(),
+		PaidByUserID: payer.ID,
+		GroupId:      group.ID,
+		Status:       models.OPEN,
+	})
+
+	resolver := func(groupId uint) ([]uint, bool, error) { return nil, true, nil }
+
+	repository := NewReceiptRepository(nil)
+	// No member groups => the helper must fail closed (return zero rows), not leave
+	// the query unfiltered.
+	query, err := repository.ApplyPaidByDisjunction(db.Table("receipts"), []uint{}, resolver)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var receipts []models.Receipt
+	if err := query.Find(&receipts).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if len(receipts) != 0 {
+		utils.PrintTestError(t, len(receipts), 0)
 	}
 }
 

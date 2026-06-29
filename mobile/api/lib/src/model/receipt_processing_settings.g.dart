@@ -22,6 +22,8 @@ class _$ReceiptProcessingSettings extends ReceiptProcessingSettings {
   @override
   final String? model;
   @override
+  final bool? enforceJsonResponseFormat;
+  @override
   final Prompt? prompt;
   @override
   final String? url;
@@ -40,7 +42,7 @@ class _$ReceiptProcessingSettings extends ReceiptProcessingSettings {
 
   factory _$ReceiptProcessingSettings(
           [void Function(ReceiptProcessingSettingsBuilder)? updates]) =>
-      (new ReceiptProcessingSettingsBuilder()..update(updates))._build();
+      (ReceiptProcessingSettingsBuilder()..update(updates))._build();
 
   _$ReceiptProcessingSettings._(
       {this.ocrEngine,
@@ -50,6 +52,7 @@ class _$ReceiptProcessingSettings extends ReceiptProcessingSettings {
       this.name,
       this.description,
       this.model,
+      this.enforceJsonResponseFormat,
       this.prompt,
       this.url,
       this.key,
@@ -58,13 +61,7 @@ class _$ReceiptProcessingSettings extends ReceiptProcessingSettings {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        id, r'ReceiptProcessingSettings', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'ReceiptProcessingSettings', 'createdAt');
-  }
-
+      : super._();
   @override
   ReceiptProcessingSettings rebuild(
           void Function(ReceiptProcessingSettingsBuilder) updates) =>
@@ -72,7 +69,7 @@ class _$ReceiptProcessingSettings extends ReceiptProcessingSettings {
 
   @override
   ReceiptProcessingSettingsBuilder toBuilder() =>
-      new ReceiptProcessingSettingsBuilder()..replace(this);
+      ReceiptProcessingSettingsBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -85,6 +82,7 @@ class _$ReceiptProcessingSettings extends ReceiptProcessingSettings {
         name == other.name &&
         description == other.description &&
         model == other.model &&
+        enforceJsonResponseFormat == other.enforceJsonResponseFormat &&
         prompt == other.prompt &&
         url == other.url &&
         key == other.key &&
@@ -105,6 +103,7 @@ class _$ReceiptProcessingSettings extends ReceiptProcessingSettings {
     _$hash = $jc(_$hash, name.hashCode);
     _$hash = $jc(_$hash, description.hashCode);
     _$hash = $jc(_$hash, model.hashCode);
+    _$hash = $jc(_$hash, enforceJsonResponseFormat.hashCode);
     _$hash = $jc(_$hash, prompt.hashCode);
     _$hash = $jc(_$hash, url.hashCode);
     _$hash = $jc(_$hash, key.hashCode);
@@ -127,6 +126,7 @@ class _$ReceiptProcessingSettings extends ReceiptProcessingSettings {
           ..add('name', name)
           ..add('description', description)
           ..add('model', model)
+          ..add('enforceJsonResponseFormat', enforceJsonResponseFormat)
           ..add('prompt', prompt)
           ..add('url', url)
           ..add('key', key)
@@ -176,8 +176,13 @@ class ReceiptProcessingSettingsBuilder
   String? get model => _$this._model;
   set model(covariant String? model) => _$this._model = model;
 
+  bool? _enforceJsonResponseFormat;
+  bool? get enforceJsonResponseFormat => _$this._enforceJsonResponseFormat;
+  set enforceJsonResponseFormat(covariant bool? enforceJsonResponseFormat) =>
+      _$this._enforceJsonResponseFormat = enforceJsonResponseFormat;
+
   PromptBuilder? _prompt;
-  PromptBuilder get prompt => _$this._prompt ??= new PromptBuilder();
+  PromptBuilder get prompt => _$this._prompt ??= PromptBuilder();
   set prompt(covariant PromptBuilder? prompt) => _$this._prompt = prompt;
 
   String? _url;
@@ -223,6 +228,7 @@ class ReceiptProcessingSettingsBuilder
       _name = $v.name;
       _description = $v.description;
       _model = $v.model;
+      _enforceJsonResponseFormat = $v.enforceJsonResponseFormat;
       _prompt = $v.prompt?.toBuilder();
       _url = $v.url;
       _key = $v.key;
@@ -238,7 +244,6 @@ class ReceiptProcessingSettingsBuilder
 
   @override
   void replace(covariant ReceiptProcessingSettings other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$ReceiptProcessingSettings;
   }
 
@@ -254,31 +259,33 @@ class ReceiptProcessingSettingsBuilder
     _$ReceiptProcessingSettings _$result;
     try {
       _$result = _$v ??
-          new _$ReceiptProcessingSettings._(
-              ocrEngine: ocrEngine,
-              isVisionModel: isVisionModel,
-              aiType: aiType,
-              promptId: promptId,
-              name: name,
-              description: description,
-              model: model,
-              prompt: _prompt?.build(),
-              url: url,
-              key: key,
-              id: BuiltValueNullFieldError.checkNotNull(
-                  id, r'ReceiptProcessingSettings', 'id'),
-              createdAt: BuiltValueNullFieldError.checkNotNull(
-                  createdAt, r'ReceiptProcessingSettings', 'createdAt'),
-              createdBy: createdBy,
-              createdByString: createdByString,
-              updatedAt: updatedAt);
+          _$ReceiptProcessingSettings._(
+            ocrEngine: ocrEngine,
+            isVisionModel: isVisionModel,
+            aiType: aiType,
+            promptId: promptId,
+            name: name,
+            description: description,
+            model: model,
+            enforceJsonResponseFormat: enforceJsonResponseFormat,
+            prompt: _prompt?.build(),
+            url: url,
+            key: key,
+            id: BuiltValueNullFieldError.checkNotNull(
+                id, r'ReceiptProcessingSettings', 'id'),
+            createdAt: BuiltValueNullFieldError.checkNotNull(
+                createdAt, r'ReceiptProcessingSettings', 'createdAt'),
+            createdBy: createdBy,
+            createdByString: createdByString,
+            updatedAt: updatedAt,
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'prompt';
         _prompt?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'ReceiptProcessingSettings', _$failedField, e.toString());
       }
       rethrow;

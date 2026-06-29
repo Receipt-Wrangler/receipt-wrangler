@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
+	"receipt-wrangler/api/internal/utils"
 
 	"github.com/shopspring/decimal"
 )
@@ -28,6 +29,12 @@ func (service PieChartService) GetPieChartData(
 	command commands.PieChartDataCommand,
 ) (structs.PieChartData, error) {
 	receiptRepository := repositories.NewReceiptRepository(service.TX)
+	permissionService := NewPermissionService(service.TX)
+
+	uintGroupId, err := utils.StringToUint(groupId)
+	if err != nil {
+		return structs.PieChartData{}, err
+	}
 
 	pagedRequest := commands.ReceiptPagedRequestCommand{
 		PagedRequestCommand: commands.PagedRequestCommand{
@@ -39,12 +46,26 @@ func (service PieChartService) GetPieChartData(
 		Filter: command.Filter,
 	}
 
+	// Restrict any category/tag filter to what the caller may see (anti-probing).
+	err = permissionService.IntersectReceiptFilterWithGrants(userId, uintGroupId, &pagedRequest.Filter)
+	if err != nil {
+		return structs.PieChartData{}, err
+	}
+
 	receipts, _, err := receiptRepository.GetPagedReceiptsByGroupId(
 		userId,
 		groupId,
 		pagedRequest,
 		[]string{"Categories", "Tags"},
+		permissionService.PaidByListResolver(userId),
 	)
+	if err != nil {
+		return structs.PieChartData{}, err
+	}
+
+	// Strip categories/tags the caller cannot see so they are not aggregated into
+	// the chart (a disallowed category collapses to Uncategorized/Untagged).
+	err = permissionService.FilterReceiptCategoriesTags(userId, receipts)
 	if err != nil {
 		return structs.PieChartData{}, err
 	}

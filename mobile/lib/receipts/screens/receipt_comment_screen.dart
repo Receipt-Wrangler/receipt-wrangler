@@ -7,8 +7,10 @@ import 'package:rxdart/rxdart.dart';
 
 import '../../client/client.dart';
 import '../../models/auth_model.dart';
+import '../../models/permissions_model.dart';
 import '../../models/receipt_model.dart';
 import '../../enums/form_state.dart';
+import '../../shared/functions/permissions.dart';
 import '../../shared/widgets/screen_wrapper.dart';
 import '../../utils/snackbar.dart';
 import '../widgets/receipt_comments.dart';
@@ -70,6 +72,19 @@ class _ReceiptCommentScreenState extends State<ReceiptCommentScreen> {
   Widget _buildCommentBottomSheet() {
     if (formState == WranglerFormState.view) {
       return SizedBox.shrink();
+    }
+
+    // For an existing receipt, hide the input unless the caller may add comments
+    // in its group (mirrors the desktop comment gate). In add-state the receipt
+    // has no persisted group yet, so the client gate is skipped and the backend
+    // still enforces on submit.
+    final groupId = receipt.groupId;
+    if (groupId > 0) {
+      final permissionsModel =
+          Provider.of<PermissionsModel>(context, listen: false);
+      if (!canCommentCreate(permissionsModel, groupId)) {
+        return SizedBox.shrink();
+      }
     }
 
     var formKey = GlobalKey<FormBuilderState>();

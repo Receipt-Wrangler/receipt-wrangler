@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -46,7 +47,7 @@ func TestShouldNotAllowUserToDeleteUser(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -71,7 +72,7 @@ func TestShouldNotAllowUserToResetPassword(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -96,7 +97,7 @@ func TestShouldNotAllowUserToConvertUser(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -121,7 +122,7 @@ func TestShouldNotAllowUserToCreateUser(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -146,7 +147,7 @@ func TestShouldNotAllowUserToUpdateUser(t *testing.T) {
 		WithValue(
 			r.Context(),
 			jwtmiddleware.ContextKey{},
-			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}},
+			&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
 		)
 	r = r.WithContext(newContext)
 
@@ -157,7 +158,7 @@ func TestShouldNotAllowUserToUpdateUser(t *testing.T) {
 	}
 }
 
-func createTestUser(t *testing.T, username string, password string, role models.UserRole) models.User {
+func createTestUser(t *testing.T, username string, password string) models.User {
 	userRepository := repositories.NewUserRepository(nil)
 	user, err := userRepository.CreateUser(commands.SignUpCommand{
 		Username:    username,
@@ -166,12 +167,6 @@ func createTestUser(t *testing.T, username string, password string, role models.
 	})
 	if err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
-	}
-
-	if role != "" {
-		db := repositories.GetDB()
-		db.Model(&models.User{}).Where("id = ?", user.ID).Update("user_role", role)
-		user.UserRole = role
 	}
 
 	return user
@@ -183,7 +178,7 @@ func TestDeleteAccountShouldFailWithWrongPassword(t *testing.T) {
 	db := repositories.GetDB()
 	db.Create(&models.SystemEmail{})
 
-	user := createTestUser(t, "testuser", "correctpassword", models.USER)
+	user := createTestUser(t, "testuser", "correctpassword")
 
 	w := httptest.NewRecorder()
 	reader := strings.NewReader("")
@@ -191,9 +186,11 @@ func TestDeleteAccountShouldFailWithWrongPassword(t *testing.T) {
 
 	ctx := context.WithValue(r.Context(), "deleteAccountCommand", commands.DeleteAccountCommand{Password: "wrongpassword"})
 	ctx = context.WithValue(ctx, jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: user.ID, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: user.ID},
 	})
 	r = r.WithContext(ctx)
+
+	grantAppPerms(t, user.ID, permissions.AppAccountDelete)
 
 	DeleteAccount(w, r)
 
@@ -209,8 +206,9 @@ func TestDeleteAccountShouldSucceedWithCorrectPassword(t *testing.T) {
 	db.Create(&models.SystemEmail{})
 
 	// Create a second admin so this user is not the only admin
-	createTestUser(t, "adminuser", "adminpass", models.ADMIN)
-	user := createTestUser(t, "testuser", "correctpassword", models.USER)
+	adminUser := createTestUser(t, "adminuser", "adminpass")
+	grantAppPerms(t, adminUser.ID, permissions.AppUsersRead)
+	user := createTestUser(t, "testuser", "correctpassword")
 
 	w := httptest.NewRecorder()
 	reader := strings.NewReader("")
@@ -218,9 +216,11 @@ func TestDeleteAccountShouldSucceedWithCorrectPassword(t *testing.T) {
 
 	ctx := context.WithValue(r.Context(), "deleteAccountCommand", commands.DeleteAccountCommand{Password: "correctpassword"})
 	ctx = context.WithValue(ctx, jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: user.ID, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: user.ID},
 	})
 	r = r.WithContext(ctx)
+
+	grantAppPerms(t, user.ID, permissions.AppAccountDelete)
 
 	DeleteAccount(w, r)
 
@@ -242,12 +242,18 @@ func TestDeleteAccountShouldPreventLastAdminDeletion(t *testing.T) {
 	db := repositories.GetDB()
 	db.Create(&models.SystemEmail{})
 
-	// This user will be the only admin (first user created gets ADMIN role)
-	user := createTestUser(t, "onlyadmin", "adminpassword", models.ADMIN)
+	// This user will be the only admin. "Administrator" is defined by the
+	// modern app.users.read permission (see services.DeleteAccount), so grant
+	// it the admin permission alongside the self-service delete permission.
+	user := createTestUser(t, "onlyadmin", "adminpassword")
+	grantAppPerms(t, user.ID, permissions.AppUsersRead, permissions.AppAccountDelete)
 
 	// Ensure no other admins exist
-	var adminCount int64
-	db.Model(&models.User{}).Where("user_role = ?", models.ADMIN).Count(&adminCount)
+	roleRepository := repositories.NewRoleRepository(nil)
+	adminCount, err := roleRepository.CountUsersWithAppPermission(permissions.AppUsersRead)
+	if err != nil {
+		t.Fatalf("count admins: %v", err)
+	}
 	if adminCount != 1 {
 		t.Fatalf("Expected exactly 1 admin, got %d", adminCount)
 	}
@@ -258,7 +264,7 @@ func TestDeleteAccountShouldPreventLastAdminDeletion(t *testing.T) {
 
 	ctx := context.WithValue(r.Context(), "deleteAccountCommand", commands.DeleteAccountCommand{Password: "adminpassword"})
 	ctx = context.WithValue(ctx, jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: user.ID, UserRole: models.ADMIN},
+		CustomClaims: &structs.Claims{UserId: user.ID},
 	})
 	r = r.WithContext(ctx)
 
@@ -280,8 +286,11 @@ func TestDeleteAccountShouldPreventLastAdminDeletion(t *testing.T) {
 // GetAmountOwedForUser tests
 // ---------------------------------------------------------------------------
 
-func setupAmountOwedTest() {
+func setupAmountOwedTest(t *testing.T) {
 	repositories.CreateTestGroupWithUsers()
+	// GetAmountOwedForUser is gated on group.receipts.read; authorize user 1 in
+	// group 1 (the group the positive cases query).
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
 }
 
 func createReceiptWithItems(
@@ -345,7 +354,7 @@ func callGetAmountOwed(callerUserId uint, groupId string, receiptIds []string) (
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	ctx := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{
-		CustomClaims: &structs.Claims{UserId: callerUserId, UserRole: models.USER},
+		CustomClaims: &structs.Claims{UserId: callerUserId},
 	})
 	r = r.WithContext(ctx)
 
@@ -390,7 +399,7 @@ func assertOwed(t *testing.T, result map[uint]decimal.Decimal, otherUserId uint,
 
 func TestGetAmountOwedForUserReturnsForbiddenWhenCallerNotInGroup(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 4 is only in Group 2; calling with groupId=1 must be rejected.
 	w, _ := callGetAmountOwed(4, "1", nil)
@@ -404,7 +413,7 @@ func TestGetAmountOwedForUserReturnsForbiddenWhenCallerNotInGroup(t *testing.T) 
 
 func TestGetAmountOwedForUserEmptyResultWhenNoReceiptsExist(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	w, result := callGetAmountOwed(1, "1", nil)
 
@@ -419,7 +428,7 @@ func TestGetAmountOwedForUserEmptyResultWhenNoReceiptsExist(t *testing.T) {
 
 func TestGetAmountOwedForUserExcludesItemsChargedToPayer(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Self-charged", 10, 1, 1, []commands.UpsertItemCommand{
 		chargedItem("only item", 10, 1),
@@ -440,7 +449,7 @@ func TestGetAmountOwedForUserExcludesItemsChargedToPayer(t *testing.T) {
 
 func TestGetAmountOwedForUserCallerChargedOnOthersReceipt(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 2 paid; item charged to user 1.
 	createReceiptWithItems(t, "Lunch", 10, 2, 1, []commands.UpsertItemCommand{
@@ -458,7 +467,7 @@ func TestGetAmountOwedForUserCallerChargedOnOthersReceipt(t *testing.T) {
 
 func TestGetAmountOwedForUserCallerPaidForOthersItem(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 1 paid; item charged to user 2.
 	createReceiptWithItems(t, "Lunch", 10, 1, 1, []commands.UpsertItemCommand{
@@ -478,7 +487,7 @@ func TestGetAmountOwedForUserCallerPaidForOthersItem(t *testing.T) {
 
 func TestGetAmountOwedForUserMultipleItemsSameUserSum(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Groceries", 30, 2, 1, []commands.UpsertItemCommand{
 		chargedItem("apples", 10, 1),
@@ -497,7 +506,7 @@ func TestGetAmountOwedForUserMultipleItemsSameUserSum(t *testing.T) {
 
 func TestGetAmountOwedForUserItemsChargedToMultipleUsersExcludesSelf(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Dinner", 30, 1, 1, []commands.UpsertItemCommand{
 		chargedItem("steak (user 2)", 10, 2),
@@ -520,7 +529,7 @@ func TestGetAmountOwedForUserItemsChargedToMultipleUsersExcludesSelf(t *testing.
 
 func TestGetAmountOwedForUserNetCancellationAcrossTwoReceipts(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 2 paid $10, item charged to user 1 → caller owes 10.
 	createReceiptWithItems(t, "Lunch", 10, 2, 1, []commands.UpsertItemCommand{
@@ -544,7 +553,7 @@ func TestGetAmountOwedForUserNetCancellationAcrossTwoReceipts(t *testing.T) {
 
 func TestGetAmountOwedForUserNegativeReceiptCallerCharged(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 2 received a $50 refund; item -$50 charged to user 1.
 	// Semantics: user 2 owes the refund share back to user 1 → negative entry.
@@ -563,7 +572,7 @@ func TestGetAmountOwedForUserNegativeReceiptCallerCharged(t *testing.T) {
 
 func TestGetAmountOwedForUserNegativeReceiptCallerPaid(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 1 received a $50 refund; item -$50 charged to user 2.
 	// Semantics: caller must pass user 2's share of the refund → positive entry.
@@ -582,7 +591,7 @@ func TestGetAmountOwedForUserNegativeReceiptCallerPaid(t *testing.T) {
 
 func TestGetAmountOwedForUserRefundCancelsOriginalDebt(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// Original purchase: user 2 paid $50, item charged to user 1 → caller owes 50.
 	createReceiptWithItems(t, "Original", 50, 2, 1, []commands.UpsertItemCommand{
@@ -604,7 +613,7 @@ func TestGetAmountOwedForUserRefundCancelsOriginalDebt(t *testing.T) {
 
 func TestGetAmountOwedForUserMixedSignItemsInOneReceipt(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	// User 2 paid; one $20 item charged to user 1 and one -$20 item charged to user 1.
 	// Net contribution to user 1's debt to user 2 is zero.
@@ -626,7 +635,7 @@ func TestGetAmountOwedForUserMixedSignItemsInOneReceipt(t *testing.T) {
 
 func TestGetAmountOwedForUserZeroAmountItemContributesZero(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Free sample", 0, 2, 1, []commands.UpsertItemCommand{
 		chargedItem("free item", 0, 1),
@@ -648,7 +657,7 @@ func TestGetAmountOwedForUserZeroAmountItemContributesZero(t *testing.T) {
 
 func TestGetAmountOwedForUserExcludesResolvedItems(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Mixed statuses", 20, 2, 1, []commands.UpsertItemCommand{
 		chargedItemWithStatus("counted", 10, 1, models.ITEM_OPEN),
@@ -666,7 +675,7 @@ func TestGetAmountOwedForUserExcludesResolvedItems(t *testing.T) {
 
 func TestGetAmountOwedForUserExcludesDraftItems(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	createReceiptWithItems(t, "Draft mix", 20, 2, 1, []commands.UpsertItemCommand{
 		chargedItemWithStatus("counted", 10, 1, models.ITEM_OPEN),
@@ -686,7 +695,7 @@ func TestGetAmountOwedForUserExcludesDraftItems(t *testing.T) {
 
 func TestGetAmountOwedForUserAllGroupAggregatesAcrossMemberships(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	db := repositories.GetDB()
 	// Make user 1 a member of Group 2 as well so the all-group covers both groups.
@@ -698,6 +707,7 @@ func TestGetAmountOwedForUserAllGroupAggregatesAcrossMemberships(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create all-group: %v", err)
 	}
+	grantGroupPerms(t, 1, allGroup.ID, permissions.GroupReceiptsRead)
 
 	// Group 1: user 2 paid $10, item charged to user 1 → caller owes user 2.
 	createReceiptWithItems(t, "G1 receipt", 10, 2, 1, []commands.UpsertItemCommand{
@@ -722,7 +732,7 @@ func TestGetAmountOwedForUserAllGroupAggregatesAcrossMemberships(t *testing.T) {
 
 func TestGetAmountOwedForUserReceiptIdsWithoutGroupId(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	receipt := createReceiptWithItems(t, "Lunch", 10, 2, 1, []commands.UpsertItemCommand{
 		chargedItem("burger", 10, 1),
@@ -740,10 +750,12 @@ func TestGetAmountOwedForUserReceiptIdsWithoutGroupId(t *testing.T) {
 
 func TestGetAmountOwedForUserReceiptIdsCombinedWithGroupId(t *testing.T) {
 	defer tearDownUserTest()
-	setupAmountOwedTest()
+	setupAmountOwedTest(t)
 
 	db := repositories.GetDB()
 	db.Create(&models.GroupMember{GroupID: 2, UserID: 1})
+	// The out-of-group receipt is in group 2; authorize the caller there too.
+	grantGroupPerms(t, 1, 2, permissions.GroupReceiptsRead)
 
 	// In-group receipt (groupId path).
 	createReceiptWithItems(t, "G1 receipt", 10, 2, 1, []commands.UpsertItemCommand{

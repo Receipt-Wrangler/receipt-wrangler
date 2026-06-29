@@ -77,6 +77,16 @@ func (repository GroupRepository) isValidColumn(orderBy string) bool {
 		orderBy == "updated_at"
 }
 
+// buildGroupMemberFromCommand maps an upsert command to a GroupMember, honoring
+// the modern group role id supplied on the command.
+func buildGroupMemberFromCommand(command commands.UpsertGroupMemberCommand) models.GroupMember {
+	return models.GroupMember{
+		UserID:      command.UserID,
+		GroupID:     command.GroupID,
+		GroupRoleID: command.GroupRoleID,
+	}
+}
+
 func (repository GroupRepository) CreateGroup(command commands.UpsertGroupCommand, userId uint) (models.Group, error) {
 	// TODO: move hooks on delete to repository func
 	db := repository.GetDB()
@@ -87,13 +97,7 @@ func (repository GroupRepository) CreateGroup(command commands.UpsertGroupComman
 	groupToCreate.Status = command.Status
 	groupToCreate.IsAllGroup = command.IsAllGroup
 	for i := 0; i < len(command.GroupMembers); i++ {
-		groupMemberCommand := command.GroupMembers[i]
-		groupMember := models.GroupMember{
-			UserID:    groupMemberCommand.UserID,
-			GroupID:   groupMemberCommand.GroupID,
-			GroupRole: groupMemberCommand.GroupRole,
-		}
-
+		groupMember := buildGroupMemberFromCommand(command.GroupMembers[i])
 		groupToCreate.GroupMembers = append(groupToCreate.GroupMembers, groupMember)
 	}
 
@@ -108,10 +112,20 @@ func (repository GroupRepository) CreateGroup(command commands.UpsertGroupComman
 			return txErr
 		}
 
+		// Assign the creator the modern default group role so the membership is
+		// not locked out under permission enforcement. Best-effort: nil when no
+		// default is seeded (e.g. an unseeded test database).
+		roleRepository := NewRoleRepository(tx)
+		defaultGroupRoleId, txErr := roleRepository.GetDefaultGroupRoleId()
+		if txErr != nil {
+			repository.ClearTransaction()
+			return txErr
+		}
+
 		groupMember := models.GroupMember{
-			UserID:    userId,
-			GroupID:   groupToCreate.ID,
-			GroupRole: models.OWNER,
+			UserID:      userId,
+			GroupID:     groupToCreate.ID,
+			GroupRoleID: defaultGroupRoleId,
 		}
 
 		txErr = tx.Model(&groupMember).Create(&groupMember).Error
@@ -167,18 +181,13 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 	groupToUpdate.ID = uint(u64Id)
 
 	for i := 0; i < len(command.GroupMembers); i++ {
-		groupMemberCommand := command.GroupMembers[i]
-		groupMember := models.GroupMember{
-			UserID:    groupMemberCommand.UserID,
-			GroupID:   groupMemberCommand.GroupID,
-			GroupRole: groupMemberCommand.GroupRole,
-		}
+		groupMember := buildGroupMemberFromCommand(command.GroupMembers[i])
 		groupToUpdate.GroupMembers = append(groupToUpdate.GroupMembers, groupMember)
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 		txErr := tx.Session(&gorm.Session{FullSaveAssociations: true}).Model(&groupToUpdate).Omit("ID", "is_all_group").Updates(&groupToUpdate).Error
-		if err != nil {
+		if txErr != nil {
 			return txErr
 		}
 

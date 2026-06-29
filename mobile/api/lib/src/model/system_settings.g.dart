@@ -8,11 +8,17 @@ part of 'system_settings.dart';
 
 class _$SystemSettings extends SystemSettings {
   @override
+  final bool? mcpEnabled;
+  @override
   final CurrencySeparator? currencyThousandthsSeparator;
+  @override
+  final int? pdfDpi;
   @override
   final String? currencyDisplay;
   @override
   final bool? currencyHideDecimalPlaces;
+  @override
+  final String? mcpPublicUrl;
   @override
   final CurrencySeparator? currencyDecimalSeparator;
   @override
@@ -45,12 +51,15 @@ class _$SystemSettings extends SystemSettings {
   final String? updatedAt;
 
   factory _$SystemSettings([void Function(SystemSettingsBuilder)? updates]) =>
-      (new SystemSettingsBuilder()..update(updates))._build();
+      (SystemSettingsBuilder()..update(updates))._build();
 
   _$SystemSettings._(
-      {this.currencyThousandthsSeparator,
+      {this.mcpEnabled,
+      this.currencyThousandthsSeparator,
+      this.pdfDpi,
       this.currencyDisplay,
       this.currencyHideDecimalPlaces,
+      this.mcpPublicUrl,
       this.currencyDecimalSeparator,
       this.debugOcr,
       this.fallbackReceiptProcessingSettingsId,
@@ -66,29 +75,24 @@ class _$SystemSettings extends SystemSettings {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        taskQueueConfigurations, r'SystemSettings', 'taskQueueConfigurations');
-    BuiltValueNullFieldError.checkNotNull(id, r'SystemSettings', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'SystemSettings', 'createdAt');
-  }
-
+      : super._();
   @override
   SystemSettings rebuild(void Function(SystemSettingsBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  SystemSettingsBuilder toBuilder() =>
-      new SystemSettingsBuilder()..replace(this);
+  SystemSettingsBuilder toBuilder() => SystemSettingsBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is SystemSettings &&
+        mcpEnabled == other.mcpEnabled &&
         currencyThousandthsSeparator == other.currencyThousandthsSeparator &&
+        pdfDpi == other.pdfDpi &&
         currencyDisplay == other.currencyDisplay &&
         currencyHideDecimalPlaces == other.currencyHideDecimalPlaces &&
+        mcpPublicUrl == other.mcpPublicUrl &&
         currencyDecimalSeparator == other.currencyDecimalSeparator &&
         debugOcr == other.debugOcr &&
         fallbackReceiptProcessingSettingsId ==
@@ -110,9 +114,12 @@ class _$SystemSettings extends SystemSettings {
   @override
   int get hashCode {
     var _$hash = 0;
+    _$hash = $jc(_$hash, mcpEnabled.hashCode);
     _$hash = $jc(_$hash, currencyThousandthsSeparator.hashCode);
+    _$hash = $jc(_$hash, pdfDpi.hashCode);
     _$hash = $jc(_$hash, currencyDisplay.hashCode);
     _$hash = $jc(_$hash, currencyHideDecimalPlaces.hashCode);
+    _$hash = $jc(_$hash, mcpPublicUrl.hashCode);
     _$hash = $jc(_$hash, currencyDecimalSeparator.hashCode);
     _$hash = $jc(_$hash, debugOcr.hashCode);
     _$hash = $jc(_$hash, fallbackReceiptProcessingSettingsId.hashCode);
@@ -135,9 +142,12 @@ class _$SystemSettings extends SystemSettings {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'SystemSettings')
+          ..add('mcpEnabled', mcpEnabled)
           ..add('currencyThousandthsSeparator', currencyThousandthsSeparator)
+          ..add('pdfDpi', pdfDpi)
           ..add('currencyDisplay', currencyDisplay)
           ..add('currencyHideDecimalPlaces', currencyHideDecimalPlaces)
+          ..add('mcpPublicUrl', mcpPublicUrl)
           ..add('currencyDecimalSeparator', currencyDecimalSeparator)
           ..add('debugOcr', debugOcr)
           ..add('fallbackReceiptProcessingSettingsId',
@@ -164,12 +174,20 @@ class SystemSettingsBuilder
         BaseModelBuilder {
   _$SystemSettings? _$v;
 
+  bool? _mcpEnabled;
+  bool? get mcpEnabled => _$this._mcpEnabled;
+  set mcpEnabled(covariant bool? mcpEnabled) => _$this._mcpEnabled = mcpEnabled;
+
   CurrencySeparator? _currencyThousandthsSeparator;
   CurrencySeparator? get currencyThousandthsSeparator =>
       _$this._currencyThousandthsSeparator;
   set currencyThousandthsSeparator(
           covariant CurrencySeparator? currencyThousandthsSeparator) =>
       _$this._currencyThousandthsSeparator = currencyThousandthsSeparator;
+
+  int? _pdfDpi;
+  int? get pdfDpi => _$this._pdfDpi;
+  set pdfDpi(covariant int? pdfDpi) => _$this._pdfDpi = pdfDpi;
 
   String? _currencyDisplay;
   String? get currencyDisplay => _$this._currencyDisplay;
@@ -180,6 +198,11 @@ class SystemSettingsBuilder
   bool? get currencyHideDecimalPlaces => _$this._currencyHideDecimalPlaces;
   set currencyHideDecimalPlaces(covariant bool? currencyHideDecimalPlaces) =>
       _$this._currencyHideDecimalPlaces = currencyHideDecimalPlaces;
+
+  String? _mcpPublicUrl;
+  String? get mcpPublicUrl => _$this._mcpPublicUrl;
+  set mcpPublicUrl(covariant String? mcpPublicUrl) =>
+      _$this._mcpPublicUrl = mcpPublicUrl;
 
   CurrencySeparator? _currencyDecimalSeparator;
   CurrencySeparator? get currencyDecimalSeparator =>
@@ -233,8 +256,7 @@ class SystemSettingsBuilder
 
   ListBuilder<TaskQueueConfiguration>? _taskQueueConfigurations;
   ListBuilder<TaskQueueConfiguration> get taskQueueConfigurations =>
-      _$this._taskQueueConfigurations ??=
-          new ListBuilder<TaskQueueConfiguration>();
+      _$this._taskQueueConfigurations ??= ListBuilder<TaskQueueConfiguration>();
   set taskQueueConfigurations(
           covariant ListBuilder<TaskQueueConfiguration>?
               taskQueueConfigurations) =>
@@ -268,9 +290,12 @@ class SystemSettingsBuilder
   SystemSettingsBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
+      _mcpEnabled = $v.mcpEnabled;
       _currencyThousandthsSeparator = $v.currencyThousandthsSeparator;
+      _pdfDpi = $v.pdfDpi;
       _currencyDisplay = $v.currencyDisplay;
       _currencyHideDecimalPlaces = $v.currencyHideDecimalPlaces;
+      _mcpPublicUrl = $v.mcpPublicUrl;
       _currencyDecimalSeparator = $v.currencyDecimalSeparator;
       _debugOcr = $v.debugOcr;
       _fallbackReceiptProcessingSettingsId =
@@ -294,7 +319,6 @@ class SystemSettingsBuilder
 
   @override
   void replace(covariant SystemSettings other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$SystemSettings;
   }
 
@@ -310,35 +334,39 @@ class SystemSettingsBuilder
     _$SystemSettings _$result;
     try {
       _$result = _$v ??
-          new _$SystemSettings._(
-              currencyThousandthsSeparator: currencyThousandthsSeparator,
-              currencyDisplay: currencyDisplay,
-              currencyHideDecimalPlaces: currencyHideDecimalPlaces,
-              currencyDecimalSeparator: currencyDecimalSeparator,
-              debugOcr: debugOcr,
-              fallbackReceiptProcessingSettingsId:
-                  fallbackReceiptProcessingSettingsId,
-              receiptProcessingSettingsId: receiptProcessingSettingsId,
-              currencySymbolPosition: currencySymbolPosition,
-              taskConcurrency: taskConcurrency,
-              emailPollingInterval: emailPollingInterval,
-              numWorkers: numWorkers,
-              enableLocalSignUp: enableLocalSignUp,
-              taskQueueConfigurations: taskQueueConfigurations.build(),
-              id: BuiltValueNullFieldError.checkNotNull(
-                  id, r'SystemSettings', 'id'),
-              createdAt: BuiltValueNullFieldError.checkNotNull(
-                  createdAt, r'SystemSettings', 'createdAt'),
-              createdBy: createdBy,
-              createdByString: createdByString,
-              updatedAt: updatedAt);
+          _$SystemSettings._(
+            mcpEnabled: mcpEnabled,
+            currencyThousandthsSeparator: currencyThousandthsSeparator,
+            pdfDpi: pdfDpi,
+            currencyDisplay: currencyDisplay,
+            currencyHideDecimalPlaces: currencyHideDecimalPlaces,
+            mcpPublicUrl: mcpPublicUrl,
+            currencyDecimalSeparator: currencyDecimalSeparator,
+            debugOcr: debugOcr,
+            fallbackReceiptProcessingSettingsId:
+                fallbackReceiptProcessingSettingsId,
+            receiptProcessingSettingsId: receiptProcessingSettingsId,
+            currencySymbolPosition: currencySymbolPosition,
+            taskConcurrency: taskConcurrency,
+            emailPollingInterval: emailPollingInterval,
+            numWorkers: numWorkers,
+            enableLocalSignUp: enableLocalSignUp,
+            taskQueueConfigurations: taskQueueConfigurations.build(),
+            id: BuiltValueNullFieldError.checkNotNull(
+                id, r'SystemSettings', 'id'),
+            createdAt: BuiltValueNullFieldError.checkNotNull(
+                createdAt, r'SystemSettings', 'createdAt'),
+            createdBy: createdBy,
+            createdByString: createdByString,
+            updatedAt: updatedAt,
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'taskQueueConfigurations';
         taskQueueConfigurations.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'SystemSettings', _$failedField, e.toString());
       }
       rethrow;

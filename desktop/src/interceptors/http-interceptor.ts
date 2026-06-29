@@ -1,19 +1,17 @@
 import { HttpErrorResponse, HttpInterceptorFn } from "@angular/common/http";
 import { inject } from "@angular/core";
-import { ActivatedRoute, Router } from "@angular/router";
+import { ActivatedRoute } from "@angular/router";
 import { Store } from "@ngxs/store";
-import { catchError, switchMap, throwError } from "rxjs";
-import { SnackbarService, TokenRefreshService } from "../services";
-import { AuthState, Logout } from "../store";
+import { catchError, throwError } from "rxjs";
+import { SnackbarService } from "../services";
+import { AuthState } from "../store";
 
-const RETRY_HEADER = "X-Token-Retry";
+const FORBIDDEN_MESSAGE = "You do not have permission to perform this action.";
 
 export const httpInterceptor: HttpInterceptorFn = (req, next) => {
   const store = inject(Store);
-  const router = inject(Router);
   const activatedRoute = inject(ActivatedRoute);
   const snackbarService = inject(SnackbarService);
-  const tokenRefreshService = inject(TokenRefreshService);
 
   return next(req).pipe(
     catchError((e: HttpErrorResponse) => {
@@ -24,32 +22,23 @@ export const httpInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => e);
       }
 
-      if (e.status === 403 && isLoggedIn && !req.headers.has(RETRY_HEADER)) {
-        // Attempt token refresh before giving up
-        return tokenRefreshService.refreshToken().pipe(
-          switchMap(() => {
-            const retryReq = req.clone({
-              headers: req.headers.set(RETRY_HEADER, "true"),
-            });
-            return next(retryReq);
-          }),
-          catchError((retryErr) => {
-            store.dispatch(new Logout());
-            localStorage.clear();
-            router.navigate(["/auth/login"]);
-            return throwError(() => retryErr);
-          }),
-        );
-      }
+      // NOTE: We check for queueMode to gracefully handle creating queues with mixed permissions
+      const receiptQueueMode = activatedRoute.snapshot.queryParams["queueMode"];
 
-      if (e.status === 403 && isLoggedIn && req.headers.has(RETRY_HEADER)) {
+      // The backend returns 403 for genuine permission denials too, not just auth. With a
+      // still-valid token this is a permission denial, so surface it instead of logging the
+      // user out. Token freshness is handled proactively elsewhere (15-min refresh timer,
+      // app-init, and the auth guard).
+      if (e.status === 403 && isLoggedIn) {
+        // Toast only user-initiated actions; background GET reads are handled by their callers.
+        if (req.method !== "GET" && !receiptQueueMode) {
+          snackbarService.error(FORBIDDEN_MESSAGE);
+        }
         return throwError(() => e);
       }
 
       const regex = new RegExp("5\\d{2}");
-      const receiptQueueMode = activatedRoute.snapshot.queryParams["queueMode"];
 
-      // NOTE: We check for queueMode to gracefully handle creating queues with mixed permissions
       if (e.error?.errorMsg && !receiptQueueMode) {
         snackbarService.error(e.error?.errorMsg);
       }

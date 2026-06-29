@@ -27,7 +27,7 @@ class _$FileData extends FileData {
   final String? updatedAt;
 
   factory _$FileData([void Function(FileDataBuilder)? updates]) =>
-      (new FileDataBuilder()..update(updates))._build();
+      (FileDataBuilder()..update(updates))._build();
 
   _$FileData._(
       {this.createdAt,
@@ -39,17 +39,13 @@ class _$FileData extends FileData {
       required this.receiptId,
       this.size,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(id, r'FileData', 'id');
-    BuiltValueNullFieldError.checkNotNull(receiptId, r'FileData', 'receiptId');
-  }
-
+      : super._();
   @override
   FileData rebuild(void Function(FileDataBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  FileDataBuilder toBuilder() => new FileDataBuilder()..replace(this);
+  FileDataBuilder toBuilder() => FileDataBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -118,8 +114,7 @@ class FileDataBuilder implements Builder<FileData, FileDataBuilder> {
   set id(int? id) => _$this._id = id;
 
   ListBuilder<int>? _imageData;
-  ListBuilder<int> get imageData =>
-      _$this._imageData ??= new ListBuilder<int>();
+  ListBuilder<int> get imageData => _$this._imageData ??= ListBuilder<int>();
   set imageData(ListBuilder<int>? imageData) => _$this._imageData = imageData;
 
   String? _name;
@@ -161,7 +156,6 @@ class FileDataBuilder implements Builder<FileData, FileDataBuilder> {
 
   @override
   void replace(FileData other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$FileData;
   }
 
@@ -177,24 +171,25 @@ class FileDataBuilder implements Builder<FileData, FileDataBuilder> {
     _$FileData _$result;
     try {
       _$result = _$v ??
-          new _$FileData._(
-              createdAt: createdAt,
-              createdBy: createdBy,
-              fileType: fileType,
-              id: BuiltValueNullFieldError.checkNotNull(id, r'FileData', 'id'),
-              imageData: _imageData?.build(),
-              name: name,
-              receiptId: BuiltValueNullFieldError.checkNotNull(
-                  receiptId, r'FileData', 'receiptId'),
-              size: size,
-              updatedAt: updatedAt);
+          _$FileData._(
+            createdAt: createdAt,
+            createdBy: createdBy,
+            fileType: fileType,
+            id: BuiltValueNullFieldError.checkNotNull(id, r'FileData', 'id'),
+            imageData: _imageData?.build(),
+            name: name,
+            receiptId: BuiltValueNullFieldError.checkNotNull(
+                receiptId, r'FileData', 'receiptId'),
+            size: size,
+            updatedAt: updatedAt,
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'imageData';
         _imageData?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'FileData', _$failedField, e.toString());
       }
       rethrow;

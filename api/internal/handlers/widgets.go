@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
-	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -16,12 +16,12 @@ func GetPieChartData(w http.ResponseWriter, r *http.Request) {
 	groupId := chi.URLParam(r, "groupId")
 
 	handler := structs.Handler{
-		ErrorMessage: "Error getting pie chart data",
-		Writer:       w,
-		Request:      r,
-		GroupId:      groupId,
-		GroupRole:    models.VIEWER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error getting pie chart data",
+		Writer:           w,
+		Request:          r,
+		GroupId:          groupId,
+		GroupPermissions: []string{permissions.GroupWidgetsRead},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.PieChartDataCommand{}
 			err := command.LoadDataFromRequest(w, r)

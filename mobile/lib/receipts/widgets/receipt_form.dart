@@ -50,8 +50,6 @@ class _ReceiptForm extends State<ReceiptForm> {
   late final categoryModel = Provider.of<CategoryModel>(context, listen: false);
   late final tagModel = Provider.of<TagModel>(context, listen: false);
   late final customFieldModel = Provider.of<CustomFieldModel>(context, listen: false);
-  late final shellContext =
-      Provider.of<ContextModel>(context, listen: false).shellContext;
   final addSharesFormKey = GlobalKey<FormBuilderState>();
   int groupId = 0;
   bool isAddingShare = false;
@@ -175,6 +173,7 @@ class _ReceiptForm extends State<ReceiptForm> {
     return CategorySelectField(
       fieldName: "categories",
       label: "Categories",
+      groupId: groupId,
       initialCategories: formKey.currentState?.fields["categories"]?.value ??
           modifiedReceipt.categories!.toList(),
       formState: formState,
@@ -190,6 +189,7 @@ class _ReceiptForm extends State<ReceiptForm> {
     return TagSelectField(
         label: "Tags",
         fieldName: "tags",
+        groupId: groupId,
         initialTags: formKey.currentState?.fields["tags"]?.value ??
             modifiedReceipt.tags!.toList(),
         formState: formState,
@@ -346,6 +346,10 @@ class _ReceiptForm extends State<ReceiptForm> {
       ..customFields = ListBuilder(updatedCustomFields));
 
     receiptModel.setModifiedReceipt(updatedReceipt);
+    // The form reads the model with listen:false, so rebuild it explicitly to
+    // mount the newly added custom-field widget (otherwise it only appears
+    // after some unrelated rebuild).
+    setState(() {});
   }
 
   void _removeCustomField(int customFieldId) {
@@ -358,6 +362,7 @@ class _ReceiptForm extends State<ReceiptForm> {
       ..customFields = ListBuilder(updatedCustomFields));
 
     receiptModel.setModifiedReceipt(updatedReceipt);
+    setState(() {});
   }
 
   Widget buildReceiptItemList() {
@@ -500,8 +505,19 @@ class _ReceiptForm extends State<ReceiptForm> {
 
   void openQuickActionsBottomSheet() {
     receiptModel.resetQuickActionsFormKey();
+    // Resolve a mounted context for the modal sheet at tap time. The shell
+    // context cached in ContextModel by the form screen can refer to a
+    // deactivated element after navigating between /view and /edit, and
+    // showModalBottomSheet dereferences context.widget -- which throws a
+    // null-check on a defunct element. Re-read it (don't cache a stale
+    // snapshot) and fall back to this form's own always-mounted context,
+    // mirroring how quick_scan.dart opens its sheet.
+    final shellContext =
+        Provider.of<ContextModel>(context, listen: false).shellContext;
+    final sheetContext =
+        (shellContext != null && shellContext.mounted) ? shellContext : context;
     showFullscreenBottomSheet(
-        shellContext as BuildContext,
+        sheetContext,
         ReceiptQuickActions(
           groupId: groupId,
         ),

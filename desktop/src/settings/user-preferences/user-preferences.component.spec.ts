@@ -11,8 +11,9 @@ import { FormConfig } from "src/interfaces/form-config.interface";
 import { InputReadonlyPipe } from "src/pipes/input-readonly.pipe";
 import { EditableListComponent } from "src/shared-ui/editable-list/editable-list.component";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
-import { UserPreferences, UserPreferencesService, UserShortcut } from "../../open-api";
+import { Permission, UserPreferences, UserPreferencesService, UserShortcut } from "../../open-api";
 import { PipesModule } from "../../pipes";
+import { SetPermissions } from "../../store/auth.state.actions";
 import { StoreModule } from "../../store/store.module";
 import { UserShortcutComponent } from "../user-shortcut/user-shortcut.component";
 
@@ -65,6 +66,18 @@ describe("UserPreferencesComponent", () => {
 
   it("should create", () => {
     expect(component).toBeTruthy();
+  });
+
+  it("gates the edit button on app.user-preferences.update", () => {
+    const store = TestBed.inject(Store);
+
+    store.dispatch(new SetPermissions([], {}));
+    expect((component as any).canEdit()).toEqual(false);
+
+    store.dispatch(
+      new SetPermissions([Permission.AppUserPreferencesUpdate], {})
+    );
+    expect((component as any).canEdit()).toEqual(true);
   });
 
   it("should init form correctly without data", () => {

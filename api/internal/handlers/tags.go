@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
-	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -15,10 +15,11 @@ import (
 
 func GetAllTags(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving tags",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error retrieving tags",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppTagsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			tagsRepository := repositories.NewTagsRepository(nil)
 			tags, err := tagsRepository.GetAllTags("*")
@@ -43,10 +44,11 @@ func GetAllTags(w http.ResponseWriter, r *http.Request) {
 
 func CreateTag(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error creating tag",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error creating tag",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppTagsCreate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			tag := commands.UpsertTagCommand{}
 			err := tag.LoadDataFromRequest(w, r)
@@ -82,10 +84,11 @@ func CreateTag(w http.ResponseWriter, r *http.Request) {
 
 func GetPagedTags(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving tags",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error retrieving tags",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppTagsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			pagedData := structs.PagedData{}
 			pagedRequestCommand := commands.PagedRequestCommand{}
@@ -125,11 +128,11 @@ func GetPagedTags(w http.ResponseWriter, r *http.Request) {
 
 func UpdateTag(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating tag",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error updating tag",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppTagsUpdate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "tagId")
 
@@ -162,11 +165,11 @@ func UpdateTag(w http.ResponseWriter, r *http.Request) {
 
 func DeleteTag(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting tag",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error deleting tag",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppTagsDelete},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "tagId")
 
@@ -192,11 +195,11 @@ func DeleteTag(w http.ResponseWriter, r *http.Request) {
 
 func GetTagNameCount(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting tag count",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.USER,
-		ResponseType: constants.TextPlain,
+		ErrorMessage:   "Error getting tag count",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppTagsRead},
+		ResponseType:   constants.TextPlain,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			tagRepository := repositories.NewTagsRepository(nil)
 			tagName := chi.URLParam(r, "tagName")

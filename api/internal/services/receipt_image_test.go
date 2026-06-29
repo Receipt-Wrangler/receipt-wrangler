@@ -67,7 +67,7 @@ func seedReceiptImagePipeline(t *testing.T, url string) (models.User, models.Gro
 	if err := db.Create(&group).Error; err != nil {
 		t.Fatalf("seed group: %v", err)
 	}
-	member := models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRole: models.OWNER}
+	member := models.GroupMember{GroupID: group.ID, UserID: user.ID}
 	if err := db.Create(&member).Error; err != nil {
 		t.Fatalf("seed group member: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestMagicFillFromImage_HappyPath(t *testing.T) {
 	}
 
 	cmd := commands.MagicFillCommand{ImageData: jpg}
-	receipt, _, err := MagicFillFromImage(cmd, utils.UintToString(group.ID))
+	receipt, _, err := MagicFillFromImage(cmd, utils.UintToString(group.ID), 0)
 	if err != nil {
 		t.Fatalf("MagicFillFromImage: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestMagicFillFromImage_InvalidImageData(t *testing.T) {
 	_, group, _ := seedReceiptImagePipeline(t, server.URL)
 
 	cmd := commands.MagicFillCommand{ImageData: []byte("not an image")}
-	_, _, err := MagicFillFromImage(cmd, utils.UintToString(group.ID))
+	_, _, err := MagicFillFromImage(cmd, utils.UintToString(group.ID), 0)
 	if err == nil {
 		t.Fatal("expected invalid file type error")
 	}
@@ -379,11 +379,4 @@ func TestGetReceiptFromReceiptImageId_MissingImage(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected FileData-not-found error")
 	}
-}
-
-// ReadAllReceiptImagesForGroup spins up multiple goroutines that each
-// instantiate an OcrService. That path needs tesseract + a proper OCR
-// engine configured. Skipped in favor of integration coverage.
-func TestReadAllReceiptImagesForGroup_SkippedByDefault(t *testing.T) {
-	t.Skip("Requires tesseract + OcrService wiring; covered by integration tests")
 }

@@ -2,10 +2,12 @@
   <app-table-header [headerText]="tableHeaderText()">
     <div class="d-flex align-items-center">
       <app-add-button
+        *hasAppPermission="Permission.AppGroupsCreate"
+        data-testid="group-create"
         tooltip="Create Group"
         [buttonRouterLink]="['create']"
       ></app-add-button>
-      <ng-container *ngIf="isAdmin">
+      <ng-container *hasAppPermission="Permission.AppGroupsRead">
         <app-button
           matButtonType="iconButton"
           icon="filter_alt"
@@ -52,14 +54,15 @@
 <ng-template #actionsCell let-element="element" let-index="index">
   <div class="d-flex">
     <app-edit-button
-      *ngIf="(element.id | groupRole : groupRole.Owner) || isAdmin"
+      *hasGroupPermission="{ groupId: element.id, permission: Permission.GroupUpdate, orApp: [Permission.AppGroupsUpdateSettings] }"
+      data-testid="group-edit"
       color="accent"
       tooltip="Edit group"
-      [buttonRouterLink]="(element | groupTableEditButton: isAdmin).routerLink"
-      [buttonQueryParams]="(element | groupTableEditButton: isAdmin).queryParams"
+      [buttonRouterLink]="[element | groupTableEditButton: appPermissions() : groupPermissions()]"
     ></app-edit-button>
     <app-delete-button
-      *ngIf="element.id | groupRole : groupRole.Owner"
+      *hasGroupPermission="{ groupId: element.id, permission: Permission.GroupDelete }"
+      data-testid="group-delete"
       tooltip="Delete Group"
       [disabled]="groups()?.length === 1"
       (clicked)="deleteGroup(index)"

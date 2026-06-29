@@ -3,7 +3,7 @@ package mcp
 import (
 	"context"
 	"errors"
-	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -127,11 +127,12 @@ func handleGetReceipt(ctx context.Context, req *mcpsdk.CallToolRequest, in getRe
 		return nil, nil, errors.New("receipt not found")
 	}
 
-	// Enforce the same VIEWER group-role check the REST handler relies on.
+	// Enforce the same group.receipts.read check the REST handler relies on.
 	// Use an identical "not found" error for missing and unauthorized so we
 	// don't leak the existence of receipts in other users' groups.
-	groupService := services.NewGroupService(nil)
-	if err := groupService.ValidateGroupRole(models.VIEWER, utils.UintToString(receipt.GroupId), utils.UintToString(claims.UserId)); err != nil {
+	permissionService := services.NewPermissionService(nil)
+	hasAccess, err := permissionService.HasGroupPermissions(claims.UserId, receipt.GroupId, permissions.GroupReceiptsRead)
+	if err != nil || !hasAccess {
 		return nil, nil, errors.New("receipt not found")
 	}
 
@@ -191,14 +192,15 @@ func handleListDashboards(ctx context.Context, req *mcpsdk.CallToolRequest, in l
 		return nil, nil, errors.New("groupId is required")
 	}
 
-	groupService := services.NewGroupService(nil)
-	if err := groupService.ValidateGroupRole(models.VIEWER, in.GroupId, utils.UintToString(claims.UserId)); err != nil {
-		return nil, nil, errors.New("unauthorized to access this group")
-	}
-
 	groupId, err := utils.StringToUint(in.GroupId)
 	if err != nil {
 		return nil, nil, errors.New("invalid groupId")
+	}
+
+	permissionService := services.NewPermissionService(nil)
+	hasAccess, err := permissionService.HasGroupPermissions(claims.UserId, groupId, permissions.GroupDashboardsRead)
+	if err != nil || !hasAccess {
+		return nil, nil, errors.New("unauthorized to access this group")
 	}
 
 	dashboardRepository := repositories.NewDashboardRepository(nil)

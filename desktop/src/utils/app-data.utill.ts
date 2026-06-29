@@ -5,8 +5,10 @@ import {
   GroupState,
   SetAuthState,
   SetFeatureConfig,
+  SetGroupCatalog,
   SetGroups,
   SetIcons,
+  SetPermissions,
   SetSelectedGroupId,
   SetUserPreferences,
   SetUsers,
@@ -24,6 +26,8 @@ export function setAppData(store: Store, appData: AppData): Observable<any[]> {
 
   return forkJoin([
     store.dispatch(new SetAuthState(appData.claims)),
+    store.dispatch(new SetPermissions(appData.appPermissions ?? [], appData.groupPermissions ?? {})),
+    store.dispatch(new SetGroupCatalog(appData.groupCategories ?? {}, appData.groupTags ?? {})),
     store.dispatch(new SetFeatureConfig(appData.featureConfig)),
     store.dispatch(new SetGroups(appData.groups)),
     store.dispatch(new SetUserPreferences(appData.userPreferences)),

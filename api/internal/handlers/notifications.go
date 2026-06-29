@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"receipt-wrangler/api/internal/constants"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -13,10 +14,11 @@ import (
 
 func GetNotificationsForUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting notifications",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting notifications",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppNotificationsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			notificationRepository := repositories.NewNotificationRepository(nil)
@@ -43,10 +45,11 @@ func GetNotificationsForUser(w http.ResponseWriter, r *http.Request) {
 
 func GetNotificationCountForUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting notificationCount",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting notificationCount",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppNotificationsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			notificationRepository := repositories.NewNotificationRepository(nil)
@@ -73,10 +76,11 @@ func GetNotificationCountForUser(w http.ResponseWriter, r *http.Request) {
 
 func DeleteAllNotificationsForUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting notifications",
-		Writer:       w,
-		Request:      r,
-		ResponseType: "",
+		ErrorMessage:   "Error deleting notifications",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppNotificationsDelete},
+		ResponseType:   "",
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			notificationRepository := repositories.NewNotificationRepository(nil)
@@ -97,10 +101,11 @@ func DeleteAllNotificationsForUser(w http.ResponseWriter, r *http.Request) {
 
 func DeleteNotification(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting notification",
-		Writer:       w,
-		Request:      r,
-		ResponseType: "",
+		ErrorMessage:   "Error deleting notification",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppNotificationsDelete},
+		ResponseType:   "",
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			token := structs.GetClaims(r)

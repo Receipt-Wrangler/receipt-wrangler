@@ -15,6 +15,7 @@ Name | Type | Description | Notes
 **updatedAt** | **String** |  | [optional] [default to '']
 **receiptId** | **int** | Receipt Id | 
 **customFieldId** | **int** | Custom Field ID | 
+**customField** | [**CustomField**](CustomField.md) |  | [optional] 
 **stringValue** | **String** | Custom Field String Value | [optional] 
 **dateValue** | **String** | Custom Field Date Value | [optional] 
 **selectValue** | **int** | Custom Field Select Value | [optional] 

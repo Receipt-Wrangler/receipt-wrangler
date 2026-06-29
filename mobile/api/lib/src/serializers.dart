@@ -55,7 +55,6 @@ import 'package:openapi/src/model/group.dart';
 import 'package:openapi/src/model/group_filter.dart';
 import 'package:openapi/src/model/group_member.dart';
 import 'package:openapi/src/model/group_receipt_settings.dart';
-import 'package:openapi/src/model/group_role.dart';
 import 'package:openapi/src/model/group_settings.dart';
 import 'package:openapi/src/model/group_settings_white_list_email.dart';
 import 'package:openapi/src/model/group_status.dart';
@@ -75,6 +74,9 @@ import 'package:openapi/src/model/paged_data.dart';
 import 'package:openapi/src/model/paged_data_data_inner.dart';
 import 'package:openapi/src/model/paged_group_request_command.dart';
 import 'package:openapi/src/model/paged_request_command.dart';
+import 'package:openapi/src/model/permission.dart';
+import 'package:openapi/src/model/permission_descriptor.dart';
+import 'package:openapi/src/model/permission_scope.dart';
 import 'package:openapi/src/model/pie_chart_data.dart';
 import 'package:openapi/src/model/pie_chart_data_command.dart';
 import 'package:openapi/src/model/pie_chart_data_point.dart';
@@ -86,6 +88,7 @@ import 'package:openapi/src/model/receipt_paged_request_filter.dart';
 import 'package:openapi/src/model/receipt_processing_settings.dart';
 import 'package:openapi/src/model/receipt_status.dart';
 import 'package:openapi/src/model/reset_password_command.dart';
+import 'package:openapi/src/model/role.dart';
 import 'package:openapi/src/model/search_result.dart';
 import 'package:openapi/src/model/sign_up_command.dart';
 import 'package:openapi/src/model/sort_direction.dart';
@@ -115,6 +118,7 @@ import 'package:openapi/src/model/upsert_item_command.dart';
 import 'package:openapi/src/model/upsert_prompt_command.dart';
 import 'package:openapi/src/model/upsert_receipt_command.dart';
 import 'package:openapi/src/model/upsert_receipt_processing_settings_command.dart';
+import 'package:openapi/src/model/upsert_role_command.dart';
 import 'package:openapi/src/model/upsert_system_email_command.dart';
 import 'package:openapi/src/model/upsert_system_settings_command.dart';
 import 'package:openapi/src/model/upsert_tag_command.dart';
@@ -122,7 +126,6 @@ import 'package:openapi/src/model/upsert_task_queue_configuration.dart';
 import 'package:openapi/src/model/upsert_widget_command.dart';
 import 'package:openapi/src/model/user.dart';
 import 'package:openapi/src/model/user_preferences.dart';
-import 'package:openapi/src/model/user_role.dart';
 import 'package:openapi/src/model/user_shortcut.dart';
 import 'package:openapi/src/model/user_view.dart';
 import 'package:openapi/src/model/widget.dart';
@@ -172,7 +175,6 @@ part 'serializers.g.dart';
   GroupFilter,
   GroupMember,
   GroupReceiptSettings,
-  GroupRole,
   GroupSettings,
   GroupSettingsWhiteListEmail,
   GroupStatus,
@@ -192,6 +194,9 @@ part 'serializers.g.dart';
   PagedDataDataInner,
   PagedGroupRequestCommand,
   PagedRequestCommand,$PagedRequestCommand,
+  Permission,
+  PermissionDescriptor,
+  PermissionScope,
   PieChartData,
   PieChartDataCommand,
   PieChartDataPoint,
@@ -203,6 +208,7 @@ part 'serializers.g.dart';
   ReceiptProcessingSettings,
   ReceiptStatus,
   ResetPasswordCommand,
+  Role,
   SearchResult,
   SignUpCommand,
   SortDirection,
@@ -232,6 +238,7 @@ part 'serializers.g.dart';
   UpsertPromptCommand,
   UpsertReceiptCommand,
   UpsertReceiptProcessingSettingsCommand,
+  UpsertRoleCommand,
   UpsertSystemEmailCommand,
   UpsertSystemSettingsCommand,
   UpsertTagCommand,
@@ -239,7 +246,6 @@ part 'serializers.g.dart';
   UpsertWidgetCommand,
   User,
   UserPreferences,
-  UserRole,
   UserShortcut,
   UserView,
   Widget,
@@ -253,6 +259,30 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(Group)]),
         () => ListBuilder<Group>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Notification)]),
+        () => ListBuilder<Notification>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Receipt)]),
+        () => ListBuilder<Receipt>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Role)]),
+        () => ListBuilder<Role>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Category)]),
+        () => ListBuilder<Category>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(Tag)]),
+        () => ListBuilder<Tag>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(PermissionDescriptor)]),
+        () => ListBuilder<PermissionDescriptor>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(SearchResult)]),
@@ -269,22 +299,6 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(int)]),
         () => ListBuilder<int>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(Notification)]),
-        () => ListBuilder<Notification>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(Receipt)]),
-        () => ListBuilder<Receipt>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(Category)]),
-        () => ListBuilder<Category>(),
-      )
-      ..addBuilderFactory(
-        const FullType(BuiltList, [FullType(Tag)]),
-        () => ListBuilder<Tag>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(UserView)]),

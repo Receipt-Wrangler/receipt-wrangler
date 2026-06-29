@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -126,12 +127,22 @@ func createReceiptInGroup(t *testing.T, name string, groupId uint, paidByUserId 
 	return receipt
 }
 
-func addGroupMember(t *testing.T, userId uint, groupId uint, role models.GroupRole) {
+func addGroupMember(t *testing.T, userId uint, groupId uint, perms []string) {
 	t.Helper()
-	member := models.GroupMember{UserID: userId, GroupID: groupId, GroupRole: role}
+	role, err := repositories.NewRoleRepository(nil).CreateGroupRole(
+		"mcp-test-role", "", perms, nil, nil, nil, false)
+	if err != nil {
+		t.Fatalf("failed to create group role: %v", err)
+	}
+	member := models.GroupMember{UserID: userId, GroupID: groupId, GroupRoleID: &role.ID}
 	if err := repositories.GetDB().Create(&member).Error; err != nil {
 		t.Fatalf("failed to create group member: %v", err)
 	}
+	// The permission/grant resolution caches are keyed by role id, which the
+	// test DB can reuse across truncations — clear them so the freshly created
+	// role's permissions are resolved from the DB rather than a stale entry.
+	services.ClearRolePermissionCacheForTests()
+	services.ClearGroupRoleGrantCacheForTests()
 }
 
 func TestListCategoriesReturnsCategories(t *testing.T) {
@@ -164,7 +175,7 @@ func TestGetReceiptEnforcesGroupAccess(t *testing.T) {
 	if err := repositories.GetDB().Create(&group).Error; err != nil {
 		t.Fatalf("failed to create group: %v", err)
 	}
-	addGroupMember(t, member.ID, group.ID, models.VIEWER)
+	addGroupMember(t, member.ID, group.ID, []string{permissions.GroupReceiptsRead})
 
 	receipt := createReceiptInGroup(t, "Lunch", group.ID, member.ID)
 	receiptId := utils.UintToString(receipt.ID)
@@ -201,7 +212,7 @@ func TestSearchReceiptsScopesToUserGroups(t *testing.T) {
 	if err := repositories.GetDB().Create(&otherGroup).Error; err != nil {
 		t.Fatalf("failed to create other group: %v", err)
 	}
-	addGroupMember(t, user.ID, memberGroup.ID, models.VIEWER)
+	addGroupMember(t, user.ID, memberGroup.ID, []string{permissions.GroupReceiptsRead})
 
 	createReceiptInGroup(t, "Coffee shop", memberGroup.ID, user.ID)
 	createReceiptInGroup(t, "Coffee beans", memberGroup.ID, user.ID)

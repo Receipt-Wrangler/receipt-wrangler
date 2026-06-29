@@ -84,19 +84,28 @@ class _StatusTransition {
 /// taps the bottom submit button, and waits to land back on /view.
 Future<void> _changeStatusViaUI(WidgetTester tester, String optionLabel) async {
   // Open the view-screen overflow menu and pick "Edit". The PopupMenuButton
-  // is gated on `canEditReceipt`, which reads from GroupModel -- on cold-boot
-  // after navigation, the model may not have populated the user's role in the
-  // receipt's group yet, so we pump until the menu button is actually mounted
-  // instead of tapping immediately.
+  // is gated on `canEditReceipt`, which checks the user's group.receipts.update
+  // permission from PermissionsModel -- on cold-boot after navigation,
+  // permissions may not be populated yet, so we pump until the menu button is
+  // actually mounted instead of tapping immediately.
   final menuButton = find.byType(PopupMenuButton<dynamic>);
   await pumpUntilFound(tester, menuButton);
   await tester.tap(menuButton);
-  await pumpUntilFound(tester, find.text('Edit'));
-  await tester.tap(find.text('Edit'));
+  // The popup scales in; the "Edit" item mounts on the animation's first
+  // frame where a tap computed from its center misses (flaked on the iOS
+  // simulator: "Offset(1184.8, 99.0) ... would not hit test"). Wait for
+  // hittability and drain the open animation -- same hardening as
+  // receipt_edit_test.dart and receipt_cost_split_test._navigateToEdit.
+  await pumpUntilFound(tester, find.text('Edit').hitTestable());
+  for (int i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await tester.tap(find.text('Edit').hitTestable());
 
-  // Wait for the edit form to mount before driving it. The same
-  // pumpUntilFound(Name) pattern used by receipt_edit_test.dart:59.
-  await pumpUntilFound(tester, find.text('Name'));
+  // /edit's destination-mounted marker: the bottom save button, which only
+  // renders on edit/add paths -- find.text('Name') matches on /view too,
+  // so it cannot prove the navigation happened.
+  await pumpUntilFound(tester, find.byType(BottomSubmitButton));
 
   // The status field sits well below Name on the receipt form; on the
   // 1280x900 test surface it's off-screen until we scroll it into view.

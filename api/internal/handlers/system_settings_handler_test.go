@@ -29,7 +29,7 @@ func TestShouldNotAllowUserToGetSystemSettings(t *testing.T) {
 
 	expectedStatusCode := http.StatusForbidden
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	GetSystemSettings(w, r)
@@ -47,8 +47,10 @@ func TestShouldGetSystemSettingsWhenThereAreNoSettings(t *testing.T) {
 
 	expectedStatusCode := http.StatusOK
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	GetSystemSettings(w, r)
 
@@ -68,8 +70,10 @@ func TestShouldGetSystemSettingsWhenThereAreExistingSettings(t *testing.T) {
 	db := repositories.GetDB()
 	db.Create(&models.SystemSettings{})
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	GetSystemSettings(w, r)
 
@@ -218,13 +222,15 @@ func TestShouldValidateUpsertSystemSettingsCommand(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for _, test := range tests {
 		bytes, _ := json.Marshal(test.input)
 		reader := strings.NewReader(string(bytes))
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api", reader)
 
-		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 		r = r.WithContext(newContext)
 
 		UpdateSystemSettings(w, r)

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
@@ -31,12 +30,6 @@ func (command *PagedApiKeyRequestCommand) LoadDataFromRequest(w http.ResponseWri
 
 func (command *PagedApiKeyRequestCommand) Validate(r *http.Request) structs.ValidatorError {
 	vErrs := command.PagedRequestCommand.Validate()
-	token := structs.GetClaims(r)
-
-	if command.ApiKeyFilter.AssociatedApiKeys == ASSOCIATED_API_KEYS_ALL &&
-		token.UserRole != models.ADMIN {
-		vErrs.Errors["associatedApiKeys"] = "Must be an admin to view all API keys"
-	}
 
 	if command.ApiKeyFilter.AssociatedApiKeys == "" {
 		vErrs.Errors["associatedApiKeys"] = "Associated API keys is required"

@@ -7,6 +7,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -26,10 +27,11 @@ type ItemView struct {
 
 func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving users.",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error retrieving users.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUsersRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			userRepository := repositories.NewUserRepository(nil)
 			users, err := userRepository.GetAllUserViews()
@@ -54,11 +56,11 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 func CreateUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error creating user.",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error creating user.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUsersCreate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			db := repositories.GetDB()
 			var UserView structs.UserView
@@ -93,17 +95,16 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating user.",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error updating user.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUsersUpdate},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			db := repositories.GetDB()
 			id := chi.URLParam(r, "id")
 			bodyData := r.Context().Value("user").(commands.SignUpCommand)
 
-			//TODO: Move to repo
-			err := db.Table("users").Select("username", "display_name", "user_role").Where("id = ?", id).Updates(&bodyData).Error
+			userRepository := repositories.NewUserRepository(nil)
+			err := userRepository.UpdateUser(id, bodyData)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -122,13 +123,17 @@ func GetAmountOwedForUser(w http.ResponseWriter, r *http.Request) {
 	receiptIds := r.Form["receiptIds"]
 
 	handler := structs.Handler{
-		ErrorMessage: "Error calculating amount owed.",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		ReceiptIds:   receiptIds,
-		GroupId:      groupId,
-		GroupRole:    models.VIEWER,
+		ErrorMessage:     "Error calculating amount owed.",
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		ReceiptIds:       receiptIds,
+		GroupId:          groupId,
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		// Amount-owed is settlement accounting: the totals must be identical for
+		// every member, so it is exempt from the paid-by visibility filter (it
+		// still requires group.receipts.read in each receipt's group).
+		SkipPaidByVisibilityCheck: true,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			if err != nil {
 				return http.StatusInternalServerError, err
@@ -278,10 +283,10 @@ func GetUsernameCount(w http.ResponseWriter, r *http.Request) {
 
 func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error resetting password.",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error resetting password.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUsersUpdate},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			db := repositories.GetDB()
 			id := chi.URLParam(r, "id")
@@ -308,11 +313,11 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 
 func ConvertDummyUserToNormalUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error converting user.",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error converting user.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUsersUpdate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			var dbUser models.User
 			db := repositories.GetDB()
@@ -352,10 +357,10 @@ func ConvertDummyUserToNormalUser(w http.ResponseWriter, r *http.Request) {
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error Deleting User.",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error Deleting User.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUsersDelete},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			token := structs.GetClaims(r)
@@ -378,10 +383,11 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 func GetClaimsForLoggedInUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting claims",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting claims",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppAccountRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			services.PrepareAccessTokenClaims(*token)
@@ -403,10 +409,11 @@ func GetClaimsForLoggedInUser(w http.ResponseWriter, r *http.Request) {
 
 func UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating user profile",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error updating user profile",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppAccountUpdate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			db := repositories.GetDB()
@@ -432,10 +439,11 @@ func UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
 
 func GetAppData(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting app data",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting app data",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppAccountRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			appData, err := services.GetAppData(token.UserId, r)
@@ -460,10 +468,10 @@ func GetAppData(w http.ResponseWriter, r *http.Request) {
 
 func BulkDeleteUsers(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error bulk deleting users",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error bulk deleting users",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUsersDelete},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.BulkUserDeleteCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -496,9 +504,10 @@ func BulkDeleteUsers(w http.ResponseWriter, r *http.Request) {
 
 func DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting account.",
-		Writer:       w,
-		Request:      r,
+		ErrorMessage:   "Error deleting account.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppAccountDelete},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			command := r.Context().Value("deleteAccountCommand").(commands.DeleteAccountCommand)

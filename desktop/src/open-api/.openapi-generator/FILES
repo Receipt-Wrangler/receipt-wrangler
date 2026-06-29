@@ -13,10 +13,12 @@ api/featureConfig.service.ts
 api/groups.service.ts
 api/import.service.ts
 api/notifications.service.ts
+api/permission.service.ts
 api/prompt.service.ts
 api/receipt.service.ts
 api/receiptImage.service.ts
 api/receiptProcessingSettings.service.ts
+api/role.service.ts
 api/search.service.ts
 api/systemEmail.service.ts
 api/systemSettings.service.ts
@@ -70,7 +72,6 @@ model/group.ts
 model/groupFilter.ts
 model/groupMember.ts
 model/groupReceiptSettings.ts
-model/groupRole.ts
 model/groupSettings.ts
 model/groupSettingsWhiteListEmail.ts
 model/groupStatus.ts
@@ -91,6 +92,9 @@ model/pagedData.ts
 model/pagedDataDataInner.ts
 model/pagedGroupRequestCommand.ts
 model/pagedRequestCommand.ts
+model/permission.ts
+model/permissionDescriptor.ts
+model/permissionScope.ts
 model/pieChartData.ts
 model/pieChartDataCommand.ts
 model/pieChartDataPoint.ts
@@ -102,6 +106,7 @@ model/receiptPagedRequestFilter.ts
 model/receiptProcessingSettings.ts
 model/receiptStatus.ts
 model/resetPasswordCommand.ts
+model/role.ts
 model/searchResult.ts
 model/signUpCommand.ts
 model/sortDirection.ts
@@ -131,6 +136,7 @@ model/upsertItemCommand.ts
 model/upsertPromptCommand.ts
 model/upsertReceiptCommand.ts
 model/upsertReceiptProcessingSettingsCommand.ts
+model/upsertRoleCommand.ts
 model/upsertSystemEmailCommand.ts
 model/upsertSystemSettingsCommand.ts
 model/upsertTagCommand.ts
@@ -138,7 +144,6 @@ model/upsertTaskQueueConfiguration.ts
 model/upsertWidgetCommand.ts
 model/user.ts
 model/userPreferences.ts
-model/userRole.ts
 model/userShortcut.ts
 model/userView.ts
 model/widget.ts

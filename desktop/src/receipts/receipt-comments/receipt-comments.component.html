@@ -1,4 +1,4 @@
-@if (mode() !== formMode.view) {
+@if (mode() === formMode.add || (mode() === formMode.edit && canCreateComments())) {
   <div class="mb-2">
     <app-card>
       <strong header class="mb-3">Leave a Comment</strong>
@@ -72,10 +72,11 @@
     <ng-container
       *ngIf="
         commentControl?.value?.userId?.toString() === loggedInUserId()
-         && (mode() === formMode.add || mode() === formMode.edit)
+         && (mode() === formMode.add || (mode() === formMode.edit && canDeleteComments()))
       "
     >
       <app-delete-button
+        data-testid="comment-delete"
         (clicked)="deleteComment(commentIndex)"
       ></app-delete-button>
     </ng-container>

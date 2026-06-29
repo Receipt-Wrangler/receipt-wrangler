@@ -591,30 +591,6 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
-  /group/{groupId}/ocrText:
-    get:
-      tags:
-        - Groups
-      summary: Reads each image in a group and returns the zipped read text
-      description: This will get the ocr text, zipped, for each image in a group and one text file per image
-      operationId: getOcrTextForGroup
-      parameters:
-        - in: path
-          name: groupId
-          schema:
-            type: integer
-          required: true
-          description: Group Id to get ocr text for
-      responses:
-        200:
-          description: Zip file containing text from each image
-        500:
-          $ref: "#/components/responses/Internal"
-        403:
-          $ref: "#/components/responses/Forbidden"
-      security:
-        - bearerAuth: [ ]
-        - apiKeyAuth: [ ]
   /group/{groupId}/pollGroupEmail:
     post:
       tags:
@@ -999,10 +975,11 @@ paths:
             type: integer
           required: true
         - in: query
-          name: groupRole
+          name: permission
+          required: true
           schema:
-            type: string
-          description: Role required to have access to receipt
+            $ref: "#/components/schemas/Permission"
+          description: Group permission required to access the receipt
       responses:
         200:
           $ref: "#/components/responses/Ok"
@@ -2707,6 +2684,185 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /permission:
+    get:
+      tags:
+        - Permission
+      summary: List all permission descriptors
+      description: Returns the full catalog of permission strings the API recognizes, with metadata for UI rendering.
+      operationId: getPermissions
+      responses:
+        200:
+          description: All permission descriptors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PermissionDescriptor"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /role:
+    get:
+      tags:
+        - Role
+      summary: List all roles
+      description: Returns the full pool of roles, both app-scoped and group-scoped.
+      operationId: getRoles
+      responses:
+        200:
+          description: All roles in the system
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+    post:
+      tags:
+        - Role
+      summary: Create role
+      description: This will create an app-scoped or group-scoped role.
+      operationId: createRole
+      requestBody:
+        description: Role to create
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertRoleCommand"
+      responses:
+        200:
+          description: The created role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /role/{roleId}:
+    parameters:
+      - in: path
+        name: roleId
+        schema:
+          type: integer
+        required: true
+        description: Id of the role to update
+    put:
+      tags:
+        - Role
+      summary: Update role
+      description: >-
+        Updates an existing app-scoped or group-scoped role. A role's type
+        cannot be changed: the scope in the request must match the existing
+        role's scope. System roles cannot be modified.
+      operationId: updateRole
+      requestBody:
+        description: Role to update
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertRoleCommand"
+      responses:
+        200:
+          description: The updated role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+    delete:
+      tags:
+        - Role
+      summary: Delete role
+      description: >-
+        Deletes an app-scoped or group-scoped role. The scope query parameter
+        disambiguates the role id, since app and group role ids overlap. A role
+        cannot be deleted while it is assigned to any user or group member, and
+        system roles cannot be deleted.
+      operationId: deleteRole
+      parameters:
+        - in: query
+          name: scope
+          required: true
+          schema:
+            $ref: "#/components/schemas/PermissionScope"
+          description: Scope of the role to delete
+      responses:
+        200:
+          $ref: "#/components/responses/Ok"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /role/{roleId}/default:
+    parameters:
+      - in: path
+        name: roleId
+        schema:
+          type: integer
+        required: true
+        description: Id of the role to make the default for its scope
+    put:
+      tags:
+        - Role
+      summary: Set default role
+      description: >-
+        Makes the role the default for its scope — the role assigned to new
+        accounts (APP) or to group creators (GROUP) — clearing the previous
+        default. The scope query parameter disambiguates the role id, since app
+        and group role ids overlap. System roles may be made default.
+      operationId: setDefaultRole
+      parameters:
+        - in: query
+          name: scope
+          required: true
+          schema:
+            $ref: "#/components/schemas/PermissionScope"
+          description: Scope of the role to make default
+      responses:
+        200:
+          description: The updated role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
 components:
   securitySchemes:
     bearerAuth:
@@ -2723,6 +2879,8 @@ components:
       description: Request was successfully processed
     BadRequest:
       description: The request was malformed
+    NotFound:
+      description: The requested resource was not found
     Forbidden:
       description: The request was not allowed
     Unauthorized:
@@ -2761,12 +2919,6 @@ components:
       enum:
         - "ACTIVE"
         - "ARCHIVED"
-    GroupRole:
-      type: string
-      enum:
-        - "OWNER"
-        - "VIEWER"
-        - "EDITOR"
     FilterOperation:
       type: string
       enum:
@@ -2777,11 +2929,224 @@ components:
         - BETWEEN
         - WITHIN_CURRENT_MONTH
         - ""
-    UserRole:
+    Permission:
+      description: All permission keys the API recognizes.
       type: string
       enum:
-        - ADMIN
-        - USER
+        - "app.users.create"
+        - "app.users.read"
+        - "app.users.update"
+        - "app.users.delete"
+        - "app.prompts.create"
+        - "app.prompts.read"
+        - "app.prompts.update"
+        - "app.prompts.delete"
+        - "app.categories.create"
+        - "app.categories.read"
+        - "app.categories.update"
+        - "app.categories.delete"
+        - "app.tags.create"
+        - "app.tags.read"
+        - "app.tags.update"
+        - "app.tags.delete"
+        - "app.custom-fields.create"
+        - "app.custom-fields.read"
+        - "app.custom-fields.delete"
+        - "app.system-settings.read"
+        - "app.system-settings.update"
+        - "app.system-settings.restart-task-server"
+        - "app.receipt-processing-settings.create"
+        - "app.receipt-processing-settings.read"
+        - "app.receipt-processing-settings.update"
+        - "app.receipt-processing-settings.delete"
+        - "app.system-emails.create"
+        - "app.system-emails.read"
+        - "app.system-emails.update"
+        - "app.system-emails.delete"
+        - "app.system-tasks.read"
+        - "app.imports.run"
+        - "app.groups.create"
+        - "app.groups.read"
+        - "app.groups.update-settings"
+        - "app.api-keys.create"
+        - "app.api-keys.read"
+        - "app.api-keys.read-any"
+        - "app.api-keys.update"
+        - "app.api-keys.delete"
+        - "app.api-keys.delete-any"
+        - "app.roles.create"
+        - "app.roles.read"
+        - "app.roles.update"
+        - "app.roles.delete"
+        - "app.notifications.read"
+        - "app.notifications.delete"
+        - "app.user-preferences.read"
+        - "app.user-preferences.update"
+        - "app.account.read"
+        - "app.account.update"
+        - "app.account.delete"
+        - "app.receipts.search"
+        - "group.view"
+        - "group.update"
+        - "group.delete"
+        - "group.receipts.create"
+        - "group.receipts.read"
+        - "group.receipts.update"
+        - "group.receipts.delete"
+        - "group.receipts.duplicate"
+        - "group.receipts.magic-fill"
+        - "group.receipts.quick-scan"
+        - "group.comments.create"
+        - "group.comments.delete"
+        - "group.dashboards.create"
+        - "group.dashboards.read"
+        - "group.dashboards.update"
+        - "group.dashboards.delete"
+        - "group.widgets.read"
+        - "group.activities.read"
+        - "group.activities.rerun"
+        - "group.email.poll"
+    PermissionScope:
+      description: Whether a permission applies app-wide or within a single group.
+      type: string
+      enum:
+        - "APP"
+        - "GROUP"
+    PermissionDescriptor:
+      type: object
+      required:
+        - key
+        - label
+        - description
+        - category
+        - scope
+      properties:
+        key:
+          $ref: "#/components/schemas/Permission"
+        label:
+          type: string
+          description: Short human-readable label for the role editor.
+        description:
+          type: string
+          description: Full description used as tooltip/help text in the role editor.
+        category:
+          type: string
+          description: Logical grouping for the role editor UI (e.g., "User Management", "Receipts").
+        scope:
+          $ref: "#/components/schemas/PermissionScope"
+    Role:
+      type: object
+      required:
+        - id
+        - name
+        - scope
+        - isDefault
+        - isSystem
+        - permissions
+      properties:
+        id:
+          type: integer
+          format: uint64
+        name:
+          type: string
+        description:
+          type: string
+        scope:
+          $ref: "#/components/schemas/PermissionScope"
+        isDefault:
+          type: boolean
+          description: >-
+            Whether this role is the default for its scope — assigned to new
+            accounts (APP) or to group creators (GROUP). Exactly one role per
+            scope is the default.
+        isSystem:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+        assignedCount:
+          type: integer
+          description: Number of users or group members currently assigned this role
+        categoryGrants:
+          type: array
+          description: >-
+            Category ids a GROUP role restricts its members to. Empty means
+            unrestricted (members may use every category). Always empty for app
+            roles.
+          items:
+            type: integer
+            format: uint64
+        tagGrants:
+          type: array
+          description: >-
+            Tag ids a GROUP role restricts its members to. Empty means
+            unrestricted (members may use every tag). Always empty for app roles.
+          items:
+            type: integer
+            format: uint64
+        paidByUserGrants:
+          type: array
+          description: >-
+            User ids whose receipts a GROUP role lets its members see (by the
+            receipt's "paid by" user). Empty with includeOwnPaidReceipts false
+            means unrestricted (members see every payer's receipts). Always empty
+            for app roles.
+          items:
+            type: integer
+            format: uint64
+        includeOwnPaidReceipts:
+          type: boolean
+          description: >-
+            Whether a GROUP role lets each member see receipts they paid for. Part
+            of the paid-by visibility filter; always false for app roles.
+    UpsertRoleCommand:
+      type: object
+      required:
+        - name
+        - scope
+        - permissions
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        scope:
+          $ref: "#/components/schemas/PermissionScope"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+        categoryGrants:
+          type: array
+          description: >-
+            Category ids to restrict a GROUP role's members to. Only valid on
+            group roles; omit or leave empty for unrestricted access.
+          items:
+            type: integer
+            format: uint64
+        tagGrants:
+          type: array
+          description: >-
+            Tag ids to restrict a GROUP role's members to. Only valid on group
+            roles; omit or leave empty for unrestricted access.
+          items:
+            type: integer
+            format: uint64
+        paidByUserGrants:
+          type: array
+          description: >-
+            User ids whose receipts a GROUP role's members may see (by the
+            receipt's "paid by" user). Only valid on group roles; omit or leave
+            empty (with includeOwnPaidReceipts false) for unrestricted access.
+          items:
+            type: integer
+            format: uint64
+        includeOwnPaidReceipts:
+          type: boolean
+          description: >-
+            Whether to also let each member see receipts they paid for. Only valid
+            on group roles.
     SortDirection:
       type: string
       enum:
@@ -3150,7 +3515,6 @@ components:
     GroupMember:
       required:
         - groupId
-        - groupRole
         - userId
       type: object
       properties:
@@ -3160,9 +3524,11 @@ components:
           type: integer
           description: Group compound primary key
           format: uint64
-        groupRole:
-          type: string
-          $ref: "#/components/schemas/GroupRole"
+        groupRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: Id of the modern group role assigned to the member
         updatedAt:
           type: string
           x-go-name: UpdatedAt
@@ -3175,7 +3541,6 @@ components:
     UpsertGroupMemberCommand:
       required:
         - groupId
-        - groupRole
         - userId
       type: object
       properties:
@@ -3183,9 +3548,11 @@ components:
           type: integer
           description: Group compound primary key
           format: uint64
-        groupRole:
-          type: string
-          $ref: "#/components/schemas/GroupRole"
+        groupRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: Id of the modern group role to assign to the member
         userId:
           type: integer
           description: User compound primary key
@@ -3513,7 +3880,6 @@ components:
         - username
         - displayName
         - isDummyUser
-        - userRole
         - id
       type: object
       properties:
@@ -3545,10 +3911,11 @@ components:
         updatedAt:
           type: string
           x-go-name: UpdatedAt
-        userRole:
-          type: string
-          $ref: "#/components/schemas/UserRole"
-          description: User's role
+        appRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: Id of the modern app role assigned to the user
         lastLoginDate:
           type: string
       description: User in the system
@@ -3558,7 +3925,6 @@ components:
         - username
         - displayName
         - isDummyUser
-        - userRole
         - id
       type: object
       properties:
@@ -3584,10 +3950,11 @@ components:
           description: Is dummy user
         updatedAt:
           type: string
-        userRole:
-          type: string
-          $ref: "#/components/schemas/UserRole"
-          description: User's role
+        appRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: Id of the modern app role assigned to the user
       description: User in the system
       x-go-package: receipt-wrangler/api/internal/models
     UpdateProfileCommand:
@@ -3652,10 +4019,14 @@ components:
         isDummyUser:
           type: boolean
           description: Whether the user is a dummy user
-        userRole:
-          type: string
-          $ref: "#/components/schemas/UserRole"
-          description: User's role
+        appRoleId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: >-
+            Id of the modern app role to assign. Honored by admin user creation;
+            ignored on public sign-up, where any caller-supplied value is stripped
+            server-side.
     BulkStatusUpdateCommand:
       required:
         - status
@@ -4219,6 +4590,8 @@ components:
         - tags
         - currencyDisplay
         - icons
+        - appPermissions
+        - groupPermissions
       properties:
         about:
           $ref: "#/components/schemas/About"
@@ -4271,6 +4644,38 @@ components:
           description: Icons in the system
           items:
             $ref: "#/components/schemas/Icon"
+        appPermissions:
+          type: array
+          description: The calling user's effective app-level permissions.
+          items:
+            $ref: "#/components/schemas/Permission"
+        groupPermissions:
+          type: object
+          description: The calling user's effective group-level permissions, keyed by group id.
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/Permission"
+        groupCategories:
+          type: object
+          description: >-
+            The categories the calling user may use in each group, keyed by group
+            id. Filtered to the user's group-role grants (the full pool when
+            unrestricted). Non-admins receive categories only through this map.
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/Category"
+        groupTags:
+          type: object
+          description: >-
+            The tags the calling user may use in each group, keyed by group id.
+            Filtered to the user's group-role grants (the full pool when
+            unrestricted). Non-admins receive tags only through this map.
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/Tag"
     TokenPair:
       type: object
       required:
@@ -4287,7 +4692,6 @@ components:
       type: object
       required:
         - userId
-        - userRole
         - displayName
         - defaultAvatarColor
         - username
@@ -4298,11 +4702,6 @@ components:
           type: integer
           description: User foreign key
           default: 0
-        userRole:
-          type: string
-          $ref: "#/components/schemas/UserRole"
-          description: User's role
-          default: USER
         displayName:
           type: string
           description: Display name
@@ -4566,6 +4965,10 @@ components:
               type: integer
               description: Concurrency for task worker
               default: 10
+            pdfDpi:
+              type: integer
+              description: DPI used when rasterizing PDFs for OCR/vision processing
+              default: 300
             taskQueueConfigurations:
               type: array
               items:
@@ -4619,6 +5022,11 @@ components:
         taskConcurrency:
           type: integer
           description: Concurrency for task worker
+        pdfDpi:
+          type: integer
+          description: DPI used when rasterizing PDFs for OCR/vision processing
+          minimum: 72
+          maximum: 1200
         taskQueueConfigurations:
           type: array
           items:
@@ -4936,6 +5344,8 @@ components:
             customFieldId:
               type: integer
               description: Custom Field ID
+            customField:
+              $ref: "#/components/schemas/CustomField"
             stringValue:
               type: string
               description: Custom Field String Value

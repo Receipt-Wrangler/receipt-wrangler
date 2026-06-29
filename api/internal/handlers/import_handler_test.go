@@ -33,7 +33,7 @@ func TestShouldNotAllowUserToImportConfig(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	ImportConfigJson(w, r)
@@ -237,6 +237,8 @@ func TestShouldRunHandlerWithDifferentInputs(t *testing.T) {
 		},
 	}
 
+	grantAllAppPerms(t, 1)
+
 	for name, test := range tests {
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
@@ -284,7 +286,7 @@ func TestShouldRunHandlerWithDifferentInputs(t *testing.T) {
 		r := httptest.NewRequest("POST", "/api", body)
 		r.Header.Set("Content-Type", writer.FormDataContentType())
 
-		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 		r = r.WithContext(newContext)
 
 		ImportConfigJson(w, r)

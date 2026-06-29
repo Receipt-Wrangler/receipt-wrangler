@@ -3,19 +3,16 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"receipt-wrangler/api/internal/wranglerasynq"
-	"strings"
 
 	"github.com/hibiken/asynq"
 
@@ -24,10 +21,11 @@ import (
 
 func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving groups.",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error retrieving groups.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppAccountRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.PagedGroupRequestCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -42,6 +40,20 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 			}
 
 			token := structs.GetClaims(r)
+
+			// Listing every group in the system requires a dedicated permission,
+			// resolved from the database (never trusted from the JWT).
+			if command.GroupFilter.AssociatedGroup == commands.ASSOCIATED_GROUP_ALL {
+				permissionService := services.NewPermissionService(nil)
+				canReadAll, err := permissionService.HasAppPermissions(token.UserId, permissions.AppGroupsRead)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				if !canReadAll {
+					return http.StatusForbidden, errors.New("user is unauthorized to view all groups")
+				}
+			}
+
 			userIdString := utils.UintToString(token.UserId)
 			groupRepository := repositories.NewGroupRepository(nil)
 
@@ -76,10 +88,11 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 
 func GetGroupsForUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving groups.",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error retrieving groups.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppAccountRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
 			groupService := services.NewGroupService(nil)
@@ -129,13 +142,13 @@ func GetGroupsForUser(w http.ResponseWriter, r *http.Request) {
 
 func GetGroupById(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error retrieving group.",
-		Writer:       w,
-		Request:      r,
-		GroupId:      chi.URLParam(r, "groupId"),
-		GroupRole:    models.VIEWER,
-		OrUserRole:   models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error retrieving group.",
+		Writer:           w,
+		Request:          r,
+		GroupId:          chi.URLParam(r, "groupId"),
+		GroupPermissions: []string{permissions.GroupView},
+		OrAppPermissions: []string{permissions.AppGroupsRead},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "groupId")
 
@@ -162,10 +175,11 @@ func GetGroupById(w http.ResponseWriter, r *http.Request) {
 
 func CreateGroup(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error creating group",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error creating group",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppGroupsCreate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpsertGroupCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -218,12 +232,12 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 // TODO: move hooks, and update swagger to take command
 func UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating group.",
-		Writer:       w,
-		Request:      r,
-		GroupId:      chi.URLParam(r, "groupId"),
-		GroupRole:    models.OWNER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     "Error updating group.",
+		Writer:           w,
+		Request:          r,
+		GroupId:          chi.URLParam(r, "groupId"),
+		GroupPermissions: []string{permissions.GroupUpdate},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpsertGroupCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -276,11 +290,11 @@ func UpdateGroupSettings(w http.ResponseWriter, r *http.Request) {
 	groupId := chi.URLParam(r, "groupId")
 
 	handler := structs.Handler{
-		ErrorMessage: "Error updating group settings",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		UserRole:     models.ADMIN,
+		ErrorMessage:   "Error updating group settings",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppGroupsUpdateSettings},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpdateGroupSettingsCommand{}
 			vErr, err := command.LoadDataFromRequestAndValidate(w, r)
@@ -317,12 +331,12 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 	groupId := chi.URLParam(r, "groupId")
 
 	handler := structs.Handler{
-		ErrorMessage: "Error updating group receipt settings",
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupId:      groupId,
-		GroupRole:    models.OWNER,
+		ErrorMessage:     "Error updating group receipt settings",
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		GroupId:          groupId,
+		GroupPermissions: []string{permissions.GroupUpdate},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpdateGroupReceiptSettingsCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -356,11 +370,11 @@ func PollGroupEmail(w http.ResponseWriter, r *http.Request) {
 	errMessage := "Error polling email(s), please review your email integration settings"
 
 	handler := structs.Handler{
-		ErrorMessage: errMessage,
-		Writer:       w,
-		Request:      r,
-		GroupRole:    models.VIEWER,
-		GroupId:      groupId,
+		ErrorMessage:     errMessage,
+		Writer:           w,
+		Request:          r,
+		GroupPermissions: []string{permissions.GroupEmailPoll},
+		GroupId:          groupId,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			groupSettingsRepository := repositories.NewGroupSettingsRepository(nil)
 			groupRepository := repositories.NewGroupRepository(nil)
@@ -439,11 +453,11 @@ func PollGroupEmail(w http.ResponseWriter, r *http.Request) {
 func DeleteGroup(w http.ResponseWriter, r *http.Request) {
 
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting group.",
-		Writer:       w,
-		Request:      r,
-		GroupId:      chi.URLParam(r, "groupId"),
-		GroupRole:    models.OWNER,
+		ErrorMessage:     "Error deleting group.",
+		Writer:           w,
+		Request:          r,
+		GroupId:          chi.URLParam(r, "groupId"),
+		GroupPermissions: []string{permissions.GroupDelete},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "groupId")
 			groupService := services.NewGroupService(nil)
@@ -468,63 +482,6 @@ func DeleteGroup(w http.ResponseWriter, r *http.Request) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-
-			return 0, nil
-		},
-	}
-
-	HandleRequest(handler)
-}
-
-func GetOcrTextForGroup(w http.ResponseWriter, r *http.Request) {
-	groupId := chi.URLParam(r, "groupId")
-	handler := structs.Handler{
-		ErrorMessage: "Error getting ocr text.",
-		Writer:       w,
-		Request:      r,
-		GroupId:      groupId,
-		GroupRole:    models.OWNER,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationZip,
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			token := structs.GetClaims(r)
-			zipFilename := "results.zip"
-
-			ocrResults, err := services.ReadAllReceiptImagesForGroup(groupId, utils.UintToString(token.UserId))
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			fileRepository := repositories.NewFileRepository(nil)
-			tempFilenames := []string{}
-
-			for i, exportResults := range ocrResults {
-				filename := strings.Split(exportResults.Filename, ".")[0] + "-" + fmt.Sprint(i) + ".txt"
-				tempPath := filepath.Join(fileRepository.GetTempDirectoryPath(), filename)
-				err := os.WriteFile(tempPath, []byte(exportResults.OcrText), 0600)
-				defer os.Remove(tempPath)
-				if err != nil {
-					return http.StatusInternalServerError, err
-				}
-
-				tempFilenames = append(tempFilenames, filename)
-			}
-
-			zipPath, err := fileRepository.CreateZipFromTempFiles(zipFilename, tempFilenames)
-			defer os.Remove(zipPath)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			bytes, err := utils.ReadFile(zipPath)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			w.Header().Set("Content-Disposition", "attachment; filename="+zipFilename)
-
-			w.WriteHeader(http.StatusOK)
-			w.Write(bytes)
 
 			return 0, nil
 		},

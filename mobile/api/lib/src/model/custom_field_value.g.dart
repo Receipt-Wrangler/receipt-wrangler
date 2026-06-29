@@ -22,6 +22,8 @@ class _$CustomFieldValue extends CustomFieldValue {
   @override
   final int receiptId;
   @override
+  final CustomField? customField;
+  @override
   final int id;
   @override
   final String createdAt;
@@ -34,7 +36,7 @@ class _$CustomFieldValue extends CustomFieldValue {
 
   factory _$CustomFieldValue(
           [void Function(CustomFieldValueBuilder)? updates]) =>
-      (new CustomFieldValueBuilder()..update(updates))._build();
+      (CustomFieldValueBuilder()..update(updates))._build();
 
   _$CustomFieldValue._(
       {this.dateValue,
@@ -44,28 +46,20 @@ class _$CustomFieldValue extends CustomFieldValue {
       required this.customFieldId,
       this.booleanValue,
       required this.receiptId,
+      this.customField,
       required this.id,
       required this.createdAt,
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        customFieldId, r'CustomFieldValue', 'customFieldId');
-    BuiltValueNullFieldError.checkNotNull(
-        receiptId, r'CustomFieldValue', 'receiptId');
-    BuiltValueNullFieldError.checkNotNull(id, r'CustomFieldValue', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'CustomFieldValue', 'createdAt');
-  }
-
+      : super._();
   @override
   CustomFieldValue rebuild(void Function(CustomFieldValueBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
   CustomFieldValueBuilder toBuilder() =>
-      new CustomFieldValueBuilder()..replace(this);
+      CustomFieldValueBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -78,6 +72,7 @@ class _$CustomFieldValue extends CustomFieldValue {
         customFieldId == other.customFieldId &&
         booleanValue == other.booleanValue &&
         receiptId == other.receiptId &&
+        customField == other.customField &&
         id == other.id &&
         createdAt == other.createdAt &&
         createdBy == other.createdBy &&
@@ -95,6 +90,7 @@ class _$CustomFieldValue extends CustomFieldValue {
     _$hash = $jc(_$hash, customFieldId.hashCode);
     _$hash = $jc(_$hash, booleanValue.hashCode);
     _$hash = $jc(_$hash, receiptId.hashCode);
+    _$hash = $jc(_$hash, customField.hashCode);
     _$hash = $jc(_$hash, id.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, createdBy.hashCode);
@@ -114,6 +110,7 @@ class _$CustomFieldValue extends CustomFieldValue {
           ..add('customFieldId', customFieldId)
           ..add('booleanValue', booleanValue)
           ..add('receiptId', receiptId)
+          ..add('customField', customField)
           ..add('id', id)
           ..add('createdAt', createdAt)
           ..add('createdBy', createdBy)
@@ -162,6 +159,12 @@ class CustomFieldValueBuilder
   int? get receiptId => _$this._receiptId;
   set receiptId(covariant int? receiptId) => _$this._receiptId = receiptId;
 
+  CustomFieldBuilder? _customField;
+  CustomFieldBuilder get customField =>
+      _$this._customField ??= CustomFieldBuilder();
+  set customField(covariant CustomFieldBuilder? customField) =>
+      _$this._customField = customField;
+
   int? _id;
   int? get id => _$this._id;
   set id(covariant int? id) => _$this._id = id;
@@ -197,6 +200,7 @@ class CustomFieldValueBuilder
       _customFieldId = $v.customFieldId;
       _booleanValue = $v.booleanValue;
       _receiptId = $v.receiptId;
+      _customField = $v.customField?.toBuilder();
       _id = $v.id;
       _createdAt = $v.createdAt;
       _createdBy = $v.createdBy;
@@ -209,7 +213,6 @@ class CustomFieldValueBuilder
 
   @override
   void replace(covariant CustomFieldValue other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$CustomFieldValue;
   }
 
@@ -222,8 +225,10 @@ class CustomFieldValueBuilder
   CustomFieldValue build() => _build();
 
   _$CustomFieldValue _build() {
-    final _$result = _$v ??
-        new _$CustomFieldValue._(
+    _$CustomFieldValue _$result;
+    try {
+      _$result = _$v ??
+          _$CustomFieldValue._(
             dateValue: dateValue,
             stringValue: stringValue,
             selectValue: selectValue,
@@ -233,13 +238,26 @@ class CustomFieldValueBuilder
             booleanValue: booleanValue,
             receiptId: BuiltValueNullFieldError.checkNotNull(
                 receiptId, r'CustomFieldValue', 'receiptId'),
+            customField: _customField?.build(),
             id: BuiltValueNullFieldError.checkNotNull(
                 id, r'CustomFieldValue', 'id'),
             createdAt: BuiltValueNullFieldError.checkNotNull(
                 createdAt, r'CustomFieldValue', 'createdAt'),
             createdBy: createdBy,
             createdByString: createdByString,
-            updatedAt: updatedAt);
+            updatedAt: updatedAt,
+          );
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'customField';
+        _customField?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+            r'CustomFieldValue', _$failedField, e.toString());
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

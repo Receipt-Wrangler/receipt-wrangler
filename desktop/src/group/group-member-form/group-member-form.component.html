@@ -8,13 +8,22 @@
         [usersToOmit]="usersToOmit"
       ></app-user-autocomplete>
       <app-select
-        class="me-1"
+        class="me-1 flex-grow-1"
         label="Role"
-        optionValueKey="value"
-        optionDisplayKey="displayValue"
-        [options]="roleOptions"
-        [inputFormControl]="form | formGet : 'groupRole'"
+        optionValueKey="id"
+        optionDisplayKey="name"
+        [options]="groupRoleOptions()"
+        [inputFormControl]="form | formGet : 'groupRoleId'"
       ></app-select>
+      <app-button
+        data-testid="role-preview"
+        matButtonType="iconButton"
+        icon="visibility"
+        color="accent"
+        tooltip="Preview role"
+        [disabled]="!selectedRole()"
+        (clicked)="previewRole()"
+      ></app-button>
     </div>
     <app-dialog-footer (cancelClicked)="closeModal()"></app-dialog-footer>
   </form>

@@ -16,17 +16,11 @@ class _$UpsertDashboardCommand extends UpsertDashboardCommand {
 
   factory _$UpsertDashboardCommand(
           [void Function(UpsertDashboardCommandBuilder)? updates]) =>
-      (new UpsertDashboardCommandBuilder()..update(updates))._build();
+      (UpsertDashboardCommandBuilder()..update(updates))._build();
 
   _$UpsertDashboardCommand._(
       {required this.name, required this.groupId, this.widgets})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        name, r'UpsertDashboardCommand', 'name');
-    BuiltValueNullFieldError.checkNotNull(
-        groupId, r'UpsertDashboardCommand', 'groupId');
-  }
-
+      : super._();
   @override
   UpsertDashboardCommand rebuild(
           void Function(UpsertDashboardCommandBuilder) updates) =>
@@ -34,7 +28,7 @@ class _$UpsertDashboardCommand extends UpsertDashboardCommand {
 
   @override
   UpsertDashboardCommandBuilder toBuilder() =>
-      new UpsertDashboardCommandBuilder()..replace(this);
+      UpsertDashboardCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -79,7 +73,7 @@ class UpsertDashboardCommandBuilder
 
   ListBuilder<UpsertWidgetCommand>? _widgets;
   ListBuilder<UpsertWidgetCommand> get widgets =>
-      _$this._widgets ??= new ListBuilder<UpsertWidgetCommand>();
+      _$this._widgets ??= ListBuilder<UpsertWidgetCommand>();
   set widgets(ListBuilder<UpsertWidgetCommand>? widgets) =>
       _$this._widgets = widgets;
 
@@ -100,7 +94,6 @@ class UpsertDashboardCommandBuilder
 
   @override
   void replace(UpsertDashboardCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertDashboardCommand;
   }
 
@@ -116,19 +109,20 @@ class UpsertDashboardCommandBuilder
     _$UpsertDashboardCommand _$result;
     try {
       _$result = _$v ??
-          new _$UpsertDashboardCommand._(
-              name: BuiltValueNullFieldError.checkNotNull(
-                  name, r'UpsertDashboardCommand', 'name'),
-              groupId: BuiltValueNullFieldError.checkNotNull(
-                  groupId, r'UpsertDashboardCommand', 'groupId'),
-              widgets: _widgets?.build());
+          _$UpsertDashboardCommand._(
+            name: BuiltValueNullFieldError.checkNotNull(
+                name, r'UpsertDashboardCommand', 'name'),
+            groupId: BuiltValueNullFieldError.checkNotNull(
+                groupId, r'UpsertDashboardCommand', 'groupId'),
+            widgets: _widgets?.build(),
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'widgets';
         _widgets?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'UpsertDashboardCommand', _$failedField, e.toString());
       }
       rethrow;

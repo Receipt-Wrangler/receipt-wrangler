@@ -32,6 +32,21 @@ func (repository TagsRepository) GetAllTags(querySelect string) ([]models.Tag, e
 	return tags, nil
 }
 
+// CountByIds returns how many of the given tag ids exist. Used to validate that
+// a role's tag grants reference real tags. Duplicate ids in the input are
+// de-duplicated by the IN clause, so callers should pass a unique set.
+func (repository TagsRepository) CountByIds(ids []uint) (int64, error) {
+	db := repository.GetDB()
+
+	var count int64
+	err := db.Model(&models.Tag{}).Where("id IN ?", ids).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func (repository TagsRepository) CreateTag(command commands.UpsertTagCommand) (models.Tag, error) {
 	db := repository.GetDB()
 	tag := models.Tag{}

@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -16,11 +17,11 @@ import (
 
 func GetSystemTasks(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting system tasks",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting system tasks",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppSystemTasksRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.GetSystemTaskCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -80,12 +81,12 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler := structs.Handler{
-		ErrorMessage: errorMsg,
-		Writer:       w,
-		Request:      r,
-		GroupIds:     stringGroupIds,
-		GroupRole:    models.VIEWER,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:     errorMsg,
+		Writer:           w,
+		Request:          r,
+		GroupIds:         stringGroupIds,
+		GroupPermissions: []string{permissions.GroupActivitiesRead},
+		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 
 			vErr := command.Validate()
@@ -200,11 +201,11 @@ func RerunActivity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler := structs.Handler{
-		ErrorMessage: errorMsg,
-		Writer:       w,
-		Request:      r,
-		GroupId:      stringGroupId,
-		GroupRole:    models.EDITOR,
+		ErrorMessage:     errorMsg,
+		Writer:           w,
+		Request:          r,
+		GroupId:          stringGroupId,
+		GroupPermissions: []string{permissions.GroupActivitiesRerun},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			err = inspector.RunTask(queueName, systemTask.AsynqTaskId)
 			if err != nil {

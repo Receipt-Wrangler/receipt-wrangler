@@ -13,6 +13,7 @@ import 'package:openapi/src/api_util.dart';
 import 'package:openapi/src/model/bulk_status_update_command.dart';
 import 'package:openapi/src/model/internal_error_response.dart';
 import 'package:openapi/src/model/paged_data.dart';
+import 'package:openapi/src/model/permission.dart';
 import 'package:openapi/src/model/receipt.dart';
 import 'package:openapi/src/model/receipt_paged_request_command.dart';
 import 'package:openapi/src/model/receipt_status.dart';
@@ -553,7 +554,7 @@ class ReceiptApi {
   ///
   /// Parameters:
   /// * [receiptId] 
-  /// * [groupRole] - Role required to have access to receipt
+  /// * [permission] - Group permission required to access the receipt
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -565,7 +566,7 @@ class ReceiptApi {
   /// Throws [DioException] if API call or serialization fails
   Future<Response<void>> hasAccessToReceipt({ 
     required int receiptId,
-    String? groupRole,
+    required Permission permission,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -599,7 +600,7 @@ class ReceiptApi {
 
     final _queryParameters = <String, dynamic>{
       r'receiptId': encodeQueryParameter(_serializers, receiptId, const FullType(int)),
-      if (groupRole != null) r'groupRole': encodeQueryParameter(_serializers, groupRole, const FullType(String)),
+      r'permission': encodeQueryParameter(_serializers, permission, const FullType(Permission)),
     };
 
     final _response = await _dio.request<Object>(

@@ -16,17 +16,11 @@ class _$UpsertCommentCommand extends UpsertCommentCommand {
 
   factory _$UpsertCommentCommand(
           [void Function(UpsertCommentCommandBuilder)? updates]) =>
-      (new UpsertCommentCommandBuilder()..update(updates))._build();
+      (UpsertCommentCommandBuilder()..update(updates))._build();
 
   _$UpsertCommentCommand._(
       {required this.comment, required this.receiptId, this.userId})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        comment, r'UpsertCommentCommand', 'comment');
-    BuiltValueNullFieldError.checkNotNull(
-        receiptId, r'UpsertCommentCommand', 'receiptId');
-  }
-
+      : super._();
   @override
   UpsertCommentCommand rebuild(
           void Function(UpsertCommentCommandBuilder) updates) =>
@@ -34,7 +28,7 @@ class _$UpsertCommentCommand extends UpsertCommentCommand {
 
   @override
   UpsertCommentCommandBuilder toBuilder() =>
-      new UpsertCommentCommandBuilder()..replace(this);
+      UpsertCommentCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -98,7 +92,6 @@ class UpsertCommentCommandBuilder
 
   @override
   void replace(UpsertCommentCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertCommentCommand;
   }
 
@@ -112,12 +105,13 @@ class UpsertCommentCommandBuilder
 
   _$UpsertCommentCommand _build() {
     final _$result = _$v ??
-        new _$UpsertCommentCommand._(
-            comment: BuiltValueNullFieldError.checkNotNull(
-                comment, r'UpsertCommentCommand', 'comment'),
-            receiptId: BuiltValueNullFieldError.checkNotNull(
-                receiptId, r'UpsertCommentCommand', 'receiptId'),
-            userId: userId);
+        _$UpsertCommentCommand._(
+          comment: BuiltValueNullFieldError.checkNotNull(
+              comment, r'UpsertCommentCommand', 'comment'),
+          receiptId: BuiltValueNullFieldError.checkNotNull(
+              receiptId, r'UpsertCommentCommand', 'receiptId'),
+          userId: userId,
+        );
     replace(_$result);
     return _$result;
   }

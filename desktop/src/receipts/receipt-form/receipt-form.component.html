@@ -56,6 +56,7 @@
                 class="w-100"
                 [inputFormControl]="form | formGet : 'categories'"
                 [categories]="categories"
+                [creatable]="canCreateCategories()"
                 [readonly]="mode | inputReadonly"
               ></app-category-autocomplete>
             }
@@ -64,6 +65,7 @@
                 class="w-100"
                 [inputFormControl]="form | formGet : 'tags'"
                 [tags]="tags"
+                [creatable]="canCreateTags()"
                 [readonly]="mode | inputReadonly"
               ></app-tag-autocomplete>
             }
@@ -189,6 +191,7 @@
           >
             <app-receipt-comments
               [receiptId]="originalReceipt?.id"
+              [groupId]="originalReceipt?.groupId"
               [comments]="originalReceipt?.comments ?? []"
               [mode]="mode"
               (commentsUpdated)="updateComments($event)"
@@ -219,7 +222,7 @@
           *ngIf="!(mode | inputReadonly)"
           [onlyIcon]="false"
           [mode]="mode"
-          [disabled]="!(originalReceipt?.groupId | groupRole : groupRole.Editor)"
+          [disabled]="!canEditReceipt()"
           [disableOnLoading]="true"
           [buttonText]="submitButtonText"
         ></app-submit-button>
@@ -277,20 +280,22 @@
     matButtonType="iconButton"
     tooltip="Edit"
     icon="edit"
-    [disabled]="!(originalReceipt?.groupId | groupRole : groupRole.Editor)"
+    [disabled]="!canEditReceipt()"
     [buttonRouterLink]="[editLink]"
   ></app-button>
-  <app-filtered-stateful-menu
-    filterLabel="Filter custom fields"
-    matButtonType="iconButton"
-    icon="list_alt"
-    tooltip="Manage custom fields"
-    color="accent"
-    [readonly]="mode | inputReadonly"
-    [items]="customFieldsStatefulMenuItems"
-    [headerText]="(mode | inputReadonly) ? 'View Custom Fields' : 'Edit Custom Fields'"
-    (itemSelected)="customFieldChanged($event)"
-  ></app-filtered-stateful-menu>
+  @if (canManageCustomFields()) {
+    <app-filtered-stateful-menu
+      filterLabel="Filter custom fields"
+      matButtonType="iconButton"
+      icon="list_alt"
+      tooltip="Manage custom fields"
+      color="accent"
+      [readonly]="mode | inputReadonly"
+      [items]="customFieldsStatefulMenuItems"
+      [headerText]="(mode | inputReadonly) ? 'View Custom Fields' : 'Edit Custom Fields'"
+      (itemSelected)="customFieldChanged($event)"
+    ></app-filtered-stateful-menu>
+  }
   <app-button
     *ngIf="mode | inputReadonly"
     class="ms-1"
@@ -298,7 +303,7 @@
     matButtonType="iconButton"
     tooltip="Duplicate"
     icon="file_copy"
-    [disabled]="!(originalReceipt?.groupId | groupRole : groupRole.Editor)"
+    [disabled]="!canDuplicate()"
     (clicked)="duplicateReceipt()"
   ></app-button>
 </ng-template>
@@ -312,7 +317,7 @@
     tooltip="Add item"
     color="accent"
     (clicked)="initItemListAddMode()"
-    [disabled]="!(originalReceipt?.groupId | groupRole : groupRole.Editor)"
+    [disabled]="!canEditReceipt()"
   ></app-button>
 </ng-template>
 
@@ -325,7 +330,7 @@
     tooltip="Add share"
     color="accent"
     (clicked)="initShareListAddMode()"
-    [disabled]="!(originalReceipt?.groupId | groupRole : groupRole.Editor)"
+    [disabled]="!canEditReceipt()"
   ></app-button>
   <app-button
     *ngIf="!(mode | inputReadonly)"
@@ -334,7 +339,7 @@
     color="accent"
     matButtonType="iconButton"
     tooltip="Quick Actions"
-    [disabled]="!(originalReceipt?.groupId | groupRole : groupRole.Editor)"
+    [disabled]="!canEditReceipt()"
     (clicked)="openQuickActionsModal()"
   ></app-button>
 </ng-template>
@@ -347,10 +352,7 @@
     matButtonType="iconButton"
     icon="photo_library"
     tooltip="Upload Image(s)"
-    [disabled]="
-      !(originalReceipt?.groupId | groupRole : groupRole.Editor) ||
-      (showProgressBar() ?? false)
-    "
+    [disabled]="!canEditReceipt() || (showProgressBar() ?? false)"
     (clicked)="uploadImageButtonClicked()"
   ></app-button>
   @if (images() && (images().length > 0 || filesToUpload().length > 0)) {
@@ -417,7 +419,7 @@
     icon="receipt_long"
     tooltip="Magic fill"
     color="accent"
-    [disabled]="(showProgressBar() ?? false)"
+    [disabled]="!canMagicFill() || (showProgressBar() ?? false)"
     (clicked)="magicFill()"
   ></app-button>
   <app-button
@@ -428,7 +430,7 @@
     icon="delete"
     tooltip="Remove Image"
     color="warn"
-    [disabled]="(showProgressBar() ?? false)"
+    [disabled]="!canEditReceipt() || (showProgressBar() ?? false)"
     (clicked)="removeImage()"
   ></app-button>
 </ng-template>

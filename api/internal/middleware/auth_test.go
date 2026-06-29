@@ -23,7 +23,6 @@ func createTestUser() models.User {
 		Username:           "testuser",
 		Password:           "hashedpassword",
 		DisplayName:        "Test User",
-		UserRole:           models.ADMIN,
 		DefaultAvatarColor: "#FF0000",
 	}
 	repositories.GetDB().Create(&user)
@@ -735,7 +734,6 @@ func TestUnifiedAuthMiddleware_DoesNotUpdateLastUsedDate_OnJWT(t *testing.T) {
 		UserId:      user.ID,
 		Username:    user.Username,
 		Displayname: user.DisplayName,
-		UserRole:    user.UserRole,
 	}
 	claims := &validator.ValidatedClaims{
 		CustomClaims: customClaims,

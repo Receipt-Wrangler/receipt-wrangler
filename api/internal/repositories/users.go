@@ -3,6 +3,7 @@ package repositories
 import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"time"
@@ -20,6 +21,21 @@ func NewUserRepository(tx *gorm.DB) UserRepository {
 		TX: tx,
 	}}
 	return repository
+}
+
+// CountByIds returns how many of the given user ids exist. Used to validate that
+// a group role's paid-by user grants reference real users. Duplicate ids in the
+// input are de-duplicated by the IN clause, so callers should pass a unique set.
+func (repository UserRepository) CountByIds(ids []uint) (int64, error) {
+	db := repository.GetDB()
+
+	var count int64
+	err := db.Model(&models.User{}).Where("id IN ?", ids).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (models.User, error) {
@@ -44,16 +60,25 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 		repository.SetTransaction(tx)
 		userPreferencesRepository := NewUserPreferencesRepository(tx)
 
-		userRole := user.UserRole
-
-		if len(userRole) == 0 {
+		if userData.AppRoleID != nil {
+			// The admin-protected create endpoint chose a modern app role
+			// explicitly. Honor it.
+			user.AppRoleID = userData.AppRoleID
+		} else {
+			// Assign the modern app role so the account is not locked out under
+			// permission enforcement: Legacy Admin for the first/bootstrap user
+			// (an administrator, so it is never the configurable default), the
+			// configurable default app role otherwise.
 			var usrCnt int64
 			tx.Model(models.User{}).Count(&usrCnt)
-			if usrCnt == 0 {
-				user.UserRole = models.ADMIN
-			} else {
-				user.UserRole = models.USER
+			isAdmin := usrCnt == 0
+
+			appRoleId, roleErr := repository.resolveAppRoleId(tx, isAdmin)
+			if roleErr != nil {
+				repository.ClearTransaction()
+				return roleErr
 			}
+			user.AppRoleID = appRoleId
 		}
 
 		err = repository.GetDB().Create(&user).Error
@@ -95,6 +120,38 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 	}
 
 	return user, nil
+}
+
+// resolveAppRoleId picks the modern app role for a newly-created user: the
+// Legacy Admin role for an administrator (the first/bootstrap user, so it is
+// never assigned the configurable default and locked out of administration) and
+// the configurable default app role for everyone else. Returns nil when the role
+// can't be resolved (e.g. an unseeded test database), leaving the user without a
+// modern role rather than failing creation.
+func (repository UserRepository) resolveAppRoleId(tx *gorm.DB, isAdmin bool) (*uint, error) {
+	roleRepository := NewRoleRepository(tx)
+	if isAdmin {
+		return roleRepository.GetAppRoleIdByName(LegacyAdminRoleName)
+	}
+	return roleRepository.GetDefaultAppRoleId()
+}
+
+// UpdateUser updates the editable fields of a user. The app role column is only
+// written when an id is supplied, so callers that omit it never clear an existing
+// assignment.
+func (repository UserRepository) UpdateUser(id string, command commands.SignUpCommand) error {
+	db := repository.GetDB()
+
+	updates := map[string]interface{}{
+		"username":     command.Username,
+		"display_name": command.DisplayName,
+	}
+
+	if command.AppRoleID != nil {
+		updates["app_role_id"] = *command.AppRoleID
+	}
+
+	return db.Table("users").Where("id = ?", id).Updates(updates).Error
 }
 
 func (repository UserRepository) CreateUserIfNoneExist() error {
@@ -149,15 +206,27 @@ func (repository UserRepository) UpdateUserLastLoginDate(userId uint) (time.Time
 	return now, nil
 }
 
+// IsFirstAdminToLogin reports whether no administrator has logged in yet, where
+// "administrator" is any user whose app role grants app.users.read (the modern
+// replacement for the removed UserRole == ADMIN check). Returns true when no such
+// user has a last_login_date.
 func (repository UserRepository) IsFirstAdminToLogin() (bool, error) {
-	foundUser := models.User{}
+	roleRepository := NewRoleRepository(repository.TX)
+	adminRoleIds, err := roleRepository.appRoleIdsWithPermission(permissions.AppUsersRead)
+	if err != nil {
+		return false, err
+	}
+	if len(adminRoleIds) == 0 {
+		return true, nil
+	}
 
-	err := repository.
+	foundUser := models.User{}
+	err = repository.
 		GetDB().
 		Limit(1).
 		Select("id").
 		Model(models.User{}).
-		Where("user_role = ? AND last_login_date IS NOT NULL", models.ADMIN).
+		Where("app_role_id IN ? AND last_login_date IS NOT NULL", adminRoleIds).
 		Find(&foundUser).
 		Error
 

@@ -2,6 +2,7 @@
   [form]="form"
   [formConfig]="formConfig"
   [formTemplate]="formTemplate"
+  [canEdit]="canEdit()"
   [editButtonRouterLink]="['/settings/user-preferences/edit']"
   [editButtonQueryParams]="{tab: 'user-preferences'}"
   [submitButtonDisabled]="(userShortcutComponent()?.editableListComponent()?.getCurrentRowOpen() ?? -1) >= 0"

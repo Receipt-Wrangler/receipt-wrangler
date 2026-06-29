@@ -27,8 +27,7 @@ class _$UpdateGroupReceiptSettingsCommand
 
   factory _$UpdateGroupReceiptSettingsCommand(
           [void Function(UpdateGroupReceiptSettingsCommandBuilder)? updates]) =>
-      (new UpdateGroupReceiptSettingsCommandBuilder()..update(updates))
-          ._build();
+      (UpdateGroupReceiptSettingsCommandBuilder()..update(updates))._build();
 
   _$UpdateGroupReceiptSettingsCommand._(
       {this.hideImages,
@@ -40,7 +39,6 @@ class _$UpdateGroupReceiptSettingsCommand
       this.hideShareCategories,
       this.hideShareTags})
       : super._();
-
   @override
   UpdateGroupReceiptSettingsCommand rebuild(
           void Function(UpdateGroupReceiptSettingsCommandBuilder) updates) =>
@@ -48,7 +46,7 @@ class _$UpdateGroupReceiptSettingsCommand
 
   @override
   UpdateGroupReceiptSettingsCommandBuilder toBuilder() =>
-      new UpdateGroupReceiptSettingsCommandBuilder()..replace(this);
+      UpdateGroupReceiptSettingsCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -159,7 +157,6 @@ class UpdateGroupReceiptSettingsCommandBuilder
 
   @override
   void replace(UpdateGroupReceiptSettingsCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpdateGroupReceiptSettingsCommand;
   }
 
@@ -174,15 +171,16 @@ class UpdateGroupReceiptSettingsCommandBuilder
 
   _$UpdateGroupReceiptSettingsCommand _build() {
     final _$result = _$v ??
-        new _$UpdateGroupReceiptSettingsCommand._(
-            hideImages: hideImages,
-            hideReceiptCategories: hideReceiptCategories,
-            hideReceiptTags: hideReceiptTags,
-            hideItemCategories: hideItemCategories,
-            hideItemTags: hideItemTags,
-            hideComments: hideComments,
-            hideShareCategories: hideShareCategories,
-            hideShareTags: hideShareTags);
+        _$UpdateGroupReceiptSettingsCommand._(
+          hideImages: hideImages,
+          hideReceiptCategories: hideReceiptCategories,
+          hideReceiptTags: hideReceiptTags,
+          hideItemCategories: hideItemCategories,
+          hideItemTags: hideItemTags,
+          hideComments: hideComments,
+          hideShareCategories: hideShareCategories,
+          hideShareTags: hideShareTags,
+        );
     replace(_$result);
     return _$result;
   }

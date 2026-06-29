@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -33,8 +34,10 @@ func TestShouldNotAllowAdminToUpdateGroupSettingsIdWithBadId(t *testing.T) {
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 	r = r.WithContext(routeContext)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 1)
 
 	UpdateGroupSettings(w, r)
 
@@ -55,7 +58,7 @@ func TestShouldNotUserToUpdateGroupSettingsById(t *testing.T) {
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 	r = r.WithContext(routeContext)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	UpdateGroupReceiptSettings(w, r)
@@ -77,7 +80,7 @@ func TestShouldNotUserToUpdateGroupReceiptSettingsById(t *testing.T) {
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 	r = r.WithContext(routeContext)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 	r = r.WithContext(newContext)
 
 	UpdateGroupSettings(w, r)
@@ -100,6 +103,8 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommands(t *testing.T) {
 
 	db.Create(&models.Prompt{})
 	db.Create(&models.Prompt{})
+
+	grantAllAppPerms(t, 1)
 
 	id := uint(1)
 	badId := uint(0)
@@ -181,7 +186,7 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommands(t *testing.T) {
 		routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, chiContext)
 		r = r.WithContext(routeContext)
 
-		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: models.ADMIN}})
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
 		r = r.WithContext(newContext)
 
 		UpdateGroupSettings(w, r)
@@ -195,19 +200,29 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommands(t *testing.T) {
 func TestShouldTestUpdateGroupSettingsWithVariousCommandsAsAdmin(t *testing.T) {
 	defer tearDownGroupTests()
 
+	// User 1 is a full admin (holds app.groups.read, so it may list ALL groups).
+	// User 2 holds only app.account.read, enough to pass the handler gate but not
+	// to list ALL groups, exercising the modern permission-based denial that
+	// replaces the removed JWT-role check.
+	grantAllAppPerms(t, 1)
+	grantAppPerms(t, 2, permissions.AppAccountRead)
+
 	tests := map[string]struct {
-		input    commands.PagedGroupRequestCommand
-		expect   int
-		userRole models.UserRole
+		userId uint
+		input  commands.PagedGroupRequestCommand
+		expect int
 	}{
 		"empty body": {
+			userId: 1,
 			expect: http.StatusBadRequest,
 		},
 		"empty command": {
+			userId: 1,
 			input:  commands.PagedGroupRequestCommand{},
 			expect: http.StatusBadRequest,
 		},
 		"bad command due to bad orderBy": {
+			userId: 1,
 			input: commands.PagedGroupRequestCommand{
 				PagedRequestCommand: commands.PagedRequestCommand{
 					Page:          1,
@@ -219,10 +234,10 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommandsAsAdmin(t *testing.T) {
 					AssociatedGroup: commands.ASSOCIATED_GROUP_ALL,
 				},
 			},
-			userRole: models.ADMIN,
-			expect:   http.StatusInternalServerError,
+			expect: http.StatusInternalServerError,
 		},
 		"valid command with all groups as admin": {
+			userId: 1,
 			input: commands.PagedGroupRequestCommand{
 				PagedRequestCommand: commands.PagedRequestCommand{
 					Page:          1,
@@ -234,10 +249,10 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommandsAsAdmin(t *testing.T) {
 					AssociatedGroup: commands.ASSOCIATED_GROUP_ALL,
 				},
 			},
-			expect:   http.StatusOK,
-			userRole: models.ADMIN,
+			expect: http.StatusOK,
 		},
-		"bad command with all groups as user": {
+		"all groups denied without app.groups.read": {
+			userId: 2,
 			input: commands.PagedGroupRequestCommand{
 				PagedRequestCommand: commands.PagedRequestCommand{
 					Page:          1,
@@ -249,10 +264,10 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommandsAsAdmin(t *testing.T) {
 					AssociatedGroup: commands.ASSOCIATED_GROUP_ALL,
 				},
 			},
-			expect:   http.StatusBadRequest,
-			userRole: models.USER,
+			expect: http.StatusForbidden,
 		},
 		"valid command with my groups as admin": {
+			userId: 1,
 			input: commands.PagedGroupRequestCommand{
 				PagedRequestCommand: commands.PagedRequestCommand{
 					Page:          1,
@@ -264,8 +279,7 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommandsAsAdmin(t *testing.T) {
 					AssociatedGroup: commands.ASSOCIATED_GROUP_MINE,
 				},
 			},
-			expect:   http.StatusOK,
-			userRole: models.ADMIN,
+			expect: http.StatusOK,
 		},
 	}
 
@@ -275,7 +289,7 @@ func TestShouldTestUpdateGroupSettingsWithVariousCommandsAsAdmin(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("POST", "/api", reader)
 
-		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1, UserRole: test.userRole}})
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: test.userId}})
 		r = r.WithContext(newContext)
 
 		GetPagedGroups(w, r)

@@ -83,15 +83,27 @@ Future<int> addManualReceiptViaUI(
   WidgetTester tester,
   String name, {
   String amount = '12.34',
+  String groupName = 'My Receipts',
 }) async {
-  await tester.tap(find.text('Add'));
-  await pumpUntilFound(tester, find.text('Add Manual Receipt'));
-  await tester.tap(find.text('Add Manual Receipt'));
+  // Inside a group two bottom navs are mounted (the group-select shell sits
+  // under the group shell), so two "Add" destinations match; `.hitTestable()`
+  // taps the visible one. On group-select there is just one, so this is safe
+  // there too.
+  await tester.tap(find.text('Add').hitTestable());
+  // The add menu is a modal bottom sheet; its items mount on the slide-in's
+  // first frame while the sheet is still rising, so a tap computed then lands
+  // at the bottom edge and misses (observed as "Offset(411.6, 852.0) ...
+  // would not hit test"). Wait for hittability, then drain the slide-in.
+  await pumpUntilFound(tester, find.text('Add Manual Receipt').hitTestable());
+  for (int i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await tester.tap(find.text('Add Manual Receipt').hitTestable());
   await pumpUntilFound(tester, find.text('Name'));
 
   await tester.enterText(formField('name'), name);
   await tester.enterText(formField('amount'), amount);
-  await selectDropdown(tester, 'groupId', 'My Receipts');
+  await selectDropdown(tester, 'groupId', groupName);
   await selectDropdown(tester, 'paidByUserId', adminDisplayName(tester));
 
   // Drain the dropdown overlay teardown -- the popup-route's overlay

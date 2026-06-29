@@ -19,6 +19,7 @@ part 'check_receipt_processing_settings_connectivity_command.g.dart';
 /// * [url] - URL for custom endpoints
 /// * [key] - Key for endpoints that require authentication
 /// * [model] - LLM model
+/// * [enforceJsonResponseFormat] - Enforce JSON response format on the LLM provider. Disable if the provider does not support this flag.
 /// * [numWorkers] - Number of workers to use
 /// * [ocrEngine] 
 /// * [promptId] - Prompt foreign key
@@ -47,6 +48,10 @@ abstract class CheckReceiptProcessingSettingsConnectivityCommand implements Buil
   /// LLM model
   @BuiltValueField(wireName: r'model')
   String? get model;
+
+  /// Enforce JSON response format on the LLM provider. Disable if the provider does not support this flag.
+  @BuiltValueField(wireName: r'enforceJsonResponseFormat')
+  bool? get enforceJsonResponseFormat;
 
   /// Number of workers to use
   @BuiltValueField(wireName: r'numWorkers')
@@ -123,6 +128,13 @@ class _$CheckReceiptProcessingSettingsConnectivityCommandSerializer implements P
       yield serializers.serialize(
         object.model,
         specifiedType: const FullType(String),
+      );
+    }
+    if (object.enforceJsonResponseFormat != null) {
+      yield r'enforceJsonResponseFormat';
+      yield serializers.serialize(
+        object.enforceJsonResponseFormat,
+        specifiedType: const FullType(bool),
       );
     }
     if (object.numWorkers != null) {
@@ -210,6 +222,13 @@ class _$CheckReceiptProcessingSettingsConnectivityCommandSerializer implements P
             specifiedType: const FullType(String),
           ) as String;
           result.model = valueDes;
+          break;
+        case r'enforceJsonResponseFormat':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.enforceJsonResponseFormat = valueDes;
           break;
         case r'numWorkers':
           final valueDes = serializers.deserialize(

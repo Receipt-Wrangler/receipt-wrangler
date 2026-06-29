@@ -1,15 +1,23 @@
 <div class="d-flex align-items-center">
   <h1>{{ (selectedGroupId() ?? "" | group)?.name }} Dashboards</h1>
-  <app-add-button (clicked)="openDashboardDialog(true)"></app-add-button>
+  <app-add-button
+    *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsCreate }"
+    (clicked)="openDashboardDialog(true)"
+  ></app-add-button>
 
   @if (selectedDashboardId()) {
     @if (selectedGroupId()) {
       <app-edit-button
+        *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsUpdate }"
         color="accent"
         (clicked)="openDashboardDialog()"
       ></app-edit-button>
     }
-    <app-delete-button color="warn" (clicked)="openDeleteConfirmationDialog()">
+    <app-delete-button
+      *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsDelete }"
+      color="warn"
+      (clicked)="openDeleteConfirmationDialog()"
+    >
     </app-delete-button>
   }
 </div>

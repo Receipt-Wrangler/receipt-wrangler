@@ -121,6 +121,25 @@ See `mobile/CLAUDE.md` for Flutter architecture, Provider state management, and 
 - Mobile uses `flutter_secure_storage` for secure token storage
 - All API endpoints except `/api/auth/login` and `/api/auth/signup` require authentication
 
+### Authorization (Roles & Permissions)
+- A configurable role system layers on top of auth: administrators define **app-level** and
+  **group-level** roles from granular permission strings (e.g. `app.users.create`,
+  `group.receipts.read`) and assign them to users / group members.
+- **Backend source of truth** is the hardcoded permission registry plus role CRUD in `api/` —
+  exposed via `GET /api/permission` and `/api/role`, and mirrored in `swagger.yml` (so regenerated
+  clients carry the `Permission` enum and role types). See `api/CLAUDE.md` → "Roles & Permissions".
+- The server **never trusts the JWT for authorization** — it re-checks a user's current permissions
+  from the database on every request. The JWT no longer carries any role field.
+- **Role rollout is complete across backend and desktop.** Handlers fully enforce the permission
+  system, and the legacy `UserRole`/`GroupRole` enums have been **removed from the backend** (Go
+  types, model fields, JWT role claim, and the `userRole`/`groupRole` API fields are all gone; only
+  the physical `user_role`/`group_role` DB columns are retained for the one-time upgrade migration).
+  The **desktop** has likewise dropped every legacy-role consumer: the user-list and group-member
+  tables now resolve `appRoleId`/`groupRoleId` to a role **name** (via a shared `RoleNamePipe`), the
+  group-form "must have an owner" rule is gone (the backend no longer enforces an owner concept), and
+  the `AuthState.userRole`/`hasRole` selectors plus the group-member legacy-enum bridge are removed.
+  See `api/CLAUDE.md` → "Roles & Permissions" and `desktop/CLAUDE.md`.
+
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
 - **Desktop**: NGXS store with actions/selectors, persistent storage for auth/preferences
@@ -264,6 +283,17 @@ For a feature that adds a new API endpoint and a corresponding UI:
 - During your planning sessions, take a moment to think if there are any edge cases, or possible regressions or any
   additional things for the user to test before considering the task complete.
 - After implementing any full feature, always commit/push.
+
+### Code Review Feedback Disposition
+
+When addressing review feedback from CodeRabbit, human reviewers, or any other source, follow this protocol every time:
+
+1. **Read every comment** before acting. Don't fix-by-fix.
+2. **Build a disposition table for the user.** One row per comment: file/line, issue summary, decision (`ACCEPT` / `REJECT` / `ACCEPT + EXTEND` / `DEFER`), and a one-line justification. **Present this table inside the plan you write for the user** — it is for the user to review your reasoning before approving changes. Do NOT post this table as a bulk PR comment; it is a planning artifact, not a review response.
+3. **Verify each "ACCEPT" against current code** — reviewers (especially bots) sometimes flag false positives, stale code, or generator output they don't recognize as such. If a flag turns out to be invalid on inspection, flip the decision to `REJECT` with the reason ("verified — generator output, matches existing repo convention" / "verified — code already handles this case at line X").
+4. **Default to rejecting** comments that target auto-generated files (`desktop/src/open-api/`, `mobile/api/`) unless the comment identifies a real type/compile error the generator introduced. Hand-edits to generated files require an explicit justification and should match an established project precedent (search `git log` for "Fix build errors" / similar prior hand-patches).
+5. **Reply on each individual review-comment thread** with the per-comment decision and justification. Every CodeRabbit (or human) comment must get its own reply explaining whether you accepted or rejected and why — that is the audit trail the reviewer sees. Use `gh api -X POST /repos/<owner>/<repo>/pulls/<num>/comments/<comment_id>/replies` (review comments live on the pulls endpoint, not the issues one) with a JSON body of `{"body": "..."}`. Fetch the review-comment IDs via `gh api /repos/<owner>/<repo>/pulls/<num>/comments`.
+6. **Commit + push** only after every comment has an individual reply posted. The per-comment replies are the audit trail; the commit is the action.
 
 ## CLAUDE.md Maintenance
 

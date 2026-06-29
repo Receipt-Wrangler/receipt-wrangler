@@ -141,7 +141,7 @@ func (service ReceiptService) QuickScan(
 	groupIdString := utils.UintToString(groupId)
 
 	now := time.Now()
-	receiptCommand, receiptProcessingMetadata, magicFillErr := MagicFillFromImage(magicFillCommand, groupIdString)
+	receiptCommand, receiptProcessingMetadata, magicFillErr := MagicFillFromImage(magicFillCommand, groupIdString, token.UserId)
 	finishedAt := time.Now()
 
 	quickScanSystemTasks, taskErr := systemTaskService.CreateSystemTasksFromMetadata(
@@ -254,6 +254,14 @@ func (service ReceiptService) DuplicateReceipt(
 	}
 
 	systemTaskCommand.GroupId = &receipt.GroupId
+
+	// Strip categories/tags the duplicating user cannot see so they are not
+	// copied onto the new receipt.
+	permissionService := NewPermissionService(nil)
+	err = permissionService.FilterReceiptCategoriesTagsForReceipt(userId, &receipt)
+	if err != nil {
+		return models.Receipt{}, err
+	}
 
 	copier.Copy(&newReceipt, receipt)
 

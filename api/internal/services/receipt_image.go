@@ -6,9 +6,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
-	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
-	"sync"
 )
 
 func ReadReceiptImage(receiptImageId string) (commands.UpsertReceiptCommand, commands.ReceiptProcessingMetadata, error) {
@@ -106,12 +104,15 @@ func ReadReceiptFromTextOnly(bodyText string, groupId string) (commands.UpsertRe
 	return receiptProcessingService.ReadReceiptText(bodyText)
 }
 
-func MagicFillFromImage(command commands.MagicFillCommand, groupId string) (commands.UpsertReceiptCommand, commands.ReceiptProcessingMetadata, error) {
+func MagicFillFromImage(command commands.MagicFillCommand, groupId string, userId uint) (commands.UpsertReceiptCommand, commands.ReceiptProcessingMetadata, error) {
 	fileRepository := repositories.NewFileRepository(nil)
 	receiptProcessingService, err := NewSystemReceiptProcessingService(nil, groupId)
 	if err != nil {
 		return commands.UpsertReceiptCommand{}, commands.ReceiptProcessingMetadata{}, err
 	}
+	// Restrict the AI prompt's candidate categories/tags to this user's grants
+	// (0 when there is no triggering user, e.g. system processing).
+	receiptProcessingService.UserId = userId
 
 	bytes, err := fileRepository.GetBytesFromImageBytes(command.ImageData)
 	if err != nil {
@@ -184,60 +185,4 @@ func GetReceiptFromReceiptImageId(receiptImageId string) (models.Receipt, error)
 	}
 
 	return receipt, nil
-}
-
-func ReadAllReceiptImagesForGroup(groupId string, userId string) ([]structs.OcrExport, error) {
-	fileRepository := repositories.NewFileRepository(nil)
-	fileDataResults, err := GetReceiptImagesForGroup(groupId, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	results := make(chan structs.OcrExport, len(fileDataResults))
-	var wg sync.WaitGroup
-
-	// Create a semaphore with a buffer size of 5
-	semaphore := make(chan struct{}, 5)
-
-	for _, fileData := range fileDataResults {
-		wg.Add(1)
-		go func(fd models.FileData) {
-			defer wg.Done()
-
-			// Acquire a semaphore slot
-			semaphore <- struct{}{}
-
-			filePath, err := fileRepository.BuildFilePath(utils.UintToString(fd.ReceiptId), utils.UintToString(fd.ID), fd.Name)
-			if err != nil {
-				results <- structs.OcrExport{OcrText: "", Filename: "", Err: err}
-			} else {
-				// TODO: V5: Refactor to use new ocr service
-				systemReceiptProcessingSettings, err := repositories.SystemSettingsRepository{}.GetSystemReceiptProcessingSettings()
-				if err != nil {
-					results <- structs.OcrExport{OcrText: "", Filename: "", Err: err}
-				}
-				ocrService := NewOcrService(nil, systemReceiptProcessingSettings.ReceiptProcessingSettings)
-				ocrText, _, err := ocrService.ReadImage(filePath)
-				if err != nil {
-					results <- structs.OcrExport{OcrText: "", Filename: "", Err: err}
-				}
-				results <- structs.OcrExport{OcrText: ocrText, Filename: fd.Name, Err: err}
-			}
-
-			// Release the semaphore slot
-			<-semaphore
-		}(fileData)
-	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	ocrExportResults := make([]structs.OcrExport, 0)
-	for r := range results {
-		ocrExportResults = append(ocrExportResults, r)
-	}
-
-	return ocrExportResults, nil
 }

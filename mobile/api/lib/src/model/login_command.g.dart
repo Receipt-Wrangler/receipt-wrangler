@@ -13,22 +13,16 @@ class _$LoginCommand extends LoginCommand {
   final String password;
 
   factory _$LoginCommand([void Function(LoginCommandBuilder)? updates]) =>
-      (new LoginCommandBuilder()..update(updates))._build();
+      (LoginCommandBuilder()..update(updates))._build();
 
   _$LoginCommand._({required this.username, required this.password})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        username, r'LoginCommand', 'username');
-    BuiltValueNullFieldError.checkNotNull(
-        password, r'LoginCommand', 'password');
-  }
-
+      : super._();
   @override
   LoginCommand rebuild(void Function(LoginCommandBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  LoginCommandBuilder toBuilder() => new LoginCommandBuilder()..replace(this);
+  LoginCommandBuilder toBuilder() => LoginCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -84,7 +78,6 @@ class LoginCommandBuilder
 
   @override
   void replace(LoginCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$LoginCommand;
   }
 
@@ -98,11 +91,12 @@ class LoginCommandBuilder
 
   _$LoginCommand _build() {
     final _$result = _$v ??
-        new _$LoginCommand._(
-            username: BuiltValueNullFieldError.checkNotNull(
-                username, r'LoginCommand', 'username'),
-            password: BuiltValueNullFieldError.checkNotNull(
-                password, r'LoginCommand', 'password'));
+        _$LoginCommand._(
+          username: BuiltValueNullFieldError.checkNotNull(
+              username, r'LoginCommand', 'username'),
+          password: BuiltValueNullFieldError.checkNotNull(
+              password, r'LoginCommand', 'password'),
+        );
     replace(_$result);
     return _$result;
   }

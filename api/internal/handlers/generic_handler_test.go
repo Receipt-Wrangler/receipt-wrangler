@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"strings"
@@ -18,484 +20,287 @@ import (
 
 func tearDownGenericHandlerTest() {
 	repositories.TruncateTestDb()
+	services.ClearRolePermissionCacheForTests()
+}
+
+// requestForUser builds a recorder + request carrying JWT claims for userId.
+func requestForUser(userId uint) (*httptest.ResponseRecorder, *http.Request) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api", strings.NewReader(""))
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: userId}})
+	return w, r.WithContext(newContext)
+}
+
+func assertStatus(t *testing.T, w *httptest.ResponseRecorder, want int) {
+	t.Helper()
+	if w.Result().StatusCode != want {
+		utils.PrintTestError(t, w.Result().StatusCode, want)
+	}
+}
+
+func okHandlerFunc(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
 }
 
 func TestShouldSetContentTypeHeader(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
+	r := httptest.NewRequest("GET", "/api", strings.NewReader(""))
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:          w,
+		Request:         r,
+		ResponseType:    constants.ApplicationJson,
+		HandlerFunction: okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	contentType := w.Header().Get("Content-Type")
-
-	if contentType != constants.ApplicationJson {
+	if contentType := w.Header().Get("Content-Type"); contentType != constants.ApplicationJson {
 		utils.PrintTestError(t, contentType, constants.ApplicationJson)
 	}
 }
 
-func TestShouldRejectAccessBasedOnGroupId(t *testing.T) {
+func TestShouldAllowWhenNoPermissionsRequired(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
-
-	repositories.CreateTestGroupWithUsers()
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.VIEWER,
-		GroupId:      "2",
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:          w,
+		Request:         r,
+		ResponseType:    constants.ApplicationJson,
+		HandlerFunction: okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusForbidden {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
-	}
+	assertStatus(t, w, http.StatusOK)
 }
 
-func TestShouldRejectAccessBasedOnGroupIdIfGroupDoesNotExist(t *testing.T) {
+func TestShouldRejectWhenUserLacksAppPermission(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
-
 	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppUsersRead)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.VIEWER,
-		GroupId:      "500",
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:          w,
+		Request:         r,
+		ResponseType:    constants.ApplicationJson,
+		AppPermissions:  []string{permissions.AppUsersDelete},
+		HandlerFunction: okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusForbidden {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
-	}
+	assertStatus(t, w, http.StatusForbidden)
 }
 
-func TestShouldRejectAccessBasedOnGroupIdIfGroupIdIsMalformed(t *testing.T) {
+func TestShouldAcceptWhenUserHasAppPermission(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
-
 	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppUsersRead, permissions.AppUsersDelete)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.VIEWER,
-		GroupId:      "bad parse",
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:          w,
+		Request:         r,
+		ResponseType:    constants.ApplicationJson,
+		AppPermissions:  []string{permissions.AppUsersDelete},
+		HandlerFunction: okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusForbidden {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
-	}
+	assertStatus(t, w, http.StatusOK)
 }
 
-func TestShouldRejectReceiptAccessBasedOnGroup(t *testing.T) {
+func TestShouldRejectGroupPermissionWhenNotAssignedRole(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
-	r = r.WithContext(newContext)
-
 	repositories.CreateTestGroupWithUsers()
-	db := repositories.GetDB()
-	receipt := models.Receipt{
-		Name:         "Test receipt",
-		GroupId:      1,
-		PaidByUserID: 1,
-	}
-	db.Create(&receipt)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.EDITOR,
-		ReceiptId:    "1",
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		GroupId:          "1",
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		HandlerFunction:  okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusForbidden {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
-	}
+	assertStatus(t, w, http.StatusForbidden)
 }
 
-func TestShouldAcceptReceiptAccessBasedOnGroup(t *testing.T) {
+func TestShouldRejectGroupPermissionWhenRoleLacksPermission(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
-
 	repositories.CreateTestGroupWithUsers()
-	db := repositories.GetDB()
-	receipt := models.Receipt{
-		Name:         "Test receipt",
-		GroupId:      1,
-		PaidByUserID: 1,
-	}
-	db.Create(&receipt)
-
-	db.Table("group_members").Where("user_id = ? & group_id = ?", 1, 1).Update("group_role", models.OWNER)
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		ReceiptId:    "1",
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		GroupId:          "1",
+		GroupPermissions: []string{permissions.GroupReceiptsDelete},
+		HandlerFunction:  okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusOK {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
-	}
+	assertStatus(t, w, http.StatusForbidden)
 }
 
-func TestShouldAcceptAccessBasedOnGroupId(t *testing.T) {
+func TestShouldAcceptGroupPermissionWhenRoleGrantsPermission(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
-
 	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead, permissions.GroupReceiptsDelete)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.VIEWER,
-		GroupId:      "1",
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		GroupId:          "1",
+		GroupPermissions: []string{permissions.GroupReceiptsDelete},
+		HandlerFunction:  okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusOK {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
-	}
+	assertStatus(t, w, http.StatusOK)
 }
 
-func TestShouldAcceptReceiptsAccessBasedOnGroup(t *testing.T) {
+func TestShouldRejectGroupPermissionWhenNoGroupProvided(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
+	repositories.CreateTestGroupWithUsers()
+	w, r := requestForUser(1)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
+	handler := structs.Handler{
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		GroupId:          "",
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		HandlerFunction:  okHandlerFunc,
+	}
 
+	HandleRequest(handler)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestShouldResolveReceiptGroupAndReject(t *testing.T) {
+	defer tearDownGenericHandlerTest()
 	repositories.CreateTestGroupWithUsers()
 	db := repositories.GetDB()
-	receipt := models.Receipt{
-		Name:         "Test receipt",
-		GroupId:      1,
-		PaidByUserID: 1,
-	}
-	receipt2 := models.Receipt{
-		Name:         "Test receipt 2",
-		GroupId:      1,
-		PaidByUserID: 1,
-	}
-	db.Create(&receipt)
-	db.Create(&receipt2)
-
-	db.Table("group_members").Where("user_id = ? & group_id = ?", 1, 1).Update("group_role", models.OWNER)
+	db.Create(&models.Receipt{Name: "Test receipt", GroupId: 1, PaidByUserID: 1})
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.OWNER,
-		ReceiptIds:   []string{"1", "2"},
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		ReceiptId:        "1",
+		GroupPermissions: []string{permissions.GroupReceiptsDelete},
+		HandlerFunction:  okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusOK {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
-	}
+	assertStatus(t, w, http.StatusForbidden)
 }
 
-func TestShouldRejectAccessBasedOnEmptyGroupId(t *testing.T) {
+func TestShouldResolveReceiptGroupAndAccept(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
-
-	repositories.CreateTestGroupWithUsers()
-
-	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.VIEWER,
-		GroupId:      "",
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
-	}
-
-	HandleRequest(handler)
-
-	if w.Result().StatusCode != http.StatusForbidden {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
-	}
-}
-
-func TestShouldRejectAccessBasedOnEmptyGroupIds(t *testing.T) {
-	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
-
-	repositories.CreateTestGroupWithUsers()
-
-	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.VIEWER,
-		GroupIds:     []string{},
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
-	}
-
-	HandleRequest(handler)
-
-	if w.Result().StatusCode != http.StatusForbidden {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
-	}
-}
-
-func TestShouldRejectReceiptAccessBasedOnWrongGroupRole(t *testing.T) {
-	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
-
 	repositories.CreateTestGroupWithUsers()
 	db := repositories.GetDB()
-	receipt := models.Receipt{
-		Name:         "Test receipt",
-		GroupId:      1,
-		PaidByUserID: 1,
-	}
-	db.Create(&receipt)
-
-	db.Table("group_members").Where("user_id = ? & group_id = ?", 1, 1).Update("group_role", models.VIEWER)
+	db.Create(&models.Receipt{Name: "Test receipt", GroupId: 1, PaidByUserID: 1})
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsDelete)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.OWNER,
-		ReceiptId:    "1",
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		ReceiptId:        "1",
+		GroupPermissions: []string{permissions.GroupReceiptsDelete},
+		HandlerFunction:  okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusForbidden {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
-	}
+	assertStatus(t, w, http.StatusOK)
 }
 
-func TestShouldRejectReceiptAccessBasedOnWrongGroupRoleForMultipleReceipts(t *testing.T) {
+func TestShouldRejectMultipleReceiptsWhenOneGroupMissingPermission(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
-	r = r.WithContext(newContext)
-
 	repositories.CreateTestGroupWithUsers()
 	db := repositories.GetDB()
-	receipt := models.Receipt{
-		Name:         "Test receipt",
-		GroupId:      1,
-		PaidByUserID: 1,
-	}
-	receipt2 := models.Receipt{
-		Name:         "Test receipt",
-		GroupId:      2,
-		PaidByUserID: 1,
-	}
-	db.Create(&receipt)
-	db.Create(&receipt2)
-
-	db.Table("group_members").Where("user_id = ? & group_id = ?", 1, 1).Update("group_role", models.OWNER)
+	db.Create(&models.Receipt{Name: "Receipt 1", GroupId: 1, PaidByUserID: 1})
+	// receipt 2 belongs to group 2, where user 1 has no role
+	db.Create(&models.Receipt{Name: "Receipt 2", GroupId: 2, PaidByUserID: 1})
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:       w,
-		Request:      r,
-		ResponseType: constants.ApplicationJson,
-		GroupRole:    models.OWNER,
-		ReceiptIds:   []string{"1", "2"},
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		ReceiptIds:       []string{"1", "2"},
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		HandlerFunction:  okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusForbidden {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
-	}
+	assertStatus(t, w, http.StatusForbidden)
 }
 
-func TestShouldAcceptIfGroupIsAll(t *testing.T) {
+func TestShouldRejectGroupIdsWhenOneMissingPermission(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
-	r = r.WithContext(newContext)
+	repositories.CreateTestGroupWithUsers()
+	// user 1 is a member of group 1 but not group 2
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:  w,
-		Request: r,
-		GroupId: "all",
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		GroupIds:         []string{"1", "2"},
+		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		HandlerFunction:  okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusOK {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
-	}
+	assertStatus(t, w, http.StatusForbidden)
 }
 
-// TODO: Fix
-// func TestShouldAcceptBasedOnUserRole(t *testing.T) {
-// 	reader := strings.NewReader("")
-// 	w := httptest.NewRecorder()
-// 	r := httptest.NewRequest("GET", "/api", reader)
-// 	db := repositories.GetDB()
-
-// 	db.Model(models.User{}).Where("id = ?", 2).Update("user_role", models.USER)
-
-// 	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
-// 	r = r.WithContext(newContext)
-
-// 	handler := structs.Handler{
-// 		Writer:   w,
-// 		Request:  r,
-// 		UserRole: models.USER,
-// 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-// 			return 0, nil
-// 		},
-// 	}
-
-// 	HandleRequest(handler)
-
-// 	if w.Result().StatusCode != http.StatusOK {
-// 		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
-// 	}
-
-// 	tearDownGenericHandlerTest()
-// }
-
-func TestShouldRejectBasedOnUserRole(t *testing.T) {
+func TestShouldAcceptGroupViaOrAppFallback(t *testing.T) {
 	defer tearDownGenericHandlerTest()
-	reader := strings.NewReader("")
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/api", reader)
-	db := repositories.GetDB()
-
-	db.Model(models.User{}).Where("id = ?", 2).Update("user_role", models.USER)
-
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
-	r = r.WithContext(newContext)
+	repositories.CreateTestGroupWithUsers()
+	// user 1 is a member of group 1 but has no group role (so the group check
+	// fails), yet holds the app-scoped fallback permission.
+	grantAppPerms(t, 1, permissions.AppGroupsRead)
+	w, r := requestForUser(1)
 
 	handler := structs.Handler{
-		Writer:   w,
-		Request:  r,
-		UserRole: models.ADMIN,
-		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return 0, nil
-		},
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		GroupId:          "1",
+		GroupPermissions: []string{permissions.GroupView},
+		OrAppPermissions: []string{permissions.AppGroupsRead},
+		HandlerFunction:  okHandlerFunc,
 	}
 
 	HandleRequest(handler)
 
-	if w.Result().StatusCode != http.StatusForbidden {
-		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
-	}
+	assertStatus(t, w, http.StatusOK)
 }

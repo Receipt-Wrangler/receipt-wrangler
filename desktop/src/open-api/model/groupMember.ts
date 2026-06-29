@@ -7,7 +7,6 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { GroupRole } from './groupRole';
 
 
 /**
@@ -19,14 +18,14 @@ export interface GroupMember {
      * Group compound primary key
      */
     groupId: number;
-    groupRole: GroupRole;
+    /**
+     * Id of the modern group role assigned to the member
+     */
+    groupRoleId?: number;
     updatedAt?: string;
     /**
      * User compound primary key
      */
     userId: number;
 }
-export namespace GroupMember {
-}
-
 

@@ -26,6 +26,7 @@ const SystemTaskType _$PROMPT_GENERATED =
     const SystemTaskType._('PROMPT_GENERATED');
 const SystemTaskType _$API_KEY_DELETED =
     const SystemTaskType._('API_KEY_DELETED');
+const SystemTaskType _$HTML_TO_PDF = const SystemTaskType._('HTML_TO_PDF');
 
 SystemTaskType _$valueOf(String name) {
   switch (name) {
@@ -53,13 +54,15 @@ SystemTaskType _$valueOf(String name) {
       return _$PROMPT_GENERATED;
     case 'API_KEY_DELETED':
       return _$API_KEY_DELETED;
+    case 'HTML_TO_PDF':
+      return _$HTML_TO_PDF;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
 final BuiltSet<SystemTaskType> _$values =
-    new BuiltSet<SystemTaskType>(const <SystemTaskType>[
+    BuiltSet<SystemTaskType>(const <SystemTaskType>[
   _$OCR_PROCESSING,
   _$CHAT_COMPLETION,
   _$MAGIC_FILL,
@@ -72,6 +75,7 @@ final BuiltSet<SystemTaskType> _$values =
   _$RECEIPT_UPDATED,
   _$PROMPT_GENERATED,
   _$API_KEY_DELETED,
+  _$HTML_TO_PDF,
 ]);
 
 class _$SystemTaskTypeMeta {
@@ -90,6 +94,7 @@ class _$SystemTaskTypeMeta {
   SystemTaskType get RECEIPT_UPDATED => _$RECEIPT_UPDATED;
   SystemTaskType get PROMPT_GENERATED => _$PROMPT_GENERATED;
   SystemTaskType get API_KEY_DELETED => _$API_KEY_DELETED;
+  SystemTaskType get HTML_TO_PDF => _$HTML_TO_PDF;
   SystemTaskType valueOf(String name) => _$valueOf(name);
   BuiltSet<SystemTaskType> get values => _$values;
 }
@@ -100,7 +105,7 @@ abstract class _$SystemTaskTypeMixin {
 }
 
 Serializer<SystemTaskType> _$systemTaskTypeSerializer =
-    new _$SystemTaskTypeSerializer();
+    _$SystemTaskTypeSerializer();
 
 class _$SystemTaskTypeSerializer
     implements PrimitiveSerializer<SystemTaskType> {
@@ -118,6 +123,7 @@ class _$SystemTaskTypeSerializer
     'RECEIPT_UPDATED': 'RECEIPT_UPDATED',
     'PROMPT_GENERATED': 'PROMPT_GENERATED',
     'API_KEY_DELETED': 'API_KEY_DELETED',
+    'HTML_TO_PDF': 'HTML_TO_PDF',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'OCR_PROCESSING': 'OCR_PROCESSING',
@@ -133,6 +139,7 @@ class _$SystemTaskTypeSerializer
     'RECEIPT_UPDATED': 'RECEIPT_UPDATED',
     'PROMPT_GENERATED': 'PROMPT_GENERATED',
     'API_KEY_DELETED': 'API_KEY_DELETED',
+    'HTML_TO_PDF': 'HTML_TO_PDF',
   };
 
   @override

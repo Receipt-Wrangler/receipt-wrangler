@@ -25,7 +25,7 @@ class _$Prompt extends Prompt {
   final String? updatedAt;
 
   factory _$Prompt([void Function(PromptBuilder)? updates]) =>
-      (new PromptBuilder()..update(updates))._build();
+      (PromptBuilder()..update(updates))._build();
 
   _$Prompt._(
       {required this.name,
@@ -36,19 +36,13 @@ class _$Prompt extends Prompt {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(name, r'Prompt', 'name');
-    BuiltValueNullFieldError.checkNotNull(prompt, r'Prompt', 'prompt');
-    BuiltValueNullFieldError.checkNotNull(id, r'Prompt', 'id');
-    BuiltValueNullFieldError.checkNotNull(createdAt, r'Prompt', 'createdAt');
-  }
-
+      : super._();
   @override
   Prompt rebuild(void Function(PromptBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  PromptBuilder toBuilder() => new PromptBuilder()..replace(this);
+  PromptBuilder toBuilder() => PromptBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -154,7 +148,6 @@ class PromptBuilder
 
   @override
   void replace(covariant Prompt other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$Prompt;
   }
 
@@ -168,18 +161,18 @@ class PromptBuilder
 
   _$Prompt _build() {
     final _$result = _$v ??
-        new _$Prompt._(
-            name:
-                BuiltValueNullFieldError.checkNotNull(name, r'Prompt', 'name'),
-            description: description,
-            prompt: BuiltValueNullFieldError.checkNotNull(
-                prompt, r'Prompt', 'prompt'),
-            id: BuiltValueNullFieldError.checkNotNull(id, r'Prompt', 'id'),
-            createdAt: BuiltValueNullFieldError.checkNotNull(
-                createdAt, r'Prompt', 'createdAt'),
-            createdBy: createdBy,
-            createdByString: createdByString,
-            updatedAt: updatedAt);
+        _$Prompt._(
+          name: BuiltValueNullFieldError.checkNotNull(name, r'Prompt', 'name'),
+          description: description,
+          prompt: BuiltValueNullFieldError.checkNotNull(
+              prompt, r'Prompt', 'prompt'),
+          id: BuiltValueNullFieldError.checkNotNull(id, r'Prompt', 'id'),
+          createdAt: BuiltValueNullFieldError.checkNotNull(
+              createdAt, r'Prompt', 'createdAt'),
+          createdBy: createdBy,
+          createdByString: createdByString,
+          updatedAt: updatedAt,
+        );
     replace(_$result);
     return _$result;
   }

@@ -32,11 +32,17 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
   @override
   final int taskConcurrency;
   @override
+  final int? pdfDpi;
+  @override
   final BuiltList<UpsertTaskQueueConfiguration>? taskQueueConfigurations;
+  @override
+  final bool? mcpEnabled;
+  @override
+  final String? mcpPublicUrl;
 
   factory _$UpsertSystemSettingsCommand(
           [void Function(UpsertSystemSettingsCommandBuilder)? updates]) =>
-      (new UpsertSystemSettingsCommandBuilder()..update(updates))._build();
+      (UpsertSystemSettingsCommandBuilder()..update(updates))._build();
 
   _$UpsertSystemSettingsCommand._(
       {this.enableLocalSignUp,
@@ -51,20 +57,11 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
       this.receiptProcessingSettingsId,
       this.fallbackReceiptProcessingSettingsId,
       required this.taskConcurrency,
-      this.taskQueueConfigurations})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(currencyThousandthsSeparator,
-        r'UpsertSystemSettingsCommand', 'currencyThousandthsSeparator');
-    BuiltValueNullFieldError.checkNotNull(currencyDecimalSeparator,
-        r'UpsertSystemSettingsCommand', 'currencyDecimalSeparator');
-    BuiltValueNullFieldError.checkNotNull(currencySymbolPosition,
-        r'UpsertSystemSettingsCommand', 'currencySymbolPosition');
-    BuiltValueNullFieldError.checkNotNull(currencyHideDecimalPlaces,
-        r'UpsertSystemSettingsCommand', 'currencyHideDecimalPlaces');
-    BuiltValueNullFieldError.checkNotNull(
-        taskConcurrency, r'UpsertSystemSettingsCommand', 'taskConcurrency');
-  }
-
+      this.pdfDpi,
+      this.taskQueueConfigurations,
+      this.mcpEnabled,
+      this.mcpPublicUrl})
+      : super._();
   @override
   UpsertSystemSettingsCommand rebuild(
           void Function(UpsertSystemSettingsCommandBuilder) updates) =>
@@ -72,7 +69,7 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
 
   @override
   UpsertSystemSettingsCommandBuilder toBuilder() =>
-      new UpsertSystemSettingsCommandBuilder()..replace(this);
+      UpsertSystemSettingsCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -91,7 +88,10 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
         fallbackReceiptProcessingSettingsId ==
             other.fallbackReceiptProcessingSettingsId &&
         taskConcurrency == other.taskConcurrency &&
-        taskQueueConfigurations == other.taskQueueConfigurations;
+        pdfDpi == other.pdfDpi &&
+        taskQueueConfigurations == other.taskQueueConfigurations &&
+        mcpEnabled == other.mcpEnabled &&
+        mcpPublicUrl == other.mcpPublicUrl;
   }
 
   @override
@@ -109,7 +109,10 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
     _$hash = $jc(_$hash, receiptProcessingSettingsId.hashCode);
     _$hash = $jc(_$hash, fallbackReceiptProcessingSettingsId.hashCode);
     _$hash = $jc(_$hash, taskConcurrency.hashCode);
+    _$hash = $jc(_$hash, pdfDpi.hashCode);
     _$hash = $jc(_$hash, taskQueueConfigurations.hashCode);
+    _$hash = $jc(_$hash, mcpEnabled.hashCode);
+    _$hash = $jc(_$hash, mcpPublicUrl.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -130,7 +133,10 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
           ..add('fallbackReceiptProcessingSettingsId',
               fallbackReceiptProcessingSettingsId)
           ..add('taskConcurrency', taskConcurrency)
-          ..add('taskQueueConfigurations', taskQueueConfigurations))
+          ..add('pdfDpi', pdfDpi)
+          ..add('taskQueueConfigurations', taskQueueConfigurations)
+          ..add('mcpEnabled', mcpEnabled)
+          ..add('mcpPublicUrl', mcpPublicUrl))
         .toString();
   }
 }
@@ -206,13 +212,25 @@ class UpsertSystemSettingsCommandBuilder
   set taskConcurrency(int? taskConcurrency) =>
       _$this._taskConcurrency = taskConcurrency;
 
+  int? _pdfDpi;
+  int? get pdfDpi => _$this._pdfDpi;
+  set pdfDpi(int? pdfDpi) => _$this._pdfDpi = pdfDpi;
+
   ListBuilder<UpsertTaskQueueConfiguration>? _taskQueueConfigurations;
   ListBuilder<UpsertTaskQueueConfiguration> get taskQueueConfigurations =>
       _$this._taskQueueConfigurations ??=
-          new ListBuilder<UpsertTaskQueueConfiguration>();
+          ListBuilder<UpsertTaskQueueConfiguration>();
   set taskQueueConfigurations(
           ListBuilder<UpsertTaskQueueConfiguration>? taskQueueConfigurations) =>
       _$this._taskQueueConfigurations = taskQueueConfigurations;
+
+  bool? _mcpEnabled;
+  bool? get mcpEnabled => _$this._mcpEnabled;
+  set mcpEnabled(bool? mcpEnabled) => _$this._mcpEnabled = mcpEnabled;
+
+  String? _mcpPublicUrl;
+  String? get mcpPublicUrl => _$this._mcpPublicUrl;
+  set mcpPublicUrl(String? mcpPublicUrl) => _$this._mcpPublicUrl = mcpPublicUrl;
 
   UpsertSystemSettingsCommandBuilder() {
     UpsertSystemSettingsCommand._defaults(this);
@@ -234,7 +252,10 @@ class UpsertSystemSettingsCommandBuilder
       _fallbackReceiptProcessingSettingsId =
           $v.fallbackReceiptProcessingSettingsId;
       _taskConcurrency = $v.taskConcurrency;
+      _pdfDpi = $v.pdfDpi;
       _taskQueueConfigurations = $v.taskQueueConfigurations?.toBuilder();
+      _mcpEnabled = $v.mcpEnabled;
+      _mcpPublicUrl = $v.mcpPublicUrl;
       _$v = null;
     }
     return this;
@@ -242,7 +263,6 @@ class UpsertSystemSettingsCommandBuilder
 
   @override
   void replace(UpsertSystemSettingsCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertSystemSettingsCommand;
   }
 
@@ -258,39 +278,47 @@ class UpsertSystemSettingsCommandBuilder
     _$UpsertSystemSettingsCommand _$result;
     try {
       _$result = _$v ??
-          new _$UpsertSystemSettingsCommand._(
-              enableLocalSignUp: enableLocalSignUp,
-              currencyDisplay: currencyDisplay,
-              currencyThousandthsSeparator: BuiltValueNullFieldError.checkNotNull(
-                  currencyThousandthsSeparator,
-                  r'UpsertSystemSettingsCommand',
-                  'currencyThousandthsSeparator'),
-              currencyDecimalSeparator: BuiltValueNullFieldError.checkNotNull(
-                  currencyDecimalSeparator,
-                  r'UpsertSystemSettingsCommand',
-                  'currencyDecimalSeparator'),
-              currencySymbolPosition: BuiltValueNullFieldError.checkNotNull(
-                  currencySymbolPosition, r'UpsertSystemSettingsCommand', 'currencySymbolPosition'),
-              currencyHideDecimalPlaces: BuiltValueNullFieldError.checkNotNull(
-                  currencyHideDecimalPlaces,
-                  r'UpsertSystemSettingsCommand',
-                  'currencyHideDecimalPlaces'),
-              debugOcr: debugOcr,
-              numWorkers: numWorkers,
-              emailPollingInterval: emailPollingInterval,
-              receiptProcessingSettingsId: receiptProcessingSettingsId,
-              fallbackReceiptProcessingSettingsId:
-                  fallbackReceiptProcessingSettingsId,
-              taskConcurrency: BuiltValueNullFieldError.checkNotNull(
-                  taskConcurrency, r'UpsertSystemSettingsCommand', 'taskConcurrency'),
-              taskQueueConfigurations: _taskQueueConfigurations?.build());
+          _$UpsertSystemSettingsCommand._(
+            enableLocalSignUp: enableLocalSignUp,
+            currencyDisplay: currencyDisplay,
+            currencyThousandthsSeparator: BuiltValueNullFieldError.checkNotNull(
+                currencyThousandthsSeparator,
+                r'UpsertSystemSettingsCommand',
+                'currencyThousandthsSeparator'),
+            currencyDecimalSeparator: BuiltValueNullFieldError.checkNotNull(
+                currencyDecimalSeparator,
+                r'UpsertSystemSettingsCommand',
+                'currencyDecimalSeparator'),
+            currencySymbolPosition: BuiltValueNullFieldError.checkNotNull(
+                currencySymbolPosition,
+                r'UpsertSystemSettingsCommand',
+                'currencySymbolPosition'),
+            currencyHideDecimalPlaces: BuiltValueNullFieldError.checkNotNull(
+                currencyHideDecimalPlaces,
+                r'UpsertSystemSettingsCommand',
+                'currencyHideDecimalPlaces'),
+            debugOcr: debugOcr,
+            numWorkers: numWorkers,
+            emailPollingInterval: emailPollingInterval,
+            receiptProcessingSettingsId: receiptProcessingSettingsId,
+            fallbackReceiptProcessingSettingsId:
+                fallbackReceiptProcessingSettingsId,
+            taskConcurrency: BuiltValueNullFieldError.checkNotNull(
+                taskConcurrency,
+                r'UpsertSystemSettingsCommand',
+                'taskConcurrency'),
+            pdfDpi: pdfDpi,
+            taskQueueConfigurations: _taskQueueConfigurations?.build(),
+            mcpEnabled: mcpEnabled,
+            mcpPublicUrl: mcpPublicUrl,
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'taskQueueConfigurations';
         _taskQueueConfigurations?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'UpsertSystemSettingsCommand', _$failedField, e.toString());
       }
       rethrow;

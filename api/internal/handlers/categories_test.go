@@ -33,8 +33,10 @@ func TestShouldGetAllCategories(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	GetAllCategories(w, r)
 
@@ -67,8 +69,10 @@ func TestShouldCreateCategory(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", reader)
 
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	CreateCategory(w, r)
 
@@ -109,8 +113,10 @@ func TestShouldUpdateCategoryIfAdmin(t *testing.T) {
 
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, ctx)
 	r = r.WithContext(routeContext)
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	UpdateCategory(w, r)
 
@@ -143,7 +149,7 @@ func TestShouldNotUpdateCategoryDueToRole(t *testing.T) {
 
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, ctx)
 	r = r.WithContext(routeContext)
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
 	r = r.WithContext(newContext)
 
 	UpdateCategory(w, r)
@@ -172,8 +178,10 @@ func TestShouldDeleteCategoryIfAdmin(t *testing.T) {
 
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, ctx)
 	r = r.WithContext(routeContext)
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	DeleteCategory(w, r)
 
@@ -201,7 +209,7 @@ func TestShouldNotDeleteCategoryDueToRole(t *testing.T) {
 
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, ctx)
 	r = r.WithContext(routeContext)
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
 	r = r.WithContext(newContext)
 
 	DeleteCategory(w, r)
@@ -226,8 +234,10 @@ func TestShouldGetCategoryNameCountIfAdmin(t *testing.T) {
 
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, ctx)
 	r = r.WithContext(routeContext)
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	GetCategoryNameCount(w, r)
 
@@ -261,8 +271,10 @@ func TestShouldGetCategoryNameCountIfAdmin2(t *testing.T) {
 
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, ctx)
 	r = r.WithContext(routeContext)
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.ADMIN}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	GetCategoryNameCount(w, r)
 
@@ -296,8 +308,10 @@ func TestShouldGetCategoryNameCountAsUser(t *testing.T) {
 
 	routeContext := context.WithValue(r.Context(), chi.RouteCtxKey, ctx)
 	r = r.WithContext(routeContext)
-	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2, UserRole: models.USER}})
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 2}})
 	r = r.WithContext(newContext)
+
+	grantAllAppPerms(t, 2)
 
 	GetCategoryNameCount(w, r)
 

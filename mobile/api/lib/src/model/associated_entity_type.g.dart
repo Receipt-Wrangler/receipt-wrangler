@@ -31,12 +31,12 @@ AssociatedEntityType _$valueOf(String name) {
     case 'API_KEY':
       return _$API_KEY;
     default:
-      throw new ArgumentError(name);
+      throw ArgumentError(name);
   }
 }
 
 final BuiltSet<AssociatedEntityType> _$values =
-    new BuiltSet<AssociatedEntityType>(const <AssociatedEntityType>[
+    BuiltSet<AssociatedEntityType>(const <AssociatedEntityType>[
   _$NOOP_ENTITY_TYPE,
   _$RECEIPT,
   _$SYSTEM_EMAIL,
@@ -65,7 +65,7 @@ abstract class _$AssociatedEntityTypeMixin {
 }
 
 Serializer<AssociatedEntityType> _$associatedEntityTypeSerializer =
-    new _$AssociatedEntityTypeSerializer();
+    _$AssociatedEntityTypeSerializer();
 
 class _$AssociatedEntityTypeSerializer
     implements PrimitiveSerializer<AssociatedEntityType> {

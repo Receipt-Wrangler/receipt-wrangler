@@ -38,7 +38,7 @@ class _$$BaseModel extends $BaseModel {
   final String? updatedAt;
 
   factory _$$BaseModel([void Function($BaseModelBuilder)? updates]) =>
-      (new $BaseModelBuilder()..update(updates))._build();
+      ($BaseModelBuilder()..update(updates))._build();
 
   _$$BaseModel._(
       {required this.id,
@@ -46,18 +46,13 @@ class _$$BaseModel extends $BaseModel {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(id, r'$BaseModel', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'$BaseModel', 'createdAt');
-  }
-
+      : super._();
   @override
   $BaseModel rebuild(void Function($BaseModelBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  $BaseModelBuilder toBuilder() => new $BaseModelBuilder()..replace(this);
+  $BaseModelBuilder toBuilder() => $BaseModelBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -138,7 +133,6 @@ class $BaseModelBuilder
 
   @override
   void replace(covariant $BaseModel other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$$BaseModel;
   }
 
@@ -152,13 +146,14 @@ class $BaseModelBuilder
 
   _$$BaseModel _build() {
     final _$result = _$v ??
-        new _$$BaseModel._(
-            id: BuiltValueNullFieldError.checkNotNull(id, r'$BaseModel', 'id'),
-            createdAt: BuiltValueNullFieldError.checkNotNull(
-                createdAt, r'$BaseModel', 'createdAt'),
-            createdBy: createdBy,
-            createdByString: createdByString,
-            updatedAt: updatedAt);
+        _$$BaseModel._(
+          id: BuiltValueNullFieldError.checkNotNull(id, r'$BaseModel', 'id'),
+          createdAt: BuiltValueNullFieldError.checkNotNull(
+              createdAt, r'$BaseModel', 'createdAt'),
+          createdBy: createdBy,
+          createdByString: createdByString,
+          updatedAt: updatedAt,
+        );
     replace(_$result);
     return _$result;
   }

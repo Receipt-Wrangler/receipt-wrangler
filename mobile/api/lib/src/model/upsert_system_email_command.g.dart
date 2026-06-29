@@ -20,7 +20,7 @@ class _$UpsertSystemEmailCommand extends UpsertSystemEmailCommand {
 
   factory _$UpsertSystemEmailCommand(
           [void Function(UpsertSystemEmailCommandBuilder)? updates]) =>
-      (new UpsertSystemEmailCommandBuilder()..update(updates))._build();
+      (UpsertSystemEmailCommandBuilder()..update(updates))._build();
 
   _$UpsertSystemEmailCommand._(
       {required this.host,
@@ -28,17 +28,7 @@ class _$UpsertSystemEmailCommand extends UpsertSystemEmailCommand {
       required this.username,
       required this.password,
       this.useStartTLS})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        host, r'UpsertSystemEmailCommand', 'host');
-    BuiltValueNullFieldError.checkNotNull(
-        port, r'UpsertSystemEmailCommand', 'port');
-    BuiltValueNullFieldError.checkNotNull(
-        username, r'UpsertSystemEmailCommand', 'username');
-    BuiltValueNullFieldError.checkNotNull(
-        password, r'UpsertSystemEmailCommand', 'password');
-  }
-
+      : super._();
   @override
   UpsertSystemEmailCommand rebuild(
           void Function(UpsertSystemEmailCommandBuilder) updates) =>
@@ -46,7 +36,7 @@ class _$UpsertSystemEmailCommand extends UpsertSystemEmailCommand {
 
   @override
   UpsertSystemEmailCommandBuilder toBuilder() =>
-      new UpsertSystemEmailCommandBuilder()..replace(this);
+      UpsertSystemEmailCommandBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -127,7 +117,6 @@ class UpsertSystemEmailCommandBuilder
 
   @override
   void replace(UpsertSystemEmailCommand other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$UpsertSystemEmailCommand;
   }
 
@@ -141,16 +130,17 @@ class UpsertSystemEmailCommandBuilder
 
   _$UpsertSystemEmailCommand _build() {
     final _$result = _$v ??
-        new _$UpsertSystemEmailCommand._(
-            host: BuiltValueNullFieldError.checkNotNull(
-                host, r'UpsertSystemEmailCommand', 'host'),
-            port: BuiltValueNullFieldError.checkNotNull(
-                port, r'UpsertSystemEmailCommand', 'port'),
-            username: BuiltValueNullFieldError.checkNotNull(
-                username, r'UpsertSystemEmailCommand', 'username'),
-            password: BuiltValueNullFieldError.checkNotNull(
-                password, r'UpsertSystemEmailCommand', 'password'),
-            useStartTLS: useStartTLS);
+        _$UpsertSystemEmailCommand._(
+          host: BuiltValueNullFieldError.checkNotNull(
+              host, r'UpsertSystemEmailCommand', 'host'),
+          port: BuiltValueNullFieldError.checkNotNull(
+              port, r'UpsertSystemEmailCommand', 'port'),
+          username: BuiltValueNullFieldError.checkNotNull(
+              username, r'UpsertSystemEmailCommand', 'username'),
+          password: BuiltValueNullFieldError.checkNotNull(
+              password, r'UpsertSystemEmailCommand', 'password'),
+          useStartTLS: useStartTLS,
+        );
     replace(_$result);
     return _$result;
   }

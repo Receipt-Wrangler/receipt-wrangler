@@ -4,37 +4,45 @@ import 'package:http/http.dart' as http;
 
 import 'env.dart';
 
-/// Logs into the Go API as the admin and returns the JWT cookie value.
+/// Logs into the Go API as [username]/[password] and returns the JWT cookie
+/// value.
 ///
 /// The API issues auth via `Set-Cookie: jwt=…` (the body's `jwt` field
 /// is empty — confirmed against a live demo response). We just parse
 /// the cookie out of the Set-Cookie header.
-Future<String> apiLogin() async {
+Future<String> apiLoginAs(String username, String password) async {
   final res = await http
       .post(
         Uri.parse('${E2eEnv.baseUrl}/login/'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'username': E2eEnv.adminUsername,
-          'password': E2eEnv.adminPassword,
+          'username': username,
+          'password': password,
         }),
       )
       .timeout(const Duration(seconds: 10));
 
   if (res.statusCode != 200) {
     throw StateError(
-      'apiLogin failed: HTTP ${res.statusCode}: ${res.body}',
+      'apiLoginAs($username) failed: HTTP ${res.statusCode}: ${res.body}',
     );
   }
   final setCookie = res.headers['set-cookie'] ?? '';
   final match = RegExp(r'jwt=([^;]+)').firstMatch(setCookie);
   if (match == null) {
     throw StateError(
-      'apiLogin succeeded but no jwt cookie in Set-Cookie: $setCookie',
+      'apiLoginAs($username) succeeded but no jwt cookie in '
+      'Set-Cookie: $setCookie',
     );
   }
   return match.group(1)!;
 }
+
+/// Logs into the Go API as the admin and returns the JWT cookie value.
+/// Thin wrapper over [apiLoginAs] kept for the existing cleanup helpers
+/// (`scheduleReceiptCleanup`, `getReceipt`, …) that always act as admin.
+Future<String> apiLogin() =>
+    apiLoginAs(E2eEnv.adminUsername, E2eEnv.adminPassword);
 
 /// Best-effort DELETE of a receipt. Swallows errors so cleanup failures
 /// don't mask test failures. Auth is via the Cookie header, matching how

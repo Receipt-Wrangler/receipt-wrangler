@@ -13,23 +13,17 @@ class _$FeatureConfig extends FeatureConfig {
   final bool enableLocalSignUp;
 
   factory _$FeatureConfig([void Function(FeatureConfigBuilder)? updates]) =>
-      (new FeatureConfigBuilder()..update(updates))._build();
+      (FeatureConfigBuilder()..update(updates))._build();
 
   _$FeatureConfig._(
       {required this.aiPoweredReceipts, required this.enableLocalSignUp})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(
-        aiPoweredReceipts, r'FeatureConfig', 'aiPoweredReceipts');
-    BuiltValueNullFieldError.checkNotNull(
-        enableLocalSignUp, r'FeatureConfig', 'enableLocalSignUp');
-  }
-
+      : super._();
   @override
   FeatureConfig rebuild(void Function(FeatureConfigBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  FeatureConfigBuilder toBuilder() => new FeatureConfigBuilder()..replace(this);
+  FeatureConfigBuilder toBuilder() => FeatureConfigBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -87,7 +81,6 @@ class FeatureConfigBuilder
 
   @override
   void replace(FeatureConfig other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$FeatureConfig;
   }
 
@@ -101,11 +94,12 @@ class FeatureConfigBuilder
 
   _$FeatureConfig _build() {
     final _$result = _$v ??
-        new _$FeatureConfig._(
-            aiPoweredReceipts: BuiltValueNullFieldError.checkNotNull(
-                aiPoweredReceipts, r'FeatureConfig', 'aiPoweredReceipts'),
-            enableLocalSignUp: BuiltValueNullFieldError.checkNotNull(
-                enableLocalSignUp, r'FeatureConfig', 'enableLocalSignUp'));
+        _$FeatureConfig._(
+          aiPoweredReceipts: BuiltValueNullFieldError.checkNotNull(
+              aiPoweredReceipts, r'FeatureConfig', 'aiPoweredReceipts'),
+          enableLocalSignUp: BuiltValueNullFieldError.checkNotNull(
+              enableLocalSignUp, r'FeatureConfig', 'enableLocalSignUp'),
+        );
     replace(_$result);
     return _$result;
   }

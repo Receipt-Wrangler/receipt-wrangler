@@ -78,6 +78,7 @@ part 'paged_data_data_inner.g.dart';
 /// * [key] - Key for endpoints that require authentication
 /// * [model] - LLM model
 /// * [isVisionModel] - Is vision model
+/// * [enforceJsonResponseFormat] - Enforce JSON response format on the LLM provider. Disable if the provider does not support this flag.
 /// * [ocrEngine] 
 /// * [promptId] - Prompt foreign key
 /// * [host] - IMAP host

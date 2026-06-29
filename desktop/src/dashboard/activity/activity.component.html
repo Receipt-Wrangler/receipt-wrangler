@@ -43,8 +43,9 @@
   <div class="aligned-content ms-2">
     {{ item.startedAt | duration }}
   </div>
-  @if (item.canBeRestarted && !ranActivities()[item.id] && (groupId() | groupRole: GroupRole.Editor)) {
+  @if (item.canBeRestarted && !ranActivities()[item.id]) {
     <app-button
+      *hasGroupPermission="{ groupId: groupId() ?? 0, permission: Permission.GroupActivitiesRerun }"
       class="aligned-content"
       matButtonType="iconButton"
       icon="refresh"

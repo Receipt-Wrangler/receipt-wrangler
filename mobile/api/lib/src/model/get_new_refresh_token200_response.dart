@@ -6,7 +6,6 @@
 import 'package:openapi/src/model/claims.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/token_pair.dart';
-import 'package:openapi/src/model/user_role.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 import 'package:one_of/any_of.dart';
@@ -19,7 +18,6 @@ part 'get_new_refresh_token200_response.g.dart';
 /// * [jwt] - JWT token
 /// * [refreshToken] - Refresh token
 /// * [userId] - User foreign key
-/// * [userRole] - User's role
 /// * [displayName] - Display name
 /// * [defaultAvatarColor] - Default avatar color
 /// * [username] - User's username used to login

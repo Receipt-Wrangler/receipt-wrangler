@@ -1,10 +1,11 @@
 import { Injectable } from "@angular/core";
 import { Action, createSelector, Selector, State, StateContext } from "@ngxs/store";
 
-import { Icon, UserPreferences } from "../open-api";
+import { hasAll, hasAny } from "../utils/permission.utils";
+import { Category, Icon, Tag, UserPreferences } from "../open-api";
 import { User } from "../open-api/model/user";
 import { AuthStateInterface } from "./auth-state.interface";
-import { Logout, SetAuthState, SetIcons, SetUserPreferences } from "./auth.state.actions";
+import { Logout, SetAuthState, SetGroupCatalog, SetIcons, SetPermissions, SetUserPreferences } from "./auth.state.actions";
 
 @State<AuthStateInterface>({
   name: "auth",
@@ -23,11 +24,6 @@ export class AuthState {
   @Selector()
   static icons(state: AuthStateInterface): Icon[] {
     return state.icons ?? [];
-  }
-
-  @Selector()
-  static userRole(state: AuthStateInterface): string {
-    return state.userRole ?? "";
   }
 
   @Selector()
@@ -59,9 +55,55 @@ export class AuthState {
     } as User;
   }
 
-  static hasRole(role: string) {
+  @Selector()
+  static appPermissions(state: AuthStateInterface): string[] {
+    return state.appPermissions ?? [];
+  }
+
+  @Selector()
+  static groupPermissions(state: AuthStateInterface): {
+    [groupId: number]: string[];
+  } {
+    return state.groupPermissions ?? {};
+  }
+
+  static groupCategories(groupId: number) {
+    return createSelector([AuthState], (state: AuthStateInterface): Category[] => {
+      return state.groupCategories?.[groupId] ?? [];
+    });
+  }
+
+  static groupTags(groupId: number) {
+    return createSelector([AuthState], (state: AuthStateInterface): Tag[] => {
+      return state.groupTags?.[groupId] ?? [];
+    });
+  }
+
+  static hasAppPermission(permission: string) {
     return createSelector([AuthState], (state: AuthStateInterface) => {
-      return state.userRole === role;
+      return hasAll(state.appPermissions ?? [], permission);
+    });
+  }
+
+  static hasAnyAppPermission(permissions: string[]) {
+    return createSelector([AuthState], (state: AuthStateInterface) => {
+      return hasAny(state.appPermissions ?? [], ...permissions);
+    });
+  }
+
+  static hasGroupPermission(
+    groupId: number,
+    permission: string,
+    orAppPermissions: string[] = []
+  ) {
+    return createSelector([AuthState], (state: AuthStateInterface) => {
+      if (
+        orAppPermissions.length > 0 &&
+        hasAny(state.appPermissions ?? [], ...orAppPermissions)
+      ) {
+        return true;
+      }
+      return hasAll(state.groupPermissions?.[groupId] ?? [], permission);
     });
   }
 
@@ -78,7 +120,28 @@ export class AuthState {
       expirationDate: claims?.exp?.toString(),
       userId: claims?.userId?.toString(),
       username: claims?.username,
-      userRole: claims?.userRole,
+    });
+  }
+
+  @Action(SetPermissions)
+  setPermissions(
+    { patchState }: StateContext<AuthStateInterface>,
+    { appPermissions, groupPermissions }: SetPermissions
+  ) {
+    patchState({
+      appPermissions,
+      groupPermissions,
+    });
+  }
+
+  @Action(SetGroupCatalog)
+  setGroupCatalog(
+    { patchState }: StateContext<AuthStateInterface>,
+    { groupCategories, groupTags }: SetGroupCatalog
+  ) {
+    patchState({
+      groupCategories,
+      groupTags,
     });
   }
 
@@ -90,8 +153,11 @@ export class AuthState {
       expirationDate: "",
       userId: "",
       username: "",
-      userRole: undefined,
       userPreferences: undefined,
+      appPermissions: undefined,
+      groupPermissions: undefined,
+      groupCategories: undefined,
+      groupTags: undefined,
     });
   }
 

@@ -20,19 +20,18 @@ import {
   BulkStatusUpdateCommand,
   Category,
   Group,
-  GroupRole,
   GroupsService,
   PagedDataDataInner,
+  Permission,
   Receipt,
   ReceiptService,
   ReceiptStatus,
   Tag,
 } from "../../open-api";
-import { GroupRolePipe } from "../../pipes/group-role.pipe";
 import { SnackbarService } from "../../services";
 import { ReceiptExportService } from "../../services/receipt-export.service";
 import { ReceiptFilterComponent } from "../../shared-ui/receipt-filter/receipt-filter.component";
-import { GroupState } from "../../store";
+import { AuthState, GroupState } from "../../store";
 import { applyFormCommand } from "../../utils/index";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { BulkStatusUpdateComponent } from "../bulk-resolve-dialog/bulk-status-update-dialog.component";
@@ -43,7 +42,6 @@ import { ColumnConfigurationDialogComponent } from "../column-configuration-dial
   selector: "app-receipts-table",
   templateUrl: "./receipts-table.component.html",
   styleUrls: ["./receipts-table.component.scss"],
-  providers: [GroupRolePipe],
   animations: [fadeInOut],
   encapsulation: ViewEncapsulation.None,
   host: DEFAULT_HOST_CLASS,
@@ -52,7 +50,6 @@ import { ColumnConfigurationDialogComponent } from "../column-configuration-dial
 export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   constructor(
     private activatedRoute: ActivatedRoute,
-    private groupPipe: GroupRolePipe,
     private groupsService: GroupsService,
     private matDialog: MatDialog,
     private receiptExportService: ReceiptExportService,
@@ -108,8 +105,6 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   public groupId: string = "0";
 
-  public groupRole = GroupRole;
-
   public dataSource = signal(new MatTableDataSource<PagedDataDataInner>([]));
 
   public displayedColumns = signal<string[]>([]);
@@ -124,9 +119,17 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   public canEdit: boolean = false;
 
+  public canCreate: boolean = false;
+
+  public canQuickScan: boolean = false;
+
+  public canPollEmail: boolean = false;
+
   public headerText: string = "";
 
   public group?: Group;
+
+  protected readonly Permission = Permission;
 
   public ngOnInit(): void {
     this.groupId = this.store
@@ -137,9 +140,15 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
     this.setHeaderText();
 
-    const data = this.activatedRoute.snapshot.data;
-    this.categories = data["categories"];
-    this.tags = data["tags"];
+    // Filter options come from the selected group's AppData catalog (filtered to
+    // the user's grants), so a restricted user can't filter by a hidden one.
+    const numericGroupId = Number(this.groupId);
+    this.categories = Number.isNaN(numericGroupId)
+      ? []
+      : this.store.selectSnapshot(AuthState.groupCategories(numericGroupId));
+    this.tags = Number.isNaN(numericGroupId)
+      ? []
+      : this.store.selectSnapshot(AuthState.groupTags(numericGroupId));
     this.getInitialData();
   }
 
@@ -162,7 +171,19 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   }
 
   private setCanEdit(): void {
-    this.canEdit = this.groupPipe.transform(this.groupId, GroupRole.Editor);
+    const groupId = Number.parseInt(this.groupId);
+    this.canEdit = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsUpdate)
+    );
+    this.canCreate = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsCreate)
+    );
+    this.canQuickScan = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsQuickScan)
+    );
+    this.canPollEmail = this.store.selectSnapshot(
+      AuthState.hasGroupPermission(groupId, Permission.GroupEmailPoll)
+    );
   }
 
   private setHeaderText(): void {
@@ -315,12 +336,10 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     const dialogRef = this.matDialog.open(ReceiptFilterComponent, {
       minWidth: "75%",
       maxWidth: "100%",
-      data: {
-        categories: this.categories,
-        tags: this.tags,
-      },
     });
 
+    dialogRef.componentInstance.categories = this.categories;
+    dialogRef.componentInstance.tags = this.tags;
     dialogRef.componentInstance.parentForm = buildReceiptFilterForm(filter, this);
     dialogRef.componentInstance.headerText = "Filter Receipts";
     const formCommandSubscription = dialogRef.componentInstance.formCommand.subscribe((formCommand) => {

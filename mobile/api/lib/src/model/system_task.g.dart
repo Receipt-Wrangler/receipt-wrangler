@@ -43,7 +43,7 @@ class _$SystemTask extends SystemTask {
   final String? updatedAt;
 
   factory _$SystemTask([void Function(SystemTaskBuilder)? updates]) =>
-      (new SystemTaskBuilder()..update(updates))._build();
+      (SystemTaskBuilder()..update(updates))._build();
 
   _$SystemTask._(
       {this.associatedEntityId,
@@ -63,18 +63,13 @@ class _$SystemTask extends SystemTask {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(id, r'SystemTask', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'SystemTask', 'createdAt');
-  }
-
+      : super._();
   @override
   SystemTask rebuild(void Function(SystemTaskBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  SystemTaskBuilder toBuilder() => new SystemTaskBuilder()..replace(this);
+  SystemTaskBuilder toBuilder() => SystemTaskBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -173,7 +168,7 @@ class SystemTaskBuilder
 
   ListBuilder<SystemTask>? _childSystemTasks;
   ListBuilder<SystemTask> get childSystemTasks =>
-      _$this._childSystemTasks ??= new ListBuilder<SystemTask>();
+      _$this._childSystemTasks ??= ListBuilder<SystemTask>();
   set childSystemTasks(covariant ListBuilder<SystemTask>? childSystemTasks) =>
       _$this._childSystemTasks = childSystemTasks;
 
@@ -259,7 +254,6 @@ class SystemTaskBuilder
 
   @override
   void replace(covariant SystemTask other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$SystemTask;
   }
 
@@ -275,33 +269,33 @@ class SystemTaskBuilder
     _$SystemTask _$result;
     try {
       _$result = _$v ??
-          new _$SystemTask._(
-              associatedEntityId: associatedEntityId,
-              endedAt: endedAt,
-              associatedEntityType: associatedEntityType,
-              groupId: groupId,
-              childSystemTasks: _childSystemTasks?.build(),
-              startedAt: startedAt,
-              apiKeyId: apiKeyId,
-              resultDescription: resultDescription,
-              type: type,
-              receiptId: receiptId,
-              ranByUserId: ranByUserId,
-              status: status,
-              id: BuiltValueNullFieldError.checkNotNull(
-                  id, r'SystemTask', 'id'),
-              createdAt: BuiltValueNullFieldError.checkNotNull(
-                  createdAt, r'SystemTask', 'createdAt'),
-              createdBy: createdBy,
-              createdByString: createdByString,
-              updatedAt: updatedAt);
+          _$SystemTask._(
+            associatedEntityId: associatedEntityId,
+            endedAt: endedAt,
+            associatedEntityType: associatedEntityType,
+            groupId: groupId,
+            childSystemTasks: _childSystemTasks?.build(),
+            startedAt: startedAt,
+            apiKeyId: apiKeyId,
+            resultDescription: resultDescription,
+            type: type,
+            receiptId: receiptId,
+            ranByUserId: ranByUserId,
+            status: status,
+            id: BuiltValueNullFieldError.checkNotNull(id, r'SystemTask', 'id'),
+            createdAt: BuiltValueNullFieldError.checkNotNull(
+                createdAt, r'SystemTask', 'createdAt'),
+            createdBy: createdBy,
+            createdByString: createdByString,
+            updatedAt: updatedAt,
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'childSystemTasks';
         _childSystemTasks?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'SystemTask', _$failedField, e.toString());
       }
       rethrow;

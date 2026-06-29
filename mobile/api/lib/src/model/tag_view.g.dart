@@ -23,7 +23,7 @@ class _$TagView extends TagView {
   final int numberOfReceipts;
 
   factory _$TagView([void Function(TagViewBuilder)? updates]) =>
-      (new TagViewBuilder()..update(updates))._build();
+      (TagViewBuilder()..update(updates))._build();
 
   _$TagView._(
       {this.createdAt,
@@ -33,19 +33,13 @@ class _$TagView extends TagView {
       this.description,
       this.updatedAt,
       required this.numberOfReceipts})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(id, r'TagView', 'id');
-    BuiltValueNullFieldError.checkNotNull(name, r'TagView', 'name');
-    BuiltValueNullFieldError.checkNotNull(
-        numberOfReceipts, r'TagView', 'numberOfReceipts');
-  }
-
+      : super._();
   @override
   TagView rebuild(void Function(TagViewBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  TagViewBuilder toBuilder() => new TagViewBuilder()..replace(this);
+  TagViewBuilder toBuilder() => TagViewBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -141,7 +135,6 @@ class TagViewBuilder implements Builder<TagView, TagViewBuilder> {
 
   @override
   void replace(TagView other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$TagView;
   }
 
@@ -155,16 +148,16 @@ class TagViewBuilder implements Builder<TagView, TagViewBuilder> {
 
   _$TagView _build() {
     final _$result = _$v ??
-        new _$TagView._(
-            createdAt: createdAt,
-            createdBy: createdBy,
-            id: BuiltValueNullFieldError.checkNotNull(id, r'TagView', 'id'),
-            name:
-                BuiltValueNullFieldError.checkNotNull(name, r'TagView', 'name'),
-            description: description,
-            updatedAt: updatedAt,
-            numberOfReceipts: BuiltValueNullFieldError.checkNotNull(
-                numberOfReceipts, r'TagView', 'numberOfReceipts'));
+        _$TagView._(
+          createdAt: createdAt,
+          createdBy: createdBy,
+          id: BuiltValueNullFieldError.checkNotNull(id, r'TagView', 'id'),
+          name: BuiltValueNullFieldError.checkNotNull(name, r'TagView', 'name'),
+          description: description,
+          updatedAt: updatedAt,
+          numberOfReceipts: BuiltValueNullFieldError.checkNotNull(
+              numberOfReceipts, r'TagView', 'numberOfReceipts'),
+        );
     replace(_$result);
     return _$result;
   }

@@ -27,7 +27,7 @@ class _$CustomField extends CustomField {
   final String? updatedAt;
 
   factory _$CustomField([void Function(CustomFieldBuilder)? updates]) =>
-      (new CustomFieldBuilder()..update(updates))._build();
+      (CustomFieldBuilder()..update(updates))._build();
 
   _$CustomField._(
       {required this.name,
@@ -39,20 +39,13 @@ class _$CustomField extends CustomField {
       this.createdBy,
       this.createdByString,
       this.updatedAt})
-      : super._() {
-    BuiltValueNullFieldError.checkNotNull(name, r'CustomField', 'name');
-    BuiltValueNullFieldError.checkNotNull(type, r'CustomField', 'type');
-    BuiltValueNullFieldError.checkNotNull(id, r'CustomField', 'id');
-    BuiltValueNullFieldError.checkNotNull(
-        createdAt, r'CustomField', 'createdAt');
-  }
-
+      : super._();
   @override
   CustomField rebuild(void Function(CustomFieldBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  CustomFieldBuilder toBuilder() => new CustomFieldBuilder()..replace(this);
+  CustomFieldBuilder toBuilder() => CustomFieldBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
@@ -111,7 +104,7 @@ class CustomFieldBuilder
 
   ListBuilder<CustomFieldOption>? _options;
   ListBuilder<CustomFieldOption> get options =>
-      _$this._options ??= new ListBuilder<CustomFieldOption>();
+      _$this._options ??= ListBuilder<CustomFieldOption>();
   set options(covariant ListBuilder<CustomFieldOption>? options) =>
       _$this._options = options;
 
@@ -168,7 +161,6 @@ class CustomFieldBuilder
 
   @override
   void replace(covariant CustomField other) {
-    ArgumentError.checkNotNull(other, 'other');
     _$v = other as _$CustomField;
   }
 
@@ -184,27 +176,27 @@ class CustomFieldBuilder
     _$CustomField _$result;
     try {
       _$result = _$v ??
-          new _$CustomField._(
-              name: BuiltValueNullFieldError.checkNotNull(
-                  name, r'CustomField', 'name'),
-              options: _options?.build(),
-              description: description,
-              type: BuiltValueNullFieldError.checkNotNull(
-                  type, r'CustomField', 'type'),
-              id: BuiltValueNullFieldError.checkNotNull(
-                  id, r'CustomField', 'id'),
-              createdAt: BuiltValueNullFieldError.checkNotNull(
-                  createdAt, r'CustomField', 'createdAt'),
-              createdBy: createdBy,
-              createdByString: createdByString,
-              updatedAt: updatedAt);
+          _$CustomField._(
+            name: BuiltValueNullFieldError.checkNotNull(
+                name, r'CustomField', 'name'),
+            options: _options?.build(),
+            description: description,
+            type: BuiltValueNullFieldError.checkNotNull(
+                type, r'CustomField', 'type'),
+            id: BuiltValueNullFieldError.checkNotNull(id, r'CustomField', 'id'),
+            createdAt: BuiltValueNullFieldError.checkNotNull(
+                createdAt, r'CustomField', 'createdAt'),
+            createdBy: createdBy,
+            createdByString: createdByString,
+            updatedAt: updatedAt,
+          );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'options';
         _options?.build();
       } catch (e) {
-        throw new BuiltValueNestedFieldError(
+        throw BuiltValueNestedFieldError(
             r'CustomField', _$failedField, e.toString());
       }
       rethrow;

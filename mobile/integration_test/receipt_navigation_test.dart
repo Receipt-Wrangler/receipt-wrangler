@@ -80,7 +80,11 @@ void main() {
     // then the negative for receipt A. Doing them in this order avoids a
     // false-clean from asserting absence before the screen has redrawn.
     await pumpUntilFound(tester, find.text(nameB));
-    expect(find.text(nameA).evaluate(), isEmpty,
+    // Scope to the on-stage view: the /view route can leave a stale, offstage
+    // ReceiptFormScreen behind the visible one on the Android `flutter drive`
+    // target, and that frozen screen still holds the prior name. The user only
+    // ever sees the on-stage screen, which is what this regression cares about.
+    expect(find.text(nameA).hitTestable().evaluate(), isEmpty,
         reason: 'receipt B\'s view must not still be rendering A\'s name '
             '-- that\'d indicate setReceipt didn\'t propagate or some '
             'late-final cached the prior receipt');
@@ -95,7 +99,7 @@ void main() {
 
     await tester.tap(find.widgetWithText(ReceiptListItem, nameA));
     await pumpUntilFound(tester, find.text(nameA));
-    expect(find.text(nameB).evaluate(), isEmpty,
+    expect(find.text(nameB).hitTestable().evaluate(), isEmpty,
         reason: 'after navigating list -> A, B\'s name must not linger');
 
     // Final hop: A -> list -> B.
@@ -105,19 +109,18 @@ void main() {
 
     await tester.tap(find.widgetWithText(ReceiptListItem, nameB));
     await pumpUntilFound(tester, find.text(nameB));
-    expect(find.text(nameA).evaluate(), isEmpty,
+    expect(find.text(nameA).hitTestable().evaluate(), isEmpty,
         reason: 'after the final list -> B switch, A\'s name must not linger');
   });
 }
 
-/// Taps the AppBar's back arrow on the receipt /view screen. Scoped to a
-/// descendant of `AppBar` to dodge the (unlikely) case where another
-/// Icons.arrow_back lives elsewhere in the tree.
+/// Taps the live back arrow on the receipt /view screen. The /view route can
+/// leave a stale, offstage `ReceiptFormScreen` (and thus a second AppBar +
+/// back arrow) underneath the visible one on the `flutter drive` (Android)
+/// target, so scoping by AppBar would match two widgets and `tap` would throw.
+/// `.hitTestable()` selects the single visible/tappable arrow regardless.
 Future<void> _tapBackArrow(WidgetTester tester) async {
-  final back = find.descendant(
-    of: find.byType(AppBar),
-    matching: find.byIcon(Icons.arrow_back),
-  );
+  final back = find.byIcon(Icons.arrow_back).hitTestable();
   await pumpUntilFound(tester, back);
   await tester.tap(back);
 }

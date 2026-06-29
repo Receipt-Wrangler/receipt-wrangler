@@ -15,7 +15,6 @@ type Claims struct {
 	Displayname        string             `json:"displayName"`
 	UserId             uint               `json:"userId"`
 	Username           string             `json:"username"`
-	UserRole           models.UserRole    `json:"userRole"`
 	ApiKeyScope        models.ApiKeyScope `json:"apiKeyScope"`
 	jwt.RegisteredClaims
 }
@@ -31,19 +30,6 @@ func (claim *Claims) Validate(ctx context.Context) error {
 
 	if claim.Displayname == "" {
 		return fmt.Errorf("display name is required")
-	}
-
-	// Validate UserRole is a valid enum value
-	validRoles := []models.UserRole{models.ADMIN, models.USER}
-	roleValid := false
-	for _, role := range validRoles {
-		if claim.UserRole == role {
-			roleValid = true
-			break
-		}
-	}
-	if !roleValid {
-		return fmt.Errorf("invalid user role: %s", claim.UserRole)
 	}
 
 	// Validate DefaultAvatarColor format (should be hex color)

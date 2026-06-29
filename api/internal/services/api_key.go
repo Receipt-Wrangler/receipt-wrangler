@@ -133,7 +133,6 @@ func (service *ApiKeyService) GetClaimsFromApiKey(key models.ApiKey) (validator.
 		UserId:             user.ID,
 		Username:           user.Username,
 		Displayname:        user.DisplayName,
-		UserRole:           user.UserRole,
 		ApiKeyScope:        models.ApiKeyScope(key.Scope),
 		RegisteredClaims:   jwt.RegisteredClaims{},
 	}

@@ -5,7 +5,7 @@ import { Sort } from "@angular/material/sort";
 import { MatTableDataSource } from "@angular/material/table";
 import { Store } from "@ngxs/store";
 import { of, switchMap, take, tap } from "rxjs";
-import { CustomField, CustomFieldService, PagedDataDataInner, PagedRequestCommand, UserRole } from "src/open-api";
+import { CustomField, CustomFieldService, PagedDataDataInner, PagedRequestCommand, Permission } from "src/open-api";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { CategoryTableState } from "src/store/category-table.state";
 import { TableComponent } from "src/table/table/table.component";
@@ -43,6 +43,8 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
   public columns: TableColumn[] = [];
 
   public totalCount = signal(0);
+
+  protected readonly Permission = Permission;
 
   constructor(
     private customFieldService: CustomFieldService,
@@ -165,7 +167,7 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
       "description",
     ];
 
-    if (this.store.selectSnapshot(AuthState.hasRole(UserRole.Admin))) {
+    if (this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppCustomFieldsDelete))) {
       this.displayedColumns.push("actions");
     }
   }

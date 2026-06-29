@@ -7,7 +7,6 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { GroupRole } from './groupRole';
 
 
 export interface UpsertGroupMemberCommand { 
@@ -15,13 +14,13 @@ export interface UpsertGroupMemberCommand {
      * Group compound primary key
      */
     groupId: number;
-    groupRole: GroupRole;
+    /**
+     * Id of the modern group role to assign to the member
+     */
+    groupRoleId?: number;
     /**
      * User compound primary key
      */
     userId: number;
 }
-export namespace UpsertGroupMemberCommand {
-}
-
 

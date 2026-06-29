@@ -12,7 +12,7 @@ Name | Type | Description | Notes
 **password** | **String** | User's password | 
 **displayName** | **String** | User's displayname | [optional] 
 **isDummyUser** | **bool** | Whether the user is a dummy user | [optional] 
-**userRole** | [**UserRole**](UserRole.md) | User's role | [optional] 
+**appRoleId** | **int** | Id of the modern app role to assign. Honored by admin user creation; ignored on public sign-up, where any caller-supplied value is stripped server-side. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

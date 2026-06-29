@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
-	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -14,11 +14,11 @@ import (
 
 func GetPagedPrompts(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting prompts",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting prompts",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppPromptsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.PagedRequestCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -63,11 +63,11 @@ func GetPagedPrompts(w http.ResponseWriter, r *http.Request) {
 
 func GetPromptById(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error getting prompt",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error getting prompt",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppPromptsRead},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			promptRepository := repositories.NewPromptRepository(nil)
@@ -93,11 +93,11 @@ func GetPromptById(w http.ResponseWriter, r *http.Request) {
 
 func UpdatePromptById(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error updating prompt",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error updating prompt",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppPromptsUpdate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			command := commands.UpsertPromptCommand{}
@@ -135,11 +135,11 @@ func UpdatePromptById(w http.ResponseWriter, r *http.Request) {
 
 func CreatePrompt(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error creating prompt",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error creating prompt",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppPromptsCreate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpsertPromptCommand{}
 			err := command.LoadDataFromRequest(w, r)
@@ -176,11 +176,11 @@ func CreatePrompt(w http.ResponseWriter, r *http.Request) {
 
 func DeletePromptById(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error deleting prompt",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error deleting prompt",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppPromptsDelete},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			promptRepository := repositories.NewPromptRepository(nil)
@@ -200,11 +200,11 @@ func DeletePromptById(w http.ResponseWriter, r *http.Request) {
 
 func CreateDefaultPrompt(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage: "Error creating default prompt",
-		Writer:       w,
-		Request:      r,
-		UserRole:     models.ADMIN,
-		ResponseType: constants.ApplicationJson,
+		ErrorMessage:   "Error creating default prompt",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppPromptsCreate},
+		ResponseType:   constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			promptService := services.NewPromptService(nil)
 			prompt, err := promptService.CreateDefaultPrompt()

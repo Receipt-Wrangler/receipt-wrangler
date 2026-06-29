@@ -10,8 +10,8 @@ import { NgxsModule, Store } from "@ngxs/store";
 import { FormMode } from "src/enums/form-mode.enum";
 import { PipesModule } from "src/pipes/pipes.module";
 import { InputComponent } from "../../input";
-import { Category, Group, GroupRole, Item, ItemStatus, Receipt, Tag, User } from "../../open-api";
-import { UserState } from "../../store/index";
+import { Category, Group, Item, ItemStatus, Receipt, Tag, User } from "../../open-api";
+import { AuthState, UserState } from "../../store/index";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { UserTotalWithPercentagePipe } from "../user-total-with-percentage.pipe";
 import { buildItemForm } from "../utils/form.utils";
@@ -56,7 +56,6 @@ describe("ShareListComponent", () => {
   const mockGroup: Group = {
     id: 1,
     name: "Test Group",
-    groupRole: GroupRole.Owner,
   } as any as Group;
 
   const mockActivatedRoute = {
@@ -83,7 +82,7 @@ describe("ShareListComponent", () => {
     await TestBed.configureTestingModule({
       declarations: [ShareListComponent, UserTotalWithPercentagePipe],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [CurrencyPipe, PipesModule, NgxsModule.forRoot([UserState, SystemSettingsState])],
+      imports: [CurrencyPipe, PipesModule, NgxsModule.forRoot([AuthState, UserState, SystemSettingsState])],
       providers: [
         {
           provide: ActivatedRoute,
@@ -101,6 +100,7 @@ describe("ShareListComponent", () => {
 
     // Reset store with proper user data structure
     store.reset({
+      auth: {},
       users: {
         users: mockUsers
       },

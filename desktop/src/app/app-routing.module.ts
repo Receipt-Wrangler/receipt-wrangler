@@ -1,8 +1,9 @@
 import { NgModule } from "@angular/core";
 import { RouterModule, Routes } from "@angular/router";
+import { appPermissionGuard } from "src/guards/app-permission.guard";
 import { AuthGuard } from "src/guards/auth.guard";
 import { SidebarComponent } from "src/layout/sidebar/sidebar.component";
-import { UserRole } from "../open-api";
+import { Permission } from "../open-api";
 
 // set up dashboard
 const routes: Routes = [
@@ -32,19 +33,28 @@ const routes: Routes = [
           import("../categories/categories.module").then(
             (m) => m.CategoriesModule
           ),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppCategoriesRead],
+        },
       },
       {
         path: "tags",
         loadChildren: () =>
           import("../tags/tags.module").then((m) => m.TagsModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppTagsRead],
+        },
       },
       {
         path: "custom-fields",
         loadChildren: () =>
           import("../custom-fields/custom-fields.module").then((m) => m.CustomFieldsModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppCustomFieldsRead],
+        },
       },
       {
         path: "groups",
@@ -62,24 +72,46 @@ const routes: Routes = [
         path: "settings",
         loadChildren: () =>
           import("../settings/settings.module").then((m) => m.SettingsModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [
+            Permission.AppAccountRead,
+            Permission.AppUserPreferencesRead,
+            Permission.AppApiKeysRead,
+          ],
+        },
       },
       {
         path: "system-settings",
         loadChildren: () =>
           import("../system-settings/system-settings.module").then((m) => m.SystemSettingsModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
         data: {
-          role: UserRole.Admin,
+          appPermissions: [
+            Permission.AppSystemSettingsRead,
+            Permission.AppPromptsRead,
+            Permission.AppReceiptProcessingSettingsRead,
+            Permission.AppSystemEmailsRead,
+            Permission.AppSystemTasksRead,
+          ],
         },
       },
       {
         path: "users",
         loadChildren: () =>
           import("../user/user.module").then((m) => m.UserModule),
-        canActivate: [AuthGuard],
+        canActivate: [AuthGuard, appPermissionGuard],
         data: {
-          role: UserRole.Admin,
+          appPermissions: [Permission.AppUsersRead],
+        },
+      },
+      {
+        path: "roles",
+        loadChildren: () =>
+          import("../roles/roles.module").then((m) => m.RolesModule),
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppRolesRead],
         },
       },
       {
