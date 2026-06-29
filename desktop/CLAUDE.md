@@ -84,6 +84,7 @@ Receipt Wrangler Desktop is an Angular 19 application with modular architecture 
 - Strict TypeScript configuration with comprehensive compiler options
 
 ### Dependency Security & Version Pins
+
 Keep `npm audit` at **0 vulnerabilities**. Two conventions exist specifically to hold that line —
 do not undo them without re-checking `npm audit`:
 - **`overrides` block in `package.json`** forces patched versions of build-time/dev-only transitive
