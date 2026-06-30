@@ -85,6 +85,16 @@ func (service ReceiptService) GetReceiptForUser(userId uint, receiptId string) (
 		return models.Receipt{}, err
 	}
 
+	// Guard the window between the authorization read and this full load: if the
+	// receipt's identity, group, or payer changed (or it was deleted — Find leaves
+	// a zero-value row), the prior authorization no longer applies, so deny rather
+	// than return data that was never authorized.
+	if receipt.ID != authReceipt.ID ||
+		receipt.GroupId != authReceipt.GroupId ||
+		receipt.PaidByUserID != authReceipt.PaidByUserID {
+		return models.Receipt{}, ErrReceiptAccessDenied
+	}
+
 	if err := permissionService.FilterReceiptCategoriesTagsForReceipt(userId, &receipt); err != nil {
 		return models.Receipt{}, err
 	}
