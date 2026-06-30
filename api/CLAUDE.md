@@ -579,9 +579,17 @@ Claude can read a user's data. It is **off by default** and Go-native (no separa
   per-tool scope enforcement.
 - **Packages**: `internal/oauth/` (authorization server) and `internal/mcp/`
   (server + read-only tools). Tools call the service/repository layer in-process with the
-  authenticated user's claims and enforce the same group-scoped authorization as the REST
-  handlers. v1 tools are read-only: `search_receipts`, `get_receipt`, `list_groups`,
-  `list_categories`, `list_tags`, `list_dashboards`.
+  authenticated user's claims and enforce the same authorization as the REST handlers — not just
+  group-scope but also the category/tag grants and paid-by visibility (the tools don't pass through
+  `HandleRequest`, so each replicates the enforcement explicitly via `PermissionService`). v1 tools
+  are read-only: `search_receipts`, `get_receipt`, `list_groups`, `list_categories`, `list_tags`,
+  `list_dashboards`. Specifically (`internal/mcp/tools.go`): `list_categories`/`list_tags` return the
+  caller's grant-visible catalog (the full pool only for `app.categories.read`/`app.tags.read`
+  holders, else the union of their group roles' grants — `visibleByGrants`); `get_receipt` checks
+  `group.receipts.read`, then `ReceiptPaidByVisible` (non-leaking "not found" when hidden), then strips
+  categories/tags via `FilterReceiptCategoriesTagsForReceipt`; `search_receipts` requires
+  `app.receipts.search` and applies the paid-by disjunction in SQL before the limit (the MCP-only
+  `ReceiptRepository.SearchReceiptsByGroupIds` takes a `PaidByAllowedResolver`).
 - **Storage**: `models.OAuthClient` + `models.OAuthAuthorizationCode` (registered in
   `MakeMigrations`). Refresh tokens reuse the existing `models.RefreshToken` flow.
 - **Production**: `docker/default.conf` proxies the new root paths to the backend; the `/mcp`

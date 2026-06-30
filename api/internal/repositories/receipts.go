@@ -918,8 +918,10 @@ func (repository ReceiptRepository) GetReceiptsByGroupIds(groupIds []string, que
 // SearchReceiptsByGroupIds returns receipts within the given groups whose name
 // matches nameQuery (a substring match; an empty nameQuery matches all),
 // ordered by most recent date first and capped at limit. Scoping to the
-// caller's group ids is the caller's responsibility.
-func (repository ReceiptRepository) SearchReceiptsByGroupIds(groupIds []uint, nameQuery string, limit int) ([]models.Receipt, error) {
+// caller's group ids is the caller's responsibility. The paidByResolver applies
+// the caller's paid-by visibility in SQL BEFORE the limit, so hidden receipts
+// can't push visible matches out of the capped result set.
+func (repository ReceiptRepository) SearchReceiptsByGroupIds(groupIds []uint, nameQuery string, limit int, paidByResolver PaidByAllowedResolver) ([]models.Receipt, error) {
 	db := repository.GetDB()
 	var receipts []models.Receipt
 
@@ -928,7 +930,12 @@ func (repository ReceiptRepository) SearchReceiptsByGroupIds(groupIds []uint, na
 		query = query.Where("name LIKE ?", "%"+nameQuery+"%")
 	}
 
-	err := query.Order("date desc").Limit(limit).Find(&receipts).Error
+	query, err := repository.ApplyPaidByDisjunction(query, groupIds, paidByResolver)
+	if err != nil {
+		return nil, err
+	}
+
+	err = query.Order("date desc").Limit(limit).Find(&receipts).Error
 	if err != nil {
 		return nil, err
 	}
