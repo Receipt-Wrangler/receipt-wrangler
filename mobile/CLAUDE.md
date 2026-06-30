@@ -223,6 +223,38 @@ the swagger, so `Claims` carries only identity claims and the field is gone from
 Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
 is otherwise forbidden — these are the documented exception.)
 
+### Android Gradle: cunning_document_scanner needs the Kotlin plugin + Kotlin 2.2.x
+
+`cunning_document_scanner` **2.3.0** modernized its `android/build.gradle` to the
+`kotlin { compilerOptions { ... } }` DSL but (a) **does not apply the Kotlin Gradle plugin
+itself** and (b) requires **Kotlin 2.2.x** for that extension-level `compilerOptions` block.
+This app historically applied `kotlin-android` only to `:app` and pinned Kotlin **2.1.0**, so a
+clean Android build failed at the Gradle **configuration** step — first
+`Could not find method kotlin()` then `Could not find method compilerOptions() ... on
+KotlinAndroidProjectExtension` — for **every** build, blocking the whole Android e2e suite.
+
+The fix (all in `mobile/android/`, committed app config — not generated):
+
+- **`build.gradle` (root):** a `subprojects { sp -> sp.plugins.withId('com.android.library')
+  { sp.apply plugin: 'org.jetbrains.kotlin.android' } }` block applies `kotlin-android` to any
+  Android-library plugin subproject the moment it applies `com.android.library`, so the
+  plugin's `kotlin {}` DSL resolves (re-applying an already-applied plugin is a no-op). The
+  legacy `buildscript` Kotlin classpath was **removed** from this file — the version is now
+  managed in `settings.gradle` (keeping it in both places triggers "plugin already on the
+  classpath with an unknown version").
+- **`settings.gradle`:** the `pluginManagement` `plugins {}` block declares
+  `id "org.jetbrains.kotlin.android" version "2.2.21" apply false` (matching the modern Flutter
+  template and the plugin's own example app). This is the lever that actually sets the Kotlin
+  version the `kotlin-android` plugin resolves to — bumping the old `ext.kotlin_version` in the
+  root `build.gradle` had **no effect**.
+
+If a future dependency bump re-breaks the Android build with a Kotlin/AGP DSL error, the Kotlin
+version to bump is in `settings.gradle`, not the root `build.gradle`. The simpler alternative
+(if you don't need 2.3.0) is to pin `cunning_document_scanner: ^1.4.0`, whose `build.gradle`
+applies `kotlin-android` itself and uses the legacy `kotlinOptions {}` DSL (works on Kotlin
+2.1.0); its `getPictures(noOfPages:)` API — the only call the app uses (`lib/utils/scan.dart`) —
+is identical.
+
 ### Testing
 
 Run tests with `flutter test`. Run a single file with `flutter test test/path/to/file_test.dart`.

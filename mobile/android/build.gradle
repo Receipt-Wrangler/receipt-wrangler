@@ -1,12 +1,12 @@
 buildscript {
-    ext.kotlin_version = '2.1.0'
+    // The Kotlin Gradle plugin version is managed in settings.gradle's
+    // pluginManagement plugins block (org.jetbrains.kotlin.android), matching the
+    // modern Flutter Android template, so it is not declared on the legacy
+    // buildscript classpath here (declaring it in both places conflicts with
+    // "plugin already on the classpath with an unknown version").
     repositories {
         google()
         mavenCentral()
-    }
-
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
 
@@ -23,6 +23,20 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(':app')
+}
+
+// Some Flutter plugins (e.g. cunning_document_scanner 2.3.0) use the modern
+// `kotlin { compilerOptions { ... } }` DSL in their android/build.gradle but do not
+// apply the Kotlin Gradle plugin themselves. This app applies kotlin-android only to
+// :app, so those plugin subprojects fail to evaluate with "Could not find method
+// kotlin()". Apply kotlin-android to any Android-library subproject the moment it
+// applies com.android.library, so the kotlin{} DSL resolves before it is referenced.
+// Re-applying an already-applied plugin is a no-op, so this is safe for plugins that
+// apply it themselves.
+subprojects { sp ->
+    sp.plugins.withId('com.android.library') {
+        sp.apply plugin: 'org.jetbrains.kotlin.android'
+    }
 }
 
 tasks.register("clean", Delete) {
