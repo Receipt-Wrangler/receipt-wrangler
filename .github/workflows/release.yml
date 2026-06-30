@@ -11,6 +11,8 @@ jobs:
     container: golang:1.25-trixie
     steps:
       - uses: actions/checkout@v4
+      - name: Mark workspace as safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Install app dependencies
         run: sh set-up-dependencies.sh
         working-directory: ./api
@@ -29,7 +31,9 @@ jobs:
           fail_ci_if_error: true
           verbose: true
       - name: Test imap client
-        run: python3 -m unittest discover -s ./imap-client
+        run: |
+          . wranglervenv/bin/activate
+          python3 -m unittest discover -s ./imap-client
         working-directory: ./api
 
   test-desktop:
