@@ -92,18 +92,42 @@ void main() {
     final addCustomFieldBtn = find.text('Add Custom Field');
     await pumpUntilFound(tester, addCustomFieldBtn);
     await tester.ensureVisible(addCustomFieldBtn);
+    // ensureVisible jumps the scroll position WITHOUT a relayout, so the
+    // button's global offset is stale until a frame is pumped; tapping
+    // immediately computes the pre-scroll (off-screen) center, the tap misses,
+    // and the modal never opens (tap-flake pattern #1 in mobile/CLAUDE.md --
+    // deterministic on iOS, intermittent on Android). Pump a frame so the tap
+    // hits the post-scroll center, then drain a few so the bottom sheet has
+    // mounted before we look for its rows.
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(addCustomFieldBtn);
-    // The selection modal lists every field; "E2E Notes" sorts last and is
-    // off-screen in the sheet, so scroll it into view before tapping or the
-    // tap lands on empty space and the field is never added. ensureVisible
-    // does a jumpTo on the sheet's ListView WITHOUT pumping -- the item's
-    // global offset only updates after a relayout, so tap() would still
-    // compute the stale off-screen center. Pump frames before tapping.
-    await pumpUntilFound(tester, find.text(_testFieldName));
-    await tester.ensureVisible(find.text(_testFieldName));
+    for (int i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    // The selection modal (buildCustomFieldSelectionSheet) lists every
+    // available field; wait for its header to confirm it opened, then for the
+    // "E2E Notes" row. "E2E Notes" can sort last / be off-screen in the sheet,
+    // so scroll it into view before tapping or the tap lands on empty space and
+    // the field is never added. ensureVisible does a jumpTo on the sheet's
+    // ListView WITHOUT pumping -- the item's global offset only updates after a
+    // relayout, so tap() would still compute the stale off-screen center. Pump
+    // frames before tapping.
+    await pumpUntilFound(tester, find.text('Select Custom Field'));
+    // The sheet's ListView.builder is lazy and "E2E Notes" sorts last
+    // (loadCustomFields fetches every field ordered by name DESC), so its row
+    // isn't built until scrolled into view -- a plain `find.text` / ensureVisible
+    // can't act on an element that doesn't exist yet, which is why waiting on the
+    // row alone times out. Scroll the sheet's list (the topmost Scrollable, mounted
+    // above the form) until the row is built and on-screen, then tap it.
+    final notesRow = find.text(_testFieldName);
+    await tester.scrollUntilVisible(
+      notesRow,
+      120,
+      scrollable: find.byType(Scrollable).last,
+      maxScrolls: 80,
+    );
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text(_testFieldName));
+    await tester.tap(notesRow);
 
     // The custom field widget mounts with name `customField_<id>`
     // (mobile/lib/shared/widgets/custom_field_widget.dart line ~47 for
