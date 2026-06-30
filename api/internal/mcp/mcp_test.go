@@ -487,8 +487,16 @@ func TestSearchReceiptsEnforcesPaidByVisibility(t *testing.T) {
 func TestSearchReceiptsRequiresSearchPermission(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
-	// No app role -> no app.receipts.search.
+	// Group read access and a matching receipt exist, but no app role -> no
+	// app.receipts.search, so the denial is specifically tied to the missing
+	// search permission rather than a lack of data or membership.
 	user := createUser(t, "nosearch")
+	group := models.Group{Name: "g"}
+	if err := repositories.GetDB().Create(&group).Error; err != nil {
+		t.Fatalf("failed to create group: %v", err)
+	}
+	addGroupMember(t, user.ID, group.ID, []string{permissions.GroupReceiptsRead})
+	createReceiptInGroup(t, "anything", group.ID, user.ID)
 
 	_, _, err := handleSearchReceipts(context.Background(), requestForUser(user.ID), searchReceiptsInput{Query: "anything"})
 	if err == nil {

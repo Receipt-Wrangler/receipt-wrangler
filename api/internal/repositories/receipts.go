@@ -854,6 +854,25 @@ func (repository ReceiptRepository) GetReceiptGroupIdByReceiptId(id string) (uin
 	return receipt.GroupId, nil
 }
 
+// GetReceiptForAuthorization loads only the fields needed to authorize a receipt
+// read (id, group_id, paid_by_user_id). It uses First, so a missing row returns
+// gorm.ErrRecordNotFound — letting callers authorize (and detect not-found)
+// before paying to preload the full receipt's associations.
+func (repository ReceiptRepository) GetReceiptForAuthorization(id string) (models.Receipt, error) {
+	db := repository.GetDB()
+	var receipt models.Receipt
+
+	err := db.Model(models.Receipt{}).
+		Where("id = ?", id).
+		Select("id", "group_id", "paid_by_user_id").
+		First(&receipt).Error
+	if err != nil {
+		return models.Receipt{}, err
+	}
+
+	return receipt, nil
+}
+
 func (repository ReceiptRepository) FilterLinkedItemsFromReceiptItems(receipt *models.Receipt) {
 	if len(receipt.ReceiptItems) == 0 {
 		return

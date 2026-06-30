@@ -53,7 +53,10 @@ func (service ReceiptService) GetReceiptForUser(userId uint, receiptId string) (
 	receiptRepository := repositories.NewReceiptRepository(service.TX)
 	permissionService := NewPermissionService(service.TX)
 
-	receipt, err := receiptRepository.GetFullyLoadedReceiptById(receiptId)
+	// Authorize on the lightweight auth fields first (this fetch uses First, so a
+	// missing row surfaces as ErrRecordNotFound). Only load the full receipt with
+	// its associations once the read is allowed.
+	authReceipt, err := receiptRepository.GetReceiptForAuthorization(receiptId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return models.Receipt{}, ErrReceiptAccessDenied
@@ -61,7 +64,7 @@ func (service ReceiptService) GetReceiptForUser(userId uint, receiptId string) (
 		return models.Receipt{}, err
 	}
 
-	hasAccess, err := permissionService.HasGroupPermissions(userId, receipt.GroupId, permissions.GroupReceiptsRead)
+	hasAccess, err := permissionService.HasGroupPermissions(userId, authReceipt.GroupId, permissions.GroupReceiptsRead)
 	if err != nil {
 		return models.Receipt{}, err
 	}
@@ -69,12 +72,17 @@ func (service ReceiptService) GetReceiptForUser(userId uint, receiptId string) (
 		return models.Receipt{}, ErrReceiptAccessDenied
 	}
 
-	visible, err := permissionService.ReceiptPaidByVisible(userId, receipt.GroupId, receipt.PaidByUserID)
+	visible, err := permissionService.ReceiptPaidByVisible(userId, authReceipt.GroupId, authReceipt.PaidByUserID)
 	if err != nil {
 		return models.Receipt{}, err
 	}
 	if !visible {
 		return models.Receipt{}, ErrReceiptAccessDenied
+	}
+
+	receipt, err := receiptRepository.GetFullyLoadedReceiptById(receiptId)
+	if err != nil {
+		return models.Receipt{}, err
 	}
 
 	if err := permissionService.FilterReceiptCategoriesTagsForReceipt(userId, &receipt); err != nil {

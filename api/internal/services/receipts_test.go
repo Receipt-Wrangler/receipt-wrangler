@@ -110,6 +110,20 @@ func TestGetReceiptForUserDeniesNonMember(t *testing.T) {
 	}
 }
 
+func TestGetReceiptForUserDeniesMemberWithoutReadPermission(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	// A member whose group role lacks group.receipts.read is denied — proving the
+	// permission gate is enforced independently of group membership.
+	userId, groupId := seedReceiptMember(t, "noread", "noread-role", []string{}, nil, nil, nil, false)
+	receipt := seedReceipt(t, "Lunch", groupId, userId)
+
+	_, err := NewReceiptService(nil).GetReceiptForUser(userId, utils.UintToString(receipt.ID))
+	if !errors.Is(err, ErrReceiptAccessDenied) {
+		t.Errorf("expected ErrReceiptAccessDenied for a member without group.receipts.read, got %v", err)
+	}
+}
+
 func TestGetReceiptForUserDeniesPaidByHidden(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
@@ -129,31 +143,40 @@ func TestGetReceiptForUserDeniesPaidByHidden(t *testing.T) {
 	}
 }
 
-func TestGetReceiptForUserStripsCategoriesToGrants(t *testing.T) {
+func TestGetReceiptForUserStripsCategoriesAndTagsToGrants(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	db := repositories.GetDB()
 
-	allowed := models.Category{Name: "allowed-cat"}
-	hidden := models.Category{Name: "hidden-cat"}
-	if err := db.Create(&allowed).Error; err != nil {
-		t.Fatalf("create category: %v", err)
-	}
-	if err := db.Create(&hidden).Error; err != nil {
-		t.Fatalf("create category: %v", err)
+	allowedCategory := models.Category{Name: "allowed-cat"}
+	hiddenCategory := models.Category{Name: "hidden-cat"}
+	allowedTag := models.Tag{Name: "allowed-tag"}
+	hiddenTag := models.Tag{Name: "hidden-tag"}
+	for _, m := range []interface{}{&allowedCategory, &hiddenCategory, &allowedTag, &hiddenTag} {
+		if err := db.Create(m).Error; err != nil {
+			t.Fatalf("create fixture: %v", err)
+		}
 	}
 
-	userId, groupId := seedReceiptMember(t, "stripper", "strip-role", []string{permissions.GroupReceiptsRead}, []uint{allowed.ID}, nil, nil, false)
-	receipt := seedReceipt(t, "with-cats", groupId, userId)
-	if err := db.Model(&receipt).Association("Categories").Append([]models.Category{allowed, hidden}); err != nil {
+	// The role grants read plus exactly one category and one tag.
+	userId, groupId := seedReceiptMember(t, "stripper", "strip-role",
+		[]string{permissions.GroupReceiptsRead}, []uint{allowedCategory.ID}, []uint{allowedTag.ID}, nil, false)
+	receipt := seedReceipt(t, "with-cats-and-tags", groupId, userId)
+	if err := db.Model(&receipt).Association("Categories").Append([]models.Category{allowedCategory, hiddenCategory}); err != nil {
 		t.Fatalf("attach categories: %v", err)
+	}
+	if err := db.Model(&receipt).Association("Tags").Append([]models.Tag{allowedTag, hiddenTag}); err != nil {
+		t.Fatalf("attach tags: %v", err)
 	}
 
 	got, err := NewReceiptService(nil).GetReceiptForUser(userId, utils.UintToString(receipt.ID))
 	if err != nil {
 		t.Fatalf("GetReceiptForUser returned error: %v", err)
 	}
-	if len(got.Categories) != 1 || got.Categories[0].ID != allowed.ID {
+	if len(got.Categories) != 1 || got.Categories[0].ID != allowedCategory.ID {
 		t.Errorf("expected only the granted category, got %+v", got.Categories)
+	}
+	if len(got.Tags) != 1 || got.Tags[0].ID != allowedTag.ID {
+		t.Errorf("expected only the granted tag, got %+v", got.Tags)
 	}
 }
 
