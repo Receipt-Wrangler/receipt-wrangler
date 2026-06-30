@@ -75,47 +75,20 @@ func handleSearchReceipts(ctx context.Context, req *mcpsdk.CallToolRequest, in s
 		return nil, nil, err
 	}
 
-	// Enforce the same app.receipts.search gate as handlers.Search.
-	permissionService := services.NewPermissionService(nil)
-	hasAccess, err := permissionService.HasAppPermissions(claims.UserId, permissions.AppReceiptsSearch)
-	if err != nil || !hasAccess {
-		return nil, nil, errors.New("unauthorized")
-	}
-
 	limit := in.MaxResults
 	if limit <= 0 || limit > maxSearchResults {
 		limit = maxSearchResults
 	}
 
-	// Scope to the user's groups exactly like handlers.Search, then delegate
-	// the query to the repository layer. The paid-by resolver is applied in SQL
-	// before the limit so a member restricted by paid-by visibility cannot see
-	// receipts paid by users outside their allowed set.
-	groupMemberRepository := repositories.NewGroupMemberRepository(nil)
-	groupIds, err := groupMemberRepository.GetGroupIdsByUserId(utils.UintToString(claims.UserId))
+	// Delegate to the shared enforced read so REST and MCP can't drift: it
+	// enforces app.receipts.search, scopes to the user's groups, and applies
+	// paid-by visibility in SQL before the limit.
+	results, err := services.NewReceiptService(nil).SearchReceiptsForUser(claims.UserId, in.Query, limit)
 	if err != nil {
+		if errors.Is(err, services.ErrSearchForbidden) {
+			return nil, nil, errors.New("unauthorized")
+		}
 		return nil, nil, err
-	}
-
-	receiptRepository := repositories.NewReceiptRepository(nil)
-	receipts, err := receiptRepository.SearchReceiptsByGroupIds(groupIds, in.Query, limit, permissionService.PaidByListResolver(claims.UserId))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	results := make([]structs.SearchResult, 0, len(receipts))
-	for _, receipt := range receipts {
-		results = append(results, structs.SearchResult{
-			ID:            receipt.ID,
-			GroupID:       receipt.GroupId,
-			Name:          receipt.Name,
-			Date:          receipt.Date,
-			Type:          "Receipt",
-			Amount:        receipt.Amount,
-			ReceiptStatus: receipt.Status,
-			PaidByUserId:  receipt.PaidByUserID,
-			CreatedAt:     receipt.CreatedAt,
-		})
 	}
 
 	return nil, results, nil
@@ -131,32 +104,15 @@ func handleGetReceipt(ctx context.Context, req *mcpsdk.CallToolRequest, in getRe
 		return nil, nil, errors.New("id is required")
 	}
 
-	receiptRepository := repositories.NewReceiptRepository(nil)
-	receipt, err := receiptRepository.GetFullyLoadedReceiptById(in.Id)
+	// Delegate to the shared enforced read (permission + paid-by visibility +
+	// category/tag stripping). Collapse every access failure to a non-leaking
+	// "receipt not found" so we don't disclose the existence of receipts in
+	// other users' groups.
+	receipt, err := services.NewReceiptService(nil).GetReceiptForUser(claims.UserId, in.Id)
 	if err != nil {
-		return nil, nil, errors.New("receipt not found")
-	}
-
-	// Enforce the same group.receipts.read check the REST handler relies on.
-	// Use an identical "not found" error for missing and unauthorized so we
-	// don't leak the existence of receipts in other users' groups.
-	permissionService := services.NewPermissionService(nil)
-	hasAccess, err := permissionService.HasGroupPermissions(claims.UserId, receipt.GroupId, permissions.GroupReceiptsRead)
-	if err != nil || !hasAccess {
-		return nil, nil, errors.New("receipt not found")
-	}
-
-	// Enforce paid-by visibility: a member restricted by their group role's
-	// paid-by filter must not reach a receipt hidden from them. Reuse the
-	// non-leaking "not found" error so existence isn't disclosed.
-	visible, err := permissionService.ReceiptPaidByVisible(claims.UserId, receipt.GroupId, receipt.PaidByUserID)
-	if err != nil || !visible {
-		return nil, nil, errors.New("receipt not found")
-	}
-
-	// Strip categories/tags the user's group role grants don't allow (receipt-,
-	// item-, and linked-item-level), exactly like the REST GetReceipt handler.
-	if err := permissionService.FilterReceiptCategoriesTagsForReceipt(claims.UserId, &receipt); err != nil {
+		if errors.Is(err, services.ErrReceiptAccessDenied) {
+			return nil, nil, errors.New("receipt not found")
+		}
 		return nil, nil, err
 	}
 

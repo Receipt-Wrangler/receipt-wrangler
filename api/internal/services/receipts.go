@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/jinzhu/copier"
 	"gorm.io/gorm"
@@ -9,11 +10,25 @@ import (
 	"os"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"strconv"
+	"strings"
 	"time"
+)
+
+// Sentinel errors for the shared, enforced read operations. They let each ingress
+// point (REST handlers, MCP tools) map a single enforcement outcome to its own
+// transport without re-implementing the checks.
+var (
+	// ErrReceiptAccessDenied is returned when a receipt is missing, the caller
+	// lacks group.receipts.read, or the receipt is hidden by paid-by visibility.
+	// It is intentionally indistinct so callers don't leak a receipt's existence.
+	ErrReceiptAccessDenied = errors.New("receipt access denied")
+	// ErrSearchForbidden is returned when the caller lacks app.receipts.search.
+	ErrSearchForbidden = errors.New("not authorized to search receipts")
 )
 
 type ReceiptService struct {
@@ -26,6 +41,96 @@ func NewReceiptService(tx *gorm.DB) ReceiptService {
 		TX: tx,
 	}}
 	return service
+}
+
+// GetReceiptForUser is the single, shared "read one receipt" operation used by
+// both the REST handler and the MCP tool. It fetches the receipt and applies the
+// full read enforcement chain — group.receipts.read, paid-by visibility, and
+// category/tag grant stripping — so the two ingress points cannot drift. Missing,
+// forbidden, and paid-by-hidden receipts all collapse to ErrReceiptAccessDenied so
+// the caller cannot infer a receipt's existence.
+func (service ReceiptService) GetReceiptForUser(userId uint, receiptId string) (models.Receipt, error) {
+	receiptRepository := repositories.NewReceiptRepository(service.TX)
+	permissionService := NewPermissionService(service.TX)
+
+	receipt, err := receiptRepository.GetFullyLoadedReceiptById(receiptId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.Receipt{}, ErrReceiptAccessDenied
+		}
+		return models.Receipt{}, err
+	}
+
+	hasAccess, err := permissionService.HasGroupPermissions(userId, receipt.GroupId, permissions.GroupReceiptsRead)
+	if err != nil {
+		return models.Receipt{}, err
+	}
+	if !hasAccess {
+		return models.Receipt{}, ErrReceiptAccessDenied
+	}
+
+	visible, err := permissionService.ReceiptPaidByVisible(userId, receipt.GroupId, receipt.PaidByUserID)
+	if err != nil {
+		return models.Receipt{}, err
+	}
+	if !visible {
+		return models.Receipt{}, ErrReceiptAccessDenied
+	}
+
+	if err := permissionService.FilterReceiptCategoriesTagsForReceipt(userId, &receipt); err != nil {
+		return models.Receipt{}, err
+	}
+
+	return receipt, nil
+}
+
+// SearchReceiptsForUser is the single, shared receipt-search operation used by both
+// the REST handler and the MCP tool. It enforces app.receipts.search, scopes to the
+// caller's groups, applies paid-by visibility in SQL before the limit, and maps to
+// SearchResult. A blank query returns no results (matching the REST search bar).
+func (service ReceiptService) SearchReceiptsForUser(userId uint, query string, limit int) ([]structs.SearchResult, error) {
+	permissionService := NewPermissionService(service.TX)
+
+	hasAccess, err := permissionService.HasAppPermissions(userId, permissions.AppReceiptsSearch)
+	if err != nil {
+		return nil, err
+	}
+	if !hasAccess {
+		return nil, ErrSearchForbidden
+	}
+
+	results := make([]structs.SearchResult, 0)
+	if len(strings.TrimSpace(query)) == 0 {
+		return results, nil
+	}
+
+	groupMemberRepository := repositories.NewGroupMemberRepository(service.TX)
+	groupIds, err := groupMemberRepository.GetGroupIdsByUserId(utils.UintToString(userId))
+	if err != nil {
+		return nil, err
+	}
+
+	receiptRepository := repositories.NewReceiptRepository(service.TX)
+	receipts, err := receiptRepository.SearchReceiptsByGroupIds(groupIds, query, limit, permissionService.PaidByListResolver(userId))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, receipt := range receipts {
+		results = append(results, structs.SearchResult{
+			ID:            receipt.ID,
+			GroupID:       receipt.GroupId,
+			Name:          receipt.Name,
+			Date:          receipt.Date,
+			Type:          "Receipt",
+			Amount:        receipt.Amount,
+			ReceiptStatus: receipt.Status,
+			PaidByUserId:  receipt.PaidByUserID,
+			CreatedAt:     receipt.CreatedAt,
+		})
+	}
+
+	return results, nil
 }
 
 func (service ReceiptService) GetReceiptByReceiptImageId(receiptImageId string) (models.Receipt, error) {

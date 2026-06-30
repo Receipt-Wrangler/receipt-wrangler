@@ -299,27 +299,24 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 
 // TODO: move to repository call
 func GetReceipt(w http.ResponseWriter, r *http.Request) {
-	receiptId := chi.URLParam(r, "id")
-
 	handler := structs.Handler{
-		ErrorMessage:     "Error retrieving receipt.",
-		Writer:           w,
-		Request:          r,
-		ReceiptId:        receiptId,
-		GroupPermissions: []string{permissions.GroupReceiptsRead},
-		ResponseType:     constants.ApplicationJson,
+		ErrorMessage: "Error retrieving receipt.",
+		Writer:       w,
+		Request:      r,
+		ResponseType: constants.ApplicationJson,
+		// Enforcement (group.receipts.read, paid-by visibility, category/tag
+		// stripping) lives in ReceiptService.GetReceiptForUser — the single shared
+		// path also used by the MCP get_receipt tool — so the declarative gates are
+		// intentionally omitted here to avoid two sources of truth.
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "id")
 			token := structs.GetClaims(r)
-			receiptRepository := repositories.NewReceiptRepository(nil)
 
-			receipt, err := receiptRepository.GetFullyLoadedReceiptById(id)
+			receipt, err := services.NewReceiptService(nil).GetReceiptForUser(token.UserId, id)
 			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			err = services.NewPermissionService(nil).FilterReceiptCategoriesTagsForReceipt(token.UserId, &receipt)
-			if err != nil {
+				if errors.Is(err, services.ErrReceiptAccessDenied) {
+					return http.StatusForbidden, err
+				}
 				return http.StatusInternalServerError, err
 			}
 

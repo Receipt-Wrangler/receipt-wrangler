@@ -580,16 +580,22 @@ Claude can read a user's data. It is **off by default** and Go-native (no separa
 - **Packages**: `internal/oauth/` (authorization server) and `internal/mcp/`
   (server + read-only tools). Tools call the service/repository layer in-process with the
   authenticated user's claims and enforce the same authorization as the REST handlers — not just
-  group-scope but also the category/tag grants and paid-by visibility (the tools don't pass through
-  `HandleRequest`, so each replicates the enforcement explicitly via `PermissionService`). v1 tools
-  are read-only: `search_receipts`, `get_receipt`, `list_groups`, `list_categories`, `list_tags`,
-  `list_dashboards`. Specifically (`internal/mcp/tools.go`): `list_categories`/`list_tags` return the
-  caller's grant-visible catalog (the full pool only for `app.categories.read`/`app.tags.read`
-  holders, else the union of their group roles' grants — `visibleByGrants`); `get_receipt` checks
-  `group.receipts.read`, then `ReceiptPaidByVisible` (non-leaking "not found" when hidden), then strips
-  categories/tags via `FilterReceiptCategoriesTagsForReceipt`; `search_receipts` requires
-  `app.receipts.search` and applies the paid-by disjunction in SQL before the limit (the MCP-only
-  `ReceiptRepository.SearchReceiptsByGroupIds` takes a `PaidByAllowedResolver`).
+  group-scope but also the category/tag grants and paid-by visibility. The tools don't pass through
+  `HandleRequest`, so for the two operations that have a REST twin the enforcement is **shared via
+  `ReceiptService`** (the single source of truth, so the two ingress points can't drift):
+  `get_receipt` and the REST `GetReceipt` handler both call
+  `ReceiptService.GetReceiptForUser(userId, id)` (fetch → `group.receipts.read` →
+  `ReceiptPaidByVisible` → `FilterReceiptCategoriesTagsForReceipt`, returning `ErrReceiptAccessDenied`
+  on any miss/deny — mapped to a non-leaking MCP "receipt not found" / REST 403); `search_receipts`
+  and the REST `Search` handler both call `ReceiptService.SearchReceiptsForUser(userId, query, limit)`
+  (`app.receipts.search` → group scope → paid-by disjunction in SQL before the limit → `SearchResult`
+  mapping; `ErrSearchForbidden` → MCP "unauthorized" / REST 403; blank query → empty). These two REST
+  handlers therefore intentionally omit the declarative `HandleRequest` permission/`ReceiptId` gates —
+  enforcement lives once, in the service. v1 tools are read-only: `search_receipts`, `get_receipt`,
+  `list_groups`, `list_categories`, `list_tags`, `list_dashboards`. `list_categories`/`list_tags` have
+  no REST twin and stay MCP-local in `tools.go`: they return the caller's grant-visible catalog (the
+  full pool only for `app.categories.read`/`app.tags.read` holders, else the union of their group
+  roles' grants — `visibleByGrants`).
 - **Storage**: `models.OAuthClient` + `models.OAuthAuthorizationCode` (registered in
   `MakeMigrations`). Refresh tokens reuse the existing `models.RefreshToken` flow.
 - **Production**: `docker/default.conf` proxies the new root paths to the backend; the `/mcp`
