@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"errors"
+	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
@@ -54,12 +55,12 @@ func registerTools(server *mcpsdk.Server) {
 
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "list_categories",
-		Description: "List all receipt categories available in the system.",
+		Description: "List the receipt categories available to the authenticated user (filtered by the user's group role grants).",
 	}, handleListCategories)
 
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "list_tags",
-		Description: "List all receipt tags available in the system.",
+		Description: "List the receipt tags available to the authenticated user (filtered by the user's group role grants).",
 	}, handleListTags)
 
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
@@ -79,33 +80,15 @@ func handleSearchReceipts(ctx context.Context, req *mcpsdk.CallToolRequest, in s
 		limit = maxSearchResults
 	}
 
-	// Scope to the user's groups exactly like handlers.Search, then delegate
-	// the query to the repository layer.
-	groupMemberRepository := repositories.NewGroupMemberRepository(nil)
-	groupIds, err := groupMemberRepository.GetGroupIdsByUserId(utils.UintToString(claims.UserId))
+	// Delegate to the shared enforced read so REST and MCP can't drift: it
+	// enforces app.receipts.search, scopes to the user's groups, and applies
+	// paid-by visibility in SQL before the limit.
+	results, err := services.NewReceiptService(nil).SearchReceiptsForUser(claims.UserId, in.Query, limit)
 	if err != nil {
+		if errors.Is(err, services.ErrSearchForbidden) {
+			return nil, nil, errors.New("unauthorized")
+		}
 		return nil, nil, err
-	}
-
-	receiptRepository := repositories.NewReceiptRepository(nil)
-	receipts, err := receiptRepository.SearchReceiptsByGroupIds(groupIds, in.Query, limit)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	results := make([]structs.SearchResult, 0, len(receipts))
-	for _, receipt := range receipts {
-		results = append(results, structs.SearchResult{
-			ID:            receipt.ID,
-			GroupID:       receipt.GroupId,
-			Name:          receipt.Name,
-			Date:          receipt.Date,
-			Type:          "Receipt",
-			Amount:        receipt.Amount,
-			ReceiptStatus: receipt.Status,
-			PaidByUserId:  receipt.PaidByUserID,
-			CreatedAt:     receipt.CreatedAt,
-		})
 	}
 
 	return nil, results, nil
@@ -121,19 +104,16 @@ func handleGetReceipt(ctx context.Context, req *mcpsdk.CallToolRequest, in getRe
 		return nil, nil, errors.New("id is required")
 	}
 
-	receiptRepository := repositories.NewReceiptRepository(nil)
-	receipt, err := receiptRepository.GetFullyLoadedReceiptById(in.Id)
+	// Delegate to the shared enforced read (permission + paid-by visibility +
+	// category/tag stripping). Collapse every access failure to a non-leaking
+	// "receipt not found" so we don't disclose the existence of receipts in
+	// other users' groups.
+	receipt, err := services.NewReceiptService(nil).GetReceiptForUser(claims.UserId, in.Id)
 	if err != nil {
-		return nil, nil, errors.New("receipt not found")
-	}
-
-	// Enforce the same group.receipts.read check the REST handler relies on.
-	// Use an identical "not found" error for missing and unauthorized so we
-	// don't leak the existence of receipts in other users' groups.
-	permissionService := services.NewPermissionService(nil)
-	hasAccess, err := permissionService.HasGroupPermissions(claims.UserId, receipt.GroupId, permissions.GroupReceiptsRead)
-	if err != nil || !hasAccess {
-		return nil, nil, errors.New("receipt not found")
+		if errors.Is(err, services.ErrReceiptAccessDenied) {
+			return nil, nil, errors.New("receipt not found")
+		}
+		return nil, nil, err
 	}
 
 	return nil, receipt, nil
@@ -155,31 +135,108 @@ func handleListGroups(ctx context.Context, req *mcpsdk.CallToolRequest, _ emptyI
 }
 
 func handleListCategories(ctx context.Context, req *mcpsdk.CallToolRequest, _ emptyInput) (*mcpsdk.CallToolResult, any, error) {
-	if _, err := claimsFromRequest(req); err != nil {
-		return nil, nil, err
-	}
-
-	categoryRepository := repositories.NewCategoryRepository(nil)
-	categories, err := categoryRepository.GetAllCategories("*")
+	claims, err := claimsFromRequest(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return nil, categories, nil
+	categories, err := repositories.NewCategoryRepository(nil).GetAllCategories("*")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	permissionService := services.NewPermissionService(nil)
+	visible, err := visibleByGrants(
+		claims.UserId,
+		categories,
+		func(category models.Category) uint { return category.ID },
+		permissions.AppCategoriesRead,
+		func(groupId uint) (map[uint]struct{}, bool, error) {
+			return permissionService.GetGroupCategoryIdsForUser(claims.UserId, groupId)
+		},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return nil, visible, nil
 }
 
 func handleListTags(ctx context.Context, req *mcpsdk.CallToolRequest, _ emptyInput) (*mcpsdk.CallToolResult, any, error) {
-	if _, err := claimsFromRequest(req); err != nil {
-		return nil, nil, err
-	}
-
-	tagsRepository := repositories.NewTagsRepository(nil)
-	tags, err := tagsRepository.GetAllTags("*")
+	claims, err := claimsFromRequest(req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return nil, tags, nil
+	tags, err := repositories.NewTagsRepository(nil).GetAllTags("*")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	permissionService := services.NewPermissionService(nil)
+	visible, err := visibleByGrants(
+		claims.UserId,
+		tags,
+		func(tag models.Tag) uint { return tag.ID },
+		permissions.AppTagsRead,
+		func(groupId uint) (map[uint]struct{}, bool, error) {
+			return permissionService.GetGroupTagIdsForUser(claims.UserId, groupId)
+		},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return nil, visible, nil
+}
+
+// visibleByGrants filters a global catalog (categories or tags) to what the user
+// may actually see, mirroring how GetAppData builds the per-group catalogs.
+// Holders of the app-level read permission see the whole pool (consistent with
+// the admin-only REST global list); everyone else sees the union of their group
+// roles' grants across their groups — being unrestricted in any group means the
+// full pool, and a user with no groups or no grants sees nothing.
+func visibleByGrants[T any](
+	userId uint,
+	all []T,
+	idOf func(T) uint,
+	appReadPermission string,
+	resolve func(groupId uint) (map[uint]struct{}, bool, error),
+) ([]T, error) {
+	bypass, err := services.NewPermissionService(nil).HasAppPermissions(userId, appReadPermission)
+	if err != nil {
+		return nil, err
+	}
+	if bypass {
+		return all, nil
+	}
+
+	groupIds, err := repositories.NewGroupMemberRepository(nil).GetGroupIdsByUserId(utils.UintToString(userId))
+	if err != nil {
+		return nil, err
+	}
+
+	allowed := make(map[uint]struct{})
+	for _, groupId := range groupIds {
+		ids, unrestricted, err := resolve(groupId)
+		if err != nil {
+			return nil, err
+		}
+		if unrestricted {
+			return all, nil
+		}
+		for id := range ids {
+			allowed[id] = struct{}{}
+		}
+	}
+
+	visible := make([]T, 0, len(allowed))
+	for _, item := range all {
+		if _, ok := allowed[idOf(item)]; ok {
+			visible = append(visible, item)
+		}
+	}
+	return visible, nil
 }
 
 func handleListDashboards(ctx context.Context, req *mcpsdk.CallToolRequest, in listDashboardsInput) (*mcpsdk.CallToolResult, any, error) {

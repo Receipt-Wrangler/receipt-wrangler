@@ -854,6 +854,25 @@ func (repository ReceiptRepository) GetReceiptGroupIdByReceiptId(id string) (uin
 	return receipt.GroupId, nil
 }
 
+// GetReceiptForAuthorization loads only the fields needed to authorize a receipt
+// read (id, group_id, paid_by_user_id). It uses First, so a missing row returns
+// gorm.ErrRecordNotFound — letting callers authorize (and detect not-found)
+// before paying to preload the full receipt's associations.
+func (repository ReceiptRepository) GetReceiptForAuthorization(id string) (models.Receipt, error) {
+	db := repository.GetDB()
+	var receipt models.Receipt
+
+	err := db.Model(models.Receipt{}).
+		Where("id = ?", id).
+		Select("id", "group_id", "paid_by_user_id").
+		First(&receipt).Error
+	if err != nil {
+		return models.Receipt{}, err
+	}
+
+	return receipt, nil
+}
+
 func (repository ReceiptRepository) FilterLinkedItemsFromReceiptItems(receipt *models.Receipt) {
 	if len(receipt.ReceiptItems) == 0 {
 		return
@@ -918,8 +937,10 @@ func (repository ReceiptRepository) GetReceiptsByGroupIds(groupIds []string, que
 // SearchReceiptsByGroupIds returns receipts within the given groups whose name
 // matches nameQuery (a substring match; an empty nameQuery matches all),
 // ordered by most recent date first and capped at limit. Scoping to the
-// caller's group ids is the caller's responsibility.
-func (repository ReceiptRepository) SearchReceiptsByGroupIds(groupIds []uint, nameQuery string, limit int) ([]models.Receipt, error) {
+// caller's group ids is the caller's responsibility. The paidByResolver applies
+// the caller's paid-by visibility in SQL BEFORE the limit, so hidden receipts
+// can't push visible matches out of the capped result set.
+func (repository ReceiptRepository) SearchReceiptsByGroupIds(groupIds []uint, nameQuery string, limit int, paidByResolver PaidByAllowedResolver) ([]models.Receipt, error) {
 	db := repository.GetDB()
 	var receipts []models.Receipt
 
@@ -928,7 +949,12 @@ func (repository ReceiptRepository) SearchReceiptsByGroupIds(groupIds []uint, na
 		query = query.Where("name LIKE ?", "%"+nameQuery+"%")
 	}
 
-	err := query.Order("date desc").Limit(limit).Find(&receipts).Error
+	query, err := repository.ApplyPaidByDisjunction(query, groupIds, paidByResolver)
+	if err != nil {
+		return nil, err
+	}
+
+	err = query.Order("date desc").Limit(limit).Find(&receipts).Error
 	if err != nil {
 		return nil, err
 	}
