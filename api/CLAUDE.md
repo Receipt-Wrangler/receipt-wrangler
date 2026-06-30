@@ -158,13 +158,16 @@ A configurable role/permission system. Administrators can define roles from gran
 strings at two scopes — **application** and **group** — and assign them to users / group members.
 **Handlers now enforce these permissions** (see "Enforcement status" below). The legacy
 `models.UserRole` (`ADMIN`/`USER`) and `models.GroupRole` (`OWNER`/`EDITOR`/`VIEWER`) enums have
-been **removed from the backend** — the Go types, the `User.UserRole`/`GroupMember.GroupRole` model
-fields, the `Claims.userRole` JWT field, and the `DeriveLegacy*` shims are all gone. "Admin" is now
+been **removed from the backend** — the Go enum types, the `User.UserRole` model field, the
+`Claims.userRole` JWT field, and the `DeriveLegacy*` shims are all gone. "Admin" is now
 defined by the app permission `app.users.read` (the seeded **Legacy Admin** role grants it; **Legacy
-User** omits it). The only legacy remnant is the **physical** `user_role`/`group_role` DB columns,
-intentionally retained on existing installs so the one-time data migration can still back-fill from
-them (see "Legacy role assignment" below); GORM never drops them and fresh installs never create
-them.
+User** omits it). The legacy remnants are the **physical** `user_role`/`group_role` DB columns,
+retained on existing installs so the one-time data migration can still back-fill from
+them (see "Legacy role assignment" below). `user_role` is purely physical (no Go field; GORM never
+creates it on fresh installs). `group_role` is the one exception: `GroupMember.GroupRole` is
+**temporarily re-declared** on the model as a plain nullable string (`json:"-"`, never read) — see
+"Legacy `group_role` column on upgrade" below — so AutoMigrate manages it on all installs again. Both
+will be dropped in a later release.
 
 ### Permission registry
 
@@ -300,12 +303,15 @@ them.
   matching `User.AppRoleID` (`ADMIN` → Legacy Admin, `USER` → Legacy User) and each member's
   `group_role` onto `GroupMember.GroupRoleID` (`OWNER`/`EDITOR`/`VIEWER` → Legacy
   Owner/Editor/Viewer). Lives in `repositories/data_migrations.go` (`assignLegacyEquivalentRoles`).
-- **Reads the retained physical columns, not Go fields.** The `UserRole`/`GroupRole` Go struct
-  fields were removed, so the migration matches the `user_role`/`group_role` values as plain strings
-  and **guards each back-fill loop with `tx.Migrator().HasColumn(...)`** — upgrading installs keep
-  the physical columns (GORM never drops them) so the back-fill runs, while fresh installs never
-  create them so the guard skips cleanly instead of erroring with "no such column". There is
-  deliberately **no drop-column migration**, to preserve this upgrade path.
+- **Reads the physical columns as plain strings, not enum Go fields.** The legacy enum types were
+  removed, so the migration matches the `user_role`/`group_role` values as plain strings and **guards
+  each back-fill loop with `tx.Migrator().HasColumn(...)`**. For `user_role` (no Go field) the guard
+  is the real safety net — upgrading installs keep the physical column so the back-fill runs, while
+  fresh installs never created it so the guard skips cleanly instead of erroring with "no such
+  column". For `group_role` the guard is now effectively always-true, since `GroupMember.GroupRole`
+  is re-declared on the model (so AutoMigrate always creates the column); the back-fill still no-ops
+  on fresh rows because their value is `""`, which matches no legacy enum. There is deliberately **no
+  drop-column migration**, to preserve this upgrade path.
 - **Tracking:** one-time data migrations are recorded in a `data_migrations` ledger
   (`models.DataMigration`, keyed by unique `name`) — distinct from GORM schema AutoMigrate. The
   runner `RunDataMigrations` skips any migration already in the ledger and otherwise runs it **and**
@@ -319,9 +325,29 @@ them.
   rows; per-create assignment for *new* users / group creators is handled by the default-role wiring
   (see "Default roles" above).
 - Tests: `repositories/data_migrations_test.go` (assignment, idempotency, ledger short-circuit,
-  no-clobber, and the `HasColumn`-guard skip path when the legacy columns are absent). The tests
-  seed the legacy columns via raw `ALTER TABLE ... ADD COLUMN` DDL since AutoMigrate no longer
-  creates them.
+  no-clobber, and the `HasColumn`-guard skip path when the legacy `user_role` column is absent). The
+  tests seed `user_role` via raw `ALTER TABLE ... ADD COLUMN` DDL since AutoMigrate no longer creates
+  it; `group_role` is left to AutoMigrate (it is back on the model) and is never added/dropped by the
+  test helpers — dropping it would leave a field-without-column state that breaks later group_members
+  inserts in the package's test run.
+
+### Legacy `group_role` column on upgrade
+
+- On databases upgraded from before the role rework, the obsolete `group_members.group_role` column
+  survives **`NOT NULL` with no default** (AutoMigrate never drops columns). Because v7 stopped
+  writing it, every new `group_members` INSERT violated the constraint (HTTP 500 on creating a group,
+  a user — which auto-creates personal groups — or adding a member). Existing data, logins, reads,
+  and receipt CRUD were unaffected.
+- **Fix:** `GroupMember.GroupRole` is **temporarily re-declared** as a plain, nullable, `json:"-"`
+  string (`internal/models/group_member.go`). Two effects: GORM writes the zero value (`""`) on every
+  INSERT, satisfying any leftover `NOT NULL`; and because the model field is nullable, AutoMigrate
+  relaxes the existing `NOT NULL` column to nullable on upgraded installs (Postgres `ALTER COLUMN …
+  DROP NOT NULL`, MariaDB `MODIFY …`). `json:"-"` keeps it off the API contract, so **no swagger /
+  client regeneration**. Nothing reads the field. Targets PostgreSQL/MariaDB; SQLite is not a goal
+  (it is handled incidentally by GORM's portable migrator). `users.user_role` needs no such treatment
+  — it is already nullable with a default.
+- **Removal plan:** drop this field together with a one-time migration that drops the `group_role`
+  column once all installs have upgraded past this release.
 
 ### Permission checks (`PermissionService`)
 
