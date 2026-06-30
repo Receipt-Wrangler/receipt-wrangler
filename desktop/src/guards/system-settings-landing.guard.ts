@@ -15,14 +15,14 @@ export const systemSettingsLandingGuard: CanActivateFn = (): UrlTree => {
   const router: Router = inject(Router);
 
   const tabs: { path: string; permission: Permission }[] = [
-    { path: "system-emails", permission: Permission.AppSystemEmailsRead },
-    { path: "prompts", permission: Permission.AppPromptsRead },
+    { path: "settings/view", permission: Permission.AppSystemSettingsRead },
     {
       path: "receipt-processing-settings",
       permission: Permission.AppReceiptProcessingSettingsRead,
     },
+    { path: "prompts", permission: Permission.AppPromptsRead },
+    { path: "system-emails", permission: Permission.AppSystemEmailsRead },
     { path: "system-tasks", permission: Permission.AppSystemTasksRead },
-    { path: "settings/view", permission: Permission.AppSystemSettingsRead },
   ];
 
   for (const tab of tabs) {

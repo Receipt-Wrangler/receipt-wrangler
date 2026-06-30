@@ -38,13 +38,30 @@ describe("systemSettingsLandingGuard", () => {
     expect(run().toString()).toBe("/system-settings/prompts");
   });
 
-  it("falls through to a later tab when earlier ones are not readable", () => {
-    store.dispatch(new SetPermissions([Permission.AppSystemSettingsRead], {}));
+  it("lands on System Settings for a user who can read every tab", () => {
+    store.dispatch(
+      new SetPermissions(
+        [
+          Permission.AppSystemSettingsRead,
+          Permission.AppReceiptProcessingSettingsRead,
+          Permission.AppPromptsRead,
+          Permission.AppSystemEmailsRead,
+          Permission.AppSystemTasksRead,
+        ],
+        {}
+      )
+    );
 
     expect(run().toString()).toBe("/system-settings/settings/view");
   });
 
-  it("prefers system-emails when it is readable", () => {
+  it("falls through to a later tab when earlier ones are not readable", () => {
+    store.dispatch(new SetPermissions([Permission.AppSystemTasksRead], {}));
+
+    expect(run().toString()).toBe("/system-settings/system-tasks");
+  });
+
+  it("prefers an earlier-rendered tab over system-emails", () => {
     store.dispatch(
       new SetPermissions(
         [Permission.AppSystemEmailsRead, Permission.AppPromptsRead],
@@ -52,7 +69,7 @@ describe("systemSettingsLandingGuard", () => {
       )
     );
 
-    expect(run().toString()).toBe("/system-settings/system-emails");
+    expect(run().toString()).toBe("/system-settings/prompts");
   });
 
   it("redirects to the dashboard when no tab is readable", () => {
