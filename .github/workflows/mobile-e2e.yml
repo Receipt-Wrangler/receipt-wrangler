@@ -10,15 +10,13 @@ name: E2E - Mobile (Android + iOS)
 # continue-on-error flags to make this gating.
 #
 # Triggers:
-#   pull_request to main  -- run during PR review so reviewers can see
-#                            mobile e2e results before merging.
-#   push to main          -- post-merge verification after the PR lands.
+#   push to main          -- post-merge verification after a PR lands.
 #   push to tech/mobile-e2e -- iteration on the e2e setup itself.
 #   workflow_dispatch     -- manual trigger from the Actions tab.
+# Intentionally NOT run on pull_request: the mobile e2e suite is advisory and
+# slow, so it runs post-merge / on demand rather than gating every PR.
 
 on:
-  pull_request:
-    branches: [main]
   push:
     branches: [main, tech/mobile-e2e]
   workflow_dispatch:
