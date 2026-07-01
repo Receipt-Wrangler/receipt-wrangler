@@ -135,6 +135,13 @@ func TestUpdateGroupAllowsLowPrivilegeMemberToRenameWithUnchangedRoster(t *testi
 	if resp.StatusCode != http.StatusOK {
 		utils.PrintTestError(t, resp.StatusCode, http.StatusOK)
 	}
+	var renamed models.Group
+	if err := repositories.GetDB().First(&renamed, 1).Error; err != nil {
+		t.Fatalf("reload group: %v", err)
+	}
+	if renamed.Name != "renamed-by-member" {
+		t.Fatalf("rename did not persist: got %q", renamed.Name)
+	}
 }
 
 func TestUpdateGroupAllowsOwnerToReassignMemberRole(t *testing.T) {
@@ -157,5 +164,46 @@ func TestUpdateGroupAllowsOwnerToReassignMemberRole(t *testing.T) {
 	}
 	if got := groupMemberRoleId(t, 2, 1); !uintPtrEqual(got, ownerRoleId) {
 		t.Fatalf("owner-driven role reassignment did not persist")
+	}
+	var managed models.Group
+	if err := repositories.GetDB().First(&managed, 1).Error; err != nil {
+		t.Fatalf("reload group: %v", err)
+	}
+	if managed.Name != "owner-managed" {
+		t.Fatalf("group name did not persist: got %q", managed.Name)
+	}
+}
+
+func TestUpdateGroupRejectsCrossGroupMemberInjection(t *testing.T) {
+	defer tearDownGroupTests()
+	ownerRoleId, attackerRoleId := setUpEscalationGroup(t)
+
+	// A second group exists so a stray cross-group write would be observable.
+	if err := repositories.GetDB().Create(&models.Group{}).Error; err != nil {
+		t.Fatalf("create second group: %v", err)
+	}
+
+	// The owner of group 1 submits a member whose body groupId points at group 2.
+	// The authorization decision is made against group 1, so writing into group 2
+	// must be rejected outright rather than silently authorized against the wrong
+	// group.
+	resp := callUpdateGroup(1, 1, commands.UpsertGroupCommand{
+		Name:   "g1",
+		Status: models.GROUP_ACTIVE,
+		GroupMembers: []commands.UpsertGroupMemberCommand{
+			{UserID: 1, GroupID: 1, GroupRoleID: ownerRoleId},
+			{UserID: 2, GroupID: 1, GroupRoleID: attackerRoleId},
+			{UserID: 99, GroupID: 2, GroupRoleID: ownerRoleId},
+		},
+	})
+
+	if resp.StatusCode != http.StatusForbidden {
+		utils.PrintTestError(t, resp.StatusCode, http.StatusForbidden)
+	}
+	var strayCount int64
+	repositories.GetDB().Model(&models.GroupMember{}).
+		Where("user_id = ? AND group_id = ?", 99, 2).Count(&strayCount)
+	if strayCount != 0 {
+		t.Fatalf("cross-group member injection persisted into group 2 (count=%d)", strayCount)
 	}
 }

@@ -501,10 +501,12 @@ func TestAddGroupMembersPermissionsToLegacyOwnerIsIdempotent(t *testing.T) {
 	}
 
 	// Fresh seeding already grants the full group scope, so the member permissions
-	// are present; running the migration again must be a no-op.
-	if err := GetDB().Transaction(addGroupMembersPermissionsToLegacyOwner); err != nil {
-		utils.PrintTestError(t, err, nil)
-		return
+	// are present; running the migration repeatedly must never create duplicates.
+	for i := 0; i < 2; i++ {
+		if err := GetDB().Transaction(addGroupMembersPermissionsToLegacyOwner); err != nil {
+			utils.PrintTestError(t, err, nil)
+			return
+		}
 	}
 
 	if got := legacyOwnerMemberPermissions(t); len(got) != 3 {

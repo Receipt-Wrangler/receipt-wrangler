@@ -75,6 +75,14 @@ func (service GroupService) AuthorizeGroupMemberChanges(callerId uint, groupId u
 	// from what is actually written, and a member can only appear once anyway.
 	submittedUserIds := make(map[uint]bool, len(submitted))
 	for _, member := range submitted {
+		// A member entry must target the group in the URL. The repository also
+		// forces this, but reject a mismatch here so the authorization decision is
+		// made against exactly what will be written (0 means "unset" — the
+		// repository scopes it to this group). This prevents authorizing against one
+		// group while a body-supplied groupId points at another.
+		if member.GroupID != 0 && member.GroupID != groupId {
+			return ErrGroupMemberChangeForbidden
+		}
 		if submittedUserIds[member.UserID] {
 			return ErrGroupMemberChangeForbidden
 		}

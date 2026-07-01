@@ -182,6 +182,10 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 
 	for i := 0; i < len(command.GroupMembers); i++ {
 		groupMember := buildGroupMemberFromCommand(command.GroupMembers[i])
+		// Never trust the body's groupId — scope every member row to the group in
+		// the URL, so a member entry can't be written into a different group than
+		// the one the caller was authorized against.
+		groupMember.GroupID = uint(u64Id)
 		groupToUpdate.GroupMembers = append(groupToUpdate.GroupMembers, groupMember)
 	}
 

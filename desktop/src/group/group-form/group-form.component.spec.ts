@@ -17,8 +17,9 @@ import { TableModule } from "src/table/table.module";
 import { UserAutocompleteModule } from "src/user-autocomplete/user-autocomplete.module";
 import { ButtonModule } from "../../button";
 import { InputModule } from "../../input";
-import { ApiModule, Group, GroupsService, GroupStatus } from "../../open-api";
+import { ApiModule, Group, GroupsService, GroupStatus, Permission } from "../../open-api";
 import { AddGroup, AuthState, UpdateGroup } from "../../store";
+import { SetPermissions } from "../../store/auth.state.actions";
 import { AppInitService } from "../../services";
 import { GroupMemberFormComponent } from "../group-member-form/group-member-form.component";
 import { buildGroupMemberForm } from "../utils/group-member.utils";
@@ -357,5 +358,54 @@ describe("GroupFormComponent", () => {
     component.submit();
 
     expect(updateSpy).toHaveBeenCalled();
+  });
+
+  it("keeps member controls enabled in create mode (the creator owns the new group)", () => {
+    const route = TestBed.inject(ActivatedRoute);
+    route.snapshot.data = { formConfig: { mode: FormMode.add } }; // no group => create
+
+    component.ngOnInit();
+
+    expect(component.canCreateGroupMembers()).toBe(true);
+    expect(component.canUpdateGroupMembers()).toBe(true);
+    expect(component.canDeleteGroupMembers()).toBe(true);
+  });
+
+  it("hides member controls in edit mode without group.members.* permissions", () => {
+    TestBed.inject(Store).dispatch(new SetPermissions([], {}));
+    const route = TestBed.inject(ActivatedRoute);
+    route.snapshot.data = {
+      group: { id: 1, name: "test", status: GroupStatus.Active, groupMembers: [] },
+      formConfig: { mode: FormMode.edit },
+    };
+
+    component.ngOnInit();
+
+    expect(component.canCreateGroupMembers()).toBe(false);
+    expect(component.canUpdateGroupMembers()).toBe(false);
+    expect(component.canDeleteGroupMembers()).toBe(false);
+  });
+
+  it("shows member controls in edit mode for holders of group.members.*", () => {
+    TestBed.inject(Store).dispatch(
+      new SetPermissions([], {
+        1: [
+          Permission.GroupMembersCreate,
+          Permission.GroupMembersUpdate,
+          Permission.GroupMembersDelete,
+        ],
+      })
+    );
+    const route = TestBed.inject(ActivatedRoute);
+    route.snapshot.data = {
+      group: { id: 1, name: "test", status: GroupStatus.Active, groupMembers: [] },
+      formConfig: { mode: FormMode.edit },
+    };
+
+    component.ngOnInit();
+
+    expect(component.canCreateGroupMembers()).toBe(true);
+    expect(component.canUpdateGroupMembers()).toBe(true);
+    expect(component.canDeleteGroupMembers()).toBe(true);
   });
 });

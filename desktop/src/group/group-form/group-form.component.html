@@ -57,14 +57,6 @@
   ></app-button>
 </ng-template>
 
-<ng-template #headerButtonsTemplate>
-  <app-edit-button
-    *ngIf="formConfig.mode | inputReadonly"
-    [disabled]="!canManageMembers()"
-    [buttonRouterLink]="[editLink]"
-  ></app-edit-button>
-</ng-template>
-
 <ng-template #nameCell let-element="element">
   {{ (element.userId | user)?.displayName }}
 </ng-template>
