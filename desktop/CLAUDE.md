@@ -184,6 +184,11 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   blank name rather than a 403-driven logout. There is no longer any legacy `groupRole` enum sync,
   and `group-form` no longer enforces a "keep an owner" rule — the backend dropped the owner concept,
   so group management is governed entirely by `group.*` permissions.
+  - **Member controls gate on `group.members.*`:** `group-form`'s Add / Edit / Delete member controls
+    render only for holders of `group.members.create` / `.update` / `.delete` (signals resolved from
+    `AuthState.hasGroupPermission`), mirroring the backend `UpdateGroup` guard (see `api/CLAUDE.md` →
+    "Group member management"). They default to enabled in **create** mode (no group yet; the creator
+    becomes owner). This is UI-only; the server re-enforces on every request.
 - **Permission-based UI gating.** The UI gates on the user's effective permissions, mirroring the
   backend's enforcement. Permissions are delivered on **AppData** (`appPermissions: string[]` and
   `groupPermissions: { [groupId]: string[] }`) and stored in `AuthState` via the dedicated
