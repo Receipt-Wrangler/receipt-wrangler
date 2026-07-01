@@ -1,14 +1,22 @@
 package services
 
 import (
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+	"errors"
 	"os"
+	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/utils"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+// ErrGroupMemberChangeForbidden is returned by AuthorizeGroupMemberChanges when
+// the caller is not permitted to make the requested group member/role changes.
+var ErrGroupMemberChangeForbidden = errors.New("caller is not authorized to make the requested group member changes")
 
 type GroupService struct {
 	BaseService
@@ -20,6 +28,136 @@ func NewGroupService(tx *gorm.DB) GroupService {
 		TX: tx,
 	}}
 	return service
+}
+
+// AuthorizeGroupMemberChanges enforces who may change a group's membership and
+// how far those changes may reach, given the roster the caller submitted relative
+// to the group's current membership. It closes GHSA-89mm-9qfv-cjg3 (a member with
+// group.update rewriting every member's group role — including their own — to
+// escalate to owner or evict the owner).
+//
+// Two independent checks apply to every row that is added, role-changed, or
+// removed (unchanged rows are never checked, so editing only the group's
+// name/settings never trips this):
+//
+//   - CRUD gate: adding a member requires group.members.create, changing a
+//     member's role requires group.members.update, removing a member requires
+//     group.members.delete.
+//   - Privilege ceiling ("you can neither grant nor strip a privilege you do not
+//     hold"): the caller may only assign, or remove/replace, a role whose
+//     permissions are a subset of the caller's own current group permissions. This
+//     is what actually prevents self-escalation to owner and eviction of a
+//     more-privileged member.
+func (service GroupService) AuthorizeGroupMemberChanges(callerId uint, groupId uint, submitted []commands.UpsertGroupMemberCommand) error {
+	permissionService := NewPermissionService(service.TX)
+	roleRepository := repositories.NewRoleRepository(service.TX)
+
+	callerPerms, err := permissionService.GetGroupPermissionsForUser(callerId, groupId)
+	if err != nil {
+		return err
+	}
+	hasCreate := permissions.HasAll(callerPerms, permissions.GroupMembersCreate)
+	hasUpdate := permissions.HasAll(callerPerms, permissions.GroupMembersUpdate)
+	hasDelete := permissions.HasAll(callerPerms, permissions.GroupMembersDelete)
+
+	var existingMembers []models.GroupMember
+	if err := service.GetDB().Where("group_id = ?", groupId).Find(&existingMembers).Error; err != nil {
+		return err
+	}
+
+	existingRoleByUser := make(map[uint]*uint, len(existingMembers))
+	for _, member := range existingMembers {
+		existingRoleByUser[member.UserID] = member.GroupRoleID
+	}
+	submittedRoleByUser := make(map[uint]*uint, len(submitted))
+	for _, member := range submitted {
+		submittedRoleByUser[member.UserID] = member.GroupRoleID
+	}
+
+	rolesEqual := func(a, b *uint) bool {
+		if a == nil || b == nil {
+			return a == b
+		}
+		return *a == *b
+	}
+
+	// callerCanWield reports whether the caller may hand out or take away a role —
+	// true when the role's permissions are a subset of the caller's own group
+	// permissions. A nil role, or one that grants nothing, is always wieldable
+	// (HasAll denies an empty required set, so short-circuit it here).
+	rolePermsCache := make(map[uint][]string)
+	callerCanWield := func(roleId *uint) (bool, error) {
+		if roleId == nil {
+			return true, nil
+		}
+		rolePerms, cached := rolePermsCache[*roleId]
+		if !cached {
+			loaded, loadErr := roleRepository.GetGroupRolePermissions(*roleId)
+			if loadErr != nil {
+				return false, loadErr
+			}
+			rolePerms = loaded
+			rolePermsCache[*roleId] = rolePerms
+		}
+		if len(rolePerms) == 0 {
+			return true, nil
+		}
+		return permissions.HasAll(callerPerms, rolePerms...), nil
+	}
+
+	// Additions and role changes, from the submitted roster.
+	for userId, submittedRole := range submittedRoleByUser {
+		existingRole, isExisting := existingRoleByUser[userId]
+		if !isExisting {
+			if !hasCreate {
+				return ErrGroupMemberChangeForbidden
+			}
+			canAssign, err := callerCanWield(submittedRole)
+			if err != nil {
+				return err
+			}
+			if !canAssign {
+				return ErrGroupMemberChangeForbidden
+			}
+			continue
+		}
+
+		if !rolesEqual(existingRole, submittedRole) {
+			if !hasUpdate {
+				return ErrGroupMemberChangeForbidden
+			}
+			canAssign, err := callerCanWield(submittedRole)
+			if err != nil {
+				return err
+			}
+			canReplace, err := callerCanWield(existingRole)
+			if err != nil {
+				return err
+			}
+			if !canAssign || !canReplace {
+				return ErrGroupMemberChangeForbidden
+			}
+		}
+	}
+
+	// Removals: existing members dropped from the submitted roster.
+	for userId, existingRole := range existingRoleByUser {
+		if _, present := submittedRoleByUser[userId]; present {
+			continue
+		}
+		if !hasDelete {
+			return ErrGroupMemberChangeForbidden
+		}
+		canRemove, err := callerCanWield(existingRole)
+		if err != nil {
+			return err
+		}
+		if !canRemove {
+			return ErrGroupMemberChangeForbidden
+		}
+	}
+
+	return nil
 }
 
 func (service GroupService) GetGroupIdsForUser(userId string) ([]uint, error) {

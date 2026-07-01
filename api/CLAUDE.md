@@ -270,7 +270,10 @@ will be dropped in a later release.
   migration.
 - **Known limitation:** because system roles are immutable and seeding skips existing names, a
   permission added to the registry later will **not** flow into an already-seeded Legacy Admin /
-  Legacy Owner. Re-syncing system roles would need a dedicated reconciliation step (out of scope).
+  Legacy Owner. A general system-role re-sync is still out of scope; when a *later* release gates an
+  existing capability behind a *new* permission, back-fill that specific permission onto the affected
+  system role with a targeted one-time data migration (see the `group.members.*` reconciliation under
+  "Group member management" below).
 
 ### Default roles
 
@@ -466,6 +469,32 @@ Because paid-by hides the **whole** receipt (not just fields), enforcement diffe
   disjunction count correctness), `handlers/receipt_paid_by_enforcement_test.go` (single-GET 403),
   plus the round-trip/validation cases in `repositories/roles_grants_test.go`,
   `services/roles_test.go`, and `commands/upsert_role_command_test.go`.
+
+### Group member management (self-escalation guard)
+
+`PUT /api/group/{groupId}` (`UpdateGroup`) replaces the whole member roster, including each member's
+`GroupRoleID`, from the request body. It is still gated by `group.update` (you must be able to edit
+the group to reach it), but the roster changes are additionally authorized by
+`GroupService.AuthorizeGroupMemberChanges` (`services/groups.go`), called from the handler **before**
+the repository write and returning **403** (`ErrGroupMemberChangeForbidden`) on any violation. This
+closes GHSA-89mm-9qfv-cjg3 (a `group.update` member rewriting their own `groupRoleId` to escalate to
+owner, or evicting the owner). The guard diffs the submitted roster against the current one and applies
+two checks to every added / role-changed / removed row (unchanged rows are skipped, so a plain
+name/settings edit never trips it):
+
+- **CRUD gate:** adding a member requires `group.members.create`, changing a member's role requires
+  `group.members.update`, removing a member requires `group.members.delete`.
+- **Privilege ceiling** ("you can neither grant nor strip a privilege you do not hold"): the caller
+  may only assign, or remove/replace, a role whose permission set is a **subset** of the caller's own
+  current group permissions (resolved via `GetGroupPermissionsForUser`; a `nil`/empty role is always
+  wieldable). This is what actually prevents self-escalation, independent of the CRUD gate.
+
+The three `group.members.*` permissions are group-scoped registry entries; **Legacy Owner** holds them
+(it is the full group scope), Legacy Editor/Viewer do not (member management was historically
+owner-only). Upgraded installs — whose immutable Legacy Owner was seeded before these keys existed —
+are back-filled by the `add-group-members-permissions-to-legacy-owner` one-time migration
+(`data_migrations.go`). Tests: `handlers/group_member_authorization_test.go` (the PoC + happy paths)
+and `services/group_member_authorization_test.go` (the guard's CRUD/ceiling matrix).
 
 ### Enforcement status
 

@@ -1,7 +1,9 @@
 package repositories
 
 import (
+	"errors"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"time"
 
 	"gorm.io/gorm"
@@ -11,6 +13,10 @@ import (
 // Name of the one-time migration that assigns the seeded legacy-equivalent roles
 // to existing users and group members.
 const assignLegacyEquivalentRolesMigration = "assign-legacy-equivalent-roles"
+
+// Name of the one-time migration that back-fills the group member-management
+// permissions onto the already-seeded Legacy Owner role on upgraded installs.
+const addGroupMembersPermissionsToLegacyOwnerMigration = "add-group-members-permissions-to-legacy-owner"
 
 // dataMigration is a single one-time data migration. Each runs at most once per
 // database; once applied it is recorded in the data_migrations ledger so it is
@@ -24,6 +30,7 @@ type dataMigration struct {
 // migrations are appended here.
 var dataMigrations = []dataMigration{
 	{name: assignLegacyEquivalentRolesMigration, run: assignLegacyEquivalentRoles},
+	{name: addGroupMembersPermissionsToLegacyOwnerMigration, run: addGroupMembersPermissionsToLegacyOwner},
 }
 
 // RunDataMigrations applies any registered one-time data migrations that have
@@ -111,6 +118,52 @@ func assignLegacyEquivalentRoles(tx *gorm.DB) error {
 				Update("group_role_id", role.ID).Error; err != nil {
 				return err
 			}
+		}
+	}
+
+	return nil
+}
+
+// addGroupMembersPermissionsToLegacyOwner grants the group member-management
+// permissions (group.members.create/update/delete) to the seeded Legacy Owner
+// role on installs that were seeded before those permissions existed.
+//
+// SeedSystemRoles is idempotent on the role Name and never edits an existing
+// role, so on an upgraded install the Legacy Owner role keeps the permission set
+// it was first seeded with — it does NOT pick up permissions added to the
+// registry later. Without this back-fill, existing owners would silently lose the
+// ability to manage members once the UpdateGroup handler starts requiring the new
+// permissions. Fresh installs seed Legacy Owner with the full group scope (which
+// already includes these keys), so this no-ops there; it is also idempotent, only
+// inserting a permission row that is missing.
+func addGroupMembersPermissionsToLegacyOwner(tx *gorm.DB) error {
+	var role models.GroupRoleDefinition
+	err := tx.Where("name = ?", LegacyOwnerRoleName).First(&role).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// No Legacy Owner role to reconcile (e.g. renamed or removed); nothing to do.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	memberPermissions := []string{
+		permissions.GroupMembersCreate,
+		permissions.GroupMembersUpdate,
+		permissions.GroupMembersDelete,
+	}
+	for _, permission := range memberPermissions {
+		var count int64
+		if err := tx.Model(&models.GroupRolePermission{}).
+			Where("group_role_id = ? AND permission = ?", role.ID, permission).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+		if err := tx.Create(&models.GroupRolePermission{GroupRoleID: role.ID, Permission: permission}).Error; err != nil {
+			return err
 		}
 	}
 
