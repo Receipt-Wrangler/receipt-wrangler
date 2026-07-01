@@ -69,9 +69,16 @@ func (service GroupService) AuthorizeGroupMemberChanges(callerId uint, groupId u
 	for _, member := range existingMembers {
 		existingRoleByUser[member.UserID] = member.GroupRoleID
 	}
-	submittedRoleByUser := make(map[uint]*uint, len(submitted))
+	// Reject a roster that lists the same user twice. The repository persists the
+	// raw submitted slice, so duplicate (userId, groupId) rows would resolve in a
+	// database-dependent way — a deduplicated authorization check must never diverge
+	// from what is actually written, and a member can only appear once anyway.
+	submittedUserIds := make(map[uint]bool, len(submitted))
 	for _, member := range submitted {
-		submittedRoleByUser[member.UserID] = member.GroupRoleID
+		if submittedUserIds[member.UserID] {
+			return ErrGroupMemberChangeForbidden
+		}
+		submittedUserIds[member.UserID] = true
 	}
 
 	rolesEqual := func(a, b *uint) bool {
@@ -105,14 +112,16 @@ func (service GroupService) AuthorizeGroupMemberChanges(callerId uint, groupId u
 		return permissions.HasAll(callerPerms, rolePerms...), nil
 	}
 
-	// Additions and role changes, from the submitted roster.
-	for userId, submittedRole := range submittedRoleByUser {
-		existingRole, isExisting := existingRoleByUser[userId]
+	// Additions and role changes — evaluate every submitted entry directly (not a
+	// deduplicated map) so the authorization check can never diverge from the raw
+	// roster the repository persists.
+	for _, member := range submitted {
+		existingRole, isExisting := existingRoleByUser[member.UserID]
 		if !isExisting {
 			if !hasCreate {
 				return ErrGroupMemberChangeForbidden
 			}
-			canAssign, err := callerCanWield(submittedRole)
+			canAssign, err := callerCanWield(member.GroupRoleID)
 			if err != nil {
 				return err
 			}
@@ -122,11 +131,11 @@ func (service GroupService) AuthorizeGroupMemberChanges(callerId uint, groupId u
 			continue
 		}
 
-		if !rolesEqual(existingRole, submittedRole) {
+		if !rolesEqual(existingRole, member.GroupRoleID) {
 			if !hasUpdate {
 				return ErrGroupMemberChangeForbidden
 			}
-			canAssign, err := callerCanWield(submittedRole)
+			canAssign, err := callerCanWield(member.GroupRoleID)
 			if err != nil {
 				return err
 			}
@@ -142,7 +151,7 @@ func (service GroupService) AuthorizeGroupMemberChanges(callerId uint, groupId u
 
 	// Removals: existing members dropped from the submitted roster.
 	for userId, existingRole := range existingRoleByUser {
-		if _, present := submittedRoleByUser[userId]; present {
+		if submittedUserIds[userId] {
 			continue
 		}
 		if !hasDelete {

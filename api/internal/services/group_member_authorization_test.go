@@ -125,6 +125,20 @@ func TestAuthorizeGroupMemberChanges(t *testing.T) {
 			submitted: []commands.UpsertGroupMemberCommand{member(owner, ownerRole), member(manager, managerRole), member(low, managerRole)},
 			forbidden: false,
 		},
+		{
+			// A duplicate userId must not let an escalating entry hide behind a
+			// "safe" one that would win a last-wins dedup: the repository persists
+			// the raw slice, so the whole roster is rejected.
+			name:   "duplicate userId entry is rejected (cannot smuggle an owner role)",
+			caller: manager,
+			submitted: []commands.UpsertGroupMemberCommand{
+				member(owner, ownerRole),
+				member(manager, ownerRole),   // escalating entry
+				member(manager, managerRole), // "safe" entry a last-wins map would keep
+				member(low, lowRole),
+			},
+			forbidden: true,
+		},
 	}
 
 	for _, test := range tests {
