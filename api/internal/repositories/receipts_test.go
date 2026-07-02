@@ -119,6 +119,53 @@ func TestShouldCreateReceipt(t *testing.T) {
 	}
 }
 
+// TestShouldCreateReceiptWithinOuterTransaction guards against a regression where
+// CreateReceipt, when bound to an outer transaction (as QuickScan and email
+// attachment ingest do), reloaded the receipt on a fresh pooled connection that
+// could not see the still-uncommitted row and returned a zero-ID receipt. That
+// zero id then broke the receipt-image foreign key with `receipt_id = 0`.
+func TestShouldCreateReceiptWithinOuterTransaction(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	tx := GetDB().Begin()
+	defer tx.Rollback()
+
+	repository := NewReceiptRepository(tx)
+
+	command := commands.UpsertReceiptCommand{
+		Name:         "Tx Receipt",
+		Amount:       decimal.NewFromFloat(10.00),
+		Date:         time.Now(),
+		PaidByUserID: 1,
+		Status:       models.OPEN,
+		GroupId:      1,
+	}
+
+	createdReceipt, err := repository.CreateReceipt(command, 1, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if createdReceipt.ID == 0 {
+		utils.PrintTestError(t, "Receipt ID should not be 0 when created within an outer transaction", nil)
+		return
+	}
+
+	// The receipt-image foreign key must be satisfiable within the same
+	// transaction (the test DB has the foreign_keys pragma enabled).
+	fileData := models.FileData{
+		Name:      "receipt.pdf",
+		FileType:  "application/pdf",
+		Size:      1,
+		ReceiptId: createdReceipt.ID,
+	}
+	if err := tx.Create(&fileData).Error; err != nil {
+		utils.PrintTestError(t, err, "FileData insert should satisfy the receipt foreign key")
+	}
+}
+
 func TestShouldGetReceiptById(t *testing.T) {
 	defer teardownReceiptTest()
 	setupReceiptTest()

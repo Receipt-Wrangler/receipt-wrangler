@@ -447,7 +447,13 @@ func (repository ReceiptRepository) CreateReceipt(
 			return err
 		}
 
-		repository.ClearTransaction()
+		// Restore the DB/transaction this method was invoked with (captured as
+		// `db` above) so the read-back below runs on the same connection that
+		// created the receipt. Clearing to nil would fall back to a fresh pooled
+		// connection which, when CreateReceipt runs inside an outer transaction
+		// (e.g. QuickScan, email attachment ingest), cannot see the still
+		// uncommitted receipt row and would return a zero-ID receipt.
+		repository.SetTransaction(db)
 		notificationRepository.ClearTransaction()
 		return nil
 	})
@@ -460,6 +466,17 @@ func (repository ReceiptRepository) CreateReceipt(
 
 	fullyLoadedReceipt, err := repository.GetFullyLoadedReceiptById(utils.UintToString(receipt.ID))
 	if err != nil {
+		if !createSystemTask {
+			createFailedUpdateSystemTask(systemTask, err)
+		}
+		return models.Receipt{}, err
+	}
+
+	// GetFullyLoadedReceiptById uses Find, which returns an empty receipt (ID 0)
+	// with no error when the row is not visible. Guard against that so callers get
+	// a clear failure here instead of a downstream foreign key violation.
+	if fullyLoadedReceipt.ID == 0 {
+		err = fmt.Errorf("created receipt %s could not be reloaded", utils.UintToString(receipt.ID))
 		if !createSystemTask {
 			createFailedUpdateSystemTask(systemTask, err)
 		}
