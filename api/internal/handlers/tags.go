@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -203,7 +202,7 @@ func GetTagNameCount(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			tagRepository := repositories.NewTagsRepository(nil)
 			tagName := chi.URLParam(r, "tagName")
-			count, err := tagRepository.GetCount("tags", fmt.Sprintf("name = '%s'", tagName))
+			count, err := tagRepository.GetCount("tags", "name = ?", tagName)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
