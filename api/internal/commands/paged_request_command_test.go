@@ -1,9 +1,42 @@
 package commands
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"receipt-wrangler/api/internal/utils"
+	"strings"
 	"testing"
 )
+
+func TestReceiptPagedRequestCommand_LoadDataFromRequest_NormalizesGroup(t *testing.T) {
+	tests := map[string]string{
+		"empty string group value": `{"filter":{"group":{"operation":"CONTAINS","value":""}}}`,
+		"null group value":         `{"filter":{"group":{"operation":"CONTAINS","value":null}}}`,
+		"missing group field":      `{"filter":{}}`,
+	}
+
+	for name, body := range tests {
+		t.Run(name, func(t *testing.T) {
+			command := ReceiptPagedRequestCommand{}
+			r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+			w := httptest.NewRecorder()
+
+			if err := command.LoadDataFromRequest(w, r); err != nil {
+				utils.PrintTestError(t, err, nil)
+				return
+			}
+
+			value, ok := command.Filter.Group.Value.([]interface{})
+			if !ok {
+				utils.PrintTestError(t, command.Filter.Group.Value, "[]interface{}")
+				return
+			}
+			if len(value) != 0 {
+				utils.PrintTestError(t, len(value), 0)
+			}
+		})
+	}
+}
 
 func TestPagedRequestCommand_Validate_ValidInputs(t *testing.T) {
 	tests := map[string]struct {

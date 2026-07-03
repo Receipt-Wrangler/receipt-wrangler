@@ -602,6 +602,85 @@ func TestShouldBuildGormFilterQuery(t *testing.T) {
 	}
 }
 
+func TestGetPagedReceiptsAppliesGroupFilter(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	group1 := models.Group{Name: "grp-filter-g1"}
+	group2 := models.Group{Name: "grp-filter-g2"}
+	allGroup := models.Group{Name: "grp-filter-all", IsAllGroup: true}
+	db.Create(&group1)
+	db.Create(&group2)
+	db.Create(&allGroup)
+
+	member := models.User{Username: "grp-filter-member", Password: "x"}
+	db.Create(&member)
+	db.Create(&models.GroupMember{GroupID: group1.ID, UserID: member.ID})
+	db.Create(&models.GroupMember{GroupID: group2.ID, UserID: member.ID})
+
+	makeReceipt := func(groupId uint, name string) {
+		db.Create(&models.Receipt{
+			Name:         name,
+			Amount:       decimal.NewFromInt(1),
+			Date:         time.Now(),
+			PaidByUserID: member.ID,
+			GroupId:      groupId,
+			Status:       models.OPEN,
+		})
+	}
+	makeReceipt(group1.ID, "g1-a")
+	makeReceipt(group1.ID, "g1-b")
+	makeReceipt(group2.ID, "g2-a")
+	makeReceipt(group2.ID, "g2-b")
+
+	// Group filter ids arrive as float64 (JSON-decoded), matching production.
+	groupFilterRequest := func(groupIds ...uint) commands.ReceiptPagedRequestCommand {
+		values := make([]interface{}, 0, len(groupIds))
+		for _, id := range groupIds {
+			values = append(values, float64(id))
+		}
+		request := pagedRequestAllReceipts()
+		request.Filter.Group = commands.PagedRequestField{
+			Operation: commands.CONTAINS,
+			Value:     values,
+		}
+		return request
+	}
+
+	repository := NewReceiptRepository(nil)
+
+	// All-groups view filtered to group1: only group1's receipts return.
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(
+		member.ID, utils.UintToString(allGroup.ID), groupFilterRequest(group1.ID), nil, nil,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 2 || len(receipts) != 2 {
+		utils.PrintTestError(t, count, 2)
+	}
+	for _, receipt := range receipts {
+		if receipt.GroupId != group1.ID {
+			utils.PrintTestError(t, receipt.Name, "only group1 receipts should return")
+		}
+	}
+
+	// Single-group view (group1) filtered to group2: the mandatory group scope and
+	// the group filter intersect to nothing, so a user cannot surface another
+	// group's receipts through the filter.
+	_, count, err = repository.GetPagedReceiptsByGroupId(
+		member.ID, utils.UintToString(group1.ID), groupFilterRequest(group2.ID), nil, nil,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 0 {
+		utils.PrintTestError(t, count, 0)
+	}
+}
+
 // Helper functions
 func createTestItems() {
 	db := GetDB()

@@ -45,6 +45,10 @@ func (command *PieChartDataCommand) LoadDataFromRequest(w http.ResponseWriter, r
 		command.Filter.Status.Value = make([]interface{}, 0)
 	}
 
+	if command.Filter.Group.Value == nil || command.Filter.Group.Value == "" {
+		command.Filter.Group.Value = make([]interface{}, 0)
+	}
+
 	if command.Filter.CreatedAt.Value == nil {
 		command.Filter.CreatedAt.Value = ""
 	}

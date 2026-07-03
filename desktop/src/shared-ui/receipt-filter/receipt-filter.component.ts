@@ -8,6 +8,7 @@ import { RECEIPT_STATUS_OPTIONS } from "src/constants";
 import { SetReceiptFilter } from "src/store/receipt-table.actions";
 import { FormCommand } from "../../form/index";
 import { Category, FilterOperation, Tag } from "../../open-api";
+import { GroupState } from "../../store";
 import { OperationsPipe } from "./operations.pipe";
 
 @Component({
@@ -45,6 +46,15 @@ export class ReceiptFilterComponent implements OnInit {
   @Input() public categories: Category[] = [];
 
   @Input() public tags: Tag[] = [];
+
+  // Only rendered on the "All groups" view (the caller sets it from
+  // group.isAllGroup); hidden on single-group and dashboard-widget views, where
+  // the view is already pinned to one group.
+  @Input() public showGroupFilter: boolean = false;
+
+  // The user's own groups (minus the synthetic "All" group) — the selectable
+  // set for the group filter.
+  public groups = this.store.selectSignal(GroupState.groupsWithoutAll);
 
   public startOfMonthFormControl = new FormControl(startOfMonth(new Date()));
 
@@ -85,6 +95,10 @@ export class ReceiptFilterComponent implements OnInit {
       path: `${this.basePath}status.value`,
       command: "clear",
     });
+    this.formCommand.emit({
+      path: `${this.basePath}group.value`,
+      command: "clear",
+    });
   }
 
   public submitButtonClicked(): void {
@@ -119,6 +133,7 @@ export class ReceiptFilterComponent implements OnInit {
       { fieldName: "categories", type: "list" },
       { fieldName: "tags", type: "list" },
       { fieldName: "status", type: "list" },
+      { fieldName: "group", type: "list" },
       { fieldName: "resolvedDate", type: "date" },
       { fieldName: "createdAt", type: "date" }
     ];

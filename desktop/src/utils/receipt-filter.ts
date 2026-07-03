@@ -46,6 +46,12 @@ export function buildReceiptFilterForm(filter: any, thisContext: any): FormGroup
       thisContext,
       true
     ),
+    group: buildFieldFormGroup(
+      filter?.group?.value ?? [],
+      filter?.group?.operation,
+      thisContext,
+      true
+    ),
     resolvedDate: buildFieldFormGroup(
       filter?.resolvedDate?.value,
       filter?.resolvedDate?.operation,

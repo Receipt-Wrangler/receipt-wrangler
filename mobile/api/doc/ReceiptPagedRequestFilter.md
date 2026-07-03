@@ -15,6 +15,7 @@ Name | Type | Description | Notes
 **categories** | [**JsonObject**](.md) | Contains two keys: operation of type FilterOperation and value which can a different type depending on the field. | [optional] 
 **tags** | [**JsonObject**](.md) | Contains two keys: operation of type FilterOperation and value which can a different type depending on the field. | [optional] 
 **status** | [**JsonObject**](.md) | Contains two keys: operation of type FilterOperation and value which can a different type depending on the field. | [optional] 
+**group** | [**JsonObject**](.md) | Contains two keys: operation of type FilterOperation and value which can a different type depending on the field. | [optional] 
 **resolvedDate** | [**JsonObject**](.md) | Contains two keys: operation of type FilterOperation and value which can a different type depending on the field. | [optional] 
 **createdAt** | [**JsonObject**](.md) | Contains two keys: operation of type FilterOperation and value which can a different type depending on the field. | [optional] 
 

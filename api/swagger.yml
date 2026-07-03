@@ -4133,6 +4133,8 @@ components:
           $ref: "#/components/schemas/PagedRequestField"
         status:
           $ref: "#/components/schemas/PagedRequestField"
+        group:
+          $ref: "#/components/schemas/PagedRequestField"
         resolvedDate:
           $ref: "#/components/schemas/PagedRequestField"
         createdAt:

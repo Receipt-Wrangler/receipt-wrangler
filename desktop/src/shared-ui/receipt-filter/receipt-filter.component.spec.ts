@@ -61,6 +61,10 @@ describe("ReceiptFilterComponent", () => {
       operation: FilterOperation.Contains,
       value: [ReceiptStatus.Open],
     },
+    group: {
+      operation: FilterOperation.Contains,
+      value: [1],
+    },
     resolvedDate: {
       operation: FilterOperation.GreaterThan,
       value: "2023-01-06",
@@ -175,6 +179,25 @@ describe("ReceiptFilterComponent", () => {
       new SetReceiptFilter(component.parentForm.value)
     );
     expect(dialogRefSpy).toHaveBeenCalledWith(true);
+  });
+
+  it("renders the group field only when showGroupFilter is true", () => {
+    const noopComponent = TestBed.createComponent(NoopComponent).componentInstance;
+
+    const countAutocompletes = (showGroupFilter: boolean): number => {
+      const localFixture = TestBed.createComponent(ReceiptFilterComponent);
+      localFixture.componentInstance.parentForm = buildReceiptFilterForm({}, noopComponent);
+      localFixture.componentInstance.showGroupFilter = showGroupFilter;
+      localFixture.detectChanges();
+      return localFixture.nativeElement.querySelectorAll("app-autocomlete").length;
+    };
+
+    // The group field is the only additional list autocomplete gated on the flag.
+    expect(countAutocompletes(true)).toBe(countAutocompletes(false) + 1);
+  });
+
+  it("defaults showGroupFilter to false", () => {
+    expect(component.showGroupFilter).toBe(false);
   });
 
   it("should close dialog on cancel", () => {

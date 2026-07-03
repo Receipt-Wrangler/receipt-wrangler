@@ -342,6 +342,9 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     dialogRef.componentInstance.tags = this.tags;
     dialogRef.componentInstance.parentForm = buildReceiptFilterForm(filter, this);
     dialogRef.componentInstance.headerText = "Filter Receipts";
+    // The group filter is only meaningful on the "All groups" view; a
+    // single-group view is already scoped to one group.
+    dialogRef.componentInstance.showGroupFilter = this.group?.isAllGroup ?? false;
     const formCommandSubscription = dialogRef.componentInstance.formCommand.subscribe((formCommand) => {
       applyFormCommand(dialogRef.componentInstance.parentForm, formCommand);
     });
