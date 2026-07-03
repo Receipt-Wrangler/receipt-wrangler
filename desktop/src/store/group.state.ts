@@ -16,6 +16,7 @@ import {
   UpdateGroup,
 } from './group.state.actions';
 import { GroupMember } from '../open-api/model/groupMember';
+import { ResetReceiptFilter, SetPage } from './receipt-table.actions';
 
 export interface GroupStateInterface {
   groups: Group[];
@@ -162,9 +163,10 @@ export class GroupState {
 
   @Action(SetSelectedGroupId)
   setSelectedGroupId(
-    { getState, patchState }: StateContext<GroupStateInterface>,
+    { getState, patchState, dispatch }: StateContext<GroupStateInterface>,
     payload: SetSelectedGroupId
   ) {
+    const previousGroupId = getState().selectedGroupId;
     let groupId = '';
     let dashboardId = '';
 
@@ -183,5 +185,15 @@ export class GroupState {
       selectedGroupId: groupId,
       selectedDashboardId: dashboardId,
     });
+
+    // The receipt-table state is global (one filter shared across all groups),
+    // so a filter set on one group would otherwise bleed into the next. Switching
+    // to a different group starts it with a clean filter and first page; columns,
+    // page size and sort stay global. Same-group re-selection is a no-op.
+    if (groupId !== previousGroupId) {
+      return dispatch([new ResetReceiptFilter(), new SetPage(1)]);
+    }
+
+    return undefined;
   }
 }
