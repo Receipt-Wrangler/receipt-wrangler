@@ -3,7 +3,7 @@ import { NgxsModule, Store } from "@ngxs/store";
 import { DEFAULT_RECEIPT_TABLE_COLUMNS } from "src/interfaces";
 import { FilterOperation, Group } from "../open-api";
 import { GroupState } from "./group.state";
-import { SetSelectedGroupId } from "./group.state.actions";
+import { RemoveGroup, SetSelectedGroupId } from "./group.state.actions";
 import { defaultReceiptFilter, ReceiptTableState } from "./receipt-table.state";
 
 describe("GroupState receipt-filter reset on group change", () => {
@@ -79,5 +79,31 @@ describe("GroupState receipt-filter reset on group change", () => {
       defaultReceiptFilter
     );
     expect(store.selectSnapshot(ReceiptTableState.page)).toEqual(1);
+  });
+
+  it("resets the receipt filter and page when the active group is deleted", () => {
+    // Selected group is 2; deleting it falls back to groups[0] (id 1), a change.
+    seed("2");
+
+    store.dispatch(new RemoveGroup("2"));
+
+    expect(store.selectSnapshot(GroupState.selectedGroupId)).toEqual("1");
+    expect(store.selectSnapshot(ReceiptTableState.filterData).filter).toEqual(
+      defaultReceiptFilter
+    );
+    expect(store.selectSnapshot(ReceiptTableState.page)).toEqual(1);
+  });
+
+  it("preserves the receipt filter and page when a non-active group is deleted", () => {
+    // Selected group is 1; deleting group 2 leaves the selection unchanged.
+    seed("1");
+
+    store.dispatch(new RemoveGroup("2"));
+
+    expect(store.selectSnapshot(GroupState.selectedGroupId)).toEqual("1");
+    expect(store.selectSnapshot(ReceiptTableState.filterData).filter).toEqual(
+      nonDefaultFilter
+    );
+    expect(store.selectSnapshot(ReceiptTableState.page)).toEqual(3);
   });
 });

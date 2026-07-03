@@ -102,7 +102,7 @@ export class GroupState {
 
   @Action(RemoveGroup)
   removeGroup(
-    { getState, patchState }: StateContext<GroupStateInterface>,
+    { getState, patchState, dispatch }: StateContext<GroupStateInterface>,
     payload: RemoveGroup
   ) {
     const state = getState();
@@ -115,12 +115,24 @@ export class GroupState {
           (g) => g.id !== group.id
         );
         newInterface.groups = newGroups;
-        if (group.id.toString() === state.selectedGroupId.toString()) {
+        const removedSelectedGroup =
+          group.id.toString() === state.selectedGroupId.toString();
+        if (removedSelectedGroup) {
           newInterface.selectedGroupId = state.groups[0].id.toString();
         }
         patchState(newInterface);
+
+        // Deleting the active group switches the selection to the fallback group,
+        // so clear the global receipt-table filter/page the same way a normal
+        // group switch does (setSelectedGroupId) — otherwise the fallback group
+        // inherits the deleted group's filter.
+        if (removedSelectedGroup) {
+          return dispatch([new ResetReceiptFilter(), new SetPage(1)]);
+        }
       }
     }
+
+    return undefined;
   }
 
   @Action(SetGroups)
@@ -177,7 +189,7 @@ export class GroupState {
       groupId = groups[0].id.toString();
     }
 
-    if (payload.groupId === getState().selectedGroupId) {
+    if (payload.groupId === previousGroupId) {
       dashboardId = getState().selectedDashboardId;
     }
 

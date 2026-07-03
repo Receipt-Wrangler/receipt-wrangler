@@ -666,6 +666,25 @@ func TestGetPagedReceiptsAppliesGroupFilter(t *testing.T) {
 		}
 	}
 
+	otherGroup := models.Group{Name: "grp-filter-other"}
+	db.Create(&otherGroup)
+	// member is intentionally NOT added to otherGroup, but it has a receipt.
+	makeReceipt(otherGroup.ID, "other-a")
+
+	// All-groups view filtered to a group the user has no membership in: the
+	// mandatory member-group scope excludes it, so nothing leaks even though the
+	// group has a receipt.
+	_, count, err = repository.GetPagedReceiptsByGroupId(
+		member.ID, utils.UintToString(allGroup.ID), groupFilterRequest(otherGroup.ID), nil, nil,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 0 {
+		utils.PrintTestError(t, count, 0)
+	}
+
 	// Single-group view (group1) filtered to group2: the mandatory group scope and
 	// the group filter intersect to nothing, so a user cannot surface another
 	// group's receipts through the filter.
