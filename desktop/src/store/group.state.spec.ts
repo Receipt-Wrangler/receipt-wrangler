@@ -106,4 +106,19 @@ describe("GroupState receipt-filter reset on group change", () => {
     );
     expect(store.selectSnapshot(ReceiptTableState.page)).toEqual(3);
   });
+
+  it("falls back to the first remaining group when the active group at index 0 is deleted", () => {
+    // groups are [{id:1},{id:2}]; the active group (id 1) is at index 0. The
+    // fallback must come from the post-removal list ("2"), not the stale
+    // pre-removal array (which would wrongly re-select the deleted "1").
+    seed("1");
+
+    store.dispatch(new RemoveGroup("1"));
+
+    expect(store.selectSnapshot(GroupState.selectedGroupId)).toEqual("2");
+    expect(store.selectSnapshot(ReceiptTableState.filterData).filter).toEqual(
+      defaultReceiptFilter
+    );
+    expect(store.selectSnapshot(ReceiptTableState.page)).toEqual(1);
+  });
 });

@@ -118,7 +118,9 @@ export class GroupState {
         const removedSelectedGroup =
           group.id.toString() === state.selectedGroupId.toString();
         if (removedSelectedGroup) {
-          newInterface.selectedGroupId = state.groups[0].id.toString();
+          // Fall back to the first *remaining* group. Reading state.groups[0]
+          // (the pre-removal array) could point at the group just deleted.
+          newInterface.selectedGroupId = newGroups[0]?.id?.toString() ?? "";
         }
         patchState(newInterface);
 
@@ -189,7 +191,7 @@ export class GroupState {
       groupId = groups[0].id.toString();
     }
 
-    if (payload.groupId === previousGroupId) {
+    if (groupId === previousGroupId) {
       dashboardId = getState().selectedDashboardId;
     }
 
