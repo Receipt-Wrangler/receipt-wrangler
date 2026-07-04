@@ -25,17 +25,35 @@
           <app-group-autocomplete
             [inputFormControl]="form | formGet : 'groupIds.' + i"
           ></app-group-autocomplete>
-          <app-user-autocomplete
-            class="w-100"
-            label="Default Paid By"
-            [inputFormControl]="form | formGet : 'paidByUserIds.' + i"
-            [groupId]="form.get('groupIds.' + i)?.value"
-            [selectGroupMembersOnly]="true"
-          ></app-user-autocomplete>
-          <app-status-select
-            label="Default Status"
-            [inputFormControl]="form | formGet : 'statuses.' + i"
-          ></app-status-select>
+          @if (showPaidBy(i)) {
+            <app-user-autocomplete
+              class="w-100"
+              label="Paid By"
+              [inputFormControl]="form | formGet : 'paidByUserIds.' + i"
+              [groupId]="form.get('groupIds.' + i)?.value"
+              [selectGroupMembersOnly]="true"
+            ></app-user-autocomplete>
+          }
+          @if (showStatus(i)) {
+            <app-status-select
+              label="Status"
+              [inputFormControl]="form | formGet : 'statuses.' + i"
+            ></app-status-select>
+          }
+          @if (showCategories(i)) {
+            <app-category-autocomplete
+              [inputFormControl]="form | formGet : 'categories.' + i"
+              [categories]="categoriesForIndex(i)"
+              [creatable]="false"
+            ></app-category-autocomplete>
+          }
+          @if (showTags(i)) {
+            <app-tag-autocomplete
+              [inputFormControl]="form | formGet : 'tags.' + i"
+              [tags]="tagsForIndex(i)"
+              [creatable]="false"
+            ></app-tag-autocomplete>
+          }
         </div>
       </slide>
     </carousel>

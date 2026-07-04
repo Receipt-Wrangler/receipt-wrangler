@@ -51,4 +51,70 @@
       [inputFormControl]="form | formGet: 'hideComments'"
     ></app-checkbox>
   </app-form-section>
+
+  <app-form-section
+    headerText="Quick Scan"
+    subtitle="Choose which fields appear in quick scan and which are required. Paid by and status always resolve to a value, so set a default for when they are optional."
+  >
+    <app-checkbox
+      label="Show Paid By"
+      [inputFormControl]="form | formGet: 'quickScanPaidByEnabled'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Require Paid By"
+      [inputFormControl]="form | formGet: 'quickScanPaidByRequired'"
+    ></app-checkbox>
+    @if (showPaidByDefault) {
+      <app-select
+        class="w-100"
+        label="Default Paid By"
+        optionValueKey="value"
+        optionDisplayKey="display"
+        [options]="paidByTypeOptions"
+        [inputFormControl]="form | formGet: 'quickScanDefaultPaidByType'"
+      ></app-select>
+    }
+    @if (showPaidByUserDefault) {
+      <app-user-autocomplete
+        label="Default Paid By User"
+        [inputFormControl]="form | formGet: 'quickScanDefaultPaidById'"
+        [groupId]="originalGroup.id.toString()"
+        [selectGroupMembersOnly]="true"
+      ></app-user-autocomplete>
+    }
+
+    <app-checkbox
+      label="Show Status"
+      [inputFormControl]="form | formGet: 'quickScanStatusEnabled'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Require Status"
+      [inputFormControl]="form | formGet: 'quickScanStatusRequired'"
+    ></app-checkbox>
+    @if (showStatusDefault) {
+      <app-status-select
+        label="Default Status"
+        [inputFormControl]="form | formGet: 'quickScanDefaultStatus'"
+        [addBlankOption]="true"
+      ></app-status-select>
+    }
+
+    <app-checkbox
+      label="Show Categories"
+      [inputFormControl]="form | formGet: 'quickScanCategoriesEnabled'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Require Categories"
+      [inputFormControl]="form | formGet: 'quickScanCategoriesRequired'"
+    ></app-checkbox>
+
+    <app-checkbox
+      label="Show Tags"
+      [inputFormControl]="form | formGet: 'quickScanTagsEnabled'"
+    ></app-checkbox>
+    <app-checkbox
+      label="Require Tags"
+      [inputFormControl]="form | formGet: 'quickScanTagsRequired'"
+    ></app-checkbox>
+  </app-form-section>
 </ng-template>

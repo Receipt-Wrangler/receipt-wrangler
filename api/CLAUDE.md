@@ -600,3 +600,29 @@ Claude can read a user's data. It is **off by default** and Go-native (no separa
   `MakeMigrations`). Refresh tokens reuse the existing `models.RefreshToken` flow.
 - **Production**: `docker/default.conf` proxies the new root paths to the backend; the `/mcp`
   location disables buffering and raises the read timeout for SSE streams.
+
+## Quick Scan Field Configuration
+
+Group admins configure the quick-scan workflow per group on `GroupReceiptSettings` (gated by the
+group `GroupUpdate` permission, edited via `PUT /group/{groupId}/groupReceiptSettings`). For each of
+**paid-by, status, categories, tags** there is an `*Enabled` (show) and `*Required` toggle. When
+paid-by/status is **not** both shown and required, a default backfills it, so **a receipt always has
+a real paid-by and status — neither field is ever null/empty**. This is why the `Receipt` model,
+`UpsertReceiptCommand.Validate`, and the email workflow are all unchanged by this feature.
+
+- **Model** (`models/group_receipt_settings.go`): the `QuickScan*` columns. Paid-by default is a
+  `QuickScanDefaultPaidByType` (`UPLOADER` | `USER`, `models/quick_scan_default_paid_by_type.go`) plus
+  a nullable `QuickScanDefaultPaidById`; status default is `QuickScanDefaultStatus`. Backwards-compatible
+  GORM defaults: paid-by/status ship **enabled + required** (no default needed), categories/tags
+  **hidden** — so existing groups are unchanged until an admin opts in. AutoMigrate adds the columns; no
+  data migration.
+- **Config validation** (`commands/update_group_receipt_settings_command.go` `Validate`, now wired into
+  the handler): a default is **required** for paid-by/status unless `(enabled && required)`; categories/
+  tags never need a default (empty is fine).
+- **Ingress** (`handlers/receipts.go` `QuickScan` → `resolveQuickScanFields`): loads each file's group
+  settings, **enforces required fields synchronously (400 before enqueue)** since quick scan is
+  fire-and-forget, and resolves paid-by/status defaults (`UPLOADER` ⇒ the caller's user id). Categories/
+  tags ride the multipart command as **per-file comma-joined id strings** (`QuickScanCommand.CategoryIds`/
+  `TagIds`; an empty paid-by string parses to `0` = unset). The async `ReceiptService.QuickScan` **merges**
+  the user's category/tag picks with the AI-filled ones (union, deduped by id; names resolved via
+  `CategoryRepository.GetByIds`/`TagsRepository.GetByIds` so the merged selections pass receipt validation).

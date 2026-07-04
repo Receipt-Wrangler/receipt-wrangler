@@ -100,6 +100,7 @@ model/pieChartDataCommand.ts
 model/pieChartDataPoint.ts
 model/prompt.ts
 model/queueName.ts
+model/quickScanDefaultPaidByType.ts
 model/receipt.ts
 model/receiptPagedRequestCommand.ts
 model/receiptPagedRequestFilter.ts

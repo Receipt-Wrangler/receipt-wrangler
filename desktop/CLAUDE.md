@@ -540,6 +540,22 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   spec rather than an extension of `group-viewer-visibility.spec.ts`, whose serial block has a known
   pre-existing failure — a Legacy User can't load `/groups` — that would skip any test appended to it.)
 
+## Quick Scan Configuration
+
+- **Group receipt settings** (`src/group/group-receipt-settings/`) has a **Quick Scan** section: per
+  field (paid-by, status, categories, tags) a *Show* + *Require* `app-checkbox`, plus a default control
+  for paid-by (`app-select` of Uploader/Specific user + a conditional `app-user-autocomplete`) and
+  status (`app-status-select`) shown only when that field is not both shown+required. The component
+  mirrors the backend rule as reactive validators (default required unless shown+required) and coerces an
+  empty `quickScanDefaultPaidById` to `undefined` on submit. See `api/CLAUDE.md` → "Quick Scan Field
+  Configuration".
+- **Quick scan dialog** (`src/receipts/quick-scan-dialog/`) resolves each image's config from **that
+  image's selected group** (`GroupState.getGroupById(...).groupReceiptSettings`) to drive per-image
+  field visibility + required validators; hidden paid-by/status are sent empty so the server backfills
+  the group default. Category/tag pickers (`app-category-autocomplete`/`app-tag-autocomplete`,
+  `[creatable]="false"`) source options from `AuthState.groupCategories`/`groupTags` and are serialized
+  as per-image comma-joined id strings for `quickScanReceipt(...)`.
+
 ## Testing Requirements
 
 **All new code must have accompanying unit tests.**

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -251,8 +252,20 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 			}
 
 			fileRepository := repositories.NewFileRepository(nil)
-
 			token := structs.GetClaims(r)
+
+			// Resolve per-file quick-scan fields against each target group's receipt settings:
+			// enforce the group's required fields (synchronously, so we can 400 before enqueuing
+			// anything) and backfill paid-by/status defaults for optional/hidden fields.
+			resolvedFields, configErr, err := resolveQuickScanFields(quickScanCommand, token.UserId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if len(configErr.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, configErr, http.StatusBadRequest)
+				return 0, nil
+			}
+
 			for i := 0; i < len(quickScanCommand.Files); i++ {
 				fileBytes := make([]byte, quickScanCommand.FileHeaders[i].Size)
 
@@ -268,9 +281,11 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 
 				payload := wranglerasynq.QuickScanTaskPayload{
 					Token:            token,
-					PaidByUserId:     quickScanCommand.PaidByUserIds[i],
+					PaidByUserId:     resolvedFields[i].PaidByUserId,
 					GroupId:          quickScanCommand.GroupIds[i],
-					Status:           quickScanCommand.Statuses[i],
+					Status:           resolvedFields[i].Status,
+					CategoryIds:      resolvedFields[i].CategoryIds,
+					TagIds:           resolvedFields[i].TagIds,
 					TempPath:         tempPath,
 					OriginalFileName: quickScanCommand.FileHeaders[i].Filename,
 				}
@@ -295,6 +310,91 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	HandleRequest(handler)
+}
+
+// resolvedQuickScanFields holds the final per-file values a quick scan will be created with, after
+// each field is checked against its group's quick-scan configuration and defaults are applied.
+type resolvedQuickScanFields struct {
+	PaidByUserId uint
+	Status       models.ReceiptStatus
+	CategoryIds  []uint
+	TagIds       []uint
+}
+
+// resolveQuickScanFields walks each uploaded file, loads its target group's receipt settings
+// (cached per group), enforces the group's required quick-scan fields into a ValidatorError, and
+// backfills paid-by/status defaults for fields the user left blank. A non-empty ValidatorError means
+// the request should 400 without enqueuing anything.
+func resolveQuickScanFields(command commands.QuickScanCommand, uploaderUserId uint) ([]resolvedQuickScanFields, structs.ValidatorError, error) {
+	settingsRepository := repositories.NewGroupReceiptSettingsRepository(nil)
+	settingsCache := make(map[uint]models.GroupReceiptSettings)
+	resolved := make([]resolvedQuickScanFields, len(command.Files))
+	configErr := structs.ValidatorError{Errors: make(map[string]string)}
+
+	for i := 0; i < len(command.Files); i++ {
+		groupId := command.GroupIds[i]
+
+		settings, cached := settingsCache[groupId]
+		if !cached {
+			loaded, err := settingsRepository.GetGroupReceiptSettingsByGroupId(groupId)
+			if err != nil {
+				return nil, structs.ValidatorError{}, err
+			}
+			settings = loaded
+			settingsCache[groupId] = settings
+		}
+
+		paidByUserId := command.PaidByUserIds[i]
+		status := command.Statuses[i]
+		categoryIds := command.CategoryIdsForFile(i)
+		tagIds := command.TagIdsForFile(i)
+		fileKey := fmt.Sprintf("files.%d", i)
+
+		if settings.QuickScanPaidByEnabled && settings.QuickScanPaidByRequired && paidByUserId == 0 {
+			configErr.Errors[fileKey+".paidByUserId"] = "Paid by is required"
+		} else if paidByUserId == 0 {
+			paidByUserId = resolveQuickScanDefaultPaidBy(settings, uploaderUserId)
+		}
+
+		if settings.QuickScanStatusEnabled && settings.QuickScanStatusRequired && len(status) == 0 {
+			configErr.Errors[fileKey+".status"] = "Status is required"
+		} else if len(status) == 0 {
+			status = settings.QuickScanDefaultStatus
+		}
+
+		if settings.QuickScanCategoriesEnabled && settings.QuickScanCategoriesRequired && len(categoryIds) == 0 {
+			configErr.Errors[fileKey+".categoryIds"] = "At least one category is required"
+		}
+
+		if settings.QuickScanTagsEnabled && settings.QuickScanTagsRequired && len(tagIds) == 0 {
+			configErr.Errors[fileKey+".tagIds"] = "At least one tag is required"
+		}
+
+		resolved[i] = resolvedQuickScanFields{
+			PaidByUserId: paidByUserId,
+			Status:       status,
+			CategoryIds:  categoryIds,
+			TagIds:       tagIds,
+		}
+	}
+
+	return resolved, configErr, nil
+}
+
+// resolveQuickScanDefaultPaidBy resolves the configured default paid-by for a group: the uploader
+// (the user running the quick scan) or a specific user. Returns 0 when unset (guarded upstream by
+// group-settings validation).
+func resolveQuickScanDefaultPaidBy(settings models.GroupReceiptSettings, uploaderUserId uint) uint {
+	switch settings.QuickScanDefaultPaidByType {
+	case models.QUICK_SCAN_PAID_BY_UPLOADER:
+		return uploaderUserId
+	case models.QUICK_SCAN_PAID_BY_USER:
+		if settings.QuickScanDefaultPaidById != nil {
+			return *settings.QuickScanDefaultPaidById
+		}
+	}
+
+	return 0
 }
 
 // TODO: move to repository call

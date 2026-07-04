@@ -229,6 +229,8 @@ func (service ReceiptService) QuickScan(
 	paidByUserId uint,
 	groupId uint,
 	status models.ReceiptStatus,
+	categoryIds []uint,
+	tagIds []uint,
 	tempPath string,
 	originalFileName string,
 	asynqTaskId string,
@@ -293,6 +295,19 @@ func (service ReceiptService) QuickScan(
 
 	receiptCommand.GroupId = groupId
 
+	// Merge the user's quick-scan category/tag picks with whatever the AI auto-assigned (union,
+	// deduped by id). Names are resolved from the ids so the merged selections pass receipt
+	// validation, which requires a category/tag name.
+	receiptCommand.Categories, err = service.mergeQuickScanCategories(receiptCommand.Categories, categoryIds)
+	if err != nil {
+		return models.Receipt{}, err
+	}
+
+	receiptCommand.Tags, err = service.mergeQuickScanTags(receiptCommand.Tags, tagIds)
+	if err != nil {
+		return models.Receipt{}, err
+	}
+
 	vErr := receiptCommand.Validate(token.UserId, true)
 	if len(vErr.Errors) > 0 {
 		errBytes, _ := json.Marshal(vErr.Errors)
@@ -344,6 +359,86 @@ func (service ReceiptService) QuickScan(
 
 	os.Remove(tempPath)
 	return createdReceipt, nil
+}
+
+// mergeQuickScanCategories appends the user-selected category ids to the AI-filled categories,
+// skipping any already present. Names are loaded from the ids so the result passes receipt
+// validation.
+func (service ReceiptService) mergeQuickScanCategories(
+	existing []commands.UpsertCategoryCommand,
+	categoryIds []uint,
+) ([]commands.UpsertCategoryCommand, error) {
+	if len(categoryIds) == 0 {
+		return existing, nil
+	}
+
+	categoryRepository := repositories.NewCategoryRepository(service.TX)
+	categories, err := categoryRepository.GetByIds(categoryIds)
+	if err != nil {
+		return nil, err
+	}
+
+	presentIds := make(map[uint]bool)
+	for _, category := range existing {
+		if category.Id != nil {
+			presentIds[*category.Id] = true
+		}
+	}
+
+	for _, category := range categories {
+		if presentIds[category.ID] {
+			continue
+		}
+
+		id := category.ID
+		existing = append(existing, commands.UpsertCategoryCommand{
+			Id:          &id,
+			Name:        category.Name,
+			Description: category.Description,
+		})
+		presentIds[id] = true
+	}
+
+	return existing, nil
+}
+
+// mergeQuickScanTags is the tag counterpart of mergeQuickScanCategories.
+func (service ReceiptService) mergeQuickScanTags(
+	existing []commands.UpsertTagCommand,
+	tagIds []uint,
+) ([]commands.UpsertTagCommand, error) {
+	if len(tagIds) == 0 {
+		return existing, nil
+	}
+
+	tagsRepository := repositories.NewTagsRepository(service.TX)
+	tags, err := tagsRepository.GetByIds(tagIds)
+	if err != nil {
+		return nil, err
+	}
+
+	presentIds := make(map[uint]bool)
+	for _, tag := range existing {
+		if tag.Id != nil {
+			presentIds[*tag.Id] = true
+		}
+	}
+
+	for _, tag := range tags {
+		if presentIds[tag.ID] {
+			continue
+		}
+
+		id := tag.ID
+		existing = append(existing, commands.UpsertTagCommand{
+			Id:          &id,
+			Name:        tag.Name,
+			Description: tag.Description,
+		})
+		presentIds[id] = true
+	}
+
+	return existing, nil
 }
 
 func (service ReceiptService) DuplicateReceipt(
