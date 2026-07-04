@@ -104,6 +104,7 @@ export 'package:openapi/src/model/pie_chart_data_command.dart';
 export 'package:openapi/src/model/pie_chart_data_point.dart';
 export 'package:openapi/src/model/prompt.dart';
 export 'package:openapi/src/model/queue_name.dart';
+export 'package:openapi/src/model/quick_scan_default_paid_by_type.dart';
 export 'package:openapi/src/model/receipt.dart';
 export 'package:openapi/src/model/receipt_paged_request_command.dart';
 export 'package:openapi/src/model/receipt_paged_request_filter.dart';

@@ -82,6 +82,7 @@ doc/PieChartDataPoint.md
 doc/Prompt.md
 doc/PromptApi.md
 doc/QueueName.md
+doc/QuickScanDefaultPaidByType.md
 doc/Receipt.md
 doc/ReceiptApi.md
 doc/ReceiptImageApi.md
@@ -245,6 +246,7 @@ lib/src/model/pie_chart_data_command.dart
 lib/src/model/pie_chart_data_point.dart
 lib/src/model/prompt.dart
 lib/src/model/queue_name.dart
+lib/src/model/quick_scan_default_paid_by_type.dart
 lib/src/model/receipt.dart
 lib/src/model/receipt_paged_request_command.dart
 lib/src/model/receipt_paged_request_filter.dart
@@ -295,3 +297,4 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
+test/quick_scan_default_paid_by_type_test.dart

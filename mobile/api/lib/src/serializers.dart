@@ -82,6 +82,7 @@ import 'package:openapi/src/model/pie_chart_data_command.dart';
 import 'package:openapi/src/model/pie_chart_data_point.dart';
 import 'package:openapi/src/model/prompt.dart';
 import 'package:openapi/src/model/queue_name.dart';
+import 'package:openapi/src/model/quick_scan_default_paid_by_type.dart';
 import 'package:openapi/src/model/receipt.dart';
 import 'package:openapi/src/model/receipt_paged_request_command.dart';
 import 'package:openapi/src/model/receipt_paged_request_filter.dart';
@@ -202,6 +203,7 @@ part 'serializers.g.dart';
   PieChartDataPoint,
   Prompt,
   QueueName,
+  QuickScanDefaultPaidByType,
   Receipt,
   ReceiptPagedRequestCommand,
   ReceiptPagedRequestFilter,
@@ -299,6 +301,10 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(int)]),
         () => ListBuilder<int>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(String)]),
+        () => ListBuilder<String>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(UserView)]),

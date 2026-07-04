@@ -165,7 +165,7 @@ When working in the Claude Code environment, Flutter may not be pre-installed. T
 # Prereqs. curl/git/pkg-config/xz-utils are usually already present; the rest
 # are required for Linux desktop builds (needed for integration_test runs).
 apt-get update && apt-get install -y --no-install-recommends \
-  unzip zip clang cmake ninja-build libgtk-3-dev
+  unzip zip clang lld llvm cmake ninja-build libgtk-3-dev
 
 # Download and extract Flutter SDK. Check the current stable version at
 # https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json
@@ -222,6 +222,22 @@ the swagger, so `Claims` carries only identity claims and the field is gone from
 
 Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
 is otherwise forbidden — these are the documented exception.)
+
+### Quick Scan field configuration
+
+The Quick Scan per-image form (`lib/receipts/widgets/quick_scan_form.dart`) respects the selected
+group's quick-scan config on `GroupReceiptSettings` — the
+`quickScan{PaidBy,Status,Categories,Tags}{Enabled,Required}` fields (mirrored from the API/desktop;
+see `api/CLAUDE.md` → "Quick Scan Field Configuration"). Each field renders per its `*Enabled` flag
+and gets a `required()` validator only when shown **and** `*Required`; Categories/Tags reuse the
+shared `CategorySelectField` / `TagSelectField`, sourced from the per-group catalogs. Because the
+backend **backfills** a default for a hidden/optional paid-by or status, `_submitQuickScan`
+(`lib/shared/functions/quick_scan.dart`) sends the "unset" sentinel (`0` / `ReceiptStatus.empty`) for
+those and per-file comma-joined `categoryIds` / `tagIds`, building **one aligned array entry per
+image** (never skipping, so `files` and the parallel arrays stay 1:1). It requires a field only when
+that group's config marks it shown+required, mirroring the backend's `resolveQuickScanFields`. Null
+settings (no group selected yet) fall back to the backend defaults: paid-by/status shown,
+categories/tags hidden.
 
 ### Android Gradle: cunning_document_scanner needs the Kotlin plugin + Kotlin 2.2.x
 
@@ -417,6 +433,8 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - **Destination markers must be unique to the destination.** `find.text('Name')` matches on BOTH `/view` and
   `/edit` receipt forms, so it cannot prove an Edit navigation happened — use `find.byType(BottomSubmitButton)`
   (only mounted on edit/add paths) instead.
+- **Quick Scan image input on Linux:** the sheet's gallery-upload icon (`getGalleryImages` in `lib/utils/scan.dart`) throws `"Unsupported platform"` on desktop via a `Platform.operatingSystem` switch **before** it reaches `file_selector`, so the file-selector mock can't help and `quick_scan_test.dart` (the gallery happy-path) is `skip: Platform.isLinux`. To reach the Quick Scan form headlessly, feed an image through the **document-scanner** icon (`Icons.add_a_photo`) with `installDocumentScannerMock()`; the camera permission `CunningDocumentScanner.getPictures` requests is already granted by `installLinuxDesktopMocks()` (its `requestPermissions` mock returns an empty map ⇒ no denied statuses).
+- **Linux build linker/ar:** the desktop build resolves its toolchain from the installed clang's dir (e.g. `/usr/lib/llvm-19/bin`). With only `clang` installed you get `Failed to find any of [ld.lld, ld]` then `[llvm-ar, ar]` — install `lld` **and** the matching `llvm` package (see the Flutter SDK Setup apt line above) so `ld.lld` / `llvm-ar` land in that dir.
 - **Headless display:** Flutter Linux desktop apps render through GTK and exit immediately without a display. `run-e2e.sh` auto-wraps in `xvfb-run` when `$DISPLAY` is unset. If you see "The log reader stopped unexpectedly, or never started," your display setup isn't working — check `xvfb-run --help` or set `DISPLAY` to a real X server.
 - **`libsecret-1-dev` at build time:** the `flutter_secure_storage_linux` plugin's CMakeLists.txt does a `pkg_check_modules(libsecret-1>=0.18.4)` — if the dev headers aren't installed, the build fails with "The following required packages were not found: libsecret-1". Installed as a prereq above.
 - **`libsecret` at runtime is avoided via mocks.** We don't bring up gnome-keyring + dbus for tests. `installLinuxDesktopMocks()` intercepts the platform channel with an in-memory map. If you ever want to exercise the real storage path (e.g. to reproduce a token-persistence bug), start a dbus session + gnome-keyring-daemon before the test — but don't do that by default; it adds a lot of fragile state.
@@ -440,6 +458,8 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - `integration_test/helpers/login.dart` / `api.dart` — UI + API login as admin, the shared e2e-user, or arbitrary credentials (`loginAs` / `apiLoginAs`).
 - `integration_test/helpers/permission_fixtures.dart` — admin-API provisioning for permission specs: fresh user + group with a chosen system group role ("Legacy Viewer"/"Legacy Editor"), optional seeded receipt, `addTearDown` cleanup. Also mints **custom roles** for negative specs: `createRole`/`deleteRole`, `rolePermissionsByName`, and the convenience `provisionUserWithoutAppPermission` / `provisionGroupMemberWithoutPermission` (build a role = a Legacy role **minus one permission**). The backend won't delete an assigned role, so the role-delete teardown is registered **before** the user/group ones — LIFO makes it run last, after the assignments are gone.
 - `integration_test/helpers/feature_flags.dart` — `enableAiPoweredReceiptsForTest()`: toggles the Quick Scan flag by pointing systemSettings at a junk receiptProcessingSettings record, restoring on teardown.
+- `integration_test/quick_scan_config_response_test.dart` — the Quick Scan per-image **form** shows/hides/requires fields per the selected group's `GroupReceiptSettings.quickScan*`. Linux-runnable: it feeds an image via the mocked document-scanner channel (not the desktop-blocked gallery path) and injects the group config by mutating the live `GroupModel` via Provider (the same technique `quick_scan_disabled_test` uses for the AI flag — deterministic, no reliance on the local API persisting the new fields).
+- `integration_test/helpers/document_scanner_mock.dart` — `installDocumentScannerMock()`: stubs the `cunning_document_scanner` channel's `getPictures` to return a fixed on-disk PNG. This is the **only** way to add an image to the Quick Scan sheet on Linux desktop (see the caveat below).
 - `integration_test/helpers/receipt_test_helpers.dart` — `addManualReceiptViaUI` (group-selectable), URL/id extraction, receipt cleanup.
 - `integration_test/helpers/nav.dart` — group-entry and group-receipt navigation helpers.
 - `test_driver/integration_test.dart` — `integrationDriver()` entrypoint that `flutter drive` uses.

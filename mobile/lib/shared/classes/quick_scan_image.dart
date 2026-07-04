@@ -13,7 +13,9 @@ class QuickScanImage extends UploadMultipartFileData {
       required this.formKey,
       this.groupId,
       this.paidByUserId,
-      this.status})
+      this.status,
+      this.categories = const [],
+      this.tags = const []})
       : super(multipartFile: multipartFile, bytes: bytes);
 
   final MultipartFile multipartFile;
@@ -27,6 +29,10 @@ class QuickScanImage extends UploadMultipartFileData {
   int? paidByUserId;
 
   ReceiptStatus? status;
+
+  List<Category> categories;
+
+  List<Tag> tags;
 
   static QuickScanImage fromUploadMultipartFileData(
       UploadMultipartFileData data,
