@@ -765,6 +765,14 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 		}
 	}
 
+	// Group
+	if pagedRequest.Filter.Group.Value != nil {
+		groups := pagedRequest.Filter.Group.Value.([]interface{})
+		if len(groups) > 0 {
+			query = repository.buildFilterQuery(query, groups, pagedRequest.Filter.Group.Operation, "group_id", true)
+		}
+	}
+
 	// Resolved Date
 	if pagedRequest.Filter.ResolvedDate.Value != nil {
 		var resolvedDate interface{}

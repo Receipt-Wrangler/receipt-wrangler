@@ -19,6 +19,7 @@ part 'receipt_paged_request_filter.g.dart';
 /// * [categories] - Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
 /// * [tags] - Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
 /// * [status] - Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
+/// * [group] - Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
 /// * [resolvedDate] - Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
 /// * [createdAt] - Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
 @BuiltValue()
@@ -50,6 +51,10 @@ abstract class ReceiptPagedRequestFilter implements Built<ReceiptPagedRequestFil
   /// Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
   @BuiltValueField(wireName: r'status')
   JsonObject? get status;
+
+  /// Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
+  @BuiltValueField(wireName: r'group')
+  JsonObject? get group;
 
   /// Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
   @BuiltValueField(wireName: r'resolvedDate')
@@ -128,6 +133,13 @@ class _$ReceiptPagedRequestFilterSerializer implements PrimitiveSerializer<Recei
       yield r'status';
       yield serializers.serialize(
         object.status,
+        specifiedType: const FullType(JsonObject),
+      );
+    }
+    if (object.group != null) {
+      yield r'group';
+      yield serializers.serialize(
+        object.group,
         specifiedType: const FullType(JsonObject),
       );
     }
@@ -216,6 +228,13 @@ class _$ReceiptPagedRequestFilterSerializer implements PrimitiveSerializer<Recei
             specifiedType: const FullType(JsonObject),
           ) as JsonObject;
           result.status = valueDes;
+          break;
+        case r'group':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(JsonObject),
+          ) as JsonObject;
+          result.group = valueDes;
           break;
         case r'resolvedDate':
           final valueDes = serializers.deserialize(

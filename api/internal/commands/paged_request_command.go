@@ -118,6 +118,10 @@ func (command *ReceiptPagedRequestCommand) LoadDataFromRequest(w http.ResponseWr
 		command.Filter.Status.Value = make([]interface{}, 0)
 	}
 
+	if command.Filter.Group.Value == nil || command.Filter.Group.Value == "" {
+		command.Filter.Group.Value = make([]interface{}, 0)
+	}
+
 	if command.Filter.CreatedAt.Value == nil {
 		command.Filter.CreatedAt.Value = ""
 	}
@@ -141,6 +145,7 @@ type ReceiptPagedRequestFilter struct {
 	Categories   PagedRequestField `json:"categories"`
 	Tags         PagedRequestField `json:"Tags"`
 	Status       PagedRequestField `json:"status"`
+	Group        PagedRequestField `json:"group"`
 	ResolvedDate PagedRequestField `json:"resolvedDate"`
 	CreatedAt    PagedRequestField `json:"createdAt"`
 }

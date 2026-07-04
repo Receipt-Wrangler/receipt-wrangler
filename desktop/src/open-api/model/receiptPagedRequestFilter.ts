@@ -41,6 +41,10 @@ export interface ReceiptPagedRequestFilter {
     /**
      * Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
      */
+    group?: object;
+    /**
+     * Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
+     */
     resolvedDate?: object;
     /**
      * Contains two keys: operation of type FilterOperation and value which can a different type depending on the field.
