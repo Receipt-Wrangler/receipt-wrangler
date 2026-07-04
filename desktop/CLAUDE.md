@@ -555,6 +555,16 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   the group default. Category/tag pickers (`app-category-autocomplete`/`app-tag-autocomplete`,
   `[creatable]="false"`) source options from `AuthState.groupCategories`/`groupTags` and are serialized
   as per-image comma-joined id strings for `quickScanReceipt(...)`.
+- **E2e** (`e2e/quick-scan-config.spec.ts`, `e2e/quick-scan-dialog.spec.ts`, admin storageState): the config
+  page is driven directly (checkboxes carry `data-testid`s `quick-scan-<field>-show/-require` because the
+  "Show"/"Require" labels collide across the four field groups). The dialog is gated by the
+  `aiPoweredReceipts` feature flag (off in dev/CI); rather than mutate that global server state, the spec
+  **intercepts `GET /api/user/appData`** (`page.route`, like `stubTokenRefresh`) to flip
+  `featureConfig.aiPoweredReceipts` true **and** inject the target group's `groupReceiptSettings` — a
+  per-BrowserContext client-side stub with no server side effects (the negative `receipt-feature-gating.spec.ts`
+  still sees the button absent). The Quick Scan header button is icon-only (tooltip is `aria-describedby`, not
+  the a11y name), so it carries `data-testid="receipts-quick-scan"`. This appData-injection pattern is the
+  general way to e2e any feature-flag-gated UI here.
 
 ## Testing Requirements
 

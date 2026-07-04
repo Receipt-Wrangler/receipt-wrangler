@@ -258,6 +258,27 @@ export async function apiCreateComment(
   return comment.id;
 }
 
+/**
+ * Creates a group via the admin API (the caller is auto-added as owner) and
+ * returns its id + name. Create only needs name+status; members are required
+ * on update, not create.
+ */
+export async function apiCreateGroup(
+  api: APIRequestContext,
+  name: string,
+): Promise<{ id: number; name: string }> {
+  const res = await api.post('/api/group', {
+    data: { name, status: 'ACTIVE' },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `create group failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  const group = (await res.json()) as { id: number; name: string };
+  return { id: group.id, name: group.name };
+}
+
 /** Hard-deletes the user with [username] (frees any app-role assignment). */
 export async function apiDeleteUserByName(
   api: APIRequestContext,

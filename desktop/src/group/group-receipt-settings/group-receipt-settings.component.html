@@ -61,10 +61,12 @@
       <div class="d-flex flex-wrap gap-4">
         <app-checkbox
           label="Show"
+          data-testid="quick-scan-paidby-show"
           [inputFormControl]="form | formGet: 'quickScanPaidByEnabled'"
         ></app-checkbox>
         <app-checkbox
           label="Require"
+          data-testid="quick-scan-paidby-require"
           [inputFormControl]="form | formGet: 'quickScanPaidByRequired'"
         ></app-checkbox>
       </div>
@@ -93,10 +95,12 @@
       <div class="d-flex flex-wrap gap-4">
         <app-checkbox
           label="Show"
+          data-testid="quick-scan-status-show"
           [inputFormControl]="form | formGet: 'quickScanStatusEnabled'"
         ></app-checkbox>
         <app-checkbox
           label="Require"
+          data-testid="quick-scan-status-require"
           [inputFormControl]="form | formGet: 'quickScanStatusRequired'"
         ></app-checkbox>
       </div>
@@ -114,10 +118,12 @@
       <div class="d-flex flex-wrap gap-4">
         <app-checkbox
           label="Show"
+          data-testid="quick-scan-categories-show"
           [inputFormControl]="form | formGet: 'quickScanCategoriesEnabled'"
         ></app-checkbox>
         <app-checkbox
           label="Require"
+          data-testid="quick-scan-categories-require"
           [inputFormControl]="form | formGet: 'quickScanCategoriesRequired'"
         ></app-checkbox>
       </div>
@@ -128,10 +134,12 @@
       <div class="d-flex flex-wrap gap-4">
         <app-checkbox
           label="Show"
+          data-testid="quick-scan-tags-show"
           [inputFormControl]="form | formGet: 'quickScanTagsEnabled'"
         ></app-checkbox>
         <app-checkbox
           label="Require"
+          data-testid="quick-scan-tags-require"
           [inputFormControl]="form | formGet: 'quickScanTagsRequired'"
         ></app-checkbox>
       </div>
