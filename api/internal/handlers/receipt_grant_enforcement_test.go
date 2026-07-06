@@ -29,9 +29,15 @@ func claimsForUser(userId uint) *validator.ValidatedClaims {
 }
 
 // seedRestrictedReceiptCreator creates a group plus a member whose group role
-// grants receipts create/read/update restricted to categoryGrantIds, and returns
-// the user id and group id.
+// grants receipts create/read/update restricted to categoryGrantIds (tags
+// unrestricted), and returns the user id and group id.
 func seedRestrictedReceiptCreator(t *testing.T, categoryGrantIds []uint) (uint, uint) {
+	return seedRestrictedReceiptCreatorWithGrants(t, categoryGrantIds, nil)
+}
+
+// seedRestrictedReceiptCreatorWithGrants is seedRestrictedReceiptCreator with an
+// explicit tag grant set, so tests can restrict tags as well as categories.
+func seedRestrictedReceiptCreatorWithGrants(t *testing.T, categoryGrantIds []uint, tagGrantIds []uint) (uint, uint) {
 	t.Helper()
 	services.ClearRolePermissionCacheForTests()
 	services.ClearGroupRoleGrantCacheForTests()
@@ -47,7 +53,7 @@ func seedRestrictedReceiptCreator(t *testing.T, categoryGrantIds []uint) (uint, 
 		"",
 		[]string{permissions.GroupReceiptsCreate, permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate},
 		categoryGrantIds,
-		nil,
+		tagGrantIds,
 		nil,
 		false,
 	)
@@ -167,39 +173,68 @@ func TestEnforceQuickScanGrantSelection(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
 	allowedCategory := models.Category{Name: "Groceries"}
-	repositories.GetDB().Create(&allowedCategory)
+	if err := repositories.GetDB().Create(&allowedCategory).Error; err != nil {
+		t.Fatalf("seed allowed category: %v", err)
+	}
 	disallowedCategory := models.Category{Name: "Salary"}
-	repositories.GetDB().Create(&disallowedCategory)
+	if err := repositories.GetDB().Create(&disallowedCategory).Error; err != nil {
+		t.Fatalf("seed disallowed category: %v", err)
+	}
+	allowedTag := models.Tag{Name: "Reimbursable"}
+	if err := repositories.GetDB().Create(&allowedTag).Error; err != nil {
+		t.Fatalf("seed allowed tag: %v", err)
+	}
+	disallowedTag := models.Tag{Name: "Personal"}
+	if err := repositories.GetDB().Create(&disallowedTag).Error; err != nil {
+		t.Fatalf("seed disallowed tag: %v", err)
+	}
 
-	userId, groupId := seedRestrictedReceiptCreator(t, []uint{allowedCategory.ID})
+	userId, groupId := seedRestrictedReceiptCreatorWithGrants(t, []uint{allowedCategory.ID}, []uint{allowedTag.ID})
 
-	// A pick outside the caller's grants is denied.
+	// A category pick outside the caller's grants is denied.
 	deniedCommand := commands.QuickScanCommand{
 		GroupIds:    []uint{groupId},
 		CategoryIds: [][]uint{{disallowedCategory.ID}},
 	}
 	allowed, denyMessage, err := enforceQuickScanGrantSelection(userId, deniedCommand)
 	if err != nil {
-		t.Fatalf("enforce denied: %v", err)
+		t.Fatalf("enforce category denied: %v", err)
 	}
 	if allowed {
 		t.Error("expected out-of-grant category pick to be denied")
 	}
 	if len(denyMessage) == 0 {
-		t.Error("expected a deny message when a pick is rejected")
+		t.Error("expected a deny message when a category pick is rejected")
 	}
 
-	// A pick within the caller's grants is allowed.
+	// A tag pick outside the caller's grants is denied.
+	tagDeniedCommand := commands.QuickScanCommand{
+		GroupIds: []uint{groupId},
+		TagIds:   [][]uint{{disallowedTag.ID}},
+	}
+	allowed, denyMessage, err = enforceQuickScanGrantSelection(userId, tagDeniedCommand)
+	if err != nil {
+		t.Fatalf("enforce tag denied: %v", err)
+	}
+	if allowed {
+		t.Error("expected out-of-grant tag pick to be denied")
+	}
+	if len(denyMessage) == 0 {
+		t.Error("expected a deny message when a tag pick is rejected")
+	}
+
+	// Picks within the caller's grants (category and tag) are allowed.
 	allowedCommand := commands.QuickScanCommand{
 		GroupIds:    []uint{groupId},
 		CategoryIds: [][]uint{{allowedCategory.ID}},
+		TagIds:      [][]uint{{allowedTag.ID}},
 	}
 	allowed, _, err = enforceQuickScanGrantSelection(userId, allowedCommand)
 	if err != nil {
 		t.Fatalf("enforce allowed: %v", err)
 	}
 	if !allowed {
-		t.Error("expected in-grant category pick to be allowed")
+		t.Error("expected in-grant category and tag picks to be allowed")
 	}
 
 	// The loop rejects the whole request when any file carries an out-of-grant pick.
@@ -223,9 +258,13 @@ func TestQuickScanHandlerDeniesOutOfGrantCategory(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
 	allowedCategory := models.Category{Name: "Groceries"}
-	repositories.GetDB().Create(&allowedCategory)
+	if err := repositories.GetDB().Create(&allowedCategory).Error; err != nil {
+		t.Fatalf("seed allowed category: %v", err)
+	}
 	disallowedCategory := models.Category{Name: "Salary"}
-	repositories.GetDB().Create(&disallowedCategory)
+	if err := repositories.GetDB().Create(&disallowedCategory).Error; err != nil {
+		t.Fatalf("seed disallowed category: %v", err)
+	}
 
 	userId, groupId := seedRestrictedQuickScanner(t, []uint{allowedCategory.ID})
 
