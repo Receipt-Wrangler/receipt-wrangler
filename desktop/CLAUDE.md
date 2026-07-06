@@ -555,16 +555,40 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   the group default. Category/tag pickers (`app-category-autocomplete`/`app-tag-autocomplete`,
   `[creatable]="false"`) source options from `AuthState.groupCategories`/`groupTags` and are serialized
   as per-image comma-joined id strings for `quickScanReceipt(...)`.
-- **E2e** (`e2e/quick-scan-config.spec.ts`, `e2e/quick-scan-dialog.spec.ts`, admin storageState): the config
-  page is driven directly (checkboxes carry `data-testid`s `quick-scan-<field>-show/-require` because the
-  "Show"/"Require" labels collide across the four field groups). The dialog is gated by the
-  `aiPoweredReceipts` feature flag (off in dev/CI); rather than mutate that global server state, the spec
-  **intercepts `GET /api/user/appData`** (`page.route`, like `stubTokenRefresh`) to flip
-  `featureConfig.aiPoweredReceipts` true **and** inject the target group's `groupReceiptSettings` — a
-  per-BrowserContext client-side stub with no server side effects (the negative `receipt-feature-gating.spec.ts`
-  still sees the button absent). The Quick Scan header button is icon-only (tooltip is `aria-describedby`, not
-  the a11y name), so it carries `data-testid="receipts-quick-scan"`. This appData-injection pattern is the
-  general way to e2e any feature-flag-gated UI here.
+  - **Each image's `categories`/`tags` control MUST be a `FormArray`** (`this.formBuilder.array([])`),
+    *not* a `FormControl([])`: `app-category-autocomplete`/`app-tag-autocomplete` run in `multiple`
+    mode, and the base `app-autocomlete`'s `optionSelected` **pushes** the picked option onto the
+    control (`inputFormControl.push(...)`) — exactly as the receipt form's `categories` FormArray does.
+    A plain `FormControl` has no `push()`, so a selection throws `push is not a function` and silently
+    adds nothing (the picker looks dead). Clear a hidden field with `FormArray.clear()`, not
+    `setValue([])` (which throws on a non-empty array). Guarded by `quick-scan-dialog-behavior.spec.ts`
+    (picks a category and asserts the submit carries its id).
+- **E2e** (`e2e/quick-scan-config.spec.ts`, `e2e/quick-scan-dialog.spec.ts`, `e2e/quick-scan-dialog-behavior.spec.ts`,
+  admin storageState): the config page is driven directly (checkboxes carry `data-testid`s
+  `quick-scan-<field>-show/-require` because the "Show"/"Require" labels collide across the four field groups).
+  The dialog is gated by the `aiPoweredReceipts` feature flag (off in dev/CI); rather than mutate that global
+  server state, the specs **intercept `GET /api/user/appData`** (`page.route`, like `stubTokenRefresh`) to flip
+  `featureConfig.aiPoweredReceipts` true **and** inject the target group's `groupReceiptSettings` (plus
+  `userPreferences.quickScanDefault*` and `groupCategories`/`groupTags` catalogs) — a per-BrowserContext
+  client-side stub with no server side effects (the negative `receipt-feature-gating.spec.ts` still sees the
+  button absent). The shared injector + a multipart field parser live in **`e2e/helpers/quick-scan.ts`**
+  (`injectQuickScanAppData`, `parseMultipartFields`, `openQuickScanDialog`, `selectImageGroup`,
+  `uploadQuickScanImages`). The Quick Scan header button is icon-only (tooltip is `aria-describedby`, not the
+  a11y name), so it carries `data-testid="receipts-quick-scan"`; the dialog's carousel nav buttons carry
+  `data-testid="quick-scan-nav-left/-right"` for the same reason. This appData-injection pattern is the general
+  way to e2e any feature-flag-gated UI here.
+  - `quick-scan-dialog-behavior.spec.ts` covers the deeper matrix: a **user-preference paid-by preset falls
+    off** the form (and the submission) when the group hides paid-by; **switching an image's group re-flips**
+    its field set; a **category picked from the catalog** rides the multipart; and **two images on different
+    groups** get independent field sets where one image's unmet required field blocks the whole submit. The two
+    **submit** tests **mock `POST /api/receipt/quickScan`** (the backend validates each group's *persisted*
+    config, which the client-side injection doesn't touch, so a real submit would 400) and assert the exact
+    multipart the client builds via `parseMultipartFields` — e.g. a hidden paid-by is sent as the empty
+    sentinel. To **change** an already-selected group in a single-select `app-autocomlete`, click its **X clear
+    button** first (the input goes `readonly` once a value is chosen); `selectImageGroup` handles this.
+  - `receipt-feature-gating.spec.ts` now has the **positive** Quick Scan contrast (previously `test.fixme`):
+    with the flag injected on, a **Legacy Editor** member (holds `group.receipts.quick-scan`) sees the button
+    while the Viewer — same user, same flag — does not.
 
 ## Testing Requirements
 

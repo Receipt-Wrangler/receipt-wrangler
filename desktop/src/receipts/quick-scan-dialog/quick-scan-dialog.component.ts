@@ -87,8 +87,11 @@ export class QuickScanDialogComponent implements OnInit {
     this.paidByUserIds.push(new FormControl(userPreferences?.quickScanDefaultPaidById ?? ""));
     this.statuses.push(new FormControl(userPreferences?.quickScanDefaultStatus ?? ""));
     this.groupIds.push(new FormControl(userPreferences?.quickScanDefaultGroupId ?? "", Validators.required));
-    this.categories.push(new FormControl([]));
-    this.tags.push(new FormControl([]));
+    // Categories/tags are multi-selects backed by app-category/tag-autocomplete,
+    // which push selections onto a FormArray (see the receipt form). A plain
+    // FormControl has no push(), so selecting one would throw — use a FormArray.
+    this.categories.push(this.formBuilder.array([]));
+    this.tags.push(this.formBuilder.array([]));
 
     this.configureImages();
   }
@@ -151,10 +154,10 @@ export class QuickScanDialogComponent implements OnInit {
         this.form.get("statuses." + i)?.setValue("", { emitEvent: false });
       }
       if (!categoriesShown) {
-        this.form.get("categories." + i)?.setValue([], { emitEvent: false });
+        (this.form.get("categories." + i) as FormArray | null)?.clear({ emitEvent: false });
       }
       if (!tagsShown) {
-        this.form.get("tags." + i)?.setValue([], { emitEvent: false });
+        (this.form.get("tags." + i) as FormArray | null)?.clear({ emitEvent: false });
       }
     }
   }

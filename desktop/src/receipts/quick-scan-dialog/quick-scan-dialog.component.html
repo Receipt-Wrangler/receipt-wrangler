@@ -78,6 +78,7 @@
     </app-button>
     <app-button
       *ngIf="images.length > 1"
+      data-testid="quick-scan-nav-left"
       matButtonType="iconButton"
       icon="arrow_back"
       tooltip="Navigate left"
@@ -87,6 +88,7 @@
     </app-button>
     <app-button
       *ngIf="images.length > 1"
+      data-testid="quick-scan-nav-right"
       matButtonType="iconButton"
       icon="arrow_forward"
       tooltip="Navigate right"

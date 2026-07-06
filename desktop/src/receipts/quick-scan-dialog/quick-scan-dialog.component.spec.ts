@@ -1,7 +1,7 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed, } from "@angular/core/testing";
-import { ReactiveFormsModule } from "@angular/forms";
+import { FormArray, FormControl, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
@@ -210,8 +210,10 @@ describe("QuickScanDialogComponent", () => {
     const fileData = { file: { name: "a" } } as any;
     component.fileLoaded(fileData);
     component.groupIds.at(0).setValue(2);
-    component.categories.at(0).setValue([{ id: 10, name: "c" }]);
-    component.tags.at(0).setValue([{ id: 20, name: "t" }]);
+    // Categories/tags are per-image FormArrays; selections are pushed onto them
+    // (as the autocomplete does), not set wholesale.
+    (component.categories.at(0) as FormArray).push(new FormControl({ id: 10, name: "c" }));
+    (component.tags.at(0) as FormArray).push(new FormControl({ id: 20, name: "t" }));
 
     component.submitButtonClicked();
 
