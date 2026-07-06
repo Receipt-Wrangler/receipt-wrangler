@@ -266,6 +266,18 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
+			// Quick scan creates receipts via the service layer, bypassing the receipt-upsert grant
+			// gate, so validate the user's category/tag picks against their grants here (403 before
+			// enqueue), mirroring enforceReceiptGrantSelection on the normal create path.
+			allowed, denyMessage, err := enforceQuickScanGrantSelection(token.UserId, quickScanCommand)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
 			for i := 0; i < len(quickScanCommand.Files); i++ {
 				fileBytes := make([]byte, quickScanCommand.FileHeaders[i].Size)
 

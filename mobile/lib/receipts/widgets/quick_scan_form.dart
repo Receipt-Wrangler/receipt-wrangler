@@ -7,6 +7,7 @@ import 'package:receipt_wrangler_mobile/constants/spacing.dart';
 import 'package:receipt_wrangler_mobile/enums/form_state.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/shared/classes/quick_scan_image.dart';
+import 'package:receipt_wrangler_mobile/shared/functions/quick_scan_field_config.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/category_select_field.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/tag_select_field.dart';
 import 'package:receipt_wrangler_mobile/utils/forms.dart';
@@ -184,14 +185,13 @@ class _QuickScanForm extends State<QuickScanForm> {
     final settings = Provider.of<GroupModel>(context, listen: false)
         .getGroupReceiptSettings(groupId);
 
-    final showPaidBy = settings?.quickScanPaidByEnabled ?? true;
-    final requirePaidBy =
-        showPaidBy && (settings?.quickScanPaidByRequired ?? true);
-    final showStatus = settings?.quickScanStatusEnabled ?? true;
-    final requireStatus =
-        showStatus && (settings?.quickScanStatusRequired ?? true);
-    final showCategories = settings?.quickScanCategoriesEnabled ?? false;
-    final showTags = settings?.quickScanTagsEnabled ?? false;
+    final config = resolveQuickScanFieldConfig(settings);
+    final showPaidBy = config.showPaidBy;
+    final requirePaidBy = config.requirePaidBy;
+    final showStatus = config.showStatus;
+    final requireStatus = config.requireStatus;
+    final showCategories = config.showCategories;
+    final showTags = config.showTags;
 
     return FormBuilder(
         key: widget.formKey,

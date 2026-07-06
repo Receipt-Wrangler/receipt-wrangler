@@ -116,6 +116,59 @@ func TestCreateReceiptDeniedForNewCategoryWithoutCreatePermission(t *testing.T) 
 	}
 }
 
+func TestEnforceQuickScanGrantSelection(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	allowedCategory := models.Category{Name: "Groceries"}
+	repositories.GetDB().Create(&allowedCategory)
+	disallowedCategory := models.Category{Name: "Salary"}
+	repositories.GetDB().Create(&disallowedCategory)
+
+	userId, groupId := seedRestrictedReceiptCreator(t, []uint{allowedCategory.ID})
+
+	// A pick outside the caller's grants is denied.
+	deniedCommand := commands.QuickScanCommand{
+		GroupIds:    []uint{groupId},
+		CategoryIds: [][]uint{{disallowedCategory.ID}},
+	}
+	allowed, denyMessage, err := enforceQuickScanGrantSelection(userId, deniedCommand)
+	if err != nil {
+		t.Fatalf("enforce denied: %v", err)
+	}
+	if allowed {
+		t.Error("expected out-of-grant category pick to be denied")
+	}
+	if len(denyMessage) == 0 {
+		t.Error("expected a deny message when a pick is rejected")
+	}
+
+	// A pick within the caller's grants is allowed.
+	allowedCommand := commands.QuickScanCommand{
+		GroupIds:    []uint{groupId},
+		CategoryIds: [][]uint{{allowedCategory.ID}},
+	}
+	allowed, _, err = enforceQuickScanGrantSelection(userId, allowedCommand)
+	if err != nil {
+		t.Fatalf("enforce allowed: %v", err)
+	}
+	if !allowed {
+		t.Error("expected in-grant category pick to be allowed")
+	}
+
+	// The loop rejects the whole request when any file carries an out-of-grant pick.
+	mixedCommand := commands.QuickScanCommand{
+		GroupIds:    []uint{groupId, groupId},
+		CategoryIds: [][]uint{{allowedCategory.ID}, {disallowedCategory.ID}},
+	}
+	allowed, _, err = enforceQuickScanGrantSelection(userId, mixedCommand)
+	if err != nil {
+		t.Fatalf("enforce mixed: %v", err)
+	}
+	if allowed {
+		t.Error("expected a request with any out-of-grant file to be denied")
+	}
+}
+
 func TestUintSetsEqual(t *testing.T) {
 	cases := []struct {
 		name string

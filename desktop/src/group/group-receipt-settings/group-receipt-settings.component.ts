@@ -1,11 +1,11 @@
 import { Component, DestroyRef, OnInit, inject } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { FormBuilder, Validators } from "@angular/forms";
+import { FormBuilder } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { switchMap, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
-import { BaseFormComponent } from "../../form/index";
+import { BaseFormComponent, setRequired } from "../../form/index";
 import { Group, GroupsService, Permission, QuickScanDefaultPaidByType } from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
 import { AuthState, UpdateGroup } from "../../store/index";
@@ -111,26 +111,12 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
   // Keeps the default-value controls' required validators in sync with the enabled/required toggles.
   private applyQuickScanValidators(): void {
     const paidByType = this.form.get("quickScanDefaultPaidByType")?.value;
-    this.setRequired("quickScanDefaultPaidByType", this.showPaidByDefault);
-    this.setRequired(
-      "quickScanDefaultPaidById",
+    setRequired(this.form.get("quickScanDefaultPaidByType"), this.showPaidByDefault);
+    setRequired(
+      this.form.get("quickScanDefaultPaidById"),
       this.showPaidByDefault && paidByType === QuickScanDefaultPaidByType.User
     );
-    this.setRequired("quickScanDefaultStatus", this.showStatusDefault);
-  }
-
-  private setRequired(path: string, required: boolean): void {
-    const control = this.form.get(path);
-    if (!control) {
-      return;
-    }
-
-    if (required) {
-      control.addValidators(Validators.required);
-    } else {
-      control.removeValidators(Validators.required);
-    }
-    control.updateValueAndValidity({ emitEvent: false });
+    setRequired(this.form.get("quickScanDefaultStatus"), this.showStatusDefault);
   }
 
   private setOriginalGroup(): void {

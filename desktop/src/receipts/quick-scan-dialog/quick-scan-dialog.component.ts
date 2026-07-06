@@ -5,6 +5,7 @@ import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { ReceiptFileUploadCommand } from "../../interfaces";
+import { setRequired } from "../../form";
 import { Category, GroupReceiptSettings, ReceiptService, ReceiptStatus, Tag } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, GroupState } from "../../store";
@@ -142,10 +143,10 @@ export class QuickScanDialogComponent implements OnInit {
       const categoriesShown = settings?.quickScanCategoriesEnabled ?? false;
       const tagsShown = settings?.quickScanTagsEnabled ?? false;
 
-      this.setRequired("paidByUserIds." + i, paidByShown && (settings?.quickScanPaidByRequired ?? true));
-      this.setRequired("statuses." + i, statusShown && (settings?.quickScanStatusRequired ?? true));
-      this.setRequired("categories." + i, categoriesShown && (settings?.quickScanCategoriesRequired ?? false));
-      this.setRequired("tags." + i, tagsShown && (settings?.quickScanTagsRequired ?? false));
+      setRequired(this.form.get("paidByUserIds." + i), paidByShown && (settings?.quickScanPaidByRequired ?? true));
+      setRequired(this.form.get("statuses." + i), statusShown && (settings?.quickScanStatusRequired ?? true));
+      setRequired(this.form.get("categories." + i), categoriesShown && (settings?.quickScanCategoriesRequired ?? false));
+      setRequired(this.form.get("tags." + i), tagsShown && (settings?.quickScanTagsRequired ?? false));
 
       if (!paidByShown) {
         this.form.get("paidByUserIds." + i)?.setValue("", { emitEvent: false });
@@ -160,20 +161,6 @@ export class QuickScanDialogComponent implements OnInit {
         (this.form.get("tags." + i) as FormArray | null)?.clear({ emitEvent: false });
       }
     }
-  }
-
-  private setRequired(path: string, required: boolean): void {
-    const control = this.form.get(path);
-    if (!control) {
-      return;
-    }
-
-    if (required) {
-      control.addValidators(Validators.required);
-    } else {
-      control.removeValidators(Validators.required);
-    }
-    control.updateValueAndValidity({ emitEvent: false });
   }
 
   public openImageUploadComponent(): void {

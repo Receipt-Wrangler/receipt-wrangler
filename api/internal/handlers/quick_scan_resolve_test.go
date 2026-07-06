@@ -28,7 +28,9 @@ func seedQuickScanGroup(settings models.GroupReceiptSettings) {
 		QuickScanTagsEnabled:        settings.QuickScanTagsEnabled,
 		QuickScanTagsRequired:       settings.QuickScanTagsRequired,
 	}
-	repository.UpdateGroupReceiptSettings("1", command)
+	if _, err := repository.UpdateGroupReceiptSettings("1", command); err != nil {
+		panic(err)
+	}
 	_ = created
 }
 

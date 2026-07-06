@@ -179,53 +179,55 @@ describe("QuickScanDialogComponent", () => {
 
   it("should send category and tag ids per image on submit", () => {
     const originalCreateObjectURL = URL.createObjectURL;
-    URL.createObjectURL = jest.fn().mockReturnValue("blob");
+    try {
+      URL.createObjectURL = jest.fn().mockReturnValue("blob");
 
-    const group = {
-      id: 2,
-      groupReceiptSettings: {
-        quickScanPaidByEnabled: false,
-        quickScanPaidByRequired: false,
-        quickScanStatusEnabled: true,
-        quickScanStatusRequired: false,
-        quickScanCategoriesEnabled: true,
-        quickScanCategoriesRequired: true,
-        quickScanTagsEnabled: true,
-        quickScanTagsRequired: false,
-      },
-    };
-    store.reset({
-      auth: {
-        groupCategories: { 2: [{ id: 10, name: "c" }] },
-        groupTags: { 2: [{ id: 20, name: "t" }] },
-      },
-      groups: { groups: [group], selectedGroupId: "", selectedDashboardId: "" },
-    });
+      const group = {
+        id: 2,
+        groupReceiptSettings: {
+          quickScanPaidByEnabled: false,
+          quickScanPaidByRequired: false,
+          quickScanStatusEnabled: true,
+          quickScanStatusRequired: false,
+          quickScanCategoriesEnabled: true,
+          quickScanCategoriesRequired: true,
+          quickScanTagsEnabled: true,
+          quickScanTagsRequired: false,
+        },
+      };
+      store.reset({
+        auth: {
+          groupCategories: { 2: [{ id: 10, name: "c" }] },
+          groupTags: { 2: [{ id: 20, name: "t" }] },
+        },
+        groups: { groups: [group], selectedGroupId: "", selectedDashboardId: "" },
+      });
 
-    const receiptService = TestBed.inject(ReceiptService);
-    const serviceSpy = jest
-      .spyOn(receiptService, "quickScanReceipt")
-      .mockReturnValue(of({} as any));
+      const receiptService = TestBed.inject(ReceiptService);
+      const serviceSpy = jest
+        .spyOn(receiptService, "quickScanReceipt")
+        .mockReturnValue(of({} as any));
 
-    const fileData = { file: { name: "a" } } as any;
-    component.fileLoaded(fileData);
-    component.groupIds.at(0).setValue(2);
-    // Categories/tags are per-image FormArrays; selections are pushed onto them
-    // (as the autocomplete does), not set wholesale.
-    (component.categories.at(0) as FormArray).push(new FormControl({ id: 10, name: "c" }));
-    (component.tags.at(0) as FormArray).push(new FormControl({ id: 20, name: "t" }));
+      const fileData = { file: { name: "a" } } as any;
+      component.fileLoaded(fileData);
+      component.groupIds.at(0).setValue(2);
+      // Categories/tags are per-image FormArrays; selections are pushed onto them
+      // (as the autocomplete does), not set wholesale.
+      (component.categories.at(0) as FormArray).push(new FormControl({ id: 10, name: "c" }));
+      (component.tags.at(0) as FormArray).push(new FormControl({ id: 20, name: "t" }));
 
-    component.submitButtonClicked();
+      component.submitButtonClicked();
 
-    expect(serviceSpy).toHaveBeenCalledWith(
-      [fileData.file],
-      [2],
-      [""],
-      [""],
-      ["10"],
-      ["20"]
-    );
-
-    URL.createObjectURL = originalCreateObjectURL;
+      expect(serviceSpy).toHaveBeenCalledWith(
+        [fileData.file],
+        [2],
+        [""],
+        [""],
+        ["10"],
+        ["20"]
+      );
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL;
+    }
   });
 });

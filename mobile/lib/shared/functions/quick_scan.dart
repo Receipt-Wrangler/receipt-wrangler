@@ -11,6 +11,7 @@ import 'package:receipt_wrangler_mobile/models/loading_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_preferences_model.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/quick_scan.dart';
 import 'package:receipt_wrangler_mobile/shared/classes/quick_scan_image.dart';
+import 'package:receipt_wrangler_mobile/shared/functions/quick_scan_field_config.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/delete_button.dart';
 import 'package:receipt_wrangler_mobile/utils/has_feature.dart';
@@ -158,17 +159,15 @@ Future<void> _submitQuickScan(
     // default; a shown+required field must have a value.
     final settings = groupModel.getGroupReceiptSettings(groupId);
 
-    final showPaidBy = settings?.quickScanPaidByEnabled ?? true;
-    final requirePaidBy =
-        showPaidBy && (settings?.quickScanPaidByRequired ?? true);
-    final showStatus = settings?.quickScanStatusEnabled ?? true;
-    final requireStatus =
-        showStatus && (settings?.quickScanStatusRequired ?? true);
-    final showCategories = settings?.quickScanCategoriesEnabled ?? false;
-    final requireCategories =
-        showCategories && (settings?.quickScanCategoriesRequired ?? false);
-    final showTags = settings?.quickScanTagsEnabled ?? false;
-    final requireTags = showTags && (settings?.quickScanTagsRequired ?? false);
+    final config = resolveQuickScanFieldConfig(settings);
+    final showPaidBy = config.showPaidBy;
+    final requirePaidBy = config.requirePaidBy;
+    final showStatus = config.showStatus;
+    final requireStatus = config.requireStatus;
+    final showCategories = config.showCategories;
+    final requireCategories = config.requireCategories;
+    final showTags = config.showTags;
+    final requireTags = config.requireTags;
 
     int paidBy = 0;
     if (showPaidBy) {

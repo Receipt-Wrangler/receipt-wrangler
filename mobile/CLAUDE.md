@@ -239,6 +239,12 @@ that group's config marks it shown+required, mirroring the backend's `resolveQui
 settings (no group selected yet) fall back to the backend defaults: paid-by/status shown,
 categories/tags hidden.
 
+The show/require derivation for all four fields lives in **one** pure helper —
+`resolveQuickScanFieldConfig(GroupReceiptSettings?)` → `QuickScanFieldConfig`
+(`lib/shared/functions/quick_scan_field_config.dart`) — reused by both the form's `build()` and
+`_submitQuickScan`, so the two can't drift from each other or from `resolveQuickScanFields`. Covered by
+`test/shared/functions/quick_scan_field_config_test.dart`.
+
 **Category/Tag picker needs a fallback context in Quick Scan.** `CategorySelectField` /
 `TagSelectField` open their multi-select via `showMultiselectBottomSheet(...)`, which calls
 `Navigator.of(context)`. They must resolve that context through

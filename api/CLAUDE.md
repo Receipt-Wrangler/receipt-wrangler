@@ -626,3 +626,11 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   `TagIds`; an empty paid-by string parses to `0` = unset). The async `ReceiptService.QuickScan` **merges**
   the user's category/tag picks with the AI-filled ones (union, deduped by id; names resolved via
   `CategoryRepository.GetByIds`/`TagsRepository.GetByIds` so the merged selections pass receipt validation).
+- **Grant enforcement (write-side):** because quick scan creates receipts through the service layer
+  (bypassing the receipt-upsert path's `enforceReceiptGrantSelection`), the handler **synchronously
+  grant-validates the user's per-file category/tag picks** before enqueue via
+  `enforceQuickScanGrantSelection` (`handlers/receipt_grant_enforcement.go`), which reuses
+  `PermissionService.ValidateCategoryTagSelection` — an out-of-grant pick returns **403** (unrestricted
+  and admin-bypass callers are a no-op). This closes a write bypass: the UI picker already limits picks
+  to the granted catalog, but a crafted request could otherwise attach a category/tag the caller can't
+  see.
