@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/commands"
@@ -54,6 +56,51 @@ func seedRestrictedReceiptCreator(t *testing.T, categoryGrantIds []uint) (uint, 
 	}
 
 	user := models.User{Username: "restricted-creator", Password: "password"}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	member := models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRoleID: &role.ID}
+	if err := db.Create(&member).Error; err != nil {
+		t.Fatalf("seed member: %v", err)
+	}
+
+	return user.ID, group.ID
+}
+
+// seedRestrictedQuickScanner creates a group (with default receipt settings) plus a member whose
+// group role grants only group.receipts.quick-scan, restricted to categoryGrantIds. It returns the
+// user id and group id. Receipt settings are seeded because resolveQuickScanFields reads them with
+// .First() and would otherwise 500 on a missing row.
+func seedRestrictedQuickScanner(t *testing.T, categoryGrantIds []uint) (uint, uint) {
+	t.Helper()
+	services.ClearRolePermissionCacheForTests()
+	services.ClearGroupRoleGrantCacheForTests()
+	db := repositories.GetDB()
+
+	group := models.Group{Name: "quick-scan-grant-group"}
+	if err := db.Create(&group).Error; err != nil {
+		t.Fatalf("seed group: %v", err)
+	}
+
+	if _, err := repositories.NewGroupReceiptSettingsRepository(nil).CreateGroupReceiptSettings(group.ID); err != nil {
+		t.Fatalf("seed group receipt settings: %v", err)
+	}
+
+	role, err := repositories.NewRoleRepository(nil).CreateGroupRole(
+		"Restricted Quick Scanner",
+		"",
+		[]string{permissions.GroupReceiptsQuickScan},
+		categoryGrantIds,
+		nil,
+		nil,
+		false,
+	)
+	if err != nil {
+		t.Fatalf("seed group role: %v", err)
+	}
+
+	user := models.User{Username: "restricted-quick-scanner", Password: "password"}
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
@@ -166,6 +213,51 @@ func TestEnforceQuickScanGrantSelection(t *testing.T) {
 	}
 	if allowed {
 		t.Error("expected a request with any out-of-grant file to be denied")
+	}
+}
+
+// TestQuickScanHandlerDeniesOutOfGrantCategory drives the real QuickScan handler to prove the grant
+// gate is actually wired in (returns 403), not just unit-tested in isolation. The deny returns before
+// the enqueue loop, so no Redis/AI/file processing is exercised.
+func TestQuickScanHandlerDeniesOutOfGrantCategory(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	allowedCategory := models.Category{Name: "Groceries"}
+	repositories.GetDB().Create(&allowedCategory)
+	disallowedCategory := models.Category{Name: "Salary"}
+	repositories.GetDB().Create(&disallowedCategory)
+
+	userId, groupId := seedRestrictedQuickScanner(t, []uint{allowedCategory.ID})
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("files", "receipt.png")
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+	part.Write([]byte("not-a-real-image"))
+
+	// One aligned entry per file. Paid-by is non-zero and status non-empty so the required-field
+	// config check passes and control reaches the grant check; the picked category is out of grant.
+	writer.WriteField("groupIds", utils.UintToString(groupId))
+	writer.WriteField("paidByUserIds", utils.UintToString(userId))
+	writer.WriteField("statuses", string(models.OPEN))
+	writer.WriteField("categoryIds", utils.UintToString(disallowedCategory.ID))
+
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close writer: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api", body)
+	r.Header.Set("Content-Type", writer.FormDataContentType())
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
+
+	QuickScan(w, r)
+
+	if w.Result().StatusCode != 403 {
+		utils.PrintTestError(t, w.Result().StatusCode, 403)
 	}
 }
 

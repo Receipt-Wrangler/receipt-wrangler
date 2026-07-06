@@ -13,7 +13,9 @@ import (
 func seedQuickScanGroup(settings models.GroupReceiptSettings) {
 	repositories.CreateTestGroup()
 	repository := repositories.NewGroupReceiptSettingsRepository(nil)
-	created, _ := repository.CreateGroupReceiptSettings(1)
+	if _, err := repository.CreateGroupReceiptSettings(1); err != nil {
+		panic(err)
+	}
 
 	command := commands.UpdateGroupReceiptSettingsCommand{
 		QuickScanPaidByEnabled:      settings.QuickScanPaidByEnabled,
@@ -31,7 +33,6 @@ func seedQuickScanGroup(settings models.GroupReceiptSettings) {
 	if _, err := repository.UpdateGroupReceiptSettings("1", command); err != nil {
 		panic(err)
 	}
-	_ = created
 }
 
 func singleFileCommand(paidBy uint, status models.ReceiptStatus, categoryIds []uint, tagIds []uint) commands.QuickScanCommand {
