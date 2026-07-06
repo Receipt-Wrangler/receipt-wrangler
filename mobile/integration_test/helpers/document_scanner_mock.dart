@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart' show MethodChannel, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'platform_mocks.dart';
+
 /// Stubs the `cunning_document_scanner` method channel so Quick Scan's
 /// "add a photo" action (`scanImagesMultiPart` → `CunningDocumentScanner.getPictures`)
 /// returns a fixed on-disk image instead of driving the native camera scanner.
@@ -11,10 +13,20 @@ import 'package:flutter_test/flutter_test.dart';
 /// This is the *only* way to feed an image into the Quick Scan sheet on Linux
 /// desktop: the sheet's other upload icon (`getGalleryImages`) hard-throws
 /// "Unsupported platform" via a `Platform.operatingSystem` switch before it ever
-/// reaches `file_selector`, so the `file_selector` mock can't help there. The
-/// scanner path only touches this method channel plus a `permission_handler`
-/// camera request (already granted by `installLinuxDesktopMocks`), so mocking the
-/// channel reaches the real per-image form headlessly, with no production change.
+/// reaches `file_selector`, so the `file_selector` mock can't help there.
+///
+/// `getPictures` requests `Permission.camera` **itself** (Dart-side) before
+/// invoking its native channel, so we also grant camera/gallery permission here
+/// via [installCameraGalleryPermissionMocks] on **every** platform. On Linux
+/// `installLinuxDesktopMocks` already grants it; on iOS/Android permission_handler
+/// is real, and without this grant the fire-and-forget `requestPermissions()` from
+/// `main.dart` leaves an app-init camera request pending (its native dialog is
+/// never dismissed in a headless test) so `getPictures`' own camera request
+/// collides with it and throws
+/// `PlatformException(ERROR_ALREADY_REQUESTING_PERMISSIONS)`. Granting up front
+/// makes both requests resolve instantly with no native dialog. (This is the one
+/// scan path that needs the grant on mobile; other specs hit permission_handler
+/// natively and never trigger a second request.)
 ///
 /// A real temp file is written to disk (not `XFile.fromData`) so `MultipartFile.fromPath`
 /// / `File.readAsBytes` behave exactly like the production picker. The bundled
@@ -24,6 +36,8 @@ Future<void> installDocumentScannerMock({
   Uint8List? bytes,
   String name = 'sample.png',
 }) async {
+  installCameraGalleryPermissionMocks();
+
   final pngBytes = bytes ??
       (await rootBundle.load('assets/test/sample.png')).buffer.asUint8List();
   final tempDir = await Directory.systemTemp.createTemp('doc_scanner_mock_');
