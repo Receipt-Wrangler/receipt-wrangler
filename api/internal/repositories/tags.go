@@ -32,6 +32,25 @@ func (repository TagsRepository) GetAllTags(querySelect string) ([]models.Tag, e
 	return tags, nil
 }
 
+// GetByIds returns the full tag records for the given ids (order not guaranteed). Used to resolve
+// names for id-only selections (e.g. quick-scan tag picks) so they can flow through receipt
+// validation, which requires a tag name.
+func (repository TagsRepository) GetByIds(ids []uint) ([]models.Tag, error) {
+	db := repository.GetDB()
+	var tags []models.Tag
+
+	if len(ids) == 0 {
+		return tags, nil
+	}
+
+	err := db.Model(&models.Tag{}).Where("id IN ?", ids).Find(&tags).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return tags, nil
+}
+
 // CountByIds returns how many of the given tag ids exist. Used to validate that
 // a role's tag grants reference real tags. Duplicate ids in the input are
 // de-duplicated by the IN clause, so callers should pass a unique set.

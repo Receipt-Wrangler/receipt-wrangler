@@ -246,6 +246,7 @@ Class | Method | HTTP request | Description
  - [PieChartDataPoint](doc/PieChartDataPoint.md)
  - [Prompt](doc/Prompt.md)
  - [QueueName](doc/QueueName.md)
+ - [QuickScanDefaultPaidByType](doc/QuickScanDefaultPaidByType.md)
  - [Receipt](doc/Receipt.md)
  - [ReceiptPagedRequestCommand](doc/ReceiptPagedRequestCommand.md)
  - [ReceiptPagedRequestFilter](doc/ReceiptPagedRequestFilter.md)

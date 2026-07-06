@@ -2901,6 +2901,13 @@ components:
         - "RESOLVED"
         - "DRAFT"
         - ""
+    QuickScanDefaultPaidByType:
+      description: How the default paid-by is resolved for optional quick-scan paid-by
+      type: string
+      enum:
+        - "UPLOADER"
+        - "USER"
+        - ""
     ApiKeyScope:
       description: Scope/permissions for API keys
       type: string
@@ -4247,6 +4254,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReceiptStatus"
+        categoryIds:
+          type: array
+          items:
+            type: string
+            description: Comma-joined category ids for the file at the same index
+        tagIds:
+          type: array
+          items:
+            type: string
+            description: Comma-joined tag ids for the file at the same index
     UserPreferences:
       allOf:
         - $ref: "#/components/schemas/BaseModel"
@@ -4337,6 +4354,38 @@ components:
             hideShareTags:
               type: boolean
               description: Hide share tags
+            quickScanPaidByEnabled:
+              type: boolean
+              description: Show the paid by field in quick scan
+            quickScanPaidByRequired:
+              type: boolean
+              description: Require the paid by field in quick scan
+            quickScanDefaultPaidByType:
+              $ref: "#/components/schemas/QuickScanDefaultPaidByType"
+            quickScanDefaultPaidById:
+              type: integer
+              nullable: true
+              description: Default paid by user id when paid by is optional and type is USER
+            quickScanStatusEnabled:
+              type: boolean
+              description: Show the status field in quick scan
+            quickScanStatusRequired:
+              type: boolean
+              description: Require the status field in quick scan
+            quickScanDefaultStatus:
+              $ref: "#/components/schemas/ReceiptStatus"
+            quickScanCategoriesEnabled:
+              type: boolean
+              description: Show the categories field in quick scan
+            quickScanCategoriesRequired:
+              type: boolean
+              description: Require the categories field in quick scan
+            quickScanTagsEnabled:
+              type: boolean
+              description: Show the tags field in quick scan
+            quickScanTagsRequired:
+              type: boolean
+              description: Require the tags field in quick scan
     UpdateGroupReceiptSettingsCommand:
       type: object
       properties:
@@ -4364,6 +4413,38 @@ components:
         hideShareTags:
           type: boolean
           description: Hide share tags
+        quickScanPaidByEnabled:
+          type: boolean
+          description: Show the paid by field in quick scan
+        quickScanPaidByRequired:
+          type: boolean
+          description: Require the paid by field in quick scan
+        quickScanDefaultPaidByType:
+          $ref: "#/components/schemas/QuickScanDefaultPaidByType"
+        quickScanDefaultPaidById:
+          type: integer
+          nullable: true
+          description: Default paid by user id when paid by is optional and type is USER
+        quickScanStatusEnabled:
+          type: boolean
+          description: Show the status field in quick scan
+        quickScanStatusRequired:
+          type: boolean
+          description: Require the status field in quick scan
+        quickScanDefaultStatus:
+          $ref: "#/components/schemas/ReceiptStatus"
+        quickScanCategoriesEnabled:
+          type: boolean
+          description: Show the categories field in quick scan
+        quickScanCategoriesRequired:
+          type: boolean
+          description: Require the categories field in quick scan
+        quickScanTagsEnabled:
+          type: boolean
+          description: Show the tags field in quick scan
+        quickScanTagsRequired:
+          type: boolean
+          description: Require the tags field in quick scan
     GroupSettings:
       type: object
       required:

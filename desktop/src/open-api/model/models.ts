@@ -66,6 +66,7 @@ export * from './pieChartDataCommand';
 export * from './pieChartDataPoint';
 export * from './prompt';
 export * from './queueName';
+export * from './quickScanDefaultPaidByType';
 export * from './receipt';
 export * from './receiptPagedRequestCommand';
 export * from './receiptPagedRequestFilter';

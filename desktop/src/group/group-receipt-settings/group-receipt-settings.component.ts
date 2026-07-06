@@ -1,11 +1,12 @@
-import { Component, OnInit } from "@angular/core";
+import { Component, DestroyRef, OnInit, inject } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { switchMap, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
-import { BaseFormComponent } from "../../form/index";
-import { Group, GroupsService, Permission } from "../../open-api/index";
+import { BaseFormComponent, setRequired } from "../../form/index";
+import { Group, GroupsService, Permission, QuickScanDefaultPaidByType } from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
 import { AuthState, UpdateGroup } from "../../store/index";
 
@@ -22,6 +23,13 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
 
   public canEdit = false;
 
+  public readonly paidByTypeOptions = [
+    { value: QuickScanDefaultPaidByType.Uploader, display: "Uploader" },
+    { value: QuickScanDefaultPaidByType.User, display: "Specific user" },
+  ];
+
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private formBuilder: FormBuilder,
@@ -31,6 +39,30 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
     private store: Store,
   ) {
     super();
+  }
+
+  // The quick-scan default for paid-by/status is only needed when the field is not both shown and
+  // required (otherwise the user always supplies it). These getters drive both conditional display
+  // and the required validators, mirroring the backend rule.
+  public get showPaidByDefault(): boolean {
+    return !(
+      this.form?.get("quickScanPaidByEnabled")?.value &&
+      this.form?.get("quickScanPaidByRequired")?.value
+    );
+  }
+
+  public get showPaidByUserDefault(): boolean {
+    return (
+      this.showPaidByDefault &&
+      this.form?.get("quickScanDefaultPaidByType")?.value === QuickScanDefaultPaidByType.User
+    );
+  }
+
+  public get showStatusDefault(): boolean {
+    return !(
+      this.form?.get("quickScanStatusEnabled")?.value &&
+      this.form?.get("quickScanStatusRequired")?.value
+    );
   }
 
   public ngOnInit(): void {
@@ -53,11 +85,38 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
       hideShareCategories: [receiptSettings.hideShareCategories ?? false],
       hideShareTags: [receiptSettings.hideShareTags ?? false],
       hideComments: [receiptSettings.hideComments ?? false],
+      quickScanPaidByEnabled: [receiptSettings.quickScanPaidByEnabled ?? true],
+      quickScanPaidByRequired: [receiptSettings.quickScanPaidByRequired ?? true],
+      quickScanDefaultPaidByType: [receiptSettings.quickScanDefaultPaidByType ?? QuickScanDefaultPaidByType.Empty],
+      quickScanDefaultPaidById: [receiptSettings.quickScanDefaultPaidById ?? null],
+      quickScanStatusEnabled: [receiptSettings.quickScanStatusEnabled ?? true],
+      quickScanStatusRequired: [receiptSettings.quickScanStatusRequired ?? true],
+      quickScanDefaultStatus: [receiptSettings.quickScanDefaultStatus ?? ""],
+      quickScanCategoriesEnabled: [receiptSettings.quickScanCategoriesEnabled ?? false],
+      quickScanCategoriesRequired: [receiptSettings.quickScanCategoriesRequired ?? false],
+      quickScanTagsEnabled: [receiptSettings.quickScanTagsEnabled ?? false],
+      quickScanTagsRequired: [receiptSettings.quickScanTagsRequired ?? false],
     });
+
+    this.applyQuickScanValidators();
+    this.form.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.applyQuickScanValidators());
 
     if (this.formConfig.mode != FormMode.edit) {
       this.form.disable();
     }
+  }
+
+  // Keeps the default-value controls' required validators in sync with the enabled/required toggles.
+  private applyQuickScanValidators(): void {
+    const paidByType = this.form.get("quickScanDefaultPaidByType")?.value;
+    setRequired(this.form.get("quickScanDefaultPaidByType"), this.showPaidByDefault);
+    setRequired(
+      this.form.get("quickScanDefaultPaidById"),
+      this.showPaidByDefault && paidByType === QuickScanDefaultPaidByType.User
+    );
+    setRequired(this.form.get("quickScanDefaultStatus"), this.showStatusDefault);
   }
 
   private setOriginalGroup(): void {
@@ -67,8 +126,17 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
 
   public submit(): void {
     if (this.form.valid) {
-      this.groupsService.updateGroupReceiptSettings(this.originalGroup.id,
-        this.form.value)
+      const value = this.form.value;
+      const command = {
+        ...value,
+        // An empty user autocomplete yields "" / null; send undefined so the nullable id is omitted
+        // rather than sent as a non-numeric value.
+        quickScanDefaultPaidById: value.quickScanDefaultPaidById
+          ? Number(value.quickScanDefaultPaidById)
+          : undefined,
+      };
+
+      this.groupsService.updateGroupReceiptSettings(this.originalGroup.id, command)
         .pipe(
           take(1),
           switchMap((updatedGroupReceiptSettings) => {

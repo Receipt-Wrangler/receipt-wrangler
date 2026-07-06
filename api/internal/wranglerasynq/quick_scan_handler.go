@@ -14,6 +14,8 @@ type QuickScanTaskPayload struct {
 	PaidByUserId     uint
 	GroupId          uint
 	Status           models.ReceiptStatus
+	CategoryIds      []uint
+	TagIds           []uint
 	TempPath         string
 	OriginalFileName string
 }
@@ -37,6 +39,8 @@ func HandleQuickScanTask(context context.Context, task *asynq.Task) error {
 		payload.PaidByUserId,
 		payload.GroupId,
 		payload.Status,
+		payload.CategoryIds,
+		payload.TagIds,
 		payload.TempPath,
 		payload.OriginalFileName,
 		taskId,

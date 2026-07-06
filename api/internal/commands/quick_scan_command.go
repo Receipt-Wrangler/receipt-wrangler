@@ -16,6 +16,11 @@ type QuickScanCommand struct {
 	PaidByUserIds []uint                  `json:"paidByUserId"`
 	GroupIds      []uint                  `json:"groupId"`
 	Statuses      []models.ReceiptStatus  `json:"status"`
+	// CategoryIds and TagIds carry the per-file category/tag selections. Each outer element maps to
+	// a file (by index); the multipart form sends one comma-joined id string per file (empty for
+	// none), keeping the payload a flat string array the generated client can encode.
+	CategoryIds [][]uint `json:"categoryIds"`
+	TagIds      [][]uint `json:"tagIds"`
 }
 
 func (command *QuickScanCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -28,10 +33,14 @@ func (command *QuickScanCommand) LoadDataFromRequest(w http.ResponseWriter, r *h
 	var paidByUserIds = make([]uint, 0)
 	var groupIds = make([]uint, 0)
 	var statuses = make([]models.ReceiptStatus, 0)
+	var categoryIds = make([][]uint, 0)
+	var tagIds = make([][]uint, 0)
 
 	var formPaidByUserIds = form["paidByUserIds"]
 	var formGroupIds = form["groupIds"]
 	var formStatuses = form["statuses"]
+	var formCategoryIds = form["categoryIds"]
+	var formTagIds = form["tagIds"]
 
 	if err != nil {
 		return err
@@ -48,7 +57,15 @@ func (command *QuickScanCommand) LoadDataFromRequest(w http.ResponseWriter, r *h
 	}
 
 	for _, userId := range formPaidByUserIds {
-		formattedUserId, err := utils.StringToUint(userId)
+		// An empty paid-by (optional/hidden field) is sent as a blank string; treat it as 0 (unset)
+		// so the handler can apply the group's configured default.
+		trimmedUserId := strings.TrimSpace(userId)
+		if len(trimmedUserId) == 0 {
+			paidByUserIds = append(paidByUserIds, 0)
+			continue
+		}
+
+		formattedUserId, err := utils.StringToUint(trimmedUserId)
 		if err != nil {
 			return err
 		}
@@ -75,13 +92,54 @@ func (command *QuickScanCommand) LoadDataFromRequest(w http.ResponseWriter, r *h
 		statuses = append(statuses, formattedStatus)
 	}
 
+	for _, idList := range formCategoryIds {
+		parsedIds, err := parseCommaSeparatedUints(idList)
+		if err != nil {
+			return err
+		}
+
+		categoryIds = append(categoryIds, parsedIds)
+	}
+
+	for _, idList := range formTagIds {
+		parsedIds, err := parseCommaSeparatedUints(idList)
+		if err != nil {
+			return err
+		}
+
+		tagIds = append(tagIds, parsedIds)
+	}
+
 	command.Files = files
 	command.FileHeaders = fileHeaders
 	command.PaidByUserIds = paidByUserIds
 	command.GroupIds = groupIds
 	command.Statuses = statuses
+	command.CategoryIds = categoryIds
+	command.TagIds = tagIds
 
 	return nil
+}
+
+// parseCommaSeparatedUints converts a comma-joined id string (e.g. "3,7") into a []uint, skipping
+// blank segments so an empty string yields an empty slice.
+func parseCommaSeparatedUints(value string) ([]uint, error) {
+	result := make([]uint, 0)
+	for _, part := range strings.Split(value, ",") {
+		trimmed := strings.TrimSpace(part)
+		if len(trimmed) == 0 {
+			continue
+		}
+
+		parsed, err := utils.StringToUint(trimmed)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, parsed)
+	}
+
+	return result, nil
 }
 
 func (command QuickScanCommand) Validate() structs.ValidatorError {
@@ -119,7 +177,35 @@ func (command QuickScanCommand) Validate() structs.ValidatorError {
 		vErr.Errors["status"] = "Status is required."
 	}
 
+	// Category/tag selections are optional (a client may omit them entirely), but when supplied they
+	// must carry one entry per file so the handler can align them by index.
+	if len(command.CategoryIds) > 0 && len(command.CategoryIds) != filesLength {
+		vErr.Errors["categoryIds"] = "Category Ids must match the number of files."
+	}
+
+	if len(command.TagIds) > 0 && len(command.TagIds) != filesLength {
+		vErr.Errors["tagIds"] = "Tag Ids must match the number of files."
+	}
+
 	return vErr
+}
+
+// CategoryIdsForFile returns the category id selections for the file at index i, or an empty slice
+// when the client omitted them (or supplied none for that file).
+func (command QuickScanCommand) CategoryIdsForFile(i int) []uint {
+	if i < len(command.CategoryIds) {
+		return command.CategoryIds[i]
+	}
+	return []uint{}
+}
+
+// TagIdsForFile returns the tag id selections for the file at index i, or an empty slice when the
+// client omitted them (or supplied none for that file).
+func (command QuickScanCommand) TagIdsForFile(i int) []uint {
+	if i < len(command.TagIds) {
+		return command.TagIds[i]
+	}
+	return []uint{}
 }
 
 func (command *QuickScanCommand) LoadDataFromRequestAndValidate(w http.ResponseWriter, r *http.Request) (structs.ValidatorError, error) {
