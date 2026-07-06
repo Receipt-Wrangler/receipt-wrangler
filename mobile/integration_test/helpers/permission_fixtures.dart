@@ -482,6 +482,48 @@ Future<void> setGroupQuickScanConfig({
   });
 }
 
+Future<Map<String, dynamic>> _getUserPreferences(String jwt) async {
+  final res = await http
+      .get(Uri.parse('${E2eEnv.baseUrl}/userPreferences'), headers: _auth(jwt))
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError(
+        'GET /userPreferences failed: HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map).cast<String, dynamic>();
+}
+
+Future<void> _putUserPreferences(String jwt, Map<String, dynamic> body) async {
+  final res = await http
+      .put(Uri.parse('${E2eEnv.baseUrl}/userPreferences'),
+          headers: _jsonAuth(jwt), body: jsonEncode(body))
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError(
+        'PUT /userPreferences failed: HTTP ${res.statusCode}: ${res.body}');
+  }
+}
+
+/// Sets the caller's quick-scan default preferences (the per-image prefill
+/// source: `quickScanDefault{GroupId,PaidById,Status}`), restoring the original
+/// preferences on teardown. [status] is a `ReceiptStatus` wire value (e.g.
+/// 'OPEN'); omit a field to leave it at its current value.
+Future<void> setUserQuickScanPrefs({
+  required String jwt,
+  int? groupId,
+  int? paidById,
+  String? status,
+}) async {
+  final original = await _getUserPreferences(jwt);
+  final updated = Map<String, dynamic>.from(original)
+    ..['quickScanDefaultGroupId'] = groupId ?? original['quickScanDefaultGroupId']
+    ..['quickScanDefaultPaidById'] =
+        paidById ?? original['quickScanDefaultPaidById']
+    ..['quickScanDefaultStatus'] = status ?? original['quickScanDefaultStatus'];
+  await _putUserPreferences(jwt, updated);
+  addTearDown(() async => _putUserPreferences(await apiLogin(), original));
+}
+
 /// Provisions a fresh user and (optionally) a fixture group it belongs to,
 /// registering `addTearDown` to delete the group and user afterwards.
 ///

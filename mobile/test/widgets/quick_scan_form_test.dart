@@ -88,11 +88,18 @@ api.Category _category() =>
 
 api.Tag _tag() => (api.TagBuilder()..id = 1..name = 'Trip').build();
 
-QuickScanImage _image(int? groupId) => QuickScanImage(
+QuickScanImage _image(
+  int? groupId, {
+  int? paidByUserId,
+  api.ReceiptStatus? status,
+}) =>
+    QuickScanImage(
       multipartFile: MultipartFile.fromBytes(const <int>[]),
       bytes: Uint8List(0),
       formKey: GlobalKey<FormBuilderState>(),
       groupId: groupId,
+      paidByUserId: paidByUserId,
+      status: status,
     );
 
 /// Pumps [QuickScanForm] with a real [GroupModel] holding [groups] and a
@@ -104,8 +111,11 @@ Future<GlobalKey<FormBuilderState>> _pumpFormGroups(
   required List<api.Group> groups,
   required int imageGroupId,
   List<api.UserView> users = const [],
+  int? imagePaidByUserId,
+  api.ReceiptStatus? imageStatus,
 }) async {
-  final image = _image(imageGroupId);
+  final image = _image(imageGroupId,
+      paidByUserId: imagePaidByUserId, status: imageStatus);
   final groupModel = GroupModel()..setGroups(groups);
   final userModel = UserModel()..setUsers(users);
 
@@ -410,5 +420,70 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Select Tags'), findsOneWidget);
+  });
+
+  // Prefill (from userPreferences.quickScanDefault*) vs the group's config: the
+  // per-image form seeds paid-by/status from the image, but a field the group
+  // hides must not appear -- the preset "falls off" (and _submitQuickScan sends
+  // the sentinel for it).
+  testWidgets('a prefilled paid-by shows when the group shows paid-by',
+      (tester) async {
+    final group = _group(
+      _settings(id: _groupId, paidByEnabled: true),
+      members: [_member(42, _groupId)],
+    );
+    await _pumpFormGroups(
+      tester,
+      groups: [group],
+      imageGroupId: _groupId,
+      users: [_user(42, 'Payer')],
+      imagePaidByUserId: 42,
+    );
+
+    final paidBy = tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
+    expect(paidBy.initialValue, 42, reason: 'prefill honored on a shown field');
+  });
+
+  testWidgets('a prefilled paid-by falls off when the group hides paid-by',
+      (tester) async {
+    final group = _group(_settings(id: _groupId, paidByEnabled: false));
+    await _pumpFormGroups(
+      tester,
+      groups: [group],
+      imageGroupId: _groupId,
+      imagePaidByUserId: 42,
+    );
+
+    expect(_dropdown('paidByUserId'), findsNothing,
+        reason: 'preset paid-by fell off the hidden field');
+  });
+
+  testWidgets('a prefilled status shows when the group shows status',
+      (tester) async {
+    final group = _group(_settings(id: _groupId, statusEnabled: true));
+    await _pumpFormGroups(
+      tester,
+      groups: [group],
+      imageGroupId: _groupId,
+      imageStatus: api.ReceiptStatus.OPEN,
+    );
+
+    final status = tester.widget(_dropdown('status')) as FormBuilderDropdown;
+    expect(status.initialValue, api.ReceiptStatus.OPEN,
+        reason: 'prefill honored on a shown field');
+  });
+
+  testWidgets('a prefilled status falls off when the group hides status',
+      (tester) async {
+    final group = _group(_settings(id: _groupId, statusEnabled: false));
+    await _pumpFormGroups(
+      tester,
+      groups: [group],
+      imageGroupId: _groupId,
+      imageStatus: api.ReceiptStatus.OPEN,
+    );
+
+    expect(_dropdown('status'), findsNothing,
+        reason: 'preset status fell off the hidden field');
   });
 }
