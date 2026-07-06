@@ -1,13 +1,15 @@
 // Verifies the Quick Scan per-image FORM responds to the selected group's
-// quick-scan configuration (GroupReceiptSettings.quickScan*) -- no scan is sent.
+// quick-scan configuration (GroupReceiptSettings.quickScan*) -- no scan is sent
+// (each test either asserts visibility or that a required+empty field blocks
+// submit). The submit-succeeds paths live in quick_scan_submit_test.dart.
 //
 // Runs headless on Linux desktop. Two facts shape the approach:
 //   * Quick Scan is gated on featureConfig.aiPoweredReceipts (off locally), so
 //     we flip it on server-side before login (enableAiPoweredReceiptsForTest).
 //   * The sheet's gallery-upload icon throws "Unsupported platform" on desktop,
 //     so we feed an image through the document-scanner icon via a mocked
-//     `cunning_document_scanner` channel (installDocumentScannerMock) -- the
-//     camera permission it requests is already granted by installLinuxDesktopMocks.
+//     `cunning_document_scanner` channel (installDocumentScannerMock), which
+//     also grants the camera permission getPictures requests.
 //
 // The group config is injected the same way quick_scan_disabled_test injects the
 // feature flag: a Provider mutation on the live GroupModel. This is deterministic
@@ -16,12 +18,10 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
-import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/category_select_field.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/tag_select_field.dart';
 
@@ -30,10 +30,7 @@ import 'helpers/feature_flags.dart';
 import 'helpers/form_actions.dart';
 import 'helpers/login.dart';
 import 'helpers/platform_mocks.dart';
-import 'helpers/pump.dart';
-
-Finder _dropdown(String name) =>
-    find.byWidgetPredicate((w) => w is FormBuilderDropdown && w.name == name);
+import 'helpers/quick_scan_actions.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -53,12 +50,8 @@ void main() {
 
     await loginAsAdmin(tester);
 
-    // Inject a distinctive quick-scan config onto a group the admin owns:
     // Paid By hidden, Status shown+optional, Categories shown+required, Tags hidden.
-    final ctx = tester.element(find.byType(Scaffold).first);
-    final groupModel = Provider.of<GroupModel>(ctx, listen: false);
-    final target = groupModel.groups.firstWhere((g) => !g.isAllGroup);
-    final configured = target.rebuild((b) => b
+    final group = await configureFirstGroup(tester, (b) => b
       ..groupReceiptSettings.quickScanPaidByEnabled = false
       ..groupReceiptSettings.quickScanPaidByRequired = false
       ..groupReceiptSettings.quickScanStatusEnabled = true
@@ -67,45 +60,23 @@ void main() {
       ..groupReceiptSettings.quickScanCategoriesRequired = true
       ..groupReceiptSettings.quickScanTagsEnabled = false
       ..groupReceiptSettings.quickScanTagsRequired = false);
-    groupModel.setGroups(groupModel.groups
-        .map((g) => g.id == target.id ? configured : g)
-        .toList());
-    await tester.pump();
 
-    // Open the bottom-nav Add menu and pick "Quick Scan" (the AI flag is on, so
-    // the menu item renders). Wait for hittability + drain the slide-in.
-    await tester.tap(find.text('Add').hitTestable());
-    await pumpUntilFound(tester, find.text('Quick Scan').hitTestable());
-    for (int i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    await tester.tap(find.text('Quick Scan').hitTestable());
-
-    // Add an image via the document-scanner icon (mock returns one PNG); the
-    // per-image form mounts once an image is present.
-    await pumpUntilFound(tester, find.byIcon(Icons.add_a_photo));
-    await tester.tap(find.byIcon(Icons.add_a_photo));
-    await pumpUntilFound(tester, find.text('Group'));
+    await openQuickScanImageForm(tester);
 
     // Select the configured group so the form reads its config.
-    await selectDropdown(tester, 'groupId', target.name);
+    await selectDropdown(tester, 'groupId', group.name);
 
     // Fields now reflect the injected config.
-    expect(_dropdown('paidByUserId'), findsNothing, reason: 'paid-by hidden');
-    expect(_dropdown('status'), findsOneWidget, reason: 'status shown');
+    expect(quickScanDropdown('paidByUserId'), findsNothing,
+        reason: 'paid-by hidden');
+    expect(quickScanDropdown('status'), findsOneWidget, reason: 'status shown');
     expect(find.byType(CategorySelectField), findsOneWidget,
         reason: 'categories shown');
     expect(find.byType(TagSelectField), findsNothing, reason: 'tags hidden');
 
-    // Categories is required and empty -> submitting surfaces the fix-error
-    // snackbar and queues nothing (the submit returns before the API call).
-    await pumpUntilFound(tester, find.byType(BottomSubmitButton).hitTestable());
-    await tester.tap(find.byType(BottomSubmitButton));
-    await pumpUntilFound(
-      tester,
-      find.textContaining('Please fix error on quick scan'),
-      timeout: const Duration(seconds: 10),
-    );
+    // Categories is required and empty -> submit is blocked with the fix-error
+    // snackbar and queues nothing.
+    await expectQuickScanSubmitBlocked(tester);
   });
 
   testWidgets('quick scan form re-reads config when the group changes',
@@ -163,42 +134,85 @@ void main() {
     groupModel.setGroups([...allGroups, group1, group2]);
     await tester.pump();
 
-    // Open Add → Quick Scan and add an image so the per-image form mounts.
-    await tester.tap(find.text('Add').hitTestable());
-    await pumpUntilFound(tester, find.text('Quick Scan').hitTestable());
-    for (int i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    await tester.tap(find.text('Quick Scan').hitTestable());
-
-    await pumpUntilFound(tester, find.byIcon(Icons.add_a_photo));
-    await tester.tap(find.byIcon(Icons.add_a_photo));
-    await pumpUntilFound(tester, find.text('Group'));
+    await openQuickScanImageForm(tester);
 
     // Select group 1 → config-A field set.
     await selectDropdown(tester, 'groupId', real.name);
-    expect(_dropdown('paidByUserId'), findsOneWidget, reason: 'A: paid-by shown');
-    expect(_dropdown('status'), findsNothing, reason: 'A: status hidden');
+    expect(quickScanDropdown('paidByUserId'), findsOneWidget,
+        reason: 'A: paid-by shown');
+    expect(quickScanDropdown('status'), findsNothing, reason: 'A: status hidden');
     expect(find.byType(CategorySelectField), findsOneWidget,
         reason: 'A: categories shown');
     expect(find.byType(TagSelectField), findsNothing, reason: 'A: tags hidden');
 
     // Switch to group 2 → the field set flips to config B.
     await selectDropdown(tester, 'groupId', group2.name);
-    expect(_dropdown('paidByUserId'), findsNothing, reason: 'B: paid-by hidden');
-    expect(_dropdown('status'), findsOneWidget, reason: 'B: status shown');
+    expect(quickScanDropdown('paidByUserId'), findsNothing,
+        reason: 'B: paid-by hidden');
+    expect(quickScanDropdown('status'), findsOneWidget, reason: 'B: status shown');
     expect(find.byType(CategorySelectField), findsNothing,
         reason: 'B: categories hidden');
     expect(find.byType(TagSelectField), findsOneWidget, reason: 'B: tags shown');
 
     // Group 2's status is shown+required and empty → submit is blocked with the
     // fix-error snackbar (a required field other than the categories case above).
-    await pumpUntilFound(tester, find.byType(BottomSubmitButton).hitTestable());
-    await tester.tap(find.byType(BottomSubmitButton));
-    await pumpUntilFound(
-      tester,
-      find.textContaining('Please fix error on quick scan'),
-      timeout: const Duration(seconds: 10),
-    );
+    await expectQuickScanSubmitBlocked(tester);
+  });
+
+  testWidgets('paid-by required + empty blocks submit', (tester) async {
+    await enableAiPoweredReceiptsForTest();
+    await installDocumentScannerMock();
+    await binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => binding.setSurfaceSize(null));
+
+    await loginAsAdmin(tester);
+
+    // Only paid-by shown+required; everything else off so paid-by is the sole
+    // blocker.
+    final group = await configureFirstGroup(tester, (b) => b
+      ..groupReceiptSettings.quickScanPaidByEnabled = true
+      ..groupReceiptSettings.quickScanPaidByRequired = true
+      ..groupReceiptSettings.quickScanStatusEnabled = false
+      ..groupReceiptSettings.quickScanStatusRequired = false
+      ..groupReceiptSettings.quickScanCategoriesEnabled = false
+      ..groupReceiptSettings.quickScanCategoriesRequired = false
+      ..groupReceiptSettings.quickScanTagsEnabled = false
+      ..groupReceiptSettings.quickScanTagsRequired = false);
+
+    await openQuickScanImageForm(tester);
+    await selectDropdown(tester, 'groupId', group.name);
+    expect(quickScanDropdown('paidByUserId'), findsOneWidget,
+        reason: 'paid-by shown');
+
+    // Paid-by required and left empty → submit blocked.
+    await expectQuickScanSubmitBlocked(tester);
+  });
+
+  testWidgets('tags required + empty blocks submit', (tester) async {
+    await enableAiPoweredReceiptsForTest();
+    await installDocumentScannerMock();
+    await binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => binding.setSurfaceSize(null));
+
+    await loginAsAdmin(tester);
+
+    // Only tags shown+required. Tags-required is enforced at submit (no field
+    // validator), so this exercises the submit-side check specifically.
+    final group = await configureFirstGroup(tester, (b) => b
+      ..groupReceiptSettings.quickScanPaidByEnabled = false
+      ..groupReceiptSettings.quickScanPaidByRequired = false
+      ..groupReceiptSettings.quickScanStatusEnabled = false
+      ..groupReceiptSettings.quickScanStatusRequired = false
+      ..groupReceiptSettings.quickScanCategoriesEnabled = false
+      ..groupReceiptSettings.quickScanCategoriesRequired = false
+      ..groupReceiptSettings.quickScanTagsEnabled = true
+      ..groupReceiptSettings.quickScanTagsRequired = true);
+
+    await openQuickScanImageForm(tester);
+    await selectDropdown(tester, 'groupId', group.name);
+    expect(find.byType(TagSelectField), findsOneWidget, reason: 'tags shown');
+
+    // Tags required and left empty → submit blocked.
+    await expectQuickScanSubmitBlocked(tester);
   });
 }

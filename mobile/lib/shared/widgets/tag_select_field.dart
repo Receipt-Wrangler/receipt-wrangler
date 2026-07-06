@@ -43,7 +43,7 @@ class _TagSelectField extends State<TagSelectField> {
 
   void showTagMultiSelect() {
     showMultiselectBottomSheet(
-        contextModel.shellContext,
+        contextModel.resolveSheetContext(context),
         "Select Tags",
         "Select",
         tagModel.tagsForGroup(widget.groupId),

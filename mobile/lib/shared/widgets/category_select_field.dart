@@ -43,7 +43,7 @@ class _CategorySelectField extends State<CategorySelectField> {
 
   void showCategoryMultiSelect() {
     showMultiselectBottomSheet(
-        contextModel.shellContext,
+        contextModel.resolveSheetContext(context),
         "Select Categories",
         "Select",
         categoryModel.categoriesForGroup(widget.groupId),

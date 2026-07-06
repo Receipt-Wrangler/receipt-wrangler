@@ -399,6 +399,89 @@ Future<void> deleteTag(int tagId, {required String jwt}) async {
   }
 }
 
+/// The admin's first non-"All" group (id + name), read via the API. Use to
+/// target a group for config persistence + dropdown selection before login.
+/// Every group `GET /group/` returns for the admin has the admin as a member, so
+/// the group's paid-by dropdown always includes the admin.
+Future<({int id, String name})> firstNonAllGroup(String jwt) async {
+  final groups = await _adminGroups(jwt);
+  final g = groups.firstWhere((x) => x['isAllGroup'] != true,
+      orElse: () => throw StateError('no non-all group for the admin'));
+  return (id: g['id'] as int, name: g['name'] as String);
+}
+
+Future<List<Map<String, dynamic>>> _adminGroups(String jwt) async {
+  final res = await http
+      .get(Uri.parse('${E2eEnv.baseUrl}/group/'), headers: _auth(jwt))
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('GET /group/ failed: HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as List).cast<Map<String, dynamic>>();
+}
+
+/// Builds an `UpdateGroupReceiptSettingsCommand` from a settings map, applying
+/// [overrides]. Only the hide* + quick-scan enabled/required flags are sent -- the
+/// default enum fields (`quickScanDefaultPaidByType` / `...Status`) are omitted
+/// because the backend keeps them and rejects an empty enum, so we never echo one
+/// back. (This is why persisted configs keep paid-by/status *required*: making
+/// them optional would need a persisted default the backend enforces.)
+Map<String, dynamic> _settingsToCommand(
+  Map<String, dynamic> s, {
+  Map<String, dynamic> overrides = const {},
+}) =>
+    {
+      for (final k in const [
+        'hideImages', 'hideReceiptCategories', 'hideReceiptTags',
+        'hideItemCategories', 'hideItemTags', 'hideComments',
+        'hideShareCategories', 'hideShareTags',
+        'quickScanPaidByEnabled', 'quickScanPaidByRequired',
+        'quickScanStatusEnabled', 'quickScanStatusRequired',
+        'quickScanCategoriesEnabled', 'quickScanCategoriesRequired',
+        'quickScanTagsEnabled', 'quickScanTagsRequired',
+      ])
+        k: s[k] ?? false,
+      ...overrides,
+    };
+
+Future<void> _putGroupReceiptSettings(
+    int groupId, String jwt, Map<String, dynamic> command) async {
+  final res = await http
+      .put(Uri.parse('${E2eEnv.baseUrl}/group/$groupId/groupReceiptSettings'),
+          headers: _jsonAuth(jwt), body: jsonEncode(command))
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('PUT groupReceiptSettings($groupId) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+}
+
+/// Persists quick-scan [overrides] (merged over the group's current settings) on
+/// [groupId], restoring the original settings on teardown.
+///
+/// Submit tests must persist -- not client-mutate GroupModel -- because the
+/// backend's `resolveQuickScanFields` validates the submit against the group's
+/// *persisted* config, so client (via AppData at login) and server must agree, as
+/// they do in production. Keep paid-by/status required in [overrides] (see
+/// `_settingsToCommand`).
+Future<void> setGroupQuickScanConfig({
+  required int groupId,
+  required String jwt,
+  required Map<String, dynamic> overrides,
+}) async {
+  final groups = await _adminGroups(jwt);
+  final original = ((groups.firstWhere((x) => x['id'] == groupId,
+              orElse: () => throw StateError('group $groupId not found'))[
+          'groupReceiptSettings']) as Map)
+      .cast<String, dynamic>();
+  await _putGroupReceiptSettings(
+      groupId, jwt, _settingsToCommand(original, overrides: overrides));
+  addTearDown(() async {
+    final j = await apiLogin();
+    await _putGroupReceiptSettings(groupId, j, _settingsToCommand(original));
+  });
+}
+
 /// Provisions a fresh user and (optionally) a fixture group it belongs to,
 /// registering `addTearDown` to delete the group and user afterwards.
 ///

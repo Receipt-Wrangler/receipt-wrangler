@@ -7,9 +7,11 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
+import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/models/category_model.dart';
 import 'package:receipt_wrangler_mobile/models/context_model.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
+import 'package:receipt_wrangler_mobile/models/loading_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_preferences_model.dart';
@@ -117,6 +119,10 @@ Future<GlobalKey<FormBuilderState>> _pumpFormGroups(
         ChangeNotifierProvider<CategoryModel>(create: (_) => CategoryModel()),
         ChangeNotifierProvider<TagModel>(create: (_) => TagModel()),
         ChangeNotifierProvider<ContextModel>(create: (_) => ContextModel()),
+        // The category/tag pickers open a fullscreen sheet whose TopAppBar reads
+        // these two; needed once a test taps a picker open.
+        ChangeNotifierProvider<AuthModel>(create: (_) => AuthModel()),
+        ChangeNotifierProvider<LoadingModel>(create: (_) => LoadingModel()),
       ],
       child: MaterialApp(
         home: Scaffold(
@@ -380,5 +386,29 @@ void main() {
     expect(paidBy.validator, isNotNull, reason: 'required in group B');
     expect(paidBy.validator!(null), isNotNull,
         reason: 'empty fails after switch');
+  });
+
+  testWidgets('tapping Categories opens the picker with no shell context',
+      (tester) async {
+    // ContextModel.shellContext is null in this harness — the same condition as
+    // the real Quick Scan flow, which never mounts the receipt-form screen that
+    // sets it. Pre-fix this tap crashed via Navigator.of(null); the fix falls
+    // back to the field's own (mounted) context so the picker opens.
+    await _pumpForm(tester, settings: _settings(categoriesEnabled: true));
+
+    await tester.tap(find.text('No Categories selected'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Select Categories'), findsOneWidget);
+  });
+
+  testWidgets('tapping Tags opens the picker with no shell context',
+      (tester) async {
+    await _pumpForm(tester, settings: _settings(tagsEnabled: true));
+
+    await tester.tap(find.text('No Tags selected'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Select Tags'), findsOneWidget);
   });
 }
