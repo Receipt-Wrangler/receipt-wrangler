@@ -107,4 +107,98 @@ void main() {
       timeout: const Duration(seconds: 10),
     );
   });
+
+  testWidgets('quick scan form re-reads config when the group changes',
+      (tester) async {
+    await enableAiPoweredReceiptsForTest();
+    await installDocumentScannerMock();
+    await binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => binding.setSurfaceSize(null));
+
+    await loginAsAdmin(tester);
+
+    // Two groups with opposite configs. Group 1 is the admin's real group
+    // rebuilt with config A; group 2 is a clone with a fresh id + name and the
+    // inverse config B. Injected via the live GroupModel (deterministic, no
+    // reliance on the API persisting the new fields).
+    final ctx = tester.element(find.byType(Scaffold).first);
+    final groupModel = Provider.of<GroupModel>(ctx, listen: false);
+    final real = groupModel.groups.firstWhere((g) => !g.isAllGroup);
+    final group2Id =
+        groupModel.groups.fold<int>(0, (m, g) => g.id > m ? g.id : m) + 1;
+
+    // Config A: paid-by shown+optional, status hidden, categories shown+required,
+    // tags hidden.
+    final group1 = real.rebuild((b) => b
+      ..groupReceiptSettings.quickScanPaidByEnabled = true
+      ..groupReceiptSettings.quickScanPaidByRequired = false
+      ..groupReceiptSettings.quickScanStatusEnabled = false
+      ..groupReceiptSettings.quickScanStatusRequired = false
+      ..groupReceiptSettings.quickScanCategoriesEnabled = true
+      ..groupReceiptSettings.quickScanCategoriesRequired = true
+      ..groupReceiptSettings.quickScanTagsEnabled = false
+      ..groupReceiptSettings.quickScanTagsRequired = false);
+
+    // Config B: paid-by hidden, status shown+required, categories hidden,
+    // tags shown+optional. Distinct id/name so it's a separate dropdown entry.
+    final group2 = real.rebuild((b) => b
+      ..id = group2Id
+      ..name = 'E2E Switch Group B'
+      ..groupReceiptSettings.id = group2Id
+      ..groupReceiptSettings.groupId = group2Id
+      ..groupReceiptSettings.quickScanPaidByEnabled = false
+      ..groupReceiptSettings.quickScanPaidByRequired = false
+      ..groupReceiptSettings.quickScanStatusEnabled = true
+      ..groupReceiptSettings.quickScanStatusRequired = true
+      ..groupReceiptSettings.quickScanCategoriesEnabled = false
+      ..groupReceiptSettings.quickScanCategoriesRequired = false
+      ..groupReceiptSettings.quickScanTagsEnabled = true
+      ..groupReceiptSettings.quickScanTagsRequired = false);
+
+    // Keep only the all-group placeholder(s) plus our two configured groups so
+    // the group dropdown is short and both entries are on-screen. The seeded
+    // admin can accumulate many groups; an appended entry would land below the
+    // dropdown menu's viewport, where `find.text` can't reach it.
+    final allGroups = groupModel.groups.where((g) => g.isAllGroup).toList();
+    groupModel.setGroups([...allGroups, group1, group2]);
+    await tester.pump();
+
+    // Open Add → Quick Scan and add an image so the per-image form mounts.
+    await tester.tap(find.text('Add').hitTestable());
+    await pumpUntilFound(tester, find.text('Quick Scan').hitTestable());
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.tap(find.text('Quick Scan').hitTestable());
+
+    await pumpUntilFound(tester, find.byIcon(Icons.add_a_photo));
+    await tester.tap(find.byIcon(Icons.add_a_photo));
+    await pumpUntilFound(tester, find.text('Group'));
+
+    // Select group 1 → config-A field set.
+    await selectDropdown(tester, 'groupId', real.name);
+    expect(_dropdown('paidByUserId'), findsOneWidget, reason: 'A: paid-by shown');
+    expect(_dropdown('status'), findsNothing, reason: 'A: status hidden');
+    expect(find.byType(CategorySelectField), findsOneWidget,
+        reason: 'A: categories shown');
+    expect(find.byType(TagSelectField), findsNothing, reason: 'A: tags hidden');
+
+    // Switch to group 2 → the field set flips to config B.
+    await selectDropdown(tester, 'groupId', group2.name);
+    expect(_dropdown('paidByUserId'), findsNothing, reason: 'B: paid-by hidden');
+    expect(_dropdown('status'), findsOneWidget, reason: 'B: status shown');
+    expect(find.byType(CategorySelectField), findsNothing,
+        reason: 'B: categories hidden');
+    expect(find.byType(TagSelectField), findsOneWidget, reason: 'B: tags shown');
+
+    // Group 2's status is shown+required and empty → submit is blocked with the
+    // fix-error snackbar (a required field other than the categories case above).
+    await pumpUntilFound(tester, find.byType(BottomSubmitButton).hitTestable());
+    await tester.tap(find.byType(BottomSubmitButton));
+    await pumpUntilFound(
+      tester,
+      find.textContaining('Please fix error on quick scan'),
+      timeout: const Duration(seconds: 10),
+    );
+  });
 }
