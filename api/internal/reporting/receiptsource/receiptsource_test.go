@@ -411,40 +411,62 @@ func TestSource_UnknownCustomFieldValueIsSkipped(t *testing.T) {
 	}
 }
 
-// Where a receipt somehow carries two values for one field, the first that
-// resolves wins, so the row is deterministic.
-func TestSource_DuplicateCustomFieldValues(t *testing.T) {
-	first, second := dec("1.00"), dec("2.00")
-	receipt := models.Receipt{CustomFields: []models.CustomFieldValue{
-		{CustomFieldId: hstFieldID, CurrencyValue: &first},
-		{CustomFieldId: hstFieldID, CurrencyValue: &second},
+// Where a receipt carries two values for one field, the lowest id wins — and it
+// wins whichever order the association came back in.
+//
+// Position cannot decide this. The association is loaded without an ORDER BY, so
+// "the first one" is whatever the database felt like returning, and a report
+// whose numbers depend on that is not deterministic.
+func TestSource_DuplicateCustomFieldValuesResolveByLowestId(t *testing.T) {
+	lower, higher := dec("1.00"), dec("2.00")
+
+	ascending := models.Receipt{CustomFields: []models.CustomFieldValue{
+		{BaseModel: models.BaseModel{ID: 10}, CustomFieldId: hstFieldID, CurrencyValue: &lower},
+		{BaseModel: models.BaseModel{ID: 20}, CustomFieldId: hstFieldID, CurrencyValue: &higher},
+	}}
+	descending := models.Receipt{CustomFields: []models.CustomFieldValue{
+		{BaseModel: models.BaseModel{ID: 20}, CustomFieldId: hstFieldID, CurrencyValue: &higher},
+		{BaseModel: models.BaseModel{ID: 10}, CustomFieldId: hstFieldID, CurrencyValue: &lower},
 	}}
 
-	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+	source := mustNew(t)
+	for name, receipt := range map[string]models.Receipt{"ascending": ascending, "descending": descending} {
+		t.Run(name, func(t *testing.T) {
+			row := source.Rows([]models.Receipt{receipt})[0]
 
-	values := row.Get("custom_1")
-	if len(values) != 1 {
-		t.Fatalf("got %d values, want 1", len(values))
-	}
-	number, _ := values[0].Decimal()
-	if !number.Equal(dec("1.00")) {
-		t.Errorf("custom_1 = %s, want 1.00", number)
+			values := row.Get("custom_1")
+			if len(values) != 1 {
+				t.Fatalf("got %d values, want 1", len(values))
+			}
+			number, _ := values[0].Decimal()
+			if !number.Equal(dec("1.00")) {
+				t.Errorf("custom_1 = %s, want 1.00 (the value with the lowest id)", number)
+			}
+		})
 	}
 }
 
-// An empty first value must not hide a real second one.
-func TestSource_FirstResolvableCustomFieldValueWins(t *testing.T) {
+// A value that resolves to nothing never wins, so an empty low-id row cannot
+// hide a real one — in either order.
+func TestSource_UnresolvableCustomFieldValueNeverWins(t *testing.T) {
 	amount := dec("2.00")
-	receipt := models.Receipt{CustomFields: []models.CustomFieldValue{
-		{CustomFieldId: hstFieldID},
-		{CustomFieldId: hstFieldID, CurrencyValue: &amount},
-	}}
 
-	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+	empty := models.CustomFieldValue{BaseModel: models.BaseModel{ID: 10}, CustomFieldId: hstFieldID}
+	real := models.CustomFieldValue{BaseModel: models.BaseModel{ID: 20}, CustomFieldId: hstFieldID, CurrencyValue: &amount}
 
-	number, isNumber := row.Measure("custom_1").Decimal()
-	if !isNumber || !number.Equal(dec("2.00")) {
-		t.Errorf("custom_1 = %v, want 2.00", row.Measure("custom_1"))
+	source := mustNew(t)
+	for name, values := range map[string][]models.CustomFieldValue{
+		"empty first": {empty, real},
+		"empty last":  {real, empty},
+	} {
+		t.Run(name, func(t *testing.T) {
+			row := source.Rows([]models.Receipt{{CustomFields: values}})[0]
+
+			number, isNumber := row.Measure("custom_1").Decimal()
+			if !isNumber || !number.Equal(dec("2.00")) {
+				t.Errorf("custom_1 = %v, want 2.00", row.Measure("custom_1"))
+			}
+		})
 	}
 }
 

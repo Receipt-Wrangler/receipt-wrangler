@@ -371,6 +371,32 @@ add 'arithmetic-type-never-currency' 'validate.go' \
 			return TypeNumber
 		}'
 
+# --- receiptsource: the receipt mapping -------------------------------------
+
+# TestSource_DuplicateCustomFieldValuesResolveByLowestId — position cannot decide
+# which of two values for one field wins, because the association is loaded
+# without an ORDER BY.
+add 'custom-field-first-in-slice-wins' 'receiptsource/receiptsource.go' \
+'		if incumbent, held := winners[key]; held && incumbent <= customFieldValue.ID {
+			continue
+		}' \
+'		if _, held := winners[key]; held {
+			continue
+		}'
+
+# TestSource_UnresolvableCustomFieldValueNeverWins — an empty value must not
+# claim the field and lock out a real one.
+add 'unresolvable-custom-field-value-wins' 'receiptsource/receiptsource.go' \
+'		value, ok := s.customFieldValue(customFieldValue)
+		if !ok {
+			continue
+		}
+
+		winners[key] = customFieldValue.ID' \
+'		value, _ := s.customFieldValue(customFieldValue)
+
+		winners[key] = customFieldValue.ID'
+
 # ----------------------------------------------------------------------------
 
 green() { printf '\033[32m%s\033[0m' "$1"; }
@@ -415,6 +441,7 @@ if mutated == original:
     sys.stderr.write("replacement changed nothing\n")
     sys.exit(1)
 
+os.makedirs(os.path.dirname(mutant), exist_ok=True)
 open(mutant, "w").write(mutated)
 open(overlay, "w").write(json.dumps({"Replace": {source_file: mutant}}))
 PY
@@ -427,8 +454,9 @@ PY
     ran=$((ran + 1))
 
     # Rule 3: -count=1, or the cache serves the previous mutation's verdict.
+    # The ... matters: receiptsource is mutated too, and its tests live with it.
     exit_code=0
-    output="$(cd "${module_dir}" && go test -count=1 -overlay="${overlay}" ./internal/reporting/ 2>&1)" || exit_code=$?
+    output="$(cd "${module_dir}" && go test -count=1 -overlay="${overlay}" ./internal/reporting/... 2>&1)" || exit_code=$?
 
     # One awk, not `grep | head`: under `set -o pipefail`, head closing the pipe
     # hands grep a SIGPIPE and the failed pipeline takes the script down.

@@ -196,12 +196,27 @@ func (s Source) row(receipt *models.Receipt) reporting.Row {
 
 // addCustomFields resolves each of a receipt's custom field values against its
 // definition. A field the receipt carries no value for simply has no entry,
-// which reads as null when measured and as (None) when grouped. Where a receipt
-// holds several values for one field, the first that resolves wins.
+// which reads as null when measured and as (None) when grouped.
+//
+// Where a receipt holds several values for one field, the one with the lowest id
+// wins. Nothing stops it holding several: custom_field_values carries no unique
+// index on (receipt_id, custom_field_id), and a receipt update replaces the
+// association with whatever the request contained. Preferring whichever came
+// back first would hand the answer to the database, since the association is
+// loaded without an ORDER BY — and a report whose numbers depend on row order is
+// the one thing this package must not produce.
+//
+// A value that does not resolve never wins, so an empty low-id row cannot hide a
+// real one. Ties are only possible between rows that were never persisted, since
+// a saved row has a distinct id; among those the first still wins.
 func (s Source) addCustomFields(row reporting.Row, receipt *models.Receipt) {
+	// The id of the value currently holding each field.
+	winners := make(map[reporting.FieldKey]uint, len(receipt.CustomFields))
+
 	for _, customFieldValue := range receipt.CustomFields {
 		key := CustomFieldKey(customFieldValue.CustomFieldId)
-		if _, resolved := row[key]; resolved {
+
+		if incumbent, held := winners[key]; held && incumbent <= customFieldValue.ID {
 			continue
 		}
 
@@ -209,6 +224,8 @@ func (s Source) addCustomFields(row reporting.Row, receipt *models.Receipt) {
 		if !ok {
 			continue
 		}
+
+		winners[key] = customFieldValue.ID
 		row[key] = []reporting.Value{value}
 	}
 }
