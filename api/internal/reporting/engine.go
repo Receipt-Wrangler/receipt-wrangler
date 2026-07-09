@@ -148,7 +148,9 @@ func (n *buildNode) child(value Value) *buildNode {
 		return existing
 	}
 
-	created := newBuildNode(value)
+	// The canonical member of the class the key names, so the bucket's reported
+	// value cannot depend on which member arrived first.
+	created := newBuildNode(value.canonical())
 	n.childByKey[key] = created
 	n.children = append(n.children, created)
 
@@ -177,7 +179,7 @@ func (e engineRun) bucket(leaf *buildNode, value Value) *detailBucket {
 		return existing
 	}
 
-	created := &detailBucket{value: value, accumulators: e.newAccumulators()}
+	created := &detailBucket{value: value.canonical(), accumulators: e.newAccumulators()}
 	leaf.bucketByKey[key] = created
 	leaf.buckets = append(leaf.buckets, created)
 

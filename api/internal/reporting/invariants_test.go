@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 // This file holds the laws every ReportModel obeys, whatever the spec and
@@ -282,9 +283,16 @@ func serializeCells(cells []Cell) string {
 	return strings.Join(parts, " ")
 }
 
-// serializeValue renders a value canonically. A number renders through the
-// decimal's own normalization, so 200 and 200.00 serialize alike, and a date
-// through its absolute instant.
+// serializeValue renders everything about a value that a renderer can observe.
+//
+// A number renders through the decimal's own normalization, so 200 and 200.00
+// serialize alike. A date renders as its wall clock and zone offset — not
+// through bucketKey, and not normalized to UTC, because both of those erase the
+// location, and the location is exactly what a renderer formats a group header
+// from. A law must not be derived from the code it judges: an earlier draft
+// serialized dates with bucketKey and so agreed that two zones naming one
+// instant were interchangeable, which is the one thing the determinism laws
+// exist to deny.
 func serializeValue(value Value) string {
 	switch value.Type() {
 	case ValueNull:
@@ -299,7 +307,8 @@ func serializeValue(value Value) string {
 		flag, _ := value.Boolean()
 		return fmt.Sprintf("b%v", flag)
 	case ValueDate:
-		return "d" + bucketKey(value)
+		instant, _ := value.Time()
+		return "d" + instant.Format(time.RFC3339Nano)
 	}
 	return "?"
 }

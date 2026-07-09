@@ -182,6 +182,112 @@ func TestBucketKey_DatesAreLocationIndependent(t *testing.T) {
 	}
 }
 
+// Sharing a bucket key is not the same as being interchangeable in the output.
+//
+// A bucket keeps whichever value created it first and discards the rest, so the
+// value it reports must not depend on which arrived. Dates compare by instant,
+// which means two Values naming one instant in two zones are "equal" and merge —
+// yet Value.Time() hands a renderer back the raw time.Time with its location, so
+// a group header formatted as a calendar day would read 2026-05-01 or 2026-04-30
+// depending on the order the rows arrived in.
+//
+// The two instants below straddle midnight precisely so that a date-only format
+// disagrees. This is the same defect class as the UnixNano key above, one layer
+// up: the equivalence class is right, the representative was arbitrary.
+func TestRun_DateBucketIsLocationIndependent(t *testing.T) {
+	catalog, err := NewFieldCatalog(
+		FieldRef{Key: "date", Label: "Date", DataType: TypeDate},
+	)
+	if err != nil {
+		t.Fatalf("NewFieldCatalog() error = %v", err)
+	}
+
+	spec := ReportSpec{
+		GroupBy: []FieldKey{"date"},
+		Columns: []Column{{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}}},
+	}
+
+	utc := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	eastern := time.Date(2026, 4, 30, 19, 0, 0, 0, time.FixedZone("est", -5*3600))
+
+	if !utc.Equal(eastern) {
+		t.Fatalf("the fixture is wrong: these must name one instant")
+	}
+	if utc.Format(time.DateOnly) == eastern.Format(time.DateOnly) {
+		t.Fatalf("the fixture is wrong: these must format as different calendar days")
+	}
+
+	forward := []Row{{"date": {DateVal(utc)}}, {"date": {DateVal(eastern)}}}
+	backward := []Row{{"date": {DateVal(eastern)}}, {"date": {DateVal(utc)}}}
+
+	first, err := Run(spec, catalog, forward, MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	second, err := Run(spec, catalog, backward, MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(first.Root.Children) != 1 {
+		t.Fatalf("one instant produced %d buckets, want 1", len(first.Root.Children))
+	}
+
+	// Not Value.String(), which normalizes to UTC and so cannot see this. A
+	// renderer reads Value.Time() and formats it in the location it carries.
+	forwardTime, _ := first.Root.Children[0].Value.Time()
+	backwardTime, _ := second.Root.Children[0].Value.Time()
+
+	if forwardTime.Format(time.RFC3339Nano) != backwardTime.Format(time.RFC3339Nano) {
+		t.Errorf("reversing the input changed the bucket's date:\n  forward  = %s\n  backward = %s",
+			forwardTime.Format(time.RFC3339Nano), backwardTime.Format(time.RFC3339Nano))
+	}
+	if forwardTime.Format(time.DateOnly) != backwardTime.Format(time.DateOnly) {
+		t.Errorf("reversing the input changed the bucket's calendar day: %s vs %s",
+			forwardTime.Format(time.DateOnly), backwardTime.Format(time.DateOnly))
+	}
+}
+
+// A date bucket's representative is canonical, so a renderer never sees an
+// arbitrary one of the zones the rows happened to carry.
+func TestRun_DateBucketsAreEmittedInUTC(t *testing.T) {
+	catalog, err := NewFieldCatalog(
+		FieldRef{Key: "date", Label: "Date", DataType: TypeDate},
+	)
+	if err != nil {
+		t.Fatalf("NewFieldCatalog() error = %v", err)
+	}
+
+	spec := ReportSpec{
+		GroupBy: []FieldKey{"date"},
+		Detail:  DetailSpec{Mode: DetailAggregate, By: "date"},
+		Columns: []Column{{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}}},
+	}
+
+	eastern := time.Date(2026, 4, 30, 19, 0, 0, 0, time.FixedZone("est", -5*3600))
+	model, err := Run(spec, catalog, []Row{{"date": {DateVal(eastern)}}}, MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	group := model.Root.Children[0]
+	groupTime, _ := group.Value.Time()
+	if groupTime.Location() != time.UTC {
+		t.Errorf("group bucket value is in %v, want UTC", groupTime.Location())
+	}
+	if !groupTime.Equal(eastern) {
+		t.Errorf("canonicalizing moved the instant: %v != %v", groupTime, eastern)
+	}
+
+	detailTime, _ := group.DetailRows[0].Value.Time()
+	if detailTime.Location() != time.UTC {
+		t.Errorf("detail bucket value is in %v, want UTC", detailTime.Location())
+	}
+	if !detailTime.Equal(eastern) {
+		t.Errorf("canonicalizing moved the instant: %v != %v", detailTime, eastern)
+	}
+}
+
 // FuzzBucketKeyMatchesCompare searches for any pair of same-typed values whose
 // bucket key disagrees with their ordering. It is the property that both the
 // date and the number defects violated.

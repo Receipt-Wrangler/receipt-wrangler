@@ -168,10 +168,17 @@ func randomDimensionValues(random *rand.Rand, dimension FieldKey) []Value {
 }
 
 // propertyDates deliberately includes the pathological instants, not merely a
-// spread of ordinary ones. The first two are distinct moments that share a
-// UnixNano, so a report grouping on them merges two buckets into one unless the
-// key is faithful. A generator that only produces plausible data only tests the
-// plausible paths.
+// spread of ordinary ones. A generator that only produces plausible data only
+// tests the plausible paths.
+//
+// Two pairs earn their place. The first two entries are distinct moments that
+// share a UnixNano, so a report grouping on them merges two buckets into one
+// unless the key is faithful. The last two are one instant expressed in two
+// zones, straddling midnight so they format as different calendar days: they
+// must merge into a single bucket whose reported value is the same whichever
+// arrived first. Note that the two 12:00 entries are *not* such a pair — one is
+// 12:00Z and the other 11:00Z — which is why the colliding pair had to be added
+// explicitly rather than assumed.
 var propertyDates = []time.Time{
 	time.Time{}, // year 1
 	time.Time{}.Add(math.MaxInt64).Add(math.MaxInt64).Add(2), // year 585, same UnixNano
@@ -179,6 +186,8 @@ var propertyDates = []time.Time{
 	time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
 	time.Date(2026, 5, 1, 12, 0, 0, 0, time.FixedZone("plus-one", 3600)),
 	time.Date(3000, 1, 1, 0, 0, 0, 1, time.UTC),
+	time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),                               // one instant,
+	time.Date(2026, 4, 30, 19, 0, 0, 0, time.FixedZone("minus-five", -18000)), // two zones, two days
 }
 
 func randomDimensionValue(random *rand.Rand, dimension FieldKey) Value {

@@ -256,6 +256,15 @@ add 'null-sorts-first' 'value.go' \
 '		case a.IsNull():
 			return -1'
 
+# TestRun_DateBucketIsLocationIndependent — a bucket must report the canonical
+# member of its class, not whichever member arrived first.
+add 'date-bucket-keeps-an-arbitrary-zone' 'value.go' \
+'	if v.valueType == ValueDate {
+		return DateVal(v.date.UTC())
+	}
+	return v' \
+'	return v'
+
 # --- eval: decimal discipline -----------------------------------------------
 
 # TestEvalArithmetic_DivisionByZeroIsNullNotPanic — shopspring panics on a zero

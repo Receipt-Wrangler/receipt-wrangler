@@ -209,3 +209,29 @@ func bucketKey(v Value) string {
 	}
 	return "z"
 }
+
+// canonical returns the representative of the value's equivalence class under
+// compareValues, and is what a bucket stores.
+//
+// Agreeing with compareValues is only half of what a bucket key owes. A bucket
+// keeps whichever value created it and drops every later one sharing its key, so
+// the value it reports must be a function of the class rather than of which
+// member happened to arrive first.
+//
+// Only dates make the two differ. compareValues orders dates by instant, so a
+// Value naming 2026-05-01T00:00:00Z and one naming 2026-04-30T19:00:00-05:00 are
+// equal and merge — yet Time returns the location each carries, and a renderer
+// formatting a calendar day would print a different day for each. Normalizing to
+// UTC, which is what String and bucketKey already do, settles it. It also drops
+// any monotonic clock reading, which no two Values should be distinguished by.
+//
+// Strings and bools compare by identity, so their classes are singletons. Two
+// equal numbers can still differ in exponent (200 and 200.00), but a number is
+// always a measure and never a dimension, so no number reaches a bucket. Were
+// that ever to change, the exponent would need canonicalizing here too.
+func (v Value) canonical() Value {
+	if v.valueType == ValueDate {
+		return DateVal(v.date.UTC())
+	}
+	return v
+}
