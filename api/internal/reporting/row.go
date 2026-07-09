@@ -17,8 +17,12 @@ func (r Row) Get(key FieldKey) []Value {
 }
 
 // Measure returns the single value a measure field contributes, or null when
-// the field is absent or empty. Measures are single-valued by definition, so a
-// field that somehow resolved to several values contributes only its first.
+// the field is absent or empty.
+//
+// Measures are single-valued: Validate refuses to aggregate a multi-valued
+// field, precisely so that no value is ever silently discarded here. The
+// first-value fallback below is therefore unreachable through Run, and exists
+// only so that a direct caller cannot make this panic.
 func (r Row) Measure(key FieldKey) Value {
 	values := r[key]
 	if len(values) == 0 {

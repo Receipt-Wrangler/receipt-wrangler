@@ -20,6 +20,11 @@ func testCatalog(t *testing.T) FieldCatalog {
 		FieldRef{Key: "paid_by", Label: "Paid By", DataType: TypeString},
 		FieldRef{Key: "date", Label: "Date", DataType: TypeDate},
 		FieldRef{Key: "resolved", Label: "Resolved", DataType: TypeBool},
+		// No receipt field is a multi-valued number, but nothing in the engine
+		// stops a producer from declaring one, so the rules that reject
+		// measuring it need something to reject.
+		FieldRef{Key: "item_amounts", Label: "Item Amounts", DataType: TypeCurrency, Multi: true},
+		FieldRef{Key: "item_counts", Label: "Item Counts", DataType: TypeNumber, Multi: true},
 	)
 	if err != nil {
 		t.Fatalf("NewFieldCatalog() error = %v", err)
@@ -122,6 +127,26 @@ func TestValidate_AcceptsVariations(t *testing.T) {
 			name: "constant arithmetic reads nothing",
 			spec: ReportSpec{
 				Columns: []Column{{Name: "Fixed", Kind: ColumnArithmetic, Expr: "1 + 1"}},
+			},
+		},
+		{
+			// Measuring a multi-valued field is refused; cutting by one, or
+			// showing every value it holds, is not.
+			name: "a multi-valued field may be grouped on and displayed",
+			spec: ReportSpec{
+				GroupBy: []FieldKey{"tag"},
+				Columns: []Column{
+					{Name: "Cats", Kind: ColumnLabel, Field: "category"},
+					{Name: "Amounts", Kind: ColumnLabel, Field: "item_amounts"},
+					{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}},
+				},
+			},
+		},
+		{
+			name: "COUNT is unaffected by multi-valued fields",
+			spec: ReportSpec{
+				GroupBy: []FieldKey{"category"},
+				Columns: []Column{{Name: "Count", Kind: ColumnAggregate, AggSrc: "COUNT()"}},
 			},
 		},
 		{
@@ -312,6 +337,34 @@ func TestValidate_Rejects(t *testing.T) {
 			name:    "count a field",
 			spec:    ReportSpec{Columns: []Column{{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount, Field: "amount"}}}},
 			wantErr: ErrCountTakesNoField,
+		},
+		{
+			// Reading only the first of several amounts would silently lose money.
+			name:    "sum a multi-valued measure",
+			spec:    ReportSpec{Columns: []Column{{Name: "Total", Kind: ColumnAggregate, Agg: Aggregate{Func: AggSum, Field: "item_amounts"}}}},
+			wantErr: ErrMeasureIsMultiValued,
+		},
+		{
+			name:    "average a multi-valued measure",
+			spec:    ReportSpec{Columns: []Column{{Name: "Mean", Kind: ColumnAggregate, Agg: Aggregate{Func: AggAvg, Field: "item_counts"}}}},
+			wantErr: ErrMeasureIsMultiValued,
+		},
+		{
+			name:    "take the maximum of a multi-valued measure",
+			spec:    ReportSpec{Columns: []Column{{Name: "Most", Kind: ColumnAggregate, AggSrc: "MAX(item_amounts)"}}},
+			wantErr: ErrMeasureIsMultiValued,
+		},
+		{
+			// A label over a multi-valued field shows every value, so a formula
+			// cannot silently pick one.
+			name: "arithmetic reads a multi-valued numeric label column",
+			spec: ReportSpec{
+				Columns: []Column{
+					{Name: "Amounts", Kind: ColumnLabel, Field: "item_amounts"},
+					{Name: "Bad", Kind: ColumnArithmetic, Expr: "Amounts * 2"},
+				},
+			},
+			wantErr: ErrMeasureIsMultiValued,
 		},
 		{
 			name:    "aggregate source is not a call",

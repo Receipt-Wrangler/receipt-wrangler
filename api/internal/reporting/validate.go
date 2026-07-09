@@ -30,6 +30,7 @@ var (
 	ErrAggregateFieldRequired = errors.New("aggregate requires a field")
 	ErrAggregateNotMeasure    = errors.New("aggregate field is not a measure")
 	ErrCountTakesNoField      = errors.New("COUNT counts records and takes no field")
+	ErrMeasureIsMultiValued   = errors.New("a multi-valued field cannot be measured")
 
 	ErrUnknownColumnRef        = errors.New("formula references an unknown column")
 	ErrArithmeticNonNumericRef = errors.New("formula references a non-numeric column")
@@ -332,6 +333,15 @@ func compileAggregateColumn(compiled compiledColumn, column Column, catalog Fiel
 			ErrAggregateNotMeasure, column.Name, aggregate.Func, aggregate.Field, field.DataType)
 	}
 
+	// A row resolves a multi-valued field to several values, and a measure reads
+	// one. Rather than silently reading the first and discarding the rest, refuse
+	// the column: whichever answer the author wanted, this is not how to ask for
+	// it. Grouping on such a field, or displaying it, remains fine.
+	if field.Multi {
+		return compiledColumn{}, fmt.Errorf("%w: column %s applies %s to %s",
+			ErrMeasureIsMultiValued, column.Name, aggregate.Func, aggregate.Field)
+	}
+
 	compiled.agg = aggregate
 	compiled.dataType = field.DataType
 
@@ -354,7 +364,7 @@ func compileArithmeticColumn(compiled compiledColumn, column Column) (compiledCo
 }
 
 // validateArithmeticRefs checks that a formula reads only declared columns that
-// actually produce numbers.
+// produce exactly one number.
 func validateArithmeticRefs(column compiledColumn, columns []compiledColumn, byName map[string]int) error {
 	for _, ref := range column.refs {
 		index, declared := byName[ref]
@@ -363,9 +373,21 @@ func validateArithmeticRefs(column compiledColumn, columns []compiledColumn, byN
 		}
 
 		referenced := columns[index]
-		if referenced.kind == ColumnLabel && !referenced.fieldRef.DataType.IsNumeric() {
+		if referenced.kind != ColumnLabel {
+			// Aggregate and arithmetic columns always produce one number.
+			continue
+		}
+
+		if !referenced.fieldRef.DataType.IsNumeric() {
 			return fmt.Errorf("%w: column %s reads %s, which shows a %s",
 				ErrArithmeticNonNumericRef, column.name, ref, referenced.fieldRef.DataType)
+		}
+
+		// A label column over a multi-valued field shows every value, and a
+		// formula cannot silently pick one of them.
+		if referenced.fieldRef.Multi {
+			return fmt.Errorf("%w: column %s reads %s, which shows every value of %s",
+				ErrMeasureIsMultiValued, column.name, ref, referenced.field)
 		}
 	}
 	return nil

@@ -716,6 +716,28 @@ func TestRun_RecordsMode(t *testing.T) {
 	}
 }
 
+// Measuring a multi-valued field is refused by Validate; displaying one shows
+// every value it holds, and drops nothing.
+func TestRun_MultiValuedLabelShowsEveryValue(t *testing.T) {
+	spec := ReportSpec{
+		Columns: []Column{{Name: "Amounts", Kind: ColumnLabel, Field: "item_amounts"}},
+	}
+
+	rows := []Row{{"item_amounts": {Num(dec("10.00")), Num(dec("90.00"))}}}
+	model := mustRun(t, spec, rows)
+
+	values := model.Root.DetailRows[0].Cells[0].Values
+	if len(values) != 2 {
+		t.Fatalf("label cell holds %d values, want 2", len(values))
+	}
+	for index, want := range []string{"10", "90"} {
+		number, isNumber := values[index].Decimal()
+		if !isNumber || !number.Equal(dec(want)) {
+			t.Errorf("value %d = %v, want %s", index, values[index], want)
+		}
+	}
+}
+
 // A cell must not alias the caller's row.
 func TestRun_RecordsModeDoesNotAliasInputRows(t *testing.T) {
 	spec := ReportSpec{
