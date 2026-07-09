@@ -643,6 +643,10 @@ A **pure** report engine: `(ReportSpec + FieldCatalog + []Row + MetaInput) → R
 fetches nothing, renders nothing, reads no clock, and consults no global. Renderers (CSV/XLSX/PDF), a
 dashboard widget, template persistence and HTTP delivery all *call* it; none of them are part of it.
 
+**`internal/reporting/README.md`** is the narrative guide for engineers: the pipeline, the type
+vocabulary, and a worked example carried from input rows through the report tree to the rendered
+table. The section below is the rules digest; the README is where the diagrams are.
+
 **The purity rule is enforceable and must stay true:**
 
 ```bash

@@ -39,4 +39,8 @@
 //
 // The engine emits raw typed values. Currency symbols, separators, and decimal
 // places are presentation, and belong to renderers.
+//
+// See README.md in this directory for a worked example carried from input rows
+// through the report tree to the rendered table, and for why aggregate and
+// arithmetic columns roll up by two different mechanisms.
 package reporting
