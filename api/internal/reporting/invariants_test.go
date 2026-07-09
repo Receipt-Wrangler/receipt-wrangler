@@ -172,13 +172,21 @@ func assertCellCardinality(t *testing.T, model ReportModel, cells []Cell, path s
 	}
 }
 
-// assertSortedByValue: siblings ascend by value, and the (None) bucket is last.
+// assertSortedByValue: siblings ascend by value, are pairwise distinct, and the
+// (None) bucket is last.
+//
+// Distinctness matters as much as order. Two siblings that compare equal are
+// one value split across two buckets, which is what a bucket key finer than
+// equality produces. Since the siblings are sorted, equals are adjacent.
 func assertSortedByValue(t *testing.T, values []Value, path string) {
 	t.Helper()
 
 	for index := 1; index < len(values); index++ {
-		if compareValues(values[index-1], values[index]) > 0 {
+		switch compareValues(values[index-1], values[index]) {
+		case 1:
 			t.Errorf("%s: %v sorts after %v", path, values[index-1], values[index])
+		case 0:
+			t.Errorf("%s: %v appears as two buckets", path, values[index])
 		}
 	}
 	for index, value := range values {
