@@ -28,6 +28,10 @@ var (
 	// ErrBadRoundPlaces is returned when ROUND's second argument is not a small
 	// integer literal.
 	ErrBadRoundPlaces = errors.New("ROUND places must be an integer literal")
+
+	// ErrFormulaTooLong is returned when an expression is longer than any real
+	// formula needs and long enough to be dangerous.
+	ErrFormulaTooLong = errors.New("formula is too long")
 )
 
 // roundFunction is the only function an arithmetic expression may call. The
@@ -39,6 +43,23 @@ const roundFunction = "ROUND"
 // arbitrary number of places would let a user-authored formula allocate without
 // bound, and no report needs more than a handful of digits either way.
 const roundPlacesLimit = 30
+
+// maxFormulaLength bounds the source an expression may be parsed from.
+//
+// The expression language caps the tree it will build at ten thousand nodes, and
+// that cap is often mistaken for a bound on the work parsing costs. It is not.
+// Parentheses group without producing a node, so they are never counted, and the
+// parser descends through several frames for each one. Nesting is therefore
+// bounded only by the goroutine stack: measured at roughly 640 bytes of stack
+// per parenthesis, Go's default one-gigabyte ceiling falls at about 1.6 million
+// of them — a few megabytes of source. A Go stack overflow is a fatal error that
+// recover cannot catch, so it takes the process down rather than the request.
+//
+// Bounding the input is the fix, for the same reason roundPlacesLimit and
+// maxDivisionScale are bounded: a template a user authored must not be able to
+// ask for unbounded work. A kilobyte is far longer than any real formula and
+// leaves the parser at most a few hundred frames deep.
+const maxFormulaLength = 1024
 
 // reservedWords are identifiers the expression language treats as operators or
 // keywords. A column may not be named one of these, since a formula referencing
@@ -79,6 +100,10 @@ func isReservedWord(name string) bool {
 // how the XLSX renderer translates a column expression into a live spreadsheet
 // formula.
 func ParseArithmetic(src string) (ast.Node, error) {
+	if err := checkFormulaLength(src); err != nil {
+		return nil, err
+	}
+
 	tree, err := parser.Parse(src)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrFormulaSyntax, err)
@@ -96,6 +121,10 @@ func ParseArithmetic(src string) (ast.Node, error) {
 //
 // Field names are not resolved here; Validate checks them against the catalog.
 func ParseAggregate(src string) (Aggregate, error) {
+	if err := checkFormulaLength(src); err != nil {
+		return Aggregate{}, err
+	}
+
 	tree, err := parser.Parse(src)
 	if err != nil {
 		return Aggregate{}, fmt.Errorf("%w: %s", ErrFormulaSyntax, err)
@@ -145,6 +174,16 @@ func ParseAggregate(src string) (Aggregate, error) {
 	}
 
 	return Aggregate{Func: aggFunc, Field: FieldKey(field.Value)}, nil
+}
+
+// checkFormulaLength refuses source long enough to make parsing it expensive.
+// It runs before the parser, because the parser is what would be made to do the
+// work.
+func checkFormulaLength(src string) error {
+	if len(src) > maxFormulaLength {
+		return fmt.Errorf("%w: %d bytes, limit is %d", ErrFormulaTooLong, len(src), maxFormulaLength)
+	}
+	return nil
 }
 
 // columnRefs returns the distinct column names an arithmetic expression

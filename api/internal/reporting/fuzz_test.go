@@ -107,7 +107,7 @@ func assertFormulaError(t *testing.T, source string, err error) {
 
 	sentinels := []error{
 		ErrFormulaSyntax, ErrFormulaUnsupported, ErrUnknownFunction,
-		ErrBadCallArity, ErrBadRoundPlaces,
+		ErrBadCallArity, ErrBadRoundPlaces, ErrFormulaTooLong,
 	}
 	for _, sentinel := range sentinels {
 		if errors.Is(err, sentinel) {

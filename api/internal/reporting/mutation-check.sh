@@ -265,6 +265,18 @@ add 'date-bucket-keeps-an-arbitrary-zone' 'value.go' \
 	return v' \
 '	return v'
 
+# --- formula: the allow-list and the bounds ---------------------------------
+
+# TestParseArithmetic_SizeLimits — the node cap does not bound parenthesis
+# nesting, because a parenthesis builds no node. Only the length check does.
+add 'formula-length-unbounded' 'formula.go' \
+'	if len(src) > maxFormulaLength {
+		return fmt.Errorf("%w: %d bytes, limit is %d", ErrFormulaTooLong, len(src), maxFormulaLength)
+	}
+	return nil' \
+'	_ = src
+	return nil'
+
 # --- eval: decimal discipline -----------------------------------------------
 
 # TestEvalArithmetic_DivisionByZeroIsNullNotPanic — shopspring panics on a zero

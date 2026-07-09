@@ -1,6 +1,7 @@
 package reporting
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -193,34 +194,81 @@ func TestRun_NullExtremesMergeWithRealOnes(t *testing.T) {
 	assertRow(t, model.GrandTotals, map[string]string{"Least": "4.00", "Total": "4.00"})
 }
 
-// The expression language caps the size of a tree it will build, so a formula
-// cannot be made to exhaust the stack or the heap. Parentheses add no nodes and
-// so parse to a shallow tree however deeply they nest.
+// A formula's source is bounded before it is parsed, which is the only thing
+// that bounds what parsing costs.
+//
+// It is tempting to rely on the expression language's ten-thousand-node cap
+// instead. That cap counts nodes as they are built, and a parenthesis builds
+// none — it only groups — while the parser descends several frames to read it.
+// Nesting is therefore bounded by the goroutine stack alone: about 640 bytes of
+// stack per parenthesis, so Go's default one-gigabyte ceiling falls near 1.6
+// million of them. Reaching it is a fatal stack overflow, which recover cannot
+// catch and which takes the process, not the request.
+//
+// An earlier version of this test asserted that 50,000 nested parentheses parse
+// fine, and read that as proof the cap protected the stack. It proved only that
+// 50,000 frames fit under the ceiling.
 func TestParseArithmetic_SizeLimits(t *testing.T) {
-	t.Run("a very long chain is refused, not fatal", func(t *testing.T) {
-		source := "a" + strings.Repeat("+a", 20000)
+	// One long identifier, so the two cases differ by exactly the one byte the
+	// bound is stated in.
+	t.Run("a formula at exactly the limit is accepted", func(t *testing.T) {
+		source := strings.Repeat("a", maxFormulaLength)
+
+		if _, err := ParseArithmetic(source); err != nil {
+			t.Errorf("a formula of exactly %d bytes was refused: %v", maxFormulaLength, err)
+		}
+	})
+
+	t.Run("one byte past the limit is refused", func(t *testing.T) {
+		source := strings.Repeat("a", maxFormulaLength+1)
 
 		node, err := ParseArithmetic(source)
-		if err == nil {
-			t.Fatalf("a %d-term chain parsed", 20000)
+		if !errors.Is(err, ErrFormulaTooLong) {
+			t.Errorf("error = %v, want ErrFormulaTooLong", err)
 		}
 		if node != nil {
 			t.Errorf("a rejected formula returned a node")
 		}
-		assertFormulaError(t, "long chain", err)
 	})
 
-	t.Run("deeply nested parentheses parse to a shallow tree", func(t *testing.T) {
-		depth := 50000
+	t.Run("a realistic chain well inside the limit is accepted", func(t *testing.T) {
+		source := "a" + strings.Repeat("+a", 100)
+
+		if _, err := ParseArithmetic(source); err != nil {
+			t.Errorf("a %d-byte chain was refused: %v", len(source), err)
+		}
+	})
+
+	t.Run("nesting deep enough to exhaust the stack never reaches the parser", func(t *testing.T) {
+		// Far below the ~1.6M that overflows, and far above the limit: the point
+		// is that the length check answers before the parser is ever called.
+		depth := 100_000
+		source := strings.Repeat("(", depth) + "a" + strings.Repeat(")", depth)
+
+		if _, err := ParseArithmetic(source); !errors.Is(err, ErrFormulaTooLong) {
+			t.Errorf("error = %v, want ErrFormulaTooLong", err)
+		}
+	})
+
+	t.Run("a long chain is refused by length, not by the node cap", func(t *testing.T) {
+		source := "a" + strings.Repeat("+a", 20000)
+
+		if _, err := ParseArithmetic(source); !errors.Is(err, ErrFormulaTooLong) {
+			t.Errorf("error = %v, want ErrFormulaTooLong", err)
+		}
+	})
+
+	t.Run("nesting within the limit still parses to a shallow tree", func(t *testing.T) {
+		// Parentheses group; they do not build nodes. That remains true, and is
+		// why the node cap could never have bounded them.
+		depth := (maxFormulaLength - 1) / 2
 		source := strings.Repeat("(", depth) + "a" + strings.Repeat(")", depth)
 
 		node, err := ParseArithmetic(source)
 		if err != nil {
 			t.Fatalf("ParseArithmetic() error = %v", err)
 		}
-		// Parentheses group; they do not build nodes.
-		refs := columnRefs(node)
-		if len(refs) != 1 || refs[0] != "a" {
+		if refs := columnRefs(node); len(refs) != 1 || refs[0] != "a" {
 			t.Errorf("columnRefs = %v, want [a]", refs)
 		}
 		if got := evalArithmetic(node, map[string]Value{"a": Num(dec("7"))}, 6); got.String() != "7" {
@@ -234,6 +282,14 @@ func TestParseArithmetic_SizeLimits(t *testing.T) {
 
 		if _, err := ParseArithmetic(source); err == nil {
 			t.Fatalf("a %d-deep call chain parsed", depth)
+		}
+	})
+
+	t.Run("an aggregate source is bounded too", func(t *testing.T) {
+		source := "SUM(" + strings.Repeat("a", maxFormulaLength) + ")"
+
+		if _, err := ParseAggregate(source); !errors.Is(err, ErrFormulaTooLong) {
+			t.Errorf("error = %v, want ErrFormulaTooLong", err)
 		}
 	})
 }
