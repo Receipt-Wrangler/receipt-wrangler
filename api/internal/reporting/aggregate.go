@@ -27,6 +27,20 @@ func (f AggFunc) String() string {
 	return "UNKNOWN"
 }
 
+// valid reports whether the reduction is one the accumulator implements.
+//
+// ParseAggregate can only produce a known reduction, but Aggregate.Func is the
+// canonical form and a persisted template deserializes an integer straight into
+// it. An unknown one would otherwise fall through finalize's switch and render
+// every cell of the column null, at every level, without an error anywhere.
+func (f AggFunc) valid() bool {
+	switch f {
+	case AggSum, AggCount, AggAvg, AggMin, AggMax:
+		return true
+	}
+	return false
+}
+
 // aggFuncFromName resolves a function name to its reduction. Names are matched
 // exactly, so "sum" is not "SUM".
 func aggFuncFromName(name string) (AggFunc, bool) {

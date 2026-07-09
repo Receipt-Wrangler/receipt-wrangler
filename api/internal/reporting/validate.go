@@ -20,6 +20,7 @@ var (
 	ErrGroupByNotDimension = errors.New("groupBy field is not a dimension")
 	ErrDuplicateGroupBy    = errors.New("duplicate groupBy field")
 
+	ErrUnknownDetailMode    = errors.New("unknown detail mode")
 	ErrDetailByRequired     = errors.New("aggregate detail mode requires a dimension")
 	ErrDetailByOnRecords    = errors.New("records detail mode must not set a dimension")
 	ErrDetailByNotDimension = errors.New("detail field is not a dimension")
@@ -27,6 +28,7 @@ var (
 	ErrLabelFieldRequired      = errors.New("label column requires a field")
 	ErrLabelColumnUnresolvable = errors.New("label column has no value on an aggregated detail row")
 
+	ErrUnknownAggFunc         = errors.New("unknown aggregate function")
 	ErrAggregateFieldRequired = errors.New("aggregate requires a field")
 	ErrAggregateNotMeasure    = errors.New("aggregate field is not a measure")
 	ErrCountTakesNoField      = errors.New("COUNT counts records and takes no field")
@@ -189,7 +191,11 @@ func compileGroupBy(keys []FieldKey, catalog FieldCatalog) ([]FieldRef, error) {
 }
 
 func compileDetail(detail DetailSpec, catalog FieldCatalog) (FieldRef, error) {
-	if detail.Mode == DetailRecords {
+	if !detail.Mode.valid() {
+		return FieldRef{}, fmt.Errorf("%w: %d", ErrUnknownDetailMode, detail.Mode)
+	}
+
+	if !detail.isAggregate() {
 		if len(detail.By) > 0 {
 			return FieldRef{}, fmt.Errorf("%w: %s", ErrDetailByOnRecords, detail.By)
 		}
@@ -285,7 +291,7 @@ func compileLabelColumn(compiled compiledColumn, column Column, spec ReportSpec,
 	// do. Aggregated detail rows have no single record to read from: the only
 	// values that exist are the row's own bucket and the buckets of the groups
 	// above it.
-	if spec.Detail.Mode == DetailAggregate && column.Field != spec.Detail.By {
+	if spec.Detail.isAggregate() && column.Field != spec.Detail.By {
 		level := groupByLevel(spec.GroupBy, column.Field)
 		if level < 0 {
 			return compiledColumn{}, fmt.Errorf(
@@ -306,6 +312,11 @@ func compileAggregateColumn(compiled compiledColumn, column Column, catalog Fiel
 			return compiledColumn{}, fmt.Errorf("column %s: %w", column.Name, err)
 		}
 		aggregate = parsed
+	}
+
+	if !aggregate.Func.valid() {
+		return compiledColumn{}, fmt.Errorf("%w: column %s applies reduction %d",
+			ErrUnknownAggFunc, column.Name, aggregate.Func)
 	}
 
 	if aggregate.Func == AggCount {

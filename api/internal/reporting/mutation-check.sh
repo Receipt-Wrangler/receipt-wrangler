@@ -326,6 +326,30 @@ add 'multi-valued-measure-accepted' 'validate.go' \
 ' \
 ''
 
+# TestValidate_Rejects/aggregate with a reduction the accumulator does not know —
+# an unknown reduction renders the whole column null rather than erroring.
+add 'unknown-agg-func-accepted' 'validate.go' \
+'	if !aggregate.Func.valid() {
+		return compiledColumn{}, fmt.Errorf("%w: column %s applies reduction %d",
+			ErrUnknownAggFunc, column.Name, aggregate.Func)
+	}
+' \
+''
+
+# TestValidate_Rejects/detail mode the engine does not know
+add 'unknown-detail-mode-accepted' 'validate.go' \
+'	if !detail.Mode.valid() {
+		return FieldRef{}, fmt.Errorf("%w: %d", ErrUnknownDetailMode, detail.Mode)
+	}
+' \
+''
+
+# No mutation swaps isAggregate() back for `Mode != DetailRecords`. With the mode
+# validated the two spellings agree on every spec that compiles, so the swap is
+# semantically equivalent and would survive by being correct. The predicate earns
+# its place by keeping a third mode from reintroducing the divergence, not by
+# changing today's behaviour — and a mutation nothing can catch teaches nothing.
+
 # TestCompileSpec_DataTypes — money combined with a count is still money.
 add 'arithmetic-type-never-currency' 'validate.go' \
 '		if columns[index].dataType == TypeCurrency {

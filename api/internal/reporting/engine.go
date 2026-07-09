@@ -158,7 +158,7 @@ func (n *buildNode) child(value Value) *buildNode {
 }
 
 func (e engineRun) insertLeaf(leaf *buildNode, row Row) {
-	if e.compiled.spec.Detail.Mode == DetailRecords {
+	if !e.compiled.spec.Detail.isAggregate() {
 		leaf.records = append(leaf.records, row)
 		return
 	}
@@ -209,7 +209,7 @@ func (e engineRun) rollUp(node *buildNode, level int) {
 }
 
 func (e engineRun) rollUpLeaf(leaf *buildNode) {
-	if e.compiled.spec.Detail.Mode == DetailRecords {
+	if !e.compiled.spec.Detail.isAggregate() {
 		for _, record := range leaf.records {
 			e.addRow(leaf.accumulators, record)
 		}
@@ -283,7 +283,7 @@ func (e engineRun) emitGroup(node *buildNode, level int, path []Value) GroupNode
 }
 
 func (e engineRun) emitDetailRows(leaf *buildNode, path []Value) []DetailRow {
-	if e.compiled.spec.Detail.Mode == DetailRecords {
+	if !e.compiled.spec.Detail.isAggregate() {
 		return e.emitRecordRows(leaf)
 	}
 	return e.emitBucketRows(leaf, path)

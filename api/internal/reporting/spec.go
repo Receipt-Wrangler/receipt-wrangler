@@ -32,6 +32,15 @@ func (m DetailMode) String() string {
 	return "unknown"
 }
 
+// valid reports whether the mode is one the engine implements.
+func (m DetailMode) valid() bool {
+	switch m {
+	case DetailRecords, DetailAggregate:
+		return true
+	}
+	return false
+}
+
 // DetailSpec chooses what the bottom rows of the report are.
 type DetailSpec struct {
 	Mode DetailMode
@@ -40,6 +49,17 @@ type DetailSpec struct {
 	// for DetailRecords.
 	By FieldKey
 }
+
+// isAggregate reports whether the bottom rows are summed buckets rather than
+// source records.
+//
+// It exists to be the single spelling of that question. Asking it as "the mode
+// is not DetailRecords" in one place and "the mode is exactly DetailAggregate"
+// in another agreed on every valid spec and disagreed on every invalid one, so
+// an unknown mode took the aggregate path everywhere but the label-column check,
+// which it skipped. Validate now rejects an unknown mode outright, and this
+// predicate keeps the two readings from drifting apart again.
+func (d DetailSpec) isAggregate() bool { return d.Mode == DetailAggregate }
 
 // EngineConfig tunes numeric behavior.
 type EngineConfig struct {

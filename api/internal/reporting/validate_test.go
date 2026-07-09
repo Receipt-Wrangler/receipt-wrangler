@@ -354,6 +354,42 @@ func TestValidate_Rejects(t *testing.T) {
 			spec:    ReportSpec{Columns: []Column{{Name: "Most", Kind: ColumnAggregate, AggSrc: "MAX(item_amounts)"}}},
 			wantErr: ErrMeasureIsMultiValued,
 		},
+		// ParseAggregate cannot produce a reduction the accumulator does not
+		// know, but Column.Agg is the canonical form and a persisted template
+		// deserializes straight into it. An unknown reduction used to validate
+		// cleanly and then render every cell of the column empty, at every
+		// level, because finalize's switch fell through to null.
+		{
+			name:    "aggregate with a reduction the accumulator does not know",
+			spec:    ReportSpec{Columns: []Column{{Name: "Total", Kind: ColumnAggregate, Agg: Aggregate{Func: AggFunc(200), Field: "amount"}}}},
+			wantErr: ErrUnknownAggFunc,
+		},
+		{
+			name:    "aggregate one past the last known reduction",
+			spec:    ReportSpec{Columns: []Column{{Name: "Total", Kind: ColumnAggregate, Agg: Aggregate{Func: AggMax + 1, Field: "amount"}}}},
+			wantErr: ErrUnknownAggFunc,
+		},
+		// compileDetail read anything that was not DetailRecords as aggregate,
+		// while compileLabelColumn tested for DetailAggregate exactly. An
+		// unknown mode therefore took the aggregate path everywhere but the
+		// label check, which it skipped — so a label column over any field at
+		// all silently rendered the detail bucket's value instead of its own.
+		{
+			name: "detail mode the engine does not know",
+			spec: ReportSpec{
+				Detail:  DetailSpec{Mode: DetailMode(200), By: "category"},
+				Columns: []Column{countColumn},
+			},
+			wantErr: ErrUnknownDetailMode,
+		},
+		{
+			name: "detail mode one past the last known mode",
+			spec: ReportSpec{
+				Detail:  DetailSpec{Mode: DetailAggregate + 1, By: "category"},
+				Columns: []Column{countColumn},
+			},
+			wantErr: ErrUnknownDetailMode,
+		},
 		{
 			// A label over a multi-valued field shows every value, so a formula
 			// cannot silently pick one.
