@@ -12,6 +12,10 @@ var (
 	// ErrDuplicateField is returned when a catalog is built with two fields
 	// sharing a key.
 	ErrDuplicateField = errors.New("duplicate field key in catalog")
+
+	// ErrInvalidFieldKey is returned when a catalog is built with a key a
+	// formula could not name.
+	ErrInvalidFieldKey = errors.New("field key must be a plain identifier")
 )
 
 // DataType is the type of value a field resolves to. It determines the field's
@@ -82,7 +86,9 @@ func RoleForDataType(dataType DataType) Role {
 }
 
 // FieldKey identifies a field within a catalog. Keys must be valid expression
-// identifiers so that a formula can name one without quoting.
+// identifiers so that a formula can name one without quoting, which
+// NewFieldCatalog enforces: a key such as "unit-price" would tokenize as a
+// subtraction rather than as the field an author meant.
 type FieldKey string
 
 // FieldRef describes one field a report may reference. Built-in fields and
@@ -109,13 +115,17 @@ type FieldCatalog struct {
 	fields map[FieldKey]FieldRef
 }
 
-// NewFieldCatalog builds a catalog, rejecting keyless and duplicated fields.
+// NewFieldCatalog builds a catalog, rejecting keyless, unnameable and duplicated
+// fields.
 func NewFieldCatalog(fields ...FieldRef) (FieldCatalog, error) {
 	catalog := FieldCatalog{fields: make(map[FieldKey]FieldRef, len(fields))}
 
 	for _, field := range fields {
 		if len(field.Key) == 0 {
 			return FieldCatalog{}, fmt.Errorf("%w: %q", ErrEmptyFieldKey, field.Label)
+		}
+		if !isIdentifier(string(field.Key)) {
+			return FieldCatalog{}, fmt.Errorf("%w: %q", ErrInvalidFieldKey, field.Key)
 		}
 		if _, exists := catalog.fields[field.Key]; exists {
 			return FieldCatalog{}, fmt.Errorf("%w: %s", ErrDuplicateField, field.Key)

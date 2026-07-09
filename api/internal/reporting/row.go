@@ -19,10 +19,16 @@ func (r Row) Get(key FieldKey) []Value {
 // Measure returns the single value a measure field contributes, or null when
 // the field is absent or empty.
 //
-// Measures are single-valued: Validate refuses to aggregate a multi-valued
-// field, precisely so that no value is ever silently discarded here. The
-// first-value fallback below is therefore unreachable through Run, and exists
-// only so that a direct caller cannot make this panic.
+// Measures are single-valued, and Validate refuses to aggregate a field the
+// catalog marks Multi, so that no value is ever silently discarded here. That
+// rests on the catalog telling the truth: Multi is a producer's declaration
+// about its own rows, and the engine never checks a row against it. A producer
+// that declares a field scalar and then resolves it to two values still loses
+// the second, here, quietly.
+//
+// The first-value fallback is therefore unreachable through Run over an honest
+// catalog, and exists so that neither a direct caller nor a dishonest one can
+// make this panic.
 func (r Row) Measure(key FieldKey) Value {
 	values := r[key]
 	if len(values) == 0 {

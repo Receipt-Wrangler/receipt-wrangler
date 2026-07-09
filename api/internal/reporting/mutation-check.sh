@@ -181,9 +181,9 @@ add 'leaf-depth-off-by-one' 'engine.go' \
 # TestRun_RecordsMode
 add 'records-and-aggregate-swapped' 'engine.go' \
 'func (e engineRun) emitDetailRows(leaf *buildNode, path []Value) []DetailRow {
-	if e.compiled.spec.Detail.Mode == DetailRecords {' \
+	if !e.compiled.spec.Detail.isAggregate() {' \
 'func (e engineRun) emitDetailRows(leaf *buildNode, path []Value) []DetailRow {
-	if e.compiled.spec.Detail.Mode != DetailRecords {'
+	if e.compiled.spec.Detail.isAggregate() {'
 
 # TestRun_ColumnOrderIsIndependentOfDependencyOrder — arithmetic is evaluated in
 # dependency order, not declaration order.
@@ -370,6 +370,17 @@ add 'arithmetic-type-never-currency' 'validate.go' \
 '		if columns[index].dataType == TypeCurrency {
 			return TypeNumber
 		}'
+
+# --- field: the catalog -----------------------------------------------------
+
+# TestNewFieldCatalog/rejects a key that is not a plain identifier — a key a
+# formula cannot name is not a key.
+add 'catalog-accepts-any-key' 'field.go' \
+'		if !isIdentifier(string(field.Key)) {
+			return FieldCatalog{}, fmt.Errorf("%w: %q", ErrInvalidFieldKey, field.Key)
+		}
+' \
+''
 
 # --- receiptsource: the receipt mapping -------------------------------------
 

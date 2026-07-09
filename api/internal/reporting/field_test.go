@@ -122,4 +122,31 @@ func TestNewFieldCatalog(t *testing.T) {
 			t.Errorf("NewFieldCatalog() error = %v, want %v", err, ErrDuplicateField)
 		}
 	})
+
+	// A key a formula cannot name is not a key. "unit-price" would tokenize as a
+	// subtraction of two identifiers, and "2nd" as a number followed by one.
+	t.Run("rejects a key that is not a plain identifier", func(t *testing.T) {
+		keys := []FieldKey{"unit-price", "unit price", "unit.price", "2nd", "montée", "sum(x)", "$env"}
+
+		for _, key := range keys {
+			t.Run(string(key), func(t *testing.T) {
+				_, err := NewFieldCatalog(FieldRef{Key: key, Label: "Whatever", DataType: TypeString})
+				if !errors.Is(err, ErrInvalidFieldKey) {
+					t.Errorf("NewFieldCatalog(%q) error = %v, want %v", key, err, ErrInvalidFieldKey)
+				}
+			})
+		}
+	})
+
+	t.Run("accepts the keys a receipt source produces", func(t *testing.T) {
+		keys := []FieldKey{"amount", "paid_by", "created_at", "custom_1", "custom_42", "_private"}
+
+		for _, key := range keys {
+			t.Run(string(key), func(t *testing.T) {
+				if _, err := NewFieldCatalog(FieldRef{Key: key, DataType: TypeString}); err != nil {
+					t.Errorf("NewFieldCatalog(%q) error = %v, want nil", key, err)
+				}
+			})
+		}
+	})
 }

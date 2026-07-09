@@ -662,6 +662,13 @@ model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), meta)
 **Caller must preload** `PaidByUser`, `Group`, `Categories`, `Tags`, `CustomFields`. An unloaded
 association resolves to no value, which surfaces as a `(None)` bucket — not an error.
 
+**Known gap — no date truncation.** `date`, `resolved_date` and `created_at` are `TypeDate`, hence
+dimensions, hence groupable — but `receiptsource` hands over a raw timestamp, so grouping by `date`
+buckets on the exact instant and yields **one group per receipt**. "Receipts by month" is not
+expressible today. Closing it means either derived fields in `receiptsource` (`date_month`,
+`date_year`) or a `GroupBy` entry carrying a truncation. Decide before `ReportTemplate` persists a
+`GroupBy` shape.
+
 ### Semantics that are easy to get wrong
 
 | Concern | Rule |
@@ -675,8 +682,12 @@ association resolves to no value, which surfaces as a `(None)` bucket — not an
 | Division by zero | `Null` cell, **never a panic** — `shopspring` panics on a zero divisor, so `evalBinary` guards `IsZero()` first. |
 | Division precision | `DivRound(x, spec.Config.DivisionScale)`. **Never read or write `decimal.DivisionPrecision`** (a mutable process-wide global). |
 | Multi-value fan-out | A receipt with two tags is attributed to **both** buckets in full, so it double-counts, and that double count propagates to the grand total. Intended — matches `services/pie_chart.go`. Two multi-value levels produce a cross product. But only **distinct** values fan out: a receipt tagged `"Alex"` twice is attributed once. |
-| Multi-valued measures | Refused (`ErrMeasureIsMultiValued`). Summing a field that resolves to several values would silently read the first and drop the rest. A `Multi` field is still a fine dimension and a fine display label. |
+| Multi-valued measures | Refused (`ErrMeasureIsMultiValued`). Summing a field that resolves to several values would silently read the first and drop the rest. A `Multi` field is still a fine dimension and a fine display label. Note `Multi` is a **producer's declaration**, never checked against the rows: a catalog that lies loses values in `Row.Measure`. |
 | Bucket keys | Two values share a bucket key **exactly when `compareValues` finds them equal**. Numbers key on `decimal.String()` (canonical, lossless); dates key on `Unix()` seconds + `Nanosecond()` and **never `UnixNano()`**, which is undefined outside 1678–2262 — a zero `time.Time` and a date in 585 share one. A coarser key merges buckets *and* makes the surviving bucket's value depend on input order. |
+| Bucket **values** | A bucket keeps `Value.canonical()`, not whichever member arrived first. Agreeing with `compareValues` is only half the job: dates compare by instant, so one instant in two zones merges, and `Value.Time()` would otherwise hand a renderer an arbitrary one of them (`2026-05-01T00:00:00Z` vs `2026-04-30T19:00:00-05:00` format as different **calendar days**). **Date buckets are emitted in UTC.** A producer wanting calendar-day grouping in a local zone must truncate before handing rows over. |
+| Unknown enums | `Validate` rejects an `AggFunc` or `DetailMode` outside the known set (`ErrUnknownAggFunc`, `ErrUnknownDetailMode`). Both used to fail silently — an unknown reduction fell through `finalize` and blanked the column; an unknown detail mode skipped the label-column check. Ask "is this aggregate mode?" only through `DetailSpec.isAggregate()`; two spellings of it once disagreed. |
+| Formula size | `ParseArithmetic`/`ParseAggregate` refuse source over `maxFormulaLength` (1 KB) **before parsing**. expr's 10k-node cap does *not* bound this: a parenthesis builds no node, so nesting is bounded only by the goroutine stack (~640 B/paren; ~1.6M overflows the default 1 GB), and a Go stack overflow is a fatal error `recover` cannot catch. |
+| Field keys | `NewFieldCatalog` rejects a key that is not a plain identifier (`ErrInvalidFieldKey`). `unit-price` would tokenize as a subtraction. |
 | Empty dimension | Explicit `(None)` bucket (`IsNone: true`, `Value` null). Never dropped. |
 | Ordering | Buckets sort by typed value with `(None)` last; records preserve input order. **Never range a Go map to produce output** (`pie_chart.go` has exactly this bug). |
 | Formatting | The engine emits raw typed values. Currency symbols and decimal places are a renderer's job. |
@@ -723,16 +734,26 @@ Four layers, each catching what the one before it cannot:
 | Properties | `property_test.go` | 400 randomized specs + rows from a fixed seed (`REPORTING_SEED` overrides). Conservation, rollup, AVG exactness, arithmetic recompute, bucket cardinality, determinism. |
 | Fuzz | `fuzz_test.go`, `bucketkey_test.go` | Seed corpora run under plain `go test`. `-fuzz` is opt-in. |
 
-**A law must not be derived from the code it judges.** `property_test.go` computes bucket identity
-with `compareValues` and reads rows with `Row.Get`, deliberately *not* `bucketKey`/`dimensionValues`
-— an earlier draft used the engine's own helpers and consequently agreed with the bug it was meant
-to catch. Likewise the random date alphabet contains the two instants that share a `UnixNano`: a
-generator that only produces plausible data only tests the plausible paths.
+**A law must not be derived from the code it judges.** This rule has now been broken twice, in two
+different files, and both times the suite went green over a real defect:
+
+- `property_test.go` computes bucket identity with `compareValues` and reads rows with `Row.Get`,
+  deliberately *not* `bucketKey`/`dimensionValues` — an earlier draft used the engine's own helpers
+  and consequently agreed with the bug it was meant to catch.
+- `invariants_test.go`'s `serializeValue` rendered a date as `bucketKey(value)`, so the determinism
+  and permutation laws agreed that two zones naming one instant were interchangeable — which is the
+  one thing they exist to deny. It now serializes the wall clock and zone offset a **renderer**
+  reads. `Value.String()` normalizes to UTC, so the golden test could not have seen it either.
+
+Likewise the random date alphabet contains both the two instants that share a `UnixNano` **and** one
+instant expressed in two zones that straddle midnight. A generator that only produces plausible data
+only tests the plausible paths — and note the two `12:00` entries look like such a pair and are not
+(one is `12:00Z`, the other `11:00Z`), which is exactly how the gap survived.
 
 ### Mutation checking
 
 ```bash
-./internal/reporting/mutation-check.sh          # all 34 mutations
+./internal/reporting/mutation-check.sh          # all 41 mutations, engine + receiptsource
 ./internal/reporting/mutation-check.sh avg      # only those matching "avg"
 ```
 
