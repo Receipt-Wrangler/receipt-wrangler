@@ -62,6 +62,26 @@ add() {
     replaces+=("$4")
 }
 
+# --- enums: the closed lists must agree with each other ----------------------
+
+# TestAggFunc_ClosedListsAgree — AggFunc is covered by four independent switches
+# (String, valid, aggFuncFromName, accumulator.finalize) and nothing but this
+# test forces them to agree. Admitting a reduction finalize does not implement is
+# how the blank-column defect comes back. 201 collides with no test fixture, so
+# only the drift test can object.
+add 'agg-func-valid-list-drifts' 'aggregate.go' \
+'	case AggSum, AggCount, AggAvg, AggMin, AggMax:
+		return true' \
+'	case AggSum, AggCount, AggAvg, AggMin, AggMax, AggFunc(201):
+		return true'
+
+# TestDetailMode_ClosedListsAgree — the same drift, one enum over.
+add 'detail-mode-valid-list-drifts' 'spec.go' \
+'	case DetailRecords, DetailAggregate:
+		return true' \
+'	case DetailRecords, DetailAggregate, DetailMode(201):
+		return true'
+
 # --- accumulator: the monoid ------------------------------------------------
 
 # TestAccumulator_Avg — AVG divides by the count of values, not of records.

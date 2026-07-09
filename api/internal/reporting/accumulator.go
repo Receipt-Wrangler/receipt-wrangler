@@ -129,5 +129,18 @@ func (a accumulator) finalize(divisionScale int32) Value {
 		return Num(a.maximum)
 	}
 
+	// An unrecognized reduction cannot reach here. Validate rejects one with
+	// ErrUnknownAggFunc before a single row is touched, and newAccumulator is
+	// called from exactly one place, with a Func that has already passed that
+	// check.
+	//
+	// It is null rather than a panic on purpose. Nothing in this package panics
+	// — evalArithmetic guards a zero divisor precisely so shopspring cannot —
+	// and a panic here would be a line no test could execute, since every path
+	// to it runs through Validate first. The risk a panic would guard against is
+	// that valid() and this switch drift apart, which is a mistake made at
+	// compile time, not at report time; TestAggFunc_ClosedListsAgree catches it
+	// there, exhaustively, over all 256 values rather than the one someone
+	// forgot.
 	return Null()
 }
