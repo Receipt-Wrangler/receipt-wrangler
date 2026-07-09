@@ -2,6 +2,7 @@ package receiptsource
 
 import (
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -559,5 +560,172 @@ func TestSource_FeedsTheEngine(t *testing.T) {
 	// cell.
 	if got := find(alex.DetailRows[1].Cells, "Hst"); got != "0" {
 		t.Errorf("Medical HST = %s, want 0", got)
+	}
+}
+
+// A receipt that never round-tripped through the database holds the zero time.
+// Grouping on it must be stable, which it was not while date buckets were keyed
+// on UnixNano: the zero time and an instant in 585 shared a key.
+func TestSource_ZeroCreatedAtGroupsStably(t *testing.T) {
+	source := mustNew(t)
+
+	// The zero time, and the instant exactly 2^64 nanoseconds later.
+	zero := time.Time{}
+	wrapped := zero.Add(math.MaxInt64).Add(math.MaxInt64).Add(2)
+
+	receipts := []models.Receipt{
+		{BaseModel: models.BaseModel{ID: 1, CreatedAt: zero}, Amount: dec("1.00")},
+		{BaseModel: models.BaseModel{ID: 2, CreatedAt: wrapped}, Amount: dec("2.00")},
+	}
+
+	spec := reporting.ReportSpec{
+		GroupBy:     []reporting.FieldKey{KeyCreatedAt},
+		Columns:     []reporting.Column{{Name: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"}},
+		GrandTotals: true,
+	}
+
+	model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(model.Root.Children) != 2 {
+		t.Errorf("two distinct created-at instants produced %d bucket(s), want 2", len(model.Root.Children))
+	}
+
+	// And reversing the receipts must not change the report.
+	reversed := []models.Receipt{receipts[1], receipts[0]}
+	permuted, err := reporting.Run(spec, source.Catalog(), source.Rows(reversed), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if permuted.Root.Children[0].Value.String() != model.Root.Children[0].Value.String() {
+		t.Errorf("reversing the receipts changed the first bucket")
+	}
+}
+
+// A receipt amount that was never set is the zero decimal, whose internal
+// coefficient is a nil big.Int. It must sum like any other zero.
+func TestSource_ZeroValueAmountSums(t *testing.T) {
+	source := mustNew(t)
+
+	receipts := []models.Receipt{
+		{BaseModel: models.BaseModel{ID: 1}}, // Amount is the zero decimal.Decimal
+		{BaseModel: models.BaseModel{ID: 2}, Amount: dec("5.00")},
+	}
+
+	spec := reporting.ReportSpec{
+		Columns:     []reporting.Column{{Name: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"}},
+		GrandTotals: true,
+	}
+
+	model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	total := model.GrandTotals[0].Value()
+	number, isNumber := total.Decimal()
+	if !isNumber || !number.Equal(dec("5.00")) {
+		t.Errorf("grand total = %v, want 5.00", total)
+	}
+}
+
+// A receipt with no status resolves to the empty string, which is a bucket of
+// its own. It is not the same as having no status field at all, and the report
+// must not quietly file it under (None).
+func TestSource_EmptyStatusIsTheEmptyString(t *testing.T) {
+	row := mustNew(t).Rows([]models.Receipt{{Name: "Bare"}})[0]
+
+	values := row.Get(KeyStatus)
+	if len(values) != 1 {
+		t.Fatalf("status resolved to %d values, want 1", len(values))
+	}
+	text, isText := values[0].Text()
+	if !isText || text != "" {
+		t.Errorf("status = %v, want the empty string", values[0])
+	}
+}
+
+// A custom field whose type is not one the engine knows takes a place in the
+// catalog, so a saved report referencing it still validates, but resolves to no
+// value rather than guessing which column holds the answer.
+func TestSource_UnknownCustomFieldType(t *testing.T) {
+	source, err := New([]models.CustomField{
+		{BaseModel: models.BaseModel{ID: 9}, Name: "Mystery", Type: models.CustomFieldType("SOMETHING_NEW")},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	field, exists := source.Catalog().Get("custom_9")
+	if !exists {
+		t.Fatalf("catalog is missing custom_9")
+	}
+	if field.DataType != reporting.TypeString {
+		t.Errorf("dataType = %v, want %v", field.DataType, reporting.TypeString)
+	}
+
+	note := "anything"
+	row := source.Rows([]models.Receipt{{
+		CustomFields: []models.CustomFieldValue{{CustomFieldId: 9, StringValue: &note}},
+	}})[0]
+
+	if len(row.Get("custom_9")) != 0 {
+		t.Errorf("custom_9 = %v, want no value", row.Get("custom_9"))
+	}
+}
+
+// Options belong to select fields. Loading them onto another kind changes
+// nothing, and must not make its values resolve through them.
+func TestSource_OptionsOnANonSelectFieldAreIgnored(t *testing.T) {
+	source, err := New([]models.CustomField{{
+		BaseModel: models.BaseModel{ID: 1},
+		Name:      "HST",
+		Type:      models.CURRENCY,
+		Options:   []models.CustomFieldOption{{BaseModel: models.BaseModel{ID: 10}, Value: "Alex"}},
+	}})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	amount := dec("15.60")
+	row := source.Rows([]models.Receipt{{
+		CustomFields: []models.CustomFieldValue{{CustomFieldId: 1, CurrencyValue: &amount}},
+	}})[0]
+
+	number, isNumber := row.Measure("custom_1").Decimal()
+	if !isNumber || !number.Equal(dec("15.60")) {
+		t.Errorf("custom_1 = %v, want 15.60", row.Measure("custom_1"))
+	}
+}
+
+// A receipt carrying the same category twice belongs to that bucket once.
+// receipt_categories cannot express it, but a row built by hand can.
+func TestSource_DuplicateCategoriesAreOneBucket(t *testing.T) {
+	source := mustNew(t)
+
+	receipts := []models.Receipt{{
+		Amount:     dec("10.00"),
+		Categories: []models.Category{{Name: "Clothing"}, {Name: "Clothing"}},
+	}}
+
+	spec := reporting.ReportSpec{
+		GroupBy:     []reporting.FieldKey{KeyCategory},
+		Columns:     []reporting.Column{{Name: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"}},
+		GrandTotals: true,
+	}
+
+	model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(model.Root.Children) != 1 {
+		t.Fatalf("got %d buckets, want 1", len(model.Root.Children))
+	}
+	number, _ := model.GrandTotals[0].Value().Decimal()
+	if !number.Equal(dec("10.00")) {
+		t.Errorf("grand total = %s, want 10.00", number)
 	}
 }
