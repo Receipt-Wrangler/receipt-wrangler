@@ -27,16 +27,39 @@ func (r Row) Measure(key FieldKey) Value {
 	return values[0]
 }
 
-// dimensionValues returns the buckets a row is attributed to for a dimension.
+// dimensionValues returns the distinct buckets a row is attributed to for a
+// dimension.
 //
 // A row with several values fans out into all of them, which double-counts it —
 // that is the pie chart's attribution and is deliberate. A row with no value
 // falls into the single (None) bucket, represented by a null Value, rather than
 // being dropped.
+//
+// Values are deduplicated, so a row is attributed once per distinct bucket.
+// A receipt tagged "Alex" twice belongs to the Alex bucket once; only distinct
+// values fan out. The database cannot express a duplicate — the join tables key
+// on the pair — but a producer over some other source could, and counting one
+// row's amount twice into one bucket is never what a report means.
 func (r Row) dimensionValues(key FieldKey) []Value {
 	values := r[key]
-	if len(values) == 0 {
+
+	switch len(values) {
+	case 0:
 		return []Value{Null()}
+	case 1:
+		return values
 	}
-	return values
+
+	distinct := make([]Value, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		bucket := bucketKey(value)
+		if _, exists := seen[bucket]; exists {
+			continue
+		}
+		seen[bucket] = struct{}{}
+		distinct = append(distinct, value)
+	}
+
+	return distinct
 }

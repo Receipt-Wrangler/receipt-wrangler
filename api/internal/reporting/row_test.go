@@ -70,11 +70,17 @@ func TestRow_Measure(t *testing.T) {
 }
 
 // An absent dimension is never dropped: it becomes exactly one (None) bucket.
+// A repeated one is not counted twice: only distinct values fan out.
 func TestRow_DimensionValues(t *testing.T) {
 	row := Row{
-		"category": {Str("Clothing"), Str("Medical")},
-		"tag":      {Str("Alex")},
-		"empty":    {},
+		"category":  {Str("Clothing"), Str("Medical")},
+		"tag":       {Str("Alex")},
+		"empty":     {},
+		"repeated":  {Str("Alex"), Str("Alex")},
+		"mixed":     {Str("Alex"), Str("Sam"), Str("Alex")},
+		"rescaled":  {Num(dec("200")), Num(dec("200.00"))},
+		"allNull":   {Null(), Null()},
+		"nullFirst": {Null(), Str("Alex")},
 	}
 
 	tests := []struct {
@@ -88,6 +94,13 @@ func TestRow_DimensionValues(t *testing.T) {
 		{"empty slice is one none bucket", row, "empty", []Value{Null()}},
 		{"absent key is one none bucket", row, "missing", []Value{Null()}},
 		{"nil row is one none bucket", nil, "category", []Value{Null()}},
+		{"a repeated value is one bucket", row, "repeated", []Value{Str("Alex")}},
+		{"deduplication keeps first-seen order", row, "mixed", []Value{Str("Alex"), Str("Sam")}},
+		// Deduplication is by bucket, so it agrees with grouping: 200 and 200.00
+		// are the same number and therefore the same bucket.
+		{"values differing only in scale are one bucket", row, "rescaled", []Value{Num(dec("200"))}},
+		{"repeated nulls are one none bucket", row, "allNull", []Value{Null()}},
+		{"an explicit null is its own bucket", row, "nullFirst", []Value{Null(), Str("Alex")}},
 	}
 
 	for _, test := range tests {

@@ -308,6 +308,90 @@ func TestRun_MultiValueDimensionsDoubleCount(t *testing.T) {
 	}
 }
 
+// Distinct values fan out; a repeated one does not. A receipt tagged "Alex"
+// twice belongs to the Alex bucket once, and its amount is counted once.
+//
+// This is the boundary of the rule above: fan-out double-counts across
+// different buckets, never within one.
+func TestRun_RepeatedDimensionValueIsOneAttribution(t *testing.T) {
+	spec := ReportSpec{
+		GroupBy: []FieldKey{"tag"},
+		Columns: []Column{
+			{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}},
+			{Name: "Subtotal", Kind: ColumnAggregate, Agg: Aggregate{Func: AggSum, Field: "amount"}},
+		},
+		Subtotals:   true,
+		GrandTotals: true,
+	}
+
+	rows := []Row{{
+		"tag":    {Str("Alex"), Str("Alex")},
+		"amount": {Num(dec("10.00"))},
+	}}
+
+	model := mustRun(t, spec, rows)
+
+	if len(model.Root.Children) != 1 {
+		t.Fatalf("got %d tag buckets, want 1", len(model.Root.Children))
+	}
+	assertRow(t, model.Root.Children[0].Subtotals, map[string]string{"Count": "1", "Subtotal": "10.00"})
+	assertRow(t, model.GrandTotals, map[string]string{"Count": "1", "Subtotal": "10.00"})
+	if model.Root.RecordCount != 1 {
+		t.Errorf("root RecordCount = %d, want 1", model.Root.RecordCount)
+	}
+}
+
+// The same rule on the detail dimension.
+func TestRun_RepeatedDetailValueIsOneRow(t *testing.T) {
+	spec := ReportSpec{
+		Detail: DetailSpec{Mode: DetailAggregate, By: "category"},
+		Columns: []Column{
+			{Name: "Category", Kind: ColumnLabel, Field: "category"},
+			{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}},
+			{Name: "Subtotal", Kind: ColumnAggregate, Agg: Aggregate{Func: AggSum, Field: "amount"}},
+		},
+		GrandTotals: true,
+	}
+
+	rows := []Row{{
+		"category": {Str("Clothing"), Str("Clothing")},
+		"amount":   {Num(dec("10.00"))},
+	}}
+
+	model := mustRun(t, spec, rows)
+
+	if len(model.Root.DetailRows) != 1 {
+		t.Fatalf("got %d detail rows, want 1", len(model.Root.DetailRows))
+	}
+	assertRow(t, model.Root.DetailRows[0].Cells, map[string]string{"Category": "Clothing", "Count": "1", "Subtotal": "10.00"})
+	assertRow(t, model.GrandTotals, map[string]string{"Count": "1", "Subtotal": "10.00"})
+}
+
+// A repeat mixed in among distinct values collapses only itself.
+func TestRun_RepeatedValueAmongDistinctOnes(t *testing.T) {
+	spec := ReportSpec{
+		GroupBy:     []FieldKey{"tag"},
+		Columns:     []Column{{Name: "Subtotal", Kind: ColumnAggregate, Agg: Aggregate{Func: AggSum, Field: "amount"}}},
+		GrandTotals: true,
+	}
+
+	rows := []Row{{
+		"tag":    {Str("Alex"), Str("Sam"), Str("Alex")},
+		"amount": {Num(dec("10.00"))},
+	}}
+
+	model := mustRun(t, spec, rows)
+
+	if len(model.Root.Children) != 2 {
+		t.Fatalf("got %d tag buckets, want 2", len(model.Root.Children))
+	}
+	// Two distinct buckets, so the amount is attributed twice -- not three times.
+	assertRow(t, model.GrandTotals, map[string]string{"Subtotal": "20.00"})
+	if model.Root.RecordCount != 2 {
+		t.Errorf("root RecordCount = %d, want 2", model.Root.RecordCount)
+	}
+}
+
 // Two multi-value grouping levels produce a cross product.
 func TestRun_TwoMultiValueLevelsCrossProduct(t *testing.T) {
 	spec := ReportSpec{
