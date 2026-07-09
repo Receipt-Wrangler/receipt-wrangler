@@ -674,11 +674,14 @@ association resolves to no value, which surfaces as a `(None)` bucket — not an
 | Nulls | Skipped by `SUM`/`MIN`/`MAX` and excluded from `AVG`'s divisor. Any null operand makes an arithmetic result null. |
 | Division by zero | `Null` cell, **never a panic** — `shopspring` panics on a zero divisor, so `evalBinary` guards `IsZero()` first. |
 | Division precision | `DivRound(x, spec.Config.DivisionScale)`. **Never read or write `decimal.DivisionPrecision`** (a mutable process-wide global). |
-| Multi-value fan-out | A receipt with two tags is attributed to **both** buckets in full, so it double-counts, and that double count propagates to the grand total. Intended — matches `services/pie_chart.go`. Two multi-value levels produce a cross product. |
+| Multi-value fan-out | A receipt with two tags is attributed to **both** buckets in full, so it double-counts, and that double count propagates to the grand total. Intended — matches `services/pie_chart.go`. Two multi-value levels produce a cross product. But only **distinct** values fan out: a receipt tagged `"Alex"` twice is attributed once. |
+| Multi-valued measures | Refused (`ErrMeasureIsMultiValued`). Summing a field that resolves to several values would silently read the first and drop the rest. A `Multi` field is still a fine dimension and a fine display label. |
+| Bucket keys | Two values share a bucket key **exactly when `compareValues` finds them equal**. Numbers key on `decimal.String()` (canonical, lossless); dates key on `Unix()` seconds + `Nanosecond()` and **never `UnixNano()`**, which is undefined outside 1678–2262 — a zero `time.Time` and a date in 585 share one. A coarser key merges buckets *and* makes the surviving bucket's value depend on input order. |
 | Empty dimension | Explicit `(None)` bucket (`IsNone: true`, `Value` null). Never dropped. |
 | Ordering | Buckets sort by typed value with `(None)` last; records preserve input order. **Never range a Go map to produce output** (`pie_chart.go` has exactly this bug). |
 | Formatting | The engine emits raw typed values. Currency symbols and decimal places are a renderer's job. |
 | `GeneratedAt` | An **input** (`MetaInput`), never `time.Now()`. Determinism depends on it. |
+| `IsNone` | Equals `Value.IsNull()` for group nodes and **aggregate-mode** detail rows only. The synthetic `Root` and every **records-mode** detail row carry a null `Value` with `IsNone: false`. It is **not** a global biconditional — do not "fix" the engine to make it one. |
 
 ### Columns and formulas
 
@@ -705,11 +708,41 @@ XLSX renderer can translate a column expression into a live `=SUM(...)` cell for
 
 Both packages are pure — **no `main_test.go`, no DB, no `app.db` cleanup.** The engine suite builds
 synthetic `Row` literals, which is what makes the scenario matrix cheap; `receiptsource` uses real
-`models.Receipt` fixtures. `engine_test.go` reproduces the design's worked example number for number
-as a golden test.
+`models.Receipt` fixtures.
 
 **Compare money with `decimal.Equal`/`StringFixed`, never `reflect.DeepEqual`** — `NewFromInt(200)`
-and `200.00` are equal but carry different internal exponents.
+and `200.00` are equal but carry different internal exponents. Determinism is compared through
+`serializeModel` for the same reason.
 
-- `internal/reporting/{value,row,field,formula,eval,accumulator,model,validate,engine}_test.go`
+Four layers, each catching what the one before it cannot:
+
+| Layer | File | What it does |
+|---|---|---|
+| Invariants | `invariants_test.go` | `assertModelInvariants` re-derives the model's structure from the spec. `mustRun` calls it, so **every** engine test checks it. |
+| Golden | `golden_test.go` | Renders a whole report as a text table. One assertion covers grouping, ordering, values, subtotal placement and blank cells. |
+| Properties | `property_test.go` | 400 randomized specs + rows from a fixed seed (`REPORTING_SEED` overrides). Conservation, rollup, AVG exactness, arithmetic recompute, bucket cardinality, determinism. |
+| Fuzz | `fuzz_test.go`, `bucketkey_test.go` | Seed corpora run under plain `go test`. `-fuzz` is opt-in. |
+
+**A law must not be derived from the code it judges.** `property_test.go` computes bucket identity
+with `compareValues` and reads rows with `Row.Get`, deliberately *not* `bucketKey`/`dimensionValues`
+— an earlier draft used the engine's own helpers and consequently agreed with the bug it was meant
+to catch. Likewise the random date alphabet contains the two instants that share a `UnixNano`: a
+generator that only produces plausible data only tests the plausible paths.
+
+### Mutation checking
+
+```bash
+./internal/reporting/mutation-check.sh          # all 34 mutations
+./internal/reporting/mutation-check.sh avg      # only those matching "avg"
+```
+
+Breaks the engine one way at a time and asserts a test objects. Uses `go test -overlay`, so it
+**never writes to the working tree**. Run it before merging any change to the engine; a survivor
+means the engine can be broken that way without a single test noticing.
+
+Its three self-imposed rules, each learned the hard way: a mutation whose search text no longer
+matches is a **failure**, not a pass; a mutant that **does not compile** was never tested, so only
+`--- FAIL` counts as caught; and `-count=1`, or the build cache serves the last verdict.
+
+- `internal/reporting/{value,bucketkey,row,field,formula,eval,accumulator,model,validate,engine,invariants,golden,property,fuzz,passthrough,adversarial}_test.go`
 - `internal/reporting/receiptsource/receiptsource_test.go`
