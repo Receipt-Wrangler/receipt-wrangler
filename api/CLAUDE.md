@@ -42,6 +42,8 @@ Receipt Wrangler API is a Go-based backend service for a receipt management and 
 - **internal/routers/** - Route definitions and middleware setup
 - **internal/wranglerasynq/** - Background job processing using Asynq
 - **internal/ai/** - AI client implementations (OpenAI, Gemini, Ollama)
+- **internal/permissions/** - Pure permission registry + wildcard matcher (no DB)
+- **internal/reporting/** - Pure report engine (no DB); `receiptsource/` maps receipts into it
 
 ### Database
 - Uses GORM ORM with support for SQLite, MySQL, and PostgreSQL
@@ -634,3 +636,80 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   and admin-bypass callers are a no-op). This closes a write bypass: the UI picker already limits picks
   to the granted catalog, but a crafted request could otherwise attach a category/tag the caller can't
   see.
+
+## Reporting Engine (`internal/reporting`)
+
+A **pure** report engine: `(ReportSpec + FieldCatalog + []Row + MetaInput) → ReportModel`. It
+fetches nothing, renders nothing, reads no clock, and consults no global. Renderers (CSV/XLSX/PDF), a
+dashboard widget, template persistence and HTTP delivery all *call* it; none of them are part of it.
+
+**The purity rule is enforceable and must stay true:**
+
+```bash
+go list -deps receipt-wrangler/api/internal/reporting | grep -E 'gorm|repositories|internal/models'
+# must print nothing
+```
+
+`internal/reporting/receiptsource/` is the **only** package that imports `models`. It maps
+`[]models.Receipt` + `[]models.CustomField` into `[]reporting.Row`. Item-grain reporting or a
+non-receipt widget adds a *sibling* of it; the engine core never changes.
+
+```go
+source, err := receiptsource.New(customFields)          // needs CustomField.Options loaded
+model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), meta)
+```
+
+**Caller must preload** `PaidByUser`, `Group`, `Categories`, `Tags`, `CustomFields`. An unloaded
+association resolves to no value, which surfaces as a `(None)` bucket — not an error.
+
+### Semantics that are easy to get wrong
+
+| Concern | Rule |
+|---|---|
+| Aggregate rollup | A parent **merges its children's accumulators**, never their finalized values. This is what makes `AVG` at a subtotal `sum(all descendants)/count(all descendants)` rather than the average of its children's averages. |
+| Arithmetic rollup | Recomputed from the **same row's** other columns at every level (detail, subtotal, grand total). Never summed. Additive formulas agree either way; ratios and averages do not. |
+| `SUM`/`COUNT` of nothing | `0` — a category with no tax shows `0.00`, not an empty cell. |
+| `AVG`/`MIN`/`MAX` of nothing | `Null` (empty cell). Zero would be a lie. |
+| `COUNT()` | Counts **records**, not values. A row with a null measure still counts. It takes no field. |
+| Nulls | Skipped by `SUM`/`MIN`/`MAX` and excluded from `AVG`'s divisor. Any null operand makes an arithmetic result null. |
+| Division by zero | `Null` cell, **never a panic** — `shopspring` panics on a zero divisor, so `evalBinary` guards `IsZero()` first. |
+| Division precision | `DivRound(x, spec.Config.DivisionScale)`. **Never read or write `decimal.DivisionPrecision`** (a mutable process-wide global). |
+| Multi-value fan-out | A receipt with two tags is attributed to **both** buckets in full, so it double-counts, and that double count propagates to the grand total. Intended — matches `services/pie_chart.go`. Two multi-value levels produce a cross product. |
+| Empty dimension | Explicit `(None)` bucket (`IsNone: true`, `Value` null). Never dropped. |
+| Ordering | Buckets sort by typed value with `(None)` last; records preserve input order. **Never range a Go map to produce output** (`pie_chart.go` has exactly this bug). |
+| Formatting | The engine emits raw typed values. Currency symbols and decimal places are a renderer's job. |
+| `GeneratedAt` | An **input** (`MetaInput`), never `time.Now()`. Determinism depends on it. |
+
+### Columns and formulas
+
+Three column kinds, declared not inferred: `ColumnLabel` (displays a field, blank on subtotal rows),
+`ColumnAggregate` (`SUM(amount)`, `COUNT()` — backed by a mergeable accumulator), and
+`ColumnArithmetic` (`Subtotal + Hst`, `ROUND(Total / Count, 2)`).
+
+`Column.Name` is what formulas reference and must be a plain identifier that is not a reserved word;
+`Column.Label` is the free-text heading. They are separate so renaming a heading (`Avg/Receipt`)
+cannot break a formula (`AvgPerReceipt`).
+
+Formulas are parsed by **`expr-lang/expr` used as a parser front-end only** (`parser.Parse` →
+`ast.Node`); its VM is never run, because it evaluates over `float64` and money must not touch a
+float. The tree is then checked against an allow-list implemented as a **closed type switch whose
+`default` rejects**. Two traps: `??`, `in`, `**` and `%` all parse as `*ast.BinaryNode` (so the
+*operator* is whitelisted too), and expr ships lower-case builtins named `sum`, `min`, `max`,
+`count`, `round`, `len` — so `round(a,2)` arrives as an `*ast.BuiltinNode`, not a `CallNode`.
+
+Arithmetic columns form a **DAG**, topologically sorted with cycle detection, so a column may be
+declared before the aggregate it reads. `ColumnDescriptor.Expr` keeps the parsed tree so the future
+XLSX renderer can translate a column expression into a live `=SUM(...)` cell formula.
+
+### Tests
+
+Both packages are pure — **no `main_test.go`, no DB, no `app.db` cleanup.** The engine suite builds
+synthetic `Row` literals, which is what makes the scenario matrix cheap; `receiptsource` uses real
+`models.Receipt` fixtures. `engine_test.go` reproduces the design's worked example number for number
+as a golden test.
+
+**Compare money with `decimal.Equal`/`StringFixed`, never `reflect.DeepEqual`** — `NewFromInt(200)`
+and `200.00` are equal but carry different internal exponents.
+
+- `internal/reporting/{value,row,field,formula,eval,accumulator,model,validate,engine}_test.go`
+- `internal/reporting/receiptsource/receiptsource_test.go`
