@@ -31,6 +31,8 @@ func receiptRow(paidBy, tag, category, amount, hst string) Row {
 	return row
 }
 
+// mustRun runs a spec and asserts the model's structural invariants, so every
+// engine test below checks them in passing whatever else it is asserting.
 func mustRun(t *testing.T, spec ReportSpec, rows []Row) ReportModel {
 	t.Helper()
 
@@ -38,6 +40,9 @@ func mustRun(t *testing.T, spec ReportSpec, rows []Row) ReportModel {
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
+
+	assertModelInvariants(t, spec, model)
+
 	return model
 }
 
