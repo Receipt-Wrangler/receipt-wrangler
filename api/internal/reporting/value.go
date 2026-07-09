@@ -9,11 +9,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// bucketNumberScale is the number of decimal places a numeric value is
-// normalized to when it is used as a grouping key, so that 200 and 200.00 land
-// in the same bucket.
-const bucketNumberScale = 12
-
 // ValueType discriminates the Value union.
 type ValueType uint8
 
@@ -179,18 +174,33 @@ func boolOrder(b bool) int {
 }
 
 // bucketKey returns a canonical map key identifying the bucket a Value groups
-// into. Keys are prefixed by type so values of different types can never
-// collide, numbers are normalized so 200 and 200.00 share a bucket, and dates
-// key off the absolute instant so the same moment expressed in two time zones
-// does not split into two buckets.
+// into.
+//
+// The one law it must obey is that two values share a key exactly when
+// compareValues finds them equal. A key coarser than that merges distinct
+// values into one bucket — and since a bucket keeps whichever value created it
+// first, the merged bucket's reported value would then depend on the order the
+// rows arrived in, breaking determinism. A key finer than that splits one value
+// across two buckets.
+//
+// Keys are prefixed by type, so values of different types never collide.
+//
+// Numbers key off decimal's canonical rendering, which is both lossless and
+// scale-independent: 200 and 200.00 render alike, while 0 and 0.0000000000001
+// do not.
+//
+// Dates key off the absolute instant, so the same moment expressed in two time
+// zones shares a bucket. That instant is the Unix second plus the nanosecond
+// within it, and deliberately not UnixNano, which is undefined before 1678 and
+// after 2262 — a zero time.Time and a date in 585 share a UnixNano.
 func bucketKey(v Value) string {
 	switch v.valueType {
 	case ValueString:
 		return "s:" + v.str
 	case ValueNumber:
-		return "n:" + v.num.StringFixed(bucketNumberScale)
+		return "n:" + v.num.String()
 	case ValueDate:
-		return "d:" + strconv.FormatInt(v.date.UnixNano(), 10)
+		return "d:" + strconv.FormatInt(v.date.Unix(), 10) + ":" + strconv.Itoa(v.date.Nanosecond())
 	case ValueBool:
 		if v.b {
 			return "b:1"
