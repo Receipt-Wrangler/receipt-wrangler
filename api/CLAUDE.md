@@ -42,6 +42,8 @@ Receipt Wrangler API is a Go-based backend service for a receipt management and 
 - **internal/routers/** - Route definitions and middleware setup
 - **internal/wranglerasynq/** - Background job processing using Asynq
 - **internal/ai/** - AI client implementations (OpenAI, Gemini, Ollama)
+- **internal/permissions/** - Pure permission registry + wildcard matcher (no DB)
+- **internal/reporting/** - Pure report engine (no DB); `receiptsource/` maps receipts into it
 
 ### Database
 - Uses GORM ORM with support for SQLite, MySQL, and PostgreSQL
@@ -634,3 +636,139 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   and admin-bypass callers are a no-op). This closes a write bypass: the UI picker already limits picks
   to the granted catalog, but a crafted request could otherwise attach a category/tag the caller can't
   see.
+
+## Reporting Engine (`internal/reporting`)
+
+A **pure** report engine: `(ReportSpec + FieldCatalog + []Row + MetaInput) → ReportModel`. It
+fetches nothing, renders nothing, reads no clock, and consults no global. Renderers (CSV/XLSX/PDF), a
+dashboard widget, template persistence and HTTP delivery all *call* it; none of them are part of it.
+
+**`internal/reporting/README.md`** is the narrative guide for engineers: the pipeline, the type
+vocabulary, and a worked example carried from input rows through the report tree to the rendered
+table. The section below is the rules digest; the README is where the diagrams are.
+
+**The purity rule is enforceable and must stay true:**
+
+```bash
+go list -deps receipt-wrangler/api/internal/reporting | grep -E 'gorm|repositories|internal/models'
+# must print nothing
+```
+
+`internal/reporting/receiptsource/` is the **only** package that imports `models`. It maps
+`[]models.Receipt` + `[]models.CustomField` into `[]reporting.Row`. Item-grain reporting or a
+non-receipt widget adds a *sibling* of it; the engine core never changes.
+
+```go
+source, err := receiptsource.New(customFields)          // needs CustomField.Options loaded
+model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), meta)
+```
+
+**Caller must preload** `PaidByUser`, `Group`, `Categories`, `Tags`, `CustomFields`. An unloaded
+association resolves to no value, which surfaces as a `(None)` bucket — not an error.
+
+**Known gap — no date truncation.** `date`, `resolved_date` and `created_at` are `TypeDate`, hence
+dimensions, hence groupable — but `receiptsource` hands over a raw timestamp, so grouping by `date`
+buckets on the exact instant and yields **one group per receipt**. "Receipts by month" is not
+expressible today. Closing it means either derived fields in `receiptsource` (`date_month`,
+`date_year`) or a `GroupBy` entry carrying a truncation. Decide before `ReportTemplate` persists a
+`GroupBy` shape.
+
+### Semantics that are easy to get wrong
+
+| Concern | Rule |
+|---|---|
+| Aggregate rollup | A parent **merges its children's accumulators**, never their finalized values. This is what makes `AVG` at a subtotal `sum(all descendants)/count(all descendants)` rather than the average of its children's averages. |
+| Arithmetic rollup | Recomputed from the **same row's** other columns at every level (detail, subtotal, grand total). Never summed. Additive formulas agree either way; ratios and averages do not. |
+| `SUM`/`COUNT` of nothing | `0` — a category with no tax shows `0.00`, not an empty cell. |
+| `AVG`/`MIN`/`MAX` of nothing | `Null` (empty cell). Zero would be a lie. |
+| `COUNT()` | Counts **records**, not values. A row with a null measure still counts. It takes no field. |
+| Nulls | Skipped by `SUM`/`MIN`/`MAX` and excluded from `AVG`'s divisor. Any null operand makes an arithmetic result null. |
+| Division by zero | `Null` cell, **never a panic** — `shopspring` panics on a zero divisor, so `evalBinary` guards `IsZero()` first. |
+| Division precision | `DivRound(x, spec.Config.DivisionScale)`. **Never read or write `decimal.DivisionPrecision`** (a mutable process-wide global). |
+| Multi-value fan-out | A receipt with two tags is attributed to **both** buckets in full, so it double-counts, and that double count propagates to the grand total. Intended — matches `services/pie_chart.go`. Two multi-value levels produce a cross product. But only **distinct** values fan out: a receipt tagged `"Alex"` twice is attributed once. |
+| Multi-valued measures | Refused (`ErrMeasureIsMultiValued`). Summing a field that resolves to several values would silently read the first and drop the rest. A `Multi` field is still a fine dimension and a fine display label. Note `Multi` is a **producer's declaration**, never checked against the rows: a catalog that lies loses values in `Row.Measure`. |
+| Bucket keys | Two values share a bucket key **exactly when `compareValues` finds them equal**. Numbers key on `decimal.String()` (canonical, lossless); dates key on `Unix()` seconds + `Nanosecond()` and **never `UnixNano()`**, which is undefined outside 1678–2262 — a zero `time.Time` and a date in 585 share one. A coarser key merges buckets *and* makes the surviving bucket's value depend on input order. |
+| Bucket **values** | A bucket keeps `Value.canonical()`, not whichever member arrived first. Agreeing with `compareValues` is only half the job: dates compare by instant, so one instant in two zones merges, and `Value.Time()` would otherwise hand a renderer an arbitrary one of them (`2026-05-01T00:00:00Z` vs `2026-04-30T19:00:00-05:00` format as different **calendar days**). **Date buckets are emitted in UTC.** A producer wanting calendar-day grouping in a local zone must truncate before handing rows over. |
+| Unknown enums | `Validate` rejects an `AggFunc` or `DetailMode` outside the known set (`ErrUnknownAggFunc`, `ErrUnknownDetailMode`). Both used to fail silently — an unknown reduction fell through `finalize` and blanked the column; an unknown detail mode skipped the label-column check. Ask "is this aggregate mode?" only through `DetailSpec.isAggregate()`; two spellings of it once disagreed. |
+| Enum switch drift | `AggFunc` is switched on in **four** places (`String`, `valid`, `aggFuncFromName`, `accumulator.finalize`) and Go forces none of them to agree. `enums_test.go` pins them to each other exhaustively over all 256 values. **Adding a reduction means updating all four** — `valid()` alone would let `Validate` accept a column `finalize` blanks. `finalize`'s fallthrough stays `Null()`, not a `panic`: nothing in this package panics, the line is unreachable through `Validate`, and drift is a compile-time mistake caught at `go test` time. |
+| Formula size | `ParseArithmetic`/`ParseAggregate` refuse source over `maxFormulaLength` (1 KB) **before parsing**. expr's 10k-node cap does *not* bound this: a parenthesis builds no node, so nesting is bounded only by the goroutine stack (~640 B/paren; ~1.6M overflows the default 1 GB), and a Go stack overflow is a fatal error `recover` cannot catch. |
+| Field keys | `NewFieldCatalog` rejects a key that is not a plain identifier (`ErrInvalidFieldKey`). `unit-price` would tokenize as a subtraction. |
+| Empty dimension | Explicit `(None)` bucket (`IsNone: true`, `Value` null). Never dropped. |
+| Ordering | Buckets sort by typed value with `(None)` last; records preserve input order. **Never range a Go map to produce output** (`pie_chart.go` has exactly this bug). |
+| Formatting | The engine emits raw typed values. Currency symbols and decimal places are a renderer's job. |
+| `GeneratedAt` | An **input** (`MetaInput`), never `time.Now()`. Determinism depends on it. |
+| `IsNone` | Equals `Value.IsNull()` for group nodes and **aggregate-mode** detail rows only. The synthetic `Root` and every **records-mode** detail row carry a null `Value` with `IsNone: false`. It is **not** a global biconditional — do not "fix" the engine to make it one. |
+
+### Columns and formulas
+
+Three column kinds, declared not inferred: `ColumnLabel` (displays a field, blank on subtotal rows),
+`ColumnAggregate` (`SUM(amount)`, `COUNT()` — backed by a mergeable accumulator), and
+`ColumnArithmetic` (`Subtotal + Hst`, `ROUND(Total / Count, 2)`).
+
+`Column.Name` is what formulas reference and must be a plain identifier that is not a reserved word;
+`Column.Label` is the free-text heading. They are separate so renaming a heading (`Avg/Receipt`)
+cannot break a formula (`AvgPerReceipt`).
+
+Formulas are parsed by **`expr-lang/expr` used as a parser front-end only** (`parser.Parse` →
+`ast.Node`); its VM is never run, because it evaluates over `float64` and money must not touch a
+float. The tree is then checked against an allow-list implemented as a **closed type switch whose
+`default` rejects**. Two traps: `??`, `in`, `**` and `%` all parse as `*ast.BinaryNode` (so the
+*operator* is whitelisted too), and expr ships lower-case builtins named `sum`, `min`, `max`,
+`count`, `round`, `len` — so `round(a,2)` arrives as an `*ast.BuiltinNode`, not a `CallNode`.
+
+Arithmetic columns form a **DAG**, topologically sorted with cycle detection, so a column may be
+declared before the aggregate it reads. `ColumnDescriptor.Expr` keeps the parsed tree so the future
+XLSX renderer can translate a column expression into a live `=SUM(...)` cell formula.
+
+### Tests
+
+Both packages are pure — **no `main_test.go`, no DB, no `app.db` cleanup.** The engine suite builds
+synthetic `Row` literals, which is what makes the scenario matrix cheap; `receiptsource` uses real
+`models.Receipt` fixtures.
+
+**Compare money with `decimal.Equal`/`StringFixed`, never `reflect.DeepEqual`** — `NewFromInt(200)`
+and `200.00` are equal but carry different internal exponents. Determinism is compared through
+`serializeModel` for the same reason.
+
+Four layers, each catching what the one before it cannot:
+
+| Layer | File | What it does |
+|---|---|---|
+| Invariants | `invariants_test.go` | `assertModelInvariants` re-derives the model's structure from the spec. `mustRun` calls it, so **every** engine test checks it. |
+| Golden | `golden_test.go` | Renders a whole report as a text table. One assertion covers grouping, ordering, values, subtotal placement and blank cells. |
+| Properties | `property_test.go` | 400 randomized specs + rows from a fixed seed (`REPORTING_SEED` overrides). Conservation, rollup, AVG exactness, arithmetic recompute, bucket cardinality, determinism. |
+| Fuzz | `fuzz_test.go`, `bucketkey_test.go` | Seed corpora run under plain `go test`. `-fuzz` is opt-in. |
+
+**A law must not be derived from the code it judges.** This rule has now been broken twice, in two
+different files, and both times the suite went green over a real defect:
+
+- `property_test.go` computes bucket identity with `compareValues` and reads rows with `Row.Get`,
+  deliberately *not* `bucketKey`/`dimensionValues` — an earlier draft used the engine's own helpers
+  and consequently agreed with the bug it was meant to catch.
+- `invariants_test.go`'s `serializeValue` rendered a date as `bucketKey(value)`, so the determinism
+  and permutation laws agreed that two zones naming one instant were interchangeable — which is the
+  one thing they exist to deny. It now serializes the wall clock and zone offset a **renderer**
+  reads. `Value.String()` normalizes to UTC, so the golden test could not have seen it either.
+
+Likewise the random date alphabet contains both the two instants that share a `UnixNano` **and** one
+instant expressed in two zones that straddle midnight. A generator that only produces plausible data
+only tests the plausible paths — and note the two `12:00` entries look like such a pair and are not
+(one is `12:00Z`, the other `11:00Z`), which is exactly how the gap survived.
+
+### Mutation checking
+
+```bash
+./internal/reporting/mutation-check.sh          # all 43 mutations, engine + receiptsource
+./internal/reporting/mutation-check.sh avg      # only those matching "avg"
+```
+
+Breaks the engine one way at a time and asserts a test objects. Uses `go test -overlay`, so it
+**never writes to the working tree**. Run it before merging any change to the engine; a survivor
+means the engine can be broken that way without a single test noticing.
+
+Its three self-imposed rules, each learned the hard way: a mutation whose search text no longer
+matches is a **failure**, not a pass; a mutant that **does not compile** was never tested, so only
+`--- FAIL` counts as caught; and `-count=1`, or the build cache serves the last verdict.
+
+- `internal/reporting/{value,bucketkey,row,field,formula,eval,accumulator,model,validate,engine,invariants,golden,property,fuzz,passthrough,adversarial}_test.go`
+- `internal/reporting/receiptsource/receiptsource_test.go`
