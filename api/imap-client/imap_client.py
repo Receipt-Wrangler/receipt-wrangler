@@ -3,6 +3,7 @@ import email
 import logging
 import os
 import re
+import ssl
 from html.parser import HTMLParser
 from io import StringIO
 from mailbox import Message
@@ -54,11 +55,30 @@ class ImapClient:
         self.email_whitelist = email_whitelist or []
 
     def connect(self):
+        # When connecting to a self-signed mail server (e.g. an internal
+        # homelab Dovecot), certificate verification will fail with an
+        # "unknown ca" alert. IMAP_TLS_SKIP_VERIFY=true disables verification
+        # for these trusted internal hosts. It defaults to off so public
+        # servers are still verified normally.
+        skip_verify = os.environ.get("IMAP_TLS_SKIP_VERIFY", "").lower() in ("1", "true", "yes")
+        ssl_context = None
+        if skip_verify:
+            logging.warning(
+                "IMAP_TLS_SKIP_VERIFY is enabled: TLS certificate verification is "
+                "DISABLED for %s:%s. This exposes the connection to "
+                "man-in-the-middle attacks and should only be used for trusted "
+                "internal hosts with self-signed certificates.",
+                self.host, self.port,
+            )
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
         if self.use_starttls:
             self.client = IMAPClient(self.host, self.port, ssl=False)
-            self.client.starttls()
+            self.client.starttls(ssl_context=ssl_context)
         else:
-            self.client = IMAPClient(self.host, self.port)
+            self.client = IMAPClient(self.host, self.port, ssl_context=ssl_context)
 
         self.client.login(self.username, self.password)
 
@@ -82,8 +102,16 @@ class ImapClient:
 
         results = []
         for message_id, data in response.items():
-            formatted_data = self._get_formatted_message_data(
-                data)
+            # Process each message independently: a single malformed message
+            # must not abort the whole poll (which would drop every fetched
+            # message and re-raise to the Go caller as exit status 1).
+            try:
+                formatted_data = self._get_formatted_message_data(data)
+            except Exception:
+                # logging.exception preserves the traceback so the malformed
+                # message can be diagnosed, while we continue the poll.
+                logging.exception(f"Skipping message {message_id}")
+                continue
             if len(formatted_data) > 0:
                 formatted_data[message_id] = message_id
                 results.append(formatted_data)
@@ -91,7 +119,11 @@ class ImapClient:
         return results
 
     def _get_formatted_message_data(self, data):
-        message_data = email.message_from_bytes(data[b"RFC822"])
+        raw_rfc822 = data.get(b"RFC822") if data else None
+        if not raw_rfc822:
+            logging.warning("Skipping message with empty RFC822 payload")
+            return {}
+        message_data = email.message_from_bytes(raw_rfc822)
 
         from_data = self._get_formatted_to_or_from_data(message_data, "From")
         if from_data["email"] is None:
@@ -179,14 +211,22 @@ class ImapClient:
 
             logging.info(f"Filename: {filename} mime_type: {mime_type}")
 
-            if len(filename) > 0 and self.valid_mime_type(mime_type):
-                filePath = os.path.join(base_path, "temp", filename)
+            if filename and len(filename) > 0 and self.valid_mime_type(mime_type):
+                # Sanitize: the filename comes from untrusted email content and
+                # is used in a path join, so strip any directory components to
+                # prevent path traversal (e.g. "../../etc/...").
+                safe_filename = os.path.basename(filename)
+                payload = part.get_payload(decode=True)
+                if payload is None:
+                    logging.warning(f"Skipping attachment with undecodable payload: {safe_filename}")
+                    continue
+                filePath = os.path.join(base_path, "temp", safe_filename)
                 with open(filePath, 'wb') as f:
-                    f.write(part.get_payload(decode=True))
+                    f.write(payload)
 
                 size = os.path.getsize(filePath)
                 data = {
-                    "filename": filename,
+                    "filename": safe_filename,
                     "fileType": mime_type,
                     "size": size,
                 }
