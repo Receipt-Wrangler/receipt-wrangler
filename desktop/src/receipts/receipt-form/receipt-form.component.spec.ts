@@ -254,6 +254,98 @@ describe("ReceiptFormComponent", () => {
     );
   });
 
+  it("should patch magic-filled receiptItems and list them in the success snackbar", () => {
+    // Mock timezone offset to be EST
+    Date.prototype.getTimezoneOffset = () => 240;
+    component.images.set([{ id: 1 } as any]);
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    Object.defineProperty(component, 'carouselComponent', {
+      value: () => ({
+        currentlyShownImageIndex: 0,
+      }),
+      configurable: true,
+    });
+
+    const magicReceipt = {
+      name: "magic",
+      amount: "54.5",
+      date: "2023-08-05T00:00:00.000Z",
+      receiptItems: [
+        { name: "Macchiato", amount: "4.5", status: "DRAFT" },
+        { name: "Schnitzel", amount: "22", status: "DRAFT" },
+      ],
+    } as any;
+
+    jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+
+    const snackbarSpy = jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "success"
+    ).mockReturnValue(undefined);
+
+    component.magicFill();
+
+    const receiptValue = component.form.getRawValue();
+
+    expect(receiptValue.receiptItems.length).toEqual(2);
+    expect(receiptValue.receiptItems[0].name).toEqual("Macchiato");
+    expect(receiptValue.receiptItems[1].name).toEqual("Schnitzel");
+    expect(snackbarSpy).toHaveBeenCalledWith(
+      "Magic fill successfully filled name, amount, date, receiptItems from selected image!",
+      { duration: 10000 }
+    );
+  });
+
+  it("should keep good receiptItems and pop an error snackbar listing the corrupted ones", () => {
+    Date.prototype.getTimezoneOffset = () => 240;
+    component.images.set([{ id: 1 } as any]);
+    component.ngOnInit();
+    component.mode = FormMode.edit;
+    Object.defineProperty(component, 'carouselComponent', {
+      value: () => ({
+        currentlyShownImageIndex: 0,
+      }),
+      configurable: true,
+    });
+
+    const magicReceipt = {
+      name: "magic",
+      amount: "4.5",
+      date: "2023-08-05T00:00:00.000Z",
+      receiptItems: [
+        { name: "Macchiato", amount: "4.5", status: "DRAFT" },
+        null,
+        // non-string name + bad categories shape: buildItemForm throws,
+        // and the catch path must coerce safely instead of calling .trim() on a number
+        { name: 42, amount: 5, categories: "not-an-array", status: "DRAFT" },
+      ],
+    } as any;
+
+    jest.spyOn(
+      TestBed.inject(ReceiptImageService),
+      "magicFillReceipt"
+    ).mockReturnValue(of(magicReceipt));
+
+    const errorSpy = jest.spyOn(
+      TestBed.inject(SnackbarService),
+      "error"
+    ).mockReturnValue(undefined);
+
+    component.magicFill();
+
+    const receiptValue = component.form.getRawValue();
+
+    expect(receiptValue.receiptItems.length).toEqual(1);
+    expect(receiptValue.receiptItems[0].name).toEqual("Macchiato");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "The following receipt items were corrupted: 5; 1 unnamed item"
+    );
+  });
+
   it("should set queue data when there is no data", () => {
     component.ngOnInit();
 
