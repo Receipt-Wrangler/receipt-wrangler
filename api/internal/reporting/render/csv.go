@@ -6,6 +6,7 @@ package render
 import (
 	"bytes"
 	"encoding/csv"
+	"fmt"
 	"strings"
 
 	"receipt-wrangler/api/internal/reporting"
@@ -47,6 +48,16 @@ const (
 // It renders no document chrome (title, intro, branding); that is the richer
 // formats' job. This is the minimal, machine-friendly export.
 func CSV(model reporting.ReportModel, groupBy []Dimension) ([]byte, error) {
+	// groupBy is a contract between the caller and the model's shape. If the
+	// report actually groups, the supplied dimensions must match its depth — too
+	// few would drop deeper ancestor values, so distinct buckets would print
+	// identical leading columns; too many would pad every row with blanks. An
+	// empty grouped report has a childless root and no discoverable depth, so it
+	// is left to render: its dimension columns come from groupBy.
+	if depth := groupDepth(model.Root); depth > 0 && depth != len(groupBy) {
+		return nil, fmt.Errorf("render: report groups %d level(s) deep, but %d dimension(s) were supplied", depth, len(groupBy))
+	}
+
 	records := [][]string{header(model, groupBy)}
 	records = appendGroup(records, model, groupBy, model.Root, nil)
 
@@ -84,6 +95,19 @@ func dimensionHeading(dimension Dimension) string {
 		return dimension.Label
 	}
 	return string(dimension.Key)
+}
+
+// groupDepth is how many grouping levels the tree nests. Every branch of a tree
+// for a fixed spec has the same depth, so walking the first child suffices. It is
+// 0 for an ungrouped report and for an empty one (a childless root), which is why
+// the caller's depth check only fires when the tree actually groups.
+func groupDepth(node reporting.GroupNode) int {
+	depth := 0
+	for len(node.Children) > 0 {
+		depth++
+		node = node.Children[0]
+	}
+	return depth
 }
 
 // appendGroup walks the tree in the order a reader expects: a node's children

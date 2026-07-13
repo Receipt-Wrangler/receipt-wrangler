@@ -607,6 +607,33 @@ func TestCSV_ArithmeticNullRendersBlank(t *testing.T) {
 	}
 }
 
+// Supplying fewer dimensions than the report groups by is a caller contract
+// violation the renderer rejects, rather than silently dropping the deeper
+// ancestor values and letting distinct buckets print identical leading columns.
+func TestCSV_GroupByDepthMismatchErrors(t *testing.T) {
+	catalog := paidByCatalog(t)
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{"paid_by", "tag"},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "category"},
+		Columns: []reporting.Column{
+			{Name: "Category", Label: "Category", Kind: reporting.ColumnLabel, Field: "category"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"},
+		},
+	}
+	rows := []reporting.Row{
+		{"paid_by": {reporting.Str("Dana")}, "tag": {reporting.Str("Alex")}, "category": {reporting.Str("Food")}, "amount": {money("100")}},
+	}
+
+	// The report groups two levels deep; supply only one dimension.
+	out, err := CSV(mustRun(t, spec, catalog, rows), []Dimension{{Key: "paid_by", Label: "Paid By"}})
+	if err == nil {
+		t.Fatalf("expected an error for a group-depth mismatch, got none")
+	}
+	if out != nil {
+		t.Errorf("expected nil bytes on error, got %d", len(out))
+	}
+}
+
 // columnHeading falls back to the column name when no label is set. Run always
 // defaults a label to its name, so this defensive path is pinned directly.
 func TestColumnHeading_FallsBackToName(t *testing.T) {
