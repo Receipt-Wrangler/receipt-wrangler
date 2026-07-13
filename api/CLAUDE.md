@@ -266,13 +266,15 @@ will be dropped in a later release.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.
-- Idempotent: keyed on role `Name` (a `uniqueIndex`), safe on every boot; a pre-existing
-  same-named role is left untouched. The five role names are shared constants
-  (`repositories/system_role_names.go`, `Legacy*RoleName`) used by both the seeder and the
-  migration.
-- **Known limitation:** because system roles are immutable and seeding skips existing names, a
-  permission added to the registry later will **not** flow into an already-seeded Legacy Admin /
-  Legacy Owner. Re-syncing system roles would need a dedicated reconciliation step (out of scope).
+- Idempotent and **self-reconciling**: keyed on role `Name` (a `uniqueIndex`), safe on every boot. A
+  missing role is created; an existing one has any permissions it lacks **added — add-only, so a
+  permission already on the role is never removed** (`missingPermissions` computes the add set). The
+  five role names are shared constants (`repositories/system_role_names.go`, `Legacy*RoleName`) used
+  by both the seeder and the migration.
+- Because reconciliation is add-only, a permission **added** to the registry later flows into an
+  already-seeded Legacy Admin / Legacy Owner on the next boot — both sets are dynamic over the
+  registry (`LegacyAppAdminKeys` / `LegacyGroupOwnerKeys`) — while a capability an install already
+  holds is never stripped.
 
 ### Default roles
 
