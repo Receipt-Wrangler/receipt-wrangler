@@ -125,6 +125,15 @@ at the group's depth, and numbers are written as **native cells** with a number 
 header and total rows bold. It writes the engine-computed values **statically** — translating arithmetic
 columns into live cell formulas (the reason `ColumnDescriptor.Expr` is exported) is a later slice.
 
+`render.HTML(model, groupBy)` is the PDF format's HTML stage: a self-contained document — a `Meta.Title`
+heading, a preamble of the report's resolved `Meta.Params`, the same faithful table as XLSX, and a
+`Meta.GeneratedAt` footer (each omitted when the model carries nothing for it). All CSS is inline and it
+references no external resources or scripts, so it converts to PDF through the headless-Chromium pipeline
+in `services/html_to_pdf.go` (which blocks network loads and disables JavaScript). It returns HTML bytes;
+the chromedp conversion to PDF is the caller's job. The two faithful renderers (XLSX and HTML) share one
+traversal — `faithfulWalk` in `render/walk.go`, which drives a format-specific `faithfulSink` — while CSV
+keeps its own flat walk.
+
 ---
 
 ## 4. A worked example, end to end
