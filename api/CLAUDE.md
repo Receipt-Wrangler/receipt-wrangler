@@ -685,6 +685,19 @@ the caller's grants (`IntersectReceiptFilterWithGrants`), hide whole receipts in
 (`PaidByListResolver`), then substitute the categories/tags the caller can't see. It returns the
 engine's `(FieldCatalog, []Row)` — it does **not** build a `ReportSpec` or call `Run`; a caller does.
 
+**Renderers** (`internal/reporting/render`) are pure downstream consumers of a `ReportModel` — they
+fetch and compute nothing, and never reach back into the engine, so a new format (or a future layout)
+touches no upstream code. `render.CSV(model, groupBy)` is the first: a flat, **data-only** CSV — the
+group-by dimensions become leading columns (`groupBy []render.Dimension` supplies their order and header
+labels, since the model carries dimension keys but not labels), each detail leaf is one row, and a
+leading `Row Type` column marks each row `Detail` / `Subtotal` / `Grand Total`. It renders only what the
+model carries (subtotal/grand-total rows appear only when the spec toggled them on), draws no document
+chrome, and is unit-tested in isolation against models built via `reporting.Run` (there is no orchestrator
+or handler yet). Per `docs/engine-design.md` §5, CSV is deliberately the minimal renderer; the
+grouped/visual "looks like the on-screen report" layout belongs to the XLSX/PDF renderers, each a separate
+consumer of the same tree. Currency renders at 2dp, other numbers at full precision, `(None)` buckets use
+`Meta.NoneLabel`.
+
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
 marker, so the receipt still counts toward the totals in its own bucket instead of vanishing. `(None)`

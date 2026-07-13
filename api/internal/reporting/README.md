@@ -111,6 +111,14 @@ ReportModel
 A `Cell` holds `[]Value`. Aggregate and arithmetic cells always hold exactly one value, possibly null.
 A label cell in records mode may hold several, because a record can carry several categories or tags.
 
+**Renderers consume this tree.** `internal/reporting/render` is the first: `render.CSV(model, groupBy)`
+emits a flat, data-only CSV — the group-by dimensions become leading columns, each detail leaf is one
+row, and a leading `Row Type` column marks each row `Detail` / `Subtotal` / `Grand Total`. It renders
+only what the model carries: subtotal and grand-total rows appear when the spec asked for them, and never
+otherwise. The `Row Type` column is what keeps the file safe to aggregate — filter `Row Type=Detail`
+before summing an additive column, or the roll-up rows double-count it. It draws no document chrome;
+grouped/visual layouts are the XLSX/PDF renderers' job, each a separate consumer of the same tree.
+
 ---
 
 ## 4. A worked example, end to end
