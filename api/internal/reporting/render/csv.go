@@ -48,14 +48,8 @@ const (
 // It renders no document chrome (title, intro, branding); that is the richer
 // formats' job. This is the minimal, machine-friendly export.
 func CSV(model reporting.ReportModel, groupBy []Dimension) ([]byte, error) {
-	// groupBy is a contract between the caller and the model's shape. If the
-	// report actually groups, the supplied dimensions must match its depth — too
-	// few would drop deeper ancestor values, so distinct buckets would print
-	// identical leading columns; too many would pad every row with blanks. An
-	// empty grouped report has a childless root and no discoverable depth, so it
-	// is left to render: its dimension columns come from groupBy.
-	if depth := groupDepth(model.Root); depth > 0 && depth != len(groupBy) {
-		return nil, fmt.Errorf("render: report groups %d level(s) deep, but %d dimension(s) were supplied", depth, len(groupBy))
+	if err := validateGroupByDepth(model, groupBy); err != nil {
+		return nil, err
 	}
 
 	records := [][]string{header(model, groupBy)}
@@ -95,6 +89,20 @@ func dimensionHeading(dimension Dimension) string {
 		return dimension.Label
 	}
 	return string(dimension.Key)
+}
+
+// validateGroupByDepth rejects a groupBy that does not match how deep the report
+// actually groups. groupBy is a contract between the caller and the model's
+// shape: too few dimensions would drop deeper ancestor values, so distinct
+// buckets would print identical leading columns; too many would pad every row
+// with blanks. An empty grouped report has a childless root and no discoverable
+// depth, so it is left to render — its dimension columns come from groupBy. Both
+// renderers share this check.
+func validateGroupByDepth(model reporting.ReportModel, groupBy []Dimension) error {
+	if depth := groupDepth(model.Root); depth > 0 && depth != len(groupBy) {
+		return fmt.Errorf("render: report groups %d level(s) deep, but %d dimension(s) were supplied", depth, len(groupBy))
+	}
+	return nil
 }
 
 // groupDepth is how many grouping levels the tree nests. Every branch of a tree

@@ -698,6 +698,17 @@ grouped/visual "looks like the on-screen report" layout belongs to the XLSX/PDF 
 consumer of the same tree. Currency renders at 2dp, other numbers at full precision, `(None)` buckets use
 `Meta.NoneLabel`.
 
+`render.XLSX(model, groupBy)` (via `github.com/xuri/excelize/v2`) is the **faithful, grouped** counterpart:
+the group-by dimensions are leading columns with each value shown **once per group** (blanked on repeats),
+and a subtotal/grand-total row carries a `Total`/`Grand Total` marker in the column at the group's depth
+(the "staircase"). Numbers are written as **native, typed cells** with a number format — currency defaults
+to `#,##0.00` (or `ColumnDescriptor.Format`/`Meta.CurrencyFormat` if set), so the workbook is analyzable —
+and header/subtotal/grand-total rows are bold; sheet name `Report`. It writes the engine-computed values
+**statically** — live `=SUM`/expression formulas (the reason `ColumnDescriptor.Expr` is an exported AST)
+are a later slice, and document chrome/slots (title, logo) await the template work. It shares the
+`Dimension` type and the `groupBy`-depth guard (`validateGroupByDepth`) with the CSV renderer but not the
+walk (flat vs faithful). Tested by round-tripping the bytes back through `excelize.OpenReader`.
+
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
 marker, so the receipt still counts toward the totals in its own bucket instead of vanishing. `(None)`
