@@ -44,6 +44,7 @@ func XLSX(model reporting.ReportModel, groupBy []Dimension) ([]byte, error) {
 		styles:  map[string]int{},
 		row:     1,
 	}
+	defer writer.file.Close()
 	if err := writer.file.SetSheetName(writer.file.GetSheetName(0), xlsxSheet); err != nil {
 		return nil, err
 	}
