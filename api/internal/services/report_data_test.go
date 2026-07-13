@@ -156,3 +156,49 @@ func TestReportDataService_ResolvesCustomFieldsInCatalogAndRows(t *testing.T) {
 		t.Errorf("custom field value = %v, want %v", rows[0].Measure(customKey), hst)
 	}
 }
+
+// A non-numeric group id cannot be resolved, so Rows fails fast rather than
+// fetching against a bad scope.
+func TestReportDataService_Rows_InvalidGroupIdReturnsError(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	userId, _, _ := seedMemberWithGroupRoleGrants(t, "rpt-badid", nil, nil)
+
+	catalog, rows, err := NewReportDataService(nil).Rows(userId, "not-a-number", commands.ReceiptPagedRequestFilter{})
+	if err == nil {
+		t.Fatalf("expected an error for a non-numeric group id, got none")
+	}
+	if rows != nil {
+		t.Errorf("expected nil rows on error, got %d", len(rows))
+	}
+	if _, ok := catalog.Get(receiptsource.KeyAmount); ok {
+		t.Errorf("expected an empty catalog on error")
+	}
+}
+
+// Rows is NOT the group-membership boundary: it trusts that a caller was already
+// authorized (the handler enforces group.reports.read before calling it, exactly
+// as pie_chart.go does). A non-member therefore receives the group's rows, and a
+// non-member's grants resolve as unrestricted. This test pins that boundary so
+// the service is not mistaken for the gate, nor the gate accidentally moved here.
+func TestReportDataService_Rows_DoesNotGateGroupMembership(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	memberId, groupId, _ := seedMemberWithGroupRoleGrants(t, "rpt-member", nil, nil)
+	createReportReceipt(t, "r1", memberId, groupId, nil)
+	createReportReceipt(t, "r2", memberId, groupId, nil)
+
+	nonMemberId := makeUser(t, "rpt-outsider")
+
+	_, rows, err := NewReportDataService(nil).Rows(nonMemberId, groupIdString(groupId), commands.ReceiptPagedRequestFilter{})
+	if err != nil {
+		t.Fatalf("Rows: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Errorf("expected the service to return the group's 2 rows to a non-member (membership is the handler's gate), got %d", len(rows))
+	}
+}

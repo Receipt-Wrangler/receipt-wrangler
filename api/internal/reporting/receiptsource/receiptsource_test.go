@@ -220,6 +220,42 @@ func TestSource_NilResolvedDateOmitsResolvedPeriodFields(t *testing.T) {
 	}
 }
 
+// The period fields are derived in UTC by design (matching the engine's date
+// buckets), so a non-UTC instant near midnight is bucketed by its UTC calendar
+// day, not its local one. This pins that choice: a later switch to a local zone
+// would have to break this test deliberately.
+func TestSource_DatePeriodFieldsTruncateInUTC(t *testing.T) {
+	minus5 := time.FixedZone("minus5", -5*60*60)
+	receipt := fullReceipt()
+	// 2026-05-31 23:30 -05:00 is 2026-06-01 04:30 UTC -> crosses into June.
+	receipt.Date = time.Date(2026, 5, 31, 23, 30, 0, 0, minus5)
+	// 2026-12-31 20:00 -05:00 is 2027-01-01 01:00 UTC -> crosses into 2027.
+	resolved := time.Date(2026, 12, 31, 20, 0, 0, 0, minus5)
+	receipt.ResolvedDate = &resolved
+
+	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+
+	tests := []struct {
+		key  reporting.FieldKey
+		want string
+	}{
+		{KeyDateDay, "2026-06-01"},
+		{KeyDateMonth, "2026-06"},
+		{KeyDateYear, "2026"},
+		{KeyResolvedDateDay, "2027-01-01"},
+		{KeyResolvedDateMonth, "2027-01"},
+		{KeyResolvedDateYear, "2027"},
+	}
+	for _, test := range tests {
+		t.Run(string(test.key), func(t *testing.T) {
+			text, isText := row.Measure(test.key).Text()
+			if !isText || text != test.want {
+				t.Errorf("%s = %v, want %q (UTC)", test.key, row.Measure(test.key), test.want)
+			}
+		})
+	}
+}
+
 // Grouping by date_month buckets receipts into calendar months: same-month
 // receipts merge into one bucket, and the buckets sort chronologically because
 // zero-padded ISO strings compare that way.
