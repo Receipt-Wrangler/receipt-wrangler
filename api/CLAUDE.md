@@ -393,8 +393,11 @@ will be dropped in a later release.
   whole pool), keeping their view consistent with the global lists.
 - **Receipt enforcement wiring:** every receipt surface that returns or accepts categories/tags is
   gated. **Reads** strip via `FilterReceiptCategoriesTags` (receipt-, item-, and linked-item-level):
-  `GetReceipt`, `GetPagedReceiptsForGroup`, `GetReceiptsForGroupIds`, the pie-chart service, and both
-  CSV export handlers; `DuplicateReceipt` strips the source before copying. **Writes**
+  `GetReceipt`, `GetPagedReceiptsForGroup`, `GetReceiptsForGroupIds`, and both CSV export handlers;
+  `DuplicateReceipt` strips the source before copying. **Aggregation** reads substitute instead of
+  stripping via `SubstituteRestrictedCategoriesTags` (receipt-level; a hidden category/tag becomes a
+  `(Restricted)` bucket rather than collapsing into `(None)`): the pie-chart service and the reporting
+  data source. **Writes**
   (`CreateReceipt` / `UpdateReceipt`) call `enforceReceiptGrantSelection` — existing ids must be in
   the caller's grants (else 403) and a new-by-name category/tag requires `app.categories.create` /
   `app.tags.create`. **List/pie/export filters** are narrowed by `IntersectReceiptFilterWithGrants`
@@ -685,8 +688,10 @@ engine's `(FieldCatalog, []Row)` — it does **not** build a `ReportSpec` or cal
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
 marker, so the receipt still counts toward the totals in its own bucket instead of vanishing. `(None)`
-stays reserved for a receipt that genuinely carries no category/tag. (The pie chart still strips today;
-switching it to `(Restricted)` is a deferred follow-up.)
+stays reserved for a receipt that genuinely carries no category/tag. The **pie chart** (`pie_chart.go`)
+substitutes the same way, so a restricted viewer sees a `(Restricted)` slice rather than hidden spend
+folding into `Uncategorized`/`Untagged`. (The CSV export handlers still strip — export is a per-receipt
+listing, not an aggregation.)
 
 ### Semantics that are easy to get wrong
 
