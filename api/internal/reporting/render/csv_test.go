@@ -455,6 +455,7 @@ func TestFormatCell_ByTypeAndKind(t *testing.T) {
 		{"currency rounds", currency, reporting.Cell{Values: []reporting.Value{money("1234.5")}}, "1234.50"},
 		{"plain number full precision", number, reporting.Cell{Values: []reporting.Value{money("1.5")}}, "1.5"},
 		{"plain integer", number, reporting.Cell{Values: []reporting.Value{num(2)}}, "2"},
+		{"non-number in a measure column", number, reporting.Cell{Values: []reporting.Value{reporting.Str("n/a")}}, "n/a"},
 		{"string label", label, reporting.Cell{Values: []reporting.Value{reporting.Str("Food")}}, "Food"},
 		{"date label utc", label, reporting.Cell{Values: []reporting.Value{reporting.DateVal(date)}}, "2026-05-15T00:00:00Z"},
 		{"bool label", label, reporting.Cell{Values: []reporting.Value{reporting.Bool(true)}}, "true"},
@@ -478,5 +479,141 @@ func TestFormatDimension_NullIsNoneLabel(t *testing.T) {
 	}
 	if got := formatDimension(reporting.Str("Dana"), "(None)"); got != "Dana" {
 		t.Errorf("string dimension = %q, want Dana", got)
+	}
+}
+
+// Subtotals without grand totals: the per-group subtotal rows appear, and no
+// Grand Total row follows.
+func TestCSV_SubtotalsWithoutGrandTotal(t *testing.T) {
+	catalog := paidByCatalog(t)
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{"paid_by"},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "category"},
+		Columns: []reporting.Column{
+			{Name: "Category", Label: "Category", Kind: reporting.ColumnLabel, Field: "category"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"},
+		},
+		Subtotals:   true,
+		GrandTotals: false,
+	}
+	rows := []reporting.Row{
+		{"paid_by": {reporting.Str("Dana")}, "category": {reporting.Str("Food")}, "amount": {money("100")}},
+		{"paid_by": {reporting.Str("Dana")}, "category": {reporting.Str("Gas")}, "amount": {money("50")}},
+		{"paid_by": {reporting.Str("Sam")}, "category": {reporting.Str("Food")}, "amount": {money("40")}},
+	}
+
+	got := mustCSV(t, mustRun(t, spec, catalog, rows), []Dimension{{Key: "paid_by", Label: "Paid By"}})
+	want := crlf(
+		"Row Type,Paid By,Category,Total",
+		"Detail,Dana,Food,100.00",
+		"Detail,Dana,Gas,50.00",
+		"Subtotal,Dana,,150.00",
+		"Detail,Sam,Food,40.00",
+		"Subtotal,Sam,,40.00",
+	)
+	if got != want {
+		t.Errorf("csv mismatch\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// A boolean grouping dimension renders its bucket value as true/false, with
+// false sorting before true.
+func TestCSV_BoolGroupDimension(t *testing.T) {
+	catalog := mustCatalog(t,
+		reporting.FieldRef{Key: "reimbursable", Label: "Reimbursable", DataType: reporting.TypeBool},
+		reporting.FieldRef{Key: "category", Label: "Category", DataType: reporting.TypeString, Multi: true},
+		reporting.FieldRef{Key: "amount", Label: "Amount", DataType: reporting.TypeCurrency},
+	)
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{"reimbursable"},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "category"},
+		Columns: []reporting.Column{
+			{Name: "Category", Label: "Category", Kind: reporting.ColumnLabel, Field: "category"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"},
+		},
+	}
+	rows := []reporting.Row{
+		{"reimbursable": {reporting.Bool(false)}, "category": {reporting.Str("Food")}, "amount": {money("100")}},
+		{"reimbursable": {reporting.Bool(true)}, "category": {reporting.Str("Food")}, "amount": {money("50")}},
+	}
+
+	got := mustCSV(t, mustRun(t, spec, catalog, rows), []Dimension{{Key: "reimbursable", Label: "Reimbursable"}})
+	want := crlf(
+		"Row Type,Reimbursable,Category,Total",
+		"Detail,false,Food,100.00",
+		"Detail,true,Food,50.00",
+	)
+	if got != want {
+		t.Errorf("csv mismatch\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// A date grouping dimension renders its bucket as the instant in UTC (RFC 3339),
+// which sorts chronologically.
+func TestCSV_DateGroupDimension(t *testing.T) {
+	catalog := mustCatalog(t,
+		reporting.FieldRef{Key: "date", Label: "Date", DataType: reporting.TypeDate},
+		reporting.FieldRef{Key: "category", Label: "Category", DataType: reporting.TypeString, Multi: true},
+		reporting.FieldRef{Key: "amount", Label: "Amount", DataType: reporting.TypeCurrency},
+	)
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{"date"},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "category"},
+		Columns: []reporting.Column{
+			{Name: "Category", Label: "Category", Kind: reporting.ColumnLabel, Field: "category"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"},
+		},
+	}
+	rows := []reporting.Row{
+		{"date": {reporting.DateVal(time.Date(2026, 2, 20, 0, 0, 0, 0, time.UTC))}, "category": {reporting.Str("Food")}, "amount": {money("50")}},
+		{"date": {reporting.DateVal(time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC))}, "category": {reporting.Str("Food")}, "amount": {money("100")}},
+	}
+
+	got := mustCSV(t, mustRun(t, spec, catalog, rows), []Dimension{{Key: "date", Label: "Date"}})
+	want := crlf(
+		"Row Type,Date,Category,Total",
+		"Detail,2026-01-15T00:00:00Z,Food,100.00",
+		"Detail,2026-02-20T00:00:00Z,Food,50.00",
+	)
+	if got != want {
+		t.Errorf("csv mismatch\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// An arithmetic column whose divisor is zero (Avg over an empty report, 0/0)
+// yields a null the renderer prints as a blank cell — distinct from the SUM
+// column, whose empty total is a real 0.00.
+func TestCSV_ArithmeticNullRendersBlank(t *testing.T) {
+	catalog := paidByCatalog(t)
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{"paid_by"},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "category"},
+		Columns: []reporting.Column{
+			{Name: "Category", Label: "Category", Kind: reporting.ColumnLabel, Field: "category"},
+			{Name: "Count", Label: "Count", Kind: reporting.ColumnAggregate, AggSrc: "COUNT()"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"},
+			{Name: "Avg", Label: "Avg", Kind: reporting.ColumnArithmetic, Expr: "Total / Count"},
+		},
+		GrandTotals: true,
+	}
+
+	got := mustCSV(t, mustRun(t, spec, catalog, nil), []Dimension{{Key: "paid_by", Label: "Paid By"}})
+	want := crlf(
+		"Row Type,Paid By,Category,Count,Total,Avg",
+		"Grand Total,,,0,0.00,",
+	)
+	if got != want {
+		t.Errorf("csv mismatch\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// columnHeading falls back to the column name when no label is set. Run always
+// defaults a label to its name, so this defensive path is pinned directly.
+func TestColumnHeading_FallsBackToName(t *testing.T) {
+	if got := columnHeading(reporting.ColumnDescriptor{Name: "amount"}); got != "amount" {
+		t.Errorf("empty label = %q, want the name", got)
+	}
+	if got := columnHeading(reporting.ColumnDescriptor{Name: "amount", Label: "Total"}); got != "Total" {
+		t.Errorf("with label = %q, want the label", got)
 	}
 }
