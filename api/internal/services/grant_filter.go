@@ -42,6 +42,35 @@ func (service PermissionService) FilterReceiptCategoriesTags(userId uint, receip
 	return nil
 }
 
+// SubstituteRestrictedCategoriesTags rewrites every receipt's Categories/Tags in
+// place, replacing the entries the user may not see with a single (Restricted)
+// marker rather than dropping them (as FilterReceiptCategoriesTags does).
+// Aggregation surfaces — reports, charts — use this so a hidden category is
+// attributed to its own (Restricted) bucket instead of vanishing from the totals
+// or collapsing into (None). Like the strip variant, the allowed sets resolve
+// once per group, and a receipt whose group is unrestricted (or whose viewer
+// bypasses grants) is left untouched.
+//
+// It operates on receipt-level Categories/Tags only, which is all an aggregation
+// reads; it does not recurse into receipt items.
+func (service PermissionService) SubstituteRestrictedCategoriesTags(userId uint, receipts []models.Receipt) error {
+	if len(receipts) == 0 {
+		return nil
+	}
+
+	filter, err := service.newReceiptGrantFilter(userId)
+	if err != nil {
+		return err
+	}
+
+	for i := range receipts {
+		if err := filter.substitute(&receipts[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // FilterReceiptCategoriesTagsForReceipt is the single-receipt variant of
 // FilterReceiptCategoriesTags (single GetReceipt, duplicate source, etc.).
 func (service PermissionService) FilterReceiptCategoriesTagsForReceipt(userId uint, receipt *models.Receipt) error {
@@ -380,4 +409,68 @@ func filterTagsBySet(tags []models.Tag, allowed map[uint]struct{}) []models.Tag 
 		}
 	}
 	return filtered
+}
+
+// restrictedCategoryTagName is the marker a hidden category or tag is replaced
+// with on an aggregation surface. It forms its own bucket, kept distinct from
+// (None) — a receipt that genuinely carries no category or tag.
+const restrictedCategoryTagName = "(Restricted)"
+
+// substitute is the substitution counterpart of apply: it keeps every receipt
+// but replaces the categories/tags the user may not see with a (Restricted)
+// marker. It stays at receipt level because that is all an aggregation reads.
+func (filter *receiptGrantFilter) substitute(receipt *models.Receipt) error {
+	if filter.bypassCategories && filter.bypassTags {
+		return nil
+	}
+
+	grants, err := filter.grantsForGroup(receipt.GroupId)
+	if err != nil {
+		return err
+	}
+
+	if !filter.bypassCategories && !grants.categoryUnrestricted {
+		receipt.Categories = substituteCategoriesBySet(receipt.Categories, grants.categoryAllowed)
+	}
+	if !filter.bypassTags && !grants.tagUnrestricted {
+		receipt.Tags = substituteTagsBySet(receipt.Tags, grants.tagAllowed)
+	}
+	return nil
+}
+
+// substituteCategoriesBySet keeps the allowed categories and, if any category was
+// disallowed, appends exactly one (Restricted) marker. Several hidden categories
+// collapse to that one marker, which is enough: the engine attributes a receipt
+// to a multi-valued bucket once no matter how many times it carries the value. A
+// receipt with no disallowed category gets no marker.
+func substituteCategoriesBySet(categories []models.Category, allowed map[uint]struct{}) []models.Category {
+	result := make([]models.Category, 0, len(categories))
+	hidden := false
+	for _, category := range categories {
+		if _, ok := allowed[category.ID]; ok {
+			result = append(result, category)
+			continue
+		}
+		hidden = true
+	}
+	if hidden {
+		result = append(result, models.Category{Name: restrictedCategoryTagName})
+	}
+	return result
+}
+
+func substituteTagsBySet(tags []models.Tag, allowed map[uint]struct{}) []models.Tag {
+	result := make([]models.Tag, 0, len(tags))
+	hidden := false
+	for _, tag := range tags {
+		if _, ok := allowed[tag.ID]; ok {
+			result = append(result, tag)
+			continue
+		}
+		hidden = true
+	}
+	if hidden {
+		result = append(result, models.Tag{Name: restrictedCategoryTagName})
+	}
+	return result
 }

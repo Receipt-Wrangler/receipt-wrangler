@@ -378,3 +378,185 @@ func TestValidateCategoryTagSelectionUnrestricted(t *testing.T) {
 		t.Error("expected unrestricted role to allow any category selection")
 	}
 }
+
+func TestSubstituteReplacesDisallowedCategoriesWithMarker(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	cat1 := makeCategory(t, "Groceries")
+	cat2 := makeCategory(t, "Utilities")
+	tag1 := makeTag(t, "Reimbursable")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-sub", []uint{cat1}, nil)
+
+	receipts := []models.Receipt{{
+		GroupId:    groupId,
+		Categories: []models.Category{categoryWithId(cat1), categoryWithId(cat2)},
+		Tags:       []models.Tag{tagWithId(tag1)},
+	}}
+
+	service := NewPermissionService(nil)
+	if err := service.SubstituteRestrictedCategoriesTags(userId, receipts); err != nil {
+		t.Fatalf("SubstituteRestrictedCategoriesTags: %v", err)
+	}
+
+	// cat1 survives; the hidden cat2 becomes one (Restricted) marker.
+	got := receipts[0].Categories
+	if len(got) != 2 || got[0].ID != cat1 || got[1].Name != restrictedCategoryTagName {
+		t.Errorf("expected [cat1, (Restricted)], got %v", got)
+	}
+	// The role grants no tags, so tags are unrestricted and left untouched.
+	if len(receipts[0].Tags) != 1 || receipts[0].Tags[0].ID != tag1 {
+		t.Errorf("expected tags untouched (unrestricted), got %v", receipts[0].Tags)
+	}
+}
+
+func TestSubstituteOnlyHiddenCategoriesBecomeSingleMarker(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	cat1 := makeCategory(t, "Groceries")
+	cat2 := makeCategory(t, "Utilities")
+	cat3 := makeCategory(t, "Travel")
+	// The role grants only cat1; the receipt carries two hidden categories.
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-sub-hidden", []uint{cat1}, nil)
+
+	receipts := []models.Receipt{{
+		GroupId:    groupId,
+		Categories: []models.Category{categoryWithId(cat2), categoryWithId(cat3)},
+	}}
+
+	service := NewPermissionService(nil)
+	if err := service.SubstituteRestrictedCategoriesTags(userId, receipts); err != nil {
+		t.Fatalf("SubstituteRestrictedCategoriesTags: %v", err)
+	}
+
+	// Two hidden categories collapse to one marker, not two.
+	got := receipts[0].Categories
+	if len(got) != 1 || got[0].Name != restrictedCategoryTagName {
+		t.Errorf("expected a single (Restricted) marker, got %v", got)
+	}
+}
+
+func TestSubstituteNoHiddenLeavesNoMarker(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	cat1 := makeCategory(t, "Groceries")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-sub-visible", []uint{cat1}, nil)
+
+	receipts := []models.Receipt{{
+		GroupId:    groupId,
+		Categories: []models.Category{categoryWithId(cat1)},
+	}}
+
+	service := NewPermissionService(nil)
+	if err := service.SubstituteRestrictedCategoriesTags(userId, receipts); err != nil {
+		t.Fatalf("SubstituteRestrictedCategoriesTags: %v", err)
+	}
+
+	got := receipts[0].Categories
+	if len(got) != 1 || got[0].ID != cat1 {
+		t.Errorf("expected only the visible category and no marker, got %v", got)
+	}
+}
+
+// A receipt with no categories stays empty, so it lands in (None) rather than
+// (Restricted) — the two buckets mean different things.
+func TestSubstituteEmptyCategoriesStayEmpty(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	cat1 := makeCategory(t, "Groceries")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-sub-empty", []uint{cat1}, nil)
+
+	receipts := []models.Receipt{{GroupId: groupId}}
+
+	service := NewPermissionService(nil)
+	if err := service.SubstituteRestrictedCategoriesTags(userId, receipts); err != nil {
+		t.Fatalf("SubstituteRestrictedCategoriesTags: %v", err)
+	}
+
+	if len(receipts[0].Categories) != 0 {
+		t.Errorf("expected no categories (None), got %v", receipts[0].Categories)
+	}
+}
+
+func TestSubstituteReplacesDisallowedTagsWithMarker(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	tag1 := makeTag(t, "Reimbursable")
+	tag2 := makeTag(t, "Personal")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-sub-tag", nil, []uint{tag1})
+
+	receipts := []models.Receipt{{
+		GroupId: groupId,
+		Tags:    []models.Tag{tagWithId(tag1), tagWithId(tag2)},
+	}}
+
+	service := NewPermissionService(nil)
+	if err := service.SubstituteRestrictedCategoriesTags(userId, receipts); err != nil {
+		t.Fatalf("SubstituteRestrictedCategoriesTags: %v", err)
+	}
+
+	got := receipts[0].Tags
+	if len(got) != 2 || got[0].ID != tag1 || got[1].Name != restrictedCategoryTagName {
+		t.Errorf("expected [tag1, (Restricted)], got %v", got)
+	}
+}
+
+func TestSubstituteUnrestrictedNoOp(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	cat1 := makeCategory(t, "Groceries")
+	cat2 := makeCategory(t, "Utilities")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-sub-open", nil, nil)
+
+	receipts := []models.Receipt{{
+		GroupId:    groupId,
+		Categories: []models.Category{categoryWithId(cat1), categoryWithId(cat2)},
+	}}
+
+	service := NewPermissionService(nil)
+	if err := service.SubstituteRestrictedCategoriesTags(userId, receipts); err != nil {
+		t.Fatalf("SubstituteRestrictedCategoriesTags: %v", err)
+	}
+
+	if len(receipts[0].Categories) != 2 {
+		t.Errorf("expected unrestricted receipt untouched, got %v", receipts[0].Categories)
+	}
+}
+
+func TestSubstituteAdminBypassNoOp(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	cat1 := makeCategory(t, "Groceries")
+	cat2 := makeCategory(t, "Utilities")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-sub-admin", []uint{cat1}, nil)
+	// The user holds app.categories.read, so grants do not apply and nothing is
+	// marked restricted.
+	grantUserAppPermissions(t, userId, []string{permissions.AppCategoriesRead})
+
+	receipts := []models.Receipt{{
+		GroupId:    groupId,
+		Categories: []models.Category{categoryWithId(cat1), categoryWithId(cat2)},
+	}}
+
+	service := NewPermissionService(nil)
+	if err := service.SubstituteRestrictedCategoriesTags(userId, receipts); err != nil {
+		t.Fatalf("SubstituteRestrictedCategoriesTags: %v", err)
+	}
+
+	if len(receipts[0].Categories) != 2 {
+		t.Errorf("expected bypass user untouched, got %v", receipts[0].Categories)
+	}
+}
