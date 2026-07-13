@@ -146,6 +146,138 @@ func TestSource_CatalogBuiltins(t *testing.T) {
 	}
 }
 
+func TestSource_CatalogHasDatePeriodFields(t *testing.T) {
+	catalog := mustNew(t).Catalog()
+
+	keys := []reporting.FieldKey{
+		KeyDateDay, KeyDateMonth, KeyDateYear,
+		KeyResolvedDateDay, KeyResolvedDateMonth, KeyResolvedDateYear,
+		KeyCreatedAtDay, KeyCreatedAtMonth, KeyCreatedAtYear,
+	}
+	for _, key := range keys {
+		t.Run(string(key), func(t *testing.T) {
+			field, exists := catalog.Get(key)
+			if !exists {
+				t.Fatalf("catalog is missing %s", key)
+			}
+			// String so the engine buckets on the exact label, and a dimension so a
+			// report may group by it.
+			if field.DataType != reporting.TypeString {
+				t.Errorf("dataType = %v, want %v", field.DataType, reporting.TypeString)
+			}
+			if field.Multi {
+				t.Errorf("%s is single-valued", key)
+			}
+			if field.Role() != reporting.RoleDimension {
+				t.Errorf("role = %v, want dimension", field.Role())
+			}
+		})
+	}
+}
+
+func TestSource_DerivesDatePeriodFields(t *testing.T) {
+	row := mustNew(t).Rows([]models.Receipt{fullReceipt()})[0]
+
+	tests := []struct {
+		key  reporting.FieldKey
+		want string
+	}{
+		// date = 2026-05-15
+		{KeyDateDay, "2026-05-15"},
+		{KeyDateMonth, "2026-05"},
+		{KeyDateYear, "2026"},
+		// resolved_date = 2026-05-20
+		{KeyResolvedDateDay, "2026-05-20"},
+		{KeyResolvedDateMonth, "2026-05"},
+		{KeyResolvedDateYear, "2026"},
+		// created_at = 2026-05-01T08:00Z
+		{KeyCreatedAtDay, "2026-05-01"},
+		{KeyCreatedAtMonth, "2026-05"},
+		{KeyCreatedAtYear, "2026"},
+	}
+	for _, test := range tests {
+		t.Run(string(test.key), func(t *testing.T) {
+			text, isText := row.Measure(test.key).Text()
+			if !isText || text != test.want {
+				t.Errorf("%s = %v, want %q", test.key, row.Measure(test.key), test.want)
+			}
+		})
+	}
+}
+
+// A nil resolved date emits none of the resolved_date period fields, so it lands
+// in the (None) bucket just like the raw resolved_date field.
+func TestSource_NilResolvedDateOmitsResolvedPeriodFields(t *testing.T) {
+	receipt := fullReceipt()
+	receipt.ResolvedDate = nil
+
+	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+
+	for _, key := range []reporting.FieldKey{KeyResolvedDate, KeyResolvedDateDay, KeyResolvedDateMonth, KeyResolvedDateYear} {
+		if values := row.Get(key); len(values) != 0 {
+			t.Errorf("%s = %v, want no value", key, values)
+		}
+	}
+}
+
+// Grouping by date_month buckets receipts into calendar months: same-month
+// receipts merge into one bucket, and the buckets sort chronologically because
+// zero-padded ISO strings compare that way.
+func TestSource_GroupByMonthBucketsByCalendarMonth(t *testing.T) {
+	source := mustNew(t)
+
+	receipt := func(year int, month time.Month, day int, amount string) models.Receipt {
+		return models.Receipt{
+			Date:   time.Date(year, month, day, 0, 0, 0, 0, time.UTC),
+			Amount: dec(amount),
+		}
+	}
+
+	receipts := []models.Receipt{
+		receipt(2026, time.May, 15, "100.00"),
+		receipt(2026, time.May, 20, "50.00"), // same month as the first -> one bucket
+		receipt(2026, time.March, 1, "30.00"),
+		receipt(2026, time.December, 31, "20.00"),
+		receipt(2027, time.January, 1, "10.00"),
+	}
+
+	spec := reporting.ReportSpec{
+		GroupBy:     []reporting.FieldKey{KeyDateMonth},
+		Columns:     []reporting.Column{{Name: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"}},
+		Subtotals:   true,
+		GrandTotals: true,
+	}
+
+	model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	wantBuckets := []string{"2026-03", "2026-05", "2026-12", "2027-01"}
+	if len(model.Root.Children) != len(wantBuckets) {
+		t.Fatalf("got %d month buckets, want %d", len(model.Root.Children), len(wantBuckets))
+	}
+	for index, want := range wantBuckets {
+		if got := model.Root.Children[index].Value.String(); got != want {
+			t.Errorf("bucket %d = %s, want %s", index, got, want)
+		}
+	}
+
+	find := func(cells []reporting.Cell, column string) string {
+		for _, candidate := range cells {
+			if candidate.Column == column {
+				return candidate.Value().String()
+			}
+		}
+		t.Fatalf("no cell for %s", column)
+		return ""
+	}
+	// The two May receipts merged into one bucket that sums both.
+	if got := find(model.Root.Children[1].Subtotals, "Total"); got != "150" {
+		t.Errorf("May total = %s, want 150", got)
+	}
+}
+
 func TestNew_RejectsDuplicateCustomFieldIds(t *testing.T) {
 	_, err := New([]models.CustomField{
 		{BaseModel: models.BaseModel{ID: 1}, Name: "HST", Type: models.CURRENCY},

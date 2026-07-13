@@ -14,6 +14,7 @@ package receiptsource
 import (
 	"sort"
 	"strconv"
+	"time"
 
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/reporting"
@@ -35,6 +36,21 @@ const (
 	KeyGroup        reporting.FieldKey = "group"
 	KeyCategory     reporting.FieldKey = "category"
 	KeyTag          reporting.FieldKey = "tag"
+
+	// Derived date-period fields. A report groups by one of these to bucket
+	// receipts by calendar day, month, or year; the raw date fields above carry
+	// the exact instant, which would put every receipt in its own group.
+	KeyDateDay   reporting.FieldKey = "date_day"
+	KeyDateMonth reporting.FieldKey = "date_month"
+	KeyDateYear  reporting.FieldKey = "date_year"
+
+	KeyResolvedDateDay   reporting.FieldKey = "resolved_date_day"
+	KeyResolvedDateMonth reporting.FieldKey = "resolved_date_month"
+	KeyResolvedDateYear  reporting.FieldKey = "resolved_date_year"
+
+	KeyCreatedAtDay   reporting.FieldKey = "created_at_day"
+	KeyCreatedAtMonth reporting.FieldKey = "created_at_month"
+	KeyCreatedAtYear  reporting.FieldKey = "created_at_year"
 )
 
 // customFieldKeyPrefix builds a custom field's key from its id rather than its
@@ -52,7 +68,7 @@ func CustomFieldKey(customFieldID uint) reporting.FieldKey {
 // every bucket it belongs to, attributing the whole amount to each, exactly as
 // the dashboard pie chart does.
 func builtinFields() []reporting.FieldRef {
-	return []reporting.FieldRef{
+	fields := []reporting.FieldRef{
 		{Key: KeyReceiptID, Label: "Receipt Id", DataType: reporting.TypeNumber},
 		{Key: KeyName, Label: "Name", DataType: reporting.TypeString},
 		{Key: KeyAmount, Label: "Amount", DataType: reporting.TypeCurrency},
@@ -64,6 +80,21 @@ func builtinFields() []reporting.FieldRef {
 		{Key: KeyGroup, Label: "Group", DataType: reporting.TypeString},
 		{Key: KeyCategory, Label: "Category", DataType: reporting.TypeString, Multi: true},
 		{Key: KeyTag, Label: "Tag", DataType: reporting.TypeString, Multi: true},
+	}
+	fields = append(fields, dateFieldRefs(KeyDateDay, KeyDateMonth, KeyDateYear, "Date")...)
+	fields = append(fields, dateFieldRefs(KeyResolvedDateDay, KeyResolvedDateMonth, KeyResolvedDateYear, "Resolved Date")...)
+	fields = append(fields, dateFieldRefs(KeyCreatedAtDay, KeyCreatedAtMonth, KeyCreatedAtYear, "Added At")...)
+	return fields
+}
+
+// dateFieldRefs builds the day/month/year string fields derived from one date
+// column, labelled off a shared prefix (e.g. "Date (Month)"). They are strings,
+// not dates, so the engine buckets them by their exact ISO text.
+func dateFieldRefs(dayKey, monthKey, yearKey reporting.FieldKey, labelPrefix string) []reporting.FieldRef {
+	return []reporting.FieldRef{
+		{Key: dayKey, Label: labelPrefix + " (Day)", DataType: reporting.TypeString},
+		{Key: monthKey, Label: labelPrefix + " (Month)", DataType: reporting.TypeString},
+		{Key: yearKey, Label: labelPrefix + " (Year)", DataType: reporting.TypeString},
 	}
 }
 
@@ -179,8 +210,12 @@ func (s Source) row(receipt *models.Receipt) reporting.Row {
 		KeyTag:       tagValues(receipt.Tags),
 	}
 
+	setDateParts(row, KeyDateDay, KeyDateMonth, KeyDateYear, receipt.Date)
+	setDateParts(row, KeyCreatedAtDay, KeyCreatedAtMonth, KeyCreatedAtYear, receipt.CreatedAt)
+
 	if receipt.ResolvedDate != nil {
 		row[KeyResolvedDate] = []reporting.Value{reporting.DateVal(*receipt.ResolvedDate)}
+		setDateParts(row, KeyResolvedDateDay, KeyResolvedDateMonth, KeyResolvedDateYear, *receipt.ResolvedDate)
 	}
 	if displayName := userDisplayName(receipt.PaidByUser); len(displayName) > 0 {
 		row[KeyPaidBy] = []reporting.Value{reporting.Str(displayName)}
@@ -192,6 +227,18 @@ func (s Source) row(receipt *models.Receipt) reporting.Row {
 	s.addCustomFields(row, receipt)
 
 	return row
+}
+
+// setDateParts writes the day/month/year strings derived from one date onto the
+// row. Each is zero-padded ISO in UTC ("2006-01-02" / "2006-01" / "2006"), so
+// the values sort chronologically as plain strings and group into calendar
+// buckets. The zone is fixed to UTC so a bucket does not depend on where the
+// instant is read.
+func setDateParts(row reporting.Row, dayKey, monthKey, yearKey reporting.FieldKey, moment time.Time) {
+	utc := moment.UTC()
+	row[dayKey] = []reporting.Value{reporting.Str(utc.Format("2006-01-02"))}
+	row[monthKey] = []reporting.Value{reporting.Str(utc.Format("2006-01"))}
+	row[yearKey] = []reporting.Value{reporting.Str(utc.Format("2006"))}
 }
 
 // addCustomFields resolves each of a receipt's custom field values against its

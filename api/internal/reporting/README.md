@@ -446,6 +446,12 @@ It offers `receipt_id`, `name`, `amount`, `date`, `resolved_date`, `created_at`,
 `group`, `category`, `tag` (the last two `Multi`), plus one field per custom field, keyed
 `custom_<id>` — **by id, not by name, so renaming a custom field cannot break a saved report**.
 
+Each date field also carries derived `_day` / `_month` / `_year` **string** fields — `date_month`,
+`created_at_year`, `resolved_date_day`, and so on. A report groups by one of these to bucket receipts by
+calendar period; the raw date fields carry the exact instant, so grouping by `date` puts every receipt
+in its own bucket. The strings are zero-padded ISO in UTC (`2026-05`), so they sort chronologically as
+plain text.
+
 The caller must preload `PaidByUser`, `Group`, `Categories`, `Tags`, `CustomFields`. An unloaded
 association resolves to no value, which surfaces as a `(None)` bucket rather than as a crash.
 
@@ -514,12 +520,6 @@ counts as caught; and `-count=1`, or the build cache serves the last verdict.
 ---
 
 ## 13. Known gaps
-
-**No date truncation.** `date`, `resolved_date` and `created_at` are dimensions, but `receiptsource`
-hands the engine a raw timestamp — so grouping by `date` buckets on the exact instant and yields **one
-group per receipt**. "Receipts by month" is not expressible today. Closing it means either derived
-fields in `receiptsource` (`date_month`, `date_year`) or a `GroupBy` entry carrying a truncation.
-Worth deciding before a persisted template fixes a `GroupBy` shape.
 
 **Per-row allocation.** `rowCells` builds a `map[string]Value` for every rendered row. At 50k rows a
 report costs roughly 165 ms and 39 allocations per row, dominated by `decimal`'s `big.Int` arithmetic
