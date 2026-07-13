@@ -832,6 +832,12 @@ func TestPieChartService_GetPieChartData_GroupByCategories_RestrictedCategory(t 
 		return
 	}
 
+	// Exactly two slices: one visible category and one shared (Restricted). Asserted
+	// on the raw data because pieDataByLabel would fold a duplicate (Restricted) point.
+	if len(result.Data) != 2 {
+		utils.PrintTestError(t, len(result.Data), 2)
+	}
+
 	byLabel := pieDataByLabel(result.Data)
 	if byLabel["Groceries"] != 100.0 {
 		utils.PrintTestError(t, byLabel["Groceries"], 100.0)
@@ -874,6 +880,11 @@ func TestPieChartService_GetPieChartData_GroupByCategories_RestrictedDistinctFro
 		return
 	}
 
+	// Exactly two slices: (Restricted) and Uncategorized, kept separate.
+	if len(result.Data) != 2 {
+		utils.PrintTestError(t, len(result.Data), 2)
+	}
+
 	byLabel := pieDataByLabel(result.Data)
 	if byLabel["(Restricted)"] != 100.0 {
 		utils.PrintTestError(t, byLabel["(Restricted)"], 100.0)
@@ -907,6 +918,11 @@ func TestPieChartService_GetPieChartData_GroupByTags_RestrictedTag(t *testing.T)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 		return
+	}
+
+	// Exactly two slices: one visible tag and one shared (Restricted).
+	if len(result.Data) != 2 {
+		utils.PrintTestError(t, len(result.Data), 2)
 	}
 
 	byLabel := pieDataByLabel(result.Data)
