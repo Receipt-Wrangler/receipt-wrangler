@@ -119,6 +119,12 @@ otherwise. The `Row Type` column is what keeps the file safe to aggregate — fi
 before summing an additive column, or the roll-up rows double-count it. It draws no document chrome;
 grouped/visual layouts are the XLSX/PDF renderers' job, each a separate consumer of the same tree.
 
+`render.XLSX(model, groupBy)` is the faithful, spreadsheet-native one: the group-by dimensions are leading
+columns (each value shown once per group), subtotal/grand-total rows carry a `Total` marker in the column
+at the group's depth, and numbers are written as **native cells** with a number format (not strings), with
+header and total rows bold. It writes the engine-computed values **statically** — translating arithmetic
+columns into live cell formulas (the reason `ColumnDescriptor.Expr` is exported) is a later slice.
+
 ---
 
 ## 4. A worked example, end to end
