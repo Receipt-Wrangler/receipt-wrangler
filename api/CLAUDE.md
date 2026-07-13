@@ -668,12 +668,25 @@ model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), meta)
 **Caller must preload** `PaidByUser`, `Group`, `Categories`, `Tags`, `CustomFields`. An unloaded
 association resolves to no value, which surfaces as a `(None)` bucket — not an error.
 
-**Known gap — no date truncation.** `date`, `resolved_date` and `created_at` are `TypeDate`, hence
-dimensions, hence groupable — but `receiptsource` hands over a raw timestamp, so grouping by `date`
-buckets on the exact instant and yields **one group per receipt**. "Receipts by month" is not
-expressible today. Closing it means either derived fields in `receiptsource` (`date_month`,
-`date_year`) or a `GroupBy` entry carrying a truncation. Decide before `ReportTemplate` persists a
-`GroupBy` shape.
+**Date period grouping — derived string fields.** `date`, `resolved_date` and `created_at` are
+`TypeDate`, so grouping by one buckets on the exact instant (one group per receipt). To group by
+calendar period, `receiptsource` also offers derived **string** fields `<base>_day` / `_month` /
+`_year` (e.g. `date_month`, `created_at_year`, `resolved_date_day`) — zero-padded ISO in **UTC**, so
+they sort chronologically as plain text. A report groups by one of these instead of the raw date field;
+a nil `resolved_date` emits none of its period fields (→ `(None)`).
+
+**`services.ReportDataService`** (`internal/services/report_data.go`) is the first DB-backed caller of
+the engine — it follows the `pie_chart.go` pattern. `Rows(userId, groupId, filter)` fetches the group's
+receipts unpaged and applies the reporting access controls **in order**: narrow the request filter to
+the caller's grants (`IntersectReceiptFilterWithGrants`), hide whole receipts in the query by paid-by
+(`PaidByListResolver`), then substitute the categories/tags the caller can't see. It returns the
+engine's `(FieldCatalog, []Row)` — it does **not** build a `ReportSpec` or call `Run`; a caller does.
+
+**`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
+(not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
+marker, so the receipt still counts toward the totals in its own bucket instead of vanishing. `(None)`
+stays reserved for a receipt that genuinely carries no category/tag. (The pie chart still strips today;
+switching it to `(Restricted)` is a deferred follow-up.)
 
 ### Semantics that are easy to get wrong
 
