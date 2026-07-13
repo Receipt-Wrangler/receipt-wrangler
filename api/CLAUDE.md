@@ -705,9 +705,20 @@ and a subtotal/grand-total row carries a `Total`/`Grand Total` marker in the col
 to `#,##0.00` (or `ColumnDescriptor.Format`/`Meta.CurrencyFormat` if set), so the workbook is analyzable —
 and header/subtotal/grand-total rows are bold; sheet name `Report`. It writes the engine-computed values
 **statically** — live `=SUM`/expression formulas (the reason `ColumnDescriptor.Expr` is an exported AST)
-are a later slice, and document chrome/slots (title, logo) await the template work. It shares the
-`Dimension` type and the `groupBy`-depth guard (`validateGroupByDepth`) with the CSV renderer but not the
-walk (flat vs faithful). Tested by round-tripping the bytes back through `excelize.OpenReader`.
+are a later slice, and document chrome/slots (logo) await the template work. It shares the `Dimension`
+type and the `groupBy`-depth guard (`validateGroupByDepth`) with the CSV renderer, and the faithful
+**walk** with the HTML renderer (`faithfulWalk` in `render/walk.go`, driving a per-format `faithfulSink`);
+CSV keeps its own flat walk. Tested by round-tripping the bytes back through `excelize.OpenReader`.
+
+`render.HTML(model, groupBy)` is the **PDF format's HTML stage** (via `html/template`): a self-contained
+document — a `Meta.Title` heading, a preamble of the resolved `Meta.Params`, the same faithful table as
+XLSX (through the shared `faithfulWalk`), and a `Meta.GeneratedAt` footer, each omitted when the model
+carries nothing for it. All CSS is inline and it references no external resources or scripts, so it renders
+through the headless-Chromium HTML-to-PDF pipeline (`services/html_to_pdf.go`, which blocks network loads
+and disables JS by default). It returns **HTML bytes** — the reporting package is pure, so the chromedp
+conversion to PDF stays in the services layer and is wired up by the future handler (deferred until the
+UI). Unit-tested against the same faithful golden grids as XLSX (parsed with `golang.org/x/net/html`) plus
+document-chrome and HTML-escaping cases.
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
