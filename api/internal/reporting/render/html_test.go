@@ -84,7 +84,7 @@ func cellTexts(row *html.Node, cellTag string) []string {
 // renderer (via assertGrid, which trims trailing blanks).
 func htmlGrid(t *testing.T, model reporting.ReportModel, groupBy []Dimension) [][]string {
 	t.Helper()
-	out, err := HTML(model, groupBy)
+	out, err := HTML(model, groupBy, DocumentChrome{})
 	if err != nil {
 		t.Fatalf("HTML: %v", err)
 	}
@@ -104,7 +104,7 @@ func htmlGrid(t *testing.T, model reporting.ReportModel, groupBy []Dimension) []
 // per-row classes and per-cell attributes the grid text drops.
 func bodyRows(t *testing.T, model reporting.ReportModel, groupBy []Dimension) []*html.Node {
 	t.Helper()
-	out, err := HTML(model, groupBy)
+	out, err := HTML(model, groupBy, DocumentChrome{})
 	if err != nil {
 		t.Fatalf("HTML: %v", err)
 	}
@@ -383,7 +383,7 @@ func TestHTML_GroupByDepthMismatchErrors(t *testing.T) {
 		{"paid_by": {reporting.Str("Dana")}, "tag": {reporting.Str("Alex")}, "category": {reporting.Str("Food")}, "amount": {money("100")}},
 	}
 
-	out, err := HTML(mustRun(t, spec, paidByCatalog(t), rows), paidByDimension())
+	out, err := HTML(mustRun(t, spec, paidByCatalog(t), rows), paidByDimension(), DocumentChrome{})
 	if err == nil {
 		t.Fatalf("expected an error for a group-depth mismatch, got none")
 	}
@@ -445,7 +445,7 @@ func TestHTML_DocumentChromeRendersFromMeta(t *testing.T) {
 		t.Fatalf("run report: %v", err)
 	}
 
-	out, err := HTML(model, paidByDimension())
+	out, err := HTML(model, paidByDimension(), DocumentChrome{})
 	if err != nil {
 		t.Fatalf("HTML: %v", err)
 	}
@@ -474,7 +474,7 @@ func TestHTML_DocumentChromeRendersFromMeta(t *testing.T) {
 // With no title, no params, and a zero timestamp the document omits its chrome
 // entirely rather than rendering empty elements.
 func TestHTML_DocumentChromeOmittedWhenEmpty(t *testing.T) {
-	out, err := HTML(mustRun(t, oneLevelSpec(), paidByCatalog(t), oneLevelRows()), paidByDimension())
+	out, err := HTML(mustRun(t, oneLevelSpec(), paidByCatalog(t), oneLevelRows()), paidByDimension(), DocumentChrome{})
 	if err != nil {
 		t.Fatalf("HTML: %v", err)
 	}
@@ -501,7 +501,7 @@ func TestHTML_EscapesCellText(t *testing.T) {
 		{"category": {reporting.Str("A & <b>")}, "amount": {money("10")}},
 	}
 
-	out, err := HTML(mustRun(t, spec, paidByCatalog(t), rows), nil)
+	out, err := HTML(mustRun(t, spec, paidByCatalog(t), rows), nil, DocumentChrome{})
 	if err != nil {
 		t.Fatalf("HTML: %v", err)
 	}
@@ -512,5 +512,80 @@ func TestHTML_EscapesCellText(t *testing.T) {
 	}
 	if strings.Contains(rendered, "<b>") {
 		t.Errorf("unescaped markup leaked into output:\n%s", rendered)
+	}
+}
+
+// An authored intro renders as prose beneath the title, and an authored footer
+// replaces the automatic generated-at note (the author composes their own).
+func TestHTML_AuthoredIntroAndFooter(t *testing.T) {
+	spec := oneLevelSpec()
+	spec.Title = "Verified Expenses"
+	meta := reporting.MetaInput{GeneratedAt: time.Date(2026, 7, 13, 9, 30, 0, 0, time.UTC)}
+	model, err := reporting.Run(spec, paidByCatalog(t), oneLevelRows(), meta)
+	if err != nil {
+		t.Fatalf("run report: %v", err)
+	}
+
+	out, err := HTML(model, paidByDimension(), DocumentChrome{
+		Intro:  "Period Covering: 2026-Q2",
+		Footer: "Generated Jul 13, 2026 · Receipt Wrangler",
+	})
+	if err != nil {
+		t.Fatalf("HTML: %v", err)
+	}
+	rendered := string(out)
+
+	if !strings.Contains(rendered, `<p class="intro">Period Covering: 2026-Q2</p>`) {
+		t.Errorf("authored intro missing:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "<footer>Generated Jul 13, 2026 · Receipt Wrangler</footer>") {
+		t.Errorf("authored footer missing:\n%s", rendered)
+	}
+	// The authored footer replaces the automatic generated-at footer.
+	if strings.Contains(rendered, "2026-07-13 09:30:00 UTC") {
+		t.Errorf("automatic generated-at footer should be replaced by the authored one:\n%s", rendered)
+	}
+}
+
+// With only an intro, the automatic generated-at footer still renders.
+func TestHTML_IntroKeepsAutomaticFooter(t *testing.T) {
+	meta := reporting.MetaInput{GeneratedAt: time.Date(2026, 7, 13, 9, 30, 0, 0, time.UTC)}
+	model, err := reporting.Run(oneLevelSpec(), paidByCatalog(t), oneLevelRows(), meta)
+	if err != nil {
+		t.Fatalf("run report: %v", err)
+	}
+
+	out, err := HTML(model, paidByDimension(), DocumentChrome{Intro: "An overview."})
+	if err != nil {
+		t.Fatalf("HTML: %v", err)
+	}
+	rendered := string(out)
+
+	if !strings.Contains(rendered, `<p class="intro">An overview.</p>`) {
+		t.Errorf("intro missing:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "Generated 2026-07-13 09:30:00 UTC") {
+		t.Errorf("automatic footer should remain when no authored footer is set:\n%s", rendered)
+	}
+}
+
+// Authored chrome is HTML-escaped like every other dynamic value.
+func TestHTML_ChromeIsEscaped(t *testing.T) {
+	model := mustRun(t, oneLevelSpec(), paidByCatalog(t), oneLevelRows())
+
+	out, err := HTML(model, paidByDimension(), DocumentChrome{
+		Intro:  "A & <b>intro</b>",
+		Footer: "footer <script>",
+	})
+	if err != nil {
+		t.Fatalf("HTML: %v", err)
+	}
+	rendered := string(out)
+
+	if !strings.Contains(rendered, "A &amp; &lt;b&gt;intro&lt;/b&gt;") {
+		t.Errorf("intro not escaped:\n%s", rendered)
+	}
+	if strings.Contains(rendered, "<script>") {
+		t.Errorf("unescaped markup leaked from chrome:\n%s", rendered)
 	}
 }
