@@ -51,6 +51,8 @@ export class ReportReceiptsDialogComponent {
 
   public readonly loading = signal<boolean>(true);
   public readonly receipts = signal<Receipt[]>([]);
+  // Set when any group's fetch fails, so the list can warn it may be incomplete.
+  public readonly hasError = signal<boolean>(false);
   // The receipt being inspected; null shows the list, non-null the breakdown.
   public readonly selected = signal<Receipt | null>(null);
 
@@ -104,7 +106,10 @@ export class ReportReceiptsDialogComponent {
       this.receiptService.getReceiptsForGroup(Number.parseInt(groupId, 10), command).pipe(
         take(1),
         map((paged) => (paged.data ?? []) as unknown as Receipt[]),
-        catchError(() => of<Receipt[]>([]))
+        catchError(() => {
+          this.hasError.set(true);
+          return of<Receipt[]>([]);
+        })
       )
     );
 

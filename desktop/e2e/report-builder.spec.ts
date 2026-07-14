@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { stubTokenRefresh } from './helpers/auth';
-import { addFirstGroupToScope, gotoReports, openComboboxAndPick } from './helpers/reports';
+import { addFirstGroupToScope, gotoReports, openComboboxAndPick, waitForPreview } from './helpers/reports';
 
 // The Report Builder is gated by the app-level app.reports.read permission, which
 // the seeded Legacy Admin role carries (and Legacy User does not). Run the positive
@@ -29,7 +29,7 @@ test.describe('Report Builder', () => {
     // With a group and the default columns, the preview activates and its
     // receipt-count chip appears (it renders the engine's HTML server-side).
     await expect(page.getByTestId('report-receipt-count')).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('iframe[title="Report preview"]')).toBeVisible();
+    await expect(page.getByTitle('Report preview')).toBeVisible();
 
     // Choose a single CSV output (default is PDF) and generate; expect a download.
     await page.getByTestId('report-format-pdf').click();
@@ -45,14 +45,16 @@ test.describe('Report Builder', () => {
     await gotoReports(page);
     await addFirstGroupToScope(page);
 
-    // Seeded receipts sit in prior months, so cover them with "Last month".
-    await openComboboxAndPick(
-      page,
-      page.locator('mat-select').filter({ hasText: 'This month' }),
-      page.getByRole('option', { name: 'Last month' }),
-    );
-    // Let the debounced preview refresh so the covered-count reflects the new period.
-    await page.waitForTimeout(1500);
+    // Seeded receipts sit in prior months, so cover them with "Last month", and
+    // wait for the debounced preview so the covered-count reflects the new period.
+    await Promise.all([
+      waitForPreview(page),
+      openComboboxAndPick(
+        page,
+        page.getByRole('combobox', { name: /Period covering/ }),
+        page.getByRole('option', { name: 'Last month' }),
+      ),
+    ]);
 
     const chip = page.getByTestId('report-receipt-count');
     await expect(chip).toBeVisible({ timeout: 20_000 });
@@ -102,7 +104,7 @@ test.describe('Report Builder', () => {
     // preview still renders from the remaining columns — no raw engine error.
     await expect(page.getByTestId('report-column-disabled')).toBeVisible();
     await expect(page.getByTestId('report-receipt-count')).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('iframe[title="Report preview"]')).toBeVisible();
+    await expect(page.getByTitle('Report preview')).toBeVisible();
   });
 
   test('adds a grouping level and a filter through the shared app-select pickers', async ({ page }) => {

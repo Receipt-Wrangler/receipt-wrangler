@@ -21,6 +21,7 @@ import {
   REPORT_PERIOD_PRESETS,
   ReportField,
 } from "../models/report-catalog.constants";
+import { CHIP_COLORS, groupInitials } from "../models/report-chip.util";
 import { isDimensionColumnDisabled, ReportColumnValue } from "../models/report-command.mapper";
 import { buildColumnGroup } from "../models/report-form.factory";
 import { formatPeriodRange, resolvePeriodRange } from "../models/report-period.util";
@@ -67,8 +68,6 @@ const KIND_META: Record<ReportColumn.KindEnum, { label: string; icon: string; cs
   aggregate: { label: "Agg", icon: "functions", cssClass: "kind-aggregate" },
   formula: { label: "Formula", icon: "calculate", cssClass: "kind-formula" },
 };
-
-const CHIP_COLORS = ["#f5a3b7", "#f7b267", "#4db6ac", "#b39ddb", "#27b1ff", "#f6c453"];
 
 /**
  * The report builder's left configuration panel: report details + scope, period,
@@ -124,7 +123,7 @@ export class ReportConfigPanelComponent implements OnInit {
       const id = control.value as string;
       const group = groups.find((candidate) => candidate.id?.toString() === id);
       const name = group?.name ?? id;
-      return { index, name, initials: initialsOf(name), color: CHIP_COLORS[index % CHIP_COLORS.length] };
+      return { index, name, initials: groupInitials(name), color: CHIP_COLORS[index % CHIP_COLORS.length] };
     });
   });
 
@@ -360,8 +359,4 @@ export class ReportConfigPanelComponent implements OnInit {
   private bump(): void {
     this.revision.update((value) => value + 1);
   }
-}
-
-function initialsOf(name: string): string {
-  return (name || "?").trim().slice(0, 2).toUpperCase();
 }

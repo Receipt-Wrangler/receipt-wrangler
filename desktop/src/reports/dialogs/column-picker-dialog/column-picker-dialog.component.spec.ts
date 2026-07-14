@@ -87,6 +87,27 @@ describe("ColumnPickerDialogComponent", () => {
     expect(saved.measure).toBeUndefined();
   });
 
+  it("configures and saves a dimension column", async () => {
+    const { fixture, component, close } = configure(baseData);
+    await fixture.whenStable();
+
+    component.pickDimension();
+    await fixture.whenStable();
+    expect(component.step()).toBe("dim");
+    // The field and label preset to the first dimension.
+    expect(component.pickerForm.get("field")!.value).toBe("category");
+    expect(component.canSave()).toBe(true);
+
+    component.save();
+    expect(close).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: ReportColumn.KindEnum.Dimension,
+        field: "category",
+        label: "Category",
+      })
+    );
+  });
+
   it("builds a formula from clicked column and operator chips", async () => {
     const { fixture, component } = configure(formulaData);
     await fixture.whenStable();

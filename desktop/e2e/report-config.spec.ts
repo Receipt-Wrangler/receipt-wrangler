@@ -38,8 +38,7 @@ test.describe('Report Builder — configuration', () => {
   });
 
   test('reorders grouping levels', async ({ page }) => {
-    // Grouping levels use their own label class (columns use a different one).
-    const labels = page.locator('.report-config__list-label');
+    const labels = page.getByTestId('report-grouping-label');
 
     await addGroupingLevel(page, 'Paid By');
     await addGroupingLevel(page, 'Tag');
@@ -91,7 +90,7 @@ test.describe('Report Builder — configuration', () => {
 
     // The preview is server-rendered HTML in an iframe; assert the heading via its
     // srcdoc rather than reaching across the frame.
-    await expect(page.locator('iframe[title="Report preview"]')).toHaveAttribute(
+    await expect(page.getByTitle('Report preview')).toHaveAttribute(
       'srcdoc',
       /Quarterly Summary/,
       { timeout: 20_000 },

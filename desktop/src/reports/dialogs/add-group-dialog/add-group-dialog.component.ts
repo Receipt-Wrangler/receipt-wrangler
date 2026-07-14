@@ -3,6 +3,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { AuthState, GroupState } from "src/store";
 import { Permission } from "../../../open-api";
+import { CHIP_COLORS, groupInitials } from "../../models/report-chip.util";
 
 export interface AddGroupDialogData {
   selectedGroupIds: string[];
@@ -15,8 +16,6 @@ interface GroupChoice {
   color: string;
   selected: boolean;
 }
-
-const CHIP_COLORS = ["#f5a3b7", "#f7b267", "#4db6ac", "#b39ddb", "#27b1ff", "#f6c453"];
 
 /**
  * Picks the groups a report covers, limited to groups where the user holds
@@ -51,7 +50,7 @@ export class AddGroupDialogComponent {
         return {
           id,
           name: group.name ?? id,
-          initials: (group.name || "?").trim().slice(0, 2).toUpperCase(),
+          initials: groupInitials(group.name),
           color: CHIP_COLORS[index % CHIP_COLORS.length],
           selected: selected.has(id),
         };

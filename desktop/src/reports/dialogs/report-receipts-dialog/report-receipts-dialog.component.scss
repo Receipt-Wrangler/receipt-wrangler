@@ -15,6 +15,26 @@
     font-size: 13px;
   }
 
+  &__warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    background: #fffbeb;
+    color: #b45309;
+    font-size: 12.5px;
+
+    mat-icon {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+      color: #d97706;
+    }
+  }
+
   &__spinner {
     animation: drill-spin 1s linear infinite;
     color: #009efa;

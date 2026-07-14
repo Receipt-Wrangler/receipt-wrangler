@@ -51,7 +51,7 @@
   @for (level of groupByLevels(); track level.index) {
     <div class="report-config__list-row">
       <span class="report-config__pos">{{ level.index + 1 }}</span>
-      <span class="report-config__list-label">{{ level.label }}</span>
+      <span class="report-config__list-label" data-testid="report-grouping-label">{{ level.label }}</span>
       <app-button matButtonType="iconButton" icon="arrow_upward" tooltip="Move up" [disabled]="level.isFirst"
         (clicked)="moveGroupBy(level.index, -1)" data-testid="report-grouping-up"></app-button>
       <app-button matButtonType="iconButton" icon="arrow_downward" tooltip="Move down" [disabled]="level.isLast"

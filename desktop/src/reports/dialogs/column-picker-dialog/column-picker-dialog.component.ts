@@ -11,7 +11,7 @@ import { FormBuilder, FormGroup } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { startWith } from "rxjs";
 import { ReportColumn } from "../../../open-api";
-import { ReportField } from "../../models/report-catalog.constants";
+import { aggregateNeedsMeasure, ReportField } from "../../models/report-catalog.constants";
 import { ReportColumnValue } from "../../models/report-command.mapper";
 import { deriveColumnName, validateFormulaExpr } from "../../models/report-column.util";
 import { nextReportRowId } from "../../models/report-form.factory";
@@ -150,7 +150,7 @@ export class ColumnPickerDialogComponent {
   }
 
   public get aggregateNeedsMeasure(): boolean {
-    return this.currentAggFunc !== ReportColumn.AggFuncEnum.Count;
+    return aggregateNeedsMeasure(this.currentAggFunc);
   }
 
   public pickDimension(): void {

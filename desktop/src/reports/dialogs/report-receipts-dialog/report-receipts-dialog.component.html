@@ -1,6 +1,13 @@
 <app-dialog headerText="Receipts in this report">
   <div class="drill__subtitle">{{ count() }} receipts · {{ periodLabel }}</div>
 
+  @if (!loading() && hasError()) {
+    <div class="drill__warning" data-testid="report-receipt-error">
+      <mat-icon>warning</mat-icon>
+      Some groups couldn't be loaded — this list may be incomplete.
+    </div>
+  }
+
   @if (loading()) {
     <div class="drill__state">
       <mat-icon class="drill__spinner">autorenew</mat-icon>

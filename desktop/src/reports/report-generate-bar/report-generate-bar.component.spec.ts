@@ -1,6 +1,9 @@
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder, FormGroup } from "@angular/forms";
+import { NoopAnimationsModule } from "@angular/platform-browser/animations";
+import { provideRouter } from "@angular/router";
+import { ButtonModule } from "../../button/button.module";
 import { ReportGenerateBarComponent } from "./report-generate-bar.component";
 
 describe("ReportGenerateBarComponent", () => {
@@ -11,7 +14,10 @@ describe("ReportGenerateBarComponent", () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [ReportGenerateBarComponent],
-      providers: [provideZonelessChangeDetection()],
+      // Import the real ButtonModule so the Generate app-button renders a real
+      // <button> whose disabled state can be asserted from the DOM.
+      imports: [ButtonModule, NoopAnimationsModule],
+      providers: [provideZonelessChangeDetection(), provideRouter([])],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
 
@@ -49,5 +55,29 @@ describe("ReportGenerateBarComponent", () => {
     component.generate.subscribe(spy);
     component.onGenerate();
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the format chips and the Generate button's disabled state", () => {
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // The format chips render, reflecting the selected (xlsx) format.
+    expect(el.querySelector('[data-testid="report-format-xlsx"]')!.classList).toContain("gen-bar__chip--on");
+    expect(el.querySelector('[data-testid="report-format-csv"]')!.classList).not.toContain("gen-bar__chip--on");
+    expect(el.querySelector(".gen-bar__summary")!.textContent).toContain("Single XLSX file");
+
+    // canGenerate=true → the Generate button is enabled.
+    const button = () => el.querySelector('[data-testid="report-generate"] button') as HTMLButtonElement;
+    expect(button().disabled).toBe(false);
+
+    // Flipping the inputs disables it (no format-generatable / mid-generation).
+    fixture.componentRef.setInput("canGenerate", false);
+    fixture.detectChanges();
+    expect(button().disabled).toBe(true);
+
+    fixture.componentRef.setInput("canGenerate", true);
+    fixture.componentRef.setInput("generating", true);
+    fixture.detectChanges();
+    expect(button().disabled).toBe(true);
   });
 });

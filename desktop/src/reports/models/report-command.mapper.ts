@@ -6,7 +6,7 @@ import {
   ReportPeriod,
   ReportRequestCommand,
 } from "../../open-api";
-import { ReportRequestFormat } from "./report-catalog.constants";
+import { aggregateNeedsMeasure, ReportRequestFormat } from "./report-catalog.constants";
 
 /** A single builder column, before mapping to the engine's ReportColumn. */
 export interface ReportColumnValue {
@@ -98,7 +98,7 @@ function toColumn(column: ReportColumnValue): ReportColumn {
       break;
     case ReportColumn.KindEnum.Aggregate:
       mapped.aggFunc = column.aggFunc;
-      if (column.aggFunc !== ReportColumn.AggFuncEnum.Count) {
+      if (aggregateNeedsMeasure(column.aggFunc!)) {
         mapped.measure = column.measure;
       }
       break;
