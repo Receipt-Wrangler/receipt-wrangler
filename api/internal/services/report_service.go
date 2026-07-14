@@ -149,7 +149,7 @@ func (service ReportService) buildModel(
 		return reportBuild{}, err
 	}
 
-	title, chrome := service.resolveDocument(userId, groupNames, periodLabel, now, command.Document)
+	title, chrome := service.resolveDocument(userId, groupNames, periodLabel, now, command.Name, command.Document)
 
 	spec, err := buildReportSpec(command)
 	if err != nil {
@@ -433,12 +433,15 @@ func resolvePeriodBounds(period commands.ReportPeriod, now time.Time) (time.Time
 // document copy, returning the resolved title (for the model's Meta) and the
 // render-time chrome (intro and footer). The runtime values it resolves — the
 // period label, the covered group names, the generation time, and the caller's
-// display name — are known only here, at generation time.
+// display name — are known only here, at generation time. The visible heading is
+// the authored document title; when it is left blank it falls back to the report
+// name so the rendered report (and its live preview) is never headingless.
 func (service ReportService) resolveDocument(
 	userId uint,
 	groupNames []string,
 	periodLabel string,
 	now time.Time,
+	name string,
 	document commands.ReportDocument,
 ) (string, render.DocumentChrome) {
 	substitutions := map[string]string{
@@ -447,7 +450,11 @@ func (service ReportService) resolveDocument(
 		"generatedAt":      now.Format("Jan 2, 2006, 3:04 PM"),
 		"currentUser.name": service.userDisplayName(userId),
 	}
-	return substituteVariables(document.Title, substitutions),
+	titleSource := document.Title
+	if strings.TrimSpace(titleSource) == "" {
+		titleSource = name
+	}
+	return substituteVariables(titleSource, substitutions),
 		render.DocumentChrome{
 			Intro:  substituteVariables(document.Intro, substitutions),
 			Footer: substituteVariables(document.Footer, substitutions),

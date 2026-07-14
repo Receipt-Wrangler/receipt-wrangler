@@ -730,7 +730,9 @@ and HTML-escaping cases.
 the pieces. `ReportService.Generate(userId, command)` resolves the request's period into a date filter,
 loads rows across every group in the request under the one (global) catalog, builds a `ReportSpec`, runs
 the pure engine, resolves the document's `{{period}}`/`{{group.name}}`/`{{generatedAt}}`/`{{currentUser.name}}`
-variables, renders each requested format (bridging PDF through `HtmlToPdfService.Render`), and returns a
+variables (the rendered heading is the authored `document.title`, falling back to the report `name` when
+blank so the report — and its live preview — is never headingless), renders each requested format
+(bridging PDF through `HtmlToPdfService.Render`), and returns a
 single file or a **zip** of several. It reads the clock exactly once. The handler (`handlers/report.go`)
 parses+validates the `ReportRequestCommand` **before** building the `structs.Handler` — because the
 `groupIds` it carries drive the gate: it declares `GroupIds` + `GroupPermissions: [group.reports.read]`,

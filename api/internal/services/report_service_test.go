@@ -64,6 +64,7 @@ func TestReportService_ResolveDocument(t *testing.T) {
 		[]string{"Household", "Roommates"},
 		"2026-05-01 to 2026-05-31",
 		now,
+		"Report Name",
 		commands.ReportDocument{
 			Title:  "{{group.name}} Report",
 			Intro:  "Period: {{period}}",
@@ -71,6 +72,7 @@ func TestReportService_ResolveDocument(t *testing.T) {
 		},
 	)
 
+	// An authored title wins over the report name.
 	if title != "Household, Roommates Report" {
 		t.Errorf("title = %q", title)
 	}
@@ -79,6 +81,31 @@ func TestReportService_ResolveDocument(t *testing.T) {
 	}
 	if chrome.Footer != "Prepared by Noah Hall on Jul 13, 2026, 4:07 PM" {
 		t.Errorf("footer = %q", chrome.Footer)
+	}
+}
+
+// A blank document title falls back to the report name (still variable-substituted)
+// so the rendered report and its live preview always carry a heading.
+func TestReportService_ResolveDocument_TitleFallsBackToName(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := models.User{Username: "u-doc-fallback", DisplayName: "Noah Hall"}
+	if err := repositories.GetDB().Create(&user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	now := time.Date(2026, 7, 13, 16, 7, 0, 0, time.UTC)
+
+	title, _ := NewReportService(nil).resolveDocument(
+		user.ID,
+		[]string{"Household"},
+		"2026-05-01 to 2026-05-31",
+		now,
+		"{{period}} Summary",
+		commands.ReportDocument{Title: "   "},
+	)
+
+	if title != "2026-05-01 to 2026-05-31 Summary" {
+		t.Errorf("title = %q, want the substituted report name", title)
 	}
 }
 
@@ -413,6 +440,10 @@ func TestReportService_Preview_RendersHtmlWithReceiptCount(t *testing.T) {
 	}
 	if !strings.HasPrefix(strings.TrimSpace(preview.Html), "<") {
 		t.Errorf("expected an HTML document, got: %q", preview.Html)
+	}
+	// With no authored document title, the heading falls back to the report name.
+	if !strings.Contains(preview.Html, "<h1>Live</h1>") {
+		t.Errorf("preview HTML missing the report-name heading <h1>Live</h1>:\n%s", preview.Html)
 	}
 	for _, want := range []string{"Household", "Roommates", "Groceries"} {
 		if !strings.Contains(preview.Html, want) {
