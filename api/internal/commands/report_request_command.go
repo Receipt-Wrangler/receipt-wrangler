@@ -132,11 +132,19 @@ func (command *ReportRequestCommand) Validate() structs.ValidatorError {
 	if len(command.GroupIds) == 0 {
 		errorMap["groupIds"] = "At least one group is required"
 	} else {
+		seenGroups := make(map[string]bool, len(command.GroupIds))
 		for _, groupId := range command.GroupIds {
 			if groupId == "" {
 				errorMap["groupIds"] = "Group ids must not be empty"
 				break
 			}
+			// A duplicate id would load and sum that group's receipts twice,
+			// silently inflating the report totals.
+			if seenGroups[groupId] {
+				errorMap["groupIds"] = "Group ids must be unique: " + groupId
+				break
+			}
+			seenGroups[groupId] = true
 		}
 	}
 
@@ -233,28 +241,6 @@ func (command *ReportRequestCommand) validateFormats(errorMap map[string]string)
 		if !validReportFormats[format] {
 			errorMap["formats"] = "Unsupported format: " + format
 			return
-		}
-	}
-}
-
-// initReceiptFilterValues seeds the same non-nil defaults the other receipt-filter
-// commands rely on so downstream grant-narrowing and query building are safe.
-func initReceiptFilterValues(filter *ReceiptPagedRequestFilter) {
-	if filter.Amount.Value == nil || filter.Amount.Value == "" {
-		filter.Amount.Value = float64(0)
-	}
-	for _, field := range []*PagedRequestField{
-		&filter.PaidBy, &filter.Categories, &filter.Tags, &filter.Status, &filter.Group,
-	} {
-		if field.Value == nil || field.Value == "" {
-			field.Value = make([]interface{}, 0)
-		}
-	}
-	for _, field := range []*PagedRequestField{
-		&filter.Date, &filter.ResolvedDate, &filter.CreatedAt, &filter.Name,
-	} {
-		if field.Value == nil {
-			field.Value = ""
 		}
 	}
 }

@@ -31,6 +31,55 @@ func TestReportService_SubstituteVariables(t *testing.T) {
 	if got := substituteVariables(in, values); got != want {
 		t.Errorf("substituteVariables:\n got %q\nwant %q", got, want)
 	}
+
+	// A resolved value that itself contains a token must not be re-substituted,
+	// so the result is deterministic regardless of map iteration order (a single
+	// pass over the original text).
+	trap := map[string]string{
+		"group.name":       "{{generatedAt}}",
+		"generatedAt":      "2026-07-13",
+		"period":           "P",
+		"currentUser.name": "U",
+	}
+	if got := substituteVariables("{{group.name}}", trap); got != "{{generatedAt}}" {
+		t.Errorf("a resolved value was re-substituted: got %q, want {{generatedAt}}", got)
+	}
+}
+
+// resolveDocument is the render-input seam: it proves the substituted title and
+// chrome (with real DB-sourced values) are what feed the renderer — a regression
+// that dropped substitution would fail here even though the opaque PDF bytes could
+// not catch it.
+func TestReportService_ResolveDocument(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := models.User{Username: "u-doc", DisplayName: "Noah Hall"}
+	if err := repositories.GetDB().Create(&user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	now := time.Date(2026, 7, 13, 16, 7, 0, 0, time.UTC)
+
+	title, chrome := NewReportService(nil).resolveDocument(
+		user.ID,
+		[]string{"Household", "Roommates"},
+		"2026-05-01 to 2026-05-31",
+		now,
+		commands.ReportDocument{
+			Title:  "{{group.name}} Report",
+			Intro:  "Period: {{period}}",
+			Footer: "Prepared by {{currentUser.name}} on {{generatedAt}}",
+		},
+	)
+
+	if title != "Household, Roommates Report" {
+		t.Errorf("title = %q", title)
+	}
+	if chrome.Intro != "Period: 2026-05-01 to 2026-05-31" {
+		t.Errorf("intro = %q", chrome.Intro)
+	}
+	if chrome.Footer != "Prepared by Noah Hall on Jul 13, 2026, 4:07 PM" {
+		t.Errorf("footer = %q", chrome.Footer)
+	}
 }
 
 func TestReportService_ResolvePeriodBounds(t *testing.T) {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -21,6 +22,14 @@ import (
 func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	command := commands.ReportRequestCommand{}
 	if err := command.LoadDataFromRequest(w, r); err != nil {
+		// A decode failure is a malformed client payload (400); only a genuine
+		// body-read failure is a server error (500).
+		var syntaxErr *json.SyntaxError
+		var typeErr *json.UnmarshalTypeError
+		if errors.As(err, &syntaxErr) || errors.As(err, &typeErr) {
+			utils.WriteCustomErrorResponse(w, "Malformed report request", http.StatusBadRequest)
+			return
+		}
 		utils.WriteCustomErrorResponse(w, "Error reading report request", http.StatusInternalServerError)
 		return
 	}

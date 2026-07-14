@@ -97,6 +97,7 @@ func TestReportRequestCommand_Validate_Rejects(t *testing.T) {
 	}{
 		{"no groups", func(c *ReportRequestCommand) { c.GroupIds = nil }, "groupIds"},
 		{"empty group id", func(c *ReportRequestCommand) { c.GroupIds = []string{""} }, "groupIds"},
+		{"duplicate group ids", func(c *ReportRequestCommand) { c.GroupIds = []string{"1", "1"} }, "groupIds"},
 		{"missing preset", func(c *ReportRequestCommand) { c.Period.Preset = "" }, "period"},
 		{"unknown preset", func(c *ReportRequestCommand) { c.Period.Preset = "someday" }, "period"},
 		{"custom without dates", func(c *ReportRequestCommand) { c.Period = ReportPeriod{Preset: ReportPeriodCustom} }, "period"},

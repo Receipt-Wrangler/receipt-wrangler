@@ -50,15 +50,11 @@ type ReportSpecError struct {
 func (e *ReportSpecError) Error() string { return e.Err.Error() }
 func (e *ReportSpecError) Unwrap() error { return e.Err }
 
-// reportVariablePatterns matches the four document variables the builder exposes.
-// Replacement is literal so a resolved value containing a "$" is not treated as a
-// regexp expansion.
-var reportVariablePatterns = map[string]*regexp.Regexp{
-	"period":           regexp.MustCompile(`\{\{\s*period\s*\}\}`),
-	"group.name":       regexp.MustCompile(`\{\{\s*group\.name\s*\}\}`),
-	"generatedAt":      regexp.MustCompile(`\{\{\s*generatedAt\s*\}\}`),
-	"currentUser.name": regexp.MustCompile(`\{\{\s*currentUser\.name\s*\}\}`),
-}
+// reportVariablePattern matches any of the four document variables the builder
+// exposes, capturing the token name. It is applied in a single pass over the
+// original text (see substituteVariables), so a substituted value is never
+// re-scanned and the output does not depend on map iteration order.
+var reportVariablePattern = regexp.MustCompile(`\{\{\s*(period|group\.name|generatedAt|currentUser\.name)\s*\}\}`)
 
 var reportFilenameUnsafe = regexp.MustCompile(`[^\w]+`)
 
@@ -82,18 +78,13 @@ func (service ReportService) Generate(userId uint, command commands.ReportReques
 		return GeneratedReport{}, err
 	}
 
-	substitutions := map[string]string{
-		"period":           periodLabel,
-		"group.name":       strings.Join(groupNames, ", "),
-		"generatedAt":      now.Format("Jan 2, 2006, 3:04 PM"),
-		"currentUser.name": service.userDisplayName(userId),
-	}
+	title, chrome := service.resolveDocument(userId, groupNames, periodLabel, now, command.Document)
 
 	spec, err := buildReportSpec(command)
 	if err != nil {
 		return GeneratedReport{}, &ReportSpecError{Err: err}
 	}
-	spec.Title = substituteVariables(command.Document.Title, substitutions)
+	spec.Title = title
 
 	meta := reporting.MetaInput{
 		GeneratedAt: now,
@@ -109,10 +100,6 @@ func (service ReportService) Generate(userId uint, command commands.ReportReques
 	}
 
 	dimensions := buildDimensions(spec.GroupBy, catalog)
-	chrome := render.DocumentChrome{
-		Intro:  substituteVariables(command.Document.Intro, substitutions),
-		Footer: substituteVariables(command.Document.Footer, substitutions),
-	}
 
 	files, err := service.renderFormats(command.Formats, model, dimensions, chrome)
 	if err != nil {
@@ -373,13 +360,40 @@ func resolvePeriodBounds(period commands.ReportPeriod, now time.Time) (time.Time
 	}
 }
 
-// substituteVariables replaces the four supported document variables in text with
-// their resolved values, leaving any unknown token untouched.
-func substituteVariables(text string, values map[string]string) string {
-	for token, pattern := range reportVariablePatterns {
-		text = pattern.ReplaceAllLiteralString(text, values[token])
+// resolveDocument substitutes the four report variables into the authored
+// document copy, returning the resolved title (for the model's Meta) and the
+// render-time chrome (intro and footer). The runtime values it resolves — the
+// period label, the covered group names, the generation time, and the caller's
+// display name — are known only here, at generation time.
+func (service ReportService) resolveDocument(
+	userId uint,
+	groupNames []string,
+	periodLabel string,
+	now time.Time,
+	document commands.ReportDocument,
+) (string, render.DocumentChrome) {
+	substitutions := map[string]string{
+		"period":           periodLabel,
+		"group.name":       strings.Join(groupNames, ", "),
+		"generatedAt":      now.Format("Jan 2, 2006, 3:04 PM"),
+		"currentUser.name": service.userDisplayName(userId),
 	}
-	return text
+	return substituteVariables(document.Title, substitutions),
+		render.DocumentChrome{
+			Intro:  substituteVariables(document.Intro, substitutions),
+			Footer: substituteVariables(document.Footer, substitutions),
+		}
+}
+
+// substituteVariables replaces the supported document variables in text with
+// their resolved values in a single pass over the original text. A resolved value
+// that itself contains a token is never re-scanned, and unknown tokens (which the
+// pattern does not match) are left untouched.
+func substituteVariables(text string, values map[string]string) string {
+	return reportVariablePattern.ReplaceAllStringFunc(text, func(match string) string {
+		token := reportVariablePattern.FindStringSubmatch(match)[1]
+		return values[token]
+	})
 }
 
 // reportBaseName sanitizes a report name into a filesystem-safe download stem,

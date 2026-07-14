@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -132,12 +135,33 @@ func TestGenerateReport_MapsInvalidSpecToBadRequest(t *testing.T) {
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
-func TestGenerateReport_RejectsMalformedBody(t *testing.T) {
+func TestGenerateReport_MalformedBodyIsBadRequest(t *testing.T) {
 	defer tearDownReportTest()
 	repositories.CreateTestGroupWithUsers()
 	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 
+	// Invalid JSON is a client payload error, not a server failure.
 	w, r := generateReportRequest(1, "{not valid json")
+	GenerateReport(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+// errReader fails on read, standing in for a genuine request-body I/O failure
+// (distinct from a malformed but readable body).
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) { return 0, errors.New("body read failed") }
+
+func TestGenerateReport_BodyReadErrorIsServerError(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/report/generate", errReader{})
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}}))
 	GenerateReport(w, r)
 
 	assertStatus(t, w, http.StatusInternalServerError)
@@ -159,5 +183,20 @@ func TestGenerateReport_StreamsZipForMultipleFormats(t *testing.T) {
 	}
 	if got := w.Header().Get("Content-Disposition"); !strings.Contains(got, `filename="HTTP_Report.zip"`) {
 		t.Errorf("Content-Disposition = %q, want it to name HTTP_Report.zip", got)
+	}
+
+	// The streamed body must be a valid zip carrying both non-empty entries.
+	reader, err := zip.NewReader(bytes.NewReader(w.Body.Bytes()), int64(w.Body.Len()))
+	if err != nil {
+		t.Fatalf("open zip body: %v", err)
+	}
+	sizes := make(map[string]uint64, len(reader.File))
+	for _, file := range reader.File {
+		sizes[file.Name] = file.UncompressedSize64
+	}
+	for _, name := range []string{"HTTP_Report.csv", "HTTP_Report.xlsx"} {
+		if size, ok := sizes[name]; !ok || size == 0 {
+			t.Errorf("zip entry %q missing or empty (entries: %v)", name, sizes)
+		}
 	}
 }
