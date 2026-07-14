@@ -41,6 +41,34 @@ export interface ReportBuilderValue {
   formats: Record<ReportRequestFormat, boolean>;
 }
 
+/**
+ * A dimension column is "disabled" in aggregate mode when it reads a field that
+ * isn't the aggregate-by dimension or one of the grouping levels — an aggregated
+ * row is a summary of many receipts, so only those fields have a single value on
+ * it (the engine rejects anything else). It's a derived state: records mode and
+ * aggregate/formula columns are never disabled, so changing the config recomputes
+ * it. Disabled columns are shown greyed in the builder and left out of the request.
+ */
+export function isDimensionColumnDisabled(
+  column: ReportColumnValue,
+  mode: ReportDetail.ModeEnum,
+  detailBy: string,
+  groupBy: string[]
+): boolean {
+  if (mode !== ReportDetail.ModeEnum.Aggregate || column.kind !== ReportColumn.KindEnum.Dimension) {
+    return false;
+  }
+  const field = column.field ?? "";
+  return field !== detailBy && !groupBy.includes(field);
+}
+
+/** The columns actually sent to the engine — every column minus the disabled ones. */
+export function enabledReportColumns(value: ReportBuilderValue): ReportColumnValue[] {
+  return value.columns.filter(
+    (column) => !isDimensionColumnDisabled(column, value.detail.mode, value.detail.by, value.groupBy)
+  );
+}
+
 /** Formats the picked date range into the YYYY-MM-DD strings the API expects. */
 function toApiDate(date: Date | null): string {
   return date ? format(date, "yyyy-MM-dd") : "";
@@ -107,7 +135,7 @@ export function toReportRequestCommand(value: ReportBuilderValue): ReportRequest
     filter: value.filter,
     groupBy: value.groupBy,
     detail,
-    columns: value.columns.map(toColumn),
+    columns: enabledReportColumns(value).map(toColumn),
     subtotals: value.subtotals,
     grandTotals: value.grandTotals,
     formats: toFormats(value.formats),

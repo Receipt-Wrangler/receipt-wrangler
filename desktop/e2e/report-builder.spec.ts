@@ -87,6 +87,34 @@ test.describe('Report Builder', () => {
     await expect(row).toBeVisible();
   });
 
+  test('disables an aggregate dimension column that is neither the aggregate-by nor a grouping level', async ({ page }) => {
+    await page.goto('/reports');
+    await expect(page.getByText('Report Builder')).toBeVisible();
+
+    // Scope to a group (the disable behavior is independent of the data).
+    await page.getByTestId('report-add-group').click();
+    await page.getByTestId('add-group-select').first().click();
+    await page.getByTestId('dialog-submit-button').click();
+
+    // Default is aggregate-by = Category with a valid Category dimension column.
+    // Switch aggregate-by to Tag — now the Category column reads neither the
+    // aggregate-by (Tag) nor a grouping level, so it becomes invalid.
+    const aggregateBy = page.locator('mat-select').filter({ hasText: 'Category' });
+    const tagOption = page.locator('mat-option').filter({ hasText: 'Tag' });
+    // The panel can re-render as the debounced preview refreshes; retry the open.
+    await expect(async () => {
+      await aggregateBy.click();
+      await expect(tagOption).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15_000 });
+    await tagOption.click();
+
+    // The Category column is kept but shown disabled (not removed), and the
+    // preview still renders from the remaining columns — no raw engine error.
+    await expect(page.getByTestId('report-column-disabled')).toBeVisible();
+    await expect(page.getByTestId('report-receipt-count')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('iframe[title="Report preview"]')).toBeVisible();
+  });
+
   test('the /reports route is gated by app.reports.read', async ({ browser }) => {
     // A regular user (Legacy User) lacks app.reports.read, so the route guard
     // redirects them away from /reports.

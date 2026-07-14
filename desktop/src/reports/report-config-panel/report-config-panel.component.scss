@@ -133,6 +133,30 @@
     border-radius: 9px;
     padding: 6px 8px;
     margin-bottom: 7px;
+
+    // A dimension column that isn't valid for the current aggregate config is
+    // kept but greyed out and left out of the report (see report-command.mapper).
+    &--disabled {
+      background: #fff;
+      border-style: dashed;
+
+      .report-config__col-label {
+        color: #94a3b8;
+        text-decoration: line-through;
+      }
+
+      .report-config__col-desc {
+        color: #b45309;
+        font-family: inherit;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+      }
+
+      .report-config__kind {
+        opacity: 0.5;
+      }
+    }
   }
 
   &__pos {

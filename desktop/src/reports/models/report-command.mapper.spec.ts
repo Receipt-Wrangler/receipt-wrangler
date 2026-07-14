@@ -1,5 +1,10 @@
 import { ReportColumn, ReportDetail, ReportPeriod } from "../../open-api";
-import { ReportBuilderValue, toReportRequestCommand } from "./report-command.mapper";
+import {
+  enabledReportColumns,
+  isDimensionColumnDisabled,
+  ReportBuilderValue,
+  toReportRequestCommand,
+} from "./report-command.mapper";
 
 function baseValue(): ReportBuilderValue {
   return {
@@ -82,5 +87,56 @@ describe("toReportRequestCommand", () => {
     const value = baseValue();
     value.document = { title: "T", intro: "", footer: "" };
     expect(toReportRequestCommand(value).document).toEqual({ title: "T", intro: "", footer: "" });
+  });
+
+  it("excludes a disabled (invalid) dimension column from the request", () => {
+    // The reported failing config: aggregate by tag, group by paid_by, but a
+    // Category dimension column that reads neither -> it is left out of the spec.
+    const value = baseValue();
+    value.groupBy = ["paid_by"];
+    value.detail = { mode: ReportDetail.ModeEnum.Aggregate, by: "tag" };
+    value.columns = [
+      { id: "cat", kind: ReportColumn.KindEnum.Dimension, name: "Category", label: "Category", field: "category" },
+      { id: "cnt", kind: ReportColumn.KindEnum.Aggregate, name: "Count", label: "Count", aggFunc: ReportColumn.AggFuncEnum.Count },
+      { id: "tot", kind: ReportColumn.KindEnum.Aggregate, name: "Total", label: "Total", aggFunc: ReportColumn.AggFuncEnum.Sum, measure: "amount" },
+    ];
+    const command = toReportRequestCommand(value);
+    expect(command.columns.map((c) => c.name)).toEqual(["Count", "Total"]);
+  });
+});
+
+describe("isDimensionColumnDisabled", () => {
+  const dim = (field: string): any => ({ id: "x", kind: ReportColumn.KindEnum.Dimension, name: "X", label: "X", field });
+  const agg = (): any => ({ id: "y", kind: ReportColumn.KindEnum.Aggregate, name: "Y", label: "Y", aggFunc: ReportColumn.AggFuncEnum.Sum, measure: "amount" });
+  const Aggregate = ReportDetail.ModeEnum.Aggregate;
+  const Records = ReportDetail.ModeEnum.Records;
+
+  it("disables a dimension that is neither the aggregate-by nor a grouping level", () => {
+    expect(isDimensionColumnDisabled(dim("category"), Aggregate, "tag", ["paid_by"])).toBe(true);
+  });
+
+  it("keeps a dimension that matches the aggregate-by dimension", () => {
+    expect(isDimensionColumnDisabled(dim("tag"), Aggregate, "tag", ["paid_by"])).toBe(false);
+  });
+
+  it("keeps a dimension that matches a grouping level", () => {
+    expect(isDimensionColumnDisabled(dim("paid_by"), Aggregate, "tag", ["paid_by"])).toBe(false);
+  });
+
+  it("never disables aggregate/formula columns", () => {
+    expect(isDimensionColumnDisabled(agg(), Aggregate, "tag", ["paid_by"])).toBe(false);
+  });
+
+  it("never disables anything in records mode", () => {
+    expect(isDimensionColumnDisabled(dim("category"), Records, "tag", ["paid_by"])).toBe(false);
+  });
+
+  it("enabledReportColumns drops only the disabled dimension columns", () => {
+    const value = {
+      detail: { mode: Aggregate, by: "tag" },
+      groupBy: ["paid_by"],
+      columns: [dim("category"), dim("tag"), agg()],
+    } as any as ReportBuilderValue;
+    expect(enabledReportColumns(value).map((c) => c.field ?? c.name)).toEqual(["tag", "Y"]);
   });
 });

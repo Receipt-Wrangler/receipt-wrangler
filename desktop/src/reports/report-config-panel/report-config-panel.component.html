@@ -106,13 +106,14 @@
     </div>
   } @else {
     @for (column of columnRows(); track column.id) {
-      <div class="report-config__list-row">
+      <div class="report-config__list-row" [class.report-config__list-row--disabled]="column.disabled"
+        [attr.data-testid]="column.disabled ? 'report-column-disabled' : 'report-column-row'">
         <span class="report-config__kind" [ngClass]="column.kindClass">
           <mat-icon>{{ column.kindIcon }}</mat-icon>
         </span>
         <div class="report-config__col-text">
           <div class="report-config__col-label">{{ column.label }}</div>
-          <div class="report-config__col-desc">{{ column.description }}</div>
+          <div class="report-config__col-desc">{{ column.disabled ? column.disabledReason : column.description }}</div>
         </div>
         <span class="report-config__kind-badge" [ngClass]="column.kindClass">{{ column.kindLabel }}</span>
         <app-button matButtonType="iconButton" icon="arrow_upward" tooltip="Move up" [disabled]="column.isFirst"

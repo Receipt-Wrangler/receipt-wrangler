@@ -1,7 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  input,
+  OnInit,
+  signal,
+} from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
+import { merge } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "src/constants/dialog.constant";
 import { GroupState } from "src/store";
 import { ReportColumn, ReportDetail, ReportPeriod } from "../../open-api";
@@ -10,7 +21,7 @@ import {
   REPORT_PERIOD_PRESETS,
   ReportField,
 } from "../models/report-catalog.constants";
-import { ReportColumnValue } from "../models/report-command.mapper";
+import { isDimensionColumnDisabled, ReportColumnValue } from "../models/report-command.mapper";
 import { buildColumnGroup } from "../models/report-form.factory";
 import { formatPeriodRange, resolvePeriodRange } from "../models/report-period.util";
 import { ReportCatalogService } from "../services/report-catalog.service";
@@ -47,6 +58,8 @@ interface ColumnRow {
   kindClass: string;
   isFirst: boolean;
   isLast: boolean;
+  disabled: boolean;
+  disabledReason: string;
 }
 
 const KIND_META: Record<ReportColumn.KindEnum, { label: string; icon: string; cssClass: string }> = {
@@ -72,13 +85,14 @@ const CHIP_COLORS = ["#f5a3b7", "#f7b267", "#4db6ac", "#b39ddb", "#27b1ff", "#f6
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ReportConfigPanelComponent {
+export class ReportConfigPanelComponent implements OnInit {
   public readonly form = input.required<FormGroup>();
 
   private readonly catalog = inject(ReportCatalogService);
   private readonly dialog = inject(MatDialog);
   private readonly formBuilder = inject(FormBuilder);
   private readonly store = inject(Store);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly allGroups = this.store.selectSignal(GroupState.groupsWithoutAll);
   private readonly revision = signal(0);
@@ -128,10 +142,14 @@ export class ReportConfigPanelComponent {
 
   public readonly columnRows = computed<ColumnRow[]>(() => {
     this.revision();
+    const mode = this.detailMode;
+    const detailBy = this.form().get("detail.by")!.value as string;
+    const groupBy = this.groupByArray.controls.map((control) => control.value as string);
     const controls = this.columnsArray.controls;
     return controls.map((control, index) => {
       const value = control.value as ReportColumnValue;
       const meta = KIND_META[value.kind];
+      const disabled = isDimensionColumnDisabled(value, mode, detailBy, groupBy);
       return {
         index,
         id: value.id,
@@ -142,9 +160,26 @@ export class ReportConfigPanelComponent {
         kindClass: meta.cssClass,
         isFirst: index === 0,
         isLast: index === controls.length - 1,
+        disabled,
+        disabledReason: disabled
+          ? `"${value.label}" is hidden — you're summarizing by ${this.labelForField(detailBy)}, so a ` +
+            `column can only show ${this.labelForField(detailBy)} or something you're grouping by. ` +
+            `To show ${value.label}, group by it or summarize by it.`
+          : "",
       };
     });
   });
+
+  /**
+   * "aggregate by" is bound straight to detail.by and grouping mutates a FormArray,
+   * so re-tick the revision signal when either changes to recompute which columns
+   * are disabled (a dimension column is only shown when it matches one of them).
+   */
+  public ngOnInit(): void {
+    merge(this.form().get("detail")!.valueChanges, this.groupByArray.valueChanges)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.bump());
+  }
 
   public get scopeArray(): FormArray {
     return this.form().get("scope") as FormArray;

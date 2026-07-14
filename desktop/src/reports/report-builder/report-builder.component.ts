@@ -11,7 +11,7 @@ import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { EMPTY, catchError, debounceTime, finalize, startWith, switchMap, take, tap } from "rxjs";
 import { ReportPeriod, ReportRequestCommand } from "../../open-api";
-import { ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
+import { enabledReportColumns, ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
 import { buildReportForm } from "../models/report-form.factory";
 import { ReportCatalogService } from "../services/report-catalog.service";
 import { ReportRunnerService } from "../services/report-runner.service";
@@ -122,11 +122,16 @@ export class ReportBuilderComponent {
 
   private isRunnable(): boolean {
     const scope = this.form.get("scope") as FormArray;
-    const columns = this.form.get("columns") as FormArray;
-    if (scope.length === 0 || columns.length === 0) {
+    if (scope.length === 0) {
       return false;
     }
-    const period = this.form.get("period")!.value;
+    // At least one column must actually be sent: an aggregate config whose only
+    // columns are disabled (invalid) dimensions would post an empty spec.
+    const value = this.form.getRawValue() as ReportBuilderValue;
+    if (enabledReportColumns(value).length === 0) {
+      return false;
+    }
+    const period = value.period;
     if (period.preset === ReportPeriod.PresetEnum.Custom) {
       return !!period.startDate && !!period.endDate;
     }

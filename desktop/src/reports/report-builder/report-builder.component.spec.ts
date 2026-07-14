@@ -2,7 +2,8 @@ import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core"
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormBuilder, FormControl } from "@angular/forms";
 import { of } from "rxjs";
-import { CustomFieldService, ReportService } from "../../open-api";
+import { CustomFieldService, ReportColumn, ReportService } from "../../open-api";
+import { buildColumnGroup } from "../models/report-form.factory";
 import { ReportBuilderComponent } from "./report-builder.component";
 
 describe("ReportBuilderComponent", () => {
@@ -48,5 +49,24 @@ describe("ReportBuilderComponent", () => {
     expect(component.canPreview()).toBe(true);
     // A format is selected by default (pdf), so generation is ready too.
     expect(component.canGenerate()).toBe(true);
+  });
+
+  it("cannot preview when every column is a disabled dimension", async () => {
+    (component.form.get("scope") as FormArray).push(new FormControl("1"));
+    // Aggregate by tag with no grouping, but the only column reads category ->
+    // it is disabled/excluded, leaving an empty spec.
+    component.form.get("detail.by")!.setValue("tag");
+    const columns = component.form.get("columns") as FormArray;
+    columns.clear();
+    columns.push(
+      buildColumnGroup(TestBed.inject(FormBuilder), {
+        kind: ReportColumn.KindEnum.Dimension,
+        name: "Category",
+        label: "Category",
+        field: "category",
+      })
+    );
+    await fixture.whenStable();
+    expect(component.canPreview()).toBe(false);
   });
 });

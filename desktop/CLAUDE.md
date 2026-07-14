@@ -623,6 +623,13 @@ user holds it.
   derived identifier kept stable across label edits (`report-column.util.ts`); formula validation is
   lightweight inline feedback — the backend is the authoritative validator (a bad spec → 400, surfaced by
   the interceptor). Grouping levels and columns reorder via up/down (no drag-and-drop).
+  - **Aggregate dimension-column rule**: in aggregate mode the engine can only label an (aggregated) row
+    by a field it's grouped/aggregated by, so a dimension column is valid only when its `field` is the
+    `detail.by` dimension or one of the `groupBy` levels. Rather than error, such a column is **disabled**
+    — a derived state (`isDimensionColumnDisabled` in `report-command.mapper.ts`) shown greyed in the
+    columns list and **left out of the request** (`enabledReportColumns`), auto-re-enabling when the
+    config makes it valid again. `report-builder` blocks preview/generate only if *no* enabled column
+    remains. Nothing is removed or auto-changed.
 - **Divergences from the design** (intentional): the **progress bar + Cancel** are gone (generation is
   synchronous → in-flight spinner, then download); **Save Template** is omitted (no template-persistence
   backend yet); the section-card look is a small local `app-report-section` shell so the pattern isn't
