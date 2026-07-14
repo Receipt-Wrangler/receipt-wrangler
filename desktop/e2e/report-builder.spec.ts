@@ -115,6 +115,38 @@ test.describe('Report Builder', () => {
     await expect(page.locator('iframe[title="Report preview"]')).toBeVisible();
   });
 
+  test('adds a grouping level and a filter through the shared app-select pickers', async ({ page }) => {
+    await page.goto('/reports');
+    await expect(page.getByText('Report Builder')).toBeVisible();
+
+    await page.getByTestId('report-add-group').click();
+    await page.getByTestId('add-group-select').first().click();
+    await page.getByTestId('dialog-submit-button').click();
+
+    // Grouping: the "Add grouping level…" picker is now an app-select (a combobox),
+    // not a native <select>. Picking a dimension appends a grouping row.
+    const addGrouping = page.getByRole('combobox', { name: /Add grouping level/ });
+    const paidByOption = page.getByRole('option', { name: 'Paid By', exact: true });
+    // The panel re-renders as the debounced preview refreshes; retry the open.
+    await expect(async () => {
+      await addGrouping.click();
+      await expect(paidByOption).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15_000 });
+    await paidByOption.click();
+    await expect(page.getByTestId('report-grouping-remove')).toBeVisible();
+
+    // Filters: the "Add filter…" picker is likewise an app-select. Picking a field
+    // adds its filter row.
+    const addFilter = page.getByRole('combobox', { name: /Add filter/ });
+    const nameOption = page.getByRole('option', { name: 'Name', exact: true });
+    await expect(async () => {
+      await addFilter.click();
+      await expect(nameOption).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15_000 });
+    await nameOption.click();
+    await expect(page.getByTestId('report-filter-remove')).toBeVisible();
+  });
+
   test('the /reports route is gated by app.reports.read', async ({ browser }) => {
     // A regular user (Legacy User) lacks app.reports.read, so the route guard
     // redirects them away from /reports.

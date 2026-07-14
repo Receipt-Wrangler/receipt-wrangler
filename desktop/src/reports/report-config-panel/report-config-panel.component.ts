@@ -9,7 +9,7 @@ import {
   signal,
 } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
+import { FormArray, FormBuilder, FormControl, FormGroup } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { merge } from "rxjs";
@@ -108,6 +108,11 @@ export class ReportConfigPanelComponent implements OnInit {
   public readonly ReportPeriodPreset = ReportPeriod.PresetEnum;
   public readonly ReportDetailMode = ReportDetail.ModeEnum;
 
+  // The "Add grouping level…" picker is a stateless dispatcher: app-select is
+  // FormControl-driven (no change output), so a scratch control feeds each pick
+  // into addGroupBy and is reset to the blank option afterward.
+  public readonly addGroupControl = new FormControl<string | null>(null);
+
   public readonly dimensionOptions = computed(() =>
     this.dimensions().map((field) => ({ value: field.key, displayValue: field.label }))
   );
@@ -179,6 +184,16 @@ export class ReportConfigPanelComponent implements OnInit {
     merge(this.form().get("detail")!.valueChanges, this.groupByArray.valueChanges)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.bump());
+
+    this.addGroupControl.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((key) => {
+        if (!key) {
+          return;
+        }
+        this.addGroupBy(key);
+        this.addGroupControl.setValue(null, { emitEvent: false });
+      });
   }
 
   public get scopeArray(): FormArray {

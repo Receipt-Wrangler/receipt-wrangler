@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from "@angular/core";
-import { FormArray, FormGroup } from "@angular/forms";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { FormArray, FormControl, FormGroup } from "@angular/forms";
 import { Store } from "@ngxs/store";
 import { RECEIPT_STATUS_OPTIONS } from "src/constants";
 import { AuthState, GroupState } from "src/store";
@@ -52,6 +53,21 @@ export class ReportFiltersComponent {
 
   public readonly FilterOperation = FilterOperation;
   public readonly receiptStatusOptions = RECEIPT_STATUS_OPTIONS;
+
+  // The "Add filter…" picker is a stateless dispatcher: app-select is
+  // FormControl-driven (no change output), so a scratch control feeds each pick
+  // into addFilter and is reset to the blank option afterward.
+  public readonly addFilterControl = new FormControl<string | null>(null);
+
+  constructor() {
+    this.addFilterControl.valueChanges.pipe(takeUntilDestroyed()).subscribe((field) => {
+      if (!field) {
+        return;
+      }
+      this.addFilter(field);
+      this.addFilterControl.setValue(null, { emitEvent: false });
+    });
+  }
 
   private readonly groups = this.store.selectSignal(GroupState.groupsWithoutAll);
   public readonly categories = computed<Category[]>(() =>

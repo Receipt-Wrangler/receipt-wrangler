@@ -61,13 +61,10 @@
     </div>
   }
   @if (addableDimensions().length > 0) {
-    <select class="report-config__add-select" #groupSelect
-      (change)="addGroupBy(groupSelect.value); groupSelect.value = ''">
-      <option value="">Add grouping level…</option>
-      @for (dimension of addableDimensions(); track dimension.key) {
-        <option [value]="dimension.key">{{ dimension.label }}</option>
-      }
-    </select>
+    <app-select class="report-config__add-select" label="Add grouping level…" [addEmptyOption]="true"
+      optionValueKey="key" optionDisplayKey="label"
+      [options]="addableDimensions()" [inputFormControl]="addGroupControl"
+      data-testid="report-add-grouping"></app-select>
   }
 </app-report-section>
 
