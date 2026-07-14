@@ -10,7 +10,24 @@ import 'package:receipt_wrangler_mobile/utils/permissions.dart';
 /// screen. Pops the raw scanned string back to the caller (validation happens
 /// there); pops null when the user cancels or camera access is unavailable.
 class QrScannerScreen extends StatefulWidget {
-  const QrScannerScreen({super.key});
+  const QrScannerScreen({
+    super.key,
+    this.debugScannerSupported,
+    this.debugForcePermissionDenied = false,
+    this.debugForceCameraError = false,
+  });
+
+  /// Test seam: overrides the `Platform.isLinux` support check. Null in prod.
+  @visibleForTesting
+  final bool? debugScannerSupported;
+
+  /// Test seam: render the permission-denied fallback without the camera flow.
+  @visibleForTesting
+  final bool debugForcePermissionDenied;
+
+  /// Test seam: render the camera-error fallback without the camera flow.
+  @visibleForTesting
+  final bool debugForceCameraError;
 
   @override
   State<QrScannerScreen> createState() => _QrScannerScreenState();
@@ -18,20 +35,30 @@ class QrScannerScreen extends StatefulWidget {
 
 class _QrScannerScreenState extends State<QrScannerScreen>
     with WidgetsBindingObserver {
-  final MobileScannerController _controller = MobileScannerController(
-    formats: const [BarcodeFormat.qrCode],
-    detectionSpeed: DetectionSpeed.noDuplicates,
-    autoStart: false, // start manually once camera permission is resolved
-  );
+  // Created lazily so the fallback states (unsupported / permission denied /
+  // camera error) never construct a controller. That keeps those states
+  // renderable under flutter_test without hitting camera platform channels.
+  MobileScannerController? _controller;
 
   StreamSubscription<BarcodeCapture>? _subscription;
+  bool _observerAdded = false;
   bool _handled = false; // hard single-fire guard: exactly one pop
   bool _permissionDenied = false;
+  bool _cameraError = false;
 
   // mobile_scanner has no Linux desktop implementation; constructing/starting it
   // on the run-e2e.sh (Linux) target throws. Degrade to a message rather than
   // crash the process.
-  bool get _scannerSupported => !Platform.isLinux;
+  bool get _scannerSupported =>
+      widget.debugScannerSupported ?? !Platform.isLinux;
+
+  MobileScannerController _ensureController() {
+    return _controller ??= MobileScannerController(
+      formats: const [BarcodeFormat.qrCode],
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      autoStart: false, // start manually once camera permission is resolved
+    );
+  }
 
   @override
   void initState() {
@@ -39,8 +66,18 @@ class _QrScannerScreenState extends State<QrScannerScreen>
     if (!_scannerSupported) {
       return;
     }
+    // Test seams: render a fallback state without the real camera flow.
+    if (widget.debugForcePermissionDenied) {
+      _permissionDenied = true;
+      return;
+    }
+    if (widget.debugForceCameraError) {
+      _cameraError = true;
+      return;
+    }
     WidgetsBinding.instance.addObserver(this);
-    _subscription = _controller.barcodes.listen(_onDetect);
+    _observerAdded = true;
+    _subscription = _ensureController().barcodes.listen(_onDetect);
     _ensurePermissionThenStart();
   }
 
@@ -54,14 +91,50 @@ class _QrScannerScreenState extends State<QrScannerScreen>
       return;
     }
     if (!status.isGranted) {
-      setState(() => _permissionDenied = true);
+      setState(() {
+        _permissionDenied = true;
+        _cameraError = false;
+      });
       return;
     }
-    await _controller.start();
+    // Permission is granted (possibly just now, via "Open Settings"): clear any
+    // stale fallback state before (re)starting the camera.
+    if (_permissionDenied || _cameraError) {
+      setState(() {
+        _permissionDenied = false;
+        _cameraError = false;
+      });
+    }
+    await _safeStart();
+  }
+
+  // Starts the camera, tolerating an already-running controller and surfacing a
+  // MobileScannerException as the retryable camera-error state instead of an
+  // unhandled async error.
+  Future<void> _safeStart() async {
+    final controller = _ensureController();
+    try {
+      if (!controller.value.isRunning) {
+        await controller.start();
+      }
+    } on MobileScannerException catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _cameraError = true);
+    }
+  }
+
+  void _retryStart() {
+    setState(() => _cameraError = false);
+    unawaited(_ensurePermissionThenStart());
   }
 
   void _onDetect(BarcodeCapture capture) {
-    if (_handled) {
+    // `!mounted` guards against a buffered detection firing after dispose (the
+    // subscription is cancelled with `unawaited`), which would pop a defunct
+    // context.
+    if (_handled || !mounted) {
       return;
     }
     final raw =
@@ -75,18 +148,30 @@ class _QrScannerScreenState extends State<QrScannerScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_scannerSupported || _permissionDenied) {
+    if (!_scannerSupported) {
       return;
+    }
+    final controller = _controller;
+    if (controller == null) {
+      return; // not in an active camera session
     }
     switch (state) {
       case AppLifecycleState.resumed:
-        _subscription = _controller.barcodes.listen(_onDetect);
-        unawaited(_controller.start());
+        _subscription ??= controller.barcodes.listen(_onDetect);
+        // Recover if we were showing a permission/camera error (e.g. the user
+        // just granted access via "Open Settings" and returned).
+        if (_permissionDenied || _cameraError) {
+          unawaited(_ensurePermissionThenStart());
+        } else {
+          unawaited(_safeStart());
+        }
         break;
       case AppLifecycleState.inactive:
         unawaited(_subscription?.cancel());
         _subscription = null;
-        unawaited(_controller.stop());
+        if (!_permissionDenied && !_cameraError) {
+          unawaited(controller.stop());
+        }
         break;
       default:
         break;
@@ -95,13 +180,13 @@ class _QrScannerScreenState extends State<QrScannerScreen>
 
   @override
   Future<void> dispose() async {
-    if (_scannerSupported) {
+    if (_observerAdded) {
       WidgetsBinding.instance.removeObserver(this);
     }
     unawaited(_subscription?.cancel());
     _subscription = null;
     super.dispose();
-    await _controller.dispose();
+    await _controller?.dispose();
   }
 
   @override
@@ -121,36 +206,52 @@ class _QrScannerScreenState extends State<QrScannerScreen>
 
   Widget _buildBody() {
     if (!_scannerSupported) {
-      return const Center(
-        child: Text("QR scanning isn't supported on this device."),
+      return _buildMessage(
+        message: "QR scanning isn't supported on this device.",
       );
     }
     if (_permissionDenied) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                "Camera access is required to scan a QR code. Enable it in "
-                "Settings, or type the URL manually.",
-                textAlign: TextAlign.center,
-              ),
-            ),
-            ElevatedButton(
-              onPressed: openAppSettings,
-              child: const Text("Open Settings"),
-            ),
-          ],
-        ),
+      return _buildMessage(
+        message: "Camera access is required to scan a QR code. Enable it in "
+            "Settings, or type the URL manually.",
+        actionLabel: "Open Settings",
+        onAction: openAppSettings,
+      );
+    }
+    if (_cameraError) {
+      return _buildMessage(
+        message: "Couldn't start the camera. Please try again.",
+        actionLabel: "Retry",
+        onAction: _retryStart,
       );
     }
     return MobileScanner(
-      controller: _controller,
+      controller: _ensureController(),
       overlayBuilder: (context, constraints) => _QrTargetOverlay(
         box: _targetBoxFor(constraints.biggest),
         color: Theme.of(context).colorScheme.primary,
+      ),
+    );
+  }
+
+  // Shared shape for the three non-camera states: a centered message with an
+  // optional action button.
+  Widget _buildMessage({
+    required String message,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(message, textAlign: TextAlign.center),
+          ),
+          if (actionLabel != null && onAction != null)
+            ElevatedButton(onPressed: onAction, child: Text(actionLabel)),
+        ],
       ),
     );
   }

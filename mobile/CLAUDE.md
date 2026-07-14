@@ -330,12 +330,21 @@ Native / platform notes:
   (`lib/utils/permissions.dart`) and uses `autoStart: false` before `controller.start()`, so it never
   races the app-init camera request (the `ERROR_ALREADY_REQUESTING_PERMISSIONS` case documented above
   for `cunning_document_scanner`).
-- **Linux / e2e:** mobile_scanner has no Linux desktop implementation, so `qr_scanner_screen.dart`
-  guards on `Platform.isLinux` and renders a message instead of constructing `MobileScanner` —
-  `run-e2e.sh` stays green (no existing spec taps the button; a plain `IconButton` builds fine on
-  Linux). Post-scan logic is covered by `test/widgets/set_homeserver_url_test.dart` via an injectable
-  `scanQrCode` seam (the widget test never builds `MobileScanner`); the validator by
-  `test/utils/url_test.dart`. A real camera scan is exercised only on Android/iOS + manual device runs.
+- **Fallback states + recovery:** besides the live camera, `qr_scanner_screen.dart` renders three
+  non-camera states via a shared `_buildMessage` helper — unsupported (Linux), **permission denied**
+  ("Open Settings"), and **camera error** ("Retry"). `controller.start()` is wrapped in `_safeStart`
+  (catches `MobileScannerException` → camera-error state; skips the start if already running). On
+  `AppLifecycleState.resumed` the screen re-checks permission and clears the denied/error state if
+  access was just granted (so "Open Settings" actually recovers). `_onDetect` is `!mounted`-guarded so
+  a buffered detection can't pop a disposed context.
+- **Linux / e2e + testing:** mobile_scanner has no Linux desktop implementation, so the screen guards
+  on `Platform.isLinux` and renders the unsupported message instead of constructing `MobileScanner` —
+  `run-e2e.sh` stays green. The controller is created **lazily** and the widget exposes small
+  `@visibleForTesting` seams (`debugScannerSupported` / `debugForcePermissionDenied` /
+  `debugForceCameraError`), so `test/widgets/qr_scanner_screen_test.dart` covers the three fallback
+  states + the close button **without a camera or channel mocks**. Post-scan/validation logic is
+  covered by `test/widgets/set_homeserver_url_test.dart` (injectable `scanQrCode` seam) and
+  `test/utils/url_test.dart`. The live-camera path is exercised only on Android/iOS + manual runs.
 
 ### Testing
 
