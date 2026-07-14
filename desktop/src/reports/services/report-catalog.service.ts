@@ -44,7 +44,7 @@ export class ReportCatalogService {
     }
     this.loaded = true;
     this.customFieldService
-      .getPagedCustomFields({ page: 1, pageSize: -1 })
+      .getPagedCustomFields({ page: 1, pageSize: -1, orderBy: "name", sortDirection: "desc" })
       .pipe(
         take(1),
         catchError(() => of({ data: [], totalCount: 0 }))
