@@ -610,7 +610,10 @@ user holds it.
   `POST /report/preview` and renders the engine's returned HTML in a **sandboxed `<iframe srcdoc>`**
   (`sandbox="allow-same-origin"`, scripts disabled; sized to content on load). The response's
   `receiptCount` drives the chip that opens the receipts drill-in (`report-receipts-dialog`, paged
-  receipts across scope with the filter + resolved period).
+  receipts across scope with the filter + resolved period). The drill-in is a read-only list → detail
+  inspector: a `selected` signal toggles the list (clickable rows) and a per-receipt breakdown card
+  (amount/category/paid-by/tags via the shared `customCurrency`/`name`/`user` pipes + `app-status-chip`);
+  "Open full receipt" does `window.open(\`/receipts/${id}/view\`, "_blank")` to view it in a new tab.
 - **Filters** (`report-filters`): the design's inline add-a-filter chips, but built on the **shared**
   `buildReceiptFilterForm` (`src/utils/receipt-filter.ts`) and SharedUiModule `OperationsPipe`, so it
   produces the exact `ReceiptPagedRequestFilter` the receipts filter does (same BETWEEN handling) — only

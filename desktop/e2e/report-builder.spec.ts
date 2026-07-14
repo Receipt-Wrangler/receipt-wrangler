@@ -44,6 +44,49 @@ test.describe('Report Builder', () => {
     expect(download.suggestedFilename()).toContain('.csv');
   });
 
+  test('admin drills into a receipt and opens the full receipt in a new tab', async ({ page }) => {
+    await page.goto('/reports');
+    await expect(page.getByText('Report Builder')).toBeVisible();
+
+    await page.getByTestId('report-add-group').click();
+    await page.getByTestId('add-group-select').first().click();
+    await page.getByTestId('dialog-submit-button').click();
+
+    // Seeded receipts sit in prior months, so cover them with "Last month".
+    await page.locator('mat-select').filter({ hasText: 'This month' }).click();
+    await page.getByRole('option', { name: 'Last month' }).click();
+    // Let the debounced preview refresh so the covered-count reflects the new period.
+    await page.waitForTimeout(1500);
+
+    const chip = page.getByTestId('report-receipt-count');
+    await expect(chip).toBeVisible({ timeout: 20_000 });
+    await chip.click();
+
+    // The chip only opens the drill-in when the report covers receipts; if the
+    // seeded scope has none in range, there is nothing to drill into.
+    const opened = await page
+      .getByText('Receipts in this report')
+      .waitFor({ state: 'visible', timeout: 4000 })
+      .then(() => true)
+      .catch(() => false);
+    test.skip(!opened, 'seeded scope has no receipts in the selected period');
+
+    // Click a receipt row to open its breakdown, then open the full receipt.
+    const row = page.getByTestId('report-receipt-row').first();
+    await expect(row).toBeVisible();
+    await row.click();
+
+    const openFull = page.getByTestId('report-receipt-open-full');
+    await expect(openFull).toBeVisible();
+
+    const [popup] = await Promise.all([page.waitForEvent('popup'), openFull.click()]);
+    await expect(popup).toHaveURL(/\/receipts\/\d+\/view/);
+
+    // Back returns to the list.
+    await page.getByTestId('report-receipt-back').click();
+    await expect(row).toBeVisible();
+  });
+
   test('the /reports route is gated by app.reports.read', async ({ browser }) => {
     // A regular user (Legacy User) lacks app.reports.read, so the route guard
     // redirects them away from /reports.

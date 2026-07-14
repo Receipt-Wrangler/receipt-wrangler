@@ -54,6 +54,7 @@ export class ReportPreviewPanelComponent {
       groupIds: value.scope,
       filter: value.filter,
       period: value.period,
+      receiptCount: this.receiptCount(),
     };
     this.dialog.open(ReportReceiptsDialogComponent, { ...DEFAULT_DIALOG_CONFIG, width: "72%", data });
   }

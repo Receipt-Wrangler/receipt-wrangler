@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   Inject,
   inject,
@@ -17,12 +18,15 @@ import {
   ReceiptService,
   ReportPeriod,
 } from "../../../open-api";
-import { resolvePeriodRange } from "../../models/report-period.util";
+import { formatPeriodRange, resolvePeriodRange } from "../../models/report-period.util";
 
 export interface ReportReceiptsDialogData {
   groupIds: string[];
   filter: ReceiptPagedRequestFilter;
   period: { preset: ReportPeriod.PresetEnum; startDate: Date | null; endDate: Date | null };
+  // The report's true covered count (from the preview), shown in the subtitle;
+  // falls back to the loaded list length when absent.
+  receiptCount?: number;
 }
 
 // Bounds the drill-in fetch per group; the count chip still reports the true total.
@@ -47,9 +51,33 @@ export class ReportReceiptsDialogComponent {
 
   public readonly loading = signal<boolean>(true);
   public readonly receipts = signal<Receipt[]>([]);
+  // The receipt being inspected; null shows the list, non-null the breakdown.
+  public readonly selected = signal<Receipt | null>(null);
+
+  public readonly periodLabel: string;
+  private readonly providedCount?: number;
+  // Subtitle count: the report's true total when known, else the loaded count.
+  public readonly count = computed(() => this.providedCount ?? this.receipts().length);
 
   constructor(@Inject(MAT_DIALOG_DATA) data: ReportReceiptsDialogData) {
+    this.periodLabel = formatPeriodRange(
+      resolvePeriodRange(data.period.preset, data.period.startDate, data.period.endDate)
+    );
+    this.providedCount = data.receiptCount;
     this.load(data);
+  }
+
+  public viewReceipt(receipt: Receipt): void {
+    this.selected.set(receipt);
+  }
+
+  public backToList(): void {
+    this.selected.set(null);
+  }
+
+  /** Opens the receipt's full page in a new tab (read-only drill-in stays open). */
+  public openFullReceipt(receipt: Receipt): void {
+    window.open(`/receipts/${receipt.id}/view`, "_blank");
   }
 
   public close(): void {

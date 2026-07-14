@@ -1,29 +1,84 @@
 <app-dialog headerText="Receipts in this report">
+  <div class="drill__subtitle">{{ count() }} receipts · {{ periodLabel }}</div>
+
   @if (loading()) {
     <div class="drill__state">
       <mat-icon class="drill__spinner">autorenew</mat-icon>
       Loading receipts…
     </div>
+  } @else if (selected(); as receipt) {
+    <!-- Detail: a simple breakdown of the selected receipt -->
+    <app-button
+      class="drill__back"
+      matButtonType="basic"
+      icon="arrow_back"
+      buttonText="All receipts"
+      (clicked)="backToList()"
+      data-testid="report-receipt-back"
+    ></app-button>
+
+    <div class="drill__card">
+      <div class="drill__card-header">
+        <span class="drill__card-icon"><mat-icon>receipt</mat-icon></span>
+        <div class="drill__card-heading">
+          <div class="drill__card-name">{{ receipt.name }}</div>
+          <div class="drill__card-date">{{ receipt.date | date: "mediumDate" }}</div>
+        </div>
+        <app-status-chip [status]="receipt.status"></app-status-chip>
+      </div>
+
+      <div class="drill__grid">
+        <div class="drill__cell">
+          <div class="drill__cell-label">Amount</div>
+          <div class="drill__cell-value drill__num">{{ receipt.amount | customCurrency }}</div>
+        </div>
+        <div class="drill__cell">
+          <div class="drill__cell-label">Category</div>
+          <div class="drill__cell-value">{{ receipt.categories | name }}</div>
+        </div>
+        <div class="drill__cell">
+          <div class="drill__cell-label">Paid by</div>
+          <div class="drill__cell-value">{{ (receipt.paidByUserId?.toString() | user)?.displayName }}</div>
+        </div>
+        <div class="drill__cell">
+          <div class="drill__cell-label">Tags</div>
+          <div class="drill__cell-value">{{ receipt.tags | name }}</div>
+        </div>
+        <div class="drill__cell">
+          <div class="drill__cell-label">Date</div>
+          <div class="drill__cell-value">{{ receipt.date | date: "mediumDate" }}</div>
+        </div>
+      </div>
+    </div>
   } @else if (receipts().length === 0) {
     <div class="drill__state">No receipts match this report.</div>
   } @else {
+    <!-- List: every covered receipt, click a row to inspect it -->
     <div class="drill__table-wrap">
       <table class="drill__table">
         <thead>
           <tr>
             <th>Receipt</th>
             <th>Date</th>
+            <th>Category</th>
+            <th>Paid by</th>
             <th class="drill__num">Amount</th>
             <th>Status</th>
+            <th class="drill__chevron-col"></th>
           </tr>
         </thead>
         <tbody>
           @for (receipt of receipts(); track receipt.id) {
-            <tr>
-              <td>{{ receipt.name }}</td>
+            <tr class="drill__row" (click)="viewReceipt(receipt)" data-testid="report-receipt-row">
+              <td class="drill__row-name">{{ receipt.name }}</td>
               <td>{{ receipt.date | date: "mediumDate" }}</td>
-              <td class="drill__num">{{ receipt.amount }}</td>
-              <td>{{ receipt.status }}</td>
+              <td>{{ receipt.categories | name }}</td>
+              <td>{{ (receipt.paidByUserId?.toString() | user)?.displayName }}</td>
+              <td class="drill__num">{{ receipt.amount | customCurrency }}</td>
+              <td><app-status-chip [status]="receipt.status"></app-status-chip></td>
+              <td class="drill__chevron-col">
+                <mat-icon class="drill__chevron">chevron_right</mat-icon>
+              </td>
             </tr>
           }
         </tbody>
@@ -32,6 +87,15 @@
   }
 
   <div class="drill__footer">
+    @if (selected(); as receipt) {
+      <app-button
+        matButtonType="matRaisedButton"
+        icon="open_in_new"
+        buttonText="Open full receipt"
+        (clicked)="openFullReceipt(receipt)"
+        data-testid="report-receipt-open-full"
+      ></app-button>
+    }
     <app-button matButtonType="basic" buttonText="Close" (clicked)="close()"></app-button>
   </div>
 </app-dialog>
