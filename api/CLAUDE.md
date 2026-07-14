@@ -710,15 +710,33 @@ type and the `groupBy`-depth guard (`validateGroupByDepth`) with the CSV rendere
 **walk** with the HTML renderer (`faithfulWalk` in `render/walk.go`, driving a per-format `faithfulSink`);
 CSV keeps its own flat walk. Tested by round-tripping the bytes back through `excelize.OpenReader`.
 
-`render.HTML(model, groupBy)` is the **PDF format's HTML stage** (via `html/template`): a self-contained
-document — a `Meta.Title` heading, a preamble of the resolved `Meta.Params`, the same faithful table as
-XLSX (through the shared `faithfulWalk`), and a `Meta.GeneratedAt` footer, each omitted when the model
-carries nothing for it. All CSS is inline and it references no external resources or scripts, so it renders
-through the headless-Chromium HTML-to-PDF pipeline (`services/html_to_pdf.go`, which blocks network loads
-and disables JS by default). It returns **HTML bytes** — the reporting package is pure, so the chromedp
-conversion to PDF stays in the services layer and is wired up by the future handler (deferred until the
-UI). Unit-tested against the same faithful golden grids as XLSX (parsed with `golang.org/x/net/html`) plus
-document-chrome and HTML-escaping cases.
+`render.HTML(model, groupBy, chrome)` is the **PDF format's HTML stage** (via `html/template`): a
+self-contained document — a `Meta.Title` heading, an optional authored intro, a preamble of the resolved
+`Meta.Params`, the same faithful table as XLSX (through the shared `faithfulWalk`), and a footer, each
+omitted when there is nothing for it. The `render.DocumentChrome{Intro, Footer}` argument is authored
+presentation copy layered on **at render time** — kept out of the pure model (which stays
+presentation-free); a zero value is byte-identical to the data-only rendering, and an authored footer
+replaces the automatic `Meta.GeneratedAt` note. All CSS is inline and it references no external resources
+or scripts, so it renders through the headless-Chromium HTML-to-PDF pipeline (`services/html_to_pdf.go`,
+which blocks network loads and disables JS by default). It returns **HTML bytes** — the reporting package
+is pure, so the chromedp conversion to PDF stays in the services layer (`ReportService`, below). Unit-tested
+against the same faithful golden grids as XLSX (parsed with `golang.org/x/net/html`) plus document-chrome
+and HTML-escaping cases.
+
+**`services.ReportService` + `POST /api/report/generate`** are the orchestrator and endpoint that join
+the pieces. `ReportService.Generate(userId, command)` resolves the request's period into a date filter,
+loads rows across every group in the request under the one (global) catalog, builds a `ReportSpec`, runs
+the pure engine, resolves the document's `{{period}}`/`{{group.name}}`/`{{generatedAt}}`/`{{currentUser.name}}`
+variables, renders each requested format (bridging PDF through `HtmlToPdfService.Render`), and returns a
+single file or a **zip** of several. It reads the clock exactly once. The handler (`handlers/report.go`)
+parses+validates the `ReportRequestCommand` **before** building the `structs.Handler` — because the
+`groupIds` it carries drive the gate: it declares `GroupIds` + `GroupPermissions: [group.reports.read]`,
+so `HandleRequest` re-checks that permission (and membership) in **every** covered group before generating.
+A malformed spec surfaces from `reporting.Run` as a `ReportService`-typed `*ReportSpecError`, which the
+handler maps to a 400. The request contract mirrors the engine (columns carry a machine `name` that
+formulas reference by name with ASCII operators; group-by/detail carry engine field keys), so the Angular
+client maps its builder UI onto engine-shaped values before submitting. Report generation is **synchronous**
+(streamed download); an async job + live progress + stored-results download is a possible later slice.
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
