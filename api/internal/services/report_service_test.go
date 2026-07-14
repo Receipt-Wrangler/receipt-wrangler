@@ -452,6 +452,44 @@ func TestReportService_Preview_RendersHtmlWithReceiptCount(t *testing.T) {
 	}
 }
 
+// A report's money must honor the app's custom currency configuration end to end:
+// buildModel loads System Settings and the rendered preview HTML reflects it.
+func TestReportService_Preview_AppliesCustomCurrencyFormat(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	category := loadCategory(t, makeCategory(t, "Groceries"))
+	userId, groupIds := seedReportUserInGroups(t, "rpt-currency", "Household")
+	createReportReceipt(t, "household-1", userId, groupIds[0], []models.Category{category})
+
+	// A non-USD configuration: symbol trails, dot thousands, comma decimal.
+	if _, err := repositories.NewSystemSettingsRepository(nil).GetSystemSettings(); err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+	if err := repositories.GetDB().Model(&models.SystemSettings{}).Where("id = ?", 1).Updates(models.SystemSettings{
+		CurrencyDisplay:              "€",
+		CurrencySymbolPosition:       models.END,
+		CurrencyThousandthsSeparator: models.DOT,
+		CurrencyDecimalSeparator:     models.COMMA,
+	}).Error; err != nil {
+		t.Fatalf("update currency settings: %v", err)
+	}
+
+	preview, err := NewReportService(nil).Preview(userId, aggregateReportCommand("Live", groupIds, nil))
+	if err != nil {
+		t.Fatalf("Preview: %v", err)
+	}
+
+	// The single receipt's amount (100) is the Total; the custom format wins.
+	if !strings.Contains(preview.Html, "100,00€") {
+		t.Errorf("preview HTML did not apply the custom currency format (want 100,00€):\n%s", preview.Html)
+	}
+	if strings.Contains(preview.Html, "$100.00") {
+		t.Errorf("preview HTML still shows the default USD format:\n%s", preview.Html)
+	}
+}
+
 func TestReportService_Preview_InvalidSpecIsClientError(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	clearGroupRoleGrantCacheAll()

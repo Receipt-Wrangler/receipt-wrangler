@@ -221,9 +221,9 @@ func detailValues(rows []DetailRow) []Value {
 func serializeModel(model ReportModel) string {
 	var out strings.Builder
 
-	fmt.Fprintf(&out, "title=%q generatedAt=%s currency=%q none=%q\n",
+	fmt.Fprintf(&out, "title=%q generatedAt=%s currency=%+v none=%q\n",
 		model.Meta.Title, model.Meta.GeneratedAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00"),
-		model.Meta.CurrencyFormat, model.Meta.NoneLabel)
+		model.Meta.Currency, model.Meta.NoneLabel)
 
 	keys := make([]string, 0, len(model.Meta.Params))
 	for key := range model.Meta.Params {

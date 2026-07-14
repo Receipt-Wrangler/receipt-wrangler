@@ -10,6 +10,7 @@ import (
 
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
+	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/reporting"
 	"receipt-wrangler/api/internal/reporting/render"
 	"receipt-wrangler/api/internal/repositories"
@@ -157,12 +158,18 @@ func (service ReportService) buildModel(
 	}
 	spec.Title = title
 
+	settings, err := repositories.NewSystemSettingsRepository(service.TX).GetSystemSettings()
+	if err != nil {
+		return reportBuild{}, err
+	}
+
 	meta := reporting.MetaInput{
 		GeneratedAt: now,
 		Params: map[string]string{
 			"Period": periodLabel,
 			"Groups": strings.Join(groupNames, ", "),
 		},
+		Currency: currencyFormat(settings),
 	}
 
 	model, err := reporting.Run(spec, catalog, rows, meta)
@@ -176,6 +183,21 @@ func (service ReportService) buildModel(
 		chrome:       chrome,
 		receiptCount: receiptCount,
 	}, nil
+}
+
+// currencyFormat maps the app's System Settings currency configuration onto the
+// engine's renderer hint, so every rendered format (the live preview included)
+// presents money exactly as the rest of the UI does. It is always supplied — the
+// settings row is a get-or-create singleton — so a report is never rendered with
+// bare, symbol-less numbers.
+func currencyFormat(settings models.SystemSettings) *reporting.CurrencyFormat {
+	return &reporting.CurrencyFormat{
+		Symbol:             settings.CurrencyDisplay,
+		SymbolAtEnd:        settings.CurrencySymbolPosition == models.END,
+		ThousandsSeparator: string(settings.CurrencyThousandthsSeparator),
+		DecimalSeparator:   string(settings.CurrencyDecimalSeparator),
+		HideDecimals:       settings.CurrencyHideDecimalPlaces,
+	}
 }
 
 // loadRows gathers the engine rows across every covered group under a single

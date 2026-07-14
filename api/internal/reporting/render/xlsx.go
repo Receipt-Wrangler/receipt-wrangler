@@ -123,8 +123,8 @@ func (s *xlsxSink) numberFormat(descriptor reporting.ColumnDescriptor) string {
 		return descriptor.Format
 	}
 	if descriptor.DataType == reporting.TypeCurrency {
-		if s.model.Meta.CurrencyFormat != "" {
-			return s.model.Meta.CurrencyFormat
+		if s.model.Meta.Currency != nil {
+			return excelCurrencyFormat(*s.model.Meta.Currency)
 		}
 		return defaultCurrencyFmt
 	}

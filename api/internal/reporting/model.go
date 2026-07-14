@@ -30,8 +30,22 @@ type Meta struct {
 	GeneratedAt time.Time
 	Params      map[string]string
 
-	CurrencyFormat string
-	NoneLabel      string
+	// Currency is the app's money-display configuration, passed through from the
+	// caller for the renderers to interpret. Nil when unconfigured, in which case
+	// renderers fall back to their bare numeric formatting.
+	Currency  *CurrencyFormat
+	NoneLabel string
+}
+
+// CurrencyFormat is the app's money-display configuration — a renderer hint the
+// engine passes through untouched (it never interprets it). It mirrors the
+// desktop's customCurrency pipe so a rendered report matches the rest of the UI.
+type CurrencyFormat struct {
+	Symbol             string // e.g. "$", "€"; "" renders no symbol
+	SymbolAtEnd        bool   // false = symbol leads (START), true = symbol trails (END)
+	ThousandsSeparator string // grouping separator, e.g. "," or "."
+	DecimalSeparator   string // decimal point, e.g. "." or ","
+	HideDecimals       bool   // drop the fractional part entirely
 }
 
 // ColumnDescriptor tells a renderer what a column is.

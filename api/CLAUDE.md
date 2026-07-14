@@ -705,14 +705,17 @@ model carries (subtotal/grand-total rows appear only when the spec toggled them 
 chrome, and is unit-tested in isolation against models built via `reporting.Run` (there is no orchestrator
 or handler yet). Per `docs/engine-design.md` §5, CSV is deliberately the minimal renderer; the
 grouped/visual "looks like the on-screen report" layout belongs to the XLSX/PDF renderers, each a separate
-consumer of the same tree. Currency renders at 2dp, other numbers at full precision, `(None)` buckets use
-`Meta.NoneLabel`.
+consumer of the same tree. Currency renders per the app's custom currency configuration — symbol, symbol
+position, thousands/decimal separators, and hide-decimal-places — when the caller supplies `Meta.Currency`
+(a bare 2dp otherwise); other numbers at full precision; `(None)` buckets use `Meta.NoneLabel`.
 
 `render.XLSX(model, groupBy)` (via `github.com/xuri/excelize/v2`) is the **faithful, grouped** counterpart:
 the group-by dimensions are leading columns with each value shown **once per group** (blanked on repeats),
 and a subtotal/grand-total row carries a `Total`/`Grand Total` marker in the column at the group's depth
-(the "staircase"). Numbers are written as **native, typed cells** with a number format — currency defaults
-to `#,##0.00` (or `ColumnDescriptor.Format`/`Meta.CurrencyFormat` if set), so the workbook is analyzable —
+(the "staircase"). Numbers are written as **native, typed cells** with a number format — for currency an
+Excel format code built from `Meta.Currency` (symbol, position, and decimal-places; the group/decimal
+glyphs follow the opener's locale, an Excel constraint), overridable per column via
+`ColumnDescriptor.Format`, defaulting to `#,##0.00` when neither is set — so the workbook stays analyzable,
 and header/subtotal/grand-total rows are bold; sheet name `Report`. It writes the engine-computed values
 **statically** — live `=SUM`/expression formulas (the reason `ColumnDescriptor.Expr` is an exported AST)
 are a later slice, and document chrome/slots (logo) await the template work. It shares the `Dimension`
@@ -760,6 +763,15 @@ engine's own output rather than a client-side re-implementation. A separate **ap
 permission gates the desktop report-builder route/nav (Legacy Admin picks it up via add-only role
 reconciliation; reporting is admin-by-default) — it does **not** gate the generate/preview endpoints,
 which stay group-scoped.
+
+**Custom currency formatting.** `buildModel` loads System Settings (`SystemSettingsRepository.GetSystemSettings`,
+a get-or-create singleton) and passes the app's currency configuration — symbol, symbol position (START/END),
+thousands/decimal separators, and hide-decimal-places — through `MetaInput.Currency` (mapped by
+`currencyFormat`). Because Generate and Preview share `buildModel`, **every** rendered output (the live
+preview, PDF/HTML, CSV, and XLSX) presents money exactly as the rest of the UI does — matching the desktop
+`customCurrency` pipe that the report's receipts drill-in dialog already uses. The engine stays pure (it
+carries `Currency` through untouched); the settings load lives in the service and the formatting in the
+`render` package (`render/currency.go`).
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
