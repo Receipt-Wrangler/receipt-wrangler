@@ -18,6 +18,13 @@ Receipt Wrangler API is a Go-based backend service for a receipt management and 
 - `go test -coverprofile=coverage.out -covermode=atomic -v ./...` - Run tests with coverage
 - `python3 -m unittest discover -s ./imap-client` - Run Python IMAP client tests
 
+### Seeding test data
+- `RW_API_KEY='key.1.<id>.<secret>' node dev/seed-reporting-data.mjs` - Seed a realistic, high-volume
+  reporting dataset (a dedicated group + member users + categories/tags + ~2000 receipts spread over a
+  date range) via the HTTP API. The admin API key is read from `RW_API_KEY` (never hardcoded). Setup is
+  idempotent (reuses the group/users/categories/tags by name); receipts are additive. Tunable via env
+  (`RECEIPT_COUNT`, `SEED_GROUP_NAME`, `START_DATE`/`END_DATE`, `CONCURRENCY`, …) — see the script header.
+
 ### API Client Generation
 - `./generate-client.sh desktop <output-dir>` - Generate TypeScript Angular client
 - `./generate-client.sh mobile <output-dir>` - Generate Dart Dio client
