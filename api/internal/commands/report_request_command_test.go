@@ -1,0 +1,110 @@
+package commands
+
+import "testing"
+
+// validReportCommand is a fully valid baseline each case mutates.
+func validReportCommand() ReportRequestCommand {
+	return ReportRequestCommand{
+		Name:     "My Report",
+		GroupIds: []string{"1"},
+		Period:   ReportPeriod{Preset: ReportPeriodThisMonth},
+		GroupBy:  []string{"group"},
+		Detail:   ReportDetail{Mode: ReportDetailAggregate, By: "category"},
+		Columns: []ReportColumn{
+			{Kind: ReportColumnDimension, Name: "Category", Label: "Category", Field: "category"},
+			{Kind: ReportColumnAggregate, Name: "Total", Label: "Total", AggFunc: "SUM", Measure: "amount"},
+			{Kind: ReportColumnAggregate, Name: "Count", Label: "Count", AggFunc: "COUNT"},
+			{Kind: ReportColumnFormula, Name: "Avg", Label: "Avg", Expr: "Total / Count"},
+		},
+		Formats: []string{ReportFormatCsv},
+	}
+}
+
+func TestReportRequestCommand_Validate_AcceptsValid(t *testing.T) {
+	command := validReportCommand()
+	if errs := command.Validate().Errors; len(errs) > 0 {
+		t.Fatalf("expected a valid command, got errors %v", errs)
+	}
+}
+
+func TestReportRequestCommand_Validate_AcceptsRecordsMode(t *testing.T) {
+	command := validReportCommand()
+	command.Detail = ReportDetail{Mode: ReportDetailRecords}
+	if errs := command.Validate().Errors; len(errs) > 0 {
+		t.Fatalf("expected records mode to be valid, got %v", errs)
+	}
+}
+
+func TestReportRequestCommand_Validate_AcceptsCustomPeriod(t *testing.T) {
+	command := validReportCommand()
+	command.Period = ReportPeriod{Preset: ReportPeriodCustom, StartDate: "2026-05-01", EndDate: "2026-05-31"}
+	if errs := command.Validate().Errors; len(errs) > 0 {
+		t.Fatalf("expected a valid custom period, got %v", errs)
+	}
+}
+
+func TestReportRequestCommand_Validate_Rejects(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*ReportRequestCommand)
+		wantKey string
+	}{
+		{"no groups", func(c *ReportRequestCommand) { c.GroupIds = nil }, "groupIds"},
+		{"empty group id", func(c *ReportRequestCommand) { c.GroupIds = []string{""} }, "groupIds"},
+		{"missing preset", func(c *ReportRequestCommand) { c.Period.Preset = "" }, "period"},
+		{"unknown preset", func(c *ReportRequestCommand) { c.Period.Preset = "someday" }, "period"},
+		{"custom without dates", func(c *ReportRequestCommand) { c.Period = ReportPeriod{Preset: ReportPeriodCustom} }, "period"},
+		{"custom end before start", func(c *ReportRequestCommand) {
+			c.Period = ReportPeriod{Preset: ReportPeriodCustom, StartDate: "2026-05-31", EndDate: "2026-05-01"}
+		}, "period"},
+		{"records with by", func(c *ReportRequestCommand) { c.Detail = ReportDetail{Mode: ReportDetailRecords, By: "category"} }, "detail"},
+		{"aggregate without by", func(c *ReportRequestCommand) { c.Detail = ReportDetail{Mode: ReportDetailAggregate} }, "detail"},
+		{"unknown mode", func(c *ReportRequestCommand) { c.Detail = ReportDetail{Mode: "pivot"} }, "detail"},
+		{"no columns", func(c *ReportRequestCommand) { c.Columns = nil }, "columns"},
+		{"column missing name", func(c *ReportRequestCommand) {
+			c.Columns = []ReportColumn{{Kind: ReportColumnDimension, Field: "category"}}
+		}, "columns"},
+		{"duplicate column names", func(c *ReportRequestCommand) {
+			c.Columns = []ReportColumn{
+				{Kind: ReportColumnDimension, Name: "Dup", Field: "category"},
+				{Kind: ReportColumnDimension, Name: "Dup", Field: "group"},
+			}
+		}, "columns"},
+		{"dimension missing field", func(c *ReportRequestCommand) {
+			c.Columns = []ReportColumn{{Kind: ReportColumnDimension, Name: "Category"}}
+		}, "columns"},
+		{"aggregate bad function", func(c *ReportRequestCommand) {
+			c.Columns = []ReportColumn{{Kind: ReportColumnAggregate, Name: "Total", AggFunc: "MEDIAN", Measure: "amount"}}
+		}, "columns"},
+		{"aggregate missing measure", func(c *ReportRequestCommand) {
+			c.Columns = []ReportColumn{{Kind: ReportColumnAggregate, Name: "Total", AggFunc: "SUM"}}
+		}, "columns"},
+		{"formula missing expr", func(c *ReportRequestCommand) {
+			c.Columns = []ReportColumn{{Kind: ReportColumnFormula, Name: "Avg"}}
+		}, "columns"},
+		{"unknown column kind", func(c *ReportRequestCommand) {
+			c.Columns = []ReportColumn{{Kind: "widget", Name: "X"}}
+		}, "columns"},
+		{"no formats", func(c *ReportRequestCommand) { c.Formats = nil }, "formats"},
+		{"unsupported format", func(c *ReportRequestCommand) { c.Formats = []string{"json"} }, "formats"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			command := validReportCommand()
+			test.mutate(&command)
+			errs := command.Validate().Errors
+			if _, ok := errs[test.wantKey]; !ok {
+				t.Errorf("expected an error under %q, got %v", test.wantKey, errs)
+			}
+		})
+	}
+}
+
+func TestReportRequestCommand_Validate_CountNeedsNoMeasure(t *testing.T) {
+	command := validReportCommand()
+	command.Columns = []ReportColumn{{Kind: ReportColumnAggregate, Name: "Count", AggFunc: "COUNT"}}
+	if _, ok := command.Validate().Errors["columns"]; ok {
+		t.Error("COUNT should not require a measure")
+	}
+}
