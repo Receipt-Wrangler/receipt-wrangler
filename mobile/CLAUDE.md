@@ -296,10 +296,14 @@ not on the `/login` username/password screen** — `/login` only *shows* the alr
 The button opens a full-screen scanner (`qr_scanner_screen.dart`) built on **`mobile_scanner`**
 (`^7.2.0`, QR-only via `formats: [BarcodeFormat.qrCode]`), which pops the raw decoded string back.
 The scanner draws a centered **targeting box** (dimmed scrim + four L-shaped corner brackets + a hint
-line, via a small private `_CornerBracketPainter`) and **gates detection to it** through
-`MobileScanner.scanWindow`. The box Rect is computed once from a `LayoutBuilder` and passed to both
-`scanWindow` and the `overlayBuilder`, so the drawn box and the detection area stay aligned (the
-scanner sits below an AppBar, so `MediaQuery.sizeOf` would misalign — use the layout constraints).
+line, via a small private `_CornerBracketPainter`) as a **visual aim guide only** — detection runs on
+the **whole camera frame**. We deliberately do **not** use `MobileScanner.scanWindow` to gate
+detection: it made scanning intermittent (a QR visibly inside the box would scan only sometimes).
+Per mobile_scanner's own changelog the scan-window intersection test is unreliable — Android accuracy
+was only just improved in 7.2.0 ("migrated boundingBox to cornerPoints") and 7.x lists "[Apple] scan
+window does not work correctly" as a known issue — so whole-frame detection is the reliable choice.
+The box Rect is computed inside the `overlayBuilder` from its `constraints` (the scanner sits below an
+AppBar, where `MediaQuery.sizeOf` would misalign the box).
 The screen validates the decoded string with `normalizeServerUrl` (`lib/utils/url.dart` — trim + require a well-formed
 http/https URL with a non-empty host; **http is allowed** for LAN/self-hosted instances) and, on
 success, `patchValue`s the `url` form field. It **never auto-connects** — the user reviews the

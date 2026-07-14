@@ -146,25 +146,20 @@ class _QrScannerScreenState extends State<QrScannerScreen>
         ),
       );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final scanWindow = _scanWindowFor(constraints.biggest);
-        return MobileScanner(
-          controller: _controller,
-          scanWindow: scanWindow, // gate detection to the box
-          overlayBuilder: (context, _) => _QrTargetOverlay(
-            scanWindow: scanWindow,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        );
-      },
+    return MobileScanner(
+      controller: _controller,
+      overlayBuilder: (context, constraints) => _QrTargetOverlay(
+        box: _targetBoxFor(constraints.biggest),
+        color: Theme.of(context).colorScheme.primary,
+      ),
     );
   }
 
-  // Centered square, 70% of the shorter side. The same Rect drives both the
-  // detection window and the drawn box, so they stay aligned.
-  Rect _scanWindowFor(Size size) {
-    final side = size.shortestSide * 0.7;
+  // Centered square used only as a visual aim guide. Detection runs on the whole
+  // frame -- mobile_scanner's scanWindow gate is unreliable -- so this box does
+  // not restrict what scans.
+  Rect _targetBoxFor(Size size) {
+    final side = size.shortestSide * 0.75;
     return Rect.fromCenter(
       center: Offset(size.width / 2, size.height / 2),
       width: side,
@@ -174,12 +169,12 @@ class _QrScannerScreenState extends State<QrScannerScreen>
 }
 
 /// Dimmed scrim outside a centered square, four L-shaped corner brackets, and a
-/// hint line below the box. Drawn from the same [scanWindow] Rect passed to
-/// [MobileScanner.scanWindow] so the box matches the detection area.
+/// hint line below the box. Purely a visual aim guide -- detection runs on the
+/// whole camera frame (mobile_scanner's scanWindow gate is unreliable).
 class _QrTargetOverlay extends StatelessWidget {
-  const _QrTargetOverlay({required this.scanWindow, required this.color});
+  const _QrTargetOverlay({required this.box, required this.color});
 
-  final Rect scanWindow;
+  final Rect box;
   final Color color;
 
   @override
@@ -188,11 +183,11 @@ class _QrTargetOverlay extends StatelessWidget {
       children: [
         Positioned.fill(
           child: CustomPaint(
-            painter: _CornerBracketPainter(scanWindow: scanWindow, color: color),
+            painter: _CornerBracketPainter(box: box, color: color),
           ),
         ),
         Positioned(
-          top: scanWindow.bottom + 24,
+          top: box.bottom + 24,
           left: 24,
           right: 24,
           child: const Text(
@@ -207,15 +202,15 @@ class _QrTargetOverlay extends StatelessWidget {
 }
 
 class _CornerBracketPainter extends CustomPainter {
-  const _CornerBracketPainter({required this.scanWindow, required this.color});
+  const _CornerBracketPainter({required this.box, required this.color});
 
-  final Rect scanWindow;
+  final Rect box;
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
     // Dim everything outside the cutout (same technique as ScanWindowPainter).
-    final cutout = RRect.fromRectAndRadius(scanWindow, const Radius.circular(12));
+    final cutout = RRect.fromRectAndRadius(box, const Radius.circular(12));
     final scrim = Path.combine(
       PathOperation.difference,
       Path()..addRect(Offset.zero & size),
@@ -224,13 +219,13 @@ class _CornerBracketPainter extends CustomPainter {
     canvas.drawPath(scrim, Paint()..color = const Color(0x99000000));
 
     // Four L-shaped corner brackets.
-    final arm = scanWindow.shortestSide * 0.12;
+    final arm = box.shortestSide * 0.12;
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4
       ..strokeCap = StrokeCap.round;
-    final r = scanWindow;
+    final r = box;
     canvas
       ..drawPath(
           Path()
@@ -260,5 +255,5 @@ class _CornerBracketPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CornerBracketPainter oldDelegate) =>
-      oldDelegate.scanWindow != scanWindow || oldDelegate.color != color;
+      oldDelegate.box != box || oldDelegate.color != color;
 }
