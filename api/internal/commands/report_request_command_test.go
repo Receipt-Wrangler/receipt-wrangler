@@ -1,6 +1,52 @@
 package commands
 
-import "testing"
+import (
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestReportRequestCommand_LoadDataFromRequest(t *testing.T) {
+	body := `{
+	  "name": "R",
+	  "groupIds": ["1", "2"],
+	  "period": {"preset": "this_month"},
+	  "detail": {"mode": "records"},
+	  "columns": [{"kind": "dimension", "name": "Name", "field": "name"}],
+	  "formats": ["csv"]
+	}`
+	request := httptest.NewRequest("POST", "/api/report/generate", strings.NewReader(body))
+	recorder := httptest.NewRecorder()
+
+	command := ReportRequestCommand{}
+	if err := command.LoadDataFromRequest(recorder, request); err != nil {
+		t.Fatalf("LoadDataFromRequest: %v", err)
+	}
+
+	if command.Name != "R" || len(command.GroupIds) != 2 || command.Period.Preset != ReportPeriodThisMonth {
+		t.Errorf("body not unmarshalled: %+v", command)
+	}
+
+	// The filter is seeded with the non-nil defaults downstream grant-narrowing
+	// and query building rely on.
+	if _, ok := command.Filter.PaidBy.Value.([]interface{}); !ok {
+		t.Errorf("PaidBy not initialized to a slice: %#v", command.Filter.PaidBy.Value)
+	}
+	if command.Filter.Amount.Value != float64(0) {
+		t.Errorf("Amount not initialized to 0: %#v", command.Filter.Amount.Value)
+	}
+	if command.Filter.Date.Value != "" {
+		t.Errorf("Date not initialized to empty string: %#v", command.Filter.Date.Value)
+	}
+}
+
+func TestReportRequestCommand_LoadDataFromRequest_MalformedBody(t *testing.T) {
+	request := httptest.NewRequest("POST", "/api/report/generate", strings.NewReader("{not json"))
+	command := ReportRequestCommand{}
+	if err := command.LoadDataFromRequest(httptest.NewRecorder(), request); err == nil {
+		t.Fatal("expected an error for a malformed body, got none")
+	}
+}
 
 // validReportCommand is a fully valid baseline each case mutates.
 func validReportCommand() ReportRequestCommand {

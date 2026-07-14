@@ -115,3 +115,49 @@ func TestGenerateReport_RejectsInvalidCommand(t *testing.T) {
 
 	assertStatus(t, w, http.StatusBadRequest)
 }
+
+func TestGenerateReport_MapsInvalidSpecToBadRequest(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seedReportReceipt(1, 1)
+
+	// The command validates, but grouping by a measure is an invalid spec the
+	// engine rejects — the handler must map that ReportSpecError to a 400, not a 500.
+	body := strings.Replace(recordsReportBody, `"detail": {"mode": "records"},`, `"groupBy": ["amount"],
+  "detail": {"mode": "records"},`, 1)
+	w, r := generateReportRequest(1, body)
+	GenerateReport(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+func TestGenerateReport_RejectsMalformedBody(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+
+	w, r := generateReportRequest(1, "{not valid json")
+	GenerateReport(w, r)
+
+	assertStatus(t, w, http.StatusInternalServerError)
+}
+
+func TestGenerateReport_StreamsZipForMultipleFormats(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seedReportReceipt(1, 1)
+
+	body := strings.Replace(recordsReportBody, `"formats": ["csv"]`, `"formats": ["csv", "xlsx"]`, 1)
+	w, r := generateReportRequest(1, body)
+	GenerateReport(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+	if got := w.Header().Get("Content-Type"); got != constants.ApplicationZip {
+		t.Errorf("Content-Type = %q, want %q", got, constants.ApplicationZip)
+	}
+	if got := w.Header().Get("Content-Disposition"); !strings.Contains(got, `filename="HTTP_Report.zip"`) {
+		t.Errorf("Content-Disposition = %q, want it to name HTTP_Report.zip", got)
+	}
+}

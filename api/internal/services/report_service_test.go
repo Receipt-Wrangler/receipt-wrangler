@@ -309,6 +309,99 @@ func TestReportService_Generate_InvalidSpecIsClientError(t *testing.T) {
 	}
 }
 
+// The PDF format exercises the full pipeline including the render.HTML → chromium
+// bridge and the document-variable substitution assembly. The PDF bytes are
+// opaque, so this asserts the path runs and produces a document, not its text.
+func TestReportService_Generate_PdfDocument(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	category := loadCategory(t, makeCategory(t, "Groceries"))
+	userId, groupIds := seedReportUserInGroups(t, "rpt-gen-pdf", "Household")
+	createReportReceipt(t, "household-1", userId, groupIds[0], []models.Category{category})
+
+	command := aggregateReportCommand("Doc", groupIds, []string{commands.ReportFormatPdf})
+	command.Document = commands.ReportDocument{
+		Title:  "{{group.name}} Report",
+		Intro:  "Period {{period}}",
+		Footer: "Prepared by {{currentUser.name}}",
+	}
+
+	report, err := NewReportService(nil).Generate(userId, command)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if report.ContentType != constants.ApplicationPdf {
+		t.Errorf("content type = %q, want %q", report.ContentType, constants.ApplicationPdf)
+	}
+	if report.Filename != "Doc.pdf" {
+		t.Errorf("filename = %q, want Doc.pdf", report.Filename)
+	}
+	if !bytes.HasPrefix(report.Bytes, []byte("%PDF-")) {
+		t.Errorf("expected PDF bytes, got prefix %q", string(report.Bytes[:min(8, len(report.Bytes))]))
+	}
+}
+
+func TestReportService_UserDisplayName(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	db := repositories.GetDB()
+
+	named := models.User{Username: "u-named", DisplayName: "Displayed Name"}
+	if err := db.Create(&named).Error; err != nil {
+		t.Fatalf("seed named user: %v", err)
+	}
+	unnamed := models.User{Username: "u-unnamed"}
+	if err := db.Create(&unnamed).Error; err != nil {
+		t.Fatalf("seed unnamed user: %v", err)
+	}
+
+	service := NewReportService(nil)
+	if got := service.userDisplayName(named.ID); got != "Displayed Name" {
+		t.Errorf("display name = %q, want the DisplayName", got)
+	}
+	if got := service.userDisplayName(unnamed.ID); got != "u-unnamed" {
+		t.Errorf("display name = %q, want the Username fallback", got)
+	}
+	if got := service.userDisplayName(9999999); got != "Unknown User" {
+		t.Errorf("display name for a missing user = %q, want Unknown User", got)
+	}
+}
+
+func TestReportService_GroupNames(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	db := repositories.GetDB()
+
+	alpha := models.Group{Name: "Alpha"}
+	beta := models.Group{Name: "Beta"}
+	if err := db.Create(&alpha).Error; err != nil {
+		t.Fatalf("seed group: %v", err)
+	}
+	if err := db.Create(&beta).Error; err != nil {
+		t.Fatalf("seed group: %v", err)
+	}
+
+	names, err := NewReportService(nil).groupNames([]string{groupIdString(alpha.ID), groupIdString(beta.ID)})
+	if err != nil {
+		t.Fatalf("groupNames: %v", err)
+	}
+	if len(names) != 2 || names[0] != "Alpha" || names[1] != "Beta" {
+		t.Errorf("group names = %v, want [Alpha Beta] in order", names)
+	}
+}
+
+func TestReportSpecError_WrapsAndReports(t *testing.T) {
+	inner := errors.New("group by field is not a dimension")
+	specErr := &ReportSpecError{Err: inner}
+
+	if specErr.Error() != inner.Error() {
+		t.Errorf("Error() = %q, want %q", specErr.Error(), inner.Error())
+	}
+	if !errors.Is(specErr, inner) {
+		t.Error("errors.Is should unwrap ReportSpecError to its cause")
+	}
+}
+
 func containsString(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
