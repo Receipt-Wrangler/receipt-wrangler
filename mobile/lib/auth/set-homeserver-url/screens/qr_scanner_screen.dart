@@ -45,6 +45,10 @@ class _QrScannerScreenState extends State<QrScannerScreen>
   bool _handled = false; // hard single-fire guard: exactly one pop
   bool _permissionDenied = false;
   bool _cameraError = false;
+  // Set once the initial permission/start flow has resolved. Until then we
+  // ignore app-lifecycle events, because the permission dialog raises
+  // inactive/resumed while the controller exists but isn't ready yet.
+  bool _startupDone = false;
 
   // mobile_scanner has no Linux desktop implementation; constructing/starting it
   // on the run-e2e.sh (Linux) target throws. Degrade to a message rather than
@@ -95,6 +99,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
         _permissionDenied = true;
         _cameraError = false;
       });
+      _startupDone = true;
       return;
     }
     // Permission is granted (possibly just now, via "Open Settings"): clear any
@@ -106,6 +111,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
       });
     }
     await _safeStart();
+    _startupDone = true;
   }
 
   // Starts the camera, tolerating an already-running controller and surfacing a
@@ -152,8 +158,11 @@ class _QrScannerScreenState extends State<QrScannerScreen>
       return;
     }
     final controller = _controller;
-    if (controller == null) {
-      return; // not in an active camera session
+    // Ignore lifecycle churn until the initial permission/start flow has
+    // finished: during the permission dialog the controller exists but isn't
+    // ready, so start()/stop() here would race startup or throw.
+    if (controller == null || !_startupDone) {
+      return;
     }
     switch (state) {
       case AppLifecycleState.resumed:
@@ -169,7 +178,9 @@ class _QrScannerScreenState extends State<QrScannerScreen>
       case AppLifecycleState.inactive:
         unawaited(_subscription?.cancel());
         _subscription = null;
-        if (!_permissionDenied && !_cameraError) {
+        // Only tear down a live camera; stopping a not-running controller can
+        // throw.
+        if (controller.value.isRunning) {
           unawaited(controller.stop());
         }
         break;
@@ -179,14 +190,14 @@ class _QrScannerScreenState extends State<QrScannerScreen>
   }
 
   @override
-  Future<void> dispose() async {
+  void dispose() {
     if (_observerAdded) {
       WidgetsBinding.instance.removeObserver(this);
     }
     unawaited(_subscription?.cancel());
     _subscription = null;
+    unawaited(_controller?.dispose());
     super.dispose();
-    await _controller?.dispose();
   }
 
   @override
