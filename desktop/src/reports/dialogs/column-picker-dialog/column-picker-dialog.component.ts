@@ -86,7 +86,7 @@ export class ColumnPickerDialogComponent {
     expr: "",
   });
 
-  private readonly exprValue = toSignal(
+  public readonly exprValue = toSignal(
     this.pickerForm.get("expr")!.valueChanges.pipe(startWith("")),
     { initialValue: "" }
   );
@@ -180,16 +180,33 @@ export class ColumnPickerDialogComponent {
     this.pickerForm.get("aggFunc")!.setValue(fn);
   }
 
+  // The expression is built only by clicking column/operator chips (no typing), so
+  // it is edited as a list of space-separated tokens: appending a chip, removing
+  // the last token, or clearing. This keeps the stored value cleanly normalized.
   public insertColumn(name: string): void {
-    const current = (this.pickerForm.get("expr")!.value as string) ?? "";
-    const separator = current && !/[\s(]$/.test(current) ? " " : "";
-    this.pickerForm.get("expr")!.setValue(current + separator + name);
+    this.setExprTokens([...this.exprTokens(), name]);
   }
 
   public insertOperator(operator: string): void {
-    const current = (this.pickerForm.get("expr")!.value as string) ?? "";
-    const separator = current && !current.endsWith(" ") ? " " : "";
-    this.pickerForm.get("expr")!.setValue(current + separator + operator + " ");
+    this.setExprTokens([...this.exprTokens(), operator]);
+  }
+
+  public removeLastToken(): void {
+    const tokens = this.exprTokens();
+    tokens.pop();
+    this.setExprTokens(tokens);
+  }
+
+  public clearExpression(): void {
+    this.pickerForm.get("expr")!.setValue("");
+  }
+
+  private exprTokens(): string[] {
+    return ((this.pickerForm.get("expr")!.value as string) ?? "").trim().split(/\s+/).filter(Boolean);
+  }
+
+  private setExprTokens(tokens: string[]): void {
+    this.pickerForm.get("expr")!.setValue(tokens.join(" "));
   }
 
   public back(): void {

@@ -33,6 +33,15 @@ const baseData: ColumnPickerDialogData = {
   existingColumns: [],
 };
 
+// A picker seeded with two aggregate columns a formula can reference by name.
+const formulaData: ColumnPickerDialogData = {
+  ...baseData,
+  existingColumns: [
+    { id: "t", kind: ReportColumn.KindEnum.Aggregate, name: "Total", label: "Total", aggFunc: ReportColumn.AggFuncEnum.Sum, measure: "amount" },
+    { id: "c", kind: ReportColumn.KindEnum.Aggregate, name: "Count", label: "Count", aggFunc: ReportColumn.AggFuncEnum.Count },
+  ],
+};
+
 describe("ColumnPickerDialogComponent", () => {
   afterEach(() => TestBed.resetTestingModule());
 
@@ -76,6 +85,47 @@ describe("ColumnPickerDialogComponent", () => {
     const saved = close.mock.calls[0][0];
     expect(saved.aggFunc).toBe(ReportColumn.AggFuncEnum.Count);
     expect(saved.measure).toBeUndefined();
+  });
+
+  it("builds a formula from clicked column and operator chips", async () => {
+    const { fixture, component } = configure(formulaData);
+    await fixture.whenStable();
+    component.pickFormula();
+    component.insertColumn("Total");
+    component.insertOperator("/");
+    component.insertColumn("Count");
+    await fixture.whenStable();
+    expect(component.pickerForm.get("expr")!.value).toBe("Total / Count");
+    expect(component.formulaStatus().ok).toBe(true);
+  });
+
+  it("removes the last token and clears the built expression", async () => {
+    const { fixture, component } = configure(formulaData);
+    await fixture.whenStable();
+    component.pickFormula();
+    component.insertColumn("Total");
+    component.insertOperator("/");
+    component.insertColumn("Count");
+    component.removeLastToken();
+    expect(component.pickerForm.get("expr")!.value).toBe("Total /");
+    component.clearExpression();
+    expect(component.pickerForm.get("expr")!.value).toBe("");
+  });
+
+  it("saves the formula built from chips", async () => {
+    const { fixture, component, close } = configure(formulaData);
+    await fixture.whenStable();
+    component.pickFormula();
+    component.pickerForm.get("label")!.setValue("Average");
+    component.insertColumn("Total");
+    component.insertOperator("/");
+    component.insertColumn("Count");
+    await fixture.whenStable();
+    expect(component.canSave()).toBe(true);
+    component.save();
+    expect(close).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: ReportColumn.KindEnum.Formula, label: "Average", expr: "Total / Count" })
+    );
   });
 
   it("blocks a formula that references an unknown column", async () => {

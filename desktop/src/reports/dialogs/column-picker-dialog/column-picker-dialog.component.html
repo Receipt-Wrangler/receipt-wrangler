@@ -54,7 +54,22 @@
 
     @case ("formula") {
       <app-input label="Column label" [inputFormControl]="pickerForm | formGet: 'label'"></app-input>
-      <app-input label="Expression" class="picker__mono" [inputFormControl]="pickerForm | formGet: 'expr'"></app-input>
+
+      <label class="picker__label">Expression</label>
+      <div class="picker__expr" [class.picker__expr--empty]="!exprValue()">
+        <span class="picker__expr-text">{{ exprValue() || "Click a column, then operators, to build the formula" }}</span>
+        <span class="picker__expr-actions">
+          <button type="button" class="picker__expr-btn" title="Remove last" [disabled]="!exprValue()"
+            (click)="removeLastToken()" data-testid="picker-formula-backspace">
+            <mat-icon>backspace</mat-icon>
+          </button>
+          <button type="button" class="picker__expr-btn" title="Clear" [disabled]="!exprValue()"
+            (click)="clearExpression()" data-testid="picker-formula-clear">
+            <mat-icon>close</mat-icon>
+          </button>
+        </span>
+      </div>
+
       <div class="picker__status" [ngClass]="'picker__status--' + formulaStatus().kind">
         <mat-icon>{{ formulaStatus().kind === "ok" ? "check_circle" : formulaStatus().kind === "error" ? "error_outline" : "lightbulb" }}</mat-icon>
         {{ formulaStatus().message }}
@@ -67,6 +82,7 @@
           }
         </div>
       }
+      <div class="picker__hint">Operators</div>
       <div class="picker__ops">
         @for (operator of operators; track operator) {
           <span class="picker__op" (click)="insertOperator(operator)">{{ operator }}</span>

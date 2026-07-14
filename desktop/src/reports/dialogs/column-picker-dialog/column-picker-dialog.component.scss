@@ -90,8 +90,68 @@
     }
   }
 
-  &__mono ::ng-deep input {
+  &__expr {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: 40px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 8px 8px 12px;
+    background: #f8fafc;
+  }
+
+  &__expr-text {
+    flex: 1;
+    min-width: 0;
+    align-self: center;
     font-family: ui-monospace, Menlo, monospace;
+    font-size: 13.5px;
+    color: #1e293b;
+    word-break: break-word;
+    line-height: 1.4;
+  }
+
+  &__expr--empty &__expr-text {
+    color: #94a3b8;
+    font-family: inherit;
+    font-size: 12.5px;
+  }
+
+  &__expr-actions {
+    display: flex;
+    gap: 4px;
+    flex: none;
+  }
+
+  &__expr-btn {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 7px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    &:hover:not(:disabled) {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
   }
 
   &__status {
