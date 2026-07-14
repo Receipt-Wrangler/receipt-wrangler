@@ -164,6 +164,41 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/generate:
+    post:
+      tags:
+        - Report
+      summary: Generate a report
+      description:
+        Generates a report over the receipts of one or more groups and streams it
+        back as a file, or a zip when several formats are requested. Runs under the
+        caller's group permissions and requires group.reports.read in every covered
+        group.
+      operationId: generateReport
+      requestBody:
+        description: The report builder configuration
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The generated report file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /category/{categoryName}:
     parameters:
       - in: path
@@ -3010,6 +3045,7 @@ components:
         - "group.dashboards.update"
         - "group.dashboards.delete"
         - "group.widgets.read"
+        - "group.reports.read"
         - "group.activities.read"
         - "group.activities.rerun"
         - "group.email.poll"
@@ -5588,3 +5624,130 @@ components:
         filter:
           $ref: "#/components/schemas/ReceiptPagedRequestFilter"
           description: Optional filter for receipts
+    ReportRequestCommand:
+      type: object
+      required:
+        - groupIds
+        - period
+        - detail
+        - columns
+        - formats
+      properties:
+        name:
+          type: string
+          description: Report name; used for the download filename
+        groupIds:
+          type: array
+          items:
+            type: string
+          description: Ids of the groups the report covers
+        period:
+          $ref: "#/components/schemas/ReportPeriod"
+        filter:
+          $ref: "#/components/schemas/ReceiptPagedRequestFilter"
+          description: Which receipts go into the report
+        groupBy:
+          type: array
+          items:
+            type: string
+          description: Ordered engine field keys to nest the report by
+        detail:
+          $ref: "#/components/schemas/ReportDetail"
+        columns:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportColumn"
+        subtotals:
+          type: boolean
+          description: Emit a subtotal row at each grouping level
+        grandTotals:
+          type: boolean
+          description: Emit one grand-total row across everything
+        document:
+          $ref: "#/components/schemas/ReportDocument"
+        formats:
+          type: array
+          items:
+            type: string
+            enum:
+              - csv
+              - xlsx
+              - pdf
+          description: One or more output formats; multiple are zipped together
+    ReportPeriod:
+      type: object
+      required:
+        - preset
+      properties:
+        preset:
+          type: string
+          enum:
+            - this_month
+            - last_month
+            - mtd
+            - qtd
+            - ytd
+            - custom
+        startDate:
+          type: string
+          description: Start date (YYYY-MM-DD), read only when preset is custom
+        endDate:
+          type: string
+          description: End date (YYYY-MM-DD), read only when preset is custom
+    ReportDetail:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum:
+            - records
+            - aggregate
+        by:
+          type: string
+          description: Dimension field key to aggregate leaf rows by (aggregate mode)
+    ReportColumn:
+      type: object
+      required:
+        - kind
+        - name
+      properties:
+        kind:
+          type: string
+          enum:
+            - dimension
+            - aggregate
+            - formula
+        name:
+          type: string
+          description: Machine identifier; formula expressions reference this
+        label:
+          type: string
+        field:
+          type: string
+          description: Field key the column displays (dimension columns)
+        aggFunc:
+          type: string
+          enum:
+            - SUM
+            - COUNT
+            - AVG
+            - MIN
+            - MAX
+          description: Aggregate function (aggregate columns)
+        measure:
+          type: string
+          description: Measure field key (aggregate columns, omitted for COUNT)
+        expr:
+          type: string
+          description: Expression over other column names (formula columns)
+    ReportDocument:
+      type: object
+      properties:
+        title:
+          type: string
+        intro:
+          type: string
+        footer:
+          type: string

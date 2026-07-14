@@ -110,6 +110,8 @@ const (
 
 	GroupWidgetsRead = "group.widgets.read"
 
+	GroupReportsRead = "group.reports.read"
+
 	GroupActivitiesRead  = "group.activities.read"
 	GroupActivitiesRerun = "group.activities.rerun"
 
@@ -207,6 +209,8 @@ var registry = []Descriptor{
 	{GroupDashboardsDelete, "Delete Dashboards", "Remove dashboards.", "Dashboards", ScopeGroup},
 
 	{GroupWidgetsRead, "Read Widgets", "Read widget data (charts, summaries).", "Dashboards", ScopeGroup},
+
+	{GroupReportsRead, "Read Reports", "Generate and download reports over the group's receipts.", "Reports", ScopeGroup},
 
 	{GroupActivitiesRead, "Read Activities", "View the activity feed for the group.", "Activity", ScopeGroup},
 	{GroupActivitiesRerun, "Rerun Activities", "Re-execute a failed or stale activity.", "Activity", ScopeGroup},
