@@ -4,13 +4,19 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:receipt_wrangler_mobile/auth/set-homeserver-url/screens/qr_scanner_screen.dart';
 import 'package:receipt_wrangler_mobile/client/client.dart';
 import 'package:receipt_wrangler_mobile/constants/spacing.dart';
 import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/utils/snackbar.dart';
+import 'package:receipt_wrangler_mobile/utils/url.dart';
 
 class SetHomeserverUrl extends StatefulWidget {
-  const SetHomeserverUrl({super.key});
+  const SetHomeserverUrl({super.key, this.scanQrCode});
+
+  /// Injectable for tests: returns the raw scanned string, or null if the user
+  /// cancelled. Defaults to opening [QrScannerScreen].
+  final Future<String?> Function(BuildContext context)? scanQrCode;
 
   @override
   State<SetHomeserverUrl> createState() => _SetHomeserverUrl();
@@ -37,6 +43,29 @@ class _SetHomeserverUrl extends State<SetHomeserverUrl> {
     }
   }
 
+  Future<void> _onScanPressed() async {
+    final scan = widget.scanQrCode ?? _openScanner;
+    final raw = await scan(context);
+    if (!mounted || raw == null) {
+      return; // null => user cancelled
+    }
+
+    final normalized = normalizeServerUrl(raw);
+    if (normalized == null) {
+      showErrorSnackbar(
+          context, "That QR code doesn't contain a valid server URL");
+      return;
+    }
+
+    _formKey.currentState?.patchValue({"url": normalized});
+  }
+
+  Future<String?> _openScanner(BuildContext context) {
+    return Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     var serverModel = Provider.of<AuthModel>(context);
@@ -54,10 +83,16 @@ class _SetHomeserverUrl extends State<SetHomeserverUrl> {
           headerSpacing,
           FormBuilderTextField(
               name: "url",
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                   hintText: "https://demo.receiptwrangler.io/api",
                   labelText: "Server URL",
-                  border: OutlineInputBorder()),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    key: const ValueKey("qr-scan-button"),
+                    icon: const Icon(Icons.qr_code_scanner),
+                    tooltip: "Scan server QR code",
+                    onPressed: _onScanPressed,
+                  )),
               initialValue: serverModel.basePath,
               validator: FormBuilderValidators.compose([
                 FormBuilderValidators.required(),
