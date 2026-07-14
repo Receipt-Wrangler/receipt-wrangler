@@ -288,6 +288,46 @@ applies `kotlin-android` itself and uses the legacy `kotlinOptions {}` DSL (work
 2.1.0); its `getPictures(noOfPages:)` API — the only call the app uses (`lib/utils/scan.dart`) —
 is identical.
 
+### QR-scan the server URL (login)
+
+The "Connect to Server" screen (`lib/auth/set-homeserver-url/screens/set_homeserver_url.dart`, route
+`/`) has a `qr_code_scanner` suffix-icon button on the URL field. **The server-URL field lives here,
+not on the `/login` username/password screen** — `/login` only *shows* the already-set base path.
+The button opens a full-screen scanner (`qr_scanner_screen.dart`) built on **`mobile_scanner`**
+(`^7.2.0`, QR-only via `formats: [BarcodeFormat.qrCode]`), which pops the raw decoded string back.
+The screen validates it with `normalizeServerUrl` (`lib/utils/url.dart` — trim + require a well-formed
+http/https URL with a non-empty host; **http is allowed** for LAN/self-hosted instances) and, on
+success, `patchValue`s the `url` form field. It **never auto-connects** — the user reviews the
+populated URL and taps Connect (phishing mitigation: a malicious QR can't silently point the app at
+an attacker's server that would then harvest credentials). Invalid content shows an error snackbar and
+leaves the field untouched.
+
+Native / platform notes:
+- **iOS: no deployment-target change.** mobile_scanner 7.x uses Apple's **Vision framework** on
+  iOS/macOS (not GoogleMLKit — see its issue #1225), and its pod declares
+  `s.ios.deployment_target = '12.0'`, so the repo's existing **13.0** is fine. Verified:
+  `flutter build ios --simulator --no-codesign` builds clean at 13.0 (an earlier plan to bump to 15.5
+  for a supposed GoogleMLKit requirement was wrong and was reverted — no iOS device support dropped).
+  `NSCameraUsageDescription` already existed (shared with `cunning_document_scanner`); only its wording
+  was broadened to mention QR scanning. After pulling this change, iOS needs `cd ios && pod install`.
+- **Android** needs no gradle/manifest change: `CAMERA` is already declared and the inherited
+  `flutter.minSdkVersion` (24) / `compileSdkVersion` (36) exceed mobile_scanner's floor (21 / 35). ML
+  Kit is **bundled** by default; to shrink the APK set
+  `dev.steenbakker.mobile_scanner.useUnbundled=true` in `android/gradle.properties` (needs Play
+  Services).
+- **`pubspec.yaml`** Dart SDK floor was raised `>=3.2.5` → `>=3.7.0` (mobile_scanner 7.2.0 requires it;
+  the resolved toolchain is already 3.10+).
+- **Permission double-request race:** the scanner `await`s the shared-in-flight `requestPermissions()`
+  (`lib/utils/permissions.dart`) and uses `autoStart: false` before `controller.start()`, so it never
+  races the app-init camera request (the `ERROR_ALREADY_REQUESTING_PERMISSIONS` case documented above
+  for `cunning_document_scanner`).
+- **Linux / e2e:** mobile_scanner has no Linux desktop implementation, so `qr_scanner_screen.dart`
+  guards on `Platform.isLinux` and renders a message instead of constructing `MobileScanner` —
+  `run-e2e.sh` stays green (no existing spec taps the button; a plain `IconButton` builds fine on
+  Linux). Post-scan logic is covered by `test/widgets/set_homeserver_url_test.dart` via an injectable
+  `scanQrCode` seam (the widget test never builds `MobileScanner`); the validator by
+  `test/utils/url_test.dart`. A real camera scan is exercised only on Android/iOS + manual device runs.
+
 ### Testing
 
 Run tests with `flutter test`. Run a single file with `flutter test test/path/to/file_test.dart`.

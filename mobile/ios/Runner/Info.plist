@@ -48,7 +48,7 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Receipt Wrangler uses your camera to scan and photograph receipts. For example, you can take a photo of a paper receipt so the app can extract its details for tracking and splitting expenses.</string>
+	<string>Receipt Wrangler uses your camera to scan and photograph receipts, and to scan a QR code to connect to your server. For example, you can take a photo of a paper receipt so the app can extract its details for tracking and splitting expenses.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Receipt Wrangler accesses your photo library so you can select existing photos of receipts to upload. For example, you can choose a receipt image you previously photographed to add it to a group for expense tracking.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
