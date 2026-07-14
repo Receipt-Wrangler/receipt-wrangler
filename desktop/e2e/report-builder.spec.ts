@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { stubTokenRefresh } from './helpers/auth';
+import { addFirstGroupToScope, gotoReports, openComboboxAndPick } from './helpers/reports';
 
 // The Report Builder is gated by the app-level app.reports.read permission, which
 // the seeded Legacy Admin role carries (and Legacy User does not). Run the positive
@@ -12,8 +13,7 @@ test.describe('Report Builder', () => {
   });
 
   test('admin builds a report, sees a live preview, and downloads it', async ({ page }) => {
-    await page.goto('/reports');
-    await expect(page.getByText('Report Builder')).toBeVisible();
+    await gotoReports(page);
 
     // The reports route opts into the shell's full-height frame: the content area
     // becomes a bounded flex column and the outlet drops the default p-4 padding so
@@ -24,10 +24,7 @@ test.describe('Report Builder', () => {
     );
     expect(outletPadding).toBe('0px');
 
-    // Add a group to the report scope via the Add Group dialog.
-    await page.getByTestId('report-add-group').click();
-    await page.getByTestId('add-group-select').first().click();
-    await page.getByTestId('dialog-submit-button').click();
+    await addFirstGroupToScope(page);
 
     // With a group and the default columns, the preview activates and its
     // receipt-count chip appears (it renders the engine's HTML server-side).
@@ -45,16 +42,15 @@ test.describe('Report Builder', () => {
   });
 
   test('admin drills into a receipt and opens the full receipt in a new tab', async ({ page }) => {
-    await page.goto('/reports');
-    await expect(page.getByText('Report Builder')).toBeVisible();
-
-    await page.getByTestId('report-add-group').click();
-    await page.getByTestId('add-group-select').first().click();
-    await page.getByTestId('dialog-submit-button').click();
+    await gotoReports(page);
+    await addFirstGroupToScope(page);
 
     // Seeded receipts sit in prior months, so cover them with "Last month".
-    await page.locator('mat-select').filter({ hasText: 'This month' }).click();
-    await page.getByRole('option', { name: 'Last month' }).click();
+    await openComboboxAndPick(
+      page,
+      page.locator('mat-select').filter({ hasText: 'This month' }),
+      page.getByRole('option', { name: 'Last month' }),
+    );
     // Let the debounced preview refresh so the covered-count reflects the new period.
     await page.waitForTimeout(1500);
 
@@ -88,25 +84,19 @@ test.describe('Report Builder', () => {
   });
 
   test('disables an aggregate dimension column that is neither the aggregate-by nor a grouping level', async ({ page }) => {
-    await page.goto('/reports');
-    await expect(page.getByText('Report Builder')).toBeVisible();
+    await gotoReports(page);
 
     // Scope to a group (the disable behavior is independent of the data).
-    await page.getByTestId('report-add-group').click();
-    await page.getByTestId('add-group-select').first().click();
-    await page.getByTestId('dialog-submit-button').click();
+    await addFirstGroupToScope(page);
 
     // Default is aggregate-by = Category with a valid Category dimension column.
     // Switch aggregate-by to Tag — now the Category column reads neither the
     // aggregate-by (Tag) nor a grouping level, so it becomes invalid.
-    const aggregateBy = page.locator('mat-select').filter({ hasText: 'Category' });
-    const tagOption = page.locator('mat-option').filter({ hasText: 'Tag' });
-    // The panel can re-render as the debounced preview refreshes; retry the open.
-    await expect(async () => {
-      await aggregateBy.click();
-      await expect(tagOption).toBeVisible({ timeout: 2000 });
-    }).toPass({ timeout: 15_000 });
-    await tagOption.click();
+    await openComboboxAndPick(
+      page,
+      page.locator('mat-select').filter({ hasText: 'Category' }),
+      page.locator('mat-option').filter({ hasText: 'Tag' }),
+    );
 
     // The Category column is kept but shown disabled (not removed), and the
     // preview still renders from the remaining columns — no raw engine error.
@@ -116,34 +106,25 @@ test.describe('Report Builder', () => {
   });
 
   test('adds a grouping level and a filter through the shared app-select pickers', async ({ page }) => {
-    await page.goto('/reports');
-    await expect(page.getByText('Report Builder')).toBeVisible();
+    await gotoReports(page);
+    await addFirstGroupToScope(page);
 
-    await page.getByTestId('report-add-group').click();
-    await page.getByTestId('add-group-select').first().click();
-    await page.getByTestId('dialog-submit-button').click();
-
-    // Grouping: the "Add grouping level…" picker is now an app-select (a combobox),
+    // Grouping: the "Add grouping level…" picker is an app-select (a combobox),
     // not a native <select>. Picking a dimension appends a grouping row.
-    const addGrouping = page.getByRole('combobox', { name: /Add grouping level/ });
-    const paidByOption = page.getByRole('option', { name: 'Paid By', exact: true });
-    // The panel re-renders as the debounced preview refreshes; retry the open.
-    await expect(async () => {
-      await addGrouping.click();
-      await expect(paidByOption).toBeVisible({ timeout: 2000 });
-    }).toPass({ timeout: 15_000 });
-    await paidByOption.click();
+    await openComboboxAndPick(
+      page,
+      page.getByRole('combobox', { name: /Add grouping level/ }),
+      page.getByRole('option', { name: 'Paid By', exact: true }),
+    );
     await expect(page.getByTestId('report-grouping-remove')).toBeVisible();
 
     // Filters: the "Add filter…" picker is likewise an app-select. Picking a field
     // adds its filter row.
-    const addFilter = page.getByRole('combobox', { name: /Add filter/ });
-    const nameOption = page.getByRole('option', { name: 'Name', exact: true });
-    await expect(async () => {
-      await addFilter.click();
-      await expect(nameOption).toBeVisible({ timeout: 2000 });
-    }).toPass({ timeout: 15_000 });
-    await nameOption.click();
+    await openComboboxAndPick(
+      page,
+      page.getByRole('combobox', { name: /Add filter/ }),
+      page.getByRole('option', { name: 'Name', exact: true }),
+    );
     await expect(page.getByTestId('report-filter-remove')).toBeVisible();
   });
 

@@ -78,14 +78,16 @@
         <div class="picker__hint">Insert a column</div>
         <div class="picker__chips">
           @for (column of referenceableColumns; track column.id) {
-            <span class="picker__chip" (click)="insertColumn(column.name)">{{ column.label }}</span>
+            <span class="picker__chip" [attr.data-testid]="'picker-col-' + column.name"
+              (click)="insertColumn(column.name)">{{ column.label }}</span>
           }
         </div>
       }
       <div class="picker__hint">Operators</div>
       <div class="picker__ops">
         @for (operator of operators; track operator) {
-          <span class="picker__op" (click)="insertOperator(operator)">{{ operator }}</span>
+          <span class="picker__op" [attr.data-testid]="'picker-op-' + operator"
+            (click)="insertOperator(operator)">{{ operator }}</span>
         }
       </div>
     }
