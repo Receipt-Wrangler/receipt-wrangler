@@ -85,6 +85,8 @@ const (
 	AppAccountDelete = "app.account.delete"
 
 	AppReceiptsSearch = "app.receipts.search"
+
+	AppReportsRead = "app.reports.read"
 )
 
 const (
@@ -187,6 +189,8 @@ var registry = []Descriptor{
 	{AppAccountDelete, "Delete Own Account", "Delete your own account.", "Account", ScopeApp},
 
 	{AppReceiptsSearch, "Search Receipts", "Search across receipts you can access.", "Receipts", ScopeApp},
+
+	{AppReportsRead, "Access Reports", "Access the report builder and generate reports across groups.", "Reports", ScopeApp},
 
 	{GroupView, "View Group", "See the group, its members, and metadata.", "Group", ScopeGroup},
 	{GroupUpdate, "Update Group", "Edit group name, settings, and receipt-handling configuration.", "Group", ScopeGroup},

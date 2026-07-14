@@ -199,6 +199,40 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/preview:
+    post:
+      tags:
+        - Report
+      summary: Preview a report
+      description:
+        Renders the current report configuration as HTML for the builder's live
+        preview, along with the number of receipts it covers. Runs under the
+        caller's group permissions and requires group.reports.read in every covered
+        group. The preview is a row-capped sample of the engine's own output.
+      operationId: previewReport
+      requestBody:
+        description: The report builder configuration
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The rendered preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportPreviewResponse"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /category/{categoryName}:
     parameters:
       - in: path
@@ -3028,6 +3062,7 @@ components:
         - "app.account.update"
         - "app.account.delete"
         - "app.receipts.search"
+        - "app.reports.read"
         - "group.view"
         - "group.update"
         - "group.delete"
@@ -5751,3 +5786,15 @@ components:
           type: string
         footer:
           type: string
+    ReportPreviewResponse:
+      type: object
+      required:
+        - html
+        - receiptCount
+      properties:
+        html:
+          type: string
+          description: The rendered report preview as a self-contained HTML document.
+        receiptCount:
+          type: integer
+          description: The number of receipts the current configuration covers.

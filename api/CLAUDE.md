@@ -261,8 +261,11 @@ will be dropped in a later release.
   `app.account.read`), so granting it would only expose the admin "Manage Users" page to normal users; and
   `app.categories.read` / `app.tags.read` — omitted as part of the category/tag grant lock-down, since they
   gate the GLOBAL category/tag lists; normal users now get only the per-group filtered catalogs (the
-  `app.categories.create` / `app.tags.create` permissions are retained for inline creation). See
-  "Category/tag delivery on AppData" below.
+  `app.categories.create` / `app.tags.create` permissions are retained for inline creation); and
+  `app.reports.read` — the app-level gate on the desktop report builder (route + nav). Reporting is
+  **admin-by-default**: Legacy Admin picks it up automatically (its set is every app permission), while
+  non-admins get it only via a custom role that grants it. Per-group generation stays gated by the
+  group-scoped `group.reports.read`. See "Category/tag delivery on AppData" below.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.

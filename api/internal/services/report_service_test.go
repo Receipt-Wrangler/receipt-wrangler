@@ -392,6 +392,76 @@ func TestReportService_Generate_PdfDocument(t *testing.T) {
 	}
 }
 
+func TestReportService_Preview_RendersHtmlWithReceiptCount(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	category := loadCategory(t, makeCategory(t, "Groceries"))
+	userId, groupIds := seedReportUserInGroups(t, "rpt-preview", "Household", "Roommates")
+	createReportReceipt(t, "household-1", userId, groupIds[0], []models.Category{category})
+	createReportReceipt(t, "roommates-1", userId, groupIds[1], []models.Category{category})
+
+	// Formats are irrelevant to Preview — it always renders the engine's HTML.
+	preview, err := NewReportService(nil).Preview(userId, aggregateReportCommand("Live", groupIds, nil))
+	if err != nil {
+		t.Fatalf("Preview: %v", err)
+	}
+
+	if preview.ReceiptCount != 2 {
+		t.Errorf("receipt count = %d, want 2", preview.ReceiptCount)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(preview.Html), "<") {
+		t.Errorf("expected an HTML document, got: %q", preview.Html)
+	}
+	for _, want := range []string{"Household", "Roommates", "Groceries"} {
+		if !strings.Contains(preview.Html, want) {
+			t.Errorf("preview HTML missing %q:\n%s", want, preview.Html)
+		}
+	}
+}
+
+func TestReportService_Preview_InvalidSpecIsClientError(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	userId, groupIds := seedReportUserInGroups(t, "rpt-preview-bad", "Household")
+	createReportReceipt(t, "household-1", userId, groupIds[0], nil)
+
+	command := aggregateReportCommand("Bad", groupIds, nil)
+	command.GroupBy = []string{"amount"} // a measure cannot be grouped by
+
+	_, err := NewReportService(nil).Preview(userId, command)
+	var specErr *ReportSpecError
+	if !errors.As(err, &specErr) {
+		t.Errorf("expected a ReportSpecError (→ 400), got %T: %v", err, err)
+	}
+}
+
+// buildModel's rowLimit caps the rows fed to the engine while ReceiptCount stays
+// the true total — so the builder's "N receipts" chip is accurate even when the
+// preview renders only a sample.
+func TestReportService_BuildModel_CapsRowsButReportsTrueCount(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	category := loadCategory(t, makeCategory(t, "Groceries"))
+	userId, groupIds := seedReportUserInGroups(t, "rpt-cap", "Household")
+	for _, name := range []string{"h1", "h2", "h3"} {
+		createReportReceipt(t, name, userId, groupIds[0], []models.Category{category})
+	}
+
+	build, err := NewReportService(nil).buildModel(userId, aggregateReportCommand("Cap", groupIds, nil), time.Now(), 1)
+	if err != nil {
+		t.Fatalf("buildModel: %v", err)
+	}
+	if build.receiptCount != 3 {
+		t.Errorf("receiptCount = %d, want 3 (the true pre-cap total)", build.receiptCount)
+	}
+}
+
 func TestReportService_UserDisplayName(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	db := repositories.GetDB()
