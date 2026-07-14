@@ -117,13 +117,16 @@
       </mat-menu>
     </mat-drawer>
   }
-  <mat-drawer-content class="drawer-content">
+  <mat-drawer-content
+    class="drawer-content"
+    [class.drawer-content--full-height]="isContentFullHeight()"
+  >
     <app-header class="d-block sticky-top"></app-header>
     <div
       [ngClass]="{
-      'p-4': isLoggedIn(),
+      'p-4': isLoggedIn() && !isContentFullHeight(),
       }"
-      class="d-block"
+      class="d-block drawer-outlet"
     >
       <router-outlet></router-outlet>
     </div>

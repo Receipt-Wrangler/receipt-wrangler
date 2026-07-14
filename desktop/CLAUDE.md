@@ -627,6 +627,13 @@ user holds it.
 - Structural lists (scope, grouping, columns) mutate the `FormArray` and bump a `revision` signal so the
   `@for`s re-render under zoneless CD (dialog-driven changes run outside a template event). Multi-select
   filter controls (categories/tags/paid-by) are `FormArray`s, per the `app-autocomlete` `.push()` contract.
+- **Full-height two-pane frame**: the screen fills the viewport below the app header with the config and
+  preview panes scrolling **independently** and the page-bar/generate-bar pinned flush. This is opt-in via
+  `data: { fullHeight: true }` on the route — `SidebarComponent` reads the deepest active route's
+  `fullHeight` flag and, **only for that route**, drops the shell's `p-4` padding and turns the content
+  area into a bounded flex column (`.drawer-content--full-height`); every other route is unaffected. Reuse
+  the same flag for any future full-bleed page. The report name appears as the rendered heading when
+  Document → Title is left blank (the engine falls back to the report name).
 
 ## Testing Requirements
 

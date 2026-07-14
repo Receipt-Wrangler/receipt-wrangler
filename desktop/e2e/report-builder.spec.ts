@@ -15,6 +15,15 @@ test.describe('Report Builder', () => {
     await page.goto('/reports');
     await expect(page.getByText('Report Builder')).toBeVisible();
 
+    // The reports route opts into the shell's full-height frame: the content area
+    // becomes a bounded flex column and the outlet drops the default p-4 padding so
+    // the two panes scroll independently under the sticky page-bar/generate-bar.
+    await expect(page.locator('mat-drawer-content.drawer-content--full-height')).toBeVisible();
+    const outletPadding = await page.locator('.drawer-outlet').evaluate(
+      (el) => getComputedStyle(el).padding,
+    );
+    expect(outletPadding).toBe('0px');
+
     // Add a group to the report scope via the Add Group dialog.
     await page.getByTestId('report-add-group').click();
     await page.getByTestId('add-group-select').first().click();
