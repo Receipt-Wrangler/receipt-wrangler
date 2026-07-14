@@ -741,6 +741,17 @@ formulas reference by name with ASCII operators; group-by/detail carry engine fi
 client maps its builder UI onto engine-shaped values before submitting. Report generation is **synchronous**
 (streamed download); an async job + live progress + stored-results download is a possible later slice.
 
+**`POST /api/report/preview`** drives the desktop builder's live preview. It shares GenerateReport's
+front-loaded parse/validate and the same per-group `group.reports.read` gate (the shared
+`loadReportCommand` handler helper), and `ReportService.Preview` runs the **same** pipeline as `Generate`
+up through the engine (both call the shared `buildModel`) but renders only `render.HTML` — no PDF bridge,
+no zip — and **row-caps** the sample (`reportPreviewRowCap`, currently 1000; `ReceiptCount` still reports
+the true total). It returns a JSON `ReportPreviewResponse { html, receiptCount }`, so the preview is the
+engine's own output rather than a client-side re-implementation. A separate **app-level `app.reports.read`**
+permission gates the desktop report-builder route/nav (Legacy Admin picks it up via add-only role
+reconciliation; reporting is admin-by-default) — it does **not** gate the generate/preview endpoints,
+which stay group-scoped.
+
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
 marker, so the receipt still counts toward the totals in its own bucket instead of vanishing. `(None)`

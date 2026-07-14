@@ -590,6 +590,44 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
     with the flag injected on, a **Legacy Editor** member (holds `group.receipts.quick-scan`) sees the button
     while the Viewer — same user, same flag — does not.
 
+## Reports (Report Builder)
+
+The **Report Builder** (`src/reports/`) is a two-pane screen for building and downloading receipt
+reports against the backend reporting engine (see `api/CLAUDE.md` → "Reporting Engine"). Route
+`/reports` (lazy `ReportsModule`), gated by `appPermissionGuard` on the **app-level `app.reports.read`**
+permission; the avatar-menu "Reports" entry is `*hasAppPermission`-gated on the same. App permission =
+access the builder; the group-scoped `group.reports.read` is what actually authorizes generating over a
+group's data (enforced by the endpoints), and the in-builder group picker only lists groups where the
+user holds it.
+
+- **No NGXS state** — the builder is a single reactive form (`report-form.factory.ts`) plus signals;
+  generate/preview are one-shot calls through `ReportRunnerService` (mirrors `ReceiptExportService`:
+  generate → `Blob` → `downloadFile`). `ReportCatalogService` supplies the dimension/measure dropdown
+  options: a built-in engine-key→label constant (`report-catalog.constants.ts`) plus custom fields from
+  `CustomFieldService` (CURRENCY → measure, else dimension, keyed `custom_<id>`). `report-command.mapper.ts`
+  maps the form to the generated `ReportRequestCommand`.
+- **Live preview** (`report-preview-panel`): the container debounces the form (~450ms, `switchMap`) into
+  `POST /report/preview` and renders the engine's returned HTML in a **sandboxed `<iframe srcdoc>`**
+  (`sandbox="allow-same-origin"`, scripts disabled; sized to content on load). The response's
+  `receiptCount` drives the chip that opens the receipts drill-in (`report-receipts-dialog`, paged
+  receipts across scope with the filter + resolved period).
+- **Filters** (`report-filters`): the design's inline add-a-filter chips, but built on the **shared**
+  `buildReceiptFilterForm` (`src/utils/receipt-filter.ts`) and SharedUiModule `OperationsPipe`, so it
+  produces the exact `ReceiptPagedRequestFilter` the receipts filter does (same BETWEEN handling) — only
+  the presentation differs. Category/tag options are the union of the user's group catalogs.
+- **Columns** (`report-config-panel` + `column-picker-dialog`): a `FormArray` of columns edited through a
+  3-step picker (dimension / aggregate / formula). A column's engine `name` (what formulas reference) is a
+  derived identifier kept stable across label edits (`report-column.util.ts`); formula validation is
+  lightweight inline feedback — the backend is the authoritative validator (a bad spec → 400, surfaced by
+  the interceptor). Grouping levels and columns reorder via up/down (no drag-and-drop).
+- **Divergences from the design** (intentional): the **progress bar + Cancel** are gone (generation is
+  synchronous → in-flight spinner, then download); **Save Template** is omitted (no template-persistence
+  backend yet); the section-card look is a small local `app-report-section` shell so the pattern isn't
+  repeated.
+- Structural lists (scope, grouping, columns) mutate the `FormArray` and bump a `revision` signal so the
+  `@for`s re-render under zoneless CD (dialog-driven changes run outside a template event). Multi-select
+  filter controls (categories/tags/paid-by) are `FormArray`s, per the `app-autocomlete` `.push()` contract.
+
 ## Testing Requirements
 
 **All new code must have accompanying unit tests.**

@@ -1,0 +1,65 @@
+.drill {
+  &__state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 40px 12px;
+    color: #94a3b8;
+    font-size: 13px;
+  }
+
+  &__spinner {
+    animation: drill-spin 1s linear infinite;
+    color: #009efa;
+  }
+
+  &__table-wrap {
+    max-height: 60vh;
+    overflow: auto;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+
+    th {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #64748b;
+      border-bottom: 1.5px solid #cbd5e1;
+      position: sticky;
+      top: 0;
+      background: #fff;
+    }
+
+    td {
+      padding: 7px 10px;
+      color: #334155;
+      border-bottom: 1px solid #f1f5f9;
+      white-space: nowrap;
+    }
+  }
+
+  &__num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 14px;
+  }
+}
+
+@keyframes drill-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

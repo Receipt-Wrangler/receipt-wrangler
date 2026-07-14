@@ -115,6 +115,15 @@ const routes: Routes = [
         },
       },
       {
+        path: "reports",
+        loadChildren: () =>
+          import("../reports/reports.module").then((m) => m.ReportsModule),
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          appPermissions: [Permission.AppReportsRead],
+        },
+      },
+      {
         path: "",
         redirectTo: "/auth/login",
         pathMatch: "full",

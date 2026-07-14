@@ -1,0 +1,45 @@
+<div class="preview">
+  <div class="preview__header">
+    <span class="preview__dot"></span>
+    <span class="preview__title">LIVE PREVIEW</span>
+    <span class="preview__subtitle">Rendered from your data</span>
+    <span class="preview__spacer"></span>
+    @if (ready() && !error()) {
+      <span class="preview__count" (click)="openReceipts()" data-testid="report-receipt-count">
+        <mat-icon>receipt_long</mat-icon>{{ receiptCount() }} receipts
+        <mat-icon>chevron_right</mat-icon>
+      </span>
+    }
+  </div>
+
+  <div class="preview__stage">
+    @if (!ready()) {
+      <div class="preview__placeholder">
+        <mat-icon>summarize</mat-icon>
+        Add a group and at least one column to see a preview.
+      </div>
+    } @else if (error()) {
+      <div class="preview__placeholder preview__placeholder--error">
+        <mat-icon>error_outline</mat-icon>
+        Couldn't render the preview.
+      </div>
+    } @else {
+      <div class="preview__paper">
+        <iframe
+          #frame
+          class="preview__frame"
+          title="Report preview"
+          sandbox="allow-same-origin"
+          [style.height.px]="frameHeight()"
+          [srcdoc]="safeHtml()"
+          (load)="onFrameLoad(frame)"
+        ></iframe>
+        @if (loading()) {
+          <div class="preview__loading">
+            <mat-icon>autorenew</mat-icon>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

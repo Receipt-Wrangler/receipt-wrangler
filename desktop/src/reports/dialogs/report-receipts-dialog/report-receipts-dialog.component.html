@@ -1,0 +1,37 @@
+<app-dialog headerText="Receipts in this report">
+  @if (loading()) {
+    <div class="drill__state">
+      <mat-icon class="drill__spinner">autorenew</mat-icon>
+      Loading receipts…
+    </div>
+  } @else if (receipts().length === 0) {
+    <div class="drill__state">No receipts match this report.</div>
+  } @else {
+    <div class="drill__table-wrap">
+      <table class="drill__table">
+        <thead>
+          <tr>
+            <th>Receipt</th>
+            <th>Date</th>
+            <th class="drill__num">Amount</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (receipt of receipts(); track receipt.id) {
+            <tr>
+              <td>{{ receipt.name }}</td>
+              <td>{{ receipt.date | date: "mediumDate" }}</td>
+              <td class="drill__num">{{ receipt.amount }}</td>
+              <td>{{ receipt.status }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <div class="drill__footer">
+    <app-button matButtonType="basic" buttonText="Close" (clicked)="close()"></app-button>
+  </div>
+</app-dialog>
