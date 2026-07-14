@@ -146,6 +146,119 @@ class _QrScannerScreenState extends State<QrScannerScreen>
         ),
       );
     }
-    return MobileScanner(controller: _controller);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scanWindow = _scanWindowFor(constraints.biggest);
+        return MobileScanner(
+          controller: _controller,
+          scanWindow: scanWindow, // gate detection to the box
+          overlayBuilder: (context, _) => _QrTargetOverlay(
+            scanWindow: scanWindow,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      },
+    );
   }
+
+  // Centered square, 70% of the shorter side. The same Rect drives both the
+  // detection window and the drawn box, so they stay aligned.
+  Rect _scanWindowFor(Size size) {
+    final side = size.shortestSide * 0.7;
+    return Rect.fromCenter(
+      center: Offset(size.width / 2, size.height / 2),
+      width: side,
+      height: side,
+    );
+  }
+}
+
+/// Dimmed scrim outside a centered square, four L-shaped corner brackets, and a
+/// hint line below the box. Drawn from the same [scanWindow] Rect passed to
+/// [MobileScanner.scanWindow] so the box matches the detection area.
+class _QrTargetOverlay extends StatelessWidget {
+  const _QrTargetOverlay({required this.scanWindow, required this.color});
+
+  final Rect scanWindow;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _CornerBracketPainter(scanWindow: scanWindow, color: color),
+          ),
+        ),
+        Positioned(
+          top: scanWindow.bottom + 24,
+          left: 24,
+          right: 24,
+          child: const Text(
+            "Point your camera at the server's QR code",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white, fontSize: 16),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CornerBracketPainter extends CustomPainter {
+  const _CornerBracketPainter({required this.scanWindow, required this.color});
+
+  final Rect scanWindow;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Dim everything outside the cutout (same technique as ScanWindowPainter).
+    final cutout = RRect.fromRectAndRadius(scanWindow, const Radius.circular(12));
+    final scrim = Path.combine(
+      PathOperation.difference,
+      Path()..addRect(Offset.zero & size),
+      Path()..addRRect(cutout),
+    );
+    canvas.drawPath(scrim, Paint()..color = const Color(0x99000000));
+
+    // Four L-shaped corner brackets.
+    final arm = scanWindow.shortestSide * 0.12;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+    final r = scanWindow;
+    canvas
+      ..drawPath(
+          Path()
+            ..moveTo(r.left, r.top + arm)
+            ..lineTo(r.left, r.top)
+            ..lineTo(r.left + arm, r.top),
+          paint)
+      ..drawPath(
+          Path()
+            ..moveTo(r.right - arm, r.top)
+            ..lineTo(r.right, r.top)
+            ..lineTo(r.right, r.top + arm),
+          paint)
+      ..drawPath(
+          Path()
+            ..moveTo(r.left, r.bottom - arm)
+            ..lineTo(r.left, r.bottom)
+            ..lineTo(r.left + arm, r.bottom),
+          paint)
+      ..drawPath(
+          Path()
+            ..moveTo(r.right - arm, r.bottom)
+            ..lineTo(r.right, r.bottom)
+            ..lineTo(r.right, r.bottom - arm),
+          paint);
+  }
+
+  @override
+  bool shouldRepaint(_CornerBracketPainter oldDelegate) =>
+      oldDelegate.scanWindow != scanWindow || oldDelegate.color != color;
 }

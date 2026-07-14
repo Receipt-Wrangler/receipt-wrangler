@@ -295,7 +295,12 @@ The "Connect to Server" screen (`lib/auth/set-homeserver-url/screens/set_homeser
 not on the `/login` username/password screen** — `/login` only *shows* the already-set base path.
 The button opens a full-screen scanner (`qr_scanner_screen.dart`) built on **`mobile_scanner`**
 (`^7.2.0`, QR-only via `formats: [BarcodeFormat.qrCode]`), which pops the raw decoded string back.
-The screen validates it with `normalizeServerUrl` (`lib/utils/url.dart` — trim + require a well-formed
+The scanner draws a centered **targeting box** (dimmed scrim + four L-shaped corner brackets + a hint
+line, via a small private `_CornerBracketPainter`) and **gates detection to it** through
+`MobileScanner.scanWindow`. The box Rect is computed once from a `LayoutBuilder` and passed to both
+`scanWindow` and the `overlayBuilder`, so the drawn box and the detection area stay aligned (the
+scanner sits below an AppBar, so `MediaQuery.sizeOf` would misalign — use the layout constraints).
+The screen validates the decoded string with `normalizeServerUrl` (`lib/utils/url.dart` — trim + require a well-formed
 http/https URL with a non-empty host; **http is allowed** for LAN/self-hosted instances) and, on
 success, `patchValue`s the `url` form field. It **never auto-connects** — the user reviews the
 populated URL and taps Connect (phishing mitigation: a malicious QR can't silently point the app at
