@@ -45,3 +45,10 @@ func (repository ReportTemplateRepository) CreateReportTemplate(command commands
 
 	return template, nil
 }
+
+// DeleteReportTemplateById removes the template with the given id. Deleting a
+// non-existent id is not an error (RowsAffected 0), so teardown stays idempotent.
+func (repository ReportTemplateRepository) DeleteReportTemplateById(id string) error {
+	db := repository.GetDB()
+	return db.Delete(&models.ReportTemplate{}, id).Error
+}

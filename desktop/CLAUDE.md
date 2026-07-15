@@ -635,7 +635,9 @@ user holds it.
   `POST /api/report/template` via `ReportRunnerService.saveTemplate`, confirming with a "Template saved"
   success snackbar. The template's name is the report's own name (no separate dialog), and it's enabled
   under the same validity as Generate plus a non-empty name (`canSaveTemplate`). Listing / editing /
-  running saved templates is a later slice. See `api/CLAUDE.md` → "Report templates".
+  running saved templates (and a delete UI) are later slices; a backend `DELETE /api/report/template/{id}`
+  (permission `app.reports.delete`) already exists and is used by the e2e to tear down what it creates.
+  See `api/CLAUDE.md` → "Report templates".
 - **Other divergences from the design** (intentional): the **progress bar + Cancel** are gone
   (generation is synchronous → in-flight spinner, then download); the section-card look is a small local
   `app-report-section` shell so the pattern isn't repeated.

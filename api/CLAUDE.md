@@ -781,7 +781,11 @@ a new `app.reports.create` permission — `handlers.CreateReportTemplate` gates 
 `repositories.ReportTemplateRepository` directly (handler→repo, like prompts, no engine involvement),
 because it persists a configuration and touches no group's receipts. Legacy Admin picks the permission up
 via add-only role reconciliation (reporting is admin-by-default, same as `app.reports.read`); per-group
-generation stays gated by `group.reports.read`. Listing / editing / running saved templates is a later slice.
+generation stays gated by `group.reports.read`. `DELETE /api/report/template/{id}` removes a template
+(`handlers.DeleteReportTemplate` → `ReportTemplateRepository.DeleteReportTemplateById`, mirroring
+`DeletePromptById`; deleting a non-existent id is a 200 no-op), gated by a separate CRUD-granular
+`app.reports.delete` (Legacy Admin auto-gains it; no ownership scoping yet — any holder may delete any
+template). Listing / editing / running saved templates, and a delete UI, are later slices.
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`

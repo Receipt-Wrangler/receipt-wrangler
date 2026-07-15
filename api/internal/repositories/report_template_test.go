@@ -2,8 +2,11 @@ package repositories
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
+	"gorm.io/gorm"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
@@ -90,5 +93,32 @@ func TestCreateReportTemplate_PersistedRowIsReadable(t *testing.T) {
 	}
 	if stored.Name != "Reloadable" {
 		utils.PrintTestError(t, stored.Name, "Reloadable")
+	}
+}
+
+func TestDeleteReportTemplateById_RemovesTheRow(t *testing.T) {
+	defer TruncateTestDb()
+
+	repository := NewReportTemplateRepository(nil)
+	created, err := repository.CreateReportTemplate(sampleReportCommand(), 5)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if err := repository.DeleteReportTemplateById(fmt.Sprint(created.ID)); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var fetched models.ReportTemplate
+	err = GetDB().First(&fetched, created.ID).Error
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		utils.PrintTestError(t, err, gorm.ErrRecordNotFound)
+	}
+
+	// Deleting a non-existent id is a no-op, not an error.
+	if err := repository.DeleteReportTemplateById("999999"); err != nil {
+		utils.PrintTestError(t, err, nil)
 	}
 }

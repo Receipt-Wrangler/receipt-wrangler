@@ -266,6 +266,32 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/template/{id}:
+    delete:
+      tags:
+        - Report
+      summary: Delete a report template
+      description: Deletes a saved report template by id. Requires app.reports.delete.
+      operationId: deleteReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to delete
+      responses:
+        200:
+          $ref: "#/components/responses/Ok"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /category/{categoryName}:
     parameters:
       - in: path
@@ -3096,6 +3122,7 @@ components:
         - "app.account.delete"
         - "app.receipts.search"
         - "app.reports.create"
+        - "app.reports.delete"
         - "app.reports.read"
         - "group.view"
         - "group.update"

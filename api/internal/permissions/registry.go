@@ -88,6 +88,7 @@ const (
 
 	AppReportsRead   = "app.reports.read"
 	AppReportsCreate = "app.reports.create"
+	AppReportsDelete = "app.reports.delete"
 )
 
 const (
@@ -193,6 +194,7 @@ var registry = []Descriptor{
 
 	{AppReportsRead, "Access Reports", "Access the report builder and generate reports across groups.", "Reports", ScopeApp},
 	{AppReportsCreate, "Save Report Templates", "Save a report configuration as a reusable template.", "Reports", ScopeApp},
+	{AppReportsDelete, "Delete Report Templates", "Delete a saved report template.", "Reports", ScopeApp},
 
 	{GroupView, "View Group", "See the group, its members, and metadata.", "Group", ScopeGroup},
 	{GroupUpdate, "Update Group", "Edit group name, settings, and receipt-handling configuration.", "Group", ScopeGroup},

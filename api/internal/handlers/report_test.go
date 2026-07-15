@@ -6,11 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
@@ -310,4 +313,54 @@ func TestCreateReportTemplate_RejectsInvalidCommand(t *testing.T) {
 	CreateReportTemplate(w, r)
 
 	assertStatus(t, w, http.StatusBadRequest)
+}
+
+// deleteReportTemplateRequest builds a DELETE carrying JWT claims for userId and a
+// chi route context supplying the {id} URL param, mirroring how the router invokes
+// DeleteReportTemplate.
+func deleteReportTemplateRequest(userId uint, id string) (*httptest.ResponseRecorder, *http.Request) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("DELETE", "/api/report/template/"+id, nil)
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: userId}}))
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
+	chi.RouteContext(r.Context()).URLParams.Add("id", id)
+	return w, r
+}
+
+func TestDeleteReportTemplate_DeletesWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsCreate, permissions.AppReportsDelete)
+
+	// Save a template through the create handler, then delete it.
+	cw, cr := generateReportRequest(1, recordsReportBody)
+	CreateReportTemplate(cw, cr)
+	assertStatus(t, cw, http.StatusOK)
+
+	var created models.ReportTemplate
+	if err := json.Unmarshal(cw.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created template: %v", err)
+	}
+
+	dw, dr := deleteReportTemplateRequest(1, fmt.Sprint(created.ID))
+	DeleteReportTemplate(dw, dr)
+	assertStatus(t, dw, http.StatusOK)
+
+	// The row is gone.
+	var count int64
+	repositories.GetDB().Model(&models.ReportTemplate{}).Where("id = ?", created.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("expected the template to be deleted, but %d row(s) remain", count)
+	}
+}
+
+func TestDeleteReportTemplate_ForbidsWithoutDeletePermission(t *testing.T) {
+	defer tearDownReportTest()
+	// Read access does not imply delete.
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	w, r := deleteReportTemplateRequest(1, "1")
+	DeleteReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
 }

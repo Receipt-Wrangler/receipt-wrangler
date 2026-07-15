@@ -12,6 +12,8 @@ import (
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // loadReportCommand parses and validates the report request body, writing the
@@ -128,6 +130,32 @@ func PreviewReport(w http.ResponseWriter, r *http.Request) {
 
 			w.WriteHeader(http.StatusOK)
 			w.Write(bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+// DeleteReportTemplate removes a saved report template by id. App-scoped behind
+// app.reports.delete, matching CreateReportTemplate. Deleting a non-existent id
+// still returns 200 (GORM treats it as a no-op), so it is idempotent.
+func DeleteReportTemplate(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage:   "Error deleting report template",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppReportsDelete},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			id := chi.URLParam(r, "id")
+
+			err := repositories.NewReportTemplateRepository(nil).DeleteReportTemplateById(id)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
 			return 0, nil
 		},
 	}
