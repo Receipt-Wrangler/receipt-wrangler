@@ -233,6 +233,39 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/template:
+    post:
+      tags:
+        - Report
+      summary: Save a report template
+      description:
+        Saves the current report configuration as a reusable template. App-scoped
+        (requires app.reports.create) — it persists a configuration and touches no
+        group's receipts.
+      operationId: createReportTemplate
+      requestBody:
+        description: The report builder configuration to save
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The saved report template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTemplate"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /category/{categoryName}:
     parameters:
       - in: path
@@ -3062,6 +3095,7 @@ components:
         - "app.account.update"
         - "app.account.delete"
         - "app.receipts.search"
+        - "app.reports.create"
         - "app.reports.read"
         - "group.view"
         - "group.update"
@@ -5798,3 +5832,16 @@ components:
         receiptCount:
           type: integer
           description: The number of receipts the current configuration covers.
+    ReportTemplate:
+      allOf:
+        - $ref: "#/components/schemas/BaseModel"
+        - type: object
+          required:
+            - name
+            - configuration
+          properties:
+            name:
+              type: string
+              description: The template name (mirrors the saved report's name).
+            configuration:
+              $ref: "#/components/schemas/ReportRequestCommand"

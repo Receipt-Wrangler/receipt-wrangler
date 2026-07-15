@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
+	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -121,6 +122,45 @@ func PreviewReport(w http.ResponseWriter, r *http.Request) {
 			}
 
 			bytes, err := utils.MarshalResponseData(preview)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+// CreateReportTemplate saves a report configuration as a reusable template. Unlike
+// generate/preview it is app-scoped (app.reports.create): it persists a
+// configuration and touches no group's receipts, so it does not gate on per-group
+// generation access. It reuses the shared loadReportCommand parse+validate, so a
+// saved template is always a complete, buildable configuration.
+func CreateReportTemplate(w http.ResponseWriter, r *http.Request) {
+	command, ok := loadReportCommand(w, r)
+	if !ok {
+		return
+	}
+
+	handler := structs.Handler{
+		ErrorMessage:   "Error saving report template",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppReportsCreate},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			token := structs.GetClaims(r)
+
+			template, err := repositories.NewReportTemplateRepository(nil).CreateReportTemplate(command, token.UserId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(template)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

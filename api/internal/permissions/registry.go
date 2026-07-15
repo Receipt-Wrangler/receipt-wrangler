@@ -86,7 +86,8 @@ const (
 
 	AppReceiptsSearch = "app.receipts.search"
 
-	AppReportsRead = "app.reports.read"
+	AppReportsRead   = "app.reports.read"
+	AppReportsCreate = "app.reports.create"
 )
 
 const (
@@ -191,6 +192,7 @@ var registry = []Descriptor{
 	{AppReceiptsSearch, "Search Receipts", "Search across receipts you can access.", "Receipts", ScopeApp},
 
 	{AppReportsRead, "Access Reports", "Access the report builder and generate reports across groups.", "Reports", ScopeApp},
+	{AppReportsCreate, "Save Report Templates", "Save a report configuration as a reusable template.", "Reports", ScopeApp},
 
 	{GroupView, "View Group", "See the group, its members, and metadata.", "Group", ScopeGroup},
 	{GroupUpdate, "Update Group", "Edit group name, settings, and receipt-handling configuration.", "Group", ScopeGroup},

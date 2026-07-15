@@ -262,3 +262,52 @@ func TestGenerateReport_StreamsZipForMultipleFormats(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateReportTemplate_SavesWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsCreate)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	CreateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var template models.ReportTemplate
+	if err := json.Unmarshal(w.Body.Bytes(), &template); err != nil {
+		t.Fatalf("decode template body: %v", err)
+	}
+	if template.ID == 0 {
+		t.Error("expected the saved template to carry an id")
+	}
+	if template.Name != "HTTP Report" {
+		t.Errorf("template name = %q, want %q", template.Name, "HTTP Report")
+	}
+	if template.CreatedBy == nil || *template.CreatedBy != 1 {
+		t.Errorf("template createdBy = %v, want 1", template.CreatedBy)
+	}
+}
+
+func TestCreateReportTemplate_ForbidsWithoutCreatePermission(t *testing.T) {
+	defer tearDownReportTest()
+	// The caller can access reports but cannot create templates — read must not
+	// imply create.
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	CreateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestCreateReportTemplate_RejectsInvalidCommand(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsCreate)
+
+	// No formats — the shared loadReportCommand validator rejects it, so a template
+	// can only ever store a complete, buildable configuration.
+	body := strings.Replace(recordsReportBody, `"formats": ["csv"]`, `"formats": []`, 1)
+	w, r := generateReportRequest(1, body)
+	CreateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}

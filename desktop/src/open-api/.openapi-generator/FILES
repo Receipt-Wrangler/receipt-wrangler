@@ -113,6 +113,7 @@ model/reportDocument.ts
 model/reportPeriod.ts
 model/reportPreviewResponse.ts
 model/reportRequestCommand.ts
+model/reportTemplate.ts
 model/resetPasswordCommand.ts
 model/role.ts
 model/searchResult.ts
