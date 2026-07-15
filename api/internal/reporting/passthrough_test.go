@@ -95,9 +95,9 @@ func TestRun_MetaAndFormatsPassThrough(t *testing.T) {
 
 	generatedAt := time.Date(2026, 6, 1, 9, 30, 0, 0, time.UTC)
 	meta := MetaInput{
-		GeneratedAt:    generatedAt,
-		Params:         map[string]string{"period": "May", "group": "Household"},
-		CurrencyFormat: "€ #.##0,00",
+		GeneratedAt: generatedAt,
+		Params:      map[string]string{"period": "May", "group": "Household"},
+		Currency:    &CurrencyFormat{Symbol: "€", SymbolAtEnd: true, ThousandsSeparator: ".", DecimalSeparator: ","},
 	}
 
 	model, err := Run(spec, testCatalog(t), []Row{{"amount": {Num(dec("1.00"))}}}, meta)
@@ -111,8 +111,10 @@ func TestRun_MetaAndFormatsPassThrough(t *testing.T) {
 	if !model.Meta.GeneratedAt.Equal(generatedAt) {
 		t.Errorf("GeneratedAt = %v", model.Meta.GeneratedAt)
 	}
-	if model.Meta.CurrencyFormat != "€ #.##0,00" {
-		t.Errorf("CurrencyFormat = %q", model.Meta.CurrencyFormat)
+	if model.Meta.Currency == nil || *model.Meta.Currency != (CurrencyFormat{
+		Symbol: "€", SymbolAtEnd: true, ThousandsSeparator: ".", DecimalSeparator: ",",
+	}) {
+		t.Errorf("Currency = %+v", model.Meta.Currency)
 	}
 	if model.Meta.NoneLabel != "Uncategorized" {
 		t.Errorf("NoneLabel = %q", model.Meta.NoneLabel)

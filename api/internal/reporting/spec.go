@@ -131,7 +131,8 @@ type MetaInput struct {
 	// renderer to substitute into its copy.
 	Params map[string]string
 
-	// CurrencyFormat is an opaque default presentation hint, overridable per
-	// column. The engine does not interpret it.
-	CurrencyFormat string
+	// Currency is the app's money-display configuration, carried through to the
+	// model for the renderers. The engine does not interpret it. Nil leaves the
+	// renderers on their bare numeric formatting.
+	Currency *CurrencyFormat
 }

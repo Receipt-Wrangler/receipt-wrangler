@@ -162,7 +162,7 @@ func buildRecord(model reporting.ReportModel, groupBy []Dimension, rowType strin
 	}
 
 	for index, column := range model.Columns {
-		record = append(record, formatCell(column, cells[index], model.Meta.NoneLabel))
+		record = append(record, formatCell(column, cells[index], model.Meta.NoneLabel, model.Meta.Currency))
 	}
 	return record
 }
@@ -183,15 +183,16 @@ func formatDimension(value reporting.Value, noneLabel string) string {
 	return value.String()
 }
 
-// formatCell renders one report cell the way this format presents it: money to
-// two places, other numbers at full precision, an undefined value as an empty
-// cell, and a multi-value label (a record carrying several categories/tags)
-// joined with commas.
+// formatCell renders one report cell the way this format presents it: money per
+// the report's currency configuration (a bare two places when none is set),
+// other numbers at full precision, an undefined value as an empty cell, and a
+// multi-value label (a record carrying several categories/tags) joined with
+// commas.
 //
 // A cell with no values is a label column on a subtotal row — no single bucket
 // named it — and stays blank. A label cell holding one null value is the (None)
 // bucket, a bucket like any other, and gets the report's name for it.
-func formatCell(column reporting.ColumnDescriptor, cell reporting.Cell, noneLabel string) string {
+func formatCell(column reporting.ColumnDescriptor, cell reporting.Cell, noneLabel string, currency *reporting.CurrencyFormat) string {
 	if len(cell.Values) == 0 {
 		return ""
 	}
@@ -218,6 +219,9 @@ func formatCell(column reporting.ColumnDescriptor, cell reporting.Cell, noneLabe
 		return value.String()
 	}
 	if column.DataType == reporting.TypeCurrency {
+		if currency != nil {
+			return formatCurrency(number, *currency)
+		}
 		return number.StringFixed(2)
 	}
 	return number.String()

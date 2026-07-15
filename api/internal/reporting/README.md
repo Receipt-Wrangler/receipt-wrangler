@@ -96,7 +96,7 @@ The kind is declared rather than inferred from whether summing happens to work. 
 
 ```
 ReportModel
-├── Meta              Title, GeneratedAt, Params, CurrencyFormat, NoneLabel
+├── Meta              Title, GeneratedAt, Params, Currency, NoneLabel
 ├── Columns  []ColumnDescriptor   name, label, kind, data type, format
 ├── Root     GroupNode            synthetic: no Dimension, no Subtotals
 │   ├── Dimension  FieldKey       the field this node's siblings were cut by

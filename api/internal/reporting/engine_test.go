@@ -10,9 +10,9 @@ var testGeneratedAt = time.Date(2026, 6, 1, 9, 30, 0, 0, time.UTC)
 
 func testMeta() MetaInput {
 	return MetaInput{
-		GeneratedAt:    testGeneratedAt,
-		Params:         map[string]string{"period": "2026-05-01 TO 2026-05-31"},
-		CurrencyFormat: "$ #,##0.00",
+		GeneratedAt: testGeneratedAt,
+		Params:      map[string]string{"period": "2026-05-01 TO 2026-05-31"},
+		Currency:    &CurrencyFormat{Symbol: "$", ThousandsSeparator: ",", DecimalSeparator: "."},
 	}
 }
 

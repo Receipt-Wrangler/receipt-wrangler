@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -165,6 +166,67 @@ func TestGenerateReport_BodyReadErrorIsServerError(t *testing.T) {
 	GenerateReport(w, r)
 
 	assertStatus(t, w, http.StatusInternalServerError)
+}
+
+func TestPreviewReport_ReturnsHtmlWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seedReportReceipt(1, 1)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	PreviewReport(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+	if got := w.Header().Get("Content-Type"); !strings.Contains(got, constants.ApplicationJson) {
+		t.Errorf("Content-Type = %q, want %q", got, constants.ApplicationJson)
+	}
+
+	var preview services.ReportPreview
+	if err := json.Unmarshal(w.Body.Bytes(), &preview); err != nil {
+		t.Fatalf("decode preview body: %v", err)
+	}
+	if !strings.Contains(preview.Html, "<") {
+		t.Errorf("expected HTML in the preview body, got %q", preview.Html)
+	}
+	if preview.ReceiptCount != 1 {
+		t.Errorf("receiptCount = %d, want 1", preview.ReceiptCount)
+	}
+}
+
+func TestPreviewReport_ForbidsWhenMemberLacksPermission(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers() // member of group 1 with no granting role
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	PreviewReport(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestPreviewReport_MapsInvalidSpecToBadRequest(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seedReportReceipt(1, 1)
+
+	body := strings.Replace(recordsReportBody, `"detail": {"mode": "records"},`, `"groupBy": ["amount"],
+  "detail": {"mode": "records"},`, 1)
+	w, r := generateReportRequest(1, body)
+	PreviewReport(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+func TestPreviewReport_MalformedBodyIsBadRequest(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+
+	w, r := generateReportRequest(1, "{not valid json")
+	PreviewReport(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
 }
 
 func TestGenerateReport_StreamsZipForMultipleFormats(t *testing.T) {

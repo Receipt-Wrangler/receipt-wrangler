@@ -122,7 +122,7 @@ func (s *htmlSink) cellView(cell faithfulCell) htmlCell {
 		return htmlCell{Text: cell.text}
 	case reportCell:
 		return htmlCell{
-			Text:    formatCell(cell.descriptor, cell.cell, s.model.Meta.NoneLabel),
+			Text:    formatCell(cell.descriptor, cell.cell, s.model.Meta.NoneLabel, s.model.Meta.Currency),
 			Numeric: cell.descriptor.Kind != reporting.ColumnLabel,
 		}
 	default: // blankCell

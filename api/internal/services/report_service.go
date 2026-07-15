@@ -10,6 +10,7 @@ import (
 
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
+	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/reporting"
 	"receipt-wrangler/api/internal/reporting/render"
 	"receipt-wrangler/api/internal/repositories"
@@ -40,6 +41,21 @@ type GeneratedReport struct {
 	ContentType string
 }
 
+// ReportPreview is the rendered HTML for the live builder preview plus the true
+// number of receipts the current configuration covers (reported even when the
+// rendered sample is capped).
+type ReportPreview struct {
+	Html         string `json:"html"`
+	ReceiptCount int    `json:"receiptCount"`
+}
+
+// reportPreviewRowCap bounds how many receipt rows a preview feeds to the engine.
+// A preview is a sample rendered on every builder edit (debounced), so beyond
+// this many rows it truncates the sample to stay fast; ReceiptCount still reports
+// the true total so the builder's "N receipts" chip is accurate. Normal
+// period-bounded reports fall well under the cap and render in full.
+const reportPreviewRowCap = 1000
+
 // ReportSpecError wraps a failure to build or compile the report spec — a
 // client-caused error (an unknown field key, a wrong-role column, a formula
 // cycle) that the handler maps to a 400 rather than a 500.
@@ -63,28 +79,89 @@ var reportFilenameUnsafe = regexp.MustCompile(`[^\w]+`)
 // every group) — this service applies the reporting access controls per group but
 // does not itself gate access.
 func (service ReportService) Generate(userId uint, command commands.ReportRequestCommand) (GeneratedReport, error) {
-	now := time.Now()
+	build, err := service.buildModel(userId, command, time.Now(), 0)
+	if err != nil {
+		return GeneratedReport{}, err
+	}
 
+	files, err := service.renderFormats(command.Formats, build.model, build.dimensions, build.chrome)
+	if err != nil {
+		return GeneratedReport{}, err
+	}
+
+	return service.assembleDownload(command.Name, files)
+}
+
+// Preview renders the report described by command as HTML for the live builder
+// preview. It runs the same pipeline as Generate up through the engine — so the
+// preview is the engine's own output, never a client-side approximation — but
+// emits only HTML (no PDF bridge, no zip) and caps the rendered sample
+// (reportPreviewRowCap). The same per-group authorization as Generate is the
+// caller's responsibility.
+func (service ReportService) Preview(userId uint, command commands.ReportRequestCommand) (ReportPreview, error) {
+	build, err := service.buildModel(userId, command, time.Now(), reportPreviewRowCap)
+	if err != nil {
+		return ReportPreview{}, err
+	}
+
+	html, err := render.HTML(build.model, build.dimensions, build.chrome)
+	if err != nil {
+		return ReportPreview{}, err
+	}
+
+	return ReportPreview{Html: string(html), ReceiptCount: build.receiptCount}, nil
+}
+
+// reportBuild is the engine output plus the render inputs both Generate and
+// Preview consume: the model, the group-by dimensions, the render-time document
+// chrome, and the true receipt count.
+type reportBuild struct {
+	model        reporting.ReportModel
+	dimensions   []render.Dimension
+	chrome       render.DocumentChrome
+	receiptCount int
+}
+
+// buildModel runs the shared pipeline both entry points need: resolve the period,
+// load rows across every covered group under the one catalog, resolve the document
+// variables, build the spec, and run the pure engine. rowLimit > 0 caps the rows
+// fed to the engine (for the preview sample); receiptCount is always the true
+// pre-cap total. It reads the clock once, via the now passed in.
+func (service ReportService) buildModel(
+	userId uint,
+	command commands.ReportRequestCommand,
+	now time.Time,
+	rowLimit int,
+) (reportBuild, error) {
 	filter := command.Filter
 	periodLabel := applyPeriod(&filter, command.Period, now)
 
 	catalog, rows, err := service.loadRows(userId, command.GroupIds, filter)
 	if err != nil {
-		return GeneratedReport{}, err
+		return reportBuild{}, err
+	}
+	receiptCount := len(rows)
+	if rowLimit > 0 && len(rows) > rowLimit {
+		rows = rows[:rowLimit]
 	}
 
 	groupNames, err := service.groupNames(command.GroupIds)
 	if err != nil {
-		return GeneratedReport{}, err
+		return reportBuild{}, err
 	}
 
-	title, chrome := service.resolveDocument(userId, groupNames, periodLabel, now, command.Document)
+	title, chrome := service.resolveDocument(userId, groupNames, periodLabel, now, command.Name, command.Document)
 
 	spec, err := buildReportSpec(command)
 	if err != nil {
-		return GeneratedReport{}, &ReportSpecError{Err: err}
+		return reportBuild{}, &ReportSpecError{Err: err}
 	}
 	spec.Title = title
+
+	settings, err := repositories.NewSystemSettingsRepository(service.TX).GetSystemSettings()
+	if err != nil {
+		return reportBuild{}, err
+	}
 
 	meta := reporting.MetaInput{
 		GeneratedAt: now,
@@ -92,21 +169,35 @@ func (service ReportService) Generate(userId uint, command commands.ReportReques
 			"Period": periodLabel,
 			"Groups": strings.Join(groupNames, ", "),
 		},
+		Currency: currencyFormat(settings),
 	}
 
 	model, err := reporting.Run(spec, catalog, rows, meta)
 	if err != nil {
-		return GeneratedReport{}, &ReportSpecError{Err: err}
+		return reportBuild{}, &ReportSpecError{Err: err}
 	}
 
-	dimensions := buildDimensions(spec.GroupBy, catalog)
+	return reportBuild{
+		model:        model,
+		dimensions:   buildDimensions(spec.GroupBy, catalog),
+		chrome:       chrome,
+		receiptCount: receiptCount,
+	}, nil
+}
 
-	files, err := service.renderFormats(command.Formats, model, dimensions, chrome)
-	if err != nil {
-		return GeneratedReport{}, err
+// currencyFormat maps the app's System Settings currency configuration onto the
+// engine's renderer hint, so every rendered format (the live preview included)
+// presents money exactly as the rest of the UI does. It is always supplied — the
+// settings row is a get-or-create singleton — so a report is never rendered with
+// bare, symbol-less numbers.
+func currencyFormat(settings models.SystemSettings) *reporting.CurrencyFormat {
+	return &reporting.CurrencyFormat{
+		Symbol:             settings.CurrencyDisplay,
+		SymbolAtEnd:        settings.CurrencySymbolPosition == models.END,
+		ThousandsSeparator: string(settings.CurrencyThousandthsSeparator),
+		DecimalSeparator:   string(settings.CurrencyDecimalSeparator),
+		HideDecimals:       settings.CurrencyHideDecimalPlaces,
 	}
-
-	return service.assembleDownload(command.Name, files)
 }
 
 // loadRows gathers the engine rows across every covered group under a single
@@ -364,12 +455,15 @@ func resolvePeriodBounds(period commands.ReportPeriod, now time.Time) (time.Time
 // document copy, returning the resolved title (for the model's Meta) and the
 // render-time chrome (intro and footer). The runtime values it resolves — the
 // period label, the covered group names, the generation time, and the caller's
-// display name — are known only here, at generation time.
+// display name — are known only here, at generation time. The visible heading is
+// the authored document title; when it is left blank it falls back to the report
+// name so the rendered report (and its live preview) is never headingless.
 func (service ReportService) resolveDocument(
 	userId uint,
 	groupNames []string,
 	periodLabel string,
 	now time.Time,
+	name string,
 	document commands.ReportDocument,
 ) (string, render.DocumentChrome) {
 	substitutions := map[string]string{
@@ -378,7 +472,11 @@ func (service ReportService) resolveDocument(
 		"generatedAt":      now.Format("Jan 2, 2006, 3:04 PM"),
 		"currentUser.name": service.userDisplayName(userId),
 	}
-	return substituteVariables(document.Title, substitutions),
+	titleSource := document.Title
+	if strings.TrimSpace(titleSource) == "" {
+		titleSource = name
+	}
+	return substituteVariables(titleSource, substitutions),
 		render.DocumentChrome{
 			Intro:  substituteVariables(document.Intro, substitutions),
 			Footer: substituteVariables(document.Footer, substitutions),

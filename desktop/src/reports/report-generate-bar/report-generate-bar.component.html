@@ -1,0 +1,27 @@
+<div class="gen-bar">
+  <span class="gen-bar__label">FORMAT</span>
+  <div class="gen-bar__chips">
+    @for (format of formats; track format.key) {
+      <div class="gen-bar__chip" [class.gen-bar__chip--on]="isSelected(format.key)"
+        (click)="toggle(format.key)" [attr.data-testid]="'report-format-' + format.key">
+        <mat-icon>{{ format.icon }}</mat-icon>
+        {{ format.label }}
+        @if (isSelected(format.key)) {
+          <mat-icon class="gen-bar__check">check_circle</mat-icon>
+        }
+      </div>
+    }
+  </div>
+  <span class="gen-bar__summary">{{ formatSummary() }}</span>
+  <span class="gen-bar__spacer"></span>
+  @if (generating()) {
+    <mat-icon class="gen-bar__spinner">autorenew</mat-icon>
+  }
+  <app-button
+    [buttonText]="generating() ? 'Generating…' : 'Generate Report'"
+    [icon]="generating() ? '' : 'play_arrow'"
+    [disabled]="!canGenerate() || generating()"
+    (clicked)="onGenerate()"
+    data-testid="report-generate"
+  ></app-button>
+</div>

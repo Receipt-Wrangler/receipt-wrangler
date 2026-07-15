@@ -12,6 +12,7 @@ func BuildReportRouter() *chi.Mux {
 
 	reportRouter.Use(middleware.UnifiedAuthMiddleware)
 	reportRouter.Post("/generate", handlers.GenerateReport)
+	reportRouter.Post("/preview", handlers.PreviewReport)
 
 	return reportRouter
 }

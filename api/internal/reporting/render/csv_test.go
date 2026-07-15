@@ -466,7 +466,7 @@ func TestFormatCell_ByTypeAndKind(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if got := formatCell(testCase.column, testCase.cell, "(None)"); got != testCase.want {
+			if got := formatCell(testCase.column, testCase.cell, "(None)", nil); got != testCase.want {
 				t.Errorf("formatCell = %q, want %q", got, testCase.want)
 			}
 		})

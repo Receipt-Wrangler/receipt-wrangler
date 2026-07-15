@@ -64,6 +64,7 @@ func TestReportService_ResolveDocument(t *testing.T) {
 		[]string{"Household", "Roommates"},
 		"2026-05-01 to 2026-05-31",
 		now,
+		"Report Name",
 		commands.ReportDocument{
 			Title:  "{{group.name}} Report",
 			Intro:  "Period: {{period}}",
@@ -71,6 +72,7 @@ func TestReportService_ResolveDocument(t *testing.T) {
 		},
 	)
 
+	// An authored title wins over the report name.
 	if title != "Household, Roommates Report" {
 		t.Errorf("title = %q", title)
 	}
@@ -79,6 +81,31 @@ func TestReportService_ResolveDocument(t *testing.T) {
 	}
 	if chrome.Footer != "Prepared by Noah Hall on Jul 13, 2026, 4:07 PM" {
 		t.Errorf("footer = %q", chrome.Footer)
+	}
+}
+
+// A blank document title falls back to the report name (still variable-substituted)
+// so the rendered report and its live preview always carry a heading.
+func TestReportService_ResolveDocument_TitleFallsBackToName(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := models.User{Username: "u-doc-fallback", DisplayName: "Noah Hall"}
+	if err := repositories.GetDB().Create(&user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	now := time.Date(2026, 7, 13, 16, 7, 0, 0, time.UTC)
+
+	title, _ := NewReportService(nil).resolveDocument(
+		user.ID,
+		[]string{"Household"},
+		"2026-05-01 to 2026-05-31",
+		now,
+		"{{period}} Summary",
+		commands.ReportDocument{Title: "   "},
+	)
+
+	if title != "2026-05-01 to 2026-05-31 Summary" {
+		t.Errorf("title = %q, want the substituted report name", title)
 	}
 }
 
@@ -389,6 +416,118 @@ func TestReportService_Generate_PdfDocument(t *testing.T) {
 	}
 	if !bytes.HasPrefix(report.Bytes, []byte("%PDF-")) {
 		t.Errorf("expected PDF bytes, got prefix %q", string(report.Bytes[:min(8, len(report.Bytes))]))
+	}
+}
+
+func TestReportService_Preview_RendersHtmlWithReceiptCount(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	category := loadCategory(t, makeCategory(t, "Groceries"))
+	userId, groupIds := seedReportUserInGroups(t, "rpt-preview", "Household", "Roommates")
+	createReportReceipt(t, "household-1", userId, groupIds[0], []models.Category{category})
+	createReportReceipt(t, "roommates-1", userId, groupIds[1], []models.Category{category})
+
+	// Formats are irrelevant to Preview — it always renders the engine's HTML.
+	preview, err := NewReportService(nil).Preview(userId, aggregateReportCommand("Live", groupIds, nil))
+	if err != nil {
+		t.Fatalf("Preview: %v", err)
+	}
+
+	if preview.ReceiptCount != 2 {
+		t.Errorf("receipt count = %d, want 2", preview.ReceiptCount)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(preview.Html), "<") {
+		t.Errorf("expected an HTML document, got: %q", preview.Html)
+	}
+	// With no authored document title, the heading falls back to the report name.
+	if !strings.Contains(preview.Html, "<h1>Live</h1>") {
+		t.Errorf("preview HTML missing the report-name heading <h1>Live</h1>:\n%s", preview.Html)
+	}
+	for _, want := range []string{"Household", "Roommates", "Groceries"} {
+		if !strings.Contains(preview.Html, want) {
+			t.Errorf("preview HTML missing %q:\n%s", want, preview.Html)
+		}
+	}
+}
+
+// A report's money must honor the app's custom currency configuration end to end:
+// buildModel loads System Settings and the rendered preview HTML reflects it.
+func TestReportService_Preview_AppliesCustomCurrencyFormat(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	category := loadCategory(t, makeCategory(t, "Groceries"))
+	userId, groupIds := seedReportUserInGroups(t, "rpt-currency", "Household")
+	createReportReceipt(t, "household-1", userId, groupIds[0], []models.Category{category})
+
+	// A non-USD configuration: symbol trails, dot thousands, comma decimal.
+	if _, err := repositories.NewSystemSettingsRepository(nil).GetSystemSettings(); err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+	if err := repositories.GetDB().Model(&models.SystemSettings{}).Where("id = ?", 1).Updates(models.SystemSettings{
+		CurrencyDisplay:              "€",
+		CurrencySymbolPosition:       models.END,
+		CurrencyThousandthsSeparator: models.DOT,
+		CurrencyDecimalSeparator:     models.COMMA,
+	}).Error; err != nil {
+		t.Fatalf("update currency settings: %v", err)
+	}
+
+	preview, err := NewReportService(nil).Preview(userId, aggregateReportCommand("Live", groupIds, nil))
+	if err != nil {
+		t.Fatalf("Preview: %v", err)
+	}
+
+	// The single receipt's amount (100) is the Total; the custom format wins.
+	if !strings.Contains(preview.Html, "100,00€") {
+		t.Errorf("preview HTML did not apply the custom currency format (want 100,00€):\n%s", preview.Html)
+	}
+	if strings.Contains(preview.Html, "$100.00") {
+		t.Errorf("preview HTML still shows the default USD format:\n%s", preview.Html)
+	}
+}
+
+func TestReportService_Preview_InvalidSpecIsClientError(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	userId, groupIds := seedReportUserInGroups(t, "rpt-preview-bad", "Household")
+	createReportReceipt(t, "household-1", userId, groupIds[0], nil)
+
+	command := aggregateReportCommand("Bad", groupIds, nil)
+	command.GroupBy = []string{"amount"} // a measure cannot be grouped by
+
+	_, err := NewReportService(nil).Preview(userId, command)
+	var specErr *ReportSpecError
+	if !errors.As(err, &specErr) {
+		t.Errorf("expected a ReportSpecError (→ 400), got %T: %v", err, err)
+	}
+}
+
+// buildModel's rowLimit caps the rows fed to the engine while ReceiptCount stays
+// the true total — so the builder's "N receipts" chip is accurate even when the
+// preview renders only a sample.
+func TestReportService_BuildModel_CapsRowsButReportsTrueCount(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	category := loadCategory(t, makeCategory(t, "Groceries"))
+	userId, groupIds := seedReportUserInGroups(t, "rpt-cap", "Household")
+	for _, name := range []string{"h1", "h2", "h3"} {
+		createReportReceipt(t, name, userId, groupIds[0], []models.Category{category})
+	}
+
+	build, err := NewReportService(nil).buildModel(userId, aggregateReportCommand("Cap", groupIds, nil), time.Now(), 1)
+	if err != nil {
+		t.Fatalf("buildModel: %v", err)
+	}
+	if build.receiptCount != 3 {
+		t.Errorf("receiptCount = %d, want 3 (the true pre-cap total)", build.receiptCount)
 	}
 }
 

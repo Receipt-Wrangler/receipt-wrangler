@@ -26,11 +26,11 @@ func Run(spec ReportSpec, catalog FieldCatalog, rows []Row, meta MetaInput) (Rep
 
 	model := ReportModel{
 		Meta: Meta{
-			Title:          compiled.spec.Title,
-			GeneratedAt:    meta.GeneratedAt,
-			Params:         copyParams(meta.Params),
-			CurrencyFormat: meta.CurrencyFormat,
-			NoneLabel:      compiled.spec.NoneLabel,
+			Title:       compiled.spec.Title,
+			GeneratedAt: meta.GeneratedAt,
+			Params:      copyParams(meta.Params),
+			Currency:    meta.Currency,
+			NoneLabel:   compiled.spec.NoneLabel,
 		},
 		Columns: run.descriptors(),
 		Root:    run.emitGroup(root, 0, nil),

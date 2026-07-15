@@ -6,11 +6,40 @@ import (
 	"net/http"
 
 	"receipt-wrangler/api/internal/commands"
+	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
+
+// loadReportCommand parses and validates the report request body, writing the
+// appropriate error response and returning ok=false on any failure. Both the
+// generate and preview handlers parse up front — before building the
+// structs.Handler — because the groupIds the command carries drive the permission
+// gate (HandleRequest re-checks group.reports.read in every covered group).
+func loadReportCommand(w http.ResponseWriter, r *http.Request) (commands.ReportRequestCommand, bool) {
+	command := commands.ReportRequestCommand{}
+	if err := command.LoadDataFromRequest(w, r); err != nil {
+		// A decode failure is a malformed client payload (400); only a genuine
+		// body-read failure is a server error (500).
+		var syntaxErr *json.SyntaxError
+		var typeErr *json.UnmarshalTypeError
+		if errors.As(err, &syntaxErr) || errors.As(err, &typeErr) {
+			utils.WriteCustomErrorResponse(w, "Malformed report request", http.StatusBadRequest)
+			return command, false
+		}
+		utils.WriteCustomErrorResponse(w, "Error reading report request", http.StatusInternalServerError)
+		return command, false
+	}
+
+	if vErr := command.Validate(); len(vErr.Errors) > 0 {
+		structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
+		return command, false
+	}
+
+	return command, true
+}
 
 // GenerateReport builds and streams a report over one or more groups' receipts.
 //
@@ -20,22 +49,8 @@ import (
 // before the handler function runs. The generation itself is synchronous; the
 // resulting file (or a zip of several formats) is streamed back as an attachment.
 func GenerateReport(w http.ResponseWriter, r *http.Request) {
-	command := commands.ReportRequestCommand{}
-	if err := command.LoadDataFromRequest(w, r); err != nil {
-		// A decode failure is a malformed client payload (400); only a genuine
-		// body-read failure is a server error (500).
-		var syntaxErr *json.SyntaxError
-		var typeErr *json.UnmarshalTypeError
-		if errors.As(err, &syntaxErr) || errors.As(err, &typeErr) {
-			utils.WriteCustomErrorResponse(w, "Malformed report request", http.StatusBadRequest)
-			return
-		}
-		utils.WriteCustomErrorResponse(w, "Error reading report request", http.StatusInternalServerError)
-		return
-	}
-
-	if vErr := command.Validate(); len(vErr.Errors) > 0 {
-		structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
+	command, ok := loadReportCommand(w, r)
+	if !ok {
 		return
 	}
 
@@ -65,6 +80,53 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Disposition", "attachment; filename=\""+report.Filename+"\"")
 			w.WriteHeader(http.StatusOK)
 			w.Write(report.Bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+// PreviewReport renders the current report configuration as HTML for the builder's
+// live preview. It shares GenerateReport's front-loaded parse/validate and the
+// same per-group gate (group.reports.read in every covered group), but returns a
+// JSON { html, receiptCount } body instead of a downloadable file — the preview is
+// the engine's own rendered HTML (row-capped), so the builder never re-implements
+// the engine.
+func PreviewReport(w http.ResponseWriter, r *http.Request) {
+	command, ok := loadReportCommand(w, r)
+	if !ok {
+		return
+	}
+
+	handler := structs.Handler{
+		ErrorMessage:     "Error generating report preview",
+		Writer:           w,
+		Request:          r,
+		ResponseType:     constants.ApplicationJson,
+		GroupIds:         command.GroupIds,
+		GroupPermissions: []string{permissions.GroupReportsRead},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			token := structs.GetClaims(r)
+			reportService := services.NewReportService(nil)
+
+			preview, err := reportService.Preview(token.UserId, command)
+			if err != nil {
+				var specErr *services.ReportSpecError
+				if errors.As(err, &specErr) {
+					utils.WriteCustomErrorResponse(w, "Invalid report configuration: "+specErr.Error(), http.StatusBadRequest)
+					return 0, nil
+				}
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(preview)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
 			return 0, nil
 		},
 	}

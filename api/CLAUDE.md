@@ -18,6 +18,13 @@ Receipt Wrangler API is a Go-based backend service for a receipt management and 
 - `go test -coverprofile=coverage.out -covermode=atomic -v ./...` - Run tests with coverage
 - `python3 -m unittest discover -s ./imap-client` - Run Python IMAP client tests
 
+### Seeding test data
+- `RW_API_KEY='key.1.<id>.<secret>' node dev/seed-reporting-data.mjs` - Seed a realistic, high-volume
+  reporting dataset (a dedicated group + member users + categories/tags + ~2000 receipts spread over a
+  date range) via the HTTP API. The admin API key is read from `RW_API_KEY` (never hardcoded). Setup is
+  idempotent (reuses the group/users/categories/tags by name); receipts are additive. Tunable via env
+  (`RECEIPT_COUNT`, `SEED_GROUP_NAME`, `START_DATE`/`END_DATE`, `CONCURRENCY`, …) — see the script header.
+
 ### API Client Generation
 - `./generate-client.sh desktop <output-dir>` - Generate TypeScript Angular client
 - `./generate-client.sh mobile <output-dir>` - Generate Dart Dio client
@@ -261,8 +268,11 @@ will be dropped in a later release.
   `app.account.read`), so granting it would only expose the admin "Manage Users" page to normal users; and
   `app.categories.read` / `app.tags.read` — omitted as part of the category/tag grant lock-down, since they
   gate the GLOBAL category/tag lists; normal users now get only the per-group filtered catalogs (the
-  `app.categories.create` / `app.tags.create` permissions are retained for inline creation). See
-  "Category/tag delivery on AppData" below.
+  `app.categories.create` / `app.tags.create` permissions are retained for inline creation); and
+  `app.reports.read` — the app-level gate on the desktop report builder (route + nav). Reporting is
+  **admin-by-default**: Legacy Admin picks it up automatically (its set is every app permission), while
+  non-admins get it only via a custom role that grants it. Per-group generation stays gated by the
+  group-scoped `group.reports.read`. See "Category/tag delivery on AppData" below.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.
@@ -695,14 +705,17 @@ model carries (subtotal/grand-total rows appear only when the spec toggled them 
 chrome, and is unit-tested in isolation against models built via `reporting.Run` (there is no orchestrator
 or handler yet). Per `docs/engine-design.md` §5, CSV is deliberately the minimal renderer; the
 grouped/visual "looks like the on-screen report" layout belongs to the XLSX/PDF renderers, each a separate
-consumer of the same tree. Currency renders at 2dp, other numbers at full precision, `(None)` buckets use
-`Meta.NoneLabel`.
+consumer of the same tree. Currency renders per the app's custom currency configuration — symbol, symbol
+position, thousands/decimal separators, and hide-decimal-places — when the caller supplies `Meta.Currency`
+(a bare 2dp otherwise); other numbers at full precision; `(None)` buckets use `Meta.NoneLabel`.
 
 `render.XLSX(model, groupBy)` (via `github.com/xuri/excelize/v2`) is the **faithful, grouped** counterpart:
 the group-by dimensions are leading columns with each value shown **once per group** (blanked on repeats),
 and a subtotal/grand-total row carries a `Total`/`Grand Total` marker in the column at the group's depth
-(the "staircase"). Numbers are written as **native, typed cells** with a number format — currency defaults
-to `#,##0.00` (or `ColumnDescriptor.Format`/`Meta.CurrencyFormat` if set), so the workbook is analyzable —
+(the "staircase"). Numbers are written as **native, typed cells** with a number format — for currency an
+Excel format code built from `Meta.Currency` (symbol, position, and decimal-places; the group/decimal
+glyphs follow the opener's locale, an Excel constraint), overridable per column via
+`ColumnDescriptor.Format`, defaulting to `#,##0.00` when neither is set — so the workbook stays analyzable,
 and header/subtotal/grand-total rows are bold; sheet name `Report`. It writes the engine-computed values
 **statically** — live `=SUM`/expression formulas (the reason `ColumnDescriptor.Expr` is an exported AST)
 are a later slice, and document chrome/slots (logo) await the template work. It shares the `Dimension`
@@ -727,7 +740,9 @@ and HTML-escaping cases.
 the pieces. `ReportService.Generate(userId, command)` resolves the request's period into a date filter,
 loads rows across every group in the request under the one (global) catalog, builds a `ReportSpec`, runs
 the pure engine, resolves the document's `{{period}}`/`{{group.name}}`/`{{generatedAt}}`/`{{currentUser.name}}`
-variables, renders each requested format (bridging PDF through `HtmlToPdfService.Render`), and returns a
+variables (the rendered heading is the authored `document.title`, falling back to the report `name` when
+blank so the report — and its live preview — is never headingless), renders each requested format
+(bridging PDF through `HtmlToPdfService.Render`), and returns a
 single file or a **zip** of several. It reads the clock exactly once. The handler (`handlers/report.go`)
 parses+validates the `ReportRequestCommand` **before** building the `structs.Handler` — because the
 `groupIds` it carries drive the gate: it declares `GroupIds` + `GroupPermissions: [group.reports.read]`,
@@ -737,6 +752,26 @@ handler maps to a 400. The request contract mirrors the engine (columns carry a 
 formulas reference by name with ASCII operators; group-by/detail carry engine field keys), so the Angular
 client maps its builder UI onto engine-shaped values before submitting. Report generation is **synchronous**
 (streamed download); an async job + live progress + stored-results download is a possible later slice.
+
+**`POST /api/report/preview`** drives the desktop builder's live preview. It shares GenerateReport's
+front-loaded parse/validate and the same per-group `group.reports.read` gate (the shared
+`loadReportCommand` handler helper), and `ReportService.Preview` runs the **same** pipeline as `Generate`
+up through the engine (both call the shared `buildModel`) but renders only `render.HTML` — no PDF bridge,
+no zip — and **row-caps** the sample (`reportPreviewRowCap`, currently 1000; `ReceiptCount` still reports
+the true total). It returns a JSON `ReportPreviewResponse { html, receiptCount }`, so the preview is the
+engine's own output rather than a client-side re-implementation. A separate **app-level `app.reports.read`**
+permission gates the desktop report-builder route/nav (Legacy Admin picks it up via add-only role
+reconciliation; reporting is admin-by-default) — it does **not** gate the generate/preview endpoints,
+which stay group-scoped.
+
+**Custom currency formatting.** `buildModel` loads System Settings (`SystemSettingsRepository.GetSystemSettings`,
+a get-or-create singleton) and passes the app's currency configuration — symbol, symbol position (START/END),
+thousands/decimal separators, and hide-decimal-places — through `MetaInput.Currency` (mapped by
+`currencyFormat`). Because Generate and Preview share `buildModel`, **every** rendered output (the live
+preview, PDF/HTML, CSV, and XLSX) presents money exactly as the rest of the UI does — matching the desktop
+`customCurrency` pipe that the report's receipts drill-in dialog already uses. The engine stays pure (it
+carries `Currency` through untouched); the settings load lives in the service and the formatting in the
+`render` package (`render/currency.go`).
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
