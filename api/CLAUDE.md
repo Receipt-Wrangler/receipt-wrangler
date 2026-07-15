@@ -773,6 +773,16 @@ preview, PDF/HTML, CSV, and XLSX) presents money exactly as the rest of the UI d
 carries `Currency` through untouched); the settings load lives in the service and the formatting in the
 `render` package (`render/currency.go`).
 
+**Report templates.** `POST /api/report/template` saves a report configuration for reuse. It reuses the
+shared `loadReportCommand` parse+validate and stores the whole `ReportRequestCommand` verbatim as a
+`json.RawMessage` blob on `models.ReportTemplate` (name + owner taken from the request / JWT), so a
+template round-trips back into the builder unchanged. Unlike generate/preview it is **app-scoped** behind
+a new `app.reports.create` permission — `handlers.CreateReportTemplate` gates on `AppPermissions` and calls
+`repositories.ReportTemplateRepository` directly (handler→repo, like prompts, no engine involvement),
+because it persists a configuration and touches no group's receipts. Legacy Admin picks the permission up
+via add-only role reconciliation (reporting is admin-by-default, same as `app.reports.read`); per-group
+generation stays gated by `group.reports.read`. Listing / editing / running saved templates is a later slice.
+
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
 marker, so the receipt still counts toward the totals in its own bucket instead of vanishing. `(None)`

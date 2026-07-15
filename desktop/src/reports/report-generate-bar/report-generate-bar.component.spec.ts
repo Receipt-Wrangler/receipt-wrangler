@@ -57,6 +57,13 @@ describe("ReportGenerateBarComponent", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it("emits saveTemplate on request", () => {
+    const spy = jest.fn();
+    component.saveTemplate.subscribe(spy);
+    component.onSaveTemplate();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
   it("renders the format chips and the Generate button's disabled state", async () => {
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;

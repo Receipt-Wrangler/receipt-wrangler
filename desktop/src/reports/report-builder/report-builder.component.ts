@@ -12,6 +12,7 @@ import { UntilDestroy } from "@ngneat/until-destroy";
 import { EMPTY, catchError, debounceTime, finalize, startWith, switchMap, take, tap } from "rxjs";
 import { ReportPeriod, ReportRequestCommand } from "../../open-api";
 import { enabledReportColumns, ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
+import { SnackbarService } from "../../services";
 import { buildReportForm } from "../models/report-form.factory";
 import { ReportCatalogService } from "../services/report-catalog.service";
 import { ReportRunnerService } from "../services/report-runner.service";
@@ -35,6 +36,7 @@ export class ReportBuilderComponent {
   private readonly formBuilder = inject(FormBuilder);
   private readonly runner = inject(ReportRunnerService);
   private readonly catalogService = inject(ReportCatalogService);
+  private readonly snackbar = inject(SnackbarService);
   private readonly destroyRef = inject(DestroyRef);
 
   public readonly form: FormGroup = buildReportForm(this.formBuilder, this);
@@ -60,6 +62,13 @@ export class ReportBuilderComponent {
   public readonly canGenerate = computed<boolean>(() => {
     this.formTick();
     return this.isRunnable() && this.selectedFormatCount() > 0;
+  });
+
+  /** Saving a template is Generate's validity plus a non-empty name to save under. */
+  public readonly canSaveTemplate = computed<boolean>(() => {
+    this.formTick();
+    const name = (this.form.get("name")!.value as string) ?? "";
+    return this.isRunnable() && this.selectedFormatCount() > 0 && name.trim().length > 0;
   });
 
   constructor() {
@@ -111,6 +120,22 @@ export class ReportBuilderComponent {
         take(1),
         catchError(() => EMPTY), // the HTTP interceptor surfaces the failure toast
         finalize(() => this.generating.set(false)),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe();
+  }
+
+  /** Saves the current configuration as a reusable report template. */
+  public saveTemplate(): void {
+    if (!this.canSaveTemplate()) {
+      return;
+    }
+    this.runner
+      .saveTemplate(this.currentCommand())
+      .pipe(
+        take(1),
+        tap(() => this.snackbar.success("Template saved")),
+        catchError(() => EMPTY), // the HTTP interceptor surfaces the failure toast
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe();
