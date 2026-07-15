@@ -5866,9 +5866,13 @@ components:
           required:
             - name
             - configuration
+            - configurationVersion
           properties:
             name:
               type: string
               description: The template name (mirrors the saved report's name).
             configuration:
               $ref: "#/components/schemas/ReportRequestCommand"
+            configurationVersion:
+              type: integer
+              description: Schema version the stored configuration was written under.

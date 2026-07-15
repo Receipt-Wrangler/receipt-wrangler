@@ -24,5 +24,9 @@ export interface ReportTemplate {
      */
     name: string;
     configuration: ReportRequestCommand;
+    /**
+     * Schema version the stored configuration was written under.
+     */
+    configurationVersion: number;
 }
 

@@ -288,6 +288,9 @@ func TestCreateReportTemplate_SavesWhenAuthorized(t *testing.T) {
 	if template.CreatedBy == nil || *template.CreatedBy != 1 {
 		t.Errorf("template createdBy = %v, want 1", template.CreatedBy)
 	}
+	if template.ConfigurationVersion != 1 {
+		t.Errorf("template configurationVersion = %d, want 1", template.ConfigurationVersion)
+	}
 }
 
 func TestCreateReportTemplate_ForbidsWithoutCreatePermission(t *testing.T) {

@@ -46,6 +46,9 @@ func TestCreateReportTemplate_PersistsNameOwnerAndConfig(t *testing.T) {
 	if template.CreatedBy == nil || *template.CreatedBy != userId {
 		utils.PrintTestError(t, template.CreatedBy, userId)
 	}
+	if template.ConfigurationVersion != commands.CurrentReportConfigurationVersion {
+		utils.PrintTestError(t, template.ConfigurationVersion, commands.CurrentReportConfigurationVersion)
+	}
 
 	// The whole command round-trips out of the stored JSON blob.
 	var stored commands.ReportRequestCommand

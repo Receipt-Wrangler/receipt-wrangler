@@ -49,8 +49,11 @@ test.describe('Report Builder — save template', () => {
     ]);
     expect(response.status()).toBe(200);
 
-    // Remember the new template so afterEach can delete it.
-    createdTemplateId = ((await response.json()) as { id: number }).id;
+    // Remember the new template so afterEach can delete it, and confirm the backend
+    // stamped it with the current config schema version.
+    const body = (await response.json()) as { id: number; configurationVersion: number };
+    createdTemplateId = body.id;
+    expect(body.configurationVersion).toBe(1);
 
     // The success snackbar confirms the save.
     await expect(page.getByText('Template saved')).toBeVisible();

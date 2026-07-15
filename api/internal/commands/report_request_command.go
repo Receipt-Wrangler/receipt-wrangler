@@ -32,6 +32,11 @@ const (
 	ReportColumnFormula   = "formula"
 )
 
+// CurrentReportConfigurationVersion is the schema version stamped onto a saved
+// report template's stored configuration. Bump it and write an upcaster when a
+// breaking change to the ReportRequestCommand shape lands.
+const CurrentReportConfigurationVersion = 1
+
 // Period presets. Everything but "custom" resolves to a date window from the
 // server clock at generation time; "custom" uses the supplied start/end.
 const (

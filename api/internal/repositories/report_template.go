@@ -33,9 +33,10 @@ func (repository ReportTemplateRepository) CreateReportTemplate(command commands
 	}
 
 	template := models.ReportTemplate{
-		BaseModel:     models.BaseModel{CreatedBy: &userId},
-		Name:          command.Name,
-		Configuration: configuration,
+		BaseModel:            models.BaseModel{CreatedBy: &userId},
+		Name:                 command.Name,
+		Configuration:        configuration,
+		ConfigurationVersion: commands.CurrentReportConfigurationVersion,
 	}
 
 	err = db.Create(&template).Error
