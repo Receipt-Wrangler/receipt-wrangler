@@ -25,6 +25,7 @@ export class ReportGenerateBarComponent {
   public readonly generating = input<boolean>(false);
   public readonly canGenerate = input<boolean>(false);
   public readonly canSaveTemplate = input<boolean>(false);
+  public readonly saving = input<boolean>(false);
   public readonly generate = output<void>();
   public readonly saveTemplate = output<void>();
 

@@ -318,6 +318,19 @@ func TestCreateReportTemplate_RejectsInvalidCommand(t *testing.T) {
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
+func TestCreateReportTemplate_RejectsBlankName(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsCreate)
+
+	// A template is identified by its name; an otherwise-valid config with a blank
+	// name is rejected (400).
+	body := strings.Replace(recordsReportBody, `"name": "HTTP Report"`, `"name": ""`, 1)
+	w, r := generateReportRequest(1, body)
+	CreateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
 // deleteReportTemplateRequest builds a DELETE carrying JWT claims for userId and a
 // chi route context supplying the {id} URL param, mirroring how the router invokes
 // DeleteReportTemplate.

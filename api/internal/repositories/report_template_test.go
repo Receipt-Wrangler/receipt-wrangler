@@ -125,3 +125,27 @@ func TestDeleteReportTemplateById_RemovesTheRow(t *testing.T) {
 		utils.PrintTestError(t, err, nil)
 	}
 }
+
+func TestDeleteReportTemplateById_BindsIdAndDoesNotDeleteOnCraftedId(t *testing.T) {
+	defer TruncateTestDb()
+
+	repository := NewReportTemplateRepository(nil)
+	created, err := repository.CreateReportTemplate(sampleReportCommand(), 1)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// A crafted, whitespace-containing id (as a decoded URL param could supply) must
+	// be treated as a bound value, not raw SQL — so it matches nothing and the real
+	// row survives, rather than deleting every template via "WHERE 1 OR 1=1".
+	if err := repository.DeleteReportTemplateById("1 OR 1=1"); err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	var count int64
+	GetDB().Model(&models.ReportTemplate{}).Where("id = ?", created.ID).Count(&count)
+	if count != 1 {
+		utils.PrintTestError(t, count, int64(1))
+	}
+}

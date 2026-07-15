@@ -1,7 +1,7 @@
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormBuilder, FormControl } from "@angular/forms";
-import { of, throwError } from "rxjs";
+import { of, Subject, throwError } from "rxjs";
 import { SnackbarService } from "../../services";
 import { CustomFieldService, ReportColumn } from "../../open-api";
 import { buildColumnGroup } from "../models/report-form.factory";
@@ -125,5 +125,26 @@ describe("ReportBuilderComponent", () => {
 
     component.saveTemplate();
     expect(runner.saveTemplate).not.toHaveBeenCalled();
+  });
+
+  it("guards against concurrent saves while one is in flight", async () => {
+    const pending = new Subject<{ id: number }>();
+    runner.saveTemplate.mockReturnValue(pending.asObservable());
+
+    (component.form.get("scope") as FormArray).push(new FormControl("1"));
+    await fixture.whenStable();
+    expect(component.canSaveTemplate()).toBe(true);
+
+    component.saveTemplate();
+    expect(component.saving()).toBe(true);
+
+    // A second call (e.g. a double-click) must not fire another POST.
+    component.saveTemplate();
+    expect(runner.saveTemplate).toHaveBeenCalledTimes(1);
+
+    // Completing the request clears the in-flight flag so later saves work again.
+    pending.next({ id: 1 });
+    pending.complete();
+    expect(component.saving()).toBe(false);
   });
 });

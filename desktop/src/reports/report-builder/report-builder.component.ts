@@ -46,6 +46,7 @@ export class ReportBuilderComponent {
   public readonly previewLoading = signal<boolean>(false);
   public readonly previewError = signal<boolean>(false);
   public readonly generating = signal<boolean>(false);
+  public readonly saving = signal<boolean>(false);
 
   // A tick that recomputes the run-readiness guards whenever the form changes.
   private readonly formTick = toSignal(this.form.valueChanges.pipe(startWith(null)), {
@@ -127,15 +128,17 @@ export class ReportBuilderComponent {
 
   /** Saves the current configuration as a reusable report template. */
   public saveTemplate(): void {
-    if (!this.canSaveTemplate()) {
+    if (!this.canSaveTemplate() || this.saving()) {
       return;
     }
+    this.saving.set(true);
     this.runner
       .saveTemplate(this.currentCommand())
       .pipe(
         take(1),
         tap(() => this.snackbar.success("Template saved")),
         catchError(() => EMPTY), // the HTTP interceptor surfaces the failure toast
+        finalize(() => this.saving.set(false)),
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe();

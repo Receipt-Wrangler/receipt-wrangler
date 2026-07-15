@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -171,6 +172,14 @@ func DeleteReportTemplate(w http.ResponseWriter, r *http.Request) {
 func CreateReportTemplate(w http.ResponseWriter, r *http.Request) {
 	command, ok := loadReportCommand(w, r)
 	if !ok {
+		return
+	}
+
+	// A template is identified by its name, so require a non-empty one. The shared
+	// loadReportCommand validator doesn't check Name (generate/preview don't need
+	// it), so enforce it here.
+	if strings.TrimSpace(command.Name) == "" {
+		utils.WriteCustomErrorResponse(w, "A report template name is required", http.StatusBadRequest)
 		return
 	}
 

@@ -20,9 +20,9 @@
   <app-button
     *hasAppPermission="Permission.AppReportsCreate"
     matButtonType="basic"
-    buttonText="Save Template"
+    [buttonText]="saving() ? 'Saving…' : 'Save Template'"
     icon="bookmark_add"
-    [disabled]="!canSaveTemplate()"
+    [disabled]="!canSaveTemplate() || saving()"
     (clicked)="onSaveTemplate()"
     data-testid="report-save-template"
   ></app-button>

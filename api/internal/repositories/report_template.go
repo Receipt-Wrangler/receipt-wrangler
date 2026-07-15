@@ -51,5 +51,8 @@ func (repository ReportTemplateRepository) CreateReportTemplate(command commands
 // non-existent id is not an error (RowsAffected 0), so teardown stays idempotent.
 func (repository ReportTemplateRepository) DeleteReportTemplateById(id string) error {
 	db := repository.GetDB()
-	return db.Delete(&models.ReportTemplate{}, id).Error
+	// Bind the id as a parameter rather than passing it as a Delete condition:
+	// GORM treats a whitespace-containing string condition as raw SQL, so an id
+	// like "1 OR 1=1" (a decoded URL param) would otherwise become a raw predicate.
+	return db.Where("id = ?", id).Delete(&models.ReportTemplate{}).Error
 }
