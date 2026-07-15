@@ -19,7 +19,10 @@ import { gotoReports } from './helpers/reports';
 // user through the UI, the tests run under that user's saved session, and the
 // role/user are torn down through the admin API (user before role).
 
-const NEW_USER_PASSWORD = 'a-really-secure-password';
+// Generated per run rather than committed: a throwaway password for the ephemeral
+// provisioned user (matches search-bar-visibility.spec.ts). The -Aa1! suffix keeps
+// the upper/lower/digit/symbol complexity the Create-User form expects.
+const NEW_USER_PASSWORD = `${uniqueName('pw')}-Aa1!`;
 const AUTH_FILE = 'e2e/.auth/report-template-nocreate.json';
 const apiBaseUrl = (): string => process.env.E2E_BASE_URL ?? 'http://localhost:4200';
 

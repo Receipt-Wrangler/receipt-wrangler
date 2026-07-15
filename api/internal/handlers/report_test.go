@@ -319,16 +319,21 @@ func TestCreateReportTemplate_RejectsInvalidCommand(t *testing.T) {
 }
 
 func TestCreateReportTemplate_RejectsBlankName(t *testing.T) {
-	defer tearDownReportTest()
-	grantAppPerms(t, 1, permissions.AppReportsCreate)
+	// A template is identified by its name, so an otherwise-valid config with a
+	// blank name is rejected (400). The handler trims, so a whitespace-only name is
+	// blank too.
+	for _, name := range []string{"", "   "} {
+		t.Run(fmt.Sprintf("name=%q", name), func(t *testing.T) {
+			defer tearDownReportTest()
+			grantAppPerms(t, 1, permissions.AppReportsCreate)
 
-	// A template is identified by its name; an otherwise-valid config with a blank
-	// name is rejected (400).
-	body := strings.Replace(recordsReportBody, `"name": "HTTP Report"`, `"name": ""`, 1)
-	w, r := generateReportRequest(1, body)
-	CreateReportTemplate(w, r)
+			body := strings.Replace(recordsReportBody, `"name": "HTTP Report"`, `"name": "`+name+`"`, 1)
+			w, r := generateReportRequest(1, body)
+			CreateReportTemplate(w, r)
 
-	assertStatus(t, w, http.StatusBadRequest)
+			assertStatus(t, w, http.StatusBadRequest)
+		})
+	}
 }
 
 // deleteReportTemplateRequest builds a DELETE carrying JWT claims for userId and a
