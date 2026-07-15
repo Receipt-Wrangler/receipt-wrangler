@@ -20,6 +20,13 @@ export async function addFirstGroupToScope(page: Page): Promise<void> {
   await page.getByTestId('dialog-submit-button').click();
 }
 
+/** Add a specific (provisioned) group to the report scope by its display name. */
+export async function addGroupToScopeByName(page: Page, name: string): Promise<void> {
+  await page.getByTestId('report-add-group').click();
+  await page.getByTestId('add-group-row').filter({ hasText: name }).getByTestId('add-group-select').click();
+  await page.getByTestId('dialog-submit-button').click();
+}
+
 /**
  * Open a left-pane select and pick an option, retrying the open. The config panel
  * re-renders as the debounced preview refreshes, which can drop a freshly opened

@@ -5,7 +5,7 @@
   </div>
 
   @for (group of groups(); track group.id) {
-    <div class="add-group__row">
+    <div class="add-group__row" data-testid="add-group-row">
       <span class="add-group__avatar" [style.background]="group.color">{{ group.initials }}</span>
       <div class="add-group__name">{{ group.name }}</div>
       @if (group.selected) {

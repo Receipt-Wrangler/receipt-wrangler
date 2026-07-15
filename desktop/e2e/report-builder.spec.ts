@@ -1,6 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { stubTokenRefresh } from './helpers/auth';
-import { addFirstGroupToScope, gotoReports, openComboboxAndPick, waitForPreview } from './helpers/reports';
+import { creds, stubTokenRefresh } from './helpers/auth';
+import {
+  apiCreateGroup,
+  apiCreateReceipt,
+  apiDeleteGroupById,
+  apiGetUserId,
+  uniqueName,
+  withAdminApi,
+} from './helpers/provisioning';
+import { addFirstGroupToScope, addGroupToScopeByName, gotoReports, openComboboxAndPick } from './helpers/reports';
 
 // The Report Builder is gated by the app-level app.reports.read permission, which
 // the seeded Legacy Admin role carries (and Legacy User does not). Run the positive
@@ -39,50 +47,6 @@ test.describe('Report Builder', () => {
     await page.getByTestId('report-generate').click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toContain('.csv');
-  });
-
-  test('admin drills into a receipt and opens the full receipt in a new tab', async ({ page }) => {
-    await gotoReports(page);
-    await addFirstGroupToScope(page);
-
-    // Seeded receipts sit in prior months, so cover them with "Last month", and
-    // wait for the debounced preview so the covered-count reflects the new period.
-    await Promise.all([
-      waitForPreview(page),
-      openComboboxAndPick(
-        page,
-        page.getByRole('combobox', { name: /Period covering/ }),
-        page.getByRole('option', { name: 'Last month' }),
-      ),
-    ]);
-
-    const chip = page.getByTestId('report-receipt-count');
-    await expect(chip).toBeVisible({ timeout: 20_000 });
-    await chip.click();
-
-    // The chip only opens the drill-in when the report covers receipts; if the
-    // seeded scope has none in range, there is nothing to drill into.
-    const opened = await page
-      .getByText('Receipts in this report')
-      .waitFor({ state: 'visible', timeout: 4000 })
-      .then(() => true)
-      .catch(() => false);
-    test.skip(!opened, 'seeded scope has no receipts in the selected period');
-
-    // Click a receipt row to open its breakdown, then open the full receipt.
-    const row = page.getByTestId('report-receipt-row').first();
-    await expect(row).toBeVisible();
-    await row.click();
-
-    const openFull = page.getByTestId('report-receipt-open-full');
-    await expect(openFull).toBeVisible();
-
-    const [popup] = await Promise.all([page.waitForEvent('popup'), openFull.click()]);
-    await expect(popup).toHaveURL(/\/receipts\/\d+\/view/);
-
-    // Back returns to the list.
-    await page.getByTestId('report-receipt-back').click();
-    await expect(row).toBeVisible();
   });
 
   test('disables an aggregate dimension column that is neither the aggregate-by nor a grouping level', async ({ page }) => {
@@ -141,5 +105,72 @@ test.describe('Report Builder', () => {
     await expect(page).not.toHaveURL(/\/reports/, { timeout: 10_000 });
 
     await context.close();
+  });
+});
+
+// The drill-in flow needs a receipt to exist, so it provisions its own group +
+// receipt (dated 2024-01-01) via the API and tears them down — deterministic and
+// parallel-safe (unique names), rather than depending on seeded data.
+test.describe('Report Builder — receipt drill-in', () => {
+  const groupName = uniqueName('report-drill-grp');
+  const receiptName = uniqueName('report-drill-rcpt');
+  let groupId: number;
+
+  test.beforeAll(async () => {
+    await withAdminApi(async (api) => {
+      const adminId = await apiGetUserId(api, creds('admin').username);
+      groupId = (await apiCreateGroup(api, groupName)).id;
+      await apiCreateReceipt(api, { groupId, paidByUserId: adminId, name: receiptName });
+    });
+  });
+
+  test.afterAll(async () => {
+    try {
+      await withAdminApi((api) => apiDeleteGroupById(api, String(groupId)));
+    } catch {
+      // Best-effort cleanup — don't mask a test failure with a cleanup error.
+    }
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await stubTokenRefresh(page);
+  });
+
+  test('drills into a receipt and opens the full receipt in a new tab', async ({ page }) => {
+    await gotoReports(page);
+    await addGroupToScopeByName(page, groupName);
+
+    // Cover the provisioned 2024-01-01 receipt with a generous custom range (a
+    // full year of slack so time zones can't push it out of the window).
+    await openComboboxAndPick(
+      page,
+      page.getByRole('combobox', { name: /Period covering/ }),
+      page.getByRole('option', { name: /Custom range/ }),
+    );
+    await page.getByLabel('Start', { exact: true }).fill('01/01/2023');
+    await page.getByLabel('End', { exact: true }).fill('12/31/2024');
+    await page.getByLabel('End', { exact: true }).blur();
+
+    // The preview now covers exactly the one provisioned receipt.
+    const chip = page.getByTestId('report-receipt-count');
+    await expect(chip).toContainText('1 receipts', { timeout: 20_000 });
+    await chip.click();
+
+    await expect(page.getByText('Receipts in this report')).toBeVisible();
+
+    // Click the receipt row to open its breakdown, then open the full receipt.
+    const row = page.getByTestId('report-receipt-row').first();
+    await expect(row).toBeVisible();
+    await row.click();
+
+    const openFull = page.getByTestId('report-receipt-open-full');
+    await expect(openFull).toBeVisible();
+
+    const [popup] = await Promise.all([page.waitForEvent('popup'), openFull.click()]);
+    await expect(popup).toHaveURL(/\/receipts\/\d+\/view/);
+
+    // Back returns to the list.
+    await page.getByTestId('report-receipt-back').click();
+    await expect(row).toBeVisible();
   });
 });

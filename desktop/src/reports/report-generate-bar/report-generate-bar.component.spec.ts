@@ -57,8 +57,8 @@ describe("ReportGenerateBarComponent", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it("renders the format chips and the Generate button's disabled state", () => {
-    fixture.detectChanges();
+  it("renders the format chips and the Generate button's disabled state", async () => {
+    await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
 
     // The format chips render, reflecting the selected (xlsx) format.
@@ -72,12 +72,12 @@ describe("ReportGenerateBarComponent", () => {
 
     // Flipping the inputs disables it (no format-generatable / mid-generation).
     fixture.componentRef.setInput("canGenerate", false);
-    fixture.detectChanges();
+    await fixture.whenStable();
     expect(button().disabled).toBe(true);
 
     fixture.componentRef.setInput("canGenerate", true);
     fixture.componentRef.setInput("generating", true);
-    fixture.detectChanges();
+    await fixture.whenStable();
     expect(button().disabled).toBe(true);
   });
 });
