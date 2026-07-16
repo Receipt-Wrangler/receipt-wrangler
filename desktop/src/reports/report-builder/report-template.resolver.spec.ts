@@ -75,4 +75,15 @@ describe("reportTemplateResolver", () => {
       done();
     });
   });
+
+  it("redirects without calling the API for an id past the safe-integer range", (done) => {
+    // Number("9007199254740993") rounds to 9007199254740992, so requesting it would
+    // hit a different template; isSafeInteger rejects it before the call.
+    run("9007199254740993").subscribe((result) => {
+      expect(result).toBeNull();
+      expect(runner.getTemplate).not.toHaveBeenCalled();
+      expect(router.navigate).toHaveBeenCalledWith(["/reports"]);
+      done();
+    });
+  });
 });

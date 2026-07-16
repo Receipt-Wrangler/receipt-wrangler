@@ -22,11 +22,13 @@ export const reportTemplateResolver: ResolveFn<ReportTemplate | null> = (route) 
     return of(null);
   };
 
-  // Reject a missing / non-numeric / non-positive id before issuing a request for
-  // it — Number(null) is 0 and a malformed id is NaN, neither of which is a real id.
+  // Reject a missing / non-numeric / non-positive / out-of-range id before issuing a
+  // request for it — Number(null) is 0, a malformed id is NaN, and an id past
+  // Number.MAX_SAFE_INTEGER is silently rounded to a different value (so a request for
+  // it could hit the wrong template). isSafeInteger rejects all three.
   const idParam = route.paramMap.get("id");
   const id = Number(idParam);
-  if (!idParam || !Number.isInteger(id) || id <= 0) {
+  if (!idParam || !Number.isSafeInteger(id) || id <= 0) {
     return redirectToList();
   }
 
