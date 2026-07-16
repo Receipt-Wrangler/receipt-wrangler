@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormControl, FormGroup } from "@angular/forms";
 import { Store } from "@ngxs/store";
@@ -44,7 +44,7 @@ const FILTER_FIELDS: FilterFieldDef[] = [
   standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ReportFiltersComponent {
+export class ReportFiltersComponent implements OnInit {
   public readonly form = input.required<FormGroup>();
 
   private readonly store = inject(Store);
@@ -67,6 +67,20 @@ export class ReportFiltersComponent {
       this.addFilter(field);
       this.addFilterControl.setValue(null, { emitEvent: false });
     });
+  }
+
+  public ngOnInit(): void {
+    // On open-in-builder the form arrives pre-seeded from the saved template, but the
+    // visible-row set lives in a local signal. Show a row for every field the stored
+    // filter actually set (non-empty operation); untouched fields stay collapsed behind
+    // "Add filter…". This mirrors the addFilter/removeFilter invariant exactly.
+    const active = FILTER_FIELDS.filter((def) => this.isFilterActive(def.field)).map((def) => def.field);
+    this.activeFieldKeys.set(active);
+  }
+
+  private isFilterActive(field: string): boolean {
+    const operation = this.filterGroup.get(field + ".operation")?.value;
+    return operation != null && operation !== FilterOperation.Empty;
   }
 
   private readonly groups = this.store.selectSignal(GroupState.groupsWithoutAll);

@@ -624,6 +624,11 @@ user holds it.
   `buildReceiptFilterForm` (`src/utils/receipt-filter.ts`) and SharedUiModule `OperationsPipe`, so it
   produces the exact `ReceiptPagedRequestFilter` the receipts filter does (same BETWEEN handling) — only
   the presentation differs. Category/tag options are the union of the user's group catalogs.
+  - **Visible rows on open-in-builder**: the form always holds every filter field; which rows *show* is a
+    local `activeFieldKeys` signal. `addFilter`/`removeFilter` maintain it for edits, and `ngOnInit`
+    **seeds it from the hydrated filter** (every field whose stored `operation` is non-empty) — otherwise
+    a saved template's filter sits in the form but renders no rows. The value itself relies on the backend
+    serializing the filter with lowercase `value`/`tags` keys (see `api/CLAUDE.md` → Report templates).
 - **Columns** (`report-config-panel` + `column-picker-dialog`): a `FormArray` of columns edited through a
   3-step picker (dimension / aggregate / formula). A column's engine `name` (what formulas reference) is a
   derived identifier kept stable across label edits (`report-column.util.ts`); formula validation is

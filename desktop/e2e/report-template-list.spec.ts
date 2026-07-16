@@ -3,6 +3,7 @@ import { stubTokenRefresh } from './helpers/auth';
 import {
   apiCreateReportTemplate,
   apiDeleteReportTemplateById,
+  apiFirstReportCategory,
   uniqueName,
   withAdminApi,
 } from './helpers/provisioning';
@@ -57,6 +58,38 @@ test.describe('Reports — templates list', () => {
     // blank "New report" builder has no scope, so it never reaches a preview.
     await expect(page.getByText(seededName)).toBeVisible();
     await expect(page.getByTestId('report-receipt-count')).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('hydrates a saved category filter into the builder on open', async ({ page }) => {
+    // Regression guard: opening a template that filters on a category used to render
+    // no filter row at all (the visible-row set wasn't seeded from the hydrated form).
+    // Seed a template filtering on a real category, open it, and assert the row and the
+    // selected category's chip are present.
+    const filterName = uniqueName('report-template-catfilter');
+    const { groupId, categoryId, categoryName } = await withAdminApi((api) =>
+      apiFirstReportCategory(api),
+    );
+    const filtered = await withAdminApi((api) =>
+      apiCreateReportTemplate(api, {
+        name: filterName,
+        groupIds: [groupId],
+        filter: { categories: { operation: 'CONTAINS', value: [categoryId] } },
+      }),
+    );
+    extraIds.push(filtered.id);
+
+    await gotoReports(page);
+    const row = page.getByRole('row').filter({ hasText: filterName });
+    await expect(row).toBeVisible();
+
+    await row.getByTestId('report-template-name').click();
+    await expect(page).toHaveURL(/\/reports\/\d+\/edit$/);
+
+    // The category filter row is rendered (its remove control) and the stored category
+    // resolves to its name chip — proving both the row-seeding fix and that the value
+    // carried over.
+    await expect(page.getByTestId('report-filter-remove')).toBeVisible();
+    await expect(page.getByText(categoryName, { exact: true })).toBeVisible();
   });
 
   test('generates a report from a row action', async ({ page }) => {

@@ -138,4 +138,63 @@ describe("buildReportFormFromCommand", () => {
     expect(form.get("columns.1.id")!.value).toBeTruthy();
     expect(form.get("columns.0.id")!.value).not.toBe(form.get("columns.1.id")!.value);
   });
+
+  // A saved filter can touch any receipt-filter field, over every editor type: text
+  // (name), number BETWEEN (amount), date BETWEEN (date), users array (paidBy), and
+  // list arrays (categories, tags, status). This is the surface the "filter doesn't
+  // come over" bug lived on, so it must round-trip and land in the controls intact.
+  const everyFilterSeed = {
+    name: { operation: FilterOperation.Contains, value: "coffee" },
+    amount: { operation: FilterOperation.Between, value: [5, 50] },
+    date: { operation: FilterOperation.Between, value: ["2026-01-01", "2026-01-31"] },
+    paidBy: { operation: FilterOperation.Contains, value: [11, 12] },
+    categories: { operation: FilterOperation.Contains, value: [2, 3] },
+    tags: { operation: FilterOperation.Contains, value: [7] },
+    status: { operation: FilterOperation.Contains, value: ["OPEN"] },
+  };
+
+  function commandWithFilter(filterSeed: unknown): ReportRequestCommand {
+    return {
+      name: "Filtered",
+      groupIds: ["1"],
+      period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+      filter: canonicalFilter(filterSeed),
+      groupBy: [],
+      detail: { mode: ReportDetail.ModeEnum.Records },
+      columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+      subtotals: false,
+      grandTotals: true,
+      formats: [ReportRequestCommand.FormatsEnum.Csv],
+    };
+  }
+
+  it("round-trips a command carrying every receipt-filter field", () => {
+    expect(roundTrip(commandWithFilter(everyFilterSeed))).toEqual(commandWithFilter(everyFilterSeed));
+  });
+
+  it("lands each filter field's value and operation in the hydrated form controls", () => {
+    const form = buildReportFormFromCommand(fb, host, commandWithFilter(everyFilterSeed));
+
+    expect(form.get("filter.name.value")!.value).toBe("coffee");
+    expect(form.get("filter.name.operation")!.value).toBe(FilterOperation.Contains);
+
+    expect(form.get("filter.amount.value")!.value).toEqual([5, 50]);
+    expect(form.get("filter.amount.operation")!.value).toBe(FilterOperation.Between);
+
+    expect(form.get("filter.date.value")!.value).toEqual(["2026-01-01", "2026-01-31"]);
+    expect(form.get("filter.date.operation")!.value).toBe(FilterOperation.Between);
+
+    expect(form.get("filter.paidBy.value")!.value).toEqual([11, 12]);
+    expect(form.get("filter.categories.value")!.value).toEqual([2, 3]);
+    expect(form.get("filter.tags.value")!.value).toEqual([7]);
+    expect(form.get("filter.status.value")!.value).toEqual(["OPEN"]);
+  });
+
+  it("round-trips a value-less date filter (WITHIN_CURRENT_MONTH)", () => {
+    const command = commandWithFilter({ date: { operation: FilterOperation.WithinCurrentMonth } });
+
+    expect(roundTrip(command)).toEqual(command);
+    const form = buildReportFormFromCommand(fb, host, command);
+    expect(form.get("filter.date.operation")!.value).toBe(FilterOperation.WithinCurrentMonth);
+  });
 });

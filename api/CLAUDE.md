@@ -780,7 +780,12 @@ carries `Currency` through untouched); the settings load lives in the service an
 **Report templates.** `POST /api/report/template` saves a report configuration for reuse. It reuses the
 shared `loadReportCommand` parse+validate and stores the whole `ReportRequestCommand` verbatim as a
 `json.RawMessage` blob on `models.ReportTemplate` (name + owner taken from the request / JWT), so a
-template round-trips back into the builder unchanged. Unlike generate/preview it is **app-scoped** behind
+template round-trips back into the builder unchanged. Because this is the first feature to **re-serialize
+a `ReceiptPagedRequestFilter` back to a client**, the filter's json tags must be correct:
+`PagedRequestField.Value` carries `json:"value"` and the filter's `Tags` field `json:"tags"` (both
+lowercase, matching swagger) — a capitalized key would deserialize fine (Go is case-insensitive) but
+serialize a `Value`/`Tags` the desktop can't read, so the operation would hydrate while the value
+silently dropped (see `paged_request_command_test.go`). Unlike generate/preview it is **app-scoped** behind
 a new `app.reports.create` permission — `handlers.CreateReportTemplate` gates on `AppPermissions` and calls
 `repositories.ReportTemplateRepository` directly (handler→repo, like prompts, no engine involvement),
 because it persists a configuration and touches no group's receipts. Legacy Admin picks the permission up
