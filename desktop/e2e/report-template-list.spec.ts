@@ -4,6 +4,7 @@ import {
   apiCreateReportTemplate,
   apiDeleteReportTemplateById,
   apiFirstReportCategory,
+  apiFirstReportGroupId,
   uniqueName,
   withAdminApi,
 } from './helpers/provisioning';
@@ -90,6 +91,65 @@ test.describe('Reports — templates list', () => {
     // carried over.
     await expect(page.getByTestId('report-filter-remove')).toBeVisible();
     await expect(page.getByText(categoryName, { exact: true })).toBeVisible();
+  });
+
+  test('updates an opened template in place (same id, no new row)', async ({ page }) => {
+    await gotoReports(page);
+    await page
+      .getByRole('row')
+      .filter({ hasText: seededName })
+      .getByTestId('report-template-name')
+      .click();
+    await expect(page).toHaveURL(/\/reports\/\d+\/edit$/);
+
+    // Hydrated: the name field carries the stored name; the edit-route Save is "Update".
+    const nameInput = page.getByLabel('Report name');
+    await expect(nameInput).toHaveValue(seededName);
+    await expect(page.getByTestId('report-save-template')).toContainText('Update Template');
+
+    // Rename and save — the edit route updates in place (PUT the seeded id), never creates.
+    const renamed = uniqueName('report-template-renamed');
+    await nameInput.fill(renamed);
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (r) => /\/api\/report\/template\/\d+$/.test(r.url()) && r.request().method() === 'PUT',
+      ),
+      page.getByTestId('report-save-template').click(),
+    ]);
+    expect(response.status()).toBe(200);
+    expect(new URL(response.url()).pathname.endsWith(`/template/${seededId}`)).toBe(true);
+
+    // Back on the list: the same row is renamed and the old name is gone — no duplicate.
+    await gotoReports(page);
+    await expect(page.getByRole('row').filter({ hasText: renamed })).toHaveCount(1);
+    await expect(page.getByRole('row').filter({ hasText: seededName })).toHaveCount(0);
+  });
+
+  test('hydrates a saved "current viewer" paid-by filter into the builder', async ({ page }) => {
+    // A template can filter paid-by on the dynamic "current viewer" sentinel (-1) rather
+    // than a static user. Opening it must render the paid-by row and resolve -1 to the
+    // pinned "Current viewer (me)" option chip.
+    const filterName = uniqueName('report-template-mefilter');
+    const groupId = await withAdminApi((api) => apiFirstReportGroupId(api));
+    const filtered = await withAdminApi((api) =>
+      apiCreateReportTemplate(api, {
+        name: filterName,
+        groupIds: [groupId],
+        filter: { paidBy: { operation: 'CONTAINS', value: [-1] } },
+      }),
+    );
+    extraIds.push(filtered.id);
+
+    await gotoReports(page);
+    await page
+      .getByRole('row')
+      .filter({ hasText: filterName })
+      .getByTestId('report-template-name')
+      .click();
+    await expect(page).toHaveURL(/\/reports\/\d+\/edit$/);
+
+    await expect(page.getByTestId('report-filter-remove')).toBeVisible();
+    await expect(page.getByText('Current viewer (me)', { exact: true })).toBeVisible();
   });
 
   test('generates a report from a row action', async ({ page }) => {

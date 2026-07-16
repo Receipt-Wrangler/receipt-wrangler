@@ -14,13 +14,14 @@ import {
 } from './helpers/provisioning';
 import { gotoReports } from './helpers/reports';
 
-// The generate/duplicate row actions are gated by app.reports.generate /
-// app.reports.duplicate. This spec covers the NEGATIVE boundary: a user who can see
-// the list (app.reports.read) but holds neither of those two sees no Generate/
-// Duplicate control AND is refused by both endpoints (403). No seeded account fits,
-// so an admin provisions a custom role (Reports category on, those two switched off)
-// + user through the UI; the tests run under that user's saved session; the role/
-// user/seeded template are torn down through the admin API.
+// The generate/duplicate row actions and in-place update are gated by
+// app.reports.generate / app.reports.duplicate / app.reports.update. This spec covers
+// the NEGATIVE boundary: a user who can see the list (app.reports.read) but holds none
+// of those three sees no Generate/Duplicate control AND is refused by all three
+// endpoints (403). No seeded account fits, so an admin provisions a custom role
+// (Reports category on, those three switched off) + user through the UI; the tests run
+// under that user's saved session; the role/user/seeded template are torn down through
+// the admin API.
 
 const NEW_USER_PASSWORD = `${uniqueName('pw')}-Aa1!`;
 const AUTH_FILE = 'e2e/.auth/report-action-nocreate.json';
@@ -67,6 +68,7 @@ test.describe('Reports — generate/duplicate permission gating', () => {
       disablePermissions: [
         { panelKey: 'app.reports', label: 'Duplicate Report Templates' },
         { panelKey: 'app.reports', label: 'Generate Reports' },
+        { panelKey: 'app.reports', label: 'Update Report Templates' },
       ],
     });
     await createUserWithRole(adminPage, { username, password: NEW_USER_PASSWORD, role: roleName });
@@ -141,6 +143,13 @@ test.describe('Reports — generate/duplicate permission gating', () => {
         data: { ...VALID_GENERATE_BODY, groupIds: [groupId] },
       });
       expect(generate.status()).toBe(403);
+
+      // Update is app-only gated, so its 403 is unambiguously app.reports.update. The
+      // body is a complete, valid command (so it reaches the gate, not a 400).
+      const update = await api.put(`/api/report/template/${seededId}`, {
+        data: { ...VALID_GENERATE_BODY, name: 'Denied Update', groupIds: ['1'] },
+      });
+      expect(update.status()).toBe(403);
     } finally {
       await api.dispose();
     }
