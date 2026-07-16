@@ -5,7 +5,7 @@ import { UntilDestroy } from "@ngneat/until-destroy";
 import { FilterOperation, ReportColumn, ReportDetail, ReportPeriod, ReportRequestCommand } from "../../open-api";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { ReportBuilderValue, toReportRequestCommand } from "./report-command.mapper";
-import { buildReportFormFromCommand } from "./report-form.factory";
+import { buildReportFormFromCommand, readStringArray } from "./report-form.factory";
 
 // buildReceiptFilterForm wires untilDestroyed subscriptions, so it needs an
 // @UntilDestroy()-decorated context — a throwaway host, exactly as the receipt
@@ -130,9 +130,24 @@ describe("buildReportFormFromCommand", () => {
     };
 
     const form = buildReportFormFromCommand(fb, host, command);
-    expect((form.get("scope") as FormArray).length).toBe(3);
-    expect((form.get("groupBy") as FormArray).length).toBe(2);
-    expect((form.get("columns") as FormArray).length).toBe(2);
+    // Assert the array CONTENTS carried over, not just the lengths.
+    expect(readStringArray(form.get("scope") as FormArray)).toEqual(["3", "4", "9"]);
+    expect(readStringArray(form.get("groupBy") as FormArray)).toEqual(["group", "status"]);
+
+    const columns = form.get("columns") as FormArray;
+    expect(columns.length).toBe(2);
+    expect([
+      form.get("columns.0.kind")!.value,
+      form.get("columns.0.name")!.value,
+      form.get("columns.0.label")!.value,
+      form.get("columns.0.field")!.value,
+    ]).toEqual([ReportColumn.KindEnum.Dimension, "Group", "Group", "group"]);
+    expect([
+      form.get("columns.1.kind")!.value,
+      form.get("columns.1.name")!.value,
+      form.get("columns.1.aggFunc")!.value,
+    ]).toEqual([ReportColumn.KindEnum.Aggregate, "Count", ReportColumn.AggFuncEnum.Count]);
+
     // Each hydrated column gets a fresh client id for @for tracking.
     expect(form.get("columns.0.id")!.value).toBeTruthy();
     expect(form.get("columns.1.id")!.value).toBeTruthy();
