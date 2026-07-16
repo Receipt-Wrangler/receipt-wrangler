@@ -654,3 +654,25 @@ func TestUpdateReportTemplate_RejectsBlankName(t *testing.T) {
 
 	assertStatus(t, w, http.StatusBadRequest)
 }
+
+func TestUpdateReportTemplate_RejectsMalformedJson(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsUpdate)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+
+	// A malformed body is rejected by the shared loadReportCommand decode branch (a
+	// json.Unmarshal *SyntaxError → 400) before the handler touches the repository, so
+	// the targeted template is left unchanged.
+	w, r := reportTemplateUpdateRequest(1, fmt.Sprint(seeded.ID), `{"name": ]}`)
+	UpdateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+
+	unchanged, err := repositories.NewReportTemplateRepository(nil).GetReportTemplateById(fmt.Sprint(seeded.ID))
+	if err != nil {
+		t.Fatalf("re-fetch template: %v", err)
+	}
+	if unchanged.Name != "HTTP Report" {
+		t.Errorf("template name = %q, want unchanged %q", unchanged.Name, "HTTP Report")
+	}
+}

@@ -120,10 +120,14 @@ func (repository ReportTemplateRepository) DuplicateReportTemplate(userId uint, 
 }
 
 // UpdateReportTemplate overwrites an existing template's name and configuration in
-// place. The row is loaded first (so a missing id surfaces gorm.ErrRecordNotFound
-// rather than silently creating a new row), preserving its id and owner while the
-// name/config/version are replaced and UpdatedAt is refreshed by GORM. The whole
-// command is re-marshaled to the JSON blob so the template round-trips unchanged.
+// place. The row is loaded first (so a missing id surfaces gorm.ErrRecordNotFound and
+// the full row — id/owner — is available for the response), preserving its id and
+// owner while the name/config/version are replaced and UpdatedAt is refreshed by GORM.
+// The whole command is re-marshaled to the JSON blob so the template round-trips
+// unchanged. The write is a bound Updates rather than a Save so that a row deleted
+// between the load and the write (RowsAffected == 0) surfaces as not-found instead of
+// a phantom success — GORM always sets updated_at on the map update, so an existing
+// row never reports 0.
 func (repository ReportTemplateRepository) UpdateReportTemplate(command commands.ReportRequestCommand, id string) (models.ReportTemplate, error) {
 	db := repository.GetDB()
 
@@ -141,9 +145,16 @@ func (repository ReportTemplateRepository) UpdateReportTemplate(command commands
 	template.Configuration = configuration
 	template.ConfigurationVersion = commands.CurrentReportConfigurationVersion
 
-	err = db.Save(&template).Error
-	if err != nil {
-		return models.ReportTemplate{}, err
+	result := db.Model(&models.ReportTemplate{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"name":                  template.Name,
+		"configuration":         template.Configuration,
+		"configuration_version": template.ConfigurationVersion,
+	})
+	if result.Error != nil {
+		return models.ReportTemplate{}, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return models.ReportTemplate{}, gorm.ErrRecordNotFound
 	}
 
 	return template, nil
