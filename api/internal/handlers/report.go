@@ -15,6 +15,7 @@ import (
 	"receipt-wrangler/api/internal/utils"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 // loadReportCommand parses and validates the report request body, writing the
@@ -50,8 +51,10 @@ func loadReportCommand(w http.ResponseWriter, r *http.Request) (commands.ReportR
 // The request command is parsed and validated up front — before the handler is
 // built — because the group ids it carries drive the permission gate: HandleRequest
 // re-checks group.reports.read (and membership) in every group the report covers
-// before the handler function runs. The generation itself is synchronous; the
-// resulting file (or a zip of several formats) is streamed back as an attachment.
+// before the handler function runs. It also requires the app-level
+// app.reports.generate (ANDed with the per-group check). The generation itself is
+// synchronous; the resulting file (or a zip of several formats) is streamed back as
+// an attachment.
 func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	command, ok := loadReportCommand(w, r)
 	if !ok {
@@ -62,6 +65,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 		ErrorMessage:     "Error generating report",
 		Writer:           w,
 		Request:          r,
+		AppPermissions:   []string{permissions.AppReportsGenerate},
 		GroupIds:         command.GroupIds,
 		GroupPermissions: []string{permissions.GroupReportsRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
@@ -157,6 +161,126 @@ func DeleteReportTemplate(w http.ResponseWriter, r *http.Request) {
 			}
 
 			w.WriteHeader(http.StatusOK)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+// GetPagedReportTemplates returns a paged, sorted list of saved report templates.
+// App-scoped behind app.reports.read, matching the report builder's route gate.
+func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage:   "Error getting report templates",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppReportsRead},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			command := commands.PagedRequestCommand{}
+			if err := command.LoadDataFromRequest(w, r); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			vErr := command.Validate()
+			if len(vErr.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
+				return 0, nil
+			}
+
+			templates, count, err := repositories.NewReportTemplateRepository(nil).GetPagedReportTemplates(command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			pagedData := structs.PagedData{}
+			data := make([]interface{}, 0, len(templates))
+			for i := 0; i < len(templates); i++ {
+				data = append(data, templates[i])
+			}
+			pagedData.TotalCount = count
+			pagedData.Data = data
+
+			responseBytes, err := utils.MarshalResponseData(pagedData)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(responseBytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+// GetReportTemplate returns a saved report template by id. App-scoped behind
+// app.reports.read; a missing id maps to a 404 rather than a 500.
+func GetReportTemplate(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage:   "Error getting report template",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppReportsRead},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			id := chi.URLParam(r, "id")
+
+			template, err := repositories.NewReportTemplateRepository(nil).GetReportTemplateById(id)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					utils.WriteCustomErrorResponse(w, "Report template not found", http.StatusNotFound)
+					return 0, nil
+				}
+				return http.StatusInternalServerError, err
+			}
+
+			responseBytes, err := utils.MarshalResponseData(template)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(responseBytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+// DuplicateReportTemplate copies a saved report template and returns the new copy.
+// App-scoped behind app.reports.duplicate; a missing source id maps to a 404. The
+// copy is owned by the caller and its name is suffixed " duplicate".
+func DuplicateReportTemplate(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage:   "Error duplicating report template",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppReportsDuplicate},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			token := structs.GetClaims(r)
+			id := chi.URLParam(r, "id")
+
+			template, err := repositories.NewReportTemplateRepository(nil).DuplicateReportTemplate(token.UserId, id)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					utils.WriteCustomErrorResponse(w, "Report template not found", http.StatusNotFound)
+					return 0, nil
+				}
+				return http.StatusInternalServerError, err
+			}
+
+			responseBytes, err := utils.MarshalResponseData(template)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(responseBytes)
 			return 0, nil
 		},
 	}

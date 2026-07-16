@@ -1,9 +1,17 @@
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormBuilder, FormControl } from "@angular/forms";
+import { ActivatedRoute } from "@angular/router";
 import { of, Subject, throwError } from "rxjs";
 import { SnackbarService } from "../../services";
-import { CustomFieldService, ReportColumn } from "../../open-api";
+import {
+  CustomFieldService,
+  ReportColumn,
+  ReportDetail,
+  ReportPeriod,
+  ReportRequestCommand,
+  ReportTemplate,
+} from "../../open-api";
 import { buildColumnGroup } from "../models/report-form.factory";
 import { ReportRunnerService } from "../services/report-runner.service";
 import { ReportBuilderComponent } from "./report-builder.component";
@@ -13,6 +21,9 @@ describe("ReportBuilderComponent", () => {
   let component: ReportBuilderComponent;
   let runner: { preview: jest.Mock; generateAndDownload: jest.Mock; saveTemplate: jest.Mock };
   let snackbar: { success: jest.Mock };
+  // Mutable route stub: the builder reads snapshot.data.template in its field
+  // initializer, so a test sets this before creating its own component instance.
+  const activatedRoute = { snapshot: { data: {} as Record<string, unknown> } };
 
   beforeEach(async () => {
     runner = {
@@ -21,6 +32,7 @@ describe("ReportBuilderComponent", () => {
       saveTemplate: jest.fn(() => of({ id: 1 })),
     };
     snackbar = { success: jest.fn() };
+    activatedRoute.snapshot.data = {};
 
     await TestBed.configureTestingModule({
       declarations: [ReportBuilderComponent],
@@ -30,6 +42,7 @@ describe("ReportBuilderComponent", () => {
         { provide: ReportRunnerService, useValue: runner },
         { provide: SnackbarService, useValue: snackbar },
         { provide: CustomFieldService, useValue: { getPagedCustomFields: jest.fn(() => of({ data: [], totalCount: 0 })) } },
+        { provide: ActivatedRoute, useValue: activatedRoute },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
@@ -146,5 +159,44 @@ describe("ReportBuilderComponent", () => {
     pending.next({ id: 1 });
     pending.complete();
     expect(component.saving()).toBe(false);
+  });
+
+  it("starts from a blank form when no template is resolved", () => {
+    expect(component.loadedTemplateName).toBeNull();
+    expect(component.form.get("name")!.value).toBe("Untitled Report");
+    expect((component.form.get("columns") as FormArray).length).toBe(3);
+  });
+
+  it("builds the form from a resolved template on the edit route", () => {
+    const configuration: ReportRequestCommand = {
+      name: "Saved Report",
+      groupIds: ["1", "2"],
+      period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+      filter: {},
+      groupBy: [],
+      detail: { mode: ReportDetail.ModeEnum.Aggregate, by: "category" },
+      columns: [
+        { kind: ReportColumn.KindEnum.Dimension, name: "Category", label: "Category", field: "category" },
+        { kind: ReportColumn.KindEnum.Aggregate, name: "Count", label: "Count", aggFunc: ReportColumn.AggFuncEnum.Count },
+      ],
+      subtotals: true,
+      grandTotals: true,
+      formats: [ReportRequestCommand.FormatsEnum.Pdf],
+    };
+    const template: ReportTemplate = {
+      id: 7,
+      name: "Saved Report",
+      createdAt: "2026-01-01T00:00:00Z",
+      configuration,
+      configurationVersion: 1,
+    };
+    activatedRoute.snapshot.data = { template };
+
+    const local = TestBed.createComponent(ReportBuilderComponent).componentInstance;
+
+    expect(local.loadedTemplateName).toBe("Saved Report");
+    expect(local.form.get("name")!.value).toBe("Saved Report");
+    expect((local.form.get("scope") as FormArray).length).toBe(2);
+    expect((local.form.get("columns") as FormArray).length).toBe(2);
   });
 });

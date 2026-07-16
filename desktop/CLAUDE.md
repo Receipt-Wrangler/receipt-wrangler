@@ -593,14 +593,20 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
 ## Reports (Report Builder)
 
 The **Report Builder** (`src/reports/`) is a two-pane screen for building and downloading receipt
-reports against the backend reporting engine (see `api/CLAUDE.md` → "Reporting Engine"). Route
-`/reports` (lazy `ReportsModule`), gated by `appPermissionGuard` on the **app-level `app.reports.read`**
-permission; the avatar-menu "Reports" entry is `*hasAppPermission`-gated on the same. App permission =
-access the builder; the group-scoped `group.reports.read` is what actually authorizes generating over a
-group's data (enforced by the endpoints), and the in-builder group picker only lists groups where the
+reports against the backend reporting engine (see `api/CLAUDE.md` → "Reporting Engine"). The lazy
+`ReportsModule` is gated by `appPermissionGuard` on the **app-level `app.reports.read`** permission (the
+avatar-menu "Reports" entry is `*hasAppPermission`-gated on the same). Its routes: `/reports` is the
+**templates list** landing (below), and the builder lives at `/reports/new` and `/reports/:id/edit` (both
+`fullHeight`). `app.reports.read` = access the reports area; **`app.reports.generate`** gates generation
+(both the Generate buttons and the endpoint), **`app.reports.create`** saving, and
+**`app.reports.duplicate`** / **`app.reports.delete`** the corresponding row actions. The group-scoped
+`group.reports.read` is what actually authorizes generating over a group's data (enforced by the
+endpoints, ANDed with `app.reports.generate`), and the in-builder group picker only lists groups where the
 user holds it.
 
-- **No NGXS state** — the builder is a single reactive form (`report-form.factory.ts`) plus signals;
+- **Builder state** — the *builder* is a single reactive form (`report-form.factory.ts`) plus signals, no
+  NGXS (the templates *list* is the module's one NGXS slice, `ReportTemplateTableState` — see "Templates
+  list" below);
   generate/preview are one-shot calls through `ReportRunnerService` (mirrors `ReceiptExportService`:
   generate → `Blob` → `downloadFile`). `ReportCatalogService` supplies the dimension/measure dropdown
   options: a built-in engine-key→label constant (`report-catalog.constants.ts`) plus custom fields from
@@ -630,14 +636,33 @@ user holds it.
     columns list and **left out of the request** (`enabledReportColumns`), auto-re-enabling when the
     config makes it valid again. `report-builder` blocks preview/generate only if *no* enabled column
     remains. Nothing is removed or auto-changed.
-- **Save Template**: the bottom action bar's secondary button (left of Generate, gated by
+- **Save Template**: the generate bar's secondary button (left of Generate, gated by
   `*hasAppPermission="Permission.AppReportsCreate"`) POSTs the current configuration to
   `POST /api/report/template` via `ReportRunnerService.saveTemplate`, confirming with a "Template saved"
-  success snackbar. The template's name is the report's own name (no separate dialog), and it's enabled
-  under the same validity as Generate plus a non-empty name (`canSaveTemplate`). Listing / editing /
-  running saved templates (and a delete UI) are later slices; a backend `DELETE /api/report/template/{id}`
-  (permission `app.reports.delete`) already exists and is used by the e2e to tear down what it creates.
-  See `api/CLAUDE.md` → "Report templates".
+  success snackbar. The template's name is the report's own name (no separate dialog), enabled under the
+  same validity as Generate plus a non-empty name (`canSaveTemplate`). **There is no update endpoint** —
+  opening a saved template and saving creates a *new* template (save-as-new). See `api/CLAUDE.md` →
+  "Report templates".
+- **Generate gating**: the generate bar's Generate button is
+  `*hasAppPermission="Permission.AppReportsGenerate"`-gated (preview is not — it stays group-scoped),
+  matching the endpoint, which now ANDs `app.reports.generate` with the per-group `group.reports.read`.
+- **Templates list** (`report-template-list/`, the `/reports` landing): a paged `app-table`
+  (`BaseTableComponent` + `ReportTemplateTableService` + the NGXS `ReportTemplateTableState`, mirroring the
+  groups/roles list pages) of saved templates. Columns Name (+ column count), Scope, Grouping, Detail,
+  Formats, Updated — the JSON-blob-derived ones are non-sortable; only `name`/`updated_at` sort
+  server-side. The derived display strings come from a pure `report-template-summary.ts` util (group ids →
+  names via `GroupState.groupsWithoutAll`). Row actions carry `data-testid="report-template-<action>"` and
+  gate on the matching permission: **generate** (`AppReportsGenerate`, runs the stored config through the
+  builder's generate path), **open/edit** (read — routes to `/reports/:id/edit`), **duplicate**
+  (`AppReportsDuplicate`), **delete** (`AppReportsDelete`, via `ConfirmationDialogComponent`). A "New
+  Report" primary button routes to the blank builder; an empty state shows when there are none.
+- **Open in builder (hydration)**: `/reports/:id/edit` uses a `reportTemplateResolver`
+  (`GET /report/template/{id}`) to load the template before the builder's form initializer, and
+  `buildReportFormFromCommand` (`report-form.factory.ts`) builds the form *seeded from* the stored
+  `ReportRequestCommand` — the faithful inverse of `toReportRequestCommand` (round-trip-tested), reusing
+  `buildReceiptFilterForm` for the filter. Building from the command in the field initializer (before the
+  constructor's preview subscription attaches) means the loaded config previews exactly once. The builder's
+  page-bar gains a back-to-list button + a breadcrumb showing the loaded template name.
 - **Other divergences from the design** (intentional): the **progress bar + Cancel** are gone
   (generation is synchronous → in-flight spinner, then download); the section-card look is a small local
   `app-report-section` shell so the pattern isn't repeated.

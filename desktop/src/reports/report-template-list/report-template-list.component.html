@@ -1,0 +1,117 @@
+<div class="report-templates-page">
+  <app-breadcrumb [items]="crumbs"></app-breadcrumb>
+
+  <div class="page-title">
+    <div class="titles">
+      <h1>Reports</h1>
+      <p class="subtitle">
+        Saved report templates — open one in the builder, generate it, duplicate it, or delete it.
+      </p>
+    </div>
+    <div class="tools">
+      <app-button
+        icon="add"
+        buttonText="New Report"
+        data-testid="report-template-new"
+        (clicked)="newReport()"
+      ></app-button>
+    </div>
+  </div>
+
+  @if (totalCount() > 0) {
+    <app-table
+      [dataSource]="dataSource()"
+      [columns]="columns"
+      [displayedColumns]="displayedColumns"
+      [pagination]="true"
+      [length]="totalCount()"
+      [page]="((baseTableService.page$ | async) || 1) - 1"
+      [pageSize]="(baseTableService.pageSize$ | async) || 50"
+      (sorted)="sorted($event)"
+      (pageChange)="pageChanged($event)"
+    ></app-table>
+  } @else if (loaded()) {
+    <div class="empty-state">
+      <span class="empty-icon"><mat-icon>summarize</mat-icon></span>
+      <h2>No report templates yet</h2>
+      <p>Build a report and save it as a template to reuse it later.</p>
+      <app-button
+        icon="add"
+        buttonText="New Report"
+        data-testid="report-template-new-empty"
+        (clicked)="newReport()"
+      ></app-button>
+    </div>
+  }
+</div>
+
+<ng-template #nameCell let-element="element">
+  <a
+    class="template-name"
+    data-testid="report-template-name"
+    [routerLink]="['/reports', element.id, 'edit']"
+  >{{ element.name }}</a>
+  <div class="sub">
+    {{ columnCountFor(element) }} {{ columnCountFor(element) === 1 ? "column" : "columns" }}
+  </div>
+</ng-template>
+
+<ng-template #scopeCell let-element="element">
+  {{ scopeSummary(element) }}
+</ng-template>
+
+<ng-template #groupingCell let-element="element">
+  {{ groupingSummaryFor(element) }}
+</ng-template>
+
+<ng-template #detailCell let-element="element">
+  {{ detailSummaryFor(element) }}
+</ng-template>
+
+<ng-template #formatsCell let-element="element">
+  <div class="format-chips">
+    @for (format of formatChipsFor(element); track format) {
+      <span class="format-chip">{{ format }}</span>
+    }
+  </div>
+</ng-template>
+
+<ng-template #updatedCell let-element="element">
+  {{ (element.updatedAt || element.createdAt) | date : "short" }}
+</ng-template>
+
+<ng-template #actionsCell let-element="element">
+  <div class="row-actions">
+    <app-button
+      *hasAppPermission="Permission.AppReportsGenerate"
+      matButtonType="iconButton"
+      color="accent"
+      icon="play_arrow"
+      tooltip="Generate report"
+      data-testid="report-template-generate"
+      [disabled]="generatingId() !== null"
+      (clicked)="generate(element)"
+    ></app-button>
+    <app-edit-button
+      color="accent"
+      tooltip="Open in builder"
+      data-testid="report-template-edit"
+      [buttonRouterLink]="['/reports', element.id, 'edit']"
+    ></app-edit-button>
+    <app-button
+      *hasAppPermission="Permission.AppReportsDuplicate"
+      matButtonType="iconButton"
+      color="accent"
+      icon="content_copy"
+      tooltip="Duplicate"
+      data-testid="report-template-duplicate"
+      (clicked)="duplicate(element)"
+    ></app-button>
+    <app-delete-button
+      *hasAppPermission="Permission.AppReportsDelete"
+      tooltip="Delete"
+      data-testid="report-template-delete"
+      (clicked)="delete(element)"
+    ></app-delete-button>
+  </div>
+</ng-template>

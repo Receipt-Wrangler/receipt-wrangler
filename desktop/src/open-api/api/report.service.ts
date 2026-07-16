@@ -19,6 +19,10 @@ import { Observable }                                        from 'rxjs';
 // @ts-ignore
 import { InternalErrorResponse } from '../model/internalErrorResponse';
 // @ts-ignore
+import { PagedData } from '../model/pagedData';
+// @ts-ignore
+import { PagedRequestCommand } from '../model/pagedRequestCommand';
+// @ts-ignore
 import { ReportPreviewResponse } from '../model/reportPreviewResponse';
 // @ts-ignore
 import { ReportRequestCommand } from '../model/reportRequestCommand';
@@ -263,6 +267,84 @@ export class ReportService {
     }
 
     /**
+     * Duplicate a report template
+     * Duplicates a saved report template by id, returning the new copy. App-scoped (requires app.reports.duplicate).
+     * @param id Id of the report template to duplicate
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     */
+    public duplicateReportTemplate(id: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ReportTemplate>;
+    public duplicateReportTemplate(id: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ReportTemplate>>;
+    public duplicateReportTemplate(id: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ReportTemplate>>;
+    public duplicateReportTemplate(id: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (id === null || id === undefined) {
+            throw new Error('Required parameter id was null or undefined when calling duplicateReportTemplate.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        let localVarCredential: string | undefined;
+        // authentication (apiKeyAuth) required
+        localVarCredential = this.configuration.lookupCredential('apiKeyAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', localVarCredential);
+        }
+
+        // authentication (bearerAuth) required
+        localVarCredential = this.configuration.lookupCredential('bearerAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', 'Bearer ' + localVarCredential);
+        }
+
+        let localVarHttpHeaderAcceptSelected: string | undefined = options && options.httpHeaderAccept;
+        if (localVarHttpHeaderAcceptSelected === undefined) {
+            // to determine the Accept header
+            const httpHeaderAccepts: string[] = [
+                'application/json'
+            ];
+            localVarHttpHeaderAcceptSelected = this.configuration.selectHeaderAccept(httpHeaderAccepts);
+        }
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        let localVarHttpContext: HttpContext | undefined = options && options.context;
+        if (localVarHttpContext === undefined) {
+            localVarHttpContext = new HttpContext();
+        }
+
+        let localVarTransferCache: boolean | undefined = options && options.transferCache;
+        if (localVarTransferCache === undefined) {
+            localVarTransferCache = true;
+        }
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/report/template/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: undefined})}/duplicate`;
+        return this.httpClient.request<ReportTemplate>('post', `${this.configuration.basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                withCredentials: this.configuration.withCredentials,
+                headers: localVarHeaders,
+                observe: observe,
+                transferCache: localVarTransferCache,
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
      * Generate a report
      * Generates a report over the receipts of one or more groups and streams it back as a file, or a zip when several formats are requested. Runs under the caller\&#39;s group permissions and requires group.reports.read in every covered group.
      * @param reportRequestCommand The report builder configuration
@@ -331,6 +413,172 @@ export class ReportService {
                 context: localVarHttpContext,
                 body: reportRequestCommand,
                 responseType: "blob",
+                withCredentials: this.configuration.withCredentials,
+                headers: localVarHeaders,
+                observe: observe,
+                transferCache: localVarTransferCache,
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Get a report template
+     * Returns a saved report template by id. Requires app.reports.read.
+     * @param id Id of the report template to get
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     */
+    public getReportTemplate(id: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ReportTemplate>;
+    public getReportTemplate(id: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ReportTemplate>>;
+    public getReportTemplate(id: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ReportTemplate>>;
+    public getReportTemplate(id: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (id === null || id === undefined) {
+            throw new Error('Required parameter id was null or undefined when calling getReportTemplate.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        let localVarCredential: string | undefined;
+        // authentication (apiKeyAuth) required
+        localVarCredential = this.configuration.lookupCredential('apiKeyAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', localVarCredential);
+        }
+
+        // authentication (bearerAuth) required
+        localVarCredential = this.configuration.lookupCredential('bearerAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', 'Bearer ' + localVarCredential);
+        }
+
+        let localVarHttpHeaderAcceptSelected: string | undefined = options && options.httpHeaderAccept;
+        if (localVarHttpHeaderAcceptSelected === undefined) {
+            // to determine the Accept header
+            const httpHeaderAccepts: string[] = [
+                'application/json'
+            ];
+            localVarHttpHeaderAcceptSelected = this.configuration.selectHeaderAccept(httpHeaderAccepts);
+        }
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        let localVarHttpContext: HttpContext | undefined = options && options.context;
+        if (localVarHttpContext === undefined) {
+            localVarHttpContext = new HttpContext();
+        }
+
+        let localVarTransferCache: boolean | undefined = options && options.transferCache;
+        if (localVarTransferCache === undefined) {
+            localVarTransferCache = true;
+        }
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/report/template/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: undefined})}`;
+        return this.httpClient.request<ReportTemplate>('get', `${this.configuration.basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                withCredentials: this.configuration.withCredentials,
+                headers: localVarHeaders,
+                observe: observe,
+                transferCache: localVarTransferCache,
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Get paged report templates
+     * Returns a paged, sorted list of saved report templates. App-scoped (requires app.reports.read).
+     * @param pagedRequestCommand Paging and sorting data
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     */
+    public getReportTemplates(pagedRequestCommand: PagedRequestCommand, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<PagedData>;
+    public getReportTemplates(pagedRequestCommand: PagedRequestCommand, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<PagedData>>;
+    public getReportTemplates(pagedRequestCommand: PagedRequestCommand, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<PagedData>>;
+    public getReportTemplates(pagedRequestCommand: PagedRequestCommand, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (pagedRequestCommand === null || pagedRequestCommand === undefined) {
+            throw new Error('Required parameter pagedRequestCommand was null or undefined when calling getReportTemplates.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        let localVarCredential: string | undefined;
+        // authentication (apiKeyAuth) required
+        localVarCredential = this.configuration.lookupCredential('apiKeyAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', localVarCredential);
+        }
+
+        // authentication (bearerAuth) required
+        localVarCredential = this.configuration.lookupCredential('bearerAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', 'Bearer ' + localVarCredential);
+        }
+
+        let localVarHttpHeaderAcceptSelected: string | undefined = options && options.httpHeaderAccept;
+        if (localVarHttpHeaderAcceptSelected === undefined) {
+            // to determine the Accept header
+            const httpHeaderAccepts: string[] = [
+                'application/json'
+            ];
+            localVarHttpHeaderAcceptSelected = this.configuration.selectHeaderAccept(httpHeaderAccepts);
+        }
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        let localVarHttpContext: HttpContext | undefined = options && options.context;
+        if (localVarHttpContext === undefined) {
+            localVarHttpContext = new HttpContext();
+        }
+
+        let localVarTransferCache: boolean | undefined = options && options.transferCache;
+        if (localVarTransferCache === undefined) {
+            localVarTransferCache = true;
+        }
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/report/template/list`;
+        return this.httpClient.request<PagedData>('post', `${this.configuration.basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: pagedRequestCommand,
+                responseType: <any>responseType_,
                 withCredentials: this.configuration.withCredentials,
                 headers: localVarHeaders,
                 observe: observe,

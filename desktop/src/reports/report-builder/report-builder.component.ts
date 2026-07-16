@@ -8,12 +8,13 @@ import {
 } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
+import { ActivatedRoute } from "@angular/router";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { EMPTY, catchError, debounceTime, finalize, startWith, switchMap, take, tap } from "rxjs";
-import { ReportPeriod, ReportRequestCommand } from "../../open-api";
+import { ReportPeriod, ReportRequestCommand, ReportTemplate } from "../../open-api";
 import { enabledReportColumns, ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
 import { SnackbarService } from "../../services";
-import { buildReportForm } from "../models/report-form.factory";
+import { buildReportForm, buildReportFormFromCommand } from "../models/report-form.factory";
 import { ReportCatalogService } from "../services/report-catalog.service";
 import { ReportRunnerService } from "../services/report-runner.service";
 
@@ -38,8 +39,20 @@ export class ReportBuilderComponent {
   private readonly catalogService = inject(ReportCatalogService);
   private readonly snackbar = inject(SnackbarService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
 
-  public readonly form: FormGroup = buildReportForm(this.formBuilder, this);
+  // On the edit route a resolver supplies the saved template; on "new" it is absent.
+  // Read it before the form initializer so the form can be built from its stored
+  // configuration synchronously — the constructor's preview subscription then fires
+  // once and previews the loaded template (no post-construction patch/rebuild).
+  private readonly loadedTemplate: ReportTemplate | null = this.route.snapshot.data["template"] ?? null;
+
+  /** The opened template's name for the breadcrumb, or null when starting fresh. */
+  public readonly loadedTemplateName: string | null = this.loadedTemplate?.name ?? null;
+
+  public readonly form: FormGroup = this.loadedTemplate
+    ? buildReportFormFromCommand(this.formBuilder, this, this.loadedTemplate.configuration)
+    : buildReportForm(this.formBuilder, this);
 
   public readonly previewHtml = signal<string>("");
   public readonly receiptCount = signal<number>(0);

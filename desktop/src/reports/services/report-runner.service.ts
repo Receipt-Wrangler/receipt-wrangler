@@ -1,6 +1,8 @@
 import { Injectable, inject } from "@angular/core";
 import { Observable, tap } from "rxjs";
 import {
+  PagedData,
+  PagedRequestCommand,
   ReportPreviewResponse,
   ReportRequestCommand,
   ReportService,
@@ -37,6 +39,34 @@ export class ReportRunnerService {
   /** Saves the current configuration as a reusable report template. */
   public saveTemplate(command: ReportRequestCommand): Observable<ReportTemplate> {
     return this.reportService.createReportTemplate(command);
+  }
+
+  /** A page of saved report templates for the list. */
+  public listTemplates(command: PagedRequestCommand): Observable<PagedData> {
+    return this.reportService.getReportTemplates(command);
+  }
+
+  /** One saved template by id — used to hydrate the builder for editing. */
+  public getTemplate(id: number): Observable<ReportTemplate> {
+    return this.reportService.getReportTemplate(id);
+  }
+
+  /** Copies a saved template into a new one (name suffixed by the backend). */
+  public duplicateTemplate(id: number): Observable<ReportTemplate> {
+    return this.reportService.duplicateReportTemplate(id);
+  }
+
+  /** Deletes a saved template. */
+  public deleteTemplate(id: number): Observable<unknown> {
+    return this.reportService.deleteReportTemplate(id);
+  }
+
+  /**
+   * Runs a saved template's stored configuration straight to a download, reusing
+   * the builder's generate path (so the same endpoint + filename logic applies).
+   */
+  public generateFromTemplate(configuration: ReportRequestCommand): Observable<Blob> {
+    return this.generateAndDownload(configuration);
   }
 }
 

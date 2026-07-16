@@ -55,6 +55,15 @@
     }
   }
 
+  &__crumb-link {
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+      color: #0086d4;
+    }
+  }
+
   &__heading {
     font-size: 20px;
     font-weight: 600;

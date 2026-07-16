@@ -1,5 +1,6 @@
+import { parseISO } from "date-fns";
 import { FormArray, FormBuilder, FormControl, FormGroup } from "@angular/forms";
-import { ReportColumn, ReportDetail, ReportPeriod } from "../../open-api";
+import { ReportColumn, ReportDetail, ReportPeriod, ReportRequestCommand } from "../../open-api";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { ReportColumnValue } from "./report-command.mapper";
 
@@ -46,6 +47,81 @@ export function buildReportForm(formBuilder: FormBuilder, thisContext: any): For
       csv: formBuilder.control(false),
       xlsx: formBuilder.control(false),
       pdf: formBuilder.control(true),
+    }),
+  });
+}
+
+/**
+ * Builds the Report Builder's form seeded from a saved template's stored command,
+ * so opening a template rehydrates the builder exactly as it was saved. It mirrors
+ * buildReportForm's shape but sources every value from the command rather than the
+ * defaults — the inverse of toReportRequestCommand, so
+ * `toReportRequestCommand(buildReportFormFromCommand(cmd).getRawValue())` round-trips
+ * back to `cmd` for any command the forward map could have produced. The filter reuses
+ * buildReceiptFilterForm (which seeds its own array/BETWEEN wiring from an initial
+ * filter), and the FormArrays (scope, group-by, columns) are rebuilt rather than
+ * patched. Document slots seed to "" when the command omits the document (the forward
+ * map drops it only when all three are empty), so a re-map omits it again instead of
+ * re-emitting the builder's non-empty defaults.
+ */
+export function buildReportFormFromCommand(
+  formBuilder: FormBuilder,
+  thisContext: any,
+  command: ReportRequestCommand
+): FormGroup {
+  const formats = command.formats ?? [];
+  return formBuilder.group({
+    name: formBuilder.control(command.name ?? ""),
+    scope: formBuilder.array<FormControl<string>>(
+      (command.groupIds ?? []).map((id) => formBuilder.control(id, { nonNullable: true }))
+    ),
+    period: formBuilder.group({
+      preset: formBuilder.control<ReportPeriod.PresetEnum>(
+        command.period?.preset ?? ReportPeriod.PresetEnum.ThisMonth
+      ),
+      startDate: formBuilder.control<Date | null>(
+        command.period?.startDate ? parseISO(command.period.startDate) : null
+      ),
+      endDate: formBuilder.control<Date | null>(
+        command.period?.endDate ? parseISO(command.period.endDate) : null
+      ),
+    }),
+    filter: buildReceiptFilterForm(command.filter ?? {}, thisContext),
+    groupBy: formBuilder.array<FormControl<string>>(
+      (command.groupBy ?? []).map((key) => formBuilder.control(key, { nonNullable: true }))
+    ),
+    detail: formBuilder.group({
+      mode: formBuilder.control<ReportDetail.ModeEnum>(
+        command.detail?.mode ?? ReportDetail.ModeEnum.Aggregate
+      ),
+      by: formBuilder.control(command.detail?.by ?? "category"),
+    }),
+    columns: formBuilder.array<FormGroup>(
+      // The generated ReportColumn types name/label as optional; a stored column
+      // always carries them, so coerce to the builder column shape's required strings.
+      (command.columns ?? []).map((column) =>
+        buildColumnGroup(formBuilder, {
+          kind: column.kind,
+          name: column.name ?? "",
+          label: column.label ?? "",
+          field: column.field,
+          aggFunc: column.aggFunc,
+          measure: column.measure,
+          expr: column.expr,
+        })
+      )
+    ),
+    subtotals: formBuilder.control(command.subtotals ?? true),
+    grandTotals: formBuilder.control(command.grandTotals ?? true),
+    document: formBuilder.group({
+      title: formBuilder.control(command.document?.title ?? ""),
+      intro: formBuilder.control(command.document?.intro ?? ""),
+      footer: formBuilder.control(command.document?.footer ?? ""),
+    }),
+    formats: formBuilder.group({
+      csv: formBuilder.control(formats.includes(ReportRequestCommand.FormatsEnum.Csv)),
+      xlsx: formBuilder.control(formats.includes(ReportRequestCommand.FormatsEnum.Xlsx)),
+      pdf: formBuilder.control(formats.includes(ReportRequestCommand.FormatsEnum.Pdf)),
     }),
   });
 }

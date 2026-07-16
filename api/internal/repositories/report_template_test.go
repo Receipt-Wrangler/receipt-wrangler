@@ -99,6 +99,150 @@ func TestCreateReportTemplate_PersistedRowIsReadable(t *testing.T) {
 	}
 }
 
+func pagedReportTemplateCommand(orderBy string, direction commands.SortDirection) commands.PagedRequestCommand {
+	return commands.PagedRequestCommand{
+		Page:          1,
+		PageSize:      10,
+		OrderBy:       orderBy,
+		SortDirection: direction,
+	}
+}
+
+func TestGetPagedReportTemplates_ReturnsRowsAndCount(t *testing.T) {
+	defer TruncateTestDb()
+
+	repository := NewReportTemplateRepository(nil)
+	for _, name := range []string{"Beta", "Alpha"} {
+		command := sampleReportCommand()
+		command.Name = name
+		if _, err := repository.CreateReportTemplate(command, 1); err != nil {
+			utils.PrintTestError(t, err, nil)
+			return
+		}
+	}
+
+	templates, count, err := repository.GetPagedReportTemplates(pagedReportTemplateCommand("name", commands.ASCENDING))
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if count != 2 {
+		utils.PrintTestError(t, count, int64(2))
+	}
+	if len(templates) != 2 {
+		utils.PrintTestError(t, len(templates), 2)
+		return
+	}
+	// Ascending name order.
+	if templates[0].Name != "Alpha" || templates[1].Name != "Beta" {
+		utils.PrintTestError(t, []string{templates[0].Name, templates[1].Name}, []string{"Alpha", "Beta"})
+	}
+}
+
+func TestGetPagedReportTemplates_EmptyReturnsZeroCount(t *testing.T) {
+	defer TruncateTestDb()
+
+	templates, count, err := NewReportTemplateRepository(nil).GetPagedReportTemplates(pagedReportTemplateCommand("name", commands.ASCENDING))
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 0 {
+		utils.PrintTestError(t, count, int64(0))
+	}
+	if len(templates) != 0 {
+		utils.PrintTestError(t, len(templates), 0)
+	}
+}
+
+func TestGetPagedReportTemplates_RejectsInvalidColumn(t *testing.T) {
+	defer TruncateTestDb()
+
+	// An order-by outside the allow-list is rejected rather than interpolated as raw SQL.
+	_, _, err := NewReportTemplateRepository(nil).GetPagedReportTemplates(pagedReportTemplateCommand("configuration", commands.ASCENDING))
+	if err == nil {
+		utils.PrintTestError(t, nil, "an invalid column error")
+	}
+}
+
+func TestGetReportTemplateById_ReturnsRow(t *testing.T) {
+	defer TruncateTestDb()
+
+	repository := NewReportTemplateRepository(nil)
+	created, err := repository.CreateReportTemplate(sampleReportCommand(), 4)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	fetched, err := repository.GetReportTemplateById(fmt.Sprint(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if fetched.ID != created.ID {
+		utils.PrintTestError(t, fetched.ID, created.ID)
+	}
+	if fetched.Name != created.Name {
+		utils.PrintTestError(t, fetched.Name, created.Name)
+	}
+}
+
+func TestGetReportTemplateById_ReturnsRecordNotFoundForMissingId(t *testing.T) {
+	defer TruncateTestDb()
+
+	_, err := NewReportTemplateRepository(nil).GetReportTemplateById("999999")
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		utils.PrintTestError(t, err, gorm.ErrRecordNotFound)
+	}
+}
+
+func TestDuplicateReportTemplate_CopiesConfigAndStampsNewOwnerAndId(t *testing.T) {
+	defer TruncateTestDb()
+
+	repository := NewReportTemplateRepository(nil)
+	command := sampleReportCommand()
+	command.Name = "Quarterly Spend"
+	source, err := repository.CreateReportTemplate(command, 2)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var duplicatingUser uint = 9
+	duplicate, err := repository.DuplicateReportTemplate(duplicatingUser, fmt.Sprint(source.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if duplicate.ID == 0 || duplicate.ID == source.ID {
+		utils.PrintTestError(t, duplicate.ID, "a new, non-zero id distinct from the source")
+	}
+	if duplicate.Name != source.Name+" duplicate" {
+		utils.PrintTestError(t, duplicate.Name, source.Name+" duplicate")
+	}
+	if duplicate.ConfigurationVersion != source.ConfigurationVersion {
+		utils.PrintTestError(t, duplicate.ConfigurationVersion, source.ConfigurationVersion)
+	}
+	if string(duplicate.Configuration) != string(source.Configuration) {
+		utils.PrintTestError(t, string(duplicate.Configuration), string(source.Configuration))
+	}
+	if duplicate.CreatedBy == nil || *duplicate.CreatedBy != duplicatingUser {
+		utils.PrintTestError(t, duplicate.CreatedBy, duplicatingUser)
+	}
+}
+
+func TestDuplicateReportTemplate_ReturnsRecordNotFoundForMissingSource(t *testing.T) {
+	defer TruncateTestDb()
+
+	_, err := NewReportTemplateRepository(nil).DuplicateReportTemplate(1, "999999")
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		utils.PrintTestError(t, err, gorm.ErrRecordNotFound)
+	}
+}
+
 func TestDeleteReportTemplateById_RemovesTheRow(t *testing.T) {
 	defer TruncateTestDb()
 
