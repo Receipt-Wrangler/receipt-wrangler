@@ -7,7 +7,7 @@ import { expect, Locator, Page } from '@playwright/test';
 /** Navigate to the Reports list (the /reports landing page) and wait for it to render. */
 export async function gotoReports(page: Page): Promise<void> {
   await page.goto('/reports');
-  await expect(page.getByTestId('report-template-new')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
 }
 
 /** Navigate straight to the builder (New Report) and wait for it to render. */
