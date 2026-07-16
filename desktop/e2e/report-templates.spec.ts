@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { stubTokenRefresh } from './helpers/auth';
 import { apiDeleteReportTemplateById, withAdminApi } from './helpers/provisioning';
-import { addFirstGroupToScope, gotoReports } from './helpers/reports';
+import { addFirstGroupToScope, gotoReportBuilder } from './helpers/reports';
 
 // Saving a report template is gated by the app-level app.reports.create permission,
 // which the seeded Legacy Admin role carries (add-only reconciliation). Run as admin.
@@ -29,7 +29,7 @@ test.describe('Report Builder — save template', () => {
   });
 
   test('saves the current configuration as a template and confirms with a snackbar', async ({ page }) => {
-    await gotoReports(page);
+    await gotoReportBuilder(page);
     await addFirstGroupToScope(page);
 
     // With a group and the default columns/format the config is buildable — the

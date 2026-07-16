@@ -13,6 +13,7 @@ import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { PipesModule } from "../pipes";
 import { SelectModule } from "../select/select.module";
+import { TableModule } from "../table/table.module";
 import { TextareaModule } from "../textarea/textarea.module";
 import { AddGroupDialogComponent } from "./dialogs/add-group-dialog/add-group-dialog.component";
 import { ColumnPickerDialogComponent } from "./dialogs/column-picker-dialog/column-picker-dialog.component";
@@ -23,6 +24,7 @@ import { ReportFiltersComponent } from "./report-filters/report-filters.componen
 import { ReportGenerateBarComponent } from "./report-generate-bar/report-generate-bar.component";
 import { ReportPreviewPanelComponent } from "./report-preview-panel/report-preview-panel.component";
 import { ReportSectionComponent } from "./report-section/report-section.component";
+import { ReportTemplateListComponent } from "./report-template-list/report-template-list.component";
 import { ReportsRoutingModule } from "./reports-routing.module";
 
 @NgModule({
@@ -36,6 +38,7 @@ import { ReportsRoutingModule } from "./reports-routing.module";
     ReportPreviewPanelComponent,
     ReportReceiptsDialogComponent,
     ReportSectionComponent,
+    ReportTemplateListComponent,
   ],
   imports: [
     AutocompleteModule,
@@ -52,6 +55,7 @@ import { ReportsRoutingModule } from "./reports-routing.module";
     ReportsRoutingModule,
     SelectModule,
     SharedUiModule,
+    TableModule,
     TextareaModule,
     UserAutocompleteModule,
   ],

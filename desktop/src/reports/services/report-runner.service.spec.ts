@@ -1,8 +1,11 @@
 import { provideZonelessChangeDetection } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { of } from "rxjs";
-import { ReportRequestCommand, ReportService } from "../../open-api";
+import { PagedRequestCommand, ReportRequestCommand, ReportService } from "../../open-api";
+import { downloadFile } from "../../utils/file";
 import { ReportRunnerService, reportFilename } from "./report-runner.service";
+
+jest.mock("../../utils/file", () => ({ downloadFile: jest.fn() }));
 
 function command(name: string, formats: ReportRequestCommand.FormatsEnum[]): ReportRequestCommand {
   return {
@@ -34,8 +37,26 @@ describe("reportFilename", () => {
 });
 
 describe("ReportRunnerService", () => {
-  it("saveTemplate delegates to ReportService.createReportTemplate", () => {
-    const reportService = { createReportTemplate: jest.fn(() => of({ id: 1 })) };
+  let reportService: {
+    createReportTemplate: jest.Mock;
+    getReportTemplates: jest.Mock;
+    getReportTemplate: jest.Mock;
+    duplicateReportTemplate: jest.Mock;
+    deleteReportTemplate: jest.Mock;
+    generateReport: jest.Mock;
+  };
+  let service: ReportRunnerService;
+
+  beforeEach(() => {
+    (downloadFile as jest.Mock).mockClear();
+    reportService = {
+      createReportTemplate: jest.fn(() => of({ id: 1 })),
+      getReportTemplates: jest.fn(() => of({ data: [], totalCount: 0 })),
+      getReportTemplate: jest.fn(() => of({ id: 3 })),
+      duplicateReportTemplate: jest.fn(() => of({ id: 4 })),
+      deleteReportTemplate: jest.fn(() => of(undefined)),
+      generateReport: jest.fn(() => of(new Blob())),
+    };
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
@@ -43,11 +64,40 @@ describe("ReportRunnerService", () => {
         { provide: ReportService, useValue: reportService },
       ],
     });
+    service = TestBed.inject(ReportRunnerService);
+  });
 
-    const service = TestBed.inject(ReportRunnerService);
+  it("saveTemplate delegates to createReportTemplate", () => {
     const cmd = command("Template", ["csv"]);
     service.saveTemplate(cmd).subscribe();
-
     expect(reportService.createReportTemplate).toHaveBeenCalledWith(cmd);
+  });
+
+  it("listTemplates delegates to getReportTemplates", () => {
+    const paged: PagedRequestCommand = { page: 1, pageSize: 10 };
+    service.listTemplates(paged).subscribe();
+    expect(reportService.getReportTemplates).toHaveBeenCalledWith(paged);
+  });
+
+  it("getTemplate delegates to getReportTemplate", () => {
+    service.getTemplate(3).subscribe();
+    expect(reportService.getReportTemplate).toHaveBeenCalledWith(3);
+  });
+
+  it("duplicateTemplate delegates to duplicateReportTemplate", () => {
+    service.duplicateTemplate(4).subscribe();
+    expect(reportService.duplicateReportTemplate).toHaveBeenCalledWith(4);
+  });
+
+  it("deleteTemplate delegates to deleteReportTemplate", () => {
+    service.deleteTemplate(5).subscribe();
+    expect(reportService.deleteReportTemplate).toHaveBeenCalledWith(5);
+  });
+
+  it("generateFromTemplate generates the stored config and triggers a download", () => {
+    const cmd = command("Run", ["pdf"]);
+    service.generateFromTemplate(cmd).subscribe();
+    expect(reportService.generateReport).toHaveBeenCalledWith(cmd);
+    expect(downloadFile).toHaveBeenCalled();
   });
 });

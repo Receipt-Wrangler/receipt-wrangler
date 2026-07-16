@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"encoding/json"
+	"errors"
 
 	"gorm.io/gorm"
 	"receipt-wrangler/api/internal/commands"
@@ -45,6 +46,86 @@ func (repository ReportTemplateRepository) CreateReportTemplate(command commands
 	}
 
 	return template, nil
+}
+
+// GetPagedReportTemplates returns a page of templates plus the unpaged total. The
+// count runs before paging so it reflects the whole set. OrderBy is guarded against
+// an allow-list because it is interpolated as a raw column name (not a bound value).
+func (repository ReportTemplateRepository) GetPagedReportTemplates(command commands.PagedRequestCommand) ([]models.ReportTemplate, int64, error) {
+	db := repository.GetDB()
+	var results []models.ReportTemplate
+	var count int64
+
+	query := db.Model(&models.ReportTemplate{})
+
+	err := query.Count(&count).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if !repository.isValidColumn(command.OrderBy) {
+		return nil, 0, errors.New("invalid column: " + command.OrderBy)
+	}
+
+	query = repository.Sort(query, command.OrderBy, command.SortDirection)
+	query = query.Scopes(repository.Paginate(command.Page, command.PageSize))
+
+	err = query.Find(&results).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return results, count, nil
+}
+
+// GetReportTemplateById loads a single template by id. The id is bound as a
+// parameter (never interpolated as raw SQL) and gorm.ErrRecordNotFound is returned
+// to the caller for a missing row.
+func (repository ReportTemplateRepository) GetReportTemplateById(id string) (models.ReportTemplate, error) {
+	db := repository.GetDB()
+	var template models.ReportTemplate
+
+	err := db.Where("id = ?", id).First(&template).Error
+	if err != nil {
+		return models.ReportTemplate{}, err
+	}
+
+	return template, nil
+}
+
+// DuplicateReportTemplate copies the source template into a new row owned by
+// userId. The new template resets identity (a fresh id + owner + " duplicate" name)
+// while carrying the source's configuration and version verbatim.
+func (repository ReportTemplateRepository) DuplicateReportTemplate(userId uint, id string) (models.ReportTemplate, error) {
+	db := repository.GetDB()
+
+	source, err := repository.GetReportTemplateById(id)
+	if err != nil {
+		return models.ReportTemplate{}, err
+	}
+
+	template := models.ReportTemplate{
+		BaseModel:            models.BaseModel{CreatedBy: &userId},
+		Name:                 source.Name + " duplicate",
+		Configuration:        source.Configuration,
+		ConfigurationVersion: source.ConfigurationVersion,
+	}
+
+	err = db.Create(&template).Error
+	if err != nil {
+		return models.ReportTemplate{}, err
+	}
+
+	return template, nil
+}
+
+// isValidColumn allow-lists the sortable columns for GetPagedReportTemplates. The
+// order-by value is interpolated as a raw column name, so it must never come
+// straight from the request.
+func (repository ReportTemplateRepository) isValidColumn(orderBy string) bool {
+	return orderBy == "name" ||
+		orderBy == "created_at" ||
+		orderBy == "updated_at"
 }
 
 // DeleteReportTemplateById removes the template with the given id. Deleting a

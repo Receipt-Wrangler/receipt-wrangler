@@ -27,6 +27,7 @@
     data-testid="report-save-template"
   ></app-button>
   <app-button
+    *hasAppPermission="Permission.AppReportsGenerate"
     [buttonText]="generating() ? 'Generating…' : 'Generate Report'"
     [icon]="generating() ? '' : 'play_arrow'"
     [disabled]="!canGenerate() || generating()"

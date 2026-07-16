@@ -266,7 +266,70 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/template/list:
+    post:
+      tags:
+        - Report
+      summary: Get paged report templates
+      description:
+        Returns a paged, sorted list of saved report templates. App-scoped
+        (requires app.reports.read).
+      operationId: getReportTemplates
+      requestBody:
+        description: Paging and sorting data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PagedRequestCommand"
+      responses:
+        200:
+          description: Paged report templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedData"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /report/template/{id}:
+    get:
+      tags:
+        - Report
+      summary: Get a report template
+      description: Returns a saved report template by id. Requires app.reports.read.
+      operationId: getReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to get
+      responses:
+        200:
+          description: The report template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTemplate"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
     delete:
       tags:
         - Report
@@ -287,6 +350,40 @@ paths:
           $ref: "#/components/responses/BadRequest"
         403:
           $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/template/{id}/duplicate:
+    post:
+      tags:
+        - Report
+      summary: Duplicate a report template
+      description:
+        Duplicates a saved report template by id, returning the new copy. App-scoped
+        (requires app.reports.duplicate).
+      operationId: duplicateReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to duplicate
+      responses:
+        200:
+          description: The duplicated report template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTemplate"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
         500:
           $ref: "#/components/responses/Internal"
       security:
@@ -3123,6 +3220,8 @@ components:
         - "app.receipts.search"
         - "app.reports.create"
         - "app.reports.delete"
+        - "app.reports.duplicate"
+        - "app.reports.generate"
         - "app.reports.read"
         - "group.view"
         - "group.update"

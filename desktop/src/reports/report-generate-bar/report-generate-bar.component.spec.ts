@@ -1,25 +1,44 @@
+import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder, FormGroup } from "@angular/forms";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
+import { NgxsModule, Store } from "@ngxs/store";
 import { ButtonModule } from "../../button/button.module";
+import { DirectivesModule } from "../../directives/directives.module";
+import { Permission } from "../../open-api";
+import { AuthState } from "../../store";
+import { SetPermissions } from "../../store/auth.state.actions";
 import { ReportGenerateBarComponent } from "./report-generate-bar.component";
 
 describe("ReportGenerateBarComponent", () => {
   let fixture: ComponentFixture<ReportGenerateBarComponent>;
   let component: ReportGenerateBarComponent;
   let form: FormGroup;
+  let store: Store;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [ReportGenerateBarComponent],
-      // Import the real ButtonModule so the Generate app-button renders a real
-      // <button> whose disabled state can be asserted from the DOM.
-      imports: [ButtonModule, NoopAnimationsModule],
-      providers: [provideZonelessChangeDetection(), provideRouter([])],
+      // The real ButtonModule renders the Generate app-button as a real <button>
+      // whose disabled state can be asserted; DirectivesModule + AuthState make the
+      // permission-gated Save/Generate buttons resolve for a permitted caller.
+      imports: [ButtonModule, DirectivesModule, NgxsModule.forRoot([AuthState]), NoopAnimationsModule],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting(),
+      ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
+
+    store = TestBed.inject(Store);
+    // Grant the report permissions so the *hasAppPermission-gated Save/Generate
+    // buttons render (the DOM assertions below target the Generate button).
+    store.dispatch(new SetPermissions([Permission.AppReportsCreate, Permission.AppReportsGenerate], {}));
 
     const formBuilder = new FormBuilder();
     form = formBuilder.group({

@@ -1,12 +1,18 @@
 import { expect, Locator, Page } from '@playwright/test';
 
-// Shared Report Builder e2e flows. The builder is gated by the app-level
+// Shared Report Builder e2e flows. The reports area is gated by the app-level
 // app.reports.read permission, so specs run as admin
 // (test.use({ storageState: 'e2e/.auth/admin.json' })).
 
-/** Navigate to the builder and wait for it to render. */
+/** Navigate to the Reports list (the /reports landing page) and wait for it to render. */
 export async function gotoReports(page: Page): Promise<void> {
   await page.goto('/reports');
+  await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
+}
+
+/** Navigate straight to the builder (New Report) and wait for it to render. */
+export async function gotoReportBuilder(page: Page): Promise<void> {
+  await page.goto('/reports/new');
   await expect(page.getByText('Report Builder')).toBeVisible();
 }
 

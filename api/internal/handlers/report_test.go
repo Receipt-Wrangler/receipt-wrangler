@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
@@ -69,6 +70,7 @@ const recordsReportBody = `{
 func TestGenerateReport_StreamsFileWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
 	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsGenerate)
 	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	seedReportReceipt(1, 1)
 
@@ -89,7 +91,24 @@ func TestGenerateReport_StreamsFileWhenAuthorized(t *testing.T) {
 
 func TestGenerateReport_ForbidsWhenMemberLacksPermission(t *testing.T) {
 	defer tearDownReportTest()
-	repositories.CreateTestGroupWithUsers() // user 1 is a member of group 1 with no granting role
+	repositories.CreateTestGroupWithUsers() // user 1 is a member of group 1 with no granting group role
+	// Hold the app-level generate permission so the denial is specifically the
+	// missing per-group group.reports.read.
+	grantAppPerms(t, 1, permissions.AppReportsGenerate)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	GenerateReport(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestGenerateReport_ForbidsWithoutGeneratePermission(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	// The caller can generate over the group, but lacks the app-level
+	// app.reports.generate gate — the report must still be denied.
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seedReportReceipt(1, 1)
 
 	w, r := generateReportRequest(1, recordsReportBody)
 	GenerateReport(w, r)
@@ -100,6 +119,7 @@ func TestGenerateReport_ForbidsWhenMemberLacksPermission(t *testing.T) {
 func TestGenerateReport_ForbidsWhenNotAMemberOfARequestedGroup(t *testing.T) {
 	defer tearDownReportTest()
 	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsGenerate)
 	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead) // reports.read in group 1 only
 
 	// user 1 is not a member of group 2, so the report over it must be denied.
@@ -126,6 +146,7 @@ func TestGenerateReport_RejectsInvalidCommand(t *testing.T) {
 func TestGenerateReport_MapsInvalidSpecToBadRequest(t *testing.T) {
 	defer tearDownReportTest()
 	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsGenerate)
 	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	seedReportReceipt(1, 1)
 
@@ -235,6 +256,7 @@ func TestPreviewReport_MalformedBodyIsBadRequest(t *testing.T) {
 func TestGenerateReport_StreamsZipForMultipleFormats(t *testing.T) {
 	defer tearDownReportTest()
 	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsGenerate)
 	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	seedReportReceipt(1, 1)
 
@@ -382,6 +404,166 @@ func TestDeleteReportTemplate_ForbidsWithoutDeletePermission(t *testing.T) {
 
 	w, r := deleteReportTemplateRequest(1, "1")
 	DeleteReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+// pagedReportTemplateBody is a minimal valid paged-list request body.
+const pagedReportTemplateBody = `{"page": 1, "pageSize": 10, "orderBy": "name", "sortDirection": "asc"}`
+
+// seedReportTemplate persists a template directly through the repository so a
+// read/get/duplicate test can grant only the permission it exercises (not create).
+func seedReportTemplate(t *testing.T, userId uint, name string) models.ReportTemplate {
+	t.Helper()
+	command := commands.ReportRequestCommand{
+		Name:     name,
+		GroupIds: []string{"1"},
+		Period:   commands.ReportPeriod{Preset: "this_month"},
+		Detail:   commands.ReportDetail{Mode: "records"},
+		Columns:  []commands.ReportColumn{{Kind: "dimension", Name: "Name", Label: "Name", Field: "name"}},
+		Formats:  []string{"csv"},
+	}
+	template, err := repositories.NewReportTemplateRepository(nil).CreateReportTemplate(command, userId)
+	if err != nil {
+		t.Fatalf("seed report template: %v", err)
+	}
+	return template
+}
+
+// reportTemplateIdRequest builds a request carrying JWT claims for userId and a chi
+// route context supplying the {id} URL param (the method is immaterial — the
+// handler reads the param, not the verb).
+func reportTemplateIdRequest(method string, userId uint, id string) (*httptest.ResponseRecorder, *http.Request) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(method, "/api/report/template/"+id, nil)
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: userId}}))
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
+	chi.RouteContext(r.Context()).URLParams.Add("id", id)
+	return w, r
+}
+
+func TestGetPagedReportTemplates_ListsWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	seedReportTemplate(t, 1, "HTTP Report")
+
+	w, r := generateReportRequest(1, pagedReportTemplateBody)
+	GetPagedReportTemplates(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var paged structs.PagedData
+	if err := json.Unmarshal(w.Body.Bytes(), &paged); err != nil {
+		t.Fatalf("decode paged body: %v", err)
+	}
+	if paged.TotalCount != 1 {
+		t.Errorf("totalCount = %d, want 1", paged.TotalCount)
+	}
+	if len(paged.Data) != 1 {
+		t.Errorf("data length = %d, want 1", len(paged.Data))
+	}
+}
+
+func TestGetPagedReportTemplates_ForbidsWithoutReadPermission(t *testing.T) {
+	defer tearDownReportTest()
+	// Create access does not imply read/list.
+	grantAppPerms(t, 1, permissions.AppReportsCreate)
+
+	w, r := generateReportRequest(1, pagedReportTemplateBody)
+	GetPagedReportTemplates(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestGetPagedReportTemplates_RejectsInvalidCommand(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	// page 0 fails PagedRequestCommand.Validate, so the handler's validation branch
+	// returns 400 (not a 500) before touching the repository.
+	w, r := generateReportRequest(1, `{"page": 0, "pageSize": 10, "orderBy": "name", "sortDirection": "asc"}`)
+	GetPagedReportTemplates(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+func TestGetReportTemplate_ReturnsWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+
+	w, r := reportTemplateIdRequest("GET", 1, fmt.Sprint(seeded.ID))
+	GetReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var template models.ReportTemplate
+	if err := json.Unmarshal(w.Body.Bytes(), &template); err != nil {
+		t.Fatalf("decode template body: %v", err)
+	}
+	if template.ID != seeded.ID {
+		t.Errorf("template id = %d, want %d", template.ID, seeded.ID)
+	}
+	if template.Name != "HTTP Report" {
+		t.Errorf("template name = %q, want %q", template.Name, "HTTP Report")
+	}
+}
+
+func TestGetReportTemplate_ForbidsWithoutReadPermission(t *testing.T) {
+	defer tearDownReportTest()
+	// Create access does not imply read.
+	grantAppPerms(t, 1, permissions.AppReportsCreate)
+
+	w, r := reportTemplateIdRequest("GET", 1, "1")
+	GetReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestGetReportTemplate_NotFoundForMissingId(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	w, r := reportTemplateIdRequest("GET", 1, "999999")
+	GetReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusNotFound)
+}
+
+func TestDuplicateReportTemplate_DuplicatesWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsDuplicate)
+	// Seeded under a different owner so the copy's new owner is observable.
+	seeded := seedReportTemplate(t, 2, "HTTP Report")
+
+	w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(seeded.ID))
+	DuplicateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var template models.ReportTemplate
+	if err := json.Unmarshal(w.Body.Bytes(), &template); err != nil {
+		t.Fatalf("decode template body: %v", err)
+	}
+	if template.ID == 0 || template.ID == seeded.ID {
+		t.Errorf("duplicate id = %d, want a new id distinct from %d", template.ID, seeded.ID)
+	}
+	if template.Name != "HTTP Report duplicate" {
+		t.Errorf("duplicate name = %q, want %q", template.Name, "HTTP Report duplicate")
+	}
+	if template.CreatedBy == nil || *template.CreatedBy != 1 {
+		t.Errorf("duplicate createdBy = %v, want 1", template.CreatedBy)
+	}
+}
+
+func TestDuplicateReportTemplate_ForbidsWithoutDuplicatePermission(t *testing.T) {
+	defer tearDownReportTest()
+	// Read access does not imply duplicate.
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	w, r := reportTemplateIdRequest("POST", 1, "1")
+	DuplicateReportTemplate(w, r)
 
 	assertStatus(t, w, http.StatusForbidden)
 }

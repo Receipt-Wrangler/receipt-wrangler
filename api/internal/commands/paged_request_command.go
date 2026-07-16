@@ -133,7 +133,7 @@ type ReceiptPagedRequestFilter struct {
 	Name         PagedRequestField `json:"name"`
 	PaidBy       PagedRequestField `json:"paidBy"`
 	Categories   PagedRequestField `json:"categories"`
-	Tags         PagedRequestField `json:"Tags"`
+	Tags         PagedRequestField `json:"tags"`
 	Status       PagedRequestField `json:"status"`
 	Group        PagedRequestField `json:"group"`
 	ResolvedDate PagedRequestField `json:"resolvedDate"`
@@ -142,7 +142,7 @@ type ReceiptPagedRequestFilter struct {
 
 type PagedRequestField struct {
 	Operation FilterOperation `json:"operation"`
-	Value     interface{}
+	Value     interface{}     `json:"value"`
 }
 
 type FilterOperation string

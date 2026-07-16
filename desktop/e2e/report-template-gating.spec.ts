@@ -9,7 +9,7 @@ import {
   uniqueName,
   withAdminApi,
 } from './helpers/provisioning';
-import { gotoReports } from './helpers/reports';
+import { gotoReportBuilder } from './helpers/reports';
 
 // Saving a template is gated by the app-level app.reports.create permission. The
 // happy path (admin, who holds it) lives in report-templates.spec.ts; this spec
@@ -102,10 +102,11 @@ test.describe('Report Builder — Save Template permission gating', () => {
   });
 
   test('hides the Save Template control and the endpoint refuses a direct POST', async ({ page }) => {
-    await gotoReports(page);
+    await gotoReportBuilder(page);
 
-    // The generate bar renders (Generate is present), but the app.reports.create-
-    // gated Save Template button is absent for this user.
+    // The generate bar renders, but the app.reports.create-gated Save Template
+    // button is absent for this user. (The Generate button is now gated by
+    // app.reports.generate, which this role holds via the enabled Reports category.)
     await expect(page.getByTestId('report-generate')).toBeVisible();
     await expect(page.getByTestId('report-save-template')).toHaveCount(0);
 

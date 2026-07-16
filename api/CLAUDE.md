@@ -269,10 +269,12 @@ will be dropped in a later release.
   `app.categories.read` / `app.tags.read` — omitted as part of the category/tag grant lock-down, since they
   gate the GLOBAL category/tag lists; normal users now get only the per-group filtered catalogs (the
   `app.categories.create` / `app.tags.create` permissions are retained for inline creation); and
-  `app.reports.read` — the app-level gate on the desktop report builder (route + nav). Reporting is
-  **admin-by-default**: Legacy Admin picks it up automatically (its set is every app permission), while
-  non-admins get it only via a custom role that grants it. Per-group generation stays gated by the
-  group-scoped `group.reports.read`. See "Category/tag delivery on AppData" below.
+  `app.reports.read` (the app-level gate on the desktop report builder route + nav and the saved-template
+  read endpoints), `app.reports.generate` (the app-level gate on report generation, ANDed with the
+  per-group check), and `app.reports.duplicate` (duplicating a saved template). Reporting is
+  **admin-by-default**: Legacy Admin picks these up automatically (its set is every app permission), while
+  non-admins get them only via a custom role that grants them. Per-group generation additionally stays
+  gated by the group-scoped `group.reports.read`. See "Category/tag delivery on AppData" below.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.
@@ -760,9 +762,11 @@ up through the engine (both call the shared `buildModel`) but renders only `rend
 no zip — and **row-caps** the sample (`reportPreviewRowCap`, currently 1000; `ReceiptCount` still reports
 the true total). It returns a JSON `ReportPreviewResponse { html, receiptCount }`, so the preview is the
 engine's own output rather than a client-side re-implementation. A separate **app-level `app.reports.read`**
-permission gates the desktop report-builder route/nav (Legacy Admin picks it up via add-only role
-reconciliation; reporting is admin-by-default) — it does **not** gate the generate/preview endpoints,
-which stay group-scoped.
+permission gates the desktop report-builder route/nav and the saved-template read endpoints (Legacy Admin
+picks it up via add-only role reconciliation; reporting is admin-by-default). Generate additionally
+requires the app-level **`app.reports.generate`** (ANDed with the per-group `group.reports.read`), so a
+non-admin needs both a custom role granting `app.reports.generate` and per-group generation access;
+**preview stays group-scoped only** (no app gate), since it is the builder's live feedback loop.
 
 **Custom currency formatting.** `buildModel` loads System Settings (`SystemSettingsRepository.GetSystemSettings`,
 a get-or-create singleton) and passes the app's currency configuration — symbol, symbol position (START/END),
@@ -776,7 +780,12 @@ carries `Currency` through untouched); the settings load lives in the service an
 **Report templates.** `POST /api/report/template` saves a report configuration for reuse. It reuses the
 shared `loadReportCommand` parse+validate and stores the whole `ReportRequestCommand` verbatim as a
 `json.RawMessage` blob on `models.ReportTemplate` (name + owner taken from the request / JWT), so a
-template round-trips back into the builder unchanged. Unlike generate/preview it is **app-scoped** behind
+template round-trips back into the builder unchanged. Because this is the first feature to **re-serialize
+a `ReceiptPagedRequestFilter` back to a client**, the filter's json tags must be correct:
+`PagedRequestField.Value` carries `json:"value"` and the filter's `Tags` field `json:"tags"` (both
+lowercase, matching swagger) — a capitalized key would deserialize fine (Go is case-insensitive) but
+serialize a `Value`/`Tags` the desktop can't read, so the operation would hydrate while the value
+silently dropped (see `paged_request_command_test.go`). Unlike generate/preview it is **app-scoped** behind
 a new `app.reports.create` permission — `handlers.CreateReportTemplate` gates on `AppPermissions` and calls
 `repositories.ReportTemplateRepository` directly (handler→repo, like prompts, no engine involvement),
 because it persists a configuration and touches no group's receipts. Legacy Admin picks the permission up
@@ -785,11 +794,22 @@ generation stays gated by `group.reports.read`. `DELETE /api/report/template/{id
 (`handlers.DeleteReportTemplate` → `ReportTemplateRepository.DeleteReportTemplateById`, mirroring
 `DeletePromptById`; deleting a non-existent id is a 200 no-op), gated by a separate CRUD-granular
 `app.reports.delete` (Legacy Admin auto-gains it; no ownership scoping yet — any holder may delete any
-template). Each template carries a `configurationVersion` (currently `1`, DB default `1`, stamped from
+template). `POST /api/report/template/list` (`getReportTemplates`) returns a paged, sorted list and
+`GET /api/report/template/{id}` (`getReportTemplate`) one template — both gated by `app.reports.read`
+(the same read gate as the builder route); the list mirrors the prompt paged-read pattern
+(`GetPagedReportTemplates` with a `name`/`created_at`/`updated_at` order-by allow-list, since the column
+is interpolated raw), and get-by-id maps `gorm.ErrRecordNotFound` to a 404.
+`POST /api/report/template/{id}/duplicate` (`duplicateReportTemplate`) copies a template into a new row
+owned by the caller (name suffixed `" duplicate"`, configuration/version carried verbatim, a fresh id),
+gated by a separate CRUD-granular **`app.reports.duplicate`**. Each template carries a
+`configurationVersion` (currently `1`, DB default `1`, stamped from
 `commands.CurrentReportConfigurationVersion`) marking the schema its stored config was written under, so
 a future breaking change to the `ReportRequestCommand` shape can upcast — or fail loud on — old blobs
 instead of silently misdeserializing them; upcasters + a migration are deferred until that first break.
-Listing / editing / running saved templates, and a delete UI, are later slices.
+The desktop **template-management UI** is delivered: `/reports` lists saved templates and each row can
+generate, open-in-builder, duplicate, or delete. Opening a template rehydrates the builder from its
+stored config; **saving is save-as-new** (there is no in-place update endpoint / `app.reports.update`
+yet — that is the one remaining CRUD gap and is deferred to a later slice).
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
