@@ -18,7 +18,7 @@ var (
 	ErrSystemRoleUndeletable = errors.New("system roles cannot be deleted")
 	ErrRoleAssigned          = errors.New("role is assigned and cannot be deleted")
 	ErrRoleIsDefault         = errors.New("the default role cannot be deleted")
-	ErrInvalidGrant          = errors.New("a category, tag, or paid-by grant references a non-existent category, tag, or user")
+	ErrInvalidGrant          = errors.New("a category, tag, paid-by, or report-template grant references a non-existent category, tag, user, or template")
 )
 
 type RoleService struct {
@@ -43,6 +43,7 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 	categoryGrants := normalizeUintSlice(command.CategoryGrants)
 	tagGrants := normalizeUintSlice(command.TagGrants)
 	paidByUserGrants := normalizeUintSlice(command.PaidByUserGrants)
+	reportTemplateGrants := normalizeReportTemplateGrants(command.ReportTemplateGrants)
 
 	err := repositories.GetDB().Transaction(func(tx *gorm.DB) error {
 		roleRepository := repositories.NewRoleRepository(tx)
@@ -54,26 +55,31 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 			}
 
 			roleView = structs.RoleView{
-				Id:               role.ID,
-				Name:             role.Name,
-				Description:      role.Description,
-				Scope:            permissions.ScopeApp,
-				IsSystem:         role.IsSystem,
-				Permissions:      perms,
-				CategoryGrants:   []uint{},
-				TagGrants:        []uint{},
-				PaidByUserGrants: []uint{},
+				Id:                   role.ID,
+				Name:                 role.Name,
+				Description:          role.Description,
+				Scope:                permissions.ScopeApp,
+				IsSystem:             role.IsSystem,
+				Permissions:          perms,
+				CategoryGrants:       []uint{},
+				TagGrants:            []uint{},
+				PaidByUserGrants:     []uint{},
+				ReportTemplateGrants: []structs.ReportTemplateGrantView{},
 			}
 
 			return nil
 		}
 
-		if txErr := validateGrantsExist(tx, categoryGrants, tagGrants, paidByUserGrants); txErr != nil {
+		if txErr := validateGrantsExist(tx, categoryGrants, tagGrants, paidByUserGrants, distinctReportTemplateIds(reportTemplateGrants)); txErr != nil {
 			return txErr
 		}
 
 		role, txErr := roleRepository.CreateGroupRole(command.Name, command.Description, perms, categoryGrants, tagGrants, paidByUserGrants, command.IncludeOwnPaidReceipts)
 		if txErr != nil {
+			return txErr
+		}
+
+		if txErr := roleRepository.ReplaceGroupRoleReportTemplateGrants(role.ID, reportTemplateGrants); txErr != nil {
 			return txErr
 		}
 
@@ -88,6 +94,7 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 			TagGrants:              tagGrants,
 			PaidByUserGrants:       paidByUserGrants,
 			IncludeOwnPaidReceipts: command.IncludeOwnPaidReceipts,
+			ReportTemplateGrants:   reportTemplateGrantsToView(reportTemplateGrants),
 		}
 
 		return nil
@@ -109,6 +116,7 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 	categoryGrants := normalizeUintSlice(command.CategoryGrants)
 	tagGrants := normalizeUintSlice(command.TagGrants)
 	paidByUserGrants := normalizeUintSlice(command.PaidByUserGrants)
+	reportTemplateGrants := normalizeReportTemplateGrants(command.ReportTemplateGrants)
 
 	err := repositories.GetDB().Transaction(func(tx *gorm.DB) error {
 		roleRepository := repositories.NewRoleRepository(tx)
@@ -131,16 +139,17 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			}
 
 			roleView = structs.RoleView{
-				Id:               role.ID,
-				Name:             role.Name,
-				Description:      role.Description,
-				Scope:            permissions.ScopeApp,
-				IsDefault:        role.IsDefault,
-				IsSystem:         role.IsSystem,
-				Permissions:      perms,
-				CategoryGrants:   []uint{},
-				TagGrants:        []uint{},
-				PaidByUserGrants: []uint{},
+				Id:                   role.ID,
+				Name:                 role.Name,
+				Description:          role.Description,
+				Scope:                permissions.ScopeApp,
+				IsDefault:            role.IsDefault,
+				IsSystem:             role.IsSystem,
+				Permissions:          perms,
+				CategoryGrants:       []uint{},
+				TagGrants:            []uint{},
+				PaidByUserGrants:     []uint{},
+				ReportTemplateGrants: []structs.ReportTemplateGrantView{},
 			}
 
 			return nil
@@ -157,12 +166,16 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			return ErrSystemRoleImmutable
 		}
 
-		if txErr := validateGrantsExist(tx, categoryGrants, tagGrants, paidByUserGrants); txErr != nil {
+		if txErr := validateGrantsExist(tx, categoryGrants, tagGrants, paidByUserGrants, distinctReportTemplateIds(reportTemplateGrants)); txErr != nil {
 			return txErr
 		}
 
 		role, txErr := roleRepository.UpdateGroupRole(id, command.Name, command.Description, perms, categoryGrants, tagGrants, paidByUserGrants, command.IncludeOwnPaidReceipts)
 		if txErr != nil {
+			return txErr
+		}
+
+		if txErr := roleRepository.ReplaceGroupRoleReportTemplateGrants(id, reportTemplateGrants); txErr != nil {
 			return txErr
 		}
 
@@ -178,6 +191,7 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			TagGrants:              tagGrants,
 			PaidByUserGrants:       paidByUserGrants,
 			IncludeOwnPaidReceipts: command.IncludeOwnPaidReceipts,
+			ReportTemplateGrants:   reportTemplateGrantsToView(reportTemplateGrants),
 		}
 
 		return nil
@@ -208,11 +222,11 @@ func normalizeUintSlice(ids []uint) []uint {
 	return ids
 }
 
-// validateGrantsExist confirms every category/tag/paid-by-user grant id
-// references a real row. Because UpsertRoleCommand.Validate already rejects
-// duplicate grant ids, a matching count means all ids exist. Returns
+// validateGrantsExist confirms every category/tag/paid-by-user/report-template
+// grant id references a real row. Because UpsertRoleCommand.Validate already
+// rejects duplicate grant ids, a matching count means all ids exist. Returns
 // ErrInvalidGrant otherwise.
-func validateGrantsExist(tx *gorm.DB, categoryGrants []uint, tagGrants []uint, paidByUserGrants []uint) error {
+func validateGrantsExist(tx *gorm.DB, categoryGrants []uint, tagGrants []uint, paidByUserGrants []uint, reportTemplateIds []uint) error {
 	if len(categoryGrants) > 0 {
 		categoryRepository := repositories.NewCategoryRepository(tx)
 		count, err := categoryRepository.CountByIds(categoryGrants)
@@ -246,7 +260,59 @@ func validateGrantsExist(tx *gorm.DB, categoryGrants []uint, tagGrants []uint, p
 		}
 	}
 
+	if len(reportTemplateIds) > 0 {
+		reportTemplateRepository := repositories.NewReportTemplateRepository(tx)
+		count, err := reportTemplateRepository.CountByIds(reportTemplateIds)
+		if err != nil {
+			return err
+		}
+		if int(count) != len(reportTemplateIds) {
+			return ErrInvalidGrant
+		}
+	}
+
 	return nil
+}
+
+// normalizeReportTemplateGrants returns a non-nil slice so an unset matrix
+// serializes as [] and never aliases the caller's nil.
+func normalizeReportTemplateGrants(grants []commands.ReportTemplateGrantCommand) []commands.ReportTemplateGrantCommand {
+	if grants == nil {
+		return []commands.ReportTemplateGrantCommand{}
+	}
+	return grants
+}
+
+// distinctReportTemplateIds returns the unique template ids referenced by a
+// matrix, for the existence check. Validate already rejects duplicate template
+// ids, so this is defensive.
+func distinctReportTemplateIds(grants []commands.ReportTemplateGrantCommand) []uint {
+	seen := make(map[uint]bool, len(grants))
+	ids := make([]uint, 0, len(grants))
+	for _, grant := range grants {
+		if seen[grant.ReportTemplateId] {
+			continue
+		}
+		seen[grant.ReportTemplateId] = true
+		ids = append(ids, grant.ReportTemplateId)
+	}
+	return ids
+}
+
+// reportTemplateGrantsToView converts validated command matrix rows into the read
+// model returned after a create/update (built from the command, mirroring how the
+// other grants are echoed back rather than re-read).
+func reportTemplateGrantsToView(grants []commands.ReportTemplateGrantCommand) []structs.ReportTemplateGrantView {
+	views := make([]structs.ReportTemplateGrantView, 0, len(grants))
+	for _, grant := range grants {
+		permissions := make([]string, 0, len(grant.Permissions))
+		permissions = append(permissions, grant.Permissions...)
+		views = append(views, structs.ReportTemplateGrantView{
+			ReportTemplateId: grant.ReportTemplateId,
+			Permissions:      permissions,
+		})
+	}
+	return views
 }
 
 // resolveMissingRoleError distinguishes a genuine not-found from a forbidden
@@ -410,16 +476,17 @@ func appRoleToView(role models.AppRole, isDefault bool) structs.RoleView {
 	}
 
 	return structs.RoleView{
-		Id:               role.ID,
-		Name:             role.Name,
-		Description:      role.Description,
-		Scope:            permissions.ScopeApp,
-		IsDefault:        isDefault,
-		IsSystem:         role.IsSystem,
-		Permissions:      perms,
-		CategoryGrants:   []uint{},
-		TagGrants:        []uint{},
-		PaidByUserGrants: []uint{},
+		Id:                   role.ID,
+		Name:                 role.Name,
+		Description:          role.Description,
+		Scope:                permissions.ScopeApp,
+		IsDefault:            isDefault,
+		IsSystem:             role.IsSystem,
+		Permissions:          perms,
+		CategoryGrants:       []uint{},
+		TagGrants:            []uint{},
+		PaidByUserGrants:     []uint{},
+		ReportTemplateGrants: []structs.ReportTemplateGrantView{},
 	}
 }
 
@@ -459,5 +526,6 @@ func groupRoleToView(role models.GroupRoleDefinition, isDefault bool) structs.Ro
 		TagGrants:              tagGrants,
 		PaidByUserGrants:       paidByUserGrants,
 		IncludeOwnPaidReceipts: role.IncludeOwnPaidReceipts,
+		ReportTemplateGrants:   repositories.ReportTemplateGrantsFromRole(role),
 	}
 }

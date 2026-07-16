@@ -93,6 +93,21 @@ func (repository ReportTemplateRepository) GetReportTemplateById(id string) (mod
 	return template, nil
 }
 
+// CountByIds returns how many of the given template ids exist. Used to validate
+// that a role's report-template grants reference real templates. Duplicate ids in
+// the input are de-duplicated by the IN clause, so callers should pass a unique set.
+func (repository ReportTemplateRepository) CountByIds(ids []uint) (int64, error) {
+	db := repository.GetDB()
+
+	var count int64
+	err := db.Model(&models.ReportTemplate{}).Where("id IN ?", ids).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 // DuplicateReportTemplate copies the source template into a new row owned by
 // userId. The new template resets identity (a fresh id + owner + " duplicate" name)
 // while carrying the source's configuration and version verbatim.

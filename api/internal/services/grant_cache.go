@@ -24,6 +24,15 @@ type grantEntry struct {
 	// (e.g. a granted user was deleted) stays restricted (and resolves to "see
 	// nothing") rather than widening to see-all.
 	paidByVisibilityRestricted bool
+
+	// reportTemplateGrants maps a template id to the set of actions this role may
+	// perform on it (read/generate/update/delete/duplicate). An empty map means
+	// unrestricted UNLESS reportTemplateGrantsRestricted is set, in which case the
+	// role fails closed (sees no templates) — the same source-of-truth rule as
+	// paidByVisibilityRestricted, so a role stays restricted after its last granted
+	// template is deleted and the grant rows cascade away.
+	reportTemplateGrants           map[uint]map[string]struct{}
+	reportTemplateGrantsRestricted bool
 }
 
 // groupRoleGrantCache memoizes a group role's category/tag grant id sets, keyed

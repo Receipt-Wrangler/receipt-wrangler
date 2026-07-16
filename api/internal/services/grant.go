@@ -168,17 +168,42 @@ func loadGroupRoleGrants(roleRepository repositories.RoleRepository, roleId uint
 	if err != nil {
 		return nil, err
 	}
+	reportTemplateGrantRows, err := roleRepository.GetGroupRoleReportTemplateGrants(roleId)
+	if err != nil {
+		return nil, err
+	}
+	reportTemplateGrantsRestricted, err := roleRepository.GetGroupRoleReportTemplateGrantsRestricted(roleId)
+	if err != nil {
+		return nil, err
+	}
 
 	entry := &grantEntry{
-		categoryIds:                uintSliceToSet(categoryIds),
-		tagIds:                     uintSliceToSet(tagIds),
-		paidByUserIds:              uintSliceToSet(paidByUserIds),
-		includeOwnPaidReceipts:     includeOwnPaidReceipts,
-		paidByVisibilityRestricted: paidByVisibilityRestricted,
+		categoryIds:                    uintSliceToSet(categoryIds),
+		tagIds:                         uintSliceToSet(tagIds),
+		paidByUserIds:                  uintSliceToSet(paidByUserIds),
+		includeOwnPaidReceipts:         includeOwnPaidReceipts,
+		paidByVisibilityRestricted:     paidByVisibilityRestricted,
+		reportTemplateGrants:           reportTemplateGrantsToSet(reportTemplateGrantRows),
+		reportTemplateGrantsRestricted: reportTemplateGrantsRestricted,
 	}
 
 	setCachedGroupRoleGrants(roleId, entry, observedGen)
 	return entry, nil
+}
+
+// reportTemplateGrantsToSet folds the flat grant rows (one per template+action)
+// into a template id -> action set map for O(1) membership tests.
+func reportTemplateGrantsToSet(rows []models.GroupRoleReportTemplateGrant) map[uint]map[string]struct{} {
+	set := make(map[uint]map[string]struct{}, len(rows))
+	for _, row := range rows {
+		actions, ok := set[row.ReportTemplateID]
+		if !ok {
+			actions = make(map[string]struct{})
+			set[row.ReportTemplateID] = actions
+		}
+		actions[row.Permission] = struct{}{}
+	}
+	return set
 }
 
 // uintSliceToSet converts a slice of ids to a set for O(1) membership tests.
