@@ -166,6 +166,36 @@ func TestGetPagedReportTemplates_RejectsInvalidColumn(t *testing.T) {
 	}
 }
 
+func TestGetPagedReportTemplates_SortsByAllowedColumns(t *testing.T) {
+	defer TruncateTestDb()
+
+	repository := NewReportTemplateRepository(nil)
+	for _, name := range []string{"Alpha", "Beta"} {
+		command := sampleReportCommand()
+		command.Name = name
+		if _, err := repository.CreateReportTemplate(command, 1); err != nil {
+			utils.PrintTestError(t, err, nil)
+			return
+		}
+	}
+
+	// name is covered above; created_at and updated_at must also execute through
+	// Sort/Find without error (they are on the allow-list but were never exercised).
+	for _, column := range []string{"created_at", "updated_at"} {
+		templates, count, err := repository.GetPagedReportTemplates(pagedReportTemplateCommand(column, commands.DESCENDING))
+		if err != nil {
+			utils.PrintTestError(t, err, "no error sorting by "+column)
+			return
+		}
+		if count != 2 {
+			utils.PrintTestError(t, count, int64(2))
+		}
+		if len(templates) != 2 {
+			utils.PrintTestError(t, len(templates), 2)
+		}
+	}
+}
+
 func TestGetReportTemplateById_ReturnsRow(t *testing.T) {
 	defer TruncateTestDb()
 

@@ -476,6 +476,18 @@ func TestGetPagedReportTemplates_ForbidsWithoutReadPermission(t *testing.T) {
 	assertStatus(t, w, http.StatusForbidden)
 }
 
+func TestGetPagedReportTemplates_RejectsInvalidCommand(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	// page 0 fails PagedRequestCommand.Validate, so the handler's validation branch
+	// returns 400 (not a 500) before touching the repository.
+	w, r := generateReportRequest(1, `{"page": 0, "pageSize": 10, "orderBy": "name", "sortDirection": "asc"}`)
+	GetPagedReportTemplates(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
 func TestGetReportTemplate_ReturnsWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
 	grantAppPerms(t, 1, permissions.AppReportsRead)

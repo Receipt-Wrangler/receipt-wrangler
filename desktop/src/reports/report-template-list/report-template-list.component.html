@@ -103,6 +103,7 @@
       icon="content_copy"
       tooltip="Duplicate"
       data-testid="report-template-duplicate"
+      [disabled]="duplicatingId() !== null"
       (clicked)="duplicate(element)"
     ></app-button>
     <app-delete-button

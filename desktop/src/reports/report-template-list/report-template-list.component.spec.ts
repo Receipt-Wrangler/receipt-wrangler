@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialog } from "@angular/material/dialog";
 import { Router } from "@angular/router";
 import { Store } from "@ngxs/store";
-import { of, Subject } from "rxjs";
+import { of, Subject, throwError } from "rxjs";
 import {
   ReportColumn,
   ReportDetail,
@@ -144,6 +144,22 @@ describe("ReportTemplateListComponent", () => {
     expect(runner.listTemplates).toHaveBeenCalled();
   });
 
+  it("duplicate ignores a second call while one is in flight", () => {
+    // A non-completing observable keeps the first duplicate in flight.
+    const pending = new Subject<ReportTemplate>();
+    runner.duplicateTemplate.mockReturnValue(pending.asObservable());
+
+    component.duplicate(templates[0]);
+    expect(component.duplicatingId()).toBe(1);
+
+    // A second click while the first runs must not fire another request.
+    component.duplicate(templates[1]);
+    expect(runner.duplicateTemplate).toHaveBeenCalledTimes(1);
+
+    pending.complete();
+    expect(component.duplicatingId()).toBeNull();
+  });
+
   it("delete confirms then deletes and reloads", () => {
     dialogResult = true;
     runner.listTemplates.mockClear();
@@ -165,5 +181,24 @@ describe("ReportTemplateListComponent", () => {
     expect(component.formatChipsFor(templates[0])).toEqual(["CSV", "PDF"]);
     expect(component.detailSummaryFor(templates[0])).toBe("Record-level");
     expect(component.groupingSummaryFor(templates[0])).toBe("Group");
+  });
+
+  it("summarizes scope by group count (unresolved groups fall back to the raw id)", () => {
+    const scoped = (ids: string[]): ReportTemplate => ({
+      ...templates[0],
+      configuration: { ...templates[0].configuration, groupIds: ids },
+    });
+    expect(component.scopeSummary(scoped([]))).toBe("—");
+    expect(component.scopeSummary(scoped(["1", "2"]))).toBe("1, 2");
+    expect(component.scopeSummary(scoped(["1", "2", "3"]))).toBe("3 groups");
+  });
+
+  it("getTableData still flips loaded on a fetch error so the empty state doesn't hang", () => {
+    component.loaded.set(false);
+    runner.listTemplates.mockReturnValue(throwError(() => new Error("boom")));
+
+    component.getTableData();
+
+    expect(component.loaded()).toBe(true);
   });
 });

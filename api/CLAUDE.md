@@ -806,7 +806,10 @@ gated by a separate CRUD-granular **`app.reports.duplicate`**. Each template car
 `commands.CurrentReportConfigurationVersion`) marking the schema its stored config was written under, so
 a future breaking change to the `ReportRequestCommand` shape can upcast — or fail loud on — old blobs
 instead of silently misdeserializing them; upcasters + a migration are deferred until that first break.
-Editing / running saved templates, and the template-management UI, are later slices.
+The desktop **template-management UI** is delivered: `/reports` lists saved templates and each row can
+generate, open-in-builder, duplicate, or delete. Opening a template rehydrates the builder from its
+stored config; **saving is save-as-new** (there is no in-place update endpoint / `app.reports.update`
+yet — that is the one remaining CRUD gap and is deferred to a later slice).
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`

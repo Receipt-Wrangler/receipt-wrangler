@@ -6,6 +6,7 @@ import {
   apiDeleteReportTemplateById,
   apiDeleteRoleByName,
   apiDeleteUserByName,
+  apiFirstReportGroupId,
   createRole,
   createUserWithRole,
   uniqueName,
@@ -25,11 +26,12 @@ const NEW_USER_PASSWORD = `${uniqueName('pw')}-Aa1!`;
 const AUTH_FILE = 'e2e/.auth/report-action-nocreate.json';
 const apiBaseUrl = (): string => process.env.E2E_BASE_URL ?? 'http://localhost:4200';
 
-// A complete, valid ReportRequestCommand — it must pass validation to reach the
-// permission gate, so a 403 proves the gate, not a bad body.
+// A complete, valid ReportRequestCommand (minus groupIds) — it must pass validation
+// to reach the permission gate, so a 403 proves the gate, not a bad body. groupIds is
+// filled at call time with a group the user CAN report on, so the group.reports.read
+// gate passes and the 403 is unambiguously the app-level app.reports.generate denial.
 const VALID_GENERATE_BODY = {
   name: 'Denied Generate',
-  groupIds: ['1'],
   period: { preset: 'this_month' },
   detail: { mode: 'records' },
   columns: [{ kind: 'dimension', name: 'Name', label: 'Name', field: 'name' }],
@@ -132,7 +134,12 @@ test.describe('Reports — generate/duplicate permission gating', () => {
       const duplicate = await api.post(`/api/report/template/${seededId}/duplicate`);
       expect(duplicate.status()).toBe(403);
 
-      const generate = await api.post('/api/report/generate', { data: VALID_GENERATE_BODY });
+      // Target a group this user CAN report on, so the group.reports.read gate passes
+      // and the 403 is the app-level app.reports.generate denial (not the group gate).
+      const groupId = await apiFirstReportGroupId(api);
+      const generate = await api.post('/api/report/generate', {
+        data: { ...VALID_GENERATE_BODY, groupIds: [groupId] },
+      });
       expect(generate.status()).toBe(403);
     } finally {
       await api.dispose();

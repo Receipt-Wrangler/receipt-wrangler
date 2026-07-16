@@ -69,6 +69,7 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
   public readonly loaded = signal(false);
   // The template currently generating (per-row spinner + single-flight guard).
   public readonly generatingId = signal<number | null>(null);
+  public readonly duplicatingId = signal<number | null>(null);
 
   private readonly groups = this.store.selectSignal(GroupState.groupsWithoutAll);
 
@@ -175,6 +176,10 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
   }
 
   public duplicate(template: ReportTemplate): void {
+    if (this.duplicatingId() !== null) {
+      return;
+    }
+    this.duplicatingId.set(template.id);
     this.runner
       .duplicateTemplate(template.id)
       .pipe(
@@ -184,6 +189,7 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
           this.getTableData();
         }),
         catchError(() => EMPTY),
+        finalize(() => this.duplicatingId.set(null)),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe();

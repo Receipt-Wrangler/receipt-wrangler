@@ -16,12 +16,19 @@ export const reportTemplateResolver: ResolveFn<ReportTemplate | null> = (route) 
   const router = inject(Router);
   const snackbar = inject(SnackbarService);
 
-  const id = Number(route.paramMap.get("id"));
-  return runner.getTemplate(id).pipe(
-    catchError(() => {
-      snackbar.error("Report template not found");
-      router.navigate(["/reports"]);
-      return of(null);
-    }),
-  );
+  const redirectToList = () => {
+    snackbar.error("Report template not found");
+    router.navigate(["/reports"]);
+    return of(null);
+  };
+
+  // Reject a missing / non-numeric / non-positive id before issuing a request for
+  // it — Number(null) is 0 and a malformed id is NaN, neither of which is a real id.
+  const idParam = route.paramMap.get("id");
+  const id = Number(idParam);
+  if (!idParam || !Number.isInteger(id) || id <= 0) {
+    return redirectToList();
+  }
+
+  return runner.getTemplate(id).pipe(catchError(() => redirectToList()));
 };

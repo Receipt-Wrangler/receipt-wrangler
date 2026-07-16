@@ -12,11 +12,11 @@ describe("reportTemplateResolver", () => {
   let router: { navigate: jest.Mock };
   let snackbar: { error: jest.Mock };
 
-  function route(id: string): ActivatedRouteSnapshot {
+  function route(id: string | null): ActivatedRouteSnapshot {
     return { paramMap: { get: () => id } } as unknown as ActivatedRouteSnapshot;
   }
 
-  function run(id: string): Observable<ReportTemplate | null> {
+  function run(id: string | null): Observable<ReportTemplate | null> {
     return TestBed.runInInjectionContext(
       () => reportTemplateResolver(route(id), {} as RouterStateSnapshot) as Observable<ReportTemplate | null>,
     );
@@ -53,6 +53,24 @@ describe("reportTemplateResolver", () => {
     run("99").subscribe((result) => {
       expect(result).toBeNull();
       expect(snackbar.error).toHaveBeenCalled();
+      expect(router.navigate).toHaveBeenCalledWith(["/reports"]);
+      done();
+    });
+  });
+
+  it("redirects without calling the API for a non-numeric id", (done) => {
+    run("abc").subscribe((result) => {
+      expect(result).toBeNull();
+      expect(runner.getTemplate).not.toHaveBeenCalled();
+      expect(router.navigate).toHaveBeenCalledWith(["/reports"]);
+      done();
+    });
+  });
+
+  it("redirects without calling the API for a missing id", (done) => {
+    run(null).subscribe((result) => {
+      expect(result).toBeNull();
+      expect(runner.getTemplate).not.toHaveBeenCalled();
       expect(router.navigate).toHaveBeenCalledWith(["/reports"]);
       done();
     });
