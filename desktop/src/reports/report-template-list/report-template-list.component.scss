@@ -17,12 +17,6 @@ $border: rgba(0, 0, 0, 0.06);
   gap: variables.$spacing-md;
   margin: variables.$spacing-sm 0 variables.$spacing-lg;
 
-  .titles h1 {
-    font-size: 28px;
-    line-height: 1.2;
-    margin: 0;
-  }
-
   .subtitle {
     color: $fg-muted;
     font-size: 14px;
