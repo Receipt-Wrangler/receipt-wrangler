@@ -484,3 +484,78 @@ func UpdateReportTemplate(w http.ResponseWriter, r *http.Request) {
 
 	HandleRequest(handler)
 }
+
+// GenerateReportFromTemplate generates a saved template by id and streams the file.
+// Unlike the ad-hoc /generate (which carries a live config and no template id), this
+// path enforces the per-template generate grant: it loads the stored configuration
+// server-side (so the caller cannot tamper with it), checks CanActOnTemplate(generate)
+// — the generate/generateAll app permission, the per-group ceiling, and the matrix —
+// then reuses the same engine path as GenerateReport.
+func GenerateReportFromTemplate(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage: "Error generating report from template",
+		Writer:       w,
+		Request:      r,
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			template, ok := authorizeTemplateAction(w, r, "generate")
+			if !ok {
+				return 0, nil
+			}
+
+			var command commands.ReportRequestCommand
+			if err := json.Unmarshal(template.Configuration, &command); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			token := structs.GetClaims(r)
+			report, err := services.NewReportService(nil).Generate(token.UserId, command)
+			if err != nil {
+				var specErr *services.ReportSpecError
+				if errors.As(err, &specErr) {
+					utils.WriteCustomErrorResponse(w, "Invalid report configuration: "+specErr.Error(), http.StatusBadRequest)
+					return 0, nil
+				}
+				return http.StatusInternalServerError, err
+			}
+
+			w.Header().Set("Content-Type", report.ContentType)
+			w.Header().Set("Content-Disposition", "attachment; filename=\""+report.Filename+"\"")
+			w.WriteHeader(http.StatusOK)
+			w.Write(report.Bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+// GetReportTemplateOptions returns every report template as a lightweight
+// {id, name, groupIds} option for the role-form access matrix. It is gated on
+// app.roles.read (the admin role editor), NOT app.reports.read: the admin building a
+// role may not personally hold report permissions, exactly like GET /permission.
+func GetReportTemplateOptions(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage:   "Error getting report template options",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppRolesRead},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			options, err := repositories.NewReportTemplateRepository(nil).GetAllTemplateOptions()
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(options)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
