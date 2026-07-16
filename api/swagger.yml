@@ -298,12 +298,40 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/template/options:
+    get:
+      tags:
+        - Report
+      summary: Get report template options
+      description:
+        Returns every report template as a lightweight {id, name, groupIds} option
+        for the role-form access matrix. Gated on app.roles.read (the admin role
+        editor may not personally hold report permissions), not a report permission.
+      operationId: getReportTemplateOptions
+      responses:
+        200:
+          description: The report template options
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReportTemplateOption"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /report/template/{id}:
     get:
       tags:
         - Report
       summary: Get a report template
-      description: Returns a saved report template by id. Requires app.reports.read.
+      description:
+        Returns a saved report template by id. Access is resolved per template
+        (readAll, or the per-group ceiling plus the per-template matrix).
       operationId: getReportTemplate
       parameters:
         - in: path
@@ -418,6 +446,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReportTemplate"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/template/{id}/generate:
+    post:
+      tags:
+        - Report
+      summary: Generate a report from a saved template
+      description:
+        Generates a saved report template by id and streams the file. Enforces the
+        per-template generate grant (generateAll, or the per-group ceiling plus the
+        matrix), loading the stored configuration server-side.
+      operationId: generateReportFromTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to generate
+      responses:
+        200:
+          description: The generated report file (or a zip of several formats)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         400:
           $ref: "#/components/responses/BadRequest"
         403:
@@ -3385,6 +3449,14 @@ components:
           description: >-
             Whether a GROUP role lets each member see receipts they paid for. Part
             of the paid-by visibility filter; always false for app roles.
+        reportTemplateGrants:
+          type: array
+          description: >-
+            Per-template action grants restricting which report templates a GROUP
+            role's members may act on. Empty means unrestricted (every template the
+            role's group access reaches). Always empty for app roles.
+          items:
+            $ref: "#/components/schemas/ReportTemplateGrant"
     UpsertRoleCommand:
       type: object
       required:
@@ -3432,6 +3504,30 @@ components:
           description: >-
             Whether to also let each member see receipts they paid for. Only valid
             on group roles.
+        reportTemplateGrants:
+          type: array
+          description: >-
+            Per-template action grants for a GROUP role, restricting which report
+            templates its members may act on. Only valid on group roles; omit or
+            leave empty for unrestricted access.
+          items:
+            $ref: "#/components/schemas/ReportTemplateGrant"
+    ReportTemplateGrant:
+      type: object
+      required:
+        - reportTemplateId
+        - permissions
+      properties:
+        reportTemplateId:
+          type: integer
+          format: uint64
+        permissions:
+          type: array
+          description: >-
+            The actions a GROUP role may perform on this report template
+            (read, generate, update, delete, duplicate).
+          items:
+            type: string
     SortDirection:
       type: string
       enum:
@@ -6022,3 +6118,29 @@ components:
             configurationVersion:
               type: integer
               description: Schema version the stored configuration was written under.
+            allowedActions:
+              type: array
+              description: >-
+                The actions the requesting user may perform on this template
+                (read, generate, update, delete, duplicate), resolved per user and
+                populated only on the list response. Drives the row action buttons.
+              items:
+                type: string
+    ReportTemplateOption:
+      type: object
+      required:
+        - id
+        - name
+        - groupIds
+      properties:
+        id:
+          type: integer
+          format: uint64
+        name:
+          type: string
+        groupIds:
+          type: array
+          description: The ids of the groups this template covers.
+          items:
+            type: integer
+            format: uint64
