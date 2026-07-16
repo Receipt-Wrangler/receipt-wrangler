@@ -112,3 +112,11 @@ func clearGroupRoleGrantCacheAll() {
 func ClearGroupRoleGrantCacheForTests() {
 	clearGroupRoleGrantCacheAll()
 }
+
+// EvictAllGroupRoleGrants empties the entire grant cache. Called when a report
+// template is deleted: its grant rows cascade out of every role's matrix, so any
+// role's cached report-template grants may now be stale. A full flush is cheap for
+// a rare admin action and avoids tracking which roles referenced the template.
+func EvictAllGroupRoleGrants() {
+	clearGroupRoleGrantCacheAll()
+}

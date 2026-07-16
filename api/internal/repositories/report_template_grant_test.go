@@ -2,10 +2,12 @@ package repositories
 
 import (
 	"encoding/json"
+	"fmt"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/utils"
+	"slices"
 	"testing"
 )
 
@@ -244,5 +246,96 @@ func TestReportTemplateCountByIds(t *testing.T) {
 	}
 	if count != 1 {
 		utils.PrintTestError(t, count, 1)
+	}
+}
+
+func TestCreateAndUpdateSyncTemplateGroupIndex(t *testing.T) {
+	defer TruncateTestDb()
+	repo := NewReportTemplateRepository(nil)
+
+	created, err := repo.CreateReportTemplate(sampleReportCommand(), 1)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Create wrote the index rows from the command's groupIds (["1","2"]).
+	groups, err := repo.GetGroupIdsByTemplateId(created.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	slices.Sort(groups)
+	if !slices.Equal(groups, []uint{1, 2}) {
+		utils.PrintTestError(t, groups, []uint{1, 2})
+	}
+
+	// Update retargets the template onto group 3 only; the index tracks it.
+	retarget := sampleReportCommand()
+	retarget.GroupIds = []string{"3"}
+	if _, err := repo.UpdateReportTemplate(retarget, fmt.Sprint(created.ID)); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	groups, err = repo.GetGroupIdsByTemplateId(created.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !slices.Equal(groups, []uint{3}) {
+		utils.PrintTestError(t, groups, []uint{3})
+	}
+}
+
+func TestGetPagedReportTemplatesAppliesIdFilter(t *testing.T) {
+	defer TruncateTestDb()
+	repo := NewReportTemplateRepository(nil)
+
+	first := sampleReportCommand()
+	first.Name = "A"
+	templateA, err := repo.CreateReportTemplate(first, 1)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	second := sampleReportCommand()
+	second.Name = "B"
+	if _, err := repo.CreateReportTemplate(second, 1); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	cmd := pagedReportTemplateCommand("name", commands.ASCENDING)
+
+	// nil filter: unrestricted, both templates.
+	_, count, err := repo.GetPagedReportTemplates(cmd, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 2 {
+		utils.PrintTestError(t, count, int64(2))
+	}
+
+	// Non-nil subset: only template A, and the count reflects the filter.
+	only := []uint{templateA.ID}
+	filtered, filteredCount, err := repo.GetPagedReportTemplates(cmd, &only)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if filteredCount != 1 || len(filtered) != 1 || filtered[0].ID != templateA.ID {
+		utils.PrintTestError(t, filtered, "only template A")
+	}
+
+	// Empty set: nothing visible.
+	empty := []uint{}
+	none, noneCount, err := repo.GetPagedReportTemplates(cmd, &empty)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if noneCount != 0 || len(none) != 0 {
+		utils.PrintTestError(t, none, "no templates")
 	}
 }

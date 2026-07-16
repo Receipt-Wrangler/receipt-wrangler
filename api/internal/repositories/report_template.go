@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/utils"
 )
 
 type ReportTemplateRepository struct {
@@ -40,7 +41,14 @@ func (repository ReportTemplateRepository) CreateReportTemplate(command commands
 		ConfigurationVersion: commands.CurrentReportConfigurationVersion,
 	}
 
-	err = db.Create(&template).Error
+	// Persist the row and its denormalized group index atomically so the index
+	// never drifts from the blob on a partial failure.
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if txErr := tx.Create(&template).Error; txErr != nil {
+			return txErr
+		}
+		return replaceReportTemplateGroups(tx, template.ID, groupIdsToUint(command.GroupIds))
+	})
 	if err != nil {
 		return models.ReportTemplate{}, err
 	}
@@ -48,15 +56,62 @@ func (repository ReportTemplateRepository) CreateReportTemplate(command commands
 	return template, nil
 }
 
+// replaceReportTemplateGroups rebuilds a template's denormalized group index from
+// the given group ids (delete-all-then-insert), keeping "index == config blob" as
+// the invariant on every write. Deleting a template cascades its index rows away.
+func replaceReportTemplateGroups(db *gorm.DB, templateId uint, groupIds []uint) error {
+	err := db.Where("report_template_id = ?", templateId).Delete(&models.ReportTemplateGroup{}).Error
+	if err != nil {
+		return err
+	}
+
+	if len(groupIds) == 0 {
+		return nil
+	}
+
+	rows := make([]models.ReportTemplateGroup, 0, len(groupIds))
+	for _, groupId := range groupIds {
+		rows = append(rows, models.ReportTemplateGroup{ReportTemplateID: templateId, GroupID: groupId})
+	}
+
+	return db.Omit("ReportTemplate").Create(&rows).Error
+}
+
+// groupIdsToUint converts the command's string group ids to uint, skipping any that
+// don't parse (the command validator already rejects malformed/empty ids).
+func groupIdsToUint(ids []string) []uint {
+	out := make([]uint, 0, len(ids))
+	for _, id := range ids {
+		groupId, err := utils.StringToUint(id)
+		if err != nil {
+			continue
+		}
+		out = append(out, groupId)
+	}
+	return out
+}
+
 // GetPagedReportTemplates returns a page of templates plus the unpaged total. The
-// count runs before paging so it reflects the whole set. OrderBy is guarded against
-// an allow-list because it is interpolated as a raw column name (not a bound value).
-func (repository ReportTemplateRepository) GetPagedReportTemplates(command commands.PagedRequestCommand) ([]models.ReportTemplate, int64, error) {
+// count runs before paging so it reflects the whole set — and the visibility filter
+// is applied BEFORE the count so the total reflects only the caller's visible
+// templates. allowedIds nil means unrestricted (no filter); a non-nil pointer
+// restricts the result to those ids, and an empty set matches nothing. OrderBy is
+// guarded against an allow-list because it is interpolated as a raw column name.
+func (repository ReportTemplateRepository) GetPagedReportTemplates(command commands.PagedRequestCommand, allowedIds *[]uint) ([]models.ReportTemplate, int64, error) {
 	db := repository.GetDB()
 	var results []models.ReportTemplate
 	var count int64
 
+	// A restricted-but-empty visible set matches no templates; short-circuit so the
+	// count is a clean 0 rather than depending on an IN () quirk.
+	if allowedIds != nil && len(*allowedIds) == 0 {
+		return []models.ReportTemplate{}, 0, nil
+	}
+
 	query := db.Model(&models.ReportTemplate{})
+	if allowedIds != nil {
+		query = query.Where("id IN ?", *allowedIds)
+	}
 
 	err := query.Count(&count).Error
 	if err != nil {
@@ -157,6 +212,11 @@ func (repository ReportTemplateRepository) DuplicateReportTemplate(userId uint, 
 		return models.ReportTemplate{}, err
 	}
 
+	sourceGroupIds, err := repository.GetGroupIdsByTemplateId(source.ID)
+	if err != nil {
+		return models.ReportTemplate{}, err
+	}
+
 	template := models.ReportTemplate{
 		BaseModel:            models.BaseModel{CreatedBy: &userId},
 		Name:                 source.Name + " duplicate",
@@ -164,7 +224,14 @@ func (repository ReportTemplateRepository) DuplicateReportTemplate(userId uint, 
 		ConfigurationVersion: source.ConfigurationVersion,
 	}
 
-	err = db.Create(&template).Error
+	// The copy carries the source's configuration verbatim, so it also carries the
+	// same covered groups — mirror them into the copy's group index atomically.
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if txErr := tx.Create(&template).Error; txErr != nil {
+			return txErr
+		}
+		return replaceReportTemplateGroups(tx, template.ID, sourceGroupIds)
+	})
 	if err != nil {
 		return models.ReportTemplate{}, err
 	}
@@ -198,16 +265,24 @@ func (repository ReportTemplateRepository) UpdateReportTemplate(command commands
 	template.Configuration = configuration
 	template.ConfigurationVersion = commands.CurrentReportConfigurationVersion
 
-	result := db.Model(&models.ReportTemplate{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"name":                  template.Name,
-		"configuration":         template.Configuration,
-		"configuration_version": template.ConfigurationVersion,
+	// Rewrite the row and rebuild its group index atomically (the update may retarget
+	// the covered groups, so the index must track them).
+	err = db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.ReportTemplate{}).Where("id = ?", id).Updates(map[string]interface{}{
+			"name":                  template.Name,
+			"configuration":         template.Configuration,
+			"configuration_version": template.ConfigurationVersion,
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return replaceReportTemplateGroups(tx, template.ID, groupIdsToUint(command.GroupIds))
 	})
-	if result.Error != nil {
-		return models.ReportTemplate{}, result.Error
-	}
-	if result.RowsAffected == 0 {
-		return models.ReportTemplate{}, gorm.ErrRecordNotFound
+	if err != nil {
+		return models.ReportTemplate{}, err
 	}
 
 	return template, nil

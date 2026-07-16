@@ -8,6 +8,7 @@ import (
 
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
+	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
@@ -44,6 +45,40 @@ func loadReportCommand(w http.ResponseWriter, r *http.Request) (commands.ReportR
 	}
 
 	return command, true
+}
+
+// authorizeTemplateAction loads the {id} template, confirms it exists, and checks
+// the caller may perform action on it (the "*All" bypass, the per-group ceiling,
+// and the per-template matrix — all resolved by CanActOnTemplate). It writes the
+// 404/403/500 response and returns ok=false on any failure; on success it returns
+// the loaded template so the handler can reuse it. Because base-OR-"*All" is an OR
+// the declarative AppPermissions gate can't express, the six template handlers do
+// their app-permission check here rather than on the structs.Handler.
+func authorizeTemplateAction(w http.ResponseWriter, r *http.Request, action string) (models.ReportTemplate, bool) {
+	id := chi.URLParam(r, "id")
+
+	template, err := repositories.NewReportTemplateRepository(nil).GetReportTemplateById(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.WriteCustomErrorResponse(w, "Report template not found", http.StatusNotFound)
+			return models.ReportTemplate{}, false
+		}
+		utils.WriteCustomErrorResponse(w, "Error loading report template", http.StatusInternalServerError)
+		return models.ReportTemplate{}, false
+	}
+
+	token := structs.GetClaims(r)
+	allowed, err := services.NewPermissionService(nil).CanActOnTemplate(token.UserId, template.ID, action)
+	if err != nil {
+		utils.WriteCustomErrorResponse(w, "Error authorizing report template access", http.StatusInternalServerError)
+		return models.ReportTemplate{}, false
+	}
+	if !allowed {
+		utils.WriteCustomErrorResponse(w, "User is unauthorized to access this report template", http.StatusForbidden)
+		return models.ReportTemplate{}, false
+	}
+
+	return template, true
 }
 
 // GenerateReport builds and streams a report over one or more groups' receipts.
@@ -142,23 +177,28 @@ func PreviewReport(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
-// DeleteReportTemplate removes a saved report template by id. App-scoped behind
-// app.reports.delete, matching CreateReportTemplate. Deleting a non-existent id
-// still returns 200 (GORM treats it as a no-op), so it is idempotent.
+// DeleteReportTemplate removes a saved report template by id. Access is resolved by
+// CanActOnTemplate (delete): a missing id maps to 404, an unauthorized caller to 403.
+// On success the grant cache is flushed, since the deleted template's grant rows
+// cascade out of every role's matrix.
 func DeleteReportTemplate(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage:   "Error deleting report template",
-		Writer:         w,
-		Request:        r,
-		ResponseType:   constants.ApplicationJson,
-		AppPermissions: []string{permissions.AppReportsDelete},
+		ErrorMessage: "Error deleting report template",
+		Writer:       w,
+		Request:      r,
+		ResponseType: constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			id := chi.URLParam(r, "id")
+			template, ok := authorizeTemplateAction(w, r, "delete")
+			if !ok {
+				return 0, nil
+			}
 
-			err := repositories.NewReportTemplateRepository(nil).DeleteReportTemplateById(id)
+			err := repositories.NewReportTemplateRepository(nil).DeleteReportTemplateById(utils.UintToString(template.ID))
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
+
+			services.EvictAllGroupRoleGrants()
 
 			w.WriteHeader(http.StatusOK)
 			return 0, nil
@@ -169,15 +209,31 @@ func DeleteReportTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetPagedReportTemplates returns a paged, sorted list of saved report templates.
-// App-scoped behind app.reports.read, matching the report builder's route gate.
+// Visibility is resolved per user (readAll sees all; otherwise only templates whose
+// covered groups the caller can read AND whose read action the per-template matrix
+// permits), and each row carries the caller's allowed actions so the client can gate
+// its buttons. The app-permission gate lives in VisibleTemplateIds (read/readAll).
 func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage:   "Error getting report templates",
-		Writer:         w,
-		Request:        r,
-		ResponseType:   constants.ApplicationJson,
-		AppPermissions: []string{permissions.AppReportsRead},
+		ErrorMessage: "Error getting report templates",
+		Writer:       w,
+		Request:      r,
+		ResponseType: constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			token := structs.GetClaims(r)
+			permissionService := services.NewPermissionService(nil)
+
+			// Report access at all is app.reports.read OR readAll (an OR the declarative
+			// AppPermissions gate can't express); deny outright without either.
+			canList, err := permissionService.HasAnyAppPermission(token.UserId, permissions.AppReportsRead, permissions.AppReportsReadAll)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !canList {
+				utils.WriteCustomErrorResponse(w, "User is unauthorized to access report templates", http.StatusForbidden)
+				return 0, nil
+			}
+
 			command := commands.PagedRequestCommand{}
 			if err := command.LoadDataFromRequest(w, r); err != nil {
 				return http.StatusInternalServerError, err
@@ -189,7 +245,16 @@ func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
-			templates, count, err := repositories.NewReportTemplateRepository(nil).GetPagedReportTemplates(command)
+			visibleIds, unrestricted, err := permissionService.VisibleTemplateIds(token.UserId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			var idFilter *[]uint
+			if !unrestricted {
+				idFilter = &visibleIds
+			}
+
+			templates, count, err := repositories.NewReportTemplateRepository(nil).GetPagedReportTemplates(command, idFilter)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -197,6 +262,11 @@ func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 			pagedData := structs.PagedData{}
 			data := make([]interface{}, 0, len(templates))
 			for i := 0; i < len(templates); i++ {
+				actions, err := permissionService.AllowedActionsForTemplate(token.UserId, templates[i].ID)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				templates[i].AllowedActions = actions
 				data = append(data, templates[i])
 			}
 			pagedData.TotalCount = count
@@ -216,25 +286,18 @@ func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
-// GetReportTemplate returns a saved report template by id. App-scoped behind
-// app.reports.read; a missing id maps to a 404 rather than a 500.
+// GetReportTemplate returns a saved report template by id. Access is resolved by
+// CanActOnTemplate (read): a missing id maps to 404, an unauthorized caller to 403.
 func GetReportTemplate(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage:   "Error getting report template",
-		Writer:         w,
-		Request:        r,
-		ResponseType:   constants.ApplicationJson,
-		AppPermissions: []string{permissions.AppReportsRead},
+		ErrorMessage: "Error getting report template",
+		Writer:       w,
+		Request:      r,
+		ResponseType: constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			id := chi.URLParam(r, "id")
-
-			template, err := repositories.NewReportTemplateRepository(nil).GetReportTemplateById(id)
-			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					utils.WriteCustomErrorResponse(w, "Report template not found", http.StatusNotFound)
-					return 0, nil
-				}
-				return http.StatusInternalServerError, err
+			template, ok := authorizeTemplateAction(w, r, "read")
+			if !ok {
+				return 0, nil
 			}
 
 			responseBytes, err := utils.MarshalResponseData(template)
@@ -252,25 +315,25 @@ func GetReportTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 // DuplicateReportTemplate copies a saved report template and returns the new copy.
-// App-scoped behind app.reports.duplicate; a missing source id maps to a 404. The
-// copy is owned by the caller and its name is suffixed " duplicate".
+// Access to the source is resolved by CanActOnTemplate (duplicate); a missing source
+// id maps to 404, an unauthorized caller to 403. The copy is owned by the caller,
+// its name suffixed " duplicate", and it starts unrestricted (no grant rows).
 func DuplicateReportTemplate(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
-		ErrorMessage:   "Error duplicating report template",
-		Writer:         w,
-		Request:        r,
-		ResponseType:   constants.ApplicationJson,
-		AppPermissions: []string{permissions.AppReportsDuplicate},
+		ErrorMessage: "Error duplicating report template",
+		Writer:       w,
+		Request:      r,
+		ResponseType: constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
-			id := chi.URLParam(r, "id")
 
-			template, err := repositories.NewReportTemplateRepository(nil).DuplicateReportTemplate(token.UserId, id)
+			source, ok := authorizeTemplateAction(w, r, "duplicate")
+			if !ok {
+				return 0, nil
+			}
+
+			template, err := repositories.NewReportTemplateRepository(nil).DuplicateReportTemplate(token.UserId, utils.UintToString(source.ID))
 			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					utils.WriteCustomErrorResponse(w, "Report template not found", http.StatusNotFound)
-					return 0, nil
-				}
 				return http.StatusInternalServerError, err
 			}
 
@@ -308,13 +371,34 @@ func CreateReportTemplate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler := structs.Handler{
-		ErrorMessage:   "Error saving report template",
-		Writer:         w,
-		Request:        r,
-		ResponseType:   constants.ApplicationJson,
-		AppPermissions: []string{permissions.AppReportsCreate},
+		ErrorMessage: "Error saving report template",
+		Writer:       w,
+		Request:      r,
+		ResponseType: constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
+			permissionService := services.NewPermissionService(nil)
+
+			// createAll implies the ability to create, so accept either. Then the
+			// caller must be able to report over every group the template attaches to
+			// (createAll bypasses that ceiling).
+			canCreate, err := permissionService.HasAnyAppPermission(token.UserId, permissions.AppReportsCreate, permissions.AppReportsCreateAll)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !canCreate {
+				utils.WriteCustomErrorResponse(w, "User is unauthorized to create report templates", http.StatusForbidden)
+				return 0, nil
+			}
+
+			canReport, err := permissionService.CanReportOverGroups(token.UserId, command.GroupIds, permissions.AppReportsCreateAll)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !canReport {
+				utils.WriteCustomErrorResponse(w, "User is unauthorized to create a report over one or more of these groups", http.StatusForbidden)
+				return 0, nil
+			}
 
 			template, err := repositories.NewReportTemplateRepository(nil).CreateReportTemplate(command, token.UserId)
 			if err != nil {
@@ -354,15 +438,31 @@ func UpdateReportTemplate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler := structs.Handler{
-		ErrorMessage:   "Error updating report template",
-		Writer:         w,
-		Request:        r,
-		ResponseType:   constants.ApplicationJson,
-		AppPermissions: []string{permissions.AppReportsUpdate},
+		ErrorMessage: "Error updating report template",
+		Writer:       w,
+		Request:      r,
+		ResponseType: constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			id := chi.URLParam(r, "id")
+			token := structs.GetClaims(r)
+			permissionService := services.NewPermissionService(nil)
 
-			template, err := repositories.NewReportTemplateRepository(nil).UpdateReportTemplate(command, id)
+			existing, ok := authorizeTemplateAction(w, r, "update")
+			if !ok {
+				return 0, nil
+			}
+
+			// Retargeting the template onto new groups requires reporting access over
+			// each of them (updateAll bypasses that ceiling).
+			canReport, err := permissionService.CanReportOverGroups(token.UserId, command.GroupIds, permissions.AppReportsUpdateAll)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !canReport {
+				utils.WriteCustomErrorResponse(w, "User is unauthorized to report over one or more of these groups", http.StatusForbidden)
+				return 0, nil
+			}
+
+			template, err := repositories.NewReportTemplateRepository(nil).UpdateReportTemplate(command, utils.UintToString(existing.ID))
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					utils.WriteCustomErrorResponse(w, "Report template not found", http.StatusNotFound)
