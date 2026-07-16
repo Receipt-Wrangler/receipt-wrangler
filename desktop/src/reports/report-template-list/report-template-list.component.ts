@@ -19,7 +19,6 @@ import { Permission, ReportTemplate } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { BaseTableService } from "../../services/base-table.service";
 import { BaseTableComponent } from "../../shared-ui/base-table/base-table.component";
-import { BreadcrumbItem } from "../../shared-ui/breadcrumb/breadcrumb-item.interface";
 import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { GroupState } from "../../store";
 import {
@@ -72,8 +71,6 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
   public readonly generatingId = signal<number | null>(null);
 
   private readonly groups = this.store.selectSignal(GroupState.groupsWithoutAll);
-
-  public readonly crumbs: BreadcrumbItem[] = [{ label: "Reports" }];
 
   constructor(public override baseTableService: BaseTableService) {
     super(baseTableService);
