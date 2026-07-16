@@ -99,6 +99,33 @@ func TestLegacyAppUserExcludesReportsRead(t *testing.T) {
 	}
 }
 
+func TestLegacyAppAdminIncludesReportAllPerms(t *testing.T) {
+	// The per-action report bypass permissions are app-scoped, so Legacy Admin auto-
+	// grants them — an upgrading install's admin keeps system-wide report reach even
+	// after the group-access ceiling tightens the six template handlers.
+	for _, key := range []string{
+		AppReportsReadAll, AppReportsCreateAll, AppReportsUpdateAll,
+		AppReportsDeleteAll, AppReportsDuplicateAll, AppReportsGenerateAll,
+	} {
+		if !slices.Contains(LegacyAppAdminKeys(), key) {
+			utilPrint(t, "Legacy Admin missing "+key, "present")
+		}
+	}
+}
+
+func TestLegacyAppUserExcludesReportAllPerms(t *testing.T) {
+	// Legacy User is a fixed subset: the "all templates" bypass permissions are
+	// admin-by-default and must never flow into it.
+	for _, key := range []string{
+		AppReportsReadAll, AppReportsCreateAll, AppReportsUpdateAll,
+		AppReportsDeleteAll, AppReportsDuplicateAll, AppReportsGenerateAll,
+	} {
+		if slices.Contains(LegacyAppUserKeys(), key) {
+			utilPrint(t, "Legacy User contains "+key, "absent")
+		}
+	}
+}
+
 func TestLegacyAppUserExcludesUsersRead(t *testing.T) {
 	// app.users.read gates only the admin "Manage Users" listing (GET /user/),
 	// which no client calls. Legacy User must NOT hold it, so normal users don't
