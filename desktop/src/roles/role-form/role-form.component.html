@@ -250,6 +250,66 @@
               >{{ option.displayName }}
             </ng-template>
           </div>
+
+          <div class="rw-card rw-form-section">
+            <div class="rw-perm-header">
+              <div>
+                <h2>Report template access</h2>
+                <div class="hint hint-inline">
+                  Limit members to specific report templates and actions. Leave
+                  everything unchecked for unrestricted access to every template
+                  their groups allow.
+                </div>
+              </div>
+            </div>
+
+            @if (reportTemplateOptions().length === 0) {
+              <div class="hint">No report templates exist yet.</div>
+            } @else {
+              <div class="rw-matrix-scroll">
+                <table class="rw-matrix">
+                  <thead>
+                    <tr>
+                      <th class="rw-matrix-name">Template</th>
+                      <th>All</th>
+                      @for (action of reportActions; track action.key) {
+                        <th>{{ action.label }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (option of reportTemplateOptions(); track option.id) {
+                      <tr>
+                        <td class="rw-matrix-name">{{ option.name }}</td>
+                        <td>
+                          <button
+                            type="button"
+                            class="rw-switch"
+                            [class.on]="isTemplateAllGranted(option.id)"
+                            [disabled]="isViewMode()"
+                            [attr.aria-label]="'Toggle all actions for ' + option.name"
+                            (click)="toggleTemplateAll(option.id, !isTemplateAllGranted(option.id))"
+                          ></button>
+                        </td>
+                        @for (action of reportActions; track action.key) {
+                          <td>
+                            <button
+                              type="button"
+                              class="rw-switch"
+                              [class.on]="isTemplateActionGranted(option.id, action.key)"
+                              [disabled]="isViewMode()"
+                              [attr.aria-label]="action.label + ' ' + option.name"
+                              (click)="toggleTemplateAction(option.id, action.key)"
+                            ></button>
+                          </td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
         }
       </div>
 

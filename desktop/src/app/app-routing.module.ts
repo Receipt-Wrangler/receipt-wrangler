@@ -120,7 +120,8 @@ const routes: Routes = [
           import("../reports/reports.module").then((m) => m.ReportsModule),
         canActivate: [AuthGuard, appPermissionGuard],
         data: {
-          appPermissions: [Permission.AppReportsRead],
+          // read OR readAll: an admin with only the "*All" bypass still reaches reports.
+          appPermissions: [Permission.AppReportsRead, Permission.AppReportsReadAll],
         },
       },
       {

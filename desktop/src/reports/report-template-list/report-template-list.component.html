@@ -80,37 +80,48 @@
 
 <ng-template #actionsCell let-element="element">
   <div class="row-actions">
-    <app-button
-      *hasAppPermission="Permission.AppReportsGenerate"
-      matButtonType="iconButton"
-      color="accent"
-      icon="play_arrow"
-      tooltip="Generate report"
-      data-testid="report-template-generate"
-      [disabled]="generatingId() !== null"
-      (clicked)="generate(element)"
-    ></app-button>
-    <app-edit-button
-      color="accent"
-      tooltip="Open in builder"
-      data-testid="report-template-edit"
-      [buttonRouterLink]="['/reports', element.id, 'edit']"
-    ></app-edit-button>
-    <app-button
-      *hasAppPermission="Permission.AppReportsDuplicate"
-      matButtonType="iconButton"
-      color="accent"
-      icon="content_copy"
-      tooltip="Duplicate"
-      data-testid="report-template-duplicate"
-      [disabled]="duplicatingId() !== null"
-      (clicked)="duplicate(element)"
-    ></app-button>
-    <app-delete-button
-      *hasAppPermission="Permission.AppReportsDelete"
-      tooltip="Delete"
-      data-testid="report-template-delete"
-      (clicked)="delete(element)"
-    ></app-delete-button>
+    <!--
+      Each button is gated on the server-computed allowedActions for this row, which
+      already bakes in the base/"*All" report permissions, the per-group ceiling, and
+      the per-template matrix — so it must NOT also be AND-ed with *hasAppPermission
+      (that would wrongly hide a button from an "*All"-only holder lacking the base).
+    -->
+    @if (element.allowedActions?.includes("generate")) {
+      <app-button
+        matButtonType="iconButton"
+        color="accent"
+        icon="play_arrow"
+        tooltip="Generate report"
+        data-testid="report-template-generate"
+        [disabled]="generatingId() !== null"
+        (clicked)="generate(element)"
+      ></app-button>
+    }
+    @if (element.allowedActions?.includes("update")) {
+      <app-edit-button
+        color="accent"
+        tooltip="Open in builder"
+        data-testid="report-template-edit"
+        [buttonRouterLink]="['/reports', element.id, 'edit']"
+      ></app-edit-button>
+    }
+    @if (element.allowedActions?.includes("duplicate")) {
+      <app-button
+        matButtonType="iconButton"
+        color="accent"
+        icon="content_copy"
+        tooltip="Duplicate"
+        data-testid="report-template-duplicate"
+        [disabled]="duplicatingId() !== null"
+        (clicked)="duplicate(element)"
+      ></app-button>
+    }
+    @if (element.allowedActions?.includes("delete")) {
+      <app-delete-button
+        tooltip="Delete"
+        data-testid="report-template-delete"
+        (clicked)="delete(element)"
+      ></app-delete-button>
+    }
   </div>
 </ng-template>

@@ -67,11 +67,14 @@ export class ReportRunnerService {
   }
 
   /**
-   * Runs a saved template's stored configuration straight to a download, reusing
-   * the builder's generate path (so the same endpoint + filename logic applies).
+   * Runs a saved template by id: the server loads its stored configuration and
+   * enforces the per-template generate grant (which the ad-hoc /generate cannot).
+   * The download filename is derived from the template's own configuration.
    */
-  public generateFromTemplate(configuration: ReportRequestCommand): Observable<Blob> {
-    return this.generateAndDownload(configuration);
+  public generateFromTemplateById(template: ReportTemplate): Observable<Blob> {
+    return this.reportService
+      .generateReportFromTemplate(template.id)
+      .pipe(tap((blob) => downloadFile(blob, reportFilename(template.configuration))));
   }
 }
 

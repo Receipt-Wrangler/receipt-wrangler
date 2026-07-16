@@ -165,7 +165,7 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
     }
     this.generatingId.set(template.id);
     this.runner
-      .generateFromTemplate(template.configuration)
+      .generateFromTemplateById(template)
       .pipe(
         take(1),
         catchError(() => EMPTY), // the HTTP interceptor surfaces the failure toast

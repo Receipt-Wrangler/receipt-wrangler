@@ -461,6 +461,44 @@ $ease: cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
+// ----- Report template access matrix -----
+.rw-matrix-scroll {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.rw-matrix {
+  border-collapse: collapse;
+  width: 100%;
+
+  th,
+  td {
+    padding: 8px 12px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  thead th {
+    font-size: 12px;
+    font-weight: 600;
+    color: $slate-500;
+    border-bottom: 1px solid $slate-200;
+  }
+
+  tbody tr:not(:last-child) td {
+    border-bottom: 1px solid $slate-100;
+  }
+
+  .rw-switch {
+    margin: 0 auto;
+  }
+}
+
+.rw-matrix-name {
+  text-align: left !important;
+  font-weight: 500;
+}
+
 // ----- Summary side panel -----
 .rw-side {
   position: sticky;

@@ -45,7 +45,7 @@ describe("ReportTemplateListComponent", () => {
     listTemplates: jest.Mock;
     duplicateTemplate: jest.Mock;
     deleteTemplate: jest.Mock;
-    generateFromTemplate: jest.Mock;
+    generateFromTemplateById: jest.Mock;
     getTemplate: jest.Mock;
   };
   let router: { navigate: jest.Mock };
@@ -62,7 +62,7 @@ describe("ReportTemplateListComponent", () => {
       listTemplates: jest.fn(() => of({ data: templates, totalCount: templates.length })),
       duplicateTemplate: jest.fn(() => of(makeTemplate(3, "Alpha duplicate"))),
       deleteTemplate: jest.fn(() => of(undefined)),
-      generateFromTemplate: jest.fn(() => of(new Blob())),
+      generateFromTemplateById: jest.fn(() => of(new Blob())),
       getTemplate: jest.fn(),
     };
     router = { navigate: jest.fn() };
@@ -113,9 +113,9 @@ describe("ReportTemplateListComponent", () => {
     expect(router.navigate).toHaveBeenCalledWith(["/reports/new"]);
   });
 
-  it("generate runs the stored configuration and clears the in-flight id", () => {
+  it("generate runs the template by id and clears the in-flight id", () => {
     component.generate(templates[0]);
-    expect(runner.generateFromTemplate).toHaveBeenCalledWith(templates[0].configuration);
+    expect(runner.generateFromTemplateById).toHaveBeenCalledWith(templates[0]);
     // of() completes synchronously, so finalize resets the flag.
     expect(component.generatingId()).toBeNull();
   });
@@ -123,14 +123,14 @@ describe("ReportTemplateListComponent", () => {
   it("generate ignores a second call while one is in flight", () => {
     // A non-completing observable keeps the first generate in flight.
     const pending = new Subject<Blob>();
-    runner.generateFromTemplate.mockReturnValue(pending.asObservable());
+    runner.generateFromTemplateById.mockReturnValue(pending.asObservable());
 
     component.generate(templates[0]);
     expect(component.generatingId()).toBe(1);
 
     // A second click while the first runs must not fire another request.
     component.generate(templates[1]);
-    expect(runner.generateFromTemplate).toHaveBeenCalledTimes(1);
+    expect(runner.generateFromTemplateById).toHaveBeenCalledTimes(1);
 
     pending.complete();
     expect(component.generatingId()).toBeNull();
