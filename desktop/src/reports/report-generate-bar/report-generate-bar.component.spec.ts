@@ -83,6 +83,38 @@ describe("ReportGenerateBarComponent", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it("labels the Save action by mode and in-flight state", async () => {
+    // New route: create label.
+    expect(component.saveTemplateText()).toBe("Save Template");
+    fixture.componentRef.setInput("saving", true);
+    await fixture.whenStable();
+    expect(component.saveTemplateText()).toBe("Saving…");
+
+    // Edit route: update label.
+    fixture.componentRef.setInput("saving", false);
+    fixture.componentRef.setInput("isEditMode", true);
+    await fixture.whenStable();
+    expect(component.saveTemplateText()).toBe("Update Template");
+    fixture.componentRef.setInput("saving", true);
+    await fixture.whenStable();
+    expect(component.saveTemplateText()).toBe("Updating…");
+  });
+
+  it("gates the Save action on the mode's permission", async () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const saveButton = () => el.querySelector('[data-testid="report-save-template"]');
+
+    // New mode gates on create (granted in beforeEach) → the Save action renders.
+    fixture.componentRef.setInput("saveTemplatePermission", Permission.AppReportsCreate);
+    await fixture.whenStable();
+    expect(saveButton()).not.toBeNull();
+
+    // Edit mode gates on update, which this caller lacks → the Save action is hidden.
+    fixture.componentRef.setInput("saveTemplatePermission", Permission.AppReportsUpdate);
+    await fixture.whenStable();
+    expect(saveButton()).toBeNull();
+  });
+
   it("renders the format chips and the Generate button's disabled state", async () => {
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;

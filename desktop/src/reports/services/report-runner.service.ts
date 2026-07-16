@@ -36,9 +36,14 @@ export class ReportRunnerService {
     return this.reportService.previewReport(command);
   }
 
-  /** Saves the current configuration as a reusable report template. */
+  /** Saves the current configuration as a new reusable report template. */
   public saveTemplate(command: ReportRequestCommand): Observable<ReportTemplate> {
     return this.reportService.createReportTemplate(command);
+  }
+
+  /** Overwrites an existing template in place with the current configuration. */
+  public updateTemplate(id: number, command: ReportRequestCommand): Observable<ReportTemplate> {
+    return this.reportService.updateReportTemplate(id, command);
   }
 
   /** A page of saved report templates for the list. */

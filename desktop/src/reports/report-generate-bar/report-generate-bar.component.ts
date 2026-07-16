@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, input, output } from "@angular/core";
 import { FormGroup } from "@angular/forms";
 import { Permission } from "../../open-api";
 
@@ -26,10 +26,23 @@ export class ReportGenerateBarComponent {
   public readonly canGenerate = input<boolean>(false);
   public readonly canSaveTemplate = input<boolean>(false);
   public readonly saving = input<boolean>(false);
+  // Editing an opened template updates it in place (permission app.reports.update);
+  // the blank builder creates a new one (app.reports.create). The parent supplies
+  // both so the Save action's gate and label follow the mode.
+  public readonly isEditMode = input<boolean>(false);
+  public readonly saveTemplatePermission = input<Permission>(Permission.AppReportsCreate);
   public readonly generate = output<void>();
   public readonly saveTemplate = output<void>();
 
   protected readonly Permission = Permission;
+
+  /** The Save button's label, reflecting create-vs-update and the in-flight state. */
+  public readonly saveTemplateText = computed<string>(() => {
+    if (this.isEditMode()) {
+      return this.saving() ? "Updating…" : "Update Template";
+    }
+    return this.saving() ? "Saving…" : "Save Template";
+  });
 
   public readonly formats: FormatChip[] = [
     { key: "csv", label: "CSV", icon: "description" },

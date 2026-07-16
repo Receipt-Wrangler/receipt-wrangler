@@ -119,6 +119,36 @@ func (repository ReportTemplateRepository) DuplicateReportTemplate(userId uint, 
 	return template, nil
 }
 
+// UpdateReportTemplate overwrites an existing template's name and configuration in
+// place. The row is loaded first (so a missing id surfaces gorm.ErrRecordNotFound
+// rather than silently creating a new row), preserving its id and owner while the
+// name/config/version are replaced and UpdatedAt is refreshed by GORM. The whole
+// command is re-marshaled to the JSON blob so the template round-trips unchanged.
+func (repository ReportTemplateRepository) UpdateReportTemplate(command commands.ReportRequestCommand, id string) (models.ReportTemplate, error) {
+	db := repository.GetDB()
+
+	template, err := repository.GetReportTemplateById(id)
+	if err != nil {
+		return models.ReportTemplate{}, err
+	}
+
+	configuration, err := json.Marshal(command)
+	if err != nil {
+		return models.ReportTemplate{}, err
+	}
+
+	template.Name = command.Name
+	template.Configuration = configuration
+	template.ConfigurationVersion = commands.CurrentReportConfigurationVersion
+
+	err = db.Save(&template).Error
+	if err != nil {
+		return models.ReportTemplate{}, err
+	}
+
+	return template, nil
+}
+
 // isValidColumn allow-lists the sortable columns for GetPagedReportTemplates. The
 // order-by value is interpolated as a raw column name, so it must never come
 // straight from the request.

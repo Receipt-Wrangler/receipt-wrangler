@@ -8,6 +8,7 @@ import { SnackbarService } from "../../services";
 import {
   CustomFieldService,
   FilterOperation,
+  Permission,
   ReportColumn,
   ReportDetail,
   ReportPeriod,
@@ -30,7 +31,12 @@ class NoopComponent {}
 describe("ReportBuilderComponent", () => {
   let fixture: ComponentFixture<ReportBuilderComponent>;
   let component: ReportBuilderComponent;
-  let runner: { preview: jest.Mock; generateAndDownload: jest.Mock; saveTemplate: jest.Mock };
+  let runner: {
+    preview: jest.Mock;
+    generateAndDownload: jest.Mock;
+    saveTemplate: jest.Mock;
+    updateTemplate: jest.Mock;
+  };
   let snackbar: { success: jest.Mock };
   // Mutable route stub: the builder reads snapshot.data.template in its field
   // initializer, so a test sets this before creating its own component instance.
@@ -41,6 +47,7 @@ describe("ReportBuilderComponent", () => {
       preview: jest.fn(() => of({ html: "<p></p>", receiptCount: 0 })),
       generateAndDownload: jest.fn(() => of(new Blob())),
       saveTemplate: jest.fn(() => of({ id: 1 })),
+      updateTemplate: jest.fn(() => of({ id: 7 })),
     };
     snackbar = { success: jest.fn() };
     activatedRoute.snapshot.data = {};
@@ -130,7 +137,12 @@ describe("ReportBuilderComponent", () => {
     expect(component.generating()).toBe(false);
   });
 
-  it("saves a template and shows a success snackbar", async () => {
+  it("saves a new template and shows a success snackbar on the new route", async () => {
+    // The blank builder creates (save-as-new is retired): the Save action gates on
+    // create, calls saveTemplate (not updateTemplate), and toasts "Template saved".
+    expect(component.isEditMode).toBe(false);
+    expect(component.saveButtonPermission).toBe(Permission.AppReportsCreate);
+
     (component.form.get("scope") as FormArray).push(new FormControl("1"));
     await fixture.whenStable();
     expect(component.canSaveTemplate()).toBe(true);
@@ -138,7 +150,44 @@ describe("ReportBuilderComponent", () => {
     component.saveTemplate();
 
     expect(runner.saveTemplate).toHaveBeenCalled();
+    expect(runner.updateTemplate).not.toHaveBeenCalled();
     expect(snackbar.success).toHaveBeenCalledWith("Template saved");
+  });
+
+  it("updates the opened template in place on the edit route", () => {
+    const configuration: ReportRequestCommand = {
+      name: "Saved Report",
+      groupIds: ["1"],
+      period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+      filter: {},
+      groupBy: [],
+      detail: { mode: ReportDetail.ModeEnum.Records },
+      columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+      subtotals: false,
+      grandTotals: false,
+      formats: [ReportRequestCommand.FormatsEnum.Csv],
+    };
+    const template: ReportTemplate = {
+      id: 7,
+      name: "Saved Report",
+      createdAt: "2026-01-01T00:00:00Z",
+      configuration,
+      configurationVersion: 1,
+    };
+    activatedRoute.snapshot.data = { template };
+
+    const local = TestBed.createComponent(ReportBuilderComponent).componentInstance;
+    // Edit mode gates Save on update, not create.
+    expect(local.isEditMode).toBe(true);
+    expect(local.saveButtonPermission).toBe(Permission.AppReportsUpdate);
+    expect(local.canSaveTemplate()).toBe(true);
+
+    local.saveTemplate();
+
+    // Updates the same id in place — never a create/save-as-new.
+    expect(runner.updateTemplate).toHaveBeenCalledWith(7, expect.objectContaining({ name: "Saved Report" }));
+    expect(runner.saveTemplate).not.toHaveBeenCalled();
+    expect(snackbar.success).toHaveBeenCalledWith("Template updated");
   });
 
   it("cannot save a template without a name", async () => {

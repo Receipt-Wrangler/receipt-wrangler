@@ -88,6 +88,7 @@ const (
 
 	AppReportsRead      = "app.reports.read"
 	AppReportsCreate    = "app.reports.create"
+	AppReportsUpdate    = "app.reports.update"
 	AppReportsDelete    = "app.reports.delete"
 	AppReportsDuplicate = "app.reports.duplicate"
 	AppReportsGenerate  = "app.reports.generate"
@@ -196,6 +197,7 @@ var registry = []Descriptor{
 
 	{AppReportsRead, "Access Reports", "Access the report builder and saved report templates.", "Reports", ScopeApp},
 	{AppReportsCreate, "Save Report Templates", "Save a report configuration as a reusable template.", "Reports", ScopeApp},
+	{AppReportsUpdate, "Update Report Templates", "Update a saved report template in place.", "Reports", ScopeApp},
 	{AppReportsDelete, "Delete Report Templates", "Delete a saved report template.", "Reports", ScopeApp},
 	{AppReportsDuplicate, "Duplicate Report Templates", "Duplicate a saved report template.", "Reports", ScopeApp},
 	{AppReportsGenerate, "Generate Reports", "Generate and download reports.", "Reports", ScopeApp},

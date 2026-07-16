@@ -11,7 +11,7 @@ import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { EMPTY, catchError, debounceTime, finalize, startWith, switchMap, take, tap } from "rxjs";
-import { ReportPeriod, ReportRequestCommand, ReportTemplate } from "../../open-api";
+import { Permission, ReportPeriod, ReportRequestCommand, ReportTemplate } from "../../open-api";
 import { enabledReportColumns, ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
 import { SnackbarService } from "../../services";
 import { buildReportForm, buildReportFormFromCommand } from "../models/report-form.factory";
@@ -49,6 +49,16 @@ export class ReportBuilderComponent {
 
   /** The opened template's name for the breadcrumb, or null when starting fresh. */
   public readonly loadedTemplateName: string | null = this.loadedTemplate?.name ?? null;
+
+  /** Edit route (a template was resolved) vs the blank "new report" route. */
+  public readonly isEditMode: boolean = this.loadedTemplate != null;
+
+  // Save creates a new template on the "new" route and updates in place on the edit
+  // route, so its permission gate follows the mode: create vs update. A user who can
+  // open a template (read) but not update it therefore sees no Save action.
+  public readonly saveButtonPermission: Permission = this.isEditMode
+    ? Permission.AppReportsUpdate
+    : Permission.AppReportsCreate;
 
   public readonly form: FormGroup = this.loadedTemplate
     ? buildReportFormFromCommand(this.formBuilder, this, this.loadedTemplate.configuration)
@@ -139,17 +149,26 @@ export class ReportBuilderComponent {
       .subscribe();
   }
 
-  /** Saves the current configuration as a reusable report template. */
+  /**
+   * Persists the current configuration. On the edit route it updates the opened
+   * template in place; on the new route it creates a fresh one. (Duplicating a
+   * template is a separate row action on the list — this is never save-as-new.)
+   */
   public saveTemplate(): void {
     if (!this.canSaveTemplate() || this.saving()) {
       return;
     }
     this.saving.set(true);
-    this.runner
-      .saveTemplate(this.currentCommand())
+    const loaded = this.loadedTemplate;
+    const command = this.currentCommand();
+    const request$ = loaded
+      ? this.runner.updateTemplate(loaded.id, command)
+      : this.runner.saveTemplate(command);
+    const successMessage = loaded ? "Template updated" : "Template saved";
+    request$
       .pipe(
         take(1),
-        tap(() => this.snackbar.success("Template saved")),
+        tap(() => this.snackbar.success(successMessage)),
         catchError(() => EMPTY), // the HTTP interceptor surfaces the failure toast
         finalize(() => this.saving.set(false)),
         takeUntilDestroyed(this.destroyRef)

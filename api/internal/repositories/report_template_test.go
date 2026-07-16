@@ -273,6 +273,110 @@ func TestDuplicateReportTemplate_ReturnsRecordNotFoundForMissingSource(t *testin
 	}
 }
 
+func TestUpdateReportTemplate_UpdatesNameAndConfigPreservingIdAndOwner(t *testing.T) {
+	defer TruncateTestDb()
+
+	repository := NewReportTemplateRepository(nil)
+	var owner uint = 4
+	created, err := repository.CreateReportTemplate(sampleReportCommand(), owner)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	updatedCommand := sampleReportCommand()
+	updatedCommand.Name = "Renamed Report"
+	updatedCommand.GroupIds = []string{"3"}
+	updatedCommand.Columns = []commands.ReportColumn{
+		{Kind: "dimension", Name: "Name", Label: "Name", Field: "name"},
+		{Kind: "dimension", Name: "Group", Label: "Group", Field: "group"},
+	}
+
+	updated, err := repository.UpdateReportTemplate(updatedCommand, fmt.Sprint(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Identity + owner are preserved; only the name/config change.
+	if updated.ID != created.ID {
+		utils.PrintTestError(t, updated.ID, created.ID)
+	}
+	if updated.CreatedBy == nil || *updated.CreatedBy != owner {
+		utils.PrintTestError(t, updated.CreatedBy, owner)
+	}
+	if updated.Name != "Renamed Report" {
+		utils.PrintTestError(t, updated.Name, "Renamed Report")
+	}
+
+	// The change is persisted and round-trips out of the stored blob.
+	var fetched models.ReportTemplate
+	if err := GetDB().First(&fetched, created.ID).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if fetched.Name != "Renamed Report" {
+		utils.PrintTestError(t, fetched.Name, "Renamed Report")
+	}
+	var stored commands.ReportRequestCommand
+	if err := json.Unmarshal(fetched.Configuration, &stored); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if len(stored.GroupIds) != 1 || stored.GroupIds[0] != "3" {
+		utils.PrintTestError(t, stored.GroupIds, updatedCommand.GroupIds)
+	}
+	if len(stored.Columns) != 2 {
+		utils.PrintTestError(t, len(stored.Columns), 2)
+	}
+
+	// Update is in place — no second row was created.
+	var count int64
+	GetDB().Model(&models.ReportTemplate{}).Count(&count)
+	if count != 1 {
+		utils.PrintTestError(t, count, int64(1))
+	}
+}
+
+func TestUpdateReportTemplate_ReturnsRecordNotFoundForMissingId(t *testing.T) {
+	defer TruncateTestDb()
+
+	_, err := NewReportTemplateRepository(nil).UpdateReportTemplate(sampleReportCommand(), "999999")
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		utils.PrintTestError(t, err, gorm.ErrRecordNotFound)
+	}
+}
+
+func TestUpdateReportTemplate_BindsIdAndDoesNotUpdateOnCraftedId(t *testing.T) {
+	defer TruncateTestDb()
+
+	repository := NewReportTemplateRepository(nil)
+	created, err := repository.CreateReportTemplate(sampleReportCommand(), 1)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// A crafted, whitespace-containing id is bound as a value by GetReportTemplateById,
+	// so it matches nothing and the update fails with record-not-found rather than
+	// mutating the real row.
+	updatedCommand := sampleReportCommand()
+	updatedCommand.Name = "Hacked"
+	_, err = repository.UpdateReportTemplate(updatedCommand, "1 OR 1=1")
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		utils.PrintTestError(t, err, gorm.ErrRecordNotFound)
+	}
+
+	var fetched models.ReportTemplate
+	if err := GetDB().First(&fetched, created.ID).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if fetched.Name != created.Name {
+		utils.PrintTestError(t, fetched.Name, created.Name)
+	}
+}
+
 func TestDeleteReportTemplateById_RemovesTheRow(t *testing.T) {
 	defer TruncateTestDb()
 

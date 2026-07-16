@@ -641,13 +641,17 @@ user holds it.
     columns list and **left out of the request** (`enabledReportColumns`), auto-re-enabling when the
     config makes it valid again. `report-builder` blocks preview/generate only if *no* enabled column
     remains. Nothing is removed or auto-changed.
-- **Save Template**: the generate bar's secondary button (left of Generate, gated by
-  `*hasAppPermission="Permission.AppReportsCreate"`) POSTs the current configuration to
-  `POST /api/report/template` via `ReportRunnerService.saveTemplate`, confirming with a "Template saved"
-  success snackbar. The template's name is the report's own name (no separate dialog), enabled under the
-  same validity as Generate plus a non-empty name (`canSaveTemplate`). **There is no update endpoint** —
-  opening a saved template and saving creates a *new* template (save-as-new). See `api/CLAUDE.md` →
-  "Report templates".
+- **Save Template**: the generate bar's secondary button (left of Generate) persists the current
+  configuration. Its gate and label follow the builder's mode, driven by two inputs from
+  `report-builder` (`isEditMode` + `saveButtonPermission`): on the **new** route it **creates** a
+  template (`POST /report/template` via `ReportRunnerService.saveTemplate`, gated by
+  `Permission.AppReportsCreate`, label "Save Template", toast "Template saved"); on the **edit** route it
+  **updates the opened template in place** (`PUT /report/template/{id}` via
+  `ReportRunnerService.updateTemplate`, gated by `Permission.AppReportsUpdate`, label "Update Template",
+  toast "Template updated"). So a user who can open a template (read) but not update it sees no Save
+  action. **Save-as-new is retired** — the list's Duplicate row action covers copying. The template's
+  name is the report's own name (no separate dialog), enabled under the same validity as Generate plus a
+  non-empty name (`canSaveTemplate`). See `api/CLAUDE.md` → "Report templates".
 - **Generate gating**: the generate bar's Generate button is
   `*hasAppPermission="Permission.AppReportsGenerate"`-gated (preview is not — it stays group-scoped),
   matching the endpoint, which now ANDs `app.reports.generate` with the per-group `group.reports.read`.
