@@ -93,6 +93,44 @@ func (repository ReportTemplateRepository) GetReportTemplateById(id string) (mod
 	return template, nil
 }
 
+// GetGroupIdsByTemplateId returns the group ids a template covers, read from the
+// denormalized report_template_groups index (kept in sync on every template write).
+// Used to evaluate a template's group-access ceiling.
+func (repository ReportTemplateRepository) GetGroupIdsByTemplateId(id uint) ([]uint, error) {
+	db := repository.GetDB()
+
+	ids := make([]uint, 0)
+	err := db.Model(&models.ReportTemplateGroup{}).
+		Where("report_template_id = ?", id).
+		Pluck("group_id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return ids, nil
+}
+
+// GetAllTemplateGroupMappings returns every template's covered group ids as a
+// templateId -> groupIds map, read from the index in one query. Lets the list
+// filter evaluate the group-access ceiling over every template without unmarshaling
+// each config blob. Templates with no index rows are absent from the map.
+func (repository ReportTemplateRepository) GetAllTemplateGroupMappings() (map[uint][]uint, error) {
+	db := repository.GetDB()
+
+	var rows []models.ReportTemplateGroup
+	err := db.Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	mappings := make(map[uint][]uint)
+	for _, row := range rows {
+		mappings[row.ReportTemplateID] = append(mappings[row.ReportTemplateID], row.GroupID)
+	}
+
+	return mappings, nil
+}
+
 // CountByIds returns how many of the given template ids exist. Used to validate
 // that a role's report-template grants reference real templates. Duplicate ids in
 // the input are de-duplicated by the IN clause, so callers should pass a unique set.
