@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -156,6 +157,58 @@ func TestReportService_ApplyPeriodWritesBetweenDateFilter(t *testing.T) {
 	if label != "2026-05-01 to 2026-05-31" {
 		t.Errorf("label = %q", label)
 	}
+}
+
+func TestReportService_ResolveCurrentViewerPaidBy(t *testing.T) {
+	// Values arrive as float64 (JSON), the same shape a static user-id filter has.
+	newFilter := func(value interface{}) commands.ReceiptPagedRequestFilter {
+		return commands.ReceiptPagedRequestFilter{
+			PaidBy: commands.PagedRequestField{Operation: commands.CONTAINS, Value: value},
+		}
+	}
+
+	t.Run("substitutes the sentinel with the generating user's id", func(t *testing.T) {
+		filter := newFilter([]interface{}{float64(currentViewerPaidBySentinel), float64(12)})
+		resolveCurrentViewerPaidBy(&filter, 7)
+
+		want := []interface{}{float64(7), float64(12)}
+		if got := filter.PaidBy.Value.([]interface{}); !reflect.DeepEqual(got, want) {
+			t.Errorf("resolved paidBy = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("is dynamic per generating user (User A vs User B run the same template)", func(t *testing.T) {
+		forA := newFilter([]interface{}{float64(currentViewerPaidBySentinel)})
+		resolveCurrentViewerPaidBy(&forA, 3)
+		forB := newFilter([]interface{}{float64(currentViewerPaidBySentinel)})
+		resolveCurrentViewerPaidBy(&forB, 9)
+
+		if got := forA.PaidBy.Value.([]interface{}); !reflect.DeepEqual(got, []interface{}{float64(3)}) {
+			t.Errorf("user 3 resolved to %v, want [3]", got)
+		}
+		if got := forB.PaidBy.Value.([]interface{}); !reflect.DeepEqual(got, []interface{}{float64(9)}) {
+			t.Errorf("user 9 resolved to %v, want [9]", got)
+		}
+	})
+
+	t.Run("leaves a static user-id filter unchanged", func(t *testing.T) {
+		filter := newFilter([]interface{}{float64(5), float64(8)})
+		resolveCurrentViewerPaidBy(&filter, 7)
+
+		want := []interface{}{float64(5), float64(8)}
+		if got := filter.PaidBy.Value.([]interface{}); !reflect.DeepEqual(got, want) {
+			t.Errorf("resolved paidBy = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("ignores a non-array paid-by value without panicking", func(t *testing.T) {
+		filter := newFilter(nil)
+		resolveCurrentViewerPaidBy(&filter, 7)
+
+		if filter.PaidBy.Value != nil {
+			t.Errorf("PaidBy.Value = %v, want nil (unchanged)", filter.PaidBy.Value)
+		}
+	})
 }
 
 func TestReportService_ReportBaseName(t *testing.T) {

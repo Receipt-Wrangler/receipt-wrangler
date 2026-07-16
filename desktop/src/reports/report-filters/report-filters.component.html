@@ -23,9 +23,11 @@
       <app-datepicker *ngIf="def.type === 'date'" class="report-filter__value"
         [label]="def.label"
         [inputFormControl]="filterGroup | formGet: def.field + '.value'"></app-datepicker>
-      <app-user-autocomplete *ngIf="def.type === 'users'" class="report-filter__value"
-        optionValueKey="id" [label]="def.label" [multiple]="true"
-        [inputFormControl]="filterGroup | formGet: def.field + '.value'"></app-user-autocomplete>
+      <app-autocomlete *ngIf="def.type === 'users'" class="report-filter__value"
+        [label]="def.label" [multiple]="true"
+        [options]="paidByOptions()"
+        optionValueKey="id" optionFilterKey="displayName" optionDisplayKey="displayName"
+        [inputFormControl]="filterGroup | formGet: def.field + '.value'"></app-autocomlete>
       <app-autocomlete *ngIf="def.type === 'list'" class="report-filter__value"
         [label]="def.label" [multiple]="true"
         [options]="optionsFor(def)"

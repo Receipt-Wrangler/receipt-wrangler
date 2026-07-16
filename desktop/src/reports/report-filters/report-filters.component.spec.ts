@@ -1,11 +1,12 @@
-import { Component, NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal } from "@angular/core";
+import { Component, NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal, WritableSignal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder, FormGroup } from "@angular/forms";
 import { Store } from "@ngxs/store";
 import { UntilDestroy } from "@ngneat/until-destroy";
-import { FilterOperation } from "../../open-api";
+import { FilterOperation, User } from "../../open-api";
+import { UserState } from "../../store";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
-import { ReportFiltersComponent } from "./report-filters.component";
+import { CURRENT_VIEWER_PAID_BY_ID, ReportFiltersComponent } from "./report-filters.component";
 
 // buildReceiptFilterForm wires untilDestroyed subscriptions, so seeding a realistic
 // filter needs an @UntilDestroy()-decorated context — a throwaway host, exactly as the
@@ -19,14 +20,23 @@ describe("ReportFiltersComponent", () => {
   let component: ReportFiltersComponent;
   let formBuilder: FormBuilder;
   let host: NoopComponent;
+  let usersSignal: WritableSignal<User[]>;
 
   beforeEach(async () => {
+    usersSignal = signal<User[]>([]);
+    // Route UserState.users to a signal the test controls (for the paid-by picker);
+    // every other selector stays empty as before.
+    const store = {
+      selectSignal: (selector: unknown) => (selector === UserState.users ? usersSignal : signal([])),
+      selectSnapshot: () => [],
+    };
+
     await TestBed.configureTestingModule({
       declarations: [ReportFiltersComponent, NoopComponent],
       providers: [
         provideZonelessChangeDetection(),
         FormBuilder,
-        { provide: Store, useValue: { selectSignal: () => signal([]), selectSnapshot: () => [] } },
+        { provide: Store, useValue: store },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
@@ -118,6 +128,31 @@ describe("ReportFiltersComponent", () => {
     mountWithFilter({ name: { operation: FilterOperation.Empty, value: "" } });
 
     expect(component.activeFields().length).toBe(0);
+  });
+
+  it("prepends a 'current viewer (me)' sentinel ahead of the user pool in the paid-by picker", () => {
+    fixture.componentRef.setInput("form", formBuilder.group({ filter: formBuilder.group({}) }));
+    usersSignal.set([
+      { id: 5, username: "amy", displayName: "Amy" } as User,
+      { id: 6, username: "ben", displayName: "" } as User,
+    ]);
+
+    const options = component.paidByOptions();
+    // The sentinel is first, then every user (display-name fallback to username).
+    expect(options[0]).toEqual({ id: CURRENT_VIEWER_PAID_BY_ID, displayName: "Current viewer (me)" });
+    expect(options.slice(1)).toEqual([
+      { id: 5, displayName: "Amy" },
+      { id: 6, displayName: "ben" },
+    ]);
+  });
+
+  it("hydrates a saved 'current viewer' paid-by filter (the -1 sentinel) into the builder", () => {
+    mountWithFilter({ paidBy: { operation: FilterOperation.Contains, value: [CURRENT_VIEWER_PAID_BY_ID] } });
+
+    expect(component.activeFields().map((def) => def.field)).toEqual(["paidBy"]);
+    // The sentinel round-trips as a plain id, and the picker always carries its option.
+    expect(component.filterGroup.get("paidBy.value")!.value).toEqual([CURRENT_VIEWER_PAID_BY_ID]);
+    expect(component.paidByOptions()[0].id).toBe(CURRENT_VIEWER_PAID_BY_ID);
   });
 
   it("still adds and removes filters after a seeded init", () => {

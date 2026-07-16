@@ -777,6 +777,18 @@ preview, PDF/HTML, CSV, and XLSX) presents money exactly as the rest of the UI d
 carries `Currency` through untouched); the settings load lives in the service and the formatting in the
 `render` package (`render/currency.go`).
 
+**Dynamic "current viewer" paid-by.** `buildModel` also resolves a **"current viewer" paid-by sentinel**
+before it fans out to `loadRows`: `resolveCurrentViewerPaidBy(&filter, userId)` replaces the value `-1`
+in `filter.PaidBy.Value` with the generating user's id (the desktop report builder stores `-1` for its
+"Current viewer (me)" paid-by option; negative so it can't collide with a real id). So a saved template
+stays **dynamic** — whoever runs it filters to their own receipts, regardless of who authored it (User A
+running User B's saved report sees User A's receipts). It runs once, upstream of
+`IntersectReceiptFilterWithGrants` + `BuildGormFilterQuery` (which then see a normal numeric
+`paid_by_user_id IN (...)`), on a by-value copy of `command.Filter` so the request is never mutated; and
+because Generate and Preview share `buildModel`, the substitution covers download and the live preview
+alike. Values arrive as `float64` (JSON), matched/substituted as such — the same shape a static user-id
+filter already flows through.
+
 **Report templates.** `POST /api/report/template` saves a report configuration for reuse. It reuses the
 shared `loadReportCommand` parse+validate and stores the whole `ReportRequestCommand` verbatim as a
 `json.RawMessage` blob on `models.ReportTemplate` (name + owner taken from the request / JWT), so a

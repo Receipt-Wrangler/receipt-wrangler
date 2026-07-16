@@ -212,4 +212,16 @@ describe("buildReportFormFromCommand", () => {
     const form = buildReportFormFromCommand(fb, host, command);
     expect(form.get("filter.date.operation")!.value).toBe(FilterOperation.WithinCurrentMonth);
   });
+
+  it("round-trips a 'current viewer' paid-by filter (the -1 sentinel), alone and mixed with a user id", () => {
+    // The sentinel is a plain id in the value array, so it survives hydration and
+    // re-serialization unchanged — the contract the backend relies on to substitute
+    // it for the report runner's own id at generate time.
+    const sentinelOnly = commandWithFilter({ paidBy: { operation: FilterOperation.Contains, value: [-1] } });
+    expect(roundTrip(sentinelOnly)).toEqual(sentinelOnly);
+    expect(buildReportFormFromCommand(fb, host, sentinelOnly).get("filter.paidBy.value")!.value).toEqual([-1]);
+
+    const mixed = commandWithFilter({ paidBy: { operation: FilterOperation.Contains, value: [-1, 12] } });
+    expect(roundTrip(mixed)).toEqual(mixed);
+  });
 });

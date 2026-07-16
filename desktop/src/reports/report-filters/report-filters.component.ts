@@ -3,9 +3,25 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormControl, FormGroup } from "@angular/forms";
 import { Store } from "@ngxs/store";
 import { RECEIPT_STATUS_OPTIONS } from "src/constants";
-import { AuthState, GroupState } from "src/store";
+import { AuthState, GroupState, UserState } from "src/store";
 import { OperationsPipe } from "../../shared-ui/receipt-filter/operations.pipe";
 import { Category, FilterOperation, Tag } from "../../open-api";
+
+/**
+ * The pinned "current viewer" paid-by option id — negative so it never collides
+ * with a real (positive) user id. A saved template stores the sentinel rather than a
+ * static user, and the backend resolves it to whoever generates the report (see
+ * `api/CLAUDE.md` → "Report templates"), so the filter follows the runner, not the
+ * author. This mirrors the role editor's OWN_PAID_RECEIPTS_OPTION_ID convention and
+ * is reporting-only — the shared receipts filter never offers it.
+ */
+export const CURRENT_VIEWER_PAID_BY_ID = -1;
+
+/** A pinned/user option for the reporting paid-by picker. */
+interface PaidByOption {
+  id: number;
+  displayName: string;
+}
 
 /** A single addable filter field and how to render its value editor. */
 interface FilterFieldDef {
@@ -82,6 +98,18 @@ export class ReportFiltersComponent implements OnInit {
     const operation = this.filterGroup.get(field + ".operation")?.value;
     return operation != null && operation !== FilterOperation.Empty;
   }
+
+  // The paid-by picker prepends a "current viewer (me)" sentinel to the full user
+  // pool (read reactively so it repopulates if AppData lands after first paint), then
+  // stores plain user ids like every other paid-by filter — the -1 sentinel included.
+  private readonly users = this.store.selectSignal(UserState.users);
+  public readonly paidByOptions = computed<PaidByOption[]>(() => [
+    { id: CURRENT_VIEWER_PAID_BY_ID, displayName: "Current viewer (me)" },
+    ...this.users().map((user) => ({
+      id: user.id,
+      displayName: user.displayName?.length ? user.displayName : user.username,
+    })),
+  ]);
 
   private readonly groups = this.store.selectSignal(GroupState.groupsWithoutAll);
   public readonly categories = computed<Category[]>(() =>
