@@ -334,3 +334,53 @@ func CreateReportTemplate(w http.ResponseWriter, r *http.Request) {
 
 	HandleRequest(handler)
 }
+
+// UpdateReportTemplate overwrites a saved report template in place with a new
+// configuration. It mirrors CreateReportTemplate (shared loadReportCommand
+// parse+validate, same non-empty-name guard) but targets an existing {id} and is
+// app-scoped behind app.reports.update; a missing target id maps to a 404. The
+// template's id and owner are preserved — only its name/config/version change.
+func UpdateReportTemplate(w http.ResponseWriter, r *http.Request) {
+	command, ok := loadReportCommand(w, r)
+	if !ok {
+		return
+	}
+
+	// A template is identified by its name, so require a non-empty one (the shared
+	// loadReportCommand validator doesn't check Name), matching CreateReportTemplate.
+	if strings.TrimSpace(command.Name) == "" {
+		utils.WriteCustomErrorResponse(w, "A report template name is required", http.StatusBadRequest)
+		return
+	}
+
+	handler := structs.Handler{
+		ErrorMessage:   "Error updating report template",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppReportsUpdate},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			id := chi.URLParam(r, "id")
+
+			template, err := repositories.NewReportTemplateRepository(nil).UpdateReportTemplate(command, id)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					utils.WriteCustomErrorResponse(w, "Report template not found", http.StatusNotFound)
+					return 0, nil
+				}
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(template)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}

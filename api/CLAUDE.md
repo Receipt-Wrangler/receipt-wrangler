@@ -777,6 +777,18 @@ preview, PDF/HTML, CSV, and XLSX) presents money exactly as the rest of the UI d
 carries `Currency` through untouched); the settings load lives in the service and the formatting in the
 `render` package (`render/currency.go`).
 
+**Dynamic report-generator paid-by.** `buildModel` also resolves a **report-generator paid-by sentinel**
+before it fans out to `loadRows`: `resolveReportGeneratorPaidBy(&filter, userId)` replaces the value `-1`
+in `filter.PaidBy.Value` with the generating user's id (the desktop report builder stores `-1` for its
+"Whoever generates the report" paid-by option; negative so it can't collide with a real id). So a saved
+template stays **dynamic** — whoever runs it filters to their own receipts, regardless of who authored it
+(User A running User B's saved report sees User A's receipts). It runs once, upstream of
+`IntersectReceiptFilterWithGrants` + `BuildGormFilterQuery` (which then see a normal numeric
+`paid_by_user_id IN (...)`), on a by-value copy of `command.Filter` so the request is never mutated; and
+because Generate and Preview share `buildModel`, the substitution covers download and the live preview
+alike. Values arrive as `float64` (JSON), matched/substituted as such — the same shape a static user-id
+filter already flows through.
+
 **Report templates.** `POST /api/report/template` saves a report configuration for reuse. It reuses the
 shared `loadReportCommand` parse+validate and stores the whole `ReportRequestCommand` verbatim as a
 `json.RawMessage` blob on `models.ReportTemplate` (name + owner taken from the request / JWT), so a
@@ -801,15 +813,21 @@ template). `POST /api/report/template/list` (`getReportTemplates`) returns a pag
 is interpolated raw), and get-by-id maps `gorm.ErrRecordNotFound` to a 404.
 `POST /api/report/template/{id}/duplicate` (`duplicateReportTemplate`) copies a template into a new row
 owned by the caller (name suffixed `" duplicate"`, configuration/version carried verbatim, a fresh id),
-gated by a separate CRUD-granular **`app.reports.duplicate`**. Each template carries a
+gated by a separate CRUD-granular **`app.reports.duplicate`**. `PUT /api/report/template/{id}`
+(`updateReportTemplate`) overwrites a template in place — it mirrors `CreateReportTemplate` (shared
+`loadReportCommand` parse+validate + the same non-empty-name guard) but loads the existing row first
+(`UpdateReportTemplate` repo method → `GetReportTemplateById`, so a missing id is a 404, not a silent
+insert), preserving its id and owner while replacing name/config/version and refreshing `UpdatedAt`.
+Gated by a separate CRUD-granular **`app.reports.update`** (Legacy Admin auto-gains it; no ownership
+scoping — any holder may update any template, matching delete/duplicate). Each template carries a
 `configurationVersion` (currently `1`, DB default `1`, stamped from
 `commands.CurrentReportConfigurationVersion`) marking the schema its stored config was written under, so
 a future breaking change to the `ReportRequestCommand` shape can upcast — or fail loud on — old blobs
 instead of silently misdeserializing them; upcasters + a migration are deferred until that first break.
 The desktop **template-management UI** is delivered: `/reports` lists saved templates and each row can
 generate, open-in-builder, duplicate, or delete. Opening a template rehydrates the builder from its
-stored config; **saving is save-as-new** (there is no in-place update endpoint / `app.reports.update`
-yet — that is the one remaining CRUD gap and is deferred to a later slice).
+stored config; **the builder's Save updates in place on the edit route** (`app.reports.update`) and
+**creates on the new route** (`app.reports.create`) — save-as-new is retired (Duplicate copies).
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`

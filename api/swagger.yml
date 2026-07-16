@@ -330,6 +330,46 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+    put:
+      tags:
+        - Report
+      summary: Update a report template
+      description:
+        Updates a saved report template in place, replacing its name and stored
+        configuration. App-scoped (requires app.reports.update).
+      operationId: updateReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to update
+      requestBody:
+        description: The report builder configuration to save over the existing template
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The updated report template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTemplate"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
     delete:
       tags:
         - Report
@@ -3223,6 +3263,7 @@ components:
         - "app.reports.duplicate"
         - "app.reports.generate"
         - "app.reports.read"
+        - "app.reports.update"
         - "group.view"
         - "group.update"
         - "group.delete"

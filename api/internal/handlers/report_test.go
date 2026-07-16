@@ -443,6 +443,19 @@ func reportTemplateIdRequest(method string, userId uint, id string) (*httptest.R
 	return w, r
 }
 
+// reportTemplateUpdateRequest builds a PUT carrying both the JSON command body and
+// the {id} URL param, plus JWT claims for userId — the shape UpdateReportTemplate
+// reads (body via loadReportCommand, id via chi.URLParam).
+func reportTemplateUpdateRequest(userId uint, id string, body string) (*httptest.ResponseRecorder, *http.Request) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("PUT", "/api/report/template/"+id, strings.NewReader(body))
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: userId}}))
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
+	chi.RouteContext(r.Context()).URLParams.Add("id", id)
+	return w, r
+}
+
 func TestGetPagedReportTemplates_ListsWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
 	grantAppPerms(t, 1, permissions.AppReportsRead)
@@ -566,4 +579,100 @@ func TestDuplicateReportTemplate_ForbidsWithoutDuplicatePermission(t *testing.T)
 	DuplicateReportTemplate(w, r)
 
 	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestUpdateReportTemplate_UpdatesWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsUpdate)
+	// Seeded under a different owner so the response proves the owner is preserved
+	// (not re-stamped to the updater).
+	seeded := seedReportTemplate(t, 2, "HTTP Report")
+
+	body := strings.Replace(recordsReportBody, `"name": "HTTP Report"`, `"name": "Renamed Report"`, 1)
+	w, r := reportTemplateUpdateRequest(1, fmt.Sprint(seeded.ID), body)
+	UpdateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var template models.ReportTemplate
+	if err := json.Unmarshal(w.Body.Bytes(), &template); err != nil {
+		t.Fatalf("decode template body: %v", err)
+	}
+	if template.ID != seeded.ID {
+		t.Errorf("update id = %d, want %d (in place, not a new row)", template.ID, seeded.ID)
+	}
+	if template.Name != "Renamed Report" {
+		t.Errorf("update name = %q, want %q", template.Name, "Renamed Report")
+	}
+	if template.CreatedBy == nil || *template.CreatedBy != 2 {
+		t.Errorf("update createdBy = %v, want 2 (owner preserved)", template.CreatedBy)
+	}
+}
+
+func TestUpdateReportTemplate_ForbidsWithoutUpdatePermission(t *testing.T) {
+	defer tearDownReportTest()
+	// Read access does not imply update.
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	w, r := reportTemplateUpdateRequest(1, "1", recordsReportBody)
+	UpdateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestUpdateReportTemplate_NotFoundForMissingId(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsUpdate)
+
+	w, r := reportTemplateUpdateRequest(1, "999999", recordsReportBody)
+	UpdateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusNotFound)
+}
+
+func TestUpdateReportTemplate_RejectsInvalidCommand(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsUpdate)
+
+	// No formats — the shared loadReportCommand validator rejects it (400) before the
+	// handler touches the repository, exactly like create.
+	body := strings.Replace(recordsReportBody, `"formats": ["csv"]`, `"formats": []`, 1)
+	w, r := reportTemplateUpdateRequest(1, "1", body)
+	UpdateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+func TestUpdateReportTemplate_RejectsBlankName(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsUpdate)
+
+	// A whitespace-only name is blank after the handler's trim, so it is rejected (400).
+	body := strings.Replace(recordsReportBody, `"name": "HTTP Report"`, `"name": "   "`, 1)
+	w, r := reportTemplateUpdateRequest(1, "1", body)
+	UpdateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+func TestUpdateReportTemplate_RejectsMalformedJson(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsUpdate)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+
+	// A malformed body is rejected by the shared loadReportCommand decode branch (a
+	// json.Unmarshal *SyntaxError → 400) before the handler touches the repository, so
+	// the targeted template is left unchanged.
+	w, r := reportTemplateUpdateRequest(1, fmt.Sprint(seeded.ID), `{"name": ]}`)
+	UpdateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+
+	unchanged, err := repositories.NewReportTemplateRepository(nil).GetReportTemplateById(fmt.Sprint(seeded.ID))
+	if err != nil {
+		t.Fatalf("re-fetch template: %v", err)
+	}
+	if unchanged.Name != "HTTP Report" {
+		t.Errorf("template name = %q, want unchanged %q", unchanged.Name, "HTTP Report")
+	}
 }

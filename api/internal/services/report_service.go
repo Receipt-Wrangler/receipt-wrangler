@@ -134,6 +134,7 @@ func (service ReportService) buildModel(
 	rowLimit int,
 ) (reportBuild, error) {
 	filter := command.Filter
+	resolveReportGeneratorPaidBy(&filter, userId)
 	periodLabel := applyPeriod(&filter, command.Period, now)
 
 	catalog, rows, err := service.loadRows(userId, command.GroupIds, filter)
@@ -404,6 +405,37 @@ func buildDimensions(groupBy []reporting.FieldKey, catalog reporting.FieldCatalo
 		dimensions[index] = render.Dimension{Key: key, Label: label}
 	}
 	return dimensions
+}
+
+// reportGeneratorPaidBySentinel is the paid-by filter value the desktop report builder
+// stores for its "Whoever generates the report" option (desktop
+// REPORT_GENERATOR_PAID_BY_ID). It is negative so it can never collide with a real
+// (positive) user id.
+const reportGeneratorPaidBySentinel = -1
+
+// resolveReportGeneratorPaidBy substitutes the report-generator sentinel in the paid-by
+// filter with the id of the user generating the report, so a saved template stays
+// dynamic — whoever runs it filters to their own receipts, regardless of who authored
+// it. It runs before the query is built (BuildGormFilterQuery otherwise passes the raw
+// -1 straight into `paid_by_user_id IN (...)`), covering both Generate and Preview
+// since both funnel through buildModel. A fresh slice is built so the caller's command
+// is never mutated. Values arrive as float64 (JSON) and are matched/substituted as
+// such, matching how a static user-id filter already flows through the same IN clause.
+func resolveReportGeneratorPaidBy(filter *commands.ReceiptPagedRequestFilter, userId uint) {
+	values, ok := filter.PaidBy.Value.([]interface{})
+	if !ok {
+		return
+	}
+
+	resolved := make([]interface{}, 0, len(values))
+	for _, value := range values {
+		if id, isNumber := value.(float64); isNumber && id == reportGeneratorPaidBySentinel {
+			resolved = append(resolved, float64(userId))
+		} else {
+			resolved = append(resolved, value)
+		}
+	}
+	filter.PaidBy.Value = resolved
 }
 
 // applyPeriod resolves the request's period into an inclusive date window, writes

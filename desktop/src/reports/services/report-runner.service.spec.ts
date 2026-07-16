@@ -39,6 +39,7 @@ describe("reportFilename", () => {
 describe("ReportRunnerService", () => {
   let reportService: {
     createReportTemplate: jest.Mock;
+    updateReportTemplate: jest.Mock;
     getReportTemplates: jest.Mock;
     getReportTemplate: jest.Mock;
     duplicateReportTemplate: jest.Mock;
@@ -51,6 +52,7 @@ describe("ReportRunnerService", () => {
     (downloadFile as jest.Mock).mockClear();
     reportService = {
       createReportTemplate: jest.fn(() => of({ id: 1 })),
+      updateReportTemplate: jest.fn(() => of({ id: 2 })),
       getReportTemplates: jest.fn(() => of({ data: [], totalCount: 0 })),
       getReportTemplate: jest.fn(() => of({ id: 3 })),
       duplicateReportTemplate: jest.fn(() => of({ id: 4 })),
@@ -71,6 +73,12 @@ describe("ReportRunnerService", () => {
     const cmd = command("Template", ["csv"]);
     service.saveTemplate(cmd).subscribe();
     expect(reportService.createReportTemplate).toHaveBeenCalledWith(cmd);
+  });
+
+  it("updateTemplate delegates to updateReportTemplate with the id", () => {
+    const cmd = command("Template", ["csv"]);
+    service.updateTemplate(2, cmd).subscribe();
+    expect(reportService.updateReportTemplate).toHaveBeenCalledWith(2, cmd);
   });
 
   it("listTemplates delegates to getReportTemplates", () => {

@@ -629,6 +629,15 @@ user holds it.
     **seeds it from the hydrated filter** (every field whose stored `operation` is non-empty) — otherwise
     a saved template's filter sits in the form but renders no rows. The value itself relies on the backend
     serializing the filter with lowercase `value`/`tags` keys (see `api/CLAUDE.md` → Report templates).
+  - **Dynamic report-generator paid-by (reporting-only)**: the paid-by row is the one place the reporting
+    filter diverges from the shared receipts filter — instead of the shared `app-user-autocomplete` it
+    uses `app-autocomlete` over `paidByOptions()`, which prepends a pinned **"Whoever generates the
+    report"** sentinel (`REPORT_GENERATOR_PAID_BY_ID = -1`, negative so it never collides with a real id)
+    ahead of `UserState.users`. The control still stores plain numeric ids (the shared form builder, the command
+    mapper, and the round-trip factory are untouched), so a saved template carries the `-1` sentinel and
+    the backend resolves it to whoever generates the report — User A running User B's saved report filters
+    to User A's own receipts. Mirrors the role editor's `OWN_PAID_RECEIPTS_OPTION_ID` convention; the
+    shared receipts filter never offers it. See `api/CLAUDE.md` → "Reporting Engine" (buildModel).
 - **Columns** (`report-config-panel` + `column-picker-dialog`): a `FormArray` of columns edited through a
   3-step picker (dimension / aggregate / formula). A column's engine `name` (what formulas reference) is a
   derived identifier kept stable across label edits (`report-column.util.ts`); formula validation is
@@ -641,13 +650,17 @@ user holds it.
     columns list and **left out of the request** (`enabledReportColumns`), auto-re-enabling when the
     config makes it valid again. `report-builder` blocks preview/generate only if *no* enabled column
     remains. Nothing is removed or auto-changed.
-- **Save Template**: the generate bar's secondary button (left of Generate, gated by
-  `*hasAppPermission="Permission.AppReportsCreate"`) POSTs the current configuration to
-  `POST /api/report/template` via `ReportRunnerService.saveTemplate`, confirming with a "Template saved"
-  success snackbar. The template's name is the report's own name (no separate dialog), enabled under the
-  same validity as Generate plus a non-empty name (`canSaveTemplate`). **There is no update endpoint** —
-  opening a saved template and saving creates a *new* template (save-as-new). See `api/CLAUDE.md` →
-  "Report templates".
+- **Save Template**: the generate bar's secondary button (left of Generate) persists the current
+  configuration. Its gate and label follow the builder's mode, driven by two inputs from
+  `report-builder` (`isEditMode` + `saveButtonPermission`): on the **new** route it **creates** a
+  template (`POST /report/template` via `ReportRunnerService.saveTemplate`, gated by
+  `Permission.AppReportsCreate`, label "Save Template", toast "Template saved"); on the **edit** route it
+  **updates the opened template in place** (`PUT /report/template/{id}` via
+  `ReportRunnerService.updateTemplate`, gated by `Permission.AppReportsUpdate`, label "Update Template",
+  toast "Template updated"). So a user who can open a template (read) but not update it sees no Save
+  action. **Save-as-new is retired** — the list's Duplicate row action covers copying. The template's
+  name is the report's own name (no separate dialog), enabled under the same validity as Generate plus a
+  non-empty name (`canSaveTemplate`). See `api/CLAUDE.md` → "Report templates".
 - **Generate gating**: the generate bar's Generate button is
   `*hasAppPermission="Permission.AppReportsGenerate"`-gated (preview is not — it stays group-scoped),
   matching the endpoint, which now ANDs `app.reports.generate` with the per-group `group.reports.read`.
