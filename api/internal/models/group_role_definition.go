@@ -29,8 +29,18 @@ type GroupRoleDefinition struct {
 	// and set on save; internal only (not exposed on the API).
 	PaidByVisibilityRestricted bool `gorm:"not null;default:false" json:"-"`
 
-	Permissions      []GroupRolePermission      `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"permissions"`
-	CategoryGrants   []GroupRoleCategoryGrant   `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"categoryGrants"`
-	TagGrants        []GroupRoleTagGrant        `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"tagGrants"`
-	PaidByUserGrants []GroupRolePaidByUserGrant `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"paidByUserGrants"`
+	// ReportTemplateGrantsRestricted plays the same fail-closed role for report
+	// template grants as PaidByVisibilityRestricted does for paid-by: it records that
+	// the admin opted into restricting this role to specific templates. It keeps the
+	// role restricted even after its grant rows are emptied — e.g. when the last
+	// granted template is deleted and the FK cascade clears ReportTemplateGrants —
+	// instead of silently widening it back to see-all. Derived and set on save;
+	// internal only (not exposed on the API).
+	ReportTemplateGrantsRestricted bool `gorm:"not null;default:false" json:"-"`
+
+	Permissions          []GroupRolePermission          `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"permissions"`
+	CategoryGrants       []GroupRoleCategoryGrant       `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"categoryGrants"`
+	TagGrants            []GroupRoleTagGrant            `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"tagGrants"`
+	PaidByUserGrants     []GroupRolePaidByUserGrant     `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"paidByUserGrants"`
+	ReportTemplateGrants []GroupRoleReportTemplateGrant `gorm:"foreignKey:GroupRoleID;constraint:OnDelete:CASCADE" json:"reportTemplateGrants"`
 }
