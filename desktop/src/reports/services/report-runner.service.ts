@@ -4,6 +4,7 @@ import {
   ReportPreviewResponse,
   ReportRequestCommand,
   ReportService,
+  ReportTemplate,
 } from "../../open-api";
 import { downloadFile } from "../../utils/file";
 
@@ -31,6 +32,11 @@ export class ReportRunnerService {
   /** Renders the current configuration to preview HTML + the covered receipt count. */
   public preview(command: ReportRequestCommand): Observable<ReportPreviewResponse> {
     return this.reportService.previewReport(command);
+  }
+
+  /** Saves the current configuration as a reusable report template. */
+  public saveTemplate(command: ReportRequestCommand): Observable<ReportTemplate> {
+    return this.reportService.createReportTemplate(command);
   }
 }
 

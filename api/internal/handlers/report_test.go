@@ -6,11 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
@@ -261,4 +264,124 @@ func TestGenerateReport_StreamsZipForMultipleFormats(t *testing.T) {
 			t.Errorf("zip entry %q missing or empty (entries: %v)", name, sizes)
 		}
 	}
+}
+
+func TestCreateReportTemplate_SavesWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsCreate)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	CreateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var template models.ReportTemplate
+	if err := json.Unmarshal(w.Body.Bytes(), &template); err != nil {
+		t.Fatalf("decode template body: %v", err)
+	}
+	if template.ID == 0 {
+		t.Error("expected the saved template to carry an id")
+	}
+	if template.Name != "HTTP Report" {
+		t.Errorf("template name = %q, want %q", template.Name, "HTTP Report")
+	}
+	if template.CreatedBy == nil || *template.CreatedBy != 1 {
+		t.Errorf("template createdBy = %v, want 1", template.CreatedBy)
+	}
+	if template.ConfigurationVersion != 1 {
+		t.Errorf("template configurationVersion = %d, want 1", template.ConfigurationVersion)
+	}
+}
+
+func TestCreateReportTemplate_ForbidsWithoutCreatePermission(t *testing.T) {
+	defer tearDownReportTest()
+	// The caller can access reports but cannot create templates — read must not
+	// imply create.
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	CreateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestCreateReportTemplate_RejectsInvalidCommand(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsCreate)
+
+	// No formats — the shared loadReportCommand validator rejects it, so a template
+	// can only ever store a complete, buildable configuration.
+	body := strings.Replace(recordsReportBody, `"formats": ["csv"]`, `"formats": []`, 1)
+	w, r := generateReportRequest(1, body)
+	CreateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+func TestCreateReportTemplate_RejectsBlankName(t *testing.T) {
+	// A template is identified by its name, so an otherwise-valid config with a
+	// blank name is rejected (400). The handler trims, so a whitespace-only name is
+	// blank too.
+	for _, name := range []string{"", "   "} {
+		t.Run(fmt.Sprintf("name=%q", name), func(t *testing.T) {
+			defer tearDownReportTest()
+			grantAppPerms(t, 1, permissions.AppReportsCreate)
+
+			body := strings.Replace(recordsReportBody, `"name": "HTTP Report"`, `"name": "`+name+`"`, 1)
+			w, r := generateReportRequest(1, body)
+			CreateReportTemplate(w, r)
+
+			assertStatus(t, w, http.StatusBadRequest)
+		})
+	}
+}
+
+// deleteReportTemplateRequest builds a DELETE carrying JWT claims for userId and a
+// chi route context supplying the {id} URL param, mirroring how the router invokes
+// DeleteReportTemplate.
+func deleteReportTemplateRequest(userId uint, id string) (*httptest.ResponseRecorder, *http.Request) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("DELETE", "/api/report/template/"+id, nil)
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: userId}}))
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
+	chi.RouteContext(r.Context()).URLParams.Add("id", id)
+	return w, r
+}
+
+func TestDeleteReportTemplate_DeletesWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsCreate, permissions.AppReportsDelete)
+
+	// Save a template through the create handler, then delete it.
+	cw, cr := generateReportRequest(1, recordsReportBody)
+	CreateReportTemplate(cw, cr)
+	assertStatus(t, cw, http.StatusOK)
+
+	var created models.ReportTemplate
+	if err := json.Unmarshal(cw.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode created template: %v", err)
+	}
+
+	dw, dr := deleteReportTemplateRequest(1, fmt.Sprint(created.ID))
+	DeleteReportTemplate(dw, dr)
+	assertStatus(t, dw, http.StatusOK)
+
+	// The row is gone.
+	var count int64
+	repositories.GetDB().Model(&models.ReportTemplate{}).Where("id = ?", created.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("expected the template to be deleted, but %d row(s) remain", count)
+	}
+}
+
+func TestDeleteReportTemplate_ForbidsWithoutDeletePermission(t *testing.T) {
+	defer tearDownReportTest()
+	// Read access does not imply delete.
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	w, r := deleteReportTemplateRequest(1, "1")
+	DeleteReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
 }

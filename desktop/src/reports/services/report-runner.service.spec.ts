@@ -1,5 +1,8 @@
-import { ReportRequestCommand } from "../../open-api";
-import { reportFilename } from "./report-runner.service";
+import { provideZonelessChangeDetection } from "@angular/core";
+import { TestBed } from "@angular/core/testing";
+import { of } from "rxjs";
+import { ReportRequestCommand, ReportService } from "../../open-api";
+import { ReportRunnerService, reportFilename } from "./report-runner.service";
 
 function command(name: string, formats: ReportRequestCommand.FormatsEnum[]): ReportRequestCommand {
   return {
@@ -27,5 +30,24 @@ describe("reportFilename", () => {
 
   it("falls back to 'report' when the name is empty", () => {
     expect(reportFilename(command("   ", ["pdf"]))).toBe("report.pdf");
+  });
+});
+
+describe("ReportRunnerService", () => {
+  it("saveTemplate delegates to ReportService.createReportTemplate", () => {
+    const reportService = { createReportTemplate: jest.fn(() => of({ id: 1 })) };
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        ReportRunnerService,
+        { provide: ReportService, useValue: reportService },
+      ],
+    });
+
+    const service = TestBed.inject(ReportRunnerService);
+    const cmd = command("Template", ["csv"]);
+    service.saveTemplate(cmd).subscribe();
+
+    expect(reportService.createReportTemplate).toHaveBeenCalledWith(cmd);
   });
 });

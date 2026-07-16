@@ -630,10 +630,17 @@ user holds it.
     columns list and **left out of the request** (`enabledReportColumns`), auto-re-enabling when the
     config makes it valid again. `report-builder` blocks preview/generate only if *no* enabled column
     remains. Nothing is removed or auto-changed.
-- **Divergences from the design** (intentional): the **progress bar + Cancel** are gone (generation is
-  synchronous → in-flight spinner, then download); **Save Template** is omitted (no template-persistence
-  backend yet); the section-card look is a small local `app-report-section` shell so the pattern isn't
-  repeated.
+- **Save Template**: the bottom action bar's secondary button (left of Generate, gated by
+  `*hasAppPermission="Permission.AppReportsCreate"`) POSTs the current configuration to
+  `POST /api/report/template` via `ReportRunnerService.saveTemplate`, confirming with a "Template saved"
+  success snackbar. The template's name is the report's own name (no separate dialog), and it's enabled
+  under the same validity as Generate plus a non-empty name (`canSaveTemplate`). Listing / editing /
+  running saved templates (and a delete UI) are later slices; a backend `DELETE /api/report/template/{id}`
+  (permission `app.reports.delete`) already exists and is used by the e2e to tear down what it creates.
+  See `api/CLAUDE.md` → "Report templates".
+- **Other divergences from the design** (intentional): the **progress bar + Cancel** are gone
+  (generation is synchronous → in-flight spinner, then download); the section-card look is a small local
+  `app-report-section` shell so the pattern isn't repeated.
 - Structural lists (scope, grouping, columns) mutate the `FormArray` and bump a `revision` signal so the
   `@for`s re-render under zoneless CD (dialog-driven changes run outside a template event). Multi-select
   filter controls (categories/tags/paid-by) are `FormArray`s, per the `app-autocomlete` `.push()` contract.

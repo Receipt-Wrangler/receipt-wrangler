@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from "@angular/core";
 import { FormGroup } from "@angular/forms";
+import { Permission } from "../../open-api";
 
 interface FormatChip {
   key: string;
@@ -23,7 +24,12 @@ export class ReportGenerateBarComponent {
   public readonly form = input.required<FormGroup>();
   public readonly generating = input<boolean>(false);
   public readonly canGenerate = input<boolean>(false);
+  public readonly canSaveTemplate = input<boolean>(false);
+  public readonly saving = input<boolean>(false);
   public readonly generate = output<void>();
+  public readonly saveTemplate = output<void>();
+
+  protected readonly Permission = Permission;
 
   public readonly formats: FormatChip[] = [
     { key: "csv", label: "CSV", icon: "description" },
@@ -53,5 +59,9 @@ export class ReportGenerateBarComponent {
 
   public onGenerate(): void {
     this.generate.emit();
+  }
+
+  public onSaveTemplate(): void {
+    this.saveTemplate.emit();
   }
 }

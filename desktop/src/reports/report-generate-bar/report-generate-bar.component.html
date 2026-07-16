@@ -18,6 +18,15 @@
     <mat-icon class="gen-bar__spinner">autorenew</mat-icon>
   }
   <app-button
+    *hasAppPermission="Permission.AppReportsCreate"
+    matButtonType="basic"
+    [buttonText]="saving() ? 'Saving…' : 'Save Template'"
+    icon="bookmark_add"
+    [disabled]="!canSaveTemplate() || saving()"
+    (clicked)="onSaveTemplate()"
+    data-testid="report-save-template"
+  ></app-button>
+  <app-button
     [buttonText]="generating() ? 'Generating…' : 'Generate Report'"
     [icon]="generating() ? '' : 'play_arrow'"
     [disabled]="!canGenerate() || generating()"

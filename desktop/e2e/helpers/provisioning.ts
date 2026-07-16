@@ -302,6 +302,14 @@ export async function apiDeleteGroupById(
   await api.delete(`/api/group/${groupId}`);
 }
 
+/** Deletes the report template [id] (requires app.reports.delete on the caller). */
+export async function apiDeleteReportTemplateById(
+  api: APIRequestContext,
+  id: number | string,
+): Promise<void> {
+  await api.delete(`/api/report/template/${id}`);
+}
+
 /**
  * Deletes the [scope] role named [name]. Only succeeds once it's unassigned, so
  * call after the user/group that referenced it is gone.

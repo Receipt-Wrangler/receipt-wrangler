@@ -1,7 +1,8 @@
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormBuilder, FormControl } from "@angular/forms";
-import { of, throwError } from "rxjs";
+import { of, Subject, throwError } from "rxjs";
+import { SnackbarService } from "../../services";
 import { CustomFieldService, ReportColumn } from "../../open-api";
 import { buildColumnGroup } from "../models/report-form.factory";
 import { ReportRunnerService } from "../services/report-runner.service";
@@ -10,13 +11,16 @@ import { ReportBuilderComponent } from "./report-builder.component";
 describe("ReportBuilderComponent", () => {
   let fixture: ComponentFixture<ReportBuilderComponent>;
   let component: ReportBuilderComponent;
-  let runner: { preview: jest.Mock; generateAndDownload: jest.Mock };
+  let runner: { preview: jest.Mock; generateAndDownload: jest.Mock; saveTemplate: jest.Mock };
+  let snackbar: { success: jest.Mock };
 
   beforeEach(async () => {
     runner = {
       preview: jest.fn(() => of({ html: "<p></p>", receiptCount: 0 })),
       generateAndDownload: jest.fn(() => of(new Blob())),
+      saveTemplate: jest.fn(() => of({ id: 1 })),
     };
+    snackbar = { success: jest.fn() };
 
     await TestBed.configureTestingModule({
       declarations: [ReportBuilderComponent],
@@ -24,6 +28,7 @@ describe("ReportBuilderComponent", () => {
         provideZonelessChangeDetection(),
         FormBuilder,
         { provide: ReportRunnerService, useValue: runner },
+        { provide: SnackbarService, useValue: snackbar },
         { provide: CustomFieldService, useValue: { getPagedCustomFields: jest.fn(() => of({ data: [], totalCount: 0 })) } },
       ],
       schemas: [NO_ERRORS_SCHEMA],
@@ -99,5 +104,47 @@ describe("ReportBuilderComponent", () => {
     expect(runner.generateAndDownload).toHaveBeenCalled();
     // generateAndDownload emits synchronously, so finalize clears the flag.
     expect(component.generating()).toBe(false);
+  });
+
+  it("saves a template and shows a success snackbar", async () => {
+    (component.form.get("scope") as FormArray).push(new FormControl("1"));
+    await fixture.whenStable();
+    expect(component.canSaveTemplate()).toBe(true);
+
+    component.saveTemplate();
+
+    expect(runner.saveTemplate).toHaveBeenCalled();
+    expect(snackbar.success).toHaveBeenCalledWith("Template saved");
+  });
+
+  it("cannot save a template without a name", async () => {
+    (component.form.get("scope") as FormArray).push(new FormControl("1"));
+    component.form.get("name")!.setValue("   ");
+    await fixture.whenStable();
+    expect(component.canSaveTemplate()).toBe(false);
+
+    component.saveTemplate();
+    expect(runner.saveTemplate).not.toHaveBeenCalled();
+  });
+
+  it("guards against concurrent saves while one is in flight", async () => {
+    const pending = new Subject<{ id: number }>();
+    runner.saveTemplate.mockReturnValue(pending.asObservable());
+
+    (component.form.get("scope") as FormArray).push(new FormControl("1"));
+    await fixture.whenStable();
+    expect(component.canSaveTemplate()).toBe(true);
+
+    component.saveTemplate();
+    expect(component.saving()).toBe(true);
+
+    // A second call (e.g. a double-click) must not fire another POST.
+    component.saveTemplate();
+    expect(runner.saveTemplate).toHaveBeenCalledTimes(1);
+
+    // Completing the request clears the in-flight flag so later saves work again.
+    pending.next({ id: 1 });
+    pending.complete();
+    expect(component.saving()).toBe(false);
   });
 });

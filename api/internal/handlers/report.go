@@ -4,13 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
+	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // loadReportCommand parses and validates the report request body, writing the
@@ -121,6 +125,79 @@ func PreviewReport(w http.ResponseWriter, r *http.Request) {
 			}
 
 			bytes, err := utils.MarshalResponseData(preview)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+// DeleteReportTemplate removes a saved report template by id. App-scoped behind
+// app.reports.delete, matching CreateReportTemplate. Deleting a non-existent id
+// still returns 200 (GORM treats it as a no-op), so it is idempotent.
+func DeleteReportTemplate(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage:   "Error deleting report template",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppReportsDelete},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			id := chi.URLParam(r, "id")
+
+			err := repositories.NewReportTemplateRepository(nil).DeleteReportTemplateById(id)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+// CreateReportTemplate saves a report configuration as a reusable template. Unlike
+// generate/preview it is app-scoped (app.reports.create): it persists a
+// configuration and touches no group's receipts, so it does not gate on per-group
+// generation access. It reuses the shared loadReportCommand parse+validate, so a
+// saved template is always a complete, buildable configuration.
+func CreateReportTemplate(w http.ResponseWriter, r *http.Request) {
+	command, ok := loadReportCommand(w, r)
+	if !ok {
+		return
+	}
+
+	// A template is identified by its name, so require a non-empty one. The shared
+	// loadReportCommand validator doesn't check Name (generate/preview don't need
+	// it), so enforce it here.
+	if strings.TrimSpace(command.Name) == "" {
+		utils.WriteCustomErrorResponse(w, "A report template name is required", http.StatusBadRequest)
+		return
+	}
+
+	handler := structs.Handler{
+		ErrorMessage:   "Error saving report template",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppReportsCreate},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			token := structs.GetClaims(r)
+
+			template, err := repositories.NewReportTemplateRepository(nil).CreateReportTemplate(command, token.UserId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(template)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
