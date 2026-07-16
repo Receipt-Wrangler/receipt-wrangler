@@ -8,14 +8,14 @@ import { OperationsPipe } from "../../shared-ui/receipt-filter/operations.pipe";
 import { Category, FilterOperation, Tag } from "../../open-api";
 
 /**
- * The pinned "current viewer" paid-by option id — negative so it never collides
+ * The pinned "report generator" paid-by option id — negative so it never collides
  * with a real (positive) user id. A saved template stores the sentinel rather than a
  * static user, and the backend resolves it to whoever generates the report (see
- * `api/CLAUDE.md` → "Report templates"), so the filter follows the runner, not the
- * author. This mirrors the role editor's OWN_PAID_RECEIPTS_OPTION_ID convention and
- * is reporting-only — the shared receipts filter never offers it.
+ * `api/CLAUDE.md` → "Report templates"), so the filter follows the report's generator,
+ * not its author. This mirrors the role editor's OWN_PAID_RECEIPTS_OPTION_ID
+ * convention and is reporting-only — the shared receipts filter never offers it.
  */
-export const CURRENT_VIEWER_PAID_BY_ID = -1;
+export const REPORT_GENERATOR_PAID_BY_ID = -1;
 
 /** A pinned/user option for the reporting paid-by picker. */
 interface PaidByOption {
@@ -99,12 +99,12 @@ export class ReportFiltersComponent implements OnInit {
     return operation != null && operation !== FilterOperation.Empty;
   }
 
-  // The paid-by picker prepends a "current viewer (me)" sentinel to the full user
-  // pool (read reactively so it repopulates if AppData lands after first paint), then
-  // stores plain user ids like every other paid-by filter — the -1 sentinel included.
+  // The paid-by picker prepends a "whoever generates the report" sentinel to the full
+  // user pool (read reactively so it repopulates if AppData lands after first paint),
+  // then stores plain user ids like every other paid-by filter — the -1 sentinel too.
   private readonly users = this.store.selectSignal(UserState.users);
   public readonly paidByOptions = computed<PaidByOption[]>(() => [
-    { id: CURRENT_VIEWER_PAID_BY_ID, displayName: "Current viewer (me)" },
+    { id: REPORT_GENERATOR_PAID_BY_ID, displayName: "Whoever generates the report" },
     ...this.users().map((user) => ({
       id: user.id,
       displayName: user.displayName?.length ? user.displayName : user.username,

@@ -125,10 +125,10 @@ test.describe('Reports — templates list', () => {
     await expect(page.getByRole('row').filter({ hasText: seededName })).toHaveCount(0);
   });
 
-  test('hydrates a saved "current viewer" paid-by filter into the builder', async ({ page }) => {
-    // A template can filter paid-by on the dynamic "current viewer" sentinel (-1) rather
+  test('hydrates a saved "report generator" paid-by filter into the builder', async ({ page }) => {
+    // A template can filter paid-by on the dynamic report-generator sentinel (-1) rather
     // than a static user. Opening it must render the paid-by row and resolve -1 to the
-    // pinned "Current viewer (me)" option chip.
+    // pinned "Whoever generates the report" option chip.
     const filterName = uniqueName('report-template-mefilter');
     const groupId = await withAdminApi((api) => apiFirstReportGroupId(api));
     const filtered = await withAdminApi((api) =>
@@ -149,7 +149,7 @@ test.describe('Reports — templates list', () => {
     await expect(page).toHaveURL(/\/reports\/\d+\/edit$/);
 
     await expect(page.getByTestId('report-filter-remove')).toBeVisible();
-    await expect(page.getByText('Current viewer (me)', { exact: true })).toBeVisible();
+    await expect(page.getByText('Whoever generates the report', { exact: true })).toBeVisible();
   });
 
   test('generates a report from a row action', async ({ page }) => {

@@ -629,11 +629,11 @@ user holds it.
     **seeds it from the hydrated filter** (every field whose stored `operation` is non-empty) — otherwise
     a saved template's filter sits in the form but renders no rows. The value itself relies on the backend
     serializing the filter with lowercase `value`/`tags` keys (see `api/CLAUDE.md` → Report templates).
-  - **Dynamic "current viewer" paid-by (reporting-only)**: the paid-by row is the one place the reporting
+  - **Dynamic report-generator paid-by (reporting-only)**: the paid-by row is the one place the reporting
     filter diverges from the shared receipts filter — instead of the shared `app-user-autocomplete` it
-    uses `app-autocomlete` over `paidByOptions()`, which prepends a pinned **"Current viewer (me)"**
-    sentinel (`CURRENT_VIEWER_PAID_BY_ID = -1`, negative so it never collides with a real id) ahead of
-    `UserState.users`. The control still stores plain numeric ids (the shared form builder, the command
+    uses `app-autocomlete` over `paidByOptions()`, which prepends a pinned **"Whoever generates the
+    report"** sentinel (`REPORT_GENERATOR_PAID_BY_ID = -1`, negative so it never collides with a real id)
+    ahead of `UserState.users`. The control still stores plain numeric ids (the shared form builder, the command
     mapper, and the round-trip factory are untouched), so a saved template carries the `-1` sentinel and
     the backend resolves it to whoever generates the report — User A running User B's saved report filters
     to User A's own receipts. Mirrors the role editor's `OWN_PAID_RECEIPTS_OPTION_ID` convention; the

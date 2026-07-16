@@ -159,7 +159,7 @@ func TestReportService_ApplyPeriodWritesBetweenDateFilter(t *testing.T) {
 	}
 }
 
-func TestReportService_ResolveCurrentViewerPaidBy(t *testing.T) {
+func TestReportService_ResolveReportGeneratorPaidBy(t *testing.T) {
 	// Values arrive as float64 (JSON), the same shape a static user-id filter has.
 	newFilter := func(value interface{}) commands.ReceiptPagedRequestFilter {
 		return commands.ReceiptPagedRequestFilter{
@@ -168,8 +168,8 @@ func TestReportService_ResolveCurrentViewerPaidBy(t *testing.T) {
 	}
 
 	t.Run("substitutes the sentinel with the generating user's id", func(t *testing.T) {
-		filter := newFilter([]interface{}{float64(currentViewerPaidBySentinel), float64(12)})
-		resolveCurrentViewerPaidBy(&filter, 7)
+		filter := newFilter([]interface{}{float64(reportGeneratorPaidBySentinel), float64(12)})
+		resolveReportGeneratorPaidBy(&filter, 7)
 
 		want := []interface{}{float64(7), float64(12)}
 		if got := filter.PaidBy.Value.([]interface{}); !reflect.DeepEqual(got, want) {
@@ -178,10 +178,10 @@ func TestReportService_ResolveCurrentViewerPaidBy(t *testing.T) {
 	})
 
 	t.Run("is dynamic per generating user (User A vs User B run the same template)", func(t *testing.T) {
-		forA := newFilter([]interface{}{float64(currentViewerPaidBySentinel)})
-		resolveCurrentViewerPaidBy(&forA, 3)
-		forB := newFilter([]interface{}{float64(currentViewerPaidBySentinel)})
-		resolveCurrentViewerPaidBy(&forB, 9)
+		forA := newFilter([]interface{}{float64(reportGeneratorPaidBySentinel)})
+		resolveReportGeneratorPaidBy(&forA, 3)
+		forB := newFilter([]interface{}{float64(reportGeneratorPaidBySentinel)})
+		resolveReportGeneratorPaidBy(&forB, 9)
 
 		if got := forA.PaidBy.Value.([]interface{}); !reflect.DeepEqual(got, []interface{}{float64(3)}) {
 			t.Errorf("user 3 resolved to %v, want [3]", got)
@@ -193,7 +193,7 @@ func TestReportService_ResolveCurrentViewerPaidBy(t *testing.T) {
 
 	t.Run("leaves a static user-id filter unchanged", func(t *testing.T) {
 		filter := newFilter([]interface{}{float64(5), float64(8)})
-		resolveCurrentViewerPaidBy(&filter, 7)
+		resolveReportGeneratorPaidBy(&filter, 7)
 
 		want := []interface{}{float64(5), float64(8)}
 		if got := filter.PaidBy.Value.([]interface{}); !reflect.DeepEqual(got, want) {
@@ -203,7 +203,7 @@ func TestReportService_ResolveCurrentViewerPaidBy(t *testing.T) {
 
 	t.Run("ignores a non-array paid-by value without panicking", func(t *testing.T) {
 		filter := newFilter(nil)
-		resolveCurrentViewerPaidBy(&filter, 7)
+		resolveReportGeneratorPaidBy(&filter, 7)
 
 		if filter.PaidBy.Value != nil {
 			t.Errorf("PaidBy.Value = %v, want nil (unchanged)", filter.PaidBy.Value)

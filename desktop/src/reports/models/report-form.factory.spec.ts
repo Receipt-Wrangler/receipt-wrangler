@@ -213,7 +213,7 @@ describe("buildReportFormFromCommand", () => {
     expect(form.get("filter.date.operation")!.value).toBe(FilterOperation.WithinCurrentMonth);
   });
 
-  it("round-trips a 'current viewer' paid-by filter (the -1 sentinel), alone and mixed with a user id", () => {
+  it("round-trips a 'report generator' paid-by filter (the -1 sentinel), alone and mixed with a user id", () => {
     // The sentinel is a plain id in the value array, so it survives hydration and
     // re-serialization unchanged — the contract the backend relies on to substitute
     // it for the report runner's own id at generate time.
