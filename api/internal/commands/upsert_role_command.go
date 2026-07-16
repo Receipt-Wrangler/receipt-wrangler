@@ -30,6 +30,31 @@ type UpsertRoleCommand struct {
 	// therefore hides the member's own receipts too.
 	PaidByUserGrants       []uint `json:"paidByUserGrants"`
 	IncludeOwnPaidReceipts bool   `json:"includeOwnPaidReceipts"`
+	// ReportTemplateGrants restrict which report templates members of a group role
+	// may act on, per action. Group-scoped only and opt-in: an empty set means
+	// unrestricted (act on every template the role's group access reaches). Each
+	// entry names a template id and the subset of actions
+	// (read/generate/update/delete/duplicate) the role may perform on it. Template
+	// existence is validated against the database in the role service.
+	ReportTemplateGrants []ReportTemplateGrantCommand `json:"reportTemplateGrants"`
+}
+
+// ReportTemplateGrantCommand is one row of the report-template access matrix: the
+// set of actions a group role may perform on a single template.
+type ReportTemplateGrantCommand struct {
+	ReportTemplateId uint     `json:"reportTemplateId"`
+	Permissions      []string `json:"permissions"`
+}
+
+// scopableReportTemplateActions is the set of report actions that can be granted
+// per template. "create" is excluded: it makes a new template, so there is no
+// existing template to scope it against.
+var scopableReportTemplateActions = map[string]bool{
+	"read":      true,
+	"generate":  true,
+	"update":    true,
+	"delete":    true,
+	"duplicate": true,
 }
 
 func (command *UpsertRoleCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -98,8 +123,47 @@ func (command *UpsertRoleCommand) Validate() structs.ValidatorError {
 		errors["paidByUserGrants"] = "Duplicate paid-by user grant"
 	}
 
+	// Report template grants are likewise a group-role concept; on an app role the
+	// scope violation is the primary problem, so it wins over structural checks.
+	if command.Scope == permissions.ScopeApp && len(command.ReportTemplateGrants) > 0 {
+		errors["reportTemplateGrants"] = "Report template grants are only valid on group roles"
+	} else if msg := validateReportTemplateGrants(command.ReportTemplateGrants); msg != "" {
+		errors["reportTemplateGrants"] = msg
+	}
+
 	vErr.Errors = errors
 	return vErr
+}
+
+// validateReportTemplateGrants checks a group role's report-template grant entries:
+// no duplicate template id, each entry names at least one action, no duplicate
+// action within an entry, and every action is one that can be scoped per template.
+// It returns an empty string when the grants are well-formed.
+func validateReportTemplateGrants(grants []ReportTemplateGrantCommand) string {
+	seenTemplate := make(map[uint]bool, len(grants))
+	for _, grant := range grants {
+		if seenTemplate[grant.ReportTemplateId] {
+			return fmt.Sprintf("Duplicate report template grant: %d", grant.ReportTemplateId)
+		}
+		seenTemplate[grant.ReportTemplateId] = true
+
+		if len(grant.Permissions) == 0 {
+			return fmt.Sprintf("Report template grant %d must list at least one action", grant.ReportTemplateId)
+		}
+
+		seenAction := make(map[string]bool, len(grant.Permissions))
+		for _, action := range grant.Permissions {
+			if seenAction[action] {
+				return fmt.Sprintf("Duplicate action %q on report template grant %d", action, grant.ReportTemplateId)
+			}
+			seenAction[action] = true
+
+			if !scopableReportTemplateActions[action] {
+				return fmt.Sprintf("Unknown report template action: %s", action)
+			}
+		}
+	}
+	return ""
 }
 
 // hasDuplicateUint reports whether ids contains the same value more than once.
