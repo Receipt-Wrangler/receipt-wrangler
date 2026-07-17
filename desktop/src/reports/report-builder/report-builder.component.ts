@@ -13,7 +13,12 @@ import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { EMPTY, catchError, debounceTime, finalize, startWith, switchMap, take, tap } from "rxjs";
 import { Permission, ReportPeriod, ReportRequestCommand, ReportTemplate } from "../../open-api";
-import { enabledReportColumns, ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
+import {
+  enabledReportColumns,
+  ReportBuilderValue,
+  toReportRequestCommand,
+  toReportRequestCommandForSave,
+} from "../models/report-command.mapper";
 import { SnackbarService } from "../../services";
 import { AuthState } from "../../store";
 import { buildReportForm, buildReportFormFromCommand } from "../models/report-form.factory";
@@ -177,7 +182,7 @@ export class ReportBuilderComponent {
     }
     this.saving.set(true);
     const loaded = this.loadedTemplate;
-    const command = this.currentCommand();
+    const command = this.commandForSave();
     const request$ = loaded
       ? this.runner.updateTemplate(loaded.id, command)
       : this.runner.saveTemplate(command);
@@ -195,6 +200,13 @@ export class ReportBuilderComponent {
 
   private currentCommand(): ReportRequestCommand {
     return toReportRequestCommand(this.form.getRawValue() as ReportBuilderValue);
+  }
+
+  // The command persisted on save keeps every column, including currently-disabled
+  // ones, so they round-trip into the builder and self-heal; preview and generate
+  // still send enabled-only columns via currentCommand().
+  private commandForSave(): ReportRequestCommand {
+    return toReportRequestCommandForSave(this.form.getRawValue() as ReportBuilderValue);
   }
 
   private isRunnable(): boolean {

@@ -197,6 +197,43 @@ describe("ReportBuilderComponent", () => {
     expect(snackbar.success).toHaveBeenCalledWith("Template updated");
   });
 
+  it("persists every column on save, including a disabled one, so a reopen self-heals", () => {
+    // The stored config carries a currently-disabled dimension column: aggregate by
+    // tag, group by paid_by, plus a Category dimension that reads neither. Save must
+    // keep it (round-trip) rather than silently dropping it. Tag (the aggregate-by)
+    // and Total stay enabled — proving only the disabled one would have been at risk.
+    const configuration: ReportRequestCommand = {
+      name: "Self-heal",
+      groupIds: ["1"],
+      period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+      filter: {},
+      groupBy: ["paid_by"],
+      detail: { mode: ReportDetail.ModeEnum.Aggregate, by: "tag" },
+      columns: [
+        { kind: ReportColumn.KindEnum.Dimension, name: "Category", label: "Category", field: "category" },
+        { kind: ReportColumn.KindEnum.Dimension, name: "Tag", label: "Tag", field: "tag" },
+        { kind: ReportColumn.KindEnum.Aggregate, name: "Total", label: "Total", aggFunc: ReportColumn.AggFuncEnum.Sum, measure: "amount" },
+      ],
+      subtotals: false,
+      grandTotals: false,
+      formats: [ReportRequestCommand.FormatsEnum.Csv],
+    };
+    const template: ReportTemplate = {
+      id: 9,
+      name: "Self-heal",
+      createdAt: "2026-01-01T00:00:00Z",
+      configuration,
+      configurationVersion: 1,
+    };
+    activatedRoute.snapshot.data = { template };
+
+    const local = TestBed.createComponent(ReportBuilderComponent).componentInstance;
+    local.saveTemplate();
+
+    const savedCommand = runner.updateTemplate.mock.calls[0][1] as ReportRequestCommand;
+    expect(savedCommand.columns.map((column) => column.name)).toEqual(["Category", "Tag", "Total"]);
+  });
+
   describe("Save/Generate permission gates honor the -All variants", () => {
     // The matcher treats "…create" and "…createAll" as unrelated keys, so gating on the
     // base key alone would hide the control from a role holding only the "*All" variant.

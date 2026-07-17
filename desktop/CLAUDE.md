@@ -658,7 +658,12 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
     — a derived state (`isDimensionColumnDisabled` in `report-command.mapper.ts`) shown greyed in the
     columns list and **left out of the request** (`enabledReportColumns`), auto-re-enabling when the
     config makes it valid again. `report-builder` blocks preview/generate only if *no* enabled column
-    remains. Nothing is removed or auto-changed.
+    remains. Nothing is removed or auto-changed — and **Save persists every column, including disabled
+    ones** (`toReportRequestCommandForSave`, distinct from the enabled-only preview/generate
+    `toReportRequestCommand`), so a disabled column round-trips into a reopened template and self-heals
+    instead of being silently dropped. The backend applies the same projection when a stored template is
+    generated (see `api/CLAUDE.md` → "Report templates"), so a template holding a currently-disabled
+    column still generates with it omitted.
 - **Save Template**: the generate bar's secondary button (left of Generate) persists the current
   configuration. Its gate and label follow the builder's mode, driven by two inputs from
   `report-builder` (`isEditMode` + `saveButtonPermission`): on the **new** route it **creates** a

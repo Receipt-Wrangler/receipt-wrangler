@@ -801,7 +801,14 @@ filter already flows through.
 **Report templates.** `POST /api/report/template` saves a report configuration for reuse. It reuses the
 shared `loadReportCommand` parse+validate and stores the whole `ReportRequestCommand` verbatim as a
 `json.RawMessage` blob on `models.ReportTemplate` (name + owner taken from the request / JWT), so a
-template round-trips back into the builder unchanged. Because this is the first feature to **re-serialize
+template round-trips back into the builder unchanged. A stored config may include a dimension column
+that is currently **disabled** in the builder (aggregate mode, a label whose field is neither the
+aggregate dimension nor a grouping level) — persisted deliberately so it round-trips and self-heals
+rather than being silently dropped on save. `buildReportSpec` (`services/report_service.go`,
+`isDisabledDimensionColumn`) **projects such a column out** before running the engine, mirroring the
+desktop `isDimensionColumnDisabled` and the engine's own `ErrLabelColumnUnresolvable` rejection — so
+verbatim generation of a stored template (including `POST /report/template/{id}/generate`) succeeds
+with the column omitted instead of returning a 400. Because this is the first feature to **re-serialize
 a `ReceiptPagedRequestFilter` back to a client**, the filter's json tags must be correct:
 `PagedRequestField.Value` carries `json:"value"` and the filter's `Tags` field `json:"tags"` (both
 lowercase, matching swagger) — a capitalized key would deserialize fine (Go is case-insensitive) but

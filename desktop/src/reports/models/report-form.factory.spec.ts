@@ -4,7 +4,7 @@ import { FormArray, FormBuilder } from "@angular/forms";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { FilterOperation, ReportColumn, ReportDetail, ReportPeriod, ReportRequestCommand } from "../../open-api";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
-import { ReportBuilderValue, toReportRequestCommand } from "./report-command.mapper";
+import { ReportBuilderValue, toReportRequestCommand, toReportRequestCommandForSave } from "./report-command.mapper";
 import { buildReportFormFromCommand, readStringArray } from "./report-form.factory";
 
 // buildReceiptFilterForm wires untilDestroyed subscriptions, so it needs an
@@ -64,6 +64,40 @@ describe("buildReportFormFromCommand", () => {
     };
 
     expect(roundTrip(command)).toEqual(command);
+  });
+
+  it("preserves a disabled dimension column through a save round-trip while generate still drops it", () => {
+    // A stored template whose config holds a currently-disabled dimension column:
+    // aggregate by tag, group by paid_by, plus a Category dimension reading neither.
+    const command: ReportRequestCommand = {
+      name: "Has a disabled column",
+      groupIds: ["1"],
+      period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+      filter: canonicalFilter({}),
+      groupBy: ["paid_by"],
+      detail: { mode: ReportDetail.ModeEnum.Aggregate, by: "tag" },
+      columns: [
+        { kind: ReportColumn.KindEnum.Dimension, name: "Category", label: "Category", field: "category" },
+        { kind: ReportColumn.KindEnum.Dimension, name: "Tag", label: "Tag", field: "tag" },
+        { kind: ReportColumn.KindEnum.Aggregate, name: "Total", label: "Total", aggFunc: ReportColumn.AggFuncEnum.Sum, measure: "amount" },
+      ],
+      subtotals: false,
+      grandTotals: false,
+      formats: [ReportRequestCommand.FormatsEnum.Csv],
+    };
+
+    const form = buildReportFormFromCommand(fb, host, command);
+
+    // The save mapper keeps every column, so hydrate -> save is a fixpoint: the
+    // disabled Category column survives the round-trip instead of being lost.
+    expect(toReportRequestCommandForSave(form.getRawValue() as ReportBuilderValue)).toEqual(command);
+
+    // The generate mapper still drops the disabled Category dimension (Tag is the
+    // aggregate-by, so it stays), proving the two paths diverge as intended.
+    expect(toReportRequestCommand(form.getRawValue() as ReportBuilderValue).columns.map((c) => c.name)).toEqual([
+      "Tag",
+      "Total",
+    ]);
   });
 
   it("round-trips a custom-period records command with no document and an amount BETWEEN filter", () => {

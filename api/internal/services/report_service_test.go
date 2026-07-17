@@ -291,6 +291,66 @@ func TestReportService_BuildReportSpec(t *testing.T) {
 	}
 }
 
+func specColumnNames(spec reporting.ReportSpec) []string {
+	names := make([]string, len(spec.Columns))
+	for index, column := range spec.Columns {
+		names[index] = column.Name
+	}
+	return names
+}
+
+// A saved template may hold a dimension column that is currently unresolvable in
+// aggregate mode — its field is neither the aggregate dimension nor a grouping
+// level, which the engine would reject (ErrLabelColumnUnresolvable). buildReportSpec
+// projects it out, mirroring the builder, so the stored template still generates
+// with the column omitted rather than failing the whole report. Resolvable
+// dimension, aggregate, and formula columns are kept, and records mode drops nothing.
+func TestReportService_BuildReportSpec_ProjectsDisabledDimensionColumns(t *testing.T) {
+	t.Run("aggregate mode drops only the unresolvable dimension column", func(t *testing.T) {
+		command := commands.ReportRequestCommand{
+			GroupBy: []string{"group"},
+			Detail:  commands.ReportDetail{Mode: commands.ReportDetailAggregate, By: "category"},
+			Columns: []commands.ReportColumn{
+				{Kind: commands.ReportColumnDimension, Name: "Group", Field: "group"},       // grouped -> kept
+				{Kind: commands.ReportColumnDimension, Name: "Category", Field: "category"}, // detail.by -> kept
+				{Kind: commands.ReportColumnDimension, Name: "PaidBy", Field: "paid_by"},    // neither -> dropped
+				{Kind: commands.ReportColumnAggregate, Name: "Total", AggFunc: "SUM", Measure: "amount"},
+				{Kind: commands.ReportColumnFormula, Name: "Double", Expr: "Total + Total"},
+			},
+		}
+
+		spec, err := buildReportSpec(command)
+		if err != nil {
+			t.Fatalf("buildReportSpec: %v", err)
+		}
+
+		got := specColumnNames(spec)
+		want := []string{"Group", "Category", "Total", "Double"}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("columns = %v, want %v (the unresolvable PaidBy dimension dropped)", got, want)
+		}
+	})
+
+	t.Run("records mode keeps every dimension column", func(t *testing.T) {
+		command := commands.ReportRequestCommand{
+			Detail: commands.ReportDetail{Mode: commands.ReportDetailRecords},
+			Columns: []commands.ReportColumn{
+				{Kind: commands.ReportColumnDimension, Name: "PaidBy", Field: "paid_by"},
+				{Kind: commands.ReportColumnDimension, Name: "Category", Field: "category"},
+			},
+		}
+
+		spec, err := buildReportSpec(command)
+		if err != nil {
+			t.Fatalf("buildReportSpec: %v", err)
+		}
+
+		if got := specColumnNames(spec); !reflect.DeepEqual(got, []string{"PaidBy", "Category"}) {
+			t.Errorf("records mode dropped a column: %v", got)
+		}
+	})
+}
+
 // --- DB-backed generation -------------------------------------------------
 
 // seedReportUserInGroups creates one user who is a member of every named group,

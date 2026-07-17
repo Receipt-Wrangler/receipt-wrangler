@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -350,6 +351,19 @@ func buildReportSpec(command commands.ReportRequestCommand) (reporting.ReportSpe
 
 	columns := make([]reporting.Column, 0, len(command.Columns))
 	for _, column := range command.Columns {
+		// A saved template may carry a dimension column that is currently
+		// unresolvable — a label the engine can't place on an aggregated row
+		// because its field is neither the aggregate dimension nor a grouping
+		// level. The builder greys these out and leaves them out of the request;
+		// the same projection here lets a template that stores one (so it
+		// round-trips into the builder and re-enables when the config makes it
+		// valid) still generate — with the column omitted — instead of failing
+		// the whole report. Mirrors the desktop isDimensionColumnDisabled rule
+		// and the engine's own compileLabelColumn rejection.
+		if isDisabledDimensionColumn(command, column) {
+			continue
+		}
+
 		built, err := buildReportColumn(column)
 		if err != nil {
 			return reporting.ReportSpec{}, err
@@ -364,6 +378,19 @@ func buildReportSpec(command commands.ReportRequestCommand) (reporting.ReportSpe
 		Subtotals:   command.Subtotals,
 		GrandTotals: command.GrandTotals,
 	}, nil
+}
+
+// isDisabledDimensionColumn reports whether a dimension column is unresolvable in
+// aggregate mode — its field is neither the aggregate dimension nor a grouping
+// level, so the engine cannot label an aggregated row with it. It is the
+// server-side twin of the desktop builder's isDimensionColumnDisabled: such a
+// column is projected out of the spec rather than failing the report, so a saved
+// template may retain it for round-trip fidelity.
+func isDisabledDimensionColumn(command commands.ReportRequestCommand, column commands.ReportColumn) bool {
+	if command.Detail.Mode != commands.ReportDetailAggregate || column.Kind != commands.ReportColumnDimension {
+		return false
+	}
+	return column.Field != command.Detail.By && !slices.Contains(command.GroupBy, column.Field)
 }
 
 func buildReportColumn(column commands.ReportColumn) (reporting.Column, error) {
