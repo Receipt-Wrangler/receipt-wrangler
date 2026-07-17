@@ -18,7 +18,7 @@ Name | Type | Description | Notes
 **groupId** | **int** |  | 
 **id** | **int** |  | 
 **imageFiles** | [**BuiltList&lt;FileData&gt;**](FileData.md) | Files associated to receipt | [optional] 
-**name** | **String** | Custom Field name | 
+**name** | **String** | The template name (mirrors the saved report's name). | 
 **paidByUserId** | **int** | User paid foreign key | 
 **receiptItems** | [**BuiltList&lt;Item&gt;**](Item.md) | Items associated to receipt | 
 **resolvedDate** | **String** | Date resolved | [optional] 
@@ -59,6 +59,9 @@ Name | Type | Description | Notes
 **useStartTLS** | **bool** | Whether to use STARTTLS | [optional] 
 **canBeRestarted** | **bool** |  | [optional] 
 **options** | [**BuiltList&lt;CustomFieldOption&gt;**](CustomFieldOption.md) |  | [optional] 
+**configuration** | [**ReportRequestCommand**](ReportRequestCommand.md) |  | 
+**configurationVersion** | **int** | Schema version the stored configuration was written under. | 
+**allowedActions** | **BuiltList&lt;String&gt;** | The actions the requesting user may perform on this template (read, generate, update, delete, duplicate), resolved per user and populated only on the list response. Drives the row action buttons. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

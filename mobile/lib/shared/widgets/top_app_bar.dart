@@ -4,6 +4,7 @@ import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/models/loading_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/user_avatar.dart';
 import 'package:receipt_wrangler_mobile/utils/snackbar.dart';
 
@@ -97,6 +98,13 @@ class _TopAppBar extends State<TopAppBar> {
     return PopupMenuButton(
         child: const UserAvatar(),
         itemBuilder: (BuildContext context) {
+          final permissionsModel =
+              Provider.of<PermissionsModel>(context, listen: false);
+          final canViewReports = permissionsModel.hasAnyAppPermission([
+            api.Permission.appPeriodReportsPeriodRead,
+            api.Permission.appPeriodReportsPeriodReadAll,
+          ]);
+
           return [
             PopupMenuItem(
               child: TextButton(
@@ -107,6 +115,16 @@ class _TopAppBar extends State<TopAppBar> {
                 child: const Text('User Profile'),
               ),
             ),
+            if (canViewReports)
+              PopupMenuItem(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    this.context.push('/reports');
+                  },
+                  child: const Text('Reports'),
+                ),
+              ),
             PopupMenuItem(
               child: TextButton(
                 onPressed: () => _logout(),
