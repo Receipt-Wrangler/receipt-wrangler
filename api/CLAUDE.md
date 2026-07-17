@@ -771,8 +771,11 @@ engine's own output rather than a client-side re-implementation. A separate **ap
 permission gates the desktop report-builder route/nav and the saved-template read endpoints (Legacy Admin
 picks it up via add-only role reconciliation; reporting is admin-by-default). Generate additionally
 requires the app-level **`app.reports.generate`** (ANDed with the per-group `group.reports.read`), so a
-non-admin needs both a custom role granting `app.reports.generate` and per-group generation access;
-**preview stays group-scoped only** (no app gate), since it is the builder's live feedback loop.
+non-admin needs both a custom role granting `app.reports.generate` and per-group generation access.
+**Preview enforces that same app-level read gate** — `app.reports.read` **or** `app.reports.readAll`,
+declared on the handler as an `AnyAppPermissions` any-of and ANDed with the per-group
+`group.reports.read` — so the builder's live feedback loop is reachable by exactly the users who can
+open the builder, and preview is never merely group-scoped.
 
 **Custom currency formatting.** `buildModel` loads System Settings (`SystemSettingsRepository.GetSystemSettings`,
 a get-or-create singleton) and passes the app's currency configuration — symbol, symbol position (START/END),

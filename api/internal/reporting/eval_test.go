@@ -101,6 +101,41 @@ func TestEvalArithmetic_DivisionScale(t *testing.T) {
 	}
 }
 
+// A computed value that grows past what money can mean collapses to null instead
+// of being materialized. Both growth modes are covered: a coefficient that keeps
+// doubling (a memory-exhaustion vector) and an exponent that keeps climbing
+// toward the int32 boundary (a silent-overflow vector). Feeding each column's
+// result back into the next is exactly what the engine's arithmetic columns do.
+func TestEvalArithmetic_BoundsMagnitude(t *testing.T) {
+	t.Run("a squaring chain collapses to null rather than growing without bound", func(t *testing.T) {
+		columns := map[string]Value{"c": Num(dec("99"))}
+		maxDigits := 0
+		for i := 0; i < 40; i++ {
+			columns["c"] = evalSrc(t, "c * c", columns)
+			if number, ok := columns["c"].Decimal(); ok && number.NumDigits() > maxDigits {
+				maxDigits = number.NumDigits()
+			}
+		}
+		if !columns["c"].IsNull() {
+			t.Errorf("deep squaring chain = %v, want a null cell", columns["c"])
+		}
+		if maxDigits > maxDecimalDigits {
+			t.Errorf("a value survived with %d digits, over the %d ceiling", maxDigits, maxDecimalDigits)
+		}
+	})
+
+	t.Run("a large-exponent chain collapses to null instead of wrapping the int32 exponent", func(t *testing.T) {
+		columns := map[string]Value{"c": evalSrc(t, "1e308", map[string]Value{})}
+		for i := 0; i < 40; i++ {
+			columns["c"] = evalSrc(t, "c * c", columns)
+			if columns["c"].IsNull() {
+				return // collapsed before it could wrap to a wrong number — the guard working
+			}
+		}
+		t.Fatalf("a 1e308 squaring chain never collapsed: %v", columns["c"])
+	})
+}
+
 // A zero divisor must yield an empty cell. shopspring panics on this, so the
 // guard is the only thing standing between a report with a zero count and a
 // crashed request.

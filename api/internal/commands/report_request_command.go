@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"receipt-wrangler/api/internal/structs"
@@ -36,6 +37,14 @@ const (
 // report template's stored configuration. Bump it and write an upcaster when a
 // breaking change to the ReportRequestCommand shape lands.
 const CurrentReportConfigurationVersion = 1
+
+// maxReportColumns caps how many columns one report may declare. Arithmetic
+// columns may reference one another, so an unbounded column list is a way to
+// chain expensive per-cell work; the engine also bounds the magnitude of any
+// single computed value, but rejecting an absurd column count here turns that
+// into a clean 400 instead of a silently-nulled cell. Real reports use a
+// handful of columns — this is a generous ceiling, not a design target.
+const maxReportColumns = 100
 
 // Period presets. Everything but "custom" resolves to a date window from the
 // server clock at generation time; "custom" uses the supplied start/end.
@@ -201,6 +210,11 @@ func (command *ReportRequestCommand) validateDetail(errorMap map[string]string) 
 func (command *ReportRequestCommand) validateColumns(errorMap map[string]string) {
 	if len(command.Columns) == 0 {
 		errorMap["columns"] = "At least one column is required"
+		return
+	}
+
+	if len(command.Columns) > maxReportColumns {
+		errorMap["columns"] = "A report may have at most " + strconv.Itoa(maxReportColumns) + " columns"
 		return
 	}
 

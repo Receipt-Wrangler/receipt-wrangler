@@ -2,6 +2,7 @@ package reporting
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -292,6 +293,56 @@ func TestParseArithmetic_SizeLimits(t *testing.T) {
 			t.Errorf("error = %v, want ErrFormulaTooLong", err)
 		}
 	})
+}
+
+// Bounding a formula's source (above) bounds what one expression costs to parse;
+// it does nothing about what an expression costs to evaluate. Arithmetic columns
+// may reference one another, so a chain that each squares the previous — c1 =
+// c0 * c0, c2 = c1 * c1, … — makes cN equal 99^(2^N): one decimal whose big.Int
+// coefficient doubles in length every column, reaching hundreds of megabytes
+// within ~30 columns and exhausting memory, all from a spec a few hundred bytes
+// long. evalBinary caps a computed value's magnitude, so an over-large
+// intermediate collapses to a null cell (the engine's "correct or null, never
+// wrong" contract) and the report stays cheap. That it returns promptly at all
+// is as much the assertion as anything checked about the result.
+func TestRun_BoundsRunawayArithmeticGrowth(t *testing.T) {
+	const depth = 40
+
+	columns := []Column{
+		{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}},
+		{Name: "c0", Kind: ColumnArithmetic, Expr: "99 * 99"},
+	}
+	for i := 1; i < depth; i++ {
+		prev := fmt.Sprintf("c%d", i-1)
+		columns = append(columns, Column{
+			Name: fmt.Sprintf("c%d", i),
+			Kind: ColumnArithmetic,
+			Expr: prev + " * " + prev,
+		})
+	}
+
+	spec := ReportSpec{
+		GroupBy:     []FieldKey{"tag"},
+		Columns:     columns,
+		GrandTotals: true,
+	}
+
+	model := mustRun(t, spec, []Row{{"tag": {Str("Alex")}}})
+
+	// The deepest column has to have collapsed to a null cell rather than
+	// materialized an astronomically large number.
+	deepest := fmt.Sprintf("c%d", depth-1)
+	if got := cell(t, model.GrandTotals, deepest); !got.IsNull() {
+		t.Errorf("deep arithmetic column %s = %v, want a null (bounded) cell", deepest, got)
+	}
+
+	// And nothing that did survive exceeds the digit ceiling.
+	for _, c := range model.GrandTotals {
+		if number, ok := c.Value().Decimal(); ok && number.NumDigits() > maxDecimalDigits {
+			t.Errorf("column %s survived with %d digits, over the %d ceiling",
+				c.Column, number.NumDigits(), maxDecimalDigits)
+		}
+	}
 }
 
 // Validate is total: whatever it is handed, it answers, and it never panics.

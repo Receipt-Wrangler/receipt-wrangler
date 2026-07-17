@@ -242,8 +242,8 @@ add 'column-format-dropped' 'engine.go' \
 
 # TestRun_MetaParamsAreCopied
 add 'meta-params-aliased' 'engine.go' \
-'			Params:         copyParams(meta.Params),' \
-'			Params:         meta.Params,'
+'			Params:      copyParams(meta.Params),' \
+'			Params:      meta.Params,'
 
 # TestRun_RecordsModeDoesNotAliasInputRows
 add 'records-label-cell-aliases-the-row' 'engine.go' \
@@ -305,13 +305,13 @@ add 'division-guard-removed' 'eval.go' \
 '		if rightNumber.IsZero() {
 			return Null()
 		}
-		return Num(leftNumber.DivRound(rightNumber, divisionScale))' \
-'		return Num(leftNumber.DivRound(rightNumber, divisionScale))'
+		return boundedNum(leftNumber.DivRound(rightNumber, divisionScale))' \
+'		return boundedNum(leftNumber.DivRound(rightNumber, divisionScale))'
 
 # TestEvalArithmetic_IgnoresDivisionPrecisionGlobal
 add 'division-reads-the-global' 'eval.go' \
-'		return Num(leftNumber.DivRound(rightNumber, divisionScale))' \
-'		return Num(leftNumber.Div(rightNumber))'
+'		return boundedNum(leftNumber.DivRound(rightNumber, divisionScale))' \
+'		return boundedNum(leftNumber.Div(rightNumber))'
 
 # TestEvalArithmetic_NullPropagates
 add 'null-operand-reads-as-zero' 'eval.go' \
@@ -322,6 +322,19 @@ add 'null-operand-reads-as-zero' 'eval.go' \
 	}' \
 '	leftNumber, _ := left.Decimal()
 	rightNumber, _ := right.Decimal()'
+
+# TestEvalArithmetic_BoundsMagnitude — without the exponent guard a chain of
+# large-exponent literals (1e308 * 1e308 * …) climbs toward the int32 exponent
+# boundary and wraps to a silently wrong number instead of a null cell. The
+# sibling coefficient guard is exercised by the same test and by
+# TestRun_BoundsRunawayArithmeticGrowth, but removing it exhausts memory rather
+# than producing a checkable value, so it is deliberately not mutated here.
+add 'exponent-guard-removed' 'eval.go' \
+'	if exponent := d.Exponent(); exponent > maxDecimalExponent || exponent < -maxDecimalExponent {
+		return Null()
+	}
+	return Num(d)' \
+'	return Num(d)'
 
 # --- validate: the rules ----------------------------------------------------
 
