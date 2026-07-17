@@ -555,6 +555,49 @@ func TestFormatDimension_NullIsNoneLabel(t *testing.T) {
 	}
 }
 
+// A NoneLabel configured to a formula-like value is neutralized with a leading
+// apostrophe wherever the renderer draws it — both the leading dimension column (a
+// (None) group bucket) and a label cell (a (None) label bucket) — so the (None) name
+// can't smuggle a formula into the export.
+func TestCSV_SanitizesNoneLabel(t *testing.T) {
+	catalog := paidByCatalog(t)
+	spec := reporting.ReportSpec{
+		GroupBy:   []reporting.FieldKey{"paid_by"},
+		Detail:    reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "category"},
+		NoneLabel: "=cmd",
+		Columns: []reporting.Column{
+			{Name: "Category", Label: "Category", Kind: reporting.ColumnLabel, Field: "category"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"},
+		},
+	}
+	// A row with no paid_by (→ (None) dimension bucket) and no category (→ (None)
+	// label cell) exercises both null paths in one render.
+	rows := []reporting.Row{
+		{"amount": {money("100")}},
+	}
+
+	out, err := CSV(mustRun(t, spec, catalog, rows), []Dimension{{Key: "paid_by", Label: "Paid By"}})
+	if err != nil {
+		t.Fatalf("CSV: %v", err)
+	}
+
+	records, err := csv.NewReader(strings.NewReader(string(out))).ReadAll()
+	if err != nil {
+		t.Fatalf("re-parse CSV: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("record count = %d, want 2 (header + one detail row)", len(records))
+	}
+	// Detail row columns: Row Type, Paid By, Category, Total.
+	detail := records[1]
+	if detail[1] != "'=cmd" {
+		t.Errorf("paid-by (None) dimension = %q, want it neutralized to %q", detail[1], "'=cmd")
+	}
+	if detail[2] != "'=cmd" {
+		t.Errorf("category (None) label = %q, want it neutralized to %q", detail[2], "'=cmd")
+	}
+}
+
 // Subtotals without grand totals: the per-group subtotal rows appear, and no
 // Grand Total row follows.
 func TestCSV_SubtotalsWithoutGrandTotal(t *testing.T) {

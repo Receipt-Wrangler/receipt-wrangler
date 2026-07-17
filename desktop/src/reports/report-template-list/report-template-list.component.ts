@@ -64,14 +64,16 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
 
   protected readonly Permission = Permission;
 
-  // "New Report" creates a template, so it gates on create — honoring both the base and
-  // the "*All" variant (the permission matcher treats "…create"/"…createAll" as unrelated
-  // keys, so the base alone would hide it from an "*All"-only holder). Resolved through the
-  // AuthState selector, exactly like the sidebar's report gate.
-  protected readonly canCreate = this.store.selectSignal(
+  // "New Report" opens the builder entry (/reports/new) — a preview/generate/ad-hoc-download
+  // tool, not the Save operation — so it gates on report **read** access, honoring both the
+  // base and the "*All" variant (the permission matcher treats "…read"/"…readAll" as unrelated
+  // keys, so the base alone would hide it from an "*All"-only holder). The Save control stays
+  // create-gated in the builder. Resolved through the AuthState selector, exactly like the
+  // sidebar's report gate.
+  protected readonly canEnterBuilder = this.store.selectSignal(
     AuthState.hasAnyAppPermission([
-      Permission.AppReportsCreate,
-      Permission.AppReportsCreateAll,
+      Permission.AppReportsRead,
+      Permission.AppReportsReadAll,
     ])
   );
 

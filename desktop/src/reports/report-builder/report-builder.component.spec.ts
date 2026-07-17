@@ -247,6 +247,58 @@ describe("ReportBuilderComponent", () => {
       expect(local.isEditMode).toBe(true);
       expect(local.saveTemplateAllowed()).toBe(true);
     });
+
+    it("gates Save on the base update permission in edit mode", async () => {
+      const configuration: ReportRequestCommand = {
+        name: "Saved Report",
+        groupIds: ["1"],
+        period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+        filter: {},
+        groupBy: [],
+        detail: { mode: ReportDetail.ModeEnum.Records },
+        columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+        subtotals: false,
+        grandTotals: false,
+        formats: [ReportRequestCommand.FormatsEnum.Csv],
+      };
+      activatedRoute.snapshot.data = {
+        template: { id: 7, name: "Saved Report", createdAt: "2026-01-01T00:00:00Z", configuration, configurationVersion: 1 },
+      };
+      // Only the base update key — not create, not the "*All" variant.
+      store.dispatch(new SetPermissions([Permission.AppReportsUpdate], {}));
+
+      const local = TestBed.createComponent(ReportBuilderComponent).componentInstance;
+      await fixture.whenStable();
+
+      expect(local.isEditMode).toBe(true);
+      expect(local.saveTemplateAllowed()).toBe(true);
+    });
+
+    it("does not let create authorize Save in edit mode", async () => {
+      const configuration: ReportRequestCommand = {
+        name: "Saved Report",
+        groupIds: ["1"],
+        period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+        filter: {},
+        groupBy: [],
+        detail: { mode: ReportDetail.ModeEnum.Records },
+        columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+        subtotals: false,
+        grandTotals: false,
+        formats: [ReportRequestCommand.FormatsEnum.Csv],
+      };
+      activatedRoute.snapshot.data = {
+        template: { id: 7, name: "Saved Report", createdAt: "2026-01-01T00:00:00Z", configuration, configurationVersion: 1 },
+      };
+      // Create only — editing an existing template needs update, so Save stays hidden.
+      store.dispatch(new SetPermissions([Permission.AppReportsCreate], {}));
+
+      const local = TestBed.createComponent(ReportBuilderComponent).componentInstance;
+      await fixture.whenStable();
+
+      expect(local.isEditMode).toBe(true);
+      expect(local.saveTemplateAllowed()).toBe(false);
+    });
   });
 
   it("cannot save a template without a name", async () => {

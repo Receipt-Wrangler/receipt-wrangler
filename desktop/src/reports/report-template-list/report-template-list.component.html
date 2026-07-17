@@ -7,7 +7,7 @@
       </p>
     </div>
     <div class="tools">
-      @if (canCreate()) {
+      @if (canEnterBuilder()) {
         <app-button
           icon="add"
           buttonText="New Report"
@@ -35,7 +35,7 @@
       <span class="empty-icon"><mat-icon>summarize</mat-icon></span>
       <h2>No report templates yet</h2>
       <p>Build a report and save it as a template to reuse it later.</p>
-      @if (canCreate()) {
+      @if (canEnterBuilder()) {
         <app-button
           icon="add"
           buttonText="New Report"

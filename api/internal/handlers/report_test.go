@@ -259,6 +259,20 @@ func TestPreviewReport_ForbidsWithoutAppReportsPermission(t *testing.T) {
 	assertStatus(t, w, http.StatusForbidden)
 }
 
+// A caller who passes the app-level gate (app.reports.read) but holds no per-group
+// group.reports.read is denied preview — the group layer still applies even when the
+// app layer passes.
+func TestPreviewReport_ForbidsWithoutGroupReportsPermission(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	PreviewReport(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
 // The app-level readAll bypass satisfies the preview app-permission gate just like
 // app.reports.read does.
 func TestPreviewReport_AllowedByReadAll(t *testing.T) {

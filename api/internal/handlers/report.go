@@ -139,9 +139,9 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 //
 // Preview additionally requires the app-level app.reports.read OR app.reports.readAll
 // (matching the desktop ReportsModule route guard: if you can open the builder, you can
-// preview). That OR can't be expressed by the declarative AppPermissions gate (which is
-// AND-only), so it is enforced in-body — like GetPagedReportTemplates — alongside the
-// per-group group.reports.read gate above.
+// preview). That any-of requirement is declared via the AnyAppPermissions gate (resolved
+// by HandleRequest), no longer enforced in-body, alongside the per-group group.reports.read
+// gate above.
 func PreviewReport(w http.ResponseWriter, r *http.Request) {
 	command, ok := loadReportCommand(w, r)
 	if !ok {
@@ -149,25 +149,15 @@ func PreviewReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler := structs.Handler{
-		ErrorMessage:     "Error generating report preview",
-		Writer:           w,
-		Request:          r,
-		ResponseType:     constants.ApplicationJson,
-		GroupIds:         command.GroupIds,
-		GroupPermissions: []string{permissions.GroupReportsRead},
+		ErrorMessage:      "Error generating report preview",
+		Writer:            w,
+		Request:           r,
+		ResponseType:      constants.ApplicationJson,
+		AnyAppPermissions: []string{permissions.AppReportsRead, permissions.AppReportsReadAll},
+		GroupIds:          command.GroupIds,
+		GroupPermissions:  []string{permissions.GroupReportsRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
-
-			// Report access at all is app.reports.read OR readAll (an OR the declarative
-			// AppPermissions gate can't express); deny outright without either.
-			canPreview, err := services.NewPermissionService(nil).HasAnyAppPermission(token.UserId, permissions.AppReportsRead, permissions.AppReportsReadAll)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-			if !canPreview {
-				utils.WriteCustomErrorResponse(w, "User is unauthorized to preview reports", http.StatusForbidden)
-				return 0, nil
-			}
 
 			reportService := services.NewReportService(nil)
 

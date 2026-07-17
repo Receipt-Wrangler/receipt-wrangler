@@ -179,7 +179,7 @@ func columnHeading(column reporting.ColumnDescriptor) string {
 // (None) bucket — a null value — gets the report's name for it.
 func formatDimension(value reporting.Value, noneLabel string) string {
 	if value.IsNull() {
-		return noneLabel
+		return SanitizeCSVField(noneLabel)
 	}
 	return SanitizeCSVField(value.String())
 }
@@ -202,7 +202,7 @@ func formatCell(column reporting.ColumnDescriptor, cell reporting.Cell, noneLabe
 		parts := make([]string, 0, len(cell.Values))
 		for _, value := range cell.Values {
 			if value.IsNull() {
-				parts = append(parts, noneLabel)
+				parts = append(parts, SanitizeCSVField(noneLabel))
 				continue
 			}
 			parts = append(parts, SanitizeCSVField(value.String()))
