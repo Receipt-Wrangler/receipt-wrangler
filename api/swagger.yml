@@ -4572,6 +4572,7 @@ components:
               - $ref: "#/components/schemas/SystemEmail"
               - $ref: "#/components/schemas/Activity"
               - $ref: "#/components/schemas/CustomField"
+              - $ref: "#/components/schemas/ReportTemplate"
         totalCount:
           type: integer
     FeatureConfig:

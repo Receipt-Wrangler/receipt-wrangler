@@ -105,7 +105,13 @@ describe("ReportRunnerService", () => {
   });
 
   it("generateFromTemplateById generates by id and triggers a download named from the config", () => {
-    const template = { id: 7, configuration: command("Run", ["pdf"]), configurationVersion: 1 };
+    const template = {
+      id: 7,
+      name: "Run",
+      createdAt: "2026-01-01T00:00:00Z",
+      configuration: command("Run", ["pdf"]),
+      configurationVersion: 1,
+    };
     service.generateFromTemplateById(template).subscribe();
     expect(reportService.generateReportFromTemplate).toHaveBeenCalledWith(7);
     expect(downloadFile).toHaveBeenCalledWith(expect.any(Blob), "Run.pdf");

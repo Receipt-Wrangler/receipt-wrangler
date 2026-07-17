@@ -214,6 +214,36 @@ func TestCanActOnTemplate_Matrix(t *testing.T) {
 			},
 		},
 		{
+			// Template covers g1+g2, ceiling passes in both; g1's matrix grants the
+			// (template, action) but g2's restricts to a DIFFERENT template → matrix
+			// intersection denies (guards against OR/first-match regressions).
+			name: "multigroup_matrix_second_denies", want: false,
+			setup: func(t *testing.T, action string) (uint, uint) {
+				userId := seedAppUser(t, "u", []string{basePermFor(action)})
+				g1, role1 := joinGroup(t, userId, "g1", []string{permissions.GroupReportsRead})
+				g2, role2 := joinGroup(t, userId, "g2", []string{permissions.GroupReportsRead})
+				templateId := seedTemplateInGroups(t, "A", []uint{g1, g2})
+				other := seedTemplateInGroups(t, "Other", []uint{g2})
+				setMatrix(t, role1, []commands.ReportTemplateGrantCommand{{ReportTemplateId: templateId, Permissions: []string{action}}})
+				setMatrix(t, role2, []commands.ReportTemplateGrantCommand{{ReportTemplateId: other, Permissions: []string{action}}})
+				return userId, templateId
+			},
+		},
+		{
+			// Template covers g1+g2, ceiling passes in both, and BOTH roles' matrices
+			// grant the (template, action) → allowed (intersection is satisfied).
+			name: "multigroup_matrix_both_grant", want: true,
+			setup: func(t *testing.T, action string) (uint, uint) {
+				userId := seedAppUser(t, "u", []string{basePermFor(action)})
+				g1, role1 := joinGroup(t, userId, "g1", []string{permissions.GroupReportsRead})
+				g2, role2 := joinGroup(t, userId, "g2", []string{permissions.GroupReportsRead})
+				templateId := seedTemplateInGroups(t, "A", []uint{g1, g2})
+				setMatrix(t, role1, []commands.ReportTemplateGrantCommand{{ReportTemplateId: templateId, Permissions: []string{action}}})
+				setMatrix(t, role2, []commands.ReportTemplateGrantCommand{{ReportTemplateId: templateId, Permissions: []string{action}}})
+				return userId, templateId
+			},
+		},
+		{
 			// Role opted into restriction, then its only granted template is deleted
 			// (cascade empties the matrix, restricted flag persists) → fail closed.
 			name: "fail_closed", want: false,

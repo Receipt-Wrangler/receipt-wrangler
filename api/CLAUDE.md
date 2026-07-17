@@ -859,8 +859,7 @@ client permission check). New endpoints: **`POST /report/template/{id}/generate`
 generate grant (the ad-hoc `/generate` stays app + per-group only — it carries no template id, so "view but
 not generate" is only a real boundary via this path); **`GET /report/template/options`** (gated on
 `app.roles.read`, the role editor's own gate) feeds the role-form access matrix. Create/update additionally
-require `CanReportOverGroups` on the attached groups (createAll/updateAll bypass). **E2e is deferred** for
-this feature until explicitly requested.
+require `CanReportOverGroups` on the attached groups (createAll/updateAll bypass).
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
