@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"strconv"
 	"strings"
@@ -64,6 +65,55 @@ func validReportCommand() ReportRequestCommand {
 			{Kind: ReportColumnFormula, Name: "Avg", Label: "Avg", Expr: "Total / Count"},
 		},
 		Formats: []string{ReportFormatCsv},
+	}
+}
+
+// TestReportColumn_MarshalOmitsEmptyContextualFields guards the omitempty tags on
+// ReportColumn: a dimension column must not emit `"aggFunc":""`, because the
+// generated mobile dart-dio ReportColumnAggFuncEnum cannot deserialize "" and the
+// whole report template would silently drop out of the mobile list.
+func TestReportColumn_MarshalOmitsEmptyContextualFields(t *testing.T) {
+	mustMarshal := func(c ReportColumn) string {
+		b, err := json.Marshal(c)
+		if err != nil {
+			t.Fatalf("json.Marshal: %v", err)
+		}
+		return string(b)
+	}
+
+	// Dimension: keeps field, omits every empty contextual field.
+	dim := mustMarshal(ReportColumn{Kind: ReportColumnDimension, Name: "Category", Field: "category"})
+	if !strings.Contains(dim, `"field":"category"`) {
+		t.Errorf("dimension should keep field, got: %s", dim)
+	}
+	for _, absent := range []string{"aggFunc", "label", "measure", "expr"} {
+		if strings.Contains(dim, `"`+absent+`"`) {
+			t.Errorf("dimension should omit %q, got: %s", absent, dim)
+		}
+	}
+
+	// Aggregate: keeps aggFunc (+ measure).
+	agg := mustMarshal(ReportColumn{Kind: ReportColumnAggregate, Name: "Total", AggFunc: "SUM", Measure: "amount"})
+	if !strings.Contains(agg, `"aggFunc":"SUM"`) || !strings.Contains(agg, `"measure":"amount"`) {
+		t.Errorf("aggregate should keep aggFunc and measure, got: %s", agg)
+	}
+
+	// COUNT: keeps aggFunc, omits the (empty) measure.
+	count := mustMarshal(ReportColumn{Kind: ReportColumnAggregate, Name: "Count", AggFunc: "COUNT"})
+	if !strings.Contains(count, `"aggFunc":"COUNT"`) {
+		t.Errorf("COUNT should keep aggFunc, got: %s", count)
+	}
+	if strings.Contains(count, `"measure"`) {
+		t.Errorf("COUNT should omit empty measure, got: %s", count)
+	}
+
+	// Formula: keeps expr, omits aggFunc.
+	formula := mustMarshal(ReportColumn{Kind: ReportColumnFormula, Name: "Avg", Expr: "Total / Count"})
+	if !strings.Contains(formula, `"expr":"Total / Count"`) {
+		t.Errorf("formula should keep expr, got: %s", formula)
+	}
+	if strings.Contains(formula, `"aggFunc"`) {
+		t.Errorf("formula should omit aggFunc, got: %s", formula)
 	}
 }
 

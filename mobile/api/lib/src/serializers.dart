@@ -88,6 +88,15 @@ import 'package:openapi/src/model/receipt_paged_request_command.dart';
 import 'package:openapi/src/model/receipt_paged_request_filter.dart';
 import 'package:openapi/src/model/receipt_processing_settings.dart';
 import 'package:openapi/src/model/receipt_status.dart';
+import 'package:openapi/src/model/report_column.dart';
+import 'package:openapi/src/model/report_detail.dart';
+import 'package:openapi/src/model/report_document.dart';
+import 'package:openapi/src/model/report_period.dart';
+import 'package:openapi/src/model/report_preview_response.dart';
+import 'package:openapi/src/model/report_request_command.dart';
+import 'package:openapi/src/model/report_template.dart';
+import 'package:openapi/src/model/report_template_grant.dart';
+import 'package:openapi/src/model/report_template_option.dart';
 import 'package:openapi/src/model/reset_password_command.dart';
 import 'package:openapi/src/model/role.dart';
 import 'package:openapi/src/model/search_result.dart';
@@ -209,6 +218,15 @@ part 'serializers.g.dart';
   ReceiptPagedRequestFilter,
   ReceiptProcessingSettings,
   ReceiptStatus,
+  ReportColumn,
+  ReportDetail,
+  ReportDocument,
+  ReportPeriod,
+  ReportPreviewResponse,
+  ReportRequestCommand,
+  ReportTemplate,
+  ReportTemplateGrant,
+  ReportTemplateOption,
   ResetPasswordCommand,
   Role,
   SearchResult,
@@ -301,6 +319,10 @@ Serializers serializers = (_$serializers.toBuilder()
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(int)]),
         () => ListBuilder<int>(),
+      )
+      ..addBuilderFactory(
+        const FullType(BuiltList, [FullType(ReportTemplateOption)]),
+        () => ListBuilder<ReportTemplateOption>(),
       )
       ..addBuilderFactory(
         const FullType(BuiltList, [FullType(String)]),

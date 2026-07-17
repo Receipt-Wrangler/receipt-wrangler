@@ -57,6 +57,7 @@ and defer the `go` until the menu finishes dismissing (see
 - `lib/groups/` - Group management, dashboards, receipts
 - `lib/receipts/` - Receipt forms, viewing, image handling
 - `lib/search/` - Search functionality
+- `lib/reports/` - Reports slice: list / preview / generate / delete saved report templates
 - `lib/shared/` - Reusable widgets and utilities
 - `lib/client/` - OpenAPI client wrapper
 - `lib/utils/` - Utility functions for auth, currency, dates, etc.
@@ -135,6 +136,11 @@ a stale action at worst returns 403.
   - The **Search** bottom-nav destination (`group_bottom_nav.dart`, `group_select_bottom_nav.dart`) is
     shown only on `app.receipts.search`. It is the **trailing** destination in both navs, so gating it
     out doesn't shift the other indices and the `switch`/`setIndexSelected` logic is unchanged.
+  - The **Reports** avatar-menu entry (`top_app_bar.dart`'s `getUserAvatar`) is shown only when the
+    caller holds `app.reports.read` **or** `app.reports.readAll` (`hasAnyAppPermission`), mirroring
+    desktop's `canViewReports` sidebar gate. Base and `*All` are unrelated matcher keys, so the two are
+    always OR-ed. The avatar is shared by both app bars, so this exposes Reports from every screen. See
+    "Reporting (mobile slice)" below.
 - **Route redirects** (`lib/guards/permission-guard.dart`, mirroring the desktop route guards; wired
   in `main.dart`'s `_buildAppRouter`):
   - `groupDashboardReadRedirect` on `/groups/:groupId/dashboards` → redirects to that group's
@@ -145,6 +151,8 @@ a stale action at worst returns 403.
   - `receiptsSearchRedirect` on `/search` → bounces deep links to the originating group's `/receipts`
     (or `/groups`) when the caller lacks `app.receipts.search`. Defense-in-depth behind the hidden
     search buttons; it also runs before the search shell's `state.extra as Map` cast.
+  - `reportsReadRedirect` on `/reports` → bounces deep links to `/groups` when the caller lacks
+    `app.reports.read` / `app.reports.readAll`. Defense-in-depth behind the hidden Reports menu entry.
 - **403 handling (`lib/interceptors/auth_interceptor.dart`):** the backend returns **403 for both** an
   expired session and a permission denial (it never sends 401), so the interceptor distinguishes them
   by **token validity** (mirroring desktop's `http-interceptor.ts`): a 403 with a still-valid token is
@@ -154,6 +162,65 @@ a stale action at worst returns 403.
   current proactively (the 15-min timer in `main.dart` and the auth guard on navigation). **Paid-by
   visibility** rides on this: a group role limited to "their own receipts" gets a server-filtered
   receipts list, and any stray 403 on a hidden receipt is surfaced without disturbing the session.
+
+### Reporting (mobile slice)
+
+A **read/preview/generate/delete** slice of the desktop reporting feature, reachable from the avatar
+menu (`lib/reports/`). Authoring is intentionally **out of scope** — there is no builder and no
+create/edit/duplicate/config-view; the mobile app only lists saved report templates, previews one,
+downloads (generates) one, and deletes one. The desktop client (`desktop/src/reports/`) and the Go
+`/report/*` API are the source of truth; this mirrors desktop's behavior and — critically — its
+permission model exactly.
+
+- **Entry + route:** the gated avatar-menu "Reports" item (above) pushes `/reports`
+  (`ReportListScreen`, a standalone `ScreenWrapper` route next to `/profile`), guarded by
+  `reportsReadRedirect`.
+- **List** (`report_list.dart` → `PagedDataList`): `POST /report/template/list` via
+  `getReportApi().getReportTemplates`, sorted `updated_at desc` (matching desktop; the backend
+  allow-lists `name`/`created_at`/`updated_at`). Rows unwrap `PagedDataDataInner.anyOf.values`
+  (a `Map<int, Object?>`) by **type** — `.values.whereType<ReportTemplate>()` — not a brittle fixed
+  index.
+- **Per-row actions are gated ONLY on the server-computed `ReportTemplate.allowedActions`**
+  (`read`→Preview eye, `generate`→Generate, `delete`→Delete), never AND-ed with a client permission
+  check — `allowedActions` already bakes in the base/`*All` report permissions, the per-group ceiling,
+  and the per-template grant matrix (`report_list_item.dart`, mirroring the desktop list). Deletion
+  confirms via `report_delete_dialog.dart` then `DELETE /report/template/{id}`.
+- **Preview = HTML, not PDF** (`report_preview_screen.dart`): desktop has no PDF preview — its preview
+  is a live, row-capped **HTML** sample. `POST /report/preview` (with the template's stored
+  `configuration`) returns `{ html, receiptCount }`, rendered in a **WebView**
+  (`WebViewController.loadHtmlString`, JS disabled — the sample is self-contained, no network). Can
+  403 if a covered group lacks `group.reports.read`; handled with a snackbar, no logout.
+- **Generate = the template's saved formats** (`report_actions.dart`): `POST
+  /report/template/{id}/generate` returns `Response<Uint8List>` (a single file, or a **ZIP** when the
+  template has multiple formats). Bytes are written to `getTemporaryDirectory()` and handed to the OS
+  **share / "Save to Files"** sheet via `SharePlus.instance.share(ShareParams(files: [XFile(...)]))`.
+  The filename is a port of desktop's `reportFilename` (`report_filename.dart`): sanitized name +
+  `.zip` for multi-format else `.<format>`.
+- **Packages added for this slice:** `webview_flutter` (HTML preview — Android system WebView, needs
+  `INTERNET` which is already declared, minSdk 24 which `flutter.minSdkVersion` already satisfies; iOS
+  WKWebView, no `Info.plist`/`NSUsageDescription` for `loadHtmlString`), `path_provider` (temp file),
+  `share_plus` (share sheet — auto-merges its own Android `FileProvider`, no manifest change). **None
+  add a privacy-sensitive OS permission or purpose string**, and each ships its own iOS
+  `PrivacyInfo.xcprivacy` (auto-processed under Flutter's dynamic framework linking). The app still has
+  no app-level `PrivacyInfo.xcprivacy` — a pre-existing gap (`shared_preferences`/UserDefaults already
+  qualifies), out of scope here.
+- **Serialization contract (`aggFunc` omitempty):** the mobile list unwraps each `PagedDataDataInner`
+  by **type** (`item.anyOf.values.values.whereType<ReportTemplate>()`, `report_list.dart`), so a
+  `ReportTemplate` that fails to deserialize silently collapses to a blank row (the `one_of`
+  `AnyOfSerializer` swallows per-type errors). The generated `ReportColumnAggFuncEnum` **throws on an
+  empty string**, so the Go `ReportColumn` fields (`aggFunc`/`label`/`field`/`measure`/`expr`) are
+  `json:",omitempty"` (`api/internal/commands/report_request_command.go`) — a dimension column must not
+  emit `"aggFunc":""`. **Keep this omitempty on the API side; any future generated-client regen must
+  keep the enum tolerant / the field omitted**, or every real report (dimension/formula columns) shows
+  invisible rows in the mobile list.
+- **Tests:** `test/widgets/report_list_item_test.dart` (the `allowedActions` row-gating contract),
+  `test/widgets/top_app_bar_reports_menu_test.dart` (menu-entry gate), `test/reports/report_filename_test.dart`
+  (filename derivation), and `reportsReadRedirect` cases in `test/guards/permission_guard_test.dart`.
+  Shared builders in `test/helpers/report_test_helpers.dart`. **E2E:** `integration_test/reports_list_test.dart`
+  drives the list view — seeds a template via the new `createReportTemplate` fixture and asserts the row
+  renders (the omitempty regression guard), the empty state, and the avatar-menu gate; the
+  `provisionUserWithAppPermissions` fixture (inverse of `provisionUserWithoutAppPermission`) grants
+  `app.reports.read`/`readAll`. Preview/generate/delete are out of the e2e scope.
 
 ## Development Notes
 
@@ -470,6 +537,7 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - `integration_test/permission_comments_test.dart` — comment **deny** paths on the edit-state comment screen: `group.comments.create` hidden → no input; `group.comments.delete` hidden → swipe-to-delete disabled. Members are provisioned from the **Legacy Editor** baseline (holds `group.receipts.update`, needed to reach edit state) minus the permission under test, via `provisionGroupMemberWithoutPermission(..., baselineRole: 'Legacy Editor')`.
 - `integration_test/permission_paid_by_visibility_test.dart` — group-role paid-by visibility: a member restricted to "their own receipts" (via `provisionPaidByOwnMember` → `createRole(..., includeOwnPaidReceipts: true)`) sees only their own receipt in the group list; the admin-paid receipt is filtered out server-side. Mirrors desktop `paid-by-visibility.spec.ts` (list axis).
 - `integration_test/permission_receipt_category_visibility_test.dart` — non-admin sees the per-group **category and tag** catalogs in the receipt-form pickers (sourced from `groupCategories` / `groupTags`, not the admin-only flat lists).
+- `integration_test/reports_list_test.dart` — the Reports **list** view: seeds a template via `createReportTemplate` and asserts the row renders (regression guard for the `aggFunc` omitempty deserialization fix), the "No reports found" empty state, and the avatar-menu gate (`app.reports.read`/`readAll` shown, Legacy User hidden). Uses `provisionUserWithAppPermissions` in `permission_fixtures.dart`.
 - `integration_test/helpers/env.dart` — dart-define consumption + guards.
 - `integration_test/helpers/pump.dart` — `pumpUntilFound` polling helper.
 - `integration_test/helpers/platform_mocks.dart` — Linux-desktop platform-channel stubs for `permission_handler`, `gal`, `flutter_secure_storage`.

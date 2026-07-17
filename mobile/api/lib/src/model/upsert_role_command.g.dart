@@ -23,6 +23,8 @@ class _$UpsertRoleCommand extends UpsertRoleCommand {
   final BuiltList<int>? paidByUserGrants;
   @override
   final bool? includeOwnPaidReceipts;
+  @override
+  final BuiltList<ReportTemplateGrant>? reportTemplateGrants;
 
   factory _$UpsertRoleCommand(
           [void Function(UpsertRoleCommandBuilder)? updates]) =>
@@ -36,7 +38,8 @@ class _$UpsertRoleCommand extends UpsertRoleCommand {
       this.categoryGrants,
       this.tagGrants,
       this.paidByUserGrants,
-      this.includeOwnPaidReceipts})
+      this.includeOwnPaidReceipts,
+      this.reportTemplateGrants})
       : super._();
   @override
   UpsertRoleCommand rebuild(void Function(UpsertRoleCommandBuilder) updates) =>
@@ -57,7 +60,8 @@ class _$UpsertRoleCommand extends UpsertRoleCommand {
         categoryGrants == other.categoryGrants &&
         tagGrants == other.tagGrants &&
         paidByUserGrants == other.paidByUserGrants &&
-        includeOwnPaidReceipts == other.includeOwnPaidReceipts;
+        includeOwnPaidReceipts == other.includeOwnPaidReceipts &&
+        reportTemplateGrants == other.reportTemplateGrants;
   }
 
   @override
@@ -71,6 +75,7 @@ class _$UpsertRoleCommand extends UpsertRoleCommand {
     _$hash = $jc(_$hash, tagGrants.hashCode);
     _$hash = $jc(_$hash, paidByUserGrants.hashCode);
     _$hash = $jc(_$hash, includeOwnPaidReceipts.hashCode);
+    _$hash = $jc(_$hash, reportTemplateGrants.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -85,7 +90,8 @@ class _$UpsertRoleCommand extends UpsertRoleCommand {
           ..add('categoryGrants', categoryGrants)
           ..add('tagGrants', tagGrants)
           ..add('paidByUserGrants', paidByUserGrants)
-          ..add('includeOwnPaidReceipts', includeOwnPaidReceipts))
+          ..add('includeOwnPaidReceipts', includeOwnPaidReceipts)
+          ..add('reportTemplateGrants', reportTemplateGrants))
         .toString();
   }
 }
@@ -133,6 +139,13 @@ class UpsertRoleCommandBuilder
   set includeOwnPaidReceipts(bool? includeOwnPaidReceipts) =>
       _$this._includeOwnPaidReceipts = includeOwnPaidReceipts;
 
+  ListBuilder<ReportTemplateGrant>? _reportTemplateGrants;
+  ListBuilder<ReportTemplateGrant> get reportTemplateGrants =>
+      _$this._reportTemplateGrants ??= ListBuilder<ReportTemplateGrant>();
+  set reportTemplateGrants(
+          ListBuilder<ReportTemplateGrant>? reportTemplateGrants) =>
+      _$this._reportTemplateGrants = reportTemplateGrants;
+
   UpsertRoleCommandBuilder() {
     UpsertRoleCommand._defaults(this);
   }
@@ -148,6 +161,7 @@ class UpsertRoleCommandBuilder
       _tagGrants = $v.tagGrants?.toBuilder();
       _paidByUserGrants = $v.paidByUserGrants?.toBuilder();
       _includeOwnPaidReceipts = $v.includeOwnPaidReceipts;
+      _reportTemplateGrants = $v.reportTemplateGrants?.toBuilder();
       _$v = null;
     }
     return this;
@@ -181,6 +195,7 @@ class UpsertRoleCommandBuilder
             tagGrants: _tagGrants?.build(),
             paidByUserGrants: _paidByUserGrants?.build(),
             includeOwnPaidReceipts: includeOwnPaidReceipts,
+            reportTemplateGrants: _reportTemplateGrants?.build(),
           );
     } catch (_) {
       late String _$failedField;
@@ -193,6 +208,9 @@ class UpsertRoleCommandBuilder
         _tagGrants?.build();
         _$failedField = 'paidByUserGrants';
         _paidByUserGrants?.build();
+
+        _$failedField = 'reportTemplateGrants';
+        _reportTemplateGrants?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
             r'UpsertRoleCommand', _$failedField, e.toString());

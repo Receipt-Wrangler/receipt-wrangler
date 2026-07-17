@@ -81,6 +81,20 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ReceiptPagedRequestFilter.serializer)
       ..add(ReceiptProcessingSettings.serializer)
       ..add(ReceiptStatus.serializer)
+      ..add(ReportColumn.serializer)
+      ..add(ReportColumnAggFuncEnum.serializer)
+      ..add(ReportColumnKindEnum.serializer)
+      ..add(ReportDetail.serializer)
+      ..add(ReportDetailModeEnum.serializer)
+      ..add(ReportDocument.serializer)
+      ..add(ReportPeriod.serializer)
+      ..add(ReportPeriodPresetEnum.serializer)
+      ..add(ReportPreviewResponse.serializer)
+      ..add(ReportRequestCommand.serializer)
+      ..add(ReportRequestCommandFormatsEnum.serializer)
+      ..add(ReportTemplate.serializer)
+      ..add(ReportTemplateGrant.serializer)
+      ..add(ReportTemplateOption.serializer)
       ..add(ResetPasswordCommand.serializer)
       ..add(Role.serializer)
       ..add(SearchResult.serializer)
@@ -209,6 +223,10 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(int)]),
           () => ListBuilder<int>())
       ..addBuilderFactory(
+          const FullType(
+              BuiltList, const [const FullType(ReportTemplateGrant)]),
+          () => ListBuilder<ReportTemplateGrant>())
+      ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(Permission)]),
           () => ListBuilder<Permission>())
       ..addBuilderFactory(
@@ -221,6 +239,10 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(int)]),
           () => ListBuilder<int>())
       ..addBuilderFactory(
+          const FullType(
+              BuiltList, const [const FullType(ReportTemplateGrant)]),
+          () => ListBuilder<ReportTemplateGrant>())
+      ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(PieChartDataPoint)]),
           () => ListBuilder<PieChartDataPoint>())
       ..addBuilderFactory(
@@ -229,6 +251,25 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(String)]),
           () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(ReportColumn)]),
+          () => ListBuilder<ReportColumn>())
+      ..addBuilderFactory(
+          const FullType(BuiltList,
+              const [const FullType(ReportRequestCommandFormatsEnum)]),
+          () => ListBuilder<ReportRequestCommandFormatsEnum>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(SubjectLineRegex)]),
           () => ListBuilder<SubjectLineRegex>())
@@ -300,6 +341,9 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(Widget)]),
           () => ListBuilder<Widget>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(int)]),
           () => ListBuilder<int>())
