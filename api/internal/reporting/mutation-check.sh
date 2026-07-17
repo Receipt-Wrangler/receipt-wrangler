@@ -323,12 +323,22 @@ add 'null-operand-reads-as-zero' 'eval.go' \
 '	leftNumber, _ := left.Decimal()
 	rightNumber, _ := right.Decimal()'
 
+# TestEvalArithmetic_BoundsMagnitude / TestRun_BoundsRunawayArithmeticGrowth —
+# without the coefficient guard a squaring chain doubles its big.Int without limit.
+# Both tests check the size ceiling *inside* the growth loop (and the Run chain is
+# kept short), so a removed guard trips a normal assertion at a small intermediate
+# rather than exhausting the test process's memory.
+add 'digit-guard-removed' 'eval.go' \
+'	if d.NumDigits() > maxDecimalDigits {
+		return Null()
+	}
+	if exponent := d.Exponent(); exponent > maxDecimalExponent || exponent < -maxDecimalExponent {' \
+'	if exponent := d.Exponent(); exponent > maxDecimalExponent || exponent < -maxDecimalExponent {'
+
 # TestEvalArithmetic_BoundsMagnitude — without the exponent guard a chain of
 # large-exponent literals (1e308 * 1e308 * …) climbs toward the int32 exponent
-# boundary and wraps to a silently wrong number instead of a null cell. The
-# sibling coefficient guard is exercised by the same test and by
-# TestRun_BoundsRunawayArithmeticGrowth, but removing it exhausts memory rather
-# than producing a checkable value, so it is deliberately not mutated here.
+# boundary and wraps to a silently wrong number instead of a null cell (the
+# coefficient stays tiny, so this one never risked memory).
 add 'exponent-guard-removed' 'eval.go' \
 '	if exponent := d.Exponent(); exponent > maxDecimalExponent || exponent < -maxDecimalExponent {
 		return Null()

@@ -303,10 +303,14 @@ func TestParseArithmetic_SizeLimits(t *testing.T) {
 // within ~30 columns and exhausting memory, all from a spec a few hundred bytes
 // long. evalBinary caps a computed value's magnitude, so an over-large
 // intermediate collapses to a null cell (the engine's "correct or null, never
-// wrong" contract) and the report stays cheap. That it returns promptly at all
-// is as much the assertion as anything checked about the result.
+// wrong" contract).
+//
+// The chain here is kept deliberately short: even with the guard removed the
+// deepest column stays a few kilobytes, so a regression fails the assertions
+// below rather than OOMing the test process — while still being long enough that
+// the guard must null the deep columns for the test to pass.
 func TestRun_BoundsRunawayArithmeticGrowth(t *testing.T) {
-	const depth = 40
+	const depth = 14
 
 	columns := []Column{
 		{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}},

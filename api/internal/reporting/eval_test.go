@@ -117,18 +117,20 @@ func TestEvalArithmetic_DivisionScale(t *testing.T) {
 func TestEvalArithmetic_BoundsMagnitude(t *testing.T) {
 	t.Run("a squaring chain collapses to null rather than growing without bound", func(t *testing.T) {
 		columns := map[string]Value{"c": Num(dec("99"))}
-		maxDigits := 0
 		for i := 0; i < 40; i++ {
 			columns["c"] = evalSrc(t, "c * c", columns)
-			if number, ok := columns["c"].Decimal(); ok && number.NumDigits() > maxDigits {
-				maxDigits = number.NumDigits()
+			// Check inside the loop and bail immediately: if the bound were removed
+			// the value would keep doubling until it exhausted memory, so failing
+			// here — at a small intermediate — beats OOMing the test process. A
+			// guarded chain nulls the value (Decimal returns false) well before it
+			// reaches the independent ceiling, so this never trips in practice.
+			if number, ok := columns["c"].Decimal(); ok && number.NumDigits() > runawayDigitCeiling {
+				t.Fatalf("a value grew to %d digits, past the independent %d ceiling — growth is not bounded",
+					number.NumDigits(), runawayDigitCeiling)
 			}
 		}
 		if !columns["c"].IsNull() {
 			t.Errorf("deep squaring chain = %v, want a null cell", columns["c"])
-		}
-		if maxDigits > runawayDigitCeiling {
-			t.Errorf("a value survived with %d digits, past the independent %d ceiling", maxDigits, runawayDigitCeiling)
 		}
 	})
 
