@@ -383,6 +383,52 @@ export async function apiCreateReportTemplate(
   return { id: template.id, name: template.name };
 }
 
+export interface UpsertRolePayload {
+  name: string;
+  scope: 'APP' | 'GROUP';
+  permissions: string[];
+  reportTemplateGrants?: { reportTemplateId: number; permissions: string[] }[];
+}
+
+/**
+ * Creates a role via the admin API and returns its id. Unlike createRole (which
+ * drives the UI), this is for provisioning a role whose exact permission set /
+ * report-template matrix a test needs precisely — e.g. a group role granting
+ * group.reports.read plus a specific reportTemplateGrants matrix.
+ */
+export async function apiCreateRole(
+  api: APIRequestContext,
+  opts: UpsertRolePayload,
+): Promise<{ id: number }> {
+  const res = await api.post('/api/role', {
+    data: { description: '', ...opts },
+  });
+  if (!res.ok()) {
+    throw new Error(`create role failed: HTTP ${res.status()} ${await res.text()}`);
+  }
+  const role = (await res.json()) as { id: number };
+  return { id: role.id };
+}
+
+/**
+ * Updates the role [id] in place (scope carried in the body). Used to set a group
+ * role's reportTemplateGrants matrix AFTER the templates it references exist (the
+ * matrix references template ids, which need the group, which needs the role — so
+ * the role is created first and its matrix filled here).
+ */
+export async function apiUpdateRole(
+  api: APIRequestContext,
+  id: number,
+  opts: UpsertRolePayload,
+): Promise<void> {
+  const res = await api.put(`/api/role/${id}`, {
+    data: { description: '', ...opts },
+  });
+  if (!res.ok()) {
+    throw new Error(`update role failed: HTTP ${res.status()} ${await res.text()}`);
+  }
+}
+
 /** Deletes the report template [id] (requires app.reports.delete on the caller). */
 export async function apiDeleteReportTemplateById(
   api: APIRequestContext,

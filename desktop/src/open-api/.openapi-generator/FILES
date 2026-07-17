@@ -114,6 +114,8 @@ model/reportPeriod.ts
 model/reportPreviewResponse.ts
 model/reportRequestCommand.ts
 model/reportTemplate.ts
+model/reportTemplateGrant.ts
+model/reportTemplateOption.ts
 model/resetPasswordCommand.ts
 model/role.ts
 model/searchResult.ts

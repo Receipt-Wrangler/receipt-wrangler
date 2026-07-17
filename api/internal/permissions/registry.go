@@ -92,6 +92,16 @@ const (
 	AppReportsDelete    = "app.reports.delete"
 	AppReportsDuplicate = "app.reports.duplicate"
 	AppReportsGenerate  = "app.reports.generate"
+
+	// The "*All" report permissions bypass both the per-group access requirement and
+	// the per-template grant matrix for that one action — a holder may perform it on
+	// any template. They are the per-action opt-out of the default group-scoped model.
+	AppReportsReadAll      = "app.reports.readAll"
+	AppReportsCreateAll    = "app.reports.createAll"
+	AppReportsUpdateAll    = "app.reports.updateAll"
+	AppReportsDeleteAll    = "app.reports.deleteAll"
+	AppReportsDuplicateAll = "app.reports.duplicateAll"
+	AppReportsGenerateAll  = "app.reports.generateAll"
 )
 
 const (
@@ -201,6 +211,13 @@ var registry = []Descriptor{
 	{AppReportsDelete, "Delete Report Templates", "Delete a saved report template.", "Reports", ScopeApp},
 	{AppReportsDuplicate, "Duplicate Report Templates", "Duplicate a saved report template.", "Reports", ScopeApp},
 	{AppReportsGenerate, "Generate Reports", "Generate and download reports.", "Reports", ScopeApp},
+
+	{AppReportsReadAll, "Read All Report Templates", "View and act on every report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
+	{AppReportsCreateAll, "Create Reports For Any Group", "Save report templates covering any group, bypassing the group-access requirement on create.", "Reports", ScopeApp},
+	{AppReportsUpdateAll, "Update All Report Templates", "Update any report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
+	{AppReportsDeleteAll, "Delete All Report Templates", "Delete any report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
+	{AppReportsDuplicateAll, "Duplicate All Report Templates", "Duplicate any report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
+	{AppReportsGenerateAll, "Generate All Reports", "Generate and download any saved report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
 
 	{GroupView, "View Group", "See the group, its members, and metadata.", "Group", ScopeGroup},
 	{GroupUpdate, "Update Group", "Edit group name, settings, and receipt-handling configuration.", "Group", ScopeGroup},

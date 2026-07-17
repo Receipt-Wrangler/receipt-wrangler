@@ -28,5 +28,9 @@ export interface ReportTemplate {
      * Schema version the stored configuration was written under.
      */
     configurationVersion: number;
+    /**
+     * The actions the requesting user may perform on this template (read, generate, update, delete, duplicate), resolved per user and populated only on the list response. Drives the row action buttons.
+     */
+    allowedActions?: Array<string>;
 }
 

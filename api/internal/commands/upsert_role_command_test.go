@@ -210,3 +210,119 @@ func TestUpsertRoleCommandDuplicatePaidByGrant(t *testing.T) {
 		t.Errorf("expected paidByUserGrants error, got %+v", vErr.Errors)
 	}
 }
+
+func TestUpsertRoleCommandReportTemplateGrantsValidOnGroupScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:        "Report Grant Group Role",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReportsRead},
+		ReportTemplateGrants: []ReportTemplateGrantCommand{
+			{ReportTemplateId: 1, Permissions: []string{"read", "generate"}},
+			{ReportTemplateId: 2, Permissions: []string{"read"}},
+		},
+	}
+
+	vErr := command.Validate()
+	if len(vErr.Errors) > 0 {
+		t.Errorf("expected no errors, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandReportTemplateGrantsRejectedOnAppScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:        "App Role With Report Grants",
+		Scope:       permissions.ScopeApp,
+		Permissions: []string{permissions.AppReportsRead},
+		ReportTemplateGrants: []ReportTemplateGrantCommand{
+			{ReportTemplateId: 1, Permissions: []string{"read"}},
+		},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["reportTemplateGrants"]; !ok {
+		t.Errorf("expected reportTemplateGrants error, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandDuplicateReportTemplateGrant(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:        "Dup Report Grant",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReportsRead},
+		ReportTemplateGrants: []ReportTemplateGrantCommand{
+			{ReportTemplateId: 1, Permissions: []string{"read"}},
+			{ReportTemplateId: 1, Permissions: []string{"generate"}},
+		},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["reportTemplateGrants"]; !ok {
+		t.Errorf("expected reportTemplateGrants error, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandReportTemplateGrantUnknownAction(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:        "Bad Action Report Grant",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReportsRead},
+		ReportTemplateGrants: []ReportTemplateGrantCommand{
+			{ReportTemplateId: 1, Permissions: []string{"read", "explode"}},
+		},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["reportTemplateGrants"]; !ok {
+		t.Errorf("expected reportTemplateGrants error, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandReportTemplateGrantCreateActionRejected(t *testing.T) {
+	// "create" is not scopable per template — there is no existing template to
+	// scope it to — so it must be rejected from the matrix.
+	command := UpsertRoleCommand{
+		Name:        "Create Action Report Grant",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReportsRead},
+		ReportTemplateGrants: []ReportTemplateGrantCommand{
+			{ReportTemplateId: 1, Permissions: []string{"create"}},
+		},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["reportTemplateGrants"]; !ok {
+		t.Errorf("expected reportTemplateGrants error, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandReportTemplateGrantEmptyPermissions(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:        "Empty Permissions Report Grant",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReportsRead},
+		ReportTemplateGrants: []ReportTemplateGrantCommand{
+			{ReportTemplateId: 1, Permissions: []string{}},
+		},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["reportTemplateGrants"]; !ok {
+		t.Errorf("expected reportTemplateGrants error, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandDuplicateActionWithinReportTemplateGrant(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:        "Dup Action Report Grant",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReportsRead},
+		ReportTemplateGrants: []ReportTemplateGrantCommand{
+			{ReportTemplateId: 1, Permissions: []string{"read", "read"}},
+		},
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["reportTemplateGrants"]; !ok {
+		t.Errorf("expected reportTemplateGrants error, got %+v", vErr.Errors)
+	}
+}

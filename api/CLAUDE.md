@@ -226,6 +226,12 @@ will be dropped in a later release.
     holder's own receipts. `UpsertRoleCommand`/`RoleView`/swagger carry `paidByUserGrants` +
     `includeOwnPaidReceipts`; the granted user ids are existence-validated like category/tag grants
     (`ErrInvalidGrant`). See "Paid-by visibility enforcement" below.
+  - **Report-template access** is a fourth grant type: `GroupRoleReportTemplateGrant` (composite-PK
+    `{GroupRoleID, ReportTemplateID, Permission}` — the action folded into the key) restricting which
+    saved report templates a role's members may act on, per action. Same opt-in rule (empty =
+    unrestricted) with a `ReportTemplateGrantsRestricted` fail-closed flag; carried on
+    `UpsertRoleCommand`/`RoleView`/swagger as `reportTemplateGrants` (a per-template action list). See
+    "Report-template access" in the Reports section for the full three-layer model + the `*All` bypass.
 - **Assignment:** nullable FKs `User.AppRoleID` and `GroupMember.GroupRoleID` (one app role per
   user; one group role per group membership). Nullable because per-create assignment is best-effort
   (the FK is left `nil` rather than failing creation when no role can be resolved, e.g. an unseeded
@@ -828,6 +834,32 @@ The desktop **template-management UI** is delivered: `/reports` lists saved temp
 generate, open-in-builder, duplicate, or delete. Opening a template rehydrates the builder from its
 stored config; **the builder's Save updates in place on the edit route** (`app.reports.update`) and
 **creates on the new route** (`app.reports.create`) — save-as-new is retired (Duplicate copies).
+
+**Report-template access (group-scoping + per-template matrix + `*All` bypass).** The flat "any holder may
+act on any template" model above is **superseded**: the six template handlers now resolve access through
+`services.PermissionService` (`internal/services/report_authz.go`) — `CanActOnTemplate`,
+`VisibleTemplateIds`, `AllowedActionsForTemplate`, `CanReportOverGroups` — which AND three layers:
+1. **App action permission** — the base `app.reports.<action>`, moved *into* the authz service so it can
+   be OR-ed with the bypass (the declarative `AppPermissions` gate is AND-only, so the six template
+   handlers dropped it and enforce in-body).
+2. **Group-access ceiling** — the caller must hold `group.reports.read` in *every* group the template
+   covers (most-restrictive-wins), read from the denormalized `report_template_groups` index (synced on
+   create/update/duplicate, cascades on delete) since the group ids otherwise live only in the config blob.
+3. **Per-template matrix** — `GroupRoleReportTemplateGrant {group_role_id, report_template_id, permission}`,
+   a group-role grant alongside category/tag/paid-by. Empty for a role = unrestricted; non-empty = only the
+   listed (template, action) pairs. A `ReportTemplateGrantsRestricted` flag fails closed once the last
+   granted template is deleted (paid-by style). Resolution rides the per-role grant cache; the delete
+   handler flushes it (`services.EvictAllGroupRoleGrants`).
+
+For each action there is an app-scoped **`app.reports.<action>All`** bypass (readAll/createAll/updateAll/
+deleteAll/duplicateAll/generateAll) short-circuiting both the ceiling and the matrix — auto-granted to
+Legacy Admin (ScopeApp), so admins keep full reach with no migration. The list returns per-row
+`allowedActions` so the desktop gates each row's buttons off the server result (never re-AND-ed with a
+client permission check). New endpoints: **`POST /report/template/{id}/generate`** enforces the per-template
+generate grant (the ad-hoc `/generate` stays app + per-group only — it carries no template id, so "view but
+not generate" is only a real boundary via this path); **`GET /report/template/options`** (gated on
+`app.roles.read`, the role editor's own gate) feeds the role-form access matrix. Create/update additionally
+require `CanReportOverGroups` on the attached groups (createAll/updateAll bypass).
 
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`

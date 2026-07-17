@@ -15,9 +15,11 @@ func BuildReportRouter() *chi.Mux {
 	reportRouter.Post("/preview", handlers.PreviewReport)
 	reportRouter.Post("/template", handlers.CreateReportTemplate)
 	reportRouter.Post("/template/list", handlers.GetPagedReportTemplates)
+	reportRouter.Get("/template/options", handlers.GetReportTemplateOptions)
 	reportRouter.Get("/template/{id}", handlers.GetReportTemplate)
 	reportRouter.Put("/template/{id}", handlers.UpdateReportTemplate)
 	reportRouter.Post("/template/{id}/duplicate", handlers.DuplicateReportTemplate)
+	reportRouter.Post("/template/{id}/generate", handlers.GenerateReportFromTemplate)
 	reportRouter.Delete("/template/{id}", handlers.DeleteReportTemplate)
 
 	return reportRouter

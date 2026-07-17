@@ -22,4 +22,16 @@ type RoleView struct {
 	// slice and false.
 	PaidByUserGrants       []uint `json:"paidByUserGrants"`
 	IncludeOwnPaidReceipts bool   `json:"includeOwnPaidReceipts"`
+	// ReportTemplateGrants restrict which report templates a group role's members
+	// may act on, per action. Empty means unrestricted (every template the role's
+	// group access reaches). Always group-scoped; app roles serialize an empty
+	// slice.
+	ReportTemplateGrants []ReportTemplateGrantView `json:"reportTemplateGrants"`
+}
+
+// ReportTemplateGrantView is one row of a group role's report-template access
+// matrix: a template id and the actions the role may perform on it.
+type ReportTemplateGrantView struct {
+	ReportTemplateId uint     `json:"reportTemplateId"`
+	Permissions      []string `json:"permissions"`
 }

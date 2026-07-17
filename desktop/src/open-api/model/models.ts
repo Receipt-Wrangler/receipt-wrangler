@@ -79,6 +79,8 @@ export * from './reportPeriod';
 export * from './reportPreviewResponse';
 export * from './reportRequestCommand';
 export * from './reportTemplate';
+export * from './reportTemplateGrant';
+export * from './reportTemplateOption';
 export * from './resetPasswordCommand';
 export * from './role';
 export * from './searchResult';

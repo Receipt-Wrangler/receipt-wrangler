@@ -52,11 +52,12 @@ test.describe('Reports — generate/duplicate permission gating', () => {
     username = uniqueName('report-noactions-user');
     seededName = uniqueName('report-template-gated');
 
-    // Admin provisions a role that grants app.reports.read (list access) plus the
-    // baseline reads a functional user needs, but NOT app.reports.generate/duplicate:
-    // enable the whole Reports category, then switch those two permissions off. Both
-    // sit in the same app.reports panel — createRole opens that panel once and toggles
-    // both.
+    // Admin provisions a role that can SEE every template (readAll) and delete
+    // (deleteAll) but holds neither the base nor the "*All" form of
+    // generate/duplicate/update: enable the whole Reports category, then switch off
+    // each of those three actions AND its "*All" bypass (otherwise the bypass would
+    // re-grant the action). All sit in the same app.reports panel — createRole opens
+    // it once and toggles each.
     const admin = await browser.newContext({ storageState: 'e2e/.auth/admin.json' });
     const adminPage = await admin.newPage();
     await stubTokenRefresh(adminPage);
@@ -69,6 +70,9 @@ test.describe('Reports — generate/duplicate permission gating', () => {
         { panelKey: 'app.reports', label: 'Duplicate Report Templates' },
         { panelKey: 'app.reports', label: 'Generate Reports' },
         { panelKey: 'app.reports', label: 'Update Report Templates' },
+        { panelKey: 'app.reports', label: 'Duplicate All Report Templates' },
+        { panelKey: 'app.reports', label: 'Generate All Reports' },
+        { panelKey: 'app.reports', label: 'Update All Report Templates' },
       ],
     });
     await createUserWithRole(adminPage, { username, password: NEW_USER_PASSWORD, role: roleName });
@@ -122,11 +126,12 @@ test.describe('Reports — generate/duplicate permission gating', () => {
     const row = page.getByRole('row').filter({ hasText: seededName });
     await expect(row).toBeVisible();
 
-    // The generate/duplicate controls are absent for this user; edit/delete (read/
-    // delete, which the role keeps) remain.
+    // The generate/duplicate/edit controls are absent for this user (edit is gated on
+    // the update action, also removed); delete remains (deleteAll is kept). Each row
+    // button is gated on the server-computed allowedActions.
     await expect(row.getByTestId('report-template-generate')).toHaveCount(0);
     await expect(row.getByTestId('report-template-duplicate')).toHaveCount(0);
-    await expect(row.getByTestId('report-template-edit')).toBeVisible();
+    await expect(row.getByTestId('report-template-edit')).toHaveCount(0);
     await expect(row.getByTestId('report-template-delete')).toBeVisible();
 
     // Server enforcement: direct calls as this user are refused with 403. Duplicate is

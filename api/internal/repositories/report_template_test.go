@@ -121,7 +121,7 @@ func TestGetPagedReportTemplates_ReturnsRowsAndCount(t *testing.T) {
 		}
 	}
 
-	templates, count, err := repository.GetPagedReportTemplates(pagedReportTemplateCommand("name", commands.ASCENDING))
+	templates, count, err := repository.GetPagedReportTemplates(pagedReportTemplateCommand("name", commands.ASCENDING), nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -143,7 +143,7 @@ func TestGetPagedReportTemplates_ReturnsRowsAndCount(t *testing.T) {
 func TestGetPagedReportTemplates_EmptyReturnsZeroCount(t *testing.T) {
 	defer TruncateTestDb()
 
-	templates, count, err := NewReportTemplateRepository(nil).GetPagedReportTemplates(pagedReportTemplateCommand("name", commands.ASCENDING))
+	templates, count, err := NewReportTemplateRepository(nil).GetPagedReportTemplates(pagedReportTemplateCommand("name", commands.ASCENDING), nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -160,7 +160,7 @@ func TestGetPagedReportTemplates_RejectsInvalidColumn(t *testing.T) {
 	defer TruncateTestDb()
 
 	// An order-by outside the allow-list is rejected rather than interpolated as raw SQL.
-	_, _, err := NewReportTemplateRepository(nil).GetPagedReportTemplates(pagedReportTemplateCommand("configuration", commands.ASCENDING))
+	_, _, err := NewReportTemplateRepository(nil).GetPagedReportTemplates(pagedReportTemplateCommand("configuration", commands.ASCENDING), nil)
 	if err == nil {
 		utils.PrintTestError(t, nil, "an invalid column error")
 	}
@@ -182,7 +182,7 @@ func TestGetPagedReportTemplates_SortsByAllowedColumns(t *testing.T) {
 	// name is covered above; created_at and updated_at must also execute through
 	// Sort/Find without error (they are on the allow-list but were never exercised).
 	for _, column := range []string{"created_at", "updated_at"} {
-		templates, count, err := repository.GetPagedReportTemplates(pagedReportTemplateCommand(column, commands.DESCENDING))
+		templates, count, err := repository.GetPagedReportTemplates(pagedReportTemplateCommand(column, commands.DESCENDING), nil)
 		if err != nil {
 			utils.PrintTestError(t, err, "no error sorting by "+column)
 			return

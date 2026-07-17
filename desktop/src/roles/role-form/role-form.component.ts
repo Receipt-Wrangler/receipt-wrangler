@@ -15,6 +15,8 @@ import {
   PermissionDescriptor,
   PermissionScope,
   PermissionService,
+  ReportService,
+  ReportTemplateOption,
   RoleService,
   Tag,
   TagService,
@@ -122,6 +124,23 @@ export class RoleFormComponent {
   private readonly pendingPaidByUserGrantIds = signal<number[]>([]);
   private readonly pendingIncludeOwnPaidReceipts = signal<boolean>(false);
 
+  // ----- Report template access matrix (group roles only) -----
+  // The scopable per-template actions (create is excluded — it makes a new
+  // template, so there is nothing to scope). The label is the admin-facing verb.
+  public readonly reportActions: { key: string; label: string }[] = [
+    { key: "read", label: "View" },
+    { key: "generate", label: "Generate" },
+    { key: "update", label: "Edit" },
+    { key: "delete", label: "Delete" },
+    { key: "duplicate", label: "Duplicate" },
+  ];
+  // The full template pool (rows of the matrix) and the granted actions per
+  // template. An empty grant map means unrestricted (every template the role's
+  // group access reaches); a template maps to the subset of actions the role may
+  // perform on it. The map is replaced immutably so zoneless CD picks up changes.
+  public readonly reportTemplateOptions = signal<ReportTemplateOption[]>([]);
+  public readonly reportTemplateGrants = signal<Map<number, Set<string>>>(new Map());
+
   /** Grants are a group-role concept; hidden for app roles. */
   public readonly showGrants = computed<boolean>(() => this.type() === "group");
 
@@ -218,6 +237,7 @@ export class RoleFormComponent {
     private readonly roleService: RoleService,
     private readonly categoryService: CategoryService,
     private readonly tagService: TagService,
+    private readonly reportService: ReportService,
     private readonly router: Router,
     private readonly route: ActivatedRoute,
     private readonly snackbar: SnackbarService,
@@ -246,6 +266,13 @@ export class RoleFormComponent {
       .getAllTags()
       .pipe(take(1), catchError(() => EMPTY), takeUntilDestroyed())
       .subscribe((tags) => this.tagPool.set(tags));
+
+    // Report templates for the access matrix. Gated on app.roles.read (the role
+    // editor's own gate), so the admin may list them even without report access.
+    this.reportService
+      .getReportTemplateOptions()
+      .pipe(take(1), catchError(() => EMPTY), takeUntilDestroyed())
+      .subscribe((options) => this.reportTemplateOptions.set(options));
 
     // A view-mode role is read-only; keep the reactive form in sync with that.
     effect(() => {
@@ -335,6 +362,14 @@ export class RoleFormComponent {
         this.pendingTagGrantIds.set(role.tagGrants ?? []);
         this.pendingPaidByUserGrantIds.set(role.paidByUserGrants ?? []);
         this.pendingIncludeOwnPaidReceipts.set(role.includeOwnPaidReceipts ?? false);
+
+        // The matrix grants are self-contained ({templateId, permissions}), so they
+        // hydrate directly — no pool resolution needed (the options only supply names).
+        const grants = new Map<number, Set<string>>();
+        for (const grant of role.reportTemplateGrants ?? []) {
+          grants.set(grant.reportTemplateId, new Set(grant.permissions));
+        }
+        this.reportTemplateGrants.set(grants);
       });
   }
 
@@ -391,6 +426,51 @@ export class RoleFormComponent {
     this.setGrantArray(this.grantedCategories, []);
     this.setGrantArray(this.grantedTags, []);
     this.setGrantArray(this.grantedPaidByUsers, []);
+    this.reportTemplateGrants.set(new Map());
+  }
+
+  // ----- Report template matrix helpers -----
+  public isTemplateActionGranted(templateId: number, action: string): boolean {
+    return this.reportTemplateGrants().get(templateId)?.has(action) ?? false;
+  }
+
+  public toggleTemplateAction(templateId: number, action: string): void {
+    if (this.isViewMode()) {
+      return;
+    }
+    const next = new Map(this.reportTemplateGrants());
+    const actions = new Set(next.get(templateId) ?? []);
+    if (actions.has(action)) {
+      actions.delete(action);
+    } else {
+      actions.add(action);
+    }
+    // Drop the template entirely once it grants nothing, so an all-empty matrix
+    // serializes as "unrestricted".
+    if (actions.size === 0) {
+      next.delete(templateId);
+    } else {
+      next.set(templateId, actions);
+    }
+    this.reportTemplateGrants.set(next);
+  }
+
+  public isTemplateAllGranted(templateId: number): boolean {
+    const actions = this.reportTemplateGrants().get(templateId);
+    return !!actions && actions.size === this.reportActions.length;
+  }
+
+  public toggleTemplateAll(templateId: number, on: boolean): void {
+    if (this.isViewMode()) {
+      return;
+    }
+    const next = new Map(this.reportTemplateGrants());
+    if (on) {
+      next.set(templateId, new Set(this.reportActions.map((action) => action.key)));
+    } else {
+      next.delete(templateId);
+    }
+    this.reportTemplateGrants.set(next);
   }
 
   public pickPreset(preset: RolePreset): void {
@@ -473,6 +553,12 @@ export class RoleFormComponent {
       payload.paidByUserGrants = paidBySelections
         .map((option) => option.id)
         .filter((id) => id !== RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID);
+
+      // An empty map serializes as [] → unrestricted; otherwise one entry per
+      // template carrying its granted actions.
+      payload.reportTemplateGrants = [...this.reportTemplateGrants().entries()].map(
+        ([reportTemplateId, actions]) => ({ reportTemplateId, permissions: [...actions] }),
+      );
     }
 
     this.lastPayload = payload;

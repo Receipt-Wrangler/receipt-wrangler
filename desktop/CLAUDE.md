@@ -157,6 +157,13 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   filters the shared `paidByOptions()` (stable references so the autocomplete excludes selected
   options). Empty = members see every payer's receipts; it restricts which receipts a member can see,
   not what they can edit. See `api/CLAUDE.md` → "Paid-by visibility enforcement".
+- **Report template access (group roles only):** the same grants section shows a "Report template access"
+  matrix — templates (rows, from `ReportService.getReportTemplateOptions()`, gated on `app.roles.read`) ×
+  actions (View/Generate/Edit/Delete/Duplicate columns) of `rw-switch` toggles, plus a per-row "All"
+  toggle. State is a `signal<Map<number, Set<string>>>` (immutable replace for zoneless CD, mirroring the
+  permissions grid's `Set` pattern — NOT a FormArray). **All-empty = unrestricted**; a template maps to the
+  subset of actions the role may perform on it. Hydrates directly from `role.reportTemplateGrants`,
+  serializes back for group scope only, resets on `pickType`. See `api/CLAUDE.md` → "Report-template access".
 - **Default roles:** the role-list page shows two `app-select` controls above the filter bar —
   "Default application role" and "Default group role". Each is pre-selected from the role flagged
   `isDefault` for its scope and, on change, calls `RoleService.setDefaultRole(scope, roleId)` then
@@ -594,15 +601,17 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
 
 The **Report Builder** (`src/reports/`) is a two-pane screen for building and downloading receipt
 reports against the backend reporting engine (see `api/CLAUDE.md` → "Reporting Engine"). The lazy
-`ReportsModule` is gated by `appPermissionGuard` on the **app-level `app.reports.read`** permission (the
-avatar-menu "Reports" entry is `*hasAppPermission`-gated on the same). Its routes: `/reports` is the
-**templates list** landing (below), and the builder lives at `/reports/new` and `/reports/:id/edit` (both
-`fullHeight`). `app.reports.read` = access the reports area; **`app.reports.generate`** gates generation
-(both the Generate buttons and the endpoint), **`app.reports.create`** saving, and
-**`app.reports.duplicate`** / **`app.reports.delete`** the corresponding row actions. The group-scoped
-`group.reports.read` is what actually authorizes generating over a group's data (enforced by the
-endpoints, ANDed with `app.reports.generate`), and the in-builder group picker only lists groups where the
-user holds it.
+`ReportsModule` is gated by `appPermissionGuard` on **`app.reports.read` OR `app.reports.readAll`** (the
+avatar-menu "Reports" entry gates on the same via a `hasAnyAppPermission([...])` signal, since the
+`*hasAppPermission` directive is single-key). Its routes: `/reports` is the **templates list** landing
+(below), and the builder lives at `/reports/new` and `/reports/:id/edit` (both `fullHeight`).
+**Per-template access is enforced end-to-end** (see `api/CLAUDE.md` → "Report-template access"): the list
+is server-filtered to the user's visible templates and each row's action buttons are gated purely on the
+server-computed **`element.allowedActions`** (never AND-ed with a client `*hasAppPermission` — that would
+wrongly hide a button from an `*All`-only holder). Row **Generate** runs the template by id through
+`ReportRunnerService.generateFromTemplateById` → `POST /report/template/{id}/generate` (the enforcing
+endpoint); the builder's own ad-hoc generate still gates on `app.reports.generate` + per-group
+`group.reports.read`. The in-builder group picker only lists groups where the user holds `group.reports.read`.
 
 - **Builder state** — the *builder* is a single reactive form (`report-form.factory.ts`) plus signals, no
   NGXS (the templates *list* is the module's one NGXS slice, `ReportTemplateTableState` — see "Templates

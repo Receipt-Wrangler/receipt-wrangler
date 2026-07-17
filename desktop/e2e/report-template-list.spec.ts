@@ -158,7 +158,8 @@ test.describe('Reports — templates list', () => {
 
     const [response] = await Promise.all([
       page.waitForResponse(
-        (r) => r.url().includes('/api/report/generate') && r.request().method() === 'POST',
+        (r) =>
+          /\/api\/report\/template\/\d+\/generate$/.test(r.url()) && r.request().method() === 'POST',
       ),
       row.getByTestId('report-template-generate').click(),
     ]);

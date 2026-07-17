@@ -154,6 +154,8 @@ func MakeMigrations() error {
 		&models.ReceiptProcessingSettings{},
 		&models.Prompt{},
 		&models.ReportTemplate{},
+		&models.ReportTemplateGroup{},
+		&models.GroupRoleReportTemplateGrant{},
 		&models.GroupReceiptSettings{},
 		&models.Pepper{},
 		&models.ApiKey{},

@@ -290,7 +290,10 @@ func TestGenerateReport_StreamsZipForMultipleFormats(t *testing.T) {
 
 func TestCreateReportTemplate_SavesWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
 	grantAppPerms(t, 1, permissions.AppReportsCreate)
+	// Creating a template over group 1 requires report access in that group.
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 
 	w, r := generateReportRequest(1, recordsReportBody)
 	CreateReportTemplate(w, r)
@@ -373,7 +376,9 @@ func deleteReportTemplateRequest(userId uint, id string) (*httptest.ResponseReco
 
 func TestDeleteReportTemplate_DeletesWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
 	grantAppPerms(t, 1, permissions.AppReportsCreate, permissions.AppReportsDelete)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 
 	// Save a template through the create handler, then delete it.
 	cw, cr := generateReportRequest(1, recordsReportBody)
@@ -399,10 +404,13 @@ func TestDeleteReportTemplate_DeletesWhenAuthorized(t *testing.T) {
 
 func TestDeleteReportTemplate_ForbidsWithoutDeletePermission(t *testing.T) {
 	defer tearDownReportTest()
-	// Read access does not imply delete.
+	// Read access does not imply delete. Seed a real template so the authorization
+	// check is reached (a missing id would 404 before it); the missing delete
+	// permission denies before any group check.
 	grantAppPerms(t, 1, permissions.AppReportsRead)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
 
-	w, r := deleteReportTemplateRequest(1, "1")
+	w, r := deleteReportTemplateRequest(1, fmt.Sprint(seeded.ID))
 	DeleteReportTemplate(w, r)
 
 	assertStatus(t, w, http.StatusForbidden)
@@ -458,7 +466,9 @@ func reportTemplateUpdateRequest(userId uint, id string, body string) (*httptest
 
 func TestGetPagedReportTemplates_ListsWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
 	grantAppPerms(t, 1, permissions.AppReportsRead)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	seedReportTemplate(t, 1, "HTTP Report")
 
 	w, r := generateReportRequest(1, pagedReportTemplateBody)
@@ -503,7 +513,9 @@ func TestGetPagedReportTemplates_RejectsInvalidCommand(t *testing.T) {
 
 func TestGetReportTemplate_ReturnsWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
 	grantAppPerms(t, 1, permissions.AppReportsRead)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	seeded := seedReportTemplate(t, 1, "HTTP Report")
 
 	w, r := reportTemplateIdRequest("GET", 1, fmt.Sprint(seeded.ID))
@@ -525,10 +537,12 @@ func TestGetReportTemplate_ReturnsWhenAuthorized(t *testing.T) {
 
 func TestGetReportTemplate_ForbidsWithoutReadPermission(t *testing.T) {
 	defer tearDownReportTest()
-	// Create access does not imply read.
+	// Create access does not imply read. Seed a real template so the authorization
+	// check is reached (a missing id would 404 before it).
 	grantAppPerms(t, 1, permissions.AppReportsCreate)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
 
-	w, r := reportTemplateIdRequest("GET", 1, "1")
+	w, r := reportTemplateIdRequest("GET", 1, fmt.Sprint(seeded.ID))
 	GetReportTemplate(w, r)
 
 	assertStatus(t, w, http.StatusForbidden)
@@ -546,7 +560,9 @@ func TestGetReportTemplate_NotFoundForMissingId(t *testing.T) {
 
 func TestDuplicateReportTemplate_DuplicatesWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
 	grantAppPerms(t, 1, permissions.AppReportsDuplicate)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	// Seeded under a different owner so the copy's new owner is observable.
 	seeded := seedReportTemplate(t, 2, "HTTP Report")
 
@@ -572,10 +588,13 @@ func TestDuplicateReportTemplate_DuplicatesWhenAuthorized(t *testing.T) {
 
 func TestDuplicateReportTemplate_ForbidsWithoutDuplicatePermission(t *testing.T) {
 	defer tearDownReportTest()
-	// Read access does not imply duplicate.
+	// Read access does not imply duplicate. Seed a real template so the authorization
+	// check is reached (a missing id would 404 before it); the missing duplicate
+	// permission denies before any group check.
 	grantAppPerms(t, 1, permissions.AppReportsRead)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
 
-	w, r := reportTemplateIdRequest("POST", 1, "1")
+	w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(seeded.ID))
 	DuplicateReportTemplate(w, r)
 
 	assertStatus(t, w, http.StatusForbidden)
@@ -583,7 +602,9 @@ func TestDuplicateReportTemplate_ForbidsWithoutDuplicatePermission(t *testing.T)
 
 func TestUpdateReportTemplate_UpdatesWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
 	grantAppPerms(t, 1, permissions.AppReportsUpdate)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	// Seeded under a different owner so the response proves the owner is preserved
 	// (not re-stamped to the updater).
 	seeded := seedReportTemplate(t, 2, "HTTP Report")
@@ -611,10 +632,13 @@ func TestUpdateReportTemplate_UpdatesWhenAuthorized(t *testing.T) {
 
 func TestUpdateReportTemplate_ForbidsWithoutUpdatePermission(t *testing.T) {
 	defer tearDownReportTest()
-	// Read access does not imply update.
+	// Read access does not imply update. Seed a real template so the authorization
+	// check is reached (a missing id would 404 before it); the missing update
+	// permission denies before any group check.
 	grantAppPerms(t, 1, permissions.AppReportsRead)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
 
-	w, r := reportTemplateUpdateRequest(1, "1", recordsReportBody)
+	w, r := reportTemplateUpdateRequest(1, fmt.Sprint(seeded.ID), recordsReportBody)
 	UpdateReportTemplate(w, r)
 
 	assertStatus(t, w, http.StatusForbidden)
@@ -675,4 +699,203 @@ func TestUpdateReportTemplate_RejectsMalformedJson(t *testing.T) {
 	if unchanged.Name != "HTTP Report" {
 		t.Errorf("template name = %q, want unchanged %q", unchanged.Name, "HTTP Report")
 	}
+}
+
+// --- Group-scoping + -All enforcement wiring (resolution logic itself is covered
+// exhaustively in services/report_authz_test.go; these assert the handlers wire it) ---
+
+func TestGetReportTemplate_ForbidsWithoutGroupReportRead(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	// Base app read, and a member of the template's group — but the group role lacks
+	// group.reports.read, so the ceiling denies (403, not 404).
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	grantGroupPerms(t, 1, 1, permissions.GroupView)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+
+	w, r := reportTemplateIdRequest("GET", 1, fmt.Sprint(seeded.ID))
+	GetReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestGetReportTemplate_AllowedByReadAllWithoutGroupAccess(t *testing.T) {
+	defer tearDownReportTest()
+	// readAll bypasses the group ceiling entirely — no membership required.
+	grantAppPerms(t, 1, permissions.AppReportsReadAll)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+
+	w, r := reportTemplateIdRequest("GET", 1, fmt.Sprint(seeded.ID))
+	GetReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+}
+
+func TestGetPagedReportTemplates_ReadAllSeesAllWithoutMembership(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsReadAll)
+	seedReportTemplate(t, 2, "HTTP Report")
+
+	w, r := generateReportRequest(1, pagedReportTemplateBody)
+	GetPagedReportTemplates(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var paged structs.PagedData
+	if err := json.Unmarshal(w.Body.Bytes(), &paged); err != nil {
+		t.Fatalf("decode paged body: %v", err)
+	}
+	if paged.TotalCount != 1 {
+		t.Errorf("totalCount = %d, want 1 (readAll sees all)", paged.TotalCount)
+	}
+}
+
+func TestGetPagedReportTemplates_SetsAllowedActions(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead, permissions.AppReportsGenerate)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seedReportTemplate(t, 1, "HTTP Report")
+
+	w, r := generateReportRequest(1, pagedReportTemplateBody)
+	GetPagedReportTemplates(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var paged struct {
+		TotalCount int
+		Data       []models.ReportTemplate
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &paged); err != nil {
+		t.Fatalf("decode paged body: %v", err)
+	}
+	if len(paged.Data) != 1 {
+		t.Fatalf("data length = %d, want 1", len(paged.Data))
+	}
+	actions := paged.Data[0].AllowedActions
+	if !containsString(actions, "read") || !containsString(actions, "generate") {
+		t.Errorf("allowedActions = %v, want read + generate", actions)
+	}
+	// No update permission was granted, so it must not appear.
+	if containsString(actions, "update") {
+		t.Errorf("allowedActions = %v, must not include update", actions)
+	}
+}
+
+func TestCreateReportTemplate_ForbidsWithoutGroupReportRead(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	// App create permission, and a member of the target group — but without
+	// group.reports.read, so the create ceiling denies.
+	grantAppPerms(t, 1, permissions.AppReportsCreate)
+	grantGroupPerms(t, 1, 1, permissions.GroupView)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	CreateReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func containsString(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if s == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// --- Generate-from-template + options endpoints ---
+
+func TestGenerateReportFromTemplate_GeneratesWithGrant(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsGenerate)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+	seedReportReceipt(1, 1)
+
+	w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(seeded.ID))
+	GenerateReportFromTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+	if got := w.Header().Get("Content-Disposition"); !strings.Contains(got, `filename="HTTP_Report.csv"`) {
+		t.Errorf("Content-Disposition = %q, want it to name HTTP_Report.csv", got)
+	}
+}
+
+func TestGenerateReportFromTemplate_GeneratesWithGenerateAll(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	// generateAll bypasses the per-template generate grant and the ceiling.
+	grantAppPerms(t, 1, permissions.AppReportsGenerateAll)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+	seedReportReceipt(1, 1)
+
+	w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(seeded.ID))
+	GenerateReportFromTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+}
+
+func TestGenerateReportFromTemplate_ForbidsWithoutGenerate(t *testing.T) {
+	defer tearDownReportTest()
+	// Read does not imply generate; the missing generate permission denies.
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+
+	w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(seeded.ID))
+	GenerateReportFromTemplate(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestGenerateReportFromTemplate_NotFoundForMissingId(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsGenerateAll)
+
+	w, r := reportTemplateIdRequest("POST", 1, "999999")
+	GenerateReportFromTemplate(w, r)
+
+	assertStatus(t, w, http.StatusNotFound)
+}
+
+func TestGetReportTemplateOptions_ReturnsOptionsUnderRolesRead(t *testing.T) {
+	defer tearDownReportTest()
+	// Gated on app.roles.read (the role editor), not a report permission.
+	grantAppPerms(t, 1, permissions.AppRolesRead)
+	seedReportTemplate(t, 1, "HTTP Report")
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/report/template/options", nil)
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}}))
+	GetReportTemplateOptions(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var options []structs.ReportTemplateOption
+	if err := json.Unmarshal(w.Body.Bytes(), &options); err != nil {
+		t.Fatalf("decode options body: %v", err)
+	}
+	if len(options) != 1 || options[0].Name != "HTTP Report" {
+		t.Fatalf("options = %+v, want one HTTP Report option", options)
+	}
+	// The template was seeded over group 1, so the option carries it.
+	if len(options[0].GroupIds) != 1 || options[0].GroupIds[0] != 1 {
+		t.Errorf("option groupIds = %v, want [1]", options[0].GroupIds)
+	}
+}
+
+func TestGetReportTemplateOptions_ForbidsWithoutRolesRead(t *testing.T) {
+	defer tearDownReportTest()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/report/template/options", nil)
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}}))
+	GetReportTemplateOptions(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
 }

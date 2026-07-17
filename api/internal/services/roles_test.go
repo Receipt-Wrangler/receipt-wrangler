@@ -104,6 +104,77 @@ func TestCreateGroupRoleRejectsNonExistentPaidByGrant(t *testing.T) {
 	}
 }
 
+func TestCreateGroupRoleWithReportTemplateGrantsExposesGrants(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	template := models.ReportTemplate{Name: "Quarterly", ConfigurationVersion: 1}
+	repositories.GetDB().Create(&template)
+
+	service := NewRoleService(nil)
+	command := commands.UpsertRoleCommand{
+		Name:        "Report Restricted Role",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReportsRead},
+		ReportTemplateGrants: []commands.ReportTemplateGrantCommand{
+			{ReportTemplateId: template.ID, Permissions: []string{"read", "generate"}},
+		},
+	}
+
+	roleView, err := service.CreateRole(command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(roleView.ReportTemplateGrants) != 1 {
+		utils.PrintTestError(t, len(roleView.ReportTemplateGrants), 1)
+		return
+	}
+	grant := roleView.ReportTemplateGrants[0]
+	if grant.ReportTemplateId != template.ID || len(grant.Permissions) != 2 {
+		utils.PrintTestError(t, grant, "template with 2 actions")
+	}
+
+	// It persists and reads back through GetRoles (grouped per template).
+	roles, err := service.GetRoles()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	found := false
+	for _, r := range roles {
+		if r.Id != roleView.Id {
+			continue
+		}
+		found = true
+		if len(r.ReportTemplateGrants) != 1 || r.ReportTemplateGrants[0].ReportTemplateId != template.ID {
+			utils.PrintTestError(t, r.ReportTemplateGrants, "one report template grant")
+		}
+	}
+	if !found {
+		utils.PrintTestError(t, "role not found in GetRoles", roleView.Id)
+	}
+}
+
+func TestCreateGroupRoleRejectsNonExistentReportTemplateGrant(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	service := NewRoleService(nil)
+	command := commands.UpsertRoleCommand{
+		Name:        "Bad Report Grant Role",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReportsRead},
+		ReportTemplateGrants: []commands.ReportTemplateGrantCommand{
+			{ReportTemplateId: 999999, Permissions: []string{"read"}},
+		},
+	}
+
+	_, err := service.CreateRole(command)
+	if !errors.Is(err, ErrInvalidGrant) {
+		utils.PrintTestError(t, err, ErrInvalidGrant)
+	}
+}
+
 func TestUpdateGroupRoleServiceReplacesGrants(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)

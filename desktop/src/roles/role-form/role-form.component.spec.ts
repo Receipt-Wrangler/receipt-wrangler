@@ -21,6 +21,8 @@ import {
   ApiModule,
   PermissionDescriptor,
   PermissionService,
+  ReportService,
+  ReportTemplateOption,
   Role,
   RoleService,
   User,
@@ -79,6 +81,8 @@ interface SetupOptions {
   roles?: Role[];
   /** Users returned by the mocked UserState snapshot (paid-by picker pool). */
   users?: User[];
+  /** Report templates returned for the access-matrix pool. */
+  reportTemplateOptions?: ReportTemplateOption[];
 }
 
 async function setup(
@@ -148,6 +152,11 @@ async function setup(
   jest
     .spyOn(roleService, "getRoles")
     .mockReturnValue(of(options.roles ?? []) as any);
+
+  const reportService = TestBed.inject(ReportService);
+  jest
+    .spyOn(reportService, "getReportTemplateOptions")
+    .mockReturnValue(of(options.reportTemplateOptions ?? []) as any);
 
   const router = TestBed.inject(Router);
   const navigateSpy = jest.spyOn(router, "navigate").mockResolvedValue(true);
@@ -411,6 +420,70 @@ describe("RoleFormComponent", () => {
     expect(component.grantedPaidByUsers.length).toBe(0);
   });
 
+  it("includes report template grants in a GROUP payload", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.name.setValue("Report Restricted Role");
+    component.toggle("group.receipts.read");
+
+    // Template 10 gets read + generate; template 20 gets read only.
+    component.toggleTemplateAction(10, "read");
+    component.toggleTemplateAction(10, "generate");
+    component.toggleTemplateAction(20, "read");
+
+    component.submit();
+
+    expect(component.lastPayload?.scope).toBe("GROUP");
+    const grants = component.lastPayload?.reportTemplateGrants ?? [];
+    const t10 = grants.find((grant) => grant.reportTemplateId === 10);
+    const t20 = grants.find((grant) => grant.reportTemplateId === 20);
+    expect([...(t10?.permissions ?? [])].sort()).toEqual(["generate", "read"]);
+    expect(t20?.permissions).toEqual(["read"]);
+  });
+
+  it("omits report template grants from an APP payload", async () => {
+    const { component } = await setup();
+    component.form.controls.name.setValue("App Role");
+    component.toggle("app.users.read");
+
+    component.submit();
+
+    expect(component.lastPayload?.reportTemplateGrants).toBeUndefined();
+  });
+
+  it("toggleTemplateAll grants every action; toggling off clears the row", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+
+    component.toggleTemplateAll(5, true);
+    expect(component.isTemplateAllGranted(5)).toBe(true);
+    expect(component.reportTemplateGrants().get(5)?.size).toBe(component.reportActions.length);
+
+    component.toggleTemplateAll(5, false);
+    expect(component.reportTemplateGrants().has(5)).toBe(false);
+  });
+
+  it("dropping a template's last action removes it (all-empty = unrestricted)", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+
+    component.toggleTemplateAction(3, "read");
+    expect(component.reportTemplateGrants().has(3)).toBe(true);
+
+    component.toggleTemplateAction(3, "read"); // toggle the only action off
+    expect(component.reportTemplateGrants().has(3)).toBe(false);
+  });
+
+  it("resets report template grants when switching role type", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.toggleTemplateAction(1, "read");
+    expect(component.reportTemplateGrants().size).toBe(1);
+
+    component.pickType("app");
+    expect(component.reportTemplateGrants().size).toBe(0);
+  });
+
   it("calls createRole, notifies, and navigates back to the list on submit", async () => {
     const { component, createRoleSpy, navigateSpy, snackbar } = await setup();
     component.form.controls.name.setValue("App Admin");
@@ -536,6 +609,30 @@ describe("RoleFormComponent", () => {
         .map((option) => option.id)
         .sort((a, b) => a - b);
       expect(selectedIds).toEqual([RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID, 42].sort((a, b) => a - b));
+    });
+
+    it("rehydrates report template grants on edit", async () => {
+      const reportGroupRole: Role = {
+        id: 12,
+        name: "Report Group Role",
+        scope: "GROUP",
+        isDefault: false,
+        isSystem: false,
+        permissions: ["group.receipts.read"],
+        reportTemplateGrants: [
+          { reportTemplateId: 10, permissions: ["read", "generate"] },
+          { reportTemplateId: 20, permissions: ["read"] },
+        ],
+      };
+      const { component } = await setup(ALL_DESCRIPTORS, {
+        routeId: "12",
+        routeScope: "group",
+        roles: [reportGroupRole],
+      });
+
+      const grants = component.reportTemplateGrants();
+      expect([...(grants.get(10) ?? [])].sort()).toEqual(["generate", "read"]);
+      expect([...(grants.get(20) ?? [])]).toEqual(["read"]);
     });
 
     it("redirects to the list when the role is not found", async () => {

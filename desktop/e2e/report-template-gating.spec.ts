@@ -49,11 +49,11 @@ test.describe('Report Builder — Save Template permission gating', () => {
     username = uniqueName('report-nocreate-user');
 
     // Admin provisions a role that grants app.reports.read (builder access) plus
-    // the baselines a functional user needs, but NOT app.reports.create (enable the
-    // whole Reports group, then switch off "Save Report Templates"). Only the create
-    // permission is switched off — that's the gate under test — and it must be a
-    // single disablePermissions entry: createRole toggles the panel open on each
-    // entry, so two entries for the same panel would re-close it.
+    // the baselines a functional user needs, but NOT create in either form: enable
+    // the whole Reports group, then switch off "Save Report Templates" (the base
+    // create) AND "Create Reports For Any Group" (createAll — otherwise the bypass
+    // would still let the endpoint create). createRole opens the app.reports panel
+    // once and toggles both.
     const admin = await browser.newContext({ storageState: 'e2e/.auth/admin.json' });
     const adminPage = await admin.newPage();
     await stubTokenRefresh(adminPage);
@@ -62,7 +62,10 @@ test.describe('Report Builder — Save Template permission gating', () => {
       type: 'Application role',
       preset: 'Start from scratch',
       enableCategories: ['Account', 'Notifications', 'Groups', 'Reports'],
-      disablePermissions: [{ panelKey: 'app.reports', label: 'Save Report Templates' }],
+      disablePermissions: [
+        { panelKey: 'app.reports', label: 'Save Report Templates' },
+        { panelKey: 'app.reports', label: 'Create Reports For Any Group' },
+      ],
     });
     await createUserWithRole(adminPage, { username, password: NEW_USER_PASSWORD, role: roleName });
     await admin.close();

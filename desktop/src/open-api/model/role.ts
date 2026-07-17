@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { Permission } from './permission';
+import { ReportTemplateGrant } from './reportTemplateGrant';
 import { PermissionScope } from './permissionScope';
 
 
@@ -42,6 +43,10 @@ export interface Role {
      * Whether a GROUP role lets each member see receipts they paid for. Part of the paid-by visibility filter; always false for app roles.
      */
     includeOwnPaidReceipts?: boolean;
+    /**
+     * Per-template action grants restricting which report templates a GROUP role\'s members may act on. Empty means unrestricted (every template the role\'s group access reaches). Always empty for app roles.
+     */
+    reportTemplateGrants?: Array<ReportTemplateGrant>;
 }
 export namespace Role {
 }

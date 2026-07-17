@@ -45,6 +45,7 @@ describe("ReportRunnerService", () => {
     duplicateReportTemplate: jest.Mock;
     deleteReportTemplate: jest.Mock;
     generateReport: jest.Mock;
+    generateReportFromTemplate: jest.Mock;
   };
   let service: ReportRunnerService;
 
@@ -58,6 +59,7 @@ describe("ReportRunnerService", () => {
       duplicateReportTemplate: jest.fn(() => of({ id: 4 })),
       deleteReportTemplate: jest.fn(() => of(undefined)),
       generateReport: jest.fn(() => of(new Blob())),
+      generateReportFromTemplate: jest.fn(() => of(new Blob())),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -102,10 +104,16 @@ describe("ReportRunnerService", () => {
     expect(reportService.deleteReportTemplate).toHaveBeenCalledWith(5);
   });
 
-  it("generateFromTemplate generates the stored config and triggers a download", () => {
-    const cmd = command("Run", ["pdf"]);
-    service.generateFromTemplate(cmd).subscribe();
-    expect(reportService.generateReport).toHaveBeenCalledWith(cmd);
-    expect(downloadFile).toHaveBeenCalled();
+  it("generateFromTemplateById generates by id and triggers a download named from the config", () => {
+    const template = {
+      id: 7,
+      name: "Run",
+      createdAt: "2026-01-01T00:00:00Z",
+      configuration: command("Run", ["pdf"]),
+      configurationVersion: 1,
+    };
+    service.generateFromTemplateById(template).subscribe();
+    expect(reportService.generateReportFromTemplate).toHaveBeenCalledWith(7);
+    expect(downloadFile).toHaveBeenCalledWith(expect.any(Blob), "Run.pdf");
   });
 });

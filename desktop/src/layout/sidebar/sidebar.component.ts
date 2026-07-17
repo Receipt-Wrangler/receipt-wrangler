@@ -71,6 +71,15 @@ export class SidebarComponent {
     AuthState.groupPermissions
   );
 
+  // Reports are reachable with read OR the readAll bypass (the *hasAppPermission
+  // directive is single-key AND-only, so the OR is resolved through the selector).
+  protected readonly canViewReports = this.store.selectSignal(
+    AuthState.hasAnyAppPermission([
+      Permission.AppReportsRead,
+      Permission.AppReportsReadAll,
+    ])
+  );
+
   // Mirrors the three speed-dial sub-button gates (Add Receipt, Quick Scan, Add
   // Group), so the plus FAB is shown iff at least one sub-button would render.
   protected readonly canAddAnything = computed(() => {
