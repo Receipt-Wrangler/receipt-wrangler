@@ -336,11 +336,12 @@ func TestRun_BoundsRunawayArithmeticGrowth(t *testing.T) {
 		t.Errorf("deep arithmetic column %s = %v, want a null (bounded) cell", deepest, got)
 	}
 
-	// And nothing that did survive exceeds the digit ceiling.
+	// And nothing that did survive exceeds an independent sanity ceiling (not the
+	// production bound, so a weakened bound is caught rather than tracked).
 	for _, c := range model.GrandTotals {
-		if number, ok := c.Value().Decimal(); ok && number.NumDigits() > maxDecimalDigits {
-			t.Errorf("column %s survived with %d digits, over the %d ceiling",
-				c.Column, number.NumDigits(), maxDecimalDigits)
+		if number, ok := c.Value().Decimal(); ok && number.NumDigits() > runawayDigitCeiling {
+			t.Errorf("column %s survived with %d digits, past the independent %d ceiling",
+				c.Column, number.NumDigits(), runawayDigitCeiling)
 		}
 	}
 }

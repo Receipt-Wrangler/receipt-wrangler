@@ -1,6 +1,7 @@
 package reporting
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -8,6 +9,13 @@ import (
 )
 
 const testDivisionScale = 6
+
+// runawayDigitCeiling is an independent sanity bound for the arithmetic-growth
+// tests, deliberately NOT the production maxDecimalDigits: if the real bound were
+// weakened or removed, a surviving value would blow past this and the test would
+// fail — a test law must not be derived from the code it judges. Money never needs
+// anywhere near this many significant digits, and the real bound is well below it.
+const runawayDigitCeiling = 2000
 
 func mustParseArithmetic(t *testing.T, src string) ast.Node {
 	t.Helper()
@@ -119,8 +127,8 @@ func TestEvalArithmetic_BoundsMagnitude(t *testing.T) {
 		if !columns["c"].IsNull() {
 			t.Errorf("deep squaring chain = %v, want a null cell", columns["c"])
 		}
-		if maxDigits > maxDecimalDigits {
-			t.Errorf("a value survived with %d digits, over the %d ceiling", maxDigits, maxDecimalDigits)
+		if maxDigits > runawayDigitCeiling {
+			t.Errorf("a value survived with %d digits, past the independent %d ceiling", maxDigits, runawayDigitCeiling)
 		}
 	})
 
@@ -134,6 +142,18 @@ func TestEvalArithmetic_BoundsMagnitude(t *testing.T) {
 		}
 		t.Fatalf("a 1e308 squaring chain never collapsed: %v", columns["c"])
 	})
+}
+
+// ROUND funnels through the same magnitude guard as every other arithmetic op, so
+// an operand past the coefficient ceiling rounds to a null cell rather than a
+// materialized giant. 1100 significant digits is comfortably past the bound; the
+// null result — not the digit count — is the law being asserted.
+func TestEvalArithmetic_RoundIsBounded(t *testing.T) {
+	columns := map[string]Value{"big": Num(dec(strings.Repeat("9", 1100)))}
+	got := evalArithmetic(mustParseArithmetic(t, "ROUND(big, 2)"), columns, testDivisionScale)
+	if !got.IsNull() {
+		t.Errorf("ROUND of an over-ceiling operand = %v, want a null cell", got)
+	}
 }
 
 // A zero divisor must yield an empty cell. shopspring panics on this, so the

@@ -138,5 +138,5 @@ func evalRound(call *ast.CallNode, columns map[string]Value, divisionScale int32
 		return Null()
 	}
 
-	return Num(operand.Round(places))
+	return boundedNum(operand.Round(places))
 }

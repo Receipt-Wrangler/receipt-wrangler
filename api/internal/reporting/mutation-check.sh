@@ -336,6 +336,13 @@ add 'exponent-guard-removed' 'eval.go' \
 	return Num(d)' \
 '	return Num(d)'
 
+# TestEvalArithmetic_RoundIsBounded — ROUND is the last arithmetic-producing path,
+# and it must bound its result like the rest; skipping boundedNum lets an
+# over-ceiling operand round straight through instead of collapsing to null.
+add 'round-guard-removed' 'eval.go' \
+'	return boundedNum(operand.Round(places))' \
+'	return Num(operand.Round(places))'
+
 # --- validate: the rules ----------------------------------------------------
 
 # TestValidate_Rejects/arithmetic references itself
