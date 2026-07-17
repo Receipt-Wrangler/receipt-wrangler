@@ -9,7 +9,6 @@ import 'package:receipt_wrangler_mobile/models/loading_model.dart';
 import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/top_app_bar.dart';
-import 'package:receipt_wrangler_mobile/shared/widgets/user_avatar.dart';
 
 import '../helpers/auth_test_helpers.dart';
 import '../helpers/permission_test_helpers.dart';
@@ -18,24 +17,21 @@ api.Claims _claims(String displayName) =>
     api.Claims((b) => b..displayName = displayName);
 
 void main() {
-  setUpAll(() {
-    // Allow Provider<AuthModel>.value with a mocktail Mock of the ChangeNotifier
-    // subclass (mirrors group_app_bar_test); the test relies on no listener
-    // rebuilds.
-    Provider.debugCheckInvalidValueType = null;
-  });
-
-  Future<void> pumpBar(WidgetTester tester, PermissionsModel permissions) async {
+  // Opens the avatar popup menu (located by its stable key) for a caller holding
+  // [appPerms], injecting every owned ChangeNotifier via ChangeNotifierProvider.
+  Future<void> pumpBar(WidgetTester tester, List<Permission> appPerms) async {
     final authModel = MockAuthModel();
     when(() => authModel.claims).thenReturn(_claims('Admin'));
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          Provider<AuthModel>.value(value: authModel),
+          ChangeNotifierProvider<AuthModel>(create: (_) => authModel),
           ChangeNotifierProvider<LoadingModel>(create: (_) => LoadingModel()),
           ChangeNotifierProvider<UserModel>(create: (_) => UserModel()),
-          ChangeNotifierProvider<PermissionsModel>.value(value: permissions),
+          ChangeNotifierProvider<PermissionsModel>(
+            create: (_) => seededPermissions(app: appPerms),
+          ),
         ],
         child: const MaterialApp(
           home: Scaffold(appBar: TopAppBar(titleText: 'Home')),
@@ -43,35 +39,29 @@ void main() {
       ),
     );
     await tester.pump();
-    // Open the avatar popup menu.
-    await tester.tap(find.byType(UserAvatar));
-    await tester.pumpAndSettle();
+
+    // Tap the avatar by key and pump the finite popup-open animation to
+    // completion with explicit pumps (no pumpAndSettle).
+    await tester.tap(find.byKey(const ValueKey('user-avatar-menu')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
   }
 
   testWidgets('shows Reports with app.reports.read', (tester) async {
-    await pumpBar(
-      tester,
-      seededPermissions(app: [Permission.appPeriodReportsPeriodRead]),
-    );
+    await pumpBar(tester, [Permission.appPeriodReportsPeriodRead]);
     expect(find.text('Reports'), findsOneWidget);
   });
 
   testWidgets('shows Reports with app.reports.readAll (base absent)',
       (tester) async {
-    await pumpBar(
-      tester,
-      seededPermissions(app: [Permission.appPeriodReportsPeriodReadAll]),
-    );
+    await pumpBar(tester, [Permission.appPeriodReportsPeriodReadAll]);
     expect(find.text('Reports'), findsOneWidget);
   });
 
   testWidgets('hides Reports without either read permission', (tester) async {
-    await pumpBar(
-      tester,
-      seededPermissions(app: [Permission.appPeriodReceiptsPeriodSearch]),
-    );
+    await pumpBar(tester, [Permission.appPeriodReceiptsPeriodSearch]);
     expect(find.text('Reports'), findsNothing);
-    // The other menu items still render.
+    // The menu did open — the ungated items are present.
     expect(find.text('User Profile'), findsOneWidget);
     expect(find.text('Logout'), findsOneWidget);
   });

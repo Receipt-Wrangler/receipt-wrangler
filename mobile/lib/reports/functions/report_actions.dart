@@ -31,6 +31,10 @@ Future<api.ReportPreviewResponse?> fetchReportPreview(
 Future<void> generateAndSaveReport(
     BuildContext context, api.ReportTemplate template) async {
   final loadingModel = Provider.of<LoadingModel>(context, listen: false);
+  // Capture the triggering widget's bounds before the async gap: on iPad the
+  // share sheet is a popover that needs a non-zero anchor rect, and share_plus
+  // throws a PlatformException without one.
+  final shareOrigin = _shareOrigin(context);
   loadingModel.setIsLoading(true);
   try {
     final response = await OpenApiClient.client
@@ -51,7 +55,10 @@ Future<void> generateAndSaveReport(
     await file.writeAsBytes(bytes);
 
     loadingModel.setIsLoading(false);
-    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile(file.path)],
+      sharePositionOrigin: shareOrigin,
+    ));
   } on DioException catch (e) {
     loadingModel.setIsLoading(false);
     if (context.mounted) showApiErrorSnackbar(context, e);
@@ -59,6 +66,15 @@ Future<void> generateAndSaveReport(
     loadingModel.setIsLoading(false);
     if (context.mounted) showErrorSnackbar(context, 'Failed to generate report');
   }
+}
+
+/// The triggering widget's global bounds, used to anchor the iPad share-sheet
+/// popover. Null when the context has no sized render object (share_plus then
+/// applies its own fallback); has no effect on phones.
+Rect? _shareOrigin(BuildContext context) {
+  final box = context.findRenderObject() as RenderBox?;
+  if (box == null || !box.hasSize) return null;
+  return box.localToGlobal(Offset.zero) & box.size;
 }
 
 /// Prompts for confirmation, then deletes [template]

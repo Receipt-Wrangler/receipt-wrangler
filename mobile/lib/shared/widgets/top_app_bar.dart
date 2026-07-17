@@ -96,6 +96,7 @@ class _TopAppBar extends State<TopAppBar> {
     }
 
     return PopupMenuButton(
+        key: const ValueKey('user-avatar-menu'),
         child: const UserAvatar(),
         itemBuilder: (BuildContext context) {
           final permissionsModel =
