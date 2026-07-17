@@ -1,6 +1,7 @@
 package reporting
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -8,6 +9,13 @@ import (
 )
 
 const testDivisionScale = 6
+
+// runawayDigitCeiling is an independent sanity bound for the arithmetic-growth
+// tests, deliberately NOT the production maxDecimalDigits: if the real bound were
+// weakened or removed, a surviving value would blow past this and the test would
+// fail — a test law must not be derived from the code it judges. Money never needs
+// anywhere near this many significant digits, and the real bound is well below it.
+const runawayDigitCeiling = 2000
 
 func mustParseArithmetic(t *testing.T, src string) ast.Node {
 	t.Helper()
@@ -98,6 +106,55 @@ func TestEvalArithmetic_DivisionScale(t *testing.T) {
 				t.Errorf("Total / Count at scale %d = %s, want %s", test.scale, number, test.want)
 			}
 		})
+	}
+}
+
+// A computed value that grows past what money can mean collapses to null instead
+// of being materialized. Both growth modes are covered: a coefficient that keeps
+// doubling (a memory-exhaustion vector) and an exponent that keeps climbing
+// toward the int32 boundary (a silent-overflow vector). Feeding each column's
+// result back into the next is exactly what the engine's arithmetic columns do.
+func TestEvalArithmetic_BoundsMagnitude(t *testing.T) {
+	t.Run("a squaring chain collapses to null rather than growing without bound", func(t *testing.T) {
+		columns := map[string]Value{"c": Num(dec("99"))}
+		for i := 0; i < 40; i++ {
+			columns["c"] = evalSrc(t, "c * c", columns)
+			// Check inside the loop and bail immediately: if the bound were removed
+			// the value would keep doubling until it exhausted memory, so failing
+			// here — at a small intermediate — beats OOMing the test process. A
+			// guarded chain nulls the value (Decimal returns false) well before it
+			// reaches the independent ceiling, so this never trips in practice.
+			if number, ok := columns["c"].Decimal(); ok && number.NumDigits() > runawayDigitCeiling {
+				t.Fatalf("a value grew to %d digits, past the independent %d ceiling — growth is not bounded",
+					number.NumDigits(), runawayDigitCeiling)
+			}
+		}
+		if !columns["c"].IsNull() {
+			t.Errorf("deep squaring chain = %v, want a null cell", columns["c"])
+		}
+	})
+
+	t.Run("a large-exponent chain collapses to null instead of wrapping the int32 exponent", func(t *testing.T) {
+		columns := map[string]Value{"c": evalSrc(t, "1e308", map[string]Value{})}
+		for i := 0; i < 40; i++ {
+			columns["c"] = evalSrc(t, "c * c", columns)
+			if columns["c"].IsNull() {
+				return // collapsed before it could wrap to a wrong number — the guard working
+			}
+		}
+		t.Fatalf("a 1e308 squaring chain never collapsed: %v", columns["c"])
+	})
+}
+
+// ROUND funnels through the same magnitude guard as every other arithmetic op, so
+// an operand past the coefficient ceiling rounds to a null cell rather than a
+// materialized giant. 1100 significant digits is comfortably past the bound; the
+// null result — not the digit count — is the law being asserted.
+func TestEvalArithmetic_RoundIsBounded(t *testing.T) {
+	columns := map[string]Value{"big": Num(dec(strings.Repeat("9", 1100)))}
+	got := evalArithmetic(mustParseArithmetic(t, "ROUND(big, 2)"), columns, testDivisionScale)
+	if !got.IsNull() {
+		t.Errorf("ROUND of an over-ceiling operand = %v, want a null cell", got)
 	}
 }
 

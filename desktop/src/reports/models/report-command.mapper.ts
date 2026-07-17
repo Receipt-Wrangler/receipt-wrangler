@@ -118,11 +118,12 @@ function toFormats(formats: Record<ReportRequestFormat, boolean>): ReportRequest
 }
 
 /**
- * Maps the builder form's value onto the ReportRequestCommand the endpoint
- * consumes. Detail `by` is only sent in aggregate mode; the document is omitted
- * when entirely empty. The same command feeds both preview and generate.
+ * Maps the builder form's value onto a ReportRequestCommand, carrying the given
+ * columns. Detail `by` is only sent in aggregate mode; the document is omitted
+ * when entirely empty. Callers choose the column set: enabled-only for
+ * preview/generate, every column for save.
  */
-export function toReportRequestCommand(value: ReportBuilderValue): ReportRequestCommand {
+function mapReportCommand(value: ReportBuilderValue, columns: ReportColumnValue[]): ReportRequestCommand {
   const detail: ReportDetail = { mode: value.detail.mode };
   if (value.detail.mode === ReportDetail.ModeEnum.Aggregate) {
     detail.by = value.detail.by;
@@ -135,7 +136,7 @@ export function toReportRequestCommand(value: ReportBuilderValue): ReportRequest
     filter: value.filter,
     groupBy: value.groupBy,
     detail,
-    columns: enabledReportColumns(value).map(toColumn),
+    columns: columns.map(toColumn),
     subtotals: value.subtotals,
     grandTotals: value.grandTotals,
     formats: toFormats(value.formats),
@@ -147,4 +148,25 @@ export function toReportRequestCommand(value: ReportBuilderValue): ReportRequest
   }
 
   return command;
+}
+
+/**
+ * The command sent to preview and generate: disabled (currently-invalid)
+ * dimension columns are excluded, because the engine rejects them. The same
+ * command feeds both preview and generate.
+ */
+export function toReportRequestCommand(value: ReportBuilderValue): ReportRequestCommand {
+  return mapReportCommand(value, enabledReportColumns(value));
+}
+
+/**
+ * The command persisted when saving a template. Unlike preview/generate it keeps
+ * *every* column, including ones currently disabled, so they round-trip back into
+ * the builder and re-enable when the config makes them valid again instead of
+ * being silently dropped. The backend applies the same disabled-column projection
+ * at generation time (buildReportSpec), so a stored template still generates with
+ * such a column omitted.
+ */
+export function toReportRequestCommandForSave(value: ReportBuilderValue): ReportRequestCommand {
+  return mapReportCommand(value, value.columns);
 }

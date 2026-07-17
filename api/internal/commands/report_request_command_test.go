@@ -2,6 +2,7 @@ package commands
 
 import (
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -154,4 +155,34 @@ func TestReportRequestCommand_Validate_CountNeedsNoMeasure(t *testing.T) {
 	if _, ok := command.Validate().Errors["columns"]; ok {
 		t.Error("COUNT should not require a measure")
 	}
+}
+
+// An unbounded column list is a way to chain expensive per-cell work (arithmetic
+// columns reference one another), so the count is capped at the boundary.
+func TestReportRequestCommand_Validate_BoundsColumnCount(t *testing.T) {
+	dimensionColumns := func(n int) []ReportColumn {
+		columns := make([]ReportColumn, n)
+		for i := range columns {
+			columns[i] = ReportColumn{Kind: ReportColumnDimension, Name: "c" + strconv.Itoa(i), Field: "category"}
+		}
+		return columns
+	}
+
+	t.Run("a report at the column ceiling is accepted", func(t *testing.T) {
+		command := validReportCommand()
+		command.Detail = ReportDetail{Mode: ReportDetailRecords}
+		command.Columns = dimensionColumns(maxReportColumns)
+		if _, ok := command.Validate().Errors["columns"]; ok {
+			t.Errorf("exactly %d columns should be accepted", maxReportColumns)
+		}
+	})
+
+	t.Run("one column past the ceiling is rejected", func(t *testing.T) {
+		command := validReportCommand()
+		command.Detail = ReportDetail{Mode: ReportDetailRecords}
+		command.Columns = dimensionColumns(maxReportColumns + 1)
+		if _, ok := command.Validate().Errors["columns"]; !ok {
+			t.Errorf("more than %d columns should be rejected", maxReportColumns)
+		}
+	})
 }

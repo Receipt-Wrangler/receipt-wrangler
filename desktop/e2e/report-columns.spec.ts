@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { stubTokenRefresh } from './helpers/auth';
-import { addFirstGroupToScope, gotoReports, openComboboxAndPick } from './helpers/reports';
+import { addFirstGroupToScope, gotoReportBuilder, openComboboxAndPick } from './helpers/reports';
 
 // The Report Builder is gated by app.reports.read, carried only by Legacy Admin.
 test.use({ storageState: 'e2e/.auth/admin.json' });
@@ -12,7 +12,7 @@ test.use({ storageState: 'e2e/.auth/admin.json' });
 test.describe('Report Builder — columns', () => {
   test.beforeEach(async ({ page }) => {
     await stubTokenRefresh(page);
-    await gotoReports(page);
+    await gotoReportBuilder(page);
     await addFirstGroupToScope(page);
   });
 

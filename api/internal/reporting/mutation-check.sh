@@ -242,8 +242,8 @@ add 'column-format-dropped' 'engine.go' \
 
 # TestRun_MetaParamsAreCopied
 add 'meta-params-aliased' 'engine.go' \
-'			Params:         copyParams(meta.Params),' \
-'			Params:         meta.Params,'
+'			Params:      copyParams(meta.Params),' \
+'			Params:      meta.Params,'
 
 # TestRun_RecordsModeDoesNotAliasInputRows
 add 'records-label-cell-aliases-the-row' 'engine.go' \
@@ -305,13 +305,13 @@ add 'division-guard-removed' 'eval.go' \
 '		if rightNumber.IsZero() {
 			return Null()
 		}
-		return Num(leftNumber.DivRound(rightNumber, divisionScale))' \
-'		return Num(leftNumber.DivRound(rightNumber, divisionScale))'
+		return boundedNum(leftNumber.DivRound(rightNumber, divisionScale))' \
+'		return boundedNum(leftNumber.DivRound(rightNumber, divisionScale))'
 
 # TestEvalArithmetic_IgnoresDivisionPrecisionGlobal
 add 'division-reads-the-global' 'eval.go' \
-'		return Num(leftNumber.DivRound(rightNumber, divisionScale))' \
-'		return Num(leftNumber.Div(rightNumber))'
+'		return boundedNum(leftNumber.DivRound(rightNumber, divisionScale))' \
+'		return boundedNum(leftNumber.Div(rightNumber))'
 
 # TestEvalArithmetic_NullPropagates
 add 'null-operand-reads-as-zero' 'eval.go' \
@@ -322,6 +322,36 @@ add 'null-operand-reads-as-zero' 'eval.go' \
 	}' \
 '	leftNumber, _ := left.Decimal()
 	rightNumber, _ := right.Decimal()'
+
+# TestEvalArithmetic_BoundsMagnitude / TestRun_BoundsRunawayArithmeticGrowth —
+# without the coefficient guard a squaring chain doubles its big.Int without limit.
+# Both tests check the size ceiling *inside* the growth loop (and the Run chain is
+# kept short), so a removed guard trips a normal assertion at a small intermediate
+# rather than exhausting the test process's memory.
+add 'digit-guard-removed' 'eval.go' \
+'	if d.NumDigits() > maxDecimalDigits {
+		return Null()
+	}
+	if exponent := d.Exponent(); exponent > maxDecimalExponent || exponent < -maxDecimalExponent {' \
+'	if exponent := d.Exponent(); exponent > maxDecimalExponent || exponent < -maxDecimalExponent {'
+
+# TestEvalArithmetic_BoundsMagnitude — without the exponent guard a chain of
+# large-exponent literals (1e308 * 1e308 * …) climbs toward the int32 exponent
+# boundary and wraps to a silently wrong number instead of a null cell (the
+# coefficient stays tiny, so this one never risked memory).
+add 'exponent-guard-removed' 'eval.go' \
+'	if exponent := d.Exponent(); exponent > maxDecimalExponent || exponent < -maxDecimalExponent {
+		return Null()
+	}
+	return Num(d)' \
+'	return Num(d)'
+
+# TestEvalArithmetic_RoundIsBounded — ROUND is the last arithmetic-producing path,
+# and it must bound its result like the rest; skipping boundedNum lets an
+# over-ceiling operand round straight through instead of collapsing to null.
+add 'round-guard-removed' 'eval.go' \
+'	return boundedNum(operand.Round(places))' \
+'	return Num(operand.Round(places))'
 
 # --- validate: the rules ----------------------------------------------------
 

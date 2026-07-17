@@ -4,6 +4,7 @@ import {
   isDimensionColumnDisabled,
   ReportBuilderValue,
   toReportRequestCommand,
+  toReportRequestCommandForSave,
 } from "./report-command.mapper";
 
 function baseValue(): ReportBuilderValue {
@@ -102,6 +103,31 @@ describe("toReportRequestCommand", () => {
     ];
     const command = toReportRequestCommand(value);
     expect(command.columns.map((c) => c.name)).toEqual(["Count", "Total"]);
+  });
+});
+
+describe("toReportRequestCommandForSave", () => {
+  it("keeps every column, including a disabled (invalid) dimension column", () => {
+    // Same failing config as the generate-mapper test: aggregate by tag, group by
+    // paid_by, plus a Category dimension that reads neither. The save mapper keeps
+    // it (so it round-trips and self-heals) where the generate mapper drops it.
+    const value = baseValue();
+    value.groupBy = ["paid_by"];
+    value.detail = { mode: ReportDetail.ModeEnum.Aggregate, by: "tag" };
+    value.columns = [
+      { id: "cat", kind: ReportColumn.KindEnum.Dimension, name: "Category", label: "Category", field: "category" },
+      { id: "cnt", kind: ReportColumn.KindEnum.Aggregate, name: "Count", label: "Count", aggFunc: ReportColumn.AggFuncEnum.Count },
+      { id: "tot", kind: ReportColumn.KindEnum.Aggregate, name: "Total", label: "Total", aggFunc: ReportColumn.AggFuncEnum.Sum, measure: "amount" },
+    ];
+
+    expect(toReportRequestCommandForSave(value).columns.map((c) => c.name)).toEqual(["Category", "Count", "Total"]);
+    // The generate mapper still drops the disabled column, proving the two diverge.
+    expect(toReportRequestCommand(value).columns.map((c) => c.name)).toEqual(["Count", "Total"]);
+  });
+
+  it("matches the generate mapper when no column is disabled", () => {
+    const value = baseValue();
+    expect(toReportRequestCommandForSave(value)).toEqual(toReportRequestCommand(value));
   });
 });
 

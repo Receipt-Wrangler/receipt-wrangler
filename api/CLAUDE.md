@@ -771,8 +771,11 @@ engine's own output rather than a client-side re-implementation. A separate **ap
 permission gates the desktop report-builder route/nav and the saved-template read endpoints (Legacy Admin
 picks it up via add-only role reconciliation; reporting is admin-by-default). Generate additionally
 requires the app-level **`app.reports.generate`** (ANDed with the per-group `group.reports.read`), so a
-non-admin needs both a custom role granting `app.reports.generate` and per-group generation access;
-**preview stays group-scoped only** (no app gate), since it is the builder's live feedback loop.
+non-admin needs both a custom role granting `app.reports.generate` and per-group generation access.
+**Preview enforces that same app-level read gate** — `app.reports.read` **or** `app.reports.readAll`,
+declared on the handler as an `AnyAppPermissions` any-of and ANDed with the per-group
+`group.reports.read` — so the builder's live feedback loop is reachable by exactly the users who can
+open the builder, and preview is never merely group-scoped.
 
 **Custom currency formatting.** `buildModel` loads System Settings (`SystemSettingsRepository.GetSystemSettings`,
 a get-or-create singleton) and passes the app's currency configuration — symbol, symbol position (START/END),
@@ -798,7 +801,14 @@ filter already flows through.
 **Report templates.** `POST /api/report/template` saves a report configuration for reuse. It reuses the
 shared `loadReportCommand` parse+validate and stores the whole `ReportRequestCommand` verbatim as a
 `json.RawMessage` blob on `models.ReportTemplate` (name + owner taken from the request / JWT), so a
-template round-trips back into the builder unchanged. Because this is the first feature to **re-serialize
+template round-trips back into the builder unchanged. A stored config may include a dimension column
+that is currently **disabled** in the builder (aggregate mode, a label whose field is neither the
+aggregate dimension nor a grouping level) — persisted deliberately so it round-trips and self-heals
+rather than being silently dropped on save. `buildReportSpec` (`services/report_service.go`,
+`isDisabledDimensionColumn`) **projects such a column out** before running the engine, mirroring the
+desktop `isDimensionColumnDisabled` and the engine's own `ErrLabelColumnUnresolvable` rejection — so
+verbatim generation of a stored template (including `POST /report/template/{id}/generate`) succeeds
+with the column omitted instead of returning a 400. Because this is the first feature to **re-serialize
 a `ReceiptPagedRequestFilter` back to a client**, the filter's json tags must be correct:
 `PagedRequestField.Value` carries `json:"value"` and the filter's `Tags` field `json:"tags"` (both
 lowercase, matching swagger) — a capitalized key would deserialize fine (Go is case-insensitive) but

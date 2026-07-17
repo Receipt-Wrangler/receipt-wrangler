@@ -64,6 +64,38 @@ func evalUnary(node *ast.UnaryNode, columns map[string]Value, divisionScale int3
 	return Num(operand)
 }
 
+// maxDecimalDigits bounds the coefficient of a computed arithmetic value. A
+// result whose coefficient carries more digits than this is treated as
+// undefined (null) rather than materialized. Money never needs anywhere near
+// this many significant digits; the bound exists so a chain of arithmetic
+// columns that fold into one another — c1 = c0 * c0, c2 = c1 * c1, … — cannot
+// grow a single decimal's big.Int coefficient without limit and exhaust memory.
+// Because each column reads the previous column's already-bounded value, capping
+// each result transitively bounds every later operand too.
+const maxDecimalDigits = 1000
+
+// maxDecimalExponent bounds a computed value's scale. shopspring stores the
+// exponent as an int32, so a chain that keeps multiplying a large-exponent
+// literal (1e308 * 1e308 * …) would eventually overflow it and wrap to a
+// silently wrong number. Real money exponents sit within a few dozen places, so
+// this leaves vast headroom while keeping the exponent far from the int32 edge.
+const maxDecimalExponent = 10_000
+
+// boundedNum wraps an arithmetic result, collapsing it to null when it has grown
+// too large to be meaningful money — too many coefficient digits (a
+// memory-exhaustion guard) or an out-of-range exponent (an int32-overflow
+// guard). It keeps the engine's contract that an undefined result is a blank
+// cell, never a wrong one.
+func boundedNum(d decimal.Decimal) Value {
+	if d.NumDigits() > maxDecimalDigits {
+		return Null()
+	}
+	if exponent := d.Exponent(); exponent > maxDecimalExponent || exponent < -maxDecimalExponent {
+		return Null()
+	}
+	return Num(d)
+}
+
 func evalBinary(operator string, left, right Value, divisionScale int32) Value {
 	leftNumber, leftIsNumber := left.Decimal()
 	rightNumber, rightIsNumber := right.Decimal()
@@ -73,16 +105,16 @@ func evalBinary(operator string, left, right Value, divisionScale int32) Value {
 
 	switch operator {
 	case "+":
-		return Num(leftNumber.Add(rightNumber))
+		return boundedNum(leftNumber.Add(rightNumber))
 	case "-":
-		return Num(leftNumber.Sub(rightNumber))
+		return boundedNum(leftNumber.Sub(rightNumber))
 	case "*":
-		return Num(leftNumber.Mul(rightNumber))
+		return boundedNum(leftNumber.Mul(rightNumber))
 	case "/":
 		if rightNumber.IsZero() {
 			return Null()
 		}
-		return Num(leftNumber.DivRound(rightNumber, divisionScale))
+		return boundedNum(leftNumber.DivRound(rightNumber, divisionScale))
 	}
 
 	return Null()
@@ -106,5 +138,5 @@ func evalRound(call *ast.CallNode, columns map[string]Value, divisionScale int32
 		return Null()
 	}
 
-	return Num(operand.Round(places))
+	return boundedNum(operand.Round(places))
 }
