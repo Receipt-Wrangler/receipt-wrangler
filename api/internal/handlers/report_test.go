@@ -195,6 +195,7 @@ func TestGenerateReport_BodyReadErrorIsServerError(t *testing.T) {
 func TestPreviewReport_ReturnsHtmlWhenAuthorized(t *testing.T) {
 	defer tearDownReportTest()
 	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
 	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	seedReportReceipt(1, 1)
 
@@ -231,6 +232,7 @@ func TestPreviewReport_ForbidsWhenMemberLacksPermission(t *testing.T) {
 func TestPreviewReport_MapsInvalidSpecToBadRequest(t *testing.T) {
 	defer tearDownReportTest()
 	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
 	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	seedReportReceipt(1, 1)
 
@@ -240,6 +242,36 @@ func TestPreviewReport_MapsInvalidSpecToBadRequest(t *testing.T) {
 	PreviewReport(w, r)
 
 	assertStatus(t, w, http.StatusBadRequest)
+}
+
+// A caller who passes the per-group gate (group.reports.read) but holds no app-level
+// report permission is denied preview — the builder's live feedback loop mirrors the
+// desktop route guard "if you can open the builder, you can preview".
+func TestPreviewReport_ForbidsWithoutAppReportsPermission(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seedReportReceipt(1, 1)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	PreviewReport(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+// The app-level readAll bypass satisfies the preview app-permission gate just like
+// app.reports.read does.
+func TestPreviewReport_AllowedByReadAll(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsReadAll)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seedReportReceipt(1, 1)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	PreviewReport(w, r)
+
+	assertStatus(t, w, http.StatusOK)
 }
 
 func TestPreviewReport_MalformedBodyIsBadRequest(t *testing.T) {

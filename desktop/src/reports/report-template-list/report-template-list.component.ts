@@ -20,7 +20,7 @@ import { SnackbarService } from "../../services";
 import { BaseTableService } from "../../services/base-table.service";
 import { BaseTableComponent } from "../../shared-ui/base-table/base-table.component";
 import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
-import { GroupState } from "../../store";
+import { AuthState, GroupState } from "../../store";
 import {
   columnCount,
   detailSummary,
@@ -63,6 +63,17 @@ export class ReportTemplateListComponent extends BaseTableComponent<ReportTempla
   private readonly actionsCell = viewChild.required<TemplateRef<any>>("actionsCell");
 
   protected readonly Permission = Permission;
+
+  // "New Report" creates a template, so it gates on create — honoring both the base and
+  // the "*All" variant (the permission matcher treats "…create"/"…createAll" as unrelated
+  // keys, so the base alone would hide it from an "*All"-only holder). Resolved through the
+  // AuthState selector, exactly like the sidebar's report gate.
+  protected readonly canCreate = this.store.selectSignal(
+    AuthState.hasAnyAppPermission([
+      Permission.AppReportsCreate,
+      Permission.AppReportsCreateAll,
+    ])
+  );
 
   // Guards the empty-state against a first-paint flash: it renders only once a load
   // has completed and returned nothing.

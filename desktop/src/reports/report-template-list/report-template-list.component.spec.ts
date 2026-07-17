@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal } from "@angular/core";
+import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal, WritableSignal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialog } from "@angular/material/dialog";
 import { Router } from "@angular/router";
@@ -13,6 +13,7 @@ import {
   ReportTemplate,
 } from "../../open-api";
 import { SnackbarService } from "../../services";
+import { GroupState } from "../../store";
 import { ReportRunnerService } from "../services/report-runner.service";
 import { ReportTemplateListComponent } from "./report-template-list.component";
 
@@ -52,12 +53,16 @@ describe("ReportTemplateListComponent", () => {
   let snackbar: { success: jest.Mock; error: jest.Mock };
   let dialogResult: boolean;
   let dialogInstance: { headerText: string; dialogContent: string };
+  // Drives the component's canCreate gate (the "New Report" button). The store mock
+  // routes the AuthState.hasAnyAppPermission selectSignal to this controllable signal.
+  let canCreate: WritableSignal<boolean>;
 
   const templates = [makeTemplate(1, "Alpha"), makeTemplate(2, "Beta")];
 
   beforeEach(async () => {
     dialogResult = true;
     dialogInstance = { headerText: "", dialogContent: "" };
+    canCreate = signal(true);
     runner = {
       listTemplates: jest.fn(() => of({ data: templates, totalCount: templates.length })),
       duplicateTemplate: jest.fn(() => of(makeTemplate(3, "Alpha duplicate"))),
@@ -69,7 +74,12 @@ describe("ReportTemplateListComponent", () => {
     snackbar = { success: jest.fn(), error: jest.fn() };
 
     const store = {
-      selectSignal: jest.fn(() => signal([])), // GroupState.groupsWithoutAll
+      // The component makes two selectSignal calls: GroupState.groupsWithoutAll (the
+      // group list) and AuthState.hasAnyAppPermission([...]) (the create gate). Route
+      // the group one to an empty list and everything else to the canCreate signal.
+      selectSignal: jest.fn((selector: unknown) =>
+        selector === GroupState.groupsWithoutAll ? signal([]) : canCreate,
+      ),
       selectSnapshot: jest.fn(() => ({ page: 1, pageSize: 50, orderBy: "updated_at", sortDirection: "desc" })),
       select: jest.fn(() => of(1)),
       dispatch: jest.fn(),
@@ -111,6 +121,22 @@ describe("ReportTemplateListComponent", () => {
   it("New Report navigates to the builder", () => {
     component.newReport();
     expect(router.navigate).toHaveBeenCalledWith(["/reports/new"]);
+  });
+
+  it("shows the New Report button for a create (or createAll) holder", async () => {
+    canCreate.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="report-template-new"]')).not.toBeNull();
+  });
+
+  it("hides the New Report button for a read-only user (no create)", async () => {
+    canCreate.set(false);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="report-template-new"]')).toBeNull();
   });
 
   it("generate runs the template by id and clears the in-flight id", () => {

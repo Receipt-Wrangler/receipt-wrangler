@@ -5,27 +5,21 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder, FormGroup } from "@angular/forms";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
-import { NgxsModule, Store } from "@ngxs/store";
 import { ButtonModule } from "../../button/button.module";
-import { DirectivesModule } from "../../directives/directives.module";
-import { Permission } from "../../open-api";
-import { AuthState } from "../../store";
-import { SetPermissions } from "../../store/auth.state.actions";
 import { ReportGenerateBarComponent } from "./report-generate-bar.component";
 
 describe("ReportGenerateBarComponent", () => {
   let fixture: ComponentFixture<ReportGenerateBarComponent>;
   let component: ReportGenerateBarComponent;
   let form: FormGroup;
-  let store: Store;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [ReportGenerateBarComponent],
-      // The real ButtonModule renders the Generate app-button as a real <button>
-      // whose disabled state can be asserted; DirectivesModule + AuthState make the
-      // permission-gated Save/Generate buttons resolve for a permitted caller.
-      imports: [ButtonModule, DirectivesModule, NgxsModule.forRoot([AuthState]), NoopAnimationsModule],
+      // The real ButtonModule renders the Save/Generate app-buttons as real <button>s
+      // whose rendered/disabled state the DOM assertions below can inspect. The bar no
+      // longer gates on permissions itself — the parent passes resolved booleans.
+      imports: [ButtonModule, NoopAnimationsModule],
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([]),
@@ -34,11 +28,6 @@ describe("ReportGenerateBarComponent", () => {
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
-
-    store = TestBed.inject(Store);
-    // Grant the report permissions so the *hasAppPermission-gated Save/Generate
-    // buttons render (the DOM assertions below target the Generate button).
-    store.dispatch(new SetPermissions([Permission.AppReportsCreate, Permission.AppReportsGenerate], {}));
 
     const formBuilder = new FormBuilder();
     form = formBuilder.group({
@@ -50,6 +39,10 @@ describe("ReportGenerateBarComponent", () => {
     fixture.componentRef.setInput("form", form);
     fixture.componentRef.setInput("generating", false);
     fixture.componentRef.setInput("canGenerate", true);
+    // The parent resolves the permission gates into these booleans (honoring the base +
+    // "*All" variants); grant both so the Save/Generate buttons render for the DOM tests.
+    fixture.componentRef.setInput("saveTemplateAllowed", true);
+    fixture.componentRef.setInput("generateAllowed", true);
     await fixture.whenStable();
   });
 
@@ -100,19 +93,28 @@ describe("ReportGenerateBarComponent", () => {
     expect(component.saveTemplateText()).toBe("Updating…");
   });
 
-  it("gates the Save action on the mode's permission", async () => {
+  it("gates the Save and Generate actions on the resolved permission booleans", async () => {
     const el = fixture.nativeElement as HTMLElement;
     const saveButton = () => el.querySelector('[data-testid="report-save-template"]');
+    const generateButton = () => el.querySelector('[data-testid="report-generate"]');
 
-    // New mode gates on create (granted in beforeEach) → the Save action renders.
-    fixture.componentRef.setInput("saveTemplatePermission", Permission.AppReportsCreate);
-    await fixture.whenStable();
+    // Both allowed (granted in beforeEach) → both actions render. The parent resolves
+    // these booleans honoring the base + "*All" permission variants.
     expect(saveButton()).not.toBeNull();
+    expect(generateButton()).not.toBeNull();
 
-    // Edit mode gates on update, which this caller lacks → the Save action is hidden.
-    fixture.componentRef.setInput("saveTemplatePermission", Permission.AppReportsUpdate);
+    // A read-only holder gets neither boolean → both actions are hidden.
+    fixture.componentRef.setInput("saveTemplateAllowed", false);
+    fixture.componentRef.setInput("generateAllowed", false);
     await fixture.whenStable();
     expect(saveButton()).toBeNull();
+    expect(generateButton()).toBeNull();
+
+    // Each gate is independent: Generate can be allowed while Save is not.
+    fixture.componentRef.setInput("generateAllowed", true);
+    await fixture.whenStable();
+    expect(saveButton()).toBeNull();
+    expect(generateButton()).not.toBeNull();
   });
 
   it("renders the format chips and the Generate button's disabled state", async () => {

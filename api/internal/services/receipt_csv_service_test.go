@@ -1,6 +1,8 @@
 package services
 
 import (
+	"bytes"
+	"encoding/csv"
 	"github.com/shopspring/decimal"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
@@ -47,6 +49,61 @@ func TestShouldBuildReceiptCsv(t *testing.T) {
 	bytes := result.ReceiptCsvBytes
 	if string(bytes) != expected {
 		utils.PrintTestError(t, string(bytes), expected)
+	}
+}
+
+// A receipt whose user-controlled text columns (name, paid-by display name,
+// category/tag names) begin with a spreadsheet formula lead are neutralized with a
+// leading apostrophe in the export, so opening it in Excel/Sheets renders them as
+// literal text rather than executing them.
+func TestBuildReceiptCsvNeutralizesFormulaInjection(t *testing.T) {
+	date := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	service := NewReceiptCsvService()
+	receipts := []models.Receipt{
+		{
+			BaseModel:  models.BaseModel{ID: 1, CreatedAt: date},
+			Date:       date,
+			Name:       `=HYPERLINK("http://evil")`,
+			PaidByUser: models.User{DisplayName: "+cmd"},
+			Amount:     decimal.NewFromFloat(1),
+			Status:     models.OPEN,
+			Categories: []models.Category{{Name: "=SUM(A1)"}},
+			Tags:       []models.Tag{{Name: "@danger"}},
+		},
+	}
+
+	result, err := service.BuildReceiptCsv(receipts)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	records, err := csv.NewReader(bytes.NewReader(result.ReceiptCsvBytes)).ReadAll()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if len(records) != 2 {
+		utils.PrintTestError(t, len(records), 2)
+		return
+	}
+
+	// Data row columns: Id, Added At, Receipt Date, Name, Paid By, Amount, Status,
+	// Categories, Tags, Resolved Date.
+	row := records[1]
+	assertions := []struct {
+		column int
+		want   string
+	}{
+		{3, `'=HYPERLINK("http://evil")`}, // Name
+		{4, "'+cmd"},                      // Paid By
+		{7, "'=SUM(A1)"},                  // Categories
+		{8, "'@danger"},                   // Tags
+	}
+	for _, assertion := range assertions {
+		if row[assertion.column] != assertion.want {
+			utils.PrintTestError(t, row[assertion.column], assertion.want)
+		}
 	}
 }
 
