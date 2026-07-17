@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormBuilder, FormControl } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 import { UntilDestroy } from "@ngneat/until-destroy";
+import { NgxsModule, Store } from "@ngxs/store";
 import { of, Subject, throwError } from "rxjs";
 import { SnackbarService } from "../../services";
 import {
@@ -15,6 +16,8 @@ import {
   ReportRequestCommand,
   ReportTemplate,
 } from "../../open-api";
+import { AuthState } from "../../store";
+import { SetPermissions } from "../../store/auth.state.actions";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
 import { buildColumnGroup, readStringArray } from "../models/report-form.factory";
@@ -38,6 +41,7 @@ describe("ReportBuilderComponent", () => {
     updateTemplate: jest.Mock;
   };
   let snackbar: { success: jest.Mock };
+  let store: Store;
   // Mutable route stub: the builder reads snapshot.data.template in its field
   // initializer, so a test sets this before creating its own component instance.
   const activatedRoute = { snapshot: { data: {} as Record<string, unknown> } };
@@ -54,6 +58,9 @@ describe("ReportBuilderComponent", () => {
 
     await TestBed.configureTestingModule({
       declarations: [ReportBuilderComponent, NoopComponent],
+      // AuthState feeds the Save/Generate permission gates (saveTemplateAllowed /
+      // generateAllowed), which resolve through the hasAnyAppPermission selector.
+      imports: [NgxsModule.forRoot([AuthState])],
       providers: [
         provideZonelessChangeDetection(),
         FormBuilder,
@@ -64,6 +71,8 @@ describe("ReportBuilderComponent", () => {
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
+
+    store = TestBed.inject(Store);
 
     fixture = TestBed.createComponent(ReportBuilderComponent);
     component = fixture.componentInstance;
@@ -138,10 +147,9 @@ describe("ReportBuilderComponent", () => {
   });
 
   it("saves a new template and shows a success snackbar on the new route", async () => {
-    // The blank builder creates (save-as-new is retired): the Save action gates on
-    // create, calls saveTemplate (not updateTemplate), and toasts "Template saved".
+    // The blank builder creates (save-as-new is retired): the Save action calls
+    // saveTemplate (not updateTemplate), and toasts "Template saved".
     expect(component.isEditMode).toBe(false);
-    expect(component.saveButtonPermission).toBe(Permission.AppReportsCreate);
 
     (component.form.get("scope") as FormArray).push(new FormControl("1"));
     await fixture.whenStable();
@@ -177,9 +185,8 @@ describe("ReportBuilderComponent", () => {
     activatedRoute.snapshot.data = { template };
 
     const local = TestBed.createComponent(ReportBuilderComponent).componentInstance;
-    // Edit mode gates Save on update, not create.
+    // Edit mode saves the opened template in place, not create.
     expect(local.isEditMode).toBe(true);
-    expect(local.saveButtonPermission).toBe(Permission.AppReportsUpdate);
     expect(local.canSaveTemplate()).toBe(true);
 
     local.saveTemplate();
@@ -188,6 +195,110 @@ describe("ReportBuilderComponent", () => {
     expect(runner.updateTemplate).toHaveBeenCalledWith(7, expect.objectContaining({ name: "Saved Report" }));
     expect(runner.saveTemplate).not.toHaveBeenCalled();
     expect(snackbar.success).toHaveBeenCalledWith("Template updated");
+  });
+
+  describe("Save/Generate permission gates honor the -All variants", () => {
+    // The matcher treats "…create" and "…createAll" as unrelated keys, so gating on the
+    // base key alone would hide the control from a role holding only the "*All" variant.
+    it("shows Save (create) and Generate with only the base permissions", async () => {
+      store.dispatch(new SetPermissions([Permission.AppReportsCreate, Permission.AppReportsGenerate], {}));
+      await fixture.whenStable();
+      expect(component.isEditMode).toBe(false);
+      expect(component.saveTemplateAllowed()).toBe(true);
+      expect(component.generateAllowed()).toBe(true);
+    });
+
+    it("shows Save (create) and Generate with only the -All permissions", async () => {
+      store.dispatch(new SetPermissions([Permission.AppReportsCreateAll, Permission.AppReportsGenerateAll], {}));
+      await fixture.whenStable();
+      expect(component.saveTemplateAllowed()).toBe(true);
+      expect(component.generateAllowed()).toBe(true);
+    });
+
+    it("hides Save and Generate for a read-only holder (neither variant)", async () => {
+      store.dispatch(new SetPermissions([Permission.AppReportsRead], {}));
+      await fixture.whenStable();
+      expect(component.saveTemplateAllowed()).toBe(false);
+      expect(component.generateAllowed()).toBe(false);
+    });
+
+    it("gates Save on update (base or -All) in edit mode", async () => {
+      const configuration: ReportRequestCommand = {
+        name: "Saved Report",
+        groupIds: ["1"],
+        period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+        filter: {},
+        groupBy: [],
+        detail: { mode: ReportDetail.ModeEnum.Records },
+        columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+        subtotals: false,
+        grandTotals: false,
+        formats: [ReportRequestCommand.FormatsEnum.Csv],
+      };
+      activatedRoute.snapshot.data = {
+        template: { id: 7, name: "Saved Report", createdAt: "2026-01-01T00:00:00Z", configuration, configurationVersion: 1 },
+      };
+      // Only the "*All" update variant — not create, not the base update key.
+      store.dispatch(new SetPermissions([Permission.AppReportsUpdateAll], {}));
+
+      const local = TestBed.createComponent(ReportBuilderComponent).componentInstance;
+      await fixture.whenStable();
+
+      expect(local.isEditMode).toBe(true);
+      expect(local.saveTemplateAllowed()).toBe(true);
+    });
+
+    it("gates Save on the base update permission in edit mode", async () => {
+      const configuration: ReportRequestCommand = {
+        name: "Saved Report",
+        groupIds: ["1"],
+        period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+        filter: {},
+        groupBy: [],
+        detail: { mode: ReportDetail.ModeEnum.Records },
+        columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+        subtotals: false,
+        grandTotals: false,
+        formats: [ReportRequestCommand.FormatsEnum.Csv],
+      };
+      activatedRoute.snapshot.data = {
+        template: { id: 7, name: "Saved Report", createdAt: "2026-01-01T00:00:00Z", configuration, configurationVersion: 1 },
+      };
+      // Only the base update key — not create, not the "*All" variant.
+      store.dispatch(new SetPermissions([Permission.AppReportsUpdate], {}));
+
+      const local = TestBed.createComponent(ReportBuilderComponent).componentInstance;
+      await fixture.whenStable();
+
+      expect(local.isEditMode).toBe(true);
+      expect(local.saveTemplateAllowed()).toBe(true);
+    });
+
+    it("does not let create authorize Save in edit mode", async () => {
+      const configuration: ReportRequestCommand = {
+        name: "Saved Report",
+        groupIds: ["1"],
+        period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+        filter: {},
+        groupBy: [],
+        detail: { mode: ReportDetail.ModeEnum.Records },
+        columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+        subtotals: false,
+        grandTotals: false,
+        formats: [ReportRequestCommand.FormatsEnum.Csv],
+      };
+      activatedRoute.snapshot.data = {
+        template: { id: 7, name: "Saved Report", createdAt: "2026-01-01T00:00:00Z", configuration, configurationVersion: 1 },
+      };
+      // Create only — editing an existing template needs update, so Save stays hidden.
+      store.dispatch(new SetPermissions([Permission.AppReportsCreate], {}));
+
+      const local = TestBed.createComponent(ReportBuilderComponent).componentInstance;
+      await fixture.whenStable();
+
+      expect(local.isEditMode).toBe(true);
+      expect(local.saveTemplateAllowed()).toBe(false);
+    });
   });
 
   it("cannot save a template without a name", async () => {

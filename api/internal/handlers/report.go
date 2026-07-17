@@ -136,6 +136,12 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 // JSON { html, receiptCount } body instead of a downloadable file — the preview is
 // the engine's own rendered HTML (row-capped), so the builder never re-implements
 // the engine.
+//
+// Preview additionally requires the app-level app.reports.read OR app.reports.readAll
+// (matching the desktop ReportsModule route guard: if you can open the builder, you can
+// preview). That any-of requirement is declared via the AnyAppPermissions gate (resolved
+// by HandleRequest), no longer enforced in-body, alongside the per-group group.reports.read
+// gate above.
 func PreviewReport(w http.ResponseWriter, r *http.Request) {
 	command, ok := loadReportCommand(w, r)
 	if !ok {
@@ -143,14 +149,16 @@ func PreviewReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	handler := structs.Handler{
-		ErrorMessage:     "Error generating report preview",
-		Writer:           w,
-		Request:          r,
-		ResponseType:     constants.ApplicationJson,
-		GroupIds:         command.GroupIds,
-		GroupPermissions: []string{permissions.GroupReportsRead},
+		ErrorMessage:      "Error generating report preview",
+		Writer:            w,
+		Request:           r,
+		ResponseType:      constants.ApplicationJson,
+		AnyAppPermissions: []string{permissions.AppReportsRead, permissions.AppReportsReadAll},
+		GroupIds:          command.GroupIds,
+		GroupPermissions:  []string{permissions.GroupReportsRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			token := structs.GetClaims(r)
+
 			reportService := services.NewReportService(nil)
 
 			preview, err := reportService.Preview(token.UserId, command)

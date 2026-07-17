@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"receipt-wrangler/api/internal/reporting"
@@ -86,9 +87,9 @@ func header(model reporting.ReportModel, groupBy []Dimension) []string {
 // label, so a column is never blank-headed.
 func dimensionHeading(dimension Dimension) string {
 	if len(dimension.Label) > 0 {
-		return dimension.Label
+		return SanitizeCSVField(dimension.Label)
 	}
-	return string(dimension.Key)
+	return SanitizeCSVField(string(dimension.Key))
 }
 
 // validateGroupByDepth rejects a groupBy that does not match how deep the report
@@ -169,18 +170,18 @@ func buildRecord(model reporting.ReportModel, groupBy []Dimension, rowType strin
 
 func columnHeading(column reporting.ColumnDescriptor) string {
 	if len(column.Label) > 0 {
-		return column.Label
+		return SanitizeCSVField(column.Label)
 	}
-	return column.Name
+	return SanitizeCSVField(column.Name)
 }
 
 // formatDimension renders a group bucket's value for a leading column. The
 // (None) bucket — a null value — gets the report's name for it.
 func formatDimension(value reporting.Value, noneLabel string) string {
 	if value.IsNull() {
-		return noneLabel
+		return SanitizeCSVField(noneLabel)
 	}
-	return value.String()
+	return SanitizeCSVField(value.String())
 }
 
 // formatCell renders one report cell the way this format presents it: money per
@@ -201,10 +202,10 @@ func formatCell(column reporting.ColumnDescriptor, cell reporting.Cell, noneLabe
 		parts := make([]string, 0, len(cell.Values))
 		for _, value := range cell.Values {
 			if value.IsNull() {
-				parts = append(parts, noneLabel)
+				parts = append(parts, SanitizeCSVField(noneLabel))
 				continue
 			}
-			parts = append(parts, value.String())
+			parts = append(parts, SanitizeCSVField(value.String()))
 		}
 		return strings.Join(parts, ", ")
 	}
@@ -216,7 +217,7 @@ func formatCell(column reporting.ColumnDescriptor, cell reporting.Cell, noneLabe
 
 	number, isNumber := value.Decimal()
 	if !isNumber {
-		return value.String()
+		return SanitizeCSVField(value.String())
 	}
 	if column.DataType == reporting.TypeCurrency {
 		if currency != nil {
@@ -225,4 +226,26 @@ func formatCell(column reporting.ColumnDescriptor, cell reporting.Cell, noneLabe
 		return number.StringFixed(2)
 	}
 	return number.String()
+}
+
+// SanitizeCSVField neutralizes spreadsheet formula/DDE injection: a text cell whose
+// first byte is a character Excel/Sheets may treat as a formula lead (= + - @) or a
+// control character (tab, CR) is prefixed with a single quote so the app renders it as
+// literal text. A value that parses as a number (e.g. a negative amount) is left intact
+// so the CSV stays machine-readable.
+//
+// It is exported so the receipt CSV export (services.ReceiptCsvService) can apply the
+// same guard to its user-controlled text columns without duplicating the logic.
+func SanitizeCSVField(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		if _, err := strconv.ParseFloat(strings.TrimSpace(s), 64); err == nil {
+			return s
+		}
+		return "'" + s
+	}
+	return s
 }

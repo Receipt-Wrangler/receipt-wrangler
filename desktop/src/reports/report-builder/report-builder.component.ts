@@ -10,10 +10,12 @@ import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 import { UntilDestroy } from "@ngneat/until-destroy";
+import { Store } from "@ngxs/store";
 import { EMPTY, catchError, debounceTime, finalize, startWith, switchMap, take, tap } from "rxjs";
 import { Permission, ReportPeriod, ReportRequestCommand, ReportTemplate } from "../../open-api";
 import { enabledReportColumns, ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
 import { SnackbarService } from "../../services";
+import { AuthState } from "../../store";
 import { buildReportForm, buildReportFormFromCommand } from "../models/report-form.factory";
 import { ReportCatalogService } from "../services/report-catalog.service";
 import { ReportRunnerService } from "../services/report-runner.service";
@@ -40,6 +42,7 @@ export class ReportBuilderComponent {
   private readonly snackbar = inject(SnackbarService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
+  private readonly store = inject(Store);
 
   // On the edit route a resolver supplies the saved template; on "new" it is absent.
   // Read it before the form initializer so the form can be built from its stored
@@ -54,11 +57,25 @@ export class ReportBuilderComponent {
   public readonly isEditMode: boolean = this.loadedTemplate != null;
 
   // Save creates a new template on the "new" route and updates in place on the edit
-  // route, so its permission gate follows the mode: create vs update. A user who can
-  // open a template (read) but not update it therefore sees no Save action.
-  public readonly saveButtonPermission: Permission = this.isEditMode
-    ? Permission.AppReportsUpdate
-    : Permission.AppReportsCreate;
+  // route, so its permission gate follows the mode: create vs update. Each mode honors
+  // both the base and the "*All" variant — the permission matcher treats "…create" and
+  // "…createAll" as unrelated keys, so gating on the base alone would hide Save from an
+  // "*All"-only holder. Resolved through the AuthState selector, exactly like the sidebar.
+  public readonly saveTemplateAllowed = this.store.selectSignal(
+    AuthState.hasAnyAppPermission(
+      this.isEditMode
+        ? [Permission.AppReportsUpdate, Permission.AppReportsUpdateAll]
+        : [Permission.AppReportsCreate, Permission.AppReportsCreateAll]
+    )
+  );
+
+  // Generate honors app.reports.generate and its "*All" variant for the same reason.
+  public readonly generateAllowed = this.store.selectSignal(
+    AuthState.hasAnyAppPermission([
+      Permission.AppReportsGenerate,
+      Permission.AppReportsGenerateAll,
+    ])
+  );
 
   public readonly form: FormGroup = this.loadedTemplate
     ? buildReportFormFromCommand(this.formBuilder, this, this.loadedTemplate.configuration)

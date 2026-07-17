@@ -861,6 +861,12 @@ not generate" is only a real boundary via this path); **`GET /report/template/op
 `app.roles.read`, the role editor's own gate) feeds the role-form access matrix. Create/update additionally
 require `CanReportOverGroups` on the attached groups (createAll/updateAll bypass).
 
+The per-template matrix is **UX scoping** (which saved templates a member sees/acts on) layered on the hard
+data-access controls — the group-access ceiling plus the category/tag/paid-by grants — which alone bound the
+receipt data any report can reach; so the ad-hoc `POST /report/generate` (no template id, so the matrix never
+applies) and a `duplicate`'s resulting copy (which starts matrix-unrestricted) are intentionally not bound by
+the per-template matrix and never widen data access beyond those hard controls, which every generation re-resolves.
+
 **`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
 (not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
 marker, so the receipt still counts toward the totals in its own bucket instead of vanishing. `(None)`

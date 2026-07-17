@@ -1,11 +1,12 @@
 import { CommonModule } from "@angular/common";
-import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal } from "@angular/core";
+import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal, WritableSignal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialog } from "@angular/material/dialog";
 import { Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { of, Subject, throwError } from "rxjs";
 import {
+  Permission,
   ReportColumn,
   ReportDetail,
   ReportPeriod,
@@ -13,6 +14,7 @@ import {
   ReportTemplate,
 } from "../../open-api";
 import { SnackbarService } from "../../services";
+import { AuthState, GroupState } from "../../store";
 import { ReportRunnerService } from "../services/report-runner.service";
 import { ReportTemplateListComponent } from "./report-template-list.component";
 
@@ -52,12 +54,16 @@ describe("ReportTemplateListComponent", () => {
   let snackbar: { success: jest.Mock; error: jest.Mock };
   let dialogResult: boolean;
   let dialogInstance: { headerText: string; dialogContent: string };
+  // Drives the component's canEnterBuilder gate (the "New Report" button). The store mock
+  // routes the AuthState.hasAnyAppPermission selectSignal to this controllable signal.
+  let canEnterBuilder: WritableSignal<boolean>;
 
   const templates = [makeTemplate(1, "Alpha"), makeTemplate(2, "Beta")];
 
   beforeEach(async () => {
     dialogResult = true;
     dialogInstance = { headerText: "", dialogContent: "" };
+    canEnterBuilder = signal(true);
     runner = {
       listTemplates: jest.fn(() => of({ data: templates, totalCount: templates.length })),
       duplicateTemplate: jest.fn(() => of(makeTemplate(3, "Alpha duplicate"))),
@@ -69,7 +75,13 @@ describe("ReportTemplateListComponent", () => {
     snackbar = { success: jest.fn(), error: jest.fn() };
 
     const store = {
-      selectSignal: jest.fn(() => signal([])), // GroupState.groupsWithoutAll
+      // The component makes two selectSignal calls: GroupState.groupsWithoutAll (the
+      // group list) and AuthState.hasAnyAppPermission([...]) (the builder-entry gate).
+      // Route the group one to an empty list and everything else to the canEnterBuilder
+      // signal.
+      selectSignal: jest.fn((selector: unknown) =>
+        selector === GroupState.groupsWithoutAll ? signal([]) : canEnterBuilder,
+      ),
       selectSnapshot: jest.fn(() => ({ page: 1, pageSize: 50, orderBy: "updated_at", sortDirection: "desc" })),
       select: jest.fn(() => of(1)),
       dispatch: jest.fn(),
@@ -95,10 +107,19 @@ describe("ReportTemplateListComponent", () => {
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
 
+    // Installed before createComponent because the builder-entry gate reads the selector
+    // at field init. Call through (default) so selectSignal still receives a real selector
+    // object, which the store mock maps to the controllable canEnterBuilder signal.
+    jest.spyOn(AuthState, "hasAnyAppPermission");
+
     fixture = TestBed.createComponent(ReportTemplateListComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
     await fixture.whenStable();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it("loads templates into the table on init", () => {
@@ -111,6 +132,52 @@ describe("ReportTemplateListComponent", () => {
   it("New Report navigates to the builder", () => {
     component.newReport();
     expect(router.navigate).toHaveBeenCalledWith(["/reports/new"]);
+  });
+
+  it("gates the builder entry on report access (read/readAll)", () => {
+    expect(AuthState.hasAnyAppPermission).toHaveBeenCalledWith([
+      Permission.AppReportsRead,
+      Permission.AppReportsReadAll,
+    ]);
+  });
+
+  it("shows the New Report button for a holder with report access (read/readAll)", async () => {
+    canEnterBuilder.set(true);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="report-template-new"]')).not.toBeNull();
+  });
+
+  it("hides the New Report button without report access (read/readAll)", async () => {
+    canEnterBuilder.set(false);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="report-template-new"]')).toBeNull();
+  });
+
+  it("shows the empty-state New Report button with report access (read/readAll)", async () => {
+    // No templates → the empty state renders; a fresh component picks up the empty list.
+    runner.listTemplates.mockReturnValue(of({ data: [], totalCount: 0 }));
+    canEnterBuilder.set(true);
+
+    const emptyFixture = TestBed.createComponent(ReportTemplateListComponent);
+    emptyFixture.detectChanges();
+    await emptyFixture.whenStable();
+
+    const el = emptyFixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="report-template-new-empty"]')).not.toBeNull();
+  });
+
+  it("hides the empty-state New Report button without report access (read/readAll)", async () => {
+    runner.listTemplates.mockReturnValue(of({ data: [], totalCount: 0 }));
+    canEnterBuilder.set(false);
+
+    const emptyFixture = TestBed.createComponent(ReportTemplateListComponent);
+    emptyFixture.detectChanges();
+    await emptyFixture.whenStable();
+
+    const el = emptyFixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="report-template-new-empty"]')).toBeNull();
   });
 
   it("generate runs the template by id and clears the in-flight id", () => {

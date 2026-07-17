@@ -7,12 +7,14 @@
       </p>
     </div>
     <div class="tools">
-      <app-button
-        icon="add"
-        buttonText="New Report"
-        data-testid="report-template-new"
-        (clicked)="newReport()"
-      ></app-button>
+      @if (canEnterBuilder()) {
+        <app-button
+          icon="add"
+          buttonText="New Report"
+          data-testid="report-template-new"
+          (clicked)="newReport()"
+        ></app-button>
+      }
     </div>
   </div>
 
@@ -33,12 +35,14 @@
       <span class="empty-icon"><mat-icon>summarize</mat-icon></span>
       <h2>No report templates yet</h2>
       <p>Build a report and save it as a template to reuse it later.</p>
-      <app-button
-        icon="add"
-        buttonText="New Report"
-        data-testid="report-template-new-empty"
-        (clicked)="newReport()"
-      ></app-button>
+      @if (canEnterBuilder()) {
+        <app-button
+          icon="add"
+          buttonText="New Report"
+          data-testid="report-template-new-empty"
+          (clicked)="newReport()"
+        ></app-button>
+      }
     </div>
   }
 </div>

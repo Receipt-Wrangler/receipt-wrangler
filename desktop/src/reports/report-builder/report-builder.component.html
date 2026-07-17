@@ -49,7 +49,8 @@
     [canSaveTemplate]="canSaveTemplate()"
     [saving]="saving()"
     [isEditMode]="isEditMode"
-    [saveTemplatePermission]="saveButtonPermission"
+    [saveTemplateAllowed]="saveTemplateAllowed()"
+    [generateAllowed]="generateAllowed()"
     (generate)="generate()"
     (saveTemplate)="saveTemplate()"
   ></app-report-generate-bar>
