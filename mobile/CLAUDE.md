@@ -204,11 +204,23 @@ permission model exactly.
   `PrivacyInfo.xcprivacy` (auto-processed under Flutter's dynamic framework linking). The app still has
   no app-level `PrivacyInfo.xcprivacy` — a pre-existing gap (`shared_preferences`/UserDefaults already
   qualifies), out of scope here.
+- **Serialization contract (`aggFunc` omitempty):** the mobile list unwraps each `PagedDataDataInner`
+  by **type** (`item.anyOf.values.values.whereType<ReportTemplate>()`, `report_list.dart`), so a
+  `ReportTemplate` that fails to deserialize silently collapses to a blank row (the `one_of`
+  `AnyOfSerializer` swallows per-type errors). The generated `ReportColumnAggFuncEnum` **throws on an
+  empty string**, so the Go `ReportColumn` fields (`aggFunc`/`label`/`field`/`measure`/`expr`) are
+  `json:",omitempty"` (`api/internal/commands/report_request_command.go`) — a dimension column must not
+  emit `"aggFunc":""`. **Keep this omitempty on the API side; any future generated-client regen must
+  keep the enum tolerant / the field omitted**, or every real report (dimension/formula columns) shows
+  invisible rows in the mobile list.
 - **Tests:** `test/widgets/report_list_item_test.dart` (the `allowedActions` row-gating contract),
   `test/widgets/top_app_bar_reports_menu_test.dart` (menu-entry gate), `test/reports/report_filename_test.dart`
   (filename derivation), and `reportsReadRedirect` cases in `test/guards/permission_guard_test.dart`.
-  Shared builders in `test/helpers/report_test_helpers.dart`. No `integration_test` spec yet (would need
-  API-seeded templates in `permission_fixtures.dart`).
+  Shared builders in `test/helpers/report_test_helpers.dart`. **E2E:** `integration_test/reports_list_test.dart`
+  drives the list view — seeds a template via the new `createReportTemplate` fixture and asserts the row
+  renders (the omitempty regression guard), the empty state, and the avatar-menu gate; the
+  `provisionUserWithAppPermissions` fixture (inverse of `provisionUserWithoutAppPermission`) grants
+  `app.reports.read`/`readAll`. Preview/generate/delete are out of the e2e scope.
 
 ## Development Notes
 
@@ -525,6 +537,7 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - `integration_test/permission_comments_test.dart` — comment **deny** paths on the edit-state comment screen: `group.comments.create` hidden → no input; `group.comments.delete` hidden → swipe-to-delete disabled. Members are provisioned from the **Legacy Editor** baseline (holds `group.receipts.update`, needed to reach edit state) minus the permission under test, via `provisionGroupMemberWithoutPermission(..., baselineRole: 'Legacy Editor')`.
 - `integration_test/permission_paid_by_visibility_test.dart` — group-role paid-by visibility: a member restricted to "their own receipts" (via `provisionPaidByOwnMember` → `createRole(..., includeOwnPaidReceipts: true)`) sees only their own receipt in the group list; the admin-paid receipt is filtered out server-side. Mirrors desktop `paid-by-visibility.spec.ts` (list axis).
 - `integration_test/permission_receipt_category_visibility_test.dart` — non-admin sees the per-group **category and tag** catalogs in the receipt-form pickers (sourced from `groupCategories` / `groupTags`, not the admin-only flat lists).
+- `integration_test/reports_list_test.dart` — the Reports **list** view: seeds a template via `createReportTemplate` and asserts the row renders (regression guard for the `aggFunc` omitempty deserialization fix), the "No reports found" empty state, and the avatar-menu gate (`app.reports.read`/`readAll` shown, Legacy User hidden). Uses `provisionUserWithAppPermissions` in `permission_fixtures.dart`.
 - `integration_test/helpers/env.dart` — dart-define consumption + guards.
 - `integration_test/helpers/pump.dart` — `pumpUntilFound` polling helper.
 - `integration_test/helpers/platform_mocks.dart` — Linux-desktop platform-channel stubs for `permission_handler`, `gal`, `flutter_secure_storage`.

@@ -309,6 +309,54 @@ Future<int> createReceipt({
   return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
 }
 
+/// Seeds a saved report template over [groupIds] (via `POST /report/template`) and
+/// returns its id. Uses the minimal valid config the Go command validator accepts
+/// (records mode + one `dimension` column on `name`, csv format) — deliberately a
+/// dimension column, which is the shape that exercises the mobile list's
+/// deserialization path. Seed as admin (Legacy Admin holds `app.reports.createAll`,
+/// so it can report over any group). Clean up with [deleteReportTemplate].
+Future<int> createReportTemplate({
+  required List<int> groupIds,
+  required String jwt,
+  required String name,
+}) async {
+  final res = await http
+      .post(
+        Uri.parse('${E2eEnv.baseUrl}/report/template'),
+        headers: _jsonAuth(jwt),
+        body: jsonEncode({
+          'name': name,
+          'groupIds': groupIds.map((g) => g.toString()).toList(),
+          'period': {'preset': 'this_month'},
+          'detail': {'mode': 'records'},
+          'columns': [
+            {'kind': 'dimension', 'name': 'Name', 'field': 'name'},
+          ],
+          'formats': ['csv'],
+        }),
+      )
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('createReportTemplate($name) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
+}
+
+/// Best-effort `DELETE /report/template/{id}`. Swallows errors like [deleteUser].
+Future<void> deleteReportTemplate(int id, {required String jwt}) async {
+  try {
+    await http
+        .delete(
+          Uri.parse('${E2eEnv.baseUrl}/report/template/$id'),
+          headers: _auth(jwt),
+        )
+        .timeout(const Duration(seconds: 10));
+  } catch (_) {
+    // best-effort cleanup
+  }
+}
+
 /// Creates a global category (categories are app-wide; group visibility is via
 /// group-role grants) and returns its id. A group role with no category grants
 /// is unrestricted, so a freshly-created category shows up in every member's
@@ -626,6 +674,35 @@ Future<PermFixture> provisionUserWithoutAppPermission(String permission) async {
   addTearDown(() async => deleteRole(roleId, scope: 'APP', jwt: await apiLogin()));
 
   return provisionPermUser(appRoleId: roleId);
+}
+
+/// Provisions a user whose APP role is "Legacy User" **plus** [extraAppPermissions]
+/// (the inverse of [provisionUserWithoutAppPermission]). Use for positive specs
+/// that need an app permission a Legacy User lacks — e.g. `app.reports.read` /
+/// `app.reports.readAll` to reveal the Reports menu and list. Pass [groupRoleName]
+/// (e.g. "Legacy Owner") to also place the user in a fixture group with that group
+/// role — needed when the scenario requires a group-scoped grant such as
+/// `group.reports.read`.
+///
+/// Same LIFO teardown ordering as [provisionUserWithoutAppPermission]: the
+/// role-delete is registered before [provisionPermUser] so it runs after the
+/// user/group (and thus the assignment) are gone.
+Future<PermFixture> provisionUserWithAppPermissions(
+  List<String> extraAppPermissions, {
+  String? groupRoleName,
+}) async {
+  final jwt = await apiLogin(); // admin
+  final base = await rolePermissionsByName('Legacy User', 'APP', jwt: jwt);
+  final perms = {...base, ...extraAppPermissions}.toList();
+  final roleId = await createRole(
+    name: 'e2e-app-${_unique()}',
+    scope: 'APP',
+    permissions: perms,
+    jwt: jwt,
+  );
+  addTearDown(() async => deleteRole(roleId, scope: 'APP', jwt: await apiLogin()));
+
+  return provisionPermUser(appRoleId: roleId, roleName: groupRoleName);
 }
 
 /// Provisions a user in a fixture group whose GROUP role is [baselineRole]

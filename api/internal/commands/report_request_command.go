@@ -106,13 +106,18 @@ type ReportDetail struct {
 // columns reference; Label is the heading. Field is set for dimensions; AggFunc
 // (+ Measure, except COUNT) for aggregates; Expr for formulas.
 type ReportColumn struct {
-	Kind    string `json:"kind"`
-	Name    string `json:"name"`
-	Label   string `json:"label"`
-	Field   string `json:"field"`
-	AggFunc string `json:"aggFunc"`
-	Measure string `json:"measure"`
-	Expr    string `json:"expr"`
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+	// The remaining fields are contextual by Kind (Label is optional, Field is set
+	// for dimensions, AggFunc/Measure for aggregates, Expr for formulas), so they
+	// are omitempty: a dimension column must not emit `"aggFunc":""`, which
+	// generated strict-enum clients (the mobile dart-dio client's
+	// ReportColumnAggFuncEnum) cannot deserialize.
+	Label   string `json:"label,omitempty"`
+	Field   string `json:"field,omitempty"`
+	AggFunc string `json:"aggFunc,omitempty"`
+	Measure string `json:"measure,omitempty"`
+	Expr    string `json:"expr,omitempty"`
 }
 
 // ReportDocument is the authored document copy. Any of the four {{variables}} the
