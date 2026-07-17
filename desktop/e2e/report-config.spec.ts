@@ -1,6 +1,6 @@
 import { expect, Page, test } from '@playwright/test';
 import { stubTokenRefresh } from './helpers/auth';
-import { addFirstGroupToScope, addGroupingLevel, gotoReports, openComboboxAndPick } from './helpers/reports';
+import { addFirstGroupToScope, addGroupingLevel, gotoReportBuilder, openComboboxAndPick } from './helpers/reports';
 
 // The Report Builder is gated by app.reports.read, carried only by Legacy Admin.
 test.use({ storageState: 'e2e/.auth/admin.json' });
@@ -19,7 +19,7 @@ async function downloadOnGenerate(page: Page) {
 test.describe('Report Builder — configuration', () => {
   test.beforeEach(async ({ page }) => {
     await stubTokenRefresh(page);
-    await gotoReports(page);
+    await gotoReportBuilder(page);
     await addFirstGroupToScope(page);
     // Settle the initial preview so per-test picks start from a stable panel.
     await expect(page.getByTestId('report-receipt-count')).toBeVisible({ timeout: 20_000 });

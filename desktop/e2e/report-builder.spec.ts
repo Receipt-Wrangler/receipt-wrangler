@@ -8,7 +8,7 @@ import {
   uniqueName,
   withAdminApi,
 } from './helpers/provisioning';
-import { addFirstGroupToScope, addGroupToScopeByName, gotoReports, openComboboxAndPick } from './helpers/reports';
+import { addFirstGroupToScope, addGroupToScopeByName, gotoReportBuilder, openComboboxAndPick } from './helpers/reports';
 
 // The Report Builder is gated by the app-level app.reports.read permission, which
 // the seeded Legacy Admin role carries (and Legacy User does not). Run the positive
@@ -21,7 +21,7 @@ test.describe('Report Builder', () => {
   });
 
   test('admin builds a report, sees a live preview, and downloads it', async ({ page }) => {
-    await gotoReports(page);
+    await gotoReportBuilder(page);
 
     // The reports route opts into the shell's full-height frame: the content area
     // becomes a bounded flex column and the outlet drops the default p-4 padding so
@@ -50,7 +50,7 @@ test.describe('Report Builder', () => {
   });
 
   test('disables an aggregate dimension column that is neither the aggregate-by nor a grouping level', async ({ page }) => {
-    await gotoReports(page);
+    await gotoReportBuilder(page);
 
     // Scope to a group (the disable behavior is independent of the data).
     await addFirstGroupToScope(page);
@@ -72,7 +72,7 @@ test.describe('Report Builder', () => {
   });
 
   test('adds a grouping level and a filter through the shared app-select pickers', async ({ page }) => {
-    await gotoReports(page);
+    await gotoReportBuilder(page);
     await addFirstGroupToScope(page);
 
     // Grouping: the "Add grouping level…" picker is an app-select (a combobox),
@@ -137,7 +137,7 @@ test.describe('Report Builder — receipt drill-in', () => {
   });
 
   test('drills into a receipt and opens the full receipt in a new tab', async ({ page }) => {
-    await gotoReports(page);
+    await gotoReportBuilder(page);
     await addGroupToScopeByName(page, groupName);
 
     // Cover the provisioned 2024-01-01 receipt with a generous custom range (a
