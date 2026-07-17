@@ -30,7 +30,15 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.disabled)
-      ..setBackgroundColor(Colors.white);
+      ..setBackgroundColor(Colors.white)
+      ..setNavigationDelegate(NavigationDelegate(
+        // Clear the spinner only once the page has actually finished painting,
+        // not when loadHtmlString returns (which resolves before the WebView has
+        // rendered) — otherwise the preview flashes blank while it lays out.
+        onPageFinished: (_) {
+          if (mounted) setState(() => _loading = false);
+        },
+      ));
     _load();
   }
 
@@ -45,12 +53,10 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
         });
         return;
       }
+      setState(() => _receiptCount = preview.receiptCount);
+      // _loading is cleared by the controller's onPageFinished callback once the
+      // HTML has rendered, so the spinner covers both the fetch and the paint.
       await _controller.loadHtmlString(preview.html);
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _receiptCount = preview.receiptCount;
-      });
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -84,12 +90,16 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
   }
 
   Widget _buildBody() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
     if (_error != null) {
       return Center(child: Text(_error!));
     }
-    return WebViewWidget(controller: _controller);
+    // The WebView stays mounted so it can load/paint while the spinner overlays
+    // it; the spinner is cleared by onPageFinished once the content is visible.
+    return Stack(
+      children: [
+        WebViewWidget(controller: _controller),
+        if (_loading) const Center(child: CircularProgressIndicator()),
+      ],
+    );
   }
 }
