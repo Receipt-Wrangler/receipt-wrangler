@@ -1008,3 +1008,59 @@ func TestRenderReportTemplate_RestrictedWhenTemplateAccessRevoked(t *testing.T) 
 		t.Errorf("restricted response must carry no allowedActions, got %v", preview.AllowedActions)
 	}
 }
+
+// A stored config that is valid JSON but an invalid spec (grouping by a measure) is
+// caught by the engine as a *ReportSpecError, which the handler maps to 400 — not the
+// 500 a generic failure would produce.
+func TestRenderReportTemplate_MapsInvalidSpecToBadRequest(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seedReportReceipt(1, 1)
+
+	// The create path stores the command verbatim (no engine validation), so an invalid
+	// spec only surfaces when the widget renders it.
+	command := commands.ReportRequestCommand{
+		Name:     "Invalid Spec",
+		GroupIds: []string{"1"},
+		Period:   commands.ReportPeriod{Preset: "this_month"},
+		GroupBy:  []string{"amount"}, // grouping by a measure is rejected by the engine
+		Detail:   commands.ReportDetail{Mode: "records"},
+		Columns:  []commands.ReportColumn{{Kind: "dimension", Name: "Name", Label: "Name", Field: "name"}},
+		Formats:  []string{"csv"},
+	}
+	template, err := repositories.NewReportTemplateRepository(nil).CreateReportTemplate(command, 1)
+	if err != nil {
+		t.Fatalf("seed invalid-spec template: %v", err)
+	}
+
+	w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(template.ID))
+	RenderReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
+}
+
+// A stored config that is not valid JSON fails to unmarshal — a generic (non-spec)
+// error the handler maps to 500. The caller can read the template, so the render
+// reaches the unmarshal.
+func TestRenderReportTemplate_MapsMalformedConfigToServerError(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+
+	db := repositories.GetDB()
+	template := models.ReportTemplate{Name: "Corrupt", Configuration: json.RawMessage("{ not json"), ConfigurationVersion: 1}
+	if err := db.Create(&template).Error; err != nil {
+		t.Fatalf("seed template: %v", err)
+	}
+	if err := db.Create(&models.ReportTemplateGroup{ReportTemplateID: template.ID, GroupID: 1}).Error; err != nil {
+		t.Fatalf("seed template group: %v", err)
+	}
+
+	w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(template.ID))
+	RenderReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusInternalServerError)
+}

@@ -25,6 +25,7 @@ describe("ReportWidgetComponent", () => {
     fixture = TestBed.createComponent(ReportWidgetComponent);
     component = fixture.componentInstance;
     fixture.componentRef.setInput("widget", w);
+    TestBed.flushEffects();
     await fixture.whenStable();
   }
 
@@ -110,6 +111,7 @@ describe("ReportWidgetComponent", () => {
 
     // Swap the pinned template while template 5's request is still pending.
     fixture.componentRef.setInput("widget", widget(7));
+    TestBed.flushEffects();
     await fixture.whenStable();
 
     // The new template resolved synchronously.
@@ -119,6 +121,7 @@ describe("ReportWidgetComponent", () => {
     // The stale template-5 request now emits — its subscription was cancelled on the
     // swap, so it must not overwrite the current report or its permissions.
     first.next({ html: "<p>five</p>", receiptCount: 9, allowedActions: [] });
+    TestBed.flushEffects();
     await fixture.whenStable();
 
     expect(component.html()).toBe("<p>seven</p>");
