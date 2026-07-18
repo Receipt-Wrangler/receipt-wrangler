@@ -777,6 +777,23 @@ declared on the handler as an `AnyAppPermissions` any-of and ANDed with the per-
 `group.reports.read` — so the builder's live feedback loop is reachable by exactly the users who can
 open the builder, and preview is never merely group-scoped.
 
+**`POST /api/report/template/{id}/render`** backs the **dashboard report widget** (a view-only widget
+that pins a saved template — see `desktop/CLAUDE.md` → "Reports"). It mirrors
+`GenerateReportFromTemplate` (loads the stored config server-side) but emits the same JSON
+`ReportPreviewResponse { html, receiptCount, allowedActions }` as `/preview`, with two deliberate
+differences from the builder preview: it renders the **full dataset** (`ReportService.RenderTemplateForUser`
+calls the shared `renderHTML` helper with `rowLimit = 0`, like `Generate` — **not** the capped
+`reportPreviewRowCap` sample the builder's `Preview` uses), and it **returns restricted-notice HTML at a
+normal 200** (with empty `allowedActions`) when the caller may not view the template or it was deleted,
+rather than a 403/404. That's because the widget always drops whatever HTML it gets into its sandboxed
+iframe, so there is no client-side "restricted" branch. Authorization is resolved **in the service** via
+`PermissionService.AllowedActionsForTemplate` (the single source: the base/`*All` app perms + the
+per-group ceiling + the per-template matrix); a result lacking `"read"` yields the restricted notice, and
+the returned `allowedActions` (which include `"generate"` iff the caller may generate) gate the widget's
+download button off the server result — the download itself reuses the enforcing
+`/report/template/{id}/generate`. The `restrictedReportHTML` notice and the extracted `renderHTML` helper
+(shared by `Preview` and `RenderTemplateForUser`) live in `services/report_service.go`.
+
 **Custom currency formatting.** `buildModel` loads System Settings (`SystemSettingsRepository.GetSystemSettings`,
 a get-or-create singleton) and passes the app's currency configuration — symbol, symbol position (START/END),
 thousands/decimal separators, and hide-decimal-places — through `MetaInput.Currency` (mapped by

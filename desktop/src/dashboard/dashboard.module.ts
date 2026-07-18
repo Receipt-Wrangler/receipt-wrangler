@@ -24,6 +24,7 @@ import { DashboardComponent } from "./dashboard/dashboard.component";
 import { FilteredReceiptsComponent } from "./filtered-receipts/filtered-receipts.component";
 import { GroupDashboardsComponent } from "./group-dashboards/group-dashboards.component";
 import { PieChartComponent } from "./pie-chart/pie-chart.component";
+import { ReportWidgetComponent } from "./report-widget/report-widget.component";
 import { WidgetTypePipe } from "./widget-type.pipe";
 
 @NgModule({
@@ -46,6 +47,7 @@ import { WidgetTypePipe } from "./widget-type.pipe";
     MatChipsModule,
     MatListModule,
     PieChartComponent,
+    ReportWidgetComponent,
     PipesModule,
     PipesModule,
     ReactiveFormsModule,

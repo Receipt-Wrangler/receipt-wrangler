@@ -1,12 +1,12 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
-import { Dashboard, DashboardService } from "../../open-api";
+import { Dashboard, DashboardService, ReportService, WidgetType } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services";
 import { EditableListComponent } from "../../shared-ui/editable-list/editable-list.component";
@@ -28,6 +28,7 @@ describe("DashboardFormComponent", () => {
         PipesModule,
         ReactiveFormsModule],
     providers: [
+        provideZonelessChangeDetection(),
         DashboardService,
         MatDialog,
         {
@@ -122,5 +123,56 @@ describe("DashboardFormComponent", () => {
       widgets: [],
     } as any);
     expect(snackbarSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers the Report widget type and loads viewable templates when the user can read reports", () => {
+    const listSpy = jest
+      .spyOn(TestBed.inject(ReportService), "getReportTemplates")
+      .mockReturnValue(
+        of({ data: [{ id: 3, name: "Monthly" }], totalCount: 1 } as any)
+      );
+    store.reset({
+      groups: { selectedGroupId: "1" },
+      auth: { appPermissions: ["app.reports.read"] },
+    });
+
+    component.ngOnInit();
+
+    expect(
+      component.availableWidgetTypeOptions().some((o) => o.value === WidgetType.Report)
+    ).toBe(true);
+    expect(listSpy).toHaveBeenCalledTimes(1);
+    expect(component.reportTemplateOptions()).toEqual([{ id: 3, name: "Monthly" }]);
+  });
+
+  it("hides the Report widget type and skips the template load without report-read", () => {
+    const listSpy = jest.spyOn(TestBed.inject(ReportService), "getReportTemplates");
+    store.reset({
+      groups: { selectedGroupId: "1" },
+      auth: { appPermissions: [] },
+    });
+
+    component.ngOnInit();
+
+    expect(
+      component.availableWidgetTypeOptions().some((o) => o.value === WidgetType.Report)
+    ).toBe(false);
+    expect(listSpy).not.toHaveBeenCalled();
+  });
+
+  it("builds a required reportTemplateId control for a Report widget", () => {
+    store.reset({
+      groups: { selectedGroupId: "1" },
+      auth: { appPermissions: ["app.reports.read"] },
+    });
+    component.ngOnInit();
+
+    component.addWidget();
+    const widget = component.widgets.at(0);
+    widget.get("widgetType")?.setValue(WidgetType.Report);
+
+    const configuration = widget.get("configuration");
+    expect(configuration?.get("reportTemplateId")).toBeTruthy();
+    expect(configuration?.get("reportTemplateId")?.valid).toBe(false); // required, still empty
   });
 });

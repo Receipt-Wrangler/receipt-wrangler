@@ -494,6 +494,42 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/template/{id}/render:
+    post:
+      tags:
+        - Report
+      summary: Render a saved template as HTML for the dashboard report widget
+      description:
+        Renders a saved report template by id as a self-contained HTML document
+        over the full dataset (unlike /report/preview, which caps the sample) for
+        the dashboard report widget, loading the stored configuration server-side.
+        Re-resolves the caller's access on every call; when the caller may not view
+        the template (or it was deleted) a restricted-notice HTML document is
+        returned at 200 with empty allowedActions, so the widget always has HTML to
+        render. allowedActions carries the actions the caller may perform (drives
+        the widget's download button).
+      operationId: renderReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to render
+      responses:
+        200:
+          description: The rendered report (or restricted notice) HTML
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportPreviewResponse"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /category/{categoryName}:
     parameters:
       - in: path
@@ -3542,6 +3578,7 @@ components:
         - "FILTERED_RECEIPTS"
         - "GROUP_ACTIVITY"
         - "PIE_CHART"
+        - "REPORT"
     ChartGrouping:
       type: string
       enum:
@@ -6103,6 +6140,15 @@ components:
         receiptCount:
           type: integer
           description: The number of receipts the current configuration covers.
+        allowedActions:
+          type: array
+          description: >-
+            The actions the requesting user may perform on the template
+            (read, generate, update, delete, duplicate), resolved per user and
+            populated only by the dashboard report-widget render endpoint. Drives
+            the widget's download button.
+          items:
+            type: string
     ReportTemplate:
       allOf:
         - $ref: "#/components/schemas/BaseModel"

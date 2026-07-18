@@ -537,6 +537,60 @@ func GenerateReportFromTemplate(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
+// RenderReportTemplate renders a saved template as full-dataset HTML for the
+// dashboard report widget. It mirrors GenerateReportFromTemplate — loading the
+// stored configuration server-side — but emits a JSON { html, receiptCount,
+// allowedActions } body (the report's own rendered HTML over the full dataset)
+// instead of a downloadable file. Unlike the other template handlers it does NOT
+// use authorizeTemplateAction (which writes 403/404): when the caller may not view
+// the template, or it was deleted, the service returns restricted-notice HTML at a
+// normal 200 — the widget always drops whatever HTML it gets into its iframe.
+// AllowedActions lets the widget gate its download button off the server result.
+//
+// The absent declarative permission gate (no AppPermissions/AnyAppPermissions) is
+// deliberate: authorization is enforced in the service — RenderTemplateForUser →
+// AllowedActionsForTemplate re-resolves the caller's access on every call and
+// gates the full-dataset render behind it, returning a data-free restricted notice
+// (never the report, never an existence oracle) to anyone lacking read. A hard
+// endpoint gate would refuse those callers with a 403 instead, breaking the widget's
+// always-200 "render something graceful" contract (an orphaned widget whose owner
+// was fully de-authorized would show an error box rather than the Restricted notice).
+// This mirrors the Search / GetReceipt handlers, which likewise enforce in the
+// service rather than via declarative Handler fields.
+func RenderReportTemplate(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage: "Error rendering report template",
+		Writer:       w,
+		Request:      r,
+		ResponseType: constants.ApplicationJson,
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			token := structs.GetClaims(r)
+			id := chi.URLParam(r, "id")
+
+			preview, err := services.NewReportService(nil).RenderTemplateForUser(token.UserId, id)
+			if err != nil {
+				var specErr *services.ReportSpecError
+				if errors.As(err, &specErr) {
+					utils.WriteCustomErrorResponse(w, "Invalid report configuration: "+specErr.Error(), http.StatusBadRequest)
+					return 0, nil
+				}
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(preview)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
 // GetReportTemplateOptions returns every report template as a lightweight
 // {id, name, groupIds} option for the role-form access matrix. It is gated on
 // app.roles.read (the admin role editor), NOT app.reports.read: the admin building a
