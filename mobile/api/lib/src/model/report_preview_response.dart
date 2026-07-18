@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:built_collection/built_collection.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -13,6 +14,7 @@ part 'report_preview_response.g.dart';
 /// Properties:
 /// * [html] - The rendered report preview as a self-contained HTML document.
 /// * [receiptCount] - The number of receipts the current configuration covers.
+/// * [allowedActions] - The actions the requesting user may perform on the template (read, generate, update, delete, duplicate), resolved per user and populated only by the dashboard report-widget render endpoint. Drives the widget's download button.
 @BuiltValue()
 abstract class ReportPreviewResponse implements Built<ReportPreviewResponse, ReportPreviewResponseBuilder> {
   /// The rendered report preview as a self-contained HTML document.
@@ -22,6 +24,10 @@ abstract class ReportPreviewResponse implements Built<ReportPreviewResponse, Rep
   /// The number of receipts the current configuration covers.
   @BuiltValueField(wireName: r'receiptCount')
   int get receiptCount;
+
+  /// The actions the requesting user may perform on the template (read, generate, update, delete, duplicate), resolved per user and populated only by the dashboard report-widget render endpoint. Drives the widget's download button.
+  @BuiltValueField(wireName: r'allowedActions')
+  BuiltList<String>? get allowedActions;
 
   ReportPreviewResponse._();
 
@@ -56,6 +62,13 @@ class _$ReportPreviewResponseSerializer implements PrimitiveSerializer<ReportPre
       object.receiptCount,
       specifiedType: const FullType(int),
     );
+    if (object.allowedActions != null) {
+      yield r'allowedActions';
+      yield serializers.serialize(
+        object.allowedActions,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
+      );
+    }
   }
 
   @override
@@ -92,6 +105,13 @@ class _$ReportPreviewResponseSerializer implements PrimitiveSerializer<ReportPre
             specifiedType: const FullType(int),
           ) as int;
           result.receiptCount = valueDes;
+          break;
+        case r'allowedActions':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(String)]),
+          ) as BuiltList<String>;
+          result.allowedActions.replace(valueDes);
           break;
         default:
           unhandled.add(key);

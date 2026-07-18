@@ -143,6 +143,7 @@ Class | Method | HTTP request | Description
 [*ReportApi*](doc/ReportApi.md) | [**getReportTemplateOptions**](doc/ReportApi.md#getreporttemplateoptions) | **GET** /report/template/options | Get report template options
 [*ReportApi*](doc/ReportApi.md) | [**getReportTemplates**](doc/ReportApi.md#getreporttemplates) | **POST** /report/template/list | Get paged report templates
 [*ReportApi*](doc/ReportApi.md) | [**previewReport**](doc/ReportApi.md#previewreport) | **POST** /report/preview | Preview a report
+[*ReportApi*](doc/ReportApi.md) | [**renderReportTemplate**](doc/ReportApi.md#renderreporttemplate) | **POST** /report/template/{id}/render | Render a saved template as HTML for the dashboard report widget
 [*ReportApi*](doc/ReportApi.md) | [**updateReportTemplate**](doc/ReportApi.md#updatereporttemplate) | **PUT** /report/template/{id} | Update a report template
 [*RoleApi*](doc/RoleApi.md) | [**createRole**](doc/RoleApi.md#createrole) | **POST** /role | Create role
 [*RoleApi*](doc/RoleApi.md) | [**deleteRole**](doc/RoleApi.md#deleterole) | **DELETE** /role/{roleId} | Delete role
