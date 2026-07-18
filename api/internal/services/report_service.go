@@ -1,6 +1,8 @@
 package services
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -44,10 +46,14 @@ type GeneratedReport struct {
 
 // ReportPreview is the rendered HTML for the live builder preview plus the true
 // number of receipts the current configuration covers (reported even when the
-// rendered sample is capped).
+// rendered sample is capped). AllowedActions is populated only by the dashboard
+// report-widget render path (RenderTemplateForUser) — it carries the actions the
+// caller may perform on the template so the widget can gate its download button;
+// the builder's own Preview leaves it nil (omitted).
 type ReportPreview struct {
-	Html         string `json:"html"`
-	ReceiptCount int    `json:"receiptCount"`
+	Html           string   `json:"html"`
+	ReceiptCount   int      `json:"receiptCount"`
+	AllowedActions []string `json:"allowedActions,omitempty"`
 }
 
 // reportPreviewRowCap bounds how many receipt rows a preview feeds to the engine.
@@ -100,7 +106,15 @@ func (service ReportService) Generate(userId uint, command commands.ReportReques
 // (reportPreviewRowCap). The same per-group authorization as Generate is the
 // caller's responsibility.
 func (service ReportService) Preview(userId uint, command commands.ReportRequestCommand) (ReportPreview, error) {
-	build, err := service.buildModel(userId, command, time.Now(), reportPreviewRowCap)
+	return service.renderHTML(userId, command, reportPreviewRowCap)
+}
+
+// renderHTML runs the shared engine pipeline and renders the report as HTML. It
+// backs both the row-capped builder preview (rowLimit = reportPreviewRowCap) and
+// the dashboard report widget, which renders the full dataset (rowLimit = 0, like
+// Generate). ReceiptCount is always the true pre-cap total.
+func (service ReportService) renderHTML(userId uint, command commands.ReportRequestCommand, rowLimit int) (ReportPreview, error) {
+	build, err := service.buildModel(userId, command, time.Now(), rowLimit)
 	if err != nil {
 		return ReportPreview{}, err
 	}
@@ -111,6 +125,77 @@ func (service ReportService) Preview(userId uint, command commands.ReportRequest
 	}
 
 	return ReportPreview{Html: string(html), ReceiptCount: build.receiptCount}, nil
+}
+
+// restrictedReportHTML is the self-contained document the report widget renders in
+// place of a report when the caller may not view the pinned template (access
+// revoked, or the template was deleted). It inlines all styling and references no
+// external resources or scripts, so it renders inside the widget's sandboxed
+// iframe (sandbox="allow-same-origin", scripts disabled) exactly like real report
+// output.
+const restrictedReportHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 260px; padding: 24px; box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #5f6368; text-align: center;
+  }
+  .notice { max-width: 360px; }
+  .notice__icon { font-size: 40px; line-height: 1; margin-bottom: 12px; }
+  .notice__title { font-size: 16px; font-weight: 600; color: #3c4043; margin: 0 0 6px; }
+  .notice__body { font-size: 13px; margin: 0; }
+</style>
+</head>
+<body>
+  <div class="notice">
+    <div class="notice__icon" aria-hidden="true">&#128274;</div>
+    <p class="notice__title">Restricted</p>
+    <p class="notice__body">You no longer have access to this report.</p>
+  </div>
+</body>
+</html>`
+
+// RenderTemplateForUser renders a saved report template as full-dataset HTML for
+// the dashboard report widget, re-resolving the caller's access to the template on
+// every call. Unlike the builder's Preview it feeds the full dataset to the engine
+// (no row cap) so the widget shows the complete report, and — because the widget
+// always renders whatever HTML it gets back — a revoked/deleted template yields the
+// restrictedReportHTML notice at a normal 200 (empty AllowedActions) rather than an
+// error. AllowedActions carries the actions the caller may perform on the template
+// so the widget can gate its download button off the server result.
+func (service ReportService) RenderTemplateForUser(userId uint, templateId string) (ReportPreview, error) {
+	template, err := repositories.NewReportTemplateRepository(service.TX).GetReportTemplateById(templateId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ReportPreview{Html: restrictedReportHTML}, nil
+		}
+		return ReportPreview{}, err
+	}
+
+	actions, err := NewPermissionService(service.TX).AllowedActionsForTemplate(userId, template.ID)
+	if err != nil {
+		return ReportPreview{}, err
+	}
+	if !slices.Contains(actions, "read") {
+		return ReportPreview{Html: restrictedReportHTML}, nil
+	}
+
+	var command commands.ReportRequestCommand
+	if err := json.Unmarshal(template.Configuration, &command); err != nil {
+		return ReportPreview{}, err
+	}
+
+	preview, err := service.renderHTML(userId, command, 0)
+	if err != nil {
+		return ReportPreview{}, err
+	}
+	preview.AllowedActions = actions
+	return preview, nil
 }
 
 // reportBuild is the engine output plus the render inputs both Generate and

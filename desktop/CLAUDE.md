@@ -709,6 +709,30 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   the same flag for any future full-bleed page. The report name appears as the rendered heading when
   Document → Title is left blank (the engine falls back to the report name).
 
+### Report dashboard widget
+
+A **view-only** dashboard widget (`WidgetType.Report`, `src/dashboard/report-widget/`) that pins a saved
+report template and renders its HTML inside a **sandboxed `<iframe srcdoc>`** (`sandbox="allow-same-origin"`,
+scripts disabled; `bypassSecurityTrustHtml`) — the same technique as the builder preview, but the widget
+copies the ~10-line idiom locally rather than reusing the builder-coupled `ReportPreviewPanelComponent`.
+The widget stores only `{ reportTemplateId }` in its configuration blob and calls
+`ReportRunnerService.renderTemplate(id)` → `POST /report/template/{id}/render` (see `api/CLAUDE.md`), which
+renders the **full dataset** (not the capped builder preview) and re-resolves access server-side.
+
+- **Restricted state is backend-driven**: a revoked/deleted template comes back as restricted-notice HTML
+  at 200, which the widget renders like any other HTML — there is no special client "restricted" branch
+  (only a generic error state for a network failure or a missing `reportTemplateId`). The report renders
+  in a height-capped, internally-scrolling stage so a long report doesn't blow out the tile.
+- **Download button** (`data-testid="report-widget-download"`): shown **only when** the server-returned
+  `allowedActions` include `"generate"` — gated purely on the server result, **never** re-AND-ed with a
+  client `*hasAppPermission` (same rule as the templates-list row buttons). It calls
+  `ReportRunnerService.downloadTemplateById(id)` (resolve template → `generateFromTemplateById`, the
+  enforcing `/report/template/{id}/generate` path).
+- **Authoring** (`dashboard-form`): the **Report** widget-type option is filtered out unless the user holds
+  `app.reports.read`/`readAll` (`availableWidgetTypeOptions`), and its config is a single template picker
+  (`app-select`) whose options come from `ReportService.getReportTemplates` — server-filtered to the
+  caller's viewable templates (`reportTemplateOptions`, loaded in `ngOnInit`, `catchError`→empty).
+
 ## Testing Requirements
 
 **All new code must have accompanying unit tests.**

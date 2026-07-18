@@ -46,6 +46,7 @@ describe("ReportRunnerService", () => {
     deleteReportTemplate: jest.Mock;
     generateReport: jest.Mock;
     generateReportFromTemplate: jest.Mock;
+    renderReportTemplate: jest.Mock;
   };
   let service: ReportRunnerService;
 
@@ -60,6 +61,7 @@ describe("ReportRunnerService", () => {
       deleteReportTemplate: jest.fn(() => of(undefined)),
       generateReport: jest.fn(() => of(new Blob())),
       generateReportFromTemplate: jest.fn(() => of(new Blob())),
+      renderReportTemplate: jest.fn(() => of({ html: "", receiptCount: 0 })),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -115,5 +117,28 @@ describe("ReportRunnerService", () => {
     service.generateFromTemplateById(template).subscribe();
     expect(reportService.generateReportFromTemplate).toHaveBeenCalledWith(7);
     expect(downloadFile).toHaveBeenCalledWith(expect.any(Blob), "Run.pdf");
+  });
+
+  it("renderTemplate delegates to renderReportTemplate", () => {
+    service.renderTemplate(9).subscribe();
+    expect(reportService.renderReportTemplate).toHaveBeenCalledWith(9);
+  });
+
+  it("downloadTemplateById resolves the template then generates + downloads by id", () => {
+    reportService.getReportTemplate.mockReturnValue(
+      of({
+        id: 9,
+        name: "Widget",
+        createdAt: "2026-01-01T00:00:00Z",
+        configuration: command("Widget", ["csv"]),
+        configurationVersion: 1,
+      })
+    );
+
+    service.downloadTemplateById(9).subscribe();
+
+    expect(reportService.getReportTemplate).toHaveBeenCalledWith(9);
+    expect(reportService.generateReportFromTemplate).toHaveBeenCalledWith(9);
+    expect(downloadFile).toHaveBeenCalledWith(expect.any(Blob), "Widget.csv");
   });
 });

@@ -26,6 +26,9 @@
             [groupId]="selectedDashboard()?.groupId"
           ></app-pie-chart>
         </ng-container>
+        <ng-container *ngSwitchCase="widgetType.Report">
+          <app-report-widget [widget]="widget"></app-report-widget>
+        </ng-container>
       </ng-container>
     </div>
   </div>

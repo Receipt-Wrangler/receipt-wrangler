@@ -17,5 +17,9 @@ export const widgetTypeOptions: FormOption[] = [
   {
     value: WidgetType.PieChart,
     displayValue: "Pie Chart",
+  },
+  {
+    value: WidgetType.Report,
+    displayValue: "Report",
   }
 ];

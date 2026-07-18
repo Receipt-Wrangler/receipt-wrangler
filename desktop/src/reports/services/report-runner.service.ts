@@ -1,5 +1,5 @@
 import { Injectable, inject } from "@angular/core";
-import { Observable, tap } from "rxjs";
+import { Observable, switchMap, tap } from "rxjs";
 import {
   PagedData,
   PagedRequestCommand,
@@ -34,6 +34,27 @@ export class ReportRunnerService {
   /** Renders the current configuration to preview HTML + the covered receipt count. */
   public preview(command: ReportRequestCommand): Observable<ReportPreviewResponse> {
     return this.reportService.previewReport(command);
+  }
+
+  /**
+   * Renders a saved template by id as full-dataset HTML for the dashboard report
+   * widget. The server loads the stored configuration, re-resolves the caller's
+   * access, and returns restricted-notice HTML (with empty allowedActions) when the
+   * caller may no longer view it — so the widget always has HTML to render.
+   */
+  public renderTemplate(id: number): Observable<ReportPreviewResponse> {
+    return this.reportService.renderReportTemplate(id);
+  }
+
+  /**
+   * Downloads a saved template by id: resolves the template (for the download
+   * filename) then runs it through the enforcing generate endpoint. Reused by the
+   * report widget's download button; the server 403s if the caller cannot generate.
+   */
+  public downloadTemplateById(id: number): Observable<Blob> {
+    return this.getTemplate(id).pipe(
+      switchMap((template) => this.generateFromTemplateById(template))
+    );
   }
 
   /** Saves the current configuration as a new reusable report template. */

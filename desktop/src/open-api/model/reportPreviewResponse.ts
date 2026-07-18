@@ -18,5 +18,9 @@ export interface ReportPreviewResponse {
      * The number of receipts the current configuration covers.
      */
     receiptCount: number;
+    /**
+     * The actions the requesting user may perform on the template (read, generate, update, delete, duplicate), resolved per user and populated only by the dashboard report-widget render endpoint. Drives the widget\'s download button.
+     */
+    allowedActions?: Array<string>;
 }
 
