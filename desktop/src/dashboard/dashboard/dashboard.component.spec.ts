@@ -110,7 +110,7 @@ describe("DashboardComponent", () => {
   // init fetch. `@for ... track widget.id` keeps the instance, so it does not
   // re-fetch. Proven here with the (non-report) GROUP_SUMMARY widget, whose effect
   // calls UserService.getAmountOwedForUser.
-  it("fetches a widget's data only once when the dashboards slice re-emits with the same widget id", () => {
+  it("fetches a widget's data only once when the dashboards slice re-emits with the same widget id", async () => {
     const owedSpy = jest
       .spyOn(TestBed.inject(UserService), "getAmountOwedForUser")
       .mockReturnValue(of({}) as any);
@@ -136,12 +136,15 @@ describe("DashboardComponent", () => {
     });
 
     // Emission 1 — the cached dashboard mounts the summary widget → one fetch.
+    // The summary card fetches from a constructor effect, so flush effects and let
+    // the fixture stabilize before asserting the spy count (zoneless CD).
     store.reset({
       ...store.snapshot(),
       groups: { selectedGroupId: "1", selectedDashboardId: "1" },
       dashboards: { dashboards: summaryDashboards() },
     });
-    fixture.detectChanges();
+    TestBed.flushEffects();
+    await fixture.whenStable();
 
     expect(owedSpy).toHaveBeenCalledTimes(1);
 
@@ -152,7 +155,8 @@ describe("DashboardComponent", () => {
       groups: { selectedGroupId: "1", selectedDashboardId: "1" },
       dashboards: { dashboards: summaryDashboards() },
     });
-    fixture.detectChanges();
+    TestBed.flushEffects();
+    await fixture.whenStable();
 
     expect(owedSpy).toHaveBeenCalledTimes(1);
   });

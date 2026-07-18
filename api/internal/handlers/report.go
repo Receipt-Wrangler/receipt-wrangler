@@ -546,6 +546,17 @@ func GenerateReportFromTemplate(w http.ResponseWriter, r *http.Request) {
 // the template, or it was deleted, the service returns restricted-notice HTML at a
 // normal 200 — the widget always drops whatever HTML it gets into its iframe.
 // AllowedActions lets the widget gate its download button off the server result.
+//
+// The absent declarative permission gate (no AppPermissions/AnyAppPermissions) is
+// deliberate: authorization is enforced in the service — RenderTemplateForUser →
+// AllowedActionsForTemplate re-resolves the caller's access on every call and
+// gates the full-dataset render behind it, returning a data-free restricted notice
+// (never the report, never an existence oracle) to anyone lacking read. A hard
+// endpoint gate would refuse those callers with a 403 instead, breaking the widget's
+// always-200 "render something graceful" contract (an orphaned widget whose owner
+// was fully de-authorized would show an error box rather than the Restricted notice).
+// This mirrors the Search / GetReceipt handlers, which likewise enforce in the
+// service rather than via declarative Handler fields.
 func RenderReportTemplate(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
 		ErrorMessage: "Error rendering report template",

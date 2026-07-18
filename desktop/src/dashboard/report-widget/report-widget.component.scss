@@ -1,6 +1,7 @@
 .report-widget {
   &__stage {
     position: relative;
+
     // The report renders its full dataset; cap the visible area and scroll so a long
     // report never blows out the dashboard tile.
     max-height: 360px;

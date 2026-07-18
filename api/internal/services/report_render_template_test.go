@@ -141,6 +141,34 @@ func TestReportService_RenderTemplateForUser_MissingTemplateIsRestricted(t *test
 	}
 }
 
+// A stored configuration that is not valid JSON surfaces as an error (no HTML, no
+// actions) rather than a silently blank render — a corrupt template blob fails loudly.
+// The caller can read the template, so the render reaches the unmarshal.
+func TestReportService_RenderTemplateForUser_MalformedConfigIsError(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	resetAuthzCaches()
+
+	userId := seedAppUser(t, "widget-badcfg", []string{permissions.AppReportsRead})
+	groupId, _ := joinGroup(t, userId, "Household", []string{permissions.GroupReportsRead, permissions.GroupReceiptsRead})
+
+	db := repositories.GetDB()
+	template := models.ReportTemplate{Name: "Corrupt", Configuration: json.RawMessage("{ not json"), ConfigurationVersion: 1}
+	if err := db.Create(&template).Error; err != nil {
+		t.Fatalf("seed template: %v", err)
+	}
+	if err := db.Create(&models.ReportTemplateGroup{ReportTemplateID: template.ID, GroupID: groupId}).Error; err != nil {
+		t.Fatalf("seed template group: %v", err)
+	}
+
+	preview, err := NewReportService(nil).RenderTemplateForUser(userId, utils.UintToString(template.ID))
+	if err == nil {
+		t.Fatalf("expected an error for a malformed stored configuration, got none (preview=%+v)", preview)
+	}
+	if preview.Html != "" || len(preview.AllowedActions) != 0 {
+		t.Errorf("error response must carry no HTML or actions, got html=%q actions=%v", preview.Html, preview.AllowedActions)
+	}
+}
+
 // The widget renders the FULL dataset, not the row-capped builder-preview sample:
 // with more than reportPreviewRowCap receipts, the grand total sums every receipt
 // (would read short if this path reused the preview cap).

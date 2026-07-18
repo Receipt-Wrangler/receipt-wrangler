@@ -945,3 +945,66 @@ func TestGetReportTemplateOptions_ForbidsWithoutRolesRead(t *testing.T) {
 
 	assertStatus(t, w, http.StatusForbidden)
 }
+
+// --- Dashboard report-widget render endpoint ---
+//
+// RenderReportTemplate has no declarative permission gate by design: it enforces
+// access in the service and returns restricted-notice HTML at 200 rather than a 403,
+// so the widget always has HTML to render (see the handler doc comment). These assert
+// the two 200 outcomes; the resolution logic itself is covered in
+// services/report_render_template_test.go and services/report_authz_test.go.
+
+func TestRenderReportTemplate_RendersWhenAuthorized(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+	seedReportReceipt(1, 1)
+
+	w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(seeded.ID))
+	RenderReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+	if got := w.Header().Get("Content-Type"); !strings.Contains(got, constants.ApplicationJson) {
+		t.Errorf("Content-Type = %q, want %q", got, constants.ApplicationJson)
+	}
+
+	var preview services.ReportPreview
+	if err := json.Unmarshal(w.Body.Bytes(), &preview); err != nil {
+		t.Fatalf("decode preview body: %v", err)
+	}
+	if !strings.Contains(preview.Html, "<") {
+		t.Errorf("expected rendered report HTML, got %q", preview.Html)
+	}
+	if !containsString(preview.AllowedActions, "read") {
+		t.Errorf("allowedActions = %v, want read present", preview.AllowedActions)
+	}
+}
+
+// A caller who holds base app read but lacks group.reports.read in the template's
+// group cannot view it — but the widget endpoint returns the restricted notice at
+// 200 (empty allowedActions), not the 403 the GET handler would return.
+func TestRenderReportTemplate_RestrictedWhenTemplateAccessRevoked(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	grantGroupPerms(t, 1, 1, permissions.GroupView)
+	seeded := seedReportTemplate(t, 1, "HTTP Report")
+
+	w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(seeded.ID))
+	RenderReportTemplate(w, r)
+
+	assertStatus(t, w, http.StatusOK)
+
+	var preview services.ReportPreview
+	if err := json.Unmarshal(w.Body.Bytes(), &preview); err != nil {
+		t.Fatalf("decode preview body: %v", err)
+	}
+	if !strings.Contains(preview.Html, "no longer have access") {
+		t.Errorf("expected the restricted notice HTML, got %q", preview.Html)
+	}
+	if len(preview.AllowedActions) != 0 {
+		t.Errorf("restricted response must carry no allowedActions, got %v", preview.AllowedActions)
+	}
+}

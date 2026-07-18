@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatIconModule } from "@angular/material/icon";
 import { DomSanitizer, SafeHtml } from "@angular/platform-browser";
-import { EMPTY, catchError, finalize, tap } from "rxjs";
+import { EMPTY, Subscription, catchError, finalize, tap } from "rxjs";
 import { ButtonModule } from "../../button/index";
 import { Widget } from "../../open-api";
 import { ReportRunnerService } from "../../reports/services/report-runner.service";
@@ -60,7 +60,13 @@ export class ReportWidgetComponent {
   constructor() {
     // Load whenever the pinned template changes (the effect tracks the
     // widget-config-derived id). Replaces ngOnChanges for this input-watching load.
-    effect(() => this.load(this.reportTemplateId()));
+    // onCleanup cancels the prior render before the next one starts (and on destroy),
+    // so a slower in-flight request for the old template can never overwrite the new
+    // one — takeUntilDestroyed alone only cancels on destroy, not on re-run.
+    effect((onCleanup) => {
+      const subscription = this.load(this.reportTemplateId());
+      onCleanup(() => subscription?.unsubscribe());
+    });
   }
 
   /** Sizes the iframe to its content; the stage caps the height and scrolls. */
@@ -87,7 +93,13 @@ export class ReportWidgetComponent {
       .subscribe();
   }
 
-  private load(id: number | undefined): void {
+  private load(id: number | undefined): Subscription | undefined {
+    // Clear the previous template's output up front so a swap can't briefly show the
+    // old report or (worse) enable download using the old template's authorization
+    // result while the new one loads.
+    this.html.set("");
+    this.allowedActions.set([]);
+
     if (!id) {
       this.isLoading.set(false);
       this.hasError.set(true);
@@ -95,7 +107,7 @@ export class ReportWidgetComponent {
     }
     this.isLoading.set(true);
     this.hasError.set(false);
-    this.runner
+    return this.runner
       .renderTemplate(id)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
