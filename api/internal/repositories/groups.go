@@ -169,7 +169,7 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 	// TODO: move hooks from model to repository func
 	db := repository.GetDB()
 
-	u64Id, err := utils.StringToUint64(groupId)
+	uintId, err := utils.StringToUint(groupId)
 	if err != nil {
 		return models.Group{}, err
 	}
@@ -178,7 +178,7 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 		Name:   command.Name,
 		Status: command.Status,
 	}
-	groupToUpdate.ID = uint(u64Id)
+	groupToUpdate.ID = uintId
 
 	for i := 0; i < len(command.GroupMembers); i++ {
 		groupMember := buildGroupMemberFromCommand(command.GroupMembers[i])
