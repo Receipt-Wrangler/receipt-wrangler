@@ -89,13 +89,21 @@ func ReadLastFileLine(filePath string) (string, error) {
 }
 
 func BuildGroupPathString(groupId string, groupName string) (string, error) {
-	basePath, err := os.Getwd()
+	dataDir, err := GetDataDir()
 	if err != nil {
 		return "", err
 	}
 
-	groupPath := groupId + "-" + groupName
-	return filepath.Join(basePath, "data", groupPath), nil
+	groupPath := filepath.Join(dataDir, groupId+"-"+groupName)
+
+	// A crafted group name must not escape the data directory (CWE-22).
+	// filepath.Join cleans any ".." only after the untrusted name is already
+	// part of the path, so verify containment before returning.
+	if err := assertWithinDataDir(groupPath); err != nil {
+		return "", err
+	}
+
+	return groupPath, nil
 }
 
 func BuildFileName(rid string, fid string, fname string) string {

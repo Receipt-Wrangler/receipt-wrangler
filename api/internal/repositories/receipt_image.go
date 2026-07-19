@@ -55,7 +55,7 @@ func (repository ReceiptImageRepository) CreateReceiptImage(fileData models.File
 
 	err = db.Model(models.FileData{}).Create(&fileData).Error
 	if err != nil {
-		os.Remove(filePath)
+		utils.RemoveDataPath(filePath)
 		return models.FileData{}, err
 	}
 

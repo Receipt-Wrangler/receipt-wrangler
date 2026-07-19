@@ -212,7 +212,7 @@ func (service ReceiptService) DeleteReceipt(id string) error {
 		}
 
 		for _, path := range imagesToDelete {
-			os.Remove(path)
+			utils.RemoveDataPath(path)
 		}
 
 		return nil

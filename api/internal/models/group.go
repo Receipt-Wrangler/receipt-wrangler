@@ -1,7 +1,6 @@
 package models
 
 import (
-	"os"
 	"receipt-wrangler/api/internal/utils"
 
 	"gorm.io/gorm"
@@ -41,7 +40,7 @@ func (groupToUpdate *Group) BeforeUpdate(tx *gorm.DB) (err error) {
 				return err
 			}
 
-			os.Rename(oldGroupPath, newGroupPath)
+			utils.RenameDataPath(oldGroupPath, newGroupPath)
 		}
 	}
 
@@ -55,7 +54,7 @@ func (deletedGroup *Group) AfterDelete(tx *gorm.DB) (err error) {
 			return err
 		}
 
-		err = os.RemoveAll(dataPath)
+		err = utils.RemoveAllInDataDir(dataPath)
 		if err != nil {
 			return err
 		}

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -60,7 +59,7 @@ func (repository ReceiptRepository) BeforeUpdateReceipt(currentReceipt models.Re
 			oldFilePath := filepath.Join(oldGroupPath, filename)
 			newFilePathPath := filepath.Join(newGroupPath, filename)
 
-			err := os.Rename(oldFilePath, newFilePathPath)
+			err := utils.RenameDataPath(oldFilePath, newFilePathPath)
 			if err != nil {
 				return err
 			}
