@@ -31,6 +31,7 @@ import { PromptTableState } from "../store/prompt-table.state";
 import { ReceiptProcessingSettingsTableState } from "../store/receipt-processing-settings-table.state";
 import { ReceiptProcessingSettingsTaskTableState } from "../store/receipt-processing-settings-task-table.state";
 import { ReceiptTableState } from "../store/receipt-table.state";
+import { ReportTemplateTableState } from "../store/report-template-table.state";
 import { SystemEmailTableState } from "../store/system-email-table.state";
 import { SystemEmailTaskTableState } from "../store/system-email-task-table.state";
 import { SystemSettingsState } from "../store/system-settings.state";
@@ -54,6 +55,7 @@ const ngxsStates = [
   ReceiptProcessingSettingsTableState,
   ReceiptProcessingSettingsTaskTableState,
   ReceiptTableState,
+  ReportTemplateTableState,
   SystemEmailTableState,
   SystemEmailTaskTableState,
   SystemSettingsState,
@@ -76,6 +78,7 @@ const ngxsStorageKeys = [
   "receiptProcessingSettingsTable",
   "receiptProcessingSettingsTaskTable",
   "receiptTable",
+  "reportTemplateTable",
   "systemEmailTable",
   "systemEmailTaskTable",
   "systemSettings",

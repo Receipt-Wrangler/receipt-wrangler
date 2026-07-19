@@ -98,43 +98,33 @@ func (command *ReceiptPagedRequestCommand) LoadDataFromRequest(w http.ResponseWr
 		return err
 	}
 
-	if command.Filter.Amount.Value == nil || command.Filter.Amount.Value == "" {
-		command.Filter.Amount.Value = float64(0)
-	}
-
-	if command.Filter.PaidBy.Value == nil || command.Filter.PaidBy.Value == "" {
-		command.Filter.PaidBy.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.Categories.Value == nil || command.Filter.Categories.Value == "" {
-		command.Filter.Categories.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.Tags.Value == nil || command.Filter.Tags.Value == "" {
-		command.Filter.Tags.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.Status.Value == nil || command.Filter.Status.Value == "" {
-		command.Filter.Status.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.Group.Value == nil || command.Filter.Group.Value == "" {
-		command.Filter.Group.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.CreatedAt.Value == nil {
-		command.Filter.CreatedAt.Value = ""
-	}
-
-	if command.Filter.Date.Value == nil {
-		command.Filter.Date.Value = ""
-	}
-
-	if command.Filter.ResolvedDate.Value == nil {
-		command.Filter.ResolvedDate.Value = ""
-	}
-
+	initReceiptFilterValues(&command.Filter)
 	return nil
+}
+
+// initReceiptFilterValues seeds the non-nil defaults the receipt query and
+// grant-narrowing rely on. Every command that carries a ReceiptPagedRequestFilter
+// (paged receipts, pie chart, reports) runs it so the three paths stay in sync.
+// Defaulting a field whose operation is unset is a query no-op (buildFilterQuery
+// falls through on an empty operation, and the slice/name branches skip empties).
+func initReceiptFilterValues(filter *ReceiptPagedRequestFilter) {
+	if filter.Amount.Value == nil || filter.Amount.Value == "" {
+		filter.Amount.Value = float64(0)
+	}
+	for _, field := range []*PagedRequestField{
+		&filter.PaidBy, &filter.Categories, &filter.Tags, &filter.Status, &filter.Group,
+	} {
+		if field.Value == nil || field.Value == "" {
+			field.Value = make([]interface{}, 0)
+		}
+	}
+	for _, field := range []*PagedRequestField{
+		&filter.Date, &filter.ResolvedDate, &filter.CreatedAt, &filter.Name,
+	} {
+		if field.Value == nil {
+			field.Value = ""
+		}
+	}
 }
 
 type ReceiptPagedRequestFilter struct {
@@ -143,7 +133,7 @@ type ReceiptPagedRequestFilter struct {
 	Name         PagedRequestField `json:"name"`
 	PaidBy       PagedRequestField `json:"paidBy"`
 	Categories   PagedRequestField `json:"categories"`
-	Tags         PagedRequestField `json:"Tags"`
+	Tags         PagedRequestField `json:"tags"`
 	Status       PagedRequestField `json:"status"`
 	Group        PagedRequestField `json:"group"`
 	ResolvedDate PagedRequestField `json:"resolvedDate"`
@@ -152,7 +142,7 @@ type ReceiptPagedRequestFilter struct {
 
 type PagedRequestField struct {
 	Operation FilterOperation `json:"operation"`
-	Value     interface{}
+	Value     interface{}     `json:"value"`
 }
 
 type FilterOperation string

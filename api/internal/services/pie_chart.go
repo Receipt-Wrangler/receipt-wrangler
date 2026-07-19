@@ -63,9 +63,11 @@ func (service PieChartService) GetPieChartData(
 		return structs.PieChartData{}, err
 	}
 
-	// Strip categories/tags the caller cannot see so they are not aggregated into
-	// the chart (a disallowed category collapses to Uncategorized/Untagged).
-	err = permissionService.FilterReceiptCategoriesTags(userId, receipts)
+	// Replace categories/tags the caller cannot see with a (Restricted) marker so
+	// their spend aggregates into its own slice rather than collapsing into
+	// Uncategorized/Untagged (which would hide it among genuinely uncategorized
+	// receipts). This matches the reporting engine's treatment of hidden values.
+	err = permissionService.SubstituteRestrictedCategoriesTags(userId, receipts)
 	if err != nil {
 		return structs.PieChartData{}, err
 	}

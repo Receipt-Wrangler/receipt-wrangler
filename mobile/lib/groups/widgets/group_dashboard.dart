@@ -4,6 +4,7 @@ import 'package:openapi/openapi.dart' as api;
 import 'package:receipt_wrangler_mobile/groups/widgets/dashboard_widgets/group_activities.dart';
 import 'package:receipt_wrangler_mobile/groups/widgets/dashboard_widgets/group_summary.dart';
 import 'package:receipt_wrangler_mobile/groups/widgets/dashboard_widgets/pie_chart.dart';
+import 'package:receipt_wrangler_mobile/groups/widgets/dashboard_widgets/report_widget.dart';
 
 import 'dashboard_widgets/filtered_receipts.dart';
 
@@ -88,6 +89,14 @@ class _GroupDashboard extends State<GroupDashboard> {
             widgets.add(SizedBox(
               height: widgetHeight,
               child: DashboardPieChart(
+                dashboardWidget: widget,
+              ),
+            ));
+            break;
+          case api.WidgetType.REPORT:
+            widgets.add(SizedBox(
+              height: widgetHeight,
+              child: ReportWidget(
                 dashboardWidget: widget,
               ),
             ));

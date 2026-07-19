@@ -8,6 +8,7 @@ import 'package:openapi/src/model/prompt.dart';
 import 'package:openapi/src/model/custom_field_value.dart';
 import 'package:openapi/src/model/tag.dart';
 import 'package:openapi/src/model/group_member.dart';
+import 'package:openapi/src/model/report_request_command.dart';
 import 'package:openapi/src/model/group.dart';
 import 'package:openapi/src/model/receipt.dart';
 import 'package:openapi/src/model/group_receipt_settings.dart';
@@ -27,6 +28,7 @@ import 'package:openapi/src/model/ai_type.dart';
 import 'package:openapi/src/model/custom_field_option.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/category.dart';
+import 'package:openapi/src/model/report_template.dart';
 import 'package:openapi/src/model/receipt_processing_settings.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -47,7 +49,7 @@ part 'paged_data_data_inner.g.dart';
 /// * [groupId] 
 /// * [id] 
 /// * [imageFiles] - Files associated to receipt
-/// * [name] - Custom Field name
+/// * [name] - The template name (mirrors the saved report's name).
 /// * [paidByUserId] - User paid foreign key
 /// * [receiptItems] - Items associated to receipt
 /// * [resolvedDate] - Date resolved
@@ -88,9 +90,12 @@ part 'paged_data_data_inner.g.dart';
 /// * [useStartTLS] - Whether to use STARTTLS
 /// * [canBeRestarted] 
 /// * [options] 
+/// * [configuration] 
+/// * [configurationVersion] - Schema version the stored configuration was written under.
+/// * [allowedActions] - The actions the requesting user may perform on this template (read, generate, update, delete, duplicate), resolved per user and populated only on the list response. Drives the row action buttons.
 @BuiltValue()
 abstract class PagedDataDataInner implements Built<PagedDataDataInner, PagedDataDataInnerBuilder> {
-  /// Any Of [Activity], [Category], [CustomField], [Group], [Prompt], [Receipt], [ReceiptProcessingSettings], [SystemEmail], [SystemTask], [Tag], [TagView]
+  /// Any Of [Activity], [Category], [CustomField], [Group], [Prompt], [Receipt], [ReceiptProcessingSettings], [ReportTemplate], [SystemEmail], [SystemTask], [Tag], [TagView]
   AnyOf get anyOf;
 
   PagedDataDataInner._();
@@ -136,7 +141,7 @@ class _$PagedDataDataInnerSerializer implements PrimitiveSerializer<PagedDataDat
   }) {
     final result = PagedDataDataInnerBuilder();
     Object? anyOfDataSrc;
-    final targetType = const FullType(AnyOf, [FullType(Receipt), FullType(Category), FullType(Tag), FullType(Prompt), FullType(Group), FullType(TagView), FullType(SystemTask), FullType(ReceiptProcessingSettings), FullType(SystemEmail), FullType(Activity), FullType(CustomField), ]);
+    final targetType = const FullType(AnyOf, [FullType(Receipt), FullType(Category), FullType(Tag), FullType(Prompt), FullType(Group), FullType(TagView), FullType(SystemTask), FullType(ReceiptProcessingSettings), FullType(SystemEmail), FullType(Activity), FullType(CustomField), FullType(ReportTemplate), ]);
     anyOfDataSrc = serialized;
     result.anyOf = serializers.deserialize(anyOfDataSrc, specifiedType: targetType) as AnyOf;
     return result.build();

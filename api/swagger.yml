@@ -164,6 +164,372 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/generate:
+    post:
+      tags:
+        - Report
+      summary: Generate a report
+      description:
+        Generates a report over the receipts of one or more groups and streams it
+        back as a file, or a zip when several formats are requested. Runs under the
+        caller's group permissions and requires group.reports.read in every covered
+        group.
+      operationId: generateReport
+      requestBody:
+        description: The report builder configuration
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The generated report file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/preview:
+    post:
+      tags:
+        - Report
+      summary: Preview a report
+      description:
+        Renders the current report configuration as HTML for the builder's live
+        preview, along with the number of receipts it covers. Requires the
+        app-level app.reports.read (or app.reports.readAll) and group.reports.read
+        in every covered group. The preview is a row-capped sample of the engine's
+        own output.
+      operationId: previewReport
+      requestBody:
+        description: The report builder configuration
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The rendered preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportPreviewResponse"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/template:
+    post:
+      tags:
+        - Report
+      summary: Save a report template
+      description:
+        Saves the current report configuration as a reusable template. App-scoped
+        (requires app.reports.create) — it persists a configuration and touches no
+        group's receipts.
+      operationId: createReportTemplate
+      requestBody:
+        description: The report builder configuration to save
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The saved report template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTemplate"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/template/list:
+    post:
+      tags:
+        - Report
+      summary: Get paged report templates
+      description:
+        Returns a paged, sorted list of saved report templates. App-scoped
+        (requires app.reports.read).
+      operationId: getReportTemplates
+      requestBody:
+        description: Paging and sorting data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PagedRequestCommand"
+      responses:
+        200:
+          description: Paged report templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedData"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/template/options:
+    get:
+      tags:
+        - Report
+      summary: Get report template options
+      description:
+        Returns every report template as a lightweight {id, name, groupIds} option
+        for the role-form access matrix. Gated on app.roles.read (the admin role
+        editor may not personally hold report permissions), not a report permission.
+      operationId: getReportTemplateOptions
+      responses:
+        200:
+          description: The report template options
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReportTemplateOption"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/template/{id}:
+    get:
+      tags:
+        - Report
+      summary: Get a report template
+      description:
+        Returns a saved report template by id. Access is resolved per template
+        (readAll, or the per-group ceiling plus the per-template matrix).
+      operationId: getReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to get
+      responses:
+        200:
+          description: The report template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTemplate"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+    put:
+      tags:
+        - Report
+      summary: Update a report template
+      description:
+        Updates a saved report template in place, replacing its name and stored
+        configuration. App-scoped (requires app.reports.update).
+      operationId: updateReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to update
+      requestBody:
+        description: The report builder configuration to save over the existing template
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The updated report template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTemplate"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+    delete:
+      tags:
+        - Report
+      summary: Delete a report template
+      description: Deletes a saved report template by id. Requires app.reports.delete.
+      operationId: deleteReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to delete
+      responses:
+        200:
+          $ref: "#/components/responses/Ok"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/template/{id}/duplicate:
+    post:
+      tags:
+        - Report
+      summary: Duplicate a report template
+      description:
+        Duplicates a saved report template by id, returning the new copy. App-scoped
+        (requires app.reports.duplicate).
+      operationId: duplicateReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to duplicate
+      responses:
+        200:
+          description: The duplicated report template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportTemplate"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/template/{id}/generate:
+    post:
+      tags:
+        - Report
+      summary: Generate a report from a saved template
+      description:
+        Generates a saved report template by id and streams the file. Enforces the
+        per-template generate grant (generateAll, or the per-group ceiling plus the
+        matrix), loading the stored configuration server-side.
+      operationId: generateReportFromTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to generate
+      responses:
+        200:
+          description: The generated report file (or a zip of several formats)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /report/template/{id}/render:
+    post:
+      tags:
+        - Report
+      summary: Render a saved template as HTML for the dashboard report widget
+      description:
+        Renders a saved report template by id as a self-contained HTML document
+        over the full dataset (unlike /report/preview, which caps the sample) for
+        the dashboard report widget, loading the stored configuration server-side.
+        Re-resolves the caller's access on every call; when the caller may not view
+        the template (or it was deleted) a restricted-notice HTML document is
+        returned at 200 with empty allowedActions, so the widget always has HTML to
+        render. allowedActions carries the actions the caller may perform (drives
+        the widget's download button).
+      operationId: renderReportTemplate
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the report template to render
+      responses:
+        200:
+          description: The rendered report (or restricted notice) HTML
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportPreviewResponse"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /category/{categoryName}:
     parameters:
       - in: path
@@ -2993,6 +3359,18 @@ components:
         - "app.account.update"
         - "app.account.delete"
         - "app.receipts.search"
+        - "app.reports.create"
+        - "app.reports.delete"
+        - "app.reports.duplicate"
+        - "app.reports.generate"
+        - "app.reports.read"
+        - "app.reports.update"
+        - "app.reports.readAll"
+        - "app.reports.createAll"
+        - "app.reports.updateAll"
+        - "app.reports.deleteAll"
+        - "app.reports.duplicateAll"
+        - "app.reports.generateAll"
         - "group.view"
         - "group.update"
         - "group.delete"
@@ -3010,6 +3388,7 @@ components:
         - "group.dashboards.update"
         - "group.dashboards.delete"
         - "group.widgets.read"
+        - "group.reports.read"
         - "group.activities.read"
         - "group.activities.rerun"
         - "group.email.poll"
@@ -3107,6 +3486,14 @@ components:
           description: >-
             Whether a GROUP role lets each member see receipts they paid for. Part
             of the paid-by visibility filter; always false for app roles.
+        reportTemplateGrants:
+          type: array
+          description: >-
+            Per-template action grants restricting which report templates a GROUP
+            role's members may act on. Empty means unrestricted (every template the
+            role's group access reaches). Always empty for app roles.
+          items:
+            $ref: "#/components/schemas/ReportTemplateGrant"
     UpsertRoleCommand:
       type: object
       required:
@@ -3154,6 +3541,30 @@ components:
           description: >-
             Whether to also let each member see receipts they paid for. Only valid
             on group roles.
+        reportTemplateGrants:
+          type: array
+          description: >-
+            Per-template action grants for a GROUP role, restricting which report
+            templates its members may act on. Only valid on group roles; omit or
+            leave empty for unrestricted access.
+          items:
+            $ref: "#/components/schemas/ReportTemplateGrant"
+    ReportTemplateGrant:
+      type: object
+      required:
+        - reportTemplateId
+        - permissions
+      properties:
+        reportTemplateId:
+          type: integer
+          format: uint64
+        permissions:
+          type: array
+          description: >-
+            The actions a GROUP role may perform on this report template
+            (read, generate, update, delete, duplicate).
+          items:
+            type: string
     SortDirection:
       type: string
       enum:
@@ -3167,6 +3578,7 @@ components:
         - "FILTERED_RECEIPTS"
         - "GROUP_ACTIVITY"
         - "PIE_CHART"
+        - "REPORT"
     ChartGrouping:
       type: string
       enum:
@@ -4198,6 +4610,7 @@ components:
               - $ref: "#/components/schemas/SystemEmail"
               - $ref: "#/components/schemas/Activity"
               - $ref: "#/components/schemas/CustomField"
+              - $ref: "#/components/schemas/ReportTemplate"
         totalCount:
           type: integer
     FeatureConfig:
@@ -5588,3 +6001,194 @@ components:
         filter:
           $ref: "#/components/schemas/ReceiptPagedRequestFilter"
           description: Optional filter for receipts
+    ReportRequestCommand:
+      type: object
+      required:
+        - groupIds
+        - period
+        - detail
+        - columns
+        - formats
+      properties:
+        name:
+          type: string
+          description: Report name; used for the download filename
+        groupIds:
+          type: array
+          items:
+            type: string
+          description: Ids of the groups the report covers
+        period:
+          $ref: "#/components/schemas/ReportPeriod"
+        filter:
+          $ref: "#/components/schemas/ReceiptPagedRequestFilter"
+          description: Which receipts go into the report
+        groupBy:
+          type: array
+          items:
+            type: string
+          description: Ordered engine field keys to nest the report by
+        detail:
+          $ref: "#/components/schemas/ReportDetail"
+        columns:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportColumn"
+        subtotals:
+          type: boolean
+          description: Emit a subtotal row at each grouping level
+        grandTotals:
+          type: boolean
+          description: Emit one grand-total row across everything
+        document:
+          $ref: "#/components/schemas/ReportDocument"
+        formats:
+          type: array
+          items:
+            type: string
+            enum:
+              - csv
+              - xlsx
+              - pdf
+          description: One or more output formats; multiple are zipped together
+    ReportPeriod:
+      type: object
+      required:
+        - preset
+      properties:
+        preset:
+          type: string
+          enum:
+            - this_month
+            - last_month
+            - mtd
+            - qtd
+            - ytd
+            - custom
+        startDate:
+          type: string
+          description: Start date (YYYY-MM-DD), read only when preset is custom
+        endDate:
+          type: string
+          description: End date (YYYY-MM-DD), read only when preset is custom
+    ReportDetail:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum:
+            - records
+            - aggregate
+        by:
+          type: string
+          description: Dimension field key to aggregate leaf rows by (aggregate mode)
+    ReportColumn:
+      type: object
+      required:
+        - kind
+        - name
+      properties:
+        kind:
+          type: string
+          enum:
+            - dimension
+            - aggregate
+            - formula
+        name:
+          type: string
+          description: Machine identifier; formula expressions reference this
+        label:
+          type: string
+        field:
+          type: string
+          description: Field key the column displays (dimension columns)
+        aggFunc:
+          type: string
+          enum:
+            - SUM
+            - COUNT
+            - AVG
+            - MIN
+            - MAX
+          description: Aggregate function (aggregate columns)
+        measure:
+          type: string
+          description: Measure field key (aggregate columns, omitted for COUNT)
+        expr:
+          type: string
+          description: Expression over other column names (formula columns)
+    ReportDocument:
+      type: object
+      properties:
+        title:
+          type: string
+        intro:
+          type: string
+        footer:
+          type: string
+    ReportPreviewResponse:
+      type: object
+      required:
+        - html
+        - receiptCount
+      properties:
+        html:
+          type: string
+          description: The rendered report preview as a self-contained HTML document.
+        receiptCount:
+          type: integer
+          description: The number of receipts the current configuration covers.
+        allowedActions:
+          type: array
+          description: >-
+            The actions the requesting user may perform on the template
+            (read, generate, update, delete, duplicate), resolved per user and
+            populated only by the dashboard report-widget render endpoint. Drives
+            the widget's download button.
+          items:
+            type: string
+    ReportTemplate:
+      allOf:
+        - $ref: "#/components/schemas/BaseModel"
+        - type: object
+          required:
+            - name
+            - configuration
+            - configurationVersion
+          properties:
+            name:
+              type: string
+              description: The template name (mirrors the saved report's name).
+            configuration:
+              $ref: "#/components/schemas/ReportRequestCommand"
+            configurationVersion:
+              type: integer
+              description: Schema version the stored configuration was written under.
+            allowedActions:
+              type: array
+              description: >-
+                The actions the requesting user may perform on this template
+                (read, generate, update, delete, duplicate), resolved per user and
+                populated only on the list response. Drives the row action buttons.
+              items:
+                type: string
+    ReportTemplateOption:
+      type: object
+      required:
+        - id
+        - name
+        - groupIds
+      properties:
+        id:
+          type: integer
+          format: uint64
+        name:
+          type: string
+        groupIds:
+          type: array
+          description: The ids of the groups this template covers.
+          items:
+            type: integer
+            format: uint64

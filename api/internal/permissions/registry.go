@@ -85,6 +85,23 @@ const (
 	AppAccountDelete = "app.account.delete"
 
 	AppReceiptsSearch = "app.receipts.search"
+
+	AppReportsRead      = "app.reports.read"
+	AppReportsCreate    = "app.reports.create"
+	AppReportsUpdate    = "app.reports.update"
+	AppReportsDelete    = "app.reports.delete"
+	AppReportsDuplicate = "app.reports.duplicate"
+	AppReportsGenerate  = "app.reports.generate"
+
+	// The "*All" report permissions bypass both the per-group access requirement and
+	// the per-template grant matrix for that one action — a holder may perform it on
+	// any template. They are the per-action opt-out of the default group-scoped model.
+	AppReportsReadAll      = "app.reports.readAll"
+	AppReportsCreateAll    = "app.reports.createAll"
+	AppReportsUpdateAll    = "app.reports.updateAll"
+	AppReportsDeleteAll    = "app.reports.deleteAll"
+	AppReportsDuplicateAll = "app.reports.duplicateAll"
+	AppReportsGenerateAll  = "app.reports.generateAll"
 )
 
 const (
@@ -109,6 +126,8 @@ const (
 	GroupDashboardsDelete = "group.dashboards.delete"
 
 	GroupWidgetsRead = "group.widgets.read"
+
+	GroupReportsRead = "group.reports.read"
 
 	GroupActivitiesRead  = "group.activities.read"
 	GroupActivitiesRerun = "group.activities.rerun"
@@ -186,6 +205,20 @@ var registry = []Descriptor{
 
 	{AppReceiptsSearch, "Search Receipts", "Search across receipts you can access.", "Receipts", ScopeApp},
 
+	{AppReportsRead, "Access Reports", "Access the report builder and saved report templates.", "Reports", ScopeApp},
+	{AppReportsCreate, "Save Report Templates", "Save a report configuration as a reusable template.", "Reports", ScopeApp},
+	{AppReportsUpdate, "Update Report Templates", "Update a saved report template in place.", "Reports", ScopeApp},
+	{AppReportsDelete, "Delete Report Templates", "Delete a saved report template.", "Reports", ScopeApp},
+	{AppReportsDuplicate, "Duplicate Report Templates", "Duplicate a saved report template.", "Reports", ScopeApp},
+	{AppReportsGenerate, "Generate Reports", "Generate and download reports.", "Reports", ScopeApp},
+
+	{AppReportsReadAll, "Read All Report Templates", "View and act on every report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
+	{AppReportsCreateAll, "Create Reports For Any Group", "Save report templates covering any group, bypassing the group-access requirement on create.", "Reports", ScopeApp},
+	{AppReportsUpdateAll, "Update All Report Templates", "Update any report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
+	{AppReportsDeleteAll, "Delete All Report Templates", "Delete any report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
+	{AppReportsDuplicateAll, "Duplicate All Report Templates", "Duplicate any report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
+	{AppReportsGenerateAll, "Generate All Reports", "Generate and download any saved report template, bypassing per-group access and per-template restrictions.", "Reports", ScopeApp},
+
 	{GroupView, "View Group", "See the group, its members, and metadata.", "Group", ScopeGroup},
 	{GroupUpdate, "Update Group", "Edit group name, settings, and receipt-handling configuration.", "Group", ScopeGroup},
 	{GroupDelete, "Delete Group", "Permanently delete the group.", "Group", ScopeGroup},
@@ -207,6 +240,8 @@ var registry = []Descriptor{
 	{GroupDashboardsDelete, "Delete Dashboards", "Remove dashboards.", "Dashboards", ScopeGroup},
 
 	{GroupWidgetsRead, "Read Widgets", "Read widget data (charts, summaries).", "Dashboards", ScopeGroup},
+
+	{GroupReportsRead, "Read Reports", "Generate and download reports over the group's receipts.", "Reports", ScopeGroup},
 
 	{GroupActivitiesRead, "Read Activities", "View the activity feed for the group.", "Activity", ScopeGroup},
 	{GroupActivitiesRerun, "Rerun Activities", "Re-execute a failed or stale activity.", "Activity", ScopeGroup},

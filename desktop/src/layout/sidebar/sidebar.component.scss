@@ -9,6 +9,21 @@ app-sidebar {
     background-color: #f8fafc;
   }
 
+  // Opt-in full-height frame: turns the content area into a bounded flex column so
+  // a full-bleed route (fullHeight route data) fills the viewport below the sticky
+  // header and owns its own internal scrolling, rather than scrolling as one block.
+  .drawer-content.drawer-content--full-height {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .drawer-outlet {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+  }
+
   .drawer-container {
     background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     border-right: 1px solid rgba(0, 0, 0, 0.08);

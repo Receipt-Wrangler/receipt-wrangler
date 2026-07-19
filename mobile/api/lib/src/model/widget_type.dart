@@ -19,6 +19,8 @@ class WidgetType extends EnumClass {
   static const WidgetType GROUP_ACTIVITY = _$GROUP_ACTIVITY;
   @BuiltValueEnumConst(wireName: r'PIE_CHART')
   static const WidgetType PIE_CHART = _$PIE_CHART;
+  @BuiltValueEnumConst(wireName: r'REPORT')
+  static const WidgetType REPORT = _$REPORT;
 
   static Serializer<WidgetType> get serializer => _$widgetTypeSerializer;
 

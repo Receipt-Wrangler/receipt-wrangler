@@ -1,0 +1,80 @@
+:host {
+  display: block;
+  flex: none;
+}
+
+.gen-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: #fff;
+  border-top: 1px solid #e2e8f0;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+  padding: 12px 24px;
+
+  &__label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    letter-spacing: 0.02em;
+  }
+
+  &__chips {
+    display: flex;
+    gap: 9px;
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 13px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    color: #64748b;
+
+    mat-icon {
+      font-size: 17px;
+      width: 17px;
+      height: 17px;
+    }
+
+    &--on {
+      background: rgba(39, 177, 255, 0.1);
+      border-color: #27b1ff;
+      color: #0086d4;
+    }
+  }
+
+  &__check {
+    font-size: 15px !important;
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  &__summary {
+    font-size: 11.5px;
+    color: #94a3b8;
+  }
+
+  &__spacer {
+    flex: 1;
+  }
+
+  &__spinner {
+    color: #009efa;
+    animation: gen-spin 1s linear infinite;
+  }
+}
+
+@keyframes gen-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

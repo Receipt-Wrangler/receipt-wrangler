@@ -63,12 +63,18 @@ export async function createRole(page: Page, opts: CreateRoleOptions): Promise<v
       .click();
   }
 
+  // Expand each accordion at most once (clicking its sub-text toggles it), then
+  // switch off every listed permission under it. Opening a panel per entry would
+  // re-close it when two permissions share a panel (e.g. two app.reports perms).
+  const openedPanels = new Set<string>();
   for (const { panelKey, label } of opts.disablePermissions ?? []) {
-    // Expand the accordion by clicking its sub-text (the resource key is unique
-    // on the page, so this won't collide with e.g. a sidebar "Dashboards" link),
-    // then switch the individual permission off.
-    const subText = new RegExp(`${panelKey.replace(/\./g, '\\.')} \\u00b7`);
-    await page.getByText(subText).click();
+    if (!openedPanels.has(panelKey)) {
+      // The resource key is unique on the page, so this won't collide with e.g. a
+      // sidebar "Dashboards" link.
+      const subText = new RegExp(`${panelKey.replace(/\./g, '\\.')} \\u00b7`);
+      await page.getByText(subText).click();
+      openedPanels.add(panelKey);
+    }
     await page.getByRole('button', { name: `Toggle ${label}` }).click();
   }
 
@@ -300,6 +306,135 @@ export async function apiDeleteGroupById(
   groupId: string,
 ): Promise<void> {
   await api.delete(`/api/group/${groupId}`);
+}
+
+/** Returns a group id (as a string) the caller can generate reports over. */
+export async function apiFirstReportGroupId(api: APIRequestContext): Promise<string> {
+  const appData = (await (await api.get('/api/user/appData')).json()) as {
+    groupPermissions?: Record<string, string[]>;
+  };
+  const groupPermissions = appData.groupPermissions ?? {};
+  const groupId = Object.keys(groupPermissions).find((id) =>
+    (groupPermissions[id] ?? []).includes('group.reports.read'),
+  );
+  if (!groupId) {
+    throw new Error('no group with group.reports.read for the caller');
+  }
+  return groupId;
+}
+
+/**
+ * Resolves a category the caller can both report on and see in the builder: a group
+ * with group.reports.read whose appData catalog carries at least one category. Read
+ * from the same appData.groupCategories the builder's picker unions, so a filter
+ * seeded with the returned id resolves to its name chip on open-in-builder.
+ */
+export async function apiFirstReportCategory(
+  api: APIRequestContext,
+): Promise<{ groupId: string; categoryId: number; categoryName: string }> {
+  const appData = (await (await api.get('/api/user/appData')).json()) as {
+    groupPermissions?: Record<string, string[]>;
+    groupCategories?: Record<string, { id?: number; name?: string }[]>;
+  };
+  const groupPermissions = appData.groupPermissions ?? {};
+  const groupCategories = appData.groupCategories ?? {};
+  for (const groupId of Object.keys(groupPermissions)) {
+    if (!(groupPermissions[groupId] ?? []).includes('group.reports.read')) {
+      continue;
+    }
+    const category = (groupCategories[groupId] ?? []).find((c) => c.id != null && !!c.name);
+    if (category) {
+      return { groupId, categoryId: category.id!, categoryName: category.name! };
+    }
+  }
+  throw new Error('no category in a group with group.reports.read for the caller');
+}
+
+/**
+ * Creates a report template via the API and returns its id + name (requires
+ * app.reports.create on the caller). The body is a complete, buildable
+ * ReportRequestCommand — records mode over a group the caller can report on.
+ */
+export async function apiCreateReportTemplate(
+  api: APIRequestContext,
+  opts?: { name?: string; groupIds?: string[]; formats?: string[]; filter?: unknown },
+): Promise<{ id: number; name: string }> {
+  const name = opts?.name ?? uniqueName('report-template');
+  // Scope a real group the caller can report on, so generating over it isn't
+  // group-gated out (the seeded admin's group ids are not necessarily [1]).
+  const groupIds = opts?.groupIds ?? [await apiFirstReportGroupId(api)];
+  const res = await api.post('/api/report/template', {
+    data: {
+      name,
+      groupIds,
+      period: { preset: 'this_month' },
+      detail: { mode: 'records' },
+      columns: [{ kind: 'dimension', name: 'Name', label: 'Name', field: 'name' }],
+      formats: opts?.formats ?? ['csv'],
+      ...(opts?.filter ? { filter: opts.filter } : {}),
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `create report template failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  const template = (await res.json()) as { id: number; name: string };
+  return { id: template.id, name: template.name };
+}
+
+export interface UpsertRolePayload {
+  name: string;
+  scope: 'APP' | 'GROUP';
+  permissions: string[];
+  reportTemplateGrants?: { reportTemplateId: number; permissions: string[] }[];
+}
+
+/**
+ * Creates a role via the admin API and returns its id. Unlike createRole (which
+ * drives the UI), this is for provisioning a role whose exact permission set /
+ * report-template matrix a test needs precisely — e.g. a group role granting
+ * group.reports.read plus a specific reportTemplateGrants matrix.
+ */
+export async function apiCreateRole(
+  api: APIRequestContext,
+  opts: UpsertRolePayload,
+): Promise<{ id: number }> {
+  const res = await api.post('/api/role', {
+    data: { description: '', ...opts },
+  });
+  if (!res.ok()) {
+    throw new Error(`create role failed: HTTP ${res.status()} ${await res.text()}`);
+  }
+  const role = (await res.json()) as { id: number };
+  return { id: role.id };
+}
+
+/**
+ * Updates the role [id] in place (scope carried in the body). Used to set a group
+ * role's reportTemplateGrants matrix AFTER the templates it references exist (the
+ * matrix references template ids, which need the group, which needs the role — so
+ * the role is created first and its matrix filled here).
+ */
+export async function apiUpdateRole(
+  api: APIRequestContext,
+  id: number,
+  opts: UpsertRolePayload,
+): Promise<void> {
+  const res = await api.put(`/api/role/${id}`, {
+    data: { description: '', ...opts },
+  });
+  if (!res.ok()) {
+    throw new Error(`update role failed: HTTP ${res.status()} ${await res.text()}`);
+  }
+}
+
+/** Deletes the report template [id] (requires app.reports.delete on the caller). */
+export async function apiDeleteReportTemplateById(
+  api: APIRequestContext,
+  id: number | string,
+): Promise<void> {
+  await api.delete(`/api/report/template/${id}`);
 }
 
 /**

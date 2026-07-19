@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"errors"
+	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/structs"
@@ -92,6 +93,7 @@ func (repository RoleRepository) GetGroupRoleById(id uint) (models.GroupRoleDefi
 		Preload("CategoryGrants").
 		Preload("TagGrants").
 		Preload("PaidByUserGrants").
+		Preload("ReportTemplateGrants").
 		First(&role, id).Error
 	if err != nil {
 		return models.GroupRoleDefinition{}, err
@@ -233,6 +235,45 @@ func (repository RoleRepository) replaceGroupRoleGrants(groupRoleId uint, catego
 	return nil
 }
 
+// ReplaceGroupRoleReportTemplateGrants resets a group role's report-template grants
+// to exactly the given matrix (delete-all-then-insert, one row per template+action),
+// and records whether the role is now restricted so it fails closed once its last
+// granted template is deleted. Kept a separate method from replaceGroupRoleGrants so
+// the widely-called CreateGroupRole/UpdateGroupRole signatures stay unchanged. The
+// ReportTemplate belongs-to association is Omit-ted so only the join rows are written.
+func (repository RoleRepository) ReplaceGroupRoleReportTemplateGrants(groupRoleId uint, grants []commands.ReportTemplateGrantCommand) error {
+	db := repository.GetDB()
+
+	err := db.Where("group_role_id = ?", groupRoleId).Delete(&models.GroupRoleReportTemplateGrant{}).Error
+	if err != nil {
+		return err
+	}
+
+	// Map-style Update so the false value persists when a role is cleared of grants.
+	err = db.Model(&models.GroupRoleDefinition{}).Where("id = ?", groupRoleId).
+		Update("report_template_grants_restricted", len(grants) > 0).Error
+	if err != nil {
+		return err
+	}
+
+	if len(grants) == 0 {
+		return nil
+	}
+
+	rows := make([]models.GroupRoleReportTemplateGrant, 0, len(grants))
+	for _, grant := range grants {
+		for _, permission := range grant.Permissions {
+			rows = append(rows, models.GroupRoleReportTemplateGrant{
+				GroupRoleID:      groupRoleId,
+				ReportTemplateID: grant.ReportTemplateId,
+				Permission:       permission,
+			})
+		}
+	}
+
+	return db.Omit("ReportTemplate").Create(&rows).Error
+}
+
 func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 	db := repository.GetDB()
 
@@ -247,6 +288,7 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		Preload("CategoryGrants").
 		Preload("TagGrants").
 		Preload("PaidByUserGrants").
+		Preload("ReportTemplateGrants").
 		Find(&groupRoles).Error
 	if err != nil {
 		return nil, err
@@ -277,11 +319,12 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 			Scope:            permissions.ScopeApp,
 			IsDefault:        role.IsDefault,
 			IsSystem:         role.IsSystem,
-			Permissions:      perms,
-			AssignedCount:    appRoleCounts[role.ID],
-			CategoryGrants:   []uint{},
-			TagGrants:        []uint{},
-			PaidByUserGrants: []uint{},
+			Permissions:          perms,
+			AssignedCount:        appRoleCounts[role.ID],
+			CategoryGrants:       []uint{},
+			TagGrants:            []uint{},
+			PaidByUserGrants:     []uint{},
+			ReportTemplateGrants: []structs.ReportTemplateGrantView{},
 		})
 	}
 
@@ -304,6 +347,7 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 			TagGrants:              tagGrantIdsFromRole(role),
 			PaidByUserGrants:       paidByUserGrantIdsFromRole(role),
 			IncludeOwnPaidReceipts: role.IncludeOwnPaidReceipts,
+			ReportTemplateGrants:   ReportTemplateGrantsFromRole(role),
 		})
 	}
 
@@ -338,6 +382,30 @@ func paidByUserGrantIdsFromRole(role models.GroupRoleDefinition) []uint {
 		ids = append(ids, grant.UserID)
 	}
 	return ids
+}
+
+// ReportTemplateGrantsFromRole groups a loaded group role's flat report-template
+// grant rows (one per template+action) into the per-template matrix rows the API
+// exposes, preserving first-seen template order for a stable response. Exported so
+// the role service's view builders reuse the grouping rather than duplicating it.
+func ReportTemplateGrantsFromRole(role models.GroupRoleDefinition) []structs.ReportTemplateGrantView {
+	byTemplate := make(map[uint][]string)
+	order := make([]uint, 0)
+	for _, grant := range role.ReportTemplateGrants {
+		if _, seen := byTemplate[grant.ReportTemplateID]; !seen {
+			order = append(order, grant.ReportTemplateID)
+		}
+		byTemplate[grant.ReportTemplateID] = append(byTemplate[grant.ReportTemplateID], grant.Permission)
+	}
+
+	views := make([]structs.ReportTemplateGrantView, 0, len(order))
+	for _, templateId := range order {
+		views = append(views, structs.ReportTemplateGrantView{
+			ReportTemplateId: templateId,
+			Permissions:      byTemplate[templateId],
+		})
+	}
+	return views
 }
 
 // roleAssignmentCount is the row shape returned by the grouped assignment-count
@@ -572,6 +640,40 @@ func (repository RoleRepository) GetGroupRolePaidByConfig(groupRoleId uint) (inc
 	}
 
 	return role.IncludeOwnPaidReceipts, role.PaidByVisibilityRestricted, nil
+}
+
+// GetGroupRoleReportTemplateGrants returns a group role's report-template grant
+// rows (one per template+action). An empty result means the role is unrestricted
+// (act on every template its group access reaches) unless
+// GetGroupRoleReportTemplateGrantsRestricted reports it opted into restriction.
+func (repository RoleRepository) GetGroupRoleReportTemplateGrants(groupRoleId uint) ([]models.GroupRoleReportTemplateGrant, error) {
+	db := repository.GetDB()
+
+	grants := make([]models.GroupRoleReportTemplateGrant, 0)
+	err := db.Where("group_role_id = ?", groupRoleId).Find(&grants).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return grants, nil
+}
+
+// GetGroupRoleReportTemplateGrantsRestricted reports whether a group role opted
+// into report-template restriction. Like the paid-by flag, it stays true after the
+// grant rows cascade away (last granted template deleted), so a configured role
+// keeps failing closed instead of widening back to see-all.
+func (repository RoleRepository) GetGroupRoleReportTemplateGrantsRestricted(groupRoleId uint) (bool, error) {
+	db := repository.GetDB()
+
+	var role models.GroupRoleDefinition
+	err := db.Select("report_template_grants_restricted").
+		Where("id = ?", groupRoleId).
+		First(&role).Error
+	if err != nil {
+		return false, err
+	}
+
+	return role.ReportTemplateGrantsRestricted, nil
 }
 
 // GetUserAppRoleId returns the app role id assigned to a user, or nil when the

@@ -200,6 +200,13 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   filters the shared `paidByOptions()` (stable references so the autocomplete excludes selected
   options). Empty = members see every payer's receipts; it restricts which receipts a member can see,
   not what they can edit. See `api/CLAUDE.md` → "Paid-by visibility enforcement".
+- **Report template access (group roles only):** the same grants section shows a "Report template access"
+  matrix — templates (rows, from `ReportService.getReportTemplateOptions()`, gated on `app.roles.read`) ×
+  actions (View/Generate/Edit/Delete/Duplicate columns) of `rw-switch` toggles, plus a per-row "All"
+  toggle. State is a `signal<Map<number, Set<string>>>` (immutable replace for zoneless CD, mirroring the
+  permissions grid's `Set` pattern — NOT a FormArray). **All-empty = unrestricted**; a template maps to the
+  subset of actions the role may perform on it. Hydrates directly from `role.reportTemplateGrants`,
+  serializes back for group scope only, resets on `pickType`. See `api/CLAUDE.md` → "Report-template access".
 - **Default roles:** the role-list page shows two `app-select` controls above the filter bar —
   "Default application role" and "Default group role". Each is pre-selected from the role flagged
   `isDefault` for its scope and, on change, calls `RoleService.setDefaultRole(scope, roleId)` then
@@ -634,6 +641,142 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   - `receipt-feature-gating.spec.ts` now has the **positive** Quick Scan contrast (previously `test.fixme`):
     with the flag injected on, a **Legacy Editor** member (holds `group.receipts.quick-scan`) sees the button
     while the Viewer — same user, same flag — does not.
+
+## Reports (Report Builder)
+
+The **Report Builder** (`src/reports/`) is a two-pane screen for building and downloading receipt
+reports against the backend reporting engine (see `api/CLAUDE.md` → "Reporting Engine"). The lazy
+`ReportsModule` is gated by `appPermissionGuard` on **`app.reports.read` OR `app.reports.readAll`** (the
+avatar-menu "Reports" entry gates on the same via a `hasAnyAppPermission([...])` signal, since the
+`*hasAppPermission` directive is single-key). Its routes: `/reports` is the **templates list** landing
+(below), and the builder lives at `/reports/new` and `/reports/:id/edit` (both `fullHeight`).
+**Per-template access is enforced end-to-end** (see `api/CLAUDE.md` → "Report-template access"): the list
+is server-filtered to the user's visible templates and each row's action buttons are gated purely on the
+server-computed **`element.allowedActions`** (never AND-ed with a client `*hasAppPermission` — that would
+wrongly hide a button from an `*All`-only holder). Row **Generate** runs the template by id through
+`ReportRunnerService.generateFromTemplateById` → `POST /report/template/{id}/generate` (the enforcing
+endpoint); the builder's own ad-hoc generate still gates on `app.reports.generate` + per-group
+`group.reports.read`. The in-builder group picker only lists groups where the user holds `group.reports.read`.
+
+- **Builder state** — the *builder* is a single reactive form (`report-form.factory.ts`) plus signals, no
+  NGXS (the templates *list* is the module's one NGXS slice, `ReportTemplateTableState` — see "Templates
+  list" below);
+  generate/preview are one-shot calls through `ReportRunnerService` (mirrors `ReceiptExportService`:
+  generate → `Blob` → `downloadFile`). `ReportCatalogService` supplies the dimension/measure dropdown
+  options: a built-in engine-key→label constant (`report-catalog.constants.ts`) plus custom fields from
+  `CustomFieldService` (CURRENCY → measure, else dimension, keyed `custom_<id>`). `report-command.mapper.ts`
+  maps the form to the generated `ReportRequestCommand`.
+- **Live preview** (`report-preview-panel`): the container debounces the form (~450ms, `switchMap`) into
+  `POST /report/preview` and renders the engine's returned HTML in a **sandboxed `<iframe srcdoc>`**
+  (`sandbox="allow-same-origin"`, scripts disabled; sized to content on load). The response's
+  `receiptCount` drives the chip that opens the receipts drill-in (`report-receipts-dialog`, paged
+  receipts across scope with the filter + resolved period). The drill-in is a read-only list → detail
+  inspector: a `selected` signal toggles the list (clickable rows) and a per-receipt breakdown card
+  (amount/category/paid-by/tags via the shared `customCurrency`/`name`/`user` pipes + `app-status-chip`);
+  "Open full receipt" does `window.open(\`/receipts/${id}/view\`, "_blank")` to view it in a new tab.
+- **Filters** (`report-filters`): the design's inline add-a-filter chips, but built on the **shared**
+  `buildReceiptFilterForm` (`src/utils/receipt-filter.ts`) and SharedUiModule `OperationsPipe`, so it
+  produces the exact `ReceiptPagedRequestFilter` the receipts filter does (same BETWEEN handling) — only
+  the presentation differs. Category/tag options are the union of the user's group catalogs.
+  - **Visible rows on open-in-builder**: the form always holds every filter field; which rows *show* is a
+    local `activeFieldKeys` signal. `addFilter`/`removeFilter` maintain it for edits, and `ngOnInit`
+    **seeds it from the hydrated filter** (every field whose stored `operation` is non-empty) — otherwise
+    a saved template's filter sits in the form but renders no rows. The value itself relies on the backend
+    serializing the filter with lowercase `value`/`tags` keys (see `api/CLAUDE.md` → Report templates).
+  - **Dynamic report-generator paid-by (reporting-only)**: the paid-by row is the one place the reporting
+    filter diverges from the shared receipts filter — instead of the shared `app-user-autocomplete` it
+    uses `app-autocomlete` over `paidByOptions()`, which prepends a pinned **"Whoever generates the
+    report"** sentinel (`REPORT_GENERATOR_PAID_BY_ID = -1`, negative so it never collides with a real id)
+    ahead of `UserState.users`. The control still stores plain numeric ids (the shared form builder, the command
+    mapper, and the round-trip factory are untouched), so a saved template carries the `-1` sentinel and
+    the backend resolves it to whoever generates the report — User A running User B's saved report filters
+    to User A's own receipts. Mirrors the role editor's `OWN_PAID_RECEIPTS_OPTION_ID` convention; the
+    shared receipts filter never offers it. See `api/CLAUDE.md` → "Reporting Engine" (buildModel).
+- **Columns** (`report-config-panel` + `column-picker-dialog`): a `FormArray` of columns edited through a
+  3-step picker (dimension / aggregate / formula). A column's engine `name` (what formulas reference) is a
+  derived identifier kept stable across label edits (`report-column.util.ts`); formula validation is
+  lightweight inline feedback — the backend is the authoritative validator (a bad spec → 400, surfaced by
+  the interceptor). Grouping levels and columns reorder via up/down (no drag-and-drop).
+  - **Aggregate dimension-column rule**: in aggregate mode the engine can only label an (aggregated) row
+    by a field it's grouped/aggregated by, so a dimension column is valid only when its `field` is the
+    `detail.by` dimension or one of the `groupBy` levels. Rather than error, such a column is **disabled**
+    — a derived state (`isDimensionColumnDisabled` in `report-command.mapper.ts`) shown greyed in the
+    columns list and **left out of the request** (`enabledReportColumns`), auto-re-enabling when the
+    config makes it valid again. `report-builder` blocks preview/generate only if *no* enabled column
+    remains. Nothing is removed or auto-changed — and **Save persists every column, including disabled
+    ones** (`toReportRequestCommandForSave`, distinct from the enabled-only preview/generate
+    `toReportRequestCommand`), so a disabled column round-trips into a reopened template and self-heals
+    instead of being silently dropped. The backend applies the same projection when a stored template is
+    generated (see `api/CLAUDE.md` → "Report templates"), so a template holding a currently-disabled
+    column still generates with it omitted.
+- **Save Template**: the generate bar's secondary button (left of Generate) persists the current
+  configuration. Its gate and label follow the builder's mode, driven by two inputs from
+  `report-builder` (`isEditMode` + `saveButtonPermission`): on the **new** route it **creates** a
+  template (`POST /report/template` via `ReportRunnerService.saveTemplate`, gated by
+  `Permission.AppReportsCreate`, label "Save Template", toast "Template saved"); on the **edit** route it
+  **updates the opened template in place** (`PUT /report/template/{id}` via
+  `ReportRunnerService.updateTemplate`, gated by `Permission.AppReportsUpdate`, label "Update Template",
+  toast "Template updated"). So a user who can open a template (read) but not update it sees no Save
+  action. **Save-as-new is retired** — the list's Duplicate row action covers copying. The template's
+  name is the report's own name (no separate dialog), enabled under the same validity as Generate plus a
+  non-empty name (`canSaveTemplate`). See `api/CLAUDE.md` → "Report templates".
+- **Generate gating**: the generate bar's Generate button is
+  `*hasAppPermission="Permission.AppReportsGenerate"`-gated (preview is not — it stays group-scoped),
+  matching the endpoint, which now ANDs `app.reports.generate` with the per-group `group.reports.read`.
+- **Templates list** (`report-template-list/`, the `/reports` landing): a paged `app-table`
+  (`BaseTableComponent` + `ReportTemplateTableService` + the NGXS `ReportTemplateTableState`, mirroring the
+  groups/roles list pages) of saved templates. Columns Name (+ column count), Scope, Grouping, Detail,
+  Formats, Updated — the JSON-blob-derived ones are non-sortable; only `name`/`updated_at` sort
+  server-side. The derived display strings come from a pure `report-template-summary.ts` util (group ids →
+  names via `GroupState.groupsWithoutAll`). Row actions carry `data-testid="report-template-<action>"` and
+  gate on the matching permission: **generate** (`AppReportsGenerate`, runs the stored config through the
+  builder's generate path), **open/edit** (read — routes to `/reports/:id/edit`), **duplicate**
+  (`AppReportsDuplicate`), **delete** (`AppReportsDelete`, via `ConfirmationDialogComponent`). A "New
+  Report" primary button routes to the blank builder; an empty state shows when there are none.
+- **Open in builder (hydration)**: `/reports/:id/edit` uses a `reportTemplateResolver`
+  (`GET /report/template/{id}`) to load the template before the builder's form initializer, and
+  `buildReportFormFromCommand` (`report-form.factory.ts`) builds the form *seeded from* the stored
+  `ReportRequestCommand` — the faithful inverse of `toReportRequestCommand` (round-trip-tested), reusing
+  `buildReceiptFilterForm` for the filter. Building from the command in the field initializer (before the
+  constructor's preview subscription attaches) means the loaded config previews exactly once. The builder's
+  page-bar gains a back-to-list button + a breadcrumb showing the loaded template name.
+- **Other divergences from the design** (intentional): the **progress bar + Cancel** are gone
+  (generation is synchronous → in-flight spinner, then download); the section-card look is a small local
+  `app-report-section` shell so the pattern isn't repeated.
+- Structural lists (scope, grouping, columns) mutate the `FormArray` and bump a `revision` signal so the
+  `@for`s re-render under zoneless CD (dialog-driven changes run outside a template event). Multi-select
+  filter controls (categories/tags/paid-by) are `FormArray`s, per the `app-autocomlete` `.push()` contract.
+- **Full-height two-pane frame**: the screen fills the viewport below the app header with the config and
+  preview panes scrolling **independently** and the page-bar/generate-bar pinned flush. This is opt-in via
+  `data: { fullHeight: true }` on the route — `SidebarComponent` reads the deepest active route's
+  `fullHeight` flag and, **only for that route**, drops the shell's `p-4` padding and turns the content
+  area into a bounded flex column (`.drawer-content--full-height`); every other route is unaffected. Reuse
+  the same flag for any future full-bleed page. The report name appears as the rendered heading when
+  Document → Title is left blank (the engine falls back to the report name).
+
+### Report dashboard widget
+
+A **view-only** dashboard widget (`WidgetType.Report`, `src/dashboard/report-widget/`) that pins a saved
+report template and renders its HTML inside a **sandboxed `<iframe srcdoc>`** (`sandbox="allow-same-origin"`,
+scripts disabled; `bypassSecurityTrustHtml`) — the same technique as the builder preview, but the widget
+copies the ~10-line idiom locally rather than reusing the builder-coupled `ReportPreviewPanelComponent`.
+The widget stores only `{ reportTemplateId }` in its configuration blob and calls
+`ReportRunnerService.renderTemplate(id)` → `POST /report/template/{id}/render` (see `api/CLAUDE.md`), which
+renders the **full dataset** (not the capped builder preview) and re-resolves access server-side.
+
+- **Restricted state is backend-driven**: a revoked/deleted template comes back as restricted-notice HTML
+  at 200, which the widget renders like any other HTML — there is no special client "restricted" branch
+  (only a generic error state for a network failure or a missing `reportTemplateId`). The report renders
+  in a height-capped, internally-scrolling stage so a long report doesn't blow out the tile.
+- **Download button** (`data-testid="report-widget-download"`): shown **only when** the server-returned
+  `allowedActions` include `"generate"` — gated purely on the server result, **never** re-AND-ed with a
+  client `*hasAppPermission` (same rule as the templates-list row buttons). It calls
+  `ReportRunnerService.downloadTemplateById(id)` (resolve template → `generateFromTemplateById`, the
+  enforcing `/report/template/{id}/generate` path).
+- **Authoring** (`dashboard-form`): the **Report** widget-type option is filtered out unless the user holds
+  `app.reports.read`/`readAll` (`availableWidgetTypeOptions`), and its config is a single template picker
+  (`app-select`) whose options come from `ReportService.getReportTemplates` — server-filtered to the
+  caller's viewable templates (`reportTemplateOptions`, loaded in `ngOnInit`, `catchError`→empty).
 
 ## Testing Requirements
 

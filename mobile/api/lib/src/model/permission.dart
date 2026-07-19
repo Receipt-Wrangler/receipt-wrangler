@@ -171,6 +171,42 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'app.receipts.search')
   static const Permission appPeriodReceiptsPeriodSearch = _$appPeriodReceiptsPeriodSearch;
   /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.create')
+  static const Permission appPeriodReportsPeriodCreate = _$appPeriodReportsPeriodCreate;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.delete')
+  static const Permission appPeriodReportsPeriodDelete = _$appPeriodReportsPeriodDelete;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.duplicate')
+  static const Permission appPeriodReportsPeriodDuplicate = _$appPeriodReportsPeriodDuplicate;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.generate')
+  static const Permission appPeriodReportsPeriodGenerate = _$appPeriodReportsPeriodGenerate;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.read')
+  static const Permission appPeriodReportsPeriodRead = _$appPeriodReportsPeriodRead;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.update')
+  static const Permission appPeriodReportsPeriodUpdate = _$appPeriodReportsPeriodUpdate;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.readAll')
+  static const Permission appPeriodReportsPeriodReadAll = _$appPeriodReportsPeriodReadAll;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.createAll')
+  static const Permission appPeriodReportsPeriodCreateAll = _$appPeriodReportsPeriodCreateAll;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.updateAll')
+  static const Permission appPeriodReportsPeriodUpdateAll = _$appPeriodReportsPeriodUpdateAll;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.deleteAll')
+  static const Permission appPeriodReportsPeriodDeleteAll = _$appPeriodReportsPeriodDeleteAll;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.duplicateAll')
+  static const Permission appPeriodReportsPeriodDuplicateAll = _$appPeriodReportsPeriodDuplicateAll;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.reports.generateAll')
+  static const Permission appPeriodReportsPeriodGenerateAll = _$appPeriodReportsPeriodGenerateAll;
+  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.view')
   static const Permission groupPeriodView = _$groupPeriodView;
   /// All permission keys the API recognizes.
@@ -221,6 +257,9 @@ class Permission extends EnumClass {
   /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.widgets.read')
   static const Permission groupPeriodWidgetsPeriodRead = _$groupPeriodWidgetsPeriodRead;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'group.reports.read')
+  static const Permission groupPeriodReportsPeriodRead = _$groupPeriodReportsPeriodRead;
   /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.activities.read')
   static const Permission groupPeriodActivitiesPeriodRead = _$groupPeriodActivitiesPeriodRead;

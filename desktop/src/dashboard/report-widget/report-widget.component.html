@@ -1,0 +1,42 @@
+<app-card cardStyle="dashboard-card">
+  <ng-container header>
+    <div class="d-flex justify-content-between align-items-center">
+      <h3>{{ widget().name || 'Report' }}</h3>
+      @if (canDownload()) {
+        <app-button
+          matButtonType="iconButton"
+          color="accent"
+          icon="download"
+          tooltip="Download report"
+          data-testid="report-widget-download"
+          [disabled]="isDownloading()"
+          (clicked)="download()"
+        ></app-button>
+      }
+    </div>
+  </ng-container>
+  <ng-container content>
+    <div class="report-widget__stage">
+      @if (isLoading()) {
+        <div class="report-widget__loading" data-testid="report-widget-loading">
+          <mat-icon>autorenew</mat-icon>
+        </div>
+      } @else if (hasError()) {
+        <div class="report-widget__placeholder" data-testid="report-widget-error">
+          <mat-icon>error_outline</mat-icon>
+          <span>Couldn't load this report.</span>
+        </div>
+      } @else {
+        <iframe
+          #frame
+          class="report-widget__frame"
+          title="Report"
+          sandbox="allow-same-origin"
+          [style.height.px]="frameHeight()"
+          [srcdoc]="safeHtml()"
+          (load)="onFrameLoad(frame)"
+        ></iframe>
+      }
+    </div>
+  </ng-container>
+</app-card>

@@ -1,0 +1,362 @@
+:host {
+  display: block;
+}
+
+.report-config {
+  &__label {
+    display: block;
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 500;
+    margin: 6px 0;
+  }
+
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(39, 177, 255, 0.1);
+    border: 1px solid #a4deff;
+    border-radius: 9999px;
+    padding: 5px 10px 5px 6px;
+    font-size: 12.5px;
+    color: #0f172a;
+    font-weight: 500;
+  }
+
+  &__chip-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  &__chip-remove {
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
+    color: #94a3b8;
+    cursor: pointer;
+
+    &:hover {
+      color: #d63333;
+    }
+  }
+
+  &__add-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #fff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 9999px;
+    padding: 5px 11px;
+    font-size: 12.5px;
+    color: #64748b;
+    cursor: pointer;
+    font-family: inherit;
+
+    &:hover {
+      border-color: #27b1ff;
+      color: #009efa;
+    }
+
+    mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+    }
+  }
+
+  &__row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+
+    &--center {
+      align-items: center;
+    }
+  }
+
+  &__grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__inline-label {
+    font-size: 12.5px;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  &__hint {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: #64748b;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 10px;
+
+    mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+      color: #009efa;
+    }
+
+    strong {
+      color: #334155;
+    }
+  }
+
+  &__list-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    padding: 6px 8px;
+    margin-bottom: 7px;
+
+    // A dimension column that isn't valid for the current aggregate config is
+    // kept but greyed out and left out of the report (see report-command.mapper).
+    &--disabled {
+      background: #fff;
+      border-style: dashed;
+
+      .report-config__col-label {
+        color: #94a3b8;
+        text-decoration: line-through;
+      }
+
+      .report-config__col-desc {
+        color: #b45309;
+        font-family: inherit;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+      }
+
+      .report-config__kind {
+        opacity: 0.5;
+      }
+    }
+  }
+
+  &__pos {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    border-radius: 6px;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__list-label {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: #0f172a;
+    font-weight: 500;
+  }
+
+  &__add-select {
+    display: block;
+    margin-top: 3px;
+  }
+
+  &__mode-cards {
+    display: flex;
+    gap: 9px;
+  }
+
+  &__mode-card {
+    flex: 1;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 11px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: #fff;
+
+    &--selected {
+      border-color: #27b1ff;
+      background: #f8fbff;
+    }
+  }
+
+  &__mode-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #64748b;
+    }
+  }
+
+  &__mode-card--selected &__mode-title mat-icon {
+    color: #009efa;
+  }
+
+  &__mode-desc {
+    font-size: 11.5px;
+    color: #64748b;
+    margin-top: 3px;
+  }
+
+  &__note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #64748b;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+      color: #94a3b8;
+    }
+  }
+
+  &__kind {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    border-radius: 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    mat-icon {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+    }
+  }
+
+  &__kind-badge {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: 5px;
+    padding: 2px 6px;
+    flex: none;
+  }
+
+  &__col-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__col-label {
+    font-size: 13px;
+    color: #0f172a;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__col-desc {
+    font-size: 11px;
+    color: #94a3b8;
+    font-family: ui-monospace, Menlo, monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__add-block {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: #fff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 9px;
+    padding: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 3px;
+
+    &:hover {
+      border-color: #27b1ff;
+      color: #009efa;
+      background: #f8fbff;
+    }
+  }
+
+  &__var-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 11px;
+  }
+
+  &__var-chip {
+    font-size: 11px;
+    font-family: ui-monospace, Menlo, monospace;
+    color: #0086d4;
+    background: rgba(39, 177, 255, 0.1);
+    border: 1px solid #a4deff;
+    border-radius: 6px;
+    padding: 2px 7px;
+    cursor: pointer;
+
+    &:hover {
+      background: #ccecff;
+    }
+  }
+}
+
+// Column kind accents (badge + icon chip)
+.kind-dimension {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.12);
+}
+.kind-aggregate {
+  color: #009efa;
+  background: rgba(39, 177, 255, 0.12);
+}
+.kind-formula {
+  color: #0f9d6e;
+  background: rgba(16, 185, 129, 0.14);
+}

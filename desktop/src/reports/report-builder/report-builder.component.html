@@ -1,0 +1,57 @@
+<div class="report-builder">
+  <div class="report-builder__page-bar">
+    <app-button
+      class="report-builder__back"
+      matButtonType="iconButton"
+      icon="arrow_back"
+      tooltip="Back to Reports"
+      data-testid="report-builder-back"
+      [buttonRouterLink]="['/reports']"
+    ></app-button>
+    <span class="report-builder__page-icon">
+      <mat-icon>summarize</mat-icon>
+    </span>
+    <div class="report-builder__titles">
+      <div class="report-builder__breadcrumb">
+        <a class="report-builder__crumb-link" [routerLink]="['/reports']">Reports</a>
+        <mat-icon>chevron_right</mat-icon>
+        <span>{{ loadedTemplateName ?? "New report" }}</span>
+      </div>
+      <div class="report-builder__heading">Report Builder</div>
+    </div>
+    <span class="report-builder__spacer"></span>
+    <span class="report-builder__scope-note">
+      <mat-icon>lock</mat-icon>
+      Runs under your group permissions
+    </span>
+  </div>
+
+  <div class="report-builder__split">
+    <div class="report-builder__config">
+      <app-report-config-panel [form]="form"></app-report-config-panel>
+    </div>
+    <div class="report-builder__preview">
+      <app-report-preview-panel
+        [form]="form"
+        [html]="previewHtml()"
+        [receiptCount]="receiptCount()"
+        [loading]="previewLoading()"
+        [error]="previewError()"
+        [ready]="canPreview()"
+      ></app-report-preview-panel>
+    </div>
+  </div>
+
+  <app-report-generate-bar
+    [form]="form"
+    [generating]="generating()"
+    [canGenerate]="canGenerate()"
+    [canSaveTemplate]="canSaveTemplate()"
+    [saving]="saving()"
+    [isEditMode]="isEditMode"
+    [saveTemplateAllowed]="saveTemplateAllowed()"
+    [generateAllowed]="generateAllowed()"
+    (generate)="generate()"
+    (saveTemplate)="saveTemplate()"
+  ></app-report-generate-bar>
+</div>

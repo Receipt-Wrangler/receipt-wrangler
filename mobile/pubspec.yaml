@@ -65,6 +65,9 @@ dependencies:
   money2: ^6.0.3
   flutter_svg: ^2.0.16
   fl_chart: ^1.2.0
+  webview_flutter: ^4.14.1
+  path_provider: ^2.1.6
+  share_plus: ^13.2.1
 
 dev_dependencies:
   flutter_test:

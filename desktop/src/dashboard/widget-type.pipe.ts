@@ -16,6 +16,8 @@ export class WidgetTypePipe implements PipeTransform {
         return "Activity";
       case WidgetType.PieChart:
         return "Pie Chart";
+      case WidgetType.Report:
+        return "Report";
     }
 
     return "";

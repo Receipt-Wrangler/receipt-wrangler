@@ -4,6 +4,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"testing"
 	"time"
@@ -789,5 +790,156 @@ func TestPieChartService_GetPieChartData_SingleReceiptAllGroupings(t *testing.T)
 
 	if len(paidByResult.Data) != 1 || paidByResult.Data[0].Value != 150.0 {
 		utils.PrintTestError(t, paidByResult.Data, "expected single entry with value 150.0")
+	}
+}
+
+// pieDataByLabel indexes pie chart data points by their label. Buckets are keyed
+// by name in the chart output, so labels are unique and this is lossless.
+func pieDataByLabel(data []structs.PieChartDataPoint) map[string]float64 {
+	byLabel := make(map[string]float64, len(data))
+	for _, point := range data {
+		byLabel[point.Label] = point.Value
+	}
+	return byLabel
+}
+
+// A category the caller may not see becomes a (Restricted) slice rather than
+// being stripped — stripping would fold its spend into Uncategorized and hide it
+// among genuinely uncategorized receipts. The allowed and the restricted slice
+// each carry the receipt amount (the chart's existing multi-value fan-out).
+//
+// The receipt carries TWO hidden categories to pin that they collapse to a
+// SINGLE (Restricted) slice: (Restricted) is counted once per receipt, so its
+// value is the receipt amount, not a multiple of the hidden-category count.
+func TestPieChartService_GetPieChartData_GroupByCategories_RestrictedCategory(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	allowedCatId := makeCategory(t, "Groceries")
+	hiddenCatId := makeCategory(t, "Salary")
+	otherHiddenCatId := makeCategory(t, "Bonus")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "pie-cat", []uint{allowedCatId}, nil)
+
+	createTestReceipt("mixed", 100.00, userId, groupId,
+		[]models.Category{loadCategory(t, allowedCatId), loadCategory(t, hiddenCatId), loadCategory(t, otherHiddenCatId)}, nil)
+
+	result, err := NewPieChartService(nil).GetPieChartData(userId, groupIdString(groupId), commands.PieChartDataCommand{
+		ChartGrouping: models.CHART_GROUPING_CATEGORIES,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// Exactly two slices: one visible category and one shared (Restricted). Asserted
+	// on the raw data because pieDataByLabel would fold a duplicate (Restricted) point.
+	if len(result.Data) != 2 {
+		utils.PrintTestError(t, len(result.Data), 2)
+	}
+
+	byLabel := pieDataByLabel(result.Data)
+	if byLabel["Groceries"] != 100.0 {
+		utils.PrintTestError(t, byLabel["Groceries"], 100.0)
+	}
+	// 100.0, not 200.0 — the two hidden categories share one (Restricted) slice.
+	if byLabel["(Restricted)"] != 100.0 {
+		utils.PrintTestError(t, byLabel["(Restricted)"], 100.0)
+	}
+	if _, ok := byLabel["Salary"]; ok {
+		utils.PrintTestError(t, "hidden category leaked into the chart", "no Salary slice")
+	}
+	if _, ok := byLabel["Bonus"]; ok {
+		utils.PrintTestError(t, "second hidden category leaked into the chart", "no Bonus slice")
+	}
+	if _, ok := byLabel["Uncategorized"]; ok {
+		utils.PrintTestError(t, "hidden spend collapsed into Uncategorized", "no Uncategorized slice")
+	}
+}
+
+// (Restricted) and Uncategorized are distinct buckets: a receipt whose only
+// category is hidden lands in (Restricted); a receipt with no category at all
+// lands in Uncategorized. They must not merge.
+func TestPieChartService_GetPieChartData_GroupByCategories_RestrictedDistinctFromUncategorized(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	allowedCatId := makeCategory(t, "Groceries")
+	hiddenCatId := makeCategory(t, "Salary")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "pie-distinct", []uint{allowedCatId}, nil)
+
+	createTestReceipt("hidden-only", 100.00, userId, groupId, []models.Category{loadCategory(t, hiddenCatId)}, nil)
+	createTestReceipt("no-category", 40.00, userId, groupId, nil, nil)
+
+	result, err := NewPieChartService(nil).GetPieChartData(userId, groupIdString(groupId), commands.PieChartDataCommand{
+		ChartGrouping: models.CHART_GROUPING_CATEGORIES,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// Exactly two slices: (Restricted) and Uncategorized, kept separate.
+	if len(result.Data) != 2 {
+		utils.PrintTestError(t, len(result.Data), 2)
+	}
+
+	byLabel := pieDataByLabel(result.Data)
+	if byLabel["(Restricted)"] != 100.0 {
+		utils.PrintTestError(t, byLabel["(Restricted)"], 100.0)
+	}
+	if byLabel["Uncategorized"] != 40.0 {
+		utils.PrintTestError(t, byLabel["Uncategorized"], 40.0)
+	}
+	if _, ok := byLabel["Salary"]; ok {
+		utils.PrintTestError(t, "hidden category leaked into the chart", "no Salary slice")
+	}
+}
+
+// The tag side mirrors categories: a tag the caller may not see becomes a
+// (Restricted) slice rather than folding into Untagged. Two hidden tags on the
+// one receipt collapse to a single (Restricted) slice counted once per receipt.
+func TestPieChartService_GetPieChartData_GroupByTags_RestrictedTag(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	allowedTag := createTestTag("Reimbursable")
+	hiddenTag := createTestTag("Personal")
+	otherHiddenTag := createTestTag("Confidential")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "pie-tag", nil, []uint{allowedTag.ID})
+
+	createTestReceipt("mixed", 100.00, userId, groupId, nil, []models.Tag{allowedTag, hiddenTag, otherHiddenTag})
+
+	result, err := NewPieChartService(nil).GetPieChartData(userId, groupIdString(groupId), commands.PieChartDataCommand{
+		ChartGrouping: models.CHART_GROUPING_TAGS,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// Exactly two slices: one visible tag and one shared (Restricted).
+	if len(result.Data) != 2 {
+		utils.PrintTestError(t, len(result.Data), 2)
+	}
+
+	byLabel := pieDataByLabel(result.Data)
+	if byLabel["Reimbursable"] != 100.0 {
+		utils.PrintTestError(t, byLabel["Reimbursable"], 100.0)
+	}
+	// 100.0, not 200.0 — the two hidden tags share one (Restricted) slice.
+	if byLabel["(Restricted)"] != 100.0 {
+		utils.PrintTestError(t, byLabel["(Restricted)"], 100.0)
+	}
+	if _, ok := byLabel["Personal"]; ok {
+		utils.PrintTestError(t, "hidden tag leaked into the chart", "no Personal slice")
+	}
+	if _, ok := byLabel["Confidential"]; ok {
+		utils.PrintTestError(t, "second hidden tag leaked into the chart", "no Confidential slice")
+	}
+	if _, ok := byLabel["Untagged"]; ok {
+		utils.PrintTestError(t, "hidden spend collapsed into Untagged", "no Untagged slice")
 	}
 }

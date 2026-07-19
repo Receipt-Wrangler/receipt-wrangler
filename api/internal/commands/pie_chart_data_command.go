@@ -9,7 +9,7 @@ import (
 )
 
 type PieChartDataCommand struct {
-	ChartGrouping models.ChartGrouping  `json:"chartGrouping"`
+	ChartGrouping models.ChartGrouping      `json:"chartGrouping"`
 	Filter        ReceiptPagedRequestFilter `json:"filter"`
 }
 
@@ -24,43 +24,7 @@ func (command *PieChartDataCommand) LoadDataFromRequest(w http.ResponseWriter, r
 		return err
 	}
 
-	// Initialize filter values if nil
-	if command.Filter.Amount.Value == nil || command.Filter.Amount.Value == "" {
-		command.Filter.Amount.Value = float64(0)
-	}
-
-	if command.Filter.PaidBy.Value == nil || command.Filter.PaidBy.Value == "" {
-		command.Filter.PaidBy.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.Categories.Value == nil || command.Filter.Categories.Value == "" {
-		command.Filter.Categories.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.Tags.Value == nil || command.Filter.Tags.Value == "" {
-		command.Filter.Tags.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.Status.Value == nil || command.Filter.Status.Value == "" {
-		command.Filter.Status.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.Group.Value == nil || command.Filter.Group.Value == "" {
-		command.Filter.Group.Value = make([]interface{}, 0)
-	}
-
-	if command.Filter.CreatedAt.Value == nil {
-		command.Filter.CreatedAt.Value = ""
-	}
-
-	if command.Filter.Date.Value == nil {
-		command.Filter.Date.Value = ""
-	}
-
-	if command.Filter.ResolvedDate.Value == nil {
-		command.Filter.ResolvedDate.Value = ""
-	}
-
+	initReceiptFilterValues(&command.Filter)
 	return nil
 }
 

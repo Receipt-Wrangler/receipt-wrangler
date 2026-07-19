@@ -7,6 +7,7 @@ import { MatSidenavModule } from "@angular/material/sidenav";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { By } from "@angular/platform-browser";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
+import { Router } from "@angular/router";
 import { RouterTestingModule } from "@angular/router/testing";
 import { NgxsModule, Store } from "@ngxs/store";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
@@ -67,6 +68,22 @@ describe("SidebarComponent", () => {
 
   it("should create", () => {
     expect(component).toBeTruthy();
+  });
+
+  it("reflects the active route's fullHeight data in isContentFullHeight", async () => {
+    const router = TestBed.inject(Router);
+    router.resetConfig([
+      { path: "plain", children: [] },
+      { path: "full", data: { fullHeight: true }, children: [] },
+    ]);
+
+    await router.navigateByUrl("/plain");
+    await fixture.whenStable();
+    expect(component.isContentFullHeight()).toBe(false);
+
+    await router.navigateByUrl("/full");
+    await fixture.whenStable();
+    expect(component.isContentFullHeight()).toBe(true);
   });
 
   it("hides the admin manage menu items without the matching read permissions", async () => {

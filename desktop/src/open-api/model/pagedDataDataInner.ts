@@ -8,29 +8,31 @@
  * Do not edit the class manually.
  */
 import { CustomFieldValue } from './customFieldValue';
-import { Comment } from './comment';
 import { Group } from './group';
 import { GroupMember } from './groupMember';
 import { Category } from './category';
-import { Receipt } from './receipt';
+import { ReportRequestCommand } from './reportRequestCommand';
+import { ReportTemplate } from './reportTemplate';
 import { Activity } from './activity';
 import { ReceiptProcessingSettings } from './receiptProcessingSettings';
-import { CustomFieldType } from './customFieldType';
 import { Item } from './item';
 import { GroupReceiptSettings } from './groupReceiptSettings';
 import { SystemTaskStatus } from './systemTaskStatus';
 import { OcrEngine } from './ocrEngine';
 import { CustomFieldOption } from './customFieldOption';
 import { SystemTask } from './systemTask';
+import { GroupSettings } from './groupSettings';
+import { TagView } from './tagView';
+import { FileData } from './fileData';
+import { Comment } from './comment';
+import { Receipt } from './receipt';
+import { CustomFieldType } from './customFieldType';
 import { AiType } from './aiType';
 import { CustomField } from './customField';
-import { GroupSettings } from './groupSettings';
 import { AssociatedEntityType } from './associatedEntityType';
 import { Prompt } from './prompt';
 import { SystemEmail } from './systemEmail';
-import { TagView } from './tagView';
 import { Tag } from './tag';
-import { FileData } from './fileData';
 
 
 export interface PagedDataDataInner { 
@@ -63,7 +65,7 @@ export interface PagedDataDataInner {
      */
     imageFiles?: Array<FileData>;
     /**
-     * Custom Field name
+     * The template name (mirrors the saved report\'s name).
      */
     name: string;
     /**
@@ -169,6 +171,15 @@ export interface PagedDataDataInner {
     useStartTLS?: boolean;
     canBeRestarted?: boolean;
     options?: Array<CustomFieldOption>;
+    configuration: ReportRequestCommand;
+    /**
+     * Schema version the stored configuration was written under.
+     */
+    configurationVersion: number;
+    /**
+     * The actions the requesting user may perform on this template (read, generate, update, delete, duplicate), resolved per user and populated only on the list response. Drives the row action buttons.
+     */
+    allowedActions?: Array<string>;
 }
 export namespace PagedDataDataInner {
 }

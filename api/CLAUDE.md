@@ -99,6 +99,13 @@ default). Those only matter for exercising email-OCR / PDF-receipt processing, n
 - `go test -coverprofile=coverage.out -covermode=atomic -v ./...` - Run tests with coverage
 - `python3 -m unittest discover -s ./imap-client` - Run Python IMAP client tests
 
+### Seeding test data
+- `RW_API_KEY='key.1.<id>.<secret>' node dev/seed-reporting-data.mjs` - Seed a realistic, high-volume
+  reporting dataset (a dedicated group + member users + categories/tags + ~2000 receipts spread over a
+  date range) via the HTTP API. The admin API key is read from `RW_API_KEY` (never hardcoded). Setup is
+  idempotent (reuses the group/users/categories/tags by name); receipts are additive. Tunable via env
+  (`RECEIPT_COUNT`, `SEED_GROUP_NAME`, `START_DATE`/`END_DATE`, `CONCURRENCY`, …) — see the script header.
+
 ### API Client Generation
 - `./generate-client.sh desktop <output-dir>` - Generate TypeScript Angular client
 - `./generate-client.sh mobile <output-dir>` - Generate Dart Dio client
@@ -123,6 +130,8 @@ default). Those only matter for exercising email-OCR / PDF-receipt processing, n
 - **internal/routers/** - Route definitions and middleware setup
 - **internal/wranglerasynq/** - Background job processing using Asynq
 - **internal/ai/** - AI client implementations (OpenAI, Gemini, Ollama)
+- **internal/permissions/** - Pure permission registry + wildcard matcher (no DB)
+- **internal/reporting/** - Pure report engine (no DB); `receiptsource/` maps receipts into it
 
 ### Database
 - Uses GORM ORM with support for SQLite, MySQL, and PostgreSQL
@@ -298,6 +307,12 @@ will be dropped in a later release.
     holder's own receipts. `UpsertRoleCommand`/`RoleView`/swagger carry `paidByUserGrants` +
     `includeOwnPaidReceipts`; the granted user ids are existence-validated like category/tag grants
     (`ErrInvalidGrant`). See "Paid-by visibility enforcement" below.
+  - **Report-template access** is a fourth grant type: `GroupRoleReportTemplateGrant` (composite-PK
+    `{GroupRoleID, ReportTemplateID, Permission}` — the action folded into the key) restricting which
+    saved report templates a role's members may act on, per action. Same opt-in rule (empty =
+    unrestricted) with a `ReportTemplateGrantsRestricted` fail-closed flag; carried on
+    `UpsertRoleCommand`/`RoleView`/swagger as `reportTemplateGrants` (a per-template action list). See
+    "Report-template access" in the Reports section for the full three-layer model + the `*All` bypass.
 - **Assignment:** nullable FKs `User.AppRoleID` and `GroupMember.GroupRoleID` (one app role per
   user; one group role per group membership). Nullable because per-create assignment is best-effort
   (the FK is left `nil` rather than failing creation when no role can be resolved, e.g. an unseeded
@@ -340,18 +355,25 @@ will be dropped in a later release.
   `app.account.read`), so granting it would only expose the admin "Manage Users" page to normal users; and
   `app.categories.read` / `app.tags.read` — omitted as part of the category/tag grant lock-down, since they
   gate the GLOBAL category/tag lists; normal users now get only the per-group filtered catalogs (the
-  `app.categories.create` / `app.tags.create` permissions are retained for inline creation). See
-  "Category/tag delivery on AppData" below.
+  `app.categories.create` / `app.tags.create` permissions are retained for inline creation); and
+  `app.reports.read` (the app-level gate on the desktop report builder route + nav and the saved-template
+  read endpoints), `app.reports.generate` (the app-level gate on report generation, ANDed with the
+  per-group check), and `app.reports.duplicate` (duplicating a saved template). Reporting is
+  **admin-by-default**: Legacy Admin picks these up automatically (its set is every app permission), while
+  non-admins get them only via a custom role that grants them. Per-group generation additionally stays
+  gated by the group-scoped `group.reports.read`. See "Category/tag delivery on AppData" below.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.
-- Idempotent: keyed on role `Name` (a `uniqueIndex`), safe on every boot; a pre-existing
-  same-named role is left untouched. The five role names are shared constants
-  (`repositories/system_role_names.go`, `Legacy*RoleName`) used by both the seeder and the
-  migration.
-- **Known limitation:** because system roles are immutable and seeding skips existing names, a
-  permission added to the registry later will **not** flow into an already-seeded Legacy Admin /
-  Legacy Owner. Re-syncing system roles would need a dedicated reconciliation step (out of scope).
+- Idempotent and **self-reconciling**: keyed on role `Name` (a `uniqueIndex`), safe on every boot. A
+  missing role is created; an existing one has any permissions it lacks **added — add-only, so a
+  permission already on the role is never removed** (`missingPermissions` computes the add set). The
+  five role names are shared constants (`repositories/system_role_names.go`, `Legacy*RoleName`) used
+  by both the seeder and the migration.
+- Because reconciliation is add-only, a permission **added** to the registry later flows into an
+  already-seeded Legacy Admin / Legacy Owner on the next boot — both sets are dynamic over the
+  registry (`LegacyAppAdminKeys` / `LegacyGroupOwnerKeys`) — while a capability an install already
+  holds is never stripped.
 
 ### Default roles
 
@@ -470,8 +492,11 @@ will be dropped in a later release.
   whole pool), keeping their view consistent with the global lists.
 - **Receipt enforcement wiring:** every receipt surface that returns or accepts categories/tags is
   gated. **Reads** strip via `FilterReceiptCategoriesTags` (receipt-, item-, and linked-item-level):
-  `GetReceipt`, `GetPagedReceiptsForGroup`, `GetReceiptsForGroupIds`, the pie-chart service, and both
-  CSV export handlers; `DuplicateReceipt` strips the source before copying. **Writes**
+  `GetReceipt`, `GetPagedReceiptsForGroup`, `GetReceiptsForGroupIds`, and both CSV export handlers;
+  `DuplicateReceipt` strips the source before copying. **Aggregation** reads substitute instead of
+  stripping via `SubstituteRestrictedCategoriesTags` (receipt-level; a hidden category/tag becomes a
+  `(Restricted)` bucket rather than collapsing into `(None)`): the pie-chart service and the reporting
+  data source. **Writes**
   (`CreateReceipt` / `UpdateReceipt`) call `enforceReceiptGrantSelection` — existing ids must be in
   the caller's grants (else 403) and a new-by-name category/tag requires `app.categories.create` /
   `app.tags.create`. **List/pie/export filters** are narrowed by `IntersectReceiptFilterWithGrants`
@@ -715,3 +740,345 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   and admin-bypass callers are a no-op). This closes a write bypass: the UI picker already limits picks
   to the granted catalog, but a crafted request could otherwise attach a category/tag the caller can't
   see.
+
+## Reporting Engine (`internal/reporting`)
+
+A **pure** report engine: `(ReportSpec + FieldCatalog + []Row + MetaInput) → ReportModel`. It
+fetches nothing, renders nothing, reads no clock, and consults no global. Renderers (CSV/XLSX/PDF), a
+dashboard widget, template persistence and HTTP delivery all *call* it; none of them are part of it.
+
+**`internal/reporting/README.md`** is the narrative guide for engineers: the pipeline, the type
+vocabulary, and a worked example carried from input rows through the report tree to the rendered
+table. The section below is the rules digest; the README is where the diagrams are.
+
+**The purity rule is enforceable and must stay true:**
+
+```bash
+go list -deps receipt-wrangler/api/internal/reporting | grep -E 'gorm|repositories|internal/models'
+# must print nothing
+```
+
+`internal/reporting/receiptsource/` is the **only** package that imports `models`. It maps
+`[]models.Receipt` + `[]models.CustomField` into `[]reporting.Row`. Item-grain reporting or a
+non-receipt widget adds a *sibling* of it; the engine core never changes.
+
+```go
+source, err := receiptsource.New(customFields)          // needs CustomField.Options loaded
+model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), meta)
+```
+
+**Caller must preload** `PaidByUser`, `Group`, `Categories`, `Tags`, `CustomFields`. An unloaded
+association resolves to no value, which surfaces as a `(None)` bucket — not an error.
+
+**Date period grouping — derived string fields.** `date`, `resolved_date` and `created_at` are
+`TypeDate`, so grouping by one buckets on the exact instant (one group per receipt). To group by
+calendar period, `receiptsource` also offers derived **string** fields `<base>_day` / `_month` /
+`_year` (e.g. `date_month`, `created_at_year`, `resolved_date_day`) — zero-padded ISO in **UTC**, so
+they sort chronologically as plain text. A report groups by one of these instead of the raw date field;
+a nil `resolved_date` emits none of its period fields (→ `(None)`).
+
+**`services.ReportDataService`** (`internal/services/report_data.go`) is the first DB-backed caller of
+the engine — it follows the `pie_chart.go` pattern. `Rows(userId, groupId, filter)` fetches the group's
+receipts unpaged and applies the reporting access controls **in order**: narrow the request filter to
+the caller's grants (`IntersectReceiptFilterWithGrants`), hide whole receipts in the query by paid-by
+(`PaidByListResolver`), then substitute the categories/tags the caller can't see. It returns the
+engine's `(FieldCatalog, []Row)` — it does **not** build a `ReportSpec` or call `Run`; a caller does.
+
+**Renderers** (`internal/reporting/render`) are pure downstream consumers of a `ReportModel` — they
+fetch and compute nothing, and never reach back into the engine, so a new format (or a future layout)
+touches no upstream code. `render.CSV(model, groupBy)` is the first: a flat, **data-only** CSV — the
+group-by dimensions become leading columns (`groupBy []render.Dimension` supplies their order and header
+labels, since the model carries dimension keys but not labels), each detail leaf is one row, and a
+leading `Row Type` column marks each row `Detail` / `Subtotal` / `Grand Total`. It renders only what the
+model carries (subtotal/grand-total rows appear only when the spec toggled them on), draws no document
+chrome, and is unit-tested in isolation against models built via `reporting.Run` (there is no orchestrator
+or handler yet). Per `docs/engine-design.md` §5, CSV is deliberately the minimal renderer; the
+grouped/visual "looks like the on-screen report" layout belongs to the XLSX/PDF renderers, each a separate
+consumer of the same tree. Currency renders per the app's custom currency configuration — symbol, symbol
+position, thousands/decimal separators, and hide-decimal-places — when the caller supplies `Meta.Currency`
+(a bare 2dp otherwise); other numbers at full precision; `(None)` buckets use `Meta.NoneLabel`.
+
+`render.XLSX(model, groupBy)` (via `github.com/xuri/excelize/v2`) is the **faithful, grouped** counterpart:
+the group-by dimensions are leading columns with each value shown **once per group** (blanked on repeats),
+and a subtotal/grand-total row carries a `Total`/`Grand Total` marker in the column at the group's depth
+(the "staircase"). Numbers are written as **native, typed cells** with a number format — for currency an
+Excel format code built from `Meta.Currency` (symbol, position, and decimal-places; the group/decimal
+glyphs follow the opener's locale, an Excel constraint), overridable per column via
+`ColumnDescriptor.Format`, defaulting to `#,##0.00` when neither is set — so the workbook stays analyzable,
+and header/subtotal/grand-total rows are bold; sheet name `Report`. It writes the engine-computed values
+**statically** — live `=SUM`/expression formulas (the reason `ColumnDescriptor.Expr` is an exported AST)
+are a later slice, and document chrome/slots (logo) await the template work. It shares the `Dimension`
+type and the `groupBy`-depth guard (`validateGroupByDepth`) with the CSV renderer, and the faithful
+**walk** with the HTML renderer (`faithfulWalk` in `render/walk.go`, driving a per-format `faithfulSink`);
+CSV keeps its own flat walk. Tested by round-tripping the bytes back through `excelize.OpenReader`.
+
+`render.HTML(model, groupBy, chrome)` is the **PDF format's HTML stage** (via `html/template`): a
+self-contained document — a `Meta.Title` heading, an optional authored intro, a preamble of the resolved
+`Meta.Params`, the same faithful table as XLSX (through the shared `faithfulWalk`), and a footer, each
+omitted when there is nothing for it. The `render.DocumentChrome{Intro, Footer}` argument is authored
+presentation copy layered on **at render time** — kept out of the pure model (which stays
+presentation-free); a zero value is byte-identical to the data-only rendering, and an authored footer
+replaces the automatic `Meta.GeneratedAt` note. All CSS is inline and it references no external resources
+or scripts, so it renders through the headless-Chromium HTML-to-PDF pipeline (`services/html_to_pdf.go`,
+which blocks network loads and disables JS by default). It returns **HTML bytes** — the reporting package
+is pure, so the chromedp conversion to PDF stays in the services layer (`ReportService`, below). Unit-tested
+against the same faithful golden grids as XLSX (parsed with `golang.org/x/net/html`) plus document-chrome
+and HTML-escaping cases.
+
+**`services.ReportService` + `POST /api/report/generate`** are the orchestrator and endpoint that join
+the pieces. `ReportService.Generate(userId, command)` resolves the request's period into a date filter,
+loads rows across every group in the request under the one (global) catalog, builds a `ReportSpec`, runs
+the pure engine, resolves the document's `{{period}}`/`{{group.name}}`/`{{generatedAt}}`/`{{currentUser.name}}`
+variables (the rendered heading is the authored `document.title`, falling back to the report `name` when
+blank so the report — and its live preview — is never headingless), renders each requested format
+(bridging PDF through `HtmlToPdfService.Render`), and returns a
+single file or a **zip** of several. It reads the clock exactly once. The handler (`handlers/report.go`)
+parses+validates the `ReportRequestCommand` **before** building the `structs.Handler` — because the
+`groupIds` it carries drive the gate: it declares `GroupIds` + `GroupPermissions: [group.reports.read]`,
+so `HandleRequest` re-checks that permission (and membership) in **every** covered group before generating.
+A malformed spec surfaces from `reporting.Run` as a `ReportService`-typed `*ReportSpecError`, which the
+handler maps to a 400. The request contract mirrors the engine (columns carry a machine `name` that
+formulas reference by name with ASCII operators; group-by/detail carry engine field keys), so the Angular
+client maps its builder UI onto engine-shaped values before submitting. Report generation is **synchronous**
+(streamed download); an async job + live progress + stored-results download is a possible later slice.
+
+**`POST /api/report/preview`** drives the desktop builder's live preview. It shares GenerateReport's
+front-loaded parse/validate and the same per-group `group.reports.read` gate (the shared
+`loadReportCommand` handler helper), and `ReportService.Preview` runs the **same** pipeline as `Generate`
+up through the engine (both call the shared `buildModel`) but renders only `render.HTML` — no PDF bridge,
+no zip — and **row-caps** the sample (`reportPreviewRowCap`, currently 1000; `ReceiptCount` still reports
+the true total). It returns a JSON `ReportPreviewResponse { html, receiptCount }`, so the preview is the
+engine's own output rather than a client-side re-implementation. A separate **app-level `app.reports.read`**
+permission gates the desktop report-builder route/nav and the saved-template read endpoints (Legacy Admin
+picks it up via add-only role reconciliation; reporting is admin-by-default). Generate additionally
+requires the app-level **`app.reports.generate`** (ANDed with the per-group `group.reports.read`), so a
+non-admin needs both a custom role granting `app.reports.generate` and per-group generation access.
+**Preview enforces that same app-level read gate** — `app.reports.read` **or** `app.reports.readAll`,
+declared on the handler as an `AnyAppPermissions` any-of and ANDed with the per-group
+`group.reports.read` — so the builder's live feedback loop is reachable by exactly the users who can
+open the builder, and preview is never merely group-scoped.
+
+**`POST /api/report/template/{id}/render`** backs the **dashboard report widget** (a view-only widget
+that pins a saved template — see `desktop/CLAUDE.md` → "Reports"). It mirrors
+`GenerateReportFromTemplate` (loads the stored config server-side) but emits the same JSON
+`ReportPreviewResponse { html, receiptCount, allowedActions }` as `/preview`, with two deliberate
+differences from the builder preview: it renders the **full dataset** (`ReportService.RenderTemplateForUser`
+calls the shared `renderHTML` helper with `rowLimit = 0`, like `Generate` — **not** the capped
+`reportPreviewRowCap` sample the builder's `Preview` uses), and it **returns restricted-notice HTML at a
+normal 200** (with empty `allowedActions`) when the caller may not view the template or it was deleted,
+rather than a 403/404. That's because the widget always drops whatever HTML it gets into its sandboxed
+iframe, so there is no client-side "restricted" branch. Authorization is resolved **in the service** via
+`PermissionService.AllowedActionsForTemplate` (the single source: the base/`*All` app perms + the
+per-group ceiling + the per-template matrix); a result lacking `"read"` yields the restricted notice, and
+the returned `allowedActions` (which include `"generate"` iff the caller may generate) gate the widget's
+download button off the server result — the download itself reuses the enforcing
+`/report/template/{id}/generate`. The `restrictedReportHTML` notice and the extracted `renderHTML` helper
+(shared by `Preview` and `RenderTemplateForUser`) live in `services/report_service.go`.
+
+**Custom currency formatting.** `buildModel` loads System Settings (`SystemSettingsRepository.GetSystemSettings`,
+a get-or-create singleton) and passes the app's currency configuration — symbol, symbol position (START/END),
+thousands/decimal separators, and hide-decimal-places — through `MetaInput.Currency` (mapped by
+`currencyFormat`). Because Generate and Preview share `buildModel`, **every** rendered output (the live
+preview, PDF/HTML, CSV, and XLSX) presents money exactly as the rest of the UI does — matching the desktop
+`customCurrency` pipe that the report's receipts drill-in dialog already uses. The engine stays pure (it
+carries `Currency` through untouched); the settings load lives in the service and the formatting in the
+`render` package (`render/currency.go`).
+
+**Dynamic report-generator paid-by.** `buildModel` also resolves a **report-generator paid-by sentinel**
+before it fans out to `loadRows`: `resolveReportGeneratorPaidBy(&filter, userId)` replaces the value `-1`
+in `filter.PaidBy.Value` with the generating user's id (the desktop report builder stores `-1` for its
+"Whoever generates the report" paid-by option; negative so it can't collide with a real id). So a saved
+template stays **dynamic** — whoever runs it filters to their own receipts, regardless of who authored it
+(User A running User B's saved report sees User A's receipts). It runs once, upstream of
+`IntersectReceiptFilterWithGrants` + `BuildGormFilterQuery` (which then see a normal numeric
+`paid_by_user_id IN (...)`), on a by-value copy of `command.Filter` so the request is never mutated; and
+because Generate and Preview share `buildModel`, the substitution covers download and the live preview
+alike. Values arrive as `float64` (JSON), matched/substituted as such — the same shape a static user-id
+filter already flows through.
+
+**Report templates.** `POST /api/report/template` saves a report configuration for reuse. It reuses the
+shared `loadReportCommand` parse+validate and stores the whole `ReportRequestCommand` verbatim as a
+`json.RawMessage` blob on `models.ReportTemplate` (name + owner taken from the request / JWT), so a
+template round-trips back into the builder unchanged. A stored config may include a dimension column
+that is currently **disabled** in the builder (aggregate mode, a label whose field is neither the
+aggregate dimension nor a grouping level) — persisted deliberately so it round-trips and self-heals
+rather than being silently dropped on save. `buildReportSpec` (`services/report_service.go`,
+`isDisabledDimensionColumn`) **projects such a column out** before running the engine, mirroring the
+desktop `isDimensionColumnDisabled` and the engine's own `ErrLabelColumnUnresolvable` rejection — so
+verbatim generation of a stored template (including `POST /report/template/{id}/generate`) succeeds
+with the column omitted instead of returning a 400. Because this is the first feature to **re-serialize
+a `ReceiptPagedRequestFilter` back to a client**, the filter's json tags must be correct:
+`PagedRequestField.Value` carries `json:"value"` and the filter's `Tags` field `json:"tags"` (both
+lowercase, matching swagger) — a capitalized key would deserialize fine (Go is case-insensitive) but
+serialize a `Value`/`Tags` the desktop can't read, so the operation would hydrate while the value
+silently dropped (see `paged_request_command_test.go`). Unlike generate/preview it is **app-scoped** behind
+a new `app.reports.create` permission — `handlers.CreateReportTemplate` gates on `AppPermissions` and calls
+`repositories.ReportTemplateRepository` directly (handler→repo, like prompts, no engine involvement),
+because it persists a configuration and touches no group's receipts. Legacy Admin picks the permission up
+via add-only role reconciliation (reporting is admin-by-default, same as `app.reports.read`); per-group
+generation stays gated by `group.reports.read`. `DELETE /api/report/template/{id}` removes a template
+(`handlers.DeleteReportTemplate` → `ReportTemplateRepository.DeleteReportTemplateById`, mirroring
+`DeletePromptById`; deleting a non-existent id is a 200 no-op), gated by a separate CRUD-granular
+`app.reports.delete` (Legacy Admin auto-gains it; no ownership scoping yet — any holder may delete any
+template). `POST /api/report/template/list` (`getReportTemplates`) returns a paged, sorted list and
+`GET /api/report/template/{id}` (`getReportTemplate`) one template — both gated by `app.reports.read`
+(the same read gate as the builder route); the list mirrors the prompt paged-read pattern
+(`GetPagedReportTemplates` with a `name`/`created_at`/`updated_at` order-by allow-list, since the column
+is interpolated raw), and get-by-id maps `gorm.ErrRecordNotFound` to a 404.
+`POST /api/report/template/{id}/duplicate` (`duplicateReportTemplate`) copies a template into a new row
+owned by the caller (name suffixed `" duplicate"`, configuration/version carried verbatim, a fresh id),
+gated by a separate CRUD-granular **`app.reports.duplicate`**. `PUT /api/report/template/{id}`
+(`updateReportTemplate`) overwrites a template in place — it mirrors `CreateReportTemplate` (shared
+`loadReportCommand` parse+validate + the same non-empty-name guard) but loads the existing row first
+(`UpdateReportTemplate` repo method → `GetReportTemplateById`, so a missing id is a 404, not a silent
+insert), preserving its id and owner while replacing name/config/version and refreshing `UpdatedAt`.
+Gated by a separate CRUD-granular **`app.reports.update`** (Legacy Admin auto-gains it; no ownership
+scoping — any holder may update any template, matching delete/duplicate). Each template carries a
+`configurationVersion` (currently `1`, DB default `1`, stamped from
+`commands.CurrentReportConfigurationVersion`) marking the schema its stored config was written under, so
+a future breaking change to the `ReportRequestCommand` shape can upcast — or fail loud on — old blobs
+instead of silently misdeserializing them; upcasters + a migration are deferred until that first break.
+The desktop **template-management UI** is delivered: `/reports` lists saved templates and each row can
+generate, open-in-builder, duplicate, or delete. Opening a template rehydrates the builder from its
+stored config; **the builder's Save updates in place on the edit route** (`app.reports.update`) and
+**creates on the new route** (`app.reports.create`) — save-as-new is retired (Duplicate copies).
+
+**Report-template access (group-scoping + per-template matrix + `*All` bypass).** The flat "any holder may
+act on any template" model above is **superseded**: the six template handlers now resolve access through
+`services.PermissionService` (`internal/services/report_authz.go`) — `CanActOnTemplate`,
+`VisibleTemplateIds`, `AllowedActionsForTemplate`, `CanReportOverGroups` — which AND three layers:
+1. **App action permission** — the base `app.reports.<action>`, moved *into* the authz service so it can
+   be OR-ed with the bypass (the declarative `AppPermissions` gate is AND-only, so the six template
+   handlers dropped it and enforce in-body).
+2. **Group-access ceiling** — the caller must hold `group.reports.read` in *every* group the template
+   covers (most-restrictive-wins), read from the denormalized `report_template_groups` index (synced on
+   create/update/duplicate, cascades on delete) since the group ids otherwise live only in the config blob.
+3. **Per-template matrix** — `GroupRoleReportTemplateGrant {group_role_id, report_template_id, permission}`,
+   a group-role grant alongside category/tag/paid-by. Empty for a role = unrestricted; non-empty = only the
+   listed (template, action) pairs. A `ReportTemplateGrantsRestricted` flag fails closed once the last
+   granted template is deleted (paid-by style). Resolution rides the per-role grant cache; the delete
+   handler flushes it (`services.EvictAllGroupRoleGrants`).
+
+For each action there is an app-scoped **`app.reports.<action>All`** bypass (readAll/createAll/updateAll/
+deleteAll/duplicateAll/generateAll) short-circuiting both the ceiling and the matrix — auto-granted to
+Legacy Admin (ScopeApp), so admins keep full reach with no migration. The list returns per-row
+`allowedActions` so the desktop gates each row's buttons off the server result (never re-AND-ed with a
+client permission check). New endpoints: **`POST /report/template/{id}/generate`** enforces the per-template
+generate grant (the ad-hoc `/generate` stays app + per-group only — it carries no template id, so "view but
+not generate" is only a real boundary via this path); **`GET /report/template/options`** (gated on
+`app.roles.read`, the role editor's own gate) feeds the role-form access matrix. Create/update additionally
+require `CanReportOverGroups` on the attached groups (createAll/updateAll bypass).
+
+The per-template matrix is **UX scoping** (which saved templates a member sees/acts on) layered on the hard
+data-access controls — the group-access ceiling plus the category/tag/paid-by grants — which alone bound the
+receipt data any report can reach; so the ad-hoc `POST /report/generate` (no template id, so the matrix never
+applies) and a `duplicate`'s resulting copy (which starts matrix-unrestricted) are intentionally not bound by
+the per-template matrix and never widen data access beyond those hard controls, which every generation re-resolves.
+
+**`(Restricted)` vs `(None)`.** Aggregation uses `PermissionService.SubstituteRestrictedCategoriesTags`
+(not the strip variant): a category/tag the caller may not see is replaced with a single `(Restricted)`
+marker, so the receipt still counts toward the totals in its own bucket instead of vanishing. `(None)`
+stays reserved for a receipt that genuinely carries no category/tag. The **pie chart** (`pie_chart.go`)
+substitutes the same way, so a restricted viewer sees a `(Restricted)` slice rather than hidden spend
+folding into `Uncategorized`/`Untagged`. (The CSV export handlers still strip — export is a per-receipt
+listing, not an aggregation.)
+
+### Semantics that are easy to get wrong
+
+| Concern | Rule |
+|---|---|
+| Aggregate rollup | A parent **merges its children's accumulators**, never their finalized values. This is what makes `AVG` at a subtotal `sum(all descendants)/count(all descendants)` rather than the average of its children's averages. |
+| Arithmetic rollup | Recomputed from the **same row's** other columns at every level (detail, subtotal, grand total). Never summed. Additive formulas agree either way; ratios and averages do not. |
+| `SUM`/`COUNT` of nothing | `0` — a category with no tax shows `0.00`, not an empty cell. |
+| `AVG`/`MIN`/`MAX` of nothing | `Null` (empty cell). Zero would be a lie. |
+| `COUNT()` | Counts **records**, not values. A row with a null measure still counts. It takes no field. |
+| Nulls | Skipped by `SUM`/`MIN`/`MAX` and excluded from `AVG`'s divisor. Any null operand makes an arithmetic result null. |
+| Division by zero | `Null` cell, **never a panic** — `shopspring` panics on a zero divisor, so `evalBinary` guards `IsZero()` first. |
+| Division precision | `DivRound(x, spec.Config.DivisionScale)`. **Never read or write `decimal.DivisionPrecision`** (a mutable process-wide global). |
+| Multi-value fan-out | A receipt with two tags is attributed to **both** buckets in full, so it double-counts, and that double count propagates to the grand total. Intended — matches `services/pie_chart.go`. Two multi-value levels produce a cross product. But only **distinct** values fan out: a receipt tagged `"Alex"` twice is attributed once. |
+| Multi-valued measures | Refused (`ErrMeasureIsMultiValued`). Summing a field that resolves to several values would silently read the first and drop the rest. A `Multi` field is still a fine dimension and a fine display label. Note `Multi` is a **producer's declaration**, never checked against the rows: a catalog that lies loses values in `Row.Measure`. |
+| Bucket keys | Two values share a bucket key **exactly when `compareValues` finds them equal**. Numbers key on `decimal.String()` (canonical, lossless); dates key on `Unix()` seconds + `Nanosecond()` and **never `UnixNano()`**, which is undefined outside 1678–2262 — a zero `time.Time` and a date in 585 share one. A coarser key merges buckets *and* makes the surviving bucket's value depend on input order. |
+| Bucket **values** | A bucket keeps `Value.canonical()`, not whichever member arrived first. Agreeing with `compareValues` is only half the job: dates compare by instant, so one instant in two zones merges, and `Value.Time()` would otherwise hand a renderer an arbitrary one of them (`2026-05-01T00:00:00Z` vs `2026-04-30T19:00:00-05:00` format as different **calendar days**). **Date buckets are emitted in UTC.** A producer wanting calendar-day grouping in a local zone must truncate before handing rows over. |
+| Unknown enums | `Validate` rejects an `AggFunc` or `DetailMode` outside the known set (`ErrUnknownAggFunc`, `ErrUnknownDetailMode`). Both used to fail silently — an unknown reduction fell through `finalize` and blanked the column; an unknown detail mode skipped the label-column check. Ask "is this aggregate mode?" only through `DetailSpec.isAggregate()`; two spellings of it once disagreed. |
+| Enum switch drift | `AggFunc` is switched on in **four** places (`String`, `valid`, `aggFuncFromName`, `accumulator.finalize`) and Go forces none of them to agree. `enums_test.go` pins them to each other exhaustively over all 256 values. **Adding a reduction means updating all four** — `valid()` alone would let `Validate` accept a column `finalize` blanks. `finalize`'s fallthrough stays `Null()`, not a `panic`: nothing in this package panics, the line is unreachable through `Validate`, and drift is a compile-time mistake caught at `go test` time. |
+| Formula size | `ParseArithmetic`/`ParseAggregate` refuse source over `maxFormulaLength` (1 KB) **before parsing**. expr's 10k-node cap does *not* bound this: a parenthesis builds no node, so nesting is bounded only by the goroutine stack (~640 B/paren; ~1.6M overflows the default 1 GB), and a Go stack overflow is a fatal error `recover` cannot catch. |
+| Field keys | `NewFieldCatalog` rejects a key that is not a plain identifier (`ErrInvalidFieldKey`). `unit-price` would tokenize as a subtraction. |
+| Empty dimension | Explicit `(None)` bucket (`IsNone: true`, `Value` null). Never dropped. |
+| Ordering | Buckets sort by typed value with `(None)` last; records preserve input order. **Never range a Go map to produce output** (`pie_chart.go` has exactly this bug). |
+| Formatting | The engine emits raw typed values. Currency symbols and decimal places are a renderer's job. |
+| `GeneratedAt` | An **input** (`MetaInput`), never `time.Now()`. Determinism depends on it. |
+| `IsNone` | Equals `Value.IsNull()` for group nodes and **aggregate-mode** detail rows only. The synthetic `Root` and every **records-mode** detail row carry a null `Value` with `IsNone: false`. It is **not** a global biconditional — do not "fix" the engine to make it one. |
+
+### Columns and formulas
+
+Three column kinds, declared not inferred: `ColumnLabel` (displays a field, blank on subtotal rows),
+`ColumnAggregate` (`SUM(amount)`, `COUNT()` — backed by a mergeable accumulator), and
+`ColumnArithmetic` (`Subtotal + Hst`, `ROUND(Total / Count, 2)`).
+
+`Column.Name` is what formulas reference and must be a plain identifier that is not a reserved word;
+`Column.Label` is the free-text heading. They are separate so renaming a heading (`Avg/Receipt`)
+cannot break a formula (`AvgPerReceipt`).
+
+Formulas are parsed by **`expr-lang/expr` used as a parser front-end only** (`parser.Parse` →
+`ast.Node`); its VM is never run, because it evaluates over `float64` and money must not touch a
+float. The tree is then checked against an allow-list implemented as a **closed type switch whose
+`default` rejects**. Two traps: `??`, `in`, `**` and `%` all parse as `*ast.BinaryNode` (so the
+*operator* is whitelisted too), and expr ships lower-case builtins named `sum`, `min`, `max`,
+`count`, `round`, `len` — so `round(a,2)` arrives as an `*ast.BuiltinNode`, not a `CallNode`.
+
+Arithmetic columns form a **DAG**, topologically sorted with cycle detection, so a column may be
+declared before the aggregate it reads. `ColumnDescriptor.Expr` keeps the parsed tree so the future
+XLSX renderer can translate a column expression into a live `=SUM(...)` cell formula.
+
+### Tests
+
+Both packages are pure — **no `main_test.go`, no DB, no `app.db` cleanup.** The engine suite builds
+synthetic `Row` literals, which is what makes the scenario matrix cheap; `receiptsource` uses real
+`models.Receipt` fixtures.
+
+**Compare money with `decimal.Equal`/`StringFixed`, never `reflect.DeepEqual`** — `NewFromInt(200)`
+and `200.00` are equal but carry different internal exponents. Determinism is compared through
+`serializeModel` for the same reason.
+
+Four layers, each catching what the one before it cannot:
+
+| Layer | File | What it does |
+|---|---|---|
+| Invariants | `invariants_test.go` | `assertModelInvariants` re-derives the model's structure from the spec. `mustRun` calls it, so **every** engine test checks it. |
+| Golden | `golden_test.go` | Renders a whole report as a text table. One assertion covers grouping, ordering, values, subtotal placement and blank cells. |
+| Properties | `property_test.go` | 400 randomized specs + rows from a fixed seed (`REPORTING_SEED` overrides). Conservation, rollup, AVG exactness, arithmetic recompute, bucket cardinality, determinism. |
+| Fuzz | `fuzz_test.go`, `bucketkey_test.go` | Seed corpora run under plain `go test`. `-fuzz` is opt-in. |
+
+**A law must not be derived from the code it judges.** This rule has now been broken twice, in two
+different files, and both times the suite went green over a real defect:
+
+- `property_test.go` computes bucket identity with `compareValues` and reads rows with `Row.Get`,
+  deliberately *not* `bucketKey`/`dimensionValues` — an earlier draft used the engine's own helpers
+  and consequently agreed with the bug it was meant to catch.
+- `invariants_test.go`'s `serializeValue` rendered a date as `bucketKey(value)`, so the determinism
+  and permutation laws agreed that two zones naming one instant were interchangeable — which is the
+  one thing they exist to deny. It now serializes the wall clock and zone offset a **renderer**
+  reads. `Value.String()` normalizes to UTC, so the golden test could not have seen it either.
+
+Likewise the random date alphabet contains both the two instants that share a `UnixNano` **and** one
+instant expressed in two zones that straddle midnight. A generator that only produces plausible data
+only tests the plausible paths — and note the two `12:00` entries look like such a pair and are not
+(one is `12:00Z`, the other `11:00Z`), which is exactly how the gap survived.
+
+### Mutation checking
+
+```bash
+./internal/reporting/mutation-check.sh          # all 43 mutations, engine + receiptsource
+./internal/reporting/mutation-check.sh avg      # only those matching "avg"
+```
+
+Breaks the engine one way at a time and asserts a test objects. Uses `go test -overlay`, so it
+**never writes to the working tree**. Run it before merging any change to the engine; a survivor
+means the engine can be broken that way without a single test noticing.
+
+Its three self-imposed rules, each learned the hard way: a mutation whose search text no longer
+matches is a **failure**, not a pass; a mutant that **does not compile** was never tested, so only
+`--- FAIL` counts as caught; and `-count=1`, or the build cache serves the last verdict.
+
+- `internal/reporting/{value,bucketkey,row,field,formula,eval,accumulator,model,validate,engine,invariants,golden,property,fuzz,passthrough,adversarial}_test.go`
+- `internal/reporting/receiptsource/receiptsource_test.go`
