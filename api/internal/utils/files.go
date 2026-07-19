@@ -99,7 +99,7 @@ func BuildGroupPathString(groupId string, groupName string) (string, error) {
 	// A crafted group name must not escape the data directory (CWE-22).
 	// filepath.Join cleans any ".." only after the untrusted name is already
 	// part of the path, so verify containment before returning.
-	if err := assertWithinDataDir(groupPath); err != nil {
+	if err := AssertWithinDataDir(groupPath); err != nil {
 		return "", err
 	}
 

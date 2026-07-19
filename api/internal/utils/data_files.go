@@ -19,11 +19,12 @@ func GetDataDir() (string, error) {
 	return filepath.Join(basePath, "data"), nil
 }
 
-// assertWithinDataDir returns an error when path resolves outside the data
+// AssertWithinDataDir returns an error when path resolves outside the data
 // directory. It is the shared containment check that defends every data-file
 // operation against path traversal (CWE-22) from untrusted input such as a
-// group name.
-func assertWithinDataDir(path string) error {
+// group name, and is exported so path builders can guarantee containment at
+// construction time.
+func AssertWithinDataDir(path string) error {
 	dataDir, err := GetDataDir()
 	if err != nil {
 		return err
@@ -42,7 +43,7 @@ func assertWithinDataDir(path string) error {
 // MakeDataDirectory creates a directory inside the data directory, refusing any
 // path that would escape it.
 func MakeDataDirectory(path string) error {
-	if err := assertWithinDataDir(path); err != nil {
+	if err := AssertWithinDataDir(path); err != nil {
 		return err
 	}
 
@@ -52,7 +53,7 @@ func MakeDataDirectory(path string) error {
 // RemoveDataPath removes a single file or empty directory inside the data
 // directory, refusing any path that would escape it.
 func RemoveDataPath(path string) error {
-	if err := assertWithinDataDir(path); err != nil {
+	if err := AssertWithinDataDir(path); err != nil {
 		return err
 	}
 
@@ -62,7 +63,7 @@ func RemoveDataPath(path string) error {
 // RemoveAllInDataDir recursively removes a path inside the data directory,
 // refusing any path that would escape it.
 func RemoveAllInDataDir(path string) error {
-	if err := assertWithinDataDir(path); err != nil {
+	if err := AssertWithinDataDir(path); err != nil {
 		return err
 	}
 
@@ -72,10 +73,10 @@ func RemoveAllInDataDir(path string) error {
 // RenameDataPath renames a path within the data directory, refusing to move a
 // file into or out of a location that would escape it.
 func RenameDataPath(oldPath string, newPath string) error {
-	if err := assertWithinDataDir(oldPath); err != nil {
+	if err := AssertWithinDataDir(oldPath); err != nil {
 		return err
 	}
-	if err := assertWithinDataDir(newPath); err != nil {
+	if err := AssertWithinDataDir(newPath); err != nil {
 		return err
 	}
 
@@ -86,7 +87,7 @@ func RenameDataPath(oldPath string, newPath string) error {
 // already exist, refusing any path that would escape it. Unlike
 // MakeDataDirectory it is tolerant of an already-existing directory.
 func EnsureDataDirectory(path string) error {
-	if err := assertWithinDataDir(path); err != nil {
+	if err := AssertWithinDataDir(path); err != nil {
 		return err
 	}
 
@@ -96,7 +97,7 @@ func EnsureDataDirectory(path string) error {
 // WriteDataFile writes data to a file inside the data directory, refusing any
 // path that would escape it.
 func WriteDataFile(path string, data []byte) error {
-	if err := assertWithinDataDir(path); err != nil {
+	if err := AssertWithinDataDir(path); err != nil {
 		return err
 	}
 
@@ -106,7 +107,7 @@ func WriteDataFile(path string, data []byte) error {
 // ReadDataFile reads a file inside the data directory, refusing any path that
 // would escape it. Unlike ReadFile, it propagates read errors to the caller.
 func ReadDataFile(path string) ([]byte, error) {
-	if err := assertWithinDataDir(path); err != nil {
+	if err := AssertWithinDataDir(path); err != nil {
 		return nil, err
 	}
 

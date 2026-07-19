@@ -10,7 +10,11 @@ import (
 // whose name resolves outside the data directory (CWE-22) must be refused so the
 // delete hook can never recursively remove an arbitrary directory.
 func TestGroup_AfterDelete_RejectsPathTraversalName(t *testing.T) {
-	sentinel := filepath.Join(os.TempDir(), "rw_model_afterdelete_sentinel")
+	// The sentinel is placed at exactly the location the crafted name below
+	// resolves to (10 "../" climb out of <cwd>/data to the filesystem root, then
+	// into /tmp), so the "not deleted" assertion is meaningful: without the guard
+	// AfterDelete's os.RemoveAll would wipe this directory.
+	sentinel := "/tmp/rw_model_afterdelete_sentinel"
 	if err := os.MkdirAll(sentinel, 0o755); err != nil {
 		t.Fatalf("setup sentinel: %v", err)
 	}

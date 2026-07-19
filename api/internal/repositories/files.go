@@ -49,6 +49,12 @@ func (repository FileRepository) BuildFilePath(receiptId string, receiptImageId 
 	fileName := utils.BuildFileName(receiptId, receiptImageId, receiptImageFileName)
 	path := filepath.Join(groupPath, fileName)
 
+	// The file name component (which can originate from an upload or email
+	// attachment) must not escape the data directory either (CWE-22).
+	if err := utils.AssertWithinDataDir(path); err != nil {
+		return "", err
+	}
+
 	return path, nil
 }
 

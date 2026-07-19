@@ -40,7 +40,10 @@ func (groupToUpdate *Group) BeforeUpdate(tx *gorm.DB) (err error) {
 				return err
 			}
 
-			utils.RenameDataPath(oldGroupPath, newGroupPath)
+			// A rename failure is intentionally ignored: both paths are already
+			// validated by BuildGroupPathString above, and a group with no
+			// on-disk directory yet (no receipts) simply has nothing to move.
+			_ = utils.RenameDataPath(oldGroupPath, newGroupPath)
 		}
 	}
 

@@ -88,9 +88,10 @@ a raw `os.Rename` / `os.RemoveAll` / `os.ReadFile` etc. on a data path.
 **Boundary (the exception):** server-generated, non-attacker-influenced paths — `temp/`, `logs/`,
 `sqlite/`, and OCR / HTML-to-PDF / email scratch files — legitimately use the generic `utils` helpers or
 raw `os.*`. They are **not** data paths and must **not** be forced through the data-scoped helpers (which
-would reject a non-`data/` path). The one deliberate raw read is the AI image reader in
-`services/receipt_processing.go`, whose path may be a `temp/` file or a data file depending on the PDF
-branch.
+would reject a non-`data/` path). The deliberate raw reads are the AI image readers in
+`services/receipt_processing.go` (the OpenAI and Gemini readers; Ollama reads via imagick), whose path may
+be a `temp/` file or a data file depending on the PDF branch — and the data-file case is now guaranteed
+contained at construction because `BuildFilePath` asserts containment on the full path.
 
 ## Testing Patterns
 
