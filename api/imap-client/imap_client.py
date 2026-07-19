@@ -9,7 +9,7 @@ from mailbox import Message
 
 from imapclient import IMAPClient
 
-from utils import valid_from_email, valid_subject
+from utils import sanitize_filename, valid_from_email, valid_subject
 
 base_path = os.environ.get("BASE_PATH", "")
 
@@ -174,12 +174,12 @@ class ImapClient:
             if part.get('Content-Disposition') is None:
                 continue
 
-            filename = part.get_filename()
+            filename = sanitize_filename(part.get_filename())
             mime_type = part.get_content_type()
 
             logging.info(f"Filename: {filename} mime_type: {mime_type}")
 
-            if len(filename) > 0 and self.valid_mime_type(mime_type):
+            if filename and self.valid_mime_type(mime_type):
                 filePath = os.path.join(base_path, "temp", filename)
                 with open(filePath, 'wb') as f:
                     f.write(part.get_payload(decode=True))
