@@ -13,6 +13,87 @@ Receipt Wrangler API is a Go-based backend service for a receipt management and 
 - `go run main.go` - Run the application directly
 - `./set-up-dependencies.sh` - Install system dependencies (tesseract, ImageMagick, Chromium, Python deps)
 
+### Running in the Claude Code Web/Cloud Sandbox
+
+> Playbook for booting the API in the Claude Code web (cloud) sandbox from a **fresh session**.
+> Everything below is ephemeral — the container is rebuilt each session, so these steps must be
+> re-run every time. Follow them top-to-bottom and the server comes up on `:8081` in ~2 min.
+
+**Why the normal path doesn't just work.** The sandbox base image is **Ubuntu 24.04 (Noble)**, but
+the project's Docker images (and `set-up-dependencies.sh`) assume **Debian** (`golang:1.25-trixie` /
+`bullseye`). Two consequences:
+- The CGO binding `gopkg.in/gographics/imagick.v3` needs **ImageMagick 7**'s MagickWand API. Ubuntu's
+  repos only ship ImageMagick **6** (`libmagickwand-dev` = IM6) and have no IM7 package, so
+  `set-up-dependencies.sh`'s `libmagickwand-7.q16-dev` isn't installable and the Go build fails to
+  link. **IM7 must be built from source.**
+- `set-up-dependencies.sh` also installs heavy Python (torch, easyocr) used only by the **IMAP email
+  client**, not the Go server. **Skip it** — install just the native libs below.
+
+**Step 1 — Start Redis** (installed but not running by default):
+```bash
+redis-server --daemonize yes --save "" --appendonly no
+redis-cli ping   # -> PONG
+```
+
+**Step 2 — Install Tesseract + build tooling** (apt, these IM6-free packages are all in Ubuntu's repos):
+```bash
+apt-get update -qq
+apt-get install -y build-essential pkg-config libtesseract-dev libleptonica-dev tesseract-ocr-eng
+```
+
+**Step 3 — Install ImageMagick 7 delegate dev libs** (needed before configuring IM7):
+```bash
+apt-get install -y libpng-dev libjpeg-turbo8-dev libtiff-dev libwebp-dev libheif-dev libde265-dev ghostscript libtool
+```
+
+**Step 4 — Build & install ImageMagick 7 from source** (the `imagemagick.org/archive` tarball 404s —
+clone from GitHub instead):
+```bash
+cd <scratchpad>            # build outside the repo
+git clone --depth 1 https://github.com/ImageMagick/ImageMagick.git
+cd ImageMagick
+./configure --prefix=/usr/local --with-heic=yes --with-jpeg=yes --with-png=yes \
+            --with-tiff=yes --with-webp=yes --with-gslib=yes --disable-docs --without-magick-plus-plus
+make -j"$(nproc)"          # ~1-2 min
+make install
+ldconfig                   # <-- the key step
+```
+`ldconfig` is what makes both the Go build and the running server find the new libs: `/usr/local/lib`
+is already listed in `/etc/ld.so.conf.d/libc.conf`, so after `ldconfig`, `pkg-config --modversion
+MagickWand` resolves `7.1.2` from the **default** path and `libMagickWand-7.Q16HDRI.so` is in the
+loader cache. You do **not** need `PKG_CONFIG_PATH` or `LD_LIBRARY_PATH` once `ldconfig` has run
+(fallbacks if it somehow didn't: `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig` for the build,
+`LD_LIBRARY_PATH=/usr/local/lib` for the run). Verify: `magick -version` shows `7.1.2 ... Q16-HDRI`.
+
+**Step 5 — Run the Go server from the `api/` directory** (paths like `logs/` and `./sqlite/` are
+relative to the working directory, so cwd **must** be `api/`):
+```bash
+cd /home/user/receipt-wrangler/api
+DB_ENGINE=sqlite DB_FILENAME=wrangler.db \
+ENCRYPTION_KEY=dev-encryption-key SECRET_KEY=dev-secret-key \
+REDIS_HOST=127.0.0.1 REDIS_PORT=6379 \
+go run main.go            # (or build once: `go build -o /tmp/rw-api . && /tmp/rw-api`)
+```
+- `ENCRYPTION_KEY` / `SECRET_KEY` just need to be **non-empty** (`config.CheckRequiredEnvironmentVariables`
+  fatals on empty) — throwaway dev values are fine.
+- Gotcha: `dev/switch-to-sqlite.sh` exports `REDIS_HOST=redis` (the docker-compose service name). For a
+  **local** Redis you must override it to `127.0.0.1`, or the connection fails at startup.
+- Ready when the log prints `Listening on port 8081`. Smoke test: `curl localhost:8081/api/featureConfig`
+  → `200`.
+
+**Logging in.** First startup auto-creates a default admin **`admin` / `admin`** (in any env except
+`-env test`; see `CreateUserIfNoneExist`). The login endpoint is **`POST /api/login/`** (not
+`/api/auth/login`); add `?tokensInBody=true` to get the JWT in the response body:
+```bash
+curl -X POST 'localhost:8081/api/login/?tokensInBody=true' \
+  -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin"}'
+```
+
+**Not needed to boot the server (skip in the sandbox):** the Python/torch/easyocr install, and the
+ImageMagick PDF-policy edit in `set-up-dependencies.sh` (it targets `/etc/ImageMagick-7/policy.xml`; a
+source build's policy is at `/usr/local/etc/ImageMagick-7/policy.xml` and doesn't block PDF by
+default). Those only matter for exercising email-OCR / PDF-receipt processing, not for a running API.
+
 ### Testing
 - `go test -v ./...` - Run all Go tests with verbose output
 - `go test -coverprofile=coverage.out -covermode=atomic -v ./...` - Run tests with coverage
