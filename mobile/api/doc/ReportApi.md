@@ -18,6 +18,7 @@ Method | HTTP request | Description
 [**getReportTemplateOptions**](ReportApi.md#getreporttemplateoptions) | **GET** /report/template/options | Get report template options
 [**getReportTemplates**](ReportApi.md#getreporttemplates) | **POST** /report/template/list | Get paged report templates
 [**previewReport**](ReportApi.md#previewreport) | **POST** /report/preview | Preview a report
+[**renderReportTemplate**](ReportApi.md#renderreporttemplate) | **POST** /report/template/{id}/render | Render a saved template as HTML for the dashboard report widget
 [**updateReportTemplate**](ReportApi.md#updatereporttemplate) | **PUT** /report/template/{id} | Update a report template
 
 
@@ -435,6 +436,53 @@ Name | Type | Description  | Notes
 ### HTTP request headers
 
  - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **renderReportTemplate**
+> ReportPreviewResponse renderReportTemplate(id)
+
+Render a saved template as HTML for the dashboard report widget
+
+Renders a saved report template by id as a self-contained HTML document over the full dataset (unlike /report/preview, which caps the sample) for the dashboard report widget, loading the stored configuration server-side. Re-resolves the caller's access on every call; when the caller may not view the template (or it was deleted) a restricted-notice HTML document is returned at 200 with empty allowedActions, so the widget always has HTML to render. allowedActions carries the actions the caller may perform (drives the widget's download button).
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getReportApi();
+final int id = 56; // int | Id of the report template to render
+
+try {
+    final response = api.renderReportTemplate(id);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling ReportApi->renderReportTemplate: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **id** | **int**| Id of the report template to render | 
+
+### Return type
+
+[**ReportPreviewResponse**](ReportPreviewResponse.md)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
  - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

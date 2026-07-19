@@ -213,14 +213,47 @@ permission model exactly.
   emit `"aggFunc":""`. **Keep this omitempty on the API side; any future generated-client regen must
   keep the enum tolerant / the field omitted**, or every real report (dimension/formula columns) shows
   invisible rows in the mobile list.
+- **Dashboard report widget (view-only):** the fifth dashboard widget type, `REPORT`, ported from
+  desktop's `desktop/src/dashboard/report-widget/`. `lib/groups/widgets/dashboard_widgets/report_widget.dart`
+  pins a saved template (reads `configuration.reportTemplateId` from the widget's untyped config blob),
+  asks the server to render the **full dataset** (`POST /report/template/{id}/render` →
+  `renderReportTemplate` → `ReportPreviewResponse { html, receiptCount, allowedActions }`), and drops the
+  self-contained HTML into a **WebView** — the same rendering path as `report_preview_screen.dart` (JS
+  disabled, spinner cleared on `onPageFinished`). A revoked/deleted template returns restricted-notice HTML
+  at 200 with empty `allowedActions`, so there is no client "restricted" branch. Wired into the widget-type
+  `switch` in `group_dashboard.dart` (bounded by the shared `SizedBox(height: widgetHeight)` so the report
+  scrolls inside the tile). The **Download** button is gated **only** on the render response's
+  `allowedActions.contains('generate')` (never AND-ed with a client permission — same contract as
+  `report_list_item.dart`); on tap it fetches the template then reuses the existing
+  `generateAndSaveReport` share helper, mirroring desktop's `downloadTemplateById` (get template →
+  generate). Authoring stays desktop-only. This required a **mobile client regen** to pick up
+  `WidgetType.REPORT`, `renderReportTemplate`, and `allowedActions` on `ReportPreviewResponse` — **no
+  swagger change** was needed (the spec already carried all three; the mobile client was simply stale).
 - **Tests:** `test/widgets/report_list_item_test.dart` (the `allowedActions` row-gating contract),
-  `test/widgets/top_app_bar_reports_menu_test.dart` (menu-entry gate), `test/reports/report_filename_test.dart`
-  (filename derivation), and `reportsReadRedirect` cases in `test/guards/permission_guard_test.dart`.
+  `test/widgets/report_widget_test.dart` (the dashboard widget's pure `reportTemplateIdFromConfig`
+  extraction + `reportWidgetCanDownload` gate — the WebView render path is not widget-testable, matching
+  `report_preview_screen.dart`), `test/widgets/top_app_bar_reports_menu_test.dart` (menu-entry gate),
+  `test/reports/report_filename_test.dart` (filename derivation), and `reportsReadRedirect` cases in
+  `test/guards/permission_guard_test.dart`.
   Shared builders in `test/helpers/report_test_helpers.dart`. **E2E:** `integration_test/reports_list_test.dart`
   drives the list view — seeds a template via the new `createReportTemplate` fixture and asserts the row
   renders (the omitempty regression guard), the empty state, and the avatar-menu gate; the
   `provisionUserWithAppPermissions` fixture (inverse of `provisionUserWithoutAppPermission`) grants
   `app.reports.read`/`readAll`. Preview/generate/delete are out of the e2e scope.
+  `integration_test/report_dashboard_widget_test.dart` drives the **dashboard report widget** end-to-end:
+  it provisions a user (`app.reports.read`/`readAll`/`generate`/`generateAll` + Legacy Owner group), seeds
+  a template, then seeds a dashboard holding a `REPORT` widget via the new `createDashboard` fixture
+  (**with the fixture user's own jwt** — `getDashboardsForUserByGroup` filters on `user_id`, so an
+  admin-owned dashboard would be invisible to the viewer), enters the group, and asserts the `ReportWidget`
+  mounts, the WebView renders (success branch, no error placeholder, spinner clears), and the server-gated
+  Download button shows. Three `testWidgets` share a `seedAndOpenReportDashboard` helper — the positive path
+  plus two **deny** cases that pin down the widget's rejection contract (the render endpoint never 403s; a
+  denied caller gets restricted-notice HTML at 200 with empty `allowedActions`, so denial shows up as the
+  Download button being withheld, never an error): (a) a user with `app.reports.read` but **not** generate →
+  the report still renders but the Download button is `findsNothing`; (b) a Legacy Viewer with no
+  `app.reports.*` and no `group.reports.read` → the restricted-notice HTML renders gracefully with no
+  Download. **iOS/Android only** (`skip: Platform.isLinux`) — `webview_flutter` has no Linux desktop
+  implementation, so the Linux `run-e2e.sh` runner can't mount the widget.
 
 ## Development Notes
 

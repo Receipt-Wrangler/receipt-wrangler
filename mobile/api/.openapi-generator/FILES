@@ -317,13 +317,3 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/report_api_test.dart
-test/report_column_test.dart
-test/report_detail_test.dart
-test/report_document_test.dart
-test/report_period_test.dart
-test/report_preview_response_test.dart
-test/report_request_command_test.dart
-test/report_template_grant_test.dart
-test/report_template_option_test.dart
-test/report_template_test.dart
