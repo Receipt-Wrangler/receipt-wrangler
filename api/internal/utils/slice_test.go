@@ -31,3 +31,17 @@ func TestContainsShouldMatchIntValues(t *testing.T) {
 		t.Errorf("Expected Contains to find int 2 in the slice")
 	}
 }
+
+func TestContainsShouldHandleUncomparableTypesWithoutPanic(t *testing.T) {
+	// Slices are not comparable with ==, which previously panicked. Contains
+	// must now compare by value without panicking.
+	slice := []interface{}{[]int{1, 2}}
+
+	if !Contains(slice, []int{1, 2}) {
+		t.Errorf("Expected Contains to find the matching slice value")
+	}
+
+	if Contains(slice, []int{9}) {
+		t.Errorf("Expected Contains to not find a non-matching slice value")
+	}
+}
