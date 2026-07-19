@@ -357,6 +357,60 @@ Future<void> deleteReportTemplate(int id, {required String jwt}) async {
   }
 }
 
+/// Seeds a dashboard in [groupId] holding a single view-only `REPORT` widget that
+/// pins [reportTemplateId] (`POST /dashboard/`), and returns its id. The widget's
+/// `configuration` is the same untyped blob the desktop authors — `{reportTemplateId}`
+/// — which `report_widget.dart`'s `reportTemplateIdFromConfig` reads back.
+///
+/// Seed with the **viewing user's** jwt, not admin's: `getDashboardsForUserByGroup`
+/// filters on `user_id`, so the dashboard is only visible to its creator. The
+/// creator therefore needs `group.dashboards.create` in [groupId] (a Legacy Owner
+/// group role grants it). Clean up with [deleteDashboard].
+Future<int> createDashboard({
+  required int groupId,
+  required int reportTemplateId,
+  required String jwt,
+  required String name,
+  required String widgetName,
+}) async {
+  final res = await http
+      .post(
+        Uri.parse('${E2eEnv.baseUrl}/dashboard/'),
+        headers: _jsonAuth(jwt),
+        body: jsonEncode({
+          'name': name,
+          'groupId': groupId.toString(),
+          'widgets': [
+            {
+              'name': widgetName,
+              'widgetType': 'REPORT',
+              'configuration': {'reportTemplateId': reportTemplateId},
+            },
+          ],
+        }),
+      )
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('createDashboard($name) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
+}
+
+/// Best-effort `DELETE /dashboard/{id}`. Swallows errors like [deleteUser].
+Future<void> deleteDashboard(int id, {required String jwt}) async {
+  try {
+    await http
+        .delete(
+          Uri.parse('${E2eEnv.baseUrl}/dashboard/$id'),
+          headers: _auth(jwt),
+        )
+        .timeout(const Duration(seconds: 10));
+  } catch (_) {
+    // best-effort cleanup
+  }
+}
+
 /// Creates a global category (categories are app-wide; group visibility is via
 /// group-role grants) and returns its id. A group role with no category grants
 /// is unrestricted, so a freshly-created category shows up in every member's

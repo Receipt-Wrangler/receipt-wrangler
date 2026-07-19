@@ -240,6 +240,14 @@ permission model exactly.
   renders (the omitempty regression guard), the empty state, and the avatar-menu gate; the
   `provisionUserWithAppPermissions` fixture (inverse of `provisionUserWithoutAppPermission`) grants
   `app.reports.read`/`readAll`. Preview/generate/delete are out of the e2e scope.
+  `integration_test/report_dashboard_widget_test.dart` drives the **dashboard report widget** end-to-end:
+  it provisions a user (`app.reports.read`/`readAll`/`generate`/`generateAll` + Legacy Owner group), seeds
+  a template, then seeds a dashboard holding a `REPORT` widget via the new `createDashboard` fixture
+  (**with the fixture user's own jwt** — `getDashboardsForUserByGroup` filters on `user_id`, so an
+  admin-owned dashboard would be invisible to the viewer), enters the group, and asserts the `ReportWidget`
+  mounts, the WebView renders (success branch, no error placeholder, spinner clears), and the server-gated
+  Download button shows. **iOS/Android only** (`skip: Platform.isLinux`) — `webview_flutter` has no Linux
+  desktop implementation, so the Linux `run-e2e.sh` runner can't mount the widget.
 
 ## Development Notes
 
