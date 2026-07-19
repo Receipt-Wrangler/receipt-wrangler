@@ -52,6 +52,31 @@ func TestStringToUint64ShouldParse(t *testing.T) {
 	}
 }
 
+func TestStringToUint64ShouldParseValuesAboveUint32(t *testing.T) {
+	// 2^32 = 4294967296, which is a valid uint64 but exceeds MaxUint32.
+	var expected uint64 = 4294967296
+
+	result, err := StringToUint64("4294967296")
+	if err != nil {
+		PrintTestError(t, err, nil)
+	}
+
+	if result != expected {
+		PrintTestError(t, result, expected)
+	}
+}
+
+func TestStringToUint64ShouldTrimWhitespace(t *testing.T) {
+	result, err := StringToUint64("  789  ")
+	if err != nil {
+		PrintTestError(t, err, nil)
+	}
+
+	if result != 789 {
+		PrintTestError(t, result, 789)
+	}
+}
+
 func TestStringToUint64ShouldErrorOnNonNumeric(t *testing.T) {
 	_, err := StringToUint64("abc")
 	if err == nil {
