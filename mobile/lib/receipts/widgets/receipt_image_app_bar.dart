@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:gal/gal.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/enums/form_state.dart';
@@ -13,6 +12,7 @@ import '../../enums/upload_method.dart';
 import '../../interfaces/upload_multipart_file_data.dart';
 import '../../models/loading_model.dart';
 import '../../models/receipt_model.dart';
+import '../../shared/functions/receipt_image_gallery.dart';
 import '../../shared/widgets/receipt_edit_popup_menu.dart';
 import '../../utils/scan.dart';
 import '../../utils/snackbar.dart';
@@ -138,37 +138,11 @@ class ReceiptImageAppBar extends StatelessWidget implements PreferredSizeWidget 
 
   Future _downloadImage(BuildContext context, ReceiptModel receiptModel) async {
     final loadingModel = Provider.of<LoadingModel>(context, listen: false);
-    loadingModel.setIsLoading(true);
-    
     var receiptImage = _getCurrentlySelectedImage(receiptModel);
     if (receiptImage == null) {
       return;
     }
-
-    var imageResponse = await OpenApiClient.client
-        .getReceiptImageApi()
-        .downloadReceiptImageById(receiptImageId: receiptImage.id);
-
-    var imageBytes = imageResponse.data;
-
-    if (imageBytes == null) {
-      loadingModel.setIsLoading(false);
-      return;
-    }
-
-    await Gal.putImageBytes(imageBytes).then((value) {
-      var snackbarAction = SnackBarAction(
-        label: "Open",
-        onPressed: () async => await Gal.open(),
-      );
-
-      showSuccessSnackbar(context, "Image saved to gallery",
-          action: snackbarAction);
-      loadingModel.setIsLoading(false);
-    }).catchError((e) {
-      showErrorSnackbar(context, "Failed to save image to gallery");
-      loadingModel.setIsLoading(false);
-    });
+    await saveReceiptImageToGallery(context, loadingModel, receiptImage.id);
   }
 
   PopupMenuEntry _buildDeleteButton(BuildContext context, ReceiptModel receiptModel) {
