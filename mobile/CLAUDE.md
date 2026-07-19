@@ -246,8 +246,14 @@ permission model exactly.
   (**with the fixture user's own jwt** — `getDashboardsForUserByGroup` filters on `user_id`, so an
   admin-owned dashboard would be invisible to the viewer), enters the group, and asserts the `ReportWidget`
   mounts, the WebView renders (success branch, no error placeholder, spinner clears), and the server-gated
-  Download button shows. **iOS/Android only** (`skip: Platform.isLinux`) — `webview_flutter` has no Linux
-  desktop implementation, so the Linux `run-e2e.sh` runner can't mount the widget.
+  Download button shows. Three `testWidgets` share a `seedAndOpenReportDashboard` helper — the positive path
+  plus two **deny** cases that pin down the widget's rejection contract (the render endpoint never 403s; a
+  denied caller gets restricted-notice HTML at 200 with empty `allowedActions`, so denial shows up as the
+  Download button being withheld, never an error): (a) a user with `app.reports.read` but **not** generate →
+  the report still renders but the Download button is `findsNothing`; (b) a Legacy Viewer with no
+  `app.reports.*` and no `group.reports.read` → the restricted-notice HTML renders gracefully with no
+  Download. **iOS/Android only** (`skip: Platform.isLinux`) — `webview_flutter` has no Linux desktop
+  implementation, so the Linux `run-e2e.sh` runner can't mount the widget.
 
 ## Development Notes
 
