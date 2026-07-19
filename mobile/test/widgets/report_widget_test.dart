@@ -21,12 +21,21 @@ void main() {
       );
     });
 
-    test('truncates a numeric (double) reportTemplateId to an int', () {
-      // JSON numbers arrive as num; ids are whole but tolerate a double form.
+    test('accepts a whole-number double', () {
+      // JSON numbers arrive as num; a whole id in double form is still valid.
       expect(
         reportTemplateIdFromConfig(
             config({'reportTemplateId': JsonObject(7.0)})),
         7,
+      );
+    });
+
+    test('returns null for a fractional reportTemplateId', () {
+      // Must not truncate 7.5 -> 7 and load the wrong template.
+      expect(
+        reportTemplateIdFromConfig(
+            config({'reportTemplateId': JsonObject(7.5)})),
+        isNull,
       );
     });
 

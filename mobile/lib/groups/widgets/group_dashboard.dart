@@ -97,6 +97,10 @@ class _GroupDashboard extends State<GroupDashboard> {
             widgets.add(SizedBox(
               height: widgetHeight,
               child: ReportWidget(
+                // Key by widget id so switching to a dashboard with a different
+                // report in this slot remounts (re-fetches) instead of reusing
+                // the previous report's cached HTML + download gate.
+                key: ValueKey(widget.id),
                 dashboardWidget: widget,
               ),
             ));

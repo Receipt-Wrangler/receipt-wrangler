@@ -12,13 +12,16 @@ import '../constants/text_styles.dart';
 
 /// Reads the pinned report template id from a dashboard widget's untyped
 /// `configuration` blob (`{ reportTemplateId: <int> }`, authored on desktop).
-/// Returns null when the key is absent or not a number, which the widget
-/// surfaces as an error state.
+/// Returns null when the key is absent or not a whole number — a malformed
+/// fractional value must not silently truncate to (and load) the wrong
+/// template; the widget then surfaces an error state.
 int? reportTemplateIdFromConfig(BuiltMap<String, JsonObject?>? config) {
   final value = config?['reportTemplateId'];
   if (value == null) return null;
   try {
-    return value.asNum.toInt();
+    final id = value.asNum;
+    if (id % 1 != 0) return null; // reject fractional ids
+    return id.toInt();
   } catch (_) {
     return null;
   }
