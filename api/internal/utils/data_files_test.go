@@ -92,6 +92,10 @@ func TestDataFileHelpers_RejectPathsOutsideDataDir(t *testing.T) {
 	assertRejected("RemoveDataPath", RemoveDataPath(marker))
 	assertRejected("RemoveAllInDataDir", RemoveAllInDataDir(sentinel))
 	assertRejected("RenameDataPath(dst-outside)", RenameDataPath(marker, filepath.Join(os.TempDir(), "rw_utils_out_moved")))
+	assertRejected("WriteDataFile", WriteDataFile(filepath.Join(sentinel, "w.txt"), []byte("x")))
+	assertRejected("EnsureDataDirectory", EnsureDataDirectory(filepath.Join(sentinel, "d")))
+	_, readErr := ReadDataFile(marker)
+	assertRejected("ReadDataFile", readErr)
 
 	if _, err := os.Stat(sentinel); os.IsNotExist(err) {
 		t.Fatalf("out-of-tree sentinel was removed — containment guard failed")
@@ -134,5 +138,44 @@ func TestDataFileHelpers_AllowPathsInsideDataDir(t *testing.T) {
 	}
 	if FileExists(renamed) {
 		t.Fatalf("expected directory to be removed")
+	}
+
+	// WriteDataFile + ReadDataFile round-trip inside the data dir.
+	file := filepath.Join(dataDir, "rw_utils_in_file.txt")
+	defer os.RemoveAll(file)
+	if err := WriteDataFile(file, []byte("hello")); err != nil {
+		t.Fatalf("WriteDataFile in data dir failed: %v", err)
+	}
+	got, err := ReadDataFile(file)
+	if err != nil {
+		t.Fatalf("ReadDataFile in data dir failed: %v", err)
+	}
+	if string(got) != "hello" {
+		PrintTestError(t, string(got), "hello")
+	}
+
+	// EnsureDataDirectory tolerates an already-existing directory.
+	if err := EnsureDataDirectory(dataDir); err != nil {
+		t.Fatalf("EnsureDataDirectory on an existing dir failed: %v", err)
+	}
+}
+
+// ReadDataFile must surface a real read error (unlike utils.ReadFile, which
+// swallows errors as nil, nil).
+func TestReadDataFile_PropagatesReadError(t *testing.T) {
+	dataDir, err := GetDataDir()
+	if err != nil {
+		t.Fatalf("GetDataDir: %v", err)
+	}
+	createdDataDir := !FileExists(dataDir)
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("setup data dir: %v", err)
+	}
+	if createdDataDir {
+		defer os.RemoveAll(dataDir)
+	}
+
+	if _, err := ReadDataFile(filepath.Join(dataDir, "definitely-missing.txt")); err == nil {
+		t.Fatalf("expected ReadDataFile to propagate a read error for a missing file")
 	}
 }

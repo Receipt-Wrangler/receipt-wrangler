@@ -63,6 +63,35 @@ Receipt Wrangler API is a Go-based backend service for a receipt management and 
 - Environment variables override config file settings
 - Sample configuration in `config/config.sample.json`
 
+## Filesystem Access & Path-Traversal Safety
+
+Group and receipt files live under the app's **data directory** (`<cwd>/data/<groupId>-<groupName>/…`).
+The group name is **user-controlled**, so any path built from it is a path-traversal vector (CWE-22,
+GHSA-966v-m9rv-j5cx): `filepath.Join` collapses `..` *after* the name is joined, so an unsanitized name
+like `../../../../tmp/x` escapes `data/`.
+
+**Rule: for any file under the data directory, always use the sanitized helpers in
+`internal/utils/data_files.go` — never raw `os.*` (and never the generic `utils.WriteFile` /
+`ReadFile` / `MakeDirectory` / `DirectoryExists`) on a data path.**
+
+- Path building: `GetDataDir()` (the single source of truth for the data root) and
+  `BuildGroupPathString` / `FileRepository.BuildFilePath`, which **reject any name that escapes `data/`**.
+- File operations (each re-asserts containment before touching disk):
+  `MakeDataDirectory`, `EnsureDataDirectory`, `WriteDataFile`, `ReadDataFile`, `RemoveDataPath`,
+  `RemoveAllInDataDir`, `RenameDataPath`.
+- Input validation: `UpsertGroupCommand.Validate` rejects group names containing path separators or
+  `.` / `..` up front (400), so a malicious name is never persisted.
+
+These are the single, centralized defense — do not sanitize ad hoc at call sites, and do not reintroduce
+a raw `os.Rename` / `os.RemoveAll` / `os.ReadFile` etc. on a data path.
+
+**Boundary (the exception):** server-generated, non-attacker-influenced paths — `temp/`, `logs/`,
+`sqlite/`, and OCR / HTML-to-PDF / email scratch files — legitimately use the generic `utils` helpers or
+raw `os.*`. They are **not** data paths and must **not** be forced through the data-scoped helpers (which
+would reject a non-`data/` path). The one deliberate raw read is the AI image reader in
+`services/receipt_processing.go`, whose path may be a `temp/` file or a data file depending on the PDF
+branch.
+
 ## Testing Patterns
 
 Each package typically has:

@@ -43,7 +43,7 @@ func ReadReceiptImage(receiptImageId string) (commands.UpsertReceiptCommand, com
 		return result, commands.ReceiptProcessingMetadata{}, err
 	}
 
-	receiptImageBytes, err := utils.ReadFile(receiptImagePath)
+	receiptImageBytes, err := utils.ReadDataFile(receiptImagePath)
 	if err != nil {
 		return commands.UpsertReceiptCommand{}, commands.ReceiptProcessingMetadata{}, err
 	}

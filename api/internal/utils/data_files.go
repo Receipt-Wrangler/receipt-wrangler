@@ -82,6 +82,37 @@ func RenameDataPath(oldPath string, newPath string) error {
 	return os.Rename(oldPath, newPath)
 }
 
+// EnsureDataDirectory creates path inside the data directory if it does not
+// already exist, refusing any path that would escape it. Unlike
+// MakeDataDirectory it is tolerant of an already-existing directory.
+func EnsureDataDirectory(path string) error {
+	if err := assertWithinDataDir(path); err != nil {
+		return err
+	}
+
+	return DirectoryExists(path, true)
+}
+
+// WriteDataFile writes data to a file inside the data directory, refusing any
+// path that would escape it.
+func WriteDataFile(path string, data []byte) error {
+	if err := assertWithinDataDir(path); err != nil {
+		return err
+	}
+
+	return WriteFile(path, data)
+}
+
+// ReadDataFile reads a file inside the data directory, refusing any path that
+// would escape it. Unlike ReadFile, it propagates read errors to the caller.
+func ReadDataFile(path string) ([]byte, error) {
+	if err := assertWithinDataDir(path); err != nil {
+		return nil, err
+	}
+
+	return os.ReadFile(path)
+}
+
 // IsSafePathComponent reports whether name is safe to embed in a single
 // filesystem path component: non-empty, no NUL byte, no path separator, and not
 // a "." / ".." traversal element. It is used to reject path traversal (CWE-22)

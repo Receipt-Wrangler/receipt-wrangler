@@ -84,7 +84,7 @@ func (repository FileRepository) GetBytesForFileData(fileData models.FileData) (
 		return nil, err
 	}
 
-	fileBytes, err := utils.ReadFile(path)
+	fileBytes, err := utils.ReadDataFile(path)
 	if err != nil {
 		return nil, err
 	}
