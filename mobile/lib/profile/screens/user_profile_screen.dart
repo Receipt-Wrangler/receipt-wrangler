@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/client/client.dart';
+import 'package:receipt_wrangler_mobile/service/crash_reporting.dart';
 import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/profile/widgets/delete_account_dialog.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/screen_wrapper.dart';
@@ -54,6 +55,12 @@ class UserProfileScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 24),
+            const Text(
+              'Privacy',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const _CrashReportingToggle(),
+            const SizedBox(height: 24),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -97,6 +104,37 @@ class UserProfileScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Opt-out toggle for crash & error reporting (on by default). Flips Sentry on
+/// the fly via [setCrashReportingEnabled] — no restart.
+class _CrashReportingToggle extends StatefulWidget {
+  const _CrashReportingToggle();
+
+  @override
+  State<_CrashReportingToggle> createState() => _CrashReportingToggleState();
+}
+
+class _CrashReportingToggleState extends State<_CrashReportingToggle> {
+  late bool _enabled = isCrashReportingEnabled();
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      value: _enabled,
+      title: const Text('Crash & error reporting'),
+      subtitle: const Text(
+        'Sends anonymous crash and error reports so bugs can be fixed. No '
+        'personal data, no usage tracking, no advertising. You can turn this '
+        'off anytime.',
+      ),
+      onChanged: (value) async {
+        setState(() => _enabled = value);
+        await setCrashReportingEnabled(value);
+      },
     );
   }
 }

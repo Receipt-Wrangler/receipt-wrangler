@@ -68,6 +68,7 @@ dependencies:
   webview_flutter: ^4.14.1
   path_provider: ^2.1.6
   share_plus: ^13.2.1
+  sentry_flutter: ^8.14.2
 
 dev_dependencies:
   flutter_test:

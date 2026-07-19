@@ -388,6 +388,50 @@ applies `kotlin-android` itself and uses the legacy `kotlinOptions {}` DSL (work
 2.1.0); its `getPictures(noOfPages:)` API — the only call the app uses (`lib/utils/scan.dart`) —
 is identical.
 
+**Related: `sentry_flutter` pins Kotlin `languageVersion 1.6`.** `sentry_flutter` **8.14.2**'s
+`android/build.gradle` hardcodes `kotlinOptions { languageVersion = "1.6" }`, which the project's
+Kotlin **2.2.x** toolchain (above) rejects at compile time — `flutter build apk --release` fails at
+`:sentry_flutter:compileReleaseKotlin` with *"Language version 1.6 is no longer supported; please,
+use version 1.8 or greater"*. iOS uses a different toolchain and never hits this. The fix (root
+`android/build.gradle`) is a `subprojects { if (sp.name == 'sentry_flutter') { sp.afterEvaluate {
+tasks.withType(KotlinCompile).configureEach { compilerOptions { languageVersion / apiVersion .set(
+KOTLIN_1_8) } } } } }` block — scoped to that one module (via `afterEvaluate` so it overrides the
+module's own `kotlinOptions`), so every other subproject keeps its own language version. The block
+is a no-op / removable once `sentry_flutter` is upgraded past the 1.6 pin (9.x drops it, but 9.x
+needs a newer Dart SDK than this app currently targets).
+
+### Crash & error reporting (GlitchTip) + the iOS launch-freeze fix
+
+**Crash reporting** is via `sentry_flutter` → a self-hosted **GlitchTip** (Sentry-compatible)
+backend, wired in `lib/service/crash_reporting.dart`. It is **opt-out (on by default)** and
+**privacy-hardened**: `sendDefaultPii=false`, no screenshots / view-hierarchy / print breadcrumbs,
+`tracesSampleRate=0`, `enableAutoSessionTracking=false` (GlitchTip has no sessions), no `setUser`.
+`main()` only calls `SentryFlutter.init` when `isCrashReportingEnabled()` (a `SharedPreferences`
+flag, default true); the **opt-out toggle** ("Crash & error reporting") lives in
+`UserProfileScreen` and flips it live via `setCrashReportingEnabled` (`SentryFlutter.init` /
+`Sentry.close()`). The app has **zero** other analytics/tracking SDKs. `sentry_flutter` is pinned at
+**8.14.2** (9.x needs a newer Dart SDK); its Android Kotlin pin needs the gradle override documented
+above.
+
+**iOS launch-freeze fix (GitHub #617).** On iOS the Flutter engine pauses rendering while the app is
+`inactive`, and on **iOS 26.x with 120Hz ProMotion displays** (iPhone 17 / Air) it doesn't reliably
+resume — the first frame is painted at transient launch window metrics (wrong size/orientation) and
+then never repaints, so the UI freezes "half-rotated / unpainted." The fix (`lib/main.dart`):
+- **No launch-time permission request.** The old fire-and-forget `requestPermissions()` in
+  `initState` popped a camera dialog (→ `inactive` → freeze) *and* collided with in-context requests.
+  Camera is now requested by the scanner itself; photo-library access is requested at the
+  `Gal.putImageBytes` save sites (`receipt_app_bar_action_builder.dart`,
+  `receipt_image_app_bar.dart`). `requestPermissions()` is kept (uncalled) because a unit test
+  covers it.
+- **A forced-frame pump** (`nudgeFrames()`): bumps an invisible `ValueNotifier` (hosted in
+  `MaterialApp.builder`) **and** calls `WidgetsBinding.instance.scheduleForcedFrame()` each tick for
+  ~3s — the forced call bypasses the engine's "frames disabled while inactive" gate. It fires from
+  three points: a **launch** `addPostFrameCallback` (cold launch delivers no `resumed`), on
+  **`didChangeMetrics`** while a 6s launch window is open (re-flows the stale frame the moment the
+  window geometry settles), and on lifecycle **`resumed`** (app-switcher / scan-camera returns). It
+  **early-returns unless `defaultTargetPlatform == TargetPlatform.iOS`**, so Android/desktop and the
+  test suites are unaffected.
+
 ### QR-scan the server URL (login)
 
 The "Connect to Server" screen (`lib/auth/set-homeserver-url/screens/set_homeserver_url.dart`, route

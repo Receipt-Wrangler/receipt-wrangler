@@ -156,6 +156,7 @@ class ReceiptImageAppBar extends StatelessWidget implements PreferredSizeWidget 
       return;
     }
 
+    await Gal.requestAccess();
     await Gal.putImageBytes(imageBytes).then((value) {
       var snackbarAction = SnackBarAction(
         label: "Open",
