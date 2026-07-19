@@ -19,6 +19,49 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Development server uses proxy configuration in `proxy.conf.json` to route API calls to backend
 - Angular CLI configuration in `angular.json`
 
+### Running in the Claude Code Web/Cloud Sandbox
+
+> Playbook for booting the desktop app in the Claude Code web (cloud) sandbox from a **fresh session**.
+> Everything is ephemeral — re-run these each session. See `api/CLAUDE.md` →
+> "Running in the Claude Code Web/Cloud Sandbox" for the backend, and the root `CLAUDE.md` for the
+> shared root-cause / run-order notes.
+
+1. **Backend first.** The dev server only *proxies* `/api` → `localhost:8081`; it does not start the
+   API. Bring the Go backend up first (see `api/CLAUDE.md`).
+2. **`npm install`** — first run, node_modules isn't present.
+   - **Lockfile gotcha:** the sandbox's npm (10.9.7) rewrites `package-lock.json`, stripping the
+     `"libc"` platform-hint fields from optional platform deps. This is **metadata drift only** — no
+     packages/versions change. Do **not** commit it: `git restore desktop/package-lock.json` to keep
+     the tree clean.
+3. **`npm start`** — serves on `0.0.0.0:4200`, proxying `/api` → `:8081` (`proxy.conf.json`). First
+   compile is ~30–60s; ready when the log shows `➜  Local:   http://localhost:4200/`. Verify the proxy:
+   `curl localhost:4200/api/featureConfig` → `200`.
+4. **Log in as `admin` / `admin`** (the backend's auto-created default admin). Login lands on
+   `/dashboard/group/<id>` ("All Dashboards", empty on a fresh DB).
+
+**Driving the UI / screenshots with Playwright in the sandbox.** `@playwright/test` is pinned to
+`1.59.1`, which expects Chromium build **1217**, but the sandbox pre-installs build **1194** at
+`/opt/pw-browsers/chromium` (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`). Do **not** run
+`playwright install` / `npm run e2e:install` (the download is blocked and pointless). Instead launch
+Chromium by explicit path:
+```js
+const { chromium } = require('@playwright/test');
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: '/opt/pw-browsers/chromium',   // pre-installed 1194, ignore the 1217 mismatch
+});
+```
+Run a standalone script (one that lives outside `desktop/`) with
+`NODE_PATH=/home/user/receipt-wrangler/desktop/node_modules node script.js` so `require('@playwright/test')`
+resolves. Scripted login flow (selectors from `e2e/helpers/auth.ts`):
+```js
+await page.goto('http://localhost:4200/auth/login');
+await page.getByLabel('Username').fill('admin');
+await page.getByLabel('Password').fill('admin');
+await page.getByRole('button', { name: 'Login' }).click();
+await page.waitForURL(/\/dashboard\/group\/\d+/);
+```
+
 ## Code Architecture
 
 ### Application Structure
@@ -438,7 +481,9 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
 
 ### Running locally
 
-1. **One-time:** install browsers — `npm run e2e:install`.
+1. **One-time:** install browsers — `npm run e2e:install`. (In the Claude Code web sandbox the browser
+   is pre-installed and `e2e:install` is blocked — use the `executablePath: '/opt/pw-browsers/chromium'`
+   workaround from "Running in the Claude Code Web/Cloud Sandbox" above instead.)
 2. **One-time:** sign up the two e2e accounts against your local DB. The **first** signup is auto-promoted to admin, so order matters. With the API running, go to `http://localhost:4200/auth/sign-up` and create:
    - Admin first: username `e2e-admin`, password `e2e-admin-password`
    - Then user: username `e2e-user`, password `e2e-user-password`

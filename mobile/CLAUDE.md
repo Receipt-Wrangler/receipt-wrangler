@@ -388,6 +388,64 @@ applies `kotlin-android` itself and uses the legacy `kotlinOptions {}` DSL (work
 2.1.0); its `getPictures(noOfPages:)` API — the only call the app uses (`lib/utils/scan.dart`) —
 is identical.
 
+### QR-scan the server URL (login)
+
+The "Connect to Server" screen (`lib/auth/set-homeserver-url/screens/set_homeserver_url.dart`, route
+`/`) has a `qr_code_scanner` suffix-icon button on the URL field. **The server-URL field lives here,
+not on the `/login` username/password screen** — `/login` only *shows* the already-set base path.
+The button opens a full-screen scanner (`qr_scanner_screen.dart`) built on **`mobile_scanner`**
+(`^7.2.0`, QR-only via `formats: [BarcodeFormat.qrCode]`), which pops the raw decoded string back.
+The scanner draws a centered **targeting box** (dimmed scrim + four L-shaped corner brackets + a hint
+line, via a small private `_CornerBracketPainter`) as a **visual aim guide only** — detection runs on
+the **whole camera frame**. We deliberately do **not** use `MobileScanner.scanWindow` to gate
+detection: it made scanning intermittent (a QR visibly inside the box would scan only sometimes).
+Per mobile_scanner's own changelog the scan-window intersection test is unreliable — Android accuracy
+was only just improved in 7.2.0 ("migrated boundingBox to cornerPoints") and 7.x lists "[Apple] scan
+window does not work correctly" as a known issue — so whole-frame detection is the reliable choice.
+The box Rect is computed inside the `overlayBuilder` from its `constraints` (the scanner sits below an
+AppBar, where `MediaQuery.sizeOf` would misalign the box).
+The screen validates the decoded string with `normalizeServerUrl` (`lib/utils/url.dart` — trim + require a well-formed
+http/https URL with a non-empty host; **http is allowed** for LAN/self-hosted instances) and, on
+success, `patchValue`s the `url` form field. It **never auto-connects** — the user reviews the
+populated URL and taps Connect (phishing mitigation: a malicious QR can't silently point the app at
+an attacker's server that would then harvest credentials). Invalid content shows an error snackbar and
+leaves the field untouched.
+
+Native / platform notes:
+- **iOS: no deployment-target change.** mobile_scanner 7.x uses Apple's **Vision framework** on
+  iOS/macOS (not GoogleMLKit — see its issue #1225), and its pod declares
+  `s.ios.deployment_target = '12.0'`, so the repo's existing **13.0** is fine. Verified:
+  `flutter build ios --simulator --no-codesign` builds clean at 13.0 (an earlier plan to bump to 15.5
+  for a supposed GoogleMLKit requirement was wrong and was reverted — no iOS device support dropped).
+  `NSCameraUsageDescription` already existed (shared with `cunning_document_scanner`); only its wording
+  was broadened to mention QR scanning. After pulling this change, iOS needs `cd ios && pod install`.
+- **Android** needs no gradle/manifest change: `CAMERA` is already declared and the inherited
+  `flutter.minSdkVersion` (24) / `compileSdkVersion` (36) exceed mobile_scanner's floor (21 / 35). ML
+  Kit is **bundled** by default; to shrink the APK set
+  `dev.steenbakker.mobile_scanner.useUnbundled=true` in `android/gradle.properties` (needs Play
+  Services).
+- **`pubspec.yaml`** Dart SDK floor was raised `>=3.2.5` → `>=3.7.0` (mobile_scanner 7.2.0 requires it;
+  the resolved toolchain is already 3.10+).
+- **Permission double-request race:** the scanner `await`s the shared-in-flight `requestPermissions()`
+  (`lib/utils/permissions.dart`) and uses `autoStart: false` before `controller.start()`, so it never
+  races the app-init camera request (the `ERROR_ALREADY_REQUESTING_PERMISSIONS` case documented above
+  for `cunning_document_scanner`).
+- **Fallback states + recovery:** besides the live camera, `qr_scanner_screen.dart` renders three
+  non-camera states via a shared `_buildMessage` helper — unsupported (Linux), **permission denied**
+  ("Open Settings"), and **camera error** ("Retry"). `controller.start()` is wrapped in `_safeStart`
+  (catches `MobileScannerException` → camera-error state; skips the start if already running). On
+  `AppLifecycleState.resumed` the screen re-checks permission and clears the denied/error state if
+  access was just granted (so "Open Settings" actually recovers). `_onDetect` is `!mounted`-guarded so
+  a buffered detection can't pop a disposed context.
+- **Linux / e2e + testing:** mobile_scanner has no Linux desktop implementation, so the screen guards
+  on `Platform.isLinux` and renders the unsupported message instead of constructing `MobileScanner` —
+  `run-e2e.sh` stays green. The controller is created **lazily** and the widget exposes small
+  `@visibleForTesting` seams (`debugScannerSupported` / `debugForcePermissionDenied` /
+  `debugForceCameraError`), so `test/widgets/qr_scanner_screen_test.dart` covers the three fallback
+  states + the close button **without a camera or channel mocks**. Post-scan/validation logic is
+  covered by `test/widgets/set_homeserver_url_test.dart` (injectable `scanQrCode` seam) and
+  `test/utils/url_test.dart`. The live-camera path is exercised only on Android/iOS + manual runs.
+
 ### Testing
 
 Run tests with `flutter test`. Run a single file with `flutter test test/path/to/file_test.dart`.
