@@ -132,8 +132,17 @@ class _CrashReportingToggleState extends State<_CrashReportingToggle> {
         'off anytime.',
       ),
       onChanged: (value) async {
+        final previous = _enabled;
         setState(() => _enabled = value);
-        await setCrashReportingEnabled(value);
+        try {
+          await setCrashReportingEnabled(value);
+        } catch (_) {
+          // Toggling the SDK failed — revert the switch so it keeps matching
+          // the persisted preference / actual SDK state, and surface the error.
+          if (!mounted) return;
+          setState(() => _enabled = previous);
+          showErrorSnackbar(context, "Couldn't update crash reporting setting");
+        }
       },
     );
   }

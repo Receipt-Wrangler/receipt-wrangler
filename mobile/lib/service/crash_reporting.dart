@@ -33,10 +33,12 @@ void configureSentry(SentryFlutterOptions options) {
 /// Toggle crash reporting at runtime (opt-out; default on). Effective
 /// immediately — no restart.
 Future<void> setCrashReportingEnabled(bool enabled) async {
-  await GlobalSharedPreferences.instance.setBool(kCrashReportingKey, enabled);
+  // Apply the SDK change first, then persist — a failed init/close must not
+  // leave the stored preference out of sync with what the SDK is actually doing.
   if (enabled) {
     await SentryFlutter.init(configureSentry);
   } else {
     await Sentry.close();
   }
+  await GlobalSharedPreferences.instance.setBool(kCrashReportingKey, enabled);
 }

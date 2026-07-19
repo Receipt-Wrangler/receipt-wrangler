@@ -152,36 +152,43 @@ class ReceiptAppBarActionBuilder {
 
   Future downloadImage() async {
     loadingModel.setIsLoading(true);
-    var receiptImage = getCurrentlySelectedImage();
-    if (receiptImage == null) {
-      return;
+    try {
+      var receiptImage = getCurrentlySelectedImage();
+      if (receiptImage == null) {
+        return;
+      }
+
+      var imageResponse = await OpenApiClient.client
+          .getReceiptImageApi()
+          .downloadReceiptImageById(receiptImageId: receiptImage.id);
+
+      var imageBytes = imageResponse.data;
+      if (imageBytes == null) {
+        return;
+      }
+
+      // Gal.requestAccess() returns false when the user denies gallery access;
+      // bail out instead of falling through to a putImageBytes that would throw.
+      if (!await Gal.requestAccess()) {
+        if (context.mounted) {
+          showErrorSnackbar(context, "Gallery access denied");
+        }
+        return;
+      }
+
+      await Gal.putImageBytes(imageBytes);
+      if (context.mounted) {
+        showSuccessSnackbar(context, "Image saved to gallery",
+            action: SnackBarAction(
+                label: "Open", onPressed: () async => await Gal.open()));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showErrorSnackbar(context, "Failed to save image to gallery");
+      }
+    } finally {
+      loadingModel.setIsLoading(false);
     }
-
-    var imageResponse = await OpenApiClient.client
-        .getReceiptImageApi()
-        .downloadReceiptImageById(receiptImageId: receiptImage.id);
-
-    var imageBytes = imageResponse.data;
-
-    if (imageBytes == null) {
-      loadingModel.setIsLoading(false);
-      return;
-    }
-
-    await Gal.requestAccess();
-    await Gal.putImageBytes(imageBytes).then((value) {
-      var snackbarAction = SnackBarAction(
-        label: "Open",
-        onPressed: () async => await Gal.open(),
-      );
-
-      showSuccessSnackbar(context, "Image saved to gallery",
-          action: snackbarAction);
-      loadingModel.setIsLoading(false);
-    }).catchError((e) {
-      showErrorSnackbar(context, "Failed to save image to gallery");
-      loadingModel.setIsLoading(false);
-    });
   }
 
   List<PopupMenuEntry> _buildViewAppBarMenuOptions() {
