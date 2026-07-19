@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
@@ -14,6 +13,7 @@ import '../../enums/upload_method.dart';
 import '../../interfaces/upload_multipart_file_data.dart';
 import '../../models/loading_model.dart';
 import '../../models/receipt_model.dart';
+import '../../shared/functions/receipt_image_gallery.dart';
 import '../../shared/widgets/receipt_edit_popup_menu.dart';
 import '../../utils/forms.dart';
 import '../../utils/scan.dart';
@@ -151,44 +151,11 @@ class ReceiptAppBarActionBuilder {
   }
 
   Future downloadImage() async {
-    loadingModel.setIsLoading(true);
-    try {
-      var receiptImage = getCurrentlySelectedImage();
-      if (receiptImage == null) {
-        return;
-      }
-
-      var imageResponse = await OpenApiClient.client
-          .getReceiptImageApi()
-          .downloadReceiptImageById(receiptImageId: receiptImage.id);
-
-      var imageBytes = imageResponse.data;
-      if (imageBytes == null) {
-        return;
-      }
-
-      // Gal.requestAccess() returns false when the user denies gallery access;
-      // bail out instead of falling through to a putImageBytes that would throw.
-      if (!await Gal.requestAccess()) {
-        if (context.mounted) {
-          showErrorSnackbar(context, "Gallery access denied");
-        }
-        return;
-      }
-
-      await Gal.putImageBytes(imageBytes);
-      if (context.mounted) {
-        showSuccessSnackbar(context, "Image saved to gallery",
-            action: SnackBarAction(
-                label: "Open", onPressed: () async => await Gal.open()));
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showErrorSnackbar(context, "Failed to save image to gallery");
-      }
-    } finally {
-      loadingModel.setIsLoading(false);
+    var receiptImage = getCurrentlySelectedImage();
+    if (receiptImage == null) {
+      return;
     }
+    await saveReceiptImageToGallery(context, loadingModel, receiptImage.id);
   }
 
   List<PopupMenuEntry> _buildViewAppBarMenuOptions() {
