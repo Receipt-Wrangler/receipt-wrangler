@@ -596,9 +596,10 @@ The three `group.members.*` permissions are group-scoped registry entries; **Leg
 (it is the full group scope), Legacy Editor/Viewer do not (member management was historically
 owner-only). Upgraded installs — whose Legacy Owner was seeded before these keys existed — pick them
 up on the next boot from `SeedSystemRoles`' add-only reconciliation (see "Seeded system roles"
-above); no dedicated data migration is needed. Tests: `handlers/group_member_authorization_test.go`
-(the PoC + happy paths) and `services/group_member_authorization_test.go` (the guard's CRUD/ceiling
-matrix).
+above); no dedicated data migration is needed, and
+`repositories/seed_roles_test.go` → `TestSeedSystemRolesBackfillsGroupMemberPermissions` pins that
+upgrade path. Tests: `handlers/group_member_authorization_test.go` (the PoC + happy paths) and
+`services/group_member_authorization_test.go` (the guard's CRUD/ceiling matrix).
 
 ### Enforcement status
 
