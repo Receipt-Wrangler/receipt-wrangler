@@ -62,10 +62,10 @@ func (repository BaseRepository) Sort(db *gorm.DB, orderBy string, sortDirection
 	})
 }
 
-func (repository BaseRepository) GetCount(table string, queryWhere string) (int64, error) {
+func (repository BaseRepository) GetCount(table string, queryWhere string, args ...interface{}) (int64, error) {
 	db := repository.GetDB()
 	var result int64
-	err := db.Table(table).Where(queryWhere).Count(&result).Error
+	err := db.Table(table).Where(queryWhere, args...).Count(&result).Error
 
 	return result, err
 }
