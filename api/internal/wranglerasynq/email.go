@@ -176,7 +176,23 @@ func enqueueEmailProcessTasks(metadataList []structs.EmailMetadata) error {
 	}
 
 	for _, metadata := range metadataList {
+		// Normalize untrusted attachment filenames up front (GHSA-h3pr-mhcr-8phg):
+		// they arrive from the raw MIME Content-Disposition header via the IMAP
+		// client and must never escape the temp/data directories. Doing it here —
+		// before any path is built or the task payload is populated — means every
+		// downstream use (the temp path builders, the task payload, and the
+		// persisted FileData.Name that drives the data-dir write) sees a safe
+		// basename.
+		for i := range metadata.Attachments {
+			metadata.Attachments[i].Filename = utils.SanitizeFileName(metadata.Attachments[i].Filename)
+		}
+
 		for _, attachment := range metadata.Attachments {
+			if attachment.Filename == "" {
+				logging.LogStd(logging.LOG_LEVEL_ERROR, "Skipping email attachment with an unsafe or empty filename")
+				continue
+			}
+
 			tempFilePath := buildTempEmailFilePath(attachment.Filename)
 			imageForOcrPath := buildTempEmailOcrFilePath(attachment.Filename)
 
@@ -314,11 +330,18 @@ func buildGroupSettingsLookup(metadataList []structs.EmailMetadata) (map[uint]mo
 	return lookup, nil
 }
 
+// buildTempEmailFilePath builds the temp-dir path for an email attachment. The
+// caller must pass a filename already reduced to a safe basename via
+// utils.SanitizeFileName (done once in enqueueEmailProcessTasks); this join does
+// not sanitize, so an unsanitized name could escape the temp dir (GHSA-h3pr-mhcr-8phg).
 func buildTempEmailFilePath(attachmentFileName string) string {
 	fileRepository := repositories.NewFileRepository(nil)
 	return filepath.Join(fileRepository.GetTempDirectoryPath(), attachmentFileName)
 }
 
+// buildTempEmailOcrFilePath builds the temp-dir path for the OCR-preprocessed
+// copy of an attachment. Same contract as buildTempEmailFilePath: the caller
+// passes a filename already sanitized to a safe basename.
 func buildTempEmailOcrFilePath(attachmentFileName string) string {
 	fileRepository := repositories.NewFileRepository(nil)
 	return filepath.Join(fileRepository.GetTempDirectoryPath(), "image-"+attachmentFileName)

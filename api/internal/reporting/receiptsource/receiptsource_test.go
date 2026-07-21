@@ -1,0 +1,921 @@
+package receiptsource
+
+import (
+	"errors"
+	"math"
+	"testing"
+	"time"
+
+	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/reporting"
+
+	"github.com/shopspring/decimal"
+)
+
+const (
+	hstFieldID      uint = 1
+	noteFieldID     uint = 2
+	childFieldID    uint = 3
+	dueDateFieldID  uint = 4
+	reimbursedField uint = 5
+)
+
+func dec(literal string) decimal.Decimal {
+	return decimal.RequireFromString(literal)
+}
+
+func testCustomFields() []models.CustomField {
+	return []models.CustomField{
+		{BaseModel: models.BaseModel{ID: hstFieldID}, Name: "HST", Type: models.CURRENCY},
+		{BaseModel: models.BaseModel{ID: noteFieldID}, Name: "Note", Type: models.TEXT},
+		{
+			BaseModel: models.BaseModel{ID: childFieldID},
+			Name:      "Child",
+			Type:      models.SELECT,
+			Options: []models.CustomFieldOption{
+				{BaseModel: models.BaseModel{ID: 10}, Value: "Alex", CustomFieldId: childFieldID},
+				{BaseModel: models.BaseModel{ID: 11}, Value: "Sam", CustomFieldId: childFieldID},
+			},
+		},
+		{BaseModel: models.BaseModel{ID: dueDateFieldID}, Name: "Due Date", Type: models.DATE},
+		{BaseModel: models.BaseModel{ID: reimbursedField}, Name: "Reimbursed", Type: models.BOOLEAN},
+	}
+}
+
+func mustNew(t *testing.T) Source {
+	t.Helper()
+
+	source, err := New(testCustomFields())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	return source
+}
+
+func TestCustomFieldKey(t *testing.T) {
+	tests := []struct {
+		id   uint
+		want reporting.FieldKey
+	}{
+		{1, "custom_1"},
+		{0, "custom_0"},
+		{4294967295, "custom_4294967295"},
+	}
+
+	for _, test := range tests {
+		if got := CustomFieldKey(test.id); got != test.want {
+			t.Errorf("CustomFieldKey(%d) = %q, want %q", test.id, got, test.want)
+		}
+	}
+}
+
+// A currency custom field is a measure, so a tax field is summable without any
+// special case. Everything else cuts the data.
+func TestSource_CatalogTypesCustomFields(t *testing.T) {
+	catalog := mustNew(t).Catalog()
+
+	tests := []struct {
+		key      reporting.FieldKey
+		label    string
+		dataType reporting.DataType
+		role     reporting.Role
+	}{
+		{"custom_1", "HST", reporting.TypeCurrency, reporting.RoleMeasure},
+		{"custom_2", "Note", reporting.TypeString, reporting.RoleDimension},
+		{"custom_3", "Child", reporting.TypeString, reporting.RoleDimension},
+		{"custom_4", "Due Date", reporting.TypeDate, reporting.RoleDimension},
+		{"custom_5", "Reimbursed", reporting.TypeBool, reporting.RoleDimension},
+	}
+
+	for _, test := range tests {
+		t.Run(test.label, func(t *testing.T) {
+			field, exists := catalog.Get(test.key)
+			if !exists {
+				t.Fatalf("catalog is missing %s", test.key)
+			}
+			if field.Label != test.label {
+				t.Errorf("label = %q, want %q", field.Label, test.label)
+			}
+			if field.DataType != test.dataType {
+				t.Errorf("dataType = %v, want %v", field.DataType, test.dataType)
+			}
+			if field.Role() != test.role {
+				t.Errorf("role = %v, want %v", field.Role(), test.role)
+			}
+			if field.Multi {
+				t.Errorf("custom fields are single-valued")
+			}
+		})
+	}
+}
+
+func TestSource_CatalogBuiltins(t *testing.T) {
+	catalog := mustNew(t).Catalog()
+
+	tests := []struct {
+		key      reporting.FieldKey
+		dataType reporting.DataType
+		multi    bool
+	}{
+		{KeyReceiptID, reporting.TypeNumber, false},
+		{KeyName, reporting.TypeString, false},
+		{KeyAmount, reporting.TypeCurrency, false},
+		{KeyDate, reporting.TypeDate, false},
+		{KeyResolvedDate, reporting.TypeDate, false},
+		{KeyCreatedAt, reporting.TypeDate, false},
+		{KeyStatus, reporting.TypeString, false},
+		{KeyPaidBy, reporting.TypeString, false},
+		{KeyGroup, reporting.TypeString, false},
+		{KeyCategory, reporting.TypeString, true},
+		{KeyTag, reporting.TypeString, true},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.key), func(t *testing.T) {
+			field, exists := catalog.Get(test.key)
+			if !exists {
+				t.Fatalf("catalog is missing %s", test.key)
+			}
+			if field.DataType != test.dataType {
+				t.Errorf("dataType = %v, want %v", field.DataType, test.dataType)
+			}
+			if field.Multi != test.multi {
+				t.Errorf("multi = %v, want %v", field.Multi, test.multi)
+			}
+		})
+	}
+}
+
+func TestSource_CatalogHasDatePeriodFields(t *testing.T) {
+	catalog := mustNew(t).Catalog()
+
+	keys := []reporting.FieldKey{
+		KeyDateDay, KeyDateMonth, KeyDateYear,
+		KeyResolvedDateDay, KeyResolvedDateMonth, KeyResolvedDateYear,
+		KeyCreatedAtDay, KeyCreatedAtMonth, KeyCreatedAtYear,
+	}
+	for _, key := range keys {
+		t.Run(string(key), func(t *testing.T) {
+			field, exists := catalog.Get(key)
+			if !exists {
+				t.Fatalf("catalog is missing %s", key)
+			}
+			// String so the engine buckets on the exact label, and a dimension so a
+			// report may group by it.
+			if field.DataType != reporting.TypeString {
+				t.Errorf("dataType = %v, want %v", field.DataType, reporting.TypeString)
+			}
+			if field.Multi {
+				t.Errorf("%s is single-valued", key)
+			}
+			if field.Role() != reporting.RoleDimension {
+				t.Errorf("role = %v, want dimension", field.Role())
+			}
+		})
+	}
+}
+
+func TestSource_DerivesDatePeriodFields(t *testing.T) {
+	row := mustNew(t).Rows([]models.Receipt{fullReceipt()})[0]
+
+	tests := []struct {
+		key  reporting.FieldKey
+		want string
+	}{
+		// date = 2026-05-15
+		{KeyDateDay, "2026-05-15"},
+		{KeyDateMonth, "2026-05"},
+		{KeyDateYear, "2026"},
+		// resolved_date = 2026-05-20
+		{KeyResolvedDateDay, "2026-05-20"},
+		{KeyResolvedDateMonth, "2026-05"},
+		{KeyResolvedDateYear, "2026"},
+		// created_at = 2026-05-01T08:00Z
+		{KeyCreatedAtDay, "2026-05-01"},
+		{KeyCreatedAtMonth, "2026-05"},
+		{KeyCreatedAtYear, "2026"},
+	}
+	for _, test := range tests {
+		t.Run(string(test.key), func(t *testing.T) {
+			text, isText := row.Measure(test.key).Text()
+			if !isText || text != test.want {
+				t.Errorf("%s = %v, want %q", test.key, row.Measure(test.key), test.want)
+			}
+		})
+	}
+}
+
+// A nil resolved date emits none of the resolved_date period fields, so it lands
+// in the (None) bucket just like the raw resolved_date field.
+func TestSource_NilResolvedDateOmitsResolvedPeriodFields(t *testing.T) {
+	receipt := fullReceipt()
+	receipt.ResolvedDate = nil
+
+	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+
+	for _, key := range []reporting.FieldKey{KeyResolvedDate, KeyResolvedDateDay, KeyResolvedDateMonth, KeyResolvedDateYear} {
+		if values := row.Get(key); len(values) != 0 {
+			t.Errorf("%s = %v, want no value", key, values)
+		}
+	}
+}
+
+// The period fields are derived in UTC by design (matching the engine's date
+// buckets), so a non-UTC instant near midnight is bucketed by its UTC calendar
+// day, not its local one. This pins that choice: a later switch to a local zone
+// would have to break this test deliberately.
+func TestSource_DatePeriodFieldsTruncateInUTC(t *testing.T) {
+	minus5 := time.FixedZone("minus5", -5*60*60)
+	receipt := fullReceipt()
+	// 2026-05-31 23:30 -05:00 is 2026-06-01 04:30 UTC -> crosses into June.
+	receipt.Date = time.Date(2026, 5, 31, 23, 30, 0, 0, minus5)
+	// 2026-12-31 20:00 -05:00 is 2027-01-01 01:00 UTC -> crosses into 2027.
+	resolved := time.Date(2026, 12, 31, 20, 0, 0, 0, minus5)
+	receipt.ResolvedDate = &resolved
+
+	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+
+	tests := []struct {
+		key  reporting.FieldKey
+		want string
+	}{
+		{KeyDateDay, "2026-06-01"},
+		{KeyDateMonth, "2026-06"},
+		{KeyDateYear, "2026"},
+		{KeyResolvedDateDay, "2027-01-01"},
+		{KeyResolvedDateMonth, "2027-01"},
+		{KeyResolvedDateYear, "2027"},
+	}
+	for _, test := range tests {
+		t.Run(string(test.key), func(t *testing.T) {
+			text, isText := row.Measure(test.key).Text()
+			if !isText || text != test.want {
+				t.Errorf("%s = %v, want %q (UTC)", test.key, row.Measure(test.key), test.want)
+			}
+		})
+	}
+}
+
+// Grouping by date_month buckets receipts into calendar months: same-month
+// receipts merge into one bucket, and the buckets sort chronologically because
+// zero-padded ISO strings compare that way.
+func TestSource_GroupByMonthBucketsByCalendarMonth(t *testing.T) {
+	source := mustNew(t)
+
+	receipt := func(year int, month time.Month, day int, amount string) models.Receipt {
+		return models.Receipt{
+			Date:   time.Date(year, month, day, 0, 0, 0, 0, time.UTC),
+			Amount: dec(amount),
+		}
+	}
+
+	receipts := []models.Receipt{
+		receipt(2026, time.May, 15, "100.00"),
+		receipt(2026, time.May, 20, "50.00"), // same month as the first -> one bucket
+		receipt(2026, time.March, 1, "30.00"),
+		receipt(2026, time.December, 31, "20.00"),
+		receipt(2027, time.January, 1, "10.00"),
+	}
+
+	spec := reporting.ReportSpec{
+		GroupBy:     []reporting.FieldKey{KeyDateMonth},
+		Columns:     []reporting.Column{{Name: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"}},
+		Subtotals:   true,
+		GrandTotals: true,
+	}
+
+	model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	wantBuckets := []string{"2026-03", "2026-05", "2026-12", "2027-01"}
+	if len(model.Root.Children) != len(wantBuckets) {
+		t.Fatalf("got %d month buckets, want %d", len(model.Root.Children), len(wantBuckets))
+	}
+	for index, want := range wantBuckets {
+		if got := model.Root.Children[index].Value.String(); got != want {
+			t.Errorf("bucket %d = %s, want %s", index, got, want)
+		}
+	}
+
+	find := func(cells []reporting.Cell, column string) string {
+		for _, candidate := range cells {
+			if candidate.Column == column {
+				return candidate.Value().String()
+			}
+		}
+		t.Fatalf("no cell for %s", column)
+		return ""
+	}
+	// The two May receipts merged into one bucket that sums both.
+	if got := find(model.Root.Children[1].Subtotals, "Total"); got != "150" {
+		t.Errorf("May total = %s, want 150", got)
+	}
+}
+
+func TestNew_RejectsDuplicateCustomFieldIds(t *testing.T) {
+	_, err := New([]models.CustomField{
+		{BaseModel: models.BaseModel{ID: 1}, Name: "HST", Type: models.CURRENCY},
+		{BaseModel: models.BaseModel{ID: 1}, Name: "GST", Type: models.CURRENCY},
+	})
+
+	if !errors.Is(err, reporting.ErrDuplicateField) {
+		t.Errorf("New() error = %v, want %v", err, reporting.ErrDuplicateField)
+	}
+}
+
+func TestNew_NoCustomFields(t *testing.T) {
+	source, err := New(nil)
+	if err != nil {
+		t.Fatalf("New(nil) error = %v", err)
+	}
+	if _, exists := source.Catalog().Get(KeyAmount); !exists {
+		t.Errorf("builtins are missing from a catalog with no custom fields")
+	}
+	if _, exists := source.Catalog().Get("custom_1"); exists {
+		t.Errorf("catalog invented a custom field")
+	}
+}
+
+// The catalog must not depend on the order the definitions arrived in.
+func TestNew_CatalogIsIndependentOfDefinitionOrder(t *testing.T) {
+	forward := testCustomFields()
+	reversed := testCustomFields()
+	for left, right := 0, len(reversed)-1; left < right; left, right = left+1, right-1 {
+		reversed[left], reversed[right] = reversed[right], reversed[left]
+	}
+
+	first, err := New(forward)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	second, err := New(reversed)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	for _, key := range []reporting.FieldKey{"custom_1", "custom_3", "custom_5"} {
+		one, _ := first.Catalog().Get(key)
+		two, _ := second.Catalog().Get(key)
+		if one != two {
+			t.Errorf("%s resolved differently: %+v vs %+v", key, one, two)
+		}
+	}
+}
+
+func fullReceipt() models.Receipt {
+	resolved := time.Date(2026, 5, 20, 0, 0, 0, 0, time.UTC)
+	hst := dec("15.60")
+	note := "office supplies"
+	option := uint(11)
+	due := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	reimbursed := true
+
+	return models.Receipt{
+		BaseModel:    models.BaseModel{ID: 7, CreatedAt: time.Date(2026, 5, 1, 8, 0, 0, 0, time.UTC)},
+		Name:         "Staples",
+		Amount:       dec("120.00"),
+		Date:         time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC),
+		ResolvedDate: &resolved,
+		Status:       models.RESOLVED,
+		PaidByUser:   models.User{DisplayName: "Dana"},
+		Group:        models.Group{Name: "Household"},
+		Categories:   []models.Category{{Name: "Clothing"}, {Name: "Medical"}},
+		Tags:         []models.Tag{{Name: "Alex"}},
+		CustomFields: []models.CustomFieldValue{
+			{CustomFieldId: hstFieldID, CurrencyValue: &hst},
+			{CustomFieldId: noteFieldID, StringValue: &note},
+			{CustomFieldId: childFieldID, SelectValue: &option},
+			{CustomFieldId: dueDateFieldID, DateValue: &due},
+			{CustomFieldId: reimbursedField, BooleanValue: &reimbursed},
+		},
+	}
+}
+
+func TestSource_RowsResolvesEveryField(t *testing.T) {
+	rows := mustNew(t).Rows([]models.Receipt{fullReceipt()})
+	if len(rows) != 1 {
+		t.Fatalf("got %d rows, want 1", len(rows))
+	}
+	row := rows[0]
+
+	t.Run("receipt id", func(t *testing.T) {
+		number, isNumber := row.Measure(KeyReceiptID).Decimal()
+		if !isNumber || !number.Equal(dec("7")) {
+			t.Errorf("receipt_id = %v", row.Measure(KeyReceiptID))
+		}
+	})
+
+	t.Run("amount", func(t *testing.T) {
+		number, isNumber := row.Measure(KeyAmount).Decimal()
+		if !isNumber || !number.Equal(dec("120.00")) {
+			t.Errorf("amount = %v", row.Measure(KeyAmount))
+		}
+	})
+
+	t.Run("currency custom field", func(t *testing.T) {
+		number, isNumber := row.Measure("custom_1").Decimal()
+		if !isNumber || !number.Equal(dec("15.60")) {
+			t.Errorf("custom_1 = %v", row.Measure("custom_1"))
+		}
+	})
+
+	strings := []struct {
+		key  reporting.FieldKey
+		want string
+	}{
+		{KeyName, "Staples"},
+		{KeyStatus, "RESOLVED"},
+		{KeyPaidBy, "Dana"},
+		{KeyGroup, "Household"},
+		{KeyTag, "Alex"},
+		{"custom_2", "office supplies"},
+		// A select stores an option id; the row carries the text.
+		{"custom_3", "Sam"},
+	}
+	for _, test := range strings {
+		t.Run(string(test.key), func(t *testing.T) {
+			text, isText := row.Measure(test.key).Text()
+			if !isText || text != test.want {
+				t.Errorf("%s = %v, want %q", test.key, row.Measure(test.key), test.want)
+			}
+		})
+	}
+
+	dates := []struct {
+		key  reporting.FieldKey
+		want time.Time
+	}{
+		{KeyDate, time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC)},
+		{KeyResolvedDate, time.Date(2026, 5, 20, 0, 0, 0, 0, time.UTC)},
+		{KeyCreatedAt, time.Date(2026, 5, 1, 8, 0, 0, 0, time.UTC)},
+		{"custom_4", time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}
+	for _, test := range dates {
+		t.Run(string(test.key), func(t *testing.T) {
+			instant, isDate := row.Measure(test.key).Time()
+			if !isDate || !instant.Equal(test.want) {
+				t.Errorf("%s = %v, want %v", test.key, row.Measure(test.key), test.want)
+			}
+		})
+	}
+
+	t.Run("boolean custom field", func(t *testing.T) {
+		value, isBool := row.Measure("custom_5").Boolean()
+		if !isBool || !value {
+			t.Errorf("custom_5 = %v, want true", row.Measure("custom_5"))
+		}
+	})
+
+	// Categories are multi-valued, and keep the order the receipt carried them.
+	t.Run("categories fan out", func(t *testing.T) {
+		values := row.Get(KeyCategory)
+		if len(values) != 2 {
+			t.Fatalf("got %d categories, want 2", len(values))
+		}
+		first, _ := values[0].Text()
+		second, _ := values[1].Text()
+		if first != "Clothing" || second != "Medical" {
+			t.Errorf("categories = %v, %v", first, second)
+		}
+	})
+}
+
+// A payer without a display name falls back to the name they log in with.
+func TestSource_PaidByFallsBackToUsername(t *testing.T) {
+	receipt := models.Receipt{PaidByUser: models.User{Username: "dana.smith"}}
+	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+
+	text, isText := row.Measure(KeyPaidBy).Text()
+	if !isText || text != "dana.smith" {
+		t.Errorf("paid_by = %v, want dana.smith", row.Measure(KeyPaidBy))
+	}
+}
+
+// An association the caller did not preload resolves to no value, which the
+// engine reports as (None) rather than as an error.
+func TestSource_UnloadedAssociationsBecomeNone(t *testing.T) {
+	row := mustNew(t).Rows([]models.Receipt{{Name: "Bare", Amount: dec("1.00")}})[0]
+
+	absent := []reporting.FieldKey{KeyPaidBy, KeyGroup, KeyResolvedDate, KeyCategory, KeyTag, "custom_1"}
+	for _, key := range absent {
+		t.Run(string(key), func(t *testing.T) {
+			if len(row.Get(key)) != 0 {
+				t.Errorf("%s resolved to %v, want no value", key, row.Get(key))
+			}
+			if !row.Measure(key).IsNull() {
+				t.Errorf("%s measures as %v, want null", key, row.Measure(key))
+			}
+		})
+	}
+}
+
+func TestSource_MissingCustomFieldValues(t *testing.T) {
+	receipt := models.Receipt{
+		CustomFields: []models.CustomFieldValue{
+			// The right field, but its column is empty.
+			{CustomFieldId: hstFieldID},
+			{CustomFieldId: noteFieldID},
+			{CustomFieldId: childFieldID},
+			{CustomFieldId: dueDateFieldID},
+			{CustomFieldId: reimbursedField},
+		},
+	}
+
+	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+
+	for _, key := range []reporting.FieldKey{"custom_1", "custom_2", "custom_3", "custom_4", "custom_5"} {
+		if len(row.Get(key)) != 0 {
+			t.Errorf("%s resolved to %v, want no value", key, row.Get(key))
+		}
+	}
+}
+
+// A select value pointing at an option that was not loaded, or that no longer
+// exists, resolves to nothing rather than to a bare id.
+func TestSource_SelectWithUnknownOption(t *testing.T) {
+	missing := uint(99)
+	receipt := models.Receipt{CustomFields: []models.CustomFieldValue{
+		{CustomFieldId: childFieldID, SelectValue: &missing},
+	}}
+
+	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+	if len(row.Get("custom_3")) != 0 {
+		t.Errorf("custom_3 = %v, want no value", row.Get("custom_3"))
+	}
+}
+
+func TestSource_SelectWithUnloadedOptions(t *testing.T) {
+	source, err := New([]models.CustomField{
+		{BaseModel: models.BaseModel{ID: childFieldID}, Name: "Child", Type: models.SELECT},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	option := uint(10)
+	receipt := models.Receipt{CustomFields: []models.CustomFieldValue{
+		{CustomFieldId: childFieldID, SelectValue: &option},
+	}}
+
+	row := source.Rows([]models.Receipt{receipt})[0]
+	if len(row.Get("custom_3")) != 0 {
+		t.Errorf("custom_3 = %v, want no value", row.Get("custom_3"))
+	}
+}
+
+// A value for a field the source does not know about is skipped: the engine
+// could not reference it anyway.
+func TestSource_UnknownCustomFieldValueIsSkipped(t *testing.T) {
+	amount := dec("5.00")
+	receipt := models.Receipt{CustomFields: []models.CustomFieldValue{
+		{CustomFieldId: 404, CurrencyValue: &amount},
+	}}
+
+	row := mustNew(t).Rows([]models.Receipt{receipt})[0]
+	if len(row.Get("custom_404")) != 0 {
+		t.Errorf("custom_404 = %v, want no value", row.Get("custom_404"))
+	}
+}
+
+// Where a receipt carries two values for one field, the lowest id wins — and it
+// wins whichever order the association came back in.
+//
+// Position cannot decide this. The association is loaded without an ORDER BY, so
+// "the first one" is whatever the database felt like returning, and a report
+// whose numbers depend on that is not deterministic.
+func TestSource_DuplicateCustomFieldValuesResolveByLowestId(t *testing.T) {
+	lower, higher := dec("1.00"), dec("2.00")
+
+	ascending := models.Receipt{CustomFields: []models.CustomFieldValue{
+		{BaseModel: models.BaseModel{ID: 10}, CustomFieldId: hstFieldID, CurrencyValue: &lower},
+		{BaseModel: models.BaseModel{ID: 20}, CustomFieldId: hstFieldID, CurrencyValue: &higher},
+	}}
+	descending := models.Receipt{CustomFields: []models.CustomFieldValue{
+		{BaseModel: models.BaseModel{ID: 20}, CustomFieldId: hstFieldID, CurrencyValue: &higher},
+		{BaseModel: models.BaseModel{ID: 10}, CustomFieldId: hstFieldID, CurrencyValue: &lower},
+	}}
+
+	source := mustNew(t)
+	for name, receipt := range map[string]models.Receipt{"ascending": ascending, "descending": descending} {
+		t.Run(name, func(t *testing.T) {
+			row := source.Rows([]models.Receipt{receipt})[0]
+
+			values := row.Get("custom_1")
+			if len(values) != 1 {
+				t.Fatalf("got %d values, want 1", len(values))
+			}
+			number, _ := values[0].Decimal()
+			if !number.Equal(dec("1.00")) {
+				t.Errorf("custom_1 = %s, want 1.00 (the value with the lowest id)", number)
+			}
+		})
+	}
+}
+
+// A value that resolves to nothing never wins, so an empty low-id row cannot
+// hide a real one — in either order.
+func TestSource_UnresolvableCustomFieldValueNeverWins(t *testing.T) {
+	amount := dec("2.00")
+
+	empty := models.CustomFieldValue{BaseModel: models.BaseModel{ID: 10}, CustomFieldId: hstFieldID}
+	real := models.CustomFieldValue{BaseModel: models.BaseModel{ID: 20}, CustomFieldId: hstFieldID, CurrencyValue: &amount}
+
+	source := mustNew(t)
+	for name, values := range map[string][]models.CustomFieldValue{
+		"empty first": {empty, real},
+		"empty last":  {real, empty},
+	} {
+		t.Run(name, func(t *testing.T) {
+			row := source.Rows([]models.Receipt{{CustomFields: values}})[0]
+
+			number, isNumber := row.Measure("custom_1").Decimal()
+			if !isNumber || !number.Equal(dec("2.00")) {
+				t.Errorf("custom_1 = %v, want 2.00", row.Measure("custom_1"))
+			}
+		})
+	}
+}
+
+func TestSource_RowsPreservesOrder(t *testing.T) {
+	receipts := []models.Receipt{
+		{BaseModel: models.BaseModel{ID: 3}},
+		{BaseModel: models.BaseModel{ID: 1}},
+		{BaseModel: models.BaseModel{ID: 2}},
+	}
+
+	rows := mustNew(t).Rows(receipts)
+
+	want := []string{"3", "1", "2"}
+	for index, expected := range want {
+		number, _ := rows[index].Measure(KeyReceiptID).Decimal()
+		if number.String() != expected {
+			t.Errorf("row %d receipt_id = %s, want %s", index, number, expected)
+		}
+	}
+}
+
+func TestSource_RowsOnNoReceipts(t *testing.T) {
+	if rows := mustNew(t).Rows(nil); len(rows) != 0 {
+		t.Errorf("Rows(nil) = %v, want empty", rows)
+	}
+}
+
+// The end-to-end shape: real receipts through the source into the engine,
+// reproducing the design document's worked example.
+func TestSource_FeedsTheEngine(t *testing.T) {
+	source := mustNew(t)
+
+	hst := func(literal string) *decimal.Decimal {
+		value := dec(literal)
+		return &value
+	}
+	receipt := func(payer, tag, category, amount string, tax *decimal.Decimal) models.Receipt {
+		built := models.Receipt{
+			Amount:     dec(amount),
+			PaidByUser: models.User{DisplayName: payer},
+			Tags:       []models.Tag{{Name: tag}},
+			Categories: []models.Category{{Name: category}},
+		}
+		if tax != nil {
+			built.CustomFields = []models.CustomFieldValue{{CustomFieldId: hstFieldID, CurrencyValue: tax}}
+		}
+		return built
+	}
+
+	receipts := []models.Receipt{
+		receipt("Dana", "Alex", "Clothing", "30.00", hst("3.90")),
+		receipt("Dana", "Alex", "Clothing", "30.00", hst("3.90")),
+		receipt("Dana", "Alex", "Clothing", "30.00", hst("3.90")),
+		receipt("Dana", "Alex", "Clothing", "30.00", hst("3.90")),
+		receipt("Dana", "Alex", "Medical", "50.00", nil),
+		receipt("Dana", "Alex", "Medical", "30.00", nil),
+		receipt("Dana", "Sam", "Clothing", "30.00", hst("3.90")),
+		receipt("Dana", "Sam", "Clothing", "30.00", hst("3.90")),
+		receipt("Dana", "Sam", "Clothing", "30.00", hst("3.90")),
+		receipt("Dana", "Sam", "Mileage", "30.00", nil),
+	}
+
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{KeyPaidBy, KeyTag},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: KeyCategory},
+		Columns: []reporting.Column{
+			{Name: "Category", Kind: reporting.ColumnLabel, Field: KeyCategory},
+			{Name: "Count", Kind: reporting.ColumnAggregate, AggSrc: "COUNT()"},
+			{Name: "Subtotal", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"},
+			{Name: "Hst", Kind: reporting.ColumnAggregate, AggSrc: "SUM(custom_1)"},
+			{Name: "Total", Kind: reporting.ColumnArithmetic, Expr: "Subtotal + Hst"},
+			{Name: "AvgPerReceipt", Label: "Avg/Receipt", Kind: reporting.ColumnArithmetic, Expr: "ROUND(Total / Count, 2)"},
+		},
+		Subtotals:   true,
+		GrandTotals: true,
+	}
+
+	model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	find := func(cells []reporting.Cell, column string) string {
+		for _, candidate := range cells {
+			if candidate.Column == column {
+				return candidate.Value().String()
+			}
+		}
+		t.Fatalf("no cell for %s", column)
+		return ""
+	}
+
+	dana := model.Root.Children[0]
+	alex, sam := dana.Children[0], dana.Children[1]
+
+	if got := find(alex.Subtotals, "Subtotal"); got != "200" {
+		t.Errorf("Alex subtotal = %s, want 200", got)
+	}
+	if got := find(alex.Subtotals, "AvgPerReceipt"); got != "35.93" {
+		t.Errorf("Alex average = %s, want 35.93", got)
+	}
+	if got := find(sam.Subtotals, "AvgPerReceipt"); got != "32.93" {
+		t.Errorf("Sam average = %s, want 32.93", got)
+	}
+	if got := find(model.GrandTotals, "Total"); got != "347.3" {
+		t.Errorf("grand total = %s, want 347.3", got)
+	}
+	if got := find(model.GrandTotals, "AvgPerReceipt"); got != "34.73" {
+		t.Errorf("grand average = %s, want 34.73", got)
+	}
+
+	// Medical carried no tax at all, and sums to zero rather than to an empty
+	// cell.
+	if got := find(alex.DetailRows[1].Cells, "Hst"); got != "0" {
+		t.Errorf("Medical HST = %s, want 0", got)
+	}
+}
+
+// A receipt that never round-tripped through the database holds the zero time.
+// Grouping on it must be stable, which it was not while date buckets were keyed
+// on UnixNano: the zero time and an instant in 585 shared a key.
+func TestSource_ZeroCreatedAtGroupsStably(t *testing.T) {
+	source := mustNew(t)
+
+	// The zero time, and the instant exactly 2^64 nanoseconds later.
+	zero := time.Time{}
+	wrapped := zero.Add(math.MaxInt64).Add(math.MaxInt64).Add(2)
+
+	receipts := []models.Receipt{
+		{BaseModel: models.BaseModel{ID: 1, CreatedAt: zero}, Amount: dec("1.00")},
+		{BaseModel: models.BaseModel{ID: 2, CreatedAt: wrapped}, Amount: dec("2.00")},
+	}
+
+	spec := reporting.ReportSpec{
+		GroupBy:     []reporting.FieldKey{KeyCreatedAt},
+		Columns:     []reporting.Column{{Name: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"}},
+		GrandTotals: true,
+	}
+
+	model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(model.Root.Children) != 2 {
+		t.Errorf("two distinct created-at instants produced %d bucket(s), want 2", len(model.Root.Children))
+	}
+
+	// And reversing the receipts must not change the report.
+	reversed := []models.Receipt{receipts[1], receipts[0]}
+	permuted, err := reporting.Run(spec, source.Catalog(), source.Rows(reversed), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if permuted.Root.Children[0].Value.String() != model.Root.Children[0].Value.String() {
+		t.Errorf("reversing the receipts changed the first bucket")
+	}
+}
+
+// A receipt amount that was never set is the zero decimal, whose internal
+// coefficient is a nil big.Int. It must sum like any other zero.
+func TestSource_ZeroValueAmountSums(t *testing.T) {
+	source := mustNew(t)
+
+	receipts := []models.Receipt{
+		{BaseModel: models.BaseModel{ID: 1}}, // Amount is the zero decimal.Decimal
+		{BaseModel: models.BaseModel{ID: 2}, Amount: dec("5.00")},
+	}
+
+	spec := reporting.ReportSpec{
+		Columns:     []reporting.Column{{Name: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"}},
+		GrandTotals: true,
+	}
+
+	model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	total := model.GrandTotals[0].Value()
+	number, isNumber := total.Decimal()
+	if !isNumber || !number.Equal(dec("5.00")) {
+		t.Errorf("grand total = %v, want 5.00", total)
+	}
+}
+
+// A receipt with no status resolves to the empty string, which is a bucket of
+// its own. It is not the same as having no status field at all, and the report
+// must not quietly file it under (None).
+func TestSource_EmptyStatusIsTheEmptyString(t *testing.T) {
+	row := mustNew(t).Rows([]models.Receipt{{Name: "Bare"}})[0]
+
+	values := row.Get(KeyStatus)
+	if len(values) != 1 {
+		t.Fatalf("status resolved to %d values, want 1", len(values))
+	}
+	text, isText := values[0].Text()
+	if !isText || text != "" {
+		t.Errorf("status = %v, want the empty string", values[0])
+	}
+}
+
+// A custom field whose type is not one the engine knows takes a place in the
+// catalog, so a saved report referencing it still validates, but resolves to no
+// value rather than guessing which column holds the answer.
+func TestSource_UnknownCustomFieldType(t *testing.T) {
+	source, err := New([]models.CustomField{
+		{BaseModel: models.BaseModel{ID: 9}, Name: "Mystery", Type: models.CustomFieldType("SOMETHING_NEW")},
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	field, exists := source.Catalog().Get("custom_9")
+	if !exists {
+		t.Fatalf("catalog is missing custom_9")
+	}
+	if field.DataType != reporting.TypeString {
+		t.Errorf("dataType = %v, want %v", field.DataType, reporting.TypeString)
+	}
+
+	note := "anything"
+	row := source.Rows([]models.Receipt{{
+		CustomFields: []models.CustomFieldValue{{CustomFieldId: 9, StringValue: &note}},
+	}})[0]
+
+	if len(row.Get("custom_9")) != 0 {
+		t.Errorf("custom_9 = %v, want no value", row.Get("custom_9"))
+	}
+}
+
+// Options belong to select fields. Loading them onto another kind changes
+// nothing, and must not make its values resolve through them.
+func TestSource_OptionsOnANonSelectFieldAreIgnored(t *testing.T) {
+	source, err := New([]models.CustomField{{
+		BaseModel: models.BaseModel{ID: 1},
+		Name:      "HST",
+		Type:      models.CURRENCY,
+		Options:   []models.CustomFieldOption{{BaseModel: models.BaseModel{ID: 10}, Value: "Alex"}},
+	}})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	amount := dec("15.60")
+	row := source.Rows([]models.Receipt{{
+		CustomFields: []models.CustomFieldValue{{CustomFieldId: 1, CurrencyValue: &amount}},
+	}})[0]
+
+	number, isNumber := row.Measure("custom_1").Decimal()
+	if !isNumber || !number.Equal(dec("15.60")) {
+		t.Errorf("custom_1 = %v, want 15.60", row.Measure("custom_1"))
+	}
+}
+
+// A receipt carrying the same category twice belongs to that bucket once.
+// receipt_categories cannot express it, but a row built by hand can.
+func TestSource_DuplicateCategoriesAreOneBucket(t *testing.T) {
+	source := mustNew(t)
+
+	receipts := []models.Receipt{{
+		Amount:     dec("10.00"),
+		Categories: []models.Category{{Name: "Clothing"}, {Name: "Clothing"}},
+	}}
+
+	spec := reporting.ReportSpec{
+		GroupBy:     []reporting.FieldKey{KeyCategory},
+		Columns:     []reporting.Column{{Name: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"}},
+		GrandTotals: true,
+	}
+
+	model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), reporting.MetaInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(model.Root.Children) != 1 {
+		t.Fatalf("got %d buckets, want 1", len(model.Root.Children))
+	}
+	number, _ := model.GrandTotals[0].Value().Decimal()
+	if !number.Equal(dec("10.00")) {
+		t.Errorf("grand total = %s, want 10.00", number)
+	}
+}

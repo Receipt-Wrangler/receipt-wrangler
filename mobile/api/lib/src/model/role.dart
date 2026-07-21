@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:openapi/src/model/permission_scope.dart';
+import 'package:openapi/src/model/report_template_grant.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/permission.dart';
 import 'package:built_value/built_value.dart';
@@ -26,6 +27,7 @@ part 'role.g.dart';
 /// * [tagGrants] - Tag ids a GROUP role restricts its members to. Empty means unrestricted (members may use every tag). Always empty for app roles.
 /// * [paidByUserGrants] - User ids whose receipts a GROUP role lets its members see (by the receipt's \"paid by\" user). Empty with includeOwnPaidReceipts false means unrestricted (members see every payer's receipts). Always empty for app roles.
 /// * [includeOwnPaidReceipts] - Whether a GROUP role lets each member see receipts they paid for. Part of the paid-by visibility filter; always false for app roles.
+/// * [reportTemplateGrants] - Per-template action grants restricting which report templates a GROUP role's members may act on. Empty means unrestricted (every template the role's group access reaches). Always empty for app roles.
 @BuiltValue()
 abstract class Role implements Built<Role, RoleBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -70,6 +72,10 @@ abstract class Role implements Built<Role, RoleBuilder> {
   /// Whether a GROUP role lets each member see receipts they paid for. Part of the paid-by visibility filter; always false for app roles.
   @BuiltValueField(wireName: r'includeOwnPaidReceipts')
   bool? get includeOwnPaidReceipts;
+
+  /// Per-template action grants restricting which report templates a GROUP role's members may act on. Empty means unrestricted (every template the role's group access reaches). Always empty for app roles.
+  @BuiltValueField(wireName: r'reportTemplateGrants')
+  BuiltList<ReportTemplateGrant>? get reportTemplateGrants;
 
   Role._();
 
@@ -164,6 +170,13 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
       yield serializers.serialize(
         object.includeOwnPaidReceipts,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.reportTemplateGrants != null) {
+      yield r'reportTemplateGrants';
+      yield serializers.serialize(
+        object.reportTemplateGrants,
+        specifiedType: const FullType(BuiltList, [FullType(ReportTemplateGrant)]),
       );
     }
   }
@@ -272,6 +285,13 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.includeOwnPaidReceipts = valueDes;
+          break;
+        case r'reportTemplateGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(ReportTemplateGrant)]),
+          ) as BuiltList<ReportTemplateGrant>;
+          result.reportTemplateGrants.replace(valueDes);
           break;
         default:
           unhandled.add(key);

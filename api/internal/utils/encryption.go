@@ -62,6 +62,10 @@ func DecryptData(key string, encryptedData []byte) (string, error) {
 		return "", err
 	}
 
+	if len(encryptedData) < gcm.NonceSize() {
+		return "", errors.New("encryptedData is too short")
+	}
+
 	nonce, cipherText := encryptedData[:gcm.NonceSize()], encryptedData[gcm.NonceSize():]
 	clearText, err := gcm.Open(nil, nonce, cipherText, nil)
 	if err != nil {

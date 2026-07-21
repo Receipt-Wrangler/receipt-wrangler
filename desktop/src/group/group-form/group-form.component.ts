@@ -72,7 +72,13 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
 
   public groupStatusOptions = GROUP_STATUS_OPTIONS;
 
-  public canManageMembers: Signal<boolean> = signal(false);
+  // Member-management controls gate on the granular group.members.* permissions
+  // (mirroring the backend UpdateGroup enforcement). Default to true so create mode
+  // — where there is no group yet and the creator becomes its owner — is unrestricted;
+  // edit/view mode resolves them from the caller's permissions in ngOnInit.
+  public canCreateGroupMembers: Signal<boolean> = signal(true);
+  public canUpdateGroupMembers: Signal<boolean> = signal(true);
+  public canDeleteGroupMembers: Signal<boolean> = signal(true);
 
   public dataSource = signal(new MatTableDataSource<GroupMember>([]));
 
@@ -94,8 +100,14 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
     this.formConfig = this.activatedRoute.snapshot.data["formConfig"];
     if (this.originalGroup) {
       this.editLink = `/groups/${this.originalGroup.id}/details/edit`;
-      this.canManageMembers = this.store.selectSignal(
-        AuthState.hasGroupPermission(this.originalGroup.id, Permission.GroupUpdate)
+      this.canCreateGroupMembers = this.store.selectSignal(
+        AuthState.hasGroupPermission(this.originalGroup.id, Permission.GroupMembersCreate)
+      );
+      this.canUpdateGroupMembers = this.store.selectSignal(
+        AuthState.hasGroupPermission(this.originalGroup.id, Permission.GroupMembersUpdate)
+      );
+      this.canDeleteGroupMembers = this.store.selectSignal(
+        AuthState.hasGroupPermission(this.originalGroup.id, Permission.GroupMembersDelete)
       );
     }
     this.initForm();

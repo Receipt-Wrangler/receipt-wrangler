@@ -56,3 +56,22 @@ String? receiptsSearchRedirect(BuildContext context, GoRouterState state) {
   }
   return "/groups";
 }
+
+/// Allows the reports route only when the caller holds `app.reports.read` or
+/// `app.reports.readAll`, mirroring the desktop reports route guard
+/// (`appPermissionGuard` with `[AppReportsRead, AppReportsReadAll]`). The Reports
+/// avatar-menu entry is hidden without these, so this is defense-in-depth against
+/// a deep link. On deny, lands on the group-select screen.
+String? reportsReadRedirect(BuildContext context, GoRouterState state) {
+  final permissionsModel =
+      Provider.of<PermissionsModel>(context, listen: false);
+
+  if (permissionsModel.hasAnyAppPermission([
+    Permission.appPeriodReportsPeriodRead,
+    Permission.appPeriodReportsPeriodReadAll,
+  ])) {
+    return null;
+  }
+
+  return "/groups";
+}

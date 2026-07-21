@@ -18,6 +18,7 @@ api/prompt.service.ts
 api/receipt.service.ts
 api/receiptImage.service.ts
 api/receiptProcessingSettings.service.ts
+api/report.service.ts
 api/role.service.ts
 api/search.service.ts
 api/systemEmail.service.ts
@@ -106,6 +107,15 @@ model/receiptPagedRequestCommand.ts
 model/receiptPagedRequestFilter.ts
 model/receiptProcessingSettings.ts
 model/receiptStatus.ts
+model/reportColumn.ts
+model/reportDetail.ts
+model/reportDocument.ts
+model/reportPeriod.ts
+model/reportPreviewResponse.ts
+model/reportRequestCommand.ts
+model/reportTemplate.ts
+model/reportTemplateGrant.ts
+model/reportTemplateOption.ts
 model/resetPasswordCommand.ts
 model/role.ts
 model/searchResult.ts

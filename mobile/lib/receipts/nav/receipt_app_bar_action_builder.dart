@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
@@ -14,6 +13,7 @@ import '../../enums/upload_method.dart';
 import '../../interfaces/upload_multipart_file_data.dart';
 import '../../models/loading_model.dart';
 import '../../models/receipt_model.dart';
+import '../../shared/functions/receipt_image_gallery.dart';
 import '../../shared/widgets/receipt_edit_popup_menu.dart';
 import '../../utils/forms.dart';
 import '../../utils/scan.dart';
@@ -151,36 +151,11 @@ class ReceiptAppBarActionBuilder {
   }
 
   Future downloadImage() async {
-    loadingModel.setIsLoading(true);
     var receiptImage = getCurrentlySelectedImage();
     if (receiptImage == null) {
       return;
     }
-
-    var imageResponse = await OpenApiClient.client
-        .getReceiptImageApi()
-        .downloadReceiptImageById(receiptImageId: receiptImage.id);
-
-    var imageBytes = imageResponse.data;
-
-    if (imageBytes == null) {
-      loadingModel.setIsLoading(false);
-      return;
-    }
-
-    await Gal.putImageBytes(imageBytes).then((value) {
-      var snackbarAction = SnackBarAction(
-        label: "Open",
-        onPressed: () async => await Gal.open(),
-      );
-
-      showSuccessSnackbar(context, "Image saved to gallery",
-          action: snackbarAction);
-      loadingModel.setIsLoading(false);
-    }).catchError((e) {
-      showErrorSnackbar(context, "Failed to save image to gallery");
-      loadingModel.setIsLoading(false);
-    });
+    await saveReceiptImageToGallery(context, loadingModel, receiptImage.id);
   }
 
   List<PopupMenuEntry> _buildViewAppBarMenuOptions() {

@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.0.0+20
+version: 2.1.0+21
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -65,11 +65,21 @@ dependencies:
   money2: ^6.0.3
   flutter_svg: ^2.0.16
   fl_chart: ^1.2.0
+  webview_flutter: ^4.14.1
+  path_provider: ^2.1.6
+  share_plus: ^13.2.1
+  sentry_flutter: ^8.14.2
+  # Kept as a regular dependency (not a dev_dependency) on purpose.
+  # Flutter 3.27+ strips dev_dependency plugins from release builds, but the
+  # generated GeneratedPluginRegistrant.java still references IntegrationTestPlugin
+  # whenever `flutter pub get` runs (e.g. Android Studio project sync). A release
+  # build driven straight from Gradle -- the Android Studio "Generate Signed
+  # Bundle / APK" wizard -- then fails to compile that stale reference.
+  integration_test:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
-    sdk: flutter
-  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to

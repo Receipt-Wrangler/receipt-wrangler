@@ -22,8 +22,8 @@ func (currencySeparator CurrencySeparator) Value() (driver.Value, error) {
 		return "", nil
 	}
 
-	if currencySeparator != COMMA && currencySeparator != DOT && currencySeparator != "" {
-		return nil, errors.New("invalid currency symbol position")
+	if currencySeparator != COMMA && currencySeparator != DOT {
+		return nil, errors.New("invalid currency separator")
 	}
 	return string(currencySeparator), nil
 }

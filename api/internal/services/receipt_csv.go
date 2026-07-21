@@ -2,6 +2,7 @@ package services
 
 import (
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/reporting/render"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -52,12 +53,12 @@ func (service *ReceiptCsvService) BuildReceiptCsv(receipts []models.Receipt) (st
 			utils.UintToString(receipt.ID),
 			receipt.CreatedAt.Format(dateFormat),
 			receipt.Date.Format(dateFormat),
-			receipt.Name,
-			receipt.PaidByUser.DisplayName,
+			render.SanitizeCSVField(receipt.Name),
+			render.SanitizeCSVField(receipt.PaidByUser.DisplayName),
 			receipt.Amount.String(),
 			string(receipt.Status),
-			service.BuildCategoryString(receipt.Categories),
-			service.BuildTagString(receipt.Tags),
+			render.SanitizeCSVField(service.BuildCategoryString(receipt.Categories)),
+			render.SanitizeCSVField(service.BuildTagString(receipt.Tags)),
 			resolvedDateString,
 		}
 		rowData = append(rowData, newRow)
@@ -97,14 +98,14 @@ func (service *ReceiptCsvService) BuildItemCsv(items []models.Item) ([]byte, err
 		newRow := []string{
 			utils.UintToString(item.ID),
 			utils.UintToString(item.ReceiptId),
-			item.Receipt.Name,
+			render.SanitizeCSVField(item.Receipt.Name),
 			item.Receipt.Date.Format(dateFormat),
-			item.Name,
-			item.ChargedToUser.DisplayName,
+			render.SanitizeCSVField(item.Name),
+			render.SanitizeCSVField(item.ChargedToUser.DisplayName),
 			item.Amount.String(),
 			string(item.Status),
-			service.BuildCategoryString(item.Categories),
-			service.BuildTagString(item.Tags),
+			render.SanitizeCSVField(service.BuildCategoryString(item.Categories)),
+			render.SanitizeCSVField(service.BuildTagString(item.Tags)),
 		}
 		rowData = append(rowData, newRow)
 	}

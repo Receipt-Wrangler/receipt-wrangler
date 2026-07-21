@@ -243,6 +243,7 @@ func DeleteUser(userId string) error {
 			&models.SystemTask{},
 			&models.ReceiptProcessingSettings{},
 			&models.Prompt{},
+			&models.ReportTemplate{},
 			&models.GroupReceiptSettings{},
 			&models.Pepper{},
 			&models.ApiKey{},

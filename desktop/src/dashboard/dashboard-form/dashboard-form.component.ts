@@ -1,12 +1,13 @@
-import { Component, OnInit, ViewEncapsulation, computed, viewChildren, viewChild } from "@angular/core";
+import { Component, OnInit, ViewEncapsulation, computed, signal, viewChildren, viewChild } from "@angular/core";
 import { FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
-import { take, tap } from "rxjs";
+import { catchError, of, take, tap } from "rxjs";
 import { ReceiptFilterComponent } from "src/shared-ui/receipt-filter/receipt-filter.component";
+import { FormOption } from "../../interfaces/form-option.interface";
 import { BaseFormComponent } from "../../form/index";
-import { Category, ChartGrouping, Dashboard, DashboardService, Tag, Widget, WidgetType } from "../../open-api";
+import { Category, ChartGrouping, Dashboard, DashboardService, PagedRequestCommand, Permission, ReportService, ReportTemplate, SortDirection, Tag, Widget, WidgetType } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { EditableListComponent } from "../../shared-ui/editable-list/editable-list.component";
 import { AuthState, GroupState } from "../../store";
@@ -56,6 +57,26 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
       : this.store.selectSnapshot(AuthState.groupTags(groupId));
   });
 
+  // Only offer the Report widget type to users who can view report templates —
+  // otherwise the template picker would be empty. Resolved through the AuthState
+  // selector, exactly like the report builder / templates-list gate.
+  private readonly canSelectReport = this.store.selectSignal(
+    AuthState.hasAnyAppPermission([
+      Permission.AppReportsRead,
+      Permission.AppReportsReadAll,
+    ])
+  );
+
+  public readonly availableWidgetTypeOptions = computed<FormOption[]>(() =>
+    this.canSelectReport()
+      ? widgetTypeOptions
+      : widgetTypeOptions.filter((option) => option.value !== WidgetType.Report)
+  );
+
+  // The templates the user may view, as determined by the API (the list endpoint is
+  // server-filtered to the caller's visible templates) — the Report widget's picker.
+  public readonly reportTemplateOptions = signal<{ id: number; name: string }[]>([]);
+
   public get widgets(): FormArray {
     return this.form.get("widgets") as FormArray;
   }
@@ -65,6 +86,7 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
     private formBuilder: FormBuilder,
     private store: Store,
     private snackbarService: SnackbarService,
+    private reportService: ReportService,
     private matDialogRef: MatDialogRef<DashboardFormComponent>
   ) {
     super();
@@ -74,6 +96,35 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
   public ngOnInit(): void {
     this.originalWidgets = Array.from(this.dashboard?.widgets ?? []);
     this.initForm();
+    if (this.canSelectReport()) {
+      this.loadReportTemplates();
+    }
+  }
+
+  // Populate the Report widget's template picker from the server-filtered list, so
+  // the choices are exactly the templates the user may view. A read failure yields
+  // an empty picker rather than an error (the user can still add other widgets).
+  private loadReportTemplates(): void {
+    const command: PagedRequestCommand = {
+      page: 1,
+      pageSize: 200,
+      orderBy: "name",
+      sortDirection: SortDirection.Asc,
+    };
+    this.reportService
+      .getReportTemplates(command)
+      .pipe(
+        take(1),
+        catchError(() => of({ data: [], totalCount: 0 })),
+        tap((paged) => {
+          const templates = (paged.data ?? []) as unknown as ReportTemplate[];
+          this.reportTemplateOptions.set(
+            templates.map((template) => ({ id: template.id, name: template.name }))
+          );
+        }),
+        untilDestroyed(this)
+      )
+      .subscribe();
   }
 
   public initForm(): void {
@@ -106,6 +157,13 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
           configuration: this.buildPieChartConfigForm(widget.configuration),
         });
         break;
+      case WidgetType.Report:
+        formGroup = this.formBuilder.group({
+          name: [widget.name, Validators.required],
+          widgetType: [widget.widgetType, Validators.required],
+          configuration: this.buildReportConfigForm(widget.configuration),
+        });
+        break;
       default:
         formGroup = this.formBuilder.group({
           name: [widget.name, Validators.required],
@@ -125,6 +183,9 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
           } else if (widgetType === WidgetType.PieChart) {
             formGroup.removeControl("configuration");
             formGroup.addControl("configuration", this.buildPieChartConfigForm({}));
+          } else if (widgetType === WidgetType.Report) {
+            formGroup.removeControl("configuration");
+            formGroup.addControl("configuration", this.buildReportConfigForm({}));
           } else {
             formGroup.removeControl("configuration");
           }
@@ -138,6 +199,12 @@ export class DashboardFormComponent extends BaseFormComponent implements OnInit 
     return this.formBuilder.group({
       chartGrouping: [config?.chartGrouping ?? ChartGrouping.Categories, Validators.required],
       filter: buildReceiptFilterForm(config?.filter ?? {}, this),
+    });
+  }
+
+  private buildReportConfigForm(config: any): FormGroup {
+    return this.formBuilder.group({
+      reportTemplateId: [config?.reportTemplateId ?? null, Validators.required],
     });
   }
 

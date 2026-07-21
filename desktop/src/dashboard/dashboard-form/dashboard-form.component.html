@@ -56,7 +56,7 @@
         [inputFormControl]="
                       form | formGet : 'widgets.' + i + '.widgetType'
                     "
-        [options]="widgetTypeOptions"
+        [options]="availableWidgetTypeOptions()"
       ></app-select>
       <ng-container
         [ngSwitch]="widgets.controls[i].value.widgetType"
@@ -101,6 +101,17 @@
               (formCommand)="handleFormCommand($event)"
             ></app-receipt-filter>
           </app-form-section>
+        </ng-container>
+        <ng-container *ngSwitchCase="WidgetType.Report">
+          <app-select
+            label="Report"
+            optionValueKey="id"
+            optionDisplayKey="name"
+            [inputFormControl]="
+              form | formGet : 'widgets.' + i + '.configuration.reportTemplateId'
+            "
+            [options]="reportTemplateOptions()"
+          ></app-select>
         </ng-container>
       </ng-container>
       <app-dialog-footer

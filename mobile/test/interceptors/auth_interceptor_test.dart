@@ -34,7 +34,7 @@ class TestErrorHandler with _NoopBaseHandler
   }
 
   @override
-  void reject(DioException err) {
+  void reject(DioException err, [bool callFollowingErrorInterceptor = false]) {
     if (!_actionCompleter.isCompleted) _actionCompleter.complete('reject');
   }
 }

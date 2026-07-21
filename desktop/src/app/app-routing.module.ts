@@ -115,6 +115,16 @@ const routes: Routes = [
         },
       },
       {
+        path: "reports",
+        loadChildren: () =>
+          import("../reports/reports.module").then((m) => m.ReportsModule),
+        canActivate: [AuthGuard, appPermissionGuard],
+        data: {
+          // read OR readAll: an admin with only the "*All" bypass still reaches reports.
+          appPermissions: [Permission.AppReportsRead, Permission.AppReportsReadAll],
+        },
+      },
+      {
         path: "",
         redirectTo: "/auth/login",
         pathMatch: "full",
