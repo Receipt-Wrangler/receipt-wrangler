@@ -1,3 +1,5 @@
+import os
+import tempfile
 import unittest
 from email.message import Message
 from email.mime.multipart import MIMEMultipart
@@ -194,6 +196,78 @@ class TestGetFormattedMessageDataWithBody(unittest.TestCase):
         self.assertEqual(result['body'], 'Order confirmation')
         self.assertEqual(result['bodyHtml'], '')
         self.assertEqual(len(result['attachments']), 1)
+
+
+class TestGetAttachments(unittest.TestCase):
+    """_get_attachments writes each attachment to base_path/temp/<filename>. A
+    malicious Content-Disposition filename must not escape that temp dir
+    (GHSA-h3pr-mhcr-8phg)."""
+
+    def setUp(self):
+        self.client = ImapClient('host', 'port', 'username', 'password', False, [], [])
+
+    def _make_message(self, filename, with_filename=True):
+        msg = MIMEMultipart()
+        attachment = MIMEBase('image', 'jpeg')
+        attachment.set_payload(b'\xff\xd8\xff\xe0')
+        encoders.encode_base64(attachment)
+        if with_filename:
+            attachment.add_header('Content-Disposition', 'attachment', filename=filename)
+        else:
+            attachment.add_header('Content-Disposition', 'attachment')
+        msg.attach(attachment)
+        return msg
+
+    def test_traversal_filename_is_contained_in_temp(self):
+        with tempfile.TemporaryDirectory() as base:
+            os.makedirs(os.path.join(base, 'temp'))
+            msg = self._make_message('../../../../evil.jpg')
+            with patch('imap_client.base_path', base):
+                result = self.client._get_attachments(msg)
+            # Returned metadata carries the sanitized basename (kept consistent
+            # with the on-disk write so the Go side reads the right file).
+            self.assertEqual(len(result), 1)
+            self.assertEqual(result[0]['filename'], 'evil.jpg')
+            # The write stayed inside temp/ — nothing escaped into base_path.
+            self.assertEqual(sorted(os.listdir(base)), ['temp'])
+            self.assertEqual(os.listdir(os.path.join(base, 'temp')), ['evil.jpg'])
+
+    def test_module_overwrite_filename_is_contained(self):
+        with tempfile.TemporaryDirectory() as base:
+            os.makedirs(os.path.join(base, 'temp'))
+            msg = self._make_message('../imap-client/utils.py')
+            with patch('imap_client.base_path', base):
+                result = self.client._get_attachments(msg)
+            self.assertEqual(result[0]['filename'], 'utils.py')
+            self.assertEqual(sorted(os.listdir(base)), ['temp'])
+            self.assertEqual(os.listdir(os.path.join(base, 'temp')), ['utils.py'])
+
+    def test_dotdot_filename_is_skipped(self):
+        with tempfile.TemporaryDirectory() as base:
+            os.makedirs(os.path.join(base, 'temp'))
+            msg = self._make_message('..')
+            with patch('imap_client.base_path', base):
+                result = self.client._get_attachments(msg)
+            self.assertEqual(result, [])
+            self.assertEqual(os.listdir(os.path.join(base, 'temp')), [])
+
+    def test_missing_filename_is_skipped(self):
+        with tempfile.TemporaryDirectory() as base:
+            os.makedirs(os.path.join(base, 'temp'))
+            msg = self._make_message(None, with_filename=False)
+            with patch('imap_client.base_path', base):
+                result = self.client._get_attachments(msg)
+            self.assertEqual(result, [])
+
+    def test_legitimate_filename_written_to_temp(self):
+        with tempfile.TemporaryDirectory() as base:
+            os.makedirs(os.path.join(base, 'temp'))
+            msg = self._make_message('receipt.jpg')
+            with patch('imap_client.base_path', base):
+                result = self.client._get_attachments(msg)
+            self.assertEqual(len(result), 1)
+            self.assertEqual(result[0]['filename'], 'receipt.jpg')
+            self.assertTrue(os.path.isfile(os.path.join(base, 'temp', 'receipt.jpg')))
 
 
 if __name__ == '__main__':
