@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { Permission } from './permission';
+import { ReportTemplateGrant } from './reportTemplateGrant';
 import { PermissionScope } from './permissionScope';
 
 
@@ -32,6 +33,10 @@ export interface UpsertRoleCommand {
      * Whether to also let each member see receipts they paid for. Only valid on group roles.
      */
     includeOwnPaidReceipts?: boolean;
+    /**
+     * Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
+     */
+    reportTemplateGrants?: Array<ReportTemplateGrant>;
 }
 export namespace UpsertRoleCommand {
 }

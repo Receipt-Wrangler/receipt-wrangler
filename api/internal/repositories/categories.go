@@ -31,6 +31,25 @@ func (repository CategoryRepository) GetAllCategories(querySelect string) ([]mod
 	return categories, nil
 }
 
+// GetByIds returns the full category records for the given ids (order not guaranteed). Used to
+// resolve names for id-only selections (e.g. quick-scan category picks) so they can flow through
+// receipt validation, which requires a category name.
+func (repository CategoryRepository) GetByIds(ids []uint) ([]models.Category, error) {
+	db := repository.GetDB()
+	var categories []models.Category
+
+	if len(ids) == 0 {
+		return categories, nil
+	}
+
+	err := db.Model(&models.Category{}).Where("id IN ?", ids).Find(&categories).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return categories, nil
+}
+
 // CountByIds returns how many of the given category ids exist. Used to validate
 // that a role's category grants reference real categories. Duplicate ids in the
 // input are de-duplicated by the IN clause, so callers should pass a unique set.

@@ -509,13 +509,10 @@ class _ReceiptForm extends State<ReceiptForm> {
     // context cached in ContextModel by the form screen can refer to a
     // deactivated element after navigating between /view and /edit, and
     // showModalBottomSheet dereferences context.widget -- which throws a
-    // null-check on a defunct element. Re-read it (don't cache a stale
-    // snapshot) and fall back to this form's own always-mounted context,
-    // mirroring how quick_scan.dart opens its sheet.
-    final shellContext =
-        Provider.of<ContextModel>(context, listen: false).shellContext;
-    final sheetContext =
-        (shellContext != null && shellContext.mounted) ? shellContext : context;
+    // null-check on a defunct element. resolveSheetContext re-reads it (no
+    // stale snapshot) and falls back to this form's own always-mounted context.
+    final sheetContext = Provider.of<ContextModel>(context, listen: false)
+        .resolveSheetContext(context);
     showFullscreenBottomSheet(
         sheetContext,
         ReceiptQuickActions(

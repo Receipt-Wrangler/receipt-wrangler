@@ -26,7 +26,7 @@ abstract class UpsertWidgetCommand implements Built<UpsertWidgetCommand, UpsertW
   /// Type of widget
   @BuiltValueField(wireName: r'widgetType')
   WidgetType get widgetType;
-  // enum widgetTypeEnum {  GROUP_SUMMARY,  FILTERED_RECEIPTS,  GROUP_ACTIVITY,  PIE_CHART,  };
+  // enum widgetTypeEnum {  GROUP_SUMMARY,  FILTERED_RECEIPTS,  GROUP_ACTIVITY,  PIE_CHART,  REPORT,  };
 
   /// Configuration of widget
   @BuiltValueField(wireName: r'configuration')

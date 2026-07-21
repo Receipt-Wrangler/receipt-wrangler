@@ -10,6 +10,7 @@ import {
   uniqueName,
   withAdminApi,
 } from './helpers/provisioning';
+import { injectQuickScanAppData } from './helpers/quick-scan';
 
 // The AI-powered receipt features are permission-gated in the UI:
 //   - Quick Scan  -> group.receipts.quick-scan (sidebar + receipts-table header),
@@ -22,12 +23,15 @@ import {
 // IMPORTANT CONFOUND: all three controls ALSO sit behind the `aiPoweredReceipts`
 // feature flag (`*appFeature="'aiPoweredReceipts'"` for Quick Scan/Poll Email,
 // and `aiPoweredReceipts()` for Magic Fill). That flag is server-config
-// (FeatureConfig) and is currently `false` in the dev/CI API, so these controls
-// are hidden for EVERYONE regardless of permission. These tests therefore prove
-// the permission-denied member sees no control (the negative axis), but they
-// cannot prove the positive contrast (a permitted member WOULD see it) without
-// enabling the feature flag on the API — which this harness must not modify. The
-// positive-contrast tests below are left as test.fixme for that reason.
+// (FeatureConfig) and is `false` in the dev/CI API, so the negative tests below
+// hold regardless of the flag — a permission-denied member sees no control.
+//
+// The Quick Scan POSITIVE contrast IS now covered: rather than mutate server
+// config, the last test injects `aiPoweredReceipts: true` client-side (the same
+// AppData interception the quick-scan-dialog spec uses). With the flag held on,
+// the button then hinges purely on the permission — a Legacy Editor member sees
+// it, the Viewer does not. (Poll Email / Magic Fill positives are still deferred;
+// they need extra server state — email integration / a magic-fill-capable role.)
 
 test.describe('Receipt feature gating (quick-scan / poll-email / magic-fill)', () => {
   test.describe.configure({ mode: 'serial' });
@@ -36,7 +40,9 @@ test.describe('Receipt feature gating (quick-scan / poll-email / magic-fill)', (
   let adminPage: Page;
   const roleName = uniqueName('no-ai-role');
   const groupName = uniqueName('no-ai-grp');
+  const editorGroupName = uniqueName('ai-editor-grp');
   let groupId: string;
+  let editorGroupId: string;
   let receiptId: number;
 
   test.beforeAll(async ({ browser }) => {
@@ -60,6 +66,14 @@ test.describe('Receipt feature gating (quick-scan / poll-email / magic-fill)', (
       roleName,
     });
 
+    // A second group where e2e-user holds the Legacy Editor system role, which
+    // includes group.receipts.quick-scan — the positive contrast for the gate.
+    editorGroupId = await createGroupWithMember(adminPage, {
+      groupName: editorGroupName,
+      memberDisplayName: 'E2E User',
+      roleName: 'Legacy Editor',
+    });
+
     await withAdminApi(async (api) => {
       const userId = await apiGetUserId(api, creds('user').username);
       receiptId = await apiCreateReceipt(api, {
@@ -74,6 +88,7 @@ test.describe('Receipt feature gating (quick-scan / poll-email / magic-fill)', (
     try {
       await withAdminApi(async (api) => {
         await apiDeleteGroupById(api, groupId);
+        await apiDeleteGroupById(api, editorGroupId);
         await apiDeleteRoleByName(api, roleName, 'GROUP');
       });
     } catch {
@@ -117,18 +132,24 @@ test.describe('Receipt feature gating (quick-scan / poll-email / magic-fill)', (
     );
   });
 
-  // Positive contrasts require the aiPoweredReceipts feature flag enabled on the
-  // API, which this harness must not modify (FeatureConfig is server config and
-  // is `false` in dev/CI). Left as fixme so the gap is explicit rather than a
-  // false green: with the flag on, a member holding the permission WOULD see the
-  // control while a Viewer still would not.
-  test.fixme(
-    'positive contrast: a member with the permission sees the control (needs aiPoweredReceipts enabled)',
-    async () => {
-      // Cannot run: aiPoweredReceipts is false in the dev/CI API and the harness
-      // must not change API config. Enabling it would let us assert e.g. a
-      // Receipt Editor (group.receipts.magic-fill) sees the Magic Fill button
-      // while the Viewer does not.
-    },
-  );
+  // Positive contrast for Quick Scan: inject aiPoweredReceipts client-side (the
+  // harness must not mutate server FeatureConfig), holding the flag on so the
+  // button hinges purely on the permission. The Legacy Editor group holds
+  // group.receipts.quick-scan and shows it; the Viewer group — same user, same
+  // flag on — does not, proving the permission is the discriminator.
+  test('positive contrast: a Legacy Editor member sees the Quick Scan button', async ({
+    page,
+  }) => {
+    await injectQuickScanAppData(page);
+
+    // Editor group (holds quick-scan) -> the button renders.
+    await page.goto(`/receipts/group/${editorGroupId}`);
+    await expect(page.getByTestId('configure-columns')).toBeVisible();
+    await expect(page.getByTestId('receipts-quick-scan')).toBeVisible();
+
+    // Viewer group (lacks quick-scan), flag still on -> the button is absent.
+    await page.goto(`/receipts/group/${groupId}`);
+    await expect(page.getByTestId('configure-columns')).toBeVisible();
+    await expect(page.getByTestId('receipts-quick-scan')).toHaveCount(0);
+  });
 });

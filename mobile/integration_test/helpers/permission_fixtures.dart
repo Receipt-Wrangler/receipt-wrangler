@@ -309,6 +309,108 @@ Future<int> createReceipt({
   return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
 }
 
+/// Seeds a saved report template over [groupIds] (via `POST /report/template`) and
+/// returns its id. Uses the minimal valid config the Go command validator accepts
+/// (records mode + one `dimension` column on `name`, csv format) — deliberately a
+/// dimension column, which is the shape that exercises the mobile list's
+/// deserialization path. Seed as admin (Legacy Admin holds `app.reports.createAll`,
+/// so it can report over any group). Clean up with [deleteReportTemplate].
+Future<int> createReportTemplate({
+  required List<int> groupIds,
+  required String jwt,
+  required String name,
+}) async {
+  final res = await http
+      .post(
+        Uri.parse('${E2eEnv.baseUrl}/report/template'),
+        headers: _jsonAuth(jwt),
+        body: jsonEncode({
+          'name': name,
+          'groupIds': groupIds.map((g) => g.toString()).toList(),
+          'period': {'preset': 'this_month'},
+          'detail': {'mode': 'records'},
+          'columns': [
+            {'kind': 'dimension', 'name': 'Name', 'field': 'name'},
+          ],
+          'formats': ['csv'],
+        }),
+      )
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('createReportTemplate($name) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
+}
+
+/// Best-effort `DELETE /report/template/{id}`. Swallows errors like [deleteUser].
+Future<void> deleteReportTemplate(int id, {required String jwt}) async {
+  try {
+    await http
+        .delete(
+          Uri.parse('${E2eEnv.baseUrl}/report/template/$id'),
+          headers: _auth(jwt),
+        )
+        .timeout(const Duration(seconds: 10));
+  } catch (_) {
+    // best-effort cleanup
+  }
+}
+
+/// Seeds a dashboard in [groupId] holding a single view-only `REPORT` widget that
+/// pins [reportTemplateId] (`POST /dashboard/`), and returns its id. The widget's
+/// `configuration` is the same untyped blob the desktop authors — `{reportTemplateId}`
+/// — which `report_widget.dart`'s `reportTemplateIdFromConfig` reads back.
+///
+/// Seed with the **viewing user's** jwt, not admin's: `getDashboardsForUserByGroup`
+/// filters on `user_id`, so the dashboard is only visible to its creator. The
+/// creator therefore needs `group.dashboards.create` in [groupId] (a Legacy Owner
+/// group role grants it). Clean up with [deleteDashboard].
+Future<int> createDashboard({
+  required int groupId,
+  required int reportTemplateId,
+  required String jwt,
+  required String name,
+  required String widgetName,
+}) async {
+  final res = await http
+      .post(
+        Uri.parse('${E2eEnv.baseUrl}/dashboard/'),
+        headers: _jsonAuth(jwt),
+        body: jsonEncode({
+          'name': name,
+          'groupId': groupId.toString(),
+          'widgets': [
+            {
+              'name': widgetName,
+              'widgetType': 'REPORT',
+              'configuration': {'reportTemplateId': reportTemplateId},
+            },
+          ],
+        }),
+      )
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('createDashboard($name) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map<String, dynamic>)['id'] as int;
+}
+
+/// Best-effort `DELETE /dashboard/{id}`. Swallows errors like [deleteUser].
+Future<void> deleteDashboard(int id, {required String jwt}) async {
+  try {
+    await http
+        .delete(
+          Uri.parse('${E2eEnv.baseUrl}/dashboard/$id'),
+          headers: _auth(jwt),
+        )
+        .timeout(const Duration(seconds: 10));
+  } catch (_) {
+    // best-effort cleanup
+  }
+}
+
 /// Creates a global category (categories are app-wide; group visibility is via
 /// group-role grants) and returns its id. A group role with no category grants
 /// is unrestricted, so a freshly-created category shows up in every member's
@@ -397,6 +499,131 @@ Future<void> deleteTag(int tagId, {required String jwt}) async {
   } catch (_) {
     // best-effort
   }
+}
+
+/// The admin's first non-"All" group (id + name), read via the API. Use to
+/// target a group for config persistence + dropdown selection before login.
+/// Every group `GET /group/` returns for the admin has the admin as a member, so
+/// the group's paid-by dropdown always includes the admin.
+Future<({int id, String name})> firstNonAllGroup(String jwt) async {
+  final groups = await _adminGroups(jwt);
+  final g = groups.firstWhere((x) => x['isAllGroup'] != true,
+      orElse: () => throw StateError('no non-all group for the admin'));
+  return (id: g['id'] as int, name: g['name'] as String);
+}
+
+Future<List<Map<String, dynamic>>> _adminGroups(String jwt) async {
+  final res = await http
+      .get(Uri.parse('${E2eEnv.baseUrl}/group/'), headers: _auth(jwt))
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('GET /group/ failed: HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as List).cast<Map<String, dynamic>>();
+}
+
+/// Builds an `UpdateGroupReceiptSettingsCommand` from a settings map, applying
+/// [overrides]. Only the hide* + quick-scan enabled/required flags are sent -- the
+/// default enum fields (`quickScanDefaultPaidByType` / `...Status`) are omitted
+/// because the backend keeps them and rejects an empty enum, so we never echo one
+/// back. (This is why persisted configs keep paid-by/status *required*: making
+/// them optional would need a persisted default the backend enforces.)
+Map<String, dynamic> _settingsToCommand(
+  Map<String, dynamic> s, {
+  Map<String, dynamic> overrides = const {},
+}) =>
+    {
+      for (final k in const [
+        'hideImages', 'hideReceiptCategories', 'hideReceiptTags',
+        'hideItemCategories', 'hideItemTags', 'hideComments',
+        'hideShareCategories', 'hideShareTags',
+        'quickScanPaidByEnabled', 'quickScanPaidByRequired',
+        'quickScanStatusEnabled', 'quickScanStatusRequired',
+        'quickScanCategoriesEnabled', 'quickScanCategoriesRequired',
+        'quickScanTagsEnabled', 'quickScanTagsRequired',
+      ])
+        k: s[k] ?? false,
+      ...overrides,
+    };
+
+Future<void> _putGroupReceiptSettings(
+    int groupId, String jwt, Map<String, dynamic> command) async {
+  final res = await http
+      .put(Uri.parse('${E2eEnv.baseUrl}/group/$groupId/groupReceiptSettings'),
+          headers: _jsonAuth(jwt), body: jsonEncode(command))
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError('PUT groupReceiptSettings($groupId) failed: '
+        'HTTP ${res.statusCode}: ${res.body}');
+  }
+}
+
+/// Persists quick-scan [overrides] (merged over the group's current settings) on
+/// [groupId], restoring the original settings on teardown.
+///
+/// Submit tests must persist -- not client-mutate GroupModel -- because the
+/// backend's `resolveQuickScanFields` validates the submit against the group's
+/// *persisted* config, so client (via AppData at login) and server must agree, as
+/// they do in production. Keep paid-by/status required in [overrides] (see
+/// `_settingsToCommand`).
+Future<void> setGroupQuickScanConfig({
+  required int groupId,
+  required String jwt,
+  required Map<String, dynamic> overrides,
+}) async {
+  final groups = await _adminGroups(jwt);
+  final original = ((groups.firstWhere((x) => x['id'] == groupId,
+              orElse: () => throw StateError('group $groupId not found'))[
+          'groupReceiptSettings']) as Map)
+      .cast<String, dynamic>();
+  await _putGroupReceiptSettings(
+      groupId, jwt, _settingsToCommand(original, overrides: overrides));
+  addTearDown(() async {
+    final j = await apiLogin();
+    await _putGroupReceiptSettings(groupId, j, _settingsToCommand(original));
+  });
+}
+
+Future<Map<String, dynamic>> _getUserPreferences(String jwt) async {
+  final res = await http
+      .get(Uri.parse('${E2eEnv.baseUrl}/userPreferences'), headers: _auth(jwt))
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError(
+        'GET /userPreferences failed: HTTP ${res.statusCode}: ${res.body}');
+  }
+  return (jsonDecode(res.body) as Map).cast<String, dynamic>();
+}
+
+Future<void> _putUserPreferences(String jwt, Map<String, dynamic> body) async {
+  final res = await http
+      .put(Uri.parse('${E2eEnv.baseUrl}/userPreferences'),
+          headers: _jsonAuth(jwt), body: jsonEncode(body))
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError(
+        'PUT /userPreferences failed: HTTP ${res.statusCode}: ${res.body}');
+  }
+}
+
+/// Sets the caller's quick-scan default preferences (the per-image prefill
+/// source: `quickScanDefault{GroupId,PaidById,Status}`), restoring the original
+/// preferences on teardown. [status] is a `ReceiptStatus` wire value (e.g.
+/// 'OPEN'); omit a field to leave it at its current value.
+Future<void> setUserQuickScanPrefs({
+  required String jwt,
+  int? groupId,
+  int? paidById,
+  String? status,
+}) async {
+  final original = await _getUserPreferences(jwt);
+  final updated = Map<String, dynamic>.from(original)
+    ..['quickScanDefaultGroupId'] = groupId ?? original['quickScanDefaultGroupId']
+    ..['quickScanDefaultPaidById'] =
+        paidById ?? original['quickScanDefaultPaidById']
+    ..['quickScanDefaultStatus'] = status ?? original['quickScanDefaultStatus'];
+  await _putUserPreferences(jwt, updated);
+  addTearDown(() async => _putUserPreferences(await apiLogin(), original));
 }
 
 /// Provisions a fresh user and (optionally) a fixture group it belongs to,
@@ -501,6 +728,35 @@ Future<PermFixture> provisionUserWithoutAppPermission(String permission) async {
   addTearDown(() async => deleteRole(roleId, scope: 'APP', jwt: await apiLogin()));
 
   return provisionPermUser(appRoleId: roleId);
+}
+
+/// Provisions a user whose APP role is "Legacy User" **plus** [extraAppPermissions]
+/// (the inverse of [provisionUserWithoutAppPermission]). Use for positive specs
+/// that need an app permission a Legacy User lacks — e.g. `app.reports.read` /
+/// `app.reports.readAll` to reveal the Reports menu and list. Pass [groupRoleName]
+/// (e.g. "Legacy Owner") to also place the user in a fixture group with that group
+/// role — needed when the scenario requires a group-scoped grant such as
+/// `group.reports.read`.
+///
+/// Same LIFO teardown ordering as [provisionUserWithoutAppPermission]: the
+/// role-delete is registered before [provisionPermUser] so it runs after the
+/// user/group (and thus the assignment) are gone.
+Future<PermFixture> provisionUserWithAppPermissions(
+  List<String> extraAppPermissions, {
+  String? groupRoleName,
+}) async {
+  final jwt = await apiLogin(); // admin
+  final base = await rolePermissionsByName('Legacy User', 'APP', jwt: jwt);
+  final perms = {...base, ...extraAppPermissions}.toList();
+  final roleId = await createRole(
+    name: 'e2e-app-${_unique()}',
+    scope: 'APP',
+    permissions: perms,
+    jwt: jwt,
+  );
+  addTearDown(() async => deleteRole(roleId, scope: 'APP', jwt: await apiLogin()));
+
+  return provisionPermUser(appRoleId: roleId, roleName: groupRoleName);
 }
 
 /// Provisions a user in a fixture group whose GROUP role is [baselineRole]

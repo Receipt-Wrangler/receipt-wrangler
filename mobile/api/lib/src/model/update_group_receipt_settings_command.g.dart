@@ -24,6 +24,28 @@ class _$UpdateGroupReceiptSettingsCommand
   final bool? hideShareCategories;
   @override
   final bool? hideShareTags;
+  @override
+  final bool? quickScanPaidByEnabled;
+  @override
+  final bool? quickScanPaidByRequired;
+  @override
+  final QuickScanDefaultPaidByType? quickScanDefaultPaidByType;
+  @override
+  final int? quickScanDefaultPaidById;
+  @override
+  final bool? quickScanStatusEnabled;
+  @override
+  final bool? quickScanStatusRequired;
+  @override
+  final ReceiptStatus? quickScanDefaultStatus;
+  @override
+  final bool? quickScanCategoriesEnabled;
+  @override
+  final bool? quickScanCategoriesRequired;
+  @override
+  final bool? quickScanTagsEnabled;
+  @override
+  final bool? quickScanTagsRequired;
 
   factory _$UpdateGroupReceiptSettingsCommand(
           [void Function(UpdateGroupReceiptSettingsCommandBuilder)? updates]) =>
@@ -37,7 +59,18 @@ class _$UpdateGroupReceiptSettingsCommand
       this.hideItemTags,
       this.hideComments,
       this.hideShareCategories,
-      this.hideShareTags})
+      this.hideShareTags,
+      this.quickScanPaidByEnabled,
+      this.quickScanPaidByRequired,
+      this.quickScanDefaultPaidByType,
+      this.quickScanDefaultPaidById,
+      this.quickScanStatusEnabled,
+      this.quickScanStatusRequired,
+      this.quickScanDefaultStatus,
+      this.quickScanCategoriesEnabled,
+      this.quickScanCategoriesRequired,
+      this.quickScanTagsEnabled,
+      this.quickScanTagsRequired})
       : super._();
   @override
   UpdateGroupReceiptSettingsCommand rebuild(
@@ -59,7 +92,18 @@ class _$UpdateGroupReceiptSettingsCommand
         hideItemTags == other.hideItemTags &&
         hideComments == other.hideComments &&
         hideShareCategories == other.hideShareCategories &&
-        hideShareTags == other.hideShareTags;
+        hideShareTags == other.hideShareTags &&
+        quickScanPaidByEnabled == other.quickScanPaidByEnabled &&
+        quickScanPaidByRequired == other.quickScanPaidByRequired &&
+        quickScanDefaultPaidByType == other.quickScanDefaultPaidByType &&
+        quickScanDefaultPaidById == other.quickScanDefaultPaidById &&
+        quickScanStatusEnabled == other.quickScanStatusEnabled &&
+        quickScanStatusRequired == other.quickScanStatusRequired &&
+        quickScanDefaultStatus == other.quickScanDefaultStatus &&
+        quickScanCategoriesEnabled == other.quickScanCategoriesEnabled &&
+        quickScanCategoriesRequired == other.quickScanCategoriesRequired &&
+        quickScanTagsEnabled == other.quickScanTagsEnabled &&
+        quickScanTagsRequired == other.quickScanTagsRequired;
   }
 
   @override
@@ -73,6 +117,17 @@ class _$UpdateGroupReceiptSettingsCommand
     _$hash = $jc(_$hash, hideComments.hashCode);
     _$hash = $jc(_$hash, hideShareCategories.hashCode);
     _$hash = $jc(_$hash, hideShareTags.hashCode);
+    _$hash = $jc(_$hash, quickScanPaidByEnabled.hashCode);
+    _$hash = $jc(_$hash, quickScanPaidByRequired.hashCode);
+    _$hash = $jc(_$hash, quickScanDefaultPaidByType.hashCode);
+    _$hash = $jc(_$hash, quickScanDefaultPaidById.hashCode);
+    _$hash = $jc(_$hash, quickScanStatusEnabled.hashCode);
+    _$hash = $jc(_$hash, quickScanStatusRequired.hashCode);
+    _$hash = $jc(_$hash, quickScanDefaultStatus.hashCode);
+    _$hash = $jc(_$hash, quickScanCategoriesEnabled.hashCode);
+    _$hash = $jc(_$hash, quickScanCategoriesRequired.hashCode);
+    _$hash = $jc(_$hash, quickScanTagsEnabled.hashCode);
+    _$hash = $jc(_$hash, quickScanTagsRequired.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -87,7 +142,18 @@ class _$UpdateGroupReceiptSettingsCommand
           ..add('hideItemTags', hideItemTags)
           ..add('hideComments', hideComments)
           ..add('hideShareCategories', hideShareCategories)
-          ..add('hideShareTags', hideShareTags))
+          ..add('hideShareTags', hideShareTags)
+          ..add('quickScanPaidByEnabled', quickScanPaidByEnabled)
+          ..add('quickScanPaidByRequired', quickScanPaidByRequired)
+          ..add('quickScanDefaultPaidByType', quickScanDefaultPaidByType)
+          ..add('quickScanDefaultPaidById', quickScanDefaultPaidById)
+          ..add('quickScanStatusEnabled', quickScanStatusEnabled)
+          ..add('quickScanStatusRequired', quickScanStatusRequired)
+          ..add('quickScanDefaultStatus', quickScanDefaultStatus)
+          ..add('quickScanCategoriesEnabled', quickScanCategoriesEnabled)
+          ..add('quickScanCategoriesRequired', quickScanCategoriesRequired)
+          ..add('quickScanTagsEnabled', quickScanTagsEnabled)
+          ..add('quickScanTagsRequired', quickScanTagsRequired))
         .toString();
   }
 }
@@ -135,6 +201,63 @@ class UpdateGroupReceiptSettingsCommandBuilder
   set hideShareTags(bool? hideShareTags) =>
       _$this._hideShareTags = hideShareTags;
 
+  bool? _quickScanPaidByEnabled;
+  bool? get quickScanPaidByEnabled => _$this._quickScanPaidByEnabled;
+  set quickScanPaidByEnabled(bool? quickScanPaidByEnabled) =>
+      _$this._quickScanPaidByEnabled = quickScanPaidByEnabled;
+
+  bool? _quickScanPaidByRequired;
+  bool? get quickScanPaidByRequired => _$this._quickScanPaidByRequired;
+  set quickScanPaidByRequired(bool? quickScanPaidByRequired) =>
+      _$this._quickScanPaidByRequired = quickScanPaidByRequired;
+
+  QuickScanDefaultPaidByType? _quickScanDefaultPaidByType;
+  QuickScanDefaultPaidByType? get quickScanDefaultPaidByType =>
+      _$this._quickScanDefaultPaidByType;
+  set quickScanDefaultPaidByType(
+          QuickScanDefaultPaidByType? quickScanDefaultPaidByType) =>
+      _$this._quickScanDefaultPaidByType = quickScanDefaultPaidByType;
+
+  int? _quickScanDefaultPaidById;
+  int? get quickScanDefaultPaidById => _$this._quickScanDefaultPaidById;
+  set quickScanDefaultPaidById(int? quickScanDefaultPaidById) =>
+      _$this._quickScanDefaultPaidById = quickScanDefaultPaidById;
+
+  bool? _quickScanStatusEnabled;
+  bool? get quickScanStatusEnabled => _$this._quickScanStatusEnabled;
+  set quickScanStatusEnabled(bool? quickScanStatusEnabled) =>
+      _$this._quickScanStatusEnabled = quickScanStatusEnabled;
+
+  bool? _quickScanStatusRequired;
+  bool? get quickScanStatusRequired => _$this._quickScanStatusRequired;
+  set quickScanStatusRequired(bool? quickScanStatusRequired) =>
+      _$this._quickScanStatusRequired = quickScanStatusRequired;
+
+  ReceiptStatus? _quickScanDefaultStatus;
+  ReceiptStatus? get quickScanDefaultStatus => _$this._quickScanDefaultStatus;
+  set quickScanDefaultStatus(ReceiptStatus? quickScanDefaultStatus) =>
+      _$this._quickScanDefaultStatus = quickScanDefaultStatus;
+
+  bool? _quickScanCategoriesEnabled;
+  bool? get quickScanCategoriesEnabled => _$this._quickScanCategoriesEnabled;
+  set quickScanCategoriesEnabled(bool? quickScanCategoriesEnabled) =>
+      _$this._quickScanCategoriesEnabled = quickScanCategoriesEnabled;
+
+  bool? _quickScanCategoriesRequired;
+  bool? get quickScanCategoriesRequired => _$this._quickScanCategoriesRequired;
+  set quickScanCategoriesRequired(bool? quickScanCategoriesRequired) =>
+      _$this._quickScanCategoriesRequired = quickScanCategoriesRequired;
+
+  bool? _quickScanTagsEnabled;
+  bool? get quickScanTagsEnabled => _$this._quickScanTagsEnabled;
+  set quickScanTagsEnabled(bool? quickScanTagsEnabled) =>
+      _$this._quickScanTagsEnabled = quickScanTagsEnabled;
+
+  bool? _quickScanTagsRequired;
+  bool? get quickScanTagsRequired => _$this._quickScanTagsRequired;
+  set quickScanTagsRequired(bool? quickScanTagsRequired) =>
+      _$this._quickScanTagsRequired = quickScanTagsRequired;
+
   UpdateGroupReceiptSettingsCommandBuilder() {
     UpdateGroupReceiptSettingsCommand._defaults(this);
   }
@@ -150,6 +273,17 @@ class UpdateGroupReceiptSettingsCommandBuilder
       _hideComments = $v.hideComments;
       _hideShareCategories = $v.hideShareCategories;
       _hideShareTags = $v.hideShareTags;
+      _quickScanPaidByEnabled = $v.quickScanPaidByEnabled;
+      _quickScanPaidByRequired = $v.quickScanPaidByRequired;
+      _quickScanDefaultPaidByType = $v.quickScanDefaultPaidByType;
+      _quickScanDefaultPaidById = $v.quickScanDefaultPaidById;
+      _quickScanStatusEnabled = $v.quickScanStatusEnabled;
+      _quickScanStatusRequired = $v.quickScanStatusRequired;
+      _quickScanDefaultStatus = $v.quickScanDefaultStatus;
+      _quickScanCategoriesEnabled = $v.quickScanCategoriesEnabled;
+      _quickScanCategoriesRequired = $v.quickScanCategoriesRequired;
+      _quickScanTagsEnabled = $v.quickScanTagsEnabled;
+      _quickScanTagsRequired = $v.quickScanTagsRequired;
       _$v = null;
     }
     return this;
@@ -180,6 +314,17 @@ class UpdateGroupReceiptSettingsCommandBuilder
           hideComments: hideComments,
           hideShareCategories: hideShareCategories,
           hideShareTags: hideShareTags,
+          quickScanPaidByEnabled: quickScanPaidByEnabled,
+          quickScanPaidByRequired: quickScanPaidByRequired,
+          quickScanDefaultPaidByType: quickScanDefaultPaidByType,
+          quickScanDefaultPaidById: quickScanDefaultPaidById,
+          quickScanStatusEnabled: quickScanStatusEnabled,
+          quickScanStatusRequired: quickScanStatusRequired,
+          quickScanDefaultStatus: quickScanDefaultStatus,
+          quickScanCategoriesEnabled: quickScanCategoriesEnabled,
+          quickScanCategoriesRequired: quickScanCategoriesRequired,
+          quickScanTagsEnabled: quickScanTagsEnabled,
+          quickScanTagsRequired: quickScanTagsRequired,
         );
     replace(_$result);
     return _$result;

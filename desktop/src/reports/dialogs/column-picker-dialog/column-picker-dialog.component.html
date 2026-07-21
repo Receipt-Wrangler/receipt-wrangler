@@ -1,0 +1,107 @@
+<app-dialog [headerText]="title()">
+  <div class="picker__subtitle">{{ subtitle() }}</div>
+
+  @switch (step()) {
+    @case ("kind") {
+      <div class="picker__kinds">
+        <div class="picker__kind-card" (click)="pickDimension()" data-testid="picker-kind-dimension">
+          <span class="picker__kind-icon kind-dimension"><mat-icon>sell</mat-icon></span>
+          <div class="picker__kind-text">
+            <div class="picker__kind-title">Dimension</div>
+            <div class="picker__kind-desc">A way to cut the data — a label column like Category</div>
+          </div>
+          <mat-icon class="picker__chevron">chevron_right</mat-icon>
+        </div>
+        <div class="picker__kind-card" (click)="pickAggregate()" data-testid="picker-kind-aggregate">
+          <span class="picker__kind-icon kind-aggregate"><mat-icon>functions</mat-icon></span>
+          <div class="picker__kind-text">
+            <div class="picker__kind-title">Aggregate</div>
+            <div class="picker__kind-desc">SUM, COUNT, AVG… over a measure. Rolls up children</div>
+          </div>
+          <mat-icon class="picker__chevron">chevron_right</mat-icon>
+        </div>
+        <div class="picker__kind-card" (click)="pickFormula()" data-testid="picker-kind-formula">
+          <span class="picker__kind-icon kind-formula"><mat-icon>calculate</mat-icon></span>
+          <div class="picker__kind-text">
+            <div class="picker__kind-title">Formula</div>
+            <div class="picker__kind-desc">An expression over other columns — recomputed each row</div>
+          </div>
+          <mat-icon class="picker__chevron">chevron_right</mat-icon>
+        </div>
+      </div>
+    }
+
+    @case ("dim") {
+      <app-select label="Field" optionValueKey="value" optionDisplayKey="displayValue"
+        [options]="dimensionOptions" [inputFormControl]="pickerForm | formGet: 'field'"></app-select>
+      <app-input label="Column label" [inputFormControl]="pickerForm | formGet: 'label'"></app-input>
+    }
+
+    @case ("agg") {
+      <label class="picker__label">Function</label>
+      <div class="picker__fns">
+        @for (fn of aggregateFunctions; track fn) {
+          <button type="button" class="picker__fn" [class.picker__fn--selected]="currentAggFunc === fn"
+            (click)="selectFunction(fn)">{{ fn }}</button>
+        }
+      </div>
+      @if (aggregateNeedsMeasure) {
+        <app-select label="Measure" optionValueKey="value" optionDisplayKey="displayValue"
+          [options]="measureOptions" [inputFormControl]="pickerForm | formGet: 'measure'"></app-select>
+      }
+      <app-input label="Column label" [inputFormControl]="pickerForm | formGet: 'label'"></app-input>
+    }
+
+    @case ("formula") {
+      <app-input label="Column label" [inputFormControl]="pickerForm | formGet: 'label'"></app-input>
+
+      <label class="picker__label">Expression</label>
+      <div class="picker__expr" [class.picker__expr--empty]="!exprValue()">
+        <span class="picker__expr-text">{{ exprValue() || "Click a column, then operators, to build the formula" }}</span>
+        <span class="picker__expr-actions">
+          <button type="button" class="picker__expr-btn" title="Remove last" [disabled]="!exprValue()"
+            (click)="removeLastToken()" data-testid="picker-formula-backspace">
+            <mat-icon>backspace</mat-icon>
+          </button>
+          <button type="button" class="picker__expr-btn" title="Clear" [disabled]="!exprValue()"
+            (click)="clearExpression()" data-testid="picker-formula-clear">
+            <mat-icon>close</mat-icon>
+          </button>
+        </span>
+      </div>
+
+      <div class="picker__status" [ngClass]="'picker__status--' + formulaStatus().kind">
+        <mat-icon>{{ formulaStatus().kind === "ok" ? "check_circle" : formulaStatus().kind === "error" ? "error_outline" : "lightbulb" }}</mat-icon>
+        {{ formulaStatus().message }}
+      </div>
+      @if (referenceableColumns.length > 0) {
+        <div class="picker__hint">Insert a column</div>
+        <div class="picker__chips">
+          @for (column of referenceableColumns; track column.id) {
+            <span class="picker__chip" [attr.data-testid]="'picker-col-' + column.name"
+              (click)="insertColumn(column.name)">{{ column.label }}</span>
+          }
+        </div>
+      }
+      <div class="picker__hint">Operators</div>
+      <div class="picker__ops">
+        @for (operator of operators; track operator) {
+          <span class="picker__op" [attr.data-testid]="'picker-op-' + operator"
+            (click)="insertOperator(operator)">{{ operator }}</span>
+        }
+      </div>
+    }
+  }
+
+  <div class="picker__footer">
+    @if (step() !== "kind") {
+      <app-button matButtonType="basic" buttonText="Back" icon="arrow_back" (clicked)="back()"></app-button>
+    }
+    <span class="picker__footer-spacer"></span>
+    <app-button matButtonType="basic" buttonText="Cancel" (clicked)="cancel()"></app-button>
+    @if (step() !== "kind") {
+      <app-button buttonText="Save column" icon="check" [disabled]="!canSave()" (clicked)="save()"
+        data-testid="picker-save"></app-button>
+    }
+  </div>
+</app-dialog>

@@ -393,6 +393,28 @@ func TestDeleteUser_WithReceipts(t *testing.T) {
 	assertCount(t, &models.Receipt{}, "id = ?", []interface{}{otherReceipt.ID}, 1, "other user's receipt should survive")
 }
 
+func TestDeleteUser_KeepsReportTemplates(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	user := createUserForDeletion(t, "templateowner")
+
+	template, err := repositories.NewReportTemplateRepository(nil).CreateReportTemplate(
+		commands.ReportRequestCommand{Name: "Owned", Formats: []string{"csv"}},
+		user.ID,
+	)
+	if err != nil {
+		t.Fatalf("create report template: %v", err)
+	}
+
+	if err := DeleteUser(utils.UintToString(user.ID)); err != nil {
+		t.Fatalf("DeleteUser failed: %v", err)
+	}
+
+	// A report template is not cascade-deleted with its creator: it survives, and
+	// its created_by is nulled (via modelsWithCreatedBy in DeleteUser).
+	assertCount(t, &models.ReportTemplate{}, "id = ?", []interface{}{template.ID}, 1, "the template should survive the user deletion")
+	assertCount(t, &models.ReportTemplate{}, "id = ? AND created_by IS NULL", []interface{}{template.ID}, 1, "the template's created_by should be nulled")
+}
+
 func TestDeleteUser_OnlyGroupMember(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	user := createUserForDeletion(t, "sologroupuser")

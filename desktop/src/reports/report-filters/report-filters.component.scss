@@ -1,0 +1,46 @@
+:host {
+  display: block;
+}
+
+.report-filter {
+  &__row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  &__value {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__between {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__sep {
+    font-size: 12px;
+    color: #94a3b8;
+    flex: none;
+  }
+
+  &__op {
+    width: 150px;
+    flex: none;
+  }
+
+  &__add {
+    display: block;
+    margin-top: 4px;
+  }
+}

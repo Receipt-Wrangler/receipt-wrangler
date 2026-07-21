@@ -351,7 +351,7 @@ void (empty response body)
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **quickScanReceipt**
-> quickScanReceipt(files, groupIds, paidByUserIds, statuses)
+> quickScanReceipt(files, groupIds, paidByUserIds, statuses, categoryIds, tagIds)
 
 Quick scan a receipt
 
@@ -370,9 +370,11 @@ final BuiltList<MultipartFile> files = /path/to/file.txt; // BuiltList<Multipart
 final BuiltList<int> groupIds = ; // BuiltList<int> | 
 final BuiltList<int> paidByUserIds = ; // BuiltList<int> | 
 final BuiltList<ReceiptStatus> statuses = ; // BuiltList<ReceiptStatus> | 
+final BuiltList<String> categoryIds = ; // BuiltList<String> | 
+final BuiltList<String> tagIds = ; // BuiltList<String> | 
 
 try {
-    api.quickScanReceipt(files, groupIds, paidByUserIds, statuses);
+    api.quickScanReceipt(files, groupIds, paidByUserIds, statuses, categoryIds, tagIds);
 } catch on DioException (e) {
     print('Exception when calling ReceiptApi->quickScanReceipt: $e\n');
 }
@@ -386,6 +388,8 @@ Name | Type | Description  | Notes
  **groupIds** | [**BuiltList&lt;int&gt;**](int.md)|  | 
  **paidByUserIds** | [**BuiltList&lt;int&gt;**](int.md)|  | 
  **statuses** | [**BuiltList&lt;ReceiptStatus&gt;**](ReceiptStatus.md)|  | 
+ **categoryIds** | [**BuiltList&lt;String&gt;**](String.md)|  | [optional] 
+ **tagIds** | [**BuiltList&lt;String&gt;**](String.md)|  | [optional] 
 
 ### Return type
 

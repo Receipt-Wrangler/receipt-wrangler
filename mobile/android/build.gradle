@@ -39,6 +39,28 @@ subprojects { sp ->
     }
 }
 
+// sentry_flutter (8.14.2) pins Kotlin `languageVersion = "1.6"` in its
+// android/build.gradle, which this project's Kotlin 2.2.x toolchain (bumped for
+// cunning_document_scanner 2.3.0, see settings.gradle) rejects at compile time:
+// "Language version 1.6 is no longer supported; please, use version 1.8 or
+// greater". Force that one module's Kotlin compile tasks up to the supported
+// floor. Scoped to sentry_flutter (via afterEvaluate, so it overrides the
+// module's own kotlinOptions) so every other subproject keeps its own language
+// version. If sentry_flutter is upgraded past the 1.6 pin, this block is a no-op
+// and can be removed.
+subprojects { sp ->
+    if (sp.name == 'sentry_flutter') {
+        sp.afterEvaluate {
+            sp.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                compilerOptions {
+                    languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_8)
+                    apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_8)
+                }
+            }
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }

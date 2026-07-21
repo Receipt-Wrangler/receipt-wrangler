@@ -719,13 +719,15 @@ export class ReceiptService {
      * @param groupIds 
      * @param paidByUserIds 
      * @param statuses 
+     * @param categoryIds 
+     * @param tagIds 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */
-    public quickScanReceipt(files: Array<Blob>, groupIds: Array<number>, paidByUserIds: Array<number>, statuses: Array<ReceiptStatus>, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
-    public quickScanReceipt(files: Array<Blob>, groupIds: Array<number>, paidByUserIds: Array<number>, statuses: Array<ReceiptStatus>, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
-    public quickScanReceipt(files: Array<Blob>, groupIds: Array<number>, paidByUserIds: Array<number>, statuses: Array<ReceiptStatus>, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
-    public quickScanReceipt(files: Array<Blob>, groupIds: Array<number>, paidByUserIds: Array<number>, statuses: Array<ReceiptStatus>, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+    public quickScanReceipt(files: Array<Blob>, groupIds: Array<number>, paidByUserIds: Array<number>, statuses: Array<ReceiptStatus>, categoryIds?: Array<string>, tagIds?: Array<string>, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public quickScanReceipt(files: Array<Blob>, groupIds: Array<number>, paidByUserIds: Array<number>, statuses: Array<ReceiptStatus>, categoryIds?: Array<string>, tagIds?: Array<string>, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public quickScanReceipt(files: Array<Blob>, groupIds: Array<number>, paidByUserIds: Array<number>, statuses: Array<ReceiptStatus>, categoryIds?: Array<string>, tagIds?: Array<string>, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public quickScanReceipt(files: Array<Blob>, groupIds: Array<number>, paidByUserIds: Array<number>, statuses: Array<ReceiptStatus>, categoryIds?: Array<string>, tagIds?: Array<string>, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
         if (files === null || files === undefined) {
             throw new Error('Required parameter files was null or undefined when calling quickScanReceipt.');
         }
@@ -829,6 +831,24 @@ export class ReceiptService {
             })
             } else {
                 localVarFormParams = localVarFormParams.append('statuses', [...statuses].join(COLLECTION_FORMATS['csv'])) as any || localVarFormParams;
+            }
+        }
+        if (categoryIds) {
+            if (localVarUseForm) {
+                categoryIds.forEach((element) => {
+                    localVarFormParams = localVarFormParams.append('categoryIds', <any>element) as any || localVarFormParams;
+            })
+            } else {
+                localVarFormParams = localVarFormParams.append('categoryIds', [...categoryIds].join(COLLECTION_FORMATS['csv'])) as any || localVarFormParams;
+            }
+        }
+        if (tagIds) {
+            if (localVarUseForm) {
+                tagIds.forEach((element) => {
+                    localVarFormParams = localVarFormParams.append('tagIds', <any>element) as any || localVarFormParams;
+            })
+            } else {
+                localVarFormParams = localVarFormParams.append('tagIds', [...tagIds].join(COLLECTION_FORMATS['csv'])) as any || localVarFormParams;
             }
         }
 

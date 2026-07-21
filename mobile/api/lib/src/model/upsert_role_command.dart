@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:openapi/src/model/permission_scope.dart';
+import 'package:openapi/src/model/report_template_grant.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/permission.dart';
 import 'package:built_value/built_value.dart';
@@ -22,6 +23,7 @@ part 'upsert_role_command.g.dart';
 /// * [tagGrants] - Tag ids to restrict a GROUP role's members to. Only valid on group roles; omit or leave empty for unrestricted access.
 /// * [paidByUserGrants] - User ids whose receipts a GROUP role's members may see (by the receipt's \"paid by\" user). Only valid on group roles; omit or leave empty (with includeOwnPaidReceipts false) for unrestricted access.
 /// * [includeOwnPaidReceipts] - Whether to also let each member see receipts they paid for. Only valid on group roles.
+/// * [reportTemplateGrants] - Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
 @BuiltValue()
 abstract class UpsertRoleCommand implements Built<UpsertRoleCommand, UpsertRoleCommandBuilder> {
   @BuiltValueField(wireName: r'name')
@@ -52,6 +54,10 @@ abstract class UpsertRoleCommand implements Built<UpsertRoleCommand, UpsertRoleC
   /// Whether to also let each member see receipts they paid for. Only valid on group roles.
   @BuiltValueField(wireName: r'includeOwnPaidReceipts')
   bool? get includeOwnPaidReceipts;
+
+  /// Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
+  @BuiltValueField(wireName: r'reportTemplateGrants')
+  BuiltList<ReportTemplateGrant>? get reportTemplateGrants;
 
   UpsertRoleCommand._();
 
@@ -124,6 +130,13 @@ class _$UpsertRoleCommandSerializer implements PrimitiveSerializer<UpsertRoleCom
       yield serializers.serialize(
         object.includeOwnPaidReceipts,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.reportTemplateGrants != null) {
+      yield r'reportTemplateGrants';
+      yield serializers.serialize(
+        object.reportTemplateGrants,
+        specifiedType: const FullType(BuiltList, [FullType(ReportTemplateGrant)]),
       );
     }
   }
@@ -204,6 +217,13 @@ class _$UpsertRoleCommandSerializer implements PrimitiveSerializer<UpsertRoleCom
             specifiedType: const FullType(bool),
           ) as bool;
           result.includeOwnPaidReceipts = valueDes;
+          break;
+        case r'reportTemplateGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(ReportTemplateGrant)]),
+          ) as BuiltList<ReportTemplateGrant>;
+          result.reportTemplateGrants.replace(valueDes);
           break;
         default:
           unhandled.add(key);

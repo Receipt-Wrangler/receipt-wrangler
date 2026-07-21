@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'helpers/feature_flags.dart';
 import 'helpers/login.dart';
 import 'helpers/nav.dart';
 import 'helpers/permission_fixtures.dart';
@@ -24,9 +25,12 @@ import 'helpers/pump.dart';
 ///   - Inside a group two bottom navs are mounted (the group-select shell sits
 ///     under the group shell), so two "Add" destinations match; `.hitTestable()`
 ///     taps the visible one.
-///   - Quick Scan is not asserted: it is additionally gated on the
-///     `aiPoweredReceipts` feature flag (off here), so its absence is
-///     flag-driven, not permission-driven.
+///   - "Quick Scan" is gated on BOTH the `aiPoweredReceipts` flag AND
+///     `group.receipts.quick-scan`. The first three tests keep the flag off, so
+///     Quick Scan is always absent (not asserted). The last two turn the flag ON
+///     (`enableAiPoweredReceiptsForTest`) and isolate the *permission* half: a
+///     Legacy Editor minus quick-scan (still holds `receipts.create`, so "Add
+///     Manual Receipt" stays) sees no Quick Scan; a full Legacy Editor does.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -99,6 +103,52 @@ void main() {
       await pumpUntilFound(tester, find.text('Add Manual Receipt'));
       expect(find.text('Add Manual Receipt'), findsOneWidget);
       expect(find.text(noPermissionSnack), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'add menu: no Quick Scan without group.receipts.quick-scan (flag on)',
+    (tester) async {
+      await enableAiPoweredReceiptsForTest();
+      // Legacy Editor MINUS quick-scan: keeps receipts.create (so "Add Manual
+      // Receipt" still shows) but not quick-scan -> Quick Scan hidden by the
+      // permission, not the flag.
+      final fixture = await provisionGroupMemberWithoutPermission(
+        'group.receipts.quick-scan',
+        baselineRole: 'Legacy Editor',
+      );
+      await loginAs(
+        tester,
+        username: fixture.username,
+        password: fixture.password,
+      );
+      await enterGroup(tester, fixture.groupName!);
+
+      await tester.tap(addButton());
+      await pumpUntilFound(tester, find.text('Add Manual Receipt'));
+      expect(find.text('Add Manual Receipt'), findsOneWidget,
+          reason: 'still holds receipts.create');
+      expect(find.text('Quick Scan'), findsNothing,
+          reason: 'lacks group.receipts.quick-scan');
+    },
+  );
+
+  testWidgets(
+    'add menu: Quick Scan shown with group.receipts.quick-scan (flag on)',
+    (tester) async {
+      await enableAiPoweredReceiptsForTest();
+      // A full Legacy Editor holds group.receipts.quick-scan.
+      final fixture = await provisionPermUser(roleName: 'Legacy Editor');
+      await loginAs(
+        tester,
+        username: fixture.username,
+        password: fixture.password,
+      );
+      await enterGroup(tester, fixture.groupName!);
+
+      await tester.tap(addButton());
+      await pumpUntilFound(tester, find.text('Quick Scan'));
+      expect(find.text('Quick Scan'), findsOneWidget);
     },
   );
 }

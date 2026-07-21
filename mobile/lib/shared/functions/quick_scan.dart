@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:infinite_carousel/infinite_carousel.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
+import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/models/loading_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_preferences_model.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/quick_scan.dart';
 import 'package:receipt_wrangler_mobile/shared/classes/quick_scan_image.dart';
+import 'package:receipt_wrangler_mobile/shared/functions/quick_scan_field_config.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/delete_button.dart';
 import 'package:receipt_wrangler_mobile/utils/has_feature.dart';
@@ -130,6 +132,8 @@ Future<void> _submitQuickScan(
   List<int> groupIds = [];
   List<int> paidByUserIds = [];
   List<api.ReceiptStatus> statuses = [];
+  List<String> categoryIds = [];
+  List<String> tagIds = [];
   List<MultipartFile> files = [];
 
   if (images.isEmpty) {
@@ -137,28 +141,79 @@ Future<void> _submitQuickScan(
     return;
   }
 
+  final groupModel = Provider.of<GroupModel>(context, listen: false);
+
   var errored = false;
   for (var (index, image) in images.indexed) {
-    files.add(image.multipartFile);
-    var isGroupIdValid = image.groupId != null && (image.groupId ?? 0) > 0;
-    var isPaidByUserIdValid =
-        image.paidByUserId != null && (image.paidByUserId ?? 0) > 0;
-    var isStatusValid =
-        image.status != null && image.status != api.ReceiptStatus.empty;
-
-    if (isGroupIdValid && isPaidByUserIdValid && isStatusValid) {
-      groupIds.add(image.groupId as int);
-      paidByUserIds.add(image.paidByUserId as int);
-      statuses.add(image.status as api.ReceiptStatus);
-    } else {
+    final groupId = image.groupId ?? 0;
+    if (groupId <= 0) {
       errored = true;
       showErrorSnackbar(
-          context,
-          "Please fix error on quick scan " +
-              (index + 1).toString() +
-              " to continue");
+          context, "Please fix error on quick scan ${index + 1} to continue");
       break;
     }
+
+    // Resolve each field against the group's quick-scan config, mirroring the
+    // backend's resolveQuickScanFields. A hidden/optional field is sent as the
+    // "unset" sentinel (0 / empty) so the server backfills the configured
+    // default; a shown+required field must have a value.
+    final settings = groupModel.getGroupReceiptSettings(groupId);
+
+    final config = resolveQuickScanFieldConfig(settings);
+    final showPaidBy = config.showPaidBy;
+    final requirePaidBy = config.requirePaidBy;
+    final showStatus = config.showStatus;
+    final requireStatus = config.requireStatus;
+    final showCategories = config.showCategories;
+    final requireCategories = config.requireCategories;
+    final showTags = config.showTags;
+    final requireTags = config.requireTags;
+
+    int paidBy = 0;
+    if (showPaidBy) {
+      paidBy = image.paidByUserId ?? 0;
+      if (requirePaidBy && paidBy <= 0) {
+        errored = true;
+      }
+    }
+
+    api.ReceiptStatus status = api.ReceiptStatus.empty;
+    if (showStatus) {
+      status = image.status ?? api.ReceiptStatus.empty;
+      if (requireStatus && status == api.ReceiptStatus.empty) {
+        errored = true;
+      }
+    }
+
+    List<int> catIds = [];
+    if (showCategories) {
+      catIds =
+          image.categories.map((c) => c.id ?? 0).where((id) => id > 0).toList();
+      if (requireCategories && catIds.isEmpty) {
+        errored = true;
+      }
+    }
+
+    List<int> tgIds = [];
+    if (showTags) {
+      tgIds = image.tags.map((t) => t.id ?? 0).where((id) => id > 0).toList();
+      if (requireTags && tgIds.isEmpty) {
+        errored = true;
+      }
+    }
+
+    if (errored) {
+      showErrorSnackbar(
+          context, "Please fix error on quick scan ${index + 1} to continue");
+      break;
+    }
+
+    files.add(image.multipartFile);
+    groupIds.add(groupId);
+    paidByUserIds.add(paidBy);
+    statuses.add(status);
+    categoryIds.add(catIds.join(","));
+    tagIds.add(tgIds.join(","));
   }
 
   if (errored) {
@@ -172,7 +227,9 @@ Future<void> _submitQuickScan(
         files: files.toBuiltList(),
         groupIds: groupIds.toBuiltList(),
         paidByUserIds: paidByUserIds.toBuiltList(),
-        statuses: statuses.toBuiltList());
+        statuses: statuses.toBuiltList(),
+        categoryIds: categoryIds.toBuiltList(),
+        tagIds: tagIds.toBuiltList());
 
     var imageWord = images.length > 1 ? "images" : "image";
 

@@ -20,7 +20,8 @@ func StringToUint(v string) (uint, error) {
 }
 
 func StringToUint64(v string) (uint64, error) {
-	result, err := strconv.ParseUint(v, 10, 32)
+	vTrimmed := strings.Trim(v, " ")
+	result, err := strconv.ParseUint(vTrimmed, 10, 64)
 	if err != nil {
 		return 0, err
 	}

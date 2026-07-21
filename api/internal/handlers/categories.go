@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -205,7 +204,7 @@ func GetCategoryNameCount(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			categoryRepository := repositories.NewCategoryRepository(nil)
 			categoryName := chi.URLParam(r, "categoryName")
-			count, err := categoryRepository.GetCount("categories", fmt.Sprintf("name = '%s'", categoryName))
+			count, err := categoryRepository.GetCount("categories", "name = ?", categoryName)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

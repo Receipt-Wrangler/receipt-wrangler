@@ -7,6 +7,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ReceiptStatus } from './receiptStatus';
+import { QuickScanDefaultPaidByType } from './quickScanDefaultPaidByType';
 
 
 export interface GroupReceiptSettings { 
@@ -54,5 +56,46 @@ export interface GroupReceiptSettings {
      * Hide share tags
      */
     hideShareTags?: boolean;
+    /**
+     * Show the paid by field in quick scan
+     */
+    quickScanPaidByEnabled?: boolean;
+    /**
+     * Require the paid by field in quick scan
+     */
+    quickScanPaidByRequired?: boolean;
+    quickScanDefaultPaidByType?: QuickScanDefaultPaidByType;
+    /**
+     * Default paid by user id when paid by is optional and type is USER
+     */
+    quickScanDefaultPaidById?: number;
+    /**
+     * Show the status field in quick scan
+     */
+    quickScanStatusEnabled?: boolean;
+    /**
+     * Require the status field in quick scan
+     */
+    quickScanStatusRequired?: boolean;
+    quickScanDefaultStatus?: ReceiptStatus;
+    /**
+     * Show the categories field in quick scan
+     */
+    quickScanCategoriesEnabled?: boolean;
+    /**
+     * Require the categories field in quick scan
+     */
+    quickScanCategoriesRequired?: boolean;
+    /**
+     * Show the tags field in quick scan
+     */
+    quickScanTagsEnabled?: boolean;
+    /**
+     * Require the tags field in quick scan
+     */
+    quickScanTagsRequired?: boolean;
 }
+export namespace GroupReceiptSettings {
+}
+
 

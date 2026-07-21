@@ -22,6 +22,8 @@ class _$ReceiptPagedRequestFilter extends ReceiptPagedRequestFilter {
   @override
   final JsonObject? status;
   @override
+  final JsonObject? group;
+  @override
   final JsonObject? resolvedDate;
   @override
   final JsonObject? createdAt;
@@ -38,6 +40,7 @@ class _$ReceiptPagedRequestFilter extends ReceiptPagedRequestFilter {
       this.categories,
       this.tags,
       this.status,
+      this.group,
       this.resolvedDate,
       this.createdAt})
       : super._();
@@ -61,6 +64,7 @@ class _$ReceiptPagedRequestFilter extends ReceiptPagedRequestFilter {
         categories == other.categories &&
         tags == other.tags &&
         status == other.status &&
+        group == other.group &&
         resolvedDate == other.resolvedDate &&
         createdAt == other.createdAt;
   }
@@ -75,6 +79,7 @@ class _$ReceiptPagedRequestFilter extends ReceiptPagedRequestFilter {
     _$hash = $jc(_$hash, categories.hashCode);
     _$hash = $jc(_$hash, tags.hashCode);
     _$hash = $jc(_$hash, status.hashCode);
+    _$hash = $jc(_$hash, group.hashCode);
     _$hash = $jc(_$hash, resolvedDate.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jf(_$hash);
@@ -91,6 +96,7 @@ class _$ReceiptPagedRequestFilter extends ReceiptPagedRequestFilter {
           ..add('categories', categories)
           ..add('tags', tags)
           ..add('status', status)
+          ..add('group', group)
           ..add('resolvedDate', resolvedDate)
           ..add('createdAt', createdAt))
         .toString();
@@ -130,6 +136,10 @@ class ReceiptPagedRequestFilterBuilder
   JsonObject? get status => _$this._status;
   set status(JsonObject? status) => _$this._status = status;
 
+  JsonObject? _group;
+  JsonObject? get group => _$this._group;
+  set group(JsonObject? group) => _$this._group = group;
+
   JsonObject? _resolvedDate;
   JsonObject? get resolvedDate => _$this._resolvedDate;
   set resolvedDate(JsonObject? resolvedDate) =>
@@ -153,6 +163,7 @@ class ReceiptPagedRequestFilterBuilder
       _categories = $v.categories;
       _tags = $v.tags;
       _status = $v.status;
+      _group = $v.group;
       _resolvedDate = $v.resolvedDate;
       _createdAt = $v.createdAt;
       _$v = null;
@@ -183,6 +194,7 @@ class ReceiptPagedRequestFilterBuilder
           categories: categories,
           tags: tags,
           status: status,
+          group: group,
           resolvedDate: resolvedDate,
           createdAt: createdAt,
         );

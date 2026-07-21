@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/auth/login/screens/auth_screen.dart';
 import 'package:receipt_wrangler_mobile/groups/nav/group/group_app_bar.dart';
@@ -28,13 +30,14 @@ import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_preferences_model.dart';
 import 'package:receipt_wrangler_mobile/persistence/global_shared_preferences.dart';
 import 'package:receipt_wrangler_mobile/receipts/screens/receipt_form_screen.dart';
+import 'package:receipt_wrangler_mobile/reports/screens/report_list_screen.dart';
 import 'package:receipt_wrangler_mobile/search/nav/search_app_bar.dart';
 import 'package:receipt_wrangler_mobile/search/screens/search_screen.dart';
 import 'package:receipt_wrangler_mobile/search/widgets/searchbar.dart';
 import 'package:receipt_wrangler_mobile/services/token_refresh_service.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/circular_loading_progress.dart';
+import 'package:receipt_wrangler_mobile/service/crash_reporting.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/screen_wrapper.dart';
-import 'package:receipt_wrangler_mobile/utils/permissions.dart';
 
 import 'package:receipt_wrangler_mobile/profile/screens/user_profile_screen.dart';
 
@@ -44,11 +47,19 @@ import 'models/custom_field_model.dart';
 import 'models/system_settings_model.dart';
 
 void main() async {
-  var widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   await GlobalSharedPreferences.initialize();
 
-  runApp(buildApp());
+  // Crash/error reporting is opt-out (on by default). When disabled we don't
+  // initialize Sentry at all, so nothing runs. SentryFlutter.init also installs
+  // the FlutterError/PlatformDispatcher error handlers that report uncaught
+  // exceptions.
+  if (isCrashReportingEnabled()) {
+    await SentryFlutter.init(configureSentry, appRunner: () => runApp(buildApp()));
+  } else {
+    runApp(buildApp());
+  }
 }
 
 /// Builds the production widget tree (providers + root app widget).
@@ -165,6 +176,11 @@ GoRouter _buildAppRouter() {
         path: '/profile',
         builder: (context, state) => const UserProfileScreen(),
       ),
+      GoRoute(
+        path: '/reports',
+        redirect: reportsReadRedirect,
+        builder: (context, state) => const ReportListScreen(),
+      ),
       ShellRoute(
         builder: (context, state, child) {
           var searchModel = Provider.of<SearchModel>(context, listen: false);
@@ -203,9 +219,12 @@ class ReceiptWrangler extends StatefulWidget {
   State<ReceiptWrangler> createState() => _ReceiptWrangler();
 }
 
-class _ReceiptWrangler extends State<ReceiptWrangler> {
+class _ReceiptWrangler extends State<ReceiptWrangler>
+    with WidgetsBindingObserver {
   late final AppLifecycleListener _lifecycleListener;
   Timer? _refreshTimer;
+  Timer? _launchWindowTimer;
+  bool _inLaunchWindow = true;
   late Future<bool> _initFuture;
   bool _initialized = false;
 
@@ -231,18 +250,48 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addObserver(this);
     _lifecycleListener = AppLifecycleListener(onStateChange: _onStateChanged);
 
-    requestPermissions();
+    // NOTE: camera/photo permissions are intentionally NOT requested here.
+    // Requesting at launch makes the app go `inactive` (system dialog), and on
+    // iOS the Flutter engine pauses rendering while inactive — on iOS 26.x it
+    // doesn't reliably resume, leaving the UI frozen (GitHub #617). Permissions
+    // are now requested in-context: the scanner requests camera itself, and the
+    // save-to-gallery flow requests photo access at the point of use.
     FlutterNativeSplash.remove();
+
+    // Cold launch itself passes through `inactive`, and iOS can paint the first
+    // frame at transient launch metrics (wrong size/orientation) and then stop
+    // producing frames — the UI is stuck on that stale, "half-rotated/unpainted"
+    // frame (GitHub #617, seen on 120Hz iPhone 17 / Air devices even with no
+    // permission dialog). Force repaints from the very first frame so the
+    // pipeline re-latches and the layout re-flows to the real geometry.
+    // `didChangeMetrics` re-arms this while the window is still settling.
+    WidgetsBinding.instance.addPostFrameCallback((_) => nudgeFrames());
+    _launchWindowTimer =
+        Timer(const Duration(seconds: 6), () => _inLaunchWindow = false);
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _launchWindowTimer?.cancel();
+    _frameNudgeTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _lifecycleListener.dispose();
 
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    // A metrics change during the launch window means the window geometry just
+    // settled; force a repaint so a stale first frame re-flows to the real
+    // size/orientation. Gated to the launch window so ordinary keyboard
+    // show/hide later doesn't trigger a burst. (GitHub #617.)
+    if (_inLaunchWindow) nudgeFrames();
   }
 
   @override
@@ -310,6 +359,19 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
         useMaterial3: true,
       ),
       routerConfig: _router,
+      // Hosts an invisible repaint pump (see [nudgeFrames]) so the app can
+      // force frames after returning from an inactive state and recover from
+      // the iOS render-pause freeze (GitHub #617).
+      builder: (context, child) => Stack(
+        textDirection: TextDirection.ltr,
+        children: [
+          child ?? const SizedBox.shrink(),
+          ValueListenableBuilder<int>(
+            valueListenable: _frameNudge,
+            builder: (_, __, ___) => const SizedBox.shrink(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -343,16 +405,45 @@ class _ReceiptWrangler extends State<ReceiptWrangler> {
     }
   }
 
-  void _onDetached() => print('detached');
+  void _onDetached() {}
 
   void _onResumed() async {
-    print("resumed");
+    // Recover from the iOS render-pause freeze after an inactive transition.
+    nudgeFrames();
     await TokenRefreshService().refreshTokens(force: true);
   }
 
-  void _onInactive() => print('inactive');
+  void _onInactive() {}
 
-  void _onHidden() => print('hidden');
+  void _onHidden() {}
 
-  void _onPaused() => print('paused');
+  void _onPaused() {}
+}
+
+/// Ticked by [nudgeFrames] to force the render pipeline to produce frames.
+final ValueNotifier<int> _frameNudge = ValueNotifier<int>(0);
+Timer? _frameNudgeTimer;
+
+/// The iOS Flutter engine pauses rendering while the app is `inactive` — a cold
+/// launch, a system permission dialog, the app switcher, an incoming call — and
+/// on iOS 26.x it doesn't reliably resume, leaving the UI frozen on its last
+/// (sometimes wrong-geometry) frame. For a short window this both bumps
+/// [_frameNudge] (marking the tree dirty) and calls
+/// [SchedulerBinding.scheduleForcedFrame] each tick: the forced call bypasses
+/// the engine's "frames disabled while inactive" gate, which a plain notifier
+/// bump does not — that re-latches the display link and unfreezes the UI.
+/// (GitHub #617 / flutter/engine#17396.)
+///
+/// iOS-only: a no-op on Android/desktop (and under the test suites, where
+/// `defaultTargetPlatform` is not iOS) so nothing else is affected.
+void nudgeFrames() {
+  if (defaultTargetPlatform != TargetPlatform.iOS) return;
+  _frameNudgeTimer?.cancel();
+  var ticks = 0;
+  WidgetsBinding.instance.scheduleForcedFrame();
+  _frameNudgeTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
+    _frameNudge.value++;
+    WidgetsBinding.instance.scheduleForcedFrame();
+    if (++ticks >= 30) t.cancel(); // ~3s
+  });
 }

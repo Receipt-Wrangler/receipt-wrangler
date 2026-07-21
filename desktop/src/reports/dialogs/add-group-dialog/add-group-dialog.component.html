@@ -1,0 +1,28 @@
+<app-dialog headerText="Add a group">
+  <div class="add-group__note">
+    <mat-icon>info</mat-icon>
+    Report across the groups you can generate reports for.
+  </div>
+
+  @for (group of groups(); track group.id) {
+    <div class="add-group__row" data-testid="add-group-row">
+      <span class="add-group__avatar" [style.background]="group.color">{{ group.initials }}</span>
+      <div class="add-group__name">{{ group.name }}</div>
+      @if (group.selected) {
+        <button type="button" class="add-group__added" (click)="toggle(group.id)" data-testid="add-group-selected">
+          <mat-icon>check_circle</mat-icon>Added
+        </button>
+      } @else {
+        <button type="button" class="add-group__add" (click)="toggle(group.id)" data-testid="add-group-select">
+          <mat-icon>add</mat-icon>Add
+        </button>
+      }
+    </div>
+  }
+
+  @if (groups().length === 0) {
+    <div class="add-group__empty">You don't have report access in any group.</div>
+  }
+
+  <app-dialog-footer submitButtonTooltip="Done" (submitClicked)="submit()" (cancelClicked)="cancel()"></app-dialog-footer>
+</app-dialog>

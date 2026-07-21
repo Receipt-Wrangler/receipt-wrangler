@@ -14,9 +14,24 @@ PODS:
     - FlutterMacOS
   - integration_test (0.0.1):
     - Flutter
+  - mobile_scanner (7.0.0):
+    - Flutter
+    - FlutterMacOS
+  - package_info_plus (0.4.5):
+    - Flutter
   - permission_handler_apple (9.4.8):
     - Flutter
+  - Sentry/HybridSDK (8.46.0)
+  - sentry_flutter (8.14.2):
+    - Flutter
+    - FlutterMacOS
+    - Sentry/HybridSDK (= 8.46.0)
+  - share_plus (0.0.1):
+    - Flutter
   - shared_preferences_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
+  - webview_flutter_wkwebview (0.0.1):
     - Flutter
     - FlutterMacOS
 
@@ -28,8 +43,17 @@ DEPENDENCIES:
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - gal (from `.symlinks/plugins/gal/darwin`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
+  - mobile_scanner (from `.symlinks/plugins/mobile_scanner/darwin`)
+  - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
+  - sentry_flutter (from `.symlinks/plugins/sentry_flutter/ios`)
+  - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
+  - webview_flutter_wkwebview (from `.symlinks/plugins/webview_flutter_wkwebview/darwin`)
+
+SPEC REPOS:
+  trunk:
+    - Sentry
 
 EXTERNAL SOURCES:
   cunning_document_scanner:
@@ -46,10 +70,20 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/gal/darwin"
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
+  mobile_scanner:
+    :path: ".symlinks/plugins/mobile_scanner/darwin"
+  package_info_plus:
+    :path: ".symlinks/plugins/package_info_plus/ios"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
+  sentry_flutter:
+    :path: ".symlinks/plugins/sentry_flutter/ios"
+  share_plus:
+    :path: ".symlinks/plugins/share_plus/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
+  webview_flutter_wkwebview:
+    :path: ".symlinks/plugins/webview_flutter_wkwebview/darwin"
 
 SPEC CHECKSUMS:
   cunning_document_scanner: 59087b3be88cf7e719fbc9d29b7278a8b2ee93d7
@@ -59,8 +93,14 @@ SPEC CHECKSUMS:
   flutter_secure_storage_darwin: 557817588b80e60213cbecb573c45c76b788018d
   gal: 6a522c75909f1244732d4596d11d6a2f86ff37a5
   integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
+  mobile_scanner: 77265f3dc8d580810e91849d4a0811a90467ed5e
+  package_info_plus: c0502532a26c7662a62a356cebe2692ec5fe4ec4
   permission_handler_apple: ee2fe0fd04551b304eb002714ff067c371c822ed
+  Sentry: da60d980b197a46db0b35ea12cb8f39af48d8854
+  sentry_flutter: 2df8b0aab7e4aba81261c230cbea31c82a62dd1b
+  share_plus: 8b6f8b3447e494cca5317c8c3073de39b3600d1f
   shared_preferences_foundation: 5086985c1d43c5ba4d5e69a4e8083a389e2909e6
+  webview_flutter_wkwebview: 29eb20d43355b48fe7d07113835b9128f84e3af4
 
 PODFILE CHECKSUM: 86fbc43373838e2352931d7236d3be98a7843d3a
 

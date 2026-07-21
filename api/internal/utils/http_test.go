@@ -9,19 +9,19 @@ import (
 	"testing"
 )
 
-// TODO: Fix
 func TestGetBodyDataGetsData(t *testing.T) {
-	var unmarshalResult any
 	testString := "my test string wowzer"
 	reader := strings.NewReader(testString)
 	r := httptest.NewRequest(http.MethodGet, "/api", reader)
 	w := httptest.NewRecorder()
-	bytes, _ := GetBodyData(w, r)
 
-	json.Unmarshal(bytes, &unmarshalResult)
+	bytes, err := GetBodyData(w, r)
+	if err != nil {
+		PrintTestError(t, err, nil)
+	}
 
-	if testString != unmarshalResult {
-		// repositories.PrintTestError(t, unmarshalResult, testString)
+	if string(bytes) != testString {
+		PrintTestError(t, string(bytes), testString)
 	}
 }
 
@@ -65,6 +65,57 @@ func TestWriteCustomErrorResponseWritesResponse(t *testing.T) {
 
 	if errMap[errKey] != customMsg {
 		PrintTestError(t, errMap[errKey], customMsg)
+	}
+}
+
+func TestMarshalResponseDataShouldMarshal(t *testing.T) {
+	data := map[string]string{"hello": "world"}
+
+	bytes, err := MarshalResponseData(data)
+	if err != nil {
+		PrintTestError(t, err, nil)
+	}
+
+	expected := `{"hello":"world"}`
+	if string(bytes) != expected {
+		PrintTestError(t, string(bytes), expected)
+	}
+}
+
+func TestMarshalResponseDataShouldErrorOnUnmarshalableValue(t *testing.T) {
+	// A channel cannot be marshaled to JSON.
+	_, err := MarshalResponseData(make(chan int))
+	if err == nil {
+		PrintTestError(t, nil, "error")
+	}
+}
+
+func TestSetJSONResponseHeadersShouldSetContentType(t *testing.T) {
+	w := httptest.NewRecorder()
+
+	SetJSONResponseHeaders(w)
+
+	contentType := w.Header().Get("Content-Type")
+	if contentType != "application/json" {
+		PrintTestError(t, contentType, "application/json")
+	}
+}
+
+func TestIsMobileAppShouldReturnTrueForDartUserAgent(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/api", nil)
+	r.Header.Set("User-Agent", "MyApp/1.0 (dart:io)")
+
+	if !IsMobileApp(r) {
+		t.Errorf("Expected IsMobileApp to return true for a dart:io user agent")
+	}
+}
+
+func TestIsMobileAppShouldReturnFalseForBrowserUserAgent(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/api", nil)
+	r.Header.Set("User-Agent", "Mozilla/5.0")
+
+	if IsMobileApp(r) {
+		t.Errorf("Expected IsMobileApp to return false for a browser user agent")
 	}
 }
 

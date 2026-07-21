@@ -1,0 +1,121 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+$fg-muted: map.get(variables.$accent-palette, 500);
+$fg-strong: map.get(variables.$accent-palette, 900);
+$border: rgba(0, 0, 0, 0.06);
+
+.report-templates-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: variables.$spacing-md;
+  margin: variables.$spacing-sm 0 variables.$spacing-lg;
+
+  .titles h1 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  .subtitle {
+    color: $fg-muted;
+    font-size: 14px;
+    margin: variables.$spacing-xs 0 0;
+    max-width: 640px;
+  }
+
+  .tools {
+    display: flex;
+    gap: variables.$spacing-sm;
+    align-items: center;
+    flex: none;
+  }
+}
+
+/* ---------- Empty state ---------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: variables.$spacing-sm;
+  padding: variables.$spacing-2xl;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: variables.$border-radius-lg;
+  box-shadow: variables.$shadow-md;
+
+  .empty-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: variables.$border-radius-xl;
+    background: map.get(variables.$primary-palette, 50);
+    color: map.get(variables.$primary-palette, 600);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: variables.$spacing-xs;
+
+    mat-icon {
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+    }
+  }
+
+  h2 {
+    font-size: 18px;
+    margin: 0;
+    color: $fg-strong;
+  }
+
+  p {
+    color: $fg-muted;
+    font-size: 14px;
+    margin: 0 0 variables.$spacing-sm;
+    max-width: 420px;
+  }
+}
+
+/* ---------- Table cell contents ---------- */
+.template-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sub {
+  color: $fg-muted;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.format-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.format-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: variables.$border-radius-sm;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: map.get(variables.$primary-palette, 50);
+  color: map.get(variables.$primary-palette, 800);
+}
+
+.row-actions {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+}

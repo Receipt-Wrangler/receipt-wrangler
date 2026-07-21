@@ -34,6 +34,22 @@
       }"
     ></ng-template>
 
+    @if (showGroupFilter) {
+      <ng-template
+        [ngTemplateOutlet]="filterField"
+        [ngTemplateOutletContext]="{
+          label: 'Group',
+          fieldName: 'group',
+          type: 'list',
+          options: groups() ?? [],
+          optionFilterKey: 'name',
+          optionDisplayKey: 'name',
+          optionValueKey: 'id',
+          multiple: true
+        }"
+      ></ng-template>
+    }
+
     <ng-template
       [ngTemplateOutlet]="filterField"
       [ngTemplateOutletContext]="{

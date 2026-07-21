@@ -119,6 +119,53 @@ func TestShouldCreateReceipt(t *testing.T) {
 	}
 }
 
+// TestShouldCreateReceiptWithinOuterTransaction guards against a regression where
+// CreateReceipt, when bound to an outer transaction (as QuickScan and email
+// attachment ingest do), reloaded the receipt on a fresh pooled connection that
+// could not see the still-uncommitted row and returned a zero-ID receipt. That
+// zero id then broke the receipt-image foreign key with `receipt_id = 0`.
+func TestShouldCreateReceiptWithinOuterTransaction(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	tx := GetDB().Begin()
+	defer tx.Rollback()
+
+	repository := NewReceiptRepository(tx)
+
+	command := commands.UpsertReceiptCommand{
+		Name:         "Tx Receipt",
+		Amount:       decimal.NewFromFloat(10.00),
+		Date:         time.Now(),
+		PaidByUserID: 1,
+		Status:       models.OPEN,
+		GroupId:      1,
+	}
+
+	createdReceipt, err := repository.CreateReceipt(command, 1, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if createdReceipt.ID == 0 {
+		utils.PrintTestError(t, "Receipt ID should not be 0 when created within an outer transaction", nil)
+		return
+	}
+
+	// The receipt-image foreign key must be satisfiable within the same
+	// transaction (the test DB has the foreign_keys pragma enabled).
+	fileData := models.FileData{
+		Name:      "receipt.pdf",
+		FileType:  "application/pdf",
+		Size:      1,
+		ReceiptId: createdReceipt.ID,
+	}
+	if err := tx.Create(&fileData).Error; err != nil {
+		utils.PrintTestError(t, err, "FileData insert should satisfy the receipt foreign key")
+	}
+}
+
 func TestShouldGetReceiptById(t *testing.T) {
 	defer teardownReceiptTest()
 	setupReceiptTest()
@@ -552,6 +599,104 @@ func TestShouldBuildGormFilterQuery(t *testing.T) {
 
 	if query == nil {
 		utils.PrintTestError(t, "Query should not be nil", nil)
+	}
+}
+
+func TestGetPagedReceiptsAppliesGroupFilter(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	group1 := models.Group{Name: "grp-filter-g1"}
+	group2 := models.Group{Name: "grp-filter-g2"}
+	allGroup := models.Group{Name: "grp-filter-all", IsAllGroup: true}
+	db.Create(&group1)
+	db.Create(&group2)
+	db.Create(&allGroup)
+
+	member := models.User{Username: "grp-filter-member", Password: "x"}
+	db.Create(&member)
+	db.Create(&models.GroupMember{GroupID: group1.ID, UserID: member.ID})
+	db.Create(&models.GroupMember{GroupID: group2.ID, UserID: member.ID})
+
+	makeReceipt := func(groupId uint, name string) {
+		db.Create(&models.Receipt{
+			Name:         name,
+			Amount:       decimal.NewFromInt(1),
+			Date:         time.Now(),
+			PaidByUserID: member.ID,
+			GroupId:      groupId,
+			Status:       models.OPEN,
+		})
+	}
+	makeReceipt(group1.ID, "g1-a")
+	makeReceipt(group1.ID, "g1-b")
+	makeReceipt(group2.ID, "g2-a")
+	makeReceipt(group2.ID, "g2-b")
+
+	// Group filter ids arrive as float64 (JSON-decoded), matching production.
+	groupFilterRequest := func(groupIds ...uint) commands.ReceiptPagedRequestCommand {
+		values := make([]interface{}, 0, len(groupIds))
+		for _, id := range groupIds {
+			values = append(values, float64(id))
+		}
+		request := pagedRequestAllReceipts()
+		request.Filter.Group = commands.PagedRequestField{
+			Operation: commands.CONTAINS,
+			Value:     values,
+		}
+		return request
+	}
+
+	repository := NewReceiptRepository(nil)
+
+	// All-groups view filtered to group1: only group1's receipts return.
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(
+		member.ID, utils.UintToString(allGroup.ID), groupFilterRequest(group1.ID), nil, nil,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 2 || len(receipts) != 2 {
+		utils.PrintTestError(t, count, 2)
+	}
+	for _, receipt := range receipts {
+		if receipt.GroupId != group1.ID {
+			utils.PrintTestError(t, receipt.Name, "only group1 receipts should return")
+		}
+	}
+
+	otherGroup := models.Group{Name: "grp-filter-other"}
+	db.Create(&otherGroup)
+	// member is intentionally NOT added to otherGroup, but it has a receipt.
+	makeReceipt(otherGroup.ID, "other-a")
+
+	// All-groups view filtered to a group the user has no membership in: the
+	// mandatory member-group scope excludes it, so nothing leaks even though the
+	// group has a receipt.
+	_, count, err = repository.GetPagedReceiptsByGroupId(
+		member.ID, utils.UintToString(allGroup.ID), groupFilterRequest(otherGroup.ID), nil, nil,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 0 {
+		utils.PrintTestError(t, count, 0)
+	}
+
+	// Single-group view (group1) filtered to group2: the mandatory group scope and
+	// the group filter intersect to nothing, so a user cannot surface another
+	// group's receipts through the filter.
+	_, count, err = repository.GetPagedReceiptsByGroupId(
+		member.ID, utils.UintToString(group1.ID), groupFilterRequest(group2.ID), nil, nil,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if count != 0 {
+		utils.PrintTestError(t, count, 0)
 	}
 }
 

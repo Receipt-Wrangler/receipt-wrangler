@@ -167,10 +167,11 @@ func TestSeedSystemRolesScopeAndFlags(t *testing.T) {
 	}
 }
 
-func TestSeedSystemRolesPreservesExisting(t *testing.T) {
+func TestSeedSystemRolesReconcilesExistingRolePermissions(t *testing.T) {
 	defer TruncateTestDb()
 
-	// Pre-create a role with the same name but a different permission set.
+	// Pre-create the Legacy Admin system role holding a single permission, as an
+	// install seeded before the admin permission set grew would have.
 	existing := models.AppRole{
 		Name:        "Legacy Admin",
 		Description: "pre-existing",
@@ -198,14 +199,167 @@ func TestSeedSystemRolesPreservesExisting(t *testing.T) {
 		utils.PrintTestError(t, len(roles), 5)
 	}
 
-	// The pre-existing role must not have been overwritten with the full admin set.
 	role, ok := findRole(roles, "Legacy Admin")
 	if !ok {
 		utils.PrintTestError(t, "missing role Legacy Admin", "present")
 		return
 	}
-	if !equalKeySet(role.Permissions, []string{permissions.AppUsersRead}) {
-		utils.PrintTestError(t, role.Permissions, []string{permissions.AppUsersRead})
+
+	// The missing permissions were added: the role now holds the full admin set,
+	// and the permission it already had was neither dropped nor duplicated.
+	if !equalKeySet(role.Permissions, permissions.LegacyAppAdminKeys()) {
+		utils.PrintTestError(t, role.Permissions, permissions.LegacyAppAdminKeys())
+	}
+	// Reconciled in place — the same row, not dropped and recreated.
+	if role.Id != existing.ID {
+		utils.PrintTestError(t, role.Id, existing.ID)
+	}
+	// Still a protected system role.
+	if !role.IsSystem {
+		utils.PrintTestError(t, role.IsSystem, true)
+	}
+}
+
+func TestSeedSystemRolesReconcileIsAddOnly(t *testing.T) {
+	defer TruncateTestDb()
+
+	// Pre-create the Legacy Owner system role with the full owner set plus an
+	// extra permission that is not part of it.
+	const extra = "group.bogus.extra"
+	ownerKeys := permissions.LegacyGroupOwnerKeys()
+	seededPerms := make([]models.GroupRolePermission, 0, len(ownerKeys)+1)
+	for _, permission := range ownerKeys {
+		seededPerms = append(seededPerms, models.GroupRolePermission{Permission: permission})
+	}
+	seededPerms = append(seededPerms, models.GroupRolePermission{Permission: extra})
+
+	existing := models.GroupRoleDefinition{
+		Name:        "Legacy Owner",
+		Description: "pre-existing",
+		IsSystem:    true,
+		Permissions: seededPerms,
+	}
+	if err := GetDB().Create(&existing).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	repository := NewRoleRepository(nil)
+	roles, err := repository.GetAllRoles()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	role, ok := findRole(roles, "Legacy Owner")
+	if !ok {
+		utils.PrintTestError(t, "missing role Legacy Owner", "present")
+		return
+	}
+
+	// Add-only: the extra permission survives and every owner permission is present.
+	want := append(append([]string(nil), ownerKeys...), extra)
+	if !equalKeySet(role.Permissions, want) {
+		utils.PrintTestError(t, role.Permissions, want)
+	}
+}
+
+func TestSeedSystemRolesReSeedAddsNoDuplicatePermissions(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	// The second boot runs every role through the reconcile branch. It must add
+	// nothing and must not trip the (roleId, permission) unique index.
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	repository := NewRoleRepository(nil)
+	roles, err := repository.GetAllRoles()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	expected := map[string][]string{
+		"Legacy Admin":  permissions.LegacyAppAdminKeys(),
+		"Legacy User":   permissions.LegacyAppUserKeys(),
+		"Legacy Viewer": permissions.LegacyGroupViewerKeys(),
+		"Legacy Editor": permissions.LegacyGroupEditorKeys(),
+		"Legacy Owner":  permissions.LegacyGroupOwnerKeys(),
+	}
+	for name, wantPerms := range expected {
+		role, ok := findRole(roles, name)
+		if !ok {
+			utils.PrintTestError(t, "missing role "+name, "present")
+			continue
+		}
+		// equalKeySet fails if a duplicate row lengthened the set; the explicit
+		// length check states the same intent directly.
+		if !equalKeySet(role.Permissions, wantPerms) {
+			utils.PrintTestError(t, role.Permissions, wantPerms)
+		}
+		if len(role.Permissions) != len(wantPerms) {
+			utils.PrintTestError(t, len(role.Permissions), len(wantPerms))
+		}
+	}
+}
+
+func TestMissingPermissions(t *testing.T) {
+	tests := []struct {
+		name    string
+		have    []string
+		desired []string
+		want    []string
+	}{
+		{
+			name:    "returns the missing permissions in desired order",
+			have:    []string{"a", "b"},
+			desired: []string{"a", "b", "c", "d"},
+			want:    []string{"c", "d"},
+		},
+		{
+			name:    "returns nothing when have already covers desired",
+			have:    []string{"a", "b", "c"},
+			desired: []string{"a", "b"},
+			want:    []string{},
+		},
+		{
+			name:    "de-duplicates repeats within desired",
+			have:    []string{},
+			desired: []string{"a", "a", "b", "b"},
+			want:    []string{"a", "b"},
+		},
+		{
+			name:    "add-only: a permission only in have is never returned",
+			have:    []string{"x", "y"},
+			desired: []string{"a"},
+			want:    []string{"a"},
+		},
+		{
+			name:    "empty desired yields nothing",
+			have:    []string{"a"},
+			desired: []string{},
+			want:    []string{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := missingPermissions(test.have, test.desired)
+			if !slices.Equal(got, test.want) {
+				utils.PrintTestError(t, got, test.want)
+			}
+		})
 	}
 }
 

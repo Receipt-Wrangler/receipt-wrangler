@@ -105,6 +105,34 @@ flutter build ios                 # Build iOS app
 
 See `mobile/CLAUDE.md` for Flutter architecture, Provider state management, and navigation.
 
+## Running in the Claude Code Web/Cloud Sandbox
+
+When running this app inside the **Claude Code web (cloud) sandbox**, the stock "just run it" commands
+above do **not** work out of the box, and the setup must be redone from scratch **every session**
+(the container is ephemeral — the built ImageMagick, Redis, the DB, and node_modules are all lost
+when the session ends). Two component-specific playbooks capture the exact, verified steps — read
+them instead of rediscovering:
+
+- **Backend:** `api/CLAUDE.md` → "Running in the Claude Code Web/Cloud Sandbox"
+- **Frontend:** `desktop/CLAUDE.md` → "Running in the Claude Code Web/Cloud Sandbox"
+
+**Root cause of the friction:** the sandbox base image is **Ubuntu 24.04 (Noble)**, whereas the
+project's Docker images / setup scripts assume **Debian** (`golang:1.25-trixie`, `bullseye`). The big
+one is ImageMagick: the Go API's `imagick.v3` CGO binding needs **ImageMagick 7**, but Ubuntu only
+ships ImageMagick **6** and has no IM7 package — so `set-up-dependencies.sh` can't provide it and IM7
+has to be **built from source**. Redis is installed but not started, and Tesseract/ImageMagick native
+dev libs must be installed by hand.
+
+**Run order & quick orientation:**
+1. Backend (`:8081`) first — start Redis, install Tesseract libs, build IM7 from source, then
+   `go run main.go` from `api/` with SQLite + local-Redis env vars.
+2. Frontend (`:4200`) second — `npm install` then `npm start`; it only *proxies* to the backend, so
+   the API must already be up.
+3. Log in with the auto-created default admin **`admin` / `admin`**; login lands on
+   `/dashboard/group/<id>`.
+4. To drive the UI / take screenshots, use Playwright against the **pre-installed** Chromium at
+   `/opt/pw-browsers/chromium` (do not `playwright install`) — details in `desktop/CLAUDE.md`.
+
 ## Critical Cross-Component Considerations
 
 ### API Changes Workflow

@@ -1,8 +1,9 @@
 import { Component, computed, ViewEncapsulation } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
-import { Router } from "@angular/router";
+import { Data, NavigationEnd, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
-import { switchMap, take } from "rxjs";
+import { filter, map, startWith, switchMap, take } from "rxjs";
 import { LayoutState } from "src/store/layout.state";
 import { SetPage } from "src/store/receipt-table.actions";
 import { AboutComponent } from "../../about/about/about.component";
@@ -35,6 +36,18 @@ export class SidebarComponent {
 
   public isSidebarOpen = this.store.selectSignal(LayoutState.isSidebarOpen);
 
+  // True when the active route opts into a full-height, no-padding content frame
+  // (route data `fullHeight`), so the routed page owns its own internal scrolling
+  // instead of the shell's block-flow + p-4 padding. Used by the Report Builder.
+  public readonly isContentFullHeight = toSignal(
+    this.router.events.pipe(
+      filter((event) => event instanceof NavigationEnd),
+      startWith(null),
+      map(() => this.deepestRouteData()["fullHeight"] === true),
+    ),
+    { initialValue: false },
+  );
+
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);
 
   protected readonly selectedGroupIdNumber = computed(() => {
@@ -56,6 +69,15 @@ export class SidebarComponent {
 
   private readonly groupPermissions = this.store.selectSignal(
     AuthState.groupPermissions
+  );
+
+  // Reports are reachable with read OR the readAll bypass (the *hasAppPermission
+  // directive is single-key AND-only, so the OR is resolved through the selector).
+  protected readonly canViewReports = this.store.selectSignal(
+    AuthState.hasAnyAppPermission([
+      Permission.AppReportsRead,
+      Permission.AppReportsReadAll,
+    ])
   );
 
   // Mirrors the three speed-dial sub-button gates (Add Receipt, Quick Scan, Add
@@ -89,6 +111,16 @@ export class SidebarComponent {
   );
 
   public addButtonExpanded: boolean | null = null;
+
+  // Walks from the router state root to the deepest activated child so the
+  // fullHeight flag is picked up wherever it is declared in the route tree.
+  private deepestRouteData(): Data {
+    let route = this.router.routerState.snapshot.root;
+    while (route.firstChild) {
+      route = route.firstChild;
+    }
+    return route.data;
+  }
 
   public groupClicked(groupId: number): void {
     this.store.dispatch(new SetSelectedGroupId(groupId.toString()));

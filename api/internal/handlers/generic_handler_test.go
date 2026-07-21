@@ -115,6 +115,47 @@ func TestShouldAcceptWhenUserHasAppPermission(t *testing.T) {
 	assertStatus(t, w, http.StatusOK)
 }
 
+func TestShouldAcceptWhenUserHasAnyAppPermission(t *testing.T) {
+	defer tearDownGenericHandlerTest()
+	repositories.CreateTestGroupWithUsers()
+	// The caller holds one of the two any-of permissions, which satisfies the gate.
+	grantAppPerms(t, 1, permissions.AppUsersRead)
+	w, r := requestForUser(1)
+
+	handler := structs.Handler{
+		Writer:            w,
+		Request:           r,
+		ResponseType:      constants.ApplicationJson,
+		AnyAppPermissions: []string{permissions.AppUsersRead, permissions.AppUsersDelete},
+		HandlerFunction:   okHandlerFunc,
+	}
+
+	HandleRequest(handler)
+
+	assertStatus(t, w, http.StatusOK)
+}
+
+func TestShouldRejectWhenUserHasNoneOfAnyAppPermission(t *testing.T) {
+	defer tearDownGenericHandlerTest()
+	repositories.CreateTestGroupWithUsers()
+	// The caller holds an unrelated permission but neither of the any-of set, so the
+	// gate denies.
+	grantAppPerms(t, 1, permissions.AppUsersCreate)
+	w, r := requestForUser(1)
+
+	handler := structs.Handler{
+		Writer:            w,
+		Request:           r,
+		ResponseType:      constants.ApplicationJson,
+		AnyAppPermissions: []string{permissions.AppUsersRead, permissions.AppUsersDelete},
+		HandlerFunction:   okHandlerFunc,
+	}
+
+	HandleRequest(handler)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
 func TestShouldRejectGroupPermissionWhenNotAssignedRole(t *testing.T) {
 	defer tearDownGenericHandlerTest()
 	repositories.CreateTestGroupWithUsers()

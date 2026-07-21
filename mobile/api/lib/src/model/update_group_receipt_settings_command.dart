@@ -3,6 +3,8 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:openapi/src/model/receipt_status.dart';
+import 'package:openapi/src/model/quick_scan_default_paid_by_type.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -19,6 +21,17 @@ part 'update_group_receipt_settings_command.g.dart';
 /// * [hideComments] - Hide receipt comments
 /// * [hideShareCategories] - Hide share categories
 /// * [hideShareTags] - Hide share tags
+/// * [quickScanPaidByEnabled] - Show the paid by field in quick scan
+/// * [quickScanPaidByRequired] - Require the paid by field in quick scan
+/// * [quickScanDefaultPaidByType] 
+/// * [quickScanDefaultPaidById] - Default paid by user id when paid by is optional and type is USER
+/// * [quickScanStatusEnabled] - Show the status field in quick scan
+/// * [quickScanStatusRequired] - Require the status field in quick scan
+/// * [quickScanDefaultStatus] 
+/// * [quickScanCategoriesEnabled] - Show the categories field in quick scan
+/// * [quickScanCategoriesRequired] - Require the categories field in quick scan
+/// * [quickScanTagsEnabled] - Show the tags field in quick scan
+/// * [quickScanTagsRequired] - Require the tags field in quick scan
 @BuiltValue()
 abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupReceiptSettingsCommand, UpdateGroupReceiptSettingsCommandBuilder> {
   /// Hide receipt images
@@ -52,6 +65,50 @@ abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupRec
   /// Hide share tags
   @BuiltValueField(wireName: r'hideShareTags')
   bool? get hideShareTags;
+
+  /// Show the paid by field in quick scan
+  @BuiltValueField(wireName: r'quickScanPaidByEnabled')
+  bool? get quickScanPaidByEnabled;
+
+  /// Require the paid by field in quick scan
+  @BuiltValueField(wireName: r'quickScanPaidByRequired')
+  bool? get quickScanPaidByRequired;
+
+  @BuiltValueField(wireName: r'quickScanDefaultPaidByType')
+  QuickScanDefaultPaidByType? get quickScanDefaultPaidByType;
+  // enum quickScanDefaultPaidByTypeEnum {  UPLOADER,  USER,  ,  };
+
+  /// Default paid by user id when paid by is optional and type is USER
+  @BuiltValueField(wireName: r'quickScanDefaultPaidById')
+  int? get quickScanDefaultPaidById;
+
+  /// Show the status field in quick scan
+  @BuiltValueField(wireName: r'quickScanStatusEnabled')
+  bool? get quickScanStatusEnabled;
+
+  /// Require the status field in quick scan
+  @BuiltValueField(wireName: r'quickScanStatusRequired')
+  bool? get quickScanStatusRequired;
+
+  @BuiltValueField(wireName: r'quickScanDefaultStatus')
+  ReceiptStatus? get quickScanDefaultStatus;
+  // enum quickScanDefaultStatusEnum {  OPEN,  NEEDS_ATTENTION,  RESOLVED,  DRAFT,  ,  };
+
+  /// Show the categories field in quick scan
+  @BuiltValueField(wireName: r'quickScanCategoriesEnabled')
+  bool? get quickScanCategoriesEnabled;
+
+  /// Require the categories field in quick scan
+  @BuiltValueField(wireName: r'quickScanCategoriesRequired')
+  bool? get quickScanCategoriesRequired;
+
+  /// Show the tags field in quick scan
+  @BuiltValueField(wireName: r'quickScanTagsEnabled')
+  bool? get quickScanTagsEnabled;
+
+  /// Require the tags field in quick scan
+  @BuiltValueField(wireName: r'quickScanTagsRequired')
+  bool? get quickScanTagsRequired;
 
   UpdateGroupReceiptSettingsCommand._();
 
@@ -129,6 +186,83 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
       yield r'hideShareTags';
       yield serializers.serialize(
         object.hideShareTags,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanPaidByEnabled != null) {
+      yield r'quickScanPaidByEnabled';
+      yield serializers.serialize(
+        object.quickScanPaidByEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanPaidByRequired != null) {
+      yield r'quickScanPaidByRequired';
+      yield serializers.serialize(
+        object.quickScanPaidByRequired,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanDefaultPaidByType != null) {
+      yield r'quickScanDefaultPaidByType';
+      yield serializers.serialize(
+        object.quickScanDefaultPaidByType,
+        specifiedType: const FullType(QuickScanDefaultPaidByType),
+      );
+    }
+    if (object.quickScanDefaultPaidById != null) {
+      yield r'quickScanDefaultPaidById';
+      yield serializers.serialize(
+        object.quickScanDefaultPaidById,
+        specifiedType: const FullType(int),
+      );
+    }
+    if (object.quickScanStatusEnabled != null) {
+      yield r'quickScanStatusEnabled';
+      yield serializers.serialize(
+        object.quickScanStatusEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanStatusRequired != null) {
+      yield r'quickScanStatusRequired';
+      yield serializers.serialize(
+        object.quickScanStatusRequired,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanDefaultStatus != null) {
+      yield r'quickScanDefaultStatus';
+      yield serializers.serialize(
+        object.quickScanDefaultStatus,
+        specifiedType: const FullType(ReceiptStatus),
+      );
+    }
+    if (object.quickScanCategoriesEnabled != null) {
+      yield r'quickScanCategoriesEnabled';
+      yield serializers.serialize(
+        object.quickScanCategoriesEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanCategoriesRequired != null) {
+      yield r'quickScanCategoriesRequired';
+      yield serializers.serialize(
+        object.quickScanCategoriesRequired,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanTagsEnabled != null) {
+      yield r'quickScanTagsEnabled';
+      yield serializers.serialize(
+        object.quickScanTagsEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanTagsRequired != null) {
+      yield r'quickScanTagsRequired';
+      yield serializers.serialize(
+        object.quickScanTagsRequired,
         specifiedType: const FullType(bool),
       );
     }
@@ -210,6 +344,83 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
             specifiedType: const FullType(bool),
           ) as bool;
           result.hideShareTags = valueDes;
+          break;
+        case r'quickScanPaidByEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanPaidByEnabled = valueDes;
+          break;
+        case r'quickScanPaidByRequired':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanPaidByRequired = valueDes;
+          break;
+        case r'quickScanDefaultPaidByType':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(QuickScanDefaultPaidByType),
+          ) as QuickScanDefaultPaidByType;
+          result.quickScanDefaultPaidByType = valueDes;
+          break;
+        case r'quickScanDefaultPaidById':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.quickScanDefaultPaidById = valueDes;
+          break;
+        case r'quickScanStatusEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanStatusEnabled = valueDes;
+          break;
+        case r'quickScanStatusRequired':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanStatusRequired = valueDes;
+          break;
+        case r'quickScanDefaultStatus':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(ReceiptStatus),
+          ) as ReceiptStatus;
+          result.quickScanDefaultStatus = valueDes;
+          break;
+        case r'quickScanCategoriesEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanCategoriesEnabled = valueDes;
+          break;
+        case r'quickScanCategoriesRequired':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanCategoriesRequired = valueDes;
+          break;
+        case r'quickScanTagsEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanTagsEnabled = valueDes;
+          break;
+        case r'quickScanTagsRequired':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanTagsRequired = valueDes;
           break;
         default:
           unhandled.add(key);

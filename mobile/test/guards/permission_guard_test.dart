@@ -53,6 +53,19 @@ void main() {
         ],
       );
 
+  GoRouter reportsRouter() => GoRouter(
+        initialLocation: '/start',
+        routes: [
+          GoRoute(path: '/start', builder: (c, s) => const Text('START')),
+          GoRoute(
+            path: '/reports',
+            redirect: reportsReadRedirect,
+            builder: (c, s) => const Text('REPORTS'),
+          ),
+          GoRoute(path: '/groups', builder: (c, s) => const Text('GROUPS')),
+        ],
+      );
+
   group('groupDashboardReadRedirect', () {
     testWidgets('redirects to receipts without group.dashboards.read',
         (tester) async {
@@ -148,6 +161,52 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('SEARCH'), findsOneWidget);
+      expect(find.text('GROUPS'), findsNothing);
+    });
+  });
+
+  group('reportsReadRedirect', () {
+    testWidgets('redirects to /groups without app.reports.read',
+        (tester) async {
+      final router = reportsRouter();
+      await tester.pumpWidget(harness(seededPermissions(), router));
+      await tester.pumpAndSettle();
+
+      router.go('/reports');
+      await tester.pumpAndSettle();
+
+      expect(find.text('GROUPS'), findsOneWidget);
+      expect(find.text('REPORTS'), findsNothing);
+    });
+
+    testWidgets('allows reports with app.reports.read', (tester) async {
+      final router = reportsRouter();
+      await tester.pumpWidget(harness(
+        seededPermissions(app: [Permission.appPeriodReportsPeriodRead]),
+        router,
+      ));
+      await tester.pumpAndSettle();
+
+      router.go('/reports');
+      await tester.pumpAndSettle();
+
+      expect(find.text('REPORTS'), findsOneWidget);
+      expect(find.text('GROUPS'), findsNothing);
+    });
+
+    testWidgets('allows reports with app.reports.readAll (base absent)',
+        (tester) async {
+      final router = reportsRouter();
+      await tester.pumpWidget(harness(
+        seededPermissions(app: [Permission.appPeriodReportsPeriodReadAll]),
+        router,
+      ));
+      await tester.pumpAndSettle();
+
+      router.go('/reports');
+      await tester.pumpAndSettle();
+
+      expect(find.text('REPORTS'), findsOneWidget);
       expect(find.text('GROUPS'), findsNothing);
     });
   });

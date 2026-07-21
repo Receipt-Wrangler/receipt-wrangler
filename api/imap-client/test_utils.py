@@ -1,6 +1,36 @@
 import unittest
 
-from utils import valid_from_email, valid_subject
+from utils import sanitize_filename, valid_from_email, valid_subject
+
+
+class TestSanitizeFilename(unittest.TestCase):
+
+    def test_plain_name_unchanged(self):
+        self.assertEqual(sanitize_filename("receipt.jpg"), "receipt.jpg")
+
+    def test_relative_traversal_reduced_to_base(self):
+        self.assertEqual(sanitize_filename("../../../../tmp/evil.txt"), "evil.txt")
+
+    def test_absolute_path_reduced_to_base(self):
+        self.assertEqual(sanitize_filename("/etc/cron.d/evil"), "evil")
+
+    def test_nested_path_reduced_to_base(self):
+        self.assertEqual(sanitize_filename("a/b/c.jpg"), "c.jpg")
+
+    def test_module_overwrite_reduced_to_base(self):
+        self.assertEqual(sanitize_filename("../imap-client/utils.py"), "utils.py")
+
+    def test_dotdot_rejected(self):
+        self.assertEqual(sanitize_filename(".."), "")
+
+    def test_dot_rejected(self):
+        self.assertEqual(sanitize_filename("."), "")
+
+    def test_empty_rejected(self):
+        self.assertEqual(sanitize_filename(""), "")
+
+    def test_none_rejected(self):
+        self.assertEqual(sanitize_filename(None), "")
 
 
 class TestEmailUtils(unittest.TestCase):

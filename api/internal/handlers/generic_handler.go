@@ -73,7 +73,7 @@ func HandleRequest(handler structs.Handler) {
 // the caller is not authorized. Handlers that declare no permissions are allowed
 // through (authentication is already enforced by the router middleware).
 func enforcePermissions(handler structs.Handler) bool {
-	if len(handler.AppPermissions) == 0 && len(handler.GroupPermissions) == 0 {
+	if len(handler.AppPermissions) == 0 && len(handler.AnyAppPermissions) == 0 && len(handler.GroupPermissions) == 0 {
 		return true
 	}
 
@@ -83,6 +83,13 @@ func enforcePermissions(handler structs.Handler) bool {
 	if len(handler.AppPermissions) > 0 {
 		hasPermissions, err := permissionService.HasAppPermissions(token.UserId, handler.AppPermissions...)
 		if err != nil || !hasPermissions {
+			return denyUnauthorized(handler, err)
+		}
+	}
+
+	if len(handler.AnyAppPermissions) > 0 {
+		hasAny, err := permissionService.HasAnyAppPermission(token.UserId, handler.AnyAppPermissions...)
+		if err != nil || !hasAny {
 			return denyUnauthorized(handler, err)
 		}
 	}

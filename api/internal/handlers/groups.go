@@ -353,7 +353,11 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 		GroupPermissions: []string{permissions.GroupUpdate},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			command := commands.UpdateGroupReceiptSettingsCommand{}
-			err := command.LoadDataFromRequest(w, r)
+			vErr, err := command.LoadDataFromRequestAndValidate(w, r)
+			if len(vErr.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
+				return 0, nil
+			}
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

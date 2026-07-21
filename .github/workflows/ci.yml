@@ -107,7 +107,7 @@ jobs:
       needs.detect-changes.outputs.docker == 'true' &&
       !contains(needs.*.result, 'failure') &&
       !contains(needs.*.result, 'cancelled')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
       - name: Get build date

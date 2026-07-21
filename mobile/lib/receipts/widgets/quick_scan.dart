@@ -54,11 +54,14 @@ class _QuickScan extends State<QuickScan> {
                   image: widget.imageSubject.value[realIndex],
                   index: realIndex,
                   enabled: !isCompleted,
-                  onFormChangeCallback: (groupId, paidByUserId, status) {
+                  onFormChangeCallback:
+                      (groupId, paidByUserId, status, categories, tags) {
                     var newImage = widget.imageSubject.value[realIndex];
                     newImage.groupId = groupId;
                     newImage.paidByUserId = paidByUserId;
                     newImage.status = status;
+                    newImage.categories = categories;
+                    newImage.tags = tags;
 
                     var newImages = widget.imageSubject.value;
 

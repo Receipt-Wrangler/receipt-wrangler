@@ -34,6 +34,10 @@ export const defaultReceiptFilter = {
     operation: null,
     value: [],
   },
+  group: {
+    operation: null,
+    value: [],
+  },
   resolvedDate: {
     operation: null,
     value: null,

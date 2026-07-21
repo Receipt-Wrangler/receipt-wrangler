@@ -112,6 +112,30 @@ const Permission _$appPeriodAccountPeriodDelete =
     const Permission._('appPeriodAccountPeriodDelete');
 const Permission _$appPeriodReceiptsPeriodSearch =
     const Permission._('appPeriodReceiptsPeriodSearch');
+const Permission _$appPeriodReportsPeriodCreate =
+    const Permission._('appPeriodReportsPeriodCreate');
+const Permission _$appPeriodReportsPeriodDelete =
+    const Permission._('appPeriodReportsPeriodDelete');
+const Permission _$appPeriodReportsPeriodDuplicate =
+    const Permission._('appPeriodReportsPeriodDuplicate');
+const Permission _$appPeriodReportsPeriodGenerate =
+    const Permission._('appPeriodReportsPeriodGenerate');
+const Permission _$appPeriodReportsPeriodRead =
+    const Permission._('appPeriodReportsPeriodRead');
+const Permission _$appPeriodReportsPeriodUpdate =
+    const Permission._('appPeriodReportsPeriodUpdate');
+const Permission _$appPeriodReportsPeriodReadAll =
+    const Permission._('appPeriodReportsPeriodReadAll');
+const Permission _$appPeriodReportsPeriodCreateAll =
+    const Permission._('appPeriodReportsPeriodCreateAll');
+const Permission _$appPeriodReportsPeriodUpdateAll =
+    const Permission._('appPeriodReportsPeriodUpdateAll');
+const Permission _$appPeriodReportsPeriodDeleteAll =
+    const Permission._('appPeriodReportsPeriodDeleteAll');
+const Permission _$appPeriodReportsPeriodDuplicateAll =
+    const Permission._('appPeriodReportsPeriodDuplicateAll');
+const Permission _$appPeriodReportsPeriodGenerateAll =
+    const Permission._('appPeriodReportsPeriodGenerateAll');
 const Permission _$groupPeriodView = const Permission._('groupPeriodView');
 const Permission _$groupPeriodUpdate = const Permission._('groupPeriodUpdate');
 const Permission _$groupPeriodDelete = const Permission._('groupPeriodDelete');
@@ -149,6 +173,8 @@ const Permission _$groupPeriodDashboardsPeriodDelete =
     const Permission._('groupPeriodDashboardsPeriodDelete');
 const Permission _$groupPeriodWidgetsPeriodRead =
     const Permission._('groupPeriodWidgetsPeriodRead');
+const Permission _$groupPeriodReportsPeriodRead =
+    const Permission._('groupPeriodReportsPeriodRead');
 const Permission _$groupPeriodActivitiesPeriodRead =
     const Permission._('groupPeriodActivitiesPeriodRead');
 const Permission _$groupPeriodActivitiesPeriodRerun =
@@ -264,6 +290,30 @@ Permission _$valueOf(String name) {
       return _$appPeriodAccountPeriodDelete;
     case 'appPeriodReceiptsPeriodSearch':
       return _$appPeriodReceiptsPeriodSearch;
+    case 'appPeriodReportsPeriodCreate':
+      return _$appPeriodReportsPeriodCreate;
+    case 'appPeriodReportsPeriodDelete':
+      return _$appPeriodReportsPeriodDelete;
+    case 'appPeriodReportsPeriodDuplicate':
+      return _$appPeriodReportsPeriodDuplicate;
+    case 'appPeriodReportsPeriodGenerate':
+      return _$appPeriodReportsPeriodGenerate;
+    case 'appPeriodReportsPeriodRead':
+      return _$appPeriodReportsPeriodRead;
+    case 'appPeriodReportsPeriodUpdate':
+      return _$appPeriodReportsPeriodUpdate;
+    case 'appPeriodReportsPeriodReadAll':
+      return _$appPeriodReportsPeriodReadAll;
+    case 'appPeriodReportsPeriodCreateAll':
+      return _$appPeriodReportsPeriodCreateAll;
+    case 'appPeriodReportsPeriodUpdateAll':
+      return _$appPeriodReportsPeriodUpdateAll;
+    case 'appPeriodReportsPeriodDeleteAll':
+      return _$appPeriodReportsPeriodDeleteAll;
+    case 'appPeriodReportsPeriodDuplicateAll':
+      return _$appPeriodReportsPeriodDuplicateAll;
+    case 'appPeriodReportsPeriodGenerateAll':
+      return _$appPeriodReportsPeriodGenerateAll;
     case 'groupPeriodView':
       return _$groupPeriodView;
     case 'groupPeriodUpdate':
@@ -304,6 +354,8 @@ Permission _$valueOf(String name) {
       return _$groupPeriodDashboardsPeriodDelete;
     case 'groupPeriodWidgetsPeriodRead':
       return _$groupPeriodWidgetsPeriodRead;
+    case 'groupPeriodReportsPeriodRead':
+      return _$groupPeriodReportsPeriodRead;
     case 'groupPeriodActivitiesPeriodRead':
       return _$groupPeriodActivitiesPeriodRead;
     case 'groupPeriodActivitiesPeriodRerun':
@@ -369,6 +421,18 @@ final BuiltSet<Permission> _$values = BuiltSet<Permission>(const <Permission>[
   _$appPeriodAccountPeriodUpdate,
   _$appPeriodAccountPeriodDelete,
   _$appPeriodReceiptsPeriodSearch,
+  _$appPeriodReportsPeriodCreate,
+  _$appPeriodReportsPeriodDelete,
+  _$appPeriodReportsPeriodDuplicate,
+  _$appPeriodReportsPeriodGenerate,
+  _$appPeriodReportsPeriodRead,
+  _$appPeriodReportsPeriodUpdate,
+  _$appPeriodReportsPeriodReadAll,
+  _$appPeriodReportsPeriodCreateAll,
+  _$appPeriodReportsPeriodUpdateAll,
+  _$appPeriodReportsPeriodDeleteAll,
+  _$appPeriodReportsPeriodDuplicateAll,
+  _$appPeriodReportsPeriodGenerateAll,
   _$groupPeriodView,
   _$groupPeriodUpdate,
   _$groupPeriodDelete,
@@ -389,6 +453,7 @@ final BuiltSet<Permission> _$values = BuiltSet<Permission>(const <Permission>[
   _$groupPeriodDashboardsPeriodUpdate,
   _$groupPeriodDashboardsPeriodDelete,
   _$groupPeriodWidgetsPeriodRead,
+  _$groupPeriodReportsPeriodRead,
   _$groupPeriodActivitiesPeriodRead,
   _$groupPeriodActivitiesPeriodRerun,
   _$groupPeriodEmailPeriodPoll,
@@ -476,6 +541,26 @@ class _$PermissionMeta {
   Permission get appPeriodAccountPeriodDelete => _$appPeriodAccountPeriodDelete;
   Permission get appPeriodReceiptsPeriodSearch =>
       _$appPeriodReceiptsPeriodSearch;
+  Permission get appPeriodReportsPeriodCreate => _$appPeriodReportsPeriodCreate;
+  Permission get appPeriodReportsPeriodDelete => _$appPeriodReportsPeriodDelete;
+  Permission get appPeriodReportsPeriodDuplicate =>
+      _$appPeriodReportsPeriodDuplicate;
+  Permission get appPeriodReportsPeriodGenerate =>
+      _$appPeriodReportsPeriodGenerate;
+  Permission get appPeriodReportsPeriodRead => _$appPeriodReportsPeriodRead;
+  Permission get appPeriodReportsPeriodUpdate => _$appPeriodReportsPeriodUpdate;
+  Permission get appPeriodReportsPeriodReadAll =>
+      _$appPeriodReportsPeriodReadAll;
+  Permission get appPeriodReportsPeriodCreateAll =>
+      _$appPeriodReportsPeriodCreateAll;
+  Permission get appPeriodReportsPeriodUpdateAll =>
+      _$appPeriodReportsPeriodUpdateAll;
+  Permission get appPeriodReportsPeriodDeleteAll =>
+      _$appPeriodReportsPeriodDeleteAll;
+  Permission get appPeriodReportsPeriodDuplicateAll =>
+      _$appPeriodReportsPeriodDuplicateAll;
+  Permission get appPeriodReportsPeriodGenerateAll =>
+      _$appPeriodReportsPeriodGenerateAll;
   Permission get groupPeriodView => _$groupPeriodView;
   Permission get groupPeriodUpdate => _$groupPeriodUpdate;
   Permission get groupPeriodDelete => _$groupPeriodDelete;
@@ -512,6 +597,7 @@ class _$PermissionMeta {
   Permission get groupPeriodDashboardsPeriodDelete =>
       _$groupPeriodDashboardsPeriodDelete;
   Permission get groupPeriodWidgetsPeriodRead => _$groupPeriodWidgetsPeriodRead;
+  Permission get groupPeriodReportsPeriodRead => _$groupPeriodReportsPeriodRead;
   Permission get groupPeriodActivitiesPeriodRead =>
       _$groupPeriodActivitiesPeriodRead;
   Permission get groupPeriodActivitiesPeriodRerun =>
@@ -588,6 +674,18 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'appPeriodAccountPeriodUpdate': 'app.account.update',
     'appPeriodAccountPeriodDelete': 'app.account.delete',
     'appPeriodReceiptsPeriodSearch': 'app.receipts.search',
+    'appPeriodReportsPeriodCreate': 'app.reports.create',
+    'appPeriodReportsPeriodDelete': 'app.reports.delete',
+    'appPeriodReportsPeriodDuplicate': 'app.reports.duplicate',
+    'appPeriodReportsPeriodGenerate': 'app.reports.generate',
+    'appPeriodReportsPeriodRead': 'app.reports.read',
+    'appPeriodReportsPeriodUpdate': 'app.reports.update',
+    'appPeriodReportsPeriodReadAll': 'app.reports.readAll',
+    'appPeriodReportsPeriodCreateAll': 'app.reports.createAll',
+    'appPeriodReportsPeriodUpdateAll': 'app.reports.updateAll',
+    'appPeriodReportsPeriodDeleteAll': 'app.reports.deleteAll',
+    'appPeriodReportsPeriodDuplicateAll': 'app.reports.duplicateAll',
+    'appPeriodReportsPeriodGenerateAll': 'app.reports.generateAll',
     'groupPeriodView': 'group.view',
     'groupPeriodUpdate': 'group.update',
     'groupPeriodDelete': 'group.delete',
@@ -608,6 +706,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'groupPeriodDashboardsPeriodUpdate': 'group.dashboards.update',
     'groupPeriodDashboardsPeriodDelete': 'group.dashboards.delete',
     'groupPeriodWidgetsPeriodRead': 'group.widgets.read',
+    'groupPeriodReportsPeriodRead': 'group.reports.read',
     'groupPeriodActivitiesPeriodRead': 'group.activities.read',
     'groupPeriodActivitiesPeriodRerun': 'group.activities.rerun',
     'groupPeriodEmailPeriodPoll': 'group.email.poll',
@@ -671,6 +770,18 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'app.account.update': 'appPeriodAccountPeriodUpdate',
     'app.account.delete': 'appPeriodAccountPeriodDelete',
     'app.receipts.search': 'appPeriodReceiptsPeriodSearch',
+    'app.reports.create': 'appPeriodReportsPeriodCreate',
+    'app.reports.delete': 'appPeriodReportsPeriodDelete',
+    'app.reports.duplicate': 'appPeriodReportsPeriodDuplicate',
+    'app.reports.generate': 'appPeriodReportsPeriodGenerate',
+    'app.reports.read': 'appPeriodReportsPeriodRead',
+    'app.reports.update': 'appPeriodReportsPeriodUpdate',
+    'app.reports.readAll': 'appPeriodReportsPeriodReadAll',
+    'app.reports.createAll': 'appPeriodReportsPeriodCreateAll',
+    'app.reports.updateAll': 'appPeriodReportsPeriodUpdateAll',
+    'app.reports.deleteAll': 'appPeriodReportsPeriodDeleteAll',
+    'app.reports.duplicateAll': 'appPeriodReportsPeriodDuplicateAll',
+    'app.reports.generateAll': 'appPeriodReportsPeriodGenerateAll',
     'group.view': 'groupPeriodView',
     'group.update': 'groupPeriodUpdate',
     'group.delete': 'groupPeriodDelete',
@@ -691,6 +802,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'group.dashboards.update': 'groupPeriodDashboardsPeriodUpdate',
     'group.dashboards.delete': 'groupPeriodDashboardsPeriodDelete',
     'group.widgets.read': 'groupPeriodWidgetsPeriodRead',
+    'group.reports.read': 'groupPeriodReportsPeriodRead',
     'group.activities.read': 'groupPeriodActivitiesPeriodRead',
     'group.activities.rerun': 'groupPeriodActivitiesPeriodRerun',
     'group.email.poll': 'groupPeriodEmailPeriodPoll',

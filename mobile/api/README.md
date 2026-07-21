@@ -134,6 +134,17 @@ Class | Method | HTTP request | Description
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**getPagedProcessingSettings**](doc/ReceiptProcessingSettingsApi.md#getpagedprocessingsettings) | **POST** /receiptProcessingSettings/getPagedProcessingSettings | Gets paged processing settings
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**getReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#getreceiptprocessingsettingsbyid) | **GET** /receiptProcessingSettings/{id} | Get receipt processing settings by id
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**updateReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#updatereceiptprocessingsettingsbyid) | **PUT** /receiptProcessingSettings/{id} | Update receipt processing settings by id
+[*ReportApi*](doc/ReportApi.md) | [**createReportTemplate**](doc/ReportApi.md#createreporttemplate) | **POST** /report/template | Save a report template
+[*ReportApi*](doc/ReportApi.md) | [**deleteReportTemplate**](doc/ReportApi.md#deletereporttemplate) | **DELETE** /report/template/{id} | Delete a report template
+[*ReportApi*](doc/ReportApi.md) | [**duplicateReportTemplate**](doc/ReportApi.md#duplicatereporttemplate) | **POST** /report/template/{id}/duplicate | Duplicate a report template
+[*ReportApi*](doc/ReportApi.md) | [**generateReport**](doc/ReportApi.md#generatereport) | **POST** /report/generate | Generate a report
+[*ReportApi*](doc/ReportApi.md) | [**generateReportFromTemplate**](doc/ReportApi.md#generatereportfromtemplate) | **POST** /report/template/{id}/generate | Generate a report from a saved template
+[*ReportApi*](doc/ReportApi.md) | [**getReportTemplate**](doc/ReportApi.md#getreporttemplate) | **GET** /report/template/{id} | Get a report template
+[*ReportApi*](doc/ReportApi.md) | [**getReportTemplateOptions**](doc/ReportApi.md#getreporttemplateoptions) | **GET** /report/template/options | Get report template options
+[*ReportApi*](doc/ReportApi.md) | [**getReportTemplates**](doc/ReportApi.md#getreporttemplates) | **POST** /report/template/list | Get paged report templates
+[*ReportApi*](doc/ReportApi.md) | [**previewReport**](doc/ReportApi.md#previewreport) | **POST** /report/preview | Preview a report
+[*ReportApi*](doc/ReportApi.md) | [**renderReportTemplate**](doc/ReportApi.md#renderreporttemplate) | **POST** /report/template/{id}/render | Render a saved template as HTML for the dashboard report widget
+[*ReportApi*](doc/ReportApi.md) | [**updateReportTemplate**](doc/ReportApi.md#updatereporttemplate) | **PUT** /report/template/{id} | Update a report template
 [*RoleApi*](doc/RoleApi.md) | [**createRole**](doc/RoleApi.md#createrole) | **POST** /role | Create role
 [*RoleApi*](doc/RoleApi.md) | [**deleteRole**](doc/RoleApi.md#deleterole) | **DELETE** /role/{roleId} | Delete role
 [*RoleApi*](doc/RoleApi.md) | [**getRoles**](doc/RoleApi.md#getroles) | **GET** /role | List all roles
@@ -246,11 +257,21 @@ Class | Method | HTTP request | Description
  - [PieChartDataPoint](doc/PieChartDataPoint.md)
  - [Prompt](doc/Prompt.md)
  - [QueueName](doc/QueueName.md)
+ - [QuickScanDefaultPaidByType](doc/QuickScanDefaultPaidByType.md)
  - [Receipt](doc/Receipt.md)
  - [ReceiptPagedRequestCommand](doc/ReceiptPagedRequestCommand.md)
  - [ReceiptPagedRequestFilter](doc/ReceiptPagedRequestFilter.md)
  - [ReceiptProcessingSettings](doc/ReceiptProcessingSettings.md)
  - [ReceiptStatus](doc/ReceiptStatus.md)
+ - [ReportColumn](doc/ReportColumn.md)
+ - [ReportDetail](doc/ReportDetail.md)
+ - [ReportDocument](doc/ReportDocument.md)
+ - [ReportPeriod](doc/ReportPeriod.md)
+ - [ReportPreviewResponse](doc/ReportPreviewResponse.md)
+ - [ReportRequestCommand](doc/ReportRequestCommand.md)
+ - [ReportTemplate](doc/ReportTemplate.md)
+ - [ReportTemplateGrant](doc/ReportTemplateGrant.md)
+ - [ReportTemplateOption](doc/ReportTemplateOption.md)
  - [ResetPasswordCommand](doc/ResetPasswordCommand.md)
  - [Role](doc/Role.md)
  - [SearchResult](doc/SearchResult.md)

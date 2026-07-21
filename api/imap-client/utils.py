@@ -1,5 +1,16 @@
 import logging
+import os
 import re
+
+
+def sanitize_filename(filename):
+    """Reduce an untrusted email attachment filename to a safe basename so it
+    cannot escape the temp directory it is written into (path traversal,
+    GHSA-h3pr-mhcr-8phg). Strips any directory portion and returns "" when the
+    name is missing or cannot be made safe ("." / ".."), so callers can skip it.
+    """
+    base = os.path.basename(filename or "")
+    return "" if base in ("", ".", "..") else base
 
 
 def valid_from_email(from_email, email_whitelist):
