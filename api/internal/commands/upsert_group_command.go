@@ -36,6 +36,8 @@ func (command *UpsertGroupCommand) Validate(isCreate bool) structs.ValidatorErro
 
 	if len(command.Name) == 0 {
 		errorMap["name"] = "Name is required"
+	} else if !utils.IsSafePathComponent(command.Name) {
+		errorMap["name"] = "Name contains invalid characters"
 	}
 
 	if len(command.Status) == 0 {

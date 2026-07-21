@@ -1,7 +1,6 @@
 package repositories
 
 import (
-	"os"
 	"path/filepath"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
@@ -35,13 +34,12 @@ func (repository ReceiptImageRepository) CreateReceiptImage(fileData models.File
 
 	fileData.FileType = validatedFileType
 
-	basePath, err := os.Getwd()
+	// Ensure the data directory exists
+	dataDir, err := utils.GetDataDir()
 	if err != nil {
 		return models.FileData{}, err
 	}
-
-	// Check if data path exists
-	err = utils.DirectoryExists(basePath+"/data", true)
+	err = utils.EnsureDataDirectory(dataDir)
 	if err != nil {
 		return models.FileData{}, err
 	}
@@ -55,12 +53,12 @@ func (repository ReceiptImageRepository) CreateReceiptImage(fileData models.File
 
 	err = db.Model(models.FileData{}).Create(&fileData).Error
 	if err != nil {
-		os.Remove(filePath)
+		utils.RemoveDataPath(filePath)
 		return models.FileData{}, err
 	}
 
 	// Check if group's path exists
-	err = utils.DirectoryExists(groupDir, true)
+	err = utils.EnsureDataDirectory(groupDir)
 	if err != nil {
 		return models.FileData{}, err
 	}
@@ -71,7 +69,7 @@ func (repository ReceiptImageRepository) CreateReceiptImage(fileData models.File
 		return models.FileData{}, err
 	}
 
-	err = utils.WriteFile(filePath, fileBytes)
+	err = utils.WriteDataFile(filePath, fileBytes)
 	if err != nil {
 		return models.FileData{}, err
 	}

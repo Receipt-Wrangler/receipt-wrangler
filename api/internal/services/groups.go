@@ -2,7 +2,6 @@ package services
 
 import (
 	"errors"
-	"os"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
@@ -304,7 +303,7 @@ func (service GroupService) DeleteGroup(groupId string, allowAllGroupDelete bool
 			return txErr
 		}
 
-		txErr = os.Remove(groupPath)
+		txErr = utils.RemoveDataPath(groupPath)
 		if txErr != nil {
 			logging.LogStd(logging.LOG_LEVEL_INFO, txErr.Error())
 		}

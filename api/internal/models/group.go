@@ -1,7 +1,6 @@
 package models
 
 import (
-	"os"
 	"receipt-wrangler/api/internal/utils"
 
 	"gorm.io/gorm"
@@ -41,7 +40,10 @@ func (groupToUpdate *Group) BeforeUpdate(tx *gorm.DB) (err error) {
 				return err
 			}
 
-			os.Rename(oldGroupPath, newGroupPath)
+			// A rename failure is intentionally ignored: both paths are already
+			// validated by BuildGroupPathString above, and a group with no
+			// on-disk directory yet (no receipts) simply has nothing to move.
+			_ = utils.RenameDataPath(oldGroupPath, newGroupPath)
 		}
 	}
 
@@ -55,7 +57,7 @@ func (deletedGroup *Group) AfterDelete(tx *gorm.DB) (err error) {
 			return err
 		}
 
-		err = os.RemoveAll(dataPath)
+		err = utils.RemoveAllInDataDir(dataPath)
 		if err != nil {
 			return err
 		}

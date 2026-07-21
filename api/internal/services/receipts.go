@@ -212,7 +212,7 @@ func (service ReceiptService) DeleteReceipt(id string) error {
 		}
 
 		for _, path := range imagesToDelete {
-			os.Remove(path)
+			utils.RemoveDataPath(path)
 		}
 
 		return nil
@@ -557,7 +557,7 @@ func (service ReceiptService) DuplicateReceipt(
 			return models.Receipt{}, err
 		}
 
-		err = utils.WriteFile(dstPath, srcImageBytes)
+		err = utils.WriteDataFile(dstPath, srcImageBytes)
 		if err != nil {
 			return models.Receipt{}, err
 		}

@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	"os"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/logging"
@@ -230,7 +229,7 @@ func RemoveReceiptImage(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
-			err = os.Remove(path)
+			err = utils.RemoveDataPath(path)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

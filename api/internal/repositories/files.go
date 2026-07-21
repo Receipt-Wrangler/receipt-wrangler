@@ -49,6 +49,12 @@ func (repository FileRepository) BuildFilePath(receiptId string, receiptImageId 
 	fileName := utils.BuildFileName(receiptId, receiptImageId, receiptImageFileName)
 	path := filepath.Join(groupPath, fileName)
 
+	// The file name component (which can originate from an upload or email
+	// attachment) must not escape the data directory either (CWE-22).
+	if err := utils.AssertWithinDataDir(path); err != nil {
+		return "", err
+	}
+
 	return path, nil
 }
 
@@ -84,7 +90,7 @@ func (repository FileRepository) GetBytesForFileData(fileData models.FileData) (
 		return nil, err
 	}
 
-	fileBytes, err := utils.ReadFile(path)
+	fileBytes, err := utils.ReadDataFile(path)
 	if err != nil {
 		return nil, err
 	}

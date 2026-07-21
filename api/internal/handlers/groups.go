@@ -214,7 +214,7 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
-			err = utils.MakeDirectory(groupPath)
+			err = utils.MakeDataDirectory(groupPath)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

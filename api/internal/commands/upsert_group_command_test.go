@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
 	"testing"
@@ -126,5 +127,56 @@ func TestUpsertGroupCommand_Validate_MultipleErrors(t *testing.T) {
 
 	if _, exists := vErr.Errors["groupMembers"]; !exists {
 		utils.PrintTestError(t, "error should exist for field", "groupMembers")
+	}
+}
+
+// A group name is used to build the group's on-disk storage directory, so a name
+// containing path separators or traversal elements must be rejected (CWE-22).
+func TestUpsertGroupCommand_Validate_RejectsUnsafeNames(t *testing.T) {
+	unsafeNames := []string{
+		"../../../../tmp/x",
+		"..",
+		".",
+		"foo/bar",
+		"foo\\bar",
+		"a/../b",
+		"/etc/passwd",
+	}
+
+	for _, name := range unsafeNames {
+		for _, isCreate := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%q_isCreate_%v", name, isCreate), func(t *testing.T) {
+				command := UpsertGroupCommand{
+					Name:         name,
+					Status:       models.GROUP_ACTIVE,
+					GroupMembers: []UpsertGroupMemberCommand{{UserID: 1, GroupID: 1}},
+				}
+
+				vErr := command.Validate(isCreate)
+
+				if _, exists := vErr.Errors["name"]; !exists {
+					utils.PrintTestError(t, "no name error for unsafe name "+name, "name error")
+				}
+			})
+		}
+	}
+}
+
+func TestUpsertGroupCommand_Validate_AllowsNormalNames(t *testing.T) {
+	names := []string{"My Receipts", "Reporting Load Test", "Mom & Dad's", "group-123"}
+
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			command := UpsertGroupCommand{
+				Name:   name,
+				Status: models.GROUP_ACTIVE,
+			}
+
+			vErr := command.Validate(true)
+
+			if _, exists := vErr.Errors["name"]; exists {
+				utils.PrintTestError(t, "unexpected name error for "+name, "no name error")
+			}
+		})
 	}
 }
