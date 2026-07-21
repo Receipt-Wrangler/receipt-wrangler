@@ -266,6 +266,20 @@ func UpdateGroup(w http.ResponseWriter, r *http.Request) {
 				return http.StatusBadRequest, errors.New("cannot update all group")
 			}
 
+			// Authorize the requested member/role changes before persisting them:
+			// the caller must hold the relevant group.members.* permission and may
+			// not grant or strip a role beyond their own privileges (self-escalation
+			// / owner-eviction guard — GHSA-89mm-9qfv-cjg3).
+			token := structs.GetClaims(r)
+			groupService := services.NewGroupService(nil)
+			err = groupService.AuthorizeGroupMemberChanges(token.UserId, uintGroupId, command.GroupMembers)
+			if err != nil {
+				if errors.Is(err, services.ErrGroupMemberChangeForbidden) {
+					return http.StatusForbidden, err
+				}
+				return http.StatusInternalServerError, err
+			}
+
 			updatedGroup, err := groupRepository.UpdateGroup(command, groupId)
 
 			if err != nil {

@@ -109,6 +109,10 @@ const (
 	GroupUpdate = "group.update"
 	GroupDelete = "group.delete"
 
+	GroupMembersCreate = "group.members.create"
+	GroupMembersUpdate = "group.members.update"
+	GroupMembersDelete = "group.members.delete"
+
 	GroupReceiptsCreate    = "group.receipts.create"
 	GroupReceiptsRead      = "group.receipts.read"
 	GroupReceiptsUpdate    = "group.receipts.update"
@@ -222,6 +226,10 @@ var registry = []Descriptor{
 	{GroupView, "View Group", "See the group, its members, and metadata.", "Group", ScopeGroup},
 	{GroupUpdate, "Update Group", "Edit group name, settings, and receipt-handling configuration.", "Group", ScopeGroup},
 	{GroupDelete, "Delete Group", "Permanently delete the group.", "Group", ScopeGroup},
+
+	{GroupMembersCreate, "Add Group Members", "Add members to the group.", "Group", ScopeGroup},
+	{GroupMembersUpdate, "Update Group Members", "Change a member's group role.", "Group", ScopeGroup},
+	{GroupMembersDelete, "Remove Group Members", "Remove members from the group.", "Group", ScopeGroup},
 
 	{GroupReceiptsCreate, "Create Receipts", "Upload images and create receipts.", "Receipts", ScopeGroup},
 	{GroupReceiptsRead, "Read Receipts", "Read, list, and export receipts.", "Receipts", ScopeGroup},

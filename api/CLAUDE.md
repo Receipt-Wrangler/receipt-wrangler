@@ -573,6 +573,34 @@ Because paid-by hides the **whole** receipt (not just fields), enforcement diffe
   plus the round-trip/validation cases in `repositories/roles_grants_test.go`,
   `services/roles_test.go`, and `commands/upsert_role_command_test.go`.
 
+### Group member management (self-escalation guard)
+
+`PUT /api/group/{groupId}` (`UpdateGroup`) replaces the whole member roster, including each member's
+`GroupRoleID`, from the request body. It is still gated by `group.update` (you must be able to edit
+the group to reach it), but the roster changes are additionally authorized by
+`GroupService.AuthorizeGroupMemberChanges` (`services/groups.go`), called from the handler **before**
+the repository write and returning **403** (`ErrGroupMemberChangeForbidden`) on any violation. This
+closes GHSA-89mm-9qfv-cjg3 (a `group.update` member rewriting their own `groupRoleId` to escalate to
+owner, or evicting the owner). The guard diffs the submitted roster against the current one and applies
+two checks to every added / role-changed / removed row (unchanged rows are skipped, so a plain
+name/settings edit never trips it):
+
+- **CRUD gate:** adding a member requires `group.members.create`, changing a member's role requires
+  `group.members.update`, removing a member requires `group.members.delete`.
+- **Privilege ceiling** ("you can neither grant nor strip a privilege you do not hold"): the caller
+  may only assign, or remove/replace, a role whose permission set is a **subset** of the caller's own
+  current group permissions (resolved via `GetGroupPermissionsForUser`; a `nil`/empty role is always
+  wieldable). This is what actually prevents self-escalation, independent of the CRUD gate.
+
+The three `group.members.*` permissions are group-scoped registry entries; **Legacy Owner** holds them
+(it is the full group scope), Legacy Editor/Viewer do not (member management was historically
+owner-only). Upgraded installs — whose Legacy Owner was seeded before these keys existed — pick them
+up on the next boot from `SeedSystemRoles`' add-only reconciliation (see "Seeded system roles"
+above); no dedicated data migration is needed, and
+`repositories/seed_roles_test.go` → `TestSeedSystemRolesBackfillsGroupMemberPermissions` pins that
+upgrade path. Tests: `handlers/group_member_authorization_test.go` (the PoC + happy paths) and
+`services/group_member_authorization_test.go` (the guard's CRUD/ceiling matrix).
+
 ### Enforcement status
 
 Authorization is enforced centrally in `HandleRequest` (`handlers/generic_handler.go`) via the

@@ -269,6 +269,81 @@ func TestSeedSystemRolesReconcileIsAddOnly(t *testing.T) {
 	}
 }
 
+// TestSeedSystemRolesBackfillsGroupMemberPermissions pins the upgrade path for
+// GHSA-89mm-9qfv-cjg3: UpdateGroup now requires group.members.create/update/delete
+// to change a group's roster, so an install seeded before those keys existed must
+// pick them up on the next boot or its owners silently lose member management.
+// SeedSystemRoles' add-only reconciliation is what delivers them — there is no
+// dedicated data migration.
+func TestSeedSystemRolesBackfillsGroupMemberPermissions(t *testing.T) {
+	defer TruncateTestDb()
+
+	memberKeys := []string{
+		permissions.GroupMembersCreate,
+		permissions.GroupMembersUpdate,
+		permissions.GroupMembersDelete,
+	}
+
+	// Pre-create Legacy Owner as a pre-fix install had it: the full group scope
+	// except the member-management keys, which did not exist yet.
+	ownerKeys := permissions.LegacyGroupOwnerKeys()
+	seededPerms := make([]models.GroupRolePermission, 0, len(ownerKeys))
+	for _, permission := range ownerKeys {
+		if slices.Contains(memberKeys, permission) {
+			continue
+		}
+		seededPerms = append(seededPerms, models.GroupRolePermission{Permission: permission})
+	}
+	if len(seededPerms) != len(ownerKeys)-len(memberKeys) {
+		utils.PrintTestError(t, len(seededPerms), len(ownerKeys)-len(memberKeys))
+		return
+	}
+
+	existing := models.GroupRoleDefinition{
+		Name:        LegacyOwnerRoleName,
+		Description: "pre-existing",
+		IsSystem:    true,
+		Permissions: seededPerms,
+	}
+	if err := GetDB().Create(&existing).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	repository := NewRoleRepository(nil)
+	roles, err := repository.GetAllRoles()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	role, ok := findRole(roles, LegacyOwnerRoleName)
+	if !ok {
+		utils.PrintTestError(t, "missing role "+LegacyOwnerRoleName, "present")
+		return
+	}
+
+	// The three member permissions were back-filled...
+	for _, permission := range memberKeys {
+		if !slices.Contains(role.Permissions, permission) {
+			utils.PrintTestError(t, role.Permissions, permission)
+		}
+	}
+	// ...and the role now holds the complete owner set.
+	if !equalKeySet(role.Permissions, ownerKeys) {
+		utils.PrintTestError(t, role.Permissions, ownerKeys)
+	}
+	// Reconciled in place, so existing group members keep their role assignment.
+	if role.Id != existing.ID {
+		utils.PrintTestError(t, role.Id, existing.ID)
+	}
+}
+
 func TestSeedSystemRolesReSeedAddsNoDuplicatePermissions(t *testing.T) {
 	defer TruncateTestDb()
 
