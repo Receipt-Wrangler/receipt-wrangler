@@ -356,6 +356,35 @@ mounts it, so a raw `shellContext` is **null** and tapping Categories/Tags would
 by `test/widgets/quick_scan_form_test.dart` (tap-opens-picker, shellContext null) and on-device by
 `quick_scan_submit_test.dart`.
 
+### `integration_test` is a regular dependency on purpose (Android Studio signed-bundle builds)
+
+`integration_test` is listed under **`dependencies`**, not `dev_dependencies`, in `pubspec.yaml`.
+This looks wrong and is deliberate — moving it back breaks release builds driven from Android
+Studio's **"Generate Signed Bundle / APK"** wizard.
+
+Why: **Flutter 3.27+ strips `dev_dependency` plugins from release builds.** But
+`android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java` (generated, gitignored)
+is rewritten by the **flutter tool**, and `flutter pub get` — which Android Studio runs on every
+**project sync** — re-injects `IntegrationTestPlugin` into it. The wizard then invokes the Gradle
+task **directly**, so nothing regenerates the registrant for release mode, and
+`:app:compileReleaseJavaWithJavac` fails with:
+
+```
+GeneratedPluginRegistrant.java:44: error: package dev.flutter.plugins.integration_test does not exist
+```
+
+`flutter clean` does **not** fix it — the registrant lives in `src/main/java`, not `build/`. The
+failure is deterministic, not flaky: every Studio sync re-poisons the file. `flutter build
+apk|appbundle --release` always works, because the flutter tool regenerates the registrant with dev
+plugins stripped — which is why the CLI and the wizard disagree.
+
+Keeping `integration_test` as a normal dependency restores the pre-3.27 behavior (the plugin stays on
+the release classpath, so the reference compiles) and costs roughly **+0.6MB** of bundle plus an
+inert `IntegrationTestPlugin` registration in production. The alternative — dropping the wizard for
+`flutter build appbundle --release` with a real `signingConfigs.release` in `android/app/build.gradle`
+— is the cleaner long-term fix but requires wiring up keystore signing, which the repo currently does
+**not** have (release is pinned to `signingConfig signingConfigs.debug`; the wizard supplies signing).
+
 ### Android Gradle: cunning_document_scanner needs the Kotlin plugin + Kotlin 2.2.x
 
 `cunning_document_scanner` **2.3.0** modernized its `android/build.gradle` to the

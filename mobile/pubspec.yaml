@@ -69,11 +69,17 @@ dependencies:
   path_provider: ^2.1.6
   share_plus: ^13.2.1
   sentry_flutter: ^8.14.2
+  # Kept as a regular dependency (not a dev_dependency) on purpose.
+  # Flutter 3.27+ strips dev_dependency plugins from release builds, but the
+  # generated GeneratedPluginRegistrant.java still references IntegrationTestPlugin
+  # whenever `flutter pub get` runs (e.g. Android Studio project sync). A release
+  # build driven straight from Gradle -- the Android Studio "Generate Signed
+  # Bundle / APK" wizard -- then fails to compile that stale reference.
+  integration_test:
+    sdk: flutter
 
 dev_dependencies:
   flutter_test:
-    sdk: flutter
-  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
