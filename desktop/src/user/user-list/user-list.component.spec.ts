@@ -1,5 +1,5 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
@@ -8,6 +8,7 @@ import { TableModule } from "src/table/table.module";
 import { DirectivesModule } from "../../directives";
 import { ApiModule } from "../../open-api";
 import { AuthState } from "../../store";
+import { UserTableState } from "../../store/user-table.state";
 import { UserListComponent } from "./user-list.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -23,9 +24,9 @@ describe("UserListComponent", () => {
         DirectivesModule,
         MatDialogModule,
         MatSnackBarModule,
-        NgxsModule.forRoot([AuthState]),
+        NgxsModule.forRoot([AuthState, UserTableState]),
         TableModule],
-    providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
+    providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 }).compileComponents();
 
     fixture = TestBed.createComponent(UserListComponent);

@@ -37,6 +37,7 @@ import { SystemEmailTaskTableState } from "../store/system-email-task-table.stat
 import { SystemSettingsState } from "../store/system-settings.state";
 import { SystemTaskTableState } from "../store/system-task-table.state";
 import { TagTableState } from "../store/tag-table.state";
+import { UserTableState } from "../store/user-table.state";
 import { UserState } from "../store/user.state";
 import { environment } from "src/environments/environment.development";
 
@@ -61,6 +62,7 @@ const ngxsStates = [
   SystemSettingsState,
   SystemTaskTableState,
   TagTableState,
+  UserTableState,
   UserState,
 ];
 
@@ -84,6 +86,7 @@ const ngxsStorageKeys = [
   "systemSettings",
   "systemTaskTable",
   "tagTable",
+  "userTable",
   "users",
 ];
 

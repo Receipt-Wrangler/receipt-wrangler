@@ -239,6 +239,16 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     `AuthState.hasGroupPermission`), mirroring the backend `UpdateGroup` guard (see `api/CLAUDE.md` →
     "Group member management"). They default to enabled in **create** mode (no group yet; the creator
     becomes owner). This is UI-only; the server re-enforces on every request.
+- **Manage Users is a server-paged `app-table`:** the admin user-list (`src/user/user-list/`) follows
+  the standard paginated-table pattern (`BaseTableComponent` + `UserTableService` + the NGXS
+  `UserTableState`, mirroring the groups/roles list pages) and reads a page at a time from
+  `UserService.getPagedUsers` (`POST /user/getPagedUsers`) — it no longer wraps `UserState.users` in a
+  client-side `MatTableDataSource`. Server-sortable columns use the DB column names as their
+  `matColumnDef` (`username`, `display_name`, `created_at`, `updated_at`); the client-resolved **Role**
+  column is non-sortable. CRUD row actions refetch via `getTableData()` after the mutation, and delete /
+  bulk-delete still dispatch `RemoveUser` / `RemoveUsers` so the `UserState` cache (consumed by the
+  role-editor & report-builder paid-by pickers, `user-autocomplete`, the `user` pipe, etc.) stays in
+  sync. `UserState` itself is unchanged and still bootstrap-loaded from AppData for those other consumers.
 - **Permission-based UI gating.** The UI gates on the user's effective permissions, mirroring the
   backend's enforcement. Permissions are delivered on **AppData** (`appPermissions: string[]` and
   `groupPermissions: { [groupId]: string[] }`) and stored in `AuthState` via the dedicated

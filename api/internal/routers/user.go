@@ -12,6 +12,7 @@ func BuildUserRouter() *chi.Mux {
 
 	// Authenticated routes
 	userRouter.With(middleware.UnifiedAuthMiddleware).Get("/", handlers.GetAllUsers)
+	userRouter.With(middleware.UnifiedAuthMiddleware).Post("/getPagedUsers", handlers.GetPagedUsers)
 	userRouter.With(middleware.UnifiedAuthMiddleware, middleware.SetGeneralBodyData("updateProfileCommand", commands.UpdateProfileCommand{})).Put("/updateUserProfile", handlers.UpdateUserProfile)
 	userRouter.With(middleware.UnifiedAuthMiddleware, middleware.SetUserData, middleware.ValidateUserData(true)).Post("/", handlers.CreateUser)
 	userRouter.With(middleware.UnifiedAuthMiddleware, middleware.SetUserData).Put("/{id}", handlers.UpdateUser)

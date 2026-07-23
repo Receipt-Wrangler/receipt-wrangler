@@ -424,3 +424,128 @@ func validateGroup(t *testing.T, group models.Group, id uint, userId uint) {
 	}
 
 }
+
+func pagedUsersCommand(orderBy string, direction commands.SortDirection) commands.PagedRequestCommand {
+	return commands.PagedRequestCommand{
+		Page:          1,
+		PageSize:      10,
+		OrderBy:       orderBy,
+		SortDirection: direction,
+	}
+}
+
+func createUserWithUsername(username string) {
+	GetDB().Create(&models.User{
+		Username:    username,
+		DisplayName: username,
+		Password:    "Password",
+	})
+}
+
+func TestGetPagedUsers_ReturnsRowsAndCount(t *testing.T) {
+	defer TruncateTestDb()
+
+	createUserWithUsername("beta")
+	createUserWithUsername("alpha")
+
+	repository := NewUserRepository(nil)
+	users, count, err := repository.GetPagedUsers(pagedUsersCommand("username", commands.ASCENDING))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if count != 2 {
+		utils.PrintTestError(t, count, int64(2))
+	}
+	if len(users) != 2 {
+		utils.PrintTestError(t, len(users), 2)
+		return
+	}
+	// Ascending username order.
+	if users[0].Username != "alpha" || users[1].Username != "beta" {
+		utils.PrintTestError(t, []string{users[0].Username, users[1].Username}, []string{"alpha", "beta"})
+	}
+}
+
+func TestGetPagedUsers_SecondPage(t *testing.T) {
+	defer TruncateTestDb()
+
+	createUserWithUsername("a")
+	createUserWithUsername("b")
+	createUserWithUsername("c")
+
+	command := pagedUsersCommand("username", commands.ASCENDING)
+	command.Page = 2
+	command.PageSize = 2
+
+	users, count, err := NewUserRepository(nil).GetPagedUsers(command)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// Count is the unpaged total.
+	if count != 3 {
+		utils.PrintTestError(t, count, int64(3))
+	}
+	if len(users) != 1 {
+		utils.PrintTestError(t, len(users), 1)
+		return
+	}
+	if users[0].Username != "c" {
+		utils.PrintTestError(t, users[0].Username, "c")
+	}
+}
+
+func TestGetPagedUsers_EmptyReturnsZeroCount(t *testing.T) {
+	defer TruncateTestDb()
+
+	users, count, err := NewUserRepository(nil).GetPagedUsers(pagedUsersCommand("username", commands.ASCENDING))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if count != 0 {
+		utils.PrintTestError(t, count, int64(0))
+	}
+	if len(users) != 0 {
+		utils.PrintTestError(t, len(users), 0)
+	}
+}
+
+func TestGetPagedUsers_RejectsInvalidColumn(t *testing.T) {
+	defer TruncateTestDb()
+
+	// An order-by outside the allow-list is rejected rather than interpolated as raw SQL.
+	_, _, err := NewUserRepository(nil).GetPagedUsers(pagedUsersCommand("password", commands.ASCENDING))
+	if err == nil {
+		utils.PrintTestError(t, nil, "an invalid column error")
+	}
+}
+
+func TestGetPagedUsers_SortsByAllowedColumns(t *testing.T) {
+	defer TruncateTestDb()
+
+	createUserWithUsername("alpha")
+	createUserWithUsername("beta")
+
+	repository := NewUserRepository(nil)
+
+	// username is covered above; display_name, created_at and updated_at must also
+	// execute through Sort/Find without error (they are on the allow-list but were
+	// never exercised).
+	for _, column := range []string{"display_name", "created_at", "updated_at"} {
+		users, count, err := repository.GetPagedUsers(pagedUsersCommand(column, commands.DESCENDING))
+		if err != nil {
+			utils.PrintTestError(t, err, "no error sorting by "+column)
+			return
+		}
+		if count != 2 {
+			utils.PrintTestError(t, count, int64(2))
+		}
+		if len(users) != 2 {
+			utils.PrintTestError(t, len(users), 2)
+		}
+	}
+}
