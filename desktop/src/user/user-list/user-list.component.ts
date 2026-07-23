@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, inject, TemplateRef, viewChild } from "@angular/core";
+import { AfterViewInit, Component, DestroyRef, inject, TemplateRef, viewChild } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
@@ -62,6 +62,8 @@ export class UserListComponent extends BaseTableComponent<User> implements After
   );
 
   public hasSelectedUsers: boolean = false;
+
+  private readonly destroyRef = inject(DestroyRef);
 
   constructor(
     public override baseTableService: BaseTableService,
@@ -138,7 +140,7 @@ export class UserListComponent extends BaseTableComponent<User> implements After
 
   private setupSelectionListener(): void {
     this.table()
-      .selection.changed.pipe(takeUntilDestroyed())
+      .selection.changed.pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         this.updateSelectionState();
       });
