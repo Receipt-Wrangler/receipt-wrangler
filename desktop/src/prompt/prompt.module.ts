@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { NgModule } from "@angular/core";
 import { ReactiveFormsModule } from "@angular/forms";
 import { ButtonModule } from "../button";
+import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { PipesModule } from "../pipes";
 import { SharedUiModule } from "../shared-ui/shared-ui.module";
@@ -20,6 +21,7 @@ import { PromptTableComponent } from "./prompt-table/prompt-table.component";
   ],
   imports: [
     CommonModule,
+    DirectivesModule,
     PromptRoutingModule,
     SharedUiModule,
     TableModule,

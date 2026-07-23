@@ -1,25 +1,47 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideZonelessChangeDetection } from "@angular/core";
+import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { ActivatedRoute } from "@angular/router";
+import { ButtonModule } from "../../button";
+import { AddButtonComponent } from "./add-button.component";
 
-import { AddButtonComponent } from './add-button.component';
-import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-
-describe('AddButtonComponent', () => {
+describe("AddButtonComponent", () => {
   let component: AddButtonComponent;
   let fixture: ComponentFixture<AddButtonComponent>;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
       declarations: [AddButtonComponent],
-      imports: [MatButtonModule],
-      schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    });
+      imports: [ButtonModule],
+      providers: [
+        provideZonelessChangeDetection(),
+        { provide: ActivatedRoute, useValue: {} },
+      ],
+    }).compileComponents();
+
     fixture = TestBed.createComponent(AddButtonComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await fixture.whenStable();
   });
 
-  it('should create', () => {
+  it("should create", () => {
     expect(component).toBeTruthy();
+  });
+
+  it("renders an icon-only button when no buttonText is provided", async () => {
+    await fixture.whenStable();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector(".mat-mdc-icon-button")).toBeTruthy();
+    expect(el.querySelector(".mat-mdc-raised-button")).toBeFalsy();
+  });
+
+  it("renders a labeled raised button when buttonText is provided", async () => {
+    fixture.componentRef.setInput("buttonText", "Add Thing");
+    await fixture.whenStable();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector(".mat-mdc-raised-button")).toBeTruthy();
+    expect(el.querySelector(".mat-mdc-icon-button")).toBeFalsy();
+    expect(el.textContent).toContain("Add Thing");
   });
 });

@@ -134,7 +134,9 @@ describe("RoleListComponent", () => {
   it("renders the breadcrumb and the page title", async () => {
     const { fixture } = await setup();
     expect(fixture.nativeElement.querySelector("app-breadcrumb")).toBeTruthy();
-    expect(fixture.nativeElement.querySelector("h1")?.textContent).toContain("Roles");
+    const header = fixture.nativeElement.querySelector("app-table-header");
+    expect(header).toBeTruthy();
+    expect(header?.getAttribute("headerText")).toBe("Roles");
   });
 
   it("shows the empty state and no table when there are no roles", async () => {

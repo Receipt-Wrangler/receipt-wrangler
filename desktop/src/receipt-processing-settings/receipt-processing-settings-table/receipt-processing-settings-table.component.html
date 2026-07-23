@@ -1,6 +1,12 @@
-<app-table-header headerText="Receipt Processing Settings">
+<app-table-header
+  headerText="Receipt Processing Settings"
+  subtitle="Configure the OCR and AI engines that process receipts."
+>
   <app-add-button
-    tooltip="Create Receipt Processing Settings"
+    *hasAppPermission="Permission.AppReceiptProcessingSettingsCreate"
+    data-testid="receipt-processing-settings-add"
+    buttonText="Add Settings"
+    tooltip="Add receipt processing settings"
     [buttonRouterLink]="['create']"
   ></app-add-button>
 </app-table-header>

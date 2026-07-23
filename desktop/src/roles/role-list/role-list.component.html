@@ -1,23 +1,20 @@
 <div class="roles-page">
   <app-breadcrumb [items]="crumbs"></app-breadcrumb>
 
-  <div class="page-title">
-    <div class="titles">
-      <h1>Roles</h1>
-      <p class="subtitle">
-        {{ roleCount() }} roles define what people can do — each applies to
-        either the application or a group. Assign roles to people from
-        <a [routerLink]="['/users']">Manage Users</a>.
-      </p>
-    </div>
-    <div class="tools">
-      <app-button
-        icon="add"
-        buttonText="Add Role"
-        (clicked)="addRole()"
-      ></app-button>
-    </div>
-  </div>
+  <app-table-header headerText="Roles">
+    <app-add-button
+      *hasAppPermission="Permission.AppRolesCreate"
+      data-testid="role-add"
+      buttonText="Add Role"
+      tooltip="Add Role"
+      (clicked)="addRole()"
+    ></app-add-button>
+    <p table-header-subtitle class="subtitle">
+      {{ roleCount() }} roles define what people can do — each applies to
+      either the application or a group. Assign roles to people from
+      <a [routerLink]="['/users']">Manage Users</a>.
+    </p>
+  </app-table-header>
 
   @if (roles().length === 0) {
     <div class="empty-state">
@@ -27,11 +24,12 @@
         Create your first role to control what people can do across the app and
         within groups.
       </p>
-      <app-button
-        icon="add"
+      <app-add-button
+        *hasAppPermission="Permission.AppRolesCreate"
         buttonText="Add Role"
+        tooltip="Add Role"
         (clicked)="addRole()"
-      ></app-button>
+      ></app-add-button>
     </div>
   } @else {
     <div class="default-roles">

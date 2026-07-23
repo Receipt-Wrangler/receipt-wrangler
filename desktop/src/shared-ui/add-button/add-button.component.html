@@ -1,6 +1,7 @@
 <app-button
   icon="add"
-  matButtonType="iconButton"
+  [matButtonType]="buttonText() ? 'matRaisedButton' : 'iconButton'"
+  [buttonText]="buttonText() ?? ''"
   type="button"
   [tooltip]="tooltip ?? ''"
   [disabled]="disabled()"

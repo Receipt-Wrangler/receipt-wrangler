@@ -3,4 +3,8 @@
     <h1>{{ headerText() }}</h1>
     <ng-content></ng-content>
   </div>
+  @if (subtitle()) {
+    <p class="table-header__subtitle">{{ subtitle() }}</p>
+  }
+  <ng-content select="[table-header-subtitle]"></ng-content>
 </div>

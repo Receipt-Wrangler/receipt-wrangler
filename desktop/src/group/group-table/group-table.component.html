@@ -1,10 +1,14 @@
 <div class="d-flex flex-column">
-  <app-table-header [headerText]="tableHeaderText()">
+  <app-table-header
+    [headerText]="tableHeaderText()"
+    subtitle="Groups organize receipts and the people who share them."
+  >
     <div class="d-flex align-items-center">
       <app-add-button
         *hasAppPermission="Permission.AppGroupsCreate"
         data-testid="group-create"
-        tooltip="Create Group"
+        buttonText="Add Group"
+        tooltip="Add Group"
         [buttonRouterLink]="['create']"
       ></app-add-button>
       <ng-container *hasAppPermission="Permission.AppGroupsRead">

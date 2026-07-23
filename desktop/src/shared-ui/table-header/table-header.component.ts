@@ -8,4 +8,6 @@ import { Component, input } from '@angular/core';
 })
 export class TableHeaderComponent {
   public readonly headerText = input<string>('');
+
+  public readonly subtitle = input<string>('');
 }

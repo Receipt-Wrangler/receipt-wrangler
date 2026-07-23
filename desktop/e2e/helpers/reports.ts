@@ -10,7 +10,7 @@ export async function gotoReports(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
 }
 
-/** Navigate straight to the builder (New Report) and wait for it to render. */
+/** Navigate straight to the builder (Add Report) and wait for it to render. */
 export async function gotoReportBuilder(page: Page): Promise<void> {
   await page.goto('/reports/new');
   await expect(page.getByText('Report Builder')).toBeVisible();
