@@ -82,6 +82,26 @@ describe("AutocomleteComponent", () => {
     expect(result).toEqual([]);
   });
 
+  it("re-seeds the single-select display from inputFormControl on syncSingleDisplay", () => {
+    component.multiple = false;
+    component.inputFormControl.setValue(42);
+    component.filterFormControl.setValue("");
+
+    component.syncSingleDisplay();
+
+    expect(component.filterFormControl.value).toEqual(42);
+  });
+
+  it("leaves the display untouched on syncSingleDisplay in multiple mode", () => {
+    component.multiple = true;
+    component.inputFormControl = new FormArray([new FormControl(1)]) as any;
+    component.filterFormControl.setValue("stale");
+
+    component.syncSingleDisplay();
+
+    expect(component.filterFormControl.value).toEqual("stale");
+  });
+
   it("should set the selected option value to the inputFormControl in single mode", () => {
     component.multiple = false;
     component.optionValueKey = "value";

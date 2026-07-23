@@ -38,6 +38,7 @@ import { StatefulMenuItem } from "../../standalone/components/filtered-stateful-
 import { AuthState, FeatureConfigState, GroupState, UserState } from "../../store";
 import { downloadFile } from "../../utils/file";
 import { ItemListComponent } from "../item-list/item-list.component";
+import { ReceiptCommentsComponent } from "../receipt-comments/receipt-comments.component";
 import { ShareListComponent } from "../share-list/share-list.component";
 
 
@@ -57,6 +58,10 @@ export class ReceiptFormComponent implements OnInit {
   public readonly shareListComponent = viewChild.required(ShareListComponent);
 
   public readonly itemListComponent = viewChild.required(ItemListComponent);
+
+  // Optional: the comments child only renders when the group doesn't hide
+  // comments (see the @if in the template), so this query may be empty.
+  public readonly receiptCommentsComponent = viewChild(ReceiptCommentsComponent);
 
   public readonly uploadImageComponent = viewChild.required(UploadImageComponent);
 
@@ -594,58 +599,192 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   private patchMagicValues(magicReceipt: Receipt): void {
+    // A field is only reported as filled when it actually changes the form, so
+    // an empty/unmatched value never claims a phantom fill. Scalars come first,
+    // then each association through the form's existing builders (amount is
+    // patched before items so item validators see the filled receipt total).
+    const filledKeys: string[] = [];
+
+    this.patchMagicScalars(magicReceipt, filledKeys);
+
+    if (
+      this.handleCategoryAndTagMagicFill(
+        "categories",
+        magicReceipt?.categories ?? [],
+        this.categories
+      )
+    ) {
+      filledKeys.push("categories");
+    }
+    if (
+      this.handleCategoryAndTagMagicFill(
+        "tags",
+        magicReceipt?.tags ?? [],
+        this.tags
+      )
+    ) {
+      filledKeys.push("tags");
+    }
+    if (this.patchMagicItems(magicReceipt)) {
+      filledKeys.push("receiptItems");
+    }
+    if (this.patchMagicCustomFields(magicReceipt)) {
+      filledKeys.push("customFields");
+    }
+    if (this.patchMagicComments(magicReceipt)) {
+      filledKeys.push("comments");
+    }
+
+    this.showMagicFillResult(filledKeys);
+  }
+
+  // Patches the scalar fields. Each is skipped when the backend value is unset:
+  // the `value && value !== default` guard covers both the falsy sentinels
+  // (name "", paidByUserId 0, status "") and the truthy ones (amount "0", the
+  // zero date). status routes through the default branch.
+  private patchMagicScalars(magicReceipt: Receipt, filledKeys: string[]): void {
     const keysWithDefaults = {
       name: "",
       amount: "0",
       date: "0001-01-01T00:00:00Z",
-      categories: null,
-      tags: null,
+      paidByUserId: 0,
+      status: "",
     } as any;
-    const validKeys: string[] = [];
     Object.keys(keysWithDefaults).forEach((key) => {
       let value = (magicReceipt as any)[key] as string | Date;
       if (value && value !== keysWithDefaults[key]) {
         switch (key) {
-          case "categories":
-            this.handleCategoryAndTagMagicFill(
-              key,
-              magicReceipt?.categories ?? [],
-              this.categories
-            );
-            break;
-          case "tags":
-            this.handleCategoryAndTagMagicFill(
-              key,
-              magicReceipt?.tags ?? [],
-              this.tags
-            );
-            break;
           case "date":
             value = this.handleDateMagicFill(value as string);
             this.form.patchValue({
               date: value,
             });
             break;
+          case "paidByUserId":
+            this.patchMagicValue(key, magicReceipt);
+            // patchValue updates the control but not the autocomplete's shown
+            // text, which is seeded from the control only once on init.
+            this.paidByAutocomplete()?.autocompleteComponent()?.syncSingleDisplay();
+            break;
           default:
             this.patchMagicValue(key, magicReceipt);
         }
 
-        validKeys.push(key);
+        filledKeys.push(key);
       }
     });
+  }
 
-    if (validKeys.length > 0) {
-      const successString = `Magic fill successfully filled ${validKeys.join(
-        ", "
-      )} from selected image!`;
-      this.snackbarService.success(successString, {
-        duration: 10000,
-      });
-    } else {
+  // Appends magic-filled items (and shares — items with a chargedToUserId) onto
+  // the receiptItems array using the same builder the form uses elsewhere, which
+  // also nests linkedItems and per-item categories/tags. Returns whether any were
+  // added.
+  private patchMagicItems(magicReceipt: Receipt): boolean {
+    const items = magicReceipt.receiptItems ?? [];
+    if (items.length === 0) {
+      return false;
+    }
+
+    items.forEach((item) => {
+      const itemForm = buildItemForm(
+        item,
+        this.originalReceipt?.id?.toString(),
+        !!item.chargedToUserId,
+        this.syncAmountWithItems
+      );
+      this.receiptItemsFormArray.push(itemForm);
+    });
+    this.refreshComponentsAndSync();
+    return true;
+  }
+
+  // Appends magic-filled custom field values. The magic-fill response carries no
+  // field definition, so a value is only ingested when its field is in the loaded
+  // catalog pool (otherwise it can't be rendered or edited); a field the receipt
+  // already has a value for is skipped to avoid duplicates. Returns whether any
+  // were added.
+  private patchMagicCustomFields(magicReceipt: Receipt): boolean {
+    const values = magicReceipt.customFields ?? [];
+    if (values.length === 0) {
+      return false;
+    }
+
+    let filledAny = false;
+    values.forEach((value) => {
+      const definition = this.customFields.find(
+        (field) => field.id === value.customFieldId
+      );
+      if (!definition) {
+        return;
+      }
+
+      const alreadyPresent = this.customFieldsFormArray.controls.some(
+        (control) => control.value?.["customFieldId"] === value.customFieldId
+      );
+      if (alreadyPresent) {
+        return;
+      }
+
+      this.customFieldsFormArray.push(this.buildCustomOptionFormGroup(value));
+      this.markCustomFieldMenuItemSelected(value.customFieldId);
+      filledAny = true;
+    });
+    return filledAny;
+  }
+
+  // Flips the manage-fields menu entry to selected so the newly added custom
+  // field renders, using an immutable array replace (required under zoneless CD,
+  // mirroring customFieldChanged).
+  private markCustomFieldMenuItemSelected(customFieldId: number): void {
+    const menuValue = customFieldId.toString();
+    const index = this.customFieldsStatefulMenuItems.findIndex(
+      (item) => item.value === menuValue
+    );
+    if (index === -1) {
+      return;
+    }
+
+    const updated = Array.from(this.customFieldsStatefulMenuItems);
+    updated[index] = { ...updated[index], selected: true };
+    this.customFieldsStatefulMenuItems = updated;
+  }
+
+  // Hands magic-filled comments to the comments child, which owns them and is
+  // mode-aware (add mode collects them for the create submit; edit mode POSTs
+  // each as an individual resource). Returns whether the child handled them.
+  private patchMagicComments(magicReceipt: Receipt): boolean {
+    const comments = magicReceipt.comments ?? [];
+    const commentsComponent = this.receiptCommentsComponent();
+    if (comments.length === 0 || !commentsComponent) {
+      return false;
+    }
+
+    commentsComponent.addMagicFilledComments(comments);
+    return true;
+  }
+
+  private showMagicFillResult(filledKeys: string[]): void {
+    if (filledKeys.length === 0) {
       this.snackbarService.error(
         "Could not find any values to fill! Try reuploading a clearer image."
       );
+      return;
     }
+
+    // Map the raw form keys of the added fields to reader-friendly labels; the
+    // existing scalar keys map to themselves.
+    const labels: { [key: string]: string } = {
+      paidByUserId: "paid by",
+      receiptItems: "items",
+      customFields: "custom fields",
+    };
+    const filledLabels = filledKeys.map((key) => labels[key] ?? key);
+    const successString = `Magic fill successfully filled ${filledLabels.join(
+      ", "
+    )} from selected image!`;
+    this.snackbarService.success(successString, {
+      duration: 10000,
+    });
   }
 
   private patchMagicValue(key: string, magicReceipt: Receipt): void {
@@ -658,11 +797,14 @@ export class ReceiptFormComponent implements OnInit {
     return this.formatMagicFilledDate(value);
   }
 
+  // Appends the magic-filled categories/tags that resolve to an entry in the
+  // available pool. Returns whether any were added, so an empty or unmatched
+  // response doesn't report a phantom fill.
   private handleCategoryAndTagMagicFill(
     formKey: "categories" | "tags",
     value: Category[] | Tag[],
     arrayToFilter: Category[] | Tag[]
-  ): void {
+  ): boolean {
     const itemsToPush = (arrayToFilter as any[]).filter((item) =>
       value.map((foundItem) => foundItem.id)?.includes(item.id)
     );
@@ -670,6 +812,7 @@ export class ReceiptFormComponent implements OnInit {
     itemsToPush.forEach((c) => {
       itemsFormArray.push(this.formBuilder.control(c));
     });
+    return itemsToPush.length > 0;
   }
 
   private formatMagicFilledDate(date: string): Date {

@@ -174,6 +174,77 @@ describe("ReceiptCommentsComponent", () => {
     expect(component.canDeleteComments()).toEqual(false);
   });
 
+  it("collects magic-filled comments and emits them in add mode", () => {
+    const emitSpy = jest.spyOn(component.commentsUpdated, "emit");
+    store.reset({ auth: { userId: 1 } });
+    fixture.componentRef.setInput("mode", FormMode.add);
+    fixture.componentRef.setInput("receiptId", 3);
+    component.ngOnInit();
+
+    component.addMagicFilledComments([
+      { comment: "from ai", userId: 9 } as any,
+      { comment: "second" } as any,
+    ]);
+
+    expect(component.commentsArray.length).toEqual(2);
+    expect(component.commentsArray.at(0).value).toEqual({
+      comment: "from ai",
+      userId: 9,
+      receiptId: 3,
+    });
+    // buildCommentFormGroup defaults userId to the logged-in user when absent
+    expect(component.commentsArray.at(1).value).toEqual({
+      comment: "second",
+      userId: 1,
+      receiptId: 3,
+    });
+    expect(emitSpy).toHaveBeenCalledWith(component.commentsArray);
+  });
+
+  it("posts each magic-filled comment individually in edit mode", () => {
+    const addSpy = jest.spyOn(TestBed.inject(CommentService), "addComment");
+    addSpy.mockReturnValue(
+      of({
+        id: 8,
+        userId: 1,
+        receiptId: 2,
+        comment: "from ai",
+        createdAt: "",
+        updatedAt: "",
+      }) as any
+    );
+    const emitSpy = jest.spyOn(component.commentsUpdated, "emit");
+    store.reset({ auth: { userId: 1 } });
+    fixture.componentRef.setInput("mode", FormMode.edit);
+    fixture.componentRef.setInput("receiptId", 2);
+    component.ngOnInit();
+
+    component.addMagicFilledComments([{ comment: "from ai", userId: 9 } as any]);
+
+    // Server assigns the author, so the POST carries the logged-in user, not the input userId
+    expect(addSpy).toHaveBeenCalledWith({
+      comment: "from ai",
+      userId: 1,
+      receiptId: 2,
+    });
+    expect(component.commentsArray.length).toEqual(1);
+    expect(component.internalComments().length).toEqual(1);
+    expect(component.internalComments()[0].id).toEqual(8);
+    // Edit-mode comments are individual resources, not part of the form submit
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when there are no magic-filled comments", () => {
+    const emitSpy = jest.spyOn(component.commentsUpdated, "emit");
+    fixture.componentRef.setInput("mode", FormMode.add);
+    component.ngOnInit();
+
+    component.addMagicFilledComments([]);
+
+    expect(component.commentsArray.length).toEqual(0);
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+
   it("should send api call if form is valid and is in edit mode", () => {
     const spy = jest.spyOn(TestBed.inject(CommentService), "addComment");
     spy.mockReturnValue(
