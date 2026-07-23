@@ -25,8 +25,8 @@
       [selectionCheckboxes]="true"
       [pagination]="true"
       [length]="totalCount()"
-      [page]="((baseTableService.page$ | async) || 1) - 1"
-      [pageSize]="(baseTableService.pageSize$ | async) || 50"
+      [page]="(page() || 1) - 1"
+      [pageSize]="pageSize() || 50"
       (sorted)="sorted($event)"
       (pageChange)="pageChanged($event)"
     ></app-table>
