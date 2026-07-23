@@ -1,13 +1,16 @@
-<app-table-header [headerText]="headerText">
+<app-table-header
+  [headerText]="headerText"
+  subtitle="View, filter, and manage this group's receipts."
+>
   <div class="d-flex align-items-center">
-    <app-button
+    <app-add-button
       *ngIf="canCreate"
       class="me-2"
-      icon="add"
-      matButtonType="iconButton"
+      data-testid="receipt-add"
+      buttonText="Add Receipt"
       tooltip="Add Receipt"
       [buttonRouterLink]="['/receipts/add']"
-    ></app-button>
+    ></app-add-button>
     <app-quick-scan-button
       *ngIf="canQuickScan"
       data-testid="receipts-quick-scan"

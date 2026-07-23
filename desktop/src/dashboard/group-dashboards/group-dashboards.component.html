@@ -1,26 +1,33 @@
-<div class="d-flex align-items-center">
-  <h1>{{ (selectedGroupId() ?? "" | group)?.name }} Dashboards</h1>
-  <app-add-button
-    *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsCreate }"
-    (clicked)="openDashboardDialog(true)"
-  ></app-add-button>
+<app-table-header
+  [headerText]="((selectedGroupId() ?? '' | group)?.name ?? '') + ' Dashboards'"
+  subtitle="Create and switch between dashboards for this group."
+>
+  <div class="d-flex align-items-center">
+    <app-add-button
+      *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsCreate }"
+      data-testid="dashboard-add"
+      buttonText="Add Dashboard"
+      tooltip="Add Dashboard"
+      (clicked)="openDashboardDialog(true)"
+    ></app-add-button>
 
-  @if (selectedDashboardId()) {
-    @if (selectedGroupId()) {
-      <app-edit-button
-        *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsUpdate }"
-        color="accent"
-        (clicked)="openDashboardDialog()"
-      ></app-edit-button>
+    @if (selectedDashboardId()) {
+      @if (selectedGroupId()) {
+        <app-edit-button
+          *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsUpdate }"
+          color="accent"
+          (clicked)="openDashboardDialog()"
+        ></app-edit-button>
+      }
+      <app-delete-button
+        *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsDelete }"
+        color="warn"
+        (clicked)="openDeleteConfirmationDialog()"
+      >
+      </app-delete-button>
     }
-    <app-delete-button
-      *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsDelete }"
-      color="warn"
-      (clicked)="openDeleteConfirmationDialog()"
-    >
-    </app-delete-button>
-  }
-</div>
+  </div>
+</app-table-header>
 <div class="mb-2">
   <mat-chip-listbox>
     @for (dashboard of dashboards(); track dashboard.id) {
@@ -39,5 +46,5 @@
   <router-outlet></router-outlet>
 }
 @if (!selectedDashboardId() && !dashboards().length) {
-  <p>Click on the + button to add a dashboard to this group.</p>
+  <p>Use the Add Dashboard button to create a dashboard for this group.</p>
 }

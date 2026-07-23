@@ -1,8 +1,12 @@
-<app-table-header [headerText]="headerText">
+<app-table-header
+  [headerText]="headerText"
+  subtitle="Categorize receipts to keep spending organized and reportable."
+>
   <app-add-button
     *hasAppPermission="Permission.AppCategoriesCreate"
     data-testid="category-add"
-    tooltip="Add category"
+    buttonText="Add Category"
+    tooltip="Add Category"
     (clicked)="openAddDialog()"
   >
   </app-add-button>

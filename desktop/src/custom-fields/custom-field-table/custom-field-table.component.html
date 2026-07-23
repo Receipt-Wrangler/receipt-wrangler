@@ -1,9 +1,13 @@
-<app-table-header headerText="Custom Fields">
+<app-table-header
+  headerText="Custom Fields"
+  subtitle="Capture extra structured data on receipts with custom fields."
+>
   <app-add-button
     *hasAppPermission="Permission.AppCustomFieldsCreate"
     data-testid="custom-field-add"
+    buttonText="Add Custom Field"
     (clicked)="openCustomFieldDialog()"
-    tooltip="Add custom field"
+    tooltip="Add Custom Field"
   >
   </app-add-button>
 </app-table-header>

@@ -1,9 +1,14 @@
 <div class="d-flex flex-column">
-  <app-table-header [headerText]="tableHeaderText()">
+  <app-table-header
+    [headerText]="tableHeaderText()"
+    subtitle="Create and manage API keys for programmatic access."
+  >
     <div class="d-flex align-items-center">
       <app-add-button
         *ngIf="canCreate()"
-        tooltip="Create API Key"
+        data-testid="api-key-add"
+        buttonText="Add API Key"
+        tooltip="Add API Key"
         (clicked)="openCreateApiKeyDialog()"
       ></app-add-button>
       <ng-container *ngIf="canViewAll()">

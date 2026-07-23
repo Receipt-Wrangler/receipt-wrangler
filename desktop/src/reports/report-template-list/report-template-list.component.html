@@ -1,22 +1,17 @@
 <div class="report-templates-page">
-  <div class="page-title">
-    <div class="titles">
-      <h1>Reports</h1>
-      <p class="subtitle">
-        Saved report templates — open one in the builder, generate it, duplicate it, or delete it.
-      </p>
-    </div>
-    <div class="tools">
-      @if (canEnterBuilder()) {
-        <app-button
-          icon="add"
-          buttonText="New Report"
-          data-testid="report-template-new"
-          (clicked)="newReport()"
-        ></app-button>
-      }
-    </div>
-  </div>
+  <app-table-header
+    headerText="Reports"
+    subtitle="Saved report templates — open one in the builder, generate it, duplicate it, or delete it."
+  >
+    @if (canEnterBuilder()) {
+      <app-add-button
+        buttonText="Add Report"
+        tooltip="Add Report"
+        data-testid="report-template-new"
+        (clicked)="newReport()"
+      ></app-add-button>
+    }
+  </app-table-header>
 
   @if (totalCount() > 0) {
     <app-table
@@ -36,12 +31,12 @@
       <h2>No report templates yet</h2>
       <p>Build a report and save it as a template to reuse it later.</p>
       @if (canEnterBuilder()) {
-        <app-button
-          icon="add"
-          buttonText="New Report"
+        <app-add-button
+          buttonText="Add Report"
+          tooltip="Add Report"
           data-testid="report-template-new-empty"
           (clicked)="newReport()"
-        ></app-button>
+        ></app-add-button>
       }
     </div>
   }

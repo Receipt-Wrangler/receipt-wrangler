@@ -1,7 +1,12 @@
 <div class="d-flex flex-column">
-  <app-table-header headerText="Emails">
+  <app-table-header
+    headerText="Emails"
+    subtitle="Configure the email accounts the system polls for receipts."
+  >
     <app-add-button
-      tooltip="Create email"
+      data-testid="system-email-add"
+      buttonText="Add Email"
+      tooltip="Add Email"
       [buttonRouterLink]="['create']"
     ></app-add-button>
   </app-table-header>

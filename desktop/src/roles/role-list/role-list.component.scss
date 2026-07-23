@@ -17,32 +17,16 @@ $group-accent-bar: #a78bfa;
   flex-direction: column;
 }
 
-.page-title {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: variables.$spacing-md;
+.roles-page app-table-header {
+  display: block;
   margin: variables.$spacing-sm 0 variables.$spacing-lg;
+}
 
-  .titles h1 {
-    font-size: 28px;
-    line-height: 1.2;
-    margin: 0;
-  }
-
-  .subtitle {
-    color: $fg-muted;
-    font-size: 14px;
-    margin: variables.$spacing-xs 0 0;
-    max-width: 640px;
-  }
-
-  .tools {
-    display: flex;
-    gap: variables.$spacing-sm;
-    align-items: center;
-    flex: none;
-  }
+.subtitle {
+  color: $fg-muted;
+  font-size: 14px;
+  margin: variables.$spacing-xs 0 0;
+  max-width: 640px;
 }
 
 /* ---------- Default-role selectors ---------- */

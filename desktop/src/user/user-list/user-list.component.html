@@ -1,5 +1,8 @@
 <div class="d-flex flex-column">
-  <app-table-header headerText="Users">
+  <app-table-header
+    headerText="Users"
+    subtitle="Manage user accounts and the roles assigned to them."
+  >
     <div class="d-flex gap-2">
       <ng-container *hasAppPermission="Permission.AppUsersDelete">
         <app-button
@@ -10,11 +13,13 @@
           (clicked)="bulkDeleteUsers()"
         ></app-button>
       </ng-container>
-      <app-button
+      <app-add-button
         *hasAppPermission="Permission.AppUsersCreate"
-        buttonText="Create User"
+        data-testid="user-add"
+        buttonText="Add User"
+        tooltip="Add User"
         (clicked)="openUserFormDialog()"
-      ></app-button>
+      ></app-add-button>
     </div>
   </app-table-header>
   <div class="table-container">
