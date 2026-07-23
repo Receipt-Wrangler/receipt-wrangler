@@ -43,7 +43,7 @@ func joinGroup(t *testing.T, userId uint, groupName string, groupPerms []string)
 	if err := db.Create(&group).Error; err != nil {
 		t.Fatalf("seed group: %v", err)
 	}
-	role, err := repositories.NewRoleRepository(nil).CreateGroupRole("Role "+groupName, "", groupPerms, nil, nil, nil, false)
+	role, err := repositories.NewRoleRepository(nil).CreateGroupRole("Role "+groupName, "", groupPerms, nil, nil, nil, false, false)
 	if err != nil {
 		t.Fatalf("seed group role: %v", err)
 	}

@@ -28,6 +28,10 @@ export interface UpsertGroupCommand {
      * Is all group for user
      */
     isAllGroup?: boolean;
+    /**
+     * Whether to enable member-presence isolation for the group. When on, members cannot discover other members unless they hold a group role flagged seesAllMembers. Defaults to false.
+     */
+    isolateMembers?: boolean;
     status: GroupStatus;
 }
 export namespace UpsertGroupCommand {

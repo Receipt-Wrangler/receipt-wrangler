@@ -99,6 +99,12 @@ func (service ReceiptService) GetReceiptForUser(userId uint, receiptId string) (
 		return models.Receipt{}, err
 	}
 
+	// Mask user references (created-by, charged-to) and drop non-visible comment
+	// authors outside the caller's member-visible set.
+	if err := permissionService.MaskReceiptForMemberVisibility(userId, &receipt); err != nil {
+		return models.Receipt{}, err
+	}
+
 	return receipt, nil
 }
 
@@ -477,6 +483,13 @@ func (service ReceiptService) DuplicateReceipt(
 	// copied onto the new receipt.
 	permissionService := NewPermissionService(nil)
 	err = permissionService.FilterReceiptCategoriesTagsForReceipt(userId, &receipt)
+	if err != nil {
+		return models.Receipt{}, err
+	}
+
+	// Mask user references outside the caller's member-visible set (e.g. an item
+	// charged to a non-visible user) so they are not carried onto the copy.
+	err = permissionService.MaskReceiptForMemberVisibility(userId, &receipt)
 	if err != nil {
 		return models.Receipt{}, err
 	}

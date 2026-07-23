@@ -319,6 +319,18 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 		tags = []models.Tag{}
 	}
 
+	// Member-presence isolation: an isolated member receives only the users and
+	// co-members they are allowed to see (no-op for unrestricted viewers). Applied
+	// at this serialization boundary, NOT inside GetGroupsForUser / GetAllUserViews,
+	// because those feed internal accounting/processing that needs the full roster.
+	users, err = permissionService.FilterVisibleUserViews(userId, users)
+	if err != nil {
+		return appData, err
+	}
+	if err := permissionService.FilterGroupMembersForGroups(userId, groups); err != nil {
+		return appData, err
+	}
+
 	appData.About = about
 	appData.Groups = groups
 	appData.Users = users

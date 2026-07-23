@@ -110,6 +110,10 @@ export interface PagedDataDataInner {
      */
     isAllGroup: boolean;
     /**
+     * Whether member-presence isolation is enabled for the group. When on, members cannot discover other members unless they hold a group role flagged seesAllMembers. Defaults to false.
+     */
+    isolateMembers?: boolean;
+    /**
      * Number of receipts associated with this tag
      */
     numberOfReceipts: number;

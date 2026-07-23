@@ -395,6 +395,63 @@ func assertOwed(t *testing.T, result map[uint]decimal.Decimal, otherUserId uint,
 	}
 }
 
+// setupIsolatedAmountOwedTest seeds group 1 as an isolated group where user 1 is
+// the (restricted) caller, user 3 is a visible supervisor, and user 2 is an
+// invisible peer.
+func setupIsolatedAmountOwedTest(t *testing.T) {
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+	isolateGroupWithSupervisor(t, 1, 3)
+}
+
+// --- Member isolation ---------------------------------------------------
+
+func TestGetAmountOwedForUserIsolatedViewerExcludesInvisibleCounterparty(t *testing.T) {
+	defer tearDownUserTest()
+	setupIsolatedAmountOwedTest(t)
+
+	// User 2 (invisible peer) paid; item charged to user 1 -> entry for user 2.
+	createReceiptWithItems(t, "Peer paid", 10, 2, 1, []commands.UpsertItemCommand{
+		chargedItem("peer item", 10, 1),
+	})
+	// User 3 (visible supervisor) paid; item charged to user 1 -> entry for user 3.
+	createReceiptWithItems(t, "Supervisor paid", 15, 3, 1, []commands.UpsertItemCommand{
+		chargedItem("sup item", 15, 1),
+	})
+
+	w, result := callGetAmountOwed(1, "1", nil)
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+		return
+	}
+
+	if _, exists := result[2]; exists {
+		t.Errorf("invisible counterparty (user 2) should be excluded from settlement, got %v", result)
+	}
+	assertOwed(t, result, 3, 15)
+}
+
+func TestGetAmountOwedForUserUnrestrictedViewerUnaffectedByIsolation(t *testing.T) {
+	defer tearDownUserTest()
+	setupIsolatedAmountOwedTest(t)
+
+	// Elevate the caller to an admin (app.users.read) -> unrestricted visibility,
+	// so isolation must not filter the settlement map.
+	grantAppPerms(t, 1, permissions.AppUsersRead)
+
+	createReceiptWithItems(t, "Peer paid", 10, 2, 1, []commands.UpsertItemCommand{
+		chargedItem("peer item", 10, 1),
+	})
+
+	w, result := callGetAmountOwed(1, "1", nil)
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+		return
+	}
+
+	assertOwed(t, result, 2, 10)
+}
+
 // --- A. Authorization ---------------------------------------------------
 
 func TestGetAmountOwedForUserReturnsForbiddenWhenCallerNotInGroup(t *testing.T) {

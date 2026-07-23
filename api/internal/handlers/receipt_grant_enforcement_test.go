@@ -55,7 +55,7 @@ func seedRestrictedReceiptCreatorWithGrants(t *testing.T, categoryGrantIds []uin
 		categoryGrantIds,
 		tagGrantIds,
 		nil,
-		false,
+		false, false,
 	)
 	if err != nil {
 		t.Fatalf("seed group role: %v", err)
@@ -100,7 +100,7 @@ func seedRestrictedQuickScanner(t *testing.T, categoryGrantIds []uint) (uint, ui
 		categoryGrantIds,
 		nil,
 		nil,
-		false,
+		false, false,
 	)
 	if err != nil {
 		t.Fatalf("seed group role: %v", err)

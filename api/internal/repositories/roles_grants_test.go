@@ -26,6 +26,73 @@ func makeTestTag(t *testing.T, name string) uint {
 	return tag.ID
 }
 
+func TestCreateGroupRolePersistsSeesAllMembers(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	role, err := repository.CreateGroupRole("Supervisor Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, true)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !role.SeesAllMembers {
+		utils.PrintTestError(t, role.SeesAllMembers, true)
+	}
+
+	reloaded, err := repository.GetGroupRoleById(role.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !reloaded.SeesAllMembers {
+		utils.PrintTestError(t, reloaded.SeesAllMembers, true)
+	}
+}
+
+func TestUpdateGroupRolePersistsSeesAllMembersToggle(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	created, err := repository.CreateGroupRole("Supervisor Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, true)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	// Toggle off — the false value must persist (map Updates form).
+	updated, err := repository.UpdateGroupRole(created.ID, "Supervisor Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if updated.SeesAllMembers {
+		utils.PrintTestError(t, updated.SeesAllMembers, false)
+	}
+	reloaded, err := repository.GetGroupRoleById(created.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if reloaded.SeesAllMembers {
+		utils.PrintTestError(t, reloaded.SeesAllMembers, false)
+	}
+
+	// Toggle back on.
+	_, err = repository.UpdateGroupRole(created.ID, "Supervisor Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, true)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	reloaded, err = repository.GetGroupRoleById(created.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !reloaded.SeesAllMembers {
+		utils.PrintTestError(t, reloaded.SeesAllMembers, true)
+	}
+}
+
 func TestCreateGroupRolePersistsCategoryAndTagGrants(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
@@ -41,7 +108,7 @@ func TestCreateGroupRolePersistsCategoryAndTagGrants(t *testing.T) {
 		[]uint{cat1, cat2},
 		[]uint{tag1},
 		nil,
-		false,
+		false, false,
 	)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
@@ -81,7 +148,7 @@ func TestCreateGroupRoleWithNoGrantsIsUnrestricted(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	role, err := repository.CreateGroupRole("Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	role, err := repository.CreateGroupRole("Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -106,14 +173,14 @@ func TestUpdateGroupRoleReplacesGrants(t *testing.T) {
 	cat3 := makeTestCategory(t, "Travel")
 	tag1 := makeTestTag(t, "Reimbursable")
 
-	created, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat1, cat2}, []uint{tag1}, nil, false)
+	created, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat1, cat2}, []uint{tag1}, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
 
 	// Replace the grant sets entirely with cat3 and no tags.
-	updated, err := repository.UpdateGroupRole(created.ID, "Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat3}, nil, nil, false)
+	updated, err := repository.UpdateGroupRole(created.ID, "Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat3}, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -143,7 +210,7 @@ func TestDeleteGroupRoleCascadesGrants(t *testing.T) {
 	cat1 := makeTestCategory(t, "Groceries")
 	tag1 := makeTestTag(t, "Reimbursable")
 
-	created, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat1}, []uint{tag1}, nil, false)
+	created, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{cat1}, []uint{tag1}, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -226,7 +293,7 @@ func TestCreateGroupRolePersistsPaidByGrants(t *testing.T) {
 		nil,
 		nil,
 		[]uint{payer1, payer2},
-		true,
+		true, false,
 	)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
@@ -268,7 +335,7 @@ func TestUpdateGroupRolePersistsIncludeOwnToggleOff(t *testing.T) {
 
 	payer := makeTestUser(t, "toggle-payer")
 
-	created, err := repository.CreateGroupRole("Toggle Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, true)
+	created, err := repository.CreateGroupRole("Toggle Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, true, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -276,7 +343,7 @@ func TestUpdateGroupRolePersistsIncludeOwnToggleOff(t *testing.T) {
 
 	// Toggle include-own OFF and drop the user grant. The map-based update must
 	// persist the false value (a struct update would skip the zero-value bool).
-	updated, err := repository.UpdateGroupRole(created.ID, "Toggle Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	updated, err := repository.UpdateGroupRole(created.ID, "Toggle Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -305,7 +372,7 @@ func TestDeleteGroupRoleCascadesPaidByGrants(t *testing.T) {
 
 	payer := makeTestUser(t, "cascade-payer")
 
-	created, err := repository.CreateGroupRole("Cascade Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, false)
+	created, err := repository.CreateGroupRole("Cascade Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -340,7 +407,7 @@ func TestGroupRolePaidByVisibilityRestrictedPersists(t *testing.T) {
 	}
 
 	// Specific-user grant (no include-own) is restricted.
-	usersOnly, err := repository.CreateGroupRole("Users Only", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, false)
+	usersOnly, err := repository.CreateGroupRole("Users Only", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -348,7 +415,7 @@ func TestGroupRolePaidByVisibilityRestrictedPersists(t *testing.T) {
 	assertRestricted(usersOnly.ID, true, "users-only role should be restricted")
 
 	// Include-own only is restricted.
-	ownOnly, err := repository.CreateGroupRole("Own Only", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, true)
+	ownOnly, err := repository.CreateGroupRole("Own Only", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, true, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -356,7 +423,7 @@ func TestGroupRolePaidByVisibilityRestrictedPersists(t *testing.T) {
 	assertRestricted(ownOnly.ID, true, "include-own role should be restricted")
 
 	// Empty paid-by config is NOT restricted (unrestricted = see everyone).
-	open, err := repository.CreateGroupRole("Open", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	open, err := repository.CreateGroupRole("Open", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -365,7 +432,7 @@ func TestGroupRolePaidByVisibilityRestrictedPersists(t *testing.T) {
 
 	// Updating a restricted role to an empty config clears the flag (map update
 	// persists the false value).
-	_, err = repository.UpdateGroupRole(usersOnly.ID, "Users Only", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	_, err = repository.UpdateGroupRole(usersOnly.ID, "Users Only", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

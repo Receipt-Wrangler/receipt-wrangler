@@ -148,7 +148,7 @@ func addGroupMemberWithGrants(
 ) {
 	t.Helper()
 	role, err := repositories.NewRoleRepository(nil).CreateGroupRole(
-		roleName, "", perms, categoryGrants, tagGrants, paidByGrants, includeOwn)
+		roleName, "", perms, categoryGrants, tagGrants, paidByGrants, includeOwn, false)
 	if err != nil {
 		t.Fatalf("failed to create group role: %v", err)
 	}

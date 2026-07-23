@@ -50,7 +50,7 @@ func seedReceiptMember(
 		t.Fatalf("seed group: %v", err)
 	}
 
-	role, err := repositories.NewRoleRepository(nil).CreateGroupRole(roleName, "", perms, categoryGrants, tagGrants, paidByGrants, includeOwn)
+	role, err := repositories.NewRoleRepository(nil).CreateGroupRole(roleName, "", perms, categoryGrants, tagGrants, paidByGrants, includeOwn, false)
 	if err != nil {
 		t.Fatalf("seed group role: %v", err)
 	}

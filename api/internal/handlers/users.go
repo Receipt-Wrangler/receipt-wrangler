@@ -234,6 +234,25 @@ func GetAmountOwedForUser(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+			// Member isolation: drop settlement entries naming a counterparty the
+			// caller may not see. This intentionally overrides the endpoint's
+			// paid-by exemption for isolated viewers. The caller's own id is always
+			// kept; no-op for unrestricted callers (backward compatible).
+			visibleUserIds, unrestricted, err := services.NewPermissionService(nil).GetVisibleUserIdsForUser(id)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !unrestricted {
+				for counterpartyId := range resultMap {
+					if counterpartyId == id {
+						continue
+					}
+					if _, ok := visibleUserIds[counterpartyId]; !ok {
+						delete(resultMap, counterpartyId)
+					}
+				}
+			}
+
 			bytes, err := json.Marshal(resultMap)
 			if err != nil {
 				return http.StatusInternalServerError, err

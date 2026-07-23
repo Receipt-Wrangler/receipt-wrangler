@@ -77,6 +77,13 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// Mask user references (created-by, charged-to) and drop non-visible
+			// comment authors the caller may not see.
+			err = permissionService.MaskReceiptsForMemberVisibility(token.UserId, receipts)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			anyData := make([]any, len(receipts))
 			for i := 0; i < len(receipts); i++ {
 				anyData[i] = receipts[i]
@@ -133,6 +140,13 @@ func GetReceiptsForGroupIds(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// Mask user references (created-by, charged-to) and drop non-visible
+			// comment authors the caller may not see.
+			err = permissionService.MaskReceiptsForMemberVisibility(token.UserId, receipts)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			bytes, err := utils.MarshalResponseData(receipts)
 			if err != nil {
 				return http.StatusInternalServerError, err
@@ -185,6 +199,17 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
+			// An isolated member may not plant a payer or charged-to user outside
+			// their member-visible set.
+			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
 			// A new receipt has no existing custom fields, so any custom field present
 			// is an add — blocked unless the caller can manage custom fields.
 			allowed, denyMessage, err = enforceReceiptCustomFieldSelection(token.UserId, command, nil)
@@ -202,7 +227,15 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
-			err = services.NewPermissionService(nil).FilterReceiptCategoriesTagsForReceipt(token.UserId, &createdReceipt)
+			permissionService := services.NewPermissionService(nil)
+			err = permissionService.FilterReceiptCategoriesTagsForReceipt(token.UserId, &createdReceipt)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// Mask user references (created-by, charged-to) and drop non-visible
+			// comment authors the caller may not see.
+			err = permissionService.MaskReceiptForMemberVisibility(token.UserId, &createdReceipt)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -490,6 +523,28 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
+			// An isolated member may not plant a payer or charged-to user outside
+			// their member-visible set.
+			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
+			// An isolated member may not silently drop a stored charge to a member
+			// they cannot see — the wholesale item replace would corrupt the split.
+			allowed, denyMessage, err = enforceReceiptChargedToPreservation(token.UserId, currentReceipt)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
 			// A caller without custom-field access may edit values but not change which
 			// custom fields are attached to the receipt.
 			currentCustomFieldIds := make([]uint, 0, len(currentReceipt.CustomFields))
@@ -519,6 +574,13 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			}
 
 			err = permissionService.FilterReceiptCategoriesTagsForReceipt(token.UserId, &updatedReceipt)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// Mask user references (created-by, charged-to) and drop non-visible
+			// comment authors the caller may not see.
+			err = permissionService.MaskReceiptForMemberVisibility(token.UserId, &updatedReceipt)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

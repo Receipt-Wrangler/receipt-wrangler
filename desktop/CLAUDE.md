@@ -239,6 +239,16 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     `AuthState.hasGroupPermission`), mirroring the backend `UpdateGroup` guard (see `api/CLAUDE.md` →
     "Group member management"). They default to enabled in **create** mode (no group yet; the creator
     becomes owner). This is UI-only; the server re-enforces on every request.
+- **Member isolation (presence privacy).** Two config controls drive the backend member-isolation
+  feature (see `api/CLAUDE.md` → "Member isolation"): (1) an **"Isolate members"** `app-checkbox` in the
+  `group-form` "Group Details" section, bound to `isolateMembers` on the `UpsertGroupCommand` — an
+  isolated group's members can't discover each other; (2) a group-scope-only **"Members with this role
+  can see, and be seen by, all members"** `app-checkbox` in `role-form` (a "Member visibility" `rw-card`
+  inside the `@if (showGrants())` block), bound to `seesAllMembers` on the `UpsertRoleCommand` (mirrors
+  `includeOwnPaidReceipts`; hydrates on edit, resets on type switch, serialized only for GROUP scope).
+  Everything else is enforced **server-side** — the desktop simply receives the already-filtered
+  `appData.users` / group rosters / receipts, so no client-side filtering is needed (and mobile needs no
+  change). The larger `UserAccessService` / `UserView`-retype consolidation is a deferred follow-up.
 - **Permission-based UI gating.** The UI gates on the user's effective permissions, mirroring the
   backend's enforcement. Permissions are delivered on **AppData** (`appPermissions: string[]` and
   `groupPermissions: { [groupId]: string[] }`) and stored in `AuthState` via the dedicated

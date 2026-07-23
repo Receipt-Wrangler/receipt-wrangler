@@ -631,6 +631,79 @@ above); no dedicated data migration is needed, and
 upgrade path. Tests: `handlers/group_member_authorization_test.go` (the PoC + happy paths) and
 `services/group_member_authorization_test.go` (the guard's CRUD/ceiling matrix).
 
+### Member isolation (presence privacy)
+
+A group can be flagged **`IsolateMembers`** (`models.Group`): within it, a member cannot discover that
+other members exist — not through the user directory, the group roster, receipts, comments, activities,
+settlement, or notifications. A group role flagged **`SeesAllMembers`** (`models.GroupRoleDefinition`)
+is the **supervisor** exemption: its holders see every member of an isolated group **and** are visible
+to every member. Both default `false`, so existing groups/roles/installs are unchanged (AutoMigrate adds
+the columns; no data migration).
+
+**Visible-set resolver.** `PermissionService.GetVisibleUserIdsForUser(viewerId)`
+(`services/member_visibility.go`) returns `(set, unrestricted, err)`. Invariants: **you always see
+yourself**; a holder of **`app.users.read` sees everyone** (unrestricted); membership in any
+non-isolated group — or an isolated group where the viewer holds a `SeesAllMembers` role — contributes
+all of that group's members; an isolated group where the viewer is a plain member contributes only that
+group's supervisors. **A viewer who is not an isolated (non-supervisor) member of any group returns
+`unrestricted == true`** — every filter below is then a no-op, which is exactly what preserves backward
+compatibility (non-isolated installs and every non-isolated member are byte-identical). Isolation only
+ever *narrows*. The resolver is NOT cached; callers resolve it once per request/batch (mirroring
+`PaidByListResolver`).
+
+**Read enforcement — every surface a user identity can reach a client:**
+- **Directory + rosters** — `appData.users` and each group's `GroupMembers` are filtered to the
+  viewer's visible set at the **serialization boundary**: `services/auth.go` (AppData), the `GET /group/`
+  and `GET /group/{id}` handlers, and MCP `list_groups`. **Not** inside `GroupService.GetGroupsForUser` /
+  `UserRepository.GetAllUserViews` — those also feed internal accounting (`amount-owed`) and receipt
+  processing, which need the full roster.
+- **Receipts (row visibility)** — the visible set is intersected into the paid-by allowed set at the one
+  shared resolver (`services/paid_by_filter.go` `foldPaidByWithVisibility`), so a receipt whose
+  `paid_by_user_id` is non-visible disappears from every read surface at once (paged list, single GET,
+  search, CSV export, duplicate, `GetReceiptsForGroupIds`, pie chart, report data).
+- **Field masking** — `services/member_masking.go` **nulls** user-reference fields whose id ∉ the visible
+  set: `BaseModel.CreatedBy`/`CreatedByString` on the receipt and every nested entity (items, linked
+  items, comments, custom-field values, image FileData), and item/linked-item `ChargedToUserId`. User
+  fields are nulled, **not** replaced with `(Restricted)` — presence must be hidden, not announced
+  (unlike category/tag grants). `paid_by_user_id` is never masked (row visibility already guarantees a
+  visible payer).
+- **Comments / activities (row drop)** — comments authored by a non-visible user are dropped from a
+  receipt payload; `GetActivitiesForGroups` drops rows whose `RanByUserId` is non-visible.
+- **Settlement** — `GetAmountOwedForUser` filters its per-user balance map to the visible set,
+  deliberately overriding the paid-by exemption for isolated viewers.
+- **Notifications** — the comment add/reply fan-out (`repositories/comments.go`, injected
+  `AuthorVisibilityResolver`) suppresses delivery to a recipient who can't see the comment author.
+
+**Write-side guards (an isolated member must not expand their own visibility or plant a non-visible id):**
+- **Receipt upsert** — `enforceReceiptMemberVisibilitySelection` rejects a `paidByUserId` or item
+  `chargedToUserId` outside the creator's visible set (403).
+- **Group-member invitation** — a non-supervisor/non-admin may only add users within their visible set:
+  inline in `GroupService.AuthorizeGroupMemberChanges` (update) and `AuthorizeAddedMembersVisibility`
+  (create). Without it an isolated member could add a guessed user id to a group they share and pull
+  that user into their own visible set.
+- **Update preservation** — `enforceReceiptChargedToPreservation` blocks a restricted editor from saving
+  a receipt whose **stored** items are charged to a member they can't see: the wholesale item replace +
+  no stable item identity would silently drop the hidden charge (corrupting the split), so the edit is
+  rejected rather than lose data. **Known limitation** (same as item-level category/tag grants): letting
+  the edit proceed while preserving the hidden charge needs stable item identity — a separate change.
+
+**Operational invariant (not code-enforced):** a viewer's visibility is the UNION across their groups,
+so two isolated members must not also share a **non-isolated** group — someone who can see both (a
+supervisor/admin) could otherwise make them mutually visible through that open group. An isolated member
+cannot do this themselves (the invite guard blocks it).
+
+**Persistence:** `isolateMembers` rides `UpsertGroupCommand` → `CreateGroup`/`UpdateGroup` (the update
+uses an explicit `Update("isolate_members", …)` so a toggle-off past the association `Omit` sticks);
+`seesAllMembers` rides `UpsertRoleCommand` → `CreateGroupRole`/`UpdateGroupRole` and is surfaced on
+`RoleView`, group scope only (mirroring `includeOwnPaidReceipts`). Both are on `swagger.yml`.
+
+**Tests:** `services/member_visibility_test.go` (resolver matrix + invite guard),
+`services/member_isolation_receipt_test.go`, `handlers/receipt_member_isolation_test.go`,
+`handlers/receipt_charge_preservation_test.go`, `handlers/system_task_test.go`, `handlers/users_test.go`
+(amount-owed), `services/member_visibility_notifications_test.go`, plus persistence round-trips in
+`repositories/groups_test.go` / `repositories/roles_grants_test.go` / `services/roles_test.go` /
+`commands/upsert_role_command_test.go`.
+
 ### Enforcement status
 
 Authorization is enforced centrally in `HandleRequest` (`handlers/generic_handler.go`) via the

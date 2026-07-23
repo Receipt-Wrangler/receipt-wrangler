@@ -15,6 +15,7 @@ import { SelectModule } from "src/select/select.module";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
 import { TableModule } from "src/table/table.module";
 import { UserAutocompleteModule } from "src/user-autocomplete/user-autocomplete.module";
+import { CheckboxModule } from "../../checkbox/checkbox.module";
 import { ButtonModule } from "../../button";
 import { InputModule } from "../../input";
 import { ApiModule, Group, GroupsService, GroupStatus, Permission } from "../../open-api";
@@ -35,6 +36,7 @@ describe("GroupFormComponent", () => {
     declarations: [GroupFormComponent, GroupMemberFormComponent],
     imports: [ApiModule,
         ButtonModule,
+        CheckboxModule,
         PipesModule,
         InputModule,
         MatCardModule,
@@ -231,6 +233,7 @@ describe("GroupFormComponent", () => {
       name: "test",
       status: GroupStatus.Active,
       groupMembers: [],
+      isolateMembers: false,
     } as any);
     expect(storeSpy).toHaveBeenCalledWith(new AddGroup(returnValue));
     expect(routerSpy).toHaveBeenCalledWith(["/groups/1/details/view"], {
@@ -321,6 +324,7 @@ describe("GroupFormComponent", () => {
             groupId: 1,
           },
         ],
+        isolateMembers: false,
       } as Group
     );
     expect(storeSpy).toHaveBeenCalledWith(new UpdateGroup(returnValue));
@@ -329,6 +333,53 @@ describe("GroupFormComponent", () => {
         tab: "details",
       }
     });
+  });
+
+  it("includes isolateMembers in the create payload when enabled", () => {
+    const createSpy = jest.spyOn(TestBed.inject(GroupsService), "createGroup");
+    jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+    jest.spyOn(TestBed.inject(AppInitService), "getAppData").mockReturnValue(of([]));
+
+    const route = TestBed.inject(ActivatedRoute);
+    route.snapshot.data = {
+      formConfig: {
+        mode: FormMode.add,
+      },
+    };
+
+    component.ngOnInit();
+    component.ngAfterViewInit();
+
+    component.form.patchValue({
+      name: "test",
+      isolateMembers: true,
+    });
+
+    createSpy.mockReturnValue(of({ ...component.form.value, id: 1 }));
+
+    component.submit();
+
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ isolateMembers: true })
+    );
+  });
+
+  it("hydrates isolateMembers from the group on edit", () => {
+    const route = TestBed.inject(ActivatedRoute);
+    route.snapshot.data = {
+      group: {
+        id: 1,
+        name: "test",
+        status: GroupStatus.Active,
+        isolateMembers: true,
+        groupMembers: [],
+      },
+      formConfig: { mode: FormMode.edit },
+    };
+
+    component.ngOnInit();
+
+    expect(component.form.get("isolateMembers")?.value).toBe(true);
   });
 
   it("submits in edit mode even when no member holds an owner role", () => {

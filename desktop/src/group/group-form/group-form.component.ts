@@ -198,6 +198,7 @@ export class GroupFormComponent implements OnInit, AfterViewInit {
       name: [this.originalGroup?.name ?? "", Validators.required],
       groupMembers: this.formBuilder.array(groupMembers),
       status: this.originalGroup?.status ?? GroupStatus.Active,
+      isolateMembers: this.originalGroup?.isolateMembers ?? false,
     });
 
     this.groupMembers.valueChanges

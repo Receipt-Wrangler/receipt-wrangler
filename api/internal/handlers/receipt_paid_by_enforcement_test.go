@@ -36,7 +36,7 @@ func seedPaidByRestrictedMember(t *testing.T, paidByUserGrantIds []uint, include
 		nil,
 		nil,
 		paidByUserGrantIds,
-		includeOwn,
+		includeOwn, false,
 	)
 	if err != nil {
 		t.Fatalf("seed group role: %v", err)

@@ -10,6 +10,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"receipt-wrangler/api/internal/wranglerasynq"
@@ -106,6 +107,16 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// Member isolation: drop activities run by a user the caller may not
+			// see (a nil RanByUserId is a system action and is always kept). No-op
+			// for unrestricted callers (backward compatible).
+			token := structs.GetClaims(r)
+			visibleUserIds, unrestricted, err := services.NewPermissionService(nil).GetVisibleUserIdsForUser(token.UserId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			activities = filterActivitiesByVisibility(activities, visibleUserIds, unrestricted)
+
 			pagedData := structs.PagedData{}
 			data := make([]any, 0)
 
@@ -129,6 +140,28 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	HandleRequest(handler)
+}
+
+// filterActivitiesByVisibility drops activities run by a user the viewer may not
+// see under member-presence isolation. An activity with a nil RanByUserId is a
+// system action and is always kept. When the viewer is unrestricted the input is
+// returned unchanged (backward compatible).
+func filterActivitiesByVisibility(activities []structs.Activity, visibleUserIds map[uint]struct{}, unrestricted bool) []structs.Activity {
+	if unrestricted {
+		return activities
+	}
+
+	visible := make([]structs.Activity, 0, len(activities))
+	for _, activity := range activities {
+		if activity.RanByUserId == nil {
+			visible = append(visible, activity)
+			continue
+		}
+		if _, ok := visibleUserIds[*activity.RanByUserId]; ok {
+			visible = append(visible, activity)
+		}
+	}
+	return visible
 }
 
 func RerunActivity(w http.ResponseWriter, r *http.Request) {

@@ -125,6 +125,13 @@ func GetGroupsForUser(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+			// Member-presence isolation: strip each roster to the members the
+			// caller may see (no-op for unrestricted viewers).
+			permissionService := services.NewPermissionService(nil)
+			if err := permissionService.FilterGroupMembersForGroups(token.UserId, groups); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			bytes, err := utils.MarshalResponseData(groups)
 			if err != nil {
 				return http.StatusInternalServerError, err
@@ -155,6 +162,14 @@ func GetGroupById(w http.ResponseWriter, r *http.Request) {
 			groupRepository := repositories.NewGroupRepository(nil)
 			groups, err := groupRepository.GetGroupById(id, true, true, true)
 			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// Member-presence isolation: strip the roster to the members the caller
+			// may see (no-op for unrestricted viewers).
+			token := structs.GetClaims(r)
+			permissionService := services.NewPermissionService(nil)
+			if err := permissionService.FilterGroupMembersForGroup(token.UserId, &groups); err != nil {
 				return http.StatusInternalServerError, err
 			}
 
@@ -194,6 +209,16 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 			}
 
 			token := structs.GetClaims(r)
+
+			// Member-presence isolation: an isolated creator may only add members
+			// they can already see (no-op for unrestricted callers).
+			groupService := services.NewGroupService(nil)
+			if err := groupService.AuthorizeAddedMembersVisibility(token.UserId, command.GroupMembers); err != nil {
+				if errors.Is(err, services.ErrGroupMemberChangeForbidden) {
+					return http.StatusForbidden, err
+				}
+				return http.StatusInternalServerError, err
+			}
 
 			command.IsAllGroup = false
 			groupRepository := repositories.NewGroupRepository(nil)

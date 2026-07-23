@@ -208,6 +208,79 @@ func TestUpdateGroupHonorsMemberGroupRoleId(t *testing.T) {
 	}
 }
 
+func TestCreateGroupPersistsIsolateMembers(t *testing.T) {
+	defer teardownGroupTest()
+	setUpGroupTest()
+	groupRepository := setupGroupRepository()
+
+	created, err := groupRepository.CreateGroup(commands.UpsertGroupCommand{Name: "iso", IsolateMembers: true}, 1)
+	if err != nil {
+		utils.PrintTestError(t, err, "Expected no error")
+		return
+	}
+	if !created.IsolateMembers {
+		utils.PrintTestError(t, created.IsolateMembers, true)
+	}
+
+	reloaded, err := groupRepository.GetGroupById(utils.UintToString(created.ID), true, false, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !reloaded.IsolateMembers {
+		utils.PrintTestError(t, reloaded.IsolateMembers, true)
+	}
+}
+
+func TestUpdateGroupPersistsIsolateMembersToggle(t *testing.T) {
+	defer teardownGroupTest()
+	setUpGroupTest()
+	groupRepository := setupGroupRepository()
+
+	created, err := groupRepository.CreateGroup(commands.UpsertGroupCommand{Name: "iso", IsolateMembers: true}, 1)
+	if err != nil {
+		utils.PrintTestError(t, err, "Expected no error")
+		return
+	}
+	groupId := utils.UintToString(created.ID)
+	members := []commands.UpsertGroupMemberCommand{{UserID: 1, GroupID: created.ID}}
+
+	// Toggle isolation OFF — the false value must persist (a struct Updates would
+	// skip the zero-value bool, leaving isolation stuck on).
+	_, err = groupRepository.UpdateGroup(commands.UpsertGroupCommand{
+		Name: "iso", Status: models.GROUP_ACTIVE, GroupMembers: members, IsolateMembers: false,
+	}, groupId)
+	if err != nil {
+		utils.PrintTestError(t, err, "Expected no error")
+		return
+	}
+	reloaded, err := groupRepository.GetGroupById(groupId, true, false, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if reloaded.IsolateMembers {
+		utils.PrintTestError(t, reloaded.IsolateMembers, false)
+	}
+
+	// Toggle isolation back ON.
+	_, err = groupRepository.UpdateGroup(commands.UpsertGroupCommand{
+		Name: "iso", Status: models.GROUP_ACTIVE, GroupMembers: members, IsolateMembers: true,
+	}, groupId)
+	if err != nil {
+		utils.PrintTestError(t, err, "Expected no error")
+		return
+	}
+	reloaded, err = groupRepository.GetGroupById(groupId, true, false, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !reloaded.IsolateMembers {
+		utils.PrintTestError(t, reloaded.IsolateMembers, true)
+	}
+}
+
 func TestShouldGetGroupById(t *testing.T) {
 	defer teardownGroupTest()
 	CreateTestGroup()

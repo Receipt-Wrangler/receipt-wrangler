@@ -15,6 +15,13 @@ type Group struct {
 	GroupReceiptSettings GroupReceiptSettings `json:"groupReceiptSettings"`
 	Status               GroupStatus          `gorm:"default:'ACTIVE'; not null" json:"status"`
 	IsAllGroup           bool                 `json:"isAllGroup" gorm:"default:false"`
+
+	// IsolateMembers turns on member-presence isolation for this group: members
+	// cannot discover that other members exist (through the user directory, group
+	// roster, receipts, comments, activities, settlement, or notifications) unless
+	// they hold a group role flagged SeesAllMembers, or the app-level app.users.read.
+	// Default false ⇒ existing groups behave exactly as before (no migration).
+	IsolateMembers bool `json:"isolateMembers" gorm:"not null;default:false"`
 }
 
 func (groupToUpdate *Group) BeforeUpdate(tx *gorm.DB) (err error) {

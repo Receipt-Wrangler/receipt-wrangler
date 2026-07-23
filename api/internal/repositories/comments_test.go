@@ -39,7 +39,7 @@ func TestShouldAddCommentAndSendNotificationToAllGroupUsers(t *testing.T) {
 		UserId:    &userId,
 	}
 
-	newComment, err := commentRepository.AddComment(comment)
+	newComment, err := commentRepository.AddComment(comment, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

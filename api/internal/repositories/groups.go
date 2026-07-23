@@ -96,6 +96,7 @@ func (repository GroupRepository) CreateGroup(command commands.UpsertGroupComman
 	groupToCreate.Name = command.Name
 	groupToCreate.Status = command.Status
 	groupToCreate.IsAllGroup = command.IsAllGroup
+	groupToCreate.IsolateMembers = command.IsolateMembers
 	for i := 0; i < len(command.GroupMembers); i++ {
 		groupMember := buildGroupMemberFromCommand(command.GroupMembers[i])
 		groupToCreate.GroupMembers = append(groupToCreate.GroupMembers, groupMember)
@@ -191,6 +192,13 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 		txErr := tx.Session(&gorm.Session{FullSaveAssociations: true}).Model(&groupToUpdate).Omit("ID", "is_all_group").Updates(&groupToUpdate).Error
+		if txErr != nil {
+			return txErr
+		}
+
+		// Persist isolate_members explicitly: a struct Updates skips a zero-value
+		// (false) bool, so toggling isolation off would otherwise not persist.
+		txErr = tx.Model(&models.Group{}).Where("id = ?", uintId).Update("isolate_members", command.IsolateMembers).Error
 		if txErr != nil {
 			return txErr
 		}

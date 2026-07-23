@@ -44,7 +44,7 @@ func (repository RoleRepository) CreateAppRole(name string, description string, 
 	return role, nil
 }
 
-func (repository RoleRepository) CreateGroupRole(name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint, paidByUserGrantIds []uint, includeOwnPaidReceipts bool) (models.GroupRoleDefinition, error) {
+func (repository RoleRepository) CreateGroupRole(name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint, paidByUserGrantIds []uint, includeOwnPaidReceipts bool, seesAllMembers bool) (models.GroupRoleDefinition, error) {
 	db := repository.GetDB()
 
 	rolePermissions := make([]models.GroupRolePermission, 0, len(perms))
@@ -57,6 +57,7 @@ func (repository RoleRepository) CreateGroupRole(name string, description string
 		Description:                description,
 		IncludeOwnPaidReceipts:     includeOwnPaidReceipts,
 		PaidByVisibilityRestricted: includeOwnPaidReceipts || len(paidByUserGrantIds) > 0,
+		SeesAllMembers:             seesAllMembers,
 		Permissions:                rolePermissions,
 	}
 
@@ -133,7 +134,7 @@ func (repository RoleRepository) UpdateAppRole(id uint, name string, description
 	return repository.GetAppRoleById(id)
 }
 
-func (repository RoleRepository) UpdateGroupRole(id uint, name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint, paidByUserGrantIds []uint, includeOwnPaidReceipts bool) (models.GroupRoleDefinition, error) {
+func (repository RoleRepository) UpdateGroupRole(id uint, name string, description string, perms []string, categoryGrantIds []uint, tagGrantIds []uint, paidByUserGrantIds []uint, includeOwnPaidReceipts bool, seesAllMembers bool) (models.GroupRoleDefinition, error) {
 	db := repository.GetDB()
 
 	err := db.Where("group_role_id = ?", id).Delete(&models.GroupRolePermission{}).Error
@@ -148,6 +149,7 @@ func (repository RoleRepository) UpdateGroupRole(id uint, name string, descripti
 		"description":                   description,
 		"include_own_paid_receipts":     includeOwnPaidReceipts,
 		"paid_by_visibility_restricted": includeOwnPaidReceipts || len(paidByUserGrantIds) > 0,
+		"sees_all_members":              seesAllMembers,
 	}).Error
 	if err != nil {
 		return models.GroupRoleDefinition{}, err
@@ -313,12 +315,12 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		}
 
 		roles = append(roles, structs.RoleView{
-			Id:               role.ID,
-			Name:             role.Name,
-			Description:      role.Description,
-			Scope:            permissions.ScopeApp,
-			IsDefault:        role.IsDefault,
-			IsSystem:         role.IsSystem,
+			Id:                   role.ID,
+			Name:                 role.Name,
+			Description:          role.Description,
+			Scope:                permissions.ScopeApp,
+			IsDefault:            role.IsDefault,
+			IsSystem:             role.IsSystem,
 			Permissions:          perms,
 			AssignedCount:        appRoleCounts[role.ID],
 			CategoryGrants:       []uint{},
@@ -347,6 +349,7 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 			TagGrants:              tagGrantIdsFromRole(role),
 			PaidByUserGrants:       paidByUserGrantIdsFromRole(role),
 			IncludeOwnPaidReceipts: role.IncludeOwnPaidReceipts,
+			SeesAllMembers:         role.SeesAllMembers,
 			ReportTemplateGrants:   ReportTemplateGrantsFromRole(role),
 		})
 	}

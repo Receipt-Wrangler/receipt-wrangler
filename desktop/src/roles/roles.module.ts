@@ -4,6 +4,7 @@ import { ReactiveFormsModule } from "@angular/forms";
 import { MatIconModule } from "@angular/material/icon";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { RouterModule } from "@angular/router";
+import { CheckboxModule } from "src/checkbox/checkbox.module";
 import { PipesModule } from "src/pipes/pipes.module";
 import { AutocompleteModule } from "../autocomplete/autocomplete.module";
 import { ButtonModule } from "../button";
@@ -22,6 +23,7 @@ import { RolesRoutingModule } from "./roles-routing.module";
   declarations: [RoleListComponent, RoleFormComponent],
   imports: [
     ButtonModule,
+    CheckboxModule,
     CommonModule,
     InputModule,
     MatIconModule,
