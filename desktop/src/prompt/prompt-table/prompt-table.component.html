@@ -5,6 +5,7 @@
   >
     <div class="d-flex">
       <app-add-button
+        *hasAppPermission="Permission.AppPromptsCreate"
         data-testid="prompt-add"
         buttonText="Add Prompt"
         tooltip="Add Prompt"

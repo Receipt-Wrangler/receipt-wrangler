@@ -6,6 +6,7 @@ import { RouterLink } from "@angular/router";
 import { AutocompleteModule } from "../autocomplete/autocomplete.module";
 import { ButtonModule } from "../button";
 import { CheckboxModule } from "../checkbox/checkbox.module";
+import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { PipesModule } from "../pipes";
 import { SelectModule } from "../select/select.module";
@@ -25,6 +26,7 @@ import { ReceiptProcessingSettingsTableComponent } from "./receipt-processing-se
   declarations: [ReceiptProcessingSettingsTableComponent, ReceiptProcessingSettingsFormComponent, ReceiptProcessingSettingsChildSystemTaskAccordionComponent],
   imports: [
     CommonModule,
+    DirectivesModule,
     TableModule,
     SharedUiModule,
     RouterLink,

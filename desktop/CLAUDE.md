@@ -784,8 +784,8 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   builder's generate path), **open/edit** (read — routes to `/reports/:id/edit`), **duplicate**
   (`AppReportsDuplicate`), **delete** (`AppReportsDelete`, via `ConfirmationDialogComponent`). The header
   is the shared `app-table-header` (with a subtitle) and an **"Add Report"** `app-add-button`
-  (`data-testid="report-template-new"`) that routes to the blank builder; an empty state (with a second
-  `report-template-new-empty` add button) shows when there are none.
+  (`data-testid="report-template-add"`) that routes to the blank builder; an empty state (with a second
+  `report-template-add-empty` add button) shows when there are none.
 - **Open in builder (hydration)**: `/reports/:id/edit` uses a `reportTemplateResolver`
   (`GET /report/template/{id}`) to load the template before the builder's form initializer, and
   `buildReportFormFromCommand` (`report-form.factory.ts`) builds the form *seeded from* the stored

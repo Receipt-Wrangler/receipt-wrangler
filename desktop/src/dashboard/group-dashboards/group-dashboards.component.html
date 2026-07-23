@@ -46,5 +46,9 @@
   <router-outlet></router-outlet>
 }
 @if (!selectedDashboardId() && !dashboards().length) {
-  <p>Use the Add Dashboard button to create a dashboard for this group.</p>
+  <p
+    *hasGroupPermission="{ groupId: selectedGroupIdNum(), permission: Permission.GroupDashboardsCreate }"
+  >
+    Use the Add Dashboard button to create a dashboard for this group.
+  </p>
 }

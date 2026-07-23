@@ -8,6 +8,7 @@ import { PipesModule } from "src/pipes/pipes.module";
 import { AutocompleteModule } from "../autocomplete/autocomplete.module";
 import { ButtonModule } from "../button";
 import { CategoryAutocompleteComponent } from "../category-autocomplete/category-autocomplete.component";
+import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { TagAutocompleteComponent } from "../tag-autocomplete/tag-autocomplete.component";
 import { SelectModule } from "../select/select.module";
@@ -23,6 +24,7 @@ import { RolesRoutingModule } from "./roles-routing.module";
   imports: [
     ButtonModule,
     CommonModule,
+    DirectivesModule,
     InputModule,
     MatIconModule,
     MatTooltipModule,

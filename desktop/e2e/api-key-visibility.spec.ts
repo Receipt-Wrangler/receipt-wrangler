@@ -29,14 +29,13 @@ async function filterToAllKeys(page: Page) {
   await expect(dialog).toBeHidden();
 }
 
-// Creates an API key via the table-header "add" dialog. The add button is the
-// first button in the header, so it's addressed positionally (as
-// ensureCustomFieldExists does in receipts.spec.ts).
+// Creates an API key via the table-header "add" dialog, opened by the add
+// button's resource test ID.
 // Submitting reveals the one-time secret view, which we dismiss with Close —
 // that closes with a truthy result, refreshing the table with the new key.
 async function createApiKey(page: Page, name: string) {
   await page.goto(API_KEYS_URL);
-  await page.locator('app-table-header').getByRole('button').first().click();
+  await page.getByTestId('api-key-add').click();
   const dialog = page.getByRole('dialog').filter({ hasText: 'Create API Key' });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Name').fill(name);

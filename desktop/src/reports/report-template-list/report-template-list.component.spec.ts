@@ -145,14 +145,14 @@ describe("ReportTemplateListComponent", () => {
     canEnterBuilder.set(true);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('[data-testid="report-template-new"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="report-template-add"]')).not.toBeNull();
   });
 
   it("hides the New Report button without report access (read/readAll)", async () => {
     canEnterBuilder.set(false);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('[data-testid="report-template-new"]')).toBeNull();
+    expect(el.querySelector('[data-testid="report-template-add"]')).toBeNull();
   });
 
   it("shows the empty-state New Report button with report access (read/readAll)", async () => {
@@ -165,7 +165,7 @@ describe("ReportTemplateListComponent", () => {
     await emptyFixture.whenStable();
 
     const el = emptyFixture.nativeElement as HTMLElement;
-    expect(el.querySelector('[data-testid="report-template-new-empty"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="report-template-add-empty"]')).not.toBeNull();
   });
 
   it("hides the empty-state New Report button without report access (read/readAll)", async () => {
@@ -177,7 +177,7 @@ describe("ReportTemplateListComponent", () => {
     await emptyFixture.whenStable();
 
     const el = emptyFixture.nativeElement as HTMLElement;
-    expect(el.querySelector('[data-testid="report-template-new-empty"]')).toBeNull();
+    expect(el.querySelector('[data-testid="report-template-add-empty"]')).toBeNull();
   });
 
   it("generate runs the template by id and clears the in-flight id", () => {

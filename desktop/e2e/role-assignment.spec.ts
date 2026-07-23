@@ -26,7 +26,7 @@ test.describe('assigning modern roles (admin)', () => {
     const username = uniqueName('approle');
     await page.goto('/users');
 
-    await page.getByRole('button', { name: 'Add User' }).click();
+    await page.getByTestId('user-add').click();
     const dialog = page.getByRole('dialog').filter({ hasText: 'Create User' });
     await expect(dialog).toBeVisible();
 

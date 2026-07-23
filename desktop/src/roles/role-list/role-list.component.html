@@ -3,6 +3,7 @@
 
   <app-table-header headerText="Roles">
     <app-add-button
+      *hasAppPermission="Permission.AppRolesCreate"
       data-testid="role-add"
       buttonText="Add Role"
       tooltip="Add Role"
@@ -24,6 +25,7 @@
         within groups.
       </p>
       <app-add-button
+        *hasAppPermission="Permission.AppRolesCreate"
         buttonText="Add Role"
         tooltip="Add Role"
         (clicked)="addRole()"

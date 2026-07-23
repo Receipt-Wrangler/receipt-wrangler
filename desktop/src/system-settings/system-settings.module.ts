@@ -7,6 +7,7 @@ import { AlertComponent } from "../alert/alert.component";
 import { AutocompleteModule } from "../autocomplete/autocomplete.module";
 import { ButtonModule } from "../button";
 import { CheckboxModule } from "../checkbox/checkbox.module";
+import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { PipesModule } from "../pipes";
 import { PromptModule } from "../prompt/prompt.module";
@@ -37,6 +38,7 @@ import { SystemTaskTableComponent } from "./system-task-table/system-task-table.
   imports: [
     ButtonModule,
     CommonModule,
+    DirectivesModule,
     InputModule,
     PipesModule,
     PromptModule,

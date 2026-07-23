@@ -72,7 +72,7 @@ async function createUserWithRole(
   opts: { username: string; password: string; role: string },
 ) {
   await page.goto('/users');
-  await page.getByRole('button', { name: 'Add User' }).click();
+  await page.getByTestId('user-add').click();
   const dialog = page.getByRole('dialog').filter({ hasText: 'Create User' });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Username').fill(opts.username);
