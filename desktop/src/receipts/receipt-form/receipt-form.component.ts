@@ -798,17 +798,23 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   // Appends the magic-filled categories/tags that resolve to an entry in the
-  // available pool. Returns whether any were added, so an empty or unmatched
-  // response doesn't report a phantom fill.
+  // available pool and aren't already on the receipt (edit mode can re-return an
+  // existing selection, which the picker itself would dedupe). Returns whether
+  // any were added, so an empty/unmatched/all-duplicate response doesn't report a
+  // phantom fill.
   private handleCategoryAndTagMagicFill(
     formKey: "categories" | "tags",
     value: Category[] | Tag[],
     arrayToFilter: Category[] | Tag[]
   ): boolean {
-    const itemsToPush = (arrayToFilter as any[]).filter((item) =>
-      value.map((foundItem) => foundItem.id)?.includes(item.id)
-    );
     const itemsFormArray = this.form.get(formKey) as FormArray;
+    const existingIds = new Set(
+      itemsFormArray.controls.map((control) => control.value?.id)
+    );
+    const magicIds = value.map((foundItem) => foundItem.id);
+    const itemsToPush = (arrayToFilter as any[]).filter(
+      (item) => magicIds.includes(item.id) && !existingIds.has(item.id)
+    );
     itemsToPush.forEach((c) => {
       itemsFormArray.push(this.formBuilder.control(c));
     });

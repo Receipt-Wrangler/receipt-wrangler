@@ -447,16 +447,25 @@ func TestQuickScan_BackfillsPaidByAndStatusWhenAiOmitsThem(t *testing.T) {
 func TestQuickScan_KeepsAiPaidByAndStatusWhenPresent(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
-	created, user, _, err := runQuickScan(
+	var aiPayerId uint
+	created, _, _, err := runQuickScan(
 		t,
 		func(u models.User) uint { return u.ID }, // default paid-by (should be ignored)
 		models.OPEN,                              // default status (should be ignored)
 		nil,
 		nil,
 		func(u models.User, g models.Group) string {
+			// A second, distinct user for the AI paid-by so the assertion fails if
+			// QuickScan drops the AI value and falls back to the default arg (the
+			// seeded user). Same-user ids would pass either way.
+			aiPayer := models.User{Username: "ai-payer", Password: "p", DisplayName: "x"}
+			if err := repositories.GetDB().Create(&aiPayer).Error; err != nil {
+				t.Fatalf("seed ai payer: %v", err)
+			}
+			aiPayerId = aiPayer.ID
 			return fmt.Sprintf(
 				`{"name": "Has Payer", "amount": 5.00, "date": "2024-02-02T00:00:00Z", "paidByUserId": %d, "status": "RESOLVED"}`,
-				u.ID,
+				aiPayer.ID,
 			)
 		},
 	)
@@ -470,8 +479,8 @@ func TestQuickScan_KeepsAiPaidByAndStatusWhenPresent(t *testing.T) {
 		utils.PrintTestError(t, err, "no error")
 		return
 	}
-	if receipt.PaidByUserID != user.ID {
-		utils.PrintTestError(t, receipt.PaidByUserID, user.ID)
+	if receipt.PaidByUserID != aiPayerId {
+		utils.PrintTestError(t, receipt.PaidByUserID, aiPayerId)
 	}
 	if receipt.Status != models.RESOLVED {
 		utils.PrintTestError(t, receipt.Status, models.RESOLVED)

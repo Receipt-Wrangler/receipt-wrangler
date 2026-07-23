@@ -300,6 +300,14 @@ describe("ReceiptFormComponent", () => {
   // backend can return (paid-by, status, items, shares, custom fields, comments),
   // not just the header fields, and drops nothing on the way into the form.
   describe("magicFill — full receipt ingest", () => {
+    // A test below overrides the timezone offset for a deterministic date
+    // assertion; capture the real one (before any test runs) and restore it so
+    // the override can't leak into later tests.
+    const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
+    afterEach(() => {
+      Date.prototype.getTimezoneOffset = originalGetTimezoneOffset;
+    });
+
     function stubCarousel(index = 0): void {
       Object.defineProperty(component, "carouselComponent", {
         value: () => ({ currentlyShownImageIndex: index }),
@@ -685,6 +693,40 @@ describe("ReceiptFormComponent", () => {
         "Existing Item",
         "New Item",
       ]);
+    });
+
+    it("does not duplicate a category the receipt already carries", () => {
+      component.images.set([{ id: 1 } as any]);
+      routeDataSubject.next({
+        mode: FormMode.edit,
+        customFields: [],
+        receipt: {
+          id: 5,
+          name: "R",
+          amount: "100.00",
+          categories: [{ id: 1, name: "existing cat" }],
+          customFields: [],
+        } as any,
+      });
+      component.mode = FormMode.edit;
+      stubCarousel();
+      component.categories = [{ id: 1, name: "existing cat" } as any];
+
+      const magicReceipt = { categories: [{ id: 1 }] } as any;
+
+      mockMagicFill(magicReceipt);
+      const errorSpy = spyError();
+
+      component.magicFill();
+
+      // The already-present category is not appended a second time, and since
+      // nothing new was added the fill reports empty (error toast).
+      expect(component.form.getRawValue().categories).toEqual([
+        { id: 1, name: "existing cat" },
+      ]);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Could not find any values to fill! Try reuploading a clearer image."
+      );
     });
 
     it("round-trips negative refund amounts on the receipt and items", () => {

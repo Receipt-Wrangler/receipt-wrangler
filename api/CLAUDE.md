@@ -799,8 +799,8 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   to the granted catalog, but a crafted request could otherwise attach a category/tag the caller can't
   see.
 - **End-to-end ingest tests** (`services/quick_scan_ingest_test.go`): the AI is mocked at the HTTP
-  transport layer (a mutable-body httptest server, reusing `newMockOllamaServerForService` /
-  `ollamaBody` / `seedReceiptImagePipeline` from `ai_test.go` / `receipt_image_test.go`), a controlled
+  transport layer (a new mutable-body httptest server `newMutableOllamaServer` + `ollamaReceiptResponse`,
+  reusing `seedReceiptImagePipeline` from `receipt_image_test.go`), a controlled
   receipt JSON is driven through the real `ReceiptService.QuickScan`, and the persisted receipt is read
   back via `GetFullyLoadedReceiptById` to prove **every** field survives — name/amount/date/paid-by/
   status, receipt- and item-level categories/tags, items (amount / status / `chargedToUserId` /
