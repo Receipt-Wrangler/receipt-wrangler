@@ -395,7 +395,6 @@ describe("ReceiptFormComponent", () => {
             name: "Regular Item",
             amount: "40.00",
             status: "OPEN",
-            IsTaxed: true,
             categories: [{ id: 5, name: "item cat" }],
             tags: [{ id: 6, name: "item tag" }],
           },
@@ -444,7 +443,6 @@ describe("ReceiptFormComponent", () => {
       expect(regular.name).toEqual("Regular Item");
       expect(regular.amount).toEqual("40.00");
       expect(regular.status).toEqual("OPEN");
-      expect(regular.isTaxed).toEqual(true);
       expect(regular.chargedToUserId).toBeFalsy();
       expect(regular.categories).toEqual([{ id: 5, name: "item cat" }]);
       expect(regular.tags).toEqual([{ id: 6, name: "item tag" }]);
