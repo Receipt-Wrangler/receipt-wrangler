@@ -381,8 +381,9 @@ will be dropped in a later release.
   Owner** (the group VIEWER / EDITOR / OWNER tiers; Owner = every group permission). The sets live in
   `permissions/legacy.go` (`Legacy*Keys()` helpers) and were derived from the actual handler-level
   gating, not the desktop UI presets. **Deliberate exceptions** (Legacy User omits these): `app.users.read`
-  — it gates only the admin `GET /user/` listing, which no client calls (user dropdowns read from AppData via
-  `app.account.read`), so granting it would only expose the admin "Manage Users" page to normal users; and
+  — it gates the admin user listing (the unpaged `GET /user/` **and** the paged `POST /user/getPagedUsers`
+  that the desktop "Manage Users" page reads from); user dropdowns instead read from AppData via
+  `app.account.read`, so granting it would only expose the admin "Manage Users" page to normal users; and
   `app.categories.read` / `app.tags.read` — omitted as part of the category/tag grant lock-down, since they
   gate the GLOBAL category/tag lists; normal users now get only the per-group filtered catalogs (the
   `app.categories.create` / `app.tags.create` permissions are retained for inline creation); and

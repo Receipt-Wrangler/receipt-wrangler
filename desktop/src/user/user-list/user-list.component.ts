@@ -1,36 +1,49 @@
-import { AfterViewInit, Component, inject, signal, TemplateRef, viewChild } from "@angular/core";
-import { toSignal } from "@angular/core/rxjs-interop";
+import { AfterViewInit, Component, DestroyRef, inject, TemplateRef, viewChild } from "@angular/core";
+import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
-import { MatTableDataSource } from "@angular/material/table";
-import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { DEFAULT_HOST_CLASS } from "src/constants";
 import { DEFAULT_DIALOG_CONFIG } from "src/constants/dialog.constant";
+import { PagedTableInterface } from "src/interfaces/paged-table.interface";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
 import { BulkUserDeleteCommand, Permission, PermissionScope, Role, RoleService, User, UserService } from "../../open-api";
 import { loadAssignableRoles } from "../../roles/role-loading.util";
 import { SnackbarService } from "../../services";
-import { AuthState, RemoveUser, RemoveUsers, UserState } from "../../store";
+import { BaseTableService } from "../../services/base-table.service";
+import { BaseTableComponent } from "../../shared-ui/base-table/base-table.component";
+import { AuthState, RemoveUser, RemoveUsers } from "../../store";
+import { UserTableState } from "../../store/user-table.state";
 import { DummyUserConversionDialogComponent } from "../dummy-user-conversion-dialog/dummy-user-conversion-dialog.component";
 import { ResetPasswordComponent } from "../reset-password/reset-password.component";
 import { UserFormComponent } from "../user-form/user-form.component";
+import { UserTableService } from "./user-table.service";
 
-@UntilDestroy()
 @Component({
     selector: "app-user-list",
     templateUrl: "./user-list.component.html",
     styleUrls: ["./user-list.component.scss"],
     host: DEFAULT_HOST_CLASS,
+    providers: [
+        {
+            provide: BaseTableService,
+            useClass: UserTableService
+        }
+    ],
     standalone: false
 })
-export class UserListComponent implements AfterViewInit {
+export class UserListComponent extends BaseTableComponent<User> implements AfterViewInit {
   protected readonly Permission = Permission;
   protected readonly PermissionScope = PermissionScope;
 
   userId = this.store.selectSignal(AuthState.userId);
+
+  // Signal-backed pagination state (per desktop guideline: selectSignal over | async).
+  public readonly page = this.store.selectSignal(UserTableState.page);
+
+  public readonly pageSize = this.store.selectSignal(UserTableState.pageSize);
 
   public readonly usernameCell = viewChild.required<TemplateRef<any>>("usernameCell");
 
@@ -46,12 +59,6 @@ export class UserListComponent implements AfterViewInit {
 
   public readonly table = viewChild.required(TableComponent);
 
-  public displayedColumns: string[] = [];
-
-  public columns: TableColumn[] = [];
-
-  public dataSource = signal(new MatTableDataSource<User>([]));
-
   // Roles resolve each user's appRoleId to a role name. The request is skipped
   // unless the caller holds app.roles.read (otherwise the 403 would log them
   // out — see loadAssignableRoles); the cell then renders blank.
@@ -62,21 +69,22 @@ export class UserListComponent implements AfterViewInit {
 
   public hasSelectedUsers: boolean = false;
 
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
+    public override baseTableService: BaseTableService,
     private matDialog: MatDialog,
     private snackbarService: SnackbarService,
     private store: Store,
     private userService: UserService
-  ) {}
-
-  public ngAfterViewInit(): void {
-    this.initTable();
-    this.setupSelectionListener();
+  ) {
+    super(baseTableService);
   }
 
-  private initTable(): void {
+  public ngAfterViewInit(): void {
     this.setColumns();
-    this.setDataSource();
+    this.getTableData();
+    this.setupSelectionListener();
   }
 
   private setColumns(): void {
@@ -90,25 +98,25 @@ export class UserListComponent implements AfterViewInit {
 
       {
         columnHeader: "Displayname",
-        matColumnDef: "displayName",
+        matColumnDef: "display_name",
         template: this.displaynameCell(),
         sortable: true,
       },
       {
         columnHeader: "Role",
-        matColumnDef: "appRole",
+        matColumnDef: "app_role",
         template: this.appRoleCell(),
-        sortable: true,
+        sortable: false,
       },
       {
         columnHeader: "Created At",
-        matColumnDef: "createdAt",
+        matColumnDef: "created_at",
         template: this.createdAtCell(),
         sortable: true,
       },
       {
         columnHeader: "Updated At",
-        matColumnDef: "updatedAt",
+        matColumnDef: "updated_at",
         template: this.updatedAtCell(),
         sortable: true,
       },
@@ -123,33 +131,22 @@ export class UserListComponent implements AfterViewInit {
     this.displayedColumns = [
       "select",
       "username",
-      "displayName",
-      "appRole",
-      "createdAt",
-      "updatedAt",
+      "display_name",
+      "app_role",
+      "created_at",
+      "updated_at",
       "actions",
     ];
-  }
 
-  private setDataSource(): void {
-    this.store
-      .select(UserState.users)
-      .pipe(
-        untilDestroyed(this),
-        tap(() => {
-          const ds = new MatTableDataSource<User>(
-            this.store.selectSnapshot(UserState.users)
-          );
-          ds.sort = this.table().sort();
-          this.dataSource.set(ds);
-        })
-      )
-      .subscribe();
+    this.setInitialSortedColumn(
+      this.baseTableService.getPagedRequestCommand() as PagedTableInterface,
+      this.columns
+    );
   }
 
   private setupSelectionListener(): void {
-    this.table().selection.changed
-      .pipe(untilDestroyed(this))
+    this.table()
+      .selection.changed.pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         this.updateSelectionState();
       });
@@ -169,7 +166,7 @@ export class UserListComponent implements AfterViewInit {
 
     dialogRef.afterClosed().subscribe((refresh) => {
       if (refresh) {
-        this.dataSource.set(new MatTableDataSource<User>(this.store.selectSnapshot(UserState.users)));
+        this.getTableData();
       }
     });
   }
@@ -193,11 +190,11 @@ export class UserListComponent implements AfterViewInit {
   }
 
   public deleteUser(index: number) {
-    const users = this.store.selectSnapshot(UserState.users);
+    const users = this.dataSource().data;
     const userId = this.store.selectSnapshot(AuthState.userId);
     const user = users[index];
 
-    if (users[index].id.toString() !== userId) {
+    if (user.id.toString() !== userId) {
       const dialogRef = this.matDialog.open(
         ConfirmationDialogComponent,
         DEFAULT_DIALOG_CONFIG
@@ -215,9 +212,7 @@ export class UserListComponent implements AfterViewInit {
               tap(() => {
                 this.snackbarService.success("User successfully deleted");
                 this.store.dispatch(new RemoveUser(user.id.toString()));
-                this.dataSource.set(new MatTableDataSource<User>(
-                  this.store.selectSnapshot(UserState.users)
-                ));
+                this.getTableData();
               })
             )
             .subscribe();
@@ -229,9 +224,9 @@ export class UserListComponent implements AfterViewInit {
   public bulkDeleteUsers(): void {
     const selectedUsers = this.table().selection.selected;
     const currentUserId = this.store.selectSnapshot(AuthState.userId);
-    
+
     const usersToDelete = selectedUsers.filter(user => user.id.toString() !== currentUserId);
-    
+
     if (usersToDelete.length === 0) {
       this.snackbarService.error("Cannot delete current user or no valid users selected");
       return;
@@ -260,7 +255,7 @@ export class UserListComponent implements AfterViewInit {
               this.snackbarService.success(`${usersToDelete.length} user(s) successfully deleted`);
               this.store.dispatch(new RemoveUsers(bulkDeleteCommand.userIds));
               this.table().selection.clear();
-              this.dataSource.set(new MatTableDataSource<User>(this.store.selectSnapshot(UserState.users)));
+              this.getTableData();
             })
           )
           .subscribe();

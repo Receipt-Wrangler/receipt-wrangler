@@ -23,6 +23,12 @@
       [columns]="columns"
       [displayedColumns]="displayedColumns"
       [selectionCheckboxes]="true"
+      [pagination]="true"
+      [length]="totalCount()"
+      [page]="(page() || 1) - 1"
+      [pageSize]="pageSize() || 50"
+      (sorted)="sorted($event)"
+      (pageChange)="pageChanged($event)"
     ></app-table>
   </div>
 </div>

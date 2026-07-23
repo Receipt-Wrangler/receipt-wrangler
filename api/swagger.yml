@@ -1938,6 +1938,36 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /user/getPagedUsers:
+    post:
+      tags:
+        - User
+      summary: Gets paged users
+      description: This will return paged users
+      operationId: getPagedUsers
+      requestBody:
+        description: Paging and sorting data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PagedRequestCommand"
+      responses:
+        200:
+          description: Paged users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedData"
+        500:
+          $ref: "#/components/responses/Internal"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /user/{userId}:
     put:
       tags:
@@ -4614,6 +4644,7 @@ components:
               - $ref: "#/components/schemas/Activity"
               - $ref: "#/components/schemas/CustomField"
               - $ref: "#/components/schemas/ReportTemplate"
+              - $ref: "#/components/schemas/UserView"
         totalCount:
           type: integer
     FeatureConfig:
