@@ -104,6 +104,45 @@ export class ReceiptCommentsComponent implements OnInit {
     }
   }
 
+  // Ingests comments produced by magic fill. Mirrors addComment's per-mode
+  // handling: in add mode the comments ride the receipt-create submit (collect
+  // in the array + emit so the parent form picks them up), while in edit mode
+  // comments are individual resources the receipt-update submit ignores, so each
+  // is POSTed via CommentService just like a manually added edit-mode comment.
+  public addMagicFilledComments(comments: Comment[]): void {
+    const magicComments = comments ?? [];
+    if (magicComments.length === 0) {
+      return;
+    }
+
+    const mode = this.mode();
+    if (mode === FormMode.add) {
+      magicComments.forEach((comment) => {
+        this.commentsArray.push(this.buildCommentFormGroup(comment));
+      });
+      this.commentsUpdated.emit(this.commentsArray);
+    } else if (mode === FormMode.edit) {
+      magicComments.forEach((comment) => {
+        const newComment = {
+          comment: comment.comment,
+          userId: Number.parseInt(this.store.selectSnapshot(AuthState.userId)),
+          receiptId: this.receiptId(),
+        } as any;
+
+        this.commentService
+          .addComment(newComment)
+          .pipe(
+            take(1),
+            tap((createdComment: Comment) => {
+              this.internalComments.update((existing) => [...existing, createdComment]);
+              this.commentsArray.push(this.buildCommentFormGroup(newComment));
+            })
+          )
+          .subscribe();
+      });
+    }
+  }
+
   public deleteComment(index: number): void {
     switch (this.mode()) {
       case FormMode.edit:

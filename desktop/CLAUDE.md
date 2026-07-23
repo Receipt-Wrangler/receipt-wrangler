@@ -647,6 +647,32 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
     with the flag injected on, a **Legacy Editor** member (holds `group.receipts.quick-scan`) sees the button
     while the Viewer — same user, same flag — does not.
 
+## Magic Fill (receipt form)
+
+Distinct from Quick Scan (which creates a receipt entirely server-side): the ✨ **Magic Fill** button on the
+receipt form (`src/receipts/receipt-form/`, `magicFill()` → `patchMagicValues`) calls
+`POST /receiptImage/magicFill`, which returns the backend's fully-parsed `UpsertReceiptCommand`, and patches
+it **into the form** for the user to review before saving. `patchMagicValues` ingests the **whole** receipt —
+name/amount/date/paid-by/status, categories/tags, `receiptItems` (items **and** shares — items with a
+`chargedToUserId` — plus nested `linkedItems` and per-item categories/tags), `customFields`, and `comments` —
+reusing the form's existing builders (`buildItemForm`, `buildCustomOptionFormGroup`, and the comments child's
+`buildCommentFormGroup`) so `this.form.value` round-trips into `UpsertReceiptCommand` on submit with nothing
+dropped. Each field is reported filled (and named in the success toast, via a friendly-label map) **only when
+it actually changes the form**, so an empty or unmatched value never claims a phantom fill. Guarded by
+`receipt-form.component.spec.ts` → `describe("magicFill — full receipt ingest")`.
+
+Two cross-component seams support this (each with its own focused spec):
+- **Paid-by display:** `patchValue` updates the `paidByUserId` control but not the autocomplete's shown text
+  (the single-select display is seeded from the control only once on init), so
+  `AutocomleteComponent.syncSingleDisplay()` re-seeds it after the patch.
+- **Comments:** the `app-receipt-comments` child owns the comments array and is **mode-aware**, so Magic Fill
+  hands them to `ReceiptCommentsComponent.addMagicFilledComments()` — add mode collects them for the create
+  submit; edit mode POSTs each via `CommentService` because the receipt-**update** path does not persist
+  comments (they're individual resources — see `api/CLAUDE.md` → `UpdateReceipt`).
+- **Custom fields** reference a field by id only (the magic-fill response carries no field definition), so a
+  value whose `customFieldId` isn't in the loaded catalog pool is skipped, and adding one flips its
+  manage-fields menu entry to selected via an immutable array replace (zoneless CD).
+
 ## Reports (Report Builder)
 
 The **Report Builder** (`src/reports/`) is a two-pane screen for building and downloading receipt

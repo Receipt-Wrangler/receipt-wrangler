@@ -94,6 +94,18 @@ export class AutocomleteComponent
     this.filterFormControl.setValue(this.inputFormControl.value);
   }
 
+  // Re-seeds the single-select display from the current inputFormControl value.
+  // The visible field is driven by filterFormControl (rendered via displayWith)
+  // and is otherwise only seeded once in ngOnInit, so a programmatic value change
+  // (e.g. a parent form.patchValue) updates the value but not the shown text.
+  // Callers invoke this after such a change to refresh the display. No-op in
+  // multiple mode, which renders selections as chips from inputFormControl.
+  public syncSingleDisplay(): void {
+    if (!this.multiple) {
+      this.initSingleAutocomplete();
+    }
+  }
+
   public _filter(value: string): any[] {
     value = value ?? "";
     const filterValue = value.toString()?.toLowerCase();

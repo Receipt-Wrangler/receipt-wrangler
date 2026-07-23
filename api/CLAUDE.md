@@ -798,6 +798,19 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   and admin-bypass callers are a no-op). This closes a write bypass: the UI picker already limits picks
   to the granted catalog, but a crafted request could otherwise attach a category/tag the caller can't
   see.
+- **End-to-end ingest tests** (`services/quick_scan_ingest_test.go`): the AI is mocked at the HTTP
+  transport layer (a new mutable-body httptest server `newMutableOllamaServer` + `ollamaReceiptResponse`,
+  reusing `seedReceiptImagePipeline` from `receipt_image_test.go`), a controlled
+  receipt JSON is driven through the real `ReceiptService.QuickScan`, and the persisted receipt is read
+  back via `GetFullyLoadedReceiptById` to prove **every** field survives — name/amount/date/paid-by/
+  status, receipt- and item-level categories/tags, items (amount / status / `chargedToUserId` /
+  `isTaxed` / linked items), comments, and all five custom-field value types. This pins the
+  AI→`CreateReceipt` contract (which passes items/comments/customFields through untouched, so a future
+  prompt emitting them just works), plus the paid-by/status backfill, the category/tag merge, refunds
+  (negative amounts), and the all-or-nothing failure path (bad item status / invalid JSON persist
+  nothing). Note: `UpsertReceiptCommand.Validate` deliberately does **not** validate `CustomFields`
+  (unlike categories/tags/items/comments), so a custom-field value is persisted unchecked — the test
+  is the only guard against a regression that silently drops or mis-columns it.
 
 ## Reporting Engine (`internal/reporting`)
 
