@@ -1,8 +1,6 @@
 package services
 
 import (
-	"errors"
-	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
@@ -159,34 +157,136 @@ func TestVisibleUsers_AppUsersReadShortCircuits(t *testing.T) {
 	assertVisible(t, admin.ID, nil, true)
 }
 
-// An isolated member cannot add (invite) a user they cannot see; a visible user,
-// themselves, and any target for an unrestricted caller are allowed.
-func TestAuthorizeAddedMembersVisibility(t *testing.T) {
+func assertVisibleInGroup(t *testing.T, viewerId uint, groupId uint, wantIds []uint, wantUnrestricted bool) {
+	t.Helper()
+	service := NewPermissionService(nil)
+	set, unrestricted, err := service.GetVisibleUserIdsForUserInGroup(viewerId, groupId)
+	if err != nil {
+		t.Fatalf("per-group resolver error: %v", err)
+	}
+	if unrestricted != wantUnrestricted {
+		t.Fatalf("unrestricted = %v, want %v (set=%v)", unrestricted, wantUnrestricted, set)
+	}
+	if wantUnrestricted {
+		if set != nil {
+			t.Fatalf("unrestricted set should be nil, got %v", set)
+		}
+		return
+	}
+	if len(set) != len(wantIds) {
+		t.Fatalf("visible set = %v, want ids %v", set, wantIds)
+	}
+	for _, id := range wantIds {
+		if _, ok := set[id]; !ok {
+			t.Errorf("expected user %d visible, set = %v", id, set)
+		}
+	}
+}
+
+// The headline of the per-group rework: a viewer who shares an OPEN group with a peer
+// still cannot see that peer INSIDE an isolated group they also share. The union
+// resolver (the flat directory) does show the peer — the viewer legitimately knows them
+// from the open group — but the per-group resolver for the isolated group does not.
+// "Isolated means isolated."
+func TestVisibleUsersInGroup_OpenGroupPeerHiddenInIsolatedGroup(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	clearRolePermissionCacheAll()
 
-	group := seedIsoGroup(t, "iso-invite", true)
-	supRole := seedIsoRole(t, "iso-invite-sup", true)
-	memberRole := seedIsoRole(t, "iso-invite-mem", false)
-	a := seedIsoUser(t, "iso-invite-a")
-	coord := seedIsoUser(t, "iso-invite-coord")
-	b := seedIsoUser(t, "iso-invite-b")
-	seedIsoMember(t, group.ID, a.ID, &memberRole.ID)
-	seedIsoMember(t, group.ID, coord.ID, &supRole.ID)
-	seedIsoMember(t, group.ID, b.ID, &memberRole.ID)
+	iso := seedIsoGroup(t, "pg-iso", true)
+	open := seedIsoGroup(t, "pg-open", false)
+	supRole := seedIsoRole(t, "pg-sup", true)
+	memberRole := seedIsoRole(t, "pg-mem", false)
 
-	service := NewGroupService(nil)
+	viewer := seedIsoUser(t, "pg-viewer")
+	coord := seedIsoUser(t, "pg-coord")
+	peer := seedIsoUser(t, "pg-peer")
 
-	// A (isolated) cannot invite B (a non-visible peer).
-	if err := service.AuthorizeAddedMembersVisibility(a.ID, []commands.UpsertGroupMemberCommand{{UserID: b.ID}}); !errors.Is(err, ErrGroupMemberChangeForbidden) {
-		t.Fatalf("inviting a non-visible user should be forbidden, got %v", err)
+	// viewer + peer share BOTH the isolated group and the open group; coord is the
+	// isolated group's supervisor.
+	seedIsoMember(t, iso.ID, viewer.ID, &memberRole.ID)
+	seedIsoMember(t, iso.ID, coord.ID, &supRole.ID)
+	seedIsoMember(t, iso.ID, peer.ID, &memberRole.ID)
+	seedIsoMember(t, open.ID, viewer.ID, nil)
+	seedIsoMember(t, open.ID, peer.ID, nil)
+
+	// Per-group, INSIDE the isolated group: only self + supervisor. Peer is hidden
+	// despite the shared open group.
+	assertVisibleInGroup(t, viewer.ID, iso.ID, []uint{viewer.ID, coord.ID}, false)
+	// Per-group, INSIDE the open group: everyone (non-isolated).
+	assertVisibleInGroup(t, viewer.ID, open.ID, nil, true)
+	// The union resolver (flat directory) still lists the peer — known via the open group.
+	assertVisible(t, viewer.ID, []uint{viewer.ID, coord.ID, peer.ID}, false)
+}
+
+// A supervisor sees every member of the isolated group (unrestricted for that group).
+func TestVisibleUsersInGroup_SupervisorUnrestricted(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	iso := seedIsoGroup(t, "pg-sup-iso", true)
+	supRole := seedIsoRole(t, "pg-sup-role", true)
+	memberRole := seedIsoRole(t, "pg-sup-mem", false)
+	coord := seedIsoUser(t, "pg-sup-coord")
+	member := seedIsoUser(t, "pg-sup-member")
+	seedIsoMember(t, iso.ID, coord.ID, &supRole.ID)
+	seedIsoMember(t, iso.ID, member.ID, &memberRole.ID)
+
+	assertVisibleInGroup(t, coord.ID, iso.ID, nil, true)
+}
+
+// A non-isolated group is unrestricted for a plain member.
+func TestVisibleUsersInGroup_NonIsolatedUnrestricted(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	open := seedIsoGroup(t, "pg-open-only", false)
+	a := seedIsoUser(t, "pg-open-a")
+	b := seedIsoUser(t, "pg-open-b")
+	seedIsoMember(t, open.ID, a.ID, nil)
+	seedIsoMember(t, open.ID, b.ID, nil)
+
+	assertVisibleInGroup(t, a.ID, open.ID, nil, true)
+}
+
+// A non-member is unrestricted for a group they don't belong to: isolation only narrows
+// for actual isolated members, and a non-member is kept out by the membership/permission
+// gate, not by this filter (mirroring the paid-by resolver).
+func TestVisibleUsersInGroup_NonMemberUnrestricted(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	iso := seedIsoGroup(t, "pg-nonmember-iso", true)
+	memberRole := seedIsoRole(t, "pg-nonmember-mem", false)
+	member := seedIsoUser(t, "pg-nonmember-member")
+	outsider := seedIsoUser(t, "pg-nonmember-outsider")
+	seedIsoMember(t, iso.ID, member.ID, &memberRole.ID)
+
+	assertVisibleInGroup(t, outsider.ID, iso.ID, nil, true)
+}
+
+// app.users.read short-circuits the per-group resolver to unrestricted.
+func TestVisibleUsersInGroup_AppUsersReadShortCircuits(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	iso := seedIsoGroup(t, "pg-admin-iso", true)
+	memberRole := seedIsoRole(t, "pg-admin-mem", false)
+	admin := seedIsoUser(t, "pg-admin-user")
+	other := seedIsoUser(t, "pg-admin-other")
+	seedIsoMember(t, iso.ID, admin.ID, &memberRole.ID)
+	seedIsoMember(t, iso.ID, other.ID, &memberRole.ID)
+
+	appRole := models.AppRole{
+		Name:        "pg-app-admin-role",
+		Permissions: []models.AppRolePermission{{Permission: permissions.AppUsersRead}},
 	}
-	// A can invite the coordinator (visible) and add themselves.
-	if err := service.AuthorizeAddedMembersVisibility(a.ID, []commands.UpsertGroupMemberCommand{{UserID: coord.ID}, {UserID: a.ID}}); err != nil {
-		t.Fatalf("inviting a visible user + self should be allowed, got %v", err)
+	if err := repositories.GetDB().Create(&appRole).Error; err != nil {
+		t.Fatalf("seed app role: %v", err)
 	}
-	// The supervisor is unrestricted and may invite anyone.
-	if err := service.AuthorizeAddedMembersVisibility(coord.ID, []commands.UpsertGroupMemberCommand{{UserID: b.ID}}); err != nil {
-		t.Fatalf("an unrestricted caller should be able to invite anyone, got %v", err)
+	if err := repositories.GetDB().Model(&models.User{}).Where("id = ?", admin.ID).
+		Update("app_role_id", appRole.ID).Error; err != nil {
+		t.Fatalf("assign app role: %v", err)
 	}
+
+	assertVisibleInGroup(t, admin.ID, iso.ID, nil, true)
 }

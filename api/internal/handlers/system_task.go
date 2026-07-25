@@ -107,15 +107,15 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
-			// Member isolation: drop activities run by a user the caller may not
-			// see (a nil RanByUserId is a system action and is always kept). No-op
-			// for unrestricted callers (backward compatible).
+			// Member isolation: drop activities run by a user the caller may not see
+			// IN THAT ACTIVITY'S GROUP (a nil RanByUserId is a system action and is
+			// always kept). Resolved per group, so an isolated group hides its
+			// non-visible actors regardless of any open group the caller also shares.
 			token := structs.GetClaims(r)
-			visibleUserIds, unrestricted, err := services.NewPermissionService(nil).GetVisibleUserIdsForUser(token.UserId)
+			activities, err = filterActivitiesByVisibility(services.NewPermissionService(nil), token.UserId, activities)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
-			activities = filterActivitiesByVisibility(activities, visibleUserIds, unrestricted)
 
 			pagedData := structs.PagedData{}
 			data := make([]any, 0)
@@ -142,26 +142,48 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
-// filterActivitiesByVisibility drops activities run by a user the viewer may not
-// see under member-presence isolation. An activity with a nil RanByUserId is a
-// system action and is always kept. When the viewer is unrestricted the input is
-// returned unchanged (backward compatible).
-func filterActivitiesByVisibility(activities []structs.Activity, visibleUserIds map[uint]struct{}, unrestricted bool) []structs.Activity {
-	if unrestricted {
-		return activities
+// filterActivitiesByVisibility drops activities run by a user the viewer may not see IN
+// THAT ACTIVITY'S GROUP, under member-presence isolation. An activity with a nil
+// RanByUserId (system action) or a nil GroupId (no group to scope against) is always
+// kept. Visibility is resolved per group and memoized, so an isolated group hides its
+// non-visible actors regardless of any open group the viewer also shares; a group where
+// the viewer is unrestricted (admin, supervisor, non-isolated) keeps every actor.
+func filterActivitiesByVisibility(permissionService services.PermissionService, viewerId uint, activities []structs.Activity) ([]structs.Activity, error) {
+	if len(activities) == 0 {
+		return activities, nil
 	}
+
+	type groupVis struct {
+		visible      map[uint]struct{}
+		unrestricted bool
+	}
+	cache := map[uint]groupVis{}
 
 	visible := make([]structs.Activity, 0, len(activities))
 	for _, activity := range activities {
-		if activity.RanByUserId == nil {
+		if activity.RanByUserId == nil || activity.GroupId == nil {
 			visible = append(visible, activity)
 			continue
 		}
-		if _, ok := visibleUserIds[*activity.RanByUserId]; ok {
+		groupId := *activity.GroupId
+		v, ok := cache[groupId]
+		if !ok {
+			set, unrestricted, err := permissionService.GetVisibleUserIdsForUserInGroup(viewerId, groupId)
+			if err != nil {
+				return nil, err
+			}
+			v = groupVis{visible: set, unrestricted: unrestricted}
+			cache[groupId] = v
+		}
+		if v.unrestricted {
+			visible = append(visible, activity)
+			continue
+		}
+		if _, actorOk := v.visible[*activity.RanByUserId]; actorOk {
 			visible = append(visible, activity)
 		}
 	}
-	return visible
+	return visible, nil
 }
 
 func RerunActivity(w http.ResponseWriter, r *http.Request) {

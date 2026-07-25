@@ -640,67 +640,88 @@ is the **supervisor** exemption: its holders see every member of an isolated gro
 to every member. Both default `false`, so existing groups/roles/installs are unchanged (AutoMigrate adds
 the columns; no data migration).
 
-**Visible-set resolver.** `PermissionService.GetVisibleUserIdsForUser(viewerId)`
-(`services/member_visibility.go`) returns `(set, unrestricted, err)`. Invariants: **you always see
-yourself**; a holder of **`app.users.read` sees everyone** (unrestricted); membership in any
-non-isolated group — or an isolated group where the viewer holds a `SeesAllMembers` role — contributes
-all of that group's members; an isolated group where the viewer is a plain member contributes only that
-group's supervisors. **A viewer who is not an isolated (non-supervisor) member of any group returns
-`unrestricted == true`** — every filter below is then a no-op, which is exactly what preserves backward
-compatibility (non-isolated installs and every non-isolated member are byte-identical). Isolation only
-ever *narrows*. The resolver is NOT cached; callers resolve it once per request/batch (mirroring
-`PaidByListResolver`).
+**Isolation is resolved PER GROUP — "isolated means isolated."** Visibility is a function of
+**(viewer, group)**, never a union across the viewer's groups. Inside an isolated group you see only
+yourself + that group's supervisors, regardless of any other group you belong to. Co-members become
+visible **only** through a shared **non-isolated** group (open means open) — and even then only on that
+open group's own surfaces; the isolated group never leaks presence or settlement. This is deliberately
+allowed to leave a cross-group aggregate incomplete (a settlement/report total may omit a hidden group's
+dollars) — the truthful isolation guarantee wins.
 
-**Read enforcement — every surface a user identity can reach a client:**
-- **Directory + rosters** — `appData.users` and each group's `GroupMembers` are filtered to the
-  viewer's visible set at the **serialization boundary**: `services/auth.go` (AppData), the `GET /group/`
-  and `GET /group/{id}` handlers, and MCP `list_groups`. **Not** inside `GroupService.GetGroupsForUser` /
-  `UserRepository.GetAllUserViews` — those also feed internal accounting (`amount-owed`) and receipt
-  processing, which need the full roster.
-- **Receipts (row visibility)** — the visible set is intersected into the paid-by allowed set at the one
-  shared resolver (`services/paid_by_filter.go` `foldPaidByWithVisibility`), so a receipt whose
-  `paid_by_user_id` is non-visible disappears from every read surface at once (paged list, single GET,
+**Two resolvers** (`services/member_visibility.go`):
+- **`GetVisibleUserIdsForUserInGroup(viewerId, groupId)`** → `(set, unrestricted, err)` — the per-group
+  resolver used by **every group-scoped surface** and by settlement. `app.users.read` ⇒ unrestricted; a
+  **non-isolated** group ⇒ unrestricted; an isolated group where the viewer holds a **`SeesAllMembers`**
+  role ⇒ unrestricted; an isolated group where the viewer is a **plain member** ⇒ `{self} ∪` that group's
+  supervisors; a **non-member** ⇒ unrestricted (isolation only narrows for actual members — a non-member
+  is kept out by the membership/permission gate, mirroring the paid-by resolver). Not cached; a batch
+  spanning groups memoizes per group via `groupVisibilityResolver` / `visibleUserIdsByGroup` (the latter
+  resolves the AppData roster path in two queries total).
+- **`GetVisibleUserIdsForUser(viewerId)`** (the original UNION resolver, unchanged) is now used by
+  **exactly one** surface: the flat `appData.users` directory (`FilterVisibleUserViews`). The union is
+  mathematically the union of the per-group sets, so it already honors isolation (it never lists a peer
+  you share only an isolated group with) — it is the correct name-resolution table, since the roster
+  (`GroupMember`) carries only a `userId` and clients resolve the display name/avatar from this flat list.
+
+**Read enforcement — every surface a user identity can reach a client (all PER GROUP):**
+- **Directory** — `appData.users` uses the union resolver (above). **Rosters** — each group's
+  `GroupMembers` is filtered with **its own** per-group set at the serialization boundary
+  (`services/auth.go` AppData via `FilterGroupMembersForGroups`, the `GET /group/{id}` handler via
+  `FilterGroupMembersForGroup`, and MCP `list_groups`). **Not** inside `GroupService.GetGroupsForUser` /
+  `UserRepository.GetAllUserViews` — those also feed internal accounting and receipt processing.
+- **Receipts (row visibility)** — the per-group visible set is intersected into the paid-by allowed set
+  inside `paidByAllowedForGroup` (`services/paid_by_filter.go`), so a receipt whose `paid_by_user_id` is
+  non-visible **in its own group** disappears from every read surface at once (paged list, single GET,
   search, CSV export, duplicate, `GetReceiptsForGroupIds`, pie chart, report data).
-- **Field masking** — `services/member_masking.go` **nulls** user-reference fields whose id ∉ the visible
-  set: `BaseModel.CreatedBy`/`CreatedByString` on the receipt and every nested entity (items, linked
-  items, comments, custom-field values, image FileData), and item/linked-item `ChargedToUserId`. User
-  fields are nulled, **not** replaced with `(Restricted)` — presence must be hidden, not announced
-  (unlike category/tag grants). `paid_by_user_id` is never masked (row visibility already guarantees a
-  visible payer).
-- **Comments / activities (row drop)** — comments authored by a non-visible user are dropped from a
-  receipt payload; `GetActivitiesForGroups` drops rows whose `RanByUserId` is non-visible.
-- **Settlement** — `GetAmountOwedForUser` filters its per-user balance map to the visible set,
-  deliberately overriding the paid-by exemption for isolated viewers.
+- **Field masking** — `services/member_masking.go` resolves per `receipt.GroupId` (memoized across a
+  batch) and **nulls** user-reference fields whose id ∉ that receipt's group's visible set:
+  `BaseModel.CreatedBy`/`CreatedByString` on the receipt and every nested entity, and item/linked-item
+  `ChargedToUserId`. Fields are nulled, **not** replaced with `(Restricted)` — presence must be hidden,
+  not announced. `paid_by_user_id` is never masked (row visibility already guarantees a visible payer).
+- **Comments / activities (row drop)** — comments authored by a non-visible user are dropped;
+  `GetActivitiesForGroups` drops rows whose `RanByUserId` is non-visible **in that activity's group**.
+- **Settlement** — `GetAmountOwedForUser` resolves visibility **per the receipt's group as it folds each
+  item** into the counterparty balance map: a contribution counts only if the counterparty is visible in
+  that receipt's group. So an isolated group contributes nothing about a hidden member even in the
+  all-groups aggregate, while a shared open group contributes normally. This overrides the endpoint's
+  paid-by exemption for isolated viewers.
 - **Notifications** — the comment add/reply fan-out (`repositories/comments.go`, injected
-  `AuthorVisibilityResolver`) suppresses delivery to a recipient who can't see the comment author.
+  `AuthorVisibilityResolver func(authorId, recipientId, groupId)`) suppresses delivery to a recipient who
+  can't see the comment author in the receipt's group.
+- **Reporting + pie** — no dedicated code: reports read only through `ReportDataService.Rows` →
+  `PaidByListResolver` (per group), called once per group by `ReportService.loadRows`, so an isolated
+  group contributes only visible-payer receipts and an open group contributes everyone; the only
+  user-identity a report row exposes is `paid_by` (row-hidden, never masked).
 
-**Write-side guards (an isolated member must not expand their own visibility or plant a non-visible id):**
+**Write-side guards:**
 - **Receipt upsert** — `enforceReceiptMemberVisibilitySelection` rejects a `paidByUserId` or item
-  `chargedToUserId` outside the creator's visible set (403).
-- **Group-member invitation** — a non-supervisor/non-admin may only add users within their visible set:
-  inline in `GroupService.AuthorizeGroupMemberChanges` (update) and `AuthorizeAddedMembersVisibility`
-  (create). Without it an isolated member could add a guessed user id to a group they share and pull
-  that user into their own visible set.
+  `chargedToUserId` outside the creator's visible set **for the receipt's group** (403).
 - **Update preservation** — `enforceReceiptChargedToPreservation` blocks a restricted editor from saving
-  a receipt whose **stored** items are charged to a member they can't see: the wholesale item replace +
-  no stable item identity would silently drop the hidden charge (corrupting the split), so the edit is
-  rejected rather than lose data. **Known limitation** (same as item-level category/tag grants): letting
-  the edit proceed while preserving the hidden charge needs stable item identity — a separate change.
+  a receipt whose **stored** items are charged to a member they can't see in that group: the wholesale
+  item replace + no stable item identity would silently drop the hidden charge, so the edit is rejected
+  rather than lose data. **Known limitation** (same as item-level category/tag grants): preserving the
+  hidden charge needs stable item identity — a separate change.
+- **No member-invitation visibility guard.** Under per-group isolation, adding a user to a group never
+  widens visibility in any *other* group (and adding to an isolated group where the caller is a plain
+  member doesn't make the added user visible to the caller), so the old union-contamination attack is
+  gone. The dedicated member-visibility invite checks were **removed**; the GHSA-89mm CRUD-gate +
+  privilege-ceiling guard in `AuthorizeGroupMemberChanges` is untouched.
 
-**Operational invariant (not code-enforced):** a viewer's visibility is the UNION across their groups,
-so two isolated members must not also share a **non-isolated** group — someone who can see both (a
-supervisor/admin) could otherwise make them mutually visible through that open group. An isolated member
-cannot do this themselves (the invite guard blocks it).
+Co-members are visible only through a shared **non-isolated** group; an isolated group never leaks
+presence or settlement — no cross-group operational discipline is required (per-group makes a shared open
+group safe by design).
 
 **Persistence:** `isolateMembers` rides `UpsertGroupCommand` → `CreateGroup`/`UpdateGroup` (the update
 uses an explicit `Update("isolate_members", …)` so a toggle-off past the association `Omit` sticks);
 `seesAllMembers` rides `UpsertRoleCommand` → `CreateGroupRole`/`UpdateGroupRole` and is surfaced on
 `RoleView`, group scope only (mirroring `includeOwnPaidReceipts`). Both are on `swagger.yml`.
 
-**Tests:** `services/member_visibility_test.go` (resolver matrix + invite guard),
-`services/member_isolation_receipt_test.go`, `handlers/receipt_member_isolation_test.go`,
-`handlers/receipt_charge_preservation_test.go`, `handlers/system_task_test.go`, `handlers/users_test.go`
-(amount-owed), `services/member_visibility_notifications_test.go`, plus persistence round-trips in
+**Tests:** `services/member_visibility_test.go` (union + per-group resolver matrix, incl. the headline
+"open-group peer hidden inside the isolated group"), `services/member_isolation_receipt_test.go`,
+`services/report_data_test.go` (reporting isolation), `handlers/receipt_member_isolation_test.go`,
+`handlers/receipt_charge_preservation_test.go`, `handlers/system_task_test.go` (per-group activity drop),
+`handlers/users_test.go` (settlement incl. the cross-group isolated/open case),
+`services/member_visibility_notifications_test.go`, plus persistence round-trips in
 `repositories/groups_test.go` / `repositories/roles_grants_test.go` / `services/roles_test.go` /
 `commands/upsert_role_command_test.go`.
 

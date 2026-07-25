@@ -1,51 +1,65 @@
 package handlers
 
 import (
+	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"testing"
 )
 
-func activityRunBy(id uint) structs.Activity {
-	return structs.Activity{RanByUserId: &id}
+func activityInGroup(ranBy uint, groupId uint) structs.Activity {
+	return structs.Activity{RanByUserId: &ranBy, GroupId: &groupId}
 }
 
-func systemActivity() structs.Activity {
-	return structs.Activity{RanByUserId: nil}
-}
-
-// An isolated (restricted) viewer sees only activities run by users in their
-// visible set; a system activity (nil RanByUserId) is always kept.
+// An isolated (restricted) viewer sees only activities run by users visible to them IN
+// THAT ACTIVITY'S GROUP; a system activity (nil RanByUserId) is always kept.
 func TestFilterActivitiesByVisibilityDropsInvisibleActor(t *testing.T) {
-	visibleUserIds := map[uint]struct{}{1: {}, 3: {}} // self + a supervisor
+	defer repositories.TruncateTestDb()
 
+	fx := seedIsolatedReceiptGroupHandler(t, true)
+	permissionService := services.NewPermissionService(nil)
+
+	groupId := fx.groupId
 	activities := []structs.Activity{
-		activityRunBy(2), // invisible peer -> dropped
-		activityRunBy(3), // visible supervisor -> kept
-		systemActivity(), // system -> kept
+		activityInGroup(fx.memberBId, fx.groupId),    // invisible peer -> dropped
+		activityInGroup(fx.supervisorId, fx.groupId), // visible supervisor -> kept
+		activityInGroup(fx.memberAId, fx.groupId),    // self -> kept
+		{RanByUserId: nil, GroupId: &groupId},        // system action -> kept
 	}
 
-	filtered := filterActivitiesByVisibility(activities, visibleUserIds, false)
-
-	if len(filtered) != 2 {
-		t.Fatalf("expected 2 visible activities, got %d (%v)", len(filtered), filtered)
+	filtered, err := filterActivitiesByVisibility(permissionService, fx.memberAId, activities)
+	if err != nil {
+		t.Fatalf("filter: %v", err)
+	}
+	if len(filtered) != 3 {
+		t.Fatalf("expected 3 visible activities, got %d (%v)", len(filtered), filtered)
 	}
 	for _, activity := range filtered {
-		if activity.RanByUserId != nil && *activity.RanByUserId == 2 {
-			t.Errorf("activity run by invisible user 2 should be dropped")
+		if activity.RanByUserId != nil && *activity.RanByUserId == fx.memberBId {
+			t.Errorf("activity run by invisible peer %d should be dropped", fx.memberBId)
 		}
 	}
 }
 
-// An unrestricted viewer is unaffected — every activity is kept unchanged.
+// A viewer unrestricted in the activity's group (here the supervisor of an isolated
+// group) keeps every activity unchanged.
 func TestFilterActivitiesByVisibilityUnrestrictedKeepsAll(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	fx := seedIsolatedReceiptGroupHandler(t, true)
+	permissionService := services.NewPermissionService(nil)
+
+	groupId := fx.groupId
 	activities := []structs.Activity{
-		activityRunBy(2),
-		activityRunBy(3),
-		systemActivity(),
+		activityInGroup(fx.memberAId, fx.groupId),
+		activityInGroup(fx.memberBId, fx.groupId),
+		{RanByUserId: nil, GroupId: &groupId},
 	}
 
-	filtered := filterActivitiesByVisibility(activities, nil, true)
-
+	filtered, err := filterActivitiesByVisibility(permissionService, fx.supervisorId, activities)
+	if err != nil {
+		t.Fatalf("filter: %v", err)
+	}
 	if len(filtered) != len(activities) {
 		t.Fatalf("unrestricted viewer should keep all %d activities, got %d", len(activities), len(filtered))
 	}

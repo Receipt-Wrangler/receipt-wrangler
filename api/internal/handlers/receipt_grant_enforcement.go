@@ -51,17 +51,17 @@ func enforceReceiptGrantSelection(userId uint, groupId uint, command commands.Up
 
 // enforceReceiptMemberVisibilitySelection checks that every user id a receipt upsert
 // plants — the payer (paidByUserId) and each item/linked-item chargedToUserId — is
-// within the creator's member-visible set, so an isolated member cannot attach a user
-// they may not see (which would leak that user's presence, or hand them a
-// receipt/charge). It mirrors enforceReceiptGrantSelection: returns (allowed,
-// denyMessage, error), and the caller responds 403 with denyMessage when not allowed.
-// No-op when the creator is unrestricted.
-func enforceReceiptMemberVisibilitySelection(userId uint, command commands.UpsertReceiptCommand) (bool, string, error) {
+// within the creator's member-visible set FOR THE RECEIPT'S GROUP, so an isolated member
+// cannot attach a user they may not see in that group (which would leak that user's
+// presence, or hand them a receipt/charge). It mirrors enforceReceiptGrantSelection:
+// returns (allowed, denyMessage, error), and the caller responds 403 with denyMessage
+// when not allowed. No-op when the creator is unrestricted in that group.
+func enforceReceiptMemberVisibilitySelection(userId uint, groupId uint, command commands.UpsertReceiptCommand) (bool, string, error) {
 	permissionService := services.NewPermissionService(nil)
 
 	chargedToUserIds := collectReceiptChargedToUserIds(command)
 
-	ok, err := permissionService.ValidateReceiptUserSelection(userId, command.PaidByUserID, chargedToUserIds)
+	ok, err := permissionService.ValidateReceiptUserSelection(userId, groupId, command.PaidByUserID, chargedToUserIds)
 	if err != nil {
 		return false, "", err
 	}
@@ -84,7 +84,7 @@ func enforceReceiptMemberVisibilitySelection(userId uint, command commands.Upser
 func enforceReceiptChargedToPreservation(userId uint, current models.Receipt) (bool, string, error) {
 	permissionService := services.NewPermissionService(nil)
 
-	visible, unrestricted, err := permissionService.GetVisibleUserIdsForUser(userId)
+	visible, unrestricted, err := permissionService.GetVisibleUserIdsForUserInGroup(userId, current.GroupId)
 	if err != nil {
 		return false, "", err
 	}

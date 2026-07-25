@@ -14,12 +14,12 @@ type CommentRepository struct {
 }
 
 // AuthorVisibilityResolver reports whether a notification recipient is allowed to
-// see the comment's author (member-presence isolation). It lets the comment
-// repository suppress a notification whose body names an author the recipient may
-// not see, without importing the service layer that resolves visibility (mirroring
-// the PaidByAllowedResolver injection). A nil resolver disables suppression, so
-// every recipient receives (backward compatible).
-type AuthorVisibilityResolver func(authorId uint, recipientId uint) (canSeeAuthor bool, err error)
+// see the comment's author WITHIN the receipt's group (member-presence isolation). It
+// lets the comment repository suppress a notification whose body names an author the
+// recipient may not see in that group, without importing the service layer that
+// resolves visibility (mirroring the PaidByAllowedResolver injection). A nil resolver
+// disables suppression, so every recipient receives (backward compatible).
+type AuthorVisibilityResolver func(authorId uint, recipientId uint, groupId uint) (canSeeAuthor bool, err error)
 
 func NewCommentRepository(tx *gorm.DB) CommentRepository {
 	repository := CommentRepository{BaseRepository: BaseRepository{
@@ -156,7 +156,7 @@ func (repository CommentRepository) sendNotificationsToUsers(comment models.Comm
 			return err
 		}
 
-		hiddenRecipients, err := omitRecipientsWhoCannotSeeAuthor(authorId, threadUsers, authorVisibleTo)
+		hiddenRecipients, err := omitRecipientsWhoCannotSeeAuthor(authorId, threadUsers, receipt.GroupId, authorVisibleTo)
 		if err != nil {
 			return err
 		}
@@ -190,13 +190,13 @@ func (repository CommentRepository) recipientsWhoCannotSeeAuthor(authorId uint, 
 		recipientIds = append(recipientIds, member.UserID)
 	}
 
-	return omitRecipientsWhoCannotSeeAuthor(authorId, recipientIds, authorVisibleTo)
+	return omitRecipientsWhoCannotSeeAuthor(authorId, recipientIds, groupId, authorVisibleTo)
 }
 
 // omitRecipientsWhoCannotSeeAuthor evaluates each candidate recipient against the
-// author-visibility resolver and returns those who may not see the author. The
-// author is never included. A nil resolver returns no ids.
-func omitRecipientsWhoCannotSeeAuthor(authorId uint, recipientIds []uint, authorVisibleTo AuthorVisibilityResolver) ([]interface{}, error) {
+// author-visibility resolver (scoped to groupId) and returns those who may not see the
+// author. The author is never included. A nil resolver returns no ids.
+func omitRecipientsWhoCannotSeeAuthor(authorId uint, recipientIds []uint, groupId uint, authorVisibleTo AuthorVisibilityResolver) ([]interface{}, error) {
 	if authorVisibleTo == nil {
 		return nil, nil
 	}
@@ -207,7 +207,7 @@ func omitRecipientsWhoCannotSeeAuthor(authorId uint, recipientIds []uint, author
 			continue
 		}
 
-		canSee, err := authorVisibleTo(authorId, recipientId)
+		canSee, err := authorVisibleTo(authorId, recipientId, groupId)
 		if err != nil {
 			return nil, err
 		}

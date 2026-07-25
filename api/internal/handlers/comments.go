@@ -43,12 +43,13 @@ func AddComment(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			commentRepository := repositories.NewCommentRepository(nil)
 
-			// Member isolation: a recipient who may not see the comment author must
-			// not receive an author-revealing notification. Resolve visibility from
-			// the recipient's side; unrestricted recipients always receive.
+			// Member isolation: a recipient who may not see the comment author IN THE
+			// RECEIPT'S GROUP must not receive an author-revealing notification.
+			// Resolve visibility per group from the recipient's side; unrestricted
+			// recipients always receive.
 			permissionService := services.NewPermissionService(nil)
-			authorVisibleTo := func(authorId uint, recipientId uint) (bool, error) {
-				visibleUserIds, unrestricted, err := permissionService.GetVisibleUserIdsForUser(recipientId)
+			authorVisibleTo := func(authorId uint, recipientId uint, groupId uint) (bool, error) {
+				visibleUserIds, unrestricted, err := permissionService.GetVisibleUserIdsForUserInGroup(recipientId, groupId)
 				if err != nil {
 					return false, err
 				}

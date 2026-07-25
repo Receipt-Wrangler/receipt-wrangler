@@ -387,7 +387,7 @@ func TestMemberIsolation_ValidateReceiptUserSelection(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			allowed, err := service.ValidateReceiptUserSelection(c.viewer, c.paidBy, c.chargedTo)
+			allowed, err := service.ValidateReceiptUserSelection(c.viewer, fx.groupId, c.paidBy, c.chargedTo)
 			if err != nil {
 				t.Fatalf("ValidateReceiptUserSelection: %v", err)
 			}
@@ -460,7 +460,7 @@ func TestMemberIsolation_BackwardCompat_NonIsolatedMemberUnaffected(t *testing.T
 	}
 
 	// Write guard: the viewer may reference the peer.
-	allowed, err := service.ValidateReceiptUserSelection(viewer, peer, []uint{peer})
+	allowed, err := service.ValidateReceiptUserSelection(viewer, group.ID, peer, []uint{peer})
 	if err != nil {
 		t.Fatalf("ValidateReceiptUserSelection: %v", err)
 	}

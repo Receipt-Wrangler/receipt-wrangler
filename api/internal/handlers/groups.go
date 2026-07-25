@@ -210,16 +210,6 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 
 			token := structs.GetClaims(r)
 
-			// Member-presence isolation: an isolated creator may only add members
-			// they can already see (no-op for unrestricted callers).
-			groupService := services.NewGroupService(nil)
-			if err := groupService.AuthorizeAddedMembersVisibility(token.UserId, command.GroupMembers); err != nil {
-				if errors.Is(err, services.ErrGroupMemberChangeForbidden) {
-					return http.StatusForbidden, err
-				}
-				return http.StatusInternalServerError, err
-			}
-
 			command.IsAllGroup = false
 			groupRepository := repositories.NewGroupRepository(nil)
 			group, err := groupRepository.CreateGroup(command, token.UserId)

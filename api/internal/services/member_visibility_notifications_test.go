@@ -12,8 +12,8 @@ import (
 // notification suppression is exercised end-to-end.
 func authorVisibleToResolver() repositories.AuthorVisibilityResolver {
 	permissionService := NewPermissionService(nil)
-	return func(authorId uint, recipientId uint) (bool, error) {
-		visible, unrestricted, err := permissionService.GetVisibleUserIdsForUser(recipientId)
+	return func(authorId uint, recipientId uint, groupId uint) (bool, error) {
+		visible, unrestricted, err := permissionService.GetVisibleUserIdsForUserInGroup(recipientId, groupId)
 		if err != nil {
 			return false, err
 		}

@@ -452,6 +452,39 @@ func TestGetAmountOwedForUserUnrestrictedViewerUnaffectedByIsolation(t *testing.
 	assertOwed(t, result, 2, 10)
 }
 
+// Cross-group settlement: a counterparty shared via an OPEN group still appears (for
+// that group's portion), while their contribution from an ISOLATED group where the
+// caller cannot see them is excluded. "Isolated means isolated" — the isolated portion
+// is dropped even though the caller knows the counterparty from the open group.
+func TestGetAmountOwedForUserCrossGroupExcludesIsolatedPortionKeepsOpen(t *testing.T) {
+	defer tearDownUserTest()
+	setupIsolatedAmountOwedTest(t) // group 1 isolated (sup=3); user 1 is the restricted caller
+
+	// User 1 and user 2 ALSO share the OPEN group 2; user 1 may read both groups.
+	grantGroupPerms(t, 1, 2, permissions.GroupReceiptsRead)
+	grantGroupPerms(t, 2, 2, permissions.GroupReceiptsRead)
+
+	// Isolated group 1: user 2 (invisible peer here) paid, item charged to user 1 ($10).
+	r1 := createReceiptWithItems(t, "Iso peer paid", 10, 2, 1, []commands.UpsertItemCommand{
+		chargedItem("iso item", 10, 1),
+	})
+	// Open group 2: user 2 (visible here) paid, item charged to user 1 ($15).
+	r2 := createReceiptWithItems(t, "Open peer paid", 15, 2, 2, []commands.UpsertItemCommand{
+		chargedItem("open item", 15, 1),
+	})
+
+	w, result := callGetAmountOwed(1, "", []string{
+		utils.UintToString(r1.ID), utils.UintToString(r2.ID),
+	})
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+		return
+	}
+
+	// Only the open-group portion counts; the isolated-group portion is excluded.
+	assertOwed(t, result, 2, 15)
+}
+
 // --- A. Authorization ---------------------------------------------------
 
 func TestGetAmountOwedForUserReturnsForbiddenWhenCallerNotInGroup(t *testing.T) {

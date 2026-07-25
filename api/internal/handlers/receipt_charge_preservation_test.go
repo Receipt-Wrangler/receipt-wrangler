@@ -49,7 +49,7 @@ func TestEnforceReceiptChargedToPreservation(t *testing.T) {
 	}
 
 	// A stored item charged to B (non-visible peer) → editing is blocked for A.
-	chargedToB := models.Receipt{ReceiptItems: []models.Item{{ChargedToUserId: &b.ID}}}
+	chargedToB := models.Receipt{GroupId: group.ID, ReceiptItems: []models.Item{{ChargedToUserId: &b.ID}}}
 	allowed, message, err := enforceReceiptChargedToPreservation(a.ID, chargedToB)
 	if err != nil {
 		t.Fatalf("preservation check errored: %v", err)
@@ -62,7 +62,7 @@ func TestEnforceReceiptChargedToPreservation(t *testing.T) {
 	}
 
 	// A stored item charged to the coordinator (visible) → allowed.
-	chargedToCoord := models.Receipt{ReceiptItems: []models.Item{{ChargedToUserId: &coord.ID}}}
+	chargedToCoord := models.Receipt{GroupId: group.ID, ReceiptItems: []models.Item{{ChargedToUserId: &coord.ID}}}
 	allowed, _, err = enforceReceiptChargedToPreservation(a.ID, chargedToCoord)
 	if err != nil {
 		t.Fatalf("preservation check errored: %v", err)

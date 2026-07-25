@@ -200,8 +200,8 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// An isolated member may not plant a payer or charged-to user outside
-			// their member-visible set.
-			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, command)
+			// their member-visible set for the group.
+			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, command.GroupId, command)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -524,8 +524,8 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// An isolated member may not plant a payer or charged-to user outside
-			// their member-visible set.
-			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, command)
+			// their member-visible set for the group.
+			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, currentReceipt.GroupId, command)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

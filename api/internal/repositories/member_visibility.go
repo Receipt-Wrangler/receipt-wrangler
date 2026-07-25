@@ -14,6 +14,30 @@ type ViewerGroupRow struct {
 	ViewerSeesAll  *bool
 }
 
+// GetViewerGroupRow returns the single (viewer, group) membership row — the group's
+// isolation flag and whether the viewer's role there sees all members — or found=false
+// when the viewer is not a member of the group. It is the single-group counterpart of
+// GetViewerGroupRows, used by the per-group visibility resolver.
+func (repository GroupMemberRepository) GetViewerGroupRow(viewerId uint, groupId uint) (ViewerGroupRow, bool, error) {
+	db := repository.GetDB()
+	var rows []ViewerGroupRow
+
+	err := db.Table("group_members AS gm").
+		Select("gm.group_id AS group_id, g.isolate_members AS isolate_members, grd.sees_all_members AS viewer_sees_all").
+		Joins("JOIN groups AS g ON g.id = gm.group_id").
+		Joins("LEFT JOIN group_role_definitions AS grd ON grd.id = gm.group_role_id").
+		Where("gm.user_id = ? AND gm.group_id = ?", viewerId, groupId).
+		Limit(1).
+		Scan(&rows).Error
+	if err != nil {
+		return ViewerGroupRow{}, false, err
+	}
+	if len(rows) == 0 {
+		return ViewerGroupRow{}, false, nil
+	}
+	return rows[0], true, nil
+}
+
 // GetViewerGroupRows returns, for each group the viewer belongs to, the group's
 // isolation flag and whether the viewer's role there sees all members. Nullable
 // ViewerSeesAll avoids a cross-engine COALESCE on a boolean column.
@@ -74,4 +98,36 @@ func (repository GroupMemberRepository) GetSupervisorUserIdsInGroups(groupIds []
 	}
 
 	return ids, nil
+}
+
+// GetSupervisorUserIdsByGroup returns a map of group_id -> distinct supervisor user ids
+// (members whose group role is flagged SeesAllMembers) across the given groups, so a
+// multi-group roster filter resolves every group's supervisors in ONE query rather than
+// one per group. A group with no supervisors is simply absent from the map.
+func (repository GroupMemberRepository) GetSupervisorUserIdsByGroup(groupIds []uint) (map[uint][]uint, error) {
+	result := map[uint][]uint{}
+	if len(groupIds) == 0 {
+		return result, nil
+	}
+
+	type supervisorRow struct {
+		GroupID uint
+		UserID  uint
+	}
+	var rows []supervisorRow
+	err := repository.GetDB().
+		Table("group_members AS gm").
+		Select("gm.group_id AS group_id, gm.user_id AS user_id").
+		Joins("JOIN group_role_definitions AS grd ON grd.id = gm.group_role_id").
+		Where("gm.group_id IN ? AND grd.sees_all_members = ?", groupIds, true).
+		Distinct().
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		result[row.GroupID] = append(result[row.GroupID], row.UserID)
+	}
+	return result, nil
 }

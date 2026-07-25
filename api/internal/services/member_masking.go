@@ -20,28 +20,25 @@ import (
 //     author would still reveal that the comment (and thus the author's activity)
 //     exists.
 //
-// All of it is a no-op when the viewer is unrestricted (admins, and anyone not an
-// isolated member), so non-isolated installs and unrestricted viewers are
-// byte-identical to before. The member-visible set is resolved once per pass.
+// All of it is a no-op for a receipt whose group does not restrict the viewer (admins,
+// supervisors, and non-isolated groups), so non-isolated installs and unrestricted
+// viewers are byte-identical to before. The member-visible set is resolved PER RECEIPT'S
+// GROUP (memoized across a batch), so a batch spanning an isolated and an open group
+// masks each receipt against its own group's set.
 
 // MaskReceiptsForMemberVisibility masks non-visible user references and drops
-// non-visible comment authors across a batch of receipts, resolving the viewer's
-// member-visible set once. No-op when the viewer is unrestricted.
+// non-visible comment authors across a batch of receipts, resolving each receipt's
+// group's member-visible set (memoized). No-op for receipts whose group is unrestricted.
 func (service PermissionService) MaskReceiptsForMemberVisibility(viewerId uint, receipts []models.Receipt) error {
 	if len(receipts) == 0 {
 		return nil
 	}
 
-	masker, err := service.newReceiptMemberMasker(viewerId)
-	if err != nil {
-		return err
-	}
-	if masker.unrestricted {
-		return nil
-	}
-
+	masker := service.newReceiptMemberMasker(viewerId)
 	for i := range receipts {
-		masker.apply(&receipts[i])
+		if err := masker.apply(&receipts[i]); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -54,42 +51,39 @@ func (service PermissionService) MaskReceiptForMemberVisibility(viewerId uint, r
 		return nil
 	}
 
-	masker, err := service.newReceiptMemberMasker(viewerId)
-	if err != nil {
-		return err
-	}
-	if masker.unrestricted {
-		return nil
-	}
-
-	masker.apply(receipt)
-	return nil
+	masker := service.newReceiptMemberMasker(viewerId)
+	return masker.apply(receipt)
 }
 
-// receiptMemberMasker caches the viewer's resolved member-visible set for the
-// lifetime of one masking pass so a batch of receipts resolves it exactly once.
+// receiptMemberMasker resolves the viewer's member-visible set per receipt's group
+// (memoized by the groupVisibilityResolver) so a batch spanning several groups resolves
+// each group's set exactly once. visible is the current receipt's set, set in apply.
 type receiptMemberMasker struct {
-	viewerId     uint
-	visible      map[uint]struct{}
-	unrestricted bool
+	viewerId uint
+	resolver *groupVisibilityResolver
+	visible  map[uint]struct{}
 }
 
-func (service PermissionService) newReceiptMemberMasker(viewerId uint) (*receiptMemberMasker, error) {
-	visible, unrestricted, err := service.GetVisibleUserIdsForUser(viewerId)
-	if err != nil {
-		return nil, err
-	}
-
+func (service PermissionService) newReceiptMemberMasker(viewerId uint) *receiptMemberMasker {
 	return &receiptMemberMasker{
-		viewerId:     viewerId,
-		visible:      visible,
-		unrestricted: unrestricted,
-	}, nil
+		viewerId: viewerId,
+		resolver: service.newGroupVisibilityResolver(viewerId),
+	}
 }
 
 // apply masks non-visible user references and drops non-visible comment authors on a
-// receipt and every nested serialized entity.
-func (masker *receiptMemberMasker) apply(receipt *models.Receipt) {
+// receipt and every nested serialized entity, using the receipt's group's visible set.
+// No-op when that group does not restrict the viewer.
+func (masker *receiptMemberMasker) apply(receipt *models.Receipt) error {
+	visible, unrestricted, err := masker.resolver.forGroup(receipt.GroupId)
+	if err != nil {
+		return err
+	}
+	if unrestricted {
+		return nil
+	}
+	masker.visible = visible
+
 	masker.maskBaseModel(&receipt.BaseModel)
 
 	for i := range receipt.ReceiptItems {
@@ -109,6 +103,7 @@ func (masker *receiptMemberMasker) apply(receipt *models.Receipt) {
 	}
 
 	receipt.Comments = masker.filterComments(receipt.Comments)
+	return nil
 }
 
 // maskItem masks an item's creator and its charged-to user reference.

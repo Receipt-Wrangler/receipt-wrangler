@@ -47,31 +47,6 @@ func NewGroupService(tx *gorm.DB) GroupService {
 //     permissions are a subset of the caller's own current group permissions. This
 //     is what actually prevents self-escalation to owner and eviction of a
 //     more-privileged member.
-// AuthorizeAddedMembersVisibility rejects any member the caller is adding whom the
-// caller may not see, for member-presence isolation. Self is always allowed, and
-// unrestricted callers (admins/supervisors, and every caller on a non-isolated
-// install) are exempt. Used by the create-group path; the update path enforces the
-// same rule inline in AuthorizeGroupMemberChanges.
-func (service GroupService) AuthorizeAddedMembersVisibility(callerId uint, members []commands.UpsertGroupMemberCommand) error {
-	permissionService := NewPermissionService(service.TX)
-	visibleUsers, unrestricted, err := permissionService.GetVisibleUserIdsForUser(callerId)
-	if err != nil {
-		return err
-	}
-	if unrestricted {
-		return nil
-	}
-	for _, member := range members {
-		if member.UserID == callerId {
-			continue
-		}
-		if _, ok := visibleUsers[member.UserID]; !ok {
-			return ErrGroupMemberChangeForbidden
-		}
-	}
-	return nil
-}
-
 func (service GroupService) AuthorizeGroupMemberChanges(callerId uint, groupId uint, submitted []commands.UpsertGroupMemberCommand) error {
 	permissionService := NewPermissionService(service.TX)
 	roleRepository := repositories.NewRoleRepository(service.TX)
@@ -83,16 +58,6 @@ func (service GroupService) AuthorizeGroupMemberChanges(callerId uint, groupId u
 	hasCreate := permissions.HasAll(callerPerms, permissions.GroupMembersCreate)
 	hasUpdate := permissions.HasAll(callerPerms, permissions.GroupMembersUpdate)
 	hasDelete := permissions.HasAll(callerPerms, permissions.GroupMembersDelete)
-
-	// Member-presence isolation: an isolated caller may only add users they can
-	// already see. Without this a caller could enumerate/guess a non-visible user's
-	// id and pull them into a group they share, expanding their own visible set and
-	// defeating isolation. Unrestricted callers (admins, supervisors, and everyone
-	// on a non-isolated install) are exempt.
-	visibleUsers, visibleUnrestricted, err := permissionService.GetVisibleUserIdsForUser(callerId)
-	if err != nil {
-		return err
-	}
 
 	var existingMembers []models.GroupMember
 	if err := service.GetDB().Where("group_id = ?", groupId).Find(&existingMembers).Error; err != nil {
@@ -162,13 +127,6 @@ func (service GroupService) AuthorizeGroupMemberChanges(callerId uint, groupId u
 		if !isExisting {
 			if !hasCreate {
 				return ErrGroupMemberChangeForbidden
-			}
-			// The added user must be within the caller's visible set (self always
-			// allowed). Isolation-only: a no-op for unrestricted callers.
-			if !visibleUnrestricted && member.UserID != callerId {
-				if _, ok := visibleUsers[member.UserID]; !ok {
-					return ErrGroupMemberChangeForbidden
-				}
 			}
 			canAssign, err := callerCanWield(member.GroupRoleID)
 			if err != nil {

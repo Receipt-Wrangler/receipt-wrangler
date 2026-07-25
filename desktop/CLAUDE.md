@@ -246,9 +246,15 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   can see, and be seen by, all members"** `app-checkbox` in `role-form` (a "Member visibility" `rw-card`
   inside the `@if (showGrants())` block), bound to `seesAllMembers` on the `UpsertRoleCommand` (mirrors
   `includeOwnPaidReceipts`; hydrates on edit, resets on type switch, serialized only for GROUP scope).
-  Everything else is enforced **server-side** — the desktop simply receives the already-filtered
-  `appData.users` / group rosters / receipts, so no client-side filtering is needed (and mobile needs no
-  change). The larger `UserAccessService` / `UserView`-retype consolidation is a deferred follow-up.
+  Isolation is resolved **per group** on the backend ("isolated means isolated" — an isolated group hides
+  co-members and their settlement/report data regardless of any other group you share; co-members are
+  visible only through a shared **non-isolated** group). Everything is enforced **server-side** — the
+  desktop simply receives the already-filtered `appData.users` (union name-table) and per-group filtered
+  group rosters / receipts / Group-Summary settlement, so no client-side filtering is needed (and mobile
+  needs no change). This works because every group-context user picker sources its SET from the group
+  roster (`group.groupMembers`) or `roster ∩ flat-list`, using the flat `UserState.users` only to resolve
+  a name/avatar by id (see `GroupMemberUserService.getUsersInGroup`). The larger `UserAccessService` /
+  `UserView`-retype consolidation is a deferred follow-up.
 - **Permission-based UI gating.** The UI gates on the user's effective permissions, mirroring the
   backend's enforcement. Permissions are delivered on **AppData** (`appPermissions: string[]` and
   `groupPermissions: { [groupId]: string[] }`) and stored in `AuthState` via the dedicated
