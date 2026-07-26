@@ -32,10 +32,15 @@ export class DashboardState {
   }
 
   @Action(SetDashboardsForGroup)
-  async setReceiptFilterData(
+  setDashboardsForGroup(
     { patchState, getState }: StateContext<DashboardStateInterface>,
     payload: SetDashboardsForGroup
   ) {
+    // Return the observable so NGXS awaits the HTTP request before completing the
+    // dispatch. Previously this subscribed internally and returned a Subscription,
+    // so the dispatch (and the route resolver that relies on it) completed before
+    // the dashboards loaded — the root cause of dashboards not rendering on a
+    // group switch.
     return this.dashboardService
       .getDashboardsForUserByGroupId(payload.groupId)
       .pipe(
@@ -45,8 +50,7 @@ export class DashboardState {
           newDashboards[payload.groupId] = dashboards;
           patchState({ dashboards: newDashboards });
         })
-      )
-      .subscribe();
+      );
   }
 
   @Action(AddDashboardToGroup)
@@ -91,9 +95,6 @@ export class DashboardState {
     newDashboards[payload.groupId] = groupDashboards.filter(
       (dashboard) => dashboard.id !== payload.dashboardId
     );
-
-    console.warn(payload.dashboardId);
-    console.warn(newDashboards);
 
     patchState({ dashboards: newDashboards });
   }
