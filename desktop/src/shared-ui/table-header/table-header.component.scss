@@ -1,6 +1,15 @@
 @use "sass:map";
 @use "../../variables.scss" as variables;
 
+// This header sits directly above a list page's table, so it owns the vertical
+// rhythm: a small gap above and a larger gap below to separate it from the
+// table. Applying it on :host makes every list page inherit the same spacing
+// (the reporting and roles pages keep their own identical page-scoped rules).
+:host {
+  display: block;
+  margin: variables.$spacing-sm 0 variables.$spacing-lg;
+}
+
 .table-header__subtitle {
   color: map.get(variables.$accent-palette, 500);
   font-size: 14px;
