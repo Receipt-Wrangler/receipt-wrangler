@@ -324,7 +324,9 @@ func (service ReceiptService) QuickScan(
 			AssociatedSystemTaskId: &parentId,
 		}, failureErr)
 		if taskErr != nil {
-			return taskErr
+			// Task recording failed; still surface the original failure as the primary cause (the
+			// reason no receipt was created), noting the recording error as secondary context.
+			return fmt.Errorf("%w (recording the failure system task also failed: %v)", failureErr, taskErr)
 		}
 		return failureErr
 	}
