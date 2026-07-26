@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -865,6 +866,32 @@ func TestQuickScan_ValidationFailureRecordsFailedSystemTask(t *testing.T) {
 	}
 	if uploaded.GroupId == nil || *uploaded.GroupId == 0 {
 		utils.PrintTestError(t, uploaded.GroupId, "the real group id")
+	}
+}
+
+// TestCombineEarlyFailureErrors pins the pre-transaction failure-wrapping used by
+// recordEarlyQuickScanFailure: when system-task recording itself fails, both the original failure and
+// the recording error must stay reachable via errors.Is (the recording error is wrapped, not just
+// string-interpolated), with the original failure leading.
+func TestCombineEarlyFailureErrors(t *testing.T) {
+	failureErr := errors.New("receipt validation failed")
+	taskErr := errors.New("system task write failed")
+
+	// No recording error: the original failure passes through unchanged.
+	if got := combineEarlyFailureErrors(failureErr, nil); got != failureErr {
+		utils.PrintTestError(t, got, failureErr)
+	}
+
+	// Both errors stay reachable via errors.Is, with failureErr's message leading.
+	combined := combineEarlyFailureErrors(failureErr, taskErr)
+	if !errors.Is(combined, failureErr) {
+		utils.PrintTestError(t, combined, "errors.Is finds failureErr")
+	}
+	if !errors.Is(combined, taskErr) {
+		utils.PrintTestError(t, combined, "errors.Is finds taskErr")
+	}
+	if !strings.Contains(combined.Error(), "receipt validation failed") {
+		utils.PrintTestError(t, combined.Error(), "message leads with the original failure")
 	}
 }
 

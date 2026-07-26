@@ -323,12 +323,7 @@ func (service ReceiptService) QuickScan(
 			GroupId:                &groupId,
 			AssociatedSystemTaskId: &parentId,
 		}, failureErr)
-		if taskErr != nil {
-			// Task recording failed; still surface the original failure as the primary cause (the
-			// reason no receipt was created), noting the recording error as secondary context.
-			return fmt.Errorf("%w (recording the failure system task also failed: %v)", failureErr, taskErr)
-		}
-		return failureErr
+		return combineEarlyFailureErrors(failureErr, taskErr)
 	}
 
 	// Resolve the AI-assigned and user-picked category/tag ids to real records: names are filled
@@ -396,6 +391,16 @@ func (service ReceiptService) QuickScan(
 
 	os.Remove(tempPath)
 	return createdReceipt, nil
+}
+
+// combineEarlyFailureErrors keeps failureErr as the primary, inspectable cause (the reason no receipt
+// was created) while also preserving taskErr in the unwrap chain when system-task recording itself
+// failed, so errors.Is/As can reach either.
+func combineEarlyFailureErrors(failureErr, taskErr error) error {
+	if taskErr == nil {
+		return failureErr
+	}
+	return fmt.Errorf("%w (recording the failure system task also failed: %w)", failureErr, taskErr)
 }
 
 // resolveQuickScanCategories turns the AI-assigned and user-picked category ids into a validated
