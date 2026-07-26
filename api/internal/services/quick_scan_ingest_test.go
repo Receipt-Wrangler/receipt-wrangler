@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -9,9 +10,11 @@ import (
 	"path/filepath"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
+	"strings"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -125,6 +128,21 @@ func runQuickScan(
 	tagPicks []uint,
 	aiJSONFor func(user models.User, group models.Group) string,
 ) (models.Receipt, models.User, models.Group, error) {
+	return runQuickScanWithSetup(t, paidByArg, status, categoryPicks, tagPicks, aiJSONFor, nil)
+}
+
+// runQuickScanWithSetup is runQuickScan with an optional postSeed hook that runs after the pipeline +
+// categories/tags are seeded and before the AI body is set - so a test can, e.g., assign the seeded
+// member a grant-restricted group role to exercise the out-of-grant drop.
+func runQuickScanWithSetup(
+	t *testing.T,
+	paidByArg func(user models.User) uint,
+	status models.ReceiptStatus,
+	categoryPicks []uint,
+	tagPicks []uint,
+	aiJSONFor func(user models.User, group models.Group) string,
+	postSeed func(t *testing.T, user models.User, group models.Group),
+) (models.Receipt, models.User, models.Group, error) {
 	t.Helper()
 
 	var body string
@@ -132,6 +150,10 @@ func runQuickScan(
 	user, group, _ := seedReceiptImagePipeline(t, server.URL)
 	repositories.CreateTestCategories()
 	createTestTags()
+
+	if postSeed != nil {
+		postSeed(t, user, group)
+	}
 
 	body = ollamaReceiptResponse(t, aiJSONFor(user, group))
 	tempPath := writeQuickScanTempFile(t)
@@ -638,6 +660,15 @@ func TestQuickScan_MissingItemStatusFailsAndPersistsNothing(t *testing.T) {
 	if count := quickScanCreatedReceiptCount(); count != 0 {
 		utils.PrintTestError(t, count, int64(0))
 	}
+
+	// The pre-transaction failure must be recorded (not just logged): the QUICK_SCAN parent flips to
+	// FAILED and a FAILED RECEIPT_UPLOADED task carries the error.
+	if parent, ok := quickScanSystemTaskByType(models.QUICK_SCAN); !ok || parent.Status != models.SYSTEM_TASK_FAILED {
+		utils.PrintTestError(t, parent.Status, models.SYSTEM_TASK_FAILED)
+	}
+	if uploaded, ok := quickScanSystemTaskByType(models.RECEIPT_UPLOADED); !ok || uploaded.Status != models.SYSTEM_TASK_FAILED {
+		utils.PrintTestError(t, "missing FAILED RECEIPT_UPLOADED task", "a FAILED RECEIPT_UPLOADED task")
+	}
 }
 
 // TestQuickScan_InvalidAiJsonReturnsError proves a non-JSON AI response surfaces as an error from
@@ -664,6 +695,206 @@ func TestQuickScan_InvalidAiJsonReturnsError(t *testing.T) {
 	}
 }
 
+// TestQuickScan_ResolvesIdOnlyAiCategory covers the quick-scan bug: the default prompt tells the AI to
+// return categories/tags by id only (no name), which previously failed receipt validation ("name is
+// required") and silently dropped the whole receipt. QuickScan now resolves each id to its real record
+// so the receipt is created with the name filled in.
+func TestQuickScan_ResolvesIdOnlyAiCategory(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	created, _, _, err := runQuickScan(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		func(u models.User, g models.Group) string {
+			// Category/tag by id only - the exact shape the default prompt produces.
+			return `{"name": "Walmart", "amount": 98.21, "date": "2024-01-01T00:00:00Z", "categories": [{"id": 1}], "tags": [{"id": 1}]}`
+		},
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(receipt.Categories) != 1 || !hasCategoryId(receipt.Categories, 1) {
+		utils.PrintTestError(t, receipt.Categories, "category 1 resolved")
+		return
+	}
+	if receipt.Categories[0].Name != "test" {
+		utils.PrintTestError(t, receipt.Categories[0].Name, "test")
+	}
+	if len(receipt.Tags) != 1 || !hasTagId(receipt.Tags, 1) {
+		utils.PrintTestError(t, receipt.Tags, "tag 1 resolved")
+		return
+	}
+	if receipt.Tags[0].Name != "tag-a" {
+		utils.PrintTestError(t, receipt.Tags[0].Name, "tag-a")
+	}
+}
+
+// TestQuickScan_DropsUnresolvableAiCategory proves a hallucinated AI category id (no matching row) is
+// dropped rather than failing the whole scan.
+func TestQuickScan_DropsUnresolvableAiCategory(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	created, _, _, err := runQuickScan(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		func(u models.User, g models.Group) string {
+			return `{"name": "Junk", "amount": 5.00, "date": "2024-01-01T00:00:00Z", "categories": [{"id": 1}, {"id": 999}]}`
+		},
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(receipt.Categories) != 1 || !hasCategoryId(receipt.Categories, 1) {
+		utils.PrintTestError(t, receipt.Categories, "only category 1 (999 dropped)")
+	}
+}
+
+// TestQuickScan_DropsOutOfGrantAiCategory proves an AI-assigned category the triggering user isn't
+// allowed to see (their group role grants only a subset) is dropped, matching the write-side grant
+// enforcement.
+func TestQuickScan_DropsOutOfGrantAiCategory(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	created, _, _, err := runQuickScanWithSetup(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		func(u models.User, g models.Group) string {
+			// AI assigns categories 1 and 2; the user's role grants only category 1.
+			return `{"name": "Restricted", "amount": 7.00, "date": "2024-01-01T00:00:00Z", "categories": [{"id": 1}, {"id": 2}]}`
+		},
+		func(t *testing.T, user models.User, group models.Group) {
+			clearGroupRoleGrantCacheAll()
+			clearRolePermissionCacheAll()
+			role, err := repositories.NewRoleRepository(nil).CreateGroupRole(
+				"restricted-cat", "", []string{permissions.GroupReceiptsRead}, []uint{1}, nil, nil, false)
+			if err != nil {
+				t.Fatalf("create restricted role: %v", err)
+			}
+			if err := repositories.GetDB().Model(&models.GroupMember{}).
+				Where("group_id = ? AND user_id = ?", group.ID, user.ID).
+				Update("group_role_id", role.ID).Error; err != nil {
+				t.Fatalf("assign role to member: %v", err)
+			}
+		},
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(receipt.Categories) != 1 || !hasCategoryId(receipt.Categories, 1) {
+		utils.PrintTestError(t, receipt.Categories, "only category 1 (2 out-of-grant dropped)")
+	}
+}
+
+// TestQuickScan_ValidationFailureRecordsFailedSystemTask covers the "missing system task" gap: a
+// failure AFTER AI processing succeeds but BEFORE the receipt is created (here receipt validation) used
+// to vanish into the log, leaving the AI tasks marked SUCCEEDED and no record of why no receipt
+// appeared. The AI JSON parses (so the QUICK_SCAN task is SUCCEEDED), then fails validation (no name);
+// QuickScan now records a FAILED RECEIPT_UPLOADED task and flips the QUICK_SCAN parent to FAILED.
+func TestQuickScan_ValidationFailureRecordsFailedSystemTask(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	_, _, _, err := runQuickScan(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		func(u models.User, g models.Group) string {
+			// Parses fine (QUICK_SCAN succeeds) but has no name -> validation fails after AI processing.
+			return `{"amount": 12.34, "date": "2024-01-01T00:00:00Z"}`
+		},
+	)
+	if err == nil {
+		utils.PrintTestError(t, nil, "a validation error")
+	}
+	if count := quickScanCreatedReceiptCount(); count != 0 {
+		utils.PrintTestError(t, count, int64(0))
+	}
+
+	// The QUICK_SCAN parent must be flipped to FAILED - this is what the activity feed shows.
+	parent, ok := quickScanSystemTaskByType(models.QUICK_SCAN)
+	if !ok {
+		utils.PrintTestError(t, "no QUICK_SCAN task", "a QUICK_SCAN task")
+		return
+	}
+	if parent.Status != models.SYSTEM_TASK_FAILED {
+		utils.PrintTestError(t, parent.Status, models.SYSTEM_TASK_FAILED)
+	}
+
+	// A FAILED RECEIPT_UPLOADED task carrying the validation error must be recorded, attributed to the
+	// real group.
+	uploaded, ok := quickScanSystemTaskByType(models.RECEIPT_UPLOADED)
+	if !ok {
+		utils.PrintTestError(t, "no RECEIPT_UPLOADED task", "a FAILED RECEIPT_UPLOADED task")
+		return
+	}
+	if uploaded.Status != models.SYSTEM_TASK_FAILED {
+		utils.PrintTestError(t, uploaded.Status, models.SYSTEM_TASK_FAILED)
+	}
+	if !strings.Contains(uploaded.ResultDescription, "validation failed") {
+		utils.PrintTestError(t, uploaded.ResultDescription, "contains 'validation failed'")
+	}
+	if uploaded.GroupId == nil || *uploaded.GroupId == 0 {
+		utils.PrintTestError(t, uploaded.GroupId, "the real group id")
+	}
+}
+
+// TestCombineEarlyFailureErrors pins the pre-transaction failure-wrapping used by
+// recordEarlyQuickScanFailure: when system-task recording itself fails, both the original failure and
+// the recording error must stay reachable via errors.Is (the recording error is wrapped, not just
+// string-interpolated), with the original failure leading.
+func TestCombineEarlyFailureErrors(t *testing.T) {
+	failureErr := errors.New("receipt validation failed")
+	taskErr := errors.New("system task write failed")
+
+	// No recording error: the original failure passes through unchanged.
+	if got := combineEarlyFailureErrors(failureErr, nil); got != failureErr {
+		utils.PrintTestError(t, got, failureErr)
+	}
+
+	// Both errors stay reachable via errors.Is, with failureErr's message leading.
+	combined := combineEarlyFailureErrors(failureErr, taskErr)
+	if !errors.Is(combined, failureErr) {
+		utils.PrintTestError(t, combined, "errors.Is finds failureErr")
+	}
+	if !errors.Is(combined, taskErr) {
+		utils.PrintTestError(t, combined, "errors.Is finds taskErr")
+	}
+	if !strings.Contains(combined.Error(), "receipt validation failed") {
+		utils.PrintTestError(t, combined.Error(), "message leads with the original failure")
+	}
+}
+
 // quickScanCreatedReceiptCount counts receipts written through CreateReceipt (which stamps
 // created_by), excluding the pipeline's seeded baseline receipt (created_by NULL). It is the "nothing
 // was persisted" probe for the failure-path tests.
@@ -671,6 +902,19 @@ func quickScanCreatedReceiptCount() int64 {
 	var count int64
 	repositories.GetDB().Model(&models.Receipt{}).Where("created_by IS NOT NULL").Count(&count)
 	return count
+}
+
+// quickScanSystemTaskByType fetches the single system task of the given type written by a runQuickScan
+// call (all carry asynqTaskId "test-task"). Returns false when none exists.
+func quickScanSystemTaskByType(taskType models.SystemTaskType) (models.SystemTask, bool) {
+	var task models.SystemTask
+	err := repositories.GetDB().
+		Where("asynq_task_id = ? AND type = ?", "test-task", taskType).
+		First(&task).Error
+	if err != nil {
+		return models.SystemTask{}, false
+	}
+	return task, true
 }
 
 // TestMagicFill_ParsesAllReceiptFields isolates the deserialization layer: a maximal AI response is
