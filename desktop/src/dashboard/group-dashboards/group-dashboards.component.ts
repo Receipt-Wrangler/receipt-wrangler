@@ -1,4 +1,4 @@
-import { Component, computed, OnInit, signal } from "@angular/core";
+import { Component, computed, effect } from "@angular/core";
 import { MatDialog } from "@angular/material/dialog";
 import { Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
@@ -13,6 +13,10 @@ import { SnackbarService } from "../../services";
 import { GroupState, SetSelectedDashboardId } from "../../store";
 import { DashboardFormComponent } from "../dashboard-form/dashboard-form.component";
 
+// Stable empty reference so the dashboards computed doesn't emit a fresh [] on
+// every recompute (which would needlessly re-run the auto-select effect).
+const EMPTY_DASHBOARDS: Dashboard[] = [];
+
 @UntilDestroy()
 @Component({
     selector: "app-group-dashboards",
@@ -20,15 +24,7 @@ import { DashboardFormComponent } from "../dashboard-form/dashboard-form.compone
     styleUrls: ["./group-dashboards.component.scss"],
     standalone: false
 })
-export class GroupDashboardsComponent implements OnInit {
-  constructor(
-    private dashboardService: DashboardService,
-    private matDialog: MatDialog,
-    private router: Router,
-    private snackbarService: SnackbarService,
-    private store: Store
-  ) {}
-
+export class GroupDashboardsComponent {
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);
 
   // Dashboard CRUD buttons gate on the group-scoped permissions via
@@ -40,39 +36,46 @@ export class GroupDashboardsComponent implements OnInit {
     () => +(this.selectedGroupId() ?? 0)
   );
 
-  public selectedDashboardId = this.store.selectSignal(GroupState.selectedDashboardId);
+  public selectedDashboardId = this.store.selectSignal(
+    GroupState.selectedDashboardId
+  );
 
-  public dashboards = signal<Dashboard[]>([]);
+  private dashboardsByGroup = this.store.selectSignal(DashboardState.dashboards);
 
-  public ngOnInit(): void {
-    this.setDashboards();
-  }
+  // Derived reactively from the store so the chip list re-renders whenever the
+  // current group's dashboards land — including when the resolver's fetch
+  // resolves after this (reused) component has already reacted to the group
+  // switch. A snapshot read here would be untracked and reintroduce the
+  // "dashboards don't load on switch" bug.
+  public dashboards = computed<Dashboard[]>(
+    () => this.dashboardsByGroup()[this.selectedGroupId()] ?? EMPTY_DASHBOARDS
+  );
 
-  private checkForSelectedDashboard(): void {
-    const selectedDashboardId = this.store.selectSnapshot(
-      GroupState.selectedDashboardId
-    );
+  constructor(
+    private dashboardService: DashboardService,
+    private matDialog: MatDialog,
+    private router: Router,
+    private snackbarService: SnackbarService,
+    private store: Store
+  ) {
+    // Once the current group's dashboards are available, ensure a dashboard is
+    // selected and its outlet is showing. Depends only on dashboards();
+    // selectedDashboardId is read as an untracked snapshot and the effect's only
+    // write (SetSelectedDashboardId) changes neither dashboards() nor
+    // selectedGroupId, so it cannot re-trigger itself.
+    effect(() => {
+      const dashboards = this.dashboards();
+      const selectedDashboardId = this.store.selectSnapshot(
+        GroupState.selectedDashboardId
+      );
 
-    if (selectedDashboardId) {
-      this.navigateToDashboard(+selectedDashboardId);
-      return;
-    } else if (this.dashboards().length > 0) {
-      this.setSelectedDashboardId(this.dashboards()[0].id);
-      this.navigateToDashboard(this.dashboards()[0].id);
-    }
-  }
-
-  private setDashboards(): void {
-    this.store
-      .select(GroupState.selectedGroupId)
-      .pipe(
-        untilDestroyed(this),
-        tap((groupId) => {
-          this.refreshDashboards(groupId);
-          this.checkForSelectedDashboard();
-        })
-      )
-      .subscribe();
+      if (selectedDashboardId) {
+        this.navigateToDashboard(+selectedDashboardId);
+      } else if (dashboards.length > 0) {
+        this.setSelectedDashboardId(dashboards[0].id);
+        this.navigateToDashboard(dashboards[0].id);
+      }
+    });
   }
 
   public navigateToDashboard(dashboardId: number): void {
@@ -123,7 +126,6 @@ export class GroupDashboardsComponent implements OnInit {
               new UpdateDashBoardForGroup(groupId, dashboard.id, dashboard)
             );
           }
-          this.refreshDashboards(groupId);
         })
       )
       .subscribe();
@@ -131,18 +133,6 @@ export class GroupDashboardsComponent implements OnInit {
 
   public setSelectedDashboardId(dashboardId: number): void {
     this.store.dispatch(new SetSelectedDashboardId(dashboardId?.toString()));
-  }
-
-  private refreshDashboards(groupId: string): void {
-    this.store
-      .select(DashboardState.getDashboardsByGroupId(groupId))
-      .pipe(
-        take(1),
-        tap((dashboards) => {
-          this.dashboards.set(dashboards);
-        })
-      )
-      .subscribe();
   }
 
   public openDeleteConfirmationDialog(): void {
@@ -185,9 +175,6 @@ export class GroupDashboardsComponent implements OnInit {
                   );
                   this.store.dispatch(new SetSelectedDashboardId(undefined));
                   this.router.navigateByUrl(dashboardLink);
-                  this.refreshDashboards(
-                    this.store.selectSnapshot(GroupState.selectedGroupId)
-                  );
                 })
               )
               .subscribe();
