@@ -10,11 +10,6 @@ $border: rgba(0, 0, 0, 0.06);
   flex-direction: column;
 }
 
-.report-templates-page app-table-header {
-  display: block;
-  margin: variables.$spacing-sm 0 variables.$spacing-lg;
-}
-
 /* ---------- Empty state ---------- */
 .empty-state {
   display: flex;

@@ -3,8 +3,8 @@
 
 // This header sits directly above a list page's table, so it owns the vertical
 // rhythm: a small gap above and a larger gap below to separate it from the
-// table. Applying it on :host makes every list page inherit the same spacing
-// (the reporting and roles pages keep their own identical page-scoped rules).
+// table. Keeping it on :host makes this the single source of that spacing, so
+// consuming pages never re-declare a margin around app-table-header.
 :host {
   display: block;
   margin: variables.$spacing-sm 0 variables.$spacing-lg;
