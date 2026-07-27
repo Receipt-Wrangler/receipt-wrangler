@@ -172,7 +172,9 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   (`src/shared-ui/table-header/`), which takes `[headerText]` and an optional `[subtitle]` one-line
   description — every list should set a subtitle. For a subtitle that needs rich content (e.g. a link),
   project it via the `[table-header-subtitle]` slot instead of the string input (see
-  `role-list`). The primary create control is the shared **`app-add-button`**
+  `role-list`). The component owns its own vertical rhythm via a `:host` margin (a small gap above,
+  a larger gap below to separate it from the table), so pages should **not** re-add margins around it.
+  The primary create control is the shared **`app-add-button`**
   (`src/shared-ui/add-button/`): pass `[buttonText]="'Add X'"` to render a filled **`+ Add X`** button;
   omit `buttonText` and it stays the compact icon-only **`+`** used for in-form section-header adds
   (Add Item / Share / Widget / shortcut / option). Standardize the verb on **"Add X"**; give every add

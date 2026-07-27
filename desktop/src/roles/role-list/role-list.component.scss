@@ -17,11 +17,6 @@ $group-accent-bar: #a78bfa;
   flex-direction: column;
 }
 
-.roles-page app-table-header {
-  display: block;
-  margin: variables.$spacing-sm 0 variables.$spacing-lg;
-}
-
 .subtitle {
   color: $fg-muted;
   font-size: 14px;
