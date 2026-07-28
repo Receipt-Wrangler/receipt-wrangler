@@ -653,10 +653,14 @@ dollars) — the truthful isolation guarantee wins.
   resolver used by **every group-scoped surface** and by settlement. `app.users.read` ⇒ unrestricted; a
   **non-isolated** group ⇒ unrestricted; an isolated group where the viewer holds a **`SeesAllMembers`**
   role ⇒ unrestricted; an isolated group where the viewer is a **plain member** ⇒ `{self} ∪` that group's
-  supervisors; a **non-member** ⇒ unrestricted (isolation only narrows for actual members — a non-member
-  is kept out by the membership/permission gate, mirroring the paid-by resolver). Not cached; a batch
-  spanning groups memoizes per group via `groupVisibilityResolver` / `visibleUserIdsByGroup` (the latter
-  resolves the AppData roster path in two queries total).
+  supervisors; a **non-member of an isolated group ⇒ `{self}` restricted** (an isolated roster must not
+  leak to a non-member reader — e.g. an `app.groups.read` holder hitting `GetGroupById` via
+  `OrAppPermissions` — who lacks the `app.users.read` directory exemption); a **non-member of a
+  non-isolated group ⇒ unrestricted** (open group, preserving the paid-by / reporting contract for
+  non-members, whose surfaces gate membership at the handler). `GetViewerGroupRow` LEFT-JOINs `groups` so
+  the isolate flag + membership are known even for a non-member. Not cached; a batch spanning groups
+  memoizes per group via `groupVisibilityResolver` / `visibleUserIdsByGroup` (the latter resolves the
+  AppData roster path in two queries total).
 - **`GetVisibleUserIdsForUser(viewerId)`** (the original UNION resolver, unchanged) is now used by
   **exactly one** surface: the flat `appData.users` directory (`FilterVisibleUserViews`). The union is
   mathematically the union of the per-group sets, so it already honors isolation (it never lists a peer
@@ -680,6 +684,11 @@ dollars) — the truthful isolation guarantee wins.
   not announced. `paid_by_user_id` is never masked (row visibility already guarantees a visible payer).
 - **Comments / activities (row drop)** — comments authored by a non-visible user are dropped;
   `GetActivitiesForGroups` drops rows whose `RanByUserId` is non-visible **in that activity's group**.
+  Activities are filtered **before count + pagination** (fetch unpaged → `filterActivitiesByVisibility` →
+  `paginateActivities` in Go), so `TotalCount` and the returned page both reflect only visible rows — a
+  restricted member cannot infer hidden-peer activity from the total. The comment-notification fan-out has
+  a **non-isolated fast path** (`recipientsWhoCannotSeeAuthor` reads the group's `isolate_members` once
+  and skips the roster fetch + per-member resolver loop when the group isn't isolated).
 - **Settlement** — `GetAmountOwedForUser` resolves visibility **per the receipt's group as it folds each
   item** into the counterparty balance map: a contribution counts only if the counterparty is visible in
   that receipt's group. So an isolated group contributes nothing about a hidden member even in the

@@ -93,10 +93,11 @@ func (service PermissionService) GetVisibleUserIdsForUser(viewerId uint) (map[ui
 // Invariants: a holder of app.users.read sees everyone (unrestricted); a non-isolated
 // group is unrestricted; in an isolated group a SeesAllMembers (supervisor) role is
 // unrestricted, while a plain member sees only themselves and that group's supervisors.
-// A non-member is unrestricted — isolation only ever NARROWS for actual isolated
-// members; a non-member is protected by the membership/permission gate, not by this
-// filter (mirroring the paid-by resolver, which is also unrestricted for a non-member
-// group).
+// A non-member of an ISOLATED group is restricted to {self} — an isolated roster must not
+// leak to a non-member reader (e.g. an app.groups.read holder hitting GetGroupById) who
+// lacks the app.users.read directory exemption checked above; a non-member of a
+// NON-isolated group is unrestricted (open group), which preserves the paid-by / reporting
+// contract for non-members (those surfaces gate membership at the handler).
 //
 // The result is a freshly allocated set and is NOT cached; callers resolving it across a
 // batch of groups should use a groupVisibilityResolver (below) to memoize per group.
@@ -110,11 +111,20 @@ func (service PermissionService) GetVisibleUserIdsForUserInGroup(viewerId uint, 
 	}
 
 	memberRepository := repositories.NewGroupMemberRepository(service.TX)
-	row, found, err := memberRepository.GetViewerGroupRow(viewerId, groupId)
+	row, found, isMember, err := memberRepository.GetViewerGroupRow(viewerId, groupId)
 	if err != nil {
 		return nil, false, err
 	}
 	if !found {
+		// The group does not exist — nothing to filter.
+		return nil, true, nil
+	}
+	if !isMember {
+		// A non-member (non-admin) reaching a group-scoped surface. An isolated group's
+		// roster must stay hidden from them; a non-isolated group adds no restriction.
+		if row.IsolateMembers {
+			return map[uint]struct{}{viewerId: {}}, false, nil
+		}
 		return nil, true, nil
 	}
 

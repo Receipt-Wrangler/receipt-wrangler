@@ -179,6 +179,22 @@ func (repository CommentRepository) recipientsWhoCannotSeeAuthor(authorId uint, 
 		return nil, nil
 	}
 
+	// Fast path: a non-isolated group hides nothing, so no recipient can fail to see the
+	// author. Skip the roster fetch and the per-member visibility lookups entirely — the
+	// common case does one cheap flag read instead of O(members) resolver calls.
+	var group struct {
+		IsolateMembers bool
+	}
+	if err := repository.GetDB().Model(&models.Group{}).
+		Select("isolate_members").
+		Where("id = ?", groupId).
+		Scan(&group).Error; err != nil {
+		return nil, err
+	}
+	if !group.IsolateMembers {
+		return nil, nil
+	}
+
 	groupMemberRepository := NewGroupMemberRepository(repository.TX)
 	members, err := groupMemberRepository.GetsGroupMembersByGroupId(utils.UintToString(groupId))
 	if err != nil {

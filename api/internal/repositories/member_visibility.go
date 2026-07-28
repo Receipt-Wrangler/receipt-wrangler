@@ -14,28 +14,44 @@ type ViewerGroupRow struct {
 	ViewerSeesAll  *bool
 }
 
-// GetViewerGroupRow returns the single (viewer, group) membership row — the group's
-// isolation flag and whether the viewer's role there sees all members — or found=false
-// when the viewer is not a member of the group. It is the single-group counterpart of
+// GetViewerGroupRow returns the single (viewer, group) row for member-isolation
+// resolution: the group's isolation flag, whether the viewer's role there sees all
+// members, and whether the viewer is a MEMBER of the group. It starts FROM groups and
+// LEFT JOINs the viewer's membership, so it returns the isolation flag even when the
+// viewer is not a member — needed to decide whether a non-member (e.g. an app.groups.read
+// reader hitting GetGroupById) may see an isolated group's roster. Returns found=false
+// only when the group itself does not exist. It is the single-group counterpart of
 // GetViewerGroupRows, used by the per-group visibility resolver.
-func (repository GroupMemberRepository) GetViewerGroupRow(viewerId uint, groupId uint) (ViewerGroupRow, bool, error) {
+func (repository GroupMemberRepository) GetViewerGroupRow(viewerId uint, groupId uint) (ViewerGroupRow, bool, bool, error) {
 	db := repository.GetDB()
-	var rows []ViewerGroupRow
 
-	err := db.Table("group_members AS gm").
-		Select("gm.group_id AS group_id, g.isolate_members AS isolate_members, grd.sees_all_members AS viewer_sees_all").
-		Joins("JOIN groups AS g ON g.id = gm.group_id").
+	type viewerGroupRowScan struct {
+		GroupID        uint
+		IsolateMembers bool
+		ViewerSeesAll  *bool
+		MemberUserId   *uint
+	}
+	var rows []viewerGroupRowScan
+
+	err := db.Table("groups AS g").
+		Select("g.id AS group_id, g.isolate_members AS isolate_members, grd.sees_all_members AS viewer_sees_all, gm.user_id AS member_user_id").
+		Joins("LEFT JOIN group_members AS gm ON gm.group_id = g.id AND gm.user_id = ?", viewerId).
 		Joins("LEFT JOIN group_role_definitions AS grd ON grd.id = gm.group_role_id").
-		Where("gm.user_id = ? AND gm.group_id = ?", viewerId, groupId).
+		Where("g.id = ?", groupId).
 		Limit(1).
 		Scan(&rows).Error
 	if err != nil {
-		return ViewerGroupRow{}, false, err
+		return ViewerGroupRow{}, false, false, err
 	}
 	if len(rows) == 0 {
-		return ViewerGroupRow{}, false, nil
+		return ViewerGroupRow{}, false, false, nil
 	}
-	return rows[0], true, nil
+	row := rows[0]
+	return ViewerGroupRow{
+		GroupID:        row.GroupID,
+		IsolateMembers: row.IsolateMembers,
+		ViewerSeesAll:  row.ViewerSeesAll,
+	}, true, row.MemberUserId != nil, nil
 }
 
 // GetViewerGroupRows returns, for each group the viewer belongs to, the group's

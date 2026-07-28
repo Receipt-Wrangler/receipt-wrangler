@@ -291,3 +291,52 @@ func TestMemberIsolationBackwardCompatNonIsolatedGroupSeesEverything(t *testing.
 		utils.PrintTestError(t, w.Result().StatusCode, 200)
 	}
 }
+
+// GetGroupById permits a non-member through OrAppPermissions:[app.groups.read]. Such a
+// reader must NOT receive an isolated group's roster unless they also hold the
+// app.users.read directory exemption.
+func TestMemberIsolationGetGroupByIdHidesRosterFromNonMemberAppGroupsReader(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	fx := seedIsolatedReceiptGroupHandler(t, true)
+
+	callGetGroupById := func(userId uint) []uint {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/api", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("groupId", utils.UintToString(fx.groupId))
+		r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+		r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
+		GetGroupById(w, r)
+		if w.Result().StatusCode != http.StatusOK {
+			t.Fatalf("GetGroupById status = %d, want 200", w.Result().StatusCode)
+		}
+		var group struct {
+			GroupMembers []struct {
+				UserID uint `json:"userId"`
+			} `json:"groupMembers"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &group); err != nil {
+			t.Fatalf("unmarshal group: %v", err)
+		}
+		ids := make([]uint, 0, len(group.GroupMembers))
+		for _, m := range group.GroupMembers {
+			ids = append(ids, m.UserID)
+		}
+		return ids
+	}
+
+	// app.groups.read alone (no directory exemption) -> isolated roster is stripped.
+	groupsReader := seedIsoHandlerUser(t, "iso-h-groups-reader")
+	grantAppPerms(t, groupsReader, permissions.AppGroupsRead)
+	if ids := callGetGroupById(groupsReader); len(ids) != 0 {
+		t.Errorf("non-member app.groups.read reader should see an empty isolated roster, got %v", ids)
+	}
+
+	// app.users.read (the directory exemption) -> full roster.
+	directoryReader := seedIsoHandlerUser(t, "iso-h-directory-reader")
+	grantAppPerms(t, directoryReader, permissions.AppGroupsRead, permissions.AppUsersRead)
+	if ids := callGetGroupById(directoryReader); len(ids) != 3 {
+		t.Errorf("app.users.read holder should see the full roster (3 members), got %v", ids)
+	}
+}

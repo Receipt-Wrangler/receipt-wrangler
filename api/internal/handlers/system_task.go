@@ -97,12 +97,15 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 			}
 
 			systemTaskRepository := repositories.NewSystemTaskRepository(nil)
-			activities, count, err := systemTaskRepository.GetPagedActivities(command)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
 
-			err = wranglerasynq.SetActivityCanBeRestarted(&activities)
+			// Fetch ALL matching activities unpaged so member-isolation filtering runs
+			// BEFORE count + pagination. Filtering an already-paged result would leak
+			// hidden-peer presence through TotalCount and could return a short page,
+			// since the DB limited/offset before the invisible rows were known.
+			unpagedCommand := command
+			unpagedCommand.Page = -1
+			unpagedCommand.PageSize = -1
+			activities, _, err := systemTaskRepository.GetPagedActivities(unpagedCommand)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -117,6 +120,16 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// Count and paginate the FILTERED set, so both the total and the returned
+			// page reflect only what the caller may see.
+			totalCount := int64(len(activities))
+			activities = paginateActivities(activities, command.Page, command.PageSize)
+
+			err = wranglerasynq.SetActivityCanBeRestarted(&activities)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			pagedData := structs.PagedData{}
 			data := make([]any, 0)
 
@@ -125,7 +138,7 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 			}
 
 			pagedData.Data = data
-			pagedData.TotalCount = count
+			pagedData.TotalCount = totalCount
 
 			responseBytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
@@ -184,6 +197,35 @@ func filterActivitiesByVisibility(permissionService services.PermissionService, 
 		}
 	}
 	return visible, nil
+}
+
+// paginateActivities slices an already-filtered activity list to the requested page,
+// mirroring repositories.BaseRepository.Paginate so in-memory pagination matches the DB
+// semantics (1-indexed page; pageSize -1 = all; pageSize clamped to [1,100] with a
+// default of 10; page <= 0 treated as 1).
+func paginateActivities(activities []structs.Activity, page int, pageSize int) []structs.Activity {
+	if pageSize == -1 {
+		return activities
+	}
+	if page <= 0 {
+		page = 1
+	}
+	switch {
+	case pageSize > 100:
+		pageSize = 100
+	case pageSize <= 0:
+		pageSize = 10
+	}
+
+	offset := (page - 1) * pageSize
+	if offset >= len(activities) {
+		return []structs.Activity{}
+	}
+	end := offset + pageSize
+	if end > len(activities) {
+		end = len(activities)
+	}
+	return activities[offset:end]
 }
 
 func RerunActivity(w http.ResponseWriter, r *http.Request) {

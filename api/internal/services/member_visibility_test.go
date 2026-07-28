@@ -248,20 +248,25 @@ func TestVisibleUsersInGroup_NonIsolatedUnrestricted(t *testing.T) {
 	assertVisibleInGroup(t, a.ID, open.ID, nil, true)
 }
 
-// A non-member is unrestricted for a group they don't belong to: isolation only narrows
-// for actual isolated members, and a non-member is kept out by the membership/permission
-// gate, not by this filter (mirroring the paid-by resolver).
-func TestVisibleUsersInGroup_NonMemberUnrestricted(t *testing.T) {
+// A non-member of an ISOLATED group is restricted to themselves — the isolated roster
+// must not leak to a non-member reader (e.g. an app.groups.read holder without the
+// app.users.read exemption). A non-member of a NON-isolated group is unrestricted.
+func TestVisibleUsersInGroup_NonMember(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	clearRolePermissionCacheAll()
 
 	iso := seedIsoGroup(t, "pg-nonmember-iso", true)
+	open := seedIsoGroup(t, "pg-nonmember-open", false)
 	memberRole := seedIsoRole(t, "pg-nonmember-mem", false)
 	member := seedIsoUser(t, "pg-nonmember-member")
 	outsider := seedIsoUser(t, "pg-nonmember-outsider")
 	seedIsoMember(t, iso.ID, member.ID, &memberRole.ID)
+	seedIsoMember(t, open.ID, member.ID, nil)
 
-	assertVisibleInGroup(t, outsider.ID, iso.ID, nil, true)
+	// Isolated group -> restricted to self (roster hidden from the non-member).
+	assertVisibleInGroup(t, outsider.ID, iso.ID, []uint{outsider.ID}, false)
+	// Non-isolated group -> unrestricted (open group).
+	assertVisibleInGroup(t, outsider.ID, open.ID, nil, true)
 }
 
 // app.users.read short-circuits the per-group resolver to unrestricted.
