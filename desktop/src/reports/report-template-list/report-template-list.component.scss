@@ -10,34 +10,6 @@ $border: rgba(0, 0, 0, 0.06);
   flex-direction: column;
 }
 
-.page-title {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: variables.$spacing-md;
-  margin: variables.$spacing-sm 0 variables.$spacing-lg;
-
-  .titles h1 {
-    font-size: 28px;
-    line-height: 1.2;
-    margin: 0;
-  }
-
-  .subtitle {
-    color: $fg-muted;
-    font-size: 14px;
-    margin: variables.$spacing-xs 0 0;
-    max-width: 640px;
-  }
-
-  .tools {
-    display: flex;
-    gap: variables.$spacing-sm;
-    align-items: center;
-    flex: none;
-  }
-}
-
 /* ---------- Empty state ---------- */
 .empty-state {
   display: flex;

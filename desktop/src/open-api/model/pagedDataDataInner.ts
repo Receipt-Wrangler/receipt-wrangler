@@ -14,6 +14,7 @@ import { Category } from './category';
 import { ReportRequestCommand } from './reportRequestCommand';
 import { ReportTemplate } from './reportTemplate';
 import { Activity } from './activity';
+import { UserView } from './userView';
 import { ReceiptProcessingSettings } from './receiptProcessingSettings';
 import { Item } from './item';
 import { GroupReceiptSettings } from './groupReceiptSettings';
@@ -162,9 +163,9 @@ export interface PagedDataDataInner {
      */
     port?: string;
     /**
-     * IMAP username
+     * User\'s username used to login
      */
-    username?: string;
+    username: string;
     /**
      * IMAP password
      */
@@ -184,6 +185,22 @@ export interface PagedDataDataInner {
      * The actions the requesting user may perform on this template (read, generate, update, delete, duplicate), resolved per user and populated only on the list response. Drives the row action buttons.
      */
     allowedActions?: Array<string>;
+    /**
+     * Default avatar color
+     */
+    defaultAvatarColor?: string;
+    /**
+     * Display name
+     */
+    displayName: string;
+    /**
+     * Is dummy user
+     */
+    isDummyUser: boolean;
+    /**
+     * Id of the modern app role assigned to the user
+     */
+    appRoleId?: number;
 }
 export namespace PagedDataDataInner {
 }

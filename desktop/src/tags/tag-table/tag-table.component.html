@@ -1,8 +1,12 @@
-<app-table-header [headerText]="headerText">
+<app-table-header
+  [headerText]="headerText"
+  subtitle="Tag receipts to group and filter them however you like."
+>
   <app-add-button
     *hasAppPermission="Permission.AppTagsCreate"
     data-testid="tag-add"
-    tooltip="Add tag"
+    buttonText="Add Tag"
+    tooltip="Add Tag"
     (clicked)="openAddDialog()"
   >
   </app-add-button>

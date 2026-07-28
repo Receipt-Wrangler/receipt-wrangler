@@ -55,6 +55,55 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
+func GetPagedUsers(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage:   "Error retrieving users.",
+		Writer:         w,
+		Request:        r,
+		AppPermissions: []string{permissions.AppUsersRead},
+		ResponseType:   constants.ApplicationJson,
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			command := commands.PagedRequestCommand{}
+			err := command.LoadDataFromRequest(w, r)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			vErr := command.Validate()
+			if len(vErr.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
+				return 0, nil
+			}
+
+			userRepository := repositories.NewUserRepository(nil)
+			users, count, err := userRepository.GetPagedUsers(command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			pagedData := structs.PagedData{}
+			data := make([]interface{}, 0)
+			for i := 0; i < len(users); i++ {
+				data = append(data, users[i])
+			}
+			pagedData.TotalCount = count
+			pagedData.Data = data
+
+			responseBytes, err := utils.MarshalResponseData(pagedData)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(responseBytes)
+
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
 func CreateUser(w http.ResponseWriter, r *http.Request) {
 	handler := structs.Handler{
 		ErrorMessage:   "Error creating user.",

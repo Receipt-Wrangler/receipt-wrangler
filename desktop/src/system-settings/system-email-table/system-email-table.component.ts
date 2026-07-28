@@ -6,7 +6,7 @@ import {MatTableDataSource} from "@angular/material/table";
 import {ActivatedRoute} from "@angular/router";
 import {Store} from "@ngxs/store";
 import {take, tap} from "rxjs";
-import {CheckEmailConnectivityCommand, Group, SystemEmail, SystemEmailService, SystemTaskStatus} from "../../open-api";
+import {CheckEmailConnectivityCommand, Group, Permission, SystemEmail, SystemEmailService, SystemTaskStatus} from "../../open-api";
 import {SnackbarService} from "../../services";
 import {ConfirmationDialogComponent} from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
 import {SystemEmailTableState} from "../../store/system-email-table.state";
@@ -20,6 +20,8 @@ import {TableColumn} from "../../table/table-column.interface";
     standalone: false
 })
 export class SystemEmailTableComponent implements OnInit, AfterViewInit {
+  protected readonly Permission = Permission;
+
   public readonly usernameCell = viewChild.required<TemplateRef<any>>("usernameCell");
 
   public readonly hostCell = viewChild.required<TemplateRef<any>>("hostCell");

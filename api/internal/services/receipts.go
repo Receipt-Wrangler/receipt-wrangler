@@ -301,23 +301,55 @@ func (service ReceiptService) QuickScan(
 
 	receiptCommand.GroupId = groupId
 
-	// Merge the user's quick-scan category/tag picks with whatever the AI auto-assigned (union,
-	// deduped by id). Names are resolved from the ids so the merged selections pass receipt
-	// validation, which requires a category/tag name.
-	receiptCommand.Categories, err = service.mergeQuickScanCategories(receiptCommand.Categories, categoryIds)
-	if err != nil {
-		return models.Receipt{}, err
+	// Record a FAILED system task for any error that aborts the quick scan *before* the
+	// create-receipt transaction (category/tag resolution or receipt validation). The
+	// in-transaction CreateReceipt failure is already covered by CreateReceiptUploadedSystemTask;
+	// this closes the gap where a pre-transaction failure (notably a validation error) left the AI
+	// processing tasks marked SUCCEEDED and no record of why no receipt was created. Chaining a
+	// FAILED child to the quick-scan parent flips that parent to FAILED (see
+	// SystemTaskRepository.CreateSystemTask) so the failure surfaces in the activity feed.
+	// RanByUserId is deliberately left nil so the child stays hidden and only the flipped parent
+	// shows, mirroring the successful RECEIPT_UPLOADED child.
+	recordEarlyQuickScanFailure := func(failureErr error) error {
+		parentTask := quickScanSystemTasks.SystemTask
+		if quickScanSystemTasks.FallbackSystemTask.Status == models.SYSTEM_TASK_SUCCEEDED {
+			parentTask = quickScanSystemTasks.FallbackSystemTask
+		}
+		if parentTask.ID == 0 {
+			return failureErr
+		}
+
+		parentId := parentTask.ID
+		_, taskErr := systemTaskService.CreateSystemTaskFromError(commands.UpsertSystemTaskCommand{
+			Type:                   models.RECEIPT_UPLOADED,
+			AssociatedEntityType:   models.RECEIPT_PROCESSING_SETTINGS,
+			AssociatedEntityId:     parentTask.AssociatedEntityId,
+			StartedAt:              finishedAt,
+			AsynqTaskId:            asynqTaskId,
+			GroupId:                &groupId,
+			AssociatedSystemTaskId: &parentId,
+		}, failureErr)
+		return combineEarlyFailureErrors(failureErr, taskErr)
 	}
 
-	receiptCommand.Tags, err = service.mergeQuickScanTags(receiptCommand.Tags, tagIds)
+	// Resolve the AI-assigned and user-picked category/tag ids to real records: names are filled
+	// from the database (the AI returns ids only, which would otherwise fail receipt validation),
+	// ids that don't resolve are dropped (hallucinated/non-existent), and ids the triggering user
+	// isn't allowed to see are dropped too (defense-in-depth alongside the prompt's grant filter).
+	receiptCommand.Categories, err = service.resolveQuickScanCategories(receiptCommand.Categories, categoryIds, token.UserId, groupId)
 	if err != nil {
-		return models.Receipt{}, err
+		return models.Receipt{}, recordEarlyQuickScanFailure(err)
+	}
+
+	receiptCommand.Tags, err = service.resolveQuickScanTags(receiptCommand.Tags, tagIds, token.UserId, groupId)
+	if err != nil {
+		return models.Receipt{}, recordEarlyQuickScanFailure(err)
 	}
 
 	vErr := receiptCommand.Validate(token.UserId, true)
 	if len(vErr.Errors) > 0 {
 		errBytes, _ := json.Marshal(vErr.Errors)
-		return models.Receipt{}, fmt.Errorf("receipt validation failed: %s", string(errBytes))
+		return models.Receipt{}, recordEarlyQuickScanFailure(fmt.Errorf("receipt validation failed: %s", string(errBytes)))
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -367,84 +399,178 @@ func (service ReceiptService) QuickScan(
 	return createdReceipt, nil
 }
 
-// mergeQuickScanCategories appends the user-selected category ids to the AI-filled categories,
-// skipping any already present. Names are loaded from the ids so the result passes receipt
-// validation.
-func (service ReceiptService) mergeQuickScanCategories(
-	existing []commands.UpsertCategoryCommand,
-	categoryIds []uint,
+// combineEarlyFailureErrors keeps failureErr as the primary, inspectable cause (the reason no receipt
+// was created) while also preserving taskErr in the unwrap chain when system-task recording itself
+// failed, so errors.Is/As can reach either.
+func combineEarlyFailureErrors(failureErr, taskErr error) error {
+	if taskErr == nil {
+		return failureErr
+	}
+	return fmt.Errorf("%w (recording the failure system task also failed: %w)", failureErr, taskErr)
+}
+
+// resolveQuickScanCategories turns the AI-assigned and user-picked category ids into a validated
+// selection. The union of ids (AI-assigned first, then the user's picks, deduped) is resolved against
+// the database so each carries its real name — the AI returns ids only, which would otherwise fail
+// receipt validation. Ids that don't resolve are dropped (hallucinated / deleted), and ids the
+// triggering user isn't allowed to see are dropped too (defense-in-depth alongside the prompt's grant
+// filter). Returns an empty slice when there is nothing to resolve.
+func (service ReceiptService) resolveQuickScanCategories(
+	aiCategories []commands.UpsertCategoryCommand,
+	userCategoryIds []uint,
+	userId uint,
+	groupId uint,
 ) ([]commands.UpsertCategoryCommand, error) {
-	if len(categoryIds) == 0 {
-		return existing, nil
+	orderedIds := make([]uint, 0, len(aiCategories)+len(userCategoryIds))
+	seen := make(map[uint]bool)
+	appendId := func(id uint) {
+		if !seen[id] {
+			seen[id] = true
+			orderedIds = append(orderedIds, id)
+		}
+	}
+	for _, category := range aiCategories {
+		if category.Id != nil {
+			appendId(*category.Id)
+		}
+	}
+	for _, id := range userCategoryIds {
+		appendId(id)
+	}
+	if len(orderedIds) == 0 {
+		return []commands.UpsertCategoryCommand{}, nil
 	}
 
 	categoryRepository := repositories.NewCategoryRepository(service.TX)
-	categories, err := categoryRepository.GetByIds(categoryIds)
+	records, err := categoryRepository.GetByIds(orderedIds)
+	if err != nil {
+		return nil, err
+	}
+	recordsById := make(map[uint]models.Category, len(records))
+	for _, record := range records {
+		recordsById[record.ID] = record
+	}
+
+	allowed, unrestricted, err := service.resolveAllowedCategoryIds(userId, groupId)
 	if err != nil {
 		return nil, err
 	}
 
-	presentIds := make(map[uint]bool)
-	for _, category := range existing {
-		if category.Id != nil {
-			presentIds[*category.Id] = true
+	resolved := make([]commands.UpsertCategoryCommand, 0, len(orderedIds))
+	for _, id := range orderedIds {
+		record, ok := recordsById[id]
+		if !ok {
+			continue // id did not resolve to a real category
 		}
-	}
-
-	for _, category := range categories {
-		if presentIds[category.ID] {
-			continue
+		if !unrestricted {
+			if _, visible := allowed[id]; !visible {
+				continue // category the user is not allowed to see
+			}
 		}
 
-		id := category.ID
-		existing = append(existing, commands.UpsertCategoryCommand{
-			Id:          &id,
-			Name:        category.Name,
-			Description: category.Description,
+		recordId := record.ID
+		resolved = append(resolved, commands.UpsertCategoryCommand{
+			Id:          &recordId,
+			Name:        record.Name,
+			Description: record.Description,
 		})
-		presentIds[id] = true
 	}
 
-	return existing, nil
+	return resolved, nil
 }
 
-// mergeQuickScanTags is the tag counterpart of mergeQuickScanCategories.
-func (service ReceiptService) mergeQuickScanTags(
-	existing []commands.UpsertTagCommand,
-	tagIds []uint,
+// resolveQuickScanTags is the tag counterpart of resolveQuickScanCategories.
+func (service ReceiptService) resolveQuickScanTags(
+	aiTags []commands.UpsertTagCommand,
+	userTagIds []uint,
+	userId uint,
+	groupId uint,
 ) ([]commands.UpsertTagCommand, error) {
-	if len(tagIds) == 0 {
-		return existing, nil
+	orderedIds := make([]uint, 0, len(aiTags)+len(userTagIds))
+	seen := make(map[uint]bool)
+	appendId := func(id uint) {
+		if !seen[id] {
+			seen[id] = true
+			orderedIds = append(orderedIds, id)
+		}
+	}
+	for _, tag := range aiTags {
+		if tag.Id != nil {
+			appendId(*tag.Id)
+		}
+	}
+	for _, id := range userTagIds {
+		appendId(id)
+	}
+	if len(orderedIds) == 0 {
+		return []commands.UpsertTagCommand{}, nil
 	}
 
 	tagsRepository := repositories.NewTagsRepository(service.TX)
-	tags, err := tagsRepository.GetByIds(tagIds)
+	records, err := tagsRepository.GetByIds(orderedIds)
+	if err != nil {
+		return nil, err
+	}
+	recordsById := make(map[uint]models.Tag, len(records))
+	for _, record := range records {
+		recordsById[record.ID] = record
+	}
+
+	allowed, unrestricted, err := service.resolveAllowedTagIds(userId, groupId)
 	if err != nil {
 		return nil, err
 	}
 
-	presentIds := make(map[uint]bool)
-	for _, tag := range existing {
-		if tag.Id != nil {
-			presentIds[*tag.Id] = true
+	resolved := make([]commands.UpsertTagCommand, 0, len(orderedIds))
+	for _, id := range orderedIds {
+		record, ok := recordsById[id]
+		if !ok {
+			continue // id did not resolve to a real tag
 		}
-	}
-
-	for _, tag := range tags {
-		if presentIds[tag.ID] {
-			continue
+		if !unrestricted {
+			if _, visible := allowed[id]; !visible {
+				continue // tag the user is not allowed to see
+			}
 		}
 
-		id := tag.ID
-		existing = append(existing, commands.UpsertTagCommand{
-			Id:          &id,
-			Name:        tag.Name,
-			Description: tag.Description,
+		recordId := record.ID
+		resolved = append(resolved, commands.UpsertTagCommand{
+			Id:          &recordId,
+			Name:        record.Name,
+			Description: record.Description,
 		})
-		presentIds[id] = true
 	}
 
-	return existing, nil
+	return resolved, nil
+}
+
+// resolveAllowedCategoryIds returns the set of category ids the triggering user may see in the group,
+// or unrestricted=true (see-all) when the user bypasses grants (holds app.categories.read) or their
+// group role grants nothing for categories. The returned set is shared grant-cache state and must
+// only be read.
+func (service ReceiptService) resolveAllowedCategoryIds(userId uint, groupId uint) (map[uint]struct{}, bool, error) {
+	permissionService := NewPermissionService(service.TX)
+	bypass, err := permissionService.userBypassesGrants(userId, permissions.AppCategoriesRead)
+	if err != nil {
+		return nil, false, err
+	}
+	if bypass {
+		return nil, true, nil
+	}
+	return permissionService.GetGroupCategoryIdsForUser(userId, groupId)
+}
+
+// resolveAllowedTagIds is the tag counterpart of resolveAllowedCategoryIds.
+func (service ReceiptService) resolveAllowedTagIds(userId uint, groupId uint) (map[uint]struct{}, bool, error) {
+	permissionService := NewPermissionService(service.TX)
+	bypass, err := permissionService.userBypassesGrants(userId, permissions.AppTagsRead)
+	if err != nil {
+		return nil, false, err
+	}
+	if bypass {
+		return nil, true, nil
+	}
+	return permissionService.GetGroupTagIdsForUser(userId, groupId)
 }
 
 func (service ReceiptService) DuplicateReceipt(

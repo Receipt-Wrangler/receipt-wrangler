@@ -381,8 +381,9 @@ will be dropped in a later release.
   Owner** (the group VIEWER / EDITOR / OWNER tiers; Owner = every group permission). The sets live in
   `permissions/legacy.go` (`Legacy*Keys()` helpers) and were derived from the actual handler-level
   gating, not the desktop UI presets. **Deliberate exceptions** (Legacy User omits these): `app.users.read`
-  — it gates only the admin `GET /user/` listing, which no client calls (user dropdowns read from AppData via
-  `app.account.read`), so granting it would only expose the admin "Manage Users" page to normal users; and
+  — it gates the admin user listing (the unpaged `GET /user/` **and** the paged `POST /user/getPagedUsers`
+  that the desktop "Manage Users" page reads from); user dropdowns instead read from AppData via
+  `app.account.read`, so granting it would only expose the admin "Manage Users" page to normal users; and
   `app.categories.read` / `app.tags.read` — omitted as part of the category/tag grant lock-down, since they
   gate the GLOBAL category/tag lists; normal users now get only the per-group filtered catalogs (the
   `app.categories.create` / `app.tags.create` permissions are retained for inline creation); and
@@ -893,9 +894,27 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   settings, **enforces required fields synchronously (400 before enqueue)** since quick scan is
   fire-and-forget, and resolves paid-by/status defaults (`UPLOADER` ⇒ the caller's user id). Categories/
   tags ride the multipart command as **per-file comma-joined id strings** (`QuickScanCommand.CategoryIds`/
-  `TagIds`; an empty paid-by string parses to `0` = unset). The async `ReceiptService.QuickScan` **merges**
-  the user's category/tag picks with the AI-filled ones (union, deduped by id; names resolved via
-  `CategoryRepository.GetByIds`/`TagsRepository.GetByIds` so the merged selections pass receipt validation).
+  `TagIds`; an empty paid-by string parses to `0` = unset). The async `ReceiptService.QuickScan`
+  **resolves** the union of the user's category/tag picks and the AI-assigned ones
+  (`resolveQuickScanCategories`/`resolveQuickScanTags`): the ids (AI first, then user, deduped) are looked
+  up via `CategoryRepository.GetByIds`/`TagsRepository.GetByIds` so each carries its real **name**. This is
+  load-bearing — the default prompt tells the model to return categories/tags **by id only** (`{ "id": N }`,
+  no name), which `UpsertReceiptCommand.Validate` (name required) would otherwise reject, silently dropping
+  the whole receipt. Ids that don't resolve (hallucinated / deleted) are **dropped**, as are ids the
+  triggering user isn't allowed to see (`resolveAllowedCategoryIds`/`resolveAllowedTagIds` reuse
+  `userBypassesGrants` + `GetGroupCategoryIdsForUser`/`GetGroupTagIdsForUser` — the same bypass+set logic as
+  the write-side check, dropping instead of rejecting). Validation deliberately stays strict (name required):
+  an id-only category reaching `UpdateReceipt` — which persists associations with `FullSaveAssociations: true`
+  — would upsert the category row and **blank its `not null; uniqueIndex` name**, so resolving names (not
+  relaxing validation) is the fix.
+- **Failed-task recording on pre-transaction errors:** `CreateReceiptUploadedSystemTask` only runs
+  **inside** the create-receipt transaction, so an error that aborts `QuickScan` *before* it (category/tag
+  resolution or receipt validation) used to leave the AI-processing tasks marked SUCCEEDED and **no record**
+  of why no receipt appeared — the failure only hit the log via `HandleError`. `QuickScan` now routes those
+  early returns through a `recordEarlyQuickScanFailure` closure that writes a FAILED `RECEIPT_UPLOADED` task
+  chained to the QUICK_SCAN parent; because `SystemTaskRepository.CreateSystemTask` flips a SUCCEEDED parent
+  to FAILED when a FAILED child references it, the QUICK_SCAN activity now surfaces the failure. `RanByUserId`
+  is left nil so the child stays hidden and only the flipped parent shows (mirroring the successful child).
 - **Grant enforcement (write-side):** because quick scan creates receipts through the service layer
   (bypassing the receipt-upsert path's `enforceReceiptGrantSelection`), the handler **synchronously
   grant-validates the user's per-file category/tag picks** before enqueue via
@@ -912,11 +931,21 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   status, receipt- and item-level categories/tags, items (amount / status / `chargedToUserId` /
   `isTaxed` / linked items), comments, and all five custom-field value types. This pins the
   AI→`CreateReceipt` contract (which passes items/comments/customFields through untouched, so a future
-  prompt emitting them just works), plus the paid-by/status backfill, the category/tag merge, refunds
+  prompt emitting them just works), plus the paid-by/status backfill, the category/tag resolution, refunds
   (negative amounts), and the all-or-nothing failure path (bad item status / invalid JSON persist
   nothing). Note: `UpsertReceiptCommand.Validate` deliberately does **not** validate `CustomFields`
   (unlike categories/tags/items/comments), so a custom-field value is persisted unchecked — the test
-  is the only guard against a regression that silently drops or mis-columns it.
+  is the only guard against a regression that silently drops or mis-columns it. The resolve/failure
+  behavior above is pinned by `TestQuickScan_ResolvesIdOnlyAiCategory` (id-only AI category gets its name
+  filled), `_DropsUnresolvableAiCategory` (hallucinated id dropped), `_DropsOutOfGrantAiCategory` (a
+  grant-restricted member's AI category dropped — seeds a restricted group role via the `postSeed` hook on
+  `runQuickScanWithSetup`), and `_ValidationFailureRecordsFailedSystemTask` + the extended
+  `_MissingItemStatusFailsAndPersistsNothing` (a pre-transaction failure flips the QUICK_SCAN task to
+  FAILED and records a FAILED RECEIPT_UPLOADED task, asserted via `quickScanSystemTaskByType`), plus the
+  unit-level `TestResolveQuickScan{Categories,Tags}`. **Known gap (follow-up):** resolution is
+  **receipt-level only** — item-level categories/tags (`receiptCommand.Items[].Categories/Tags`) aren't
+  produced by the default prompt and aren't resolved here, so a future prompt emitting id-only item-level
+  categories would hit the same validation failure.
 
 ## Reporting Engine (`internal/reporting`)
 

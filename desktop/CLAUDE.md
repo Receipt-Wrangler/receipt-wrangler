@@ -168,6 +168,18 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
 - **Simple filters:** the segmented `app-filter-bar` (`src/shared-ui/filter-bar/`) — pass `FilterTab[]`
   (`{ value, label, icon?, count? }`) and two-way bind the selected `value`.
 - **Breadcrumbs:** `app-breadcrumb` with `BreadcrumbItem[]`.
+- **List-page headers & the "add" button:** every list page's header is `app-table-header`
+  (`src/shared-ui/table-header/`), which takes `[headerText]` and an optional `[subtitle]` one-line
+  description — every list should set a subtitle. For a subtitle that needs rich content (e.g. a link),
+  project it via the `[table-header-subtitle]` slot instead of the string input (see
+  `role-list`). The component owns its own vertical rhythm via a `:host` margin (a small gap above,
+  a larger gap below to separate it from the table), so pages should **not** re-add margins around it.
+  The primary create control is the shared **`app-add-button`**
+  (`src/shared-ui/add-button/`): pass `[buttonText]="'Add X'"` to render a filled **`+ Add X`** button;
+  omit `buttonText` and it stays the compact icon-only **`+`** used for in-form section-header adds
+  (Add Item / Share / Widget / shortcut / option). Standardize the verb on **"Add X"**; give every add
+  control a `<resource>-add` `data-testid` and a `tooltip`. Do NOT hand-roll a raw `app-button` for a
+  list-page add action, and do NOT use a bespoke page-title header.
 If a design appears to require a new pattern, confirm with the user before diverging.
 
 ### Roles & Permissions (Manage Roles)
@@ -239,6 +251,16 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     `AuthState.hasGroupPermission`), mirroring the backend `UpdateGroup` guard (see `api/CLAUDE.md` →
     "Group member management"). They default to enabled in **create** mode (no group yet; the creator
     becomes owner). This is UI-only; the server re-enforces on every request.
+- **Manage Users is a server-paged `app-table`:** the admin user-list (`src/user/user-list/`) follows
+  the standard paginated-table pattern (`BaseTableComponent` + `UserTableService` + the NGXS
+  `UserTableState`, mirroring the groups/roles list pages) and reads a page at a time from
+  `UserService.getPagedUsers` (`POST /user/getPagedUsers`) — it no longer wraps `UserState.users` in a
+  client-side `MatTableDataSource`. Server-sortable columns use the DB column names as their
+  `matColumnDef` (`username`, `display_name`, `created_at`, `updated_at`); the client-resolved **Role**
+  column is non-sortable. CRUD row actions refetch via `getTableData()` after the mutation, and delete /
+  bulk-delete still dispatch `RemoveUser` / `RemoveUsers` so the `UserState` cache (consumed by the
+  role-editor & report-builder paid-by pickers, `user-autocomplete`, the `user` pipe, etc.) stays in
+  sync. `UserState` itself is unchanged and still bootstrap-loaded from AppData for those other consumers.
 - **Member isolation (presence privacy).** Two config controls drive the backend member-isolation
   feature (see `api/CLAUDE.md` → "Member isolation"): (1) an **"Isolate members"** `app-checkbox` in the
   `group-form` "Group Details" section, bound to `isolateMembers` on the `UpsertGroupCommand` — an
@@ -778,8 +800,10 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   names via `GroupState.groupsWithoutAll`). Row actions carry `data-testid="report-template-<action>"` and
   gate on the matching permission: **generate** (`AppReportsGenerate`, runs the stored config through the
   builder's generate path), **open/edit** (read — routes to `/reports/:id/edit`), **duplicate**
-  (`AppReportsDuplicate`), **delete** (`AppReportsDelete`, via `ConfirmationDialogComponent`). A "New
-  Report" primary button routes to the blank builder; an empty state shows when there are none.
+  (`AppReportsDuplicate`), **delete** (`AppReportsDelete`, via `ConfirmationDialogComponent`). The header
+  is the shared `app-table-header` (with a subtitle) and an **"Add Report"** `app-add-button`
+  (`data-testid="report-template-add"`) that routes to the blank builder; an empty state (with a second
+  `report-template-add-empty` add button) shows when there are none.
 - **Open in builder (hydration)**: `/reports/:id/edit` uses a `reportTemplateResolver`
   (`GET /report/template/{id}`) to load the template before the builder's form initializer, and
   `buildReportFormFromCommand` (`report-form.factory.ts`) builds the form *seeded from* the stored

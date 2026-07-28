@@ -1,8 +1,14 @@
 <div class="d-flex flex-column">
-  <app-table-header headerText="Prompts">
+  <app-table-header
+    headerText="Prompts"
+    subtitle="Manage the AI prompts used to extract data from receipts."
+  >
     <div class="d-flex">
       <app-add-button
-        tooltip="Create Prompt"
+        *hasAppPermission="Permission.AppPromptsCreate"
+        data-testid="prompt-add"
+        buttonText="Add Prompt"
+        tooltip="Add Prompt"
         [buttonRouterLink]="['create']"
       ></app-add-button>
       <app-button

@@ -5,6 +5,7 @@ import { ComponentFixture, TestBed, } from "@angular/core/testing";
 import { MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { ActivatedRoute, Params, Router } from "@angular/router";
+import { By } from "@angular/platform-browser";
 import { NgxsModule, Store } from "@ngxs/store";
 import { BehaviorSubject } from "rxjs";
 import { PipesModule } from "src/pipes/pipes.module";
@@ -21,6 +22,35 @@ describe("GroupDashboardsComponent", () => {
   let component: GroupDashboardsComponent;
   let fixture: ComponentFixture<GroupDashboardsComponent>;
   let store: Store;
+
+  const dashboard = (id: number, groupId = 1): Dashboard => ({
+    id,
+    name: `dashboard-${id}`,
+    groupId,
+    userId: 1,
+  });
+
+  // navigateToDashboard defers the actual navigation via setTimeout(0); spying
+  // navigateByUrl keeps a real (routeless) Router from producing rejected
+  // navigations, and lets the navigation tests assert the target url.
+  const spyNavigate = () =>
+    jest
+      .spyOn(TestBed.inject(Router), "navigateByUrl")
+      .mockResolvedValue(true as any);
+
+  const seed = (
+    groups: Partial<{ selectedGroupId: string; selectedDashboardId: string }>,
+    dashboards: { [groupId: string]: Dashboard[] } = {}
+  ) => {
+    store.reset({
+      ...store.snapshot(),
+      groups: {
+        ...store.snapshot().groups,
+        ...groups,
+      },
+      dashboards: { dashboards },
+    });
+  };
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -68,100 +98,93 @@ describe("GroupDashboardsComponent", () => {
     expect(component).toBeTruthy();
   });
 
-  it("should set dashboards with dashboards", () => {
-    const dashboards: Dashboard[] = [
-      {
-        id: 1,
-        name: "test",
-        groupId: 1,
-        userId: 1,
-      },
-    ];
-    store.reset({
-      ...store.snapshot(),
-      groups: {
-        ...store.snapshot().groups,
-        selectedGroupId: "1",
-      },
-      dashboards: {
-        dashboards: {
-          "1": dashboards,
-        },
-      },
-    });
+  it("derives the current group's dashboards from the store", () => {
+    spyNavigate();
+    const dashboards = [dashboard(1)];
+    seed({ selectedGroupId: "1", selectedDashboardId: "" }, { "1": dashboards });
 
-    component.ngOnInit();
+    TestBed.flushEffects();
 
     expect(component.dashboards()).toEqual(dashboards);
   });
 
-  it("should set dashboards with dashboards on seleced group id change", () => {
-    const dashboards: Dashboard[] = [
-      {
-        id: 1,
-        name: "test",
-        groupId: 1,
-        userId: 1,
-      },
-    ];
-    const newDashboards: Dashboard[] = [
-      {
-        id: 2,
-        name: "test",
-        groupId: 1,
-        userId: 1,
-      },
-    ];
-    const activatedRoute = TestBed.inject(ActivatedRoute);
-    store.reset({
-      ...store.snapshot(),
-      groups: {
-        ...store.snapshot().groups,
-        selectedGroupId: "1",
-      },
-      dashboards: {
-        dashboards: {
-          "1": dashboards,
-        },
-      },
-    });
-    component.ngOnInit();
+  it("reacts to the selected group id changing", () => {
+    spyNavigate();
+    const g1 = [dashboard(1, 1)];
+    const g2 = [dashboard(2, 2)];
+    seed({ selectedGroupId: "1", selectedDashboardId: "" }, { "1": g1, "2": g2 });
+    TestBed.flushEffects();
 
-    expect(component.dashboards()).toEqual(dashboards);
+    expect(component.dashboards()).toEqual(g1);
 
     store.reset({
       ...store.snapshot(),
       groups: {
         ...store.snapshot().groups,
         selectedGroupId: "2",
-      },
-      dashboards: {
-        dashboards: {
-          "2": newDashboards,
-        },
+        selectedDashboardId: "",
       },
     });
+    TestBed.flushEffects();
 
-    (activatedRoute.params as any).next({
-      dashboardId: 2,
-    });
-
-    expect(component.dashboards()).toEqual(newDashboards);
+    expect(component.dashboards()).toEqual(g2);
   });
 
-  it("should not navigate to selected dashboard", () => {
-    const routerSpy = jest.spyOn(TestBed.inject(Router), "navigateByUrl");
-    store.reset({
-      ...store.snapshot(),
-      groups: {
-        ...store.snapshot().groups,
-        selectedDashboardId: undefined,
-      },
-    });
+  it("renders a chip per dashboard once they land in the store", async () => {
+    spyNavigate();
+    const chips = () =>
+      fixture.debugElement.queryAll(By.css("mat-chip-option"));
 
-    component.ngOnInit();
+    expect(chips().length).toBe(0);
 
-    expect(routerSpy).toHaveBeenCalledTimes(0);
+    seed({ selectedGroupId: "1", selectedDashboardId: "" }, { "1": [dashboard(1)] });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(chips().length).toBe(1);
+  });
+
+  it("auto-selects and navigates to the first dashboard once a cold group's data lands", () => {
+    jest.useFakeTimers();
+    const navSpy = spyNavigate();
+    seed({ selectedGroupId: "1", selectedDashboardId: "" }, { "1": [dashboard(7)] });
+
+    TestBed.flushEffects();
+
+    expect(store.selectSnapshot(GroupState.selectedDashboardId)).toBe("7");
+
+    jest.runOnlyPendingTimers();
+    expect(navSpy).toHaveBeenCalledWith("/dashboard/group/1/7");
+    jest.useRealTimers();
+  });
+
+  it("navigates to the already-selected dashboard when data lands (warm/deep-link)", () => {
+    jest.useFakeTimers();
+    const navSpy = spyNavigate();
+    seed(
+      { selectedGroupId: "1", selectedDashboardId: "5" },
+      { "1": [dashboard(5), dashboard(8)] }
+    );
+
+    TestBed.flushEffects();
+    jest.runOnlyPendingTimers();
+
+    expect(navSpy).toHaveBeenCalledWith("/dashboard/group/1/5");
+    expect(store.selectSnapshot(GroupState.selectedDashboardId)).toBe("5");
+    jest.useRealTimers();
+  });
+
+  it("does not navigate when the group has no dashboards and none is selected", () => {
+    jest.useFakeTimers();
+    const navSpy = spyNavigate();
+    seed({ selectedGroupId: "1", selectedDashboardId: "" }, {});
+
+    TestBed.flushEffects();
+    jest.runOnlyPendingTimers();
+
+    expect(navSpy).not.toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it("should set selected dashboard id", () => {

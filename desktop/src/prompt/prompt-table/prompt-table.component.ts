@@ -6,7 +6,7 @@ import { MatTableDataSource } from "@angular/material/table";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
-import { Group, Prompt, PromptService, ReceiptProcessingSettings, UpsertPromptCommand } from "../../open-api";
+import { Group, Permission, Prompt, PromptService, ReceiptProcessingSettings, UpsertPromptCommand } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { PromptTableState } from "../../store/prompt-table.state";
@@ -20,6 +20,8 @@ import { TableColumn } from "../../table/table-column.interface";
     standalone: false
 })
 export class PromptTableComponent implements OnInit, AfterViewInit {
+  protected readonly Permission = Permission;
+
   public tableState = this.store.selectSignal(PromptTableState.state);
 
   public readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");

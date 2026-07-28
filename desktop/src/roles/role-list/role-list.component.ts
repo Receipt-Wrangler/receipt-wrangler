@@ -15,6 +15,7 @@ import { MatTableDataSource } from "@angular/material/table";
 import { Router } from "@angular/router";
 import { EMPTY, catchError, take, tap } from "rxjs";
 import {
+  Permission,
   PermissionScope,
   Role,
   RoleService,
@@ -52,6 +53,8 @@ export class RoleListComponent implements AfterViewInit {
   private readonly matDialog = inject(MatDialog);
   private readonly snackbarService = inject(SnackbarService);
   private readonly destroyRef = inject(DestroyRef);
+
+  protected readonly Permission = Permission;
 
   private readonly roleCellTemplate = viewChild.required<TemplateRef<any>>("roleCell");
   private readonly typeCellTemplate = viewChild.required<TemplateRef<any>>("typeCell");

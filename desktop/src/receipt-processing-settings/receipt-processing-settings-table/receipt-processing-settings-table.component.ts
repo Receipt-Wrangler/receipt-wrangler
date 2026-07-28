@@ -6,6 +6,7 @@ import { take, tap } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants";
 import {
   CheckReceiptProcessingSettingsConnectivityCommand,
+  Permission,
   ReceiptProcessingSettings,
   ReceiptProcessingSettingsService,
   SystemSettings,
@@ -32,6 +33,8 @@ import { ReceiptProcessingSettingsTableService } from "./receipt-processing-sett
     standalone: false
 })
 export class ReceiptProcessingSettingsTableComponent extends BaseTableComponent<ReceiptProcessingSettings> implements OnInit, AfterViewInit {
+  protected readonly Permission = Permission;
+
   public readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");
 
   public readonly descriptionCell = viewChild.required<TemplateRef<any>>("descriptionCell");

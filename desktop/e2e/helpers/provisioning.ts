@@ -103,13 +103,13 @@ export async function createRole(page: Page, opts: CreateRoleOptions): Promise<v
   await expect(page).toHaveURL(/\/roles$/);
 }
 
-/** Creates a user assigned [opts.role] via the Create User dialog. */
+/** Creates a user assigned [opts.role] via the Add User dialog. */
 export async function createUserWithRole(
   page: Page,
   opts: { username: string; password: string; role: string },
 ): Promise<void> {
   await page.goto('/users');
-  await page.getByRole('button', { name: 'Create User' }).click();
+  await page.getByTestId('user-add').click();
   const dialog = page.getByRole('dialog').filter({ hasText: 'Create User' });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Username').fill(opts.username);

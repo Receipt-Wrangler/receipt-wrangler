@@ -148,17 +148,25 @@ func (service PermissionService) GetVisibleUserIdsForUserInGroup(viewerId uint, 
 // to filter activities by member isolation IN SQL: for a group it reports the ran-by user
 // ids the caller may see, or unrestricted == true (see every actor). Mirrors
 // PaidByListResolver, so the repository stays free of the service layer.
-func (service PermissionService) ActivityVisibilityResolver(userId uint) repositories.ActivityVisibilityResolver {
+//
+// The per-group visible sets are resolved ONCE up front via visibleUserIdsByGroup (a fixed
+// ~three queries regardless of group count) and the returned closure just reads that map,
+// so a multi-group activity request does not pay a DB round trip per group.
+func (service PermissionService) ActivityVisibilityResolver(userId uint, groupIds []uint) (repositories.ActivityVisibilityResolver, error) {
+	byGroup, unrestrictedAll, err := service.visibleUserIdsByGroup(userId, groupIds)
+	if err != nil {
+		return nil, err
+	}
 	return func(groupId uint) ([]uint, bool, error) {
-		set, unrestricted, err := service.GetVisibleUserIdsForUserInGroup(userId, groupId)
-		if err != nil {
-			return nil, false, err
-		}
-		if unrestricted {
+		if unrestrictedAll {
 			return nil, true, nil
 		}
-		return uintSetToSlice(set), false, nil
-	}
+		vis, ok := byGroup[groupId]
+		if !ok || vis.unrestricted {
+			return nil, true, nil
+		}
+		return uintSetToSlice(vis.visible), false, nil
+	}, nil
 }
 
 // groupVisibility is one group's resolved member-visible set. unrestricted == true

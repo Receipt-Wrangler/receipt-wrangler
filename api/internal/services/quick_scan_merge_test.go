@@ -34,25 +34,26 @@ func containsTagId(tags []commands.UpsertTagCommand, id uint) bool {
 	return count == 1
 }
 
-func TestMergeQuickScanCategories(t *testing.T) {
+func TestResolveQuickScanCategories(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	repositories.CreateTestCategories()
 	service := NewReceiptService(nil)
 
 	id1 := uint(1)
 
-	// No selections leaves the AI-filled categories untouched.
-	existing := []commands.UpsertCategoryCommand{{Id: &id1, Name: "test"}}
-	result, err := service.mergeQuickScanCategories(existing, []uint{})
+	// AI returns category 1 by id only (no name); it is resolved to its real record so the name is
+	// filled in, even with no user picks. userId/groupId 0 => unrestricted (no grants apply).
+	aiCategories := []commands.UpsertCategoryCommand{{Id: &id1}}
+	result, err := service.resolveQuickScanCategories(aiCategories, nil, 0, 0)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
-	if len(result) != 1 {
-		utils.PrintTestError(t, result, "unchanged existing")
+	if len(result) != 1 || !containsCategoryId(result, 1) || result[0].Name != "test" {
+		utils.PrintTestError(t, result, "category 1 resolved with name")
 	}
 
 	// Union of AI (id 1) and user picks (ids 2, 3), all present exactly once, names resolved.
-	result, err = service.mergeQuickScanCategories(existing, []uint{2, 3})
+	result, err = service.resolveQuickScanCategories(aiCategories, []uint{2, 3}, 0, 0)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -66,33 +67,49 @@ func TestMergeQuickScanCategories(t *testing.T) {
 	}
 
 	// Overlap between AI and user pick (both id 1) is deduped, not duplicated.
-	result, err = service.mergeQuickScanCategories(existing, []uint{1, 2})
+	result, err = service.resolveQuickScanCategories(aiCategories, []uint{1, 2}, 0, 0)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
 	if len(result) != 2 || !containsCategoryId(result, 1) || !containsCategoryId(result, 2) {
 		utils.PrintTestError(t, result, "categories 1,2 deduped")
 	}
+
+	// A hallucinated / non-existent id is dropped rather than surfaced.
+	badId := uint(999)
+	result, err = service.resolveQuickScanCategories([]commands.UpsertCategoryCommand{{Id: &id1}, {Id: &badId}}, nil, 0, 0)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+	if len(result) != 1 || !containsCategoryId(result, 1) {
+		utils.PrintTestError(t, result, "only category 1 (999 dropped)")
+	}
 }
 
-func TestMergeQuickScanTags(t *testing.T) {
+func TestResolveQuickScanTags(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	createTestTags()
 	service := NewReceiptService(nil)
 
 	id1 := uint(1)
-	existing := []commands.UpsertTagCommand{{Id: &id1, Name: "tag-a"}}
+	aiTags := []commands.UpsertTagCommand{{Id: &id1}}
 
-	result, err := service.mergeQuickScanTags(existing, []uint{2})
+	// AI tag by id only is resolved (name filled) and unioned with the user's pick.
+	result, err := service.resolveQuickScanTags(aiTags, []uint{2}, 0, 0)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
 	if len(result) != 2 || !containsTagId(result, 1) || !containsTagId(result, 2) {
 		utils.PrintTestError(t, result, "tags 1,2 unioned")
 	}
+	for _, tag := range result {
+		if len(tag.Name) == 0 {
+			utils.PrintTestError(t, tag, "name resolved for merged tag")
+		}
+	}
 
 	// Dedup overlap.
-	result, err = service.mergeQuickScanTags(existing, []uint{1})
+	result, err = service.resolveQuickScanTags(aiTags, []uint{1}, 0, 0)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}

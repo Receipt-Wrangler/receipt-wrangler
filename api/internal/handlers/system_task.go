@@ -105,9 +105,11 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 			// LIMIT/OFFSET is preserved. See applyActivityVisibilityDisjunction (mirrors
 			// the paid-by disjunction).
 			permissionService := services.NewPermissionService(nil)
-			activities, count, err := systemTaskRepository.GetPagedActivities(
-				command, permissionService.ActivityVisibilityResolver(token.UserId),
-			)
+			resolver, err := permissionService.ActivityVisibilityResolver(token.UserId, command.GroupIds)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			activities, count, err := systemTaskRepository.GetPagedActivities(command, resolver)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

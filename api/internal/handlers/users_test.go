@@ -865,3 +865,107 @@ func TestGetAmountOwedForUserReceiptIdsCombinedWithGroupId(t *testing.T) {
 	assertOwed(t, result, 2, 10)
 	assertOwed(t, result, 4, 25)
 }
+
+func TestShouldNotAllowUserToGetPagedUsers(t *testing.T) {
+	defer tearDownUserTest()
+	reader := strings.NewReader("")
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api", reader)
+
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
+	r = r.WithContext(newContext)
+
+	GetPagedUsers(w, r)
+
+	if w.Result().StatusCode != http.StatusForbidden {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
+	}
+}
+
+func TestShouldNotGetPagedUsersWithBadRequest(t *testing.T) {
+	defer tearDownUserTest()
+
+	tests := map[string]struct {
+		input  commands.PagedRequestCommand
+		expect int
+	}{
+		"badOrderBy": {
+			input:  commands.PagedRequestCommand{Page: 1, PageSize: 50, OrderBy: "badOrderBy", SortDirection: "asc"},
+			expect: http.StatusInternalServerError,
+		},
+		"badSortDirection": {
+			input:  commands.PagedRequestCommand{Page: 1, PageSize: 50, OrderBy: "username", SortDirection: "badSortDirection"},
+			expect: http.StatusBadRequest,
+		},
+		"badPage": {
+			input:  commands.PagedRequestCommand{Page: -1, PageSize: 50, OrderBy: "username", SortDirection: "asc"},
+			expect: http.StatusBadRequest,
+		},
+		"badPageSize": {
+			input:  commands.PagedRequestCommand{Page: 1, PageSize: -2, OrderBy: "username", SortDirection: "asc"},
+			expect: http.StatusBadRequest,
+		},
+		"valid": {
+			input:  commands.PagedRequestCommand{Page: 1, PageSize: 25, OrderBy: "username", SortDirection: "asc"},
+			expect: http.StatusOK,
+		},
+	}
+
+	grantAllAppPerms(t, 1)
+
+	for name, test := range tests {
+		bytes, _ := json.Marshal(test.input)
+		reader := strings.NewReader(string(bytes))
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("POST", "/api", reader)
+
+		newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
+		r = r.WithContext(newContext)
+
+		GetPagedUsers(w, r)
+
+		if w.Result().StatusCode != test.expect {
+			utils.PrintTestError(t, name+" status "+strconv.Itoa(w.Result().StatusCode), test.expect)
+		}
+	}
+}
+
+func TestShouldAllowAdminToGetPagedUsers(t *testing.T) {
+	defer tearDownUserTest()
+
+	// grantAllAppPerms creates user 1 with the admin role; add two more so the
+	// page returns a known, non-trivial set.
+	grantAllAppPerms(t, 1)
+	db := repositories.GetDB()
+	db.Create(&models.User{Username: "alpha", DisplayName: "alpha", Password: "password"})
+	db.Create(&models.User{Username: "beta", DisplayName: "beta", Password: "password"})
+
+	command := commands.PagedRequestCommand{Page: 1, PageSize: 25, OrderBy: "username", SortDirection: "asc"}
+	bytes, _ := json.Marshal(command)
+	reader := strings.NewReader(string(bytes))
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api", reader)
+
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
+	r = r.WithContext(newContext)
+
+	GetPagedUsers(w, r)
+
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+		return
+	}
+
+	var pagedData structs.PagedData
+	if err := json.NewDecoder(w.Result().Body).Decode(&pagedData); err != nil {
+		utils.PrintTestError(t, err, "no error decoding paged data")
+		return
+	}
+
+	if pagedData.TotalCount != 3 {
+		utils.PrintTestError(t, pagedData.TotalCount, int64(3))
+	}
+	if len(pagedData.Data) != 3 {
+		utils.PrintTestError(t, len(pagedData.Data), 3)
+	}
+}
