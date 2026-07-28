@@ -684,9 +684,12 @@ dollars) — the truthful isolation guarantee wins.
   not announced. `paid_by_user_id` is never masked (row visibility already guarantees a visible payer).
 - **Comments / activities (row drop)** — comments authored by a non-visible user are dropped;
   `GetActivitiesForGroups` drops rows whose `RanByUserId` is non-visible **in that activity's group**.
-  Activities are filtered **before count + pagination** (fetch unpaged → `filterActivitiesByVisibility` →
-  `paginateActivities` in Go), so `TotalCount` and the returned page both reflect only visible rows — a
-  restricted member cannot infer hidden-peer activity from the total. The comment-notification fan-out has
+  Activity visibility is filtered **in the SQL query, before `COUNT`/`LIMIT`**, via
+  `applyActivityVisibilityDisjunction` (`repositories/system_task.go`) — a per-group disjunction mirroring
+  `ReceiptRepository.ApplyPaidByDisjunction`, fed by `PermissionService.ActivityVisibilityResolver`
+  (the activity analogue of `PaidByListResolver`). So `TotalCount` and the returned page both reflect only
+  visible rows with DB-side `LIMIT/OFFSET` preserved — a restricted member cannot infer hidden-peer
+  activity from the total, and there is no unpaged in-memory fetch. The comment-notification fan-out has
   a **non-isolated fast path** (`recipientsWhoCannotSeeAuthor` reads the group's `isolate_members` once
   and skips the roster fetch + per-member resolver loop when the group isn't isolated).
 - **Settlement** — `GetAmountOwedForUser` resolves visibility **per the receipt's group as it folds each

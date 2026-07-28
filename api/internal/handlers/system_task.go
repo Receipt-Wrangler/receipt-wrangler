@@ -97,33 +97,20 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 			}
 
 			systemTaskRepository := repositories.NewSystemTaskRepository(nil)
-
-			// Fetch ALL matching activities unpaged so member-isolation filtering runs
-			// BEFORE count + pagination. Filtering an already-paged result would leak
-			// hidden-peer presence through TotalCount and could return a short page,
-			// since the DB limited/offset before the invisible rows were known.
-			unpagedCommand := command
-			unpagedCommand.Page = -1
-			unpagedCommand.PageSize = -1
-			activities, _, err := systemTaskRepository.GetPagedActivities(unpagedCommand)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			// Member isolation: drop activities run by a user the caller may not see
-			// IN THAT ACTIVITY'S GROUP (a nil RanByUserId is a system action and is
-			// always kept). Resolved per group, so an isolated group hides its
-			// non-visible actors regardless of any open group the caller also shares.
 			token := structs.GetClaims(r)
-			activities, err = filterActivitiesByVisibility(services.NewPermissionService(nil), token.UserId, activities)
+
+			// Member isolation: activities run by a user the caller may not see in that
+			// activity's group are filtered IN THE QUERY (before Count + pagination), so
+			// TotalCount and the returned page both reflect only visible rows and DB-side
+			// LIMIT/OFFSET is preserved. See applyActivityVisibilityDisjunction (mirrors
+			// the paid-by disjunction).
+			permissionService := services.NewPermissionService(nil)
+			activities, count, err := systemTaskRepository.GetPagedActivities(
+				command, permissionService.ActivityVisibilityResolver(token.UserId),
+			)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
-
-			// Count and paginate the FILTERED set, so both the total and the returned
-			// page reflect only what the caller may see.
-			totalCount := int64(len(activities))
-			activities = paginateActivities(activities, command.Page, command.PageSize)
 
 			err = wranglerasynq.SetActivityCanBeRestarted(&activities)
 			if err != nil {
@@ -138,7 +125,7 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 			}
 
 			pagedData.Data = data
-			pagedData.TotalCount = totalCount
+			pagedData.TotalCount = count
 
 			responseBytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
@@ -153,79 +140,6 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	HandleRequest(handler)
-}
-
-// filterActivitiesByVisibility drops activities run by a user the viewer may not see IN
-// THAT ACTIVITY'S GROUP, under member-presence isolation. An activity with a nil
-// RanByUserId (system action) or a nil GroupId (no group to scope against) is always
-// kept. Visibility is resolved per group and memoized, so an isolated group hides its
-// non-visible actors regardless of any open group the viewer also shares; a group where
-// the viewer is unrestricted (admin, supervisor, non-isolated) keeps every actor.
-func filterActivitiesByVisibility(permissionService services.PermissionService, viewerId uint, activities []structs.Activity) ([]structs.Activity, error) {
-	if len(activities) == 0 {
-		return activities, nil
-	}
-
-	type groupVis struct {
-		visible      map[uint]struct{}
-		unrestricted bool
-	}
-	cache := map[uint]groupVis{}
-
-	visible := make([]structs.Activity, 0, len(activities))
-	for _, activity := range activities {
-		if activity.RanByUserId == nil || activity.GroupId == nil {
-			visible = append(visible, activity)
-			continue
-		}
-		groupId := *activity.GroupId
-		v, ok := cache[groupId]
-		if !ok {
-			set, unrestricted, err := permissionService.GetVisibleUserIdsForUserInGroup(viewerId, groupId)
-			if err != nil {
-				return nil, err
-			}
-			v = groupVis{visible: set, unrestricted: unrestricted}
-			cache[groupId] = v
-		}
-		if v.unrestricted {
-			visible = append(visible, activity)
-			continue
-		}
-		if _, actorOk := v.visible[*activity.RanByUserId]; actorOk {
-			visible = append(visible, activity)
-		}
-	}
-	return visible, nil
-}
-
-// paginateActivities slices an already-filtered activity list to the requested page,
-// mirroring repositories.BaseRepository.Paginate so in-memory pagination matches the DB
-// semantics (1-indexed page; pageSize -1 = all; pageSize clamped to [1,100] with a
-// default of 10; page <= 0 treated as 1).
-func paginateActivities(activities []structs.Activity, page int, pageSize int) []structs.Activity {
-	if pageSize == -1 {
-		return activities
-	}
-	if page <= 0 {
-		page = 1
-	}
-	switch {
-	case pageSize > 100:
-		pageSize = 100
-	case pageSize <= 0:
-		pageSize = 10
-	}
-
-	offset := (page - 1) * pageSize
-	if offset >= len(activities) {
-		return []structs.Activity{}
-	}
-	end := offset + pageSize
-	if end > len(activities) {
-		end = len(activities)
-	}
-	return activities[offset:end]
 }
 
 func RerunActivity(w http.ResponseWriter, r *http.Request) {

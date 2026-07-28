@@ -144,6 +144,23 @@ func (service PermissionService) GetVisibleUserIdsForUserInGroup(viewerId uint, 
 	return visible, false, nil
 }
 
+// ActivityVisibilityResolver returns the injected resolver the system-task repository uses
+// to filter activities by member isolation IN SQL: for a group it reports the ran-by user
+// ids the caller may see, or unrestricted == true (see every actor). Mirrors
+// PaidByListResolver, so the repository stays free of the service layer.
+func (service PermissionService) ActivityVisibilityResolver(userId uint) repositories.ActivityVisibilityResolver {
+	return func(groupId uint) ([]uint, bool, error) {
+		set, unrestricted, err := service.GetVisibleUserIdsForUserInGroup(userId, groupId)
+		if err != nil {
+			return nil, false, err
+		}
+		if unrestricted {
+			return nil, true, nil
+		}
+		return uintSetToSlice(set), false, nil
+	}
+}
+
 // groupVisibility is one group's resolved member-visible set. unrestricted == true
 // (with a nil set) means "see every member of this group."
 type groupVisibility struct {
