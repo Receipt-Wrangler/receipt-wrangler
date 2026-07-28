@@ -789,7 +789,7 @@ func TestQuickScan_DropsOutOfGrantAiCategory(t *testing.T) {
 			clearGroupRoleGrantCacheAll()
 			clearRolePermissionCacheAll()
 			role, err := repositories.NewRoleRepository(nil).CreateGroupRole(
-				"restricted-cat", "", []string{permissions.GroupReceiptsRead}, []uint{1}, nil, nil, false)
+				"restricted-cat", "", []string{permissions.GroupReceiptsRead}, []uint{1}, nil, nil, false, false)
 			if err != nil {
 				t.Fatalf("create restricted role: %v", err)
 			}

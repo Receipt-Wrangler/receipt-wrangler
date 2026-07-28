@@ -3519,6 +3519,12 @@ components:
           description: >-
             Whether a GROUP role lets each member see receipts they paid for. Part
             of the paid-by visibility filter; always false for app roles.
+        seesAllMembers:
+          type: boolean
+          description: >-
+            Whether a GROUP role exempts its members from member-presence isolation
+            (they see, and are seen by, every member of an isolated group). Always
+            false for app roles.
         reportTemplateGrants:
           type: array
           description: >-
@@ -3574,6 +3580,12 @@ components:
           description: >-
             Whether to also let each member see receipts they paid for. Only valid
             on group roles.
+        seesAllMembers:
+          type: boolean
+          description: >-
+            Whether a GROUP role exempts its members from member-presence isolation
+            (they see, and are seen by, every member of an isolated group). Only
+            valid on group roles.
         reportTemplateGrants:
           type: array
           description: >-
@@ -3934,6 +3946,12 @@ components:
         isAllGroup:
           type: boolean
           description: Is all group for user
+        isolateMembers:
+          type: boolean
+          description: >-
+            Whether member-presence isolation is enabled for the group. When on,
+            members cannot discover other members unless they hold a group role
+            flagged seesAllMembers. Defaults to false.
         status:
           type: string
           $ref: "#/components/schemas/GroupStatus"
@@ -3961,6 +3979,12 @@ components:
         isAllGroup:
           type: boolean
           description: Is all group for user
+        isolateMembers:
+          type: boolean
+          description: >-
+            Whether to enable member-presence isolation for the group. When on,
+            members cannot discover other members unless they hold a group role
+            flagged seesAllMembers. Defaults to false.
         status:
           type: string
           $ref: "#/components/schemas/GroupStatus"

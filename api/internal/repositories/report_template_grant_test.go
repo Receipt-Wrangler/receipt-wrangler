@@ -29,7 +29,7 @@ func TestReportTemplateGrantAndGroupTablesMigrate(t *testing.T) {
 	repository := NewRoleRepository(nil)
 
 	templateId := makeTestReportTemplate(t, "Quarterly")
-	role, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false)
+	role, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -55,7 +55,7 @@ func TestDeleteReportTemplateCascadesGrantAndGroupRows(t *testing.T) {
 	repository := NewRoleRepository(nil)
 
 	templateId := makeTestReportTemplate(t, "Cascade Template")
-	role, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false)
+	role, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -88,7 +88,7 @@ func TestDeleteGroupRoleCascadesReportTemplateGrants(t *testing.T) {
 	repository := NewRoleRepository(nil)
 
 	templateId := makeTestReportTemplate(t, "Role Cascade Template")
-	role, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false)
+	role, err := repository.CreateGroupRole("Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -115,7 +115,7 @@ func TestReplaceGroupRoleReportTemplateGrantsPersistsAndReplaces(t *testing.T) {
 	t1 := makeTestReportTemplate(t, "T1")
 	t2 := makeTestReportTemplate(t, "T2")
 
-	role, err := repository.CreateGroupRole("Report Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false)
+	role, err := repository.CreateGroupRole("Report Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -185,7 +185,7 @@ func TestReplaceGroupRoleReportTemplateGrantsEmptyClearsRestricted(t *testing.T)
 	repository := NewRoleRepository(nil)
 
 	t1 := makeTestReportTemplate(t, "T1")
-	role, err := repository.CreateGroupRole("Report Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false)
+	role, err := repository.CreateGroupRole("Report Role", "", []string{permissions.GroupReportsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

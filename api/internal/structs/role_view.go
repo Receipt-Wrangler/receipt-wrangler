@@ -22,6 +22,10 @@ type RoleView struct {
 	// slice and false.
 	PaidByUserGrants       []uint `json:"paidByUserGrants"`
 	IncludeOwnPaidReceipts bool   `json:"includeOwnPaidReceipts"`
+	// SeesAllMembers marks a group role whose members are exempt from member-presence
+	// isolation (they see, and are seen by, every member of an isolated group).
+	// Always group-scoped; app roles serialize false.
+	SeesAllMembers bool `json:"seesAllMembers"`
 	// ReportTemplateGrants restrict which report templates a group role's members
 	// may act on, per action. Empty means unrestricted (every template the role's
 	// group access reaches). Always group-scoped; app roles serialize an empty

@@ -74,7 +74,7 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 			return txErr
 		}
 
-		role, txErr := roleRepository.CreateGroupRole(command.Name, command.Description, perms, categoryGrants, tagGrants, paidByUserGrants, command.IncludeOwnPaidReceipts)
+		role, txErr := roleRepository.CreateGroupRole(command.Name, command.Description, perms, categoryGrants, tagGrants, paidByUserGrants, command.IncludeOwnPaidReceipts, command.SeesAllMembers)
 		if txErr != nil {
 			return txErr
 		}
@@ -94,6 +94,7 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 			TagGrants:              tagGrants,
 			PaidByUserGrants:       paidByUserGrants,
 			IncludeOwnPaidReceipts: command.IncludeOwnPaidReceipts,
+			SeesAllMembers:         command.SeesAllMembers,
 			ReportTemplateGrants:   reportTemplateGrantsToView(reportTemplateGrants),
 		}
 
@@ -170,7 +171,7 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			return txErr
 		}
 
-		role, txErr := roleRepository.UpdateGroupRole(id, command.Name, command.Description, perms, categoryGrants, tagGrants, paidByUserGrants, command.IncludeOwnPaidReceipts)
+		role, txErr := roleRepository.UpdateGroupRole(id, command.Name, command.Description, perms, categoryGrants, tagGrants, paidByUserGrants, command.IncludeOwnPaidReceipts, command.SeesAllMembers)
 		if txErr != nil {
 			return txErr
 		}
@@ -191,6 +192,7 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			TagGrants:              tagGrants,
 			PaidByUserGrants:       paidByUserGrants,
 			IncludeOwnPaidReceipts: command.IncludeOwnPaidReceipts,
+			SeesAllMembers:         command.SeesAllMembers,
 			ReportTemplateGrants:   reportTemplateGrantsToView(reportTemplateGrants),
 		}
 
@@ -526,6 +528,7 @@ func groupRoleToView(role models.GroupRoleDefinition, isDefault bool) structs.Ro
 		TagGrants:              tagGrants,
 		PaidByUserGrants:       paidByUserGrants,
 		IncludeOwnPaidReceipts: role.IncludeOwnPaidReceipts,
+		SeesAllMembers:         role.SeesAllMembers,
 		ReportTemplateGrants:   repositories.ReportTemplateGrantsFromRole(role),
 	}
 }

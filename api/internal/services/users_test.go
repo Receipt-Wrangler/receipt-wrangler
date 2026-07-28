@@ -351,7 +351,7 @@ func TestDeleteUser_WithPaidByGrant(t *testing.T) {
 		nil,
 		nil,
 		[]uint{user.ID},
-		false,
+		false, false,
 	)
 	if err != nil {
 		t.Fatalf("create group role: %v", err)

@@ -197,6 +197,34 @@ func TestUpsertRoleCommandIncludeOwnRejectedOnAppScope(t *testing.T) {
 	}
 }
 
+func TestUpsertRoleCommandSeesAllMembersValidOnGroupScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:           "Supervisor Group Role",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		SeesAllMembers: true,
+	}
+
+	vErr := command.Validate()
+	if len(vErr.Errors) > 0 {
+		t.Errorf("expected no errors, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandSeesAllMembersRejectedOnAppScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:           "App Role With SeesAll",
+		Scope:          permissions.ScopeApp,
+		Permissions:    []string{permissions.AppUsersRead},
+		SeesAllMembers: true,
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["grants"]; !ok {
+		t.Errorf("expected grants error, got %+v", vErr.Errors)
+	}
+}
+
 func TestUpsertRoleCommandDuplicatePaidByGrant(t *testing.T) {
 	command := UpsertRoleCommand{
 		Name:             "Dup Paid-By Grant",

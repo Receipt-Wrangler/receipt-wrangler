@@ -10,6 +10,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"receipt-wrangler/api/internal/wranglerasynq"
@@ -96,7 +97,19 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 			}
 
 			systemTaskRepository := repositories.NewSystemTaskRepository(nil)
-			activities, count, err := systemTaskRepository.GetPagedActivities(command)
+			token := structs.GetClaims(r)
+
+			// Member isolation: activities run by a user the caller may not see in that
+			// activity's group are filtered IN THE QUERY (before Count + pagination), so
+			// TotalCount and the returned page both reflect only visible rows and DB-side
+			// LIMIT/OFFSET is preserved. See applyActivityVisibilityDisjunction (mirrors
+			// the paid-by disjunction).
+			permissionService := services.NewPermissionService(nil)
+			resolver, err := permissionService.ActivityVisibilityResolver(token.UserId, command.GroupIds)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			activities, count, err := systemTaskRepository.GetPagedActivities(command, resolver)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

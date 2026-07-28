@@ -28,6 +28,12 @@
         [inputFormControl]="form | formGet : 'status'"
         [options]="groupStatusOptions"
       ></app-select>
+      <app-checkbox
+        label="Isolate members"
+        helpText="When on, members of this group can't see each other. Members with a role that can see all members remain visible to everyone."
+        [readonly]="formConfig.mode | inputReadonly"
+        [inputFormControl]="form | formGet : 'isolateMembers'"
+      ></app-checkbox>
     </app-form-section>
     <app-form-section
       headerText="Group Members"

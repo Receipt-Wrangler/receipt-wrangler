@@ -71,6 +71,9 @@ export class RoleFormComponent {
   public readonly form = new FormGroup({
     name: new FormControl<string>("", { nonNullable: true, validators: [Validators.required] }),
     description: new FormControl<string>("", { nonNullable: true }),
+    // Group-role-only flag: holders can see, and be seen by, all members of an
+    // isolated group. Ignored for app roles (serialized only when showGrants()).
+    seesAllMembers: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   // ----- State signals -----
@@ -355,7 +358,11 @@ export class RoleFormComponent {
 
         // System roles are immutable — open them read-only.
         this.mode.set(role.isSystem ? FormMode.view : FormMode.edit);
-        this.form.patchValue({ name: role.name, description: role.description ?? "" });
+        this.form.patchValue({
+          name: role.name,
+          description: role.description ?? "",
+          seesAllMembers: role.seesAllMembers ?? false,
+        });
         this.type.set(role.scope === PermissionScope.Group ? "group" : "app");
         this.granted.set(new Set(role.permissions));
         this.pendingCategoryGrantIds.set(role.categoryGrants ?? []);
@@ -427,6 +434,7 @@ export class RoleFormComponent {
     this.setGrantArray(this.grantedTags, []);
     this.setGrantArray(this.grantedPaidByUsers, []);
     this.reportTemplateGrants.set(new Map());
+    this.form.controls.seesAllMembers.setValue(false);
   }
 
   // ----- Report template matrix helpers -----
@@ -559,6 +567,10 @@ export class RoleFormComponent {
       payload.reportTemplateGrants = [...this.reportTemplateGrants().entries()].map(
         ([reportTemplateId, actions]) => ({ reportTemplateId, permissions: [...actions] }),
       );
+
+      // Supervisor exemption: holders see, and are seen by, all members of an
+      // isolated group. Only meaningful on group roles.
+      payload.seesAllMembers = this.form.controls.seesAllMembers.value;
     }
 
     this.lastPayload = payload;

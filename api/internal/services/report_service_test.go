@@ -362,7 +362,7 @@ func seedReportUserInGroups(t *testing.T, username string, groupNames ...string)
 	role, err := roleRepository.CreateGroupRole(
 		"Report Role "+username, "",
 		[]string{permissions.GroupReportsRead, permissions.GroupReceiptsRead},
-		nil, nil, nil, false,
+		nil, nil, nil, false, false,
 	)
 	if err != nil {
 		t.Fatalf("seed group role: %v", err)

@@ -30,7 +30,7 @@ func seedMemberWithPaidByRole(t *testing.T, username string, paidByUserGrantIds 
 	}
 
 	roleRepository := repositories.NewRoleRepository(nil)
-	role, err := roleRepository.CreateGroupRole("PaidBy Role "+username, "", []string{permissions.GroupReceiptsRead}, nil, nil, paidByUserGrantIds, includeOwn)
+	role, err := roleRepository.CreateGroupRole("PaidBy Role "+username, "", []string{permissions.GroupReceiptsRead}, nil, nil, paidByUserGrantIds, includeOwn, false)
 	if err != nil {
 		t.Fatalf("seed group role: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestGetGroupPaidByUserIdsDoesNotMutateCacheAcrossUsers(t *testing.T) {
 	}
 
 	roleRepository := repositories.NewRoleRepository(nil)
-	role, err := roleRepository.CreateGroupRole("PaidBy Shared Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, true)
+	role, err := roleRepository.CreateGroupRole("PaidBy Shared Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, []uint{payer}, true, false)
 	if err != nil {
 		t.Fatalf("seed role: %v", err)
 	}

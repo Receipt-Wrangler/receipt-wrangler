@@ -30,6 +30,11 @@ type UpsertRoleCommand struct {
 	// therefore hides the member's own receipts too.
 	PaidByUserGrants       []uint `json:"paidByUserGrants"`
 	IncludeOwnPaidReceipts bool   `json:"includeOwnPaidReceipts"`
+	// SeesAllMembers is the "supervisor" exemption for member-presence isolation:
+	// holders of this group role see every member of an isolated group and are
+	// visible to every member. Group-scoped only; ignored (rejected) on APP scope,
+	// mirroring the paid-by flags. Default false ⇒ no effect on existing roles.
+	SeesAllMembers bool `json:"seesAllMembers"`
 	// ReportTemplateGrants restrict which report templates members of a group role
 	// may act on, per action. Group-scoped only and opt-in: an empty set means
 	// unrestricted (act on every template the role's group access reaches). Each
@@ -103,12 +108,14 @@ func (command *UpsertRoleCommand) Validate() structs.ValidatorError {
 		}
 	}
 
-	// Category/tag/paid-by grants are a group-role concept (they slice the global
-	// pool / narrow visibility per group role); they make no sense on an app role.
+	// Category/tag/paid-by grants and member-visibility settings are a group-role
+	// concept (they slice the global pool / narrow visibility per group role); they
+	// make no sense on an app role.
 	if command.Scope == permissions.ScopeApp &&
 		(len(command.CategoryGrants) > 0 || len(command.TagGrants) > 0 ||
-			len(command.PaidByUserGrants) > 0 || command.IncludeOwnPaidReceipts) {
-		errors["grants"] = "Category, tag, and paid-by grants are only valid on group roles"
+			len(command.PaidByUserGrants) > 0 || command.IncludeOwnPaidReceipts ||
+			command.SeesAllMembers) {
+		errors["grants"] = "Category, tag, paid-by, and member-visibility settings are only valid on group roles"
 	}
 
 	if hasDuplicateUint(command.CategoryGrants) {

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"receipt-wrangler/api/internal/commands"
+	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
 )
@@ -46,6 +47,90 @@ func enforceReceiptGrantSelection(userId uint, groupId uint, command commands.Up
 	}
 
 	return true, "", nil
+}
+
+// enforceReceiptMemberVisibilitySelection checks that every user id a receipt upsert
+// plants — the payer (paidByUserId) and each item/linked-item chargedToUserId — is
+// within the creator's member-visible set FOR THE RECEIPT'S GROUP, so an isolated member
+// cannot attach a user they may not see in that group (which would leak that user's
+// presence, or hand them a receipt/charge). It mirrors enforceReceiptGrantSelection:
+// returns (allowed, denyMessage, error), and the caller responds 403 with denyMessage
+// when not allowed. No-op when the creator is unrestricted in that group.
+func enforceReceiptMemberVisibilitySelection(userId uint, groupId uint, command commands.UpsertReceiptCommand) (bool, string, error) {
+	permissionService := services.NewPermissionService(nil)
+
+	chargedToUserIds := collectReceiptChargedToUserIds(command)
+
+	ok, err := permissionService.ValidateReceiptUserSelection(userId, groupId, command.PaidByUserID, chargedToUserIds)
+	if err != nil {
+		return false, "", err
+	}
+	if !ok {
+		return false, "You do not have access to one or more selected users", nil
+	}
+
+	return true, "", nil
+}
+
+// enforceReceiptChargedToPreservation blocks an isolated editor from updating a
+// receipt whose STORED items are charged to a user they cannot see. Because the
+// update replaces items wholesale and item commands carry no stable id, the hidden
+// charge (masked to unset when the editor read the receipt) would be silently
+// dropped on save — corrupting the split. Rather than lose the charge we reject the
+// edit and tell the caller to route it through someone with full access. No-op when
+// the editor is unrestricted. (Letting the edit proceed while preserving the hidden
+// charge needs stable item identity — a separate, larger change.) Returns
+// (allowed, denyMessage, error).
+func enforceReceiptChargedToPreservation(userId uint, current models.Receipt) (bool, string, error) {
+	permissionService := services.NewPermissionService(nil)
+
+	visible, unrestricted, err := permissionService.GetVisibleUserIdsForUserInGroup(userId, current.GroupId)
+	if err != nil {
+		return false, "", err
+	}
+	if unrestricted {
+		return true, "", nil
+	}
+
+	hidden := func(chargedTo *uint) bool {
+		if chargedTo == nil || *chargedTo == 0 || *chargedTo == userId {
+			return false
+		}
+		_, ok := visible[*chargedTo]
+		return !ok
+	}
+
+	for _, item := range current.ReceiptItems {
+		if hidden(item.ChargedToUserId) {
+			return false, receiptHiddenChargeMessage, nil
+		}
+		for _, linkedItem := range item.LinkedItems {
+			if hidden(linkedItem.ChargedToUserId) {
+				return false, receiptHiddenChargeMessage, nil
+			}
+		}
+	}
+
+	return true, "", nil
+}
+
+const receiptHiddenChargeMessage = "This receipt includes a charge to a member you do not have access to and cannot be edited here. Ask an administrator or a member with full access to edit it."
+
+// collectReceiptChargedToUserIds walks a receipt command's items and linked items and
+// returns every charged-to user id referenced (skipping unset/zero ids).
+func collectReceiptChargedToUserIds(command commands.UpsertReceiptCommand) []uint {
+	var ids []uint
+	for _, item := range command.Items {
+		if item.ChargedToUserId != nil && *item.ChargedToUserId != 0 {
+			ids = append(ids, *item.ChargedToUserId)
+		}
+		for _, linkedItem := range item.LinkedItems {
+			if linkedItem.ChargedToUserId != nil && *linkedItem.ChargedToUserId != 0 {
+				ids = append(ids, *linkedItem.ChargedToUserId)
+			}
+		}
+	}
+	return ids
 }
 
 // enforceQuickScanGrantSelection checks a quick-scan command's per-file category/tag

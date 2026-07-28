@@ -74,6 +74,44 @@ func TestReportDataService_HidesReceiptsByPaidBy(t *testing.T) {
 	}
 }
 
+// Reporting inherits per-group member isolation through the shared paid-by resolver: a
+// receipt paid by a member the viewer cannot see in an isolated group never reaches the
+// report engine, while the viewer's own and a visible supervisor's receipts do.
+func TestReportDataService_MemberIsolationHidesPeerPaidReceipts(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	iso := seedIsoGroup(t, "rpt-iso", true)
+	supRole := seedIsoRole(t, "rpt-iso-sup", true)
+	memRole := seedIsoRole(t, "rpt-iso-mem", false)
+
+	viewer := seedIsoUser(t, "rpt-iso-viewer")
+	coord := seedIsoUser(t, "rpt-iso-coord")
+	peer := seedIsoUser(t, "rpt-iso-peer")
+	seedIsoMember(t, iso.ID, viewer.ID, &memRole.ID)
+	seedIsoMember(t, iso.ID, coord.ID, &supRole.ID)
+	seedIsoMember(t, iso.ID, peer.ID, &memRole.ID)
+
+	own := createReportReceipt(t, "own", viewer.ID, iso.ID, nil)
+	supPaid := createReportReceipt(t, "sup", coord.ID, iso.ID, nil)
+	createReportReceipt(t, "peer", peer.ID, iso.ID, nil) // paid by a hidden peer -> excluded
+
+	_, rows, err := NewReportDataService(nil).Rows(viewer.ID, groupIdString(iso.ID), commands.ReceiptPagedRequestFilter{})
+	if err != nil {
+		t.Fatalf("Rows: %v", err)
+	}
+
+	gotIds := map[int64]bool{}
+	for _, row := range rows {
+		id, _ := row.Measure(receiptsource.KeyReceiptID).Decimal()
+		gotIds[id.IntPart()] = true
+	}
+	if len(gotIds) != 2 || !gotIds[int64(own.ID)] || !gotIds[int64(supPaid.ID)] {
+		t.Fatalf("expected only the viewer's own + supervisor receipts, got %v", gotIds)
+	}
+}
+
 // A category the caller may not see becomes (Restricted) in the row rather than
 // being stripped (which would silently drop it from the totals).
 func TestReportDataService_SubstitutesRestrictedCategory(t *testing.T) {

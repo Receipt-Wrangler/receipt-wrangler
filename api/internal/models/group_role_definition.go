@@ -14,6 +14,13 @@ type GroupRoleDefinition struct {
 	IsDefault   bool   `gorm:"not null;default:false" json:"isDefault"`
 	IsSystem    bool   `gorm:"not null;default:false" json:"isSystem"`
 
+	// SeesAllMembers is the "supervisor" exemption for member isolation (see
+	// Group.IsolateMembers): holders of this group role can see every member of an
+	// isolated group AND are visible to every member (so an isolated member can still
+	// see and transact with their coordinator). Only meaningful in an isolated group;
+	// default false ⇒ no effect on existing roles/groups.
+	SeesAllMembers bool `gorm:"not null;default:false" json:"seesAllMembers"`
+
 	// IncludeOwnPaidReceipts is the relative "their own receipts" token of the
 	// paid-by visibility filter: when true the role lets each member see receipts
 	// they paid for. It is stored separately from PaidByUserGrants because it

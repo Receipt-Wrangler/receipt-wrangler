@@ -59,7 +59,7 @@ func grantGroupPerms(t *testing.T, userId uint, groupId uint, perms ...string) {
 	db := repositories.GetDB()
 
 	roleRepository := repositories.NewRoleRepository(nil)
-	role, err := roleRepository.CreateGroupRole(fmt.Sprintf("Test Group Role %d-%d", userId, groupId), "", perms, nil, nil, nil, false)
+	role, err := roleRepository.CreateGroupRole(fmt.Sprintf("Test Group Role %d-%d", userId, groupId), "", perms, nil, nil, nil, false, false)
 	if err != nil {
 		t.Fatalf("create group role: %v", err)
 	}
@@ -89,4 +89,31 @@ func grantAllAppPerms(t *testing.T, userId uint) {
 func grantAllGroupPerms(t *testing.T, userId uint, groupId uint) {
 	t.Helper()
 	grantGroupPerms(t, userId, groupId, permissions.LegacyGroupOwnerKeys()...)
+}
+
+// isolateGroupWithSupervisor turns on member-presence isolation for groupId and
+// assigns supervisorUserId a SeesAllMembers group role in it (so they remain
+// visible to isolated members). Members without such a role become mutually
+// invisible. Assumes the membership rows already exist.
+func isolateGroupWithSupervisor(t *testing.T, groupId uint, supervisorUserId uint) {
+	t.Helper()
+	services.ClearRolePermissionCacheForTests()
+	services.ClearGroupRoleGrantCacheForTests()
+	db := repositories.GetDB()
+
+	if err := db.Model(&models.Group{}).Where("id = ?", groupId).Update("isolate_members", true).Error; err != nil {
+		t.Fatalf("isolate group: %v", err)
+	}
+
+	supRole, err := repositories.NewRoleRepository(nil).CreateGroupRole(
+		fmt.Sprintf("Iso Supervisor %d-%d", groupId, supervisorUserId), "",
+		[]string{permissions.GroupReceiptsRead}, nil, nil, nil, false, true)
+	if err != nil {
+		t.Fatalf("create supervisor role: %v", err)
+	}
+	if err := db.Model(&models.GroupMember{}).
+		Where("user_id = ? AND group_id = ?", supervisorUserId, groupId).
+		Update("group_role_id", supRole.ID).Error; err != nil {
+		t.Fatalf("assign supervisor role: %v", err)
+	}
 }

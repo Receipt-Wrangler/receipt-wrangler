@@ -49,7 +49,7 @@ func TestCreateGroupRolePersistsPermissions(t *testing.T) {
 	repository := NewRoleRepository(nil)
 
 	perms := []string{permissions.GroupReceiptsCreate}
-	role, err := repository.CreateGroupRole("Group Role", "Description", perms, nil, nil, nil, false)
+	role, err := repository.CreateGroupRole("Group Role", "Description", perms, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -93,13 +93,13 @@ func TestUpdateGroupRolePersistsChanges(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	created, err := repository.CreateGroupRole("Group Role", "Description", []string{permissions.GroupReceiptsCreate}, nil, nil, nil, false)
+	created, err := repository.CreateGroupRole("Group Role", "Description", []string{permissions.GroupReceiptsCreate}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
 
-	updated, err := repository.UpdateGroupRole(created.ID, "Renamed Group Role", "New description", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	updated, err := repository.UpdateGroupRole(created.ID, "Renamed Group Role", "New description", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -228,7 +228,7 @@ func TestGetGroupRolePermissions(t *testing.T) {
 	repository := NewRoleRepository(nil)
 
 	perms := []string{permissions.GroupReceiptsRead}
-	role, err := repository.CreateGroupRole("Group Role", "", perms, nil, nil, nil, false)
+	role, err := repository.CreateGroupRole("Group Role", "", perms, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -298,7 +298,7 @@ func TestGetGroupMemberRoleId(t *testing.T) {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
-	role, err := repository.CreateGroupRole("Group Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	role, err := repository.CreateGroupRole("Group Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -378,12 +378,12 @@ func TestSetDefaultGroupRoleClearsOthers(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	first, err := repository.CreateGroupRole("First", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	first, err := repository.CreateGroupRole("First", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
-	second, err := repository.CreateGroupRole("Second", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	second, err := repository.CreateGroupRole("Second", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

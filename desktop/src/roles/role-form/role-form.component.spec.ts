@@ -420,6 +420,51 @@ describe("RoleFormComponent", () => {
     expect(component.grantedPaidByUsers.length).toBe(0);
   });
 
+  it("includes seesAllMembers in a GROUP payload when enabled", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.name.setValue("Supervisor Role");
+    component.toggle("group.receipts.read");
+    component.form.controls.seesAllMembers.setValue(true);
+
+    component.submit();
+
+    expect(component.lastPayload?.scope).toBe("GROUP");
+    expect(component.lastPayload?.seesAllMembers).toBe(true);
+  });
+
+  it("defaults seesAllMembers to false in a GROUP payload", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.name.setValue("Plain Group Role");
+    component.toggle("group.receipts.read");
+
+    component.submit();
+
+    expect(component.lastPayload?.seesAllMembers).toBe(false);
+  });
+
+  it("omits seesAllMembers from an APP payload", async () => {
+    const { component } = await setup();
+    component.form.controls.name.setValue("App Role");
+    component.toggle("app.users.read");
+    // Even if the control somehow held true, an app payload must not carry it.
+    component.form.controls.seesAllMembers.setValue(true);
+
+    component.submit();
+
+    expect(component.lastPayload?.seesAllMembers).toBeUndefined();
+  });
+
+  it("resets seesAllMembers when switching role type", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.seesAllMembers.setValue(true);
+
+    component.pickType("app");
+    expect(component.form.controls.seesAllMembers.value).toBe(false);
+  });
+
   it("includes report template grants in a GROUP payload", async () => {
     const { component } = await setup();
     component.pickType("group");
@@ -609,6 +654,25 @@ describe("RoleFormComponent", () => {
         .map((option) => option.id)
         .sort((a, b) => a - b);
       expect(selectedIds).toEqual([RoleFormComponent.OWN_PAID_RECEIPTS_OPTION_ID, 42].sort((a, b) => a - b));
+    });
+
+    it("rehydrates seesAllMembers on edit", async () => {
+      const seesAllGroupRole: Role = {
+        id: 13,
+        name: "Supervisor Group Role",
+        scope: "GROUP",
+        isDefault: false,
+        isSystem: false,
+        permissions: ["group.receipts.read"],
+        seesAllMembers: true,
+      };
+      const { component } = await setup(ALL_DESCRIPTORS, {
+        routeId: "13",
+        routeScope: "group",
+        roles: [seesAllGroupRole],
+      });
+
+      expect(component.form.controls.seesAllMembers.value).toBe(true);
     });
 
     it("rehydrates report template grants on edit", async () => {

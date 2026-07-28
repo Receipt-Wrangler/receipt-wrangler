@@ -41,6 +41,59 @@ func TestCreateGroupRoleWithGrantsExposesGrantIds(t *testing.T) {
 	}
 }
 
+func TestGroupRoleSeesAllMembersRoundTrips(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	service := NewRoleService(nil)
+	created, err := service.CreateRole(commands.UpsertRoleCommand{
+		Name:           "Supervisor Role",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		SeesAllMembers: true,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !created.SeesAllMembers {
+		utils.PrintTestError(t, created.SeesAllMembers, true)
+	}
+
+	// It surfaces on the read model too.
+	roles, err := service.GetRoles()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	found := false
+	for _, role := range roles {
+		if role.Id == created.Id {
+			found = true
+			if !role.SeesAllMembers {
+				utils.PrintTestError(t, role.SeesAllMembers, true)
+			}
+		}
+	}
+	if !found {
+		utils.PrintTestError(t, "role not found in GetRoles", created.Id)
+	}
+
+	// Update toggles it off; the returned view reflects false.
+	updated, err := service.UpdateRole(created.Id, commands.UpsertRoleCommand{
+		Name:           "Supervisor Role",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		SeesAllMembers: false,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if updated.SeesAllMembers {
+		utils.PrintTestError(t, updated.SeesAllMembers, false)
+	}
+}
+
 func TestCreateGroupRoleRejectsNonExistentGrant(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
@@ -184,7 +237,7 @@ func TestUpdateGroupRoleServiceReplacesGrants(t *testing.T) {
 	catB := models.Category{Name: "B"}
 	repositories.GetDB().Create(&catB)
 
-	created, err := roleRepository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{catA.ID}, nil, nil, false)
+	created, err := roleRepository.CreateGroupRole("Role", "", []string{permissions.GroupReceiptsRead}, []uint{catA.ID}, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

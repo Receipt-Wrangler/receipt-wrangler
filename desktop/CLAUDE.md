@@ -261,6 +261,22 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   bulk-delete still dispatch `RemoveUser` / `RemoveUsers` so the `UserState` cache (consumed by the
   role-editor & report-builder paid-by pickers, `user-autocomplete`, the `user` pipe, etc.) stays in
   sync. `UserState` itself is unchanged and still bootstrap-loaded from AppData for those other consumers.
+- **Member isolation (presence privacy).** Two config controls drive the backend member-isolation
+  feature (see `api/CLAUDE.md` → "Member isolation"): (1) an **"Isolate members"** `app-checkbox` in the
+  `group-form` "Group Details" section, bound to `isolateMembers` on the `UpsertGroupCommand` — an
+  isolated group's members can't discover each other; (2) a group-scope-only **"Members with this role
+  can see, and be seen by, all members"** `app-checkbox` in `role-form` (a "Member visibility" `rw-card`
+  inside the `@if (showGrants())` block), bound to `seesAllMembers` on the `UpsertRoleCommand` (mirrors
+  `includeOwnPaidReceipts`; hydrates on edit, resets on type switch, serialized only for GROUP scope).
+  Isolation is resolved **per group** on the backend ("isolated means isolated" — an isolated group hides
+  co-members and their settlement/report data regardless of any other group you share; co-members are
+  visible only through a shared **non-isolated** group). Everything is enforced **server-side** — the
+  desktop simply receives the already-filtered `appData.users` (union name-table) and per-group filtered
+  group rosters / receipts / Group-Summary settlement, so no client-side filtering is needed (and mobile
+  needs no change). This works because every group-context user picker sources its SET from the group
+  roster (`group.groupMembers`) or `roster ∩ flat-list`, using the flat `UserState.users` only to resolve
+  a name/avatar by id (see `GroupMemberUserService.getUsersInGroup`). The larger `UserAccessService` /
+  `UserView`-retype consolidation is a deferred follow-up.
 - **Permission-based UI gating.** The UI gates on the user's effective permissions, mirroring the
   backend's enforcement. Permissions are delivered on **AppData** (`appPermissions: string[]` and
   `groupPermissions: { [groupId]: string[] }`) and stored in `AuthState` via the dedicated

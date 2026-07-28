@@ -14,6 +14,9 @@ type UpsertGroupCommand struct {
 	Status         models.GroupStatus         `gorm:"default:'ACTIVE'; not null" json:"status"`
 	IsAllGroup     bool                       `json:"isAllGroup" gorm:"default:false"`
 	IsDefaultGroup bool                       `json:"isDefault"`
+	// IsolateMembers turns on member-presence isolation for the group. Default
+	// false ⇒ existing groups behave exactly as before.
+	IsolateMembers bool `json:"isolateMembers"`
 }
 
 func (command *UpsertGroupCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {

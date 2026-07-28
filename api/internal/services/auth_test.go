@@ -439,6 +439,70 @@ func TestGetAppData_PopulatesFields(t *testing.T) {
 	}
 }
 
+// GetAppData applies member isolation at the serialization boundary: a plain member of
+// an isolated group sees neither a peer's user-directory entry nor the peer in that
+// group's roster, while self + the supervisor remain.
+func TestGetAppData_IsolationHidesPeerFromDirectoryAndRoster(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	group := seedIsoGroup(t, "appdata-iso", true)
+	supRole := seedIsoRole(t, "appdata-iso-sup", true)
+	memberRole := seedIsoRole(t, "appdata-iso-mem", false)
+
+	viewer := seedIsoUser(t, "appdata-iso-viewer")
+	supervisor := seedIsoUser(t, "appdata-iso-sup-user")
+	peer := seedIsoUser(t, "appdata-iso-peer")
+	seedIsoMember(t, group.ID, viewer.ID, &memberRole.ID)
+	seedIsoMember(t, group.ID, supervisor.ID, &supRole.ID)
+	seedIsoMember(t, group.ID, peer.ID, &memberRole.ID)
+
+	appData, err := GetAppData(viewer.ID, nil)
+	if err != nil {
+		t.Fatalf("GetAppData: %v", err)
+	}
+
+	// Directory (appData.Users): peer absent; self + supervisor present.
+	inUsers := func(id uint) bool {
+		for _, u := range appData.Users {
+			if u.ID == id {
+				return true
+			}
+		}
+		return false
+	}
+	if inUsers(peer.ID) {
+		t.Errorf("peer should be hidden from appData.Users for an isolated member")
+	}
+	if !inUsers(viewer.ID) || !inUsers(supervisor.ID) {
+		t.Errorf("self + supervisor should remain in appData.Users")
+	}
+
+	// Roster of the isolated group: peer absent; self + supervisor present.
+	var isoRoster []uint
+	for _, g := range appData.Groups {
+		if g.ID == group.ID {
+			for _, m := range g.GroupMembers {
+				isoRoster = append(isoRoster, m.UserID)
+			}
+		}
+	}
+	contains := func(ids []uint, id uint) bool {
+		for _, x := range ids {
+			if x == id {
+				return true
+			}
+		}
+		return false
+	}
+	if contains(isoRoster, peer.ID) {
+		t.Errorf("peer should be hidden from the isolated group's roster, got %v", isoRoster)
+	}
+	if !contains(isoRoster, viewer.ID) || !contains(isoRoster, supervisor.ID) {
+		t.Errorf("self + supervisor should remain in the isolated group's roster, got %v", isoRoster)
+	}
+}
+
 // GetAppData with non-nil request that carries ValidatedClaims — Claims
 // should be populated on the AppData.
 func TestGetAppData_WithRequestPopulatesClaims(t *testing.T) {
@@ -498,7 +562,7 @@ func TestGetAppData_PopulatesPermissions(t *testing.T) {
 	}
 
 	groupPerms := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate}
-	groupRole, err := roleRepository.CreateGroupRole("AppData Group Role", "", groupPerms, nil, nil, nil, false)
+	groupRole, err := roleRepository.CreateGroupRole("AppData Group Role", "", groupPerms, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
@@ -554,7 +618,7 @@ func TestGetAppData_GroupCategoriesFilteredByGrants(t *testing.T) {
 		utils.PrintTestError(t, err, nil)
 	}
 
-	groupRole, err := roleRepository.CreateGroupRole("AppData Restricted Role", "", []string{permissions.GroupReceiptsRead}, []uint{grantedCategory.ID}, nil, nil, false)
+	groupRole, err := roleRepository.CreateGroupRole("AppData Restricted Role", "", []string{permissions.GroupReceiptsRead}, []uint{grantedCategory.ID}, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
@@ -604,7 +668,7 @@ func TestGetAppData_AdminGetsFlatCategoriesUnrestrictedGroup(t *testing.T) {
 		utils.PrintTestError(t, err, nil)
 	}
 
-	groupRole, err := roleRepository.CreateGroupRole("AppData Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false)
+	groupRole, err := roleRepository.CreateGroupRole("AppData Open Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}

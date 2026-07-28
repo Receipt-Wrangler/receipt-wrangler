@@ -196,6 +196,25 @@
           <div class="rw-card rw-form-section">
             <div class="rw-perm-header">
               <div>
+                <h2>Member visibility</h2>
+                <div class="hint hint-inline">
+                  In an isolated group, members can't see each other. Turn this
+                  on so holders of this role can see, and be seen by, all
+                  members.
+                </div>
+              </div>
+            </div>
+
+            <app-checkbox
+              label="Members with this role can see, and be seen by, all members"
+              [inputFormControl]="form | formGet: 'seesAllMembers'"
+              [readonly]="isViewMode()"
+            ></app-checkbox>
+          </div>
+
+          <div class="rw-card rw-form-section">
+            <div class="rw-perm-header">
+              <div>
                 <h2>Category &amp; tag access</h2>
                 <div class="hint hint-inline">
                   Limit members to specific categories and tags. Leave empty for

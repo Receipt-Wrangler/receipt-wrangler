@@ -131,6 +131,12 @@ func handleListGroups(ctx context.Context, req *mcpsdk.CallToolRequest, _ emptyI
 		return nil, nil, err
 	}
 
+	// Member-presence isolation: strip each roster to the members the caller may see.
+	permissionService := services.NewPermissionService(nil)
+	if err := permissionService.FilterGroupMembersForGroups(claims.UserId, groups); err != nil {
+		return nil, nil, err
+	}
+
 	return nil, groups, nil
 }
 
