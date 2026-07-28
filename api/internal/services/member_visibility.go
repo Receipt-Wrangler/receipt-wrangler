@@ -162,8 +162,13 @@ func (service PermissionService) ActivityVisibilityResolver(userId uint, groupId
 			return nil, true, nil
 		}
 		vis, ok := byGroup[groupId]
-		if !ok || vis.unrestricted {
+		if ok && vis.unrestricted {
 			return nil, true, nil
+		}
+		if !ok {
+			// Defensive: an unrequested groupId must not default to unrestricted
+			// (member isolation fails closed). Self-only is the minimum-visibility set.
+			return []uint{userId}, false, nil
 		}
 		return uintSetToSlice(vis.visible), false, nil
 	}, nil

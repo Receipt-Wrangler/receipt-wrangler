@@ -295,3 +295,32 @@ func TestVisibleUsersInGroup_AppUsersReadShortCircuits(t *testing.T) {
 
 	assertVisibleInGroup(t, admin.ID, iso.ID, nil, true)
 }
+
+// ActivityVisibilityResolver fails CLOSED for a groupId it was never asked to resolve:
+// an unrecognized group must restrict to the viewer alone, never default to unrestricted
+// (member isolation must never fail open). Built with an empty groupIds list so the
+// per-group map is empty and any group misses.
+func TestActivityVisibilityResolverFailsClosedOnUnknownGroup(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearRolePermissionCacheAll()
+
+	// A plain user with no app role → no app.users.read, so unrestrictedAll is false.
+	viewer := seedIsoUser(t, "act-failclosed-user")
+
+	service := NewPermissionService(nil)
+	resolver, err := service.ActivityVisibilityResolver(viewer.ID, nil)
+	if err != nil {
+		t.Fatalf("ActivityVisibilityResolver: %v", err)
+	}
+
+	ids, unrestricted, err := resolver(9999) // a group never passed to the resolver
+	if err != nil {
+		t.Fatalf("resolver closure: %v", err)
+	}
+	if unrestricted {
+		t.Fatalf("unknown group resolved to unrestricted (fail-open); want restricted")
+	}
+	if len(ids) != 1 || ids[0] != viewer.ID {
+		t.Errorf("unknown group should fail closed to {self} (%d), got %v", viewer.ID, ids)
+	}
+}
