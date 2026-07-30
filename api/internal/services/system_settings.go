@@ -1,10 +1,27 @@
 package services
 
 import (
+	"net/url"
+	"strings"
+
 	"gorm.io/gorm"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 )
+
+// loginQrDeepLinkBase is the App Link / Universal Link entry point that the
+// login QR encodes. It is a fixed, project-owned domain (the same one baked
+// into the published mobile app and its hosted assetlinks.json /
+// apple-app-site-association files) — it is NOT the self-hoster's own domain.
+// Keep this in sync with the mobile App Link config and the hosted files.
+const loginQrDeepLinkBase = "https://receiptwrangler.io/app/setup"
+
+// BuildLoginQrUrl composes the deep link the desktop login page renders as a
+// QR. The server URL rides in the fragment (#url=...) so it never reaches
+// receiptwrangler.io's server logs in the app-not-installed web fallback.
+func BuildLoginQrUrl(serverUrl string) string {
+	return loginQrDeepLinkBase + "#url=" + url.QueryEscape(serverUrl)
+}
 
 type SystemSettingsService struct {
 	BaseService
@@ -31,6 +48,11 @@ func (service SystemSettingsService) GetFeatureConfig() (structs.FeatureConfig, 
 
 	featureConfig.EnableLocalSignUp = systemSettings.EnableLocalSignUp
 	featureConfig.AiPoweredReceipts = aiPoweredReceipts
+
+	mobileServerUrl := strings.TrimSpace(systemSettings.MobileServerUrl)
+	if systemSettings.ShowLoginQr && len(mobileServerUrl) > 0 {
+		featureConfig.LoginQrUrl = BuildLoginQrUrl(mobileServerUrl)
+	}
 
 	return featureConfig, nil
 }

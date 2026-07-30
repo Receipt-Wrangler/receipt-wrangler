@@ -24,4 +24,9 @@ type SystemSettings struct {
 	// McpPublicUrl is the externally reachable origin (scheme + host) used to
 	// build the OAuth issuer/metadata/redirect URLs and the MCP token audience.
 	McpPublicUrl string `json:"mcpPublicUrl"`
+	// ShowLoginQr toggles the self-contained setup QR on the desktop login page.
+	ShowLoginQr bool `json:"showLoginQr" gorm:"default:false"`
+	// MobileServerUrl is the server/API URL mobile clients connect to. It is
+	// encoded (in the login QR's deep link) so scanning it sets up the app.
+	MobileServerUrl string `json:"mobileServerUrl"`
 }

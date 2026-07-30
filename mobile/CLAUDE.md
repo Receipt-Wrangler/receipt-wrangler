@@ -519,6 +519,59 @@ Native / platform notes:
   covered by `test/widgets/set_homeserver_url_test.dart` (injectable `scanQrCode` seam) and
   `test/utils/url_test.dart`. The live-camera path is exercised only on Android/iOS + manual runs.
 
+### App Links / Universal Links — server-URL pre-fill (login)
+
+The desktop login page shows a QR encoding a **deep link** to
+`https://receiptwrangler.io/app/setup`, with the server URL carried in the **URL fragment** as
+`#url=<percent-encoded server url>` (e.g.
+`https://receiptwrangler.io/app/setup#url=https%3A%2F%2Fdemo.receiptwrangler.io%2Fapi`). Scanning it
+(or tapping it on device) opens this app and **pre-fills** the "Server URL" field on the Connect-to-Server
+screen (`/`, `SetHomeserverUrl`). The **same** link also works when scanned by the in-app QR scanner.
+We deliberately **do not auto-connect** — the user reviews the URL and taps Connect (phishing
+mitigation, matching the plain-QR path above).
+
+- **Dependency:** `app_links` (`^6.4.1`) handles the links ourselves rather than letting go_router try
+  (and fail) to route `/app/setup`. We intentionally do **not** set `flutter_deeplinking_enabled`.
+  Pinned to the **6.x** line on purpose: `app_links` 7.x requires Dart `>=3.12.0`, but this app's
+  `environment.sdk` floor is `>=3.7.0` (6.4.1 needs only `>=3.5.0`), and the 6.x API
+  (`getInitialLink()` / `uriLinkStream`) is identical to 7.x. Bumping to 7.x would require raising the
+  Dart floor — do that deliberately if/when the app moves to Flutter 3.44+.
+- **Extractor** (`lib/utils/url.dart`): `extractDeepLinkServerUrl(String raw)` requires
+  `host == receiptwrangler.io` and `path == /app/setup`, reads `Uri.splitQueryString(uri.fragment)['url']`,
+  and passes that value back through the existing `normalizeServerUrl` gate (so http/https +
+  non-empty-host validation is reused). Returns null for anything that isn't this deep link. Covered by
+  `test/utils/url_test.dart`.
+- **Deep-link handler** (`lib/main.dart`, `_ReceiptWrangler`): subscribes via `app_links` in `initState`
+  — `getInitialLink()` for cold start (stashed immediately so it survives the `FutureBuilder` first-paint
+  gate) and `uriLinkStream` for warm/resumed. For each URI it runs `extractDeepLinkServerUrl`; on a match
+  it sets `AuthModel.pendingServerUrl` and routes to `/`. The stream subscription is cancelled in
+  `dispose`.
+- **Pre-fill** (`AuthModel.pendingServerUrl` + `SetHomeserverUrl`): the handler stashes the URL on
+  `AuthModel.pendingServerUrl` (a nullable field with `setPendingServerUrl` / `clearPendingServerUrl`,
+  both `notifyListeners`). `SetHomeserverUrl` consumes it in `build`: when non-null it `patchValue`s the
+  `url` field in a post-frame callback (the FormBuilder state isn't attached during the first build) and
+  clears it. This covers both the **cold-start** case (value present when the widget first mounts) and
+  the **warm** case (value arrives later → listener fires → rebuild). Covered by
+  `test/widgets/set_homeserver_url_test.dart`.
+- **In-app scanner reuse** (`set_homeserver_url.dart` `_onScanPressed`): resolves the scanned value with
+  `extractDeepLinkServerUrl(raw) ?? normalizeServerUrl(raw)`, so the deep-link QR and a plain server-URL
+  QR both fill the field.
+- **Redirect interaction:** the existing `/`→`/groups` auth redirect
+  (`guards/auth-guard.dart` `unprotectedRouteRedirect`) means the pre-fill only surfaces for
+  **unauthenticated** sessions — a logged-in user is already set up, so bouncing them to `/groups` is
+  intended. Do not try to defeat the redirect.
+- **Native config:**
+  - **Android** (`android/app/src/main/AndroidManifest.xml`): a second `<intent-filter>` on
+    `MainActivity` with `android:autoVerify="true"` (VIEW/DEFAULT/BROWSABLE) and
+    `<data android:scheme="https" android:host="receiptwrangler.io" android:pathPrefix="/app/setup"/>`.
+    App Links verify against the installed `applicationId` (`io.receiptwrangler`), so no namespace change
+    is needed. No new permissions.
+  - **iOS** (`ios/Runner/Runner.entitlements`): `com.apple.developer.associated-domains` =
+    `[applinks:receiptwrangler.io]`, wired via `CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;` into
+    the **Debug** and **Release** Runner build configs in `project.pbxproj` (not RunnerTests, not Profile).
+    Universal Links don't need an Info.plist change. Bundle id `io.receiptwrangler`, Apple Team ID
+    `3VD3YNZ3KA` (already set).
+
 ### Testing
 
 Run tests with `flutter test`. Run a single file with `flutter test test/path/to/file_test.dart`.

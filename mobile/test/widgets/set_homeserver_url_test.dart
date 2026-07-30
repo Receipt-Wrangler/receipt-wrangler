@@ -75,4 +75,33 @@ void main() {
 
     expect(find.text(invalidMessage), findsNothing);
   });
+
+  testWidgets(
+      'AuthModel.pendingServerUrl pre-fills the field without auto-connecting',
+      (tester) async {
+    // Use a test-owned model so we can push the pending URL onto it, mimicking
+    // the deep-link handler in main.dart (warm case: the screen is already
+    // mounted when the value arrives).
+    final authModel = AuthModel();
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AuthModel>.value(
+        value: authModel,
+        child: const MaterialApp(
+          home: Scaffold(body: SetHomeserverUrl()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    authModel.setPendingServerUrl('https://deeplink.example.io/api');
+    await tester.pump(); // rebuild (listener) -> schedule post-frame patch
+    await tester.pump(const Duration(milliseconds: 400)); // run patch + clear
+
+    // Field is pre-filled from the pending URL.
+    expect(find.text('https://deeplink.example.io/api'), findsOneWidget);
+    // Consumed exactly once (cleared), so a later rebuild won't re-apply it.
+    expect(authModel.pendingServerUrl, isNull);
+    // No auto-connect: still on the Connect screen (never navigated away).
+    expect(find.text('Connect to Server'), findsOneWidget);
+  });
 }

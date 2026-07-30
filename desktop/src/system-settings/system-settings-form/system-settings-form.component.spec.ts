@@ -99,6 +99,8 @@ describe("SystemSettingsFormComponent", () => {
       ],
       mcpEnabled: null,
       mcpPublicUrl: null,
+      showLoginQr: null,
+      mobileServerUrl: null,
     });
   });
 
@@ -123,6 +125,8 @@ describe("SystemSettingsFormComponent", () => {
       }],
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      showLoginQr: true,
+      mobileServerUrl: "https://receipts.example.com/api",
     };
 
     component.ngOnInit();
@@ -146,7 +150,35 @@ describe("SystemSettingsFormComponent", () => {
       }],
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      showLoginQr: true,
+      mobileServerUrl: "https://receipts.example.com/api",
     });
+  });
+
+  it("requires a mobile server url only when the login QR is enabled", () => {
+    component.ngOnInit();
+
+    const showLoginQr = component.form.get("showLoginQr")!;
+    const mobileServerUrl = component.form.get("mobileServerUrl")!;
+
+    // Off by default: an empty url is valid.
+    showLoginQr.setValue(false);
+    mobileServerUrl.setValue("");
+    expect(mobileServerUrl.valid).toBe(true);
+
+    // Enabled: an empty url is now required (invalid).
+    showLoginQr.setValue(true);
+    mobileServerUrl.setValue("");
+    expect(mobileServerUrl.hasError("required")).toBe(true);
+
+    // Enabled with a url is valid again.
+    mobileServerUrl.setValue("https://receipts.example.com/api");
+    expect(mobileServerUrl.valid).toBe(true);
+
+    // Disabling clears the requirement.
+    showLoginQr.setValue(false);
+    mobileServerUrl.setValue("");
+    expect(mobileServerUrl.valid).toBe(true);
   });
 
   it("should submit form", () => {
@@ -178,6 +210,8 @@ describe("SystemSettingsFormComponent", () => {
       taskConcurrency: "12",
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      showLoginQr: true,
+      mobileServerUrl: "https://receipts.example.com/api",
     });
 
     // Update the quick_scan queue priority specifically
@@ -212,6 +246,8 @@ describe("SystemSettingsFormComponent", () => {
       ],
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      showLoginQr: true,
+      mobileServerUrl: "https://receipts.example.com/api",
     });
 
     expect(snackbarServiceSpy).toHaveBeenCalled();

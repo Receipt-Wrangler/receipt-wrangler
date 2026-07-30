@@ -319,6 +319,25 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   - **Notification delete** (`notification/notification.component.html`): the per-notification delete
     control gates on `app.notifications.delete` via `*hasAppPermission`.
 
+## Login QR (mobile app setup)
+
+The login page (`src/auth/sign-up/auth-form.component.*`, shared by login + sign-up) renders a QR that
+deep-links users into the mobile app to set it up. It is **self-contained** — generated locally with
+the `qrcode` package (no external QR service), from the derived `featureConfig.loginQrUrl` string the
+backend composes (see `api/CLAUDE.md` → "Login QR & mobile deep link"). The component reads
+`FeatureConfigState.loginQrUrl` via `store.selectSignal`, regenerates a `data:` URL in an `effect()`
+(the `qrDataUrl` signal), and the template shows it only when non-empty (`@if (qrDataUrl())`), so the
+QR appears only when an admin enabled it. `FeatureConfigState` gained a `loginQrUrl` default (`""`), a
+selector, and — the load-bearing bit — the field in the `SetFeatureConfig` `patchState` block (that
+block lists each field explicitly, so a new field is silently dropped unless added there; guarded by
+`feature-config.state.spec.ts`).
+
+Admins configure it on the System Settings form (`src/system-settings/system-settings-form/`): a
+"Mobile App Setup" `app-form-section` with a **Show login QR code** `app-checkbox` (`showLoginQr`) and
+a **Mobile Server URL** `app-input` (`mobileServerUrl`), the URL conditionally required when the toggle
+is on (`listenForShowLoginQrChanges`, mirroring the MCP section's pattern). Saving refetches the
+feature config, so the login QR updates without a reload.
+
 ## Signals & Zoneless Change Detection
 
 This application uses Angular's signal-based reactivity model with zoneless change detection (`provideZonelessChangeDetection()`). All new code MUST follow these patterns.

@@ -141,6 +141,8 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       taskQueueConfigurations: this.formBuilder.array(this.buildAsynqQueueConfigurations()),
       mcpEnabled: [this.originalSystemSettings?.mcpEnabled],
       mcpPublicUrl: [this.originalSystemSettings?.mcpPublicUrl],
+      showLoginQr: [this.originalSystemSettings?.showLoginQr],
+      mobileServerUrl: [this.originalSystemSettings?.mobileServerUrl],
     });
 
     if (this.inputReadonlyPipe.transform(this.formConfig.mode)) {
@@ -152,11 +154,14 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       this.form.get("currencyHideDecimalPlaces")?.disable();
       this.form.get("mcpEnabled")?.disable();
       this.form.get("mcpPublicUrl")?.disable();
+      this.form.get("showLoginQr")?.disable();
+      this.form.get("mobileServerUrl")?.disable();
     }
 
     this.listenForReceiptProcessingSettingsChanges();
     this.listenForHideDecimalPlacesChanges();
     this.listenForMcpEnabledChanges();
+    this.listenForShowLoginQrChanges();
   }
 
   // TODO: finish implementing UI for taskQueueConfigurations
@@ -213,6 +218,23 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
         tap((enabled: boolean) => {
           mcpPublicUrl?.setValidators(enabled ? [Validators.required] : []);
           mcpPublicUrl?.updateValueAndValidity({ emitEvent: false });
+        })
+      )
+      .subscribe();
+  }
+
+  // A mobile server URL is required to show the login QR code, mirroring the
+  // backend validation. The control's validators track the toggle.
+  private listenForShowLoginQrChanges(): void {
+    const mobileServerUrl = this.form.get("mobileServerUrl");
+
+    this.form.get("showLoginQr")?.valueChanges
+      .pipe(
+        startWith(this.form.get("showLoginQr")?.value),
+        untilDestroyed(this),
+        tap((enabled: boolean) => {
+          mobileServerUrl?.setValidators(enabled ? [Validators.required] : []);
+          mobileServerUrl?.updateValueAndValidity({ emitEvent: false });
         })
       )
       .subscribe();

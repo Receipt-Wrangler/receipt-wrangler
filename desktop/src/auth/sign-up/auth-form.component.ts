@@ -1,13 +1,14 @@
-import { Component, OnInit, ViewEncapsulation } from "@angular/core";
+import { Component, effect, OnInit, signal, ViewEncapsulation } from "@angular/core";
 import { FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
+import * as QRCode from "qrcode";
 import { BehaviorSubject, catchError, finalize, of, switchMap, tap, } from "rxjs";
 import { AppData, AuthService } from "src/open-api";
 import { SnackbarService } from "src/services";
 import { setAppData } from "src/utils";
 import { fadeIn, fadeInOut } from "../../animations";
-import { GroupState } from "../../store";
+import { FeatureConfigState, GroupState } from "../../store";
 import { UserValidators } from "../../validators";
 
 @Component({
@@ -29,6 +30,9 @@ export class AuthForm implements OnInit {
   public secondaryButtonText: string = "";
   public secondaryButtonRouterLink: string[] = [];
   public isLoading = false;
+  // Rendered locally from featureConfig.loginQrUrl; null when the login QR is
+  // disabled/unset, which hides the QR block on the login page.
+  public qrDataUrl = signal<string | null>(null);
 
   constructor(
     private authSerivce: AuthService,
@@ -39,6 +43,17 @@ export class AuthForm implements OnInit {
     protected store: Store,
     protected userValidators: UserValidators
   ) {
+    const loginQrUrl = this.store.selectSignal(FeatureConfigState.loginQrUrl);
+    effect(() => {
+      const url = loginQrUrl();
+      if (url) {
+        QRCode.toDataURL(url, { margin: 2, width: 220 })
+          .then((dataUrl) => this.qrDataUrl.set(dataUrl))
+          .catch(() => this.qrDataUrl.set(null));
+      } else {
+        this.qrDataUrl.set(null);
+      }
+    });
   }
 
   public ngOnInit(): void {

@@ -23,6 +23,18 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- App Links: open https://receiptwrangler.io/app/setup deep links
+                 directly in the app. autoVerify makes Android verify ownership
+                 against the site's Digital Asset Links file. Handled in-app via
+                 the app_links package (see lib/main.dart). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"
+                      android:host="receiptwrangler.io"
+                      android:pathPrefix="/app/setup"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

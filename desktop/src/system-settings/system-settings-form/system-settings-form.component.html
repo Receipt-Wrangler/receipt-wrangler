@@ -161,6 +161,26 @@
       </div>
     }
   </app-form-section>
+  <app-form-section
+    headerText="Mobile App Setup"
+  >
+    <p class="text-muted mb-3">
+      Shows a QR code on the login page that opens the Receipt Wrangler mobile app and pre-fills the
+      server URL below, so users can connect their phone without typing it. Leave this off to hide the
+      QR code.
+    </p>
+    <app-checkbox
+      label="Show login QR code"
+      [inputFormControl]="form | formGet:'showLoginQr'"
+      [readonly]="formConfig.mode | inputReadonly"
+    ></app-checkbox>
+    <app-input
+      label="Mobile Server URL"
+      hint="The server/API URL mobile clients connect to, e.g. https://receipts.example.com/api. Encoded into the login QR code."
+      [readonly]="formConfig.mode | inputReadonly"
+      [inputFormControl]="form | formGet:'mobileServerUrl'"
+    ></app-input>
+  </app-form-section>
   <app-form-button-bar
     [mode]="formConfig.mode"
   >

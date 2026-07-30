@@ -33,6 +33,29 @@ class AuthModel extends ChangeNotifier {
 
   api.FeatureConfig get featureConfig => _featureConfig;
 
+  /// A server URL captured from a `receiptwrangler.io/app/setup` deep link,
+  /// waiting to be consumed by the Connect-to-Server screen to pre-fill its
+  /// field. The deep-link handler in `main.dart` sets it; `SetHomeserverUrl`
+  /// reads it (both on mount for the cold-start case and via this notifier for
+  /// the warm case) and clears it via [clearPendingServerUrl]. It is never
+  /// auto-connected — the user still reviews the URL and taps Connect.
+  String? _pendingServerUrl;
+
+  String? get pendingServerUrl => _pendingServerUrl;
+
+  void setPendingServerUrl(String? url) {
+    _pendingServerUrl = url;
+    notifyListeners();
+  }
+
+  void clearPendingServerUrl() {
+    if (_pendingServerUrl == null) {
+      return;
+    }
+    _pendingServerUrl = null;
+    notifyListeners();
+  }
+
   void initializeAuth() {
     _updateDefaultApiClient();
   }

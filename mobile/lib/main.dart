@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -38,6 +39,7 @@ import 'package:receipt_wrangler_mobile/services/token_refresh_service.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/circular_loading_progress.dart';
 import 'package:receipt_wrangler_mobile/service/crash_reporting.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/screen_wrapper.dart';
+import 'package:receipt_wrangler_mobile/utils/url.dart';
 
 import 'package:receipt_wrangler_mobile/profile/screens/user_profile_screen.dart';
 
@@ -228,6 +230,12 @@ class _ReceiptWrangler extends State<ReceiptWrangler>
   late Future<bool> _initFuture;
   bool _initialized = false;
 
+  // Deep-link (App Links / Universal Links) plumbing for
+  // receiptwrangler.io/app/setup. We handle links ourselves via app_links
+  // rather than letting go_router try (and fail) to route /app/setup.
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSubscription;
+
   // GoRouter held per-State instance so each `pumpWidget(buildApp())` in
   // tests gets a fresh router starting at '/'. As a top-level `final` it
   // would be initialized once per isolate and leak location across tests.
@@ -271,6 +279,8 @@ class _ReceiptWrangler extends State<ReceiptWrangler>
     WidgetsBinding.instance.addPostFrameCallback((_) => nudgeFrames());
     _launchWindowTimer =
         Timer(const Duration(seconds: 6), () => _inLaunchWindow = false);
+
+    _initDeepLinks();
   }
 
   @override
@@ -278,10 +288,49 @@ class _ReceiptWrangler extends State<ReceiptWrangler>
     _refreshTimer?.cancel();
     _launchWindowTimer?.cancel();
     _frameNudgeTimer?.cancel();
+    _linkSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _lifecycleListener.dispose();
 
     super.dispose();
+  }
+
+  /// Subscribes to receiptwrangler.io/app/setup deep links. Handles the cold
+  /// start ([AppLinks.getInitialLink]) and warm/resumed ([AppLinks.uriLinkStream])
+  /// cases. A matching link pre-fills the Connect screen's server URL via
+  /// [AuthModel.pendingServerUrl]; it is never auto-connected.
+  Future<void> _initDeepLinks() async {
+    // Cold start: the app-link that launched the app. Stash it on AuthModel
+    // immediately so it survives the FutureBuilder first-paint gate and the
+    // Connect screen reads it the moment it mounts.
+    try {
+      final initial = await _appLinks.getInitialLink();
+      if (initial != null) {
+        _handleDeepLink(initial);
+      }
+    } catch (_) {
+      // Ignore an unavailable / malformed initial link.
+    }
+
+    // Warm / resumed: further links delivered while the app is running.
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      _handleDeepLink,
+      onError: (_) {},
+    );
+  }
+
+  void _handleDeepLink(Uri uri) {
+    final serverUrl = extractDeepLinkServerUrl(uri.toString());
+    if (serverUrl == null) {
+      return;
+    }
+
+    // Stash the URL for the Connect screen to pre-fill, then route to it. A
+    // logged-in user hitting '/' is bounced to '/groups' by the auth redirect,
+    // so the pre-fill only surfaces for unauthenticated sessions (intended — a
+    // logged-in user is already set up).
+    authModel.setPendingServerUrl(serverUrl);
+    _router.go('/');
   }
 
   @override

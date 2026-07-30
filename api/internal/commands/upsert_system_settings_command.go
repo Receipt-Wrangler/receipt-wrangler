@@ -27,6 +27,8 @@ type UpsertSystemSettingsCommand struct {
 	TaskQueueConfigurations             []UpsertTaskQueueConfigurationCommand `json:"taskQueueConfigurations"`
 	McpEnabled                          bool                                  `json:"mcpEnabled"`
 	McpPublicUrl                        string                                `json:"mcpPublicUrl"`
+	ShowLoginQr                         bool                                  `json:"showLoginQr"`
+	MobileServerUrl                     string                                `json:"mobileServerUrl"`
 }
 
 func (command *UpsertSystemSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -99,17 +101,23 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 	trimmedMcpPublicUrl := strings.TrimSpace(command.McpPublicUrl)
 	if command.McpEnabled && len(trimmedMcpPublicUrl) == 0 {
 		errorMap["mcpPublicUrl"] = "A public URL is required to enable the MCP server"
-	} else if len(trimmedMcpPublicUrl) > 0 && !isValidMcpPublicUrl(trimmedMcpPublicUrl) {
+	} else if len(trimmedMcpPublicUrl) > 0 && !isValidAbsoluteUrl(trimmedMcpPublicUrl) {
 		errorMap["mcpPublicUrl"] = "MCP public URL must be an absolute origin like https://receipts.example.com"
+	}
+
+	trimmedMobileServerUrl := strings.TrimSpace(command.MobileServerUrl)
+	if command.ShowLoginQr && len(trimmedMobileServerUrl) == 0 {
+		errorMap["mobileServerUrl"] = "A server URL is required to show the login QR code"
+	} else if len(trimmedMobileServerUrl) > 0 && !isValidAbsoluteUrl(trimmedMobileServerUrl) {
+		errorMap["mobileServerUrl"] = "Mobile server URL must be an absolute URL like https://receipts.example.com/api"
 	}
 
 	return vErr
 }
 
-// isValidMcpPublicUrl reports whether the value is an absolute http(s) origin.
-// A scheme and host are required; paths/queries/fragments are tolerated here
-// because they are stripped to the bare origin when the URL is consumed.
-func isValidMcpPublicUrl(raw string) bool {
+// isValidAbsoluteUrl reports whether the value is an absolute http(s) URL.
+// A scheme and host are required; paths/queries/fragments are tolerated.
+func isValidAbsoluteUrl(raw string) bool {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" {
 		return false

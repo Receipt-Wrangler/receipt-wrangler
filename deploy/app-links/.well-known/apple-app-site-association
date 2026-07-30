@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "3VD3YNZ3KA.io.receiptwrangler",
+        "paths": ["/app/setup", "/app/setup/*"]
+      }
+    ]
+  }
+}

@@ -766,6 +766,31 @@ Claude can read a user's data. It is **off by default** and Go-native (no separa
 - **Production**: `docker/default.conf` proxies the new root paths to the backend; the `/mcp`
   location disables buffering and raises the read timeout for SSE streams.
 
+## Login QR & mobile deep link
+
+The desktop login page can show a self-contained QR that sets up the mobile app. Two System Settings
+drive it (`models.SystemSettings`, edited via the System Settings UI, validated in
+`commands.UpsertSystemSettingsCommand.Validate`):
+
+- `showLoginQr` (bool, default false) — opt-in toggle.
+- `mobileServerUrl` (string) — the server/API URL mobile clients connect to; required (absolute
+  http/https, validated by `isValidAbsoluteUrl` — the former `isValidMcpPublicUrl`, generalized and
+  now shared by both settings) when `showLoginQr` is on.
+
+`SystemSettingsService.GetFeatureConfig()` derives a single **`FeatureConfig.LoginQrUrl`** from them
+via `BuildLoginQrUrl` (`services/system_settings.go`): the App Link / Universal Link
+`https://receiptwrangler.io/app/setup#url=<percent-encoded mobileServerUrl>` when the toggle is on and
+a URL is set, else `""`. The server URL rides in the **fragment** so it never reaches
+receiptwrangler.io's logs in the app-not-installed web fallback. `loginQrUrl` is the **only** login-QR
+value exposed on the public, unauthenticated `GET /featureConfig` payload — the raw setting and toggle
+stay behind auth. The desktop renders the QR locally from `loginQrUrl` (no new endpoint/handler).
+
+The `receiptwrangler.io/app/setup` host/path is a fixed, project-owned constant that MUST stay in sync
+with the mobile App Link config and the hosted `deploy/app-links/.well-known/*` files. See
+`mobile/CLAUDE.md` → "App Links / Universal Links — server-URL pre-fill (login)" and
+`deploy/app-links/README.md`. Tests: `commands/upsert_system_settings_command_test.go` (validation),
+`services/system_settings_test.go` (`BuildLoginQrUrl` compose/encoding + `GetFeatureConfig` mapping).
+
 ## Quick Scan Field Configuration
 
 Group admins configure the quick-scan workflow per group on `GroupReceiptSettings` (gated by the

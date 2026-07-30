@@ -5,7 +5,7 @@ import { SetFeatureConfig } from "./feature-config.state.actions";
 
 @State<FeatureConfig>({
   name: "featureConfig",
-  defaults: { enableLocalSignUp: true, aiPoweredReceipts: false },
+  defaults: { enableLocalSignUp: true, aiPoweredReceipts: false, loginQrUrl: "" },
 })
 @Injectable()
 export class FeatureConfigState {
@@ -17,6 +17,11 @@ export class FeatureConfigState {
   @Selector()
   static aiPoweredReceipts(state: FeatureConfig): boolean {
     return state.aiPoweredReceipts as boolean;
+  }
+
+  @Selector()
+  static loginQrUrl(state: FeatureConfig): string | undefined {
+    return state.loginQrUrl;
   }
 
   @Selector()
@@ -38,6 +43,7 @@ export class FeatureConfigState {
     patchState({
       aiPoweredReceipts: payload.config?.aiPoweredReceipts,
       enableLocalSignUp: payload.config?.enableLocalSignUp,
+      loginQrUrl: payload.config?.loginQrUrl,
     });
   }
 }
