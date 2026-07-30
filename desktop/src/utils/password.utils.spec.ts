@@ -22,6 +22,15 @@ describe("generateSecurePassword", () => {
     ).toThrow(RangeError);
   });
 
+  // Without the integer guard, Infinity spins the fill loop forever and NaN
+  // falls through it, returning only the class-guaranteed characters.
+  it.each([Infinity, -Infinity, NaN, 20.5])(
+    "throws for the non-integer length %p",
+    (length) => {
+      expect(() => generateSecurePassword(length)).toThrow(RangeError);
+    }
+  );
+
   it("always contains at least one character from each class", () => {
     for (let i = 0; i < ITERATIONS; i++) {
       const password = generateSecurePassword();

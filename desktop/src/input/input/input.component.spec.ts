@@ -100,6 +100,32 @@ describe("InputComponent", () => {
       expect(component.type).toEqual("password");
     });
 
+    it("masks the field when the generate button is enabled later", async () => {
+      fixture.componentRef.setInput("showGeneratePassword", false);
+      await fixture.whenStable();
+      expect(component.type).toEqual("text");
+
+      // A parent flipping the flag on after init still turns this into a
+      // password field — otherwise typed passwords would sit in plain text.
+      fixture.componentRef.setInput("showGeneratePassword", true);
+      await fixture.whenStable();
+
+      expect(component.type).toEqual("password");
+    });
+
+    it("does not re-mask a revealed password when an unrelated input changes", async () => {
+      fixture.componentRef.setInput("showGeneratePassword", true);
+      await fixture.whenStable();
+
+      component.generatePassword();
+      expect(component.type).toEqual("text");
+
+      fixture.componentRef.setInput("label", "New Password");
+      await fixture.whenStable();
+
+      expect(component.type).toEqual("text");
+    });
+
     it("fills the control with a generated password and reveals it", async () => {
       fixture.componentRef.setInput("inputFormControl", new FormControl(""));
       fixture.componentRef.setInput("showGeneratePassword", true);

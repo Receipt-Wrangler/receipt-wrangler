@@ -165,8 +165,10 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
 - **Form fields:** `app-input`, `app-textarea`, `app-select`, `app-checkbox`, grouped with
   `app-form-section`; bind via the `formGet` pipe.
 - **Password fields:** `app-input` owns both password affordances as opt-in suffix icon buttons —
-  `[showVisibilityEye]="true"` (the eye) and `[showGeneratePassword]="true"`
-  (`data-testid="password-generate"`). Either flag masks the field on init. Generate fills the
+  `[showVisibilityEye]="true"` (the eye, `data-testid="password-visibility-toggle"`) and
+  `[showGeneratePassword]="true"` (`data-testid="password-generate"`). Switching either flag on
+  masks the field — on the initial binding *and* on a later `false -> true` flip, so a field that
+  becomes a password field at runtime is never left in plain text. Generate fills the
   control with `generateSecurePassword()` (`src/utils/password.utils.ts` — `crypto.getRandomValues`
   with rejection sampling, one char per class, ambiguous glyphs excluded), reveals it, and copies it
   to the clipboard with a toast via `PasswordGeneratorService`

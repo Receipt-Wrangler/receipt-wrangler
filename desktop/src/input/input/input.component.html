@@ -41,6 +41,7 @@
         class="visibility-eye-button"
         mat-icon-button
         type="button"
+        data-testid="password-visibility-toggle"
         [matTooltip]="type === 'password' ? 'Show ' + label : 'Hide ' + label"
         (click)="toggleVisibility()"
       >

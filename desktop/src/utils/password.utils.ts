@@ -45,9 +45,12 @@ export const GENERATED_PASSWORD_LENGTH = 20;
 export function generateSecurePassword(
   length: number = GENERATED_PASSWORD_LENGTH
 ): string {
-  if (length < PASSWORD_CHARACTER_CLASSES.length) {
+  // Guard the loop below: Infinity would spin forever, and NaN would fall
+  // straight through and silently yield a password of only the guaranteed
+  // characters.
+  if (!Number.isInteger(length) || length < PASSWORD_CHARACTER_CLASSES.length) {
     throw new RangeError(
-      `Password length must be at least ${PASSWORD_CHARACTER_CLASSES.length}.`
+      `Password length must be a whole number of at least ${PASSWORD_CHARACTER_CLASSES.length}.`
     );
   }
 

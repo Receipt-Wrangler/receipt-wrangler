@@ -56,10 +56,13 @@ export class InputComponent
 
 
   public ngOnChanges(changes: SimpleChanges): void {
-    // Either password affordance implies a password field, so mask it up front.
+    // Either password affordance implies a password field, so mask it whenever
+    // one is switched on — `changes` only carries a key that actually changed,
+    // so this fires on the initial binding and on a later false -> true flip,
+    // and never re-masks a field the user has revealed.
     const becamePasswordField =
-      (changes["showVisibilityEye"]?.firstChange && this.showVisibilityEye) ||
-      (changes["showGeneratePassword"]?.firstChange && this.showGeneratePassword);
+      changes["showVisibilityEye"]?.currentValue ||
+      changes["showGeneratePassword"]?.currentValue;
     if (becamePasswordField) {
       this.type = "password";
     }

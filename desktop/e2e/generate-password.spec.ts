@@ -10,9 +10,14 @@ import { stubTokenRefresh } from './helpers/auth';
 const GENERATED_PASSWORD_LENGTH = 20;
 const COPIED_MESSAGE = 'Password generated and copied to clipboard';
 
+// Both suffix controls put their test ID on the native button, so neither needs
+// the .locator('button') hop the app-button-wrapped test IDs do.
 function generateButton(scope: Page | Locator): Locator {
-  // Unlike the app-button-wrapped test IDs, this one sits on the native button.
   return scope.getByTestId('password-generate');
+}
+
+function visibilityToggle(scope: Page | Locator): Locator {
+  return scope.getByTestId('password-visibility-toggle');
 }
 
 async function openCreateUserDialog(page: Page): Promise<Locator> {
@@ -80,7 +85,7 @@ test.describe('Generate password — Create User', () => {
     await generateButton(dialog).click();
     await expect(password).toHaveAttribute('type', 'text');
 
-    await dialog.locator('button.visibility-eye-button').click();
+    await visibilityToggle(dialog).click();
     await expect(password).toHaveAttribute('type', 'password');
     // Masking is display-only — the generated value is still submitted.
     await expect(password).not.toHaveValue('');
@@ -142,7 +147,7 @@ test.describe('password fields without a generate affordance', () => {
     await page.goto('/auth/login');
     await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
 
-    await expect(page.locator('button.visibility-eye-button')).toHaveCount(1);
+    await expect(visibilityToggle(page)).toHaveCount(1);
     await expect(generateButton(page)).toHaveCount(0);
   });
 });
