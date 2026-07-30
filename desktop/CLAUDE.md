@@ -164,6 +164,17 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   place Save/Cancel buttons in the page header.
 - **Form fields:** `app-input`, `app-textarea`, `app-select`, `app-checkbox`, grouped with
   `app-form-section`; bind via the `formGet` pipe.
+- **Password fields:** `app-input` owns both password affordances as opt-in suffix icon buttons —
+  `[showVisibilityEye]="true"` (the eye) and `[showGeneratePassword]="true"`
+  (`data-testid="password-generate"`). Either flag masks the field on init. Generate fills the
+  control with `generateSecurePassword()` (`src/utils/password.utils.ts` — `crypto.getRandomValues`
+  with rejection sampling, one char per class, ambiguous glyphs excluded), reveals it, and copies it
+  to the clipboard with a toast via `PasswordGeneratorService`
+  (`src/services/password-generator.service.ts`). It is deliberately **admin-sets-someone-else's-
+  password only** — the user form, Set Password, and Convert Dummy User dialogs — not sign-up or the
+  fields that hold an existing external secret (system email, receipt-processing settings). The
+  generate handler is synchronous by design: `type` is a plain `@Input`, so under zoneless CD only
+  the click event's CD pass renders the reveal (the clipboard write is a detached side effect).
 - **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`.
 - **Simple filters:** the segmented `app-filter-bar` (`src/shared-ui/filter-bar/`) — pass `FilterTab[]`
   (`{ value, label, icon?, count? }`) and two-way bind the selected `value`.
