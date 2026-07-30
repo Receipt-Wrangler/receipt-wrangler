@@ -77,7 +77,7 @@ async function createUserWithRole(
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Username').fill(opts.username);
   await dialog.getByLabel('Displayname').fill(opts.username);
-  await dialog.getByLabel('Password').fill(opts.password);
+  await dialog.getByLabel('Password', { exact: true }).fill(opts.password);
   await dialog.getByRole('combobox', { name: 'App Role' }).click();
   await page.getByRole('option', { name: opts.role, exact: true }).click();
   await dialog.locator('app-submit-button button').click();

@@ -600,6 +600,13 @@ In CI the same spec files run against the demo URL. GitHub secrets populate the 
 - Forms use a custom `<app-input>` wrapper over `<mat-form-field>`. `page.getByLabel('Username')` resolves through the `<mat-label>` association.
 - Submit buttons use `<app-button>` rendering `<button>` with visible text — `page.getByRole('button', { name: '...' })` works directly.
 - Error feedback is often a Material snackbar (not inline `<mat-error>`). When asserting errors, locate the snackbar container or its text, not the form.
+- **`getByLabel` matches substrings.** On any password field carrying the generate button, plain
+  `getByLabel('Password')` resolves *two* elements — the input and the button, whose accessible name
+  is "Generate password" — and fails on strict mode. Use `getByLabel('Password', { exact: true })`
+  for the Create User / Set Password dialogs (the login form has no generate button, so it is
+  unaffected). The generated password is asserted in `generate-password.spec.ts`, which also grants
+  `permissions: ['clipboard-read', 'clipboard-write']` in `test.use` — the only clipboard-reading
+  spec in the suite.
 
 ### Permission-gating specs (provisioned roles/users/groups)
 

@@ -114,7 +114,7 @@ export async function createUserWithRole(
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Username').fill(opts.username);
   await dialog.getByLabel('Displayname').fill(opts.username);
-  await dialog.getByLabel('Password').fill(opts.password);
+  await dialog.getByLabel('Password', { exact: true }).fill(opts.password);
   await dialog.getByRole('combobox', { name: 'App Role' }).click();
   // The option panel is a floating overlay rendered on the page, not the dialog.
   await page.getByRole('option', { name: opts.role, exact: true }).click();

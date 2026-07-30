@@ -32,7 +32,7 @@ test.describe('assigning modern roles (admin)', () => {
 
     await dialog.getByLabel('Username').fill(username);
     await dialog.getByLabel('Displayname').fill('E2E App Role');
-    await dialog.getByLabel('Password').fill('a-really-secure-password');
+    await dialog.getByLabel('Password', { exact: true }).fill('a-really-secure-password');
 
     // The app-role selector defaults to the configured default app role.
     const roleSelect = selectByLabel(page, 'App Role');
