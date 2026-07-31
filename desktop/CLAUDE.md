@@ -338,6 +338,13 @@ a **Mobile Server URL** `app-input` (`mobileServerUrl`), the URL conditionally r
 is on (`listenForShowLoginQrChanges`, mirroring the MCP section's pattern). Saving refetches the
 feature config, so the login QR updates without a reload.
 
+**E2E:** `e2e/login-qr.spec.ts` (serial, admin `storageState` + a fresh unauthenticated context for the
+login page) drives the whole flow — admin enables the toggle + URL in System Settings and it persists,
+the QR `<img>` then renders on `/auth/login` with the `featureConfig.loginQrUrl` decoding back to the
+configured server URL, and disabling hides it. It reverts `showLoginQr` via the admin API in `afterAll`
+(the setting is global). Component-level specs live alongside the code: `feature-config.state.spec.ts`,
+`auth-form.component.spec.ts`, `system-settings-form.component.spec.ts`.
+
 ## Signals & Zoneless Change Detection
 
 This application uses Angular's signal-based reactivity model with zoneless change detection (`provideZonelessChangeDetection()`). All new code MUST follow these patterns.
