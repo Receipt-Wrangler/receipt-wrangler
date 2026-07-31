@@ -1,3 +1,29 @@
 .header-text {
   margin-top: 0px;
 }
+
+// One block per group in the per-member category/tag assignment section.
+.user-form__grant-group {
+  & + & {
+    margin-top: 1.25rem;
+  }
+}
+
+.user-form__grant-group-name {
+  align-items: center;
+  display: flex;
+  font-size: 1rem;
+  font-weight: 600;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+// The member's role, shown so the admin knows which ceiling is narrowing the pool.
+.user-form__grant-role {
+  background: rgba(139, 92, 246, 0.12);
+  border-radius: 999px;
+  color: #8b5cf6;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.125rem 0.5rem;
+}

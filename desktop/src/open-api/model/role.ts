@@ -48,6 +48,14 @@ export interface Role {
      */
     seesAllMembers?: boolean;
     /**
+     * Whether a GROUP role requires per-member category assignment. When true, a member holding this role with no individual category grants sees NO categories, rather than falling back to the role\'s set. Always false for app roles.
+     */
+    requiresIndividualCategoryGrants?: boolean;
+    /**
+     * Tag counterpart of requiresIndividualCategoryGrants. Always false for app roles.
+     */
+    requiresIndividualTagGrants?: boolean;
+    /**
      * Per-template action grants restricting which report templates a GROUP role\'s members may act on. Empty means unrestricted (every template the role\'s group access reaches). Always empty for app roles.
      */
     reportTemplateGrants?: Array<ReportTemplateGrant>;

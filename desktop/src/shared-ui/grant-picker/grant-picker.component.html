@@ -1,0 +1,23 @@
+<app-category-autocomplete
+  class="w-100"
+  [inputFormControl]="$any(grantedCategories)"
+  [categories]="availableCategories()"
+  [creatable]="false"
+  [readonly]="readonly()"
+></app-category-autocomplete>
+
+@if (categoryCeilingHint()) {
+  <div class="hint hint-inline grant-picker__hint">{{ categoryCeilingHint() }}</div>
+}
+
+<app-tag-autocomplete
+  class="w-100"
+  [inputFormControl]="$any(grantedTags)"
+  [tags]="availableTags()"
+  [creatable]="false"
+  [readonly]="readonly()"
+></app-tag-autocomplete>
+
+@if (tagCeilingHint()) {
+  <div class="hint hint-inline grant-picker__hint">{{ tagCeilingHint() }}</div>
+}

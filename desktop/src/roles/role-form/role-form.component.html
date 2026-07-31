@@ -223,21 +223,31 @@
               </div>
             </div>
 
-            <app-category-autocomplete
-              class="w-100"
-              [inputFormControl]="$any(grantedCategories)"
-              [categories]="categoryPool()"
-              [creatable]="false"
+            <app-grant-picker
+              [categoryPool]="categoryPool()"
+              [tagPool]="tagPool()"
+              [selectedCategoryIds]="pendingCategoryGrantIds()"
+              [selectedTagIds]="pendingTagGrantIds()"
               [readonly]="isViewMode()"
-            ></app-category-autocomplete>
+              (grantsChange)="onGrantsChange($event)"
+            ></app-grant-picker>
 
-            <app-tag-autocomplete
-              class="w-100"
-              [inputFormControl]="$any(grantedTags)"
-              [tags]="tagPool()"
-              [creatable]="false"
+            <app-checkbox
+              label="Require an individual category assignment for each member"
+              [inputFormControl]="form | formGet: 'requiresIndividualCategoryGrants'"
               [readonly]="isViewMode()"
-            ></app-tag-autocomplete>
+            ></app-checkbox>
+            <div class="hint hint-inline">
+              When on, a member of this role who has not been individually assigned
+              categories sees none at all, instead of everything above. Use this so a
+              newly added member is never exposed to categories by default.
+            </div>
+
+            <app-checkbox
+              label="Require an individual tag assignment for each member"
+              [inputFormControl]="form | formGet: 'requiresIndividualTagGrants'"
+              [readonly]="isViewMode()"
+            ></app-checkbox>
           </div>
 
           <div class="rw-card rw-form-section">

@@ -203,6 +203,33 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   pool objects by an effect once the pool arrives) and serialized back as id arrays on
   `UpsertRoleCommand` for group scope only. The grant pickers pass `[creatable]="false"` (pick from
   existing, never create). See `api/CLAUDE.md` → "Data model".
+- **Shared grant picker (`src/shared-ui/grant-picker/`):** the category/tag grant UI is a standalone
+  `app-grant-picker` used by **three** forms — `role-form` (a group role's grants), `user-form` and
+  `group-member-form` (an individual member's assignment). It owns the two autocomplete `FormArray`s
+  and the pool→id resolution effect, takes `[selectedCategoryIds]`/`[selectedTagIds]` and emits
+  `(grantsChange)` with the current ids. An optional `[ceiling]` (`GrantCeiling`) **filters the offered
+  pool** and shows a hint naming the constraint — filtering rather than per-option disabling because
+  the shared `app-autocomlete` has no per-option disable support and adding one would touch a
+  component used app-wide. **It emits nothing while merely seeding itself** (`emitEvent: false`), so a
+  host must not treat "no emission" as "empty selection" — `role-form` uses a `linkedSignal`
+  (`grantSelection`) defaulting to the loaded role's grants, or an untouched save would wipe them.
+  `shared-ui/grant-picker/member-grant-assignment.ts` holds the shared row-building
+  (`buildMemberGrantRows`, `ceilingForRole`) and the diff-and-write helper
+  (`saveChangedMemberGrants`), so the two member-facing entry points cannot drift.
+- **Per-member category/tag assignment (`user-form`, `group-member-form`):** grants hang off a group
+  **membership**, so both forms only offer the picker for a membership that already exists on the
+  server — `user-form` renders one section per group the **edited** user belongs to (nothing in add
+  mode), and `group-member-form` shows it only when editing an already-persisted member. They write
+  through the dedicated **`PUT /group/{groupId}/member/{userId}/grants`** endpoint (its own permission,
+  `group.members.grants.update`), **not** the group-member upsert — so grants are saved independently
+  of the parent form and the two entry points cannot clobber each other via `UpdateGroup`'s wholesale
+  roster replace. Only **changed** rows issue a request. The role's own grants supply the picker's
+  ceiling; the backend re-validates and 400s an out-of-ceiling id. See `api/CLAUDE.md` →
+  "Category/tag grant resolution".
+- **Require-individual-assignment toggles (`role-form`, group roles only):** two `app-checkbox`es in
+  the grants section bound to `requiresIndividualCategoryGrants` / `requiresIndividualTagGrants`. When
+  on, a member of that role with no individual assignment sees **nothing** rather than the role's set,
+  so a newly added member is never exposed by default. Default off — existing roles are unchanged.
 - **Paid-by visibility (group roles only):** the same group-scoped grants section also shows a
   "Paid-by visibility" picker — a single `app-autocomlete` multi-select over `paidByOptions()` (a
   pinned **"Their own receipts"** sentinel option, id `OWN_PAID_RECEIPTS_OPTION_ID = -1`, followed by

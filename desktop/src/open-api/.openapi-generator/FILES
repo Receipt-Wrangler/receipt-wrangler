@@ -131,6 +131,7 @@ model/tag.ts
 model/tagView.ts
 model/taskQueueConfiguration.ts
 model/tokenPair.ts
+model/updateGroupMemberGrantsCommand.ts
 model/updateGroupReceiptSettingsCommand.ts
 model/updateGroupSettingsCommand.ts
 model/updateProfileCommand.ts

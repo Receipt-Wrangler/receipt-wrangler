@@ -38,6 +38,14 @@ export interface UpsertRoleCommand {
      */
     seesAllMembers?: boolean;
     /**
+     * Whether this GROUP role requires per-member category assignment. When true, a member with no individual category grants sees NO categories instead of falling back to the role\'s set, so an unassigned member fails closed. Only valid on group roles.
+     */
+    requiresIndividualCategoryGrants?: boolean;
+    /**
+     * Tag counterpart of requiresIndividualCategoryGrants. Only valid on group roles.
+     */
+    requiresIndividualTagGrants?: boolean;
+    /**
      * Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
      */
     reportTemplateGrants?: Array<ReportTemplateGrant>;

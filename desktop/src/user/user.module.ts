@@ -13,6 +13,7 @@ import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { DummyUserConversionDialogComponent } from "./dummy-user-conversion-dialog/dummy-user-conversion-dialog.component";
 import { ResetPasswordComponent } from "./reset-password/reset-password.component";
+import { GrantPickerComponent } from "../shared-ui/grant-picker/grant-picker.component";
 import { UserFormComponent } from "./user-form/user-form.component";
 import { UserListComponent } from "./user-list/user-list.component";
 import { UserRoutingModule } from "./user-routing.module";
@@ -38,6 +39,7 @@ import { UserRoutingModule } from "./user-routing.module";
     SharedUiModule,
     TableModule,
     UserRoutingModule,
+    GrantPickerComponent,
   ],
 })
 export class UserModule {}

@@ -25,6 +25,26 @@
         (clicked)="previewRole()"
       ></app-button>
     </div>
+
+    @if (grantRow(); as row) {
+      <div class="group-member-form__grants">
+        <h3 class="group-member-form__grants-header">Category &amp; tag access</h3>
+        <div class="hint hint-inline">
+          Limit this member to specific categories and tags. This narrows within what
+          their group role already allows — it can never widen it. Leave empty to give
+          them everything the role allows. Saved immediately when you save this member.
+        </div>
+        <app-grant-picker
+          [categoryPool]="categoryPool()"
+          [tagPool]="tagPool()"
+          [selectedCategoryIds]="row.current.categoryIds"
+          [selectedTagIds]="row.current.tagIds"
+          [ceiling]="row.ceiling"
+          (grantsChange)="onGrantsChange(row.groupId, $event)"
+        ></app-grant-picker>
+      </div>
+    }
+
     <app-dialog-footer (cancelClicked)="closeModal()"></app-dialog-footer>
   </form>
 </app-dialog>

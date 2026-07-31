@@ -322,7 +322,13 @@ will be dropped in a later release.
   `GroupRoleTagGrant` (composite-PK join rows) for per-role category/tag visibility. A group role
   with **no** grant rows is **unrestricted** (sees every category/tag); a non-empty grant set
   restricts members to exactly those ids — restriction is opt-in, so legacy/system roles (no grants)
-  keep seeing everything and no data migration is needed. Categories/tags are **global** (no
+  keep seeing everything and no data migration is needed.
+  - **Per-member grants** (`GroupMemberCategoryGrant` / `GroupMemberTagGrant`, composite-PK
+    `{UserID, GroupID, CategoryID|TagID}`) are a second, finer layer hanging off the **membership**,
+    for the case a shared role cannot express ("Alice sees Child A and B, Bob sees Child C"). The two
+    layers compose by **intersection** — the role is a ceiling, the member narrows within it. See
+    "Category/tag grant resolution" below for the full rule, the fail-closed flags, the dedicated
+    write endpoint and its own permission, and the grant-row lifecycle hazards. Categories/tags are **global** (no
   `GroupId`); a grant is a per-group-role slice of the global pool. CRUD persists/returns the grants
   and `PermissionService` resolves them (see "Category/tag grant resolution" below); wiring the
   resolved sets into AppData delivery and request enforcement is rolled out in later slices.
@@ -501,19 +507,91 @@ will be dropped in a later release.
 
 ### Category/tag grant resolution (`PermissionService`)
 
-- `services/grant.go` resolves a user's allowed category/tag ids for a group:
-  `GetGroupCategoryIdsForUser` / `GetGroupTagIdsForUser` return `(allowedSet, unrestricted, err)`,
-  where **`unrestricted == true` means see-all** (the role grants nothing for that resource) and the
-  set is then `nil`. A non-member, or a member whose group role has no grants, is **unrestricted** —
-  grants only *narrow* access within an already-permitted group; they never *grant* access (the
-  handler permission gate is the access control). Categories and tags are independent (a role may
-  restrict one and not the other). `GetVisibleCategoriesForUser` / `GetVisibleTagsForUser` filter a
-  full category/tag slice to the visible subset (pass-through when unrestricted) — used by AppData.
-- Backed by a grant cache (`services/grant_cache.go`) keyed by **group-role id** (grants are
-  group-only), same generation-counter invalidation as the permission cache, evicted in
-  `RoleService.UpdateRole` / `DeleteRole` for group scope. Only a role's grant *lists* are cached;
-  the user's role *assignment* is resolved fresh each call. A category/tag deleted out from under a
-  cached grant id is benign — a stale id simply never matches a real row when filtering.
+Category/tag visibility resolves from **two grant layers**, composed by **intersection**:
+
+1. **Group role grants** — `GroupRoleCategoryGrant` / `GroupRoleTagGrant`, shared by everyone holding
+   the role. This is the **ceiling**.
+2. **Group MEMBER grants** — `GroupMemberCategoryGrant` / `GroupMemberTagGrant`, composite-PK
+   `(UserID, GroupID, CategoryID|TagID)`, per individual. This **narrows within** the ceiling.
+
+The member layer exists because a role is shared and so cannot express "Alice sees Child A and B, Bob
+sees Child C" — the foster-care requirement. It is scoped to the **membership**, not the user, because
+categories are global but visibility always resolves in a group context: a flat per-user list would
+follow the member into unrelated groups and blank their catalog there.
+
+**Why intersection, not union.** Union can only ever *add*, so any role carrying grants would floor
+every member at the role's full set and an individual assignment could never *restrict* anyone —
+which is the entire point of the member layer. Intersection also keeps a role an auditable ceiling
+("no holder of this role can see outside its set") and makes role grants safe to widen, since widening
+a role never widens an individually-assigned member.
+
+- `services/grant.go` — `resolveEffectiveGrants(userId, groupId)` composes the layers and returns an
+  `effectiveGrantSet`; `composeGrantLayer` applies the rule per resource:
+
+  ```
+  role requires individual && member unconfigured -> see nothing (fail closed)
+  effective = ALL
+  if the role grants a non-empty set          -> effective ∩= role set
+  if the membership opted into restriction    -> effective ∩= membership set
+  if neither narrows                          -> unrestricted
+  ```
+
+  `GetGroupCategoryIdsForUser` / `GetGroupTagIdsForUser` keep their `(allowedSet, unrestricted, err)`
+  signature, so **every existing call site inherits the member layer with no change** —
+  `grant_filter.go`, AppData (`auth.go`), the AI candidate lists (`receipt_processing.go`),
+  `receipts.go`, and MCP `tools.go`. **`unrestricted == true` means see-all** and the set is `nil`; a
+  `false` flag with an **empty** set means **see nothing**. A non-member is unrestricted — grants only
+  *narrow* within an already-permitted group; they never *grant* access (the handler permission gate is
+  the access control). Categories and tags are independent. `GetVisibleCategoriesForUser` /
+  `GetVisibleTagsForUser` filter a full slice to the visible subset (pass-through when unrestricted).
+- **Fail-closed flags.** `GroupMember.CategoryGrantsRestricted` / `TagGrantsRestricted`
+  (`json:"-"`, derived on save from the *submitted* sets) keep a configured membership restricted after
+  its grant rows are emptied by a category deletion cascade, instead of silently widening back to the
+  role's set. Same purpose and pattern as `GroupRoleDefinition.PaidByVisibilityRestricted`.
+- **`RequiresIndividualCategoryGrants` / `RequiresIndividualTagGrants`** on `GroupRoleDefinition`
+  (default **false**, so existing roles are unchanged) make per-member assignment mandatory: a member
+  holding the role with no individual grants sees **nothing** rather than the role's set — so
+  forgetting to assign a newly added member fails closed. Carried on `UpsertRoleCommand`/`RoleView`,
+  group scope only (rejected on APP), persisted by
+  `RoleRepository.SetGroupRoleIndividualGrantConfig` — a **separate** method from
+  `CreateGroupRole`/`UpdateGroupRole` (whose positional signatures already end in two bools; appending
+  two more would make four adjacent transposable bools), mirroring
+  `ReplaceGroupRoleReportTemplateGrants`.
+- **Caching.** The role layer is cached (`services/grant_cache.go`, keyed by **group-role id**, same
+  generation-counter invalidation as the permission cache, evicted in `RoleService.UpdateRole` /
+  `DeleteRole`); the `requiresIndividual*` flags ride that entry. The **member layer is deliberately
+  NOT cached** — one indexed lookup, resolution is already batched once per group per pass by
+  `newReceiptGrantFilter`, and caching would add a second invalidation surface across four write paths.
+  A user's role *assignment* is resolved fresh each call. A category/tag deleted out from under a
+  cached grant id is benign — a stale id never matches a real row when filtering.
+- **Write surface: `PUT /group/{groupId}/member/{userId}/grants`** (`handlers.UpdateGroupMemberGrants`
+  → `GroupService.UpdateMemberGrants`), body `{categoryGrants, tagGrants}`. A **dedicated endpoint,
+  not a field on the group-member upsert**, for two reasons: it carries its own permission
+  **`group.members.grants.update`** (separate from `group.members.update`, so a restricted member who
+  can manage the roster cannot thereby widen their own visibility — the feature's main escalation
+  hole), and it keeps grant writes off `UpdateGroup`'s wholesale roster replace, where the user form
+  and group form posting partial rosters would clobber each other. Both ids come from the **URL only**.
+  Submitted ids are checked for existence (`ErrInvalidGrant` → 400) and against the member's role
+  ceiling (`GrantCeilingViolation`, naming the offending ids → 400), which is what makes the
+  empty-intersection state unreachable through the API. `Legacy Owner` picks the permission up
+  automatically (`LegacyGroupOwnerKeys()` = every group-scope key) via add-only seed reconciliation.
+- **Lifecycle (the sharp edge).** Grant rows are keyed by `(user, group)` with **no FK to
+  `group_members`**, and the teardown paths delete memberships with a raw `tx.Delete` (no Go-side
+  cascade; SQLite does not enforce FKs unless `PRAGMA foreign_keys=ON` per connection). Orphaned rows
+  would be **silently re-adopted when a removed user rejoins the same group**, restoring revoked
+  visibility with nothing in the UI to show it. So `repositories/group_members.go` exposes
+  `DeleteMemberGrants` / `DeleteMemberGrantsForUser` / `DeleteMemberGrantsForGroup` /
+  `DeleteOrphanedMemberGrants`, called explicitly from `UserService.DeleteUser`,
+  `GroupService.DeleteGroup`, and `GroupRepository.UpdateGroup` (after its association replace, phrased
+  as "whatever no longer has a membership" so it is correct regardless of how GORM's replace behaves,
+  and leaves retained members untouched). **Do not remove these calls.**
+- **`GroupMember.CategoryGrants` / `TagGrants` are transient view fields (`gorm:"-"`)**, populated on
+  read by `LoadMemberGrantsForGroup(s)` at the roster serialization boundary (AppData,
+  `GetGroupsForUser`, `GetGroupById`) — deliberately **not** GORM associations, which would put the
+  grant tables inside `UpdateGroup`'s wholesale association write.
+- Tests: `services/group_member_grants_test.go` (intersection matrix incl. the disjoint "see nothing"
+  case, the fail-closed toggle, restriction surviving a category delete, **no resurrection on rejoin**,
+  orphan cleanup keeping retained members, and the endpoint's ceiling/existence/non-member rejections).
 - `services/grant_filter.go` is the **single** shared enforcement mechanism, reused by every read and
   write surface: `FilterReceiptCategoriesTags` / `FilterReceiptCategoriesTagsForReceipt` strip a
   receipt's `Categories`/`Tags` in place to the visible subset (resolving each group's grants at most
@@ -622,6 +700,12 @@ name/settings edit never trips it):
   may only assign, or remove/replace, a role whose permission set is a **subset** of the caller's own
   current group permissions (resolved via `GetGroupPermissionsForUser`; a `nil`/empty role is always
   wieldable). This is what actually prevents self-escalation, independent of the CRUD gate.
+
+A fourth, **separate** permission `group.members.grants.update` gates per-member category/tag
+assignment (`PUT /group/{groupId}/member/{userId}/grants`). It is deliberately **not** folded into
+`group.members.update`: bundling them would let a restricted member who can manage the roster edit
+their own grants and lift the very restriction the feature enforces. See "Category/tag grant
+resolution" above.
 
 The three `group.members.*` permissions are group-scoped registry entries; **Legacy Owner** holds them
 (it is the full group scope), Legacy Editor/Viewer do not (member management was historically

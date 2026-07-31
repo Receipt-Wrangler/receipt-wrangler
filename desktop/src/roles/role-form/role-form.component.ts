@@ -1,4 +1,4 @@
-import { Component, DestroyRef, Signal, computed, effect, signal } from "@angular/core";
+import { Component, DestroyRef, Signal, computed, effect, linkedSignal, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormControl, FormGroup, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
@@ -23,6 +23,9 @@ import {
   UpsertRoleCommand,
   User,
 } from "../../open-api";
+import {
+  GrantSelection,
+} from "../../shared-ui/grant-picker/grant-picker.component";
 import {
   CUSTOM_PRESET_ID,
   friendlyActionLabel,
@@ -74,6 +77,11 @@ export class RoleFormComponent {
     // Group-role-only flag: holders can see, and be seen by, all members of an
     // isolated group. Ignored for app roles (serialized only when showGrants()).
     seesAllMembers: new FormControl<boolean>(false, { nonNullable: true }),
+    // Group-role-only: when set, a member of this role with no individual
+    // category/tag assignment sees NOTHING rather than the role's set, so
+    // forgetting to assign a new member fails closed.
+    requiresIndividualCategoryGrants: new FormControl<boolean>(false, { nonNullable: true }),
+    requiresIndividualTagGrants: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   // ----- State signals -----
@@ -89,13 +97,21 @@ export class RoleFormComponent {
   // autocomplete drives these as FormArrays of the selected category/tag objects.
   public readonly categoryPool = signal<Category[]>([]);
   public readonly tagPool = signal<Tag[]>([]);
-  public readonly grantedCategories = new FormArray<FormControl<Category>>([]);
-  public readonly grantedTags = new FormArray<FormControl<Tag>>([]);
 
-  // Grant ids loaded for an existing role, resolved to pool objects by an effect
-  // once the pool arrives (pool and role load independently/asynchronously).
-  private readonly pendingCategoryGrantIds = signal<number[]>([]);
-  private readonly pendingTagGrantIds = signal<number[]>([]);
+  // Grant ids loaded for an existing role. The shared app-grant-picker resolves
+  // them to pool objects once the pool arrives (pool and role load
+  // independently/asynchronously).
+  public readonly pendingCategoryGrantIds = signal<number[]>([]);
+  public readonly pendingTagGrantIds = signal<number[]>([]);
+
+  // What actually gets serialized. A linkedSignal so it defaults to the loaded
+  // role's grants and is overridden by the picker on edit — a plain signal
+  // starting empty would silently wipe a role's grants if the user saved without
+  // touching the picker (which emits nothing while it is merely seeding itself).
+  public readonly grantSelection = linkedSignal<GrantSelection>(() => ({
+    categoryIds: this.pendingCategoryGrantIds(),
+    tagIds: this.pendingTagGrantIds(),
+  }));
 
   // ----- Paid-by visibility grants (group roles only) -----
   // The sentinel id of the pinned "their own receipts" option. Real user ids are
@@ -286,20 +302,6 @@ export class RoleFormComponent {
       }
     });
 
-    // Resolve a loaded role's grant ids to pool objects once the pool is
-    // available. Pool and grant ids are stable after load, so this does not
-    // clobber subsequent manual edits.
-    effect(() => {
-      const pool = this.categoryPool();
-      const ids = this.pendingCategoryGrantIds();
-      this.setGrantArray(this.grantedCategories, pool.filter((category) => category.id !== undefined && ids.includes(category.id)));
-    });
-    effect(() => {
-      const pool = this.tagPool();
-      const ids = this.pendingTagGrantIds();
-      this.setGrantArray(this.grantedTags, pool.filter((tag) => tag.id !== undefined && ids.includes(tag.id)));
-    });
-
     // Resolve a loaded role's paid-by config to picker options, prepending the
     // "their own receipts" sentinel when include-own is set. Filtering the shared
     // paidByOptions list keeps object references stable so the autocomplete
@@ -362,6 +364,8 @@ export class RoleFormComponent {
           name: role.name,
           description: role.description ?? "",
           seesAllMembers: role.seesAllMembers ?? false,
+          requiresIndividualCategoryGrants: role.requiresIndividualCategoryGrants ?? false,
+          requiresIndividualTagGrants: role.requiresIndividualTagGrants ?? false,
         });
         this.type.set(role.scope === PermissionScope.Group ? "group" : "app");
         this.granted.set(new Set(role.permissions));
@@ -382,6 +386,11 @@ export class RoleFormComponent {
 
   // Replace a grant FormArray's contents with the given option objects, without
   // emitting (the autocomplete reads the value, not change events, on load).
+  /** Receives the shared grant picker's current selection. */
+  public onGrantsChange(selection: GrantSelection): void {
+    this.grantSelection.set(selection);
+  }
+
   private setGrantArray<T>(array: FormArray, values: T[]): void {
     array.clear({ emitEvent: false });
     for (const value of values) {
@@ -430,11 +439,11 @@ export class RoleFormComponent {
     this.pendingTagGrantIds.set([]);
     this.pendingPaidByUserGrantIds.set([]);
     this.pendingIncludeOwnPaidReceipts.set(false);
-    this.setGrantArray(this.grantedCategories, []);
-    this.setGrantArray(this.grantedTags, []);
     this.setGrantArray(this.grantedPaidByUsers, []);
     this.reportTemplateGrants.set(new Map());
     this.form.controls.seesAllMembers.setValue(false);
+    this.form.controls.requiresIndividualCategoryGrants.setValue(false);
+    this.form.controls.requiresIndividualTagGrants.setValue(false);
   }
 
   // ----- Report template matrix helpers -----
@@ -545,12 +554,11 @@ export class RoleFormComponent {
 
     // Category/tag/paid-by grants are only valid on group roles.
     if (this.showGrants()) {
-      payload.categoryGrants = (this.grantedCategories.value as Category[])
-        .map((category) => category.id)
-        .filter((id): id is number => id !== undefined);
-      payload.tagGrants = (this.grantedTags.value as Tag[])
-        .map((tag) => tag.id)
-        .filter((id): id is number => id !== undefined);
+      payload.categoryGrants = this.grantSelection().categoryIds;
+      payload.tagGrants = this.grantSelection().tagIds;
+      payload.requiresIndividualCategoryGrants =
+        this.form.controls.requiresIndividualCategoryGrants.value;
+      payload.requiresIndividualTagGrants = this.form.controls.requiresIndividualTagGrants.value;
 
       // Split the picker's selections into the relative "their own" toggle and
       // the absolute user-id grants (the sentinel never goes to the backend).

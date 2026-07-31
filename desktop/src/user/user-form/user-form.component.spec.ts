@@ -6,10 +6,18 @@ import { MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dial
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, throwError } from "rxjs";
-import { ApiModule, PermissionScope, Role, RoleService, User, UserService } from "../../open-api";
+import {
+  ApiModule,
+  GroupsService,
+  PermissionScope,
+  Role,
+  RoleService,
+  User,
+  UserService,
+} from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService, TokenRefreshService } from "../../services";
-import { AddUser, AuthState, UpdateUser, UserState } from "../../store";
+import { AddUser, AuthState, GroupState, SetGroups, UpdateUser, UserState } from "../../store";
 import { UserFormComponent } from "./user-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -45,7 +53,7 @@ describe("UserFormComponent", () => {
     await TestBed.configureTestingModule({
     declarations: [UserFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [NgxsModule.forRoot([AuthState, UserState]),
+    imports: [NgxsModule.forRoot([AuthState, UserState, GroupState]),
         ReactiveFormsModule,
         PipesModule,
         MatDialogModule,
@@ -370,5 +378,123 @@ describe("UserFormComponent", () => {
 
     expect(openSpy).toHaveBeenCalledTimes(1);
     expect(openSpy.mock.calls[0][1]?.data?.role).toEqual(defaultAppRole);
+  });
+
+  describe("per-member category/tag assignment", () => {
+    const groups = [
+      {
+        id: 100,
+        name: "Agency",
+        groupMembers: [
+          { userId: 1, groupId: 100, groupRoleId: 8, categoryGrants: [5], tagGrants: [] },
+        ],
+      },
+    ] as any[];
+
+    const user: User = {
+      id: 1,
+      displayName: "Foster Parent",
+      username: "fparent",
+      appRoleId: 7,
+    } as User;
+
+    function seedGroups(): void {
+      store.dispatch(new SetGroups(groups));
+    }
+
+    it("shows no assignment rows when creating a user", async () => {
+      // Grants hang off a MEMBERSHIP, and a user being created has none yet.
+      seedGroups();
+      const freshComponent = await createWithRoles(of([defaultAppRole, groupRole]));
+      freshComponent.ngOnInit();
+
+      expect(freshComponent.grantRows()).toEqual([]);
+    });
+
+    it("builds one row per group the edited user belongs to", async () => {
+      seedGroups();
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      const rows = freshComponent.grantRows();
+      expect(rows.length).toBe(1);
+      expect(rows[0].groupName).toBe("Agency");
+      expect(rows[0].roleName).toBe("Legacy Owner");
+      expect(rows[0].current.categoryIds).toEqual([5]);
+    });
+
+    it("writes changed assignments through the grants endpoint on submit", async () => {
+      seedGroups();
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+
+      jest.spyOn(TestBed.inject(SnackbarService), "success").mockReturnValue();
+      jest
+        .spyOn(TestBed.inject(UserService), "getUsernameCount")
+        .mockReturnValue(of(0 as any));
+      jest
+        .spyOn(TestBed.inject(UserService), "updateUserById")
+        .mockReturnValue(of(undefined as any));
+      jest
+        .spyOn(TestBed.inject(TokenRefreshService), "refreshToken")
+        .mockReturnValue(of(undefined as any));
+      const updateGrantsSpy = jest
+        .spyOn(TestBed.inject(GroupsService), "updateGroupMemberGrants")
+        .mockReturnValue(of({}) as any);
+
+      // Seed groups BEFORE stubbing dispatch — the rows are read from GroupState.
+      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      expect(updateGrantsSpy).toHaveBeenCalledWith(100, 1, {
+        categoryGrants: [5, 6],
+        tagGrants: [],
+      });
+    });
+
+    it("does not write assignments that were never edited", async () => {
+      seedGroups();
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+
+      jest.spyOn(TestBed.inject(SnackbarService), "success").mockReturnValue();
+      jest
+        .spyOn(TestBed.inject(UserService), "getUsernameCount")
+        .mockReturnValue(of(0 as any));
+      jest
+        .spyOn(TestBed.inject(UserService), "updateUserById")
+        .mockReturnValue(of(undefined as any));
+      jest
+        .spyOn(TestBed.inject(TokenRefreshService), "refreshToken")
+        .mockReturnValue(of(undefined as any));
+      const updateGrantsSpy = jest
+        .spyOn(TestBed.inject(GroupsService), "updateGroupMemberGrants")
+        .mockReturnValue(of({}) as any);
+
+      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      // Renaming the user must not rewrite their assignment.
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      expect(updateGrantsSpy).not.toHaveBeenCalled();
+    });
   });
 });

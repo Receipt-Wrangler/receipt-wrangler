@@ -45,6 +45,36 @@
         [inputFormControl]="form | formGet : 'isDummyUser'"
       ></app-checkbox>
     </app-form-section>
+
+    @if (grantRows().length) {
+      <app-form-section headerText="Category &amp; tag access">
+        <div class="hint hint-inline">
+          Limit this user to specific categories and tags, per group. This narrows
+          within whatever their group role already allows — it can never widen it.
+          Leave a group empty to give them everything their role allows.
+        </div>
+
+        @for (row of grantRows(); track row.groupId) {
+          <div class="user-form__grant-group">
+            <h3 class="user-form__grant-group-name">
+              {{ row.groupName }}
+              @if (row.roleName) {
+                <span class="user-form__grant-role">{{ row.roleName }}</span>
+              }
+            </h3>
+            <app-grant-picker
+              [categoryPool]="categoryPool()"
+              [tagPool]="tagPool()"
+              [selectedCategoryIds]="row.current.categoryIds"
+              [selectedTagIds]="row.current.tagIds"
+              [ceiling]="row.ceiling"
+              (grantsChange)="onGrantsChange(row.groupId, $event)"
+            ></app-grant-picker>
+          </div>
+        }
+      </app-form-section>
+    }
+
     <div class="d-flex justify-content-end align-items-center">
       <app-submit-button></app-submit-button>
       <app-cancel-button (clicked)="closeModal()"></app-cancel-button>

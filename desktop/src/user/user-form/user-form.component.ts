@@ -6,7 +6,25 @@ import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { catchError, defer, iif, of, startWith, switchMap, take, tap, } from "rxjs";
 import { UserValidators } from "src/validators/user-validators";
-import { PermissionScope, Role, RoleService, User, UserService } from "../../open-api";
+import {
+  Category,
+  CategoryService,
+  GroupsService,
+  PermissionScope,
+  Role,
+  RoleService,
+  Tag,
+  TagService,
+  User,
+  UserService,
+} from "../../open-api";
+import { GrantSelection } from "../../shared-ui/grant-picker/grant-picker.component";
+import {
+  buildMemberGrantRows,
+  MemberGrantRow,
+  saveChangedMemberGrants,
+} from "../../shared-ui/grant-picker/member-grant-assignment";
+import { GroupState } from "../../store";
 import { openRolePreviewDialog } from "../../roles/role-preview/role-preview-dialog.component";
 import { SnackbarService, TokenRefreshService } from "../../services";
 import { AddUser, AuthState, UpdateUser } from "../../store";
@@ -34,6 +52,9 @@ export class UserFormComponent implements OnInit {
     private userValidators: UserValidators,
     private matDialog: MatDialog,
     private destroyRef: DestroyRef,
+    private categoryService: CategoryService,
+    private tagService: TagService,
+    private groupsService: GroupsService,
     public matDialogRef: MatDialogRef<UserFormComponent>
   ) {
     // Pre-select the configured default app role on the add form once the roles
@@ -75,12 +96,58 @@ export class UserFormComponent implements OnInit {
       ) ?? null
   );
 
+  // ----- Per-member category/tag assignment -----
+  // Only meaningful when editing an existing user: grants hang off a group
+  // MEMBERSHIP, and a user being created has none yet. The admin assigns them on
+  // a second pass, after the user exists.
+  public readonly categoryPool = signal<Category[]>([]);
+  public readonly tagPool = signal<Tag[]>([]);
+  private readonly groups = this.store.selectSignal(GroupState.groups);
+
+  /** One row per group the user belongs to, each carrying its role's ceiling. */
+  public readonly grantRows = computed<MemberGrantRow[]>(() => {
+    if (!this.user) {
+      return [];
+    }
+    return buildMemberGrantRows(
+      this.user.id,
+      this.groups(),
+      this.roles().filter((role) => role.scope === PermissionScope.Group),
+    );
+  });
+
+  // Edits made in the pickers, keyed by group id. Only groups present here (and
+  // actually changed) are written on submit.
+  private readonly editedGrants = new Map<number, GrantSelection>();
+
   public ngOnInit(): void {
     this.initForm();
     this.listenToAppRoleChanges();
     if (!this.user) {
       this.listenToIsDummyChanges();
+    } else {
+      this.loadGrantPools();
     }
+  }
+
+  /**
+   * The category/tag pools the assignment pickers choose from. This form is
+   * admin-only, so the global lists are readable; degrade to empty rather than
+   * erroring if they are not.
+   */
+  private loadGrantPools(): void {
+    this.categoryService
+      .getAllCategories()
+      .pipe(take(1), catchError(() => of([] as Category[])), takeUntilDestroyed(this.destroyRef))
+      .subscribe((categories) => this.categoryPool.set(categories));
+    this.tagService
+      .getAllTags()
+      .pipe(take(1), catchError(() => of([] as Tag[])), takeUntilDestroyed(this.destroyRef))
+      .subscribe((tags) => this.tagPool.set(tags));
+  }
+
+  public onGrantsChange(groupId: number, selection: GrantSelection): void {
+    this.editedGrants.set(groupId, selection);
   }
 
   private listenToAppRoleChanges(): void {
@@ -157,6 +224,17 @@ export class UserFormComponent implements OnInit {
                 ...this.user,
                 ...this.form.value,
               })
+            )
+          ),
+          // Grants go through their own endpoint (and their own permission), so
+          // they are written after the user update rather than as part of it.
+          // Only changed groups are touched.
+          switchMap(() =>
+            saveChangedMemberGrants(
+              this.groupsService,
+              this.user!.id,
+              this.grantRows(),
+              this.editedGrants
             )
           ),
           switchMap(() =>

@@ -96,6 +96,7 @@ export * from './tag';
 export * from './tagView';
 export * from './taskQueueConfiguration';
 export * from './tokenPair';
+export * from './updateGroupMemberGrantsCommand';
 export * from './updateGroupReceiptSettingsCommand';
 export * from './updateGroupSettingsCommand';
 export * from './updateProfileCommand';

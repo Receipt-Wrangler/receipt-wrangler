@@ -334,9 +334,9 @@ describe("RoleFormComponent", () => {
     component.form.controls.name.setValue("Restricted Role");
     component.toggle("group.receipts.read");
 
-    // The autocomplete drives these FormArrays; push selected grants directly.
-    component.grantedCategories.push(new FormControl({ id: 10, name: "Groceries" } as any));
-    component.grantedTags.push(new FormControl({ id: 20, name: "Reimbursable" } as any));
+    // The shared app-grant-picker owns the autocomplete FormArrays and reports its
+    // selection back through (grantsChange); emulate that here.
+    component.onGrantsChange({ categoryIds: [10], tagIds: [20] });
 
     component.submit();
 
@@ -359,11 +359,28 @@ describe("RoleFormComponent", () => {
   it("resets grants when switching role type", async () => {
     const { component } = await setup();
     component.pickType("group");
-    component.grantedCategories.push(new FormControl({ id: 10, name: "Groceries" } as any));
-    expect(component.grantedCategories.length).toBe(1);
+    component.onGrantsChange({ categoryIds: [10], tagIds: [20] });
+    expect(component.grantSelection().categoryIds).toEqual([10]);
 
     component.pickType("app");
-    expect(component.grantedCategories.length).toBe(0);
+    expect(component.grantSelection().categoryIds).toEqual([]);
+    expect(component.grantSelection().tagIds).toEqual([]);
+  });
+
+  it("keeps a loaded role's grants when the picker is never touched", async () => {
+    // The picker seeds itself silently (emitEvent: false), so it reports nothing
+    // on load. A save that read only picker emissions would wipe the role's grants.
+    const { component } = await setup();
+    component.pickType("group");
+    component.pendingCategoryGrantIds.set([7]);
+    component.pendingTagGrantIds.set([8]);
+
+    component.form.controls.name.setValue("Untouched Role");
+    component.toggle("group.receipts.read");
+    component.submit();
+
+    expect(component.lastPayload?.categoryGrants).toEqual([7]);
+    expect(component.lastPayload?.tagGrants).toEqual([8]);
   });
 
   it("includes paid-by grants and includeOwn in a GROUP payload", async () => {
