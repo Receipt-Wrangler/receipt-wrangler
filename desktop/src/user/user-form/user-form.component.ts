@@ -215,9 +215,6 @@ export class UserFormComponent implements OnInit {
         .updateUserById(this.user.id, this.form.value)
         .pipe(
           take(1),
-          tap(() => {
-            this.snackbarService.success("User successfully updated");
-          }),
           switchMap(() =>
             this.store.dispatch(
               new UpdateUser(this.user?.id.toString() as string, {
@@ -237,6 +234,14 @@ export class UserFormComponent implements OnInit {
               this.editedGrants
             )
           ),
+          // Reported only once BOTH writes have landed. The grants are a separate
+          // request that can fail on its own (a 400 ceiling violation, a 403), so
+          // announcing success any earlier claims an assignment that never saved.
+          // It stays ahead of the token refresh below, which is session
+          // housekeeping rather than something this message speaks for.
+          tap(() => {
+            this.snackbarService.success("User successfully updated");
+          }),
           switchMap(() =>
             iif(
               () =>
@@ -246,7 +251,12 @@ export class UserFormComponent implements OnInit {
               of(undefined)
             )
           ),
-          tap(() => this.matDialogRef.close(true))
+          tap(() => this.matDialogRef.close(true)),
+          catchError(() => {
+            // The interceptor surfaces the failure; keep the dialog open so the
+            // admin can correct the input rather than losing it.
+            return of(undefined);
+          })
         )
         .subscribe();
     } else if (this.form.valid && !this.user) {
@@ -257,13 +267,19 @@ export class UserFormComponent implements OnInit {
           switchMap((u) => this.store.dispatch(new AddUser(u))),
           tap(() => {
             this.snackbarService.success("User successfully created");
+            this.matDialogRef.close(true);
           }),
           catchError((err) => {
-            return of(
-              this.snackbarService.error(err.error["username"] ?? err["errMsg"])
-            );
-          }),
-          tap(() => this.matDialogRef.close(true))
+            // Closing here would report a create that never happened and discard
+            // what the admin typed, so the dialog stays open. The username
+            // conflict comes back as a field message the interceptor ignores, so
+            // it is surfaced here; anything else it already toasted itself.
+            const message = err?.error?.["username"] ?? err?.["errMsg"];
+            if (message) {
+              this.snackbarService.error(message);
+            }
+            return of(undefined);
+          })
         )
         .subscribe();
     }

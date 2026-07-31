@@ -5,7 +5,7 @@ import { ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
-import { of, throwError } from "rxjs";
+import { Observable, of, throwError } from "rxjs";
 import {
   ApiModule,
   GroupsService,
@@ -290,6 +290,42 @@ describe("UserFormComponent", () => {
     expect(dialogRefSpy).toHaveBeenCalledWith(true);
   });
 
+  it("keeps the dialog open when creating the user fails", () => {
+    // Closing on failure would report a create that never happened and discard
+    // everything the admin typed.
+    const errorSpy = jest
+      .spyOn(TestBed.inject(SnackbarService), "error")
+      .mockReturnValue();
+    const successSpy = jest
+      .spyOn(TestBed.inject(SnackbarService), "success")
+      .mockReturnValue();
+    jest
+      .spyOn(TestBed.inject(UserService), "getUsernameCount")
+      .mockReturnValue(of(0 as any));
+    jest
+      .spyOn(TestBed.inject(UserService), "createUser")
+      .mockReturnValue(
+        throwError(() => ({ error: { username: "Username already exists" } })) as any
+      );
+
+    const dialogRefSpy = jest.spyOn(component.matDialogRef, "close");
+    component.ngOnInit();
+
+    component.form.patchValue({
+      displayName: "Pizza man",
+      username: "Waffle guy",
+      isDummyUser: false,
+      password: "Dough boy",
+      appRoleId: 5,
+    });
+
+    component.submit();
+
+    expect(errorSpy).toHaveBeenCalledWith("Username already exists");
+    expect(successSpy).not.toHaveBeenCalled();
+    expect(dialogRefSpy).not.toHaveBeenCalled();
+  });
+
   it("should disable empty and disable password field if isDummyUser is true", () => {
     component.ngOnInit();
     component.form.patchValue({
@@ -402,6 +438,50 @@ describe("UserFormComponent", () => {
       store.dispatch(new SetGroups(groups));
     }
 
+    /**
+     * Builds an edit-mode component with everything submit() touches stubbed.
+     *
+     * Every test below needs the same six spies and differs only in what the two
+     * writes return, so they are parameters rather than a copy of the block.
+     */
+    async function createEditForm(
+      results: {
+        grants?: Observable<unknown>;
+        userUpdate?: Observable<unknown>;
+      } = {}
+    ) {
+      // Seed groups BEFORE stubbing dispatch — the rows are read from GroupState.
+      seedGroups();
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+
+      const successSpy = jest
+        .spyOn(TestBed.inject(SnackbarService), "success")
+        .mockReturnValue();
+      jest
+        .spyOn(TestBed.inject(UserService), "getUsernameCount")
+        .mockReturnValue(of(0 as any));
+      jest
+        .spyOn(TestBed.inject(UserService), "updateUserById")
+        .mockReturnValue((results.userUpdate ?? of(undefined)) as any);
+      jest
+        .spyOn(TestBed.inject(TokenRefreshService), "refreshToken")
+        .mockReturnValue(of(undefined as any));
+      const updateGrantsSpy = jest
+        .spyOn(TestBed.inject(GroupsService), "updateGroupMemberGrants")
+        .mockReturnValue((results.grants ?? of({})) as any);
+
+      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      const closeSpy = jest.spyOn(freshComponent.matDialogRef, "close");
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      return { freshFixture, freshComponent, successSpy, updateGrantsSpy, closeSpy };
+    }
+
     it("shows no assignment rows when creating a user", async () => {
       // Grants hang off a MEMBERSHIP, and a user being created has none yet.
       seedGroups();
@@ -428,31 +508,7 @@ describe("UserFormComponent", () => {
     });
 
     it("writes changed assignments through the grants endpoint on submit", async () => {
-      seedGroups();
-      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
-
-      jest.spyOn(TestBed.inject(SnackbarService), "success").mockReturnValue();
-      jest
-        .spyOn(TestBed.inject(UserService), "getUsernameCount")
-        .mockReturnValue(of(0 as any));
-      jest
-        .spyOn(TestBed.inject(UserService), "updateUserById")
-        .mockReturnValue(of(undefined as any));
-      jest
-        .spyOn(TestBed.inject(TokenRefreshService), "refreshToken")
-        .mockReturnValue(of(undefined as any));
-      const updateGrantsSpy = jest
-        .spyOn(TestBed.inject(GroupsService), "updateGroupMemberGrants")
-        .mockReturnValue(of({}) as any);
-
-      // Seed groups BEFORE stubbing dispatch — the rows are read from GroupState.
-      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
-
-      const freshFixture = TestBed.createComponent(UserFormComponent);
-      const freshComponent = freshFixture.componentInstance;
-      freshComponent.user = user;
-      freshComponent.ngOnInit();
-      await freshFixture.whenStable();
+      const { freshFixture, freshComponent, updateGrantsSpy } = await createEditForm();
 
       freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
       freshComponent.submit();
@@ -464,42 +520,13 @@ describe("UserFormComponent", () => {
       });
     });
 
-    // PARKED — documents a real defect, deliberately NOT fixed (reported for triage).
-    //
-    // submit() fires snackbarService.success("User successfully updated") in a tap
-    // BEFORE the switchMap that calls saveChangedMemberGrants. When the grants
-    // write fails (a 400 ceiling violation, or a 403), the admin sees a success
-    // toast followed by an error toast, and the assignment silently did not save.
-    // The dialog does stay open and the edit is preserved, so nothing is lost —
-    // but the success message is a lie. group-member-form gets this right via a
-    // catchError. Un-skip once the toast is moved after the grants switchMap.
-    it.skip("reports success only after the grants save succeeds", async () => {
-      seedGroups();
-      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
-
-      const successSpy = jest
-        .spyOn(TestBed.inject(SnackbarService), "success")
-        .mockReturnValue();
-      jest
-        .spyOn(TestBed.inject(UserService), "getUsernameCount")
-        .mockReturnValue(of(0 as any));
-      jest
-        .spyOn(TestBed.inject(UserService), "updateUserById")
-        .mockReturnValue(of(undefined as any));
-      jest
-        .spyOn(TestBed.inject(TokenRefreshService), "refreshToken")
-        .mockReturnValue(of(undefined as any));
-      jest
-        .spyOn(TestBed.inject(GroupsService), "updateGroupMemberGrants")
-        .mockReturnValue(throwError(() => new Error("400 ceiling violation")) as any);
-
-      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
-
-      const freshFixture = TestBed.createComponent(UserFormComponent);
-      const freshComponent = freshFixture.componentInstance;
-      freshComponent.user = user;
-      freshComponent.ngOnInit();
-      await freshFixture.whenStable();
+    // The user record and the grants are two independent writes, so the success
+    // message must speak for both — announcing it after the first one claims an
+    // assignment that never saved.
+    it("reports success only after the grants save succeeds", async () => {
+      const { freshFixture, freshComponent, successSpy } = await createEditForm({
+        grants: throwError(() => new Error("400 ceiling violation")),
+      });
 
       freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
       freshComponent.submit();
@@ -508,31 +535,51 @@ describe("UserFormComponent", () => {
       expect(successSpy).not.toHaveBeenCalled();
     });
 
-    it("does not write assignments that were never edited", async () => {
-      seedGroups();
-      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+    it("keeps the dialog open when the grants save fails", async () => {
+      // The other half of the contract: the interceptor reports the failure, and
+      // the selection survives so the admin can correct it instead of retyping.
+      const { freshFixture, freshComponent, closeSpy } = await createEditForm({
+        grants: throwError(() => new Error("400 ceiling violation")),
+      });
 
-      jest.spyOn(TestBed.inject(SnackbarService), "success").mockReturnValue();
-      jest
-        .spyOn(TestBed.inject(UserService), "getUsernameCount")
-        .mockReturnValue(of(0 as any));
-      jest
-        .spyOn(TestBed.inject(UserService), "updateUserById")
-        .mockReturnValue(of(undefined as any));
-      jest
-        .spyOn(TestBed.inject(TokenRefreshService), "refreshToken")
-        .mockReturnValue(of(undefined as any));
-      const updateGrantsSpy = jest
-        .spyOn(TestBed.inject(GroupsService), "updateGroupMemberGrants")
-        .mockReturnValue(of({}) as any);
-
-      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
-
-      const freshFixture = TestBed.createComponent(UserFormComponent);
-      const freshComponent = freshFixture.componentInstance;
-      freshComponent.user = user;
-      freshComponent.ngOnInit();
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
       await freshFixture.whenStable();
+
+      expect(closeSpy).not.toHaveBeenCalled();
+    });
+
+    it("reports nothing and keeps the dialog open when the user update fails", async () => {
+      const { freshFixture, freshComponent, successSpy, closeSpy, updateGrantsSpy } =
+        await createEditForm({
+          userUpdate: throwError(() => new Error("500")),
+        });
+
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      expect(successSpy).not.toHaveBeenCalled();
+      expect(closeSpy).not.toHaveBeenCalled();
+      // The grants write is downstream of the user update, so it never runs.
+      expect(updateGrantsSpy).not.toHaveBeenCalled();
+    });
+
+    it("reports success once and closes the dialog when both writes land", async () => {
+      const { freshFixture, freshComponent, successSpy, closeSpy } = await createEditForm();
+
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      // Exactly once: a toast left behind at the old site would double up here.
+      expect(successSpy).toHaveBeenCalledTimes(1);
+      expect(successSpy).toHaveBeenCalledWith("User successfully updated");
+      expect(closeSpy).toHaveBeenCalledWith(true);
+    });
+
+    it("does not write assignments that were never edited", async () => {
+      const { freshFixture, freshComponent, updateGrantsSpy } = await createEditForm();
 
       // Renaming the user must not rewrite their assignment.
       freshComponent.submit();

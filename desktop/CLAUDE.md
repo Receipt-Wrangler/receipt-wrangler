@@ -236,6 +236,12 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   roster replace. Only **changed** rows issue a request. The role's own grants supply the picker's
   ceiling; the backend re-validates and 400s an out-of-ceiling id. See `api/CLAUDE.md` →
   "Category/tag grant resolution".
+  - **Reporting the outcome:** because the grants are a *second* write that can fail on its own, both
+    forms fire their success toast only **after** it lands, and a failed write leaves the dialog open
+    (a trailing `catchError` — the interceptor already reports the error) so the admin can correct the
+    selection instead of losing it. `user-form` is the only submit in the app with two writes, so this
+    is where the general "toast in a `tap` on the write it describes" convention needs stating: the
+    message must speak for *all* the writes it covers, not just the first.
 - **Require-individual-assignment toggles (`role-form`, group roles only):** two `app-checkbox`es in
   the grants section bound to `requiresIndividualCategoryGrants` / `requiresIndividualTagGrants`. When
   on, a member of that role with no individual assignment sees **nothing** rather than the role's set,
