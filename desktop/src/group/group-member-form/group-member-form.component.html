@@ -26,8 +26,8 @@
       ></app-button>
     </div>
 
-    @if (grantRow(); as row) {
-      <div class="group-member-form__grants">
+    @if (grantsReady() && grantRow(); as row) {
+      <div class="group-member-form__grants" data-testid="member-grant-section">
         <h3 class="group-member-form__grants-header">Category &amp; tag access</h3>
         <div class="hint hint-inline">
           Limit this member to specific categories and tags. This narrows within what

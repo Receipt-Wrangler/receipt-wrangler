@@ -74,10 +74,34 @@ export class TableComponent implements OnChanges {
     }
   }
 
+  /**
+   * The index a cell template should act on: the row's position in the ORIGINAL
+   * data, so an action still targets the right record after the table is sorted.
+   *
+   * Rows WITHOUT an id (e.g. GroupMember, whose key is composite userId+groupId)
+   * fall back to the rendered index. They used to all collapse onto a single
+   * `undefined` key in rowIndexes, so every such row reported the LAST row's
+   * index — meaning edit/delete in an actions column hit the wrong record.
+   */
+  public indexFor(element: any): number {
+    if (element?.id !== undefined && element?.id !== null) {
+      const mapped = this.rowIndexes[element.id];
+      if (mapped !== undefined) {
+        return mapped;
+      }
+    }
+    // Reference lookup against the source data — the table renders these exact
+    // objects, so this resolves an id-less row to its real position.
+    return this.dataSource().data.indexOf(element);
+  }
+
+  // Keyed by id only; id-less rows are handled by indexFor's fallback.
   private setRowIndexes(): void {
     const indexes: { [key: number]: number } = {};
     this.dataSource().data.forEach((row, index) => {
-      indexes[row.id] = index;
+      if (row.id !== undefined && row.id !== null) {
+        indexes[row.id] = index;
+      }
     });
 
     this.rowIndexes = indexes;

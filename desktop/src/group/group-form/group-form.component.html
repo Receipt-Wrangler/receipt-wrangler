@@ -75,6 +75,7 @@
   <div class="d-flex">
     <app-edit-button
       *ngIf="canUpdateGroupMembers()"
+      data-testid="group-member-edit"
       tooltip="Edit group member"
       color="accent"
       (clicked)="editGroupMemberClicked(index)"

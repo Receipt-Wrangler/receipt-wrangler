@@ -55,7 +55,10 @@
         </div>
 
         @for (row of grantRows(); track row.groupId) {
-          <div class="user-form__grant-group">
+          <div
+            class="user-form__grant-group"
+            [attr.data-testid]="'grant-section-' + row.groupId"
+          >
             <h3 class="user-form__grant-group-name">
               {{ row.groupName }}
               @if (row.roleName) {

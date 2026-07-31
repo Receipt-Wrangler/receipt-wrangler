@@ -9,3 +9,12 @@
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
+
+// The dialog grows once the category/tag assignment section is shown, which can
+// push the footer (and its save button) past the bottom of the viewport. Cap the
+// height and let it scroll, matching the user form.
+:host {
+  display: block;
+  max-height: 85vh;
+  overflow-y: auto;
+}

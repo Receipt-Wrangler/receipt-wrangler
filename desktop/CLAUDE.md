@@ -216,6 +216,16 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   `shared-ui/grant-picker/member-grant-assignment.ts` holds the shared row-building
   (`buildMemberGrantRows`, `ceilingForRole`) and the diff-and-write helper
   (`saveChangedMemberGrants`), so the two member-facing entry points cannot drift.
+  - **It stops seeding once the user edits.** The effect's inputs keep changing after mount (the
+    pool arrives async; the ceiling changes again when the host's role list resolves), so without
+    that guard a late re-run silently discards the user's selection and hands the host back the
+    original value.
+  - **Each instance passes a unique `inputId`** to the autocompletes. The base `app-autocomlete`
+    otherwise derives the input's DOM id from its label, so the user form's N pickers would all
+    render `id="categories"` — which breaks `<label for>` association for every field after the
+    first and misdirects the base component's `getElementById`-based filter clear to the first
+    instance. `app-category-autocomplete` / `app-tag-autocomplete` gained an `inputId` passthrough
+    for this.
 - **Per-member category/tag assignment (`user-form`, `group-member-form`):** grants hang off a group
   **membership**, so both forms only offer the picker for a membership that already exists on the
   server — `user-form` renders one section per group the **edited** user belongs to (nothing in add
@@ -616,6 +626,46 @@ In CI the same spec files run against the demo URL. GitHub secrets populate the 
 - Forms use a custom `<app-input>` wrapper over `<mat-form-field>`. `page.getByLabel('Username')` resolves through the `<mat-label>` association.
 - Submit buttons use `<app-button>` rendering `<button>` with visible text — `page.getByRole('button', { name: '...' })` works directly.
 - Error feedback is often a Material snackbar (not inline `<mat-error>`). When asserting errors, locate the snackbar container or its text, not the form.
+
+### Per-member category/tag grant specs
+
+Three specs cover the per-member grant feature (see `api/CLAUDE.md` → "Category/tag grant
+resolution"). They use the standard **`e2e-user`** as the restricted member with custom **group**
+roles — no custom app role or per-spec `storageState` is needed, because the default app role
+(Legacy User) omits `app.categories.read`/`app.tags.read`, so that user does **not** get the admin
+grant bypass and is genuinely restrictable.
+
+- **`member-grant-visibility.spec.ts`** — the composed semantics: role-only, member-only, the
+  intersection, a role narrowed below an existing assignment (fails closed), clearing, category/tag
+  independence, the require-individual toggle both ways, the write-side 403 on an out-of-grant
+  category, and that the receipt form's picker offers exactly the effective set. Assertions read
+  `apiMemberCatalog` (appData's per-group catalogs) — the same array the desktop pickers render
+  from, so it tests the real delivery path rather than a parallel one.
+- **`member-grant-security.spec.ts`** — the silent failure modes: a member with
+  `group.members.update` but **not** `group.members.grants.update` is denied (with the positive
+  contrast), ceiling/existence/non-member rejections, the URL (not the body) identifying the
+  membership, and the two lifecycle regressions — a group rename preserving both the assignment and
+  its restriction flag, and no grant resurrection when a removed member rejoins. Both lifecycle
+  tests were verified to FAIL when their fix is reverted.
+- **`member-grant-assignment.spec.ts`** — the authoring UI: one section per group, the ceiling
+  narrowing the offered pool plus its hint, the unrestricted case, assignment persisting, an
+  untouched save issuing **no** grants request, both add-modes hiding the section, the role form
+  rehydrating its grants, and the **"one record, two doors"** check that the group-member dialog and
+  the user form edit the same membership.
+
+Helpers added to `e2e/helpers/provisioning.ts`: `apiCreateCategory`/`apiCreateTag` (+ deletes),
+`apiSetMemberGrants` (returns the raw response so specs assert 200/400/403/404), `apiMemberCatalog`,
+`apiSetGroupRoster`, `apiGetGroupMembers`, plus `categoryGrants`/`tagGrants`/`requiresIndividual*` on
+`UpsertRolePayload` and `CreateRoleOptions`.
+
+**Gotchas these specs encode:**
+- **Categories/tags are global with a unique name** — every spec mints `uniqueName`-suffixed ones and
+  deletes them in `afterAll`, or a re-run's create fails.
+- **Teardown order:** group → role → categories/tags (a role can't be deleted while assigned).
+- The group roster is only editable on `/groups/:id/details/**edit**`; `/details/view` is read-only.
+- The group-member dialog's submit is dispatched (`dispatchEvent('click')`) rather than clicked:
+  adding a chip grows the dialog and MatDialog re-centres, so the footer button never satisfies
+  Playwright's stability check.
 
 ### Permission-gating specs (provisioned roles/users/groups)
 

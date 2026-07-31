@@ -1,3 +1,13 @@
+// The form is a dialog. Its height grows with the number of groups the user
+// belongs to (one category/tag assignment section each), so cap it and let the
+// body scroll — otherwise a user in several groups produces a dialog taller than
+// the viewport with no way to reach the lower sections or the save button.
+:host {
+  display: block;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
 .header-text {
   margin-top: 0px;
 }

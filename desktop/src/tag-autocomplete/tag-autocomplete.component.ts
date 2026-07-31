@@ -24,4 +24,8 @@ export class TagAutocompleteComponent {
   // Whether the user may create a brand-new tag inline. Defaults to true to
   // preserve existing call sites; gated callers bind it to app.tags.create.
   public readonly creatable = input(true);
+
+  // See CategoryAutocompleteComponent.inputId — overrides the underlying input's
+  // DOM id so multiple instances on one page don't collide.
+  public readonly inputId = input("");
 }

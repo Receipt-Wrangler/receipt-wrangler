@@ -25,4 +25,11 @@ export class CategoryAutocompleteComponent {
   // preserve existing call sites; gated callers (e.g. the receipt form) bind it
   // to the app.categories.create permission.
   public readonly creatable = input(true);
+
+  // Overrides the underlying input's DOM id. The base autocomplete otherwise
+  // derives it from the label, so rendering this component more than once on a
+  // page produces duplicate ids — which breaks <label for> association (only the
+  // first field gets an accessible name) and makes the base component's
+  // getElementById-based filter clear target the wrong input.
+  public readonly inputId = input("");
 }

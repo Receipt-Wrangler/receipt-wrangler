@@ -25,6 +25,14 @@ export interface GrantSelection {
   tagIds: number[];
 }
 
+// The user form renders one picker per group, so the underlying autocompletes
+// would otherwise all derive the same DOM id from their label. Duplicate ids
+// break <label for> association (every field after the first loses its
+// accessible name) and misdirect the base autocomplete's getElementById-based
+// filter clear to the first instance's input. A per-instance counter keeps them
+// unique.
+let grantPickerInstanceCount = 0;
+
 /**
  * Shared category/tag grant picker.
  *
@@ -60,6 +68,15 @@ export class GrantPickerComponent {
   public readonly grantedCategories = new FormArray<FormControl<Category>>([]);
   public readonly grantedTags = new FormArray<FormControl<Tag>>([]);
 
+  // Set once the user touches a picker, after which the seeding effect stops
+  // overwriting their selection (see the constructor).
+  private userEditedCategories = false;
+  private userEditedTags = false;
+
+  private readonly instanceId = ++grantPickerInstanceCount;
+  public readonly categoryInputId = `grant-categories-${this.instanceId}`;
+  public readonly tagInputId = `grant-tags-${this.instanceId}`;
+
   /**
    * The pools actually offered, narrowed to the ceiling. Filtering rather than
    * disabling individual options is deliberate: the shared `app-autocomlete` has
@@ -86,9 +103,18 @@ export class GrantPickerComponent {
     // Resolve granted ids to pool objects once the pool lands (pool and ids load
     // independently). Written with emitEvent: false so seeding the form never
     // echoes back out as a user edit.
+    //
+    // Seeding STOPS once the user has picked something. The effect's inputs keep
+    // changing after mount — the pool arrives asynchronously, and the ceiling
+    // changes again when the host's role list resolves — so without this guard a
+    // late re-run would silently discard the user's selection and hand the host
+    // back the original value.
     effect(() => {
       const pool = this.availableCategories();
       const ids = this.selectedCategoryIds();
+      if (this.userEditedCategories) {
+        return;
+      }
       this.setGrantArray(
         this.grantedCategories,
         pool.filter((category) => category.id !== undefined && ids.includes(category.id)),
@@ -98,18 +124,24 @@ export class GrantPickerComponent {
     effect(() => {
       const pool = this.availableTags();
       const ids = this.selectedTagIds();
+      if (this.userEditedTags) {
+        return;
+      }
       this.setGrantArray(
         this.grantedTags,
         pool.filter((tag) => tag.id !== undefined && ids.includes(tag.id)),
       );
     });
 
-    this.grantedCategories.valueChanges
-      .pipe(takeUntilDestroyed())
-      .subscribe(() => this.emitSelection());
-    this.grantedTags.valueChanges
-      .pipe(takeUntilDestroyed())
-      .subscribe(() => this.emitSelection());
+    // valueChanges only fires for real user edits — seeding uses emitEvent: false.
+    this.grantedCategories.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.userEditedCategories = true;
+      this.emitSelection();
+    });
+    this.grantedTags.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.userEditedTags = true;
+      this.emitSelection();
+    });
   }
 
   /** The current selection, for callers that read on submit rather than on change. */
