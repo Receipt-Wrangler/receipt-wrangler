@@ -786,10 +786,12 @@ value exposed on the public, unauthenticated `GET /featureConfig` payload — th
 stay behind auth. The desktop renders the QR locally from `loginQrUrl` (no new endpoint/handler).
 
 The `receiptwrangler.io/app/setup` host/path is a fixed, project-owned constant that MUST stay in sync
-with the mobile App Link config and the hosted `deploy/app-links/.well-known/*` files. See
-`mobile/CLAUDE.md` → "App Links / Universal Links — server-URL pre-fill (login)" and
-`deploy/app-links/README.md`. Tests: `commands/upsert_system_settings_command_test.go` (validation),
-`services/system_settings_test.go` (`BuildLoginQrUrl` compose/encoding + `GetFeatureConfig` mapping).
+with the mobile App Link config and the `.well-known/assetlinks.json` / `apple-app-site-association`
+files hosted on **receiptwrangler.io** (served from that domain's own nginx/docs infra — not this
+repo; the same layer also serves a `/app/setup` platform redirect for the app-not-installed fallback).
+See `mobile/CLAUDE.md` → "App Links / Universal Links — server-URL pre-fill (login)". Tests:
+`commands/upsert_system_settings_command_test.go` (validation), `services/system_settings_test.go`
+(`BuildLoginQrUrl` compose/encoding + `GetFeatureConfig` mapping).
 
 ## Quick Scan Field Configuration
 
