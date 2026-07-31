@@ -112,6 +112,12 @@ const (
 	GroupMembersCreate = "group.members.create"
 	GroupMembersUpdate = "group.members.update"
 	GroupMembersDelete = "group.members.delete"
+	// GroupMembersGrantsUpdate is deliberately SEPARATE from GroupMembersUpdate.
+	// Per-member category/tag grants are a privacy boundary, so the ability to edit
+	// them must not ride along with ordinary member management — otherwise a
+	// restricted member holding group.members.update could widen their own grants
+	// and lift the very restriction the feature exists to enforce.
+	GroupMembersGrantsUpdate = "group.members.grants.update"
 
 	GroupReceiptsCreate    = "group.receipts.create"
 	GroupReceiptsRead      = "group.receipts.read"
@@ -230,6 +236,7 @@ var registry = []Descriptor{
 	{GroupMembersCreate, "Add Group Members", "Add members to the group.", "Group", ScopeGroup},
 	{GroupMembersUpdate, "Update Group Members", "Change a member's group role.", "Group", ScopeGroup},
 	{GroupMembersDelete, "Remove Group Members", "Remove members from the group.", "Group", ScopeGroup},
+	{GroupMembersGrantsUpdate, "Assign Member Categories & Tags", "Assign which categories and tags an individual member can see, within the limits of their group role.", "Group", ScopeGroup},
 
 	{GroupReceiptsCreate, "Create Receipts", "Upload images and create receipts.", "Receipts", ScopeGroup},
 	{GroupReceiptsRead, "Read Receipts", "Read, list, and export receipts.", "Receipts", ScopeGroup},

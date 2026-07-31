@@ -26,6 +26,12 @@ type RoleView struct {
 	// isolation (they see, and are seen by, every member of an isolated group).
 	// Always group-scoped; app roles serialize false.
 	SeesAllMembers bool `json:"seesAllMembers"`
+	// RequiresIndividualCategoryGrants / RequiresIndividualTagGrants mark a group
+	// role that requires per-member category/tag assignment: a member with no
+	// individual grants sees nothing rather than the role's set. Always
+	// group-scoped; app roles serialize false.
+	RequiresIndividualCategoryGrants bool `json:"requiresIndividualCategoryGrants"`
+	RequiresIndividualTagGrants      bool `json:"requiresIndividualTagGrants"`
 	// ReportTemplateGrants restrict which report templates a group role's members
 	// may act on, per action. Empty means unrestricted (every template the role's
 	// group access reaches). Always group-scoped; app roles serialize an empty

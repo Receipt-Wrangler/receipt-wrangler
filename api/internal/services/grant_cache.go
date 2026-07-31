@@ -33,6 +33,13 @@ type grantEntry struct {
 	// template is deleted and the grant rows cascade away.
 	reportTemplateGrants           map[uint]map[string]struct{}
 	reportTemplateGrantsRestricted bool
+
+	// requiresIndividualCategoryGrants / requiresIndividualTagGrants mark the role
+	// as requiring PER-MEMBER assignment: a member holding it with no membership
+	// grants of their own sees nothing at all, instead of falling back to the role's
+	// set. Role-level, so they ride this role-keyed cache and its existing eviction.
+	requiresIndividualCategoryGrants bool
+	requiresIndividualTagGrants      bool
 }
 
 // groupRoleGrantCache memoizes a group role's category/tag grant id sets, keyed

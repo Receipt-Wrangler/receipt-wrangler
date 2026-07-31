@@ -186,6 +186,15 @@ func DeleteUser(userId string) error {
 			}
 		}
 
+		// Remove the user's per-member category/tag grants across EVERY group. The
+		// membership deletes above are raw, so nothing cascades these away; leaving
+		// them orphaned would silently restore this user's old category visibility if
+		// the same user id were ever reused.
+		txErr = repositories.DeleteMemberGrantsForUser(tx, uintUserId)
+		if txErr != nil {
+			return txErr
+		}
+
 		// Remove user's notifications
 		txErr = notificationsRepository.DeleteAllNotificationsForUser(uintUserId)
 		if txErr != nil {

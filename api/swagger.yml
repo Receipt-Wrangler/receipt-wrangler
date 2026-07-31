@@ -1114,6 +1114,61 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /group/{groupId}/member/{userId}/grants:
+    put:
+      tags:
+        - Groups
+      summary: Update a group member's category and tag assignment
+      description: >-
+        Replaces one member's per-member category/tag grants. These narrow WITHIN
+        the ceiling set by the member's group role — the two layers intersect — so
+        every submitted id must be one the role already allows, or the request is
+        rejected with 400. An empty array clears that resource's restriction and
+        hands the member back to their role's set.
+
+
+        Deliberately a dedicated endpoint rather than a field on the group-member
+        upsert: it carries its own permission (group.members.grants.update), so a
+        member who can manage the roster cannot thereby widen their own visibility.
+      operationId: updateGroupMemberGrants
+      parameters:
+        - in: path
+          name: groupId
+          schema:
+            type: integer
+          required: true
+          description: Group the membership belongs to
+        - in: path
+          name: userId
+          schema:
+            type: integer
+          required: true
+          description: Member whose assignment is being replaced
+      requestBody:
+        description: The category and tag ids to assign
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGroupMemberGrantsCommand"
+      responses:
+        200:
+          description: The member's updated assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateGroupMemberGrantsCommand"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /group/getPagedGroups:
     post:
       tags:
@@ -3407,6 +3462,7 @@ components:
         - "group.members.create"
         - "group.members.update"
         - "group.members.delete"
+        - "group.members.grants.update"
         - "group.receipts.create"
         - "group.receipts.read"
         - "group.receipts.update"
@@ -3525,6 +3581,18 @@ components:
             Whether a GROUP role exempts its members from member-presence isolation
             (they see, and are seen by, every member of an isolated group). Always
             false for app roles.
+        requiresIndividualCategoryGrants:
+          type: boolean
+          description: >-
+            Whether a GROUP role requires per-member category assignment. When true, a
+            member holding this role with no individual category grants sees NO
+            categories, rather than falling back to the role's set. Always false for
+            app roles.
+        requiresIndividualTagGrants:
+          type: boolean
+          description: >-
+            Tag counterpart of requiresIndividualCategoryGrants. Always false for app
+            roles.
         reportTemplateGrants:
           type: array
           description: >-
@@ -3586,6 +3654,18 @@ components:
             Whether a GROUP role exempts its members from member-presence isolation
             (they see, and are seen by, every member of an isolated group). Only
             valid on group roles.
+        requiresIndividualCategoryGrants:
+          type: boolean
+          description: >-
+            Whether this GROUP role requires per-member category assignment. When
+            true, a member with no individual category grants sees NO categories
+            instead of falling back to the role's set, so an unassigned member fails
+            closed. Only valid on group roles.
+        requiresIndividualTagGrants:
+          type: boolean
+          description: >-
+            Tag counterpart of requiresIndividualCategoryGrants. Only valid on group
+            roles.
         reportTemplateGrants:
           type: array
           description: >-
@@ -4013,7 +4093,47 @@ components:
           description: User compound primary key
           format: uint64
           x-go-name: UserID
+        categoryGrants:
+          type: array
+          description: >-
+            Category ids this individual member may see, narrowing WITHIN whatever
+            their group role allows (the two layers intersect). Empty means the
+            member adds no narrowing of their own and falls back to the role. Read
+            only here — write via PUT /group/{groupId}/member/{userId}/grants.
+          items:
+            type: integer
+            format: uint64
+        tagGrants:
+          type: array
+          description: >-
+            Tag counterpart of categoryGrants. Restricted independently of
+            categories.
+          items:
+            type: integer
+            format: uint64
       description: Group member
+    UpdateGroupMemberGrantsCommand:
+      type: object
+      properties:
+        categoryGrants:
+          type: array
+          description: >-
+            Category ids to assign to this member. Every id must sit within the
+            ceiling set by the member's group role, or the request is rejected with
+            400. An empty array clears the member's category restriction, handing
+            them back to their role's set.
+          items:
+            type: integer
+            format: uint64
+        tagGrants:
+          type: array
+          description: Tag counterpart of categoryGrants.
+          items:
+            type: integer
+            format: uint64
+      description: >-
+        Per-member category/tag assignment. The membership being edited is taken
+        from the URL, never this body.
     UpsertGroupMemberCommand:
       required:
         - groupId

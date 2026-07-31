@@ -21,6 +21,18 @@ type GroupRoleDefinition struct {
 	// default false ⇒ no effect on existing roles/groups.
 	SeesAllMembers bool `gorm:"not null;default:false" json:"seesAllMembers"`
 
+	// RequiresIndividualCategoryGrants makes per-member category assignment
+	// MANDATORY for this role: a member holding it who has no individual category
+	// grants sees NOTHING, rather than falling back to the role's set (or to
+	// see-all when the role grants nothing). It exists so that forgetting to assign
+	// a newly added member fails closed instead of exposing every category.
+	// Defaults false, so every existing role behaves exactly as before.
+	RequiresIndividualCategoryGrants bool `gorm:"not null;default:false" json:"requiresIndividualCategoryGrants"`
+
+	// RequiresIndividualTagGrants is the tag counterpart of
+	// RequiresIndividualCategoryGrants.
+	RequiresIndividualTagGrants bool `gorm:"not null;default:false" json:"requiresIndividualTagGrants"`
+
 	// IncludeOwnPaidReceipts is the relative "their own receipts" token of the
 	// paid-by visibility filter: when true the role lets each member see receipts
 	// they paid for. It is stored separately from PaidByUserGrants because it

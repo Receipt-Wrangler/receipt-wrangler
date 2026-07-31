@@ -208,6 +208,15 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 			return txErr
 		}
 
+		// The replace above rewrites the whole roster, so any member it dropped still
+		// has per-member category/tag grant rows behind them. Clear whatever no longer
+		// has a membership — retained members keep theirs, and a removed member cannot
+		// have their old visibility silently restored by being re-added later.
+		txErr = DeleteOrphanedMemberGrants(tx, uintId)
+		if txErr != nil {
+			return txErr
+		}
+
 		return nil
 	})
 	if err != nil {
