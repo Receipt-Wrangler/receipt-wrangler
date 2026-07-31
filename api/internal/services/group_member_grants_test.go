@@ -4,7 +4,9 @@ import (
 	"errors"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/utils"
 	"slices"
 	"testing"
 )
@@ -23,6 +25,12 @@ func setMemberGrants(t *testing.T, userId uint, groupId uint, categoryIds []uint
 }
 
 // setRequiresIndividualGrants flips a group role's fail-closed toggles.
+//
+// It writes through the REPOSITORY, which deliberately bypasses the grant cache
+// (only RoleService evicts), so the manual clear here is correct — it stands in
+// for the eviction the service would have done. Do NOT copy this clear into a
+// test that exercises the service path: see
+// TestRoleUpdateEvictsStaleGrantsWithoutManualCacheClear.
 func setRequiresIndividualGrants(t *testing.T, roleId uint, categories bool, tags bool) {
 	t.Helper()
 
@@ -459,4 +467,112 @@ func TestUpdateMemberGrants_EmptySelectionClearsRestriction(t *testing.T) {
 
 	// Clearing the individual assignment hands the member back to their role.
 	assertAllowedCategories(t, userId, groupId, true, []uint{catA, catB})
+}
+
+// --- Cache eviction on the real update path ---------------------------------
+
+// TestRoleUpdateEvictsStaleGrantsWithoutManualCacheClear pins that narrowing a
+// role through RoleService takes effect immediately.
+//
+// The grant cache is keyed by group-role id and is only evicted by
+// RoleService.UpdateRole / DeleteRole. Every other test in this file writes
+// grants through the repository and clears the cache by hand — which means that
+// if the service's eviction regressed, they would all still pass while
+// production kept serving the revoked categories.
+//
+// So this test MUST NOT call clearGroupRoleGrantCacheAll after the update: the
+// whole point is that the service does it. It resolves the member's set first to
+// force the pre-update grants into the cache, so a missing eviction actually
+// shows up as a stale read rather than a cold miss.
+func TestRoleUpdateEvictsStaleGrantsWithoutManualCacheClear(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	catA := makeCategory(t, "A")
+	catB := makeCategory(t, "B")
+	userId, groupId, roleId := seedMemberWithGroupRoleGrants(t, "m-evict", []uint{catA, catB}, nil)
+
+	// Prime the cache with the pre-update grants.
+	assertAllowedCategories(t, userId, groupId, true, []uint{catA, catB})
+
+	// Narrow the role through the production path.
+	_, err := NewRoleService(nil).UpdateRole(roleId, commands.UpsertRoleCommand{
+		Name:           "Grant Role m-evict",
+		Description:    "",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		CategoryGrants: []uint{catA},
+	})
+	if err != nil {
+		t.Fatalf("UpdateRole: %v", err)
+	}
+
+	// No manual cache clear here, deliberately.
+	assertAllowedCategories(t, userId, groupId, true, []uint{catA})
+}
+
+// TestRoleUpdateEvictsRequiresIndividualToggle covers the same eviction for the
+// fail-closed toggle, which is written by a SEPARATE repository call inside
+// RoleService.UpdateRole's transaction and so could plausibly be missed by an
+// eviction that only considered the grant rows.
+func TestRoleUpdateEvictsRequiresIndividualToggle(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	catA := makeCategory(t, "A")
+	userId, groupId, roleId := seedMemberWithGroupRoleGrants(t, "m-evict-toggle", []uint{catA}, nil)
+
+	// Prime: the unassigned member currently inherits the role's set.
+	assertAllowedCategories(t, userId, groupId, true, []uint{catA})
+
+	_, err := NewRoleService(nil).UpdateRole(roleId, commands.UpsertRoleCommand{
+		Name:                             "Grant Role m-evict-toggle",
+		Description:                      "",
+		Scope:                            permissions.ScopeGroup,
+		Permissions:                      []string{permissions.GroupReceiptsRead},
+		CategoryGrants:                   []uint{catA},
+		RequiresIndividualCategoryGrants: true,
+	})
+	if err != nil {
+		t.Fatalf("UpdateRole: %v", err)
+	}
+
+	// Again no manual clear: the member must now fail closed immediately.
+	assertAllowedCategories(t, userId, groupId, true, []uint{})
+}
+
+// --- Delete-path cleanup ----------------------------------------------------
+
+// TestDeleteGroupRemovesMemberGrants pins the group-teardown half of the
+// resurrection hazard. GroupService.DeleteGroup removes memberships with a raw
+// delete that cascades nothing, so the grant rows must be cleared explicitly.
+func TestDeleteGroupRemovesMemberGrants(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	catA := makeCategory(t, "A")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "m-group-delete", nil, nil)
+	setMemberGrants(t, userId, groupId, []uint{catA}, nil)
+
+	before, err := repositories.NewGroupMemberRepository(nil).GetMemberCategoryGrantIds(userId, groupId)
+	if err != nil {
+		t.Fatalf("GetMemberCategoryGrantIds: %v", err)
+	}
+	if len(before) != 1 {
+		t.Fatalf("expected a seeded grant before delete, got %v", before)
+	}
+
+	if err := NewGroupService(nil).DeleteGroup(utils.UintToString(groupId), true); err != nil {
+		t.Fatalf("DeleteGroup: %v", err)
+	}
+
+	var remaining int64
+	err = repositories.GetDB().Model(&models.GroupMemberCategoryGrant{}).
+		Where("group_id = ?", groupId).Count(&remaining).Error
+	if err != nil {
+		t.Fatalf("count grants: %v", err)
+	}
+	if remaining != 0 {
+		t.Errorf("deleting the group left %d member grant rows behind", remaining)
+	}
 }

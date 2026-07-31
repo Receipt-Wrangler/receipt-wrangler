@@ -646,6 +646,88 @@ func TestGetAppData_GroupCategoriesFilteredByGrants(t *testing.T) {
 	}
 }
 
+// GetAppData's per-group catalog honours a narrowing that comes from the
+// MEMBERSHIP rather than the group role, and carries each member's own grant ids
+// on the roster so the desktop forms can render them.
+//
+// AppData is the delivery surface the receipt-form pickers read from, so this is
+// where the two grant layers have to compose correctly in practice.
+func TestGetAppData_MemberGrantsNarrowGroupCatalog(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+	ClearGroupRoleGrantCacheForTests()
+
+	db := repositories.GetDB()
+	roleRepository := repositories.NewRoleRepository(nil)
+
+	assignedCategory := models.Category{Name: "Child A"}
+	roleOnlyCategory := models.Category{Name: "Child B"}
+	db.Create(&assignedCategory)
+	db.Create(&roleOnlyCategory)
+
+	// A non-admin: no app.categories.read, so no grant bypass.
+	appRole, err := roleRepository.CreateAppRole("AppData Member Grant App Role", "", []string{})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	user := models.User{Username: "appdata-member-grant-user", Password: "password", AppRoleID: &appRole.ID}
+	if err := db.Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	// The ROLE allows both categories; the member is assigned only one.
+	groupRole, err := roleRepository.CreateGroupRole(
+		"AppData Member Grant Role", "", []string{permissions.GroupReceiptsRead},
+		[]uint{assignedCategory.ID, roleOnlyCategory.ID}, nil, nil, false, false,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	group := models.Group{Name: "appdata-member-grant-group"}
+	if err := db.Create(&group).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if err := db.Create(&models.GroupMember{GroupID: group.ID, UserID: user.ID, GroupRoleID: &groupRole.ID}).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	err = repositories.NewGroupMemberRepository(nil).
+		ReplaceMemberGrants(user.ID, group.ID, []uint{assignedCategory.ID}, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	appData, err := GetAppData(user.ID, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	// Intersection: the role's second category must not reach the catalog.
+	visible := appData.GroupCategories[group.ID]
+	if len(visible) != 1 || visible[0].ID != assignedCategory.ID {
+		utils.PrintTestError(t, visible, []uint{assignedCategory.ID})
+	}
+
+	// The roster carries the member's own assignment for the admin forms.
+	var member *models.GroupMember
+	for i := range appData.Groups {
+		if appData.Groups[i].ID != group.ID {
+			continue
+		}
+		for j := range appData.Groups[i].GroupMembers {
+			if appData.Groups[i].GroupMembers[j].UserID == user.ID {
+				member = &appData.Groups[i].GroupMembers[j]
+			}
+		}
+	}
+	if member == nil {
+		utils.PrintTestError(t, "member missing from appData roster", user.ID)
+		return
+	}
+	if len(member.CategoryGrants) != 1 || member.CategoryGrants[0] != assignedCategory.ID {
+		utils.PrintTestError(t, member.CategoryGrants, []uint{assignedCategory.ID})
+	}
+}
+
 // GetAppData gives an admin (app.categories.read) the flat global list, and an
 // unrestricted group's catalog contains every category.
 func TestGetAppData_AdminGetsFlatCategoriesUnrestrictedGroup(t *testing.T) {

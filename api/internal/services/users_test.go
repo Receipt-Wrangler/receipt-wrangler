@@ -451,6 +451,62 @@ func TestDeleteUser_MultiMemberGroup(t *testing.T) {
 	assertCount(t, &models.GroupMember{}, "user_id = ? AND group_id = ?", []interface{}{otherUser.ID, group.ID}, 1, "other user's group membership should survive")
 }
 
+// TestDeleteUser_RemovesMemberGrants pins the user-teardown half of the grant
+// resurrection hazard.
+//
+// Grant rows are keyed (user, group) with no FK to group_members, and DeleteUser
+// removes memberships with a raw tx.Delete that cascades nothing — so orphaned
+// rows would be silently re-adopted if the same user id were ever reused.
+//
+// The user is put in TWO surviving multi-member groups on purpose: the cleanup
+// helper (DeleteMemberGrantsForUser) is deliberately group-WIDE, and a
+// per-group loop bolted onto the membership-removal loop would leave the second
+// group's rows behind.
+func TestDeleteUser_RemovesMemberGrants(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	user := createUserForDeletion(t, "grantuser")
+	otherUser := createUserForDeletion(t, "grantuserother")
+
+	db := repositories.GetDB()
+	category := models.Category{Name: "Grant Cascade Category"}
+	if err := db.Create(&category).Error; err != nil {
+		t.Fatalf("seed category: %v", err)
+	}
+
+	// The user's own group, plus a second one — both kept alive by otherUser so
+	// DeleteUser removes the memberships instead of deleting the groups.
+	firstGroup := getNonAllGroupForUser(t, user.ID)
+	db.Create(&models.GroupMember{UserID: otherUser.ID, GroupID: firstGroup.ID})
+
+	secondGroup := models.Group{Name: "Grant Cascade Second Group"}
+	if err := db.Create(&secondGroup).Error; err != nil {
+		t.Fatalf("seed second group: %v", err)
+	}
+	db.Create(&models.GroupMember{UserID: user.ID, GroupID: secondGroup.ID})
+	db.Create(&models.GroupMember{UserID: otherUser.ID, GroupID: secondGroup.ID})
+
+	groupMemberRepository := repositories.NewGroupMemberRepository(nil)
+	for _, groupId := range []uint{firstGroup.ID, secondGroup.ID} {
+		if err := groupMemberRepository.ReplaceMemberGrants(user.ID, groupId, []uint{category.ID}, nil); err != nil {
+			t.Fatalf("seed member grants: %v", err)
+		}
+	}
+	// otherUser keeps an assignment too — it must survive the delete.
+	if err := groupMemberRepository.ReplaceMemberGrants(otherUser.ID, firstGroup.ID, []uint{category.ID}, nil); err != nil {
+		t.Fatalf("seed other member grants: %v", err)
+	}
+
+	assertCount(t, &models.GroupMemberCategoryGrant{}, "user_id = ?", []interface{}{user.ID}, 2, "member grants should exist before delete")
+
+	if err := DeleteUser(utils.UintToString(user.ID)); err != nil {
+		t.Fatalf("DeleteUser failed: %v", err)
+	}
+
+	assertCount(t, &models.GroupMemberCategoryGrant{}, "user_id = ?", []interface{}{user.ID}, 0, "the deleted user's member grants should be gone from EVERY group")
+	assertCount(t, &models.GroupMemberCategoryGrant{}, "user_id = ?", []interface{}{otherUser.ID}, 1, "another member's grants should survive the delete")
+	assertCount(t, &models.Category{}, "id = ?", []interface{}{category.ID}, 1, "the category itself should survive the delete")
+}
+
 func TestDeleteUser_WithNotifications(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	user := createUserForDeletion(t, "notifuser")

@@ -815,6 +815,59 @@ func TestQuickScan_DropsOutOfGrantAiCategory(t *testing.T) {
 	}
 }
 
+// TestQuickScan_DropsMemberOutOfGrantAiCategory is the member-layer twin of
+// TestQuickScan_DropsOutOfGrantAiCategory: the AI candidate filter resolves through the same
+// GetGroupCategoryIdsForUser, so a category the ROLE allows but the member's own assignment does
+// not must still be dropped. Without this, quick scan would silently attach a child to a foster
+// parent's receipt that they were never assigned.
+func TestQuickScan_DropsMemberOutOfGrantAiCategory(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	created, _, _, err := runQuickScanWithSetup(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		func(u models.User, g models.Group) string {
+			// AI assigns categories 1 and 2; the ROLE allows both, the MEMBER only 1.
+			return `{"name": "MemberRestricted", "amount": 7.00, "date": "2024-01-01T00:00:00Z", "categories": [{"id": 1}, {"id": 2}]}`
+		},
+		func(t *testing.T, user models.User, group models.Group) {
+			clearGroupRoleGrantCacheAll()
+			clearRolePermissionCacheAll()
+			role, err := repositories.NewRoleRepository(nil).CreateGroupRole(
+				"member-restricted-cat", "", []string{permissions.GroupReceiptsRead}, []uint{1, 2}, nil, nil, false, false)
+			if err != nil {
+				t.Fatalf("create role: %v", err)
+			}
+			if err := repositories.GetDB().Model(&models.GroupMember{}).
+				Where("group_id = ? AND user_id = ?", group.ID, user.ID).
+				Update("group_role_id", role.ID).Error; err != nil {
+				t.Fatalf("assign role to member: %v", err)
+			}
+			err = repositories.NewGroupMemberRepository(nil).
+				ReplaceMemberGrants(user.ID, group.ID, []uint{1}, nil)
+			if err != nil {
+				t.Fatalf("assign member grants: %v", err)
+			}
+		},
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(receipt.Categories) != 1 || !hasCategoryId(receipt.Categories, 1) {
+		utils.PrintTestError(t, receipt.Categories, "only category 1 (2 dropped by the member assignment)")
+	}
+}
+
 // TestQuickScan_ValidationFailureRecordsFailedSystemTask covers the "missing system task" gap: a
 // failure AFTER AI processing succeeds but BEFORE the receipt is created (here receipt validation) used
 // to vanish into the log, leaving the AI tasks marked SUCCEEDED and no record of why no receipt

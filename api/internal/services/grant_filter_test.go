@@ -319,6 +319,92 @@ func TestMergeHiddenReceiptCategoriesTagsUnrestrictedNoOp(t *testing.T) {
 	}
 }
 
+// TestMergeHiddenReceiptCategoriesTagsMemberLevel is the member-layer twin of
+// TestMergeHiddenReceiptCategoriesTags.
+//
+// The merge resolves visibility through GetGroupCategoryIdsForUser, so it must
+// honour a narrowing that comes from the MEMBERSHIP rather than the role. Without
+// it, a member restricted individually would silently drop the categories they
+// cannot see every time they edit a receipt — the update does a wholesale
+// association replace.
+func TestMergeHiddenReceiptCategoriesTagsMemberLevel(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	allowedCat := makeCategory(t, "Child A")
+	hiddenCat := makeCategory(t, "Child B")
+
+	// The ROLE allows both; only the member's individual assignment narrows.
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-merge-member", []uint{allowedCat, hiddenCat}, nil)
+	err := repositories.NewGroupMemberRepository(nil).
+		ReplaceMemberGrants(userId, groupId, []uint{allowedCat}, nil)
+	if err != nil {
+		t.Fatalf("ReplaceMemberGrants: %v", err)
+	}
+
+	currentCategories := []models.Category{
+		{BaseModel: models.BaseModel{ID: allowedCat}, Name: "Child A"},
+		{BaseModel: models.BaseModel{ID: hiddenCat}, Name: "Child B"},
+	}
+	command := commands.UpsertReceiptCommand{
+		GroupId:    groupId,
+		Categories: []commands.UpsertCategoryCommand{{Id: &allowedCat, Name: "Child A"}},
+	}
+
+	service := NewPermissionService(nil)
+	if err := service.MergeHiddenReceiptCategoriesTags(userId, groupId, currentCategories, nil, &command); err != nil {
+		t.Fatalf("MergeHiddenReceiptCategoriesTags: %v", err)
+	}
+
+	foundHidden := false
+	for _, category := range command.Categories {
+		if category.Id != nil && *category.Id == hiddenCat {
+			foundHidden = true
+		}
+	}
+	if !foundHidden {
+		t.Errorf("expected the member-hidden category to be merged back, got %v", command.Categories)
+	}
+	if len(command.Categories) != 2 {
+		t.Errorf("expected 2 categories after merge, got %d", len(command.Categories))
+	}
+}
+
+// TestFilterReceiptStripsMemberHiddenCategories pins the read side of the same
+// composition: a category the ROLE allows but the member's own assignment does
+// not must be stripped from a receipt before it reaches the client.
+func TestFilterReceiptStripsMemberHiddenCategories(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	allowedCat := makeCategory(t, "Child A")
+	hiddenCat := makeCategory(t, "Child B")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "u-strip-member", []uint{allowedCat, hiddenCat}, nil)
+	err := repositories.NewGroupMemberRepository(nil).
+		ReplaceMemberGrants(userId, groupId, []uint{allowedCat}, nil)
+	if err != nil {
+		t.Fatalf("ReplaceMemberGrants: %v", err)
+	}
+
+	receipts := []models.Receipt{{
+		GroupId: groupId,
+		Categories: []models.Category{
+			{BaseModel: models.BaseModel{ID: allowedCat}, Name: "Child A"},
+			{BaseModel: models.BaseModel{ID: hiddenCat}, Name: "Child B"},
+		},
+	}}
+
+	if err := NewPermissionService(nil).FilterReceiptCategoriesTags(userId, receipts); err != nil {
+		t.Fatalf("FilterReceiptCategoriesTags: %v", err)
+	}
+
+	if len(receipts[0].Categories) != 1 || receipts[0].Categories[0].ID != allowedCat {
+		t.Errorf("expected only the member-assigned category to survive, got %v", receipts[0].Categories)
+	}
+}
+
 func TestIntersectReceiptFilterWithGrants(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	clearGroupRoleGrantCacheAll()

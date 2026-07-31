@@ -464,6 +464,50 @@ describe("UserFormComponent", () => {
       });
     });
 
+    // PARKED — documents a real defect, deliberately NOT fixed (reported for triage).
+    //
+    // submit() fires snackbarService.success("User successfully updated") in a tap
+    // BEFORE the switchMap that calls saveChangedMemberGrants. When the grants
+    // write fails (a 400 ceiling violation, or a 403), the admin sees a success
+    // toast followed by an error toast, and the assignment silently did not save.
+    // The dialog does stay open and the edit is preserved, so nothing is lost —
+    // but the success message is a lie. group-member-form gets this right via a
+    // catchError. Un-skip once the toast is moved after the grants switchMap.
+    it.skip("reports success only after the grants save succeeds", async () => {
+      seedGroups();
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+
+      const successSpy = jest
+        .spyOn(TestBed.inject(SnackbarService), "success")
+        .mockReturnValue();
+      jest
+        .spyOn(TestBed.inject(UserService), "getUsernameCount")
+        .mockReturnValue(of(0 as any));
+      jest
+        .spyOn(TestBed.inject(UserService), "updateUserById")
+        .mockReturnValue(of(undefined as any));
+      jest
+        .spyOn(TestBed.inject(TokenRefreshService), "refreshToken")
+        .mockReturnValue(of(undefined as any));
+      jest
+        .spyOn(TestBed.inject(GroupsService), "updateGroupMemberGrants")
+        .mockReturnValue(throwError(() => new Error("400 ceiling violation")) as any);
+
+      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      expect(successSpy).not.toHaveBeenCalled();
+    });
+
     it("does not write assignments that were never edited", async () => {
       seedGroups();
       getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
