@@ -585,6 +585,16 @@ a role never widens an individually-assigned member.
   `GroupService.DeleteGroup`, and `GroupRepository.UpdateGroup` (after its association replace, phrased
   as "whatever no longer has a membership" so it is correct regardless of how GORM's replace behaves,
   and leaves retained members untouched). **Do not remove these calls.**
+- **`UpdateGroup` must carry the restriction flags forward.** It persists `GroupMember` rows rebuilt
+  from the request command (which carry both flags at their **zero value**) twice — once via the
+  `FullSaveAssociations` `Updates`, once via the association `Replace`. So `UpdateGroup` reads
+  `GetMemberGrantFlagsForGroup` **at the very top of the transaction, before either write**, and
+  re-applies each retained member's flags to the rebuilt structs. Without it, a plain group edit —
+  even just a rename — clears every member's restriction and silently widens them back to their
+  role's full set. The flags are **carried forward, not recomputed** from the surviving grant rows: a
+  membership configured and then emptied by a category deletion must stay restricted, which is the
+  whole reason the flags exist apart from the rows. Pinned by
+  `repositories/group_member_grants_test.go` → `TestUpdateGroupPreservesRetainedMemberGrantFlags`.
 - **`GroupMember.CategoryGrants` / `TagGrants` are transient view fields (`gorm:"-"`)**, populated on
   read by `LoadMemberGrantsForGroup(s)` at the roster serialization boundary (AppData,
   `GetGroupsForUser`, `GetGroupById`) — deliberately **not** GORM associations, which would put the

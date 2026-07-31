@@ -188,6 +188,47 @@ func (repository GroupMemberRepository) ReplaceMemberGrants(userId uint, groupId
 // category visibility that was deliberately revoked, with nothing in the UI to
 // show it happened.
 
+// MemberGrantFlags is a membership's pair of fail-closed restriction flags.
+type MemberGrantFlags struct {
+	CategoryGrantsRestricted bool
+	TagGrantsRestricted      bool
+}
+
+// GetMemberGrantFlagsForGroup returns every member's restriction flags in a
+// group, keyed by user id.
+//
+// Used by GroupRepository.UpdateGroup to carry the flags across its wholesale
+// roster replace. That replace writes GroupMember rows built from the request
+// command, which carry both flags at their zero value — so without this, a plain
+// group edit (even just a rename) would clear every member's restriction and
+// silently widen them back to their role's full set.
+//
+// The flags are carried forward rather than recomputed from the surviving grant
+// rows on purpose: a membership that was configured and then emptied by a
+// category deletion must STAY restricted, which is the entire reason the flags
+// exist separately from the rows.
+func GetMemberGrantFlagsForGroup(db *gorm.DB, groupId uint) (map[uint]MemberGrantFlags, error) {
+	var members []models.GroupMember
+
+	err := db.Model(&models.GroupMember{}).
+		Select("user_id", "category_grants_restricted", "tag_grants_restricted").
+		Where("group_id = ?", groupId).
+		Find(&members).Error
+	if err != nil {
+		return nil, err
+	}
+
+	flags := make(map[uint]MemberGrantFlags, len(members))
+	for _, member := range members {
+		flags[member.UserID] = MemberGrantFlags{
+			CategoryGrantsRestricted: member.CategoryGrantsRestricted,
+			TagGrantsRestricted:      member.TagGrantsRestricted,
+		}
+	}
+
+	return flags, nil
+}
+
 // deleteMemberGrantsWhere removes category and tag grant rows matching a
 // condition. The two tables are always torn down together.
 func deleteMemberGrantsWhere(db *gorm.DB, query interface{}, args ...interface{}) error {
