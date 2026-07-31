@@ -164,6 +164,19 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   place Save/Cancel buttons in the page header.
 - **Form fields:** `app-input`, `app-textarea`, `app-select`, `app-checkbox`, grouped with
   `app-form-section`; bind via the `formGet` pipe.
+- **Password fields:** `app-input` owns both password affordances as opt-in suffix icon buttons —
+  `[showVisibilityEye]="true"` (the eye, `data-testid="password-visibility-toggle"`) and
+  `[showGeneratePassword]="true"` (`data-testid="password-generate"`). Switching either flag on
+  masks the field — on the initial binding *and* on a later `false -> true` flip, so a field that
+  becomes a password field at runtime is never left in plain text. Generate fills the
+  control with `generateSecurePassword()` (`src/utils/password.utils.ts` — `crypto.getRandomValues`
+  with rejection sampling, one char per class, ambiguous glyphs excluded), reveals it, and copies it
+  to the clipboard with a toast via `PasswordGeneratorService`
+  (`src/services/password-generator.service.ts`). It is deliberately **admin-sets-someone-else's-
+  password only** — the user form, Set Password, and Convert Dummy User dialogs — not sign-up or the
+  fields that hold an existing external secret (system email, receipt-processing settings). The
+  generate handler is synchronous by design: `type` is a plain `@Input`, so under zoneless CD only
+  the click event's CD pass renders the reveal (the clipboard write is a detached side effect).
 - **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`.
 - **Simple filters:** the segmented `app-filter-bar` (`src/shared-ui/filter-bar/`) — pass `FilterTab[]`
   (`{ value, label, icon?, count? }`) and two-way bind the selected `value`.
@@ -589,6 +602,13 @@ In CI the same spec files run against the demo URL. GitHub secrets populate the 
 - Forms use a custom `<app-input>` wrapper over `<mat-form-field>`. `page.getByLabel('Username')` resolves through the `<mat-label>` association.
 - Submit buttons use `<app-button>` rendering `<button>` with visible text — `page.getByRole('button', { name: '...' })` works directly.
 - Error feedback is often a Material snackbar (not inline `<mat-error>`). When asserting errors, locate the snackbar container or its text, not the form.
+- **`getByLabel` matches substrings.** On any password field carrying the generate button, plain
+  `getByLabel('Password')` resolves *two* elements — the input and the button, whose accessible name
+  is "Generate password" — and fails on strict mode. Use `getByLabel('Password', { exact: true })`
+  for the Create User / Set Password dialogs (the login form has no generate button, so it is
+  unaffected). The generated password is asserted in `generate-password.spec.ts`, which also grants
+  `permissions: ['clipboard-read', 'clipboard-write']` in `test.use` — the only clipboard-reading
+  spec in the suite.
 
 ### Permission-gating specs (provisioned roles/users/groups)
 
