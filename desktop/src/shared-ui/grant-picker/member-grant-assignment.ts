@@ -17,6 +17,44 @@ export interface MemberGrantRow {
   roleName: string;
   ceiling: GrantCeiling | null;
   current: GrantSelection;
+
+  /**
+   * Whether the group role makes an individual assignment MANDATORY, per resource.
+   *
+   * These invert what an empty selection means: normally empty is "no narrowing"
+   * and the member gets everything the role allows, but under these flags an
+   * unconfigured member sees NOTHING (the backend's fail-closed rule — see
+   * `api/CLAUDE.md` → "Category/tag grant resolution"). The hint text has to say
+   * so, which is why they are carried on the row rather than folded into the
+   * ceiling: a ceiling bounds what may be picked, these change what picking
+   * nothing means.
+   */
+  requiresIndividualCategories: boolean;
+  requiresIndividualTags: boolean;
+}
+
+/**
+ * The sentence explaining what leaving a picker empty does for this membership.
+ *
+ * Shared by both hosts so the two entry points cannot describe the same rule
+ * differently — the wording is the only thing telling an admin that an empty
+ * selection can mean "nothing" rather than "everything".
+ */
+export function emptySelectionHint(row: MemberGrantRow): string {
+  const categories = row.requiresIndividualCategories;
+  const tags = row.requiresIndividualTags;
+
+  if (categories && tags) {
+    return "Their role requires an individual assignment, so leaving these empty gives them no categories and no tags.";
+  }
+  if (categories) {
+    return "Their role requires an individual category assignment, so leaving categories empty gives them none. Leaving tags empty gives them every tag the role allows.";
+  }
+  if (tags) {
+    return "Their role requires an individual tag assignment, so leaving tags empty gives them none. Leaving categories empty gives them every category the role allows.";
+  }
+
+  return "Leave empty to give them everything their role allows.";
 }
 
 /**
@@ -57,6 +95,8 @@ export function buildMemberGrantRow(
       categoryIds: member.categoryGrants ?? [],
       tagIds: member.tagGrants ?? [],
     },
+    requiresIndividualCategories: role?.requiresIndividualCategoryGrants ?? false,
+    requiresIndividualTags: role?.requiresIndividualTagGrants ?? false,
   };
 }
 

@@ -537,18 +537,41 @@ export async function apiCreateTag(
   return { id: tag.id, name: tag.name };
 }
 
+/**
+ * Warns rather than throws on a failed delete.
+ *
+ * Every caller runs inside an `afterAll` whose body is wrapped in `try/catch {}`
+ * so cleanup can never mask a test failure. Throwing here would be swallowed by
+ * that catch AND abort the remaining deletes in the same block — leaking more
+ * names than it reports. A warning keeps every delete running and still puts the
+ * failure in the test output, which is what makes a leaked unique name (the thing
+ * that breaks the next run's create) diagnosable.
+ */
+async function warnOnFailedDelete(
+  api: APIRequestContext,
+  path: string,
+  what: string,
+): Promise<void> {
+  const res = await api.delete(path);
+  if (!res.ok()) {
+    console.warn(
+      `e2e cleanup: failed to delete ${what} — HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+}
+
 export async function apiDeleteCategoryById(
   api: APIRequestContext,
   id: number,
 ): Promise<void> {
-  await api.delete(`/api/category/${id}`);
+  await warnOnFailedDelete(api, `/api/category/${id}`, `category ${id}`);
 }
 
 export async function apiDeleteTagById(
   api: APIRequestContext,
   id: number,
 ): Promise<void> {
-  await api.delete(`/api/tag/${id}`);
+  await warnOnFailedDelete(api, `/api/tag/${id}`, `tag ${id}`);
 }
 
 // --- Per-member category/tag grants ------------------------------------------

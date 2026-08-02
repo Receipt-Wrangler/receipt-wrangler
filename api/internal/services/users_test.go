@@ -475,15 +475,25 @@ func TestDeleteUser_RemovesMemberGrants(t *testing.T) {
 
 	// The user's own group, plus a second one — both kept alive by otherUser so
 	// DeleteUser removes the memberships instead of deleting the groups.
+	// These creates are checked because the co-members are what keep both groups
+	// alive: if one silently fails, DeleteUser deletes that group instead of just
+	// the membership, the grants are cleaned up by the group-delete path, and the
+	// assertions below pass without ever exercising the group-wide cleanup this
+	// test exists to pin.
 	firstGroup := getNonAllGroupForUser(t, user.ID)
-	db.Create(&models.GroupMember{UserID: otherUser.ID, GroupID: firstGroup.ID})
+	if err := db.Create(&models.GroupMember{UserID: otherUser.ID, GroupID: firstGroup.ID}).Error; err != nil {
+		t.Fatalf("seed first group co-member: %v", err)
+	}
 
 	secondGroup := models.Group{Name: "Grant Cascade Second Group"}
 	if err := db.Create(&secondGroup).Error; err != nil {
 		t.Fatalf("seed second group: %v", err)
 	}
-	db.Create(&models.GroupMember{UserID: user.ID, GroupID: secondGroup.ID})
-	db.Create(&models.GroupMember{UserID: otherUser.ID, GroupID: secondGroup.ID})
+	for _, memberUserId := range []uint{user.ID, otherUser.ID} {
+		if err := db.Create(&models.GroupMember{UserID: memberUserId, GroupID: secondGroup.ID}).Error; err != nil {
+			t.Fatalf("seed second group member %d: %v", memberUserId, err)
+		}
+	}
 
 	groupMemberRepository := repositories.NewGroupMemberRepository(nil)
 	for _, groupId := range []uint{firstGroup.ID, secondGroup.ID} {

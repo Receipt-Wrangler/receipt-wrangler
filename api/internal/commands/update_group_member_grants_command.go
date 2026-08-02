@@ -36,12 +36,14 @@ func (command *UpdateGroupMemberGrantsCommand) LoadDataFromRequest(w http.Respon
 func (command *UpdateGroupMemberGrantsCommand) Validate() structs.ValidatorError {
 	errors := structs.ValidatorError{Errors: make(map[string]string)}
 
+	// Keyed by the REQUEST field names, not the Go field names, so a client can map
+	// a validation error back to the control the user typed into.
 	if hasDuplicateIds(command.CategoryIds) {
-		errors.Errors["categoryIds"] = "Duplicate category ids are not allowed"
+		errors.Errors["categoryGrants"] = "Duplicate category ids are not allowed"
 	}
 
 	if hasDuplicateIds(command.TagIds) {
-		errors.Errors["tagIds"] = "Duplicate tag ids are not allowed"
+		errors.Errors["tagGrants"] = "Duplicate tag ids are not allowed"
 	}
 
 	return errors

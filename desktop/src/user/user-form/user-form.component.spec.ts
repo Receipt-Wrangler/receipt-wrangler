@@ -9,6 +9,7 @@ import { Observable, of, throwError } from "rxjs";
 import {
   ApiModule,
   GroupsService,
+  Permission,
   PermissionScope,
   Role,
   RoleService,
@@ -18,6 +19,7 @@ import {
 import { PipesModule } from "../../pipes";
 import { SnackbarService, TokenRefreshService } from "../../services";
 import { AddUser, AuthState, GroupState, SetGroups, UpdateUser, UserState } from "../../store";
+import { SetPermissions } from "../../store/auth.state.actions";
 import { UserFormComponent } from "./user-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -438,6 +440,14 @@ describe("UserFormComponent", () => {
       store.dispatch(new SetGroups(groups));
     }
 
+    // The grant endpoint is gated on a GROUP-scoped permission with no app-level
+    // bypass, so the admin-only user form still has to hold it per group.
+    function grantWritePermission(groupId = 100): void {
+      store.dispatch(
+        new SetPermissions([], { [groupId]: [Permission.GroupMembersGrantsUpdate] })
+      );
+    }
+
     /**
      * Builds an edit-mode component with everything submit() touches stubbed.
      *
@@ -452,6 +462,7 @@ describe("UserFormComponent", () => {
     ) {
       // Seed groups BEFORE stubbing dispatch — the rows are read from GroupState.
       seedGroups();
+      grantWritePermission();
       getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
 
       const successSpy = jest
@@ -491,8 +502,42 @@ describe("UserFormComponent", () => {
       expect(freshComponent.grantRows()).toEqual([]);
     });
 
+    it("renders no rows without group.members.grants.update", async () => {
+      // The endpoint declares no app-level bypass, so an admin who lacks the
+      // group-scoped permission would only get a rejected request. `grantRows`
+      // drives the whole section, so it disappears rather than showing dead
+      // controls.
+      seedGroups();
+      store.dispatch(new SetPermissions([], {}));
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      expect(freshComponent.grantRows()).toEqual([]);
+    });
+
+    it("renders only the groups the admin may write grants in", async () => {
+      seedGroups();
+      // Held for a DIFFERENT group than the one the user belongs to.
+      store.dispatch(
+        new SetPermissions([], { 999: [Permission.GroupMembersGrantsUpdate] })
+      );
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      expect(freshComponent.grantRows()).toEqual([]);
+    });
+
     it("builds one row per group the edited user belongs to", async () => {
       seedGroups();
+      grantWritePermission();
       getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
       const freshFixture = TestBed.createComponent(UserFormComponent);
       const freshComponent = freshFixture.componentInstance;

@@ -326,7 +326,7 @@ test.describe('Per-member category/tag visibility', () => {
     await page.goto(`/receipts/${receiptId}/edit`);
 
     const categoryField = page
-      .locator('app-category-autocomplete')
+      .getByTestId('receipt-categories')
       .getByRole('combobox', { name: 'Categories' });
     await expect(categoryField).toBeVisible();
     await categoryField.click();

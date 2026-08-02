@@ -1,7 +1,9 @@
 package repositories
 
 import (
+	"maps"
 	"receipt-wrangler/api/internal/models"
+	"slices"
 
 	"gorm.io/gorm"
 )
@@ -314,12 +316,18 @@ func (repository GroupMemberRepository) LoadMemberGrants(members []*models.Group
 
 	db := repository.GetDB()
 
-	groupIds := make([]uint, 0, len(members))
-	userIds := make([]uint, 0, len(members))
+	// Distinct ids only: appending per member would repeat a group id once per
+	// member of it (and a user id once per group they are in), so the generated IN
+	// lists would grow with roster size instead of with distinct ids and a large
+	// group could approach the driver's bind-parameter limit.
+	groupIdSet := make(map[uint]struct{}, len(members))
+	userIdSet := make(map[uint]struct{}, len(members))
 	for _, member := range members {
-		groupIds = append(groupIds, member.GroupID)
-		userIds = append(userIds, member.UserID)
+		groupIdSet[member.GroupID] = struct{}{}
+		userIdSet[member.UserID] = struct{}{}
 	}
+	groupIds := slices.Collect(maps.Keys(groupIdSet))
+	userIds := slices.Collect(maps.Keys(userIdSet))
 
 	var categoryGrants []models.GroupMemberCategoryGrant
 	err := db.Where("group_id IN ? AND user_id IN ?", groupIds, userIds).Find(&categoryGrants).Error
@@ -347,11 +355,22 @@ func (repository GroupMemberRepository) LoadMemberGrants(members []*models.Group
 		tagsByMember[key] = append(tagsByMember[key], grant.TagID)
 	}
 
+	// A member with no grants must still serialize as [], not null: swagger declares
+	// both as arrays, and a missing map key yields a nil slice. Normalizing here
+	// covers every read path at once (AppData, GetGroupById, the paged list and the
+	// group create/update responses) rather than per handler.
 	for _, member := range members {
 		key := memberKey{member.UserID, member.GroupID}
-		member.CategoryGrants = categoriesByMember[key]
-		member.TagGrants = tagsByMember[key]
+		member.CategoryGrants = grantIdsOrEmpty(categoriesByMember[key])
+		member.TagGrants = grantIdsOrEmpty(tagsByMember[key])
 	}
 
 	return nil
+}
+
+func grantIdsOrEmpty(ids []uint) []uint {
+	if ids == nil {
+		return []uint{}
+	}
+	return ids
 }

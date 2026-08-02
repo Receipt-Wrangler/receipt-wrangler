@@ -50,8 +50,9 @@ func assertAllowedCategories(t *testing.T, userId uint, groupId uint, wantRestri
 		t.Fatalf("GetGroupCategoryIdsForUser: %v", err)
 	}
 
-	if unrestricted == wantRestricted {
-		t.Fatalf("expected restricted=%v, got unrestricted=%v", wantRestricted, unrestricted)
+	gotRestricted := !unrestricted
+	if gotRestricted != wantRestricted {
+		t.Fatalf("expected restricted=%v, got restricted=%v", wantRestricted, gotRestricted)
 	}
 	if !wantRestricted {
 		return

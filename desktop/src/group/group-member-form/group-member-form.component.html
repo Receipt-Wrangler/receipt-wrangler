@@ -27,12 +27,24 @@
     </div>
 
     @if (grantsReady() && grantRow(); as row) {
-      <div class="group-member-form__grants" data-testid="member-grant-section">
+      <!-- Grants have their own group-scoped permission, separate from the
+           group.members.update that opens this dialog, and the endpoint allows no
+           app-level bypass — so a roster manager without it must not see editable
+           controls that only produce a rejected request. -->
+      <div
+        class="group-member-form__grants"
+        data-testid="member-grant-section"
+        *hasGroupPermission="{
+          groupId: row.groupId,
+          permission: Permission.GroupMembersGrantsUpdate
+        }"
+      >
         <h3 class="group-member-form__grants-header">Category &amp; tag access</h3>
-        <div class="hint hint-inline">
+        <div class="hint hint-inline" data-testid="member-grant-hint">
           Limit this member to specific categories and tags. This narrows within what
-          their group role already allows — it can never widen it. Leave empty to give
-          them everything the role allows. Saved immediately when you save this member.
+          their group role already allows — it can never widen it.
+          {{ emptySelectionHint(row) }}
+          Saved immediately when you save this member.
         </div>
         <app-grant-picker
           [categoryPool]="categoryPool()"

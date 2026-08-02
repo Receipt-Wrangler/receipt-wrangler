@@ -10,6 +10,7 @@ import {
   Category,
   CategoryService,
   GroupsService,
+  Permission,
   PermissionScope,
   Role,
   RoleService,
@@ -18,9 +19,11 @@ import {
   User,
   UserService,
 } from "../../open-api";
+import { hasAll } from "../../utils/permission.utils";
 import { GrantSelection } from "../../shared-ui/grant-picker/grant-picker.component";
 import {
   buildMemberGrantRows,
+  emptySelectionHint,
   MemberGrantRow,
   saveChangedMemberGrants,
 } from "../../shared-ui/grant-picker/member-grant-assignment";
@@ -104,21 +107,41 @@ export class UserFormComponent implements OnInit {
   public readonly tagPool = signal<Tag[]>([]);
   private readonly groups = this.store.selectSignal(GroupState.groups);
 
-  /** One row per group the user belongs to, each carrying its role's ceiling. */
+  private readonly groupPermissions = this.store.selectSignal(
+    AuthState.groupPermissions
+  );
+
+  /**
+   * One row per group the user belongs to, each carrying its role's ceiling —
+   * restricted to the groups this admin may actually write grants in.
+   *
+   * `group.members.grants.update` is group-scoped and deliberately separate from
+   * `group.members.update` (see `api/CLAUDE.md`), and its handler declares no
+   * app-level bypass. Rendering a picker for a group the caller lacks it in would
+   * only produce a rejected request. The section as a whole is keyed off this
+   * list's length, so it disappears when no group is writable. UI-only — the
+   * server re-checks on every request.
+   */
   public readonly grantRows = computed<MemberGrantRow[]>(() => {
     if (!this.user) {
       return [];
     }
+    const permissions = this.groupPermissions();
     return buildMemberGrantRows(
       this.user.id,
       this.groups(),
       this.roles().filter((role) => role.scope === PermissionScope.Group),
+    ).filter((row) =>
+      hasAll(permissions[row.groupId] ?? [], Permission.GroupMembersGrantsUpdate)
     );
   });
 
   // Edits made in the pickers, keyed by group id. Only groups present here (and
   // actually changed) are written on submit.
   private readonly editedGrants = new Map<number, GrantSelection>();
+
+  /** Exposed for the template; see the helper for why the wording is shared. */
+  public readonly emptySelectionHint = emptySelectionHint;
 
   public ngOnInit(): void {
     this.initForm();

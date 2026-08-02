@@ -51,7 +51,6 @@
         <div class="hint hint-inline">
           Limit this user to specific categories and tags, per group. This narrows
           within whatever their group role already allows — it can never widen it.
-          Leave a group empty to give them everything their role allows.
         </div>
 
         @for (row of grantRows(); track row.groupId) {
@@ -65,6 +64,11 @@
                 <span class="user-form__grant-role">{{ row.roleName }}</span>
               }
             </h3>
+            <!-- Per group, not per section: what an empty selection means depends on
+                 the role in THAT group. -->
+            <div class="hint hint-inline" [attr.data-testid]="'grant-hint-' + row.groupId">
+              {{ emptySelectionHint(row) }}
+            </div>
             <app-grant-picker
               [categoryPool]="categoryPool()"
               [tagPool]="tagPool()"

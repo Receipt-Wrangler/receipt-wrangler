@@ -4,6 +4,8 @@ import { GrantSelection } from "./grant-picker.component";
 import {
   buildMemberGrantRows,
   ceilingForRole,
+  emptySelectionHint,
+  MemberGrantRow,
   saveChangedMemberGrants,
 } from "./member-grant-assignment";
 
@@ -80,8 +82,101 @@ describe("member-grant-assignment", () => {
     });
   });
 
+  describe("require-individual flags", () => {
+    // These invert what an empty picker means, so the row has to carry them or the
+    // hint tells the admin the exact opposite of what the backend will do.
+    const requiresBoth = {
+      id: 3,
+      name: "Strict",
+      categoryGrants: [],
+      tagGrants: [],
+      requiresIndividualCategoryGrants: true,
+      requiresIndividualTagGrants: true,
+    } as unknown as Role;
+
+    const groups = [
+      {
+        id: 100,
+        name: "Agency",
+        groupMembers: [{ userId: 7, groupId: 100, groupRoleId: 3 }],
+      },
+    ] as unknown as Group[];
+
+    it("carries both flags from the role onto the row", () => {
+      const [row] = buildMemberGrantRows(7, groups, [requiresBoth]);
+
+      expect(row.requiresIndividualCategories).toBe(true);
+      expect(row.requiresIndividualTags).toBe(true);
+    });
+
+    it("defaults both flags to false when the role omits them", () => {
+      const [row] = buildMemberGrantRows(7, groups, [
+        { id: 3, name: "Strict", categoryGrants: [], tagGrants: [] } as unknown as Role,
+      ]);
+
+      expect(row.requiresIndividualCategories).toBe(false);
+      expect(row.requiresIndividualTags).toBe(false);
+    });
+
+    it("defaults both flags to false when the member has no role at all", () => {
+      const roleless = [
+        {
+          id: 100,
+          name: "Agency",
+          groupMembers: [{ userId: 7, groupId: 100 }],
+        },
+      ] as unknown as Group[];
+
+      const [row] = buildMemberGrantRows(7, roleless, [requiresBoth]);
+
+      expect(row.requiresIndividualCategories).toBe(false);
+      expect(row.requiresIndividualTags).toBe(false);
+    });
+  });
+
+  describe("emptySelectionHint", () => {
+    function rowWith(categories: boolean, tags: boolean): MemberGrantRow {
+      return {
+        groupId: 1,
+        groupName: "Agency",
+        roleName: "Strict",
+        ceiling: null,
+        current: { categoryIds: [], tagIds: [] },
+        requiresIndividualCategories: categories,
+        requiresIndividualTags: tags,
+      };
+    }
+
+    it("promises everything the role allows when neither resource requires an assignment", () => {
+      expect(emptySelectionHint(rowWith(false, false))).toBe(
+        "Leave empty to give them everything their role allows."
+      );
+    });
+
+    it("warns that empty means nothing when both resources require an assignment", () => {
+      const hint = emptySelectionHint(rowWith(true, true));
+
+      expect(hint).toContain("no categories and no tags");
+      expect(hint).not.toContain("everything");
+    });
+
+    it("distinguishes the resources when only categories require an assignment", () => {
+      const hint = emptySelectionHint(rowWith(true, false));
+
+      expect(hint).toContain("leaving categories empty gives them none");
+      expect(hint).toContain("every tag the role allows");
+    });
+
+    it("distinguishes the resources when only tags require an assignment", () => {
+      const hint = emptySelectionHint(rowWith(false, true));
+
+      expect(hint).toContain("leaving tags empty gives them none");
+      expect(hint).toContain("every category the role allows");
+    });
+  });
+
   describe("saveChangedMemberGrants", () => {
-    let groupsService: jasmine.SpyObj<GroupsService> | any;
+    let groupsService: Pick<GroupsService, "updateGroupMemberGrants"> | any;
 
     beforeEach(() => {
       groupsService = {

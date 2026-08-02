@@ -45,6 +45,7 @@ export class TableComponent implements OnChanges {
   public expandedElement: any;
 
   public rowIndexes: { [key: number]: number } = {};
+  private rowIndexesByReference = new Map<any, number>();
 
   constructor(private _liveAnnouncer: LiveAnnouncer) {}
 
@@ -90,21 +91,31 @@ export class TableComponent implements OnChanges {
         return mapped;
       }
     }
-    // Reference lookup against the source data — the table renders these exact
-    // objects, so this resolves an id-less row to its real position.
-    return this.dataSource().data.indexOf(element);
+    // Reference lookup — the table renders these exact objects, so this resolves
+    // an id-less row to its real position. Precomputed rather than an indexOf
+    // scan, because the template calls this for every rendered cell.
+    return this.rowIndexesByReference.get(element) ?? -1;
   }
 
-  // Keyed by id only; id-less rows are handled by indexFor's fallback.
+  // Two maps because the rows have two possible identities: by id where there is
+  // one, by object reference for composite-key rows (e.g. GroupMember).
+  //
+  // Both rely on callers REPLACING the dataSource rather than mutating its `data`
+  // in place — which every consumer does (`dataSource.set(new MatTableDataSource(...))`),
+  // and which is what makes ngOnChanges fire. An in-place mutation would leave both
+  // maps stale and indexFor pointing at the wrong record.
   private setRowIndexes(): void {
     const indexes: { [key: number]: number } = {};
+    const byReference = new Map<any, number>();
     this.dataSource().data.forEach((row, index) => {
       if (row.id !== undefined && row.id !== null) {
         indexes[row.id] = index;
       }
+      byReference.set(row, index);
     });
 
     this.rowIndexes = indexes;
+    this.rowIndexesByReference = byReference;
   }
 
   public isAllSelected() {

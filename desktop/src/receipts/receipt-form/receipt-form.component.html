@@ -54,6 +54,7 @@
             @if (!this.selectedGroup()?.groupReceiptSettings?.hideReceiptCategories) {
               <app-category-autocomplete
                 class="w-100"
+                data-testid="receipt-categories"
                 [inputFormControl]="form | formGet : 'categories'"
                 [categories]="categories"
                 [creatable]="canCreateCategories()"

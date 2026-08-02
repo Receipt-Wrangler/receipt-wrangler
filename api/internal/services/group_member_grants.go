@@ -50,7 +50,15 @@ func (service GroupService) UpdateMemberGrants(
 	categoryIds := normalizeUintSlice(command.CategoryIds)
 	tagIds := normalizeUintSlice(command.TagIds)
 
-	return repositories.GetDB().Transaction(func(tx *gorm.DB) error {
+	// Honor a caller-supplied transaction, as every other GroupService method does;
+	// starting from GetDB() would silently run this write in a second, independent
+	// transaction that the caller cannot roll back with theirs.
+	baseDb := repositories.GetDB()
+	if service.TX != nil {
+		baseDb = service.TX
+	}
+
+	return baseDb.Transaction(func(tx *gorm.DB) error {
 		groupMemberRepository := repositories.NewGroupMemberRepository(tx)
 
 		member, err := groupMemberRepository.GetMemberGrantContext(userId, groupId)
@@ -71,7 +79,6 @@ func (service GroupService) UpdateMemberGrants(
 			return err
 		}
 
-		groupMemberRepository.SetTransaction(tx)
 		return groupMemberRepository.ReplaceMemberGrants(userId, groupId, categoryIds, tagIds)
 	})
 }
@@ -136,6 +143,17 @@ func (service GroupService) GetMemberGrants(groupId uint, userId uint) ([]uint, 
 	tagIds, err := groupMemberRepository.GetMemberTagGrantIds(userId, groupId)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Pluck leaves the slice nil when nothing matches, and a nil []uint marshals to
+	// null — but swagger declares these as arrays. Normalize here rather than at the
+	// handler so every caller sees the shape the contract promises, including after
+	// an admin clears a member's assignment (the case that actually produces empty).
+	if categoryIds == nil {
+		categoryIds = []uint{}
+	}
+	if tagIds == nil {
+		tagIds = []uint{}
 	}
 
 	return categoryIds, tagIds, nil

@@ -236,6 +236,17 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   roster replace. Only **changed** rows issue a request. The role's own grants supply the picker's
   ceiling; the backend re-validates and 400s an out-of-ceiling id. See `api/CLAUDE.md` →
   "Category/tag grant resolution".
+  - **Gated on `group.members.grants.update`, per group.** The endpoint declares **no**
+    `OrAppPermissions` bypass, so holding `app.users.update` (user form) or `group.members.update`
+    (member dialog) is not enough. `user-form` filters `grantRows()` to the groups the admin holds it
+    in — so the section disappears when none qualifies — and `group-member-form` wraps its block in
+    `*hasGroupPermission`. Without this both forms render pickers whose saves can only 403.
+  - **The "leave empty" guidance is conditional.** `MemberGrantRow` carries
+    `requiresIndividualCategories`/`requiresIndividualTags` from the role, and the shared
+    `emptySelectionHint(row)` turns them into the right sentence: normally empty means "everything the
+    role allows", but under a require-individual role empty means **nothing**. Both forms render that
+    helper rather than hard-coded text — the wording is the only thing that tells an admin which rule
+    is in force, so it must not drift between the two entry points.
   - **Reporting the outcome:** because the grants are a *second* write that can fail on its own, both
     forms fire their success toast only **after** it lands, and a failed write leaves the dialog open
     (a trailing `catchError` — the interceptor already reports the error) so the admin can correct the

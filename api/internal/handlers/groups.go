@@ -228,6 +228,12 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// A brand-new group has no grants yet, but the response must still carry
+			// the empty arrays swagger declares rather than null.
+			if err := repositories.NewGroupMemberRepository(nil).LoadMemberGrantsForGroup(&group); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			bytes, err := utils.MarshalResponseData(group)
 			if err != nil {
 				return http.StatusInternalServerError, err
@@ -308,6 +314,15 @@ func UpdateGroup(w http.ResponseWriter, r *http.Request) {
 			updatedGroup, err := groupRepository.UpdateGroup(command, groupId)
 
 			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// Grants are transient (gorm:"-") and so are absent from anything the
+			// repository returns. Load them, as GetGroupById does: the desktop feeds
+			// this response straight into GroupState, which is what the user form
+			// reads its assignments from — an unloaded response would show every
+			// member as unassigned.
+			if err := repositories.NewGroupMemberRepository(nil).LoadMemberGrantsForGroup(&updatedGroup); err != nil {
 				return http.StatusInternalServerError, err
 			}
 

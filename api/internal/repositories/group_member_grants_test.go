@@ -10,13 +10,32 @@ import (
 
 // seedGrantGroup creates a group with two members and gives each an individual
 // category grant, returning the group id, the two user ids, and the category id.
-func seedGrantGroup(t *testing.T) (uint, uint, uint, uint) {
+// grantFixture is the seeded world these tests act on. A struct rather than a run
+// of bare uints so the tag additions stay readable at the call sites.
+type grantFixture struct {
+	groupId       uint
+	keptUserId    uint
+	removedUserId uint
+	categoryId    uint
+	tagId         uint
+}
+
+// seedGrantGroup seeds a group whose members are restricted on BOTH resources.
+// Tags matter as much as categories here: UpdateGroup restores each restriction
+// flag in its own statement, so a category-only fixture would let a regression
+// that drops the tag flag pass every test in this file.
+func seedGrantGroup(t *testing.T) grantFixture {
 	t.Helper()
 	db := GetDB()
 
 	category := models.Category{Name: "Child A"}
 	if err := db.Create(&category).Error; err != nil {
 		t.Fatalf("seed category: %v", err)
+	}
+
+	tag := models.Tag{Name: "Respite"}
+	if err := db.Create(&tag).Error; err != nil {
+		t.Fatalf("seed tag: %v", err)
 	}
 
 	keptUser := models.User{Username: "kept-user", Password: "password"}
@@ -39,12 +58,18 @@ func seedGrantGroup(t *testing.T) (uint, uint, uint, uint) {
 			t.Fatalf("seed member: %v", err)
 		}
 		repository := NewGroupMemberRepository(nil)
-		if err := repository.ReplaceMemberGrants(userId, group.ID, []uint{category.ID}, nil); err != nil {
+		if err := repository.ReplaceMemberGrants(userId, group.ID, []uint{category.ID}, []uint{tag.ID}); err != nil {
 			t.Fatalf("seed member grants: %v", err)
 		}
 	}
 
-	return group.ID, keptUser.ID, removedUser.ID, category.ID
+	return grantFixture{
+		groupId:       group.ID,
+		keptUserId:    keptUser.ID,
+		removedUserId: removedUser.ID,
+		categoryId:    category.ID,
+		tagId:         tag.ID,
+	}
 }
 
 func memberCategoryGrantIds(t *testing.T, userId uint, groupId uint) []uint {
@@ -57,14 +82,26 @@ func memberCategoryGrantIds(t *testing.T, userId uint, groupId uint) []uint {
 	return ids
 }
 
-func memberGrantsRestricted(t *testing.T, userId uint, groupId uint) bool {
+func memberTagGrantIds(t *testing.T, userId uint, groupId uint) []uint {
+	t.Helper()
+
+	ids, err := NewGroupMemberRepository(nil).GetMemberTagGrantIds(userId, groupId)
+	if err != nil {
+		t.Fatalf("GetMemberTagGrantIds: %v", err)
+	}
+	return ids
+}
+
+// memberGrantsRestricted reports both flags separately — UpdateGroup restores them
+// independently, so collapsing them would hide a regression in either one.
+func memberGrantsRestricted(t *testing.T, userId uint, groupId uint) (bool, bool) {
 	t.Helper()
 
 	member, err := NewGroupMemberRepository(nil).GetMemberGrantContext(userId, groupId)
 	if err != nil {
 		t.Fatalf("GetMemberGrantContext: %v", err)
 	}
-	return member.CategoryGrantsRestricted
+	return member.CategoryGrantsRestricted, member.TagGrantsRestricted
 }
 
 // TestUpdateGroupClearsRemovedMembersGrants exercises the REAL UpdateGroup path
@@ -74,26 +111,32 @@ func memberGrantsRestricted(t *testing.T, userId uint, groupId uint) bool {
 func TestUpdateGroupClearsRemovedMembersGrants(t *testing.T) {
 	defer TruncateTestDb()
 
-	groupId, keptUserId, removedUserId, categoryId := seedGrantGroup(t)
+	fixture := seedGrantGroup(t)
 	repository := NewGroupRepository(nil)
 
 	_, err := repository.UpdateGroup(commands.UpsertGroupCommand{
 		Name:   "Agency",
 		Status: models.GROUP_ACTIVE,
 		GroupMembers: []commands.UpsertGroupMemberCommand{
-			{UserID: keptUserId, GroupID: groupId},
+			{UserID: fixture.keptUserId, GroupID: fixture.groupId},
 		},
-	}, utils.UintToString(groupId))
+	}, utils.UintToString(fixture.groupId))
 	if err != nil {
 		t.Fatalf("UpdateGroup: %v", err)
 	}
 
-	if got := memberCategoryGrantIds(t, removedUserId, groupId); len(got) != 0 {
-		t.Errorf("removed member's grants survived the roster replace: %v", got)
+	if got := memberCategoryGrantIds(t, fixture.removedUserId, fixture.groupId); len(got) != 0 {
+		t.Errorf("removed member's category grants survived the roster replace: %v", got)
+	}
+	if got := memberTagGrantIds(t, fixture.removedUserId, fixture.groupId); len(got) != 0 {
+		t.Errorf("removed member's tag grants survived the roster replace: %v", got)
 	}
 
-	if got := memberCategoryGrantIds(t, keptUserId, groupId); !slices.Equal(got, []uint{categoryId}) {
-		t.Errorf("retained member lost their grants: got %v, want [%d]", got, categoryId)
+	if got := memberCategoryGrantIds(t, fixture.keptUserId, fixture.groupId); !slices.Equal(got, []uint{fixture.categoryId}) {
+		t.Errorf("retained member lost their category grants: got %v, want [%d]", got, fixture.categoryId)
+	}
+	if got := memberTagGrantIds(t, fixture.keptUserId, fixture.groupId); !slices.Equal(got, []uint{fixture.tagId}) {
+		t.Errorf("retained member lost their tag grants: got %v, want [%d]", got, fixture.tagId)
 	}
 }
 
@@ -103,15 +146,15 @@ func TestUpdateGroupClearsRemovedMembersGrants(t *testing.T) {
 func TestUpdateGroupDoesNotResurrectGrantsOnRejoin(t *testing.T) {
 	defer TruncateTestDb()
 
-	groupId, keptUserId, removedUserId, _ := seedGrantGroup(t)
+	fixture := seedGrantGroup(t)
 	repository := NewGroupRepository(nil)
-	groupIdString := utils.UintToString(groupId)
+	groupIdString := utils.UintToString(fixture.groupId)
 
 	_, err := repository.UpdateGroup(commands.UpsertGroupCommand{
 		Name:   "Agency",
 		Status: models.GROUP_ACTIVE,
 		GroupMembers: []commands.UpsertGroupMemberCommand{
-			{UserID: keptUserId, GroupID: groupId},
+			{UserID: fixture.keptUserId, GroupID: fixture.groupId},
 		},
 	}, groupIdString)
 	if err != nil {
@@ -122,19 +165,26 @@ func TestUpdateGroupDoesNotResurrectGrantsOnRejoin(t *testing.T) {
 		Name:   "Agency",
 		Status: models.GROUP_ACTIVE,
 		GroupMembers: []commands.UpsertGroupMemberCommand{
-			{UserID: keptUserId, GroupID: groupId},
-			{UserID: removedUserId, GroupID: groupId},
+			{UserID: fixture.keptUserId, GroupID: fixture.groupId},
+			{UserID: fixture.removedUserId, GroupID: fixture.groupId},
 		},
 	}, groupIdString)
 	if err != nil {
 		t.Fatalf("UpdateGroup (re-add): %v", err)
 	}
 
-	if got := memberCategoryGrantIds(t, removedUserId, groupId); len(got) != 0 {
-		t.Errorf("rejoined member's revoked grants were resurrected: %v", got)
+	if got := memberCategoryGrantIds(t, fixture.removedUserId, fixture.groupId); len(got) != 0 {
+		t.Errorf("rejoined member's revoked category grants were resurrected: %v", got)
 	}
-	if memberGrantsRestricted(t, removedUserId, groupId) {
-		t.Error("rejoined member should come back unrestricted, not carrying a stale restriction flag")
+	if got := memberTagGrantIds(t, fixture.removedUserId, fixture.groupId); len(got) != 0 {
+		t.Errorf("rejoined member's revoked tag grants were resurrected: %v", got)
+	}
+	categoryRestricted, tagRestricted := memberGrantsRestricted(t, fixture.removedUserId, fixture.groupId)
+	if categoryRestricted || tagRestricted {
+		t.Errorf(
+			"rejoined member should come back unrestricted, not carrying stale restriction flags (category=%v, tag=%v)",
+			categoryRestricted, tagRestricted,
+		)
 	}
 }
 
@@ -144,27 +194,35 @@ func TestUpdateGroupDoesNotResurrectGrantsOnRejoin(t *testing.T) {
 func TestUpdateGroupPreservesRetainedMemberGrantFlags(t *testing.T) {
 	defer TruncateTestDb()
 
-	groupId, keptUserId, removedUserId, categoryId := seedGrantGroup(t)
+	fixture := seedGrantGroup(t)
 	repository := NewGroupRepository(nil)
 
 	_, err := repository.UpdateGroup(commands.UpsertGroupCommand{
 		Name:   "Agency Renamed",
 		Status: models.GROUP_ACTIVE,
 		GroupMembers: []commands.UpsertGroupMemberCommand{
-			{UserID: keptUserId, GroupID: groupId},
-			{UserID: removedUserId, GroupID: groupId},
+			{UserID: fixture.keptUserId, GroupID: fixture.groupId},
+			{UserID: fixture.removedUserId, GroupID: fixture.groupId},
 		},
-	}, utils.UintToString(groupId))
+	}, utils.UintToString(fixture.groupId))
 	if err != nil {
 		t.Fatalf("UpdateGroup: %v", err)
 	}
 
-	for _, userId := range []uint{keptUserId, removedUserId} {
-		if got := memberCategoryGrantIds(t, userId, groupId); !slices.Equal(got, []uint{categoryId}) {
-			t.Errorf("member %d lost grants on a rename: got %v, want [%d]", userId, got, categoryId)
+	for _, userId := range []uint{fixture.keptUserId, fixture.removedUserId} {
+		if got := memberCategoryGrantIds(t, userId, fixture.groupId); !slices.Equal(got, []uint{fixture.categoryId}) {
+			t.Errorf("member %d lost category grants on a rename: got %v, want [%d]", userId, got, fixture.categoryId)
 		}
-		if !memberGrantsRestricted(t, userId, groupId) {
-			t.Errorf("member %d lost their restriction flag on a rename", userId)
+		if got := memberTagGrantIds(t, userId, fixture.groupId); !slices.Equal(got, []uint{fixture.tagId}) {
+			t.Errorf("member %d lost tag grants on a rename: got %v, want [%d]", userId, got, fixture.tagId)
+		}
+
+		categoryRestricted, tagRestricted := memberGrantsRestricted(t, userId, fixture.groupId)
+		if !categoryRestricted {
+			t.Errorf("member %d lost their CATEGORY restriction flag on a rename", userId)
+		}
+		if !tagRestricted {
+			t.Errorf("member %d lost their TAG restriction flag on a rename", userId)
 		}
 	}
 }

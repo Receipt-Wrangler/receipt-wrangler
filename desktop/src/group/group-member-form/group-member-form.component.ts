@@ -10,6 +10,7 @@ import {
   Group,
   GroupMember,
   GroupsService,
+  Permission,
   PermissionScope,
   Role,
   RoleService,
@@ -20,6 +21,7 @@ import { openRolePreviewDialog } from "../../roles/role-preview/role-preview-dia
 import { GrantSelection } from "../../shared-ui/grant-picker/grant-picker.component";
 import {
   buildMemberGrantRow,
+  emptySelectionHint,
   MemberGrantRow,
   saveChangedMemberGrants,
 } from "../../shared-ui/grant-picker/member-grant-assignment";
@@ -33,6 +35,8 @@ import { buildGroupMemberForm } from "../utils/group-member.utils";
     standalone: false
 })
 export class GroupMemberFormComponent implements OnInit {
+  protected readonly Permission = Permission;
+
   public userId = this.store.selectSignal(AuthState.userId);
 
   public headerText: string = "";
@@ -137,6 +141,9 @@ export class GroupMemberFormComponent implements OnInit {
   });
 
   private readonly editedGrants = new Map<number, GrantSelection>();
+
+  /** Exposed for the template; see the helper for why the wording is shared. */
+  public readonly emptySelectionHint = emptySelectionHint;
 
   public ngOnInit(): void {
     this.form = buildGroupMemberForm(this.groupMember);

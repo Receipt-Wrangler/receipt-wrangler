@@ -528,7 +528,7 @@ a role never widens an individually-assigned member.
 - `services/grant.go` — `resolveEffectiveGrants(userId, groupId)` composes the layers and returns an
   `effectiveGrantSet`; `composeGrantLayer` applies the rule per resource:
 
-  ```
+  ```text
   role requires individual && member unconfigured -> see nothing (fail closed)
   effective = ALL
   if the role grants a non-empty set          -> effective ∩= role set
@@ -717,7 +717,7 @@ assignment (`PUT /group/{groupId}/member/{userId}/grants`). It is deliberately *
 their own grants and lift the very restriction the feature enforces. See "Category/tag grant
 resolution" above.
 
-The three `group.members.*` permissions are group-scoped registry entries; **Legacy Owner** holds them
+The four `group.members.*` permissions are group-scoped registry entries; **Legacy Owner** holds them
 (it is the full group scope), Legacy Editor/Viewer do not (member management was historically
 owner-only). Upgraded installs — whose Legacy Owner was seeded before these keys existed — pick them
 up on the next boot from `SeedSystemRoles`' add-only reconciliation (see "Seeded system roles"
