@@ -58,6 +58,23 @@ void main() {
     expect(find.text(invalidMessage), findsNothing);
   });
 
+  testWidgets('a deep-link QR scan fills the field with the decoded server URL',
+      (tester) async {
+    // The same receiptwrangler.io/app/setup#url=... link the OS uses to open the
+    // app is also readable by the in-app scanner: _onScanPressed resolves it via
+    // extractDeepLinkServerUrl before falling back to normalizeServerUrl.
+    await pumpScreen(
+      tester,
+      (_) async =>
+          'https://receiptwrangler.io/app/setup#url=https%3A%2F%2Fscanned.example.io%2Fapi',
+    );
+
+    await tapScanAndSettle(tester);
+
+    expect(find.text('https://scanned.example.io/api'), findsOneWidget);
+    expect(find.text(invalidMessage), findsNothing);
+  });
+
   testWidgets('an invalid scan shows an error and leaves the field empty',
       (tester) async {
     await pumpScreen(tester, (_) async => 'not a url');
