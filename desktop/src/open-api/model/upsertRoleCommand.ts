@@ -38,6 +38,10 @@ export interface UpsertRoleCommand {
      */
     seesAllMembers?: boolean;
     /**
+     * Whether users created with this APP role skip the automatic personal \"My Receipts\" group (the virtual \"All\" group is always created). Only valid on app roles; applies at user-creation time only.
+     */
+    skipDefaultGroupCreation?: boolean;
+    /**
      * Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
      */
     reportTemplateGrants?: Array<ReportTemplateGrant>;

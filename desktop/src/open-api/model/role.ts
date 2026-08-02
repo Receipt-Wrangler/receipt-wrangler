@@ -48,6 +48,10 @@ export interface Role {
      */
     seesAllMembers?: boolean;
     /**
+     * Whether users created with this APP role skip the automatic personal \"My Receipts\" group. The virtual \"All\" group is always created. Applies at user-creation time only — changing it never adds or removes a group for an existing user. Always false for group roles.
+     */
+    skipDefaultGroupCreation?: boolean;
+    /**
      * Per-template action grants restricting which report templates a GROUP role\'s members may act on. Empty means unrestricted (every template the role\'s group access reaches). Always empty for app roles.
      */
     reportTemplateGrants?: Array<ReportTemplateGrant>;

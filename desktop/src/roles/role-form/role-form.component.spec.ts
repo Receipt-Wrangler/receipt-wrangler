@@ -306,6 +306,7 @@ describe("RoleFormComponent", () => {
       description: "Runs the app",
       scope: "APP",
       permissions: ["app.users.create"],
+      skipDefaultGroupCreation: false,
     });
   });
 
@@ -465,6 +466,49 @@ describe("RoleFormComponent", () => {
     expect(component.form.controls.seesAllMembers.value).toBe(false);
   });
 
+  it("includes skipDefaultGroupCreation in an APP payload when enabled", async () => {
+    const { component } = await setup();
+    component.form.controls.name.setValue("Restricted App Role");
+    component.toggle("app.users.read");
+    component.form.controls.skipDefaultGroupCreation.setValue(true);
+
+    component.submit();
+
+    expect(component.lastPayload?.scope).toBe("APP");
+    expect(component.lastPayload?.skipDefaultGroupCreation).toBe(true);
+  });
+
+  it("defaults skipDefaultGroupCreation to false in an APP payload", async () => {
+    const { component } = await setup();
+    component.form.controls.name.setValue("Plain App Role");
+    component.toggle("app.users.read");
+
+    component.submit();
+
+    expect(component.lastPayload?.skipDefaultGroupCreation).toBe(false);
+  });
+
+  it("omits skipDefaultGroupCreation from a GROUP payload", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.name.setValue("Group Role");
+    component.toggle("group.receipts.read");
+    // Even if the control somehow held true, a group payload must not carry it.
+    component.form.controls.skipDefaultGroupCreation.setValue(true);
+
+    component.submit();
+
+    expect(component.lastPayload?.skipDefaultGroupCreation).toBeUndefined();
+  });
+
+  it("resets skipDefaultGroupCreation when switching role type", async () => {
+    const { component } = await setup();
+    component.form.controls.skipDefaultGroupCreation.setValue(true);
+
+    component.pickType("group");
+    expect(component.form.controls.skipDefaultGroupCreation.value).toBe(false);
+  });
+
   it("includes report template grants in a GROUP payload", async () => {
     const { component } = await setup();
     component.pickType("group");
@@ -541,6 +585,7 @@ describe("RoleFormComponent", () => {
       description: "",
       scope: "APP",
       permissions: ["app.users.create"],
+      skipDefaultGroupCreation: false,
     });
     expect(snackbar.success).toHaveBeenCalled();
     expect(navigateSpy).toHaveBeenCalledWith(["/roles"]);
@@ -606,6 +651,7 @@ describe("RoleFormComponent", () => {
         description: "Manages the app",
         scope: "APP",
         permissions: ["app.users.create", "app.users.read"],
+        skipDefaultGroupCreation: false,
       });
       expect(snackbar.success).toHaveBeenCalled();
       expect(navigateSpy).toHaveBeenCalledWith(["/roles"]);
@@ -673,6 +719,25 @@ describe("RoleFormComponent", () => {
       });
 
       expect(component.form.controls.seesAllMembers.value).toBe(true);
+    });
+
+    it("rehydrates skipDefaultGroupCreation on edit", async () => {
+      const restrictedAppRole: Role = {
+        id: 14,
+        name: "Restricted App Role",
+        scope: "APP",
+        isDefault: false,
+        isSystem: false,
+        permissions: ["app.users.read"],
+        skipDefaultGroupCreation: true,
+      };
+      const { component } = await setup(ALL_DESCRIPTORS, {
+        routeId: "14",
+        routeScope: "app",
+        roles: [restrictedAppRole],
+      });
+
+      expect(component.form.controls.skipDefaultGroupCreation.value).toBe(true);
     });
 
     it("rehydrates report template grants on edit", async () => {

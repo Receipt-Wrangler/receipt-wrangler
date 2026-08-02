@@ -89,15 +89,27 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 			return err
 		}
 
-		groupCommand := commands.UpsertGroupCommand{
-			Name:           "My Receipts",
-			IsDefaultGroup: true,
-		}
-
-		_, err := groupRepository.CreateGroup(groupCommand, user.ID)
+		// An app role may opt its users out of the personal "My Receipts" group, for
+		// accounts that are only ever meant to live in specific shared groups. The
+		// virtual "All" group is always created, so the account still has a working
+		// dashboard.
+		skipDefaultGroup, err := repository.appRoleSkipsDefaultGroup(tx, user.AppRoleID)
 		if err != nil {
 			repository.ClearTransaction()
 			return err
+		}
+
+		if !skipDefaultGroup {
+			groupCommand := commands.UpsertGroupCommand{
+				Name:           "My Receipts",
+				IsDefaultGroup: true,
+			}
+
+			_, err := groupRepository.CreateGroup(groupCommand, user.ID)
+			if err != nil {
+				repository.ClearTransaction()
+				return err
+			}
 		}
 
 		_, err = groupRepository.CreateAllGroup(user.ID)
@@ -121,6 +133,26 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 	}
 
 	return user, nil
+}
+
+// appRoleSkipsDefaultGroup reports whether a newly-created user's app role opts
+// out of the personal "My Receipts" group. Best-effort, matching resolveAppRoleId:
+// an unassigned or unreadable role falls back to creating the group rather than
+// failing user creation.
+func (repository UserRepository) appRoleSkipsDefaultGroup(tx *gorm.DB, appRoleId *uint) (bool, error) {
+	if appRoleId == nil {
+		return false, nil
+	}
+
+	skip, err := NewRoleRepository(tx).AppRoleSkipsDefaultGroup(*appRoleId)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return skip, nil
 }
 
 // resolveAppRoleId picks the modern app role for a newly-created user: the

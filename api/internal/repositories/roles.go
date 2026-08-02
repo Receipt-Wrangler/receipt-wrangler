@@ -22,7 +22,7 @@ func NewRoleRepository(tx *gorm.DB) RoleRepository {
 	return repository
 }
 
-func (repository RoleRepository) CreateAppRole(name string, description string, perms []string) (models.AppRole, error) {
+func (repository RoleRepository) CreateAppRole(name string, description string, perms []string, skipDefaultGroupCreation bool) (models.AppRole, error) {
 	db := repository.GetDB()
 
 	rolePermissions := make([]models.AppRolePermission, 0, len(perms))
@@ -31,9 +31,10 @@ func (repository RoleRepository) CreateAppRole(name string, description string, 
 	}
 
 	role := models.AppRole{
-		Name:        name,
-		Description: description,
-		Permissions: rolePermissions,
+		Name:                     name,
+		Description:              description,
+		SkipDefaultGroupCreation: skipDefaultGroupCreation,
+		Permissions:              rolePermissions,
 	}
 
 	err := db.Create(&role).Error
@@ -103,7 +104,7 @@ func (repository RoleRepository) GetGroupRoleById(id uint) (models.GroupRoleDefi
 	return role, nil
 }
 
-func (repository RoleRepository) UpdateAppRole(id uint, name string, description string, perms []string) (models.AppRole, error) {
+func (repository RoleRepository) UpdateAppRole(id uint, name string, description string, perms []string, skipDefaultGroupCreation bool) (models.AppRole, error) {
 	db := repository.GetDB()
 
 	err := db.Where("app_role_id = ?", id).Delete(&models.AppRolePermission{}).Error
@@ -111,9 +112,12 @@ func (repository RoleRepository) UpdateAppRole(id uint, name string, description
 		return models.AppRole{}, err
 	}
 
+	// Use the map form so false bools persist (GORM's struct Updates skips
+	// zero-value bools, which would leave a toggled-off flag set).
 	err = db.Model(&models.AppRole{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"name":        name,
-		"description": description,
+		"name":                        name,
+		"description":                 description,
+		"skip_default_group_creation": skipDefaultGroupCreation,
 	}).Error
 	if err != nil {
 		return models.AppRole{}, err
@@ -315,18 +319,19 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 		}
 
 		roles = append(roles, structs.RoleView{
-			Id:                   role.ID,
-			Name:                 role.Name,
-			Description:          role.Description,
-			Scope:                permissions.ScopeApp,
-			IsDefault:            role.IsDefault,
-			IsSystem:             role.IsSystem,
-			Permissions:          perms,
-			AssignedCount:        appRoleCounts[role.ID],
-			CategoryGrants:       []uint{},
-			TagGrants:            []uint{},
-			PaidByUserGrants:     []uint{},
-			ReportTemplateGrants: []structs.ReportTemplateGrantView{},
+			Id:                       role.ID,
+			Name:                     role.Name,
+			Description:              role.Description,
+			Scope:                    permissions.ScopeApp,
+			IsDefault:                role.IsDefault,
+			IsSystem:                 role.IsSystem,
+			Permissions:              perms,
+			AssignedCount:            appRoleCounts[role.ID],
+			SkipDefaultGroupCreation: role.SkipDefaultGroupCreation,
+			CategoryGrants:           []uint{},
+			TagGrants:                []uint{},
+			PaidByUserGrants:         []uint{},
+			ReportTemplateGrants:     []structs.ReportTemplateGrantView{},
 		})
 	}
 
@@ -681,6 +686,23 @@ func (repository RoleRepository) GetGroupRoleReportTemplateGrantsRestricted(grou
 
 // GetUserAppRoleId returns the app role id assigned to a user, or nil when the
 // user has no app role. Returns gorm.ErrRecordNotFound if the user is missing.
+// AppRoleSkipsDefaultGroup reports whether users created with this app role skip
+// the personal "My Receipts" group. Reads the single column so user creation does
+// not preload the role's whole permission set.
+func (repository RoleRepository) AppRoleSkipsDefaultGroup(id uint) (bool, error) {
+	db := repository.GetDB()
+
+	var role models.AppRole
+	err := db.Select("skip_default_group_creation").
+		Where("id = ?", id).
+		First(&role).Error
+	if err != nil {
+		return false, err
+	}
+
+	return role.SkipDefaultGroupCreation, nil
+}
+
 func (repository RoleRepository) GetUserAppRoleId(userId uint) (*uint, error) {
 	db := repository.GetDB()
 

@@ -182,7 +182,7 @@ func TestShouldLogInUserCorrectly(t *testing.T) {
 	// (the modern replacement for the removed UserRole == ADMIN check), so the
 	// user must hold an admin role for the firstAdminToLogin path to be exercised.
 	roleRepository := repositories.NewRoleRepository(nil)
-	adminRole, err := roleRepository.CreateAppRole("Login Admin Role", "", []string{permissions.AppUsersRead})
+	adminRole, err := roleRepository.CreateAppRole("Login Admin Role", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
@@ -551,7 +551,7 @@ func TestGetAppData_PopulatesPermissions(t *testing.T) {
 	roleRepository := repositories.NewRoleRepository(nil)
 
 	appPerms := []string{permissions.AppUsersRead, permissions.AppUsersCreate}
-	appRole, err := roleRepository.CreateAppRole("AppData App Role", "", appPerms)
+	appRole, err := roleRepository.CreateAppRole("AppData App Role", "", appPerms, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
@@ -609,7 +609,7 @@ func TestGetAppData_GroupCategoriesFilteredByGrants(t *testing.T) {
 	db.Create(&hiddenCategory)
 
 	// Legacy-User-like app role: create but not read.
-	appRole, err := roleRepository.CreateAppRole("AppData User Role", "", []string{permissions.AppCategoriesCreate})
+	appRole, err := roleRepository.CreateAppRole("AppData User Role", "", []string{permissions.AppCategoriesCreate}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}
@@ -659,7 +659,7 @@ func TestGetAppData_AdminGetsFlatCategoriesUnrestrictedGroup(t *testing.T) {
 	db.Create(&models.Category{Name: "Groceries"})
 	db.Create(&models.Category{Name: "Salary"})
 
-	appRole, err := roleRepository.CreateAppRole("AppData Admin Role", "", []string{permissions.AppCategoriesRead, permissions.AppTagsRead})
+	appRole, err := roleRepository.CreateAppRole("AppData Admin Role", "", []string{permissions.AppCategoriesRead, permissions.AppTagsRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 	}

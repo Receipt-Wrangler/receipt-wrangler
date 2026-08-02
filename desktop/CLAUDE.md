@@ -232,6 +232,16 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   permissions grid's `Set` pattern — NOT a FormArray). **All-empty = unrestricted**; a template maps to the
   subset of actions the role may perform on it. Hydrates directly from `role.reportTemplateGrants`,
   serializes back for group scope only, resets on `pickType`. See `api/CLAUDE.md` → "Report-template access".
+- **Group creation (app roles only):** an app-scope-only **"Group creation"** `rw-card` in
+  `role-form` (gated on `showAppOptions()` = `type() === "app"`, the mirror of `showGrants()`) holds a
+  single `app-checkbox` — "Don't create a personal group for new users with this role"
+  (`data-testid="skip-default-group"`) — bound to `skipDefaultGroupCreation` on the
+  `UpsertRoleCommand`. New users normally get a personal "My Receipts" group; turning this on skips it
+  for accounts that should only belong to groups an admin adds them to (the virtual "All" group is
+  always created, so the dashboard still works). It mirrors `seesAllMembers` exactly but in the
+  opposite scope: hydrates on edit, resets in `pickType`, and serializes in the **`else`** branch of
+  `submit`'s `if (showGrants())` so it only ships on APP scope. Creation-time only — toggling it never
+  changes an existing user's groups. See `api/CLAUDE.md` → "Skipping the personal group per app role".
 - **Default roles:** the role-list page shows two `app-select` controls above the filter bar —
   "Default application role" and "Default group role". Each is pre-selected from the role flagged
   `isDefault` for its scope and, on change, calls `RoleService.setDefaultRole(scope, roleId)` then
