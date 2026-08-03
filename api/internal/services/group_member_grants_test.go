@@ -577,3 +577,206 @@ func TestDeleteGroupRemovesMemberGrants(t *testing.T) {
 		t.Errorf("deleting the group left %d member grant rows behind", remaining)
 	}
 }
+
+// addMemberToNewGroup puts an existing user in a second, role-less group and
+// returns its id. Used to prove the memo keeps a user's groups apart.
+func addMemberToNewGroup(t *testing.T, userId uint, groupName string) uint {
+	t.Helper()
+	db := repositories.GetDB()
+
+	group := models.Group{Name: groupName}
+	if err := db.Create(&group).Error; err != nil {
+		t.Fatalf("seed second group: %v", err)
+	}
+
+	member := models.GroupMember{GroupID: group.ID, UserID: userId}
+	if err := db.Create(&member).Error; err != nil {
+		t.Fatalf("seed second group member: %v", err)
+	}
+
+	return group.ID
+}
+
+// --- Grant resolution memo ---------------------------------------------------
+//
+// PermissionService memoizes resolveEffectiveGrants per (user, group) so the
+// category and tag accessors share one resolution. These pin both halves of that
+// bargain: the memo is real, and it stops at the service instance.
+
+// TestGrantMemoServesBothResourcesFromOneResolution proves the memo is actually
+// live, by changing the underlying grants behind the service's back and showing
+// the SAME instance keeps its first answer.
+//
+// This asserts deliberately stale behavior, which is the documented contract:
+// PermissionService is request-scoped. If someone later adds invalidation, this
+// test should be updated rather than deleted — it is what says the caching exists
+// at all, and a memo that silently stopped memoizing would restore the double
+// query this was added to remove.
+func TestGrantMemoServesBothResourcesFromOneResolution(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	catA := makeCategory(t, "A")
+	catB := makeCategory(t, "B")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "m-memo", nil, nil)
+	setMemberGrants(t, userId, groupId, []uint{catA}, nil)
+
+	service := NewPermissionService(nil)
+
+	allowed, unrestricted, err := service.GetGroupCategoryIdsForUser(userId, groupId)
+	if err != nil {
+		t.Fatalf("GetGroupCategoryIdsForUser: %v", err)
+	}
+	if unrestricted || len(allowed) != 1 {
+		t.Fatalf("expected the member restricted to one category, got unrestricted=%v set=%v", unrestricted, allowed)
+	}
+
+	// Widen the assignment underneath the service.
+	setMemberGrants(t, userId, groupId, []uint{catA, catB}, nil)
+
+	allowed, _, err = service.GetGroupCategoryIdsForUser(userId, groupId)
+	if err != nil {
+		t.Fatalf("GetGroupCategoryIdsForUser (second): %v", err)
+	}
+	if len(allowed) != 1 {
+		t.Errorf("memo did not serve the cached resolution: got %d categories, want the 1 from the first call", len(allowed))
+	}
+}
+
+// TestGrantMemoInvalidatedByRoleGrantEviction is the guard that keeps the memo
+// from weakening a real guarantee.
+//
+// "After a role update the next resolution is fresh" must NOT degrade into
+// "...only on a new service instance". The memo carries the grant cache's
+// eviction generation, so RoleService.UpdateRole invalidates it along with the
+// process-wide role cache. Without that link an admin narrowing a role would not
+// be observed by an already-warm service.
+func TestGrantMemoInvalidatedByRoleGrantEviction(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	catA := makeCategory(t, "A")
+	catB := makeCategory(t, "B")
+	userId, groupId, roleId := seedMemberWithGroupRoleGrants(t, "m-memo-evict", []uint{catA}, nil)
+
+	service := NewPermissionService(nil)
+
+	allowed, _, err := service.GetGroupCategoryIdsForUser(userId, groupId)
+	if err != nil {
+		t.Fatalf("prime the memo: %v", err)
+	}
+	if _, ok := allowed[catA]; !ok {
+		t.Fatalf("expected the role's category A, got %v", allowed)
+	}
+
+	// Narrow the role through the SERVICE, which evicts and bumps the generation.
+	roleService := NewRoleService(nil)
+	if _, err := roleService.UpdateRole(roleId, commands.UpsertRoleCommand{
+		Name:           "Grant Role m-memo-evict",
+		Scope:          permissions.ScopeGroup,
+		Permissions:    []string{permissions.GroupReceiptsRead},
+		CategoryGrants: []uint{catB},
+	}); err != nil {
+		t.Fatalf("UpdateRole: %v", err)
+	}
+
+	// Same warm instance — must observe the update, not its memoized answer.
+	allowed, _, err = service.GetGroupCategoryIdsForUser(userId, groupId)
+	if err != nil {
+		t.Fatalf("re-resolve: %v", err)
+	}
+	if _, ok := allowed[catB]; !ok || len(allowed) != 1 {
+		t.Errorf("memo survived a role-grant eviction: got %v, want just category B", allowed)
+	}
+}
+
+// TestGrantMemoDoesNotOutliveTheServiceInstance is the boundary that makes the
+// memo safe: a NEW service must see the current state. If the memo ever became
+// process-wide, an admin's revocation would not take effect until restart —
+// exactly the silent over-exposure this whole feature exists to prevent.
+func TestGrantMemoDoesNotOutliveTheServiceInstance(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	catA := makeCategory(t, "A")
+	catB := makeCategory(t, "B")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "m-memo-scope", nil, nil)
+	setMemberGrants(t, userId, groupId, []uint{catA, catB}, nil)
+
+	stale := NewPermissionService(nil)
+	if _, _, err := stale.GetGroupCategoryIdsForUser(userId, groupId); err != nil {
+		t.Fatalf("prime the memo: %v", err)
+	}
+
+	// Revoke one category, then read through a fresh service.
+	setMemberGrants(t, userId, groupId, []uint{catA}, nil)
+
+	assertAllowedCategories(t, userId, groupId, true, []uint{catA})
+}
+
+// TestGrantMemoKeepsGroupsDistinct guards the key. Keying on the user alone would
+// hand a member one group's category set in every other group they belong to.
+func TestGrantMemoKeepsGroupsDistinct(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	catA := makeCategory(t, "A")
+	catB := makeCategory(t, "B")
+
+	userId, firstGroupId, _ := seedMemberWithGroupRoleGrants(t, "m-memo-groups", nil, nil)
+	setMemberGrants(t, userId, firstGroupId, []uint{catA}, nil)
+
+	secondGroupId := addMemberToNewGroup(t, userId, "memo-second-group")
+	setMemberGrants(t, userId, secondGroupId, []uint{catB}, nil)
+
+	service := NewPermissionService(nil)
+
+	first, _, err := service.GetGroupCategoryIdsForUser(userId, firstGroupId)
+	if err != nil {
+		t.Fatalf("first group: %v", err)
+	}
+	second, _, err := service.GetGroupCategoryIdsForUser(userId, secondGroupId)
+	if err != nil {
+		t.Fatalf("second group: %v", err)
+	}
+
+	if _, ok := first[catA]; !ok || len(first) != 1 {
+		t.Errorf("first group resolved to %v, want just category A", first)
+	}
+	if _, ok := second[catB]; !ok || len(second) != 1 {
+		t.Errorf("second group resolved to %v, want just category B — the memo leaked across groups", second)
+	}
+}
+
+// TestGrantMemoSharesOneResolutionAcrossResources pins the actual win: the tag
+// accessor must reuse the resolution the category accessor already paid for.
+func TestGrantMemoSharesOneResolutionAcrossResources(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+
+	catA := makeCategory(t, "A")
+	tagA := makeTag(t, "T-A")
+	tagB := makeTag(t, "T-B")
+	userId, groupId, _ := seedMemberWithGroupRoleGrants(t, "m-memo-resources", nil, nil)
+	setMemberGrants(t, userId, groupId, []uint{catA}, []uint{tagA})
+
+	service := NewPermissionService(nil)
+
+	if _, _, err := service.GetGroupCategoryIdsForUser(userId, groupId); err != nil {
+		t.Fatalf("GetGroupCategoryIdsForUser: %v", err)
+	}
+
+	// Change the TAG assignment after the category read primed the memo.
+	setMemberGrants(t, userId, groupId, []uint{catA}, []uint{tagA, tagB})
+
+	tags, unrestricted, err := service.GetGroupTagIdsForUser(userId, groupId)
+	if err != nil {
+		t.Fatalf("GetGroupTagIdsForUser: %v", err)
+	}
+	if unrestricted {
+		t.Fatal("expected the member to stay tag-restricted")
+	}
+	if len(tags) != 1 {
+		t.Errorf("tag accessor re-resolved instead of reusing the memo: got %d tags, want 1", len(tags))
+	}
+}

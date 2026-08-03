@@ -164,7 +164,61 @@ type effectiveGrantSet struct {
 // It is still handled here rather than assumed away, because a role can be
 // narrowed AFTER a membership was configured — that member correctly loses the
 // out-of-ceiling ids instead of keeping visibility the role no longer allows.
+//
+// # Memoization
+//
+// The result is cached on the service instance, keyed by (user, group). Both
+// GetGroupCategoryIdsForUser and GetGroupTagIdsForUser call this, and each call
+// costs a membership read plus a grant-id read per resource — so without the memo
+// a caller needing both resources pays for the whole resolution twice, and
+// GetAppData pays that per group.
+//
+// The memo is scoped to the service value and keyed to the group-role grant
+// cache's eviction GENERATION, reusing the counter in grant_cache.go. Anything
+// that evicts role grants — RoleService.UpdateRole / DeleteRole — bumps that
+// counter and so invalidates memoized resolutions as well. Without this the memo
+// would quietly weaken a real guarantee: "after a role update, the next
+// resolution is fresh" would become "...only on a new service instance".
+//
+// The generation is captured BEFORE the read and stored with the result, so an
+// eviction racing the read invalidates the entry rather than resurrecting a stale
+// one — the same discipline setCachedGroupRoleGrants applies.
+//
+// Residual limit: a MEMBER-level grant write bumps nothing, so one instance can
+// still serve a pre-write member assignment. That is safe today because no flow
+// resolves grants, rewrites them, and re-resolves through the same service (the
+// grants endpoint uses GroupService and builds no PermissionService). A flow that
+// needs to see its own member-grant write must use a fresh service.
 func (service PermissionService) resolveEffectiveGrants(userId uint, groupId uint) (*effectiveGrantSet, error) {
+	memoKey := grantMemoKey{userId: userId, groupId: groupId}
+	generation := groupRoleGrantCacheGen()
+
+	if service.grantMemo != nil {
+		// A cached nil grants field is a real answer (not a member), so test
+		// presence rather than the value.
+		if cached, isCached := service.grantMemo[memoKey]; isCached && cached.generation == generation {
+			return cached.grants, nil
+		}
+	}
+
+	grants, err := service.loadEffectiveGrants(userId, groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Errors are never memoized — a transient database failure must not pin a user
+	// to a wrong answer for the rest of the request.
+	if service.grantMemo != nil {
+		service.grantMemo[memoKey] = grantMemoEntry{grants: grants, generation: generation}
+	}
+
+	return grants, nil
+}
+
+// loadEffectiveGrants is resolveEffectiveGrants without the memo — the actual
+// composition. Split out so the caching stays readable and testable apart from the
+// rule it caches.
+func (service PermissionService) loadEffectiveGrants(userId uint, groupId uint) (*effectiveGrantSet, error) {
 	memberRepository := repositories.NewGroupMemberRepository(service.TX)
 
 	member, err := memberRepository.GetMemberGrantContext(userId, groupId)
