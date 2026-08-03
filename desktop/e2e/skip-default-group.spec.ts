@@ -28,8 +28,14 @@ const PERSONAL_GROUP = 'My Receipts';
 const ALL_GROUP = 'All';
 const PASSWORD = 'a really secure password';
 
+// Each scope-specific card is located by its own <h2>, not by the shared
+// .rw-card styling class — a raw CSS selector would break silently on a styling
+// refactor even though the card is unchanged (see CLAUDE.md → "Locators").
 const groupCreationCard = (page: Page) =>
-  page.locator('.rw-card').filter({ hasText: 'Group creation' });
+  page.getByRole('heading', { name: 'Group creation' });
+
+const memberVisibilityCard = (page: Page) =>
+  page.getByRole('heading', { name: 'Member visibility' });
 
 const skipCheckbox = (page: Page) =>
   page.getByTestId('skip-default-group').getByRole('checkbox');
@@ -99,9 +105,7 @@ test.describe('role editor: the Group creation card is app-scope only', () => {
     // a membership long after the account was created).
     await expect(groupCreationCard(page)).toHaveCount(0);
     // The group-scoped card still renders, proving the form isn't just blank.
-    await expect(
-      page.locator('.rw-card').filter({ hasText: 'Member visibility' }),
-    ).toBeVisible();
+    await expect(memberVisibilityCard(page)).toBeVisible();
   });
 
   test('resets when switching role type', async ({ page }) => {
@@ -157,12 +161,18 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
   let normalRole: string;
   let skipUser: string;
   let normalUser: string;
+  // A third pair, used only by the creation-time-only case, which flips its
+  // role's flag mid-test — so it must not share a role with the cases above.
+  let laterRole: string;
+  let laterUser: string;
 
   test.beforeAll(async ({ browser }) => {
     skipRole = uniqueName('skip-role');
     normalRole = uniqueName('normal-role');
     skipUser = uniqueName('skip-user');
     normalUser = uniqueName('normal-user');
+    laterRole = uniqueName('later-role');
+    laterUser = uniqueName('later-user');
 
     adminContext = await browser.newContext({
       storageState: 'e2e/.auth/admin.json',
@@ -184,6 +194,12 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
       type: 'Application role',
       preset: 'Read Only',
     });
+    // Starts unflagged; the creation-time-only case turns it on afterwards.
+    await createRole(adminPage, {
+      name: laterRole,
+      type: 'Application role',
+      preset: 'Read Only',
+    });
 
     await createUserWithRole(adminPage, {
       username: skipUser,
@@ -195,6 +211,11 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
       password: PASSWORD,
       role: normalRole,
     });
+    await createUserWithRole(adminPage, {
+      username: laterUser,
+      password: PASSWORD,
+      role: laterRole,
+    });
   });
 
   test.afterAll(async () => {
@@ -203,8 +224,10 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
         // Users first — a role cannot be deleted while it is still assigned.
         await apiDeleteUserByName(api, skipUser);
         await apiDeleteUserByName(api, normalUser);
+        await apiDeleteUserByName(api, laterUser);
         await apiDeleteRoleByName(api, skipRole, 'APP');
         await apiDeleteRoleByName(api, normalRole, 'APP');
+        await apiDeleteRoleByName(api, laterRole, 'APP');
       });
     } catch {
       // Best-effort cleanup — don't mask a test failure with a cleanup error.
@@ -226,6 +249,26 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
 
     // Contrast case: proves the skip is driven by the role's flag, not by
     // something else about how these accounts are provisioned.
+    expect(groups).toContain(PERSONAL_GROUP);
+    expect(groups).toContain(ALL_GROUP);
+  });
+
+  test('turning the flag on later leaves an existing user\'s groups alone', async () => {
+    // laterUser was created while its role was unflagged, so it has the group.
+    let groups = await withApiAsCreds(laterUser, PASSWORD, apiGroupNames);
+    expect(groups).toContain(PERSONAL_GROUP);
+
+    // Flip the flag on after the fact.
+    await openRoleEditor(adminPage, laterRole);
+    await skipCheckbox(adminPage).check();
+    await saveRole(adminPage);
+    await expect(adminPage).toHaveURL(/\/roles$/);
+    await openRoleEditor(adminPage, laterRole);
+    await expect(skipCheckbox(adminPage)).toBeChecked();
+
+    // The flag is evaluated once, at user-creation time — it is not a live
+    // property of the account, so the existing user keeps its personal group.
+    groups = await withApiAsCreds(laterUser, PASSWORD, apiGroupNames);
     expect(groups).toContain(PERSONAL_GROUP);
     expect(groups).toContain(ALL_GROUP);
   });

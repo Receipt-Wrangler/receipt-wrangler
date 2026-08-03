@@ -136,9 +136,11 @@ func (repository UserRepository) CreateUser(userData commands.SignUpCommand) (mo
 }
 
 // appRoleSkipsDefaultGroup reports whether a newly-created user's app role opts
-// out of the personal "My Receipts" group. Best-effort, matching resolveAppRoleId:
-// an unassigned or unreadable role falls back to creating the group rather than
-// failing user creation.
+// out of the personal "My Receipts" group. Best-effort in the same way as
+// resolveAppRoleId: an unassigned (nil) or missing role falls back to creating
+// the group rather than failing user creation. Any *other* lookup error
+// propagates and rolls the creation back — a transient DB failure must not
+// silently decide which groups an account is created with.
 func (repository UserRepository) appRoleSkipsDefaultGroup(tx *gorm.DB, appRoleId *uint) (bool, error) {
 	if appRoleId == nil {
 		return false, nil

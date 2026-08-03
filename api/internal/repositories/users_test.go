@@ -234,6 +234,35 @@ func TestCreateUserSkipsDefaultGroupForFlaggedAppRole(t *testing.T) {
 	}
 }
 
+// The two best-effort branches of the helper, which the CreateUser tests below
+// can't reach: a user with no app role at all, and an id with no matching row.
+// Both must report "don't skip" rather than erroring, so user creation proceeds
+// with the personal group instead of failing. (A non-record-not-found lookup
+// error deliberately propagates instead — that path needs DB error injection,
+// which this package has no mechanism for, and is unreachable in practice since
+// User.AppRoleID is an OnDelete:RESTRICT FK.)
+func TestAppRoleSkipsDefaultGroupBestEffortBranches(t *testing.T) {
+	defer TruncateTestDb()
+	userRepository := NewUserRepository(nil)
+
+	skip, err := userRepository.appRoleSkipsDefaultGroup(nil, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if skip {
+		utils.PrintTestError(t, skip, false)
+	}
+
+	missingId := uint(999999)
+	skip, err = userRepository.appRoleSkipsDefaultGroup(nil, &missingId)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if skip {
+		utils.PrintTestError(t, skip, false)
+	}
+}
+
 func TestCreateUserCreatesDefaultGroupForUnflaggedAppRole(t *testing.T) {
 	defer TruncateTestDb()
 

@@ -449,8 +449,12 @@ will be dropped in a later release.
   `AppRoleID` via `UserRepository.appRoleSkipsDefaultGroup` → `RoleRepository.AppRoleSkipsDefaultGroup`
   (a single-column read, mirroring `GetGroupRolePaidByConfig`) and skips only the `"My Receipts"`
   `CreateGroup` call. Assigning the role later — or unchecking the box — never adds or removes a
-  group for an existing user. Resolution is **best-effort** like `resolveAppRoleId`: a nil or
-  unreadable role falls back to creating the group rather than failing user creation.
+  group for an existing user. Resolution is **best-effort** in the same way as `resolveAppRoleId`: a
+  nil or **missing** role (`gorm.ErrRecordNotFound`) falls back to creating the group rather than
+  failing user creation, while any *other* lookup error propagates and rolls the creation back — a
+  transient DB failure must not silently decide which groups an account is created with. (The
+  missing-role branch is defensive: `User.AppRoleID` is an `OnDelete:RESTRICT` FK, so a non-nil id
+  always references a live row.)
 - Because the flag lives on the role, it applies at **every** creation path — admin create (explicit
   `appRoleId`) and public self-signup (which uses the configured **default** app role, so flagging
   the default makes signups skip the personal group too). The bootstrap admin resolves to Legacy
