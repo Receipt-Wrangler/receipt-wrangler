@@ -528,7 +528,7 @@ func TestEnsureDefaultRolesPreservesCustomDefault(t *testing.T) {
 
 	// An administrator picked a custom app role as the default before this runs.
 	repository := NewRoleRepository(nil)
-	custom, err := repository.CreateAppRole("Custom Default", "", []string{permissions.AppUsersRead})
+	custom, err := repository.CreateAppRole("Custom Default", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

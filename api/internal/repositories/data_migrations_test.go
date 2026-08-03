@@ -253,7 +253,7 @@ func TestRunDataMigrationsDoesNotClobberExistingAssignment(t *testing.T) {
 	db := GetDB()
 
 	roleRepository := NewRoleRepository(nil)
-	customAppRole, err := roleRepository.CreateAppRole("Custom Role", "", []string{permissions.AppUsersRead})
+	customAppRole, err := roleRepository.CreateAppRole("Custom Role", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

@@ -232,6 +232,16 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   permissions grid's `Set` pattern — NOT a FormArray). **All-empty = unrestricted**; a template maps to the
   subset of actions the role may perform on it. Hydrates directly from `role.reportTemplateGrants`,
   serializes back for group scope only, resets on `pickType`. See `api/CLAUDE.md` → "Report-template access".
+- **Group creation (app roles only):** an app-scope-only **"Group creation"** `rw-card` in
+  `role-form` (gated on `showAppOptions()` = `type() === "app"`, the mirror of `showGrants()`) holds a
+  single `app-checkbox` — "Don't create a personal group for new users with this role"
+  (`data-testid="skip-default-group"`) — bound to `skipDefaultGroupCreation` on the
+  `UpsertRoleCommand`. New users normally get a personal "My Receipts" group; turning this on skips it
+  for accounts that should only belong to groups an admin adds them to (the virtual "All" group is
+  always created, so the dashboard still works). It mirrors `seesAllMembers` exactly but in the
+  opposite scope: hydrates on edit, resets in `pickType`, and serializes in the **`else`** branch of
+  `submit`'s `if (showGrants())` so it only ships on APP scope. Creation-time only — toggling it never
+  changes an existing user's groups. See `api/CLAUDE.md` → "Skipping the personal group per app role".
 - **Default roles:** the role-list page shows two `app-select` controls above the filter bar —
   "Default application role" and "Default group role". Each is pre-selected from the role flagged
   `isDefault` for its scope and, on change, calls `RoleService.setDefaultRole(scope, roleId)` then
@@ -281,6 +291,9 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   can see, and be seen by, all members"** `app-checkbox` in `role-form` (a "Member visibility" `rw-card`
   inside the `@if (showGrants())` block), bound to `seesAllMembers` on the `UpsertRoleCommand` (mirrors
   `includeOwnPaidReceipts`; hydrates on edit, resets on type switch, serialized only for GROUP scope).
+  E2E coverage for the group-creation card lives in `e2e/skip-default-group.spec.ts` (card present on
+  APP / absent on GROUP, reset on type switch, round-trip through save including turning it back off,
+  the end-to-end effect on a provisioned account, and the server's 400 on GROUP scope).
   Isolation is resolved **per group** on the backend ("isolated means isolated" — an isolated group hides
   co-members and their settlement/report data regardless of any other group you share; co-members are
   visible only through a shared **non-isolated** group). Everything is enforced **server-side** — the
@@ -618,6 +631,15 @@ real UI** in `beforeAll` and **tears it down through the admin API** in `afterAl
 in `e2e/helpers/provisioning.ts`: `createRole` (role form — type, preset, category toggles, individual
 toggle-offs), `createUserWithRole`, `createGroupWithMember`, `uniqueName`, and the API-teardown
 helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDeleteRoleByName`.
+`createRole` also accepts `skipDefaultGroup` (app roles only — ticks the "Group creation" checkbox).
+
+- **Asserting as a provisioned user without a browser session.** `withApiAsCreds(username, password,
+  fn)` opens an `APIRequestContext` for arbitrary credentials — `withApiAs` is now a thin wrapper over
+  it for the two `E2E_*` fixture accounts. Use it when the assertion is about server state rather than
+  UI, e.g. `apiGroupNames(api)` (the caller's own groups, gated on `app.account.read`) in
+  `skip-default-group.spec.ts`, which checks a new account got the "All" group but no personal
+  "My Receipts". A role built from the **"Read Only"** preset grants every `*.read` permission,
+  including the `app.account.read` those calls need.
 
 - An admin `BrowserContext` (`storageState: 'e2e/.auth/admin.json'`) provisions in `beforeAll`. Tests
   then run **either** as the default e2e-user — for a *group-scoped* member added to a fixture group

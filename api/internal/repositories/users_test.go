@@ -149,7 +149,7 @@ func TestCreateUserHonorsExplicitAppRole(t *testing.T) {
 	}
 
 	// A custom (non-system) app role is honored as-is on the modern FK.
-	custom, err := roleRepository.CreateAppRole("Auditor", "", []string{permissions.AppUsersRead})
+	custom, err := roleRepository.CreateAppRole("Auditor", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -164,6 +164,153 @@ func TestCreateUserHonorsExplicitAppRole(t *testing.T) {
 	}
 	if auditor.AppRoleID == nil || *auditor.AppRoleID != custom.ID {
 		utils.PrintTestError(t, auditor.AppRoleID, custom.ID)
+	}
+}
+
+// groupNamesForUser returns the names of every group the user is a member of.
+func groupNamesForUser(t *testing.T, userId uint) []string {
+	var groups []models.Group
+	err := GetDB().Model(&models.Group{}).
+		Joins("JOIN group_members ON group_members.group_id = groups.id").
+		Where("group_members.user_id = ?", userId).
+		Find(&groups).Error
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return nil
+	}
+
+	names := make([]string, 0, len(groups))
+	for _, group := range groups {
+		names = append(names, group.Name)
+	}
+
+	return names
+}
+
+func TestCreateUserSkipsDefaultGroupForFlaggedAppRole(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	userRepository := NewUserRepository(nil)
+	roleRepository := NewRoleRepository(nil)
+
+	// Occupy the first-user slot so the accounts below take their explicit role
+	// rather than the bootstrap Legacy Admin.
+	if _, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "bootstrap", DisplayName: "b", Password: "a really secure password",
+	}); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	skipRole, err := roleRepository.CreateAppRole("Shared Groups Only", "", []string{permissions.AppUsersRead}, true)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	restricted, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "restricted", DisplayName: "r", Password: "a really secure password",
+		AppRoleID: &skipRole.ID,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// The personal group is skipped, but the virtual "All" group is always created
+	// so the account still has a working dashboard.
+	names := groupNamesForUser(t, restricted.ID)
+	if len(names) != 1 || names[0] != "All" {
+		utils.PrintTestError(t, names, []string{"All"})
+	}
+}
+
+// The two best-effort branches of the helper, which the CreateUser tests below
+// can't reach: a user with no app role at all, and an id with no matching row.
+// Both must report "don't skip" rather than erroring, so user creation proceeds
+// with the personal group instead of failing. (A non-record-not-found lookup
+// error deliberately propagates instead — that path needs DB error injection,
+// which this package has no mechanism for. The OnDelete:RESTRICT FK on
+// User.AppRoleID rules out dangling role ids, not connection, transaction, or
+// context errors.)
+func TestAppRoleSkipsDefaultGroupBestEffortBranches(t *testing.T) {
+	defer TruncateTestDb()
+	userRepository := NewUserRepository(nil)
+
+	skip, err := userRepository.appRoleSkipsDefaultGroup(nil, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if skip {
+		utils.PrintTestError(t, skip, false)
+	}
+
+	missingId := uint(999999)
+	skip, err = userRepository.appRoleSkipsDefaultGroup(nil, &missingId)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if skip {
+		utils.PrintTestError(t, skip, false)
+	}
+}
+
+func TestCreateUserCreatesDefaultGroupForUnflaggedAppRole(t *testing.T) {
+	defer TruncateTestDb()
+
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if err := EnsureDefaultRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	userRepository := NewUserRepository(nil)
+
+	if _, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "bootstrap", DisplayName: "b", Password: "a really secure password",
+	}); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// The default app role is unflagged, so the personal group is still created.
+	normal, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username: "normal", DisplayName: "n", Password: "a really secure password",
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	names := groupNamesForUser(t, normal.ID)
+	if len(names) != 2 {
+		utils.PrintTestError(t, names, []string{"My Receipts", "All"})
+		return
+	}
+
+	var hasPersonal, hasAll bool
+	for _, name := range names {
+		if name == "My Receipts" {
+			hasPersonal = true
+		}
+		if name == "All" {
+			hasAll = true
+		}
+	}
+	if !hasPersonal || !hasAll {
+		utils.PrintTestError(t, names, []string{"My Receipts", "All"})
 	}
 }
 

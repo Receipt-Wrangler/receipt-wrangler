@@ -22,7 +22,7 @@ func seedAppUser(t *testing.T, username string, appPerms []string) uint {
 	t.Helper()
 	db := repositories.GetDB()
 
-	role, err := repositories.NewRoleRepository(nil).CreateAppRole("App "+username, "", appPerms)
+	role, err := repositories.NewRoleRepository(nil).CreateAppRole("App "+username, "", appPerms, false)
 	if err != nil {
 		t.Fatalf("seed app role: %v", err)
 	}

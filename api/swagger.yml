@@ -3525,6 +3525,13 @@ components:
             Whether a GROUP role exempts its members from member-presence isolation
             (they see, and are seen by, every member of an isolated group). Always
             false for app roles.
+        skipDefaultGroupCreation:
+          type: boolean
+          description: >-
+            Whether users created with this APP role skip the automatic personal
+            "My Receipts" group. The virtual "All" group is always created. Applies
+            at user-creation time only — changing it never adds or removes a group
+            for an existing user. Always false for group roles.
         reportTemplateGrants:
           type: array
           description: >-
@@ -3586,6 +3593,12 @@ components:
             Whether a GROUP role exempts its members from member-presence isolation
             (they see, and are seen by, every member of an isolated group). Only
             valid on group roles.
+        skipDefaultGroupCreation:
+          type: boolean
+          description: >-
+            Whether users created with this APP role skip the automatic personal
+            "My Receipts" group (the virtual "All" group is always created). Only
+            valid on app roles; applies at user-creation time only.
         reportTemplateGrants:
           type: array
           description: >-

@@ -430,6 +430,46 @@ will be dropped in a later release.
   modern-role authoring flow — see "Modern role assignment in authoring flows" under "Enforcement
   status".
 
+### Skipping the personal group per app role
+
+- Every new user normally gets **two** groups in `UserRepository.CreateUser`: the personal
+  `"My Receipts"` group and the virtual `"All"` aggregate group (`IsAllGroup`, which backs the
+  dashboard's all-receipts view). For accounts that are only ever meant to live in a few specific
+  shared groups, the personal group is dead weight that accumulates as clutter in group management.
+- **`AppRole.SkipDefaultGroupCreation`** (`models/app_role.go`, `not null;default:false`) opts a
+  role's new users out of the personal group. The `"All"` group is **always** created, so the
+  account still has a working dashboard landing page and sees receipts from groups an admin adds it
+  to. AutoMigrate adds the column with default `false`, so existing roles/installs are unchanged —
+  **no data migration**.
+- **App-scope only**, mirroring the group-scope-only `seesAllMembers` in the opposite direction:
+  `UpsertRoleCommand.Validate` rejects it on GROUP scope (`skipDefaultGroupCreation` error key), and
+  `structs.RoleView` serializes `false` for every group role. Carried on `swagger.yml` for both
+  `Role` and `UpsertRoleCommand`.
+- **Creation-time only.** `CreateUser` resolves the flag from the user's just-assigned
+  `AppRoleID` via `UserRepository.appRoleSkipsDefaultGroup` → `RoleRepository.AppRoleSkipsDefaultGroup`
+  (a single-column read, mirroring `GetGroupRolePaidByConfig`) and skips only the `"My Receipts"`
+  `CreateGroup` call. Assigning the role later — or unchecking the box — never adds or removes a
+  group for an existing user. Resolution is **best-effort** in the same way as `resolveAppRoleId`: a
+  nil or **missing** role (`gorm.ErrRecordNotFound`) falls back to creating the group rather than
+  failing user creation, while any *other* lookup error propagates and rolls the creation back — a
+  transient DB failure must not silently decide which groups an account is created with. (The
+  missing-role branch is defensive: `User.AppRoleID` is an `OnDelete:RESTRICT` FK, so a non-nil id
+  always references a live row.)
+- Because the flag lives on the role, it applies at **every** creation path — admin create (explicit
+  `appRoleId`) and public self-signup (which uses the configured **default** app role, so flagging
+  the default makes signups skip the personal group too). The bootstrap admin resolves to Legacy
+  Admin, a seeded system role whose column is the `false` zero value and which the UI opens
+  read-only, so it is never affected.
+- `UpdateAppRole` writes the column through the **map form** `Updates` — GORM's struct form skips
+  zero-value bools, which would leave a toggled-off flag stuck on (the same reason
+  `UpdateGroupRole` uses it).
+- Tests: `commands/upsert_role_command_test.go` (APP accepted / GROUP rejected),
+  `repositories/roles_test.go` (`TestAppRoleSkipDefaultGroupCreationRoundTrips` incl. the
+  toggle-off case, `TestGetAllRolesReturnsSkipDefaultGroupCreation`), `repositories/users_test.go`
+  (`TestCreateUserSkipsDefaultGroupForFlaggedAppRole` — only `"All"` remains — and
+  `TestCreateUserCreatesDefaultGroupForUnflaggedAppRole`), and `services/roles_test.go`
+  (service round-trip + group roles never carrying it).
+
 ### Legacy role assignment (one-time data migration)
 
 - A startup data migration back-fills the new role assignments from the legacy role values so

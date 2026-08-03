@@ -24,7 +24,7 @@ func grantAppPerms(t *testing.T, userId uint, perms ...string) {
 	db := repositories.GetDB()
 
 	roleRepository := repositories.NewRoleRepository(nil)
-	role, err := roleRepository.CreateAppRole(fmt.Sprintf("Test App Role %d", userId), "", perms)
+	role, err := roleRepository.CreateAppRole(fmt.Sprintf("Test App Role %d", userId), "", perms, false)
 	if err != nil {
 		t.Fatalf("create app role: %v", err)
 	}

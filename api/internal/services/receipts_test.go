@@ -72,7 +72,7 @@ func seedReceiptMember(
 // giveAppRole assigns an app role with the given permissions to a user.
 func giveAppRole(t *testing.T, userId uint, roleName string, perms []string) {
 	t.Helper()
-	role, err := repositories.NewRoleRepository(nil).CreateAppRole(roleName, "", perms)
+	role, err := repositories.NewRoleRepository(nil).CreateAppRole(roleName, "", perms, false)
 	if err != nil {
 		t.Fatalf("create app role: %v", err)
 	}

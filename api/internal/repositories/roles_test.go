@@ -29,7 +29,7 @@ func TestCreateAppRolePersistsPermissions(t *testing.T) {
 	repository := NewRoleRepository(nil)
 
 	perms := []string{permissions.AppUsersCreate, permissions.AppUsersRead}
-	role, err := repository.CreateAppRole("App Role", "Description", perms)
+	role, err := repository.CreateAppRole("App Role", "Description", perms, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -68,13 +68,13 @@ func TestUpdateAppRolePersistsChanges(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	created, err := repository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate})
+	created, err := repository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
 
-	updated, err := repository.UpdateAppRole(created.ID, "Renamed Role", "New description", []string{permissions.AppUsersRead})
+	updated, err := repository.UpdateAppRole(created.ID, "Renamed Role", "New description", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -86,6 +86,94 @@ func TestUpdateAppRolePersistsChanges(t *testing.T) {
 
 	if updated.Description != "New description" {
 		utils.PrintTestError(t, updated.Description, "New description")
+	}
+}
+
+func TestAppRoleSkipDefaultGroupCreationRoundTrips(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	created, err := repository.CreateAppRole("Shared Groups Only", "", []string{permissions.AppUsersRead}, true)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if !created.SkipDefaultGroupCreation {
+		utils.PrintTestError(t, created.SkipDefaultGroupCreation, true)
+	}
+
+	skips, err := repository.AppRoleSkipsDefaultGroup(created.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if !skips {
+		utils.PrintTestError(t, skips, true)
+	}
+
+	// Toggling the flag back off must persist — the update uses the map form
+	// precisely because GORM's struct Updates skips zero-value bools.
+	updated, err := repository.UpdateAppRole(created.ID, "Shared Groups Only", "", []string{permissions.AppUsersRead}, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if updated.SkipDefaultGroupCreation {
+		utils.PrintTestError(t, updated.SkipDefaultGroupCreation, false)
+	}
+
+	skips, err = repository.AppRoleSkipsDefaultGroup(created.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if skips {
+		utils.PrintTestError(t, skips, false)
+	}
+}
+
+func TestGetAllRolesReturnsSkipDefaultGroupCreation(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	appRole, err := repository.CreateAppRole("Shared Groups Only", "", []string{permissions.AppUsersRead}, true)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	groupRole, err := repository.CreateGroupRole("Group Role", "", []string{permissions.GroupReceiptsRead}, nil, nil, nil, false, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	roles, err := repository.GetAllRoles()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var sawApp, sawGroup bool
+	for _, role := range roles {
+		if role.Scope == permissions.ScopeApp && role.Id == appRole.ID {
+			sawApp = true
+			if !role.SkipDefaultGroupCreation {
+				utils.PrintTestError(t, role.SkipDefaultGroupCreation, true)
+			}
+		}
+		// A group role never carries the app-only flag.
+		if role.Scope == permissions.ScopeGroup && role.Id == groupRole.ID {
+			sawGroup = true
+			if role.SkipDefaultGroupCreation {
+				utils.PrintTestError(t, role.SkipDefaultGroupCreation, false)
+			}
+		}
+	}
+
+	if !sawApp || !sawGroup {
+		utils.PrintTestError(t, []bool{sawApp, sawGroup}, []bool{true, true})
 	}
 }
 
@@ -118,13 +206,13 @@ func TestUpdateAppRoleReplacesPermissions(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	created, err := repository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate, permissions.AppUsersRead})
+	created, err := repository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate, permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
 
-	updated, err := repository.UpdateAppRole(created.ID, "App Role", "Description", []string{permissions.AppUsersDelete})
+	updated, err := repository.UpdateAppRole(created.ID, "App Role", "Description", []string{permissions.AppUsersDelete}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -189,7 +277,7 @@ func TestGetAppRolePermissions(t *testing.T) {
 	repository := NewRoleRepository(nil)
 
 	perms := []string{permissions.AppUsersCreate, permissions.AppUsersRead}
-	role, err := repository.CreateAppRole("App Role", "", perms)
+	role, err := repository.CreateAppRole("App Role", "", perms, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -208,7 +296,7 @@ func TestGetAppRolePermissions(t *testing.T) {
 	}
 
 	// A role with no permissions resolves to an empty (non-nil) slice.
-	empty, err := repository.CreateAppRole("Empty Role", "", []string{})
+	empty, err := repository.CreateAppRole("Empty Role", "", []string{}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -249,7 +337,7 @@ func TestGetUserAppRoleId(t *testing.T) {
 	repository := NewRoleRepository(nil)
 	db := GetDB()
 
-	role, err := repository.CreateAppRole("App Role", "", []string{permissions.AppUsersRead})
+	role, err := repository.CreateAppRole("App Role", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -334,12 +422,12 @@ func TestSetDefaultAppRoleClearsOthers(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	first, err := repository.CreateAppRole("First", "", []string{permissions.AppUsersRead})
+	first, err := repository.CreateAppRole("First", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
-	second, err := repository.CreateAppRole("Second", "", []string{permissions.AppUsersRead})
+	second, err := repository.CreateAppRole("Second", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -421,7 +509,7 @@ func TestGetDefaultAppRoleIdNilWhenUnset(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	if _, err := repository.CreateAppRole("Role", "", []string{permissions.AppUsersRead}); err != nil {
+	if _, err := repository.CreateAppRole("Role", "", []string{permissions.AppUsersRead}, false); err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
@@ -440,7 +528,7 @@ func TestGetAppRoleIdByName(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	created, err := repository.CreateAppRole("Named Role", "", []string{permissions.AppUsersRead})
+	created, err := repository.CreateAppRole("Named Role", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -470,7 +558,7 @@ func TestGetAllRolesReturnsIsDefault(t *testing.T) {
 	defer TruncateTestDb()
 	repository := NewRoleRepository(nil)
 
-	role, err := repository.CreateAppRole("Default App", "", []string{permissions.AppUsersRead})
+	role, err := repository.CreateAppRole("Default App", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

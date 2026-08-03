@@ -266,7 +266,7 @@ func TestUpdateRolePersistsChanges(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
 
-	created, err := roleRepository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate})
+	created, err := roleRepository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -299,11 +299,66 @@ func TestUpdateRolePersistsChanges(t *testing.T) {
 	}
 }
 
+func TestCreateAndUpdateRoleRoundTripSkipDefaultGroupCreation(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	service := NewRoleService(nil)
+
+	roleView, err := service.CreateRole(commands.UpsertRoleCommand{
+		Name:                     "Shared Groups Only",
+		Scope:                    permissions.ScopeApp,
+		Permissions:              []string{permissions.AppUsersRead},
+		SkipDefaultGroupCreation: true,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if !roleView.SkipDefaultGroupCreation {
+		utils.PrintTestError(t, roleView.SkipDefaultGroupCreation, true)
+	}
+
+	// Toggling it off through the service must stick.
+	updated, err := service.UpdateRole(roleView.Id, commands.UpsertRoleCommand{
+		Name:                     "Shared Groups Only",
+		Scope:                    permissions.ScopeApp,
+		Permissions:              []string{permissions.AppUsersRead},
+		SkipDefaultGroupCreation: false,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if updated.SkipDefaultGroupCreation {
+		utils.PrintTestError(t, updated.SkipDefaultGroupCreation, false)
+	}
+}
+
+func TestCreateGroupRoleNeverCarriesSkipDefaultGroupCreation(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	service := NewRoleService(nil)
+
+	roleView, err := service.CreateRole(commands.UpsertRoleCommand{
+		Name:        "Group Role",
+		Scope:       permissions.ScopeGroup,
+		Permissions: []string{permissions.GroupReceiptsRead},
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if roleView.SkipDefaultGroupCreation {
+		utils.PrintTestError(t, roleView.SkipDefaultGroupCreation, false)
+	}
+}
+
 func TestUpdateRoleBlocksTypeSwitch(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
 
-	created, err := roleRepository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate})
+	created, err := roleRepository.CreateAppRole("App Role", "Description", []string{permissions.AppUsersCreate}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -372,7 +427,7 @@ func TestSetDefaultRoleApp(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
 
-	created, err := roleRepository.CreateAppRole("App Role", "", []string{permissions.AppUsersRead})
+	created, err := roleRepository.CreateAppRole("App Role", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -429,7 +484,7 @@ func TestSetDefaultRoleTypeMismatch(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
 
-	created, err := roleRepository.CreateAppRole("App Role", "", []string{permissions.AppUsersRead})
+	created, err := roleRepository.CreateAppRole("App Role", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -457,7 +512,7 @@ func TestDeleteRoleRejectsDefault(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
 
-	created, err := roleRepository.CreateAppRole("Default App Role", "", []string{permissions.AppUsersRead})
+	created, err := roleRepository.CreateAppRole("Default App Role", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

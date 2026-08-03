@@ -30,7 +30,7 @@ func categoryIdSet(categories []models.Category) map[uint]struct{} {
 // user bypasses grant filtering for those resources.
 func grantUserAppPermissions(t *testing.T, userId uint, perms []string) {
 	t.Helper()
-	role, err := repositories.NewRoleRepository(nil).CreateAppRole("Bypass Role", "", perms)
+	role, err := repositories.NewRoleRepository(nil).CreateAppRole("Bypass Role", "", perms, false)
 	if err != nil {
 		t.Fatalf("create app role: %v", err)
 	}
