@@ -49,22 +49,23 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 		roleRepository := repositories.NewRoleRepository(tx)
 
 		if command.Scope == permissions.ScopeApp {
-			role, txErr := roleRepository.CreateAppRole(command.Name, command.Description, perms)
+			role, txErr := roleRepository.CreateAppRole(command.Name, command.Description, perms, command.SkipDefaultGroupCreation)
 			if txErr != nil {
 				return txErr
 			}
 
 			roleView = structs.RoleView{
-				Id:                   role.ID,
-				Name:                 role.Name,
-				Description:          role.Description,
-				Scope:                permissions.ScopeApp,
-				IsSystem:             role.IsSystem,
-				Permissions:          perms,
-				CategoryGrants:       []uint{},
-				TagGrants:            []uint{},
-				PaidByUserGrants:     []uint{},
-				ReportTemplateGrants: []structs.ReportTemplateGrantView{},
+				Id:                       role.ID,
+				Name:                     role.Name,
+				Description:              role.Description,
+				Scope:                    permissions.ScopeApp,
+				IsSystem:                 role.IsSystem,
+				Permissions:              perms,
+				SkipDefaultGroupCreation: role.SkipDefaultGroupCreation,
+				CategoryGrants:           []uint{},
+				TagGrants:                []uint{},
+				PaidByUserGrants:         []uint{},
+				ReportTemplateGrants:     []structs.ReportTemplateGrantView{},
 			}
 
 			return nil
@@ -144,23 +145,24 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 				return ErrSystemRoleImmutable
 			}
 
-			role, txErr := roleRepository.UpdateAppRole(id, command.Name, command.Description, perms)
+			role, txErr := roleRepository.UpdateAppRole(id, command.Name, command.Description, perms, command.SkipDefaultGroupCreation)
 			if txErr != nil {
 				return txErr
 			}
 
 			roleView = structs.RoleView{
-				Id:                   role.ID,
-				Name:                 role.Name,
-				Description:          role.Description,
-				Scope:                permissions.ScopeApp,
-				IsDefault:            role.IsDefault,
-				IsSystem:             role.IsSystem,
-				Permissions:          perms,
-				CategoryGrants:       []uint{},
-				TagGrants:            []uint{},
-				PaidByUserGrants:     []uint{},
-				ReportTemplateGrants: []structs.ReportTemplateGrantView{},
+				Id:                       role.ID,
+				Name:                     role.Name,
+				Description:              role.Description,
+				Scope:                    permissions.ScopeApp,
+				IsDefault:                role.IsDefault,
+				IsSystem:                 role.IsSystem,
+				Permissions:              perms,
+				SkipDefaultGroupCreation: role.SkipDefaultGroupCreation,
+				CategoryGrants:           []uint{},
+				TagGrants:                []uint{},
+				PaidByUserGrants:         []uint{},
+				ReportTemplateGrants:     []structs.ReportTemplateGrantView{},
 			}
 
 			return nil
@@ -498,17 +500,18 @@ func appRoleToView(role models.AppRole, isDefault bool) structs.RoleView {
 	}
 
 	return structs.RoleView{
-		Id:                   role.ID,
-		Name:                 role.Name,
-		Description:          role.Description,
-		Scope:                permissions.ScopeApp,
-		IsDefault:            isDefault,
-		IsSystem:             role.IsSystem,
-		Permissions:          perms,
-		CategoryGrants:       []uint{},
-		TagGrants:            []uint{},
-		PaidByUserGrants:     []uint{},
-		ReportTemplateGrants: []structs.ReportTemplateGrantView{},
+		Id:                       role.ID,
+		Name:                     role.Name,
+		Description:              role.Description,
+		Scope:                    permissions.ScopeApp,
+		IsDefault:                isDefault,
+		IsSystem:                 role.IsSystem,
+		Permissions:              perms,
+		SkipDefaultGroupCreation: role.SkipDefaultGroupCreation,
+		CategoryGrants:           []uint{},
+		TagGrants:                []uint{},
+		PaidByUserGrants:         []uint{},
+		ReportTemplateGrants:     []structs.ReportTemplateGrantView{},
 	}
 }
 

@@ -50,7 +50,7 @@ func makeUserAdmin(t *testing.T, userId uint) {
 		t.Fatalf("look up admin role: %v", err)
 	}
 	if roleId == nil {
-		role, err := roleRepository.CreateAppRole(adminRoleName, "", []string{permissions.AppUsersRead})
+		role, err := roleRepository.CreateAppRole(adminRoleName, "", []string{permissions.AppUsersRead}, false)
 		if err != nil {
 			t.Fatalf("create admin role: %v", err)
 		}

@@ -35,6 +35,11 @@ type UpsertRoleCommand struct {
 	// visible to every member. Group-scoped only; ignored (rejected) on APP scope,
 	// mirroring the paid-by flags. Default false ⇒ no effect on existing roles.
 	SeesAllMembers bool `json:"seesAllMembers"`
+	// SkipDefaultGroupCreation suppresses the personal "My Receipts" group that is
+	// otherwise created for every new user assigned this role. App-scoped only;
+	// rejected on GROUP scope (a group role is assigned to a membership, long
+	// after the user was created). Default false ⇒ no effect on existing roles.
+	SkipDefaultGroupCreation bool `json:"skipDefaultGroupCreation"`
 	// RequiresIndividualCategoryGrants / RequiresIndividualTagGrants make per-member
 	// assignment MANDATORY for this role: a member holding it who has no individual
 	// grants sees nothing, rather than falling back to the role's set. This is what
@@ -124,6 +129,13 @@ func (command *UpsertRoleCommand) Validate() structs.ValidatorError {
 			command.SeesAllMembers ||
 			command.RequiresIndividualCategoryGrants || command.RequiresIndividualTagGrants) {
 		errors["grants"] = "Category, tag, paid-by, and member-visibility settings are only valid on group roles"
+	}
+
+	// Skipping personal-group creation is an app-role concept: it acts when the
+	// user account is created, whereas a group role is assigned to an existing
+	// membership long after that.
+	if command.Scope == permissions.ScopeGroup && command.SkipDefaultGroupCreation {
+		errors["skipDefaultGroupCreation"] = "Skipping default group creation is only valid on application roles"
 	}
 
 	if hasDuplicateUint(command.CategoryGrants) {

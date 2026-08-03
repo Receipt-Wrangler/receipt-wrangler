@@ -2,6 +2,7 @@ import { Component, Input, OnChanges, SimpleChanges, input, viewChild } from "@a
 import { Store } from "@ngxs/store";
 import { BaseInputComponent } from "../../base-input";
 import { CurrencySeparator, CurrencySymbolPosition } from "../../open-api/index";
+import { PasswordGeneratorService } from "../../services/password-generator.service";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { InputInterface } from "../input.interface";
 
@@ -32,6 +33,8 @@ export class InputComponent
 
   @Input() public showVisibilityEye = false;
 
+  @Input() public showGeneratePassword = false;
+
   public readonly isCurrency = input<boolean>(false);
 
   @Input() public mask: string = "";
@@ -44,13 +47,23 @@ export class InputComponent
 
   @Input() public decimalMarker: CurrencySeparator = CurrencySeparator.Period;
 
-  constructor(private store: Store) {
+  constructor(
+    private store: Store,
+    private passwordGeneratorService: PasswordGeneratorService
+  ) {
     super();
   }
 
 
   public ngOnChanges(changes: SimpleChanges): void {
-    if (changes["showVisibilityEye"]?.firstChange && changes["showVisibilityEye"]?.currentValue) {
+    // Either password affordance implies a password field, so mask it whenever
+    // one is switched on — `changes` only carries a key that actually changed,
+    // so this fires on the initial binding and on a later false -> true flip,
+    // and never re-masks a field the user has revealed.
+    const becamePasswordField =
+      changes["showVisibilityEye"]?.currentValue ||
+      changes["showGeneratePassword"]?.currentValue;
+    if (becamePasswordField) {
       this.type = "password";
     }
 
@@ -81,6 +94,22 @@ export class InputComponent
       this.thousandSeparator = "";
       this.decimalMarker = CurrencySeparator.Period;
     }
+  }
+
+  /**
+   * Fills the field with a freshly generated password and reveals it so the
+   * user can see what landed on their clipboard. Everything that affects the
+   * view is set synchronously — under zoneless change detection only the click
+   * event's change-detection pass will render it.
+   */
+  public generatePassword(): void {
+    if (this.inputFormControl.disabled || this.readonly) {
+      return;
+    }
+
+    this.inputFormControl.setValue(this.passwordGeneratorService.generateAndCopy());
+    this.inputFormControl.markAsDirty();
+    this.type = "text";
   }
 
   public toggleVisibility(): void {

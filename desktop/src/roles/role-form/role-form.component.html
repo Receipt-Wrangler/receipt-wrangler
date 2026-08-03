@@ -191,6 +191,29 @@
           }
         </div>
 
+        <!-- Personal group creation (app roles only) -->
+        @if (showAppOptions()) {
+          <div class="rw-card rw-form-section">
+            <div class="rw-perm-header">
+              <div>
+                <h2>Group creation</h2>
+                <div class="hint hint-inline">
+                  New users normally get their own "My Receipts" group. Turn this
+                  on for roles whose users should only belong to the groups you
+                  add them to.
+                </div>
+              </div>
+            </div>
+
+            <app-checkbox
+              data-testid="skip-default-group"
+              label="Don't create a personal group for new users with this role"
+              [inputFormControl]="form | formGet: 'skipDefaultGroupCreation'"
+              [readonly]="isViewMode()"
+            ></app-checkbox>
+          </div>
+        }
+
         <!-- Category & tag grants (group roles only) -->
         @if (showGrants()) {
           <div class="rw-card rw-form-section">
@@ -206,6 +229,7 @@
             </div>
 
             <app-checkbox
+              data-testid="sees-all-members"
               label="Members with this role can see, and be seen by, all members"
               [inputFormControl]="form | formGet: 'seesAllMembers'"
               [readonly]="isViewMode()"

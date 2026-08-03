@@ -77,6 +77,10 @@ export class RoleFormComponent {
     // Group-role-only flag: holders can see, and be seen by, all members of an
     // isolated group. Ignored for app roles (serialized only when showGrants()).
     seesAllMembers: new FormControl<boolean>(false, { nonNullable: true }),
+    // App-role-only flag: users created with this role skip the personal
+    // "My Receipts" group. Ignored for group roles (serialized only when
+    // showAppOptions()).
+    skipDefaultGroupCreation: new FormControl<boolean>(false, { nonNullable: true }),
     // Group-role-only: when set, a member of this role with no individual
     // category/tag assignment sees NOTHING rather than the role's set, so
     // forgetting to assign a new member fails closed.
@@ -162,6 +166,9 @@ export class RoleFormComponent {
 
   /** Grants are a group-role concept; hidden for app roles. */
   public readonly showGrants = computed<boolean>(() => this.type() === "group");
+
+  /** Personal-group creation is an app-role concept; hidden for group roles. */
+  public readonly showAppOptions = computed<boolean>(() => this.type() === "app");
 
   // ----- Mode-derived state -----
   public readonly isEditMode = computed<boolean>(() => this.mode() === FormMode.edit);
@@ -364,6 +371,7 @@ export class RoleFormComponent {
           name: role.name,
           description: role.description ?? "",
           seesAllMembers: role.seesAllMembers ?? false,
+          skipDefaultGroupCreation: role.skipDefaultGroupCreation ?? false,
           requiresIndividualCategoryGrants: role.requiresIndividualCategoryGrants ?? false,
           requiresIndividualTagGrants: role.requiresIndividualTagGrants ?? false,
         });
@@ -442,6 +450,8 @@ export class RoleFormComponent {
     this.setGrantArray(this.grantedPaidByUsers, []);
     this.reportTemplateGrants.set(new Map());
     this.form.controls.seesAllMembers.setValue(false);
+    // Personal-group creation only applies to app roles — reset it too.
+    this.form.controls.skipDefaultGroupCreation.setValue(false);
     this.form.controls.requiresIndividualCategoryGrants.setValue(false);
     this.form.controls.requiresIndividualTagGrants.setValue(false);
   }
@@ -579,6 +589,11 @@ export class RoleFormComponent {
       // Supervisor exemption: holders see, and are seen by, all members of an
       // isolated group. Only meaningful on group roles.
       payload.seesAllMembers = this.form.controls.seesAllMembers.value;
+    } else {
+      // Personal-group creation is an app-role concept: users created with this
+      // role skip the automatic "My Receipts" group.
+      payload.skipDefaultGroupCreation =
+        this.form.controls.skipDefaultGroupCreation.value;
     }
 
     this.lastPayload = payload;

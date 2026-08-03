@@ -40,6 +40,12 @@ export interface CreateRoleOptions {
   paidByOwn?: boolean;
   paidByUsers?: string[];
   /**
+   * App-role only: tick "Don't create a personal group for new users with this
+   * role" in the "Group creation" card, so accounts created with the role skip
+   * the automatic "My Receipts" group (the virtual "All" group is still made).
+   */
+  skipDefaultGroup?: boolean;
+  /**
    * Group-role category/tag grants (the shared app-grant-picker), by NAME. This
    * is the ceiling a member's individual assignment narrows within. Leaving both
    * unset keeps the role unrestricted (members see every category/tag).
@@ -89,6 +95,13 @@ export async function createRole(page: Page, opts: CreateRoleOptions): Promise<v
       openedPanels.add(panelKey);
     }
     await page.getByRole('button', { name: `Toggle ${label}` }).click();
+  }
+
+  if (opts.skipDefaultGroup) {
+    await page
+      .getByTestId('skip-default-group')
+      .getByRole('checkbox')
+      .check();
   }
 
   if (opts.paidByOwn || (opts.paidByUsers?.length ?? 0) > 0) {
@@ -164,9 +177,22 @@ export async function createUserWithRole(
   await page.getByTestId('user-add').click();
   const dialog = page.getByRole('dialog').filter({ hasText: 'Create User' });
   await expect(dialog).toBeVisible();
+
+  // The password input is *ngIf-ed in (create mode only) and carries the
+  // generate/visibility buttons, so it settles a tick after the dialog opens.
+  // Wait for it BEFORE filling anything: typing into a half-rendered dialog can
+  // land the password in whichever field currently owns focus (seen as a
+  // username of "<name><password>" and an empty, still-required password).
+  const password = dialog.getByLabel('Password', { exact: true });
+  await expect(password).toBeVisible();
+
   await dialog.getByLabel('Username').fill(opts.username);
   await dialog.getByLabel('Displayname').fill(opts.username);
-  await dialog.getByLabel('Password').fill(opts.password);
+  await password.fill(opts.password);
+  // Fail here, with the actual values, rather than later on an unexplained
+  // "dialog never closed".
+  await expect(dialog.getByLabel('Username')).toHaveValue(opts.username);
+  await expect(password).toHaveValue(opts.password);
   await dialog.getByRole('combobox', { name: 'App Role' }).click();
   // The option panel is a floating overlay rendered on the page, not the dialog.
   await page.getByRole('option', { name: opts.role, exact: true }).click();
@@ -224,6 +250,28 @@ const apiBaseUrl = (): string =>
   process.env.E2E_BASE_URL ?? 'http://localhost:4200';
 
 /**
+ * Opens an `APIRequestContext` authenticated with the given credentials, runs
+ * [fn], and disposes it. Use for a user the test provisioned itself, which has
+ * no `E2E_*` env credentials — for a fixture account use `withApiAs` instead.
+ */
+export async function withApiAsCreds<T>(
+  username: string,
+  password: string,
+  fn: (api: APIRequestContext) => Promise<T>,
+): Promise<T> {
+  const api = await pwRequest.newContext({ baseURL: apiBaseUrl() });
+  try {
+    const res = await api.post('/api/login', { data: { username, password } });
+    if (!res.ok()) {
+      throw new Error(`${username} API login failed: HTTP ${res.status()}`);
+    }
+    return await fn(api);
+  } finally {
+    await api.dispose();
+  }
+}
+
+/**
  * Opens an `APIRequestContext` authenticated as the given e2e [role], runs [fn],
  * and disposes it. Use to drive API calls AS a specific user — e.g. asserting a
  * restricted user's request is denied, or admin teardown.
@@ -232,17 +280,8 @@ export async function withApiAs<T>(
   role: Role,
   fn: (api: APIRequestContext) => Promise<T>,
 ): Promise<T> {
-  const api = await pwRequest.newContext({ baseURL: apiBaseUrl() });
-  try {
-    const { username, password } = creds(role);
-    const res = await api.post('/api/login', { data: { username, password } });
-    if (!res.ok()) {
-      throw new Error(`${role} API login failed: HTTP ${res.status()}`);
-    }
-    return await fn(api);
-  } finally {
-    await api.dispose();
-  }
+  const { username, password } = creds(role);
+  return withApiAsCreds(username, password, fn);
 }
 
 /**
@@ -269,6 +308,22 @@ export async function apiGetUserId(
     throw new Error(`user ${username} not found`);
   }
   return user.id;
+}
+
+/**
+ * Returns the names of the groups the authenticated caller belongs to, including
+ * the virtual "All" group. `GET /api/group/` lists the caller's own groups and is
+ * gated on app.account.read, so the caller's role must grant it.
+ */
+export async function apiGroupNames(api: APIRequestContext): Promise<string[]> {
+  const res = await api.get('/api/group/');
+  if (!res.ok()) {
+    throw new Error(
+      `list groups failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  const groups = (await res.json()) as { name: string }[];
+  return groups.map((group) => group.name);
 }
 
 /** Creates a minimal OPEN receipt and returns its id. */

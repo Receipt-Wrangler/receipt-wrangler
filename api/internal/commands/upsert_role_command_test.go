@@ -225,6 +225,34 @@ func TestUpsertRoleCommandSeesAllMembersRejectedOnAppScope(t *testing.T) {
 	}
 }
 
+func TestUpsertRoleCommandSkipDefaultGroupCreationValidOnAppScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:                     "Restricted App Role",
+		Scope:                    permissions.ScopeApp,
+		Permissions:              []string{permissions.AppUsersRead},
+		SkipDefaultGroupCreation: true,
+	}
+
+	vErr := command.Validate()
+	if len(vErr.Errors) > 0 {
+		t.Errorf("expected no errors, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandSkipDefaultGroupCreationRejectedOnGroupScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:                     "Group Role With Skip",
+		Scope:                    permissions.ScopeGroup,
+		Permissions:              []string{permissions.GroupReceiptsRead},
+		SkipDefaultGroupCreation: true,
+	}
+
+	vErr := command.Validate()
+	if _, ok := vErr.Errors["skipDefaultGroupCreation"]; !ok {
+		t.Errorf("expected skipDefaultGroupCreation error, got %+v", vErr.Errors)
+	}
+}
+
 func TestUpsertRoleCommandDuplicatePaidByGrant(t *testing.T) {
 	command := UpsertRoleCommand{
 		Name:             "Dup Paid-By Grant",

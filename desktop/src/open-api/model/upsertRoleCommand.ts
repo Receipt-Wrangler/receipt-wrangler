@@ -38,6 +38,10 @@ export interface UpsertRoleCommand {
      */
     seesAllMembers?: boolean;
     /**
+     * Whether users created with this APP role skip the automatic personal \"My Receipts\" group (the virtual \"All\" group is always created). Only valid on app roles; applies at user-creation time only.
+     */
+    skipDefaultGroupCreation?: boolean;
+    /**
      * Whether this GROUP role requires per-member category assignment. When true, a member with no individual category grants sees NO categories instead of falling back to the role\'s set, so an unassigned member fails closed. Only valid on group roles.
      */
     requiresIndividualCategoryGrants?: boolean;

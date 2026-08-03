@@ -48,6 +48,10 @@ export interface Role {
      */
     seesAllMembers?: boolean;
     /**
+     * Whether users created with this APP role skip the automatic personal \"My Receipts\" group. The virtual \"All\" group is always created. Applies at user-creation time only — changing it never adds or removes a group for an existing user. Always false for group roles.
+     */
+    skipDefaultGroupCreation?: boolean;
+    /**
      * Whether a GROUP role requires per-member category assignment. When true, a member holding this role with no individual category grants sees NO categories, rather than falling back to the role\'s set. Always false for app roles.
      */
     requiresIndividualCategoryGrants?: boolean;

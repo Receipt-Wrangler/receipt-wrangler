@@ -22,12 +22,26 @@
         err.message
       }}
     </mat-error>
-    <div matSuffix *ngIf="showVisibilityEye">
+    <div matSuffix *ngIf="showVisibilityEye || showGeneratePassword">
+      <button
+        *ngIf="showGeneratePassword"
+        class="generate-password-button"
+        mat-icon-button
+        type="button"
+        data-testid="password-generate"
+        aria-label="Generate password"
+        matTooltip="Generate password"
+        [disabled]="inputFormControl.disabled || readonly"
+        (click)="generatePassword()"
+      >
+        <mat-icon>autorenew</mat-icon>
+      </button>
       <button
         *ngIf="showVisibilityEye"
         class="visibility-eye-button"
         mat-icon-button
         type="button"
+        data-testid="password-visibility-toggle"
         [matTooltip]="type === 'password' ? 'Show ' + label : 'Hide ' + label"
         (click)="toggleVisibility()"
       >

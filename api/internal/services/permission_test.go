@@ -17,7 +17,7 @@ func seedUserWithAppRole(t *testing.T, username string, perms []string) (uint, u
 	db := repositories.GetDB()
 
 	roleRepository := repositories.NewRoleRepository(nil)
-	role, err := roleRepository.CreateAppRole("App Role", "", perms)
+	role, err := roleRepository.CreateAppRole("App Role", "", perms, false)
 	if err != nil {
 		t.Fatalf("seed app role: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestPermissionCacheInvalidatedOnRoleDelete(t *testing.T) {
 	// lookup is always fresh, so prime the cache directly for an unassigned role
 	// and verify DeleteRole evicts that role's cached permission list.
 	roleRepository := repositories.NewRoleRepository(nil)
-	role, err := roleRepository.CreateAppRole("Deletable Role", "", []string{permissions.AppUsersRead})
+	role, err := roleRepository.CreateAppRole("Deletable Role", "", []string{permissions.AppUsersRead}, false)
 	if err != nil {
 		t.Fatalf("seed role: %v", err)
 	}

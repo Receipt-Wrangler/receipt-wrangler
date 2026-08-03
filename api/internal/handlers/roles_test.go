@@ -49,7 +49,7 @@ func ensureRoleAdmin(userId uint) {
 			permissions.AppRolesRead,
 			permissions.AppRolesUpdate,
 			permissions.AppRolesDelete,
-		})
+		}, false)
 		if cErr != nil {
 			panic(cErr)
 		}
@@ -349,7 +349,7 @@ func TestShouldNotUpdateRoleDueToRole(t *testing.T) {
 func TestShouldNotChangeRoleType(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
-	created, err := roleRepository.CreateAppRole("App Role", "desc", []string{permissions.AppUsersCreate})
+	created, err := roleRepository.CreateAppRole("App Role", "desc", []string{permissions.AppUsersCreate}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -513,7 +513,7 @@ func TestShouldReturnNotFoundForMissingDeleteRole(t *testing.T) {
 func TestShouldNotDeleteRoleDueToScopeMismatch(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
-	created, err := roleRepository.CreateAppRole("App Role", "desc", []string{permissions.AppUsersCreate})
+	created, err := roleRepository.CreateAppRole("App Role", "desc", []string{permissions.AppUsersCreate}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -564,7 +564,7 @@ func TestShouldNotDeleteSystemRole(t *testing.T) {
 func TestShouldNotDeleteAssignedAppRole(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	roleRepository := repositories.NewRoleRepository(nil)
-	created, err := roleRepository.CreateAppRole("App Role", "desc", []string{permissions.AppUsersCreate})
+	created, err := roleRepository.CreateAppRole("App Role", "desc", []string{permissions.AppUsersCreate}, false)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return

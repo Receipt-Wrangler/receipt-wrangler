@@ -26,6 +26,10 @@ type RoleView struct {
 	// isolation (they see, and are seen by, every member of an isolated group).
 	// Always group-scoped; app roles serialize false.
 	SeesAllMembers bool `json:"seesAllMembers"`
+	// SkipDefaultGroupCreation marks an app role whose new users skip the personal
+	// "My Receipts" group (the virtual "All" group is always created). Always
+	// app-scoped; group roles serialize false.
+	SkipDefaultGroupCreation bool `json:"skipDefaultGroupCreation"`
 	// RequiresIndividualCategoryGrants / RequiresIndividualTagGrants mark a group
 	// role that requires per-member category/tag assignment: a member with no
 	// individual grants sees nothing rather than the role's set. Always
