@@ -239,8 +239,9 @@ func TestCreateUserSkipsDefaultGroupForFlaggedAppRole(t *testing.T) {
 // Both must report "don't skip" rather than erroring, so user creation proceeds
 // with the personal group instead of failing. (A non-record-not-found lookup
 // error deliberately propagates instead — that path needs DB error injection,
-// which this package has no mechanism for, and is unreachable in practice since
-// User.AppRoleID is an OnDelete:RESTRICT FK.)
+// which this package has no mechanism for. The OnDelete:RESTRICT FK on
+// User.AppRoleID rules out dangling role ids, not connection, transaction, or
+// context errors.)
 func TestAppRoleSkipsDefaultGroupBestEffortBranches(t *testing.T) {
 	defer TruncateTestDb()
 	userRepository := NewUserRepository(nil)

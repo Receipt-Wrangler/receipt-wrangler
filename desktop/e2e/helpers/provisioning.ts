@@ -125,9 +125,22 @@ export async function createUserWithRole(
   await page.getByTestId('user-add').click();
   const dialog = page.getByRole('dialog').filter({ hasText: 'Create User' });
   await expect(dialog).toBeVisible();
+
+  // The password input is *ngIf-ed in (create mode only) and carries the
+  // generate/visibility buttons, so it settles a tick after the dialog opens.
+  // Wait for it BEFORE filling anything: typing into a half-rendered dialog can
+  // land the password in whichever field currently owns focus (seen as a
+  // username of "<name><password>" and an empty, still-required password).
+  const password = dialog.getByLabel('Password', { exact: true });
+  await expect(password).toBeVisible();
+
   await dialog.getByLabel('Username').fill(opts.username);
   await dialog.getByLabel('Displayname').fill(opts.username);
-  await dialog.getByLabel('Password', { exact: true }).fill(opts.password);
+  await password.fill(opts.password);
+  // Fail here, with the actual values, rather than later on an unexplained
+  // "dialog never closed".
+  await expect(dialog.getByLabel('Username')).toHaveValue(opts.username);
+  await expect(password).toHaveValue(opts.password);
   await dialog.getByRole('combobox', { name: 'App Role' }).click();
   // The option panel is a floating overlay rendered on the page, not the dialog.
   await page.getByRole('option', { name: opts.role, exact: true }).click();

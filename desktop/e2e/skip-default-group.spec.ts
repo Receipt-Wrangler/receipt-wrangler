@@ -161,18 +161,12 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
   let normalRole: string;
   let skipUser: string;
   let normalUser: string;
-  // A third pair, used only by the creation-time-only case, which flips its
-  // role's flag mid-test — so it must not share a role with the cases above.
-  let laterRole: string;
-  let laterUser: string;
 
   test.beforeAll(async ({ browser }) => {
     skipRole = uniqueName('skip-role');
     normalRole = uniqueName('normal-role');
     skipUser = uniqueName('skip-user');
     normalUser = uniqueName('normal-user');
-    laterRole = uniqueName('later-role');
-    laterUser = uniqueName('later-user');
 
     adminContext = await browser.newContext({
       storageState: 'e2e/.auth/admin.json',
@@ -194,13 +188,6 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
       type: 'Application role',
       preset: 'Read Only',
     });
-    // Starts unflagged; the creation-time-only case turns it on afterwards.
-    await createRole(adminPage, {
-      name: laterRole,
-      type: 'Application role',
-      preset: 'Read Only',
-    });
-
     await createUserWithRole(adminPage, {
       username: skipUser,
       password: PASSWORD,
@@ -211,11 +198,6 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
       password: PASSWORD,
       role: normalRole,
     });
-    await createUserWithRole(adminPage, {
-      username: laterUser,
-      password: PASSWORD,
-      role: laterRole,
-    });
   });
 
   test.afterAll(async () => {
@@ -224,10 +206,8 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
         // Users first — a role cannot be deleted while it is still assigned.
         await apiDeleteUserByName(api, skipUser);
         await apiDeleteUserByName(api, normalUser);
-        await apiDeleteUserByName(api, laterUser);
         await apiDeleteRoleByName(api, skipRole, 'APP');
         await apiDeleteRoleByName(api, normalRole, 'APP');
-        await apiDeleteRoleByName(api, laterRole, 'APP');
       });
     } catch {
       // Best-effort cleanup — don't mask a test failure with a cleanup error.
@@ -253,24 +233,57 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
     expect(groups).toContain(ALL_GROUP);
   });
 
+  // Unlike the two cases above, this one MUTATES its role mid-test, so it
+  // provisions and tears down its own role/user instead of reading the cohort's
+  // shared fixtures — no other test can be affected by the flag flip, whatever
+  // order they run in. (The admin browser context is still shared: it is a
+  // driving session, not mutable server state.)
   test('turning the flag on later leaves an existing user\'s groups alone', async () => {
-    // laterUser was created while its role was unflagged, so it has the group.
-    let groups = await withApiAsCreds(laterUser, PASSWORD, apiGroupNames);
-    expect(groups).toContain(PERSONAL_GROUP);
+    const roleName = uniqueName('later-role');
+    const userName = uniqueName('later-user');
 
-    // Flip the flag on after the fact.
-    await openRoleEditor(adminPage, laterRole);
-    await skipCheckbox(adminPage).check();
-    await saveRole(adminPage);
-    await expect(adminPage).toHaveURL(/\/roles$/);
-    await openRoleEditor(adminPage, laterRole);
-    await expect(skipCheckbox(adminPage)).toBeChecked();
+    try {
+      await createRole(adminPage, {
+        name: roleName,
+        type: 'Application role',
+        preset: 'Read Only',
+      });
+      await createUserWithRole(adminPage, {
+        username: userName,
+        password: PASSWORD,
+        role: roleName,
+      });
 
-    // The flag is evaluated once, at user-creation time — it is not a live
-    // property of the account, so the existing user keeps its personal group.
-    groups = await withApiAsCreds(laterUser, PASSWORD, apiGroupNames);
-    expect(groups).toContain(PERSONAL_GROUP);
-    expect(groups).toContain(ALL_GROUP);
+      // Created while the role was unflagged, so it has the personal group.
+      let groups = await withApiAsCreds(userName, PASSWORD, apiGroupNames);
+      expect(groups).toContain(PERSONAL_GROUP);
+
+      // Flip the flag on after the fact, and confirm it actually persisted —
+      // otherwise the "nothing changed" assertion below would pass just as
+      // happily on a no-op toggle, proving nothing.
+      await openRoleEditor(adminPage, roleName);
+      await skipCheckbox(adminPage).check();
+      await saveRole(adminPage);
+      await expect(adminPage).toHaveURL(/\/roles$/);
+      await openRoleEditor(adminPage, roleName);
+      await expect(skipCheckbox(adminPage)).toBeChecked();
+
+      // The flag is evaluated once, at user-creation time — it is not a live
+      // property of the account, so the existing user keeps its personal group.
+      groups = await withApiAsCreds(userName, PASSWORD, apiGroupNames);
+      expect(groups).toContain(PERSONAL_GROUP);
+      expect(groups).toContain(ALL_GROUP);
+    } finally {
+      try {
+        await withAdminApi(async (api) => {
+          // User first — a role cannot be deleted while it is still assigned.
+          await apiDeleteUserByName(api, userName);
+          await apiDeleteRoleByName(api, roleName, 'APP');
+        });
+      } catch {
+        // Best-effort cleanup — don't mask a test failure with a cleanup error.
+      }
+    }
   });
 });
 
