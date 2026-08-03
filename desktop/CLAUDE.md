@@ -291,6 +291,9 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   can see, and be seen by, all members"** `app-checkbox` in `role-form` (a "Member visibility" `rw-card`
   inside the `@if (showGrants())` block), bound to `seesAllMembers` on the `UpsertRoleCommand` (mirrors
   `includeOwnPaidReceipts`; hydrates on edit, resets on type switch, serialized only for GROUP scope).
+  E2E coverage for the group-creation card lives in `e2e/skip-default-group.spec.ts` (card present on
+  APP / absent on GROUP, reset on type switch, round-trip through save including turning it back off,
+  the end-to-end effect on a provisioned account, and the server's 400 on GROUP scope).
   Isolation is resolved **per group** on the backend ("isolated means isolated" — an isolated group hides
   co-members and their settlement/report data regardless of any other group you share; co-members are
   visible only through a shared **non-isolated** group). Everything is enforced **server-side** — the
@@ -628,6 +631,15 @@ real UI** in `beforeAll` and **tears it down through the admin API** in `afterAl
 in `e2e/helpers/provisioning.ts`: `createRole` (role form — type, preset, category toggles, individual
 toggle-offs), `createUserWithRole`, `createGroupWithMember`, `uniqueName`, and the API-teardown
 helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDeleteRoleByName`.
+`createRole` also accepts `skipDefaultGroup` (app roles only — ticks the "Group creation" checkbox).
+
+- **Asserting as a provisioned user without a browser session.** `withApiAsCreds(username, password,
+  fn)` opens an `APIRequestContext` for arbitrary credentials — `withApiAs` is now a thin wrapper over
+  it for the two `E2E_*` fixture accounts. Use it when the assertion is about server state rather than
+  UI, e.g. `apiGroupNames(api)` (the caller's own groups, gated on `app.account.read`) in
+  `skip-default-group.spec.ts`, which checks a new account got the "All" group but no personal
+  "My Receipts". A role built from the **"Read Only"** preset grants every `*.read` permission,
+  including the `app.account.read` those calls need.
 
 - An admin `BrowserContext` (`storageState: 'e2e/.auth/admin.json'`) provisions in `beforeAll`. Tests
   then run **either** as the default e2e-user — for a *group-scoped* member added to a fixture group
