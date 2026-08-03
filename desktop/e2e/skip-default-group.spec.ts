@@ -233,22 +233,26 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
     expect(groups).toContain(ALL_GROUP);
   });
 
-  // Unlike the two cases above, this one MUTATES its role mid-test, so it
-  // provisions and tears down its own role/user instead of reading the cohort's
-  // shared fixtures — no other test can be affected by the flag flip, whatever
-  // order they run in. (The admin browser context is still shared: it is a
-  // driving session, not mutable server state.)
-  test('turning the flag on later leaves an existing user\'s groups alone', async () => {
+  // Fully self-contained: it MUTATES its role mid-test, so it provisions and
+  // tears down its own role/user rather than reading the cohort's fixtures, and
+  // it drives the UI through the per-test `page` fixture — a fresh
+  // BrowserContext carrying the file-level admin storageState — instead of the
+  // beforeAll context (CLAUDE.md → "Isolation — each test gets a fresh
+  // BrowserContext"). Nothing about this case is shared with a sibling test.
+  test('turning the flag on later leaves an existing user\'s groups alone', async ({
+    page,
+  }) => {
+    await stubTokenRefresh(page);
     const roleName = uniqueName('later-role');
     const userName = uniqueName('later-user');
 
     try {
-      await createRole(adminPage, {
+      await createRole(page, {
         name: roleName,
         type: 'Application role',
         preset: 'Read Only',
       });
-      await createUserWithRole(adminPage, {
+      await createUserWithRole(page, {
         username: userName,
         password: PASSWORD,
         role: roleName,
@@ -261,12 +265,12 @@ test.describe('a flagged role skips the new user\'s personal group', () => {
       // Flip the flag on after the fact, and confirm it actually persisted —
       // otherwise the "nothing changed" assertion below would pass just as
       // happily on a no-op toggle, proving nothing.
-      await openRoleEditor(adminPage, roleName);
-      await skipCheckbox(adminPage).check();
-      await saveRole(adminPage);
-      await expect(adminPage).toHaveURL(/\/roles$/);
-      await openRoleEditor(adminPage, roleName);
-      await expect(skipCheckbox(adminPage)).toBeChecked();
+      await openRoleEditor(page, roleName);
+      await skipCheckbox(page).check();
+      await saveRole(page);
+      await expect(page).toHaveURL(/\/roles$/);
+      await openRoleEditor(page, roleName);
+      await expect(skipCheckbox(page)).toBeChecked();
 
       // The flag is evaluated once, at user-creation time — it is not a live
       // property of the account, so the existing user keeps its personal group.
