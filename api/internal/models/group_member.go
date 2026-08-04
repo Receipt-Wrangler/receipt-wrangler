@@ -17,4 +17,27 @@ type GroupMember struct {
 	// group_members INSERT 500s on upgraded installs. Remove this field together with a
 	// migration that drops the column once all installs have upgraded.
 	GroupRole string `json:"-" gorm:"column:group_role"`
+
+	// CategoryGrantsRestricted records whether an admin opted this membership into
+	// per-member category filtering at all. It is what keeps a configured member
+	// restricted after their grant rows are emptied — e.g. when the last granted
+	// category is deleted and the FK cascade clears CategoryGrants. Without it,
+	// "no grant rows" is indistinguishable from "never configured", which would
+	// silently widen the member back to their role's full set. Derived and set on
+	// save; internal only (not exposed on the API). Mirrors
+	// GroupRoleDefinition.PaidByVisibilityRestricted.
+	CategoryGrantsRestricted bool `gorm:"not null;default:false" json:"-"`
+
+	// TagGrantsRestricted is the tag counterpart of CategoryGrantsRestricted.
+	TagGrantsRestricted bool `gorm:"not null;default:false" json:"-"`
+
+	// CategoryGrants/TagGrants are the member's granted category/tag ids, carried
+	// for serialization only — they are deliberately NOT GORM associations
+	// (`gorm:"-"`). GroupRepository.UpdateGroup replaces the whole member roster via
+	// Association("GroupMembers").Unscoped().Replace, and a real association here
+	// would put the grant join rows inside that wholesale write. Keeping them
+	// transient means the grant tables are only ever touched explicitly, by
+	// GroupMemberRepository. Populated on read by LoadMemberGrants.
+	CategoryGrants []uint `gorm:"-" json:"categoryGrants"`
+	TagGrants      []uint `gorm:"-" json:"tagGrants"`
 }

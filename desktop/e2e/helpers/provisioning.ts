@@ -45,6 +45,19 @@ export interface CreateRoleOptions {
    * the automatic "My Receipts" group (the virtual "All" group is still made).
    */
   skipDefaultGroup?: boolean;
+  /**
+   * Group-role category/tag grants (the shared app-grant-picker), by NAME. This
+   * is the ceiling a member's individual assignment narrows within. Leaving both
+   * unset keeps the role unrestricted (members see every category/tag).
+   */
+  categoryGrants?: string[];
+  tagGrants?: string[];
+  /**
+   * Flips "Require an individual category/tag assignment for each member", so a
+   * member with no assignment sees nothing instead of the role's set.
+   */
+  requiresIndividualCategories?: boolean;
+  requiresIndividualTags?: boolean;
 }
 
 /**
@@ -112,8 +125,47 @@ export async function createRole(page: Page, opts: CreateRoleOptions): Promise<v
     await page.keyboard.press('Escape');
   }
 
+  await selectGrants(page, 'grant-picker-categories', 'Categories', opts.categoryGrants);
+  await selectGrants(page, 'grant-picker-tags', 'Tags', opts.tagGrants);
+
+  if (opts.requiresIndividualCategories) {
+    await page
+      .getByText('Require an individual category assignment for each member')
+      .click();
+  }
+  if (opts.requiresIndividualTags) {
+    await page
+      .getByText('Require an individual tag assignment for each member')
+      .click();
+  }
+
   await page.getByRole('button', { name: 'Save Role' }).click();
   await expect(page).toHaveURL(/\/roles$/);
+}
+
+/**
+ * Picks [names] in one of the grant picker's multi-select autocompletes. While
+ * the option panel is open the listbox shares the field's label, so the field is
+ * targeted by its combobox role within the testid-scoped picker.
+ */
+async function selectGrants(
+  page: Page,
+  testId: string,
+  label: string,
+  names?: string[],
+): Promise<void> {
+  if (!names?.length) {
+    return;
+  }
+
+  const field = page.getByTestId(testId).getByRole('combobox', { name: label });
+  for (const name of names) {
+    await field.click();
+    await field.fill(name);
+    await page.getByRole('option', { name, exact: true }).click();
+  }
+  // Selecting an option re-opens the panel; close it so Save stays clickable.
+  await page.keyboard.press('Escape');
 }
 
 /** Creates a user assigned [opts.role] via the Add User dialog. */
@@ -443,6 +495,20 @@ export interface UpsertRolePayload {
   scope: 'APP' | 'GROUP';
   permissions: string[];
   reportTemplateGrants?: { reportTemplateId: number; permissions: string[] }[];
+  /**
+   * Category/tag ids a GROUP role's members may see. This is the CEILING that a
+   * member's individual assignment narrows within — the two intersect. Empty (or
+   * omitted) means unrestricted, matching the backend's grant convention.
+   */
+  categoryGrants?: number[];
+  tagGrants?: number[];
+  /**
+   * When true, a member holding this role with NO individual assignment sees
+   * nothing at all rather than falling back to the role's set — so forgetting to
+   * assign a new member fails closed.
+   */
+  requiresIndividualCategoryGrants?: boolean;
+  requiresIndividualTagGrants?: boolean;
 }
 
 /**
@@ -490,6 +556,170 @@ export async function apiDeleteReportTemplateById(
   id: number | string,
 ): Promise<void> {
   await api.delete(`/api/report/template/${id}`);
+}
+
+// --- Categories / tags -------------------------------------------------------
+//
+// Categories and tags are GLOBAL with a uniquely-indexed name, so every spec must
+// mint uniqueName-suffixed ones and delete them in teardown; a leaked name makes
+// the next run's create fail.
+
+/** Creates a category and returns its id + name. */
+export async function apiCreateCategory(
+  api: APIRequestContext,
+  name: string,
+): Promise<{ id: number; name: string }> {
+  const res = await api.post('/api/category', { data: { name, description: '' } });
+  if (!res.ok()) {
+    throw new Error(
+      `create category failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  const category = (await res.json()) as { id: number; name: string };
+  return { id: category.id, name: category.name };
+}
+
+/** Creates a tag and returns its id + name. */
+export async function apiCreateTag(
+  api: APIRequestContext,
+  name: string,
+): Promise<{ id: number; name: string }> {
+  const res = await api.post('/api/tag', { data: { name, description: '' } });
+  if (!res.ok()) {
+    throw new Error(`create tag failed: HTTP ${res.status()} ${await res.text()}`);
+  }
+  const tag = (await res.json()) as { id: number; name: string };
+  return { id: tag.id, name: tag.name };
+}
+
+/**
+ * Warns rather than throws on a failed delete.
+ *
+ * Every caller runs inside an `afterAll` whose body is wrapped in `try/catch {}`
+ * so cleanup can never mask a test failure. Throwing here would be swallowed by
+ * that catch AND abort the remaining deletes in the same block — leaking more
+ * names than it reports. A warning keeps every delete running and still puts the
+ * failure in the test output, which is what makes a leaked unique name (the thing
+ * that breaks the next run's create) diagnosable.
+ */
+async function warnOnFailedDelete(
+  api: APIRequestContext,
+  path: string,
+  what: string,
+): Promise<void> {
+  const res = await api.delete(path);
+  if (!res.ok()) {
+    console.warn(
+      `e2e cleanup: failed to delete ${what} — HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+}
+
+export async function apiDeleteCategoryById(
+  api: APIRequestContext,
+  id: number,
+): Promise<void> {
+  await warnOnFailedDelete(api, `/api/category/${id}`, `category ${id}`);
+}
+
+export async function apiDeleteTagById(
+  api: APIRequestContext,
+  id: number,
+): Promise<void> {
+  await warnOnFailedDelete(api, `/api/tag/${id}`, `tag ${id}`);
+}
+
+// --- Per-member category/tag grants ------------------------------------------
+
+/**
+ * Replaces one group member's individual category/tag assignment, returning the
+ * RAW response so a spec can assert the status (200 / 400 out-of-ceiling / 403
+ * missing group.members.grants.update / 404 non-member) rather than only the
+ * happy-path effect.
+ *
+ * [groupId]/[userId] go in the URL because that is what the endpoint authorizes
+ * against; [body] may carry contradicting ids to prove the URL wins.
+ */
+export async function apiSetMemberGrants(
+  api: APIRequestContext,
+  groupId: number | string,
+  userId: number,
+  body: { categoryGrants?: number[]; tagGrants?: number[] } & Record<string, unknown>,
+) {
+  return api.put(`/api/group/${groupId}/member/${userId}/grants`, { data: body });
+}
+
+/**
+ * The category/tag names the calling user can actually SEE in [groupId], read
+ * from appData's per-group catalogs.
+ *
+ * This is deliberately the assertion surface for effective visibility: it is the
+ * very array the desktop's receipt-form pickers render from, so it tests the real
+ * delivery path rather than a parallel one. Names (not ids) so failures read
+ * clearly.
+ */
+export async function apiMemberCatalog(
+  api: APIRequestContext,
+  groupId: number | string,
+): Promise<{ categories: string[]; tags: string[] }> {
+  const appData = (await (await api.get('/api/user/appData')).json()) as {
+    groupCategories?: Record<string, { name?: string }[]>;
+    groupTags?: Record<string, { name?: string }[]>;
+  };
+  const key = String(groupId);
+  const names = (entries?: { name?: string }[]) =>
+    (entries ?? []).map((e) => e.name ?? '').sort();
+
+  return {
+    categories: names(appData.groupCategories?.[key]),
+    tags: names(appData.groupTags?.[key]),
+  };
+}
+
+/** Replaces a group's whole member roster (the wholesale UpdateGroup path). */
+export async function apiSetGroupRoster(
+  api: APIRequestContext,
+  groupId: number | string,
+  opts: {
+    name: string;
+    members: { userId: number; groupRoleId: number }[];
+  },
+) {
+  return api.put(`/api/group/${groupId}`, {
+    data: {
+      name: opts.name,
+      status: 'ACTIVE',
+      isAllGroup: false,
+      groupMembers: opts.members.map((m) => ({
+        userId: m.userId,
+        groupId: Number(groupId),
+        groupRoleId: m.groupRoleId,
+      })),
+    },
+  });
+}
+
+/** Returns a group's members (including their individual grant ids). */
+export async function apiGetGroupMembers(
+  api: APIRequestContext,
+  groupId: number | string,
+): Promise<
+  {
+    userId: number;
+    groupRoleId: number;
+    categoryGrants?: number[] | null;
+    tagGrants?: number[] | null;
+  }[]
+> {
+  const group = (await (await api.get(`/api/group/${groupId}`)).json()) as {
+    groupMembers: {
+      userId: number;
+      groupRoleId: number;
+      categoryGrants?: number[] | null;
+      tagGrants?: number[] | null;
+    }[];
+  };
+  return group.groupMembers;
 }
 
 /**

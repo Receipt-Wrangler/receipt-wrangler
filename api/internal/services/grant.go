@@ -10,32 +10,39 @@ import (
 
 // GetGroupCategoryIdsForUser returns the set of category ids a user may use in a
 // group, plus an "unrestricted" flag. When unrestricted is true the returned set
-// is nil and the caller must treat every category as allowed (the empty-grants =
-// see-all rule). A non-member, or a member whose group role has no category
-// grants, is unrestricted — grants only NARROW access within an already-permitted
-// group; they never grant access (the handler permission gate is the access
-// control). The returned map is read-only shared cache state.
+// is nil and the caller must treat every category as allowed.
+//
+// The result composes TWO layers — the group role's grants and the individual
+// membership's grants — by intersection; see resolveEffectiveGrants for the rule.
+// A non-member, or a member whose role and membership both grant nothing, is
+// unrestricted: grants only NARROW access within an already-permitted group; they
+// never grant access (the handler permission gate is the access control).
+//
+// The returned map must be treated as read-only — when only the role layer
+// narrows, it is shared cache state.
 func (service PermissionService) GetGroupCategoryIdsForUser(userId uint, groupId uint) (map[uint]struct{}, bool, error) {
-	entry, err := service.resolveGroupRoleGrants(userId, groupId)
+	grants, err := service.resolveEffectiveGrants(userId, groupId)
 	if err != nil {
 		return nil, false, err
 	}
-	if entry == nil || len(entry.categoryIds) == 0 {
+	if grants == nil || !grants.categoryRestricted {
 		return nil, true, nil
 	}
-	return entry.categoryIds, false, nil
+	return grants.categoryIds, false, nil
 }
 
 // GetGroupTagIdsForUser is the tag counterpart of GetGroupCategoryIdsForUser.
+// Categories and tags resolve independently — a role or membership may restrict
+// one and leave the other unrestricted.
 func (service PermissionService) GetGroupTagIdsForUser(userId uint, groupId uint) (map[uint]struct{}, bool, error) {
-	entry, err := service.resolveGroupRoleGrants(userId, groupId)
+	grants, err := service.resolveEffectiveGrants(userId, groupId)
 	if err != nil {
 		return nil, false, err
 	}
-	if entry == nil || len(entry.tagIds) == 0 {
+	if grants == nil || !grants.tagRestricted {
 		return nil, true, nil
 	}
-	return entry.tagIds, false, nil
+	return grants.tagIds, false, nil
 }
 
 // GetGroupPaidByUserIdsForUser returns the set of "paid by" user ids whose
@@ -121,9 +128,200 @@ func (service PermissionService) GetVisibleTagsForUser(userId uint, groupId uint
 	return visible, nil
 }
 
+// effectiveGrantSet is the composed category/tag visibility for one (user, group),
+// after the group role's grants and the individual membership's grants have been
+// folded together. A false *Restricted flag means "see all" and the paired set is
+// meaningless; a true flag with an EMPTY set means "see nothing".
+type effectiveGrantSet struct {
+	categoryIds        map[uint]struct{}
+	categoryRestricted bool
+	tagIds             map[uint]struct{}
+	tagRestricted      bool
+}
+
+// resolveEffectiveGrants composes a user's group-role grants with their
+// individual membership grants for a group. Returns nil when the user is not a
+// member of the group (nothing narrows).
+//
+// The two layers compose by INTERSECTION, with the role as a ceiling:
+//
+//	role requires individual && member unconfigured -> see nothing (fail closed)
+//	effective = ALL
+//	if the role grants a non-empty set          -> effective ∩= role set
+//	if the membership opted into restriction    -> effective ∩= membership set
+//	if neither narrows                          -> unrestricted
+//
+// Union was rejected deliberately: it can only ever ADD, so a role carrying grants
+// would floor every member at the role's full set and an individual assignment
+// could never restrict anyone — which is the entire point of the membership layer.
+// Intersection also keeps a role an auditable ceiling ("no holder of this role can
+// see outside its set") and makes role grants safe to widen, since widening a role
+// never widens an individually-assigned member.
+//
+// The empty-intersection case (a membership granted ids outside its role's
+// ceiling, resolving to "see nothing") is unreachable through the API: the grants
+// endpoint validates every submitted id against the ceiling and rejects the write.
+// It is still handled here rather than assumed away, because a role can be
+// narrowed AFTER a membership was configured — that member correctly loses the
+// out-of-ceiling ids instead of keeping visibility the role no longer allows.
+//
+// # Memoization
+//
+// The result is cached on the service instance, keyed by (user, group). Both
+// GetGroupCategoryIdsForUser and GetGroupTagIdsForUser call this, and each call
+// costs a membership read plus a grant-id read per resource — so without the memo
+// a caller needing both resources pays for the whole resolution twice, and
+// GetAppData pays that per group.
+//
+// The memo is scoped to the service value and keyed to the group-role grant
+// cache's eviction GENERATION, reusing the counter in grant_cache.go. Anything
+// that evicts role grants — RoleService.UpdateRole / DeleteRole — bumps that
+// counter and so invalidates memoized resolutions as well. Without this the memo
+// would quietly weaken a real guarantee: "after a role update, the next
+// resolution is fresh" would become "...only on a new service instance".
+//
+// The generation is captured BEFORE the read and stored with the result, so an
+// eviction racing the read invalidates the entry rather than resurrecting a stale
+// one — the same discipline setCachedGroupRoleGrants applies.
+//
+// Residual limit: a MEMBER-level grant write bumps nothing, so one instance can
+// still serve a pre-write member assignment. That is safe today because no flow
+// resolves grants, rewrites them, and re-resolves through the same service (the
+// grants endpoint uses GroupService and builds no PermissionService). A flow that
+// needs to see its own member-grant write must use a fresh service.
+func (service PermissionService) resolveEffectiveGrants(userId uint, groupId uint) (*effectiveGrantSet, error) {
+	memoKey := grantMemoKey{userId: userId, groupId: groupId}
+	generation := groupRoleGrantCacheGen()
+
+	if service.grantMemo != nil {
+		// A cached nil grants field is a real answer (not a member), so test
+		// presence rather than the value.
+		if cached, isCached := service.grantMemo[memoKey]; isCached && cached.generation == generation {
+			return cached.grants, nil
+		}
+	}
+
+	grants, err := service.loadEffectiveGrants(userId, groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Errors are never memoized — a transient database failure must not pin a user
+	// to a wrong answer for the rest of the request.
+	if service.grantMemo != nil {
+		service.grantMemo[memoKey] = grantMemoEntry{grants: grants, generation: generation}
+	}
+
+	return grants, nil
+}
+
+// loadEffectiveGrants is resolveEffectiveGrants without the memo — the actual
+// composition. Split out so the caching stays readable and testable apart from the
+// rule it caches.
+func (service PermissionService) loadEffectiveGrants(userId uint, groupId uint) (*effectiveGrantSet, error) {
+	memberRepository := repositories.NewGroupMemberRepository(service.TX)
+
+	member, err := memberRepository.GetMemberGrantContext(userId, groupId)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// A membership with no group role still honors its individual grants — role
+	// assignment is optional, individual assignment is not conditional on it.
+	var role *grantEntry
+	if member.GroupRoleID != nil {
+		role, err = loadGroupRoleGrants(repositories.NewRoleRepository(service.TX), *member.GroupRoleID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	grants := &effectiveGrantSet{}
+
+	grants.categoryIds, grants.categoryRestricted, err = composeGrantLayer(
+		roleGrantSet(role, func(entry *grantEntry) map[uint]struct{} { return entry.categoryIds }),
+		role != nil && role.requiresIndividualCategoryGrants,
+		member.CategoryGrantsRestricted,
+		func() ([]uint, error) { return memberRepository.GetMemberCategoryGrantIds(userId, groupId) },
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	grants.tagIds, grants.tagRestricted, err = composeGrantLayer(
+		roleGrantSet(role, func(entry *grantEntry) map[uint]struct{} { return entry.tagIds }),
+		role != nil && role.requiresIndividualTagGrants,
+		member.TagGrantsRestricted,
+		func() ([]uint, error) { return memberRepository.GetMemberTagGrantIds(userId, groupId) },
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return grants, nil
+}
+
+// roleGrantSet reads one resource's grant set off a possibly-nil role entry.
+func roleGrantSet(role *grantEntry, pick func(*grantEntry) map[uint]struct{}) map[uint]struct{} {
+	if role == nil {
+		return nil
+	}
+	return pick(role)
+}
+
+// composeGrantLayer intersects one resource's role ceiling with the membership's
+// own grants, returning (allowed, restricted). Loading the membership ids is
+// deferred behind loadMemberIds so the query is skipped entirely for the common
+// unconfigured membership.
+func composeGrantLayer(
+	roleIds map[uint]struct{},
+	requiresIndividual bool,
+	memberRestricted bool,
+	loadMemberIds func() ([]uint, error),
+) (map[uint]struct{}, bool, error) {
+	// The role demands individual assignment and this member has none. Fail closed
+	// rather than falling back to the role's set (or to see-all).
+	if requiresIndividual && !memberRestricted {
+		return map[uint]struct{}{}, true, nil
+	}
+
+	if !memberRestricted {
+		// Only the role layer can narrow. An empty role set is the long-standing
+		// "unrestricted" signal for category/tag grants.
+		if len(roleIds) == 0 {
+			return nil, false, nil
+		}
+		return roleIds, true, nil
+	}
+
+	memberIds, err := loadMemberIds()
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Freshly allocated — never the shared, read-only cache map.
+	allowed := make(map[uint]struct{}, len(memberIds))
+	for _, id := range memberIds {
+		// An empty role set is unrestricted, so it imposes no ceiling to test against.
+		if len(roleIds) > 0 {
+			if _, withinCeiling := roleIds[id]; !withinCeiling {
+				continue
+			}
+		}
+		allowed[id] = struct{}{}
+	}
+
+	return allowed, true, nil
+}
+
 // resolveGroupRoleGrants returns the cached grant entry for a user's role in a
 // group, or nil when the user is not a member or the membership has no group role
-// (both mean "unrestricted").
+// (both mean "unrestricted"). It is the ROLE-ONLY resolver, still used by the
+// paid-by and report-template grant types; category/tag visibility goes through
+// resolveEffectiveGrants, which layers individual membership grants on top.
 func (service PermissionService) resolveGroupRoleGrants(userId uint, groupId uint) (*grantEntry, error) {
 	roleRepository := repositories.NewRoleRepository(service.TX)
 
@@ -176,15 +374,21 @@ func loadGroupRoleGrants(roleRepository repositories.RoleRepository, roleId uint
 	if err != nil {
 		return nil, err
 	}
+	requiresIndividualCategoryGrants, requiresIndividualTagGrants, err := roleRepository.GetGroupRoleIndividualGrantConfig(roleId)
+	if err != nil {
+		return nil, err
+	}
 
 	entry := &grantEntry{
-		categoryIds:                    uintSliceToSet(categoryIds),
-		tagIds:                         uintSliceToSet(tagIds),
-		paidByUserIds:                  uintSliceToSet(paidByUserIds),
-		includeOwnPaidReceipts:         includeOwnPaidReceipts,
-		paidByVisibilityRestricted:     paidByVisibilityRestricted,
-		reportTemplateGrants:           reportTemplateGrantsToSet(reportTemplateGrantRows),
-		reportTemplateGrantsRestricted: reportTemplateGrantsRestricted,
+		categoryIds:                      uintSliceToSet(categoryIds),
+		tagIds:                           uintSliceToSet(tagIds),
+		paidByUserIds:                    uintSliceToSet(paidByUserIds),
+		includeOwnPaidReceipts:           includeOwnPaidReceipts,
+		paidByVisibilityRestricted:       paidByVisibilityRestricted,
+		reportTemplateGrants:             reportTemplateGrantsToSet(reportTemplateGrantRows),
+		reportTemplateGrantsRestricted:   reportTemplateGrantsRestricted,
+		requiresIndividualCategoryGrants: requiresIndividualCategoryGrants,
+		requiresIndividualTagGrants:      requiresIndividualTagGrants,
 	}
 
 	setCachedGroupRoleGrants(roleId, entry, observedGen)

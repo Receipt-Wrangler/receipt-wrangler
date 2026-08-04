@@ -191,7 +191,25 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		txErr := tx.Session(&gorm.Session{FullSaveAssociations: true}).Model(&groupToUpdate).Omit("ID", "is_all_group").Updates(&groupToUpdate).Error
+		// Read the members' grant restriction flags FIRST, before anything writes the
+		// roster. Both the FullSaveAssociations Updates below and the association
+		// Replace further down persist GroupMember rows rebuilt from the request
+		// command, which carry both flags at their zero value — so a plain group edit
+		// (even just a rename) would otherwise clear every member's restriction and
+		// silently widen them back to their role's full set.
+		grantFlags, txErr := GetMemberGrantFlagsForGroup(tx, uintId)
+		if txErr != nil {
+			return txErr
+		}
+		for i := range groupToUpdate.GroupMembers {
+			flags, isExistingMember := grantFlags[groupToUpdate.GroupMembers[i].UserID]
+			if isExistingMember {
+				groupToUpdate.GroupMembers[i].CategoryGrantsRestricted = flags.CategoryGrantsRestricted
+				groupToUpdate.GroupMembers[i].TagGrantsRestricted = flags.TagGrantsRestricted
+			}
+		}
+
+		txErr = tx.Session(&gorm.Session{FullSaveAssociations: true}).Model(&groupToUpdate).Omit("ID", "is_all_group").Updates(&groupToUpdate).Error
 		if txErr != nil {
 			return txErr
 		}
@@ -204,6 +222,15 @@ func (repository GroupRepository) UpdateGroup(command commands.UpsertGroupComman
 		}
 
 		txErr = tx.Model(&groupToUpdate).Association("GroupMembers").Unscoped().Replace(groupToUpdate.GroupMembers)
+		if txErr != nil {
+			return txErr
+		}
+
+		// The replace above rewrites the whole roster, so any member it dropped still
+		// has per-member category/tag grant rows behind them. Clear whatever no longer
+		// has a membership — retained members keep theirs, and a removed member cannot
+		// have their old visibility silently restored by being re-added later.
+		txErr = DeleteOrphanedMemberGrants(tx, uintId)
 		if txErr != nil {
 			return txErr
 		}

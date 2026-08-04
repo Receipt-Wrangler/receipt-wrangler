@@ -1,0 +1,9 @@
+:host {
+  display: block;
+}
+
+// Pull the hint up under its picker, which carries its own bottom margin.
+.grant-picker__hint {
+  margin-top: -0.5rem;
+  margin-bottom: 0.75rem;
+}

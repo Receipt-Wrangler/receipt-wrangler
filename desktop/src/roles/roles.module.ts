@@ -9,6 +9,7 @@ import { PipesModule } from "src/pipes/pipes.module";
 import { AutocompleteModule } from "../autocomplete/autocomplete.module";
 import { ButtonModule } from "../button";
 import { CategoryAutocompleteComponent } from "../category-autocomplete/category-autocomplete.component";
+import { GrantPickerComponent } from "../shared-ui/grant-picker/grant-picker.component";
 import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { TagAutocompleteComponent } from "../tag-autocomplete/tag-autocomplete.component";
@@ -41,6 +42,7 @@ import { RolesRoutingModule } from "./roles-routing.module";
     AutocompleteModule,
     CategoryAutocompleteComponent,
     TagAutocompleteComponent,
+    GrantPickerComponent,
   ],
 })
 export class RolesModule {}

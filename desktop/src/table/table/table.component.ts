@@ -45,6 +45,7 @@ export class TableComponent implements OnChanges {
   public expandedElement: any;
 
   public rowIndexes: { [key: number]: number } = {};
+  private rowIndexesByReference = new Map<any, number>();
 
   constructor(private _liveAnnouncer: LiveAnnouncer) {}
 
@@ -74,13 +75,47 @@ export class TableComponent implements OnChanges {
     }
   }
 
+  /**
+   * The index a cell template should act on: the row's position in the ORIGINAL
+   * data, so an action still targets the right record after the table is sorted.
+   *
+   * Rows WITHOUT an id (e.g. GroupMember, whose key is composite userId+groupId)
+   * fall back to the rendered index. They used to all collapse onto a single
+   * `undefined` key in rowIndexes, so every such row reported the LAST row's
+   * index — meaning edit/delete in an actions column hit the wrong record.
+   */
+  public indexFor(element: any): number {
+    if (element?.id !== undefined && element?.id !== null) {
+      const mapped = this.rowIndexes[element.id];
+      if (mapped !== undefined) {
+        return mapped;
+      }
+    }
+    // Reference lookup — the table renders these exact objects, so this resolves
+    // an id-less row to its real position. Precomputed rather than an indexOf
+    // scan, because the template calls this for every rendered cell.
+    return this.rowIndexesByReference.get(element) ?? -1;
+  }
+
+  // Two maps because the rows have two possible identities: by id where there is
+  // one, by object reference for composite-key rows (e.g. GroupMember).
+  //
+  // Both rely on callers REPLACING the dataSource rather than mutating its `data`
+  // in place — which every consumer does (`dataSource.set(new MatTableDataSource(...))`),
+  // and which is what makes ngOnChanges fire. An in-place mutation would leave both
+  // maps stale and indexFor pointing at the wrong record.
   private setRowIndexes(): void {
     const indexes: { [key: number]: number } = {};
+    const byReference = new Map<any, number>();
     this.dataSource().data.forEach((row, index) => {
-      indexes[row.id] = index;
+      if (row.id !== undefined && row.id !== null) {
+        indexes[row.id] = index;
+      }
+      byReference.set(row, index);
     });
 
     this.rowIndexes = indexes;
+    this.rowIndexesByReference = byReference;
   }
 
   public isAllSelected() {

@@ -650,6 +650,41 @@ func (repository RoleRepository) GetGroupRolePaidByConfig(groupRoleId uint) (inc
 	return role.IncludeOwnPaidReceipts, role.PaidByVisibilityRestricted, nil
 }
 
+// GetGroupRoleIndividualGrantConfig returns whether a group role requires
+// per-member category / tag assignment. When set, a member holding the role with
+// no membership grants of their own sees nothing at all rather than falling back
+// to the role's set — so forgetting to assign a new member fails closed.
+func (repository RoleRepository) GetGroupRoleIndividualGrantConfig(groupRoleId uint) (categories bool, tags bool, err error) {
+	db := repository.GetDB()
+
+	var role models.GroupRoleDefinition
+	err = db.Select("requires_individual_category_grants", "requires_individual_tag_grants").
+		Where("id = ?", groupRoleId).
+		First(&role).Error
+	if err != nil {
+		return false, false, err
+	}
+
+	return role.RequiresIndividualCategoryGrants, role.RequiresIndividualTagGrants, nil
+}
+
+// SetGroupRoleIndividualGrantConfig records whether a group role requires
+// per-member category / tag assignment.
+//
+// Kept a separate method from CreateGroupRole / UpdateGroupRole — whose positional
+// signatures already end in two bools — for the same reason
+// ReplaceGroupRoleReportTemplateGrants is separate: appending two more would make
+// four adjacent bools at every call site, which is trivially transposable and
+// silently wrong when it is. Uses the map form so a toggled-off false persists.
+func (repository RoleRepository) SetGroupRoleIndividualGrantConfig(groupRoleId uint, requiresCategories bool, requiresTags bool) error {
+	return repository.GetDB().Model(&models.GroupRoleDefinition{}).
+		Where("id = ?", groupRoleId).
+		Updates(map[string]interface{}{
+			"requires_individual_category_grants": requiresCategories,
+			"requires_individual_tag_grants":      requiresTags,
+		}).Error
+}
+
 // GetGroupRoleReportTemplateGrants returns a group role's report-template grant
 // rows (one per template+action). An empty result means the role is unrestricted
 // (act on every template its group access reaches) unless

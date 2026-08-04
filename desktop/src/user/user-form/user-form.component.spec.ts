@@ -5,11 +5,21 @@ import { ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatDialog, MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
-import { of, throwError } from "rxjs";
-import { ApiModule, PermissionScope, Role, RoleService, User, UserService } from "../../open-api";
+import { Observable, of, throwError } from "rxjs";
+import {
+  ApiModule,
+  GroupsService,
+  Permission,
+  PermissionScope,
+  Role,
+  RoleService,
+  User,
+  UserService,
+} from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService, TokenRefreshService } from "../../services";
-import { AddUser, AuthState, UpdateUser, UserState } from "../../store";
+import { AddUser, AuthState, GroupState, SetGroups, UpdateUser, UserState } from "../../store";
+import { SetPermissions } from "../../store/auth.state.actions";
 import { UserFormComponent } from "./user-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -45,7 +55,7 @@ describe("UserFormComponent", () => {
     await TestBed.configureTestingModule({
     declarations: [UserFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [NgxsModule.forRoot([AuthState, UserState]),
+    imports: [NgxsModule.forRoot([AuthState, UserState, GroupState]),
         ReactiveFormsModule,
         PipesModule,
         MatDialogModule,
@@ -282,6 +292,42 @@ describe("UserFormComponent", () => {
     expect(dialogRefSpy).toHaveBeenCalledWith(true);
   });
 
+  it("keeps the dialog open when creating the user fails", () => {
+    // Closing on failure would report a create that never happened and discard
+    // everything the admin typed.
+    const errorSpy = jest
+      .spyOn(TestBed.inject(SnackbarService), "error")
+      .mockReturnValue();
+    const successSpy = jest
+      .spyOn(TestBed.inject(SnackbarService), "success")
+      .mockReturnValue();
+    jest
+      .spyOn(TestBed.inject(UserService), "getUsernameCount")
+      .mockReturnValue(of(0 as any));
+    jest
+      .spyOn(TestBed.inject(UserService), "createUser")
+      .mockReturnValue(
+        throwError(() => ({ error: { username: "Username already exists" } })) as any
+      );
+
+    const dialogRefSpy = jest.spyOn(component.matDialogRef, "close");
+    component.ngOnInit();
+
+    component.form.patchValue({
+      displayName: "Pizza man",
+      username: "Waffle guy",
+      isDummyUser: false,
+      password: "Dough boy",
+      appRoleId: 5,
+    });
+
+    component.submit();
+
+    expect(errorSpy).toHaveBeenCalledWith("Username already exists");
+    expect(successSpy).not.toHaveBeenCalled();
+    expect(dialogRefSpy).not.toHaveBeenCalled();
+  });
+
   it("should disable empty and disable password field if isDummyUser is true", () => {
     component.ngOnInit();
     component.form.patchValue({
@@ -370,5 +416,221 @@ describe("UserFormComponent", () => {
 
     expect(openSpy).toHaveBeenCalledTimes(1);
     expect(openSpy.mock.calls[0][1]?.data?.role).toEqual(defaultAppRole);
+  });
+
+  describe("per-member category/tag assignment", () => {
+    const groups = [
+      {
+        id: 100,
+        name: "Agency",
+        groupMembers: [
+          { userId: 1, groupId: 100, groupRoleId: 8, categoryGrants: [5], tagGrants: [] },
+        ],
+      },
+    ] as any[];
+
+    const user: User = {
+      id: 1,
+      displayName: "Foster Parent",
+      username: "fparent",
+      appRoleId: 7,
+    } as User;
+
+    function seedGroups(): void {
+      store.dispatch(new SetGroups(groups));
+    }
+
+    // The grant endpoint is gated on a GROUP-scoped permission with no app-level
+    // bypass, so the admin-only user form still has to hold it per group.
+    function grantWritePermission(groupId = 100): void {
+      store.dispatch(
+        new SetPermissions([], { [groupId]: [Permission.GroupMembersGrantsUpdate] })
+      );
+    }
+
+    /**
+     * Builds an edit-mode component with everything submit() touches stubbed.
+     *
+     * Every test below needs the same six spies and differs only in what the two
+     * writes return, so they are parameters rather than a copy of the block.
+     */
+    async function createEditForm(
+      results: {
+        grants?: Observable<unknown>;
+        userUpdate?: Observable<unknown>;
+      } = {}
+    ) {
+      // Seed groups BEFORE stubbing dispatch — the rows are read from GroupState.
+      seedGroups();
+      grantWritePermission();
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+
+      const successSpy = jest
+        .spyOn(TestBed.inject(SnackbarService), "success")
+        .mockReturnValue();
+      jest
+        .spyOn(TestBed.inject(UserService), "getUsernameCount")
+        .mockReturnValue(of(0 as any));
+      jest
+        .spyOn(TestBed.inject(UserService), "updateUserById")
+        .mockReturnValue((results.userUpdate ?? of(undefined)) as any);
+      jest
+        .spyOn(TestBed.inject(TokenRefreshService), "refreshToken")
+        .mockReturnValue(of(undefined as any));
+      const updateGrantsSpy = jest
+        .spyOn(TestBed.inject(GroupsService), "updateGroupMemberGrants")
+        .mockReturnValue((results.grants ?? of({})) as any);
+
+      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      const closeSpy = jest.spyOn(freshComponent.matDialogRef, "close");
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      return { freshFixture, freshComponent, successSpy, updateGrantsSpy, closeSpy };
+    }
+
+    it("shows no assignment rows when creating a user", async () => {
+      // Grants hang off a MEMBERSHIP, and a user being created has none yet.
+      seedGroups();
+      const freshComponent = await createWithRoles(of([defaultAppRole, groupRole]));
+      freshComponent.ngOnInit();
+
+      expect(freshComponent.grantRows()).toEqual([]);
+    });
+
+    it("renders no rows without group.members.grants.update", async () => {
+      // The endpoint declares no app-level bypass, so an admin who lacks the
+      // group-scoped permission would only get a rejected request. `grantRows`
+      // drives the whole section, so it disappears rather than showing dead
+      // controls.
+      seedGroups();
+      store.dispatch(new SetPermissions([], {}));
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      expect(freshComponent.grantRows()).toEqual([]);
+    });
+
+    it("renders only the groups the admin may write grants in", async () => {
+      seedGroups();
+      // Held for a DIFFERENT group than the one the user belongs to.
+      store.dispatch(
+        new SetPermissions([], { 999: [Permission.GroupMembersGrantsUpdate] })
+      );
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      expect(freshComponent.grantRows()).toEqual([]);
+    });
+
+    it("builds one row per group the edited user belongs to", async () => {
+      seedGroups();
+      grantWritePermission();
+      getRolesMock.mockReturnValue(of([defaultAppRole, groupRole]));
+      const freshFixture = TestBed.createComponent(UserFormComponent);
+      const freshComponent = freshFixture.componentInstance;
+      freshComponent.user = user;
+      freshComponent.ngOnInit();
+      await freshFixture.whenStable();
+
+      const rows = freshComponent.grantRows();
+      expect(rows.length).toBe(1);
+      expect(rows[0].groupName).toBe("Agency");
+      expect(rows[0].roleName).toBe("Legacy Owner");
+      expect(rows[0].current.categoryIds).toEqual([5]);
+    });
+
+    it("writes changed assignments through the grants endpoint on submit", async () => {
+      const { freshFixture, freshComponent, updateGrantsSpy } = await createEditForm();
+
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      expect(updateGrantsSpy).toHaveBeenCalledWith(100, 1, {
+        categoryGrants: [5, 6],
+        tagGrants: [],
+      });
+    });
+
+    // The user record and the grants are two independent writes, so the success
+    // message must speak for both — announcing it after the first one claims an
+    // assignment that never saved.
+    it("reports success only after the grants save succeeds", async () => {
+      const { freshFixture, freshComponent, successSpy } = await createEditForm({
+        grants: throwError(() => new Error("400 ceiling violation")),
+      });
+
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      expect(successSpy).not.toHaveBeenCalled();
+    });
+
+    it("keeps the dialog open when the grants save fails", async () => {
+      // The other half of the contract: the interceptor reports the failure, and
+      // the selection survives so the admin can correct it instead of retyping.
+      const { freshFixture, freshComponent, closeSpy } = await createEditForm({
+        grants: throwError(() => new Error("400 ceiling violation")),
+      });
+
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      expect(closeSpy).not.toHaveBeenCalled();
+    });
+
+    it("reports nothing and keeps the dialog open when the user update fails", async () => {
+      const { freshFixture, freshComponent, successSpy, closeSpy, updateGrantsSpy } =
+        await createEditForm({
+          userUpdate: throwError(() => new Error("500")),
+        });
+
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      expect(successSpy).not.toHaveBeenCalled();
+      expect(closeSpy).not.toHaveBeenCalled();
+      // The grants write is downstream of the user update, so it never runs.
+      expect(updateGrantsSpy).not.toHaveBeenCalled();
+    });
+
+    it("reports success once and closes the dialog when both writes land", async () => {
+      const { freshFixture, freshComponent, successSpy, closeSpy } = await createEditForm();
+
+      freshComponent.onGrantsChange(100, { categoryIds: [5, 6], tagIds: [] });
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      // Exactly once: a toast left behind at the old site would double up here.
+      expect(successSpy).toHaveBeenCalledTimes(1);
+      expect(successSpy).toHaveBeenCalledWith("User successfully updated");
+      expect(closeSpy).toHaveBeenCalledWith(true);
+    });
+
+    it("does not write assignments that were never edited", async () => {
+      const { freshFixture, freshComponent, updateGrantsSpy } = await createEditForm();
+
+      // Renaming the user must not rewrite their assignment.
+      freshComponent.submit();
+      await freshFixture.whenStable();
+
+      expect(updateGrantsSpy).not.toHaveBeenCalled();
+    });
   });
 });

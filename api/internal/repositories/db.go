@@ -138,6 +138,8 @@ func MakeMigrations() error {
 		&models.GroupRoleTagGrant{},
 		&models.GroupRolePaidByUserGrant{},
 		&models.GroupMember{},
+		&models.GroupMemberCategoryGrant{},
+		&models.GroupMemberTagGrant{},
 		&models.Comment{},
 		&models.Notification{},
 		&models.UserShortcut{},

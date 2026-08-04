@@ -1,1 +1,4 @@
 .claude
+
+# Redis snapshot, written wherever redis-server is started from
+dump.rdb

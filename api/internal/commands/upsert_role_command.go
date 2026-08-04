@@ -40,6 +40,13 @@ type UpsertRoleCommand struct {
 	// rejected on GROUP scope (a group role is assigned to a membership, long
 	// after the user was created). Default false ⇒ no effect on existing roles.
 	SkipDefaultGroupCreation bool `json:"skipDefaultGroupCreation"`
+	// RequiresIndividualCategoryGrants / RequiresIndividualTagGrants make per-member
+	// assignment MANDATORY for this role: a member holding it who has no individual
+	// grants sees nothing, rather than falling back to the role's set. This is what
+	// makes forgetting to assign a newly added member fail closed. Group-scoped only
+	// and default false ⇒ no effect on existing roles.
+	RequiresIndividualCategoryGrants bool `json:"requiresIndividualCategoryGrants"`
+	RequiresIndividualTagGrants      bool `json:"requiresIndividualTagGrants"`
 	// ReportTemplateGrants restrict which report templates members of a group role
 	// may act on, per action. Group-scoped only and opt-in: an empty set means
 	// unrestricted (act on every template the role's group access reaches). Each
@@ -119,7 +126,8 @@ func (command *UpsertRoleCommand) Validate() structs.ValidatorError {
 	if command.Scope == permissions.ScopeApp &&
 		(len(command.CategoryGrants) > 0 || len(command.TagGrants) > 0 ||
 			len(command.PaidByUserGrants) > 0 || command.IncludeOwnPaidReceipts ||
-			command.SeesAllMembers) {
+			command.SeesAllMembers ||
+			command.RequiresIndividualCategoryGrants || command.RequiresIndividualTagGrants) {
 		errors["grants"] = "Category, tag, paid-by, and member-visibility settings are only valid on group roles"
 	}
 

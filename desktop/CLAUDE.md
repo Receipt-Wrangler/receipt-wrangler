@@ -216,6 +216,60 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   pool objects by an effect once the pool arrives) and serialized back as id arrays on
   `UpsertRoleCommand` for group scope only. The grant pickers pass `[creatable]="false"` (pick from
   existing, never create). See `api/CLAUDE.md` → "Data model".
+- **Shared grant picker (`src/shared-ui/grant-picker/`):** the category/tag grant UI is a standalone
+  `app-grant-picker` used by **three** forms — `role-form` (a group role's grants), `user-form` and
+  `group-member-form` (an individual member's assignment). It owns the two autocomplete `FormArray`s
+  and the pool→id resolution effect, takes `[selectedCategoryIds]`/`[selectedTagIds]` and emits
+  `(grantsChange)` with the current ids. An optional `[ceiling]` (`GrantCeiling`) **filters the offered
+  pool** and shows a hint naming the constraint — filtering rather than per-option disabling because
+  the shared `app-autocomlete` has no per-option disable support and adding one would touch a
+  component used app-wide. **It emits nothing while merely seeding itself** (`emitEvent: false`), so a
+  host must not treat "no emission" as "empty selection" — `role-form` uses a `linkedSignal`
+  (`grantSelection`) defaulting to the loaded role's grants, or an untouched save would wipe them.
+  `shared-ui/grant-picker/member-grant-assignment.ts` holds the shared row-building
+  (`buildMemberGrantRows`, `ceilingForRole`) and the diff-and-write helper
+  (`saveChangedMemberGrants`), so the two member-facing entry points cannot drift.
+  - **It stops seeding once the user edits.** The effect's inputs keep changing after mount (the
+    pool arrives async; the ceiling changes again when the host's role list resolves), so without
+    that guard a late re-run silently discards the user's selection and hands the host back the
+    original value.
+  - **Each instance passes a unique `inputId`** to the autocompletes. The base `app-autocomlete`
+    otherwise derives the input's DOM id from its label, so the user form's N pickers would all
+    render `id="categories"` — which breaks `<label for>` association for every field after the
+    first and misdirects the base component's `getElementById`-based filter clear to the first
+    instance. `app-category-autocomplete` / `app-tag-autocomplete` gained an `inputId` passthrough
+    for this.
+- **Per-member category/tag assignment (`user-form`, `group-member-form`):** grants hang off a group
+  **membership**, so both forms only offer the picker for a membership that already exists on the
+  server — `user-form` renders one section per group the **edited** user belongs to (nothing in add
+  mode), and `group-member-form` shows it only when editing an already-persisted member. They write
+  through the dedicated **`PUT /group/{groupId}/member/{userId}/grants`** endpoint (its own permission,
+  `group.members.grants.update`), **not** the group-member upsert — so grants are saved independently
+  of the parent form and the two entry points cannot clobber each other via `UpdateGroup`'s wholesale
+  roster replace. Only **changed** rows issue a request. The role's own grants supply the picker's
+  ceiling; the backend re-validates and 400s an out-of-ceiling id. See `api/CLAUDE.md` →
+  "Category/tag grant resolution".
+  - **Gated on `group.members.grants.update`, per group.** The endpoint declares **no**
+    `OrAppPermissions` bypass, so holding `app.users.update` (user form) or `group.members.update`
+    (member dialog) is not enough. `user-form` filters `grantRows()` to the groups the admin holds it
+    in — so the section disappears when none qualifies — and `group-member-form` wraps its block in
+    `*hasGroupPermission`. Without this both forms render pickers whose saves can only 403.
+  - **The "leave empty" guidance is conditional.** `MemberGrantRow` carries
+    `requiresIndividualCategories`/`requiresIndividualTags` from the role, and the shared
+    `emptySelectionHint(row)` turns them into the right sentence: normally empty means "everything the
+    role allows", but under a require-individual role empty means **nothing**. Both forms render that
+    helper rather than hard-coded text — the wording is the only thing that tells an admin which rule
+    is in force, so it must not drift between the two entry points.
+  - **Reporting the outcome:** because the grants are a *second* write that can fail on its own, both
+    forms fire their success toast only **after** it lands, and a failed write leaves the dialog open
+    (a trailing `catchError` — the interceptor already reports the error) so the admin can correct the
+    selection instead of losing it. `user-form` is the only submit in the app with two writes, so this
+    is where the general "toast in a `tap` on the write it describes" convention needs stating: the
+    message must speak for *all* the writes it covers, not just the first.
+- **Require-individual-assignment toggles (`role-form`, group roles only):** two `app-checkbox`es in
+  the grants section bound to `requiresIndividualCategoryGrants` / `requiresIndividualTagGrants`. When
+  on, a member of that role with no individual assignment sees **nothing** rather than the role's set,
+  so a newly added member is never exposed by default. Default off — existing roles are unchanged.
 - **Paid-by visibility (group roles only):** the same group-scoped grants section also shows a
   "Paid-by visibility" picker — a single `app-autocomlete` multi-select over `paidByOptions()` (a
   pinned **"Their own receipts"** sentinel option, id `OWN_PAID_RECEIPTS_OPTION_ID = -1`, followed by
@@ -622,6 +676,46 @@ In CI the same spec files run against the demo URL. GitHub secrets populate the 
   unaffected). The generated password is asserted in `generate-password.spec.ts`, which also grants
   `permissions: ['clipboard-read', 'clipboard-write']` in `test.use` — the only clipboard-reading
   spec in the suite.
+
+### Per-member category/tag grant specs
+
+Three specs cover the per-member grant feature (see `api/CLAUDE.md` → "Category/tag grant
+resolution"). They use the standard **`e2e-user`** as the restricted member with custom **group**
+roles — no custom app role or per-spec `storageState` is needed, because the default app role
+(Legacy User) omits `app.categories.read`/`app.tags.read`, so that user does **not** get the admin
+grant bypass and is genuinely restrictable.
+
+- **`member-grant-visibility.spec.ts`** — the composed semantics: role-only, member-only, the
+  intersection, a role narrowed below an existing assignment (fails closed), clearing, category/tag
+  independence, the require-individual toggle both ways, the write-side 403 on an out-of-grant
+  category, and that the receipt form's picker offers exactly the effective set. Assertions read
+  `apiMemberCatalog` (appData's per-group catalogs) — the same array the desktop pickers render
+  from, so it tests the real delivery path rather than a parallel one.
+- **`member-grant-security.spec.ts`** — the silent failure modes: a member with
+  `group.members.update` but **not** `group.members.grants.update` is denied (with the positive
+  contrast), ceiling/existence/non-member rejections, the URL (not the body) identifying the
+  membership, and the two lifecycle regressions — a group rename preserving both the assignment and
+  its restriction flag, and no grant resurrection when a removed member rejoins. Both lifecycle
+  tests were verified to FAIL when their fix is reverted.
+- **`member-grant-assignment.spec.ts`** — the authoring UI: one section per group, the ceiling
+  narrowing the offered pool plus its hint, the unrestricted case, assignment persisting, an
+  untouched save issuing **no** grants request, both add-modes hiding the section, the role form
+  rehydrating its grants, and the **"one record, two doors"** check that the group-member dialog and
+  the user form edit the same membership.
+
+Helpers added to `e2e/helpers/provisioning.ts`: `apiCreateCategory`/`apiCreateTag` (+ deletes),
+`apiSetMemberGrants` (returns the raw response so specs assert 200/400/403/404), `apiMemberCatalog`,
+`apiSetGroupRoster`, `apiGetGroupMembers`, plus `categoryGrants`/`tagGrants`/`requiresIndividual*` on
+`UpsertRolePayload` and `CreateRoleOptions`.
+
+**Gotchas these specs encode:**
+- **Categories/tags are global with a unique name** — every spec mints `uniqueName`-suffixed ones and
+  deletes them in `afterAll`, or a re-run's create fails.
+- **Teardown order:** group → role → categories/tags (a role can't be deleted while assigned).
+- The group roster is only editable on `/groups/:id/details/**edit**`; `/details/view` is read-only.
+- The group-member dialog's submit is dispatched (`dispatchEvent('click')`) rather than clicked:
+  adding a chip grows the dialog and MatDialog re-centres, so the footer button never satisfies
+  Playwright's stability check.
 
 ### Permission-gating specs (provisioned roles/users/groups)
 

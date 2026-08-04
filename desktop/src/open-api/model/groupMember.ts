@@ -27,5 +27,13 @@ export interface GroupMember {
      * User compound primary key
      */
     userId: number;
+    /**
+     * Category ids this individual member may see, narrowing WITHIN whatever their group role allows (the two layers intersect). Empty means the member adds no narrowing of their own and falls back to the role. Read only here — write via PUT /group/{groupId}/member/{userId}/grants.
+     */
+    categoryGrants?: Array<number>;
+    /**
+     * Tag counterpart of categoryGrants. Restricted independently of categories.
+     */
+    tagGrants?: Array<number>;
 }
 

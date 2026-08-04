@@ -23,13 +23,51 @@ type matcher func(granted []string, required ...string) bool
 // kept as separate entry points; both share the permissions package matcher.
 type PermissionService struct {
 	BaseService
+
+	// grantMemo caches resolveEffectiveGrants per (user, group), so the category and
+	// tag accessors — which each resolve the FULL set — share one membership lookup
+	// instead of doing the work twice. See resolveEffectiveGrants.
+	//
+	// Entries carry the group-role grant cache's eviction generation and are
+	// discarded once it advances, so a role update invalidates this memo too rather
+	// than only the process-wide role cache.
+	//
+	// A map (not a pointer field) because every method has a value receiver: copies
+	// of the service share the same memo, which is what lets a resolver struct
+	// holding a copy (groupVisibilityResolver, receiptGrantFilter) benefit too.
+	grantMemo map[grantMemoKey]grantMemoEntry
 }
 
+// grantMemoKey identifies one resolution. Grants are per membership, so the user
+// alone is not enough — the same user resolves differently in each group.
+type grantMemoKey struct {
+	userId  uint
+	groupId uint
+}
+
+// grantMemoEntry is a memoized resolution plus the eviction generation it was
+// computed under. A nil grants field is a real answer ("not a member"), which is
+// why presence is tested rather than the value.
+type grantMemoEntry struct {
+	grants     *effectiveGrantSet
+	generation uint64
+}
+
+// NewPermissionService builds a request-scoped permission service.
+//
+// It memoizes grant resolution (see resolveEffectiveGrants). Role-grant changes
+// invalidate that memo through the eviction generation, but a MEMBER-level grant
+// write does not — so do not hold one instance across a call that reassigns a
+// member's individual grants. No current flow does: the grants endpoint uses
+// GroupService and constructs no PermissionService.
 func NewPermissionService(tx *gorm.DB) PermissionService {
-	service := PermissionService{BaseService: BaseService{
-		DB: repositories.GetDB(),
-		TX: tx,
-	}}
+	service := PermissionService{
+		BaseService: BaseService{
+			DB: repositories.GetDB(),
+			TX: tx,
+		},
+		grantMemo: make(map[grantMemoKey]grantMemoEntry),
+	}
 	return service
 }
 

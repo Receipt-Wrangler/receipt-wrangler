@@ -17,3 +17,6 @@ api
 ./dev/mariadb/data
 ./dev/mariadb/data/*
 /wranglervenv/*
+
+# Redis snapshot written when redis-server is run from this directory
+dump.rdb

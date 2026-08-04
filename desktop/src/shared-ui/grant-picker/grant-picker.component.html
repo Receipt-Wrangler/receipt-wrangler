@@ -1,0 +1,33 @@
+<app-category-autocomplete
+  class="w-100"
+  data-testid="grant-picker-categories"
+  [inputId]="categoryInputId"
+  [inputFormControl]="$any(grantedCategories)"
+  [categories]="availableCategories()"
+  [creatable]="false"
+  [readonly]="readonly()"
+></app-category-autocomplete>
+
+@if (categoryCeilingHint()) {
+  <div
+    class="hint hint-inline grant-picker__hint"
+    data-testid="grant-picker-category-ceiling"
+  >{{ categoryCeilingHint() }}</div>
+}
+
+<app-tag-autocomplete
+  class="w-100"
+  data-testid="grant-picker-tags"
+  [inputId]="tagInputId"
+  [inputFormControl]="$any(grantedTags)"
+  [tags]="availableTags()"
+  [creatable]="false"
+  [readonly]="readonly()"
+></app-tag-autocomplete>
+
+@if (tagCeilingHint()) {
+  <div
+    class="hint hint-inline grant-picker__hint"
+    data-testid="grant-picker-tag-ceiling"
+  >{{ tagCeilingHint() }}</div>
+}
