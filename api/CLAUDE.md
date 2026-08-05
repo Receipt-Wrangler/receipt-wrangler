@@ -775,7 +775,11 @@ drive it (`models.SystemSettings`, edited via the System Settings UI, validated 
 - `showLoginQr` (bool, default false) — opt-in toggle.
 - `mobileServerUrl` (string) — the server/API URL mobile clients connect to; required (absolute
   http/https, validated by `isValidAbsoluteUrl` — the former `isValidMcpPublicUrl`, generalized and
-  now shared by both settings) when `showLoginQr` is on.
+  now shared by both settings) when `showLoginQr` is on. `isValidAbsoluteUrl` also rejects **embedded
+  credentials** (`https://user:token@host`): both settings it guards are published to unauthenticated
+  clients — this one inside the login QR on the public `/featureConfig`, `mcpPublicUrl` in the OAuth
+  discovery metadata — so userinfo would be handed out verbatim. **http stays valid** on purpose:
+  LAN / bare-IP self-hosting is a supported deployment (the mobile Connect screen accepts http too).
 
 `SystemSettingsService.GetFeatureConfig()` derives a single **`FeatureConfig.LoginQrUrl`** from them
 via `BuildLoginQrUrl` (`services/system_settings.go`): the App Link / Universal Link

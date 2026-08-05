@@ -17,6 +17,15 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    # This job and mobile-e2e.yml's android-e2e job drive the SAME backend
+    # (secrets.E2E_BASE_URL) and both mutate global System Settings -- e.g. the
+    # login-QR toggle, which each suite asserts on. Their workflow-level
+    # concurrency groups differ, so this shared job-level group is what keeps
+    # them from overlapping. cancel-in-progress must stay false: the point is to
+    # queue the second suite, not kill it.
+    concurrency:
+      group: e2e-shared-backend-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

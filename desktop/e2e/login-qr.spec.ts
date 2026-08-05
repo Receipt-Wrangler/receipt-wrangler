@@ -7,29 +7,45 @@ import { withAdminApi } from './helpers/provisioning';
 const SERVER_URL = 'https://e2e-mobile.example.com/api';
 const QR_IMG_NAME = 'Scan to set up the Receipt Wrangler mobile app';
 
-// `showLoginQr` is a GLOBAL system setting, so these tests mutate shared server
-// state and must run serially. afterAll force-reverts it so the QR can't leak
-// onto the parallel suite's login page.
+// `showLoginQr` / `mobileServerUrl` are GLOBAL system settings, so these tests
+// mutate shared server state and must run serially. afterAll puts both fields
+// back to whatever they were before the suite -- never a hardcoded "off", which
+// would silently disable the QR on an environment that had it enabled.
 test.describe.serial('Login QR (System Settings → login page)', () => {
-  let original: Record<string, unknown> | undefined;
+  let originalShowLoginQr: unknown;
+  let originalMobileServerUrl: unknown;
 
   test.beforeAll(async () => {
     await withAdminApi(async (api) => {
-      original = await (await api.get('/api/systemSettings')).json();
+      const res = await api.get('/api/systemSettings');
+      if (!res.ok()) {
+        throw new Error(`GET /api/systemSettings failed: HTTP ${res.status()}`);
+      }
+      const settings = await res.json();
+      originalShowLoginQr = settings.showLoginQr;
+      originalMobileServerUrl = settings.mobileServerUrl;
     });
   });
 
   test.afterAll(async () => {
-    if (!original) {
-      return;
-    }
-    // Restore the full settings object (it's an upsert with required currency /
-    // taskConcurrency fields), forcing the login QR back off.
-    await withAdminApi(async (api) => {
-      await api.put('/api/systemSettings', {
-        data: { ...original, showLoginQr: false, mobileServerUrl: '' },
+    // Re-read the live settings and overlay only the two captured fields, so a
+    // concurrent change to an unrelated setting isn't clobbered by a stale
+    // snapshot (the PUT is an upsert needing the full object). Mirrors
+    // mobile/integration_test/helpers/login_qr_fixtures.dart.
+    try {
+      await withAdminApi(async (api) => {
+        const current = await (await api.get('/api/systemSettings')).json();
+        await api.put('/api/systemSettings', {
+          data: {
+            ...current,
+            showLoginQr: originalShowLoginQr ?? false,
+            mobileServerUrl: originalMobileServerUrl ?? '',
+          },
+        });
       });
-    });
+    } catch {
+      // Best-effort teardown -- don't mask the suite's real result.
+    }
   });
 
   test('admin enables the login QR in System Settings and it persists', async ({

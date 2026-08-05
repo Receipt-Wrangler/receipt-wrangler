@@ -117,9 +117,14 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 
 // isValidAbsoluteUrl reports whether the value is an absolute http(s) URL.
 // A scheme and host are required; paths/queries/fragments are tolerated.
+//
+// Embedded credentials (https://user:token@host) are rejected: both settings
+// this guards are published verbatim to unauthenticated clients — the mobile
+// server URL is encoded into the login QR served by the public /featureConfig,
+// and the MCP public URL is echoed in the OAuth discovery metadata.
 func isValidAbsoluteUrl(raw string) bool {
 	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Host == "" {
+	if err != nil || parsed.Host == "" || parsed.User != nil {
 		return false
 	}
 

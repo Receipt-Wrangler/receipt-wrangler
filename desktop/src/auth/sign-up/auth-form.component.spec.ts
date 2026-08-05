@@ -103,4 +103,36 @@ describe('AuthForm', () => {
       fixture.nativeElement.querySelector('img.login-qr-code')
     ).toBeTruthy();
   });
+
+  it('ignores a stale QR generation that resolves after a newer one', async () => {
+    // Hand out manually-resolved promises so the two generations can be
+    // completed out of order.
+    const resolvers: Array<(dataUrl: string) => void> = [];
+    (QRCode.toDataURL as jest.Mock).mockImplementation(
+      () => new Promise<string>((resolve) => resolvers.push(resolve))
+    );
+    const store = TestBed.inject(Store);
+
+    const setLoginQrUrl = (loginQrUrl: string) => {
+      store.dispatch(
+        new SetFeatureConfig({
+          enableLocalSignUp: false,
+          aiPoweredReceipts: false,
+          loginQrUrl,
+        })
+      );
+      fixture.detectChanges();
+    };
+
+    setLoginQrUrl('https://receiptwrangler.io/app/setup#url=stale');
+    setLoginQrUrl('https://receiptwrangler.io/app/setup#url=current');
+    expect(resolvers.length).toBe(2);
+
+    // Reverse order: the current generation finishes first, then the stale one.
+    resolvers[1]('data:image/png;base64,CURRENT');
+    resolvers[0]('data:image/png;base64,STALE');
+    await fixture.whenStable();
+
+    expect(component.qrDataUrl()).toBe('data:image/png;base64,CURRENT');
+  });
 });

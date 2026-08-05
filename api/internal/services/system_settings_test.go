@@ -111,6 +111,18 @@ func TestGetFeatureConfigLoginQrUrl(t *testing.T) {
 			mobileServerUrl: "https://demo.receiptwrangler.io/api",
 			want:            BuildLoginQrUrl("https://demo.receiptwrangler.io/api"),
 		},
+		{
+			name:            "enabled with a padded url encodes the trimmed url",
+			show:            true,
+			mobileServerUrl: "  https://demo.receiptwrangler.io/api  ",
+			want:            BuildLoginQrUrl("https://demo.receiptwrangler.io/api"),
+		},
+		{
+			name:            "enabled with a whitespace-only url is empty",
+			show:            true,
+			mobileServerUrl: "   ",
+			want:            "",
+		},
 	}
 
 	for _, test := range tests {

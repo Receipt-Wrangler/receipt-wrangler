@@ -181,6 +181,66 @@ describe("SystemSettingsFormComponent", () => {
     expect(mobileServerUrl.valid).toBe(true);
   });
 
+  it("rejects a mobile server url that is not an absolute http(s) url", () => {
+    component.ngOnInit();
+
+    const showLoginQr = component.form.get("showLoginQr")!;
+    const mobileServerUrl = component.form.get("mobileServerUrl")!;
+    showLoginQr.setValue(true);
+
+    // Whitespace satisfies Validators.required but the backend trims first, so
+    // it would be rejected server-side as missing.
+    mobileServerUrl.setValue("   ");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+
+    mobileServerUrl.setValue("receipts.example.com/api");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+
+    mobileServerUrl.setValue("ftp://receipts.example.com");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+
+    // Credentials would be published verbatim by the public login QR.
+    mobileServerUrl.setValue("https://user:token@receipts.example.com/api");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+
+    // http stays valid -- LAN / bare-IP self-hosting is supported.
+    mobileServerUrl.setValue("http://192.168.1.50:8081/api");
+    expect(mobileServerUrl.valid).toBe(true);
+
+    mobileServerUrl.setValue("https://receipts.example.com/api");
+    expect(mobileServerUrl.valid).toBe(true);
+
+    // The format check applies with the toggle off too, mirroring the backend,
+    // which validates any non-empty url regardless of the toggle.
+    showLoginQr.setValue(false);
+    mobileServerUrl.setValue("ftp://receipts.example.com");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+  });
+
+  it("rejects an mcp public url that is not an absolute http(s) url", () => {
+    component.ngOnInit();
+
+    const mcpEnabled = component.form.get("mcpEnabled")!;
+    const mcpPublicUrl = component.form.get("mcpPublicUrl")!;
+    mcpEnabled.setValue(true);
+
+    mcpPublicUrl.setValue("   ");
+    expect(mcpPublicUrl.hasError("url")).toBe(true);
+
+    mcpPublicUrl.setValue("receipts.example.com");
+    expect(mcpPublicUrl.hasError("url")).toBe(true);
+
+    mcpPublicUrl.setValue("https://user:token@receipts.example.com");
+    expect(mcpPublicUrl.hasError("url")).toBe(true);
+
+    // The dev default must keep validating.
+    mcpPublicUrl.setValue("http://localhost:8081");
+    expect(mcpPublicUrl.valid).toBe(true);
+
+    mcpPublicUrl.setValue("https://receipts.example.com");
+    expect(mcpPublicUrl.valid).toBe(true);
+  });
+
   it("should submit form", () => {
     const systemSettingsService = TestBed.inject(SystemSettingsService);
     const snackbarService = TestBed.inject(SnackbarService);
