@@ -545,7 +545,12 @@ mitigation, matching the plain-QR path above).
   — `getInitialLink()` for cold start (stashed immediately so it survives the `FutureBuilder` first-paint
   gate) and `uriLinkStream` for warm/resumed. For each URI it runs `extractDeepLinkServerUrl`; on a match
   it sets `AuthModel.pendingServerUrl` and routes to `/`. The stream subscription is cancelled in
-  `dispose`.
+  `dispose`. Both sources are **injectable for tests** — `buildApp({initialDeepLink, deepLinkStream})`
+  → `ReceiptWrangler`, and `_initDeepLinks` falls back to the real plugin
+  (`widget.initialDeepLink ?? await _appLinks.getInitialLink()`, `widget.deepLinkStream ??
+  _appLinks.uriLinkStream`). `main()` passes neither. The seam exists because the e2e process runs **on**
+  the device and can't ask the OS to open a URL; mocking `app_links`' private channels instead would
+  couple the spec to plugin internals.
 - **Pre-fill** (`AuthModel.pendingServerUrl` + `SetHomeserverUrl`): the handler stashes the URL on
   `AuthModel.pendingServerUrl` (a nullable field with `setPendingServerUrl` / `clearPendingServerUrl`,
   both `notifyListeners`). `SetHomeserverUrl` consumes it in `build`: when non-null it `patchValue`s the
@@ -571,6 +576,21 @@ mitigation, matching the plain-QR path above).
     the **Debug** and **Release** Runner build configs in `project.pbxproj` (not RunnerTests, not Profile).
     Universal Links don't need an Info.plist change. Bundle id `io.receiptwrangler`, Apple Team ID
     `3VD3YNZ3KA` (already set).
+  - The hosted `.well-known/assetlinks.json` / `apple-app-site-association` files live on the
+    **receiptwrangler.io host** (nginx), not in this repo — nothing here can verify them, so a broken
+    association shows up only on a real device.
+- **E2E** (`integration_test/login_qr_deep_link_test.dart`): the cross-component contract test. It
+  enables the login QR for the run's own backend (`enableLoginQrForTest` in
+  `helpers/login_qr_fixtures.dart` — a **global** system-settings mutation, restored on teardown), reads
+  the **real** `loginQrUrl` the Go API composed off the unauthenticated `GET /featureConfig`, and feeds
+  that exact string to the app through the `buildApp` seam. Three cases: cold start (prefill → assert the
+  Go-escaped fragment round-trips to the exact server URL → **no auto-connect** → Connect → log in →
+  `GroupSelect`), warm stream delivery, and wrong-host / wrong-path links being ignored (with a positive
+  control so a dead subscription can't fake the pass). Go tests and the Dart unit tests each assert
+  against their own hardcoded strings — this spec is the only thing pinning the two together. The deep-link
+  stream fixture is a **single-subscription** `StreamController` on purpose: it buffers events until
+  `_initDeepLinks` attaches its listener (which happens after an `await`), where a broadcast controller
+  would silently drop them.
 
 ### Testing
 
@@ -758,9 +778,11 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - `integration_test/helpers/env.dart` — dart-define consumption + guards.
 - `integration_test/helpers/pump.dart` — `pumpUntilFound` polling helper.
 - `integration_test/helpers/platform_mocks.dart` — Linux-desktop platform-channel stubs for `permission_handler`, `gal`, `flutter_secure_storage`.
-- `integration_test/helpers/login.dart` / `api.dart` — UI + API login as admin, the shared e2e-user, or arbitrary credentials (`loginAs` / `apiLoginAs`).
+- `integration_test/login_qr_deep_link_test.dart` — the login-QR **deep link** end to end: reads the real `loginQrUrl` off `GET /featureConfig` and injects it via the `buildApp` seam. See "App Links / Universal Links" above.
+- `integration_test/helpers/login.dart` / `api.dart` — UI + API login as admin, the shared e2e-user, or arbitrary credentials (`loginAs` / `apiLoginAs`). `login.dart` also exposes the two halves `loginAs` is built from — `resetPersistedAppState()` (wipe secure storage + `basePath` so the app boots to the Connect screen) and `loginFromLoginScreen()` (credentials + `GroupSelect` landing) — for specs that reach the login screen some other way. `api.dart` carries the shared `getSystemSettings` / `putSystemSettings` (the PUT is an **upsert**: patch a fetched object, never send a partial body).
 - `integration_test/helpers/permission_fixtures.dart` — admin-API provisioning for permission specs: fresh user + group with a chosen system group role ("Legacy Viewer"/"Legacy Editor"), optional seeded receipt, `addTearDown` cleanup. Also mints **custom roles** for negative specs: `createRole`/`deleteRole`, `rolePermissionsByName`, and the convenience `provisionUserWithoutAppPermission` / `provisionGroupMemberWithoutPermission` (build a role = a Legacy role **minus one permission**). The backend won't delete an assigned role, so the role-delete teardown is registered **before** the user/group ones — LIFO makes it run last, after the assignments are gone.
 - `integration_test/helpers/feature_flags.dart` — `enableAiPoweredReceiptsForTest()`: toggles the Quick Scan flag by pointing systemSettings at a junk receiptProcessingSettings record, restoring on teardown.
+- `integration_test/helpers/login_qr_fixtures.dart` — `enableLoginQrForTest(serverUrl)`: flips the **global** `showLoginQr` / `mobileServerUrl` system settings, restores them on teardown (re-reads current settings rather than replaying a stale snapshot, like `feature_flags.dart`), and returns the backend-composed `loginQrUrl`. Plus `getLoginQrUrl()` — the unauthenticated `GET /featureConfig` read.
 - `integration_test/quick_scan_config_response_test.dart` — the Quick Scan per-image **form** shows/hides/requires fields per the selected group's `GroupReceiptSettings.quickScan*`, **without hitting the backend** (visibility assertions + client-side required-empty blocking, which short-circuits before the API call). Green on **all** targets (Linux/iOS/Android): it feeds an image via the mocked document-scanner channel (not the desktop-blocked gallery path) and injects the group config by mutating the live `GroupModel` via Provider (the same technique `quick_scan_disabled_test` uses for the AI flag — deterministic, no reliance on the local API persisting the fields). Four `testWidgets`: (1) single-group visibility + a categories-required fix-error snackbar; (2) **group switch** — two groups with opposite configs, asserts the field set **flips** when the dropdown changes; (3)+(4) **paid-by** / **tags** required+empty each block submit (completing the 4-field negative matrix). Shared actions live in `helpers/quick_scan_actions.dart`. **Client injection only works for these no-backend tests** — successful submits must persist the config (see the submit spec). When injecting a synthetic group for a dropdown assertion, **trim `GroupModel.groups` to the all-group placeholder(s) + your target group(s)** (`keepOnlyGroup`) — the seeded admin accumulates many groups and an appended entry lands below the dropdown menu's viewport, where `find.text` can't reach it (a Material dropdown's scrollable doesn't build off-screen items into the element tree).
 - `integration_test/quick_scan_submit_test.dart` — Quick Scan **submit** outcomes that actually POST to the API. The backend's `resolveQuickScanFields` validates against the group's **persisted** config, so these tests **persist** the config via `PUT /group/{id}/groupReceiptSettings` (`setGroupQuickScanConfig`, restored on teardown) instead of client-injecting — client (via AppData at login) and server then agree, as in production. Two `testWidgets`, both keeping paid-by/status **required** (making them optional needs a persisted default the backend enforces): (1) required paid-by+status filled + an **optional** category left empty still queues; (2) a **required** category **selected via the picker** queues — this is the on-device regression guard for the shellContext crash fix (see caveat below). Uses `firstNonAllGroup` + `keepOnlyGroup`, seeds the category via `createCategory`, and drives the multi-select via the filter field + `ChoiceChip` (mirroring `receipt_cost_split_test`).
 - `integration_test/quick_scan_prefill_test.dart` — Quick Scan per-image **prefill** from user preferences vs group config. Each added image seeds group/paid-by/status from `userPreferences.quickScanDefault*` (`_getInitialQuickScanValues`, delivered via AppData). Persists a group that **hides** paid-by (real prefs→AppData→form path via `setUserQuickScanPrefs` + `setGroupQuickScanConfig`, both restored) and asserts a **preset paid-by falls off** (field absent) while a **preset status is kept** (shown), then that submit **queues** (the hidden paid-by is backfilled from the group's `UPLOADER` default). Hiding paid-by/status in a persisted config **requires a group default** (`quickScanDefaultPaidByType: 'UPLOADER'` needs no id; `quickScanDefaultStatus` for status) — the backend rejects hiding/optional without one.

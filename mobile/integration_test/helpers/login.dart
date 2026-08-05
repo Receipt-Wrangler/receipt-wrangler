@@ -55,20 +55,34 @@ Future<void> loginAs(
   required String username,
   required String password,
 }) async {
-  // Reset persistent state before pumping a fresh app tree.
-  //
-  // flutter_secure_storage (JWT): iOS keychain entries are scoped to the
-  // bundle id and survive `simctl uninstall` -- that's documented Apple
-  // behavior, not a CI quirk. Without this wipe, a JWT written by a
-  // prior `flutter drive` invocation auto-logs the app in and the test
-  // never sees the login screen. Linux uses installLinuxDesktopMocks for
-  // isolation so the channel call is skipped there.
-  //
-  // SharedPreferences (basePath = homeserver URL): wiping it ensures
-  // `loginAsAdmin` always lands on the SetHomeserverUrl screen first,
-  // even when multiple `testWidgets` run inside one `flutter drive`
-  // (now possible since the GoRouter is built per-State -- see
-  // `lib/main.dart:_ReceiptWrangler._router`).
+  await resetPersistedAppState();
+
+  await tester.pumpWidget(buildApp());
+
+  await pumpUntilFound(tester, find.text('Server URL'));
+
+  await tester.enterText(formField('url'), E2eEnv.baseUrl);
+  await tester.tap(filledButton('Connect'));
+
+  await loginFromLoginScreen(tester, username: username, password: password);
+}
+
+/// Wipes the persistent state a previous run may have left behind, so the
+/// next `pumpWidget(buildApp())` always starts on the SetHomeserverUrl
+/// ("Connect to Server") screen. Call before pumping the app tree.
+///
+/// flutter_secure_storage (JWT): iOS keychain entries are scoped to the
+/// bundle id and survive `simctl uninstall` -- that's documented Apple
+/// behavior, not a CI quirk. Without this wipe, a JWT written by a
+/// prior `flutter drive` invocation auto-logs the app in and the test
+/// never sees the login screen. Linux uses installLinuxDesktopMocks for
+/// isolation so the channel call is skipped there.
+///
+/// SharedPreferences (basePath = homeserver URL): wiping it ensures we
+/// always land on the SetHomeserverUrl screen first, even when multiple
+/// `testWidgets` run inside one `flutter drive` (now possible since the
+/// GoRouter is built per-State -- see `lib/main.dart:_ReceiptWrangler._router`).
+Future<void> resetPersistedAppState() async {
   if (!Platform.isLinux) {
     const secureChannel =
         MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
@@ -82,13 +96,20 @@ Future<void> loginAs(
   }
   await GlobalSharedPreferences.initialize();
   await GlobalSharedPreferences.instance.remove('basePath');
+}
 
-  await tester.pumpWidget(buildApp());
-
-  await pumpUntilFound(tester, find.text('Server URL'));
-
-  await tester.enterText(formField('url'), E2eEnv.baseUrl);
-  await tester.tap(filledButton('Connect'));
+/// Waits for the login screen, enters [username]/[password], submits, and
+/// returns once `GroupSelect` is on screen (= logged-in landing).
+///
+/// Split out of [loginAs] so specs that reach the login screen some other way
+/// -- e.g. `login_qr_deep_link_test.dart`, which gets its server URL from a
+/// deep link rather than typing it -- can reuse the credential half without
+/// duplicating the locators or the landing assertion.
+Future<void> loginFromLoginScreen(
+  WidgetTester tester, {
+  required String username,
+  required String password,
+}) async {
   await pumpUntilFound(tester, find.text('Log In'));
 
   await tester.enterText(formField('username'), username);

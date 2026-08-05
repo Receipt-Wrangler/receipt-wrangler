@@ -70,7 +70,11 @@ void main() async {
 /// returns a fresh tree — the `GoRouter` lives inside `_ReceiptWrangler`
 /// as a per-`State` `late final` field, so test #N never inherits test
 /// #N-1's router location.
-Widget buildApp() {
+///
+/// [initialDeepLink] / [deepLinkStream] are test seams standing in for the two
+/// `app_links` sources (cold start / warm delivery). `main()` passes neither, so
+/// production always reads the real plugin. See [ReceiptWrangler].
+Widget buildApp({Uri? initialDeepLink, Stream<Uri>? deepLinkStream}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => AuthModel()),
@@ -88,7 +92,10 @@ Widget buildApp() {
       ChangeNotifierProvider(create: (_) => UserModel()),
       ChangeNotifierProvider(create: (_) => UserPreferencesModel()),
     ],
-    child: const ReceiptWrangler(),
+    child: ReceiptWrangler(
+      initialDeepLink: initialDeepLink,
+      deepLinkStream: deepLinkStream,
+    ),
   );
 }
 
@@ -215,7 +222,19 @@ GoRouter _buildAppRouter() {
 }
 
 class ReceiptWrangler extends StatefulWidget {
-  const ReceiptWrangler({super.key});
+  const ReceiptWrangler({
+    super.key,
+    this.initialDeepLink,
+    this.deepLinkStream,
+  });
+
+  /// Injectable for tests: stands in for [AppLinks.getInitialLink] (the link
+  /// that cold-launched the app). Null in production.
+  final Uri? initialDeepLink;
+
+  /// Injectable for tests: stands in for [AppLinks.uriLinkStream] (links
+  /// delivered while the app is already running). Null in production.
+  final Stream<Uri>? deepLinkStream;
 
   @override
   State<ReceiptWrangler> createState() => _ReceiptWrangler();
@@ -299,12 +318,15 @@ class _ReceiptWrangler extends State<ReceiptWrangler>
   /// start ([AppLinks.getInitialLink]) and warm/resumed ([AppLinks.uriLinkStream])
   /// cases. A matching link pre-fills the Connect screen's server URL via
   /// [AuthModel.pendingServerUrl]; it is never auto-connected.
+  ///
+  /// Both sources fall back to the real plugin unless a test supplied
+  /// [ReceiptWrangler.initialDeepLink] / [ReceiptWrangler.deepLinkStream].
   Future<void> _initDeepLinks() async {
     // Cold start: the app-link that launched the app. Stash it on AuthModel
     // immediately so it survives the FutureBuilder first-paint gate and the
     // Connect screen reads it the moment it mounts.
     try {
-      final initial = await _appLinks.getInitialLink();
+      final initial = await _resolveInitialDeepLink();
       if (initial != null) {
         _handleDeepLink(initial);
       }
@@ -313,10 +335,22 @@ class _ReceiptWrangler extends State<ReceiptWrangler>
     }
 
     // Warm / resumed: further links delivered while the app is running.
-    _linkSubscription = _appLinks.uriLinkStream.listen(
+    _linkSubscription = (widget.deepLinkStream ?? _appLinks.uriLinkStream).listen(
       _handleDeepLink,
       onError: (_) {},
     );
+  }
+
+  /// The cold-start link, from the test seam if one was injected.
+  ///
+  /// Deliberately a separate awaited call rather than
+  /// `widget.initialDeepLink ?? await _appLinks.getInitialLink()`: `??` would
+  /// short-circuit the `await`, so an injected link would be handled
+  /// SYNCHRONOUSLY inside `initState` — routing before the tree is attached, on
+  /// a timing production never sees. Awaiting always yields a microtask, so
+  /// injected and real links arrive at the same point in the lifecycle.
+  Future<Uri?> _resolveInitialDeepLink() async {
+    return widget.initialDeepLink ?? await _appLinks.getInitialLink();
   }
 
   void _handleDeepLink(Uri uri) {

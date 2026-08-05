@@ -193,6 +193,7 @@ jobs:
             integration_test/receipt_view_to_groups_navigation_test.dart
             integration_test/quick_scan_test.dart
             integration_test/quick_scan_disabled_test.dart
+            integration_test/login_qr_deep_link_test.dart
 
   ios-e2e:
     # macos-14 ships Xcode 15.4 + iOS 17.0/17.2/17.4/17.5/18.1/18.2
