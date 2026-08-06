@@ -50,7 +50,11 @@ class _SetHomeserverUrl extends State<SetHomeserverUrl> {
       return; // null => user cancelled
     }
 
-    final normalized = normalizeServerUrl(raw);
+    // Resolve the deep-link QR (fragment-encoded server url) first, falling back
+    // to treating the scan as a plain server-URL QR. Both fill the field only —
+    // the user still reviews and taps Connect (no auto-connect).
+    final normalized =
+        extractDeepLinkServerUrl(raw) ?? normalizeServerUrl(raw);
     if (normalized == null) {
       showErrorSnackbar(
           context, "That QR code doesn't contain a valid server URL");
@@ -69,6 +73,24 @@ class _SetHomeserverUrl extends State<SetHomeserverUrl> {
   @override
   Widget build(BuildContext context) {
     var serverModel = Provider.of<AuthModel>(context);
+
+    // A server URL arriving from a receiptwrangler.io/app/setup deep link is
+    // stashed on AuthModel.pendingServerUrl by the deep-link handler in
+    // main.dart. Consume it here to pre-fill the field. This covers both the
+    // cold-start case (value already present when this widget first mounts) and
+    // the warm case (value arrives later -> this listener fires -> rebuild). The
+    // patch runs post-frame because the FormBuilder state isn't attached yet
+    // during the first build. We never auto-connect (phishing mitigation).
+    final pending = serverModel.pendingServerUrl;
+    if (pending != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _formKey.currentState?.patchValue({"url": pending});
+        serverModel.clearPendingServerUrl();
+      });
+    }
 
     return FormBuilder(
       key: _formKey,

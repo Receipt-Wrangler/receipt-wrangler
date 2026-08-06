@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, ElementRef, OnInit, viewChild } from "@angular/core";
-import { FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { FormArray, FormBuilder, FormGroup, ValidatorFn, Validators } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
@@ -21,6 +21,7 @@ import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 import { SnackbarService } from "../../services";
 import { SetFeatureConfig } from "../../store";
 import { SetCurrencyData, SetCurrencyDisplay } from "../../store/system-settings.state.actions";
+import { absoluteUrlValidator } from "../../validators";
 
 interface QueueData extends FormOption {
   description: string;
@@ -141,6 +142,8 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       taskQueueConfigurations: this.formBuilder.array(this.buildAsynqQueueConfigurations()),
       mcpEnabled: [this.originalSystemSettings?.mcpEnabled],
       mcpPublicUrl: [this.originalSystemSettings?.mcpPublicUrl],
+      showLoginQr: [this.originalSystemSettings?.showLoginQr],
+      mobileServerUrl: [this.originalSystemSettings?.mobileServerUrl],
     });
 
     if (this.inputReadonlyPipe.transform(this.formConfig.mode)) {
@@ -152,11 +155,14 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       this.form.get("currencyHideDecimalPlaces")?.disable();
       this.form.get("mcpEnabled")?.disable();
       this.form.get("mcpPublicUrl")?.disable();
+      this.form.get("showLoginQr")?.disable();
+      this.form.get("mobileServerUrl")?.disable();
     }
 
     this.listenForReceiptProcessingSettingsChanges();
     this.listenForHideDecimalPlacesChanges();
     this.listenForMcpEnabledChanges();
+    this.listenForShowLoginQrChanges();
   }
 
   // TODO: finish implementing UI for taskQueueConfigurations
@@ -202,7 +208,9 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
   }
 
   // A public URL is required to enable the MCP server, mirroring the backend
-  // validation. The control's validators are toggled with the enable flag.
+  // validation. The control's validators are toggled with the enable flag; the
+  // format check stays on either way because the backend validates a non-empty
+  // URL regardless of the toggle.
   private listenForMcpEnabledChanges(): void {
     const mcpPublicUrl = this.form.get("mcpPublicUrl");
 
@@ -211,11 +219,36 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
         startWith(this.form.get("mcpEnabled")?.value),
         untilDestroyed(this),
         tap((enabled: boolean) => {
-          mcpPublicUrl?.setValidators(enabled ? [Validators.required] : []);
+          mcpPublicUrl?.setValidators(this.urlValidators(enabled));
           mcpPublicUrl?.updateValueAndValidity({ emitEvent: false });
         })
       )
       .subscribe();
+  }
+
+  // A mobile server URL is required to show the login QR code, mirroring the
+  // backend validation. The control's validators track the toggle.
+  private listenForShowLoginQrChanges(): void {
+    const mobileServerUrl = this.form.get("mobileServerUrl");
+
+    this.form.get("showLoginQr")?.valueChanges
+      .pipe(
+        startWith(this.form.get("showLoginQr")?.value),
+        untilDestroyed(this),
+        tap((enabled: boolean) => {
+          mobileServerUrl?.setValidators(this.urlValidators(enabled));
+          mobileServerUrl?.updateValueAndValidity({ emitEvent: false });
+        })
+      )
+      .subscribe();
+  }
+
+  // setValidators replaces the whole list, so the format check has to be
+  // re-supplied on every toggle rather than declared once in initForm.
+  private urlValidators(required: boolean): ValidatorFn[] {
+    return required
+      ? [Validators.required, absoluteUrlValidator()]
+      : [absoluteUrlValidator()];
   }
 
   public displayWith(id: number): string {

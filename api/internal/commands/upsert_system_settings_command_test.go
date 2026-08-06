@@ -68,6 +68,22 @@ func TestUpsertSystemSettingsCommand_Validate_ValidInputs(t *testing.T) {
 				return cmd
 			}(),
 		},
+		"valid with login qr enabled and a mobile server url": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.ShowLoginQr = true
+				cmd.MobileServerUrl = "https://receipts.example.com/api"
+				return cmd
+			}(),
+		},
+		"valid with login qr disabled and no mobile server url": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.ShowLoginQr = false
+				cmd.MobileServerUrl = ""
+				return cmd
+			}(),
+		},
 	}
 
 	for testName, test := range tests {
@@ -151,6 +167,32 @@ func TestUpsertSystemSettingsCommand_Validate_InvalidInputs(t *testing.T) {
 		"mcp public url with unsupported scheme": {
 			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpPublicUrl = "ftp://receipts.example.com" },
 			expectedError: "mcpPublicUrl",
+		},
+		"mcp public url with embedded credentials": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpPublicUrl = "https://user:token@receipts.example.com" },
+			expectedError: "mcpPublicUrl",
+		},
+		"login qr enabled without a mobile server url": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.ShowLoginQr = true; cmd.MobileServerUrl = "" },
+			expectedError: "mobileServerUrl",
+		},
+		"mobile server url missing scheme": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.MobileServerUrl = "receipts.example.com/api" },
+			expectedError: "mobileServerUrl",
+		},
+		"mobile server url with unsupported scheme": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.MobileServerUrl = "ftp://receipts.example.com" },
+			expectedError: "mobileServerUrl",
+		},
+		// The login QR is served to unauthenticated clients, so credentials in
+		// the URL would be published as a scannable code.
+		"mobile server url with embedded credentials": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.MobileServerUrl = "https://user:token@receipts.example.com/api" },
+			expectedError: "mobileServerUrl",
+		},
+		"mobile server url with an embedded username only": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.MobileServerUrl = "https://user@receipts.example.com/api" },
+			expectedError: "mobileServerUrl",
 		},
 	}
 

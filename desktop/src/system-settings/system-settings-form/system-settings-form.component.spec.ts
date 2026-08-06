@@ -1,5 +1,5 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from "@angular/forms";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
@@ -38,6 +38,7 @@ describe("SystemSettingsFormComponent", () => {
         SharedUiModule,
         NoopAnimationsModule],
     providers: [
+        provideZonelessChangeDetection(),
         CustomCurrencyPipe,
         {
             provide: ActivatedRoute,
@@ -99,6 +100,8 @@ describe("SystemSettingsFormComponent", () => {
       ],
       mcpEnabled: null,
       mcpPublicUrl: null,
+      showLoginQr: null,
+      mobileServerUrl: null,
     });
   });
 
@@ -123,6 +126,8 @@ describe("SystemSettingsFormComponent", () => {
       }],
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      showLoginQr: true,
+      mobileServerUrl: "https://receipts.example.com/api",
     };
 
     component.ngOnInit();
@@ -146,7 +151,123 @@ describe("SystemSettingsFormComponent", () => {
       }],
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      showLoginQr: true,
+      mobileServerUrl: "https://receipts.example.com/api",
     });
+  });
+
+  it("requires a mobile server url only when the login QR is enabled", () => {
+    component.ngOnInit();
+
+    const showLoginQr = component.form.get("showLoginQr")!;
+    const mobileServerUrl = component.form.get("mobileServerUrl")!;
+
+    // Off by default: an empty url is valid.
+    showLoginQr.setValue(false);
+    mobileServerUrl.setValue("");
+    expect(mobileServerUrl.valid).toBe(true);
+
+    // Enabled: an empty url is now required (invalid).
+    showLoginQr.setValue(true);
+    mobileServerUrl.setValue("");
+    expect(mobileServerUrl.hasError("required")).toBe(true);
+
+    // Enabled with a url is valid again.
+    mobileServerUrl.setValue("https://receipts.example.com/api");
+    expect(mobileServerUrl.valid).toBe(true);
+
+    // Disabling clears the requirement.
+    showLoginQr.setValue(false);
+    mobileServerUrl.setValue("");
+    expect(mobileServerUrl.valid).toBe(true);
+  });
+
+  it("rejects a mobile server url that is not an absolute http(s) url", () => {
+    component.ngOnInit();
+
+    const showLoginQr = component.form.get("showLoginQr")!;
+    const mobileServerUrl = component.form.get("mobileServerUrl")!;
+    showLoginQr.setValue(true);
+
+    // Whitespace satisfies Validators.required but the backend trims first, so
+    // it would be rejected server-side as missing.
+    mobileServerUrl.setValue("   ");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+
+    mobileServerUrl.setValue("receipts.example.com/api");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+
+    mobileServerUrl.setValue("ftp://receipts.example.com");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+
+    // Credentials would be published verbatim by the public login QR.
+    mobileServerUrl.setValue("https://user:token@receipts.example.com/api");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+
+    // http stays valid -- LAN / bare-IP self-hosting is supported.
+    mobileServerUrl.setValue("http://192.168.1.50:8081/api");
+    expect(mobileServerUrl.valid).toBe(true);
+
+    mobileServerUrl.setValue("https://receipts.example.com/api");
+    expect(mobileServerUrl.valid).toBe(true);
+
+    // The format check applies with the toggle off too, mirroring the backend,
+    // which validates any non-empty url regardless of the toggle.
+    showLoginQr.setValue(false);
+    mobileServerUrl.setValue("ftp://receipts.example.com");
+    expect(mobileServerUrl.hasError("url")).toBe(true);
+  });
+
+  // `new URL()` is more lenient than Go's `url.Parse`: it normalizes these three
+  // authority-less forms into a valid URL, while `url.Parse` leaves Host empty
+  // and the backend rejects them. Without a literal `http(s)://` prefix check
+  // the form would accept a value the server 400s on -- exactly what this
+  // validator exists to prevent.
+  it("rejects url forms that the backend rejects", () => {
+    component.ngOnInit();
+
+    const showLoginQr = component.form.get("showLoginQr")!;
+    const mobileServerUrl = component.form.get("mobileServerUrl")!;
+    showLoginQr.setValue(true);
+
+    for (const value of [
+      "https:receipts.example.com/api",
+      "https:/receipts.example.com/api",
+      "https:\\\\receipts.example.com/api",
+    ]) {
+      mobileServerUrl.setValue(value);
+      expect(mobileServerUrl.hasError("url")).toBe(true);
+    }
+
+    // But the scheme is case-insensitive server-side (`url.Parse` lowercases
+    // it), so an uppercase scheme must stay VALID -- a case-sensitive prefix
+    // check would introduce the very mismatch above in the other direction.
+    mobileServerUrl.setValue("HTTPS://receipts.example.com/api");
+    expect(mobileServerUrl.valid).toBe(true);
+  });
+
+  it("rejects an mcp public url that is not an absolute http(s) url", () => {
+    component.ngOnInit();
+
+    const mcpEnabled = component.form.get("mcpEnabled")!;
+    const mcpPublicUrl = component.form.get("mcpPublicUrl")!;
+    mcpEnabled.setValue(true);
+
+    mcpPublicUrl.setValue("   ");
+    expect(mcpPublicUrl.hasError("url")).toBe(true);
+
+    mcpPublicUrl.setValue("receipts.example.com");
+    expect(mcpPublicUrl.hasError("url")).toBe(true);
+
+    mcpPublicUrl.setValue("https://user:token@receipts.example.com");
+    expect(mcpPublicUrl.hasError("url")).toBe(true);
+
+    // The dev default must keep validating.
+    mcpPublicUrl.setValue("http://localhost:8081");
+    expect(mcpPublicUrl.valid).toBe(true);
+
+    mcpPublicUrl.setValue("https://receipts.example.com");
+    expect(mcpPublicUrl.valid).toBe(true);
   });
 
   it("should submit form", () => {
@@ -178,6 +299,8 @@ describe("SystemSettingsFormComponent", () => {
       taskConcurrency: "12",
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      showLoginQr: true,
+      mobileServerUrl: "https://receipts.example.com/api",
     });
 
     // Update the quick_scan queue priority specifically
@@ -212,6 +335,8 @@ describe("SystemSettingsFormComponent", () => {
       ],
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      showLoginQr: true,
+      mobileServerUrl: "https://receipts.example.com/api",
     });
 
     expect(snackbarServiceSpy).toHaveBeenCalled();

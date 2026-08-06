@@ -18,5 +18,9 @@ export interface FeatureConfig {
      * Whether local sign up is enabled
      */
     enableLocalSignUp: boolean;
+    /**
+     * Composed deep link the desktop login page encodes as a QR; empty unless the login QR is enabled with a mobile server URL
+     */
+    loginQrUrl?: string;
 }
 

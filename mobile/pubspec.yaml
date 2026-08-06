@@ -52,6 +52,10 @@ dependencies:
   permission_handler: ^12.0.1
   cunning_document_scanner: ^2.3.0
   mobile_scanner: ^7.2.0
+  # Handles receiptwrangler.io/app/setup App Links / Universal Links ourselves
+  # (rather than via go_router) so the desktop login QR / OS-opened deep link
+  # can pre-fill the Connect-to-Server URL. See lib/main.dart's deep-link handler.
+  app_links: ^6.4.1
   file_selector: ^1.0.3
   rxdart: ^0.28.0
   flutter_launcher_icons: ^0.14.1

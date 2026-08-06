@@ -38,6 +38,21 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 45
+    # Shared with e2e.yml's `e2e` job: both drive the same backend
+    # (secrets.E2E_BASE_URL) and both run a login-QR spec that flips the global
+    # showLoginQr / mobileServerUrl settings. The workflow-level groups above
+    # only serialize each workflow against itself, so this job-level group is
+    # what keeps the two suites from racing on that shared state. Only this job
+    # needs it -- ios-e2e does not run integration_test/login_qr_deep_link_test.dart.
+    #
+    # REF-INDEPENDENT on purpose (no github.ref), and must stay byte-identical
+    # to e2e.yml's group. This workflow also fires on tech/mobile-e2e and
+    # workflow_dispatch while e2e.yml only fires on main, so a ref-scoped group
+    # would put them in different buckets and let both hit the backend at once.
+    # See e2e.yml for the cancel-in-progress trade-off.
+    concurrency:
+      group: e2e-shared-backend
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -193,6 +208,7 @@ jobs:
             integration_test/receipt_view_to_groups_navigation_test.dart
             integration_test/quick_scan_test.dart
             integration_test/quick_scan_disabled_test.dart
+            integration_test/login_qr_deep_link_test.dart
 
   ios-e2e:
     # macos-14 ships Xcode 15.4 + iOS 17.0/17.2/17.4/17.5/18.1/18.2

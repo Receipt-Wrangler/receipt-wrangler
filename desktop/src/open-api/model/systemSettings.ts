@@ -73,6 +73,14 @@ export interface SystemSettings {
      * Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
      */
     mcpPublicUrl?: string;
+    /**
+     * Whether to show the mobile-setup QR code on the desktop login page
+     */
+    showLoginQr?: boolean;
+    /**
+     * Server/API URL mobile clients connect to; encoded into the login QR\'s deep link
+     */
+    mobileServerUrl?: string;
 }
 export namespace SystemSettings {
 }

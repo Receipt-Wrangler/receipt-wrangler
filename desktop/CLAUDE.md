@@ -417,6 +417,51 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   - **Notification delete** (`notification/notification.component.html`): the per-notification delete
     control gates on `app.notifications.delete` via `*hasAppPermission`.
 
+## Login QR (mobile app setup)
+
+The login page (`src/auth/sign-up/auth-form.component.*`, shared by login + sign-up) renders a QR that
+deep-links users into the mobile app to set it up. It is **self-contained** — generated locally with
+the `qrcode` package (no external QR service), from the derived `featureConfig.loginQrUrl` string the
+backend composes (see `api/CLAUDE.md` → "Login QR & mobile deep link"). The component reads
+`FeatureConfigState.loginQrUrl` via `store.selectSignal`, regenerates a `data:` URL in an `effect()`
+(the `qrDataUrl` signal), and the template shows it only when non-empty (`@if (qrDataUrl())`), so the
+QR appears only when an admin enabled it. Generation is async, so the effect takes an `onCleanup`
+cancellation flag — a URL change leaves the previous `QRCode.toDataURL` in flight, and without the
+guard a late-resolving stale QR could overwrite the current one. `FeatureConfigState` gained a `loginQrUrl` default (`""`), a
+selector, and — the load-bearing bit — the field in the `SetFeatureConfig` `patchState` block (that
+block lists each field explicitly, so a new field is silently dropped unless added there; guarded by
+`feature-config.state.spec.ts`).
+
+Admins configure it on the System Settings form (`src/system-settings/system-settings-form/`): a
+"Mobile App Setup" `app-form-section` with a **Show login QR code** `app-checkbox` (`showLoginQr`) and
+a **Mobile Server URL** `app-input` (`mobileServerUrl`), the URL conditionally required when the toggle
+is on (`listenForShowLoginQrChanges`, mirroring the MCP section's pattern). Saving refetches the
+feature config, so the login QR updates without a reload.
+
+Both URL settings — `mobileServerUrl` and `mcpPublicUrl` — also carry the shared
+**`absoluteUrlValidator()`** (`src/validators/url-validators.ts`), a port of the backend's
+`isValidAbsoluteUrl`: absolute http(s), non-empty host, no embedded credentials, and whitespace-only
+treated as invalid (the backend trims before its own emptiness check, so spaces would otherwise
+satisfy `Validators.required` and still be rejected server-side). It applies with the toggle **off**
+too, because the backend validates any non-empty URL regardless of the toggle.
+
+It also requires a **literal `http://` / `https://` prefix** before parsing, because `new URL()` is
+more lenient than Go's `url.Parse`: it normalizes authority-less forms (`https:host/api`,
+`https:/host/api`, and backslash variants) into a valid URL, while `url.Parse` leaves `Host` empty
+and the server rejects them — so without the prefix check the form would green-light a value that
+400s. The test is **case-insensitive** on purpose (`url.Parse` lowercases the scheme, so
+`HTTPS://host` is valid server-side); pinned by the "rejects url forms that the backend rejects" spec
+case. Both listener methods
+build their list through the shared `urlValidators(required)` helper — `setValidators` replaces the
+whole list, so the format check must be re-supplied on every toggle rather than declared in `initForm`.
+
+**E2E:** `e2e/login-qr.spec.ts` (serial, admin `storageState` + a fresh unauthenticated context for the
+login page) drives the whole flow — admin enables the toggle + URL in System Settings and it persists,
+the QR `<img>` then renders on `/auth/login` with the `featureConfig.loginQrUrl` decoding back to the
+configured server URL, and disabling hides it. It reverts `showLoginQr` via the admin API in `afterAll`
+(the setting is global). Component-level specs live alongside the code: `feature-config.state.spec.ts`,
+`auth-form.component.spec.ts`, `system-settings-form.component.spec.ts`.
+
 ## Signals & Zoneless Change Detection
 
 This application uses Angular's signal-based reactivity model with zoneless change detection (`provideZonelessChangeDetection()`). All new code MUST follow these patterns.
@@ -621,6 +666,18 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
 ### CI
 
 In CI the same spec files run against the demo URL. GitHub secrets populate the `E2E_*` vars — point `E2E_BASE_URL` at `https://demo.receiptwrangler.io` and supply the secret credentials. When `E2E_BASE_URL` is remote, the config skips the `webServer` block and does not start a local dev server.
+
+**The mobile suite shares that backend.** `.github/workflows/mobile-e2e.yml`'s `android-e2e` job reads
+the same `secrets.E2E_BASE_URL`, and both suites mutate **global** System Settings (the login-QR
+toggle, the AI-powered-receipts flag). Their workflow-level concurrency groups differ, so the desktop
+`e2e` job and the mobile `android-e2e` job additionally share a **job-level** concurrency group
+(`e2e-shared-backend`, `cancel-in-progress: false`) that queues one behind the other. The group name
+is deliberately **ref-independent** — the backend is a single shared resource, and `mobile-e2e.yml`
+also fires on `tech/mobile-e2e` / `workflow_dispatch` while `e2e.yml` fires only on `main`, so a
+`${{ github.ref }}`-scoped group would put them in different buckets and let both run at once. Keep
+the two groups byte-identical. Any new spec that mutates a global setting relies on that lock — don't
+remove it, and prefer client-side interception (below) over server mutation whenever the assertion
+allows it.
 
 ### Best practices (follow these when adding new e2e tests)
 

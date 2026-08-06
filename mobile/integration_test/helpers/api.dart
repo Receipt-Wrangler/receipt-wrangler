@@ -202,3 +202,46 @@ Future<List<Map<String, dynamic>>> listReceiptsForGroup(
   return ((body['data'] as List?) ?? const [])
       .cast<Map<String, dynamic>>();
 }
+
+/// JSON + admin-cookie headers for the write endpoints below.
+Map<String, String> jsonAuthHeaders(String jwt) => {
+      'Content-Type': 'application/json',
+      'Cookie': 'jwt=$jwt',
+    };
+
+/// GETs the global system settings. Shared by the fixtures that flip a
+/// server-wide flag for the duration of a test (`feature_flags.dart`,
+/// `login_qr_fixtures.dart`) -- both need the current object to capture the
+/// original value AND to build the restore payload.
+Future<Map<String, dynamic>> getSystemSettings(String jwt) async {
+  final res = await http
+      .get(Uri.parse('${E2eEnv.baseUrl}/systemSettings/'),
+          headers: {'Cookie': 'jwt=$jwt'})
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError(
+        'GET systemSettings failed: HTTP ${res.statusCode}: ${res.body}');
+  }
+  return jsonDecode(res.body) as Map<String, dynamic>;
+}
+
+/// PUTs the global system settings. The endpoint is an UPSERT with required
+/// fields (currency, taskConcurrency, ...), so callers must pass a full
+/// settings object -- read one with [getSystemSettings] and patch the keys
+/// they care about rather than sending a partial body.
+Future<void> putSystemSettings(
+  String jwt,
+  Map<String, dynamic> settings,
+) async {
+  final res = await http
+      .put(
+        Uri.parse('${E2eEnv.baseUrl}/systemSettings/'),
+        headers: jsonAuthHeaders(jwt),
+        body: jsonEncode(settings),
+      )
+      .timeout(const Duration(seconds: 10));
+  if (res.statusCode != 200) {
+    throw StateError(
+        'PUT systemSettings failed: HTTP ${res.statusCode}: ${res.body}');
+  }
+}

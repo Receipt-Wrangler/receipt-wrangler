@@ -4816,6 +4816,9 @@ components:
         enableLocalSignUp:
           type: boolean
           description: Whether local sign up is enabled
+        loginQrUrl:
+          type: string
+          description: Composed deep link the desktop login page encodes as a QR; empty unless the login QR is enabled with a mobile server URL
     MagicFillCommand:
       required:
         - imageData
@@ -5667,6 +5670,13 @@ components:
             mcpPublicUrl:
               type: string
               description: Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
+            showLoginQr:
+              type: boolean
+              description: Whether to show the mobile-setup QR code on the desktop login page
+              default: false
+            mobileServerUrl:
+              type: string
+              description: Server/API URL mobile clients connect to; encoded into the login QR's deep link
     UpsertSystemSettingsCommand:
       type: object
       required:
@@ -5724,6 +5734,12 @@ components:
         mcpPublicUrl:
           type: string
           description: Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
+        showLoginQr:
+          type: boolean
+          description: Whether to show the mobile-setup QR code on the desktop login page
+        mobileServerUrl:
+          type: string
+          description: Server/API URL mobile clients connect to; encoded into the login QR's deep link
     CheckEmailConnectivityCommand:
       type: object
       properties:
