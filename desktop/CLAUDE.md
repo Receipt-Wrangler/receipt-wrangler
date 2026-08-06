@@ -345,7 +345,15 @@ Both URL settings — `mobileServerUrl` and `mcpPublicUrl` — also carry the sh
 `isValidAbsoluteUrl`: absolute http(s), non-empty host, no embedded credentials, and whitespace-only
 treated as invalid (the backend trims before its own emptiness check, so spaces would otherwise
 satisfy `Validators.required` and still be rejected server-side). It applies with the toggle **off**
-too, because the backend validates any non-empty URL regardless of the toggle. Both listener methods
+too, because the backend validates any non-empty URL regardless of the toggle.
+
+It also requires a **literal `http://` / `https://` prefix** before parsing, because `new URL()` is
+more lenient than Go's `url.Parse`: it normalizes authority-less forms (`https:host/api`,
+`https:/host/api`, and backslash variants) into a valid URL, while `url.Parse` leaves `Host` empty
+and the server rejects them — so without the prefix check the form would green-light a value that
+400s. The test is **case-insensitive** on purpose (`url.Parse` lowercases the scheme, so
+`HTTPS://host` is valid server-side); pinned by the "rejects url forms that the backend rejects" spec
+case. Both listener methods
 build their list through the shared `urlValidators(required)` helper — `setValidators` replaces the
 whole list, so the format check must be re-supplied on every toggle rather than declared in `initForm`.
 
@@ -565,9 +573,13 @@ In CI the same spec files run against the demo URL. GitHub secrets populate the 
 the same `secrets.E2E_BASE_URL`, and both suites mutate **global** System Settings (the login-QR
 toggle, the AI-powered-receipts flag). Their workflow-level concurrency groups differ, so the desktop
 `e2e` job and the mobile `android-e2e` job additionally share a **job-level** concurrency group
-(`e2e-shared-backend-${{ github.ref }}`, `cancel-in-progress: false`) that queues one behind the
-other. Any new spec that mutates a global setting relies on that lock — don't remove it, and prefer
-client-side interception (below) over server mutation whenever the assertion allows it.
+(`e2e-shared-backend`, `cancel-in-progress: false`) that queues one behind the other. The group name
+is deliberately **ref-independent** — the backend is a single shared resource, and `mobile-e2e.yml`
+also fires on `tech/mobile-e2e` / `workflow_dispatch` while `e2e.yml` fires only on `main`, so a
+`${{ github.ref }}`-scoped group would put them in different buckets and let both run at once. Keep
+the two groups byte-identical. Any new spec that mutates a global setting relies on that lock — don't
+remove it, and prefer client-side interception (below) over server mutation whenever the assertion
+allows it.
 
 ### Best practices (follow these when adding new e2e tests)
 

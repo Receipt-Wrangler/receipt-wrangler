@@ -34,17 +34,33 @@ test.describe.serial('Login QR (System Settings → login page)', () => {
     // mobile/integration_test/helpers/login_qr_fixtures.dart.
     try {
       await withAdminApi(async (api) => {
-        const current = await (await api.get('/api/systemSettings')).json();
-        await api.put('/api/systemSettings', {
+        // Playwright's request methods resolve on 4xx/5xx, so both calls need
+        // an explicit status check or a failed restore passes silently.
+        const getResponse = await api.get('/api/systemSettings');
+        if (!getResponse.ok()) {
+          throw new Error(
+            `GET /api/systemSettings failed: HTTP ${getResponse.status()}`,
+          );
+        }
+        const current = await getResponse.json();
+
+        const putResponse = await api.put('/api/systemSettings', {
           data: {
             ...current,
             showLoginQr: originalShowLoginQr ?? false,
             mobileServerUrl: originalMobileServerUrl ?? '',
           },
         });
+        if (!putResponse.ok()) {
+          throw new Error(
+            `PUT /api/systemSettings failed: HTTP ${putResponse.status()}`,
+          );
+        }
       });
-    } catch {
-      // Best-effort teardown -- don't mask the suite's real result.
+    } catch (error) {
+      // Best-effort teardown -- report the failure but don't mask the suite's
+      // real result by throwing out of afterAll.
+      console.warn('Failed to restore login QR system settings', error);
     }
   });
 

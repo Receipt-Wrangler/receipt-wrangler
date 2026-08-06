@@ -1,5 +1,5 @@
 import { provideHttpClientTesting } from "@angular/common/http/testing";
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from "@angular/forms";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
@@ -38,6 +38,7 @@ describe("SystemSettingsFormComponent", () => {
         SharedUiModule,
         NoopAnimationsModule],
     providers: [
+        provideZonelessChangeDetection(),
         CustomCurrencyPipe,
         {
             provide: ActivatedRoute,
@@ -215,6 +216,34 @@ describe("SystemSettingsFormComponent", () => {
     showLoginQr.setValue(false);
     mobileServerUrl.setValue("ftp://receipts.example.com");
     expect(mobileServerUrl.hasError("url")).toBe(true);
+  });
+
+  // `new URL()` is more lenient than Go's `url.Parse`: it normalizes these three
+  // authority-less forms into a valid URL, while `url.Parse` leaves Host empty
+  // and the backend rejects them. Without a literal `http(s)://` prefix check
+  // the form would accept a value the server 400s on -- exactly what this
+  // validator exists to prevent.
+  it("rejects url forms that the backend rejects", () => {
+    component.ngOnInit();
+
+    const showLoginQr = component.form.get("showLoginQr")!;
+    const mobileServerUrl = component.form.get("mobileServerUrl")!;
+    showLoginQr.setValue(true);
+
+    for (const value of [
+      "https:receipts.example.com/api",
+      "https:/receipts.example.com/api",
+      "https:\\\\receipts.example.com/api",
+    ]) {
+      mobileServerUrl.setValue(value);
+      expect(mobileServerUrl.hasError("url")).toBe(true);
+    }
+
+    // But the scheme is case-insensitive server-side (`url.Parse` lowercases
+    // it), so an uppercase scheme must stay VALID -- a case-sensitive prefix
+    // check would introduce the very mismatch above in the other direction.
+    mobileServerUrl.setValue("HTTPS://receipts.example.com/api");
+    expect(mobileServerUrl.valid).toBe(true);
   });
 
   it("rejects an mcp public url that is not an absolute http(s) url", () => {

@@ -27,6 +27,16 @@ export function absoluteUrlValidator(): ValidatorFn {
       return { url: true };
     }
 
+    // `new URL()` is more lenient than Go's `url.Parse`: it normalizes
+    // authority-less forms (`https:host/api`, `https:/host/api`, and
+    // backslash variants) into a valid URL, whereas `url.Parse` leaves Host
+    // empty and the backend rejects them. Requiring the literal prefix keeps
+    // the two in agreement. Case-insensitive on purpose -- `url.Parse`
+    // lowercases the scheme, so `HTTPS://host` is valid server-side.
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return { url: true };
+    }
+
     let parsed: URL;
     try {
       parsed = new URL(trimmed);

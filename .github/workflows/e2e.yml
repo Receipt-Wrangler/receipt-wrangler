@@ -21,10 +21,22 @@ jobs:
     # (secrets.E2E_BASE_URL) and both mutate global System Settings -- e.g. the
     # login-QR toggle, which each suite asserts on. Their workflow-level
     # concurrency groups differ, so this shared job-level group is what keeps
-    # them from overlapping. cancel-in-progress must stay false: the point is to
-    # queue the second suite, not kill it.
+    # them from overlapping.
+    #
+    # The group is deliberately REF-INDEPENDENT (no github.ref): the backend is
+    # one shared resource, so runs must serialize across branches and event
+    # types, not just within a ref. mobile-e2e.yml also fires on
+    # tech/mobile-e2e and workflow_dispatch, which a ref-scoped group would let
+    # run straight through this one.
+    #
+    # cancel-in-progress must stay false: the point is to queue the second
+    # suite, not kill it. Trade-off: GitHub keeps only ONE pending job per
+    # group, so a third concurrent contender cancels the older pending job
+    # rather than queueing it. That's acceptable -- the mobile jobs are already
+    # continue-on-error, and a cancelled run beats two suites corrupting each
+    # other's global settings.
     concurrency:
-      group: e2e-shared-backend-${{ github.ref }}
+      group: e2e-shared-backend
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4

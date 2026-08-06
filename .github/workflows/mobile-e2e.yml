@@ -44,8 +44,14 @@ jobs:
     # only serialize each workflow against itself, so this job-level group is
     # what keeps the two suites from racing on that shared state. Only this job
     # needs it -- ios-e2e does not run integration_test/login_qr_deep_link_test.dart.
+    #
+    # REF-INDEPENDENT on purpose (no github.ref), and must stay byte-identical
+    # to e2e.yml's group. This workflow also fires on tech/mobile-e2e and
+    # workflow_dispatch while e2e.yml only fires on main, so a ref-scoped group
+    # would put them in different buckets and let both hit the backend at once.
+    # See e2e.yml for the cancel-in-progress trade-off.
     concurrency:
-      group: e2e-shared-backend-${{ github.ref }}
+      group: e2e-shared-backend
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
