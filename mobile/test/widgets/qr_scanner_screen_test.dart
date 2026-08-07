@@ -8,6 +8,14 @@ void main() {
   // channels unavailable under flutter_test — it's exercised on device /
   // integration tests. The lazy controller + debug seams let the fallback
   // states render here without any camera or channel mocks.
+  //
+  // ALWAYS pass debugScannerSupported explicitly. It defaults to
+  // `!Platform.isLinux`, so omitting it makes a test host-dependent: on Linux
+  // (which is what CI runs on) `_scannerSupported` is false, initState returns
+  // before the debugForce* seams are read, and _buildBody renders "QR scanning
+  // isn't supported on this device." instead of the state under test. That is
+  // exactly how the permission-denied and camera-error cases passed locally on
+  // macOS while failing in CI.
 
   Future<void> pumpScreen(WidgetTester tester, Widget screen) async {
     await tester.pumpWidget(MaterialApp(home: screen));
@@ -28,7 +36,10 @@ void main() {
       (tester) async {
     await pumpScreen(
       tester,
-      const QrScannerScreen(debugForcePermissionDenied: true),
+      const QrScannerScreen(
+        debugScannerSupported: true,
+        debugForcePermissionDenied: true,
+      ),
     );
 
     expect(find.textContaining('Camera access is required'), findsOneWidget);
@@ -41,7 +52,10 @@ void main() {
   testWidgets('camera-error state shows the message and Retry', (tester) async {
     await pumpScreen(
       tester,
-      const QrScannerScreen(debugForceCameraError: true),
+      const QrScannerScreen(
+        debugScannerSupported: true,
+        debugForceCameraError: true,
+      ),
     );
 
     expect(find.textContaining("Couldn't start the camera"), findsOneWidget);
