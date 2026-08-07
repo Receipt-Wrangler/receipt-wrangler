@@ -37,6 +37,8 @@ part 'system_settings.g.dart';
 /// * [taskQueueConfigurations] 
 /// * [mcpEnabled] - Whether the OAuth 2.1-protected MCP server is enabled
 /// * [mcpPublicUrl] - Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
+/// * [showLoginQr] - Whether to show the mobile-setup QR code on the desktop login page
+/// * [mobileServerUrl] - Server/API URL mobile clients connect to; encoded into the login QR's deep link
 @BuiltValue()
 abstract class SystemSettings implements BaseModel, Built<SystemSettings, SystemSettingsBuilder> {
   /// Whether the OAuth 2.1-protected MCP server is enabled
@@ -54,6 +56,10 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
   /// Currency display
   @BuiltValueField(wireName: r'currencyDisplay')
   String? get currencyDisplay;
+
+  /// Whether to show the mobile-setup QR code on the desktop login page
+  @BuiltValueField(wireName: r'showLoginQr')
+  bool? get showLoginQr;
 
   /// Whether to hide decimal places
   @BuiltValueField(wireName: r'currencyHideDecimalPlaces')
@@ -78,6 +84,10 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
   /// Receipt processing settings foreign key
   @BuiltValueField(wireName: r'receiptProcessingSettingsId')
   int? get receiptProcessingSettingsId;
+
+  /// Server/API URL mobile clients connect to; encoded into the login QR's deep link
+  @BuiltValueField(wireName: r'mobileServerUrl')
+  String? get mobileServerUrl;
 
   @BuiltValueField(wireName: r'currencySymbolPosition')
   CurrencySymbolPosition? get currencySymbolPosition;
@@ -111,6 +121,7 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
       ..mcpEnabled = false
       ..pdfDpi = 300
       ..currencyDisplay = r'$'
+      ..showLoginQr = false
       ..currencyHideDecimalPlaces = false
       ..debugOcr = false
       ..createdBy = 0
@@ -165,6 +176,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
         specifiedType: const FullType(String),
       );
     }
+    if (object.showLoginQr != null) {
+      yield r'showLoginQr';
+      yield serializers.serialize(
+        object.showLoginQr,
+        specifiedType: const FullType(bool),
+      );
+    }
     if (object.currencyHideDecimalPlaces != null) {
       yield r'currencyHideDecimalPlaces';
       yield serializers.serialize(
@@ -210,6 +228,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
       yield serializers.serialize(
         object.receiptProcessingSettingsId,
         specifiedType: const FullType(int),
+      );
+    }
+    if (object.mobileServerUrl != null) {
+      yield r'mobileServerUrl';
+      yield serializers.serialize(
+        object.mobileServerUrl,
+        specifiedType: const FullType(String),
       );
     }
     if (object.createdBy != null) {
@@ -329,6 +354,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
           ) as String;
           result.currencyDisplay = valueDes;
           break;
+        case r'showLoginQr':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.showLoginQr = valueDes;
+          break;
         case r'currencyHideDecimalPlaces':
           final valueDes = serializers.deserialize(
             value,
@@ -377,6 +409,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
             specifiedType: const FullType(int),
           ) as int;
           result.receiptProcessingSettingsId = valueDes;
+          break;
+        case r'mobileServerUrl':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.mobileServerUrl = valueDes;
           break;
         case r'createdBy':
           final valueDes = serializers.deserialize(

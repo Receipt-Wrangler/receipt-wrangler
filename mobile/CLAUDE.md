@@ -106,8 +106,28 @@ a stale action at worst returns 403.
 - **Matcher:** `lib/utils/permission_matcher.dart` (`permissionMatches` / `hasAll` / `hasAny`) is a
   faithful port of the backend matcher (`api/internal/permissions/matcher.go`) and its desktop twin
   (`desktop/src/utils/permission.utils.ts`), wildcard semantics included, so UI gating === backend.
-  The generated `Permission` enum is converted to its wire string at hydration (effective
-  permissions are always concrete registry keys, so the enum round-trips safely).
+- **Effective permissions are plain STRINGS on the wire, deliberately not the `Permission` enum.**
+  `AppData.appPermissions` / `.groupPermissions` are typed `string` in `swagger.yml`, so
+  `PermissionsModel` ingests and stores raw wire strings; the **query** methods still take the
+  `Permission` enum for call-site type safety (converted via `permissionWireName`). This split is
+  load-bearing, not cosmetic:
+  - `Permission` is a built_value `EnumClass` whose `_$valueOf` ends in
+    `default: throw ArgumentError(name)`. An unknown value fails the **entire** `AppData`
+    deserialization, and since permissions hydrate on login that **hard-fails login** — the request
+    returns HTTP 200 and the user sees a generic red "An error occurred". It shipped **twice**:
+    2026-07-24 (`group.members.create`) and 2026-08-06 (`group.members.grants.update`, PR #661).
+    Both times the released binary simply predated a backend permission addition.
+  - The enum is the **catalog** ("which permissions exist" — `Role.permissions`,
+    `UpsertRoleCommand.permissions`, `PermissionDescriptor.key`); the effective list is **data**
+    ("which permissions this user holds"), which is server-authoritative and open-ended.
+  - A granted entry may be a **wildcard** (`group.receipts.*`), which the matcher supports and the
+    enum could never represent.
+  - Guarded by `api/internal/permissions/registry_test.go` →
+    `TestAppDataEffectivePermissionsAreUntypedStrings` (fails if the `$ref` comes back) and
+    `test/models/app_data_permission_ingest_test.dart` (deserializes a payload carrying an unknown
+    permission key through the real generated serializer).
+  - **General lesson:** adding a value to *any* enum on a response model is a breaking change for
+    already-released mobile builds. Effective-permission-style payloads should not use closed enums.
 - **Checks** (`PermissionsModel`): `hasAppPermission(p)`, `hasAnyAppPermission([..])`,
   `hasGroupPermission(groupId, p, {orApp})` — the group one applies the `orApp` app-scoped override
   first (the backend `OrAppPermissions` admin-not-a-member pattern) — and

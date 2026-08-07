@@ -364,6 +364,15 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   `TokenRefreshService` (whose claims-only `SetAuthState` must not wipe permissions). They refresh on
   login + app-init; the server re-checks real permissions on every request, so the stored set is a UI
   hint (a stale button at worst 403s, handled by the interceptor).
+  - **`string[]`, not the `Permission` enum — on purpose.** `swagger.yml` types these two `AppData`
+    fields as plain strings rather than `$ref`-ing the `Permission` enum, so the generated
+    `appData.ts` yields `Array<string>`. The enum stays the contract for the *catalog*
+    (`Role.permissions`, `UpsertRoleCommand.permissions`, `PermissionDescriptor.key` — the role
+    editor still gets an exhaustive, type-safe list). The desktop is unaffected either way (TS string
+    enums are assignable to `string`), but the **mobile** Dart client is not: a closed built_value
+    enum throws on an unknown value and fails the whole `AppData` parse, hard-failing login on
+    already-released builds. Also, a granted string may be a **wildcard** (`app.*`), which the
+    matcher supports and an enum cannot express. Don't "tighten" these back to `Permission`.
   - **403 handling (`src/interceptors/http-interceptor.ts`).** The backend returns **403 for every
     access denial** (auth *and* permission — it never uses 401). With a still-valid token a 403 is a
     permission denial, so the interceptor surfaces it via a **Forbidden toast** (only for

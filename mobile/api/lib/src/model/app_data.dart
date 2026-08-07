@@ -3,19 +3,18 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:openapi/src/model/tag.dart';
-import 'package:openapi/src/model/currency_separator.dart';
-import 'package:openapi/src/model/permission.dart';
-import 'package:openapi/src/model/group.dart';
-import 'package:openapi/src/model/feature_config.dart';
 import 'package:openapi/src/model/claims.dart';
 import 'package:openapi/src/model/user_preferences.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/about.dart';
 import 'package:openapi/src/model/category.dart';
+import 'package:openapi/src/model/tag.dart';
 import 'package:openapi/src/model/currency_symbol_position.dart';
 import 'package:openapi/src/model/icon.dart';
 import 'package:openapi/src/model/user_view.dart';
+import 'package:openapi/src/model/currency_separator.dart';
+import 'package:openapi/src/model/group.dart';
+import 'package:openapi/src/model/feature_config.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -40,8 +39,8 @@ part 'app_data.g.dart';
 /// * [currencySymbolPosition] 
 /// * [currencyHideDecimalPlaces] - Whether to hide decimal places
 /// * [icons] - Icons in the system
-/// * [appPermissions] - The calling user's effective app-level permissions.
-/// * [groupPermissions] - The calling user's effective group-level permissions, keyed by group id.
+/// * [appPermissions] - The calling user's effective app-level permissions. Deliberately typed as plain strings rather than the Permission enum: this is server-resolved data, not a contract. A granted entry may be a wildcard (e.g. \"app.*\"), which is not an enum member, and a client built before a newly added permission must still be able to parse the payload. Clients match these with the wildcard matcher.
+/// * [groupPermissions] - The calling user's effective group-level permissions, keyed by group id. Plain strings for the same reason as appPermissions.
 /// * [groupCategories] - The categories the calling user may use in each group, keyed by group id. Filtered to the user's group-role grants (the full pool when unrestricted). Non-admins receive categories only through this map.
 /// * [groupTags] - The tags the calling user may use in each group, keyed by group id. Filtered to the user's group-role grants (the full pool when unrestricted). Non-admins receive tags only through this map.
 @BuiltValue()
@@ -106,13 +105,13 @@ abstract class AppData implements Built<AppData, AppDataBuilder> {
   @BuiltValueField(wireName: r'icons')
   BuiltList<Icon> get icons;
 
-  /// The calling user's effective app-level permissions.
+  /// The calling user's effective app-level permissions. Deliberately typed as plain strings rather than the Permission enum: this is server-resolved data, not a contract. A granted entry may be a wildcard (e.g. \"app.*\"), which is not an enum member, and a client built before a newly added permission must still be able to parse the payload. Clients match these with the wildcard matcher.
   @BuiltValueField(wireName: r'appPermissions')
-  BuiltList<Permission> get appPermissions;
+  BuiltList<String> get appPermissions;
 
-  /// The calling user's effective group-level permissions, keyed by group id.
+  /// The calling user's effective group-level permissions, keyed by group id. Plain strings for the same reason as appPermissions.
   @BuiltValueField(wireName: r'groupPermissions')
-  BuiltMap<String, BuiltList<Permission>> get groupPermissions;
+  BuiltMap<String, BuiltList<String>> get groupPermissions;
 
   /// The categories the calling user may use in each group, keyed by group id. Filtered to the user's group-role grants (the full pool when unrestricted). Non-admins receive categories only through this map.
   @BuiltValueField(wireName: r'groupCategories')
@@ -240,12 +239,12 @@ class _$AppDataSerializer implements PrimitiveSerializer<AppData> {
     yield r'appPermissions';
     yield serializers.serialize(
       object.appPermissions,
-      specifiedType: const FullType(BuiltList, [FullType(Permission)]),
+      specifiedType: const FullType(BuiltList, [FullType(String)]),
     );
     yield r'groupPermissions';
     yield serializers.serialize(
       object.groupPermissions,
-      specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(Permission)])]),
+      specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(String)])]),
     );
     if (object.groupCategories != null) {
       yield r'groupCategories';
@@ -399,15 +398,15 @@ class _$AppDataSerializer implements PrimitiveSerializer<AppData> {
         case r'appPermissions':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(BuiltList, [FullType(Permission)]),
-          ) as BuiltList<Permission>;
+            specifiedType: const FullType(BuiltList, [FullType(String)]),
+          ) as BuiltList<String>;
           result.appPermissions.replace(valueDes);
           break;
         case r'groupPermissions':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(Permission)])]),
-          ) as BuiltMap<String, BuiltList<Permission>>;
+            specifiedType: const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(String)])]),
+          ) as BuiltMap<String, BuiltList<String>>;
           result.groupPermissions.replace(valueDes);
           break;
         case r'groupCategories':

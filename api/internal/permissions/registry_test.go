@@ -111,6 +111,82 @@ func TestSwaggerEnumMatchesRegistry(t *testing.T) {
 	}
 }
 
+// TestAppDataEffectivePermissionsAreUntypedStrings pins the AppData transport
+// decision so a future "consistency cleanup" cannot re-arm it.
+//
+// The Permission schema is a CLOSED enum in generated clients. The dart-dio
+// EnumClass's _$valueOf ends in `default: throw ArgumentError(name)`, so an
+// unknown wire value fails the WHOLE AppData deserialization -- and since
+// permissions hydrate on login, that hard-fails login on every already-released
+// mobile build the moment a permission is added here. It shipped twice:
+// 2026-07-24 (group.members.create) and 2026-08-06 (group.members.grants.update,
+// PR #661).
+//
+// So a user's EFFECTIVE permissions ride as plain strings: that payload is
+// server-resolved data the client only pattern-matches, and a granted entry may
+// even be a wildcard (matcher.go), which is not an enum member at all. The
+// CATALOG of which permissions exist keeps the enum -- Role.permissions,
+// UpsertRoleCommand.permissions, PermissionDescriptor.key, and the `permission`
+// query param, all still covered by TestSwaggerEnumMatchesRegistry above.
+func TestAppDataEffectivePermissionsAreUntypedStrings(t *testing.T) {
+	swaggerPath := findSwagger(t)
+
+	data, err := os.ReadFile(swaggerPath)
+	if err != nil {
+		t.Fatalf("read swagger.yml: %v", err)
+	}
+
+	var doc struct {
+		Components struct {
+			Schemas map[string]struct {
+				Properties map[string]struct {
+					Items struct {
+						Type string `yaml:"type"`
+						Ref  string `yaml:"$ref"`
+					} `yaml:"items"`
+					AdditionalProperties struct {
+						Items struct {
+							Type string `yaml:"type"`
+							Ref  string `yaml:"$ref"`
+						} `yaml:"items"`
+					} `yaml:"additionalProperties"`
+				} `yaml:"properties"`
+			} `yaml:"schemas"`
+		} `yaml:"components"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("parse swagger.yml: %v", err)
+	}
+
+	appData, ok := doc.Components.Schemas["AppData"]
+	if !ok {
+		t.Fatal("swagger.yml is missing the AppData schema")
+	}
+
+	appPermissions, ok := appData.Properties["appPermissions"]
+	if !ok {
+		t.Fatal("AppData is missing appPermissions")
+	}
+	if appPermissions.Items.Ref != "" {
+		t.Errorf("AppData.appPermissions.items uses $ref %q; effective permissions must be plain strings", appPermissions.Items.Ref)
+	}
+	if appPermissions.Items.Type != "string" {
+		t.Errorf("AppData.appPermissions.items type = %q, want %q", appPermissions.Items.Type, "string")
+	}
+
+	groupPermissions, ok := appData.Properties["groupPermissions"]
+	if !ok {
+		t.Fatal("AppData is missing groupPermissions")
+	}
+	groupItems := groupPermissions.AdditionalProperties.Items
+	if groupItems.Ref != "" {
+		t.Errorf("AppData.groupPermissions items use $ref %q; effective permissions must be plain strings", groupItems.Ref)
+	}
+	if groupItems.Type != "string" {
+		t.Errorf("AppData.groupPermissions items type = %q, want %q", groupItems.Type, "string")
+	}
+}
+
 func findSwagger(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)

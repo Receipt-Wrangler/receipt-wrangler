@@ -1,4 +1,3 @@
-import 'package:built_collection/built_collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openapi/openapi.dart' show Permission;
@@ -7,16 +6,10 @@ import 'package:receipt_wrangler_mobile/enums/form_state.dart';
 import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/receipt_edit_popup_menu.dart';
 
-PermissionsModel _modelWith(List<Permission> group7Permissions) {
-  final model = PermissionsModel();
-  model.setPermissions(
-    BuiltList<Permission>(),
-    BuiltMap<String, BuiltList<Permission>>({
-      '7': BuiltList<Permission>(group7Permissions),
-    }),
-  );
-  return model;
-}
+import '../helpers/permission_test_helpers.dart';
+
+PermissionsModel _modelWith(List<Permission> group7Permissions) =>
+    seededPermissions(group: {7: group7Permissions});
 
 const _menuKey = ValueKey('popup-menu-under-test');
 

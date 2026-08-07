@@ -13,7 +13,6 @@ import { Category } from './category';
 import { Claims } from './claims';
 import { CurrencySeparator } from './currencySeparator';
 import { FeatureConfig } from './featureConfig';
-import { Permission } from './permission';
 import { UserView } from './userView';
 import { Icon } from './icon';
 import { Tag } from './tag';
@@ -66,13 +65,13 @@ export interface AppData {
      */
     icons: Array<Icon>;
     /**
-     * The calling user\'s effective app-level permissions.
+     * The calling user\'s effective app-level permissions. Deliberately typed as plain strings rather than the Permission enum: this is server-resolved data, not a contract. A granted entry may be a wildcard (e.g. \"app.*\"), which is not an enum member, and a client built before a newly added permission must still be able to parse the payload. Clients match these with the wildcard matcher.
      */
-    appPermissions: Array<Permission>;
+    appPermissions: Array<string>;
     /**
-     * The calling user\'s effective group-level permissions, keyed by group id.
+     * The calling user\'s effective group-level permissions, keyed by group id. Plain strings for the same reason as appPermissions.
      */
-    groupPermissions: { [key: string]: Array<Permission>; };
+    groupPermissions: { [key: string]: Array<string>; };
     /**
      * The categories the calling user may use in each group, keyed by group id. Filtered to the user\'s group-role grants (the full pool when unrestricted). Non-admins receive categories only through this map.
      */

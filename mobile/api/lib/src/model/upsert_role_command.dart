@@ -23,6 +23,10 @@ part 'upsert_role_command.g.dart';
 /// * [tagGrants] - Tag ids to restrict a GROUP role's members to. Only valid on group roles; omit or leave empty for unrestricted access.
 /// * [paidByUserGrants] - User ids whose receipts a GROUP role's members may see (by the receipt's \"paid by\" user). Only valid on group roles; omit or leave empty (with includeOwnPaidReceipts false) for unrestricted access.
 /// * [includeOwnPaidReceipts] - Whether to also let each member see receipts they paid for. Only valid on group roles.
+/// * [seesAllMembers] - Whether a GROUP role exempts its members from member-presence isolation (they see, and are seen by, every member of an isolated group). Only valid on group roles.
+/// * [skipDefaultGroupCreation] - Whether users created with this APP role skip the automatic personal \"My Receipts\" group (the virtual \"All\" group is always created). Only valid on app roles; applies at user-creation time only.
+/// * [requiresIndividualCategoryGrants] - Whether this GROUP role requires per-member category assignment. When true, a member with no individual category grants sees NO categories instead of falling back to the role's set, so an unassigned member fails closed. Only valid on group roles.
+/// * [requiresIndividualTagGrants] - Tag counterpart of requiresIndividualCategoryGrants. Only valid on group roles.
 /// * [reportTemplateGrants] - Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
 @BuiltValue()
 abstract class UpsertRoleCommand implements Built<UpsertRoleCommand, UpsertRoleCommandBuilder> {
@@ -54,6 +58,22 @@ abstract class UpsertRoleCommand implements Built<UpsertRoleCommand, UpsertRoleC
   /// Whether to also let each member see receipts they paid for. Only valid on group roles.
   @BuiltValueField(wireName: r'includeOwnPaidReceipts')
   bool? get includeOwnPaidReceipts;
+
+  /// Whether a GROUP role exempts its members from member-presence isolation (they see, and are seen by, every member of an isolated group). Only valid on group roles.
+  @BuiltValueField(wireName: r'seesAllMembers')
+  bool? get seesAllMembers;
+
+  /// Whether users created with this APP role skip the automatic personal \"My Receipts\" group (the virtual \"All\" group is always created). Only valid on app roles; applies at user-creation time only.
+  @BuiltValueField(wireName: r'skipDefaultGroupCreation')
+  bool? get skipDefaultGroupCreation;
+
+  /// Whether this GROUP role requires per-member category assignment. When true, a member with no individual category grants sees NO categories instead of falling back to the role's set, so an unassigned member fails closed. Only valid on group roles.
+  @BuiltValueField(wireName: r'requiresIndividualCategoryGrants')
+  bool? get requiresIndividualCategoryGrants;
+
+  /// Tag counterpart of requiresIndividualCategoryGrants. Only valid on group roles.
+  @BuiltValueField(wireName: r'requiresIndividualTagGrants')
+  bool? get requiresIndividualTagGrants;
 
   /// Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
   @BuiltValueField(wireName: r'reportTemplateGrants')
@@ -129,6 +149,34 @@ class _$UpsertRoleCommandSerializer implements PrimitiveSerializer<UpsertRoleCom
       yield r'includeOwnPaidReceipts';
       yield serializers.serialize(
         object.includeOwnPaidReceipts,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.seesAllMembers != null) {
+      yield r'seesAllMembers';
+      yield serializers.serialize(
+        object.seesAllMembers,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.skipDefaultGroupCreation != null) {
+      yield r'skipDefaultGroupCreation';
+      yield serializers.serialize(
+        object.skipDefaultGroupCreation,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.requiresIndividualCategoryGrants != null) {
+      yield r'requiresIndividualCategoryGrants';
+      yield serializers.serialize(
+        object.requiresIndividualCategoryGrants,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.requiresIndividualTagGrants != null) {
+      yield r'requiresIndividualTagGrants';
+      yield serializers.serialize(
+        object.requiresIndividualTagGrants,
         specifiedType: const FullType(bool),
       );
     }
@@ -217,6 +265,34 @@ class _$UpsertRoleCommandSerializer implements PrimitiveSerializer<UpsertRoleCom
             specifiedType: const FullType(bool),
           ) as bool;
           result.includeOwnPaidReceipts = valueDes;
+          break;
+        case r'seesAllMembers':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.seesAllMembers = valueDes;
+          break;
+        case r'skipDefaultGroupCreation':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.skipDefaultGroupCreation = valueDes;
+          break;
+        case r'requiresIndividualCategoryGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.requiresIndividualCategoryGrants = valueDes;
+          break;
+        case r'requiresIndividualTagGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.requiresIndividualTagGrants = valueDes;
           break;
         case r'reportTemplateGrants':
           final valueDes = serializers.deserialize(

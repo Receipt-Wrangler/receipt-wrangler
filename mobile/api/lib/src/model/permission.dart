@@ -225,6 +225,9 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'group.members.delete')
   static const Permission groupPeriodMembersPeriodDelete = _$groupPeriodMembersPeriodDelete;
   /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'group.members.grants.update')
+  static const Permission groupPeriodMembersPeriodGrantsPeriodUpdate = _$groupPeriodMembersPeriodGrantsPeriodUpdate;
+  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.receipts.create')
   static const Permission groupPeriodReceiptsPeriodCreate = _$groupPeriodReceiptsPeriodCreate;
   /// All permission keys the API recognizes.

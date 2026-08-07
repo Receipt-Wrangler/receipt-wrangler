@@ -145,6 +145,8 @@ const Permission _$groupPeriodMembersPeriodUpdate =
     const Permission._('groupPeriodMembersPeriodUpdate');
 const Permission _$groupPeriodMembersPeriodDelete =
     const Permission._('groupPeriodMembersPeriodDelete');
+const Permission _$groupPeriodMembersPeriodGrantsPeriodUpdate =
+    const Permission._('groupPeriodMembersPeriodGrantsPeriodUpdate');
 const Permission _$groupPeriodReceiptsPeriodCreate =
     const Permission._('groupPeriodReceiptsPeriodCreate');
 const Permission _$groupPeriodReceiptsPeriodRead =
@@ -326,6 +328,8 @@ Permission _$valueOf(String name) {
       return _$groupPeriodMembersPeriodUpdate;
     case 'groupPeriodMembersPeriodDelete':
       return _$groupPeriodMembersPeriodDelete;
+    case 'groupPeriodMembersPeriodGrantsPeriodUpdate':
+      return _$groupPeriodMembersPeriodGrantsPeriodUpdate;
     case 'groupPeriodReceiptsPeriodCreate':
       return _$groupPeriodReceiptsPeriodCreate;
     case 'groupPeriodReceiptsPeriodRead':
@@ -439,6 +443,7 @@ final BuiltSet<Permission> _$values = BuiltSet<Permission>(const <Permission>[
   _$groupPeriodMembersPeriodCreate,
   _$groupPeriodMembersPeriodUpdate,
   _$groupPeriodMembersPeriodDelete,
+  _$groupPeriodMembersPeriodGrantsPeriodUpdate,
   _$groupPeriodReceiptsPeriodCreate,
   _$groupPeriodReceiptsPeriodRead,
   _$groupPeriodReceiptsPeriodUpdate,
@@ -570,6 +575,8 @@ class _$PermissionMeta {
       _$groupPeriodMembersPeriodUpdate;
   Permission get groupPeriodMembersPeriodDelete =>
       _$groupPeriodMembersPeriodDelete;
+  Permission get groupPeriodMembersPeriodGrantsPeriodUpdate =>
+      _$groupPeriodMembersPeriodGrantsPeriodUpdate;
   Permission get groupPeriodReceiptsPeriodCreate =>
       _$groupPeriodReceiptsPeriodCreate;
   Permission get groupPeriodReceiptsPeriodRead =>
@@ -692,6 +699,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'groupPeriodMembersPeriodCreate': 'group.members.create',
     'groupPeriodMembersPeriodUpdate': 'group.members.update',
     'groupPeriodMembersPeriodDelete': 'group.members.delete',
+    'groupPeriodMembersPeriodGrantsPeriodUpdate': 'group.members.grants.update',
     'groupPeriodReceiptsPeriodCreate': 'group.receipts.create',
     'groupPeriodReceiptsPeriodRead': 'group.receipts.read',
     'groupPeriodReceiptsPeriodUpdate': 'group.receipts.update',
@@ -788,6 +796,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'group.members.create': 'groupPeriodMembersPeriodCreate',
     'group.members.update': 'groupPeriodMembersPeriodUpdate',
     'group.members.delete': 'groupPeriodMembersPeriodDelete',
+    'group.members.grants.update': 'groupPeriodMembersPeriodGrantsPeriodUpdate',
     'group.receipts.create': 'groupPeriodReceiptsPeriodCreate',
     'group.receipts.read': 'groupPeriodReceiptsPeriodRead',
     'group.receipts.update': 'groupPeriodReceiptsPeriodUpdate',

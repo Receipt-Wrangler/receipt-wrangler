@@ -5336,16 +5336,24 @@ components:
             $ref: "#/components/schemas/Icon"
         appPermissions:
           type: array
-          description: The calling user's effective app-level permissions.
+          description: >-
+            The calling user's effective app-level permissions. Deliberately
+            typed as plain strings rather than the Permission enum: this is
+            server-resolved data, not a contract. A granted entry may be a
+            wildcard (e.g. "app.*"), which is not an enum member, and a client
+            built before a newly added permission must still be able to parse
+            the payload. Clients match these with the wildcard matcher.
           items:
-            $ref: "#/components/schemas/Permission"
+            type: string
         groupPermissions:
           type: object
-          description: The calling user's effective group-level permissions, keyed by group id.
+          description: >-
+            The calling user's effective group-level permissions, keyed by group
+            id. Plain strings for the same reason as appPermissions.
           additionalProperties:
             type: array
             items:
-              $ref: "#/components/schemas/Permission"
+              type: string
         groupCategories:
           type: object
           description: >-

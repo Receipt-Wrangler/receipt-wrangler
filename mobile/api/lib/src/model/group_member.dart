@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:built_collection/built_collection.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -16,6 +17,8 @@ part 'group_member.g.dart';
 /// * [groupRoleId] - Id of the modern group role assigned to the member
 /// * [updatedAt] 
 /// * [userId] - User compound primary key
+/// * [categoryGrants] - Category ids this individual member may see, narrowing WITHIN whatever their group role allows (the two layers intersect). Empty means the member adds no narrowing of their own and falls back to the role. Read only here — write via PUT /group/{groupId}/member/{userId}/grants.
+/// * [tagGrants] - Tag counterpart of categoryGrants. Restricted independently of categories.
 @BuiltValue()
 abstract class GroupMember implements Built<GroupMember, GroupMemberBuilder> {
   @BuiltValueField(wireName: r'createdAt')
@@ -35,6 +38,14 @@ abstract class GroupMember implements Built<GroupMember, GroupMemberBuilder> {
   /// User compound primary key
   @BuiltValueField(wireName: r'userId')
   int get userId;
+
+  /// Category ids this individual member may see, narrowing WITHIN whatever their group role allows (the two layers intersect). Empty means the member adds no narrowing of their own and falls back to the role. Read only here — write via PUT /group/{groupId}/member/{userId}/grants.
+  @BuiltValueField(wireName: r'categoryGrants')
+  BuiltList<int>? get categoryGrants;
+
+  /// Tag counterpart of categoryGrants. Restricted independently of categories.
+  @BuiltValueField(wireName: r'tagGrants')
+  BuiltList<int>? get tagGrants;
 
   GroupMember._();
 
@@ -90,6 +101,20 @@ class _$GroupMemberSerializer implements PrimitiveSerializer<GroupMember> {
       object.userId,
       specifiedType: const FullType(int),
     );
+    if (object.categoryGrants != null) {
+      yield r'categoryGrants';
+      yield serializers.serialize(
+        object.categoryGrants,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
+    if (object.tagGrants != null) {
+      yield r'tagGrants';
+      yield serializers.serialize(
+        object.tagGrants,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
   }
 
   @override
@@ -147,6 +172,20 @@ class _$GroupMemberSerializer implements PrimitiveSerializer<GroupMember> {
             specifiedType: const FullType(int),
           ) as int;
           result.userId = valueDes;
+          break;
+        case r'categoryGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.categoryGrants.replace(valueDes);
+          break;
+        case r'tagGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.tagGrants.replace(valueDes);
           break;
         default:
           unhandled.add(key);

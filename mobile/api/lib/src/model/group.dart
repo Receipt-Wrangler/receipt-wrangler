@@ -25,6 +25,7 @@ part 'group.g.dart';
 /// * [isDefault] - Is default group (not used yet)
 /// * [name] - Name of the group
 /// * [isAllGroup] - Is all group for user
+/// * [isolateMembers] - Whether member-presence isolation is enabled for the group. When on, members cannot discover other members unless they hold a group role flagged seesAllMembers. Defaults to false.
 /// * [status] 
 /// * [updatedAt] 
 @BuiltValue()
@@ -59,6 +60,10 @@ abstract class Group implements Built<Group, GroupBuilder> {
   /// Is all group for user
   @BuiltValueField(wireName: r'isAllGroup')
   bool get isAllGroup;
+
+  /// Whether member-presence isolation is enabled for the group. When on, members cannot discover other members unless they hold a group role flagged seesAllMembers. Defaults to false.
+  @BuiltValueField(wireName: r'isolateMembers')
+  bool? get isolateMembers;
 
   @BuiltValueField(wireName: r'status')
   GroupStatus get status;
@@ -143,6 +148,13 @@ class _$GroupSerializer implements PrimitiveSerializer<Group> {
       object.isAllGroup,
       specifiedType: const FullType(bool),
     );
+    if (object.isolateMembers != null) {
+      yield r'isolateMembers';
+      yield serializers.serialize(
+        object.isolateMembers,
+        specifiedType: const FullType(bool),
+      );
+    }
     yield r'status';
     yield serializers.serialize(
       object.status,
@@ -240,6 +252,13 @@ class _$GroupSerializer implements PrimitiveSerializer<Group> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.isAllGroup = valueDes;
+          break;
+        case r'isolateMembers':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.isolateMembers = valueDes;
           break;
         case r'status':
           final valueDes = serializers.deserialize(

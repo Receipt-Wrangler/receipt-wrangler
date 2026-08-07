@@ -122,6 +122,7 @@ doc/TagApi.md
 doc/TagView.md
 doc/TaskQueueConfiguration.md
 doc/TokenPair.md
+doc/UpdateGroupMemberGrantsCommand.md
 doc/UpdateGroupReceiptSettingsCommand.md
 doc/UpdateGroupSettingsCommand.md
 doc/UpdateProfileCommand.md
@@ -287,6 +288,7 @@ lib/src/model/tag.dart
 lib/src/model/tag_view.dart
 lib/src/model/task_queue_configuration.dart
 lib/src/model/token_pair.dart
+lib/src/model/update_group_member_grants_command.dart
 lib/src/model/update_group_receipt_settings_command.dart
 lib/src/model/update_group_settings_command.dart
 lib/src/model/update_profile_command.dart
@@ -317,3 +319,4 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
+test/update_group_member_grants_command_test.dart

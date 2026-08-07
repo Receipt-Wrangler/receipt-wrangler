@@ -16,6 +16,8 @@ class _$SystemSettings extends SystemSettings {
   @override
   final String? currencyDisplay;
   @override
+  final bool? showLoginQr;
+  @override
   final bool? currencyHideDecimalPlaces;
   @override
   final String? mcpPublicUrl;
@@ -27,6 +29,8 @@ class _$SystemSettings extends SystemSettings {
   final int? fallbackReceiptProcessingSettingsId;
   @override
   final int? receiptProcessingSettingsId;
+  @override
+  final String? mobileServerUrl;
   @override
   final CurrencySymbolPosition? currencySymbolPosition;
   @override
@@ -58,12 +62,14 @@ class _$SystemSettings extends SystemSettings {
       this.currencyThousandthsSeparator,
       this.pdfDpi,
       this.currencyDisplay,
+      this.showLoginQr,
       this.currencyHideDecimalPlaces,
       this.mcpPublicUrl,
       this.currencyDecimalSeparator,
       this.debugOcr,
       this.fallbackReceiptProcessingSettingsId,
       this.receiptProcessingSettingsId,
+      this.mobileServerUrl,
       this.currencySymbolPosition,
       this.taskConcurrency,
       this.emailPollingInterval,
@@ -91,6 +97,7 @@ class _$SystemSettings extends SystemSettings {
         currencyThousandthsSeparator == other.currencyThousandthsSeparator &&
         pdfDpi == other.pdfDpi &&
         currencyDisplay == other.currencyDisplay &&
+        showLoginQr == other.showLoginQr &&
         currencyHideDecimalPlaces == other.currencyHideDecimalPlaces &&
         mcpPublicUrl == other.mcpPublicUrl &&
         currencyDecimalSeparator == other.currencyDecimalSeparator &&
@@ -98,6 +105,7 @@ class _$SystemSettings extends SystemSettings {
         fallbackReceiptProcessingSettingsId ==
             other.fallbackReceiptProcessingSettingsId &&
         receiptProcessingSettingsId == other.receiptProcessingSettingsId &&
+        mobileServerUrl == other.mobileServerUrl &&
         currencySymbolPosition == other.currencySymbolPosition &&
         taskConcurrency == other.taskConcurrency &&
         emailPollingInterval == other.emailPollingInterval &&
@@ -118,12 +126,14 @@ class _$SystemSettings extends SystemSettings {
     _$hash = $jc(_$hash, currencyThousandthsSeparator.hashCode);
     _$hash = $jc(_$hash, pdfDpi.hashCode);
     _$hash = $jc(_$hash, currencyDisplay.hashCode);
+    _$hash = $jc(_$hash, showLoginQr.hashCode);
     _$hash = $jc(_$hash, currencyHideDecimalPlaces.hashCode);
     _$hash = $jc(_$hash, mcpPublicUrl.hashCode);
     _$hash = $jc(_$hash, currencyDecimalSeparator.hashCode);
     _$hash = $jc(_$hash, debugOcr.hashCode);
     _$hash = $jc(_$hash, fallbackReceiptProcessingSettingsId.hashCode);
     _$hash = $jc(_$hash, receiptProcessingSettingsId.hashCode);
+    _$hash = $jc(_$hash, mobileServerUrl.hashCode);
     _$hash = $jc(_$hash, currencySymbolPosition.hashCode);
     _$hash = $jc(_$hash, taskConcurrency.hashCode);
     _$hash = $jc(_$hash, emailPollingInterval.hashCode);
@@ -146,6 +156,7 @@ class _$SystemSettings extends SystemSettings {
           ..add('currencyThousandthsSeparator', currencyThousandthsSeparator)
           ..add('pdfDpi', pdfDpi)
           ..add('currencyDisplay', currencyDisplay)
+          ..add('showLoginQr', showLoginQr)
           ..add('currencyHideDecimalPlaces', currencyHideDecimalPlaces)
           ..add('mcpPublicUrl', mcpPublicUrl)
           ..add('currencyDecimalSeparator', currencyDecimalSeparator)
@@ -153,6 +164,7 @@ class _$SystemSettings extends SystemSettings {
           ..add('fallbackReceiptProcessingSettingsId',
               fallbackReceiptProcessingSettingsId)
           ..add('receiptProcessingSettingsId', receiptProcessingSettingsId)
+          ..add('mobileServerUrl', mobileServerUrl)
           ..add('currencySymbolPosition', currencySymbolPosition)
           ..add('taskConcurrency', taskConcurrency)
           ..add('emailPollingInterval', emailPollingInterval)
@@ -194,6 +206,11 @@ class SystemSettingsBuilder
   set currencyDisplay(covariant String? currencyDisplay) =>
       _$this._currencyDisplay = currencyDisplay;
 
+  bool? _showLoginQr;
+  bool? get showLoginQr => _$this._showLoginQr;
+  set showLoginQr(covariant bool? showLoginQr) =>
+      _$this._showLoginQr = showLoginQr;
+
   bool? _currencyHideDecimalPlaces;
   bool? get currencyHideDecimalPlaces => _$this._currencyHideDecimalPlaces;
   set currencyHideDecimalPlaces(covariant bool? currencyHideDecimalPlaces) =>
@@ -227,6 +244,11 @@ class SystemSettingsBuilder
   int? get receiptProcessingSettingsId => _$this._receiptProcessingSettingsId;
   set receiptProcessingSettingsId(covariant int? receiptProcessingSettingsId) =>
       _$this._receiptProcessingSettingsId = receiptProcessingSettingsId;
+
+  String? _mobileServerUrl;
+  String? get mobileServerUrl => _$this._mobileServerUrl;
+  set mobileServerUrl(covariant String? mobileServerUrl) =>
+      _$this._mobileServerUrl = mobileServerUrl;
 
   CurrencySymbolPosition? _currencySymbolPosition;
   CurrencySymbolPosition? get currencySymbolPosition =>
@@ -294,6 +316,7 @@ class SystemSettingsBuilder
       _currencyThousandthsSeparator = $v.currencyThousandthsSeparator;
       _pdfDpi = $v.pdfDpi;
       _currencyDisplay = $v.currencyDisplay;
+      _showLoginQr = $v.showLoginQr;
       _currencyHideDecimalPlaces = $v.currencyHideDecimalPlaces;
       _mcpPublicUrl = $v.mcpPublicUrl;
       _currencyDecimalSeparator = $v.currencyDecimalSeparator;
@@ -301,6 +324,7 @@ class SystemSettingsBuilder
       _fallbackReceiptProcessingSettingsId =
           $v.fallbackReceiptProcessingSettingsId;
       _receiptProcessingSettingsId = $v.receiptProcessingSettingsId;
+      _mobileServerUrl = $v.mobileServerUrl;
       _currencySymbolPosition = $v.currencySymbolPosition;
       _taskConcurrency = $v.taskConcurrency;
       _emailPollingInterval = $v.emailPollingInterval;
@@ -339,6 +363,7 @@ class SystemSettingsBuilder
             currencyThousandthsSeparator: currencyThousandthsSeparator,
             pdfDpi: pdfDpi,
             currencyDisplay: currencyDisplay,
+            showLoginQr: showLoginQr,
             currencyHideDecimalPlaces: currencyHideDecimalPlaces,
             mcpPublicUrl: mcpPublicUrl,
             currencyDecimalSeparator: currencyDecimalSeparator,
@@ -346,6 +371,7 @@ class SystemSettingsBuilder
             fallbackReceiptProcessingSettingsId:
                 fallbackReceiptProcessingSettingsId,
             receiptProcessingSettingsId: receiptProcessingSettingsId,
+            mobileServerUrl: mobileServerUrl,
             currencySymbolPosition: currencySymbolPosition,
             taskConcurrency: taskConcurrency,
             emailPollingInterval: emailPollingInterval,

@@ -110,6 +110,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(TagView.serializer)
       ..add(TaskQueueConfiguration.serializer)
       ..add(TokenPair.serializer)
+      ..add(UpdateGroupMemberGrantsCommand.serializer)
       ..add(UpdateGroupReceiptSettingsCommand.serializer)
       ..add(UpdateGroupSettingsCommand.serializer)
       ..add(UpdateProfileCommand.serializer)
@@ -175,14 +176,14 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(Icon)]),
           () => ListBuilder<Icon>())
       ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(Permission)]),
-          () => ListBuilder<Permission>())
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
       ..addBuilderFactory(
           const FullType(BuiltMap, const [
             const FullType(String),
-            const FullType(BuiltList, const [const FullType(Permission)])
+            const FullType(BuiltList, const [const FullType(String)])
           ]),
-          () => MapBuilder<String, BuiltList<Permission>>())
+          () => MapBuilder<String, BuiltList<String>>())
       ..addBuilderFactory(
           const FullType(BuiltMap, const [
             const FullType(String),
@@ -344,6 +345,18 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(Widget)]),
           () => ListBuilder<Widget>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(int)]),
           () => ListBuilder<int>())

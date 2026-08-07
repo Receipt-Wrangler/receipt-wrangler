@@ -72,6 +72,37 @@ When the API swagger.yml changes, regenerate clients:
 
 **IMPORTANT**: Never manually edit generated client code in `desktop/src/open-api/` or `mobile/api/`. Changes will be overwritten.
 
+**Regenerate `mobile/api/` in the SAME change as any `swagger.yml` edit** — not "later". It is easy
+to update the backend and desktop and forget mobile, because nothing fails: the Go tests pass, the
+desktop compiles, and the drift is invisible until a released Android build hits the new payload.
+That has caused **two production login outages** (2026-07-24, 2026-08-06). The Dart client is the
+strict one — a value added to any closed enum on a response model fails the *whole* payload's
+deserialization on every already-released binary. See `mobile/CLAUDE.md` → "Permission-based UI
+gating" for the mechanism and the guard tests.
+
+To check for drift at any time, diff the last regen against the last swagger change:
+
+```bash
+git log -1 --format=%h -- api/swagger.yml     # must not be newer than...
+git log -1 --format=%h -- mobile/api          # ...this
+```
+
+**Generator on macOS:** `generate-client.sh` shells out to `npx @openapitools/openapi-generator-cli`,
+which fails with `EACCES` when the global npm prefix is root-owned. Run the pinned jar directly
+instead (version is in `api/openapitools.json`), which produces identical output:
+
+```bash
+curl -fL -o /tmp/openapi-generator-cli-7.10.0.jar \
+  https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/7.10.0/openapi-generator-cli-7.10.0.jar
+cd api
+java -jar /tmp/openapi-generator-cli-7.10.0.jar generate -i swagger.yml -g dart-dio -o ../mobile/api
+java -jar /tmp/openapi-generator-cli-7.10.0.jar generate -i swagger.yml -g typescript-angular -o ../desktop/src/open-api
+cd ../mobile/api && flutter pub get && dart run build_runner build
+```
+
+After a mobile regen, re-apply the two documented dart-dio patches (`mobile/CLAUDE.md` → "Known
+dart-dio default-value regressions") and run `flutter analyze`.
+
 ## Component Development
 
 ### Backend Development (api/)

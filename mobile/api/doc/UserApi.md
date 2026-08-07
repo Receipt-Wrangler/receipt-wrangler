@@ -16,6 +16,7 @@ Method | HTTP request | Description
 [**deleteUserById**](UserApi.md#deleteuserbyid) | **DELETE** /user/{userId} | Delete user
 [**getAmountOwedForUser**](UserApi.md#getamountowedforuser) | **GET** /user/amountOwedForUser | Get amount owed for user
 [**getAppData**](UserApi.md#getappdata) | **GET** /user/appData | Get app data
+[**getPagedUsers**](UserApi.md#getpagedusers) | **POST** /user/getPagedUsers | Gets paged users
 [**getUserClaims**](UserApi.md#getuserclaims) | **GET** /user/getUserClaims | Get claims for logged in user
 [**getUsernameCount**](UserApi.md#getusernamecount) | **GET** /user/{username} | Get username count
 [**getUsers**](UserApi.md#getusers) | **GET** /user | Get users
@@ -344,6 +345,53 @@ This endpoint does not need any parameter.
 ### HTTP request headers
 
  - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getPagedUsers**
+> PagedData getPagedUsers(pagedRequestCommand)
+
+Gets paged users
+
+This will return paged users
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getUserApi();
+final PagedRequestCommand pagedRequestCommand = ; // PagedRequestCommand | Paging and sorting data
+
+try {
+    final response = api.getPagedUsers(pagedRequestCommand);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling UserApi->getPagedUsers: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **pagedRequestCommand** | [**PagedRequestCommand**](PagedRequestCommand.md)| Paging and sorting data | 
+
+### Return type
+
+[**PagedData**](PagedData.md)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
  - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

@@ -11,12 +11,16 @@ class _$FeatureConfig extends FeatureConfig {
   final bool aiPoweredReceipts;
   @override
   final bool enableLocalSignUp;
+  @override
+  final String? loginQrUrl;
 
   factory _$FeatureConfig([void Function(FeatureConfigBuilder)? updates]) =>
       (FeatureConfigBuilder()..update(updates))._build();
 
   _$FeatureConfig._(
-      {required this.aiPoweredReceipts, required this.enableLocalSignUp})
+      {required this.aiPoweredReceipts,
+      required this.enableLocalSignUp,
+      this.loginQrUrl})
       : super._();
   @override
   FeatureConfig rebuild(void Function(FeatureConfigBuilder) updates) =>
@@ -30,7 +34,8 @@ class _$FeatureConfig extends FeatureConfig {
     if (identical(other, this)) return true;
     return other is FeatureConfig &&
         aiPoweredReceipts == other.aiPoweredReceipts &&
-        enableLocalSignUp == other.enableLocalSignUp;
+        enableLocalSignUp == other.enableLocalSignUp &&
+        loginQrUrl == other.loginQrUrl;
   }
 
   @override
@@ -38,6 +43,7 @@ class _$FeatureConfig extends FeatureConfig {
     var _$hash = 0;
     _$hash = $jc(_$hash, aiPoweredReceipts.hashCode);
     _$hash = $jc(_$hash, enableLocalSignUp.hashCode);
+    _$hash = $jc(_$hash, loginQrUrl.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -46,7 +52,8 @@ class _$FeatureConfig extends FeatureConfig {
   String toString() {
     return (newBuiltValueToStringHelper(r'FeatureConfig')
           ..add('aiPoweredReceipts', aiPoweredReceipts)
-          ..add('enableLocalSignUp', enableLocalSignUp))
+          ..add('enableLocalSignUp', enableLocalSignUp)
+          ..add('loginQrUrl', loginQrUrl))
         .toString();
   }
 }
@@ -65,6 +72,10 @@ class FeatureConfigBuilder
   set enableLocalSignUp(bool? enableLocalSignUp) =>
       _$this._enableLocalSignUp = enableLocalSignUp;
 
+  String? _loginQrUrl;
+  String? get loginQrUrl => _$this._loginQrUrl;
+  set loginQrUrl(String? loginQrUrl) => _$this._loginQrUrl = loginQrUrl;
+
   FeatureConfigBuilder() {
     FeatureConfig._defaults(this);
   }
@@ -74,6 +85,7 @@ class FeatureConfigBuilder
     if ($v != null) {
       _aiPoweredReceipts = $v.aiPoweredReceipts;
       _enableLocalSignUp = $v.enableLocalSignUp;
+      _loginQrUrl = $v.loginQrUrl;
       _$v = null;
     }
     return this;
@@ -99,6 +111,7 @@ class FeatureConfigBuilder
               aiPoweredReceipts, r'FeatureConfig', 'aiPoweredReceipts'),
           enableLocalSignUp: BuiltValueNullFieldError.checkNotNull(
               enableLocalSignUp, r'FeatureConfig', 'enableLocalSignUp'),
+          loginQrUrl: loginQrUrl,
         );
     replace(_$result);
     return _$result;

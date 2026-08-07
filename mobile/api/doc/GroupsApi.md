@@ -16,6 +16,7 @@ Method | HTTP request | Description
 [**getPagedGroups**](GroupsApi.md#getpagedgroups) | **POST** /group/getPagedGroups | Get paged groups
 [**pollGroupEmail**](GroupsApi.md#pollgroupemail) | **POST** /group/{groupId}/pollGroupEmail | Poll group email
 [**updateGroup**](GroupsApi.md#updategroup) | **PUT** /group/{groupId} | Update a group
+[**updateGroupMemberGrants**](GroupsApi.md#updategroupmembergrants) | **PUT** /group/{groupId}/member/{userId}/grants | Update a group member&#39;s category and tag assignment
 [**updateGroupReceiptSettings**](GroupsApi.md#updategroupreceiptsettings) | **PUT** /group/{groupId}/groupReceiptSettings | Update group receipt settings
 [**updateGroupSettings**](GroupsApi.md#updategroupsettings) | **PUT** /group/{groupId}/groupSettings | Update group settings
 
@@ -330,6 +331,57 @@ Name | Type | Description  | Notes
 ### Return type
 
 void (empty response body)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **updateGroupMemberGrants**
+> UpdateGroupMemberGrantsCommand updateGroupMemberGrants(groupId, userId, updateGroupMemberGrantsCommand)
+
+Update a group member's category and tag assignment
+
+Replaces one member's per-member category/tag grants. These narrow WITHIN the ceiling set by the member's group role — the two layers intersect — so every submitted id must be one the role already allows, or the request is rejected with 400. An empty array clears that resource's restriction and hands the member back to their role's set.  Deliberately a dedicated endpoint rather than a field on the group-member upsert: it carries its own permission (group.members.grants.update), so a member who can manage the roster cannot thereby widen their own visibility.
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getGroupsApi();
+final int groupId = 56; // int | Group the membership belongs to
+final int userId = 56; // int | Member whose assignment is being replaced
+final UpdateGroupMemberGrantsCommand updateGroupMemberGrantsCommand = ; // UpdateGroupMemberGrantsCommand | The category and tag ids to assign
+
+try {
+    final response = api.updateGroupMemberGrants(groupId, userId, updateGroupMemberGrantsCommand);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling GroupsApi->updateGroupMemberGrants: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **groupId** | **int**| Group the membership belongs to | 
+ **userId** | **int**| Member whose assignment is being replaced | 
+ **updateGroupMemberGrantsCommand** | [**UpdateGroupMemberGrantsCommand**](UpdateGroupMemberGrantsCommand.md)| The category and tag ids to assign | 
+
+### Return type
+
+[**UpdateGroupMemberGrantsCommand**](UpdateGroupMemberGrantsCommand.md)
 
 ### Authorization
 

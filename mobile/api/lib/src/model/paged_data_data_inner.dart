@@ -18,6 +18,7 @@ import 'package:openapi/src/model/associated_entity_type.dart';
 import 'package:openapi/src/model/comment.dart';
 import 'package:openapi/src/model/custom_field_type.dart';
 import 'package:openapi/src/model/file_data.dart';
+import 'package:openapi/src/model/user_view.dart';
 import 'package:openapi/src/model/item.dart';
 import 'package:openapi/src/model/system_task_status.dart';
 import 'package:openapi/src/model/tag_view.dart';
@@ -64,6 +65,7 @@ part 'paged_data_data_inner.g.dart';
 /// * [groupMembers] - Members of the group
 /// * [isDefault] - Is default group (not used yet)
 /// * [isAllGroup] - Is all group for user
+/// * [isolateMembers] - Whether member-presence isolation is enabled for the group. When on, members cannot discover other members unless they hold a group role flagged seesAllMembers. Defaults to false.
 /// * [numberOfReceipts] - Number of receipts associated with this tag
 /// * [type] 
 /// * [startedAt] 
@@ -85,7 +87,7 @@ part 'paged_data_data_inner.g.dart';
 /// * [promptId] - Prompt foreign key
 /// * [host] - IMAP host
 /// * [port] - IMAP port
-/// * [username] - IMAP username
+/// * [username] - User's username used to login
 /// * [password] - IMAP password
 /// * [useStartTLS] - Whether to use STARTTLS
 /// * [canBeRestarted] 
@@ -93,9 +95,13 @@ part 'paged_data_data_inner.g.dart';
 /// * [configuration] 
 /// * [configurationVersion] - Schema version the stored configuration was written under.
 /// * [allowedActions] - The actions the requesting user may perform on this template (read, generate, update, delete, duplicate), resolved per user and populated only on the list response. Drives the row action buttons.
+/// * [defaultAvatarColor] - Default avatar color
+/// * [displayName] - Display name
+/// * [isDummyUser] - Is dummy user
+/// * [appRoleId] - Id of the modern app role assigned to the user
 @BuiltValue()
 abstract class PagedDataDataInner implements Built<PagedDataDataInner, PagedDataDataInnerBuilder> {
-  /// Any Of [Activity], [Category], [CustomField], [Group], [Prompt], [Receipt], [ReceiptProcessingSettings], [ReportTemplate], [SystemEmail], [SystemTask], [Tag], [TagView]
+  /// Any Of [Activity], [Category], [CustomField], [Group], [Prompt], [Receipt], [ReceiptProcessingSettings], [ReportTemplate], [SystemEmail], [SystemTask], [Tag], [TagView], [UserView]
   AnyOf get anyOf;
 
   PagedDataDataInner._();
@@ -141,7 +147,7 @@ class _$PagedDataDataInnerSerializer implements PrimitiveSerializer<PagedDataDat
   }) {
     final result = PagedDataDataInnerBuilder();
     Object? anyOfDataSrc;
-    final targetType = const FullType(AnyOf, [FullType(Receipt), FullType(Category), FullType(Tag), FullType(Prompt), FullType(Group), FullType(TagView), FullType(SystemTask), FullType(ReceiptProcessingSettings), FullType(SystemEmail), FullType(Activity), FullType(CustomField), FullType(ReportTemplate), ]);
+    final targetType = const FullType(AnyOf, [FullType(Receipt), FullType(Category), FullType(Tag), FullType(Prompt), FullType(Group), FullType(TagView), FullType(SystemTask), FullType(ReceiptProcessingSettings), FullType(SystemEmail), FullType(Activity), FullType(CustomField), FullType(ReportTemplate), FullType(UserView), ]);
     anyOfDataSrc = serialized;
     result.anyOf = serializers.deserialize(anyOfDataSrc, specifiedType: targetType) as AnyOf;
     return result.build();
