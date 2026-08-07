@@ -119,8 +119,17 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.mobile == 'true'
     runs-on: ubuntu-latest
+    # Least-privilege GITHUB_TOKEN: this job only reads the repo source. Mirrors
+    # the same hardening applied to mobile-e2e.yml for the CodeQL
+    # actions-missing-workflow-permissions alert.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Don't leave the token in .git/config for later steps to pick up
+          # (zizmor "artipacked"); nothing here pushes.
+          persist-credentials: false
       # Pinned to the same version as .github/workflows/mobile-e2e.yml -- keep
       # the two in sync so unit and e2e runs can't drift onto different SDKs.
       - uses: subosito/flutter-action@v2

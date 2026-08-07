@@ -319,4 +319,3 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/update_group_member_grants_command_test.dart

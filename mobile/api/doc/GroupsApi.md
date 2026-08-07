@@ -348,7 +348,7 @@ void (empty response body)
 
 Update a group member's category and tag assignment
 
-Replaces one member's per-member category/tag grants. These narrow WITHIN the ceiling set by the member's group role — the two layers intersect — so every submitted id must be one the role already allows, or the request is rejected with 400. An empty array clears that resource's restriction and hands the member back to their role's set.  Deliberately a dedicated endpoint rather than a field on the group-member upsert: it carries its own permission (group.members.grants.update), so a member who can manage the roster cannot thereby widen their own visibility.
+Replaces one member's per-member category/tag grants. These narrow WITHIN the ceiling set by the member's group role — the two layers intersect — so every submitted id must be one the role already allows, or the request is rejected with 400. Duplicate ids within either array are also rejected with 400.  An empty array clears that resource's restriction. What the member then sees depends on their group role: when the role's requiresIndividualCategoryGrants (resp. requiresIndividualTagGrants) is false — the default — they fall back to the role's set; when it is true the assignment is mandatory, so clearing it leaves them seeing NOTHING for that resource. That is deliberate: it fails closed, so forgetting to assign a newly added member cannot silently widen their visibility.  Deliberately a dedicated endpoint rather than a field on the group-member upsert: it carries its own permission (group.members.grants.update), so a member who can manage the roster cannot thereby widen their own visibility.
 
 ### Example
 ```dart

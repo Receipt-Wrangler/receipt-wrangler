@@ -12,11 +12,11 @@ part 'update_group_member_grants_command.g.dart';
 /// Per-member category/tag assignment. The membership being edited is taken from the URL, never this body.
 ///
 /// Properties:
-/// * [categoryGrants] - Category ids to assign to this member. Every id must sit within the ceiling set by the member's group role, or the request is rejected with 400. An empty array clears the member's category restriction, handing them back to their role's set.
+/// * [categoryGrants] - Category ids to assign to this member. Every id must sit within the ceiling set by the member's group role, or the request is rejected with 400; duplicate ids are rejected with 400 as well. An empty array clears the member's category restriction — handing them back to their role's set, or, when the role sets requiresIndividualCategoryGrants, leaving them with no categories at all (fail closed).
 /// * [tagGrants] - Tag counterpart of categoryGrants.
 @BuiltValue()
 abstract class UpdateGroupMemberGrantsCommand implements Built<UpdateGroupMemberGrantsCommand, UpdateGroupMemberGrantsCommandBuilder> {
-  /// Category ids to assign to this member. Every id must sit within the ceiling set by the member's group role, or the request is rejected with 400. An empty array clears the member's category restriction, handing them back to their role's set.
+  /// Category ids to assign to this member. Every id must sit within the ceiling set by the member's group role, or the request is rejected with 400; duplicate ids are rejected with 400 as well. An empty array clears the member's category restriction — handing them back to their role's set, or, when the role sets requiresIndividualCategoryGrants, leaving them with no categories at all (fail closed).
   @BuiltValueField(wireName: r'categoryGrants')
   BuiltList<int>? get categoryGrants;
 

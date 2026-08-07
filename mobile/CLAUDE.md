@@ -107,10 +107,12 @@ a stale action at worst returns 403.
   faithful port of the backend matcher (`api/internal/permissions/matcher.go`) and its desktop twin
   (`desktop/src/utils/permission.utils.ts`), wildcard semantics included, so UI gating === backend.
 - **Effective permissions are plain STRINGS on the wire, deliberately not the `Permission` enum.**
-  `AppData.appPermissions` / `.groupPermissions` are typed `string` in `swagger.yml`, so
-  `PermissionsModel` ingests and stores raw wire strings; the **query** methods still take the
-  `Permission` enum for call-site type safety (converted via `permissionWireName`). This split is
-  load-bearing, not cosmetic:
+  In `swagger.yml`, `AppData.appPermissions` is an **array of raw wire strings** and
+  `AppData.groupPermissions` is a **map of group id → array of raw wire strings** (`BuiltList<String>`
+  / `BuiltMap<String, BuiltList<String>>` in the generated client). `PermissionsModel` ingests and
+  stores those raw strings; the **query** methods still take the `Permission` enum for call-site type
+  safety, converting it to its wire string via `permissionWireName`. This split is load-bearing, not
+  cosmetic:
   - `Permission` is a built_value `EnumClass` whose `_$valueOf` ends in
     `default: throw ArgumentError(name)`. An unknown value fails the **entire** `AppData`
     deserialization, and since permissions hydrate on login that **hard-fails login** — the request

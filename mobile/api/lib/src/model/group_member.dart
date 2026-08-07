@@ -17,7 +17,7 @@ part 'group_member.g.dart';
 /// * [groupRoleId] - Id of the modern group role assigned to the member
 /// * [updatedAt] 
 /// * [userId] - User compound primary key
-/// * [categoryGrants] - Category ids this individual member may see, narrowing WITHIN whatever their group role allows (the two layers intersect). Empty means the member adds no narrowing of their own and falls back to the role. Read only here — write via PUT /group/{groupId}/member/{userId}/grants.
+/// * [categoryGrants] - Category ids this individual member may see, narrowing WITHIN whatever their group role allows (the two layers intersect). Empty means the member adds no narrowing of their own: they fall back to the role's set, EXCEPT when the role sets requiresIndividualCategoryGrants, in which case an unassigned member sees no categories at all (fail closed). Read only here — write via PUT /group/{groupId}/member/{userId}/grants.
 /// * [tagGrants] - Tag counterpart of categoryGrants. Restricted independently of categories.
 @BuiltValue()
 abstract class GroupMember implements Built<GroupMember, GroupMemberBuilder> {
@@ -39,7 +39,7 @@ abstract class GroupMember implements Built<GroupMember, GroupMemberBuilder> {
   @BuiltValueField(wireName: r'userId')
   int get userId;
 
-  /// Category ids this individual member may see, narrowing WITHIN whatever their group role allows (the two layers intersect). Empty means the member adds no narrowing of their own and falls back to the role. Read only here — write via PUT /group/{groupId}/member/{userId}/grants.
+  /// Category ids this individual member may see, narrowing WITHIN whatever their group role allows (the two layers intersect). Empty means the member adds no narrowing of their own: they fall back to the role's set, EXCEPT when the role sets requiresIndividualCategoryGrants, in which case an unassigned member sees no categories at all (fail closed). Read only here — write via PUT /group/{groupId}/member/{userId}/grants.
   @BuiltValueField(wireName: r'categoryGrants')
   BuiltList<int>? get categoryGrants;
 

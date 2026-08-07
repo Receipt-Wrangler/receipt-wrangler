@@ -80,11 +80,13 @@ strict one — a value added to any closed enum on a response model fails the *w
 deserialization on every already-released binary. See `mobile/CLAUDE.md` → "Permission-based UI
 gating" for the mechanism and the guard tests.
 
-To check for drift at any time, diff the last regen against the last swagger change:
+To check for drift at any time, compare *when* each was last touched — commit timestamps, since two
+short hashes tell you nothing about ordering:
 
 ```bash
-git log -1 --format=%h -- api/swagger.yml     # must not be newer than...
-git log -1 --format=%h -- mobile/api          # ...this
+swagger=$(git log -1 --format=%ct -- api/swagger.yml)
+client=$(git log -1 --format=%ct -- mobile/api)
+[ "$swagger" -le "$client" ] && echo "mobile/api is current" || echo "mobile/api is STALE — regenerate"
 ```
 
 **Generator on macOS:** `generate-client.sh` shells out to `npx @openapitools/openapi-generator-cli`,
