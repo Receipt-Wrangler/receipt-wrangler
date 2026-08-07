@@ -39,6 +39,10 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
   final bool? mcpEnabled;
   @override
   final String? mcpPublicUrl;
+  @override
+  final bool? showLoginQr;
+  @override
+  final String? mobileServerUrl;
 
   factory _$UpsertSystemSettingsCommand(
           [void Function(UpsertSystemSettingsCommandBuilder)? updates]) =>
@@ -60,7 +64,9 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
       this.pdfDpi,
       this.taskQueueConfigurations,
       this.mcpEnabled,
-      this.mcpPublicUrl})
+      this.mcpPublicUrl,
+      this.showLoginQr,
+      this.mobileServerUrl})
       : super._();
   @override
   UpsertSystemSettingsCommand rebuild(
@@ -91,7 +97,9 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
         pdfDpi == other.pdfDpi &&
         taskQueueConfigurations == other.taskQueueConfigurations &&
         mcpEnabled == other.mcpEnabled &&
-        mcpPublicUrl == other.mcpPublicUrl;
+        mcpPublicUrl == other.mcpPublicUrl &&
+        showLoginQr == other.showLoginQr &&
+        mobileServerUrl == other.mobileServerUrl;
   }
 
   @override
@@ -113,6 +121,8 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
     _$hash = $jc(_$hash, taskQueueConfigurations.hashCode);
     _$hash = $jc(_$hash, mcpEnabled.hashCode);
     _$hash = $jc(_$hash, mcpPublicUrl.hashCode);
+    _$hash = $jc(_$hash, showLoginQr.hashCode);
+    _$hash = $jc(_$hash, mobileServerUrl.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -136,7 +146,9 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
           ..add('pdfDpi', pdfDpi)
           ..add('taskQueueConfigurations', taskQueueConfigurations)
           ..add('mcpEnabled', mcpEnabled)
-          ..add('mcpPublicUrl', mcpPublicUrl))
+          ..add('mcpPublicUrl', mcpPublicUrl)
+          ..add('showLoginQr', showLoginQr)
+          ..add('mobileServerUrl', mobileServerUrl))
         .toString();
   }
 }
@@ -232,6 +244,15 @@ class UpsertSystemSettingsCommandBuilder
   String? get mcpPublicUrl => _$this._mcpPublicUrl;
   set mcpPublicUrl(String? mcpPublicUrl) => _$this._mcpPublicUrl = mcpPublicUrl;
 
+  bool? _showLoginQr;
+  bool? get showLoginQr => _$this._showLoginQr;
+  set showLoginQr(bool? showLoginQr) => _$this._showLoginQr = showLoginQr;
+
+  String? _mobileServerUrl;
+  String? get mobileServerUrl => _$this._mobileServerUrl;
+  set mobileServerUrl(String? mobileServerUrl) =>
+      _$this._mobileServerUrl = mobileServerUrl;
+
   UpsertSystemSettingsCommandBuilder() {
     UpsertSystemSettingsCommand._defaults(this);
   }
@@ -256,6 +277,8 @@ class UpsertSystemSettingsCommandBuilder
       _taskQueueConfigurations = $v.taskQueueConfigurations?.toBuilder();
       _mcpEnabled = $v.mcpEnabled;
       _mcpPublicUrl = $v.mcpPublicUrl;
+      _showLoginQr = $v.showLoginQr;
+      _mobileServerUrl = $v.mobileServerUrl;
       _$v = null;
     }
     return this;
@@ -311,6 +334,8 @@ class UpsertSystemSettingsCommandBuilder
             taskQueueConfigurations: _taskQueueConfigurations?.build(),
             mcpEnabled: mcpEnabled,
             mcpPublicUrl: mcpPublicUrl,
+            showLoginQr: showLoginQr,
+            mobileServerUrl: mobileServerUrl,
           );
     } catch (_) {
       late String _$failedField;

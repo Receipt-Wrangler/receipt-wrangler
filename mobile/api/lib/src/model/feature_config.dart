@@ -13,6 +13,7 @@ part 'feature_config.g.dart';
 /// Properties:
 /// * [aiPoweredReceipts] - Whether AI powered receipts are enabled
 /// * [enableLocalSignUp] - Whether local sign up is enabled
+/// * [loginQrUrl] - Composed deep link the desktop login page encodes as a QR; empty unless the login QR is enabled with a mobile server URL
 @BuiltValue()
 abstract class FeatureConfig implements Built<FeatureConfig, FeatureConfigBuilder> {
   /// Whether AI powered receipts are enabled
@@ -22,6 +23,10 @@ abstract class FeatureConfig implements Built<FeatureConfig, FeatureConfigBuilde
   /// Whether local sign up is enabled
   @BuiltValueField(wireName: r'enableLocalSignUp')
   bool get enableLocalSignUp;
+
+  /// Composed deep link the desktop login page encodes as a QR; empty unless the login QR is enabled with a mobile server URL
+  @BuiltValueField(wireName: r'loginQrUrl')
+  String? get loginQrUrl;
 
   FeatureConfig._();
 
@@ -56,6 +61,13 @@ class _$FeatureConfigSerializer implements PrimitiveSerializer<FeatureConfig> {
       object.enableLocalSignUp,
       specifiedType: const FullType(bool),
     );
+    if (object.loginQrUrl != null) {
+      yield r'loginQrUrl';
+      yield serializers.serialize(
+        object.loginQrUrl,
+        specifiedType: const FullType(String),
+      );
+    }
   }
 
   @override
@@ -92,6 +104,13 @@ class _$FeatureConfigSerializer implements PrimitiveSerializer<FeatureConfig> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.enableLocalSignUp = valueDes;
+          break;
+        case r'loginQrUrl':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.loginQrUrl = valueDes;
           break;
         default:
           unhandled.add(key);

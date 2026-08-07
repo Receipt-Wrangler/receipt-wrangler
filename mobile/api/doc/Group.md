@@ -17,6 +17,7 @@ Name | Type | Description | Notes
 **isDefault** | **bool** | Is default group (not used yet) | [optional] 
 **name** | **String** | Name of the group | 
 **isAllGroup** | **bool** | Is all group for user | 
+**isolateMembers** | **bool** | Whether member-presence isolation is enabled for the group. When on, members cannot discover other members unless they hold a group role flagged seesAllMembers. Defaults to false. | [optional] 
 **status** | [**GroupStatus**](GroupStatus.md) |  | 
 **updatedAt** | **String** |  | [optional] 
 

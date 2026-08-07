@@ -28,7 +28,7 @@ export interface GroupMember {
      */
     userId: number;
     /**
-     * Category ids this individual member may see, narrowing WITHIN whatever their group role allows (the two layers intersect). Empty means the member adds no narrowing of their own and falls back to the role. Read only here — write via PUT /group/{groupId}/member/{userId}/grants.
+     * Category ids this individual member may see, narrowing WITHIN whatever their group role allows (the two layers intersect). Empty means the member adds no narrowing of their own: they fall back to the role\'s set, EXCEPT when the role sets requiresIndividualCategoryGrants, in which case an unassigned member sees no categories at all (fail closed). Read only here — write via PUT /group/{groupId}/member/{userId}/grants.
      */
     categoryGrants?: Array<number>;
     /**

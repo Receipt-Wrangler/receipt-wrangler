@@ -26,6 +26,8 @@ class _$Group extends Group {
   @override
   final bool isAllGroup;
   @override
+  final bool? isolateMembers;
+  @override
   final GroupStatus status;
   @override
   final String? updatedAt;
@@ -43,6 +45,7 @@ class _$Group extends Group {
       this.isDefault,
       required this.name,
       required this.isAllGroup,
+      this.isolateMembers,
       required this.status,
       this.updatedAt})
       : super._();
@@ -66,6 +69,7 @@ class _$Group extends Group {
         isDefault == other.isDefault &&
         name == other.name &&
         isAllGroup == other.isAllGroup &&
+        isolateMembers == other.isolateMembers &&
         status == other.status &&
         updatedAt == other.updatedAt;
   }
@@ -82,6 +86,7 @@ class _$Group extends Group {
     _$hash = $jc(_$hash, isDefault.hashCode);
     _$hash = $jc(_$hash, name.hashCode);
     _$hash = $jc(_$hash, isAllGroup.hashCode);
+    _$hash = $jc(_$hash, isolateMembers.hashCode);
     _$hash = $jc(_$hash, status.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jf(_$hash);
@@ -100,6 +105,7 @@ class _$Group extends Group {
           ..add('isDefault', isDefault)
           ..add('name', name)
           ..add('isAllGroup', isAllGroup)
+          ..add('isolateMembers', isolateMembers)
           ..add('status', status)
           ..add('updatedAt', updatedAt))
         .toString();
@@ -151,6 +157,11 @@ class GroupBuilder implements Builder<Group, GroupBuilder> {
   bool? get isAllGroup => _$this._isAllGroup;
   set isAllGroup(bool? isAllGroup) => _$this._isAllGroup = isAllGroup;
 
+  bool? _isolateMembers;
+  bool? get isolateMembers => _$this._isolateMembers;
+  set isolateMembers(bool? isolateMembers) =>
+      _$this._isolateMembers = isolateMembers;
+
   GroupStatus? _status;
   GroupStatus? get status => _$this._status;
   set status(GroupStatus? status) => _$this._status = status;
@@ -175,6 +186,7 @@ class GroupBuilder implements Builder<Group, GroupBuilder> {
       _isDefault = $v.isDefault;
       _name = $v.name;
       _isAllGroup = $v.isAllGroup;
+      _isolateMembers = $v.isolateMembers;
       _status = $v.status;
       _updatedAt = $v.updatedAt;
       _$v = null;
@@ -210,6 +222,7 @@ class GroupBuilder implements Builder<Group, GroupBuilder> {
             name: BuiltValueNullFieldError.checkNotNull(name, r'Group', 'name'),
             isAllGroup: BuiltValueNullFieldError.checkNotNull(
                 isAllGroup, r'Group', 'isAllGroup'),
+            isolateMembers: isolateMembers,
             status: BuiltValueNullFieldError.checkNotNull(
                 status, r'Group', 'status'),
             updatedAt: updatedAt,

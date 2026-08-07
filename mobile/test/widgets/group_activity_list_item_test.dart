@@ -1,4 +1,3 @@
-import 'package:built_collection/built_collection.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +10,8 @@ import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/slidable_widget.dart';
+
+import '../helpers/permission_test_helpers.dart';
 
 /// Permission-gating coverage for the activity rerun swipe action
 /// (`group_activity_list_item.dart`). The gate is
@@ -35,16 +36,8 @@ class _MockOpenapi extends Mock implements api.Openapi {}
 
 class _MockSystemTaskApi extends Mock implements api.SystemTaskApi {}
 
-PermissionsModel _permissions(List<api.Permission> groupPerms) {
-  final model = PermissionsModel();
-  model.setPermissions(
-    BuiltList<api.Permission>(),
-    BuiltMap<String, BuiltList<api.Permission>>({
-      '$_groupId': BuiltList<api.Permission>(groupPerms),
-    }),
-  );
-  return model;
-}
+PermissionsModel _permissions(List<api.Permission> groupPerms) =>
+    seededPermissions(group: {_groupId: groupPerms});
 
 api.Activity _activity({required bool canBeRestarted}) => api.Activity(
       (b) => b

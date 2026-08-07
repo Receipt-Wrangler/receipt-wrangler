@@ -135,6 +135,7 @@ export 'package:openapi/src/model/tag.dart';
 export 'package:openapi/src/model/tag_view.dart';
 export 'package:openapi/src/model/task_queue_configuration.dart';
 export 'package:openapi/src/model/token_pair.dart';
+export 'package:openapi/src/model/update_group_member_grants_command.dart';
 export 'package:openapi/src/model/update_group_receipt_settings_command.dart';
 export 'package:openapi/src/model/update_group_settings_command.dart';
 export 'package:openapi/src/model/update_profile_command.dart';

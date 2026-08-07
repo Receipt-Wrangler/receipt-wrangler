@@ -361,9 +361,9 @@ void main() {
             .thenReturn(CurrencySymbolPosition.END);
         when(() => mockAppData.currencyHideDecimalPlaces).thenReturn(false);
         when(() => mockAppData.appPermissions)
-            .thenReturn(BuiltList<Permission>());
+            .thenReturn(BuiltList<String>());
         when(() => mockAppData.groupPermissions)
-            .thenReturn(BuiltMap<String, BuiltList<Permission>>());
+            .thenReturn(BuiltMap<String, BuiltList<String>>());
 
         when(() => mockUserApi.getAppData()).thenAnswer((_) async => Response(
               data: mockAppData,
@@ -425,9 +425,9 @@ void main() {
             .thenReturn(CurrencySymbolPosition.END);
         when(() => mockAppData.currencyHideDecimalPlaces).thenReturn(false);
         when(() => mockAppData.appPermissions)
-            .thenReturn(BuiltList<Permission>());
+            .thenReturn(BuiltList<String>());
         when(() => mockAppData.groupPermissions)
-            .thenReturn(BuiltMap<String, BuiltList<Permission>>());
+            .thenReturn(BuiltMap<String, BuiltList<String>>());
 
         when(() => mockUserApi.getAppData()).thenAnswer((_) async => Response(
               data: mockAppData,

@@ -16,6 +16,7 @@ import 'package:openapi/src/model/group_settings.dart';
 import 'package:openapi/src/model/internal_error_response.dart';
 import 'package:openapi/src/model/paged_data.dart';
 import 'package:openapi/src/model/paged_group_request_command.dart';
+import 'package:openapi/src/model/update_group_member_grants_command.dart';
 import 'package:openapi/src/model/update_group_receipt_settings_command.dart';
 import 'package:openapi/src/model/update_group_settings_command.dart';
 import 'package:openapi/src/model/upsert_group_command.dart';
@@ -548,6 +549,116 @@ class GroupsApi {
     );
 
     return _response;
+  }
+
+  /// Update a group member&#39;s category and tag assignment
+  /// Replaces one member&#39;s per-member category/tag grants. These narrow WITHIN the ceiling set by the member&#39;s group role — the two layers intersect — so every submitted id must be one the role already allows, or the request is rejected with 400. Duplicate ids within either array are also rejected with 400.  An empty array clears that resource&#39;s restriction. What the member then sees depends on their group role: when the role&#39;s requiresIndividualCategoryGrants (resp. requiresIndividualTagGrants) is false — the default — they fall back to the role&#39;s set; when it is true the assignment is mandatory, so clearing it leaves them seeing NOTHING for that resource. That is deliberate: it fails closed, so forgetting to assign a newly added member cannot silently widen their visibility.  Deliberately a dedicated endpoint rather than a field on the group-member upsert: it carries its own permission (group.members.grants.update), so a member who can manage the roster cannot thereby widen their own visibility.
+  ///
+  /// Parameters:
+  /// * [groupId] - Group the membership belongs to
+  /// * [userId] - Member whose assignment is being replaced
+  /// * [updateGroupMemberGrantsCommand] - The category and tag ids to assign
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [UpdateGroupMemberGrantsCommand] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<UpdateGroupMemberGrantsCommand>> updateGroupMemberGrants({ 
+    required int groupId,
+    required int userId,
+    required UpdateGroupMemberGrantsCommand updateGroupMemberGrantsCommand,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/group/{groupId}/member/{userId}/grants'.replaceAll('{' r'groupId' '}', encodeQueryParameter(_serializers, groupId, const FullType(int)).toString()).replaceAll('{' r'userId' '}', encodeQueryParameter(_serializers, userId, const FullType(int)).toString());
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(UpdateGroupMemberGrantsCommand);
+      _bodyData = _serializers.serialize(updateGroupMemberGrantsCommand, specifiedType: _type);
+
+    } catch(error, stackTrace) {
+      throw DioException(
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    UpdateGroupMemberGrantsCommand? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null ? null : _serializers.deserialize(
+        rawResponse,
+        specifiedType: const FullType(UpdateGroupMemberGrantsCommand),
+      ) as UpdateGroupMemberGrantsCommand;
+
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<UpdateGroupMemberGrantsCommand>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
   }
 
   /// Update group receipt settings

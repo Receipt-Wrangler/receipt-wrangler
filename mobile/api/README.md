@@ -99,6 +99,7 @@ Class | Method | HTTP request | Description
 [*GroupsApi*](doc/GroupsApi.md) | [**getPagedGroups**](doc/GroupsApi.md#getpagedgroups) | **POST** /group/getPagedGroups | Get paged groups
 [*GroupsApi*](doc/GroupsApi.md) | [**pollGroupEmail**](doc/GroupsApi.md#pollgroupemail) | **POST** /group/{groupId}/pollGroupEmail | Poll group email
 [*GroupsApi*](doc/GroupsApi.md) | [**updateGroup**](doc/GroupsApi.md#updategroup) | **PUT** /group/{groupId} | Update a group
+[*GroupsApi*](doc/GroupsApi.md) | [**updateGroupMemberGrants**](doc/GroupsApi.md#updategroupmembergrants) | **PUT** /group/{groupId}/member/{userId}/grants | Update a group member&#39;s category and tag assignment
 [*GroupsApi*](doc/GroupsApi.md) | [**updateGroupReceiptSettings**](doc/GroupsApi.md#updategroupreceiptsettings) | **PUT** /group/{groupId}/groupReceiptSettings | Update group receipt settings
 [*GroupsApi*](doc/GroupsApi.md) | [**updateGroupSettings**](doc/GroupsApi.md#updategroupsettings) | **PUT** /group/{groupId}/groupSettings | Update group settings
 [*ImportApi*](doc/ImportApi.md) | [**importConfigJson**](doc/ImportApi.md#importconfigjson) | **POST** /import/importConfigJson | Import config json
@@ -176,6 +177,7 @@ Class | Method | HTTP request | Description
 [*UserApi*](doc/UserApi.md) | [**deleteUserById**](doc/UserApi.md#deleteuserbyid) | **DELETE** /user/{userId} | Delete user
 [*UserApi*](doc/UserApi.md) | [**getAmountOwedForUser**](doc/UserApi.md#getamountowedforuser) | **GET** /user/amountOwedForUser | Get amount owed for user
 [*UserApi*](doc/UserApi.md) | [**getAppData**](doc/UserApi.md#getappdata) | **GET** /user/appData | Get app data
+[*UserApi*](doc/UserApi.md) | [**getPagedUsers**](doc/UserApi.md#getpagedusers) | **POST** /user/getPagedUsers | Gets paged users
 [*UserApi*](doc/UserApi.md) | [**getUserClaims**](doc/UserApi.md#getuserclaims) | **GET** /user/getUserClaims | Get claims for logged in user
 [*UserApi*](doc/UserApi.md) | [**getUsernameCount**](doc/UserApi.md#getusernamecount) | **GET** /user/{username} | Get username count
 [*UserApi*](doc/UserApi.md) | [**getUsers**](doc/UserApi.md#getusers) | **GET** /user | Get users
@@ -287,6 +289,7 @@ Class | Method | HTTP request | Description
  - [TagView](doc/TagView.md)
  - [TaskQueueConfiguration](doc/TaskQueueConfiguration.md)
  - [TokenPair](doc/TokenPair.md)
+ - [UpdateGroupMemberGrantsCommand](doc/UpdateGroupMemberGrantsCommand.md)
  - [UpdateGroupReceiptSettingsCommand](doc/UpdateGroupReceiptSettingsCommand.md)
  - [UpdateGroupSettingsCommand](doc/UpdateGroupSettingsCommand.md)
  - [UpdateProfileCommand](doc/UpdateProfileCommand.md)

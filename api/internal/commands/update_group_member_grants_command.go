@@ -13,9 +13,12 @@ import (
 // aim a grant write at a different member or group than the one the caller was
 // authorized against.
 //
-// An empty CategoryIds (or TagIds) means "not restricted for that resource": the
-// member falls back to whatever their group role allows. There is no separate
-// "clear restriction" verb.
+// An empty CategoryIds (or TagIds) means "not restricted for that resource" —
+// there is no separate "clear restriction" verb. What the member then sees is
+// decided by their group role, NOT unconditionally by the role's grant set: with
+// RequiresIndividualCategoryGrants (resp. RequiresIndividualTagGrants) false they
+// fall back to the role's set, but with it true they see nothing for that
+// resource. See composeGrantLayer in services/grant.go, which fails closed.
 type UpdateGroupMemberGrantsCommand struct {
 	CategoryIds []uint `json:"categoryGrants"`
 	TagIds      []uint `json:"tagGrants"`

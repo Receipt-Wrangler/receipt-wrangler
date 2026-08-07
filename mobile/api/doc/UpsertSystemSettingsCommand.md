@@ -24,6 +24,8 @@ Name | Type | Description | Notes
 **taskQueueConfigurations** | [**BuiltList&lt;UpsertTaskQueueConfiguration&gt;**](UpsertTaskQueueConfiguration.md) |  | [optional] 
 **mcpEnabled** | **bool** | Whether the OAuth 2.1-protected MCP server is enabled | [optional] 
 **mcpPublicUrl** | **String** | Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience | [optional] 
+**showLoginQr** | **bool** | Whether to show the mobile-setup QR code on the desktop login page | [optional] 
+**mobileServerUrl** | **String** | Server/API URL mobile clients connect to; encoded into the login QR's deep link | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

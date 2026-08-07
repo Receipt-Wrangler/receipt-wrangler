@@ -27,6 +27,10 @@ part 'role.g.dart';
 /// * [tagGrants] - Tag ids a GROUP role restricts its members to. Empty means unrestricted (members may use every tag). Always empty for app roles.
 /// * [paidByUserGrants] - User ids whose receipts a GROUP role lets its members see (by the receipt's \"paid by\" user). Empty with includeOwnPaidReceipts false means unrestricted (members see every payer's receipts). Always empty for app roles.
 /// * [includeOwnPaidReceipts] - Whether a GROUP role lets each member see receipts they paid for. Part of the paid-by visibility filter; always false for app roles.
+/// * [seesAllMembers] - Whether a GROUP role exempts its members from member-presence isolation (they see, and are seen by, every member of an isolated group). Always false for app roles.
+/// * [skipDefaultGroupCreation] - Whether users created with this APP role skip the automatic personal \"My Receipts\" group. The virtual \"All\" group is always created. Applies at user-creation time only — changing it never adds or removes a group for an existing user. Always false for group roles.
+/// * [requiresIndividualCategoryGrants] - Whether a GROUP role requires per-member category assignment. When true, a member holding this role with no individual category grants sees NO categories, rather than falling back to the role's set. Always false for app roles.
+/// * [requiresIndividualTagGrants] - Tag counterpart of requiresIndividualCategoryGrants. Always false for app roles.
 /// * [reportTemplateGrants] - Per-template action grants restricting which report templates a GROUP role's members may act on. Empty means unrestricted (every template the role's group access reaches). Always empty for app roles.
 @BuiltValue()
 abstract class Role implements Built<Role, RoleBuilder> {
@@ -72,6 +76,22 @@ abstract class Role implements Built<Role, RoleBuilder> {
   /// Whether a GROUP role lets each member see receipts they paid for. Part of the paid-by visibility filter; always false for app roles.
   @BuiltValueField(wireName: r'includeOwnPaidReceipts')
   bool? get includeOwnPaidReceipts;
+
+  /// Whether a GROUP role exempts its members from member-presence isolation (they see, and are seen by, every member of an isolated group). Always false for app roles.
+  @BuiltValueField(wireName: r'seesAllMembers')
+  bool? get seesAllMembers;
+
+  /// Whether users created with this APP role skip the automatic personal \"My Receipts\" group. The virtual \"All\" group is always created. Applies at user-creation time only — changing it never adds or removes a group for an existing user. Always false for group roles.
+  @BuiltValueField(wireName: r'skipDefaultGroupCreation')
+  bool? get skipDefaultGroupCreation;
+
+  /// Whether a GROUP role requires per-member category assignment. When true, a member holding this role with no individual category grants sees NO categories, rather than falling back to the role's set. Always false for app roles.
+  @BuiltValueField(wireName: r'requiresIndividualCategoryGrants')
+  bool? get requiresIndividualCategoryGrants;
+
+  /// Tag counterpart of requiresIndividualCategoryGrants. Always false for app roles.
+  @BuiltValueField(wireName: r'requiresIndividualTagGrants')
+  bool? get requiresIndividualTagGrants;
 
   /// Per-template action grants restricting which report templates a GROUP role's members may act on. Empty means unrestricted (every template the role's group access reaches). Always empty for app roles.
   @BuiltValueField(wireName: r'reportTemplateGrants')
@@ -169,6 +189,34 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
       yield r'includeOwnPaidReceipts';
       yield serializers.serialize(
         object.includeOwnPaidReceipts,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.seesAllMembers != null) {
+      yield r'seesAllMembers';
+      yield serializers.serialize(
+        object.seesAllMembers,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.skipDefaultGroupCreation != null) {
+      yield r'skipDefaultGroupCreation';
+      yield serializers.serialize(
+        object.skipDefaultGroupCreation,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.requiresIndividualCategoryGrants != null) {
+      yield r'requiresIndividualCategoryGrants';
+      yield serializers.serialize(
+        object.requiresIndividualCategoryGrants,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.requiresIndividualTagGrants != null) {
+      yield r'requiresIndividualTagGrants';
+      yield serializers.serialize(
+        object.requiresIndividualTagGrants,
         specifiedType: const FullType(bool),
       );
     }
@@ -285,6 +333,34 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.includeOwnPaidReceipts = valueDes;
+          break;
+        case r'seesAllMembers':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.seesAllMembers = valueDes;
+          break;
+        case r'skipDefaultGroupCreation':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.skipDefaultGroupCreation = valueDes;
+          break;
+        case r'requiresIndividualCategoryGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.requiresIndividualCategoryGrants = valueDes;
+          break;
+        case r'requiresIndividualTagGrants':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.requiresIndividualTagGrants = valueDes;
           break;
         case r'reportTemplateGrants':
           final valueDes = serializers.deserialize(

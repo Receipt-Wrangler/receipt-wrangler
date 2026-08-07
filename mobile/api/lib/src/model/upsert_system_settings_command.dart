@@ -31,6 +31,8 @@ part 'upsert_system_settings_command.g.dart';
 /// * [taskQueueConfigurations] 
 /// * [mcpEnabled] - Whether the OAuth 2.1-protected MCP server is enabled
 /// * [mcpPublicUrl] - Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
+/// * [showLoginQr] - Whether to show the mobile-setup QR code on the desktop login page
+/// * [mobileServerUrl] - Server/API URL mobile clients connect to; encoded into the login QR's deep link
 @BuiltValue()
 abstract class UpsertSystemSettingsCommand implements Built<UpsertSystemSettingsCommand, UpsertSystemSettingsCommandBuilder> {
   /// Whether local sign up is enabled
@@ -94,6 +96,14 @@ abstract class UpsertSystemSettingsCommand implements Built<UpsertSystemSettings
   /// Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
   @BuiltValueField(wireName: r'mcpPublicUrl')
   String? get mcpPublicUrl;
+
+  /// Whether to show the mobile-setup QR code on the desktop login page
+  @BuiltValueField(wireName: r'showLoginQr')
+  bool? get showLoginQr;
+
+  /// Server/API URL mobile clients connect to; encoded into the login QR's deep link
+  @BuiltValueField(wireName: r'mobileServerUrl')
+  String? get mobileServerUrl;
 
   UpsertSystemSettingsCommand._();
 
@@ -218,6 +228,20 @@ class _$UpsertSystemSettingsCommandSerializer implements PrimitiveSerializer<Ups
       yield r'mcpPublicUrl';
       yield serializers.serialize(
         object.mcpPublicUrl,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.showLoginQr != null) {
+      yield r'showLoginQr';
+      yield serializers.serialize(
+        object.showLoginQr,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.mobileServerUrl != null) {
+      yield r'mobileServerUrl';
+      yield serializers.serialize(
+        object.mobileServerUrl,
         specifiedType: const FullType(String),
       );
     }
@@ -355,6 +379,20 @@ class _$UpsertSystemSettingsCommandSerializer implements PrimitiveSerializer<Ups
             specifiedType: const FullType(String),
           ) as String;
           result.mcpPublicUrl = valueDes;
+          break;
+        case r'showLoginQr':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.showLoginQr = valueDes;
+          break;
+        case r'mobileServerUrl':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.mobileServerUrl = valueDes;
           break;
         default:
           unhandled.add(key);

@@ -7,6 +7,7 @@ on:
     paths:
       - 'api/**'
       - 'desktop/**'
+      - 'mobile/**'
       - 'docker/**'
       - '.github/workflows/**'
 
@@ -20,6 +21,7 @@ jobs:
     outputs:
       api: ${{ steps.filter.outputs.api }}
       desktop: ${{ steps.filter.outputs.desktop }}
+      mobile: ${{ steps.filter.outputs.mobile }}
       docker: ${{ steps.filter.outputs.docker }}
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +33,10 @@ jobs:
               - 'api/**'
             desktop:
               - 'desktop/**'
+            mobile:
+              - 'mobile/**'
+            # Deliberately excludes mobile/ -- the Flutter app is not part of
+            # the monolith image, so a mobile-only change must not rebuild it.
             docker:
               - 'api/**'
               - 'desktop/**'
@@ -99,6 +105,44 @@ jobs:
           files: ./desktop/coverage/receipt-wrangler-desktop/cobertura-coverage.xml
           flags: desktop
           fail_ci_if_error: true
+
+  # Flutter unit/widget tests. Fast and hermetic -- no emulator, no backend --
+  # so unlike the advisory mobile-e2e workflow this one is gating.
+  #
+  # `flutter analyze` is deliberately NOT run here: it currently exits 1 on 108
+  # pre-existing issues (0 errors), 73 of which are inside the generated client
+  # under mobile/api/, which the repo forbids hand-editing. Gating on it would
+  # fail the build for reasons unrelated to the change under test. Enabling it
+  # means first excluding api/** in mobile/analysis_options.yaml (empty today)
+  # and clearing the remainder in lib/ + test/.
+  test-mobile:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.mobile == 'true'
+    runs-on: ubuntu-latest
+    # Least-privilege GITHUB_TOKEN: this job only reads the repo source. Mirrors
+    # the same hardening applied to mobile-e2e.yml for the CodeQL
+    # actions-missing-workflow-permissions alert.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Don't leave the token in .git/config for later steps to pick up
+          # (zizmor "artipacked"); nothing here pushes.
+          persist-credentials: false
+      # Pinned to the same version as .github/workflows/mobile-e2e.yml -- keep
+      # the two in sync so unit and e2e runs can't drift onto different SDKs.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.7'
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: ./mobile
+      - name: Run tests
+        run: flutter test
+        working-directory: ./mobile
 
   build-docker-arm64:
     needs: [detect-changes, test-api, test-desktop]

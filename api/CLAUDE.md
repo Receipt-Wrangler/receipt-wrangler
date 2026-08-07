@@ -302,7 +302,20 @@ will be dropped in a later release.
   mirrored in the `swagger.yml` `Permission` enum. `permissions/registry_test.go` enforces that the
   registry and the swagger enum stay in sync.
 - **Adding a permission:** add the constant + `Descriptor` in `registry.go`, add the key to the
-  `Permission` enum in `swagger.yml`, then regenerate clients (see "API Client Generation").
+  `Permission` enum in `swagger.yml`, then regenerate clients (see "API Client Generation") —
+  **including `mobile/api/`, in the same change**. A `ScopeGroup` key is picked up automatically by
+  the seeded **Legacy Owner** (`LegacyGroupOwnerKeys()` = every group-scope key) on the next boot, so
+  it lands in essentially every user's `AppData` the moment the server upgrades.
+- **Catalog vs. data — do not `$ref` the `Permission` enum onto `AppData`.** The enum is the
+  **catalog** of which permissions exist (`Role.permissions`, `UpsertRoleCommand.permissions`,
+  `PermissionDescriptor.key`, the `permission` query param). A user's **effective** permissions
+  (`AppData.appPermissions` / `.groupPermissions`) are server-resolved **data** and ride as plain
+  `type: string`. Generated clients render an enum as a *closed* set — the Dart `EnumClass` throws on
+  an unknown value and fails the entire `AppData` parse, which hard-fails login on every
+  already-released mobile build. That shipped twice (2026-07-24 `group.members.create`; 2026-08-06
+  `group.members.grants.update`). Granted strings may also be **wildcards** (see "Matcher"), which an
+  enum cannot represent. Pinned by `permissions/registry_test.go` →
+  `TestAppDataEffectivePermissionsAreUntypedStrings`.
 
 ### Matcher
 

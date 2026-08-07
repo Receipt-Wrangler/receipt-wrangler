@@ -1123,8 +1123,17 @@ paths:
         Replaces one member's per-member category/tag grants. These narrow WITHIN
         the ceiling set by the member's group role — the two layers intersect — so
         every submitted id must be one the role already allows, or the request is
-        rejected with 400. An empty array clears that resource's restriction and
-        hands the member back to their role's set.
+        rejected with 400. Duplicate ids within either array are also rejected
+        with 400.
+
+
+        An empty array clears that resource's restriction. What the member then
+        sees depends on their group role: when the role's
+        requiresIndividualCategoryGrants (resp. requiresIndividualTagGrants) is
+        false — the default — they fall back to the role's set; when it is true
+        the assignment is mandatory, so clearing it leaves them seeing NOTHING for
+        that resource. That is deliberate: it fails closed, so forgetting to
+        assign a newly added member cannot silently widen their visibility.
 
 
         Deliberately a dedicated endpoint rather than a field on the group-member
@@ -4111,8 +4120,11 @@ components:
           description: >-
             Category ids this individual member may see, narrowing WITHIN whatever
             their group role allows (the two layers intersect). Empty means the
-            member adds no narrowing of their own and falls back to the role. Read
-            only here — write via PUT /group/{groupId}/member/{userId}/grants.
+            member adds no narrowing of their own: they fall back to the role's
+            set, EXCEPT when the role sets requiresIndividualCategoryGrants, in
+            which case an unassigned member sees no categories at all (fail
+            closed). Read only here — write via
+            PUT /group/{groupId}/member/{userId}/grants.
           items:
             type: integer
             format: uint64
@@ -4133,8 +4145,10 @@ components:
           description: >-
             Category ids to assign to this member. Every id must sit within the
             ceiling set by the member's group role, or the request is rejected with
-            400. An empty array clears the member's category restriction, handing
-            them back to their role's set.
+            400; duplicate ids are rejected with 400 as well. An empty array clears
+            the member's category restriction — handing them back to their role's
+            set, or, when the role sets requiresIndividualCategoryGrants, leaving
+            them with no categories at all (fail closed).
           items:
             type: integer
             format: uint64
@@ -5336,16 +5350,24 @@ components:
             $ref: "#/components/schemas/Icon"
         appPermissions:
           type: array
-          description: The calling user's effective app-level permissions.
+          description: >-
+            The calling user's effective app-level permissions. Deliberately
+            typed as plain strings rather than the Permission enum: this is
+            server-resolved data, not a contract. A granted entry may be a
+            wildcard (e.g. "app.*"), which is not an enum member, and a client
+            built before a newly added permission must still be able to parse
+            the payload. Clients match these with the wildcard matcher.
           items:
-            $ref: "#/components/schemas/Permission"
+            type: string
         groupPermissions:
           type: object
-          description: The calling user's effective group-level permissions, keyed by group id.
+          description: >-
+            The calling user's effective group-level permissions, keyed by group
+            id. Plain strings for the same reason as appPermissions.
           additionalProperties:
             type: array
             items:
-              $ref: "#/components/schemas/Permission"
+              type: string
         groupCategories:
           type: object
           description: >-

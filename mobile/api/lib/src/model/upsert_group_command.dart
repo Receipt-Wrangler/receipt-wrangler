@@ -18,6 +18,7 @@ part 'upsert_group_command.g.dart';
 /// * [isDefault] - Is default group (not used yet)
 /// * [name] - Name of the group
 /// * [isAllGroup] - Is all group for user
+/// * [isolateMembers] - Whether to enable member-presence isolation for the group. When on, members cannot discover other members unless they hold a group role flagged seesAllMembers. Defaults to false.
 /// * [status] 
 @BuiltValue()
 abstract class UpsertGroupCommand implements Built<UpsertGroupCommand, UpsertGroupCommandBuilder> {
@@ -36,6 +37,10 @@ abstract class UpsertGroupCommand implements Built<UpsertGroupCommand, UpsertGro
   /// Is all group for user
   @BuiltValueField(wireName: r'isAllGroup')
   bool? get isAllGroup;
+
+  /// Whether to enable member-presence isolation for the group. When on, members cannot discover other members unless they hold a group role flagged seesAllMembers. Defaults to false.
+  @BuiltValueField(wireName: r'isolateMembers')
+  bool? get isolateMembers;
 
   @BuiltValueField(wireName: r'status')
   GroupStatus get status;
@@ -85,6 +90,13 @@ class _$UpsertGroupCommandSerializer implements PrimitiveSerializer<UpsertGroupC
       yield r'isAllGroup';
       yield serializers.serialize(
         object.isAllGroup,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.isolateMembers != null) {
+      yield r'isolateMembers';
+      yield serializers.serialize(
+        object.isolateMembers,
         specifiedType: const FullType(bool),
       );
     }
@@ -143,6 +155,13 @@ class _$UpsertGroupCommandSerializer implements PrimitiveSerializer<UpsertGroupC
             specifiedType: const FullType(bool),
           ) as bool;
           result.isAllGroup = valueDes;
+          break;
+        case r'isolateMembers':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.isolateMembers = valueDes;
           break;
         case r'status':
           final valueDes = serializers.deserialize(

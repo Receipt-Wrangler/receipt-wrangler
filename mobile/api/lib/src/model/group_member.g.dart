@@ -17,6 +17,10 @@ class _$GroupMember extends GroupMember {
   final String? updatedAt;
   @override
   final int userId;
+  @override
+  final BuiltList<int>? categoryGrants;
+  @override
+  final BuiltList<int>? tagGrants;
 
   factory _$GroupMember([void Function(GroupMemberBuilder)? updates]) =>
       (GroupMemberBuilder()..update(updates))._build();
@@ -26,7 +30,9 @@ class _$GroupMember extends GroupMember {
       required this.groupId,
       this.groupRoleId,
       this.updatedAt,
-      required this.userId})
+      required this.userId,
+      this.categoryGrants,
+      this.tagGrants})
       : super._();
   @override
   GroupMember rebuild(void Function(GroupMemberBuilder) updates) =>
@@ -43,7 +49,9 @@ class _$GroupMember extends GroupMember {
         groupId == other.groupId &&
         groupRoleId == other.groupRoleId &&
         updatedAt == other.updatedAt &&
-        userId == other.userId;
+        userId == other.userId &&
+        categoryGrants == other.categoryGrants &&
+        tagGrants == other.tagGrants;
   }
 
   @override
@@ -54,6 +62,8 @@ class _$GroupMember extends GroupMember {
     _$hash = $jc(_$hash, groupRoleId.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jc(_$hash, userId.hashCode);
+    _$hash = $jc(_$hash, categoryGrants.hashCode);
+    _$hash = $jc(_$hash, tagGrants.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -65,7 +75,9 @@ class _$GroupMember extends GroupMember {
           ..add('groupId', groupId)
           ..add('groupRoleId', groupRoleId)
           ..add('updatedAt', updatedAt)
-          ..add('userId', userId))
+          ..add('userId', userId)
+          ..add('categoryGrants', categoryGrants)
+          ..add('tagGrants', tagGrants))
         .toString();
   }
 }
@@ -93,6 +105,16 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
   int? get userId => _$this._userId;
   set userId(int? userId) => _$this._userId = userId;
 
+  ListBuilder<int>? _categoryGrants;
+  ListBuilder<int> get categoryGrants =>
+      _$this._categoryGrants ??= ListBuilder<int>();
+  set categoryGrants(ListBuilder<int>? categoryGrants) =>
+      _$this._categoryGrants = categoryGrants;
+
+  ListBuilder<int>? _tagGrants;
+  ListBuilder<int> get tagGrants => _$this._tagGrants ??= ListBuilder<int>();
+  set tagGrants(ListBuilder<int>? tagGrants) => _$this._tagGrants = tagGrants;
+
   GroupMemberBuilder() {
     GroupMember._defaults(this);
   }
@@ -105,6 +127,8 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
       _groupRoleId = $v.groupRoleId;
       _updatedAt = $v.updatedAt;
       _userId = $v.userId;
+      _categoryGrants = $v.categoryGrants?.toBuilder();
+      _tagGrants = $v.tagGrants?.toBuilder();
       _$v = null;
     }
     return this;
@@ -124,16 +148,33 @@ class GroupMemberBuilder implements Builder<GroupMember, GroupMemberBuilder> {
   GroupMember build() => _build();
 
   _$GroupMember _build() {
-    final _$result = _$v ??
-        _$GroupMember._(
-          createdAt: createdAt,
-          groupId: BuiltValueNullFieldError.checkNotNull(
-              groupId, r'GroupMember', 'groupId'),
-          groupRoleId: groupRoleId,
-          updatedAt: updatedAt,
-          userId: BuiltValueNullFieldError.checkNotNull(
-              userId, r'GroupMember', 'userId'),
-        );
+    _$GroupMember _$result;
+    try {
+      _$result = _$v ??
+          _$GroupMember._(
+            createdAt: createdAt,
+            groupId: BuiltValueNullFieldError.checkNotNull(
+                groupId, r'GroupMember', 'groupId'),
+            groupRoleId: groupRoleId,
+            updatedAt: updatedAt,
+            userId: BuiltValueNullFieldError.checkNotNull(
+                userId, r'GroupMember', 'userId'),
+            categoryGrants: _categoryGrants?.build(),
+            tagGrants: _tagGrants?.build(),
+          );
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'categoryGrants';
+        _categoryGrants?.build();
+        _$failedField = 'tagGrants';
+        _tagGrants?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+            r'GroupMember', _$failedField, e.toString());
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

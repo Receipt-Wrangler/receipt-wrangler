@@ -1,4 +1,3 @@
-import 'package:built_collection/built_collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -9,16 +8,10 @@ import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/shared/functions/show_add_menu.dart';
 
-PermissionsModel _permissions(List<api.Permission> group5) {
-  final model = PermissionsModel();
-  model.setPermissions(
-    BuiltList<api.Permission>(),
-    BuiltMap<String, BuiltList<api.Permission>>({
-      '5': BuiltList<api.Permission>(group5),
-    }),
-  );
-  return model;
-}
+import '../../helpers/permission_test_helpers.dart';
+
+PermissionsModel _permissions(List<api.Permission> group5) =>
+    seededPermissions(group: {5: group5});
 
 AuthModel _auth({required bool aiPoweredReceipts}) {
   final model = AuthModel();

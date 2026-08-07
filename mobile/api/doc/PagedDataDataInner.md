@@ -13,7 +13,7 @@ Name | Type | Description | Notes
 **comments** | [**BuiltList&lt;Comment&gt;**](Comment.md) | Comments associated to receipt | 
 **customFields** | [**BuiltList&lt;CustomFieldValue&gt;**](CustomFieldValue.md) | Custom fields associated to receipt | 
 **createdAt** | **String** |  | 
-**createdBy** | **int** |  | [optional] [default to 0]
+**createdBy** | **int** |  | [optional] 
 **date** | **String** | Receipt date | 
 **groupId** | **int** |  | 
 **id** | **int** |  | 
@@ -24,7 +24,7 @@ Name | Type | Description | Notes
 **resolvedDate** | **String** | Date resolved | [optional] 
 **status** | [**SystemTaskStatus**](SystemTaskStatus.md) |  | 
 **tags** | [**BuiltList&lt;Tag&gt;**](Tag.md) | Tags associated to receipt | 
-**updatedAt** | **String** |  | [optional] [default to '']
+**updatedAt** | **String** |  | [optional] 
 **createdByString** | **String** | Created by entity's name | [optional] [default to '']
 **description** | **String** | Custom Field description | [optional] 
 **prompt** | [**Prompt**](Prompt.md) |  | 
@@ -33,6 +33,7 @@ Name | Type | Description | Notes
 **groupMembers** | [**BuiltList&lt;GroupMember&gt;**](GroupMember.md) | Members of the group | 
 **isDefault** | **bool** | Is default group (not used yet) | [optional] 
 **isAllGroup** | **bool** | Is all group for user | 
+**isolateMembers** | **bool** | Whether member-presence isolation is enabled for the group. When on, members cannot discover other members unless they hold a group role flagged seesAllMembers. Defaults to false. | [optional] 
 **numberOfReceipts** | **int** | Number of receipts associated with this tag | 
 **type** | [**CustomFieldType**](CustomFieldType.md) |  | 
 **startedAt** | **String** |  | 
@@ -54,7 +55,7 @@ Name | Type | Description | Notes
 **promptId** | **int** | Prompt foreign key | [optional] 
 **host** | **String** | IMAP host | [optional] 
 **port** | **String** | IMAP port | [optional] 
-**username** | **String** | IMAP username | [optional] 
+**username** | **String** | User's username used to login | 
 **password** | **String** | IMAP password | [optional] 
 **useStartTLS** | **bool** | Whether to use STARTTLS | [optional] 
 **canBeRestarted** | **bool** |  | [optional] 
@@ -62,6 +63,10 @@ Name | Type | Description | Notes
 **configuration** | [**ReportRequestCommand**](ReportRequestCommand.md) |  | 
 **configurationVersion** | **int** | Schema version the stored configuration was written under. | 
 **allowedActions** | **BuiltList&lt;String&gt;** | The actions the requesting user may perform on this template (read, generate, update, delete, duplicate), resolved per user and populated only on the list response. Drives the row action buttons. | [optional] 
+**defaultAvatarColor** | **String** | Default avatar color | [optional] 
+**displayName** | **String** | Display name | 
+**isDummyUser** | **bool** | Is dummy user | 
+**appRoleId** | **int** | Id of the modern app role assigned to the user | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

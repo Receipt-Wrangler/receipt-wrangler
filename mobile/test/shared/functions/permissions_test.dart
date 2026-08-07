@@ -1,19 +1,12 @@
-import 'package:built_collection/built_collection.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openapi/openapi.dart';
 import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/shared/functions/permissions.dart';
 
-PermissionsModel _modelWithGroup(int groupId, List<Permission> permissions) {
-  final model = PermissionsModel();
-  model.setPermissions(
-    BuiltList<Permission>(),
-    BuiltMap<String, BuiltList<Permission>>({
-      '$groupId': BuiltList<Permission>(permissions),
-    }),
-  );
-  return model;
-}
+import '../../helpers/permission_test_helpers.dart';
+
+PermissionsModel _modelWithGroup(int groupId, List<Permission> permissions) =>
+    seededPermissions(group: {groupId: permissions});
 
 void main() {
   group('canEditReceipt', () {

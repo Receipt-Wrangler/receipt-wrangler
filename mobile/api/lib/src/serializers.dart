@@ -112,6 +112,7 @@ import 'package:openapi/src/model/tag.dart';
 import 'package:openapi/src/model/tag_view.dart';
 import 'package:openapi/src/model/task_queue_configuration.dart';
 import 'package:openapi/src/model/token_pair.dart';
+import 'package:openapi/src/model/update_group_member_grants_command.dart';
 import 'package:openapi/src/model/update_group_receipt_settings_command.dart';
 import 'package:openapi/src/model/update_group_settings_command.dart';
 import 'package:openapi/src/model/update_profile_command.dart';
@@ -242,6 +243,7 @@ part 'serializers.g.dart';
   TagView,
   TaskQueueConfiguration,
   TokenPair,
+  UpdateGroupMemberGrantsCommand,
   UpdateGroupReceiptSettingsCommand,
   UpdateGroupSettingsCommand,
   UpdateProfileCommand,

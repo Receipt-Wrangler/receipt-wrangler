@@ -40,9 +40,9 @@ class _$AppData extends AppData {
   @override
   final BuiltList<Icon> icons;
   @override
-  final BuiltList<Permission> appPermissions;
+  final BuiltList<String> appPermissions;
   @override
-  final BuiltMap<String, BuiltList<Permission>> groupPermissions;
+  final BuiltMap<String, BuiltList<String>> groupPermissions;
   @override
   final BuiltMap<String, BuiltList<Category>>? groupCategories;
   @override
@@ -242,17 +242,17 @@ class AppDataBuilder implements Builder<AppData, AppDataBuilder> {
   ListBuilder<Icon> get icons => _$this._icons ??= ListBuilder<Icon>();
   set icons(ListBuilder<Icon>? icons) => _$this._icons = icons;
 
-  ListBuilder<Permission>? _appPermissions;
-  ListBuilder<Permission> get appPermissions =>
-      _$this._appPermissions ??= ListBuilder<Permission>();
-  set appPermissions(ListBuilder<Permission>? appPermissions) =>
+  ListBuilder<String>? _appPermissions;
+  ListBuilder<String> get appPermissions =>
+      _$this._appPermissions ??= ListBuilder<String>();
+  set appPermissions(ListBuilder<String>? appPermissions) =>
       _$this._appPermissions = appPermissions;
 
-  MapBuilder<String, BuiltList<Permission>>? _groupPermissions;
-  MapBuilder<String, BuiltList<Permission>> get groupPermissions =>
-      _$this._groupPermissions ??= MapBuilder<String, BuiltList<Permission>>();
+  MapBuilder<String, BuiltList<String>>? _groupPermissions;
+  MapBuilder<String, BuiltList<String>> get groupPermissions =>
+      _$this._groupPermissions ??= MapBuilder<String, BuiltList<String>>();
   set groupPermissions(
-          MapBuilder<String, BuiltList<Permission>>? groupPermissions) =>
+          MapBuilder<String, BuiltList<String>>? groupPermissions) =>
       _$this._groupPermissions = groupPermissions;
 
   MapBuilder<String, BuiltList<Category>>? _groupCategories;

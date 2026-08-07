@@ -14,7 +14,7 @@
  */
 export interface UpdateGroupMemberGrantsCommand { 
     /**
-     * Category ids to assign to this member. Every id must sit within the ceiling set by the member\'s group role, or the request is rejected with 400. An empty array clears the member\'s category restriction, handing them back to their role\'s set.
+     * Category ids to assign to this member. Every id must sit within the ceiling set by the member\'s group role, or the request is rejected with 400; duplicate ids are rejected with 400 as well. An empty array clears the member\'s category restriction — handing them back to their role\'s set, or, when the role sets requiresIndividualCategoryGrants, leaving them with no categories at all (fail closed).
      */
     categoryGrants?: Array<number>;
     /**
