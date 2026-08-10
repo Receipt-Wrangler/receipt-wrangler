@@ -110,14 +110,25 @@ dart-dio default-value regressions") and run `flutter analyze`.
 only needed for the app itself. Fetch it from the dart-archive, then:
 
 ```bash
-export PATH="<dart-sdk>/bin:$PATH"
+export PATH="<dart-sdk>/bin:$PATH"     # verified with Dart 3.12.2
 cd mobile/api && dart pub get && dart run build_runner build && dart analyze
 ```
 
-`dart run build_runner build` reproduces the committed `.g.dart` files byte-for-byte, so the diff
-stays limited to the actual swagger change; `dart analyze` substitutes for `flutter analyze` (it
-reports the same errors — the package has ~73 pre-existing generator warnings and **0 errors**, so
-judge a regen by the error count).
+**Use the Dart SDK that ships inside the pinned Flutter** (`3.41.7` — `.github/workflows/ci.yml`,
+`docker/dev/Dockerfile` `FLUTTER_VERSION`); a mismatched SDK is the main thing that widens the diff.
+Under Dart 3.12.2 `dart run build_runner build` reproduced the committed `.g.dart` files exactly, so
+the diff stayed limited to the actual swagger change — but that is **not** guaranteed across
+versions: the package declares `build_runner: any` and its `pubspec.lock` is gitignored, so a
+different resolution can reformat unrelated files. The pin can't be added to
+`mobile/api/pubspec.yaml` either — that file is generator output (see `.openapi-generator/FILES`) and
+is overwritten on the next regen. So **always read the diff and revert churn unrelated to the swagger
+change**.
+
+`dart analyze` substitutes for `flutter analyze` here (it reports the same errors) and stays scoped to
+`mobile/api` — judge a regen by the **error** count, which must be **0**. The warnings are
+pre-existing generator noise: ~73 in `mobile/api` of 108 across `mobile/`, the split recorded in
+`.github/workflows/ci.yml` where the analyzer is deliberately not gated. Keep those two numbers in
+sync with that comment.
 
 ## Component Development
 

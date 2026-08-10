@@ -144,22 +144,44 @@ test.describe('Delete any group (app.groups.delete)', () => {
   });
 
   test.afterAll(async () => {
+    // Cleanup stays best-effort — it must never mask a test failure — but this
+    // spec provisions six resources, so each step is isolated: one failure would
+    // otherwise strand the rest, and a leaked role blocks the next run (its name
+    // is unique per run, but the role list grows and an assigned role can't be
+    // deleted later by hand).
+    const cleanUp = async (what: string, run: () => Promise<void>) => {
+      try {
+        await run();
+      } catch (err) {
+        console.warn(`teardown: ${what} failed —`, err);
+      }
+    };
+
     try {
       await withAdminApi(async (api) => {
         // Groups/users first — deleting them frees the role assignments, without
         // which the roles can't be removed.
         for (const group of [deletableGroup, untouchedGroup]) {
           if (group) {
-            await apiDeleteGroupById(api, String(group.id));
+            await cleanUp(`delete group ${group.name}`, () =>
+              apiDeleteGroupById(api, String(group.id)),
+            );
           }
         }
-        await apiDeleteUserByName(api, deleterUser);
-        await apiDeleteUserByName(api, readerUser);
-        await apiDeleteRoleByName(api, deleterRole, 'APP');
-        await apiDeleteRoleByName(api, readerRole, 'APP');
+        for (const username of [deleterUser, readerUser]) {
+          await cleanUp(`delete user ${username}`, () =>
+            apiDeleteUserByName(api, username),
+          );
+        }
+        for (const role of [deleterRole, readerRole]) {
+          await cleanUp(`delete role ${role}`, () =>
+            apiDeleteRoleByName(api, role, 'APP'),
+          );
+        }
       });
-    } catch {
-      // Best-effort cleanup — don't mask a test failure with a cleanup error.
+    } catch (err) {
+      // The admin API context itself failed (e.g. login) — nothing to clean up with.
+      console.warn('teardown: admin API unavailable —', err);
     }
     rmSync(DELETER_AUTH_FILE, { force: true });
     rmSync(READER_AUTH_FILE, { force: true });
