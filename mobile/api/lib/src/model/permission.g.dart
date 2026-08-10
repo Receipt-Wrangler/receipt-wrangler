@@ -76,6 +76,8 @@ const Permission _$appPeriodGroupsPeriodRead =
     const Permission._('appPeriodGroupsPeriodRead');
 const Permission _$appPeriodGroupsPeriodUpdateSettings =
     const Permission._('appPeriodGroupsPeriodUpdateSettings');
+const Permission _$appPeriodGroupsPeriodDelete =
+    const Permission._('appPeriodGroupsPeriodDelete');
 const Permission _$appPeriodApiKeysPeriodCreate =
     const Permission._('appPeriodApiKeysPeriodCreate');
 const Permission _$appPeriodApiKeysPeriodRead =
@@ -256,6 +258,8 @@ Permission _$valueOf(String name) {
       return _$appPeriodGroupsPeriodRead;
     case 'appPeriodGroupsPeriodUpdateSettings':
       return _$appPeriodGroupsPeriodUpdateSettings;
+    case 'appPeriodGroupsPeriodDelete':
+      return _$appPeriodGroupsPeriodDelete;
     case 'appPeriodApiKeysPeriodCreate':
       return _$appPeriodApiKeysPeriodCreate;
     case 'appPeriodApiKeysPeriodRead':
@@ -407,6 +411,7 @@ final BuiltSet<Permission> _$values = BuiltSet<Permission>(const <Permission>[
   _$appPeriodGroupsPeriodCreate,
   _$appPeriodGroupsPeriodRead,
   _$appPeriodGroupsPeriodUpdateSettings,
+  _$appPeriodGroupsPeriodDelete,
   _$appPeriodApiKeysPeriodCreate,
   _$appPeriodApiKeysPeriodRead,
   _$appPeriodApiKeysPeriodReadAny,
@@ -521,6 +526,7 @@ class _$PermissionMeta {
   Permission get appPeriodGroupsPeriodRead => _$appPeriodGroupsPeriodRead;
   Permission get appPeriodGroupsPeriodUpdateSettings =>
       _$appPeriodGroupsPeriodUpdateSettings;
+  Permission get appPeriodGroupsPeriodDelete => _$appPeriodGroupsPeriodDelete;
   Permission get appPeriodApiKeysPeriodCreate => _$appPeriodApiKeysPeriodCreate;
   Permission get appPeriodApiKeysPeriodRead => _$appPeriodApiKeysPeriodRead;
   Permission get appPeriodApiKeysPeriodReadAny =>
@@ -663,6 +669,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'appPeriodGroupsPeriodCreate': 'app.groups.create',
     'appPeriodGroupsPeriodRead': 'app.groups.read',
     'appPeriodGroupsPeriodUpdateSettings': 'app.groups.update-settings',
+    'appPeriodGroupsPeriodDelete': 'app.groups.delete',
     'appPeriodApiKeysPeriodCreate': 'app.api-keys.create',
     'appPeriodApiKeysPeriodRead': 'app.api-keys.read',
     'appPeriodApiKeysPeriodReadAny': 'app.api-keys.read-any',
@@ -760,6 +767,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'app.groups.create': 'appPeriodGroupsPeriodCreate',
     'app.groups.read': 'appPeriodGroupsPeriodRead',
     'app.groups.update-settings': 'appPeriodGroupsPeriodUpdateSettings',
+    'app.groups.delete': 'appPeriodGroupsPeriodDelete',
     'app.api-keys.create': 'appPeriodApiKeysPeriodCreate',
     'app.api-keys.read': 'appPeriodApiKeysPeriodRead',
     'app.api-keys.read-any': 'appPeriodApiKeysPeriodReadAny',

@@ -126,6 +126,24 @@ func TestLegacyAppUserExcludesReportAllPerms(t *testing.T) {
 	}
 }
 
+func TestLegacyAppAdminIncludesDeleteAnyGroup(t *testing.T) {
+	// Legacy Admin is every app permission, so app.groups.delete flows into it
+	// automatically — an upgrading install's admin can clean up abandoned groups
+	// with no manual reconciliation.
+	if !slices.Contains(LegacyAppAdminKeys(), AppGroupsDelete) {
+		utilPrint(t, "Legacy Admin missing "+AppGroupsDelete, "present")
+	}
+}
+
+func TestLegacyAppUserExcludesDeleteAnyGroup(t *testing.T) {
+	// Legacy User is a fixed subset: deleting a group the caller is not a member
+	// of is an administrative capability and must never flow into it. A normal
+	// user still deletes their own groups through the group-scoped group.delete.
+	if slices.Contains(LegacyAppUserKeys(), AppGroupsDelete) {
+		utilPrint(t, "Legacy User contains "+AppGroupsDelete, "absent")
+	}
+}
+
 func TestLegacyAppUserExcludesUsersRead(t *testing.T) {
 	// app.users.read gates only the admin "Manage Users" listing (GET /user/),
 	// which no client calls. Legacy User must NOT hold it, so normal users don't

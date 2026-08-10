@@ -105,6 +105,20 @@ cd ../mobile/api && flutter pub get && dart run build_runner build
 After a mobile regen, re-apply the two documented dart-dio patches (`mobile/CLAUDE.md` → "Known
 dart-dio default-value regressions") and run `flutter analyze`.
 
+**Mobile regen without Flutter (e.g. the Claude Code web sandbox):** `mobile/api/pubspec.yaml` has
+**no Flutter dependency**, so the standalone **Dart SDK** is enough to finish the regen — Flutter is
+only needed for the app itself. Fetch it from the dart-archive, then:
+
+```bash
+export PATH="<dart-sdk>/bin:$PATH"
+cd mobile/api && dart pub get && dart run build_runner build && dart analyze
+```
+
+`dart run build_runner build` reproduces the committed `.g.dart` files byte-for-byte, so the diff
+stays limited to the actual swagger change; `dart analyze` substitutes for `flutter analyze` (it
+reports the same errors — the package has ~73 pre-existing generator warnings and **0 errors**, so
+judge a regen by the error count).
+
 ## Component Development
 
 ### Backend Development (api/)

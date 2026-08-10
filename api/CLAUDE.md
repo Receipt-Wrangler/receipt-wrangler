@@ -898,6 +898,22 @@ Authorization is enforced centrally in `HandleRequest` (`handlers/generic_handle
   check (e.g. an administrator viewing a group they aren't a member of). Replaces the old
   `OrUserRole`.
 
+**`app.groups.delete` — deleting any group (Group Management):** the app-scoped counterpart to
+`app.groups.read`. Reading all groups without being able to remove the abandoned/garbage ones left
+admins unable to clean up, so `DeleteGroup` declares `OrAppPermissions: [app.groups.delete]` beside
+its group-scoped `GroupPermissions: [group.delete]` — a holder deletes a group they are not a member
+of, while an ordinary member still deletes their own via `group.delete`. Legacy Admin auto-includes
+it (its set is every app permission); **Legacy User deliberately does not**. It is inert on its own:
+the delete control lives on the Manage Groups page, which is reached behind `app.groups.read`. The
+`IsAllGroup` → 400 guard is unaffected, so the virtual "All" group stays undeletable for everyone.
+
+**`middleware.CanDeleteGroup` is permission-aware.** That middleware (`middleware/group.go`, wrapping
+only the DELETE route) rejects when the **caller** belongs to ≤1 group — self-protection so a user
+can't delete themselves out of every group. It ignores `{groupId}` and runs *before* `HandleRequest`,
+so it would have blocked an administrator cleaning up a group they aren't in. It now short-circuits
+for holders of `app.groups.delete` (resolved from the DB via `PermissionService`; a lookup error
+fails closed with 500). It is **not** the authorization gate — that is still `HandleRequest`.
+
 `HandleRequest` resolves the caller's effective permissions from the database (never the JWT) and
 denies with `403` on any failure. The legacy `UserRole` / `GroupRole` / `OrUserRole` handler fields
 and their checks have been **removed**. Every authenticated endpoint that previously had a legacy
@@ -955,6 +971,8 @@ caller-supplied `AppRoleID` so a sign-up can never self-assign a role.
 `repositories/seed_roles_test.go` (default-role seeding), the per-create assignment tests in
 `repositories/users_test.go` / `repositories/groups_test.go`, and the handler authorization tests in
 `handlers/generic_handler_test.go` (with shared helpers in `handlers/auth_test_helpers_test.go`).
+`handlers/group_delete_authorization_test.go` covers the `DeleteGroup` matrix (member with
+`group.delete`, non-member with `app.groups.delete`, both denials, and the All-group 400).
 
 ## MCP Server & OAuth 2.1
 

@@ -516,6 +516,11 @@ func DeleteGroup(w http.ResponseWriter, r *http.Request) {
 		Request:          r,
 		GroupId:          chi.URLParam(r, "groupId"),
 		GroupPermissions: []string{permissions.GroupDelete},
+		// An administrator cleaning up abandoned or garbage groups is not a
+		// member of them, so the group-scoped check can never pass. app.groups.delete
+		// is the app-scoped counterpart to app.groups.read: see every group, and
+		// remove the ones that shouldn't exist.
+		OrAppPermissions: []string{permissions.AppGroupsDelete},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id := chi.URLParam(r, "groupId")
 			groupService := services.NewGroupService(nil)

@@ -3435,6 +3435,7 @@ components:
         - "app.groups.create"
         - "app.groups.read"
         - "app.groups.update-settings"
+        - "app.groups.delete"
         - "app.api-keys.create"
         - "app.api-keys.read"
         - "app.api-keys.read-any"

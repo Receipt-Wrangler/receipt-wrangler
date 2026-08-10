@@ -1,6 +1,5 @@
-import { AfterViewInit, Component, OnInit, signal, TemplateRef, viewChild } from "@angular/core";
+import { AfterViewInit, Component, computed, OnInit, signal, TemplateRef, viewChild } from "@angular/core";
 import { MatDialog } from "@angular/material/dialog";
-import { MatTableDataSource } from "@angular/material/table";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
@@ -51,6 +50,19 @@ export class GroupTableComponent extends BaseTableComponent<Group> implements On
   public readonly appPermissions = this.store.selectSignal(AuthState.appPermissions);
 
   public readonly groupPermissions = this.store.selectSignal(AuthState.groupPermissions);
+
+  public readonly canDeleteAnyGroup = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppGroupsDelete)
+  );
+
+  /**
+   * Mirrors the backend's CanDeleteGroup rule: an ordinary user must stay in at
+   * least one group, while an app.groups.delete holder cleaning up groups across
+   * the system is exempt (they are typically not a member of what they delete).
+   */
+  public readonly deleteDisabled = computed(
+    () => !this.canDeleteAnyGroup() && (this.groups()?.length ?? 0) <= 1
+  );
 
   public tableHeaderText = signal("My Groups");
 
@@ -136,9 +148,8 @@ export class GroupTableComponent extends BaseTableComponent<Group> implements On
   }
 
   public deleteGroup(index: number): void {
-    const groups = this.dataSource().data;
-    if (groups.length > 1) {
-      const group = groups[index];
+    if (!this.deleteDisabled()) {
+      const group = this.dataSource().data[index];
       const dialogRef = this.matDialog.open(
         ConfirmationDialogComponent,
         DEFAULT_DIALOG_CONFIG
@@ -155,10 +166,12 @@ export class GroupTableComponent extends BaseTableComponent<Group> implements On
               take(1),
               tap(() => {
                 this.snackbarService.success("Group successfully deleted");
+                // Keeps the GroupState cache in sync; a no-op for a group the
+                // caller is not a member of (an app.groups.delete cleanup).
                 this.store.dispatch(new RemoveGroup(group.id.toString()));
-                this.dataSource.set(new MatTableDataSource(
-                  this.store.selectSnapshot(GroupState.groupsWithoutAll)
-                ));
+                // Refetch rather than swapping in the caller's own groups: this
+                // table is server-paged and may be showing the all-groups filter.
+                this.getTableData();
               })
             )
             .subscribe();
