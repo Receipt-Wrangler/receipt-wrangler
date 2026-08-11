@@ -1,0 +1,13 @@
+@if (qrDataUrl(); as qr) {
+  <div class="login-qr">
+    @if (headerText(); as header) {
+      <div class="login-qr-divider"><span>{{ header }}</span></div>
+    }
+    <img
+      [src]="qr"
+      class="login-qr-code"
+      alt="Scan to set up the Receipt Wrangler mobile app"
+    >
+    <p class="login-qr-caption">{{ caption() }}</p>
+  </div>
+}

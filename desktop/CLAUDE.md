@@ -440,15 +440,31 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
 
 ## Login QR (mobile app setup)
 
-The login page (`src/auth/sign-up/auth-form.component.*`, shared by login + sign-up) renders a QR that
-deep-links users into the mobile app to set it up. It is **self-contained** — generated locally with
-the `qrcode` package (no external QR service), from the derived `featureConfig.loginQrUrl` string the
-backend composes (see `api/CLAUDE.md` → "Login QR & mobile deep link"). The component reads
-`FeatureConfigState.loginQrUrl` via `store.selectSignal`, regenerates a `data:` URL in an `effect()`
-(the `qrDataUrl` signal), and the template shows it only when non-empty (`@if (qrDataUrl())`), so the
-QR appears only when an admin enabled it. Generation is async, so the effect takes an `onCleanup`
-cancellation flag — a URL change leaves the previous `QRCode.toDataURL` in flight, and without the
-guard a late-resolving stale QR could overwrite the current one. `FeatureConfigState` gained a `loginQrUrl` default (`""`), a
+A QR that deep-links users into the mobile app to set it up. It renders in **two** places — the login
+page (`src/auth/sign-up/auth-form.component.*`, shared by login + sign-up) and the **About dialog**
+(`src/about/about/about.component.*`), so a user who is already signed in can reach it without logging
+out. Both consume the shared standalone **`app-login-qr`** (`src/shared-ui/login-qr/`), which owns the
+whole generation path; do not re-implement it at a third call site.
+
+It is **self-contained** — generated locally with the `qrcode` package (no external QR service), from
+the derived `featureConfig.loginQrUrl` string the backend composes (see `api/CLAUDE.md` → "Login QR &
+mobile deep link"). The component reads `FeatureConfigState.loginQrUrl` via `store.selectSignal`,
+regenerates a `data:` URL in an `effect()` (the `qrDataUrl` signal), and its template renders
+**nothing** unless that signal is set (`@if (qrDataUrl())`), so the QR appears only when an admin
+enabled it and neither call site carries generation-state logic. Generation is async, so the effect
+takes an `onCleanup` cancellation flag — a URL change leaves the previous `QRCode.toDataURL` in flight,
+and without the guard a late-resolving stale QR could overwrite the current one. Its two inputs are
+presentation only: an optional `headerText` (renders the divider row; the login page passes
+"Set up the mobile app", About omits it) and a `caption` with the default scan-instruction text. The
+`.login-qr*` styles live in the component (encapsulated), **not** in the login page's
+`ViewEncapsulation.None` stylesheet.
+
+Availability differs per call site but needs no extra plumbing: the login page is pre-auth and gets
+`loginQrUrl` from `GET /featureConfig`, while About rides on the authenticated `GET /appData`
+(`setAppData` already dispatches `SetFeatureConfig`). About is the one call site that also gates on the
+**setting** — `@if (loginQrUrl())` around its "Mobile App" `app-form-section` — because an
+`app-form-section` would otherwise render an empty header when the feature is off. No permission gate:
+`loginQrUrl` is a public, pre-auth value. `FeatureConfigState` gained a `loginQrUrl` default (`""`), a
 selector, and — the load-bearing bit — the field in the `SetFeatureConfig` `patchState` block (that
 block lists each field explicitly, so a new field is silently dropped unless added there; guarded by
 `feature-config.state.spec.ts`).
@@ -479,9 +495,13 @@ whole list, so the format check must be re-supplied on every toggle rather than 
 **E2E:** `e2e/login-qr.spec.ts` (serial, admin `storageState` + a fresh unauthenticated context for the
 login page) drives the whole flow — admin enables the toggle + URL in System Settings and it persists,
 the QR `<img>` then renders on `/auth/login` with the `featureConfig.loginQrUrl` decoding back to the
-configured server URL, and disabling hides it. It reverts `showLoginQr` via the admin API in `afterAll`
-(the setting is global). Component-level specs live alongside the code: `feature-config.state.spec.ts`,
-`auth-form.component.spec.ts`, `system-settings-form.component.spec.ts`.
+configured server URL, the **About dialog** shows the same QR in an admin session (sidebar avatar →
+About; the avatar carries `data-testid="sidebar-avatar-menu"` for this), and disabling hides it. It
+reverts `showLoginQr` via the admin API in `afterAll` (the setting is global). Component-level specs
+live alongside the code: `login-qr.component.spec.ts` (the generation unit cases — empty, generated,
+divider-only-with-`headerText`, turned back off, and the stale-generation guard),
+`feature-config.state.spec.ts`, `auth-form.component.spec.ts` and `about.component.spec.ts` (each
+pinning that its page wires the shared component up), and `system-settings-form.component.spec.ts`.
 
 ## Signals & Zoneless Change Detection
 

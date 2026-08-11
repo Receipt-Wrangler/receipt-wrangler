@@ -9,6 +9,7 @@
       >
         <app-avatar
           class="cursor-pointer"
+          data-testid="sidebar-avatar-menu"
           [user]="loggedInUser() ?? $any({})"
           [matMenuTriggerFor]="menu"
         ></app-avatar>

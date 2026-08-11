@@ -4,6 +4,7 @@ import { Store } from "@ngxs/store";
 import { About } from "../../open-api/index";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { AboutState } from "../../store/about.state";
+import { FeatureConfigState } from "../../store/feature-config.state";
 
 interface Link {
   url: string;
@@ -22,6 +23,7 @@ interface Link {
 export class AboutComponent {
   private store = inject(Store);
   public about = this.store.selectSignal(AboutState.about);
+  public loginQrUrl = this.store.selectSignal(FeatureConfigState.loginQrUrl);
 
   public links: Link[] = [
     {

@@ -121,6 +121,38 @@ test.describe.serial('Login QR (System Settings → login page)', () => {
     await context.close();
   });
 
+  test('the QR also shows on the About dialog while logged in', async ({
+    browser,
+  }) => {
+    // The whole point of the About QR: a signed-in user can reach it without
+    // logging out. This context rides on appData (not GET /featureConfig).
+    const context = await browser.newContext({
+      storageState: 'e2e/.auth/admin.json',
+    });
+    const page = await context.newPage();
+    await stubTokenRefresh(page);
+    // The sidebar holding the About menu defaults to closed and its open/closed
+    // flag is persisted, so seed it rather than blind-clicking the toggle (which
+    // would CLOSE it if a saved session already had it open).
+    await page.addInitScript(() => {
+      const layout = JSON.parse(localStorage.getItem('layout') ?? '{}');
+      localStorage.setItem(
+        'layout',
+        JSON.stringify({ ...layout, isSidebarOpen: true }),
+      );
+    });
+
+    await page.goto('/');
+    await page.getByTestId('sidebar-avatar-menu').click();
+    await page.getByRole('menuitem', { name: 'About' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Mobile App')).toBeVisible();
+    await expect(dialog.getByRole('img', { name: QR_IMG_NAME })).toBeVisible();
+
+    await context.close();
+  });
+
   test('disabling the toggle hides the QR on the login page', async ({
     browser,
   }) => {
