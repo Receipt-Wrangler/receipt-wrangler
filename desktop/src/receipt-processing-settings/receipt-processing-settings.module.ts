@@ -14,6 +14,7 @@ import { SharedUiModule } from "../shared-ui/shared-ui.module";
 import { TableModule } from "../table/table.module";
 import { AiTypePipe } from "./pipes/ai-type.pipe";
 import { OcrEnginePipe } from "./pipes/ocr-engine.pipe";
+import { UrlHintPipe } from "./pipes/url-hint.pipe";
 import { UrlLabelPipe } from "./pipes/url-label.pipe";
 import {
   ReceiptProcessingSettingsChildSystemTaskAccordionComponent
@@ -38,6 +39,7 @@ import { ReceiptProcessingSettingsTableComponent } from "./receipt-processing-se
     AiTypePipe,
     OcrEnginePipe,
     UrlLabelPipe,
+    UrlHintPipe,
     ButtonModule,
     MatTooltip,
     CheckboxModule

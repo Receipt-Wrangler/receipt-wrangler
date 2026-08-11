@@ -94,6 +94,19 @@ ImageMagick PDF-policy edit in `set-up-dependencies.sh` (it targets `/etc/ImageM
 source build's policy is at `/usr/local/etc/ImageMagick-7/policy.xml` and doesn't block PDF by
 default). Those only matter for exercising email-OCR / PDF-receipt processing, not for a running API.
 
+**Running the Go test suite in the sandbox — set `CHROMIUM_BINARY_PATH`.** Steps 1-4 above are enough
+to *compile* the module, but two tests additionally need a browser:
+`TestHtmlToPdfService_Render_BasicHtml` and `TestReportService_Generate_PdfDocument` drive the
+HTML-to-PDF pipeline through headless Chromium. `services/html_to_pdf.go` defaults to
+`/usr/bin/chromium`, which **does not exist** in this sandbox — the pre-installed Playwright build is
+at `/opt/pw-browsers/chromium`. Without the override both fail and `internal/services` reports FAIL,
+which looks like a code regression and is not one:
+```bash
+CHROMIUM_BINARY_PATH=/opt/pw-browsers/chromium go test -count=1 ./...
+```
+Do **not** run `playwright install` to get `/usr/bin/chromium` — the download is blocked, and the
+pre-installed binary works.
+
 ### Testing
 - `go test -v ./...` - Run all Go tests with verbose output
 - `go test -coverprofile=coverage.out -covermode=atomic -v ./...` - Run tests with coverage
@@ -147,6 +160,22 @@ default). Those only matter for exercising email-OCR / PDF-receipt processing, n
 - Supports multiple AI providers: OpenAI, Google Gemini, and Ollama
 - AI clients implement a common interface defined in `internal/ai/base_client.go`
 - Used for receipt data extraction and processing
+- **The configured URL is used verbatim.** `internal/ai/open_ai.go` treats
+  `ReceiptProcessingSettings.Url` as an OpenAI-compatible **base** url and appends only
+  `/chat/completions`, authenticating with `Authorization: Bearer <key>`. There is no
+  provider-specific rewriting: the client does **not** inspect the url, inject a deployment path, or
+  add an `api-version` query param. An empty url (the plain `OPEN_AI` type, which
+  `UpsertReceiptProcessingSettingsCommand.Validate` requires to be empty) falls back to go-openai's
+  `https://api.openai.com/v1`. Ollama is the same — `internal/ai/ollama.go` posts to the url exactly
+  as entered, with no suffix.
+- **Azure must be configured with its OpenAI-compatible endpoint**, i.e.
+  `https://<resource>.services.ai.azure.com/openai/v1` (with `Model` set to the *deployment* name), not
+  a bare resource origin. Earlier versions sniffed the url for the substring `azure` and switched
+  go-openai into Azure mode (`DefaultAzureConfig`), which rewrote the path to
+  `/openai/deployments/<model>/chat/completions` and pinned `api-version=2023-05-15`. That heuristic
+  was **removed**: it mangled the modern Foundry `/openai/v1` endpoint into a 404, and it could never
+  match an Azure resource behind a custom domain. Pinned by
+  `TestOpenAiGetChatCompletion_AzureUrlIsUsedVerbatim`.
 
 ### Configuration
 - Configuration loaded from JSON files in `config/` directory
