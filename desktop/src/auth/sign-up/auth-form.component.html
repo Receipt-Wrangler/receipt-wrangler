@@ -69,19 +69,7 @@
       </form>
 
       <!-- Mobile app setup QR (shown only when configured in System Settings) -->
-      @if (qrDataUrl(); as qr) {
-        <div class="login-qr">
-          <div class="login-qr-divider"><span>Set up the mobile app</span></div>
-          <img
-            [src]="qr"
-            class="login-qr-code"
-            alt="Scan to set up the Receipt Wrangler mobile app"
-          >
-          <p class="login-qr-caption">
-            Scan with your phone to open the app and connect it to this server.
-          </p>
-        </div>
-      }
+      <app-login-qr headerText="Set up the mobile app"></app-login-qr>
     </div>
   </div>
 }

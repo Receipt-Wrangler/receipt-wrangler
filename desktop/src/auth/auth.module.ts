@@ -6,6 +6,7 @@ import { ButtonModule } from "../button/button.module";
 import { DirectivesModule } from "../directives/directives.module";
 import { InputModule } from "../input/input.module";
 import { PipesModule } from "../pipes/pipes.module";
+import { LoginQrComponent } from "../shared-ui/login-qr/login-qr.component";
 import { AuthRoutingModule } from "./auth-routing.module";
 import { AuthForm } from "./sign-up/auth-form.component";
 
@@ -21,6 +22,7 @@ import { AuthForm } from "./sign-up/auth-form.component";
     ReactiveFormsModule,
     NgOptimizedImage,
     MatProgressSpinner,
+    LoginQrComponent,
   ],
   exports: [AuthForm],
 })

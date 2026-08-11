@@ -14,17 +14,27 @@
       </div>
     </app-form-section>
   </div>
-  <app-form-section
-    headerText="Build"
-  >
-    <div class="d-flex flex-column m-2">
-      <span>Version: {{ about()?.version || 'unknown' }}</span>
-      @if (about()?.buildDate !== "unknown") {
-        <span>Build Date: {{ (about()?.buildDate | date) || 'unknown' }}</span>
-      } @else {
-        <span>Build Date: unknown</span>
-      }
-
-    </div>
-  </app-form-section>
+  <div class="mb-3">
+    <app-form-section
+      headerText="Build"
+    >
+      <div class="d-flex flex-column m-2">
+        <span>Version: {{ about()?.version || 'unknown' }}</span>
+        @if (about()?.buildDate !== "unknown") {
+          <span>Build Date: {{ (about()?.buildDate | date) || 'unknown' }}</span>
+        } @else {
+          <span>Build Date: unknown</span>
+        }
+      </div>
+    </app-form-section>
+  </div>
+  @if (loginQrUrl()) {
+    <app-form-section
+      headerText="Mobile App"
+    >
+      <div class="m-2">
+        <app-login-qr></app-login-qr>
+      </div>
+    </app-form-section>
+  }
 </app-dialog>

@@ -65,6 +65,7 @@ import { TaskTableComponent } from "./task-table/task-table.component";
 import { EditableListComponent } from './editable-list/editable-list.component';
 import { IconAutocompleteComponent } from './icon-autocomplete/icon-autocomplete.component';
 import { PieChartUiComponent } from './pie-chart/pie-chart.component';
+import { LoginQrComponent } from './login-qr/login-qr.component';
 
 @NgModule({
   declarations: [
@@ -137,6 +138,7 @@ import { PieChartUiComponent } from './pie-chart/pie-chart.component';
     TableModule,
     UserAutocompleteModule,
     PieChartUiComponent,
+    LoginQrComponent,
   ],
   exports: [
     AddButtonComponent,
@@ -180,6 +182,7 @@ import { PieChartUiComponent } from './pie-chart/pie-chart.component';
     EditableListComponent,
     IconAutocompleteComponent,
     PieChartUiComponent,
+    LoginQrComponent,
   ],
   providers: [CurrencyPipe],
 })

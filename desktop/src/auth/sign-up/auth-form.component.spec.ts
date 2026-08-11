@@ -24,6 +24,7 @@ import { AuthForm } from './auth-form.component';
 import { AuthState } from '../../store/auth.state';
 import { FeatureConfigState } from '../../store/feature-config.state';
 import { AuthFormUtil } from './auth-form.util';
+import { LoginQrComponent } from '../../shared-ui/login-qr/login-qr.component';
 import { RouterTestingModule } from '@angular/router/testing';
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 
@@ -42,6 +43,7 @@ describe('AuthForm', () => {
         PipesModule,
         ReactiveFormsModule,
         ApiModule,
+        LoginQrComponent,
         RouterTestingModule],
     providers: [
         SnackbarService,
@@ -67,15 +69,16 @@ describe('AuthForm', () => {
     expect(component).toBeTruthy();
   });
 
+  // The QR itself is unit-tested in shared-ui/login-qr; these two only pin that
+  // the login page still wires the shared component up.
   it('does not render the login QR when loginQrUrl is empty', () => {
     // Default featureConfig carries an empty loginQrUrl.
-    expect(component.qrDataUrl()).toBeNull();
     expect(
       fixture.nativeElement.querySelector('img.login-qr-code')
     ).toBeNull();
   });
 
-  it('renders a locally-generated QR when loginQrUrl is set', async () => {
+  it('renders the login QR when loginQrUrl is set', async () => {
     (QRCode.toDataURL as jest.Mock).mockResolvedValue(
       'data:image/png;base64,QR'
     );
@@ -98,41 +101,11 @@ describe('AuthForm', () => {
       loginQrUrl,
       expect.anything()
     );
-    expect(component.qrDataUrl()).toBe('data:image/png;base64,QR');
     expect(
       fixture.nativeElement.querySelector('img.login-qr-code')
     ).toBeTruthy();
-  });
-
-  it('ignores a stale QR generation that resolves after a newer one', async () => {
-    // Hand out manually-resolved promises so the two generations can be
-    // completed out of order.
-    const resolvers: Array<(dataUrl: string) => void> = [];
-    (QRCode.toDataURL as jest.Mock).mockImplementation(
-      () => new Promise<string>((resolve) => resolvers.push(resolve))
-    );
-    const store = TestBed.inject(Store);
-
-    const setLoginQrUrl = (loginQrUrl: string) => {
-      store.dispatch(
-        new SetFeatureConfig({
-          enableLocalSignUp: false,
-          aiPoweredReceipts: false,
-          loginQrUrl,
-        })
-      );
-      fixture.detectChanges();
-    };
-
-    setLoginQrUrl('https://receiptwrangler.io/app/setup#url=stale');
-    setLoginQrUrl('https://receiptwrangler.io/app/setup#url=current');
-    expect(resolvers.length).toBe(2);
-
-    // Reverse order: the current generation finishes first, then the stale one.
-    resolvers[1]('data:image/png;base64,CURRENT');
-    resolvers[0]('data:image/png;base64,STALE');
-    await fixture.whenStable();
-
-    expect(component.qrDataUrl()).toBe('data:image/png;base64,CURRENT');
+    expect(
+      fixture.nativeElement.querySelector('.login-qr-divider').textContent
+    ).toContain('Set up the mobile app');
   });
 });

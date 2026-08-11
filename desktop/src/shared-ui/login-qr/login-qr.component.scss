@@ -1,0 +1,46 @@
+@use "../../variables.scss" as variables;
+
+:host {
+  display: block;
+}
+
+.login-qr {
+  margin-top: variables.$spacing-lg;
+  text-align: center;
+
+  .login-qr-divider {
+    display: flex;
+    align-items: center;
+    gap: variables.$spacing-sm;
+    margin-bottom: variables.$spacing-md;
+    color: #64748b;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+
+    &::before,
+    &::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+  }
+
+  .login-qr-code {
+    width: 180px;
+    height: 180px;
+    border-radius: variables.$border-radius-xl;
+    border: 2px solid #e2e8f0;
+    padding: variables.$spacing-xs;
+    background: white;
+  }
+
+  .login-qr-caption {
+    margin-top: variables.$spacing-sm;
+    margin-bottom: 0;
+    font-size: 0.85rem;
+    color: #64748b;
+  }
+}
