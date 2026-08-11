@@ -94,6 +94,19 @@ ImageMagick PDF-policy edit in `set-up-dependencies.sh` (it targets `/etc/ImageM
 source build's policy is at `/usr/local/etc/ImageMagick-7/policy.xml` and doesn't block PDF by
 default). Those only matter for exercising email-OCR / PDF-receipt processing, not for a running API.
 
+**Running the Go test suite in the sandbox — set `CHROMIUM_BINARY_PATH`.** Steps 1-4 above are enough
+to *compile* the module, but two tests additionally need a browser:
+`TestHtmlToPdfService_Render_BasicHtml` and `TestReportService_Generate_PdfDocument` drive the
+HTML-to-PDF pipeline through headless Chromium. `services/html_to_pdf.go` defaults to
+`/usr/bin/chromium`, which **does not exist** in this sandbox — the pre-installed Playwright build is
+at `/opt/pw-browsers/chromium`. Without the override both fail and `internal/services` reports FAIL,
+which looks like a code regression and is not one:
+```bash
+CHROMIUM_BINARY_PATH=/opt/pw-browsers/chromium go test -count=1 ./...
+```
+Do **not** run `playwright install` to get `/usr/bin/chromium` — the download is blocked, and the
+pre-installed binary works.
+
 ### Testing
 - `go test -v ./...` - Run all Go tests with verbose output
 - `go test -coverprofile=coverage.out -covermode=atomic -v ./...` - Run tests with coverage
