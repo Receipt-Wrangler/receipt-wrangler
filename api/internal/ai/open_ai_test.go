@@ -15,7 +15,9 @@ import (
 type capturedOpenAiRequest struct {
 	Method      string
 	Path        string
+	RawQuery    string
 	ContentType string
+	Header      http.Header
 	Body        map[string]interface{}
 }
 
@@ -26,7 +28,9 @@ func newMockOpenAiServer(t *testing.T, statusCode int, responseBody string) (*ht
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured.Method = r.Method
 		captured.Path = r.URL.Path
+		captured.RawQuery = r.URL.RawQuery
 		captured.ContentType = r.Header.Get("Content-Type")
+		captured.Header = r.Header.Clone()
 
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err == nil && len(bodyBytes) > 0 {
@@ -250,25 +254,47 @@ func TestOpenAiGetChatCompletion_EmptyChoicesReturnsError(t *testing.T) {
 	}
 }
 
-// Azure branch (URL contains "azure"): verifies the conditional path compiles
-// and executes without panicking. Points at a server whose URL path contains
-// "azure" to trigger the DefaultAzureConfig branch; the mock happily responds
-// to whatever path the SDK actually uses.
-func TestOpenAiGetChatCompletion_AzureBranch(t *testing.T) {
-	server, _ := newMockOpenAiServer(t, http.StatusOK, openAiSuccessBody("azure-ok"))
+// An Azure URL must be used verbatim, exactly like any other OpenAI-compatible
+// endpoint. The client used to sniff the URL for "azure" and switch the SDK into
+// Azure mode, which rewrote a correct Foundry base URL
+// (https://<resource>.services.ai.azure.com/openai/v1) into
+// .../openai/v1/openai/deployments/<model>/chat/completions?api-version=2023-05-15
+// and swapped Bearer auth for the api-key header — a 404 from Azure.
+func TestOpenAiGetChatCompletion_AzureUrlIsUsedVerbatim(t *testing.T) {
+	server, captured := newMockOpenAiServer(t, http.StatusOK, openAiSuccessBody("azure-ok"))
 
-	// Embed "azure" in the path so the URL string contains "azure" but the
-	// httptest server still handles the request.
-	url := server.URL + "/azure-deployment"
+	// The mock's host has no "azure" in it, so put it in the path to reproduce a
+	// URL the old heuristic would have matched.
+	url := server.URL + "/my-resource.services.ai.azure.com/openai/v1"
 
-	client := newOpenAiClient(url, "gpt-4o-mini", "test-key", false, []structs.AiClientMessage{
+	// A dotted deployment name: Azure mode also ran the model through
+	// AzureModelMapperFunc, which stripped "." and ":".
+	client := newOpenAiClient(url, "gpt-4.1", "test-key", false, []structs.AiClientMessage{
 		{Role: "user", Content: "hi"},
 	})
-	result, _ := client.GetChatCompletion()
-	// We don't assert on err — Azure SDK may build a different URL structure
-	// the mock doesn't fully satisfy; coverage of the branch is the goal.
-	// But if it succeeded, the response content should round-trip.
-	if result.Response != "" && result.Response != "azure-ok" {
+	result, err := client.GetChatCompletion()
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if result.Response != "azure-ok" {
 		utils.PrintTestError(t, result.Response, "azure-ok")
+	}
+
+	expectedPath := "/my-resource.services.ai.azure.com/openai/v1/chat/completions"
+	if captured.Path != expectedPath {
+		utils.PrintTestError(t, captured.Path, expectedPath)
+	}
+	// Azure mode appended ?api-version=<hardcoded>; the plain path adds no query.
+	if captured.RawQuery != "" {
+		utils.PrintTestError(t, captured.RawQuery, "no query string")
+	}
+	if captured.Header.Get("Authorization") != "Bearer test-key" {
+		utils.PrintTestError(t, captured.Header.Get("Authorization"), "Bearer test-key")
+	}
+	if captured.Header.Get("api-key") != "" {
+		utils.PrintTestError(t, captured.Header.Get("api-key"), "no api-key header")
+	}
+	if captured.Body["model"] != "gpt-4.1" {
+		utils.PrintTestError(t, captured.Body["model"], "gpt-4.1")
 	}
 }

@@ -147,6 +147,22 @@ default). Those only matter for exercising email-OCR / PDF-receipt processing, n
 - Supports multiple AI providers: OpenAI, Google Gemini, and Ollama
 - AI clients implement a common interface defined in `internal/ai/base_client.go`
 - Used for receipt data extraction and processing
+- **The configured URL is used verbatim.** `internal/ai/open_ai.go` treats
+  `ReceiptProcessingSettings.Url` as an OpenAI-compatible **base** url and appends only
+  `/chat/completions`, authenticating with `Authorization: Bearer <key>`. There is no
+  provider-specific rewriting: the client does **not** inspect the url, inject a deployment path, or
+  add an `api-version` query param. An empty url (the plain `OPEN_AI` type, which
+  `UpsertReceiptProcessingSettingsCommand.Validate` requires to be empty) falls back to go-openai's
+  `https://api.openai.com/v1`. Ollama is the same — `internal/ai/ollama.go` posts to the url exactly
+  as entered, with no suffix.
+- **Azure must be configured with its OpenAI-compatible endpoint**, i.e.
+  `https://<resource>.services.ai.azure.com/openai/v1` (with `Model` set to the *deployment* name), not
+  a bare resource origin. Earlier versions sniffed the url for the substring `azure` and switched
+  go-openai into Azure mode (`DefaultAzureConfig`), which rewrote the path to
+  `/openai/deployments/<model>/chat/completions` and pinned `api-version=2023-05-15`. That heuristic
+  was **removed**: it mangled the modern Foundry `/openai/v1` endpoint into a 404, and it could never
+  match an Azure resource behind a custom domain. Pinned by
+  `TestOpenAiGetChatCompletion_AzureUrlIsUsedVerbatim`.
 
 ### Configuration
 - Configuration loaded from JSON files in `config/` directory

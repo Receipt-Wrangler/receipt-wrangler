@@ -5,7 +5,6 @@ import (
 	"errors"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/structs"
-	"strings"
 
 	"github.com/sashabaranov/go-openai"
 	"golang.org/x/net/context"
@@ -29,19 +28,16 @@ func NewOpenAiClient(
 
 func (openAi OpenAiClient) GetChatCompletion() (structs.ChatCompletionResult, error) {
 	result := structs.ChatCompletionResult{}
-	var config openai.ClientConfig
 
 	key, err := openAi.getKey(openAi.Options.DecryptKey)
 	if err != nil {
 		return result, err
 	}
 
-	if strings.Contains(openAi.ReceiptProcessingSettings.Url, "azure") {
-		config = openai.DefaultAzureConfig(key, openAi.ReceiptProcessingSettings.Url)
-	} else {
-		config = openai.DefaultConfig(key)
-	}
-
+	// The configured URL is used verbatim as an OpenAI-compatible base URL, with no
+	// provider-specific rewriting. Providers that serve their compatible API under a path
+	// must include it, e.g. https://<resource>.services.ai.azure.com/openai/v1 for Azure.
+	config := openai.DefaultConfig(key)
 	if len(openAi.ReceiptProcessingSettings.Url) > 0 {
 		config.BaseURL = openAi.ReceiptProcessingSettings.Url
 	}

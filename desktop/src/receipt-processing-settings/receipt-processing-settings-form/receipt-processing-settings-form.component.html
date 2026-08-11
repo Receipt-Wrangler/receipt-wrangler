@@ -67,6 +67,7 @@
       (form | formGet: 'aiType')?.value === AiType.Ollama) {
         <app-input
           [label]="(form | formGet: 'aiType')?.value | urlLabel"
+          [hint]="(form | formGet: 'aiType')?.value | urlHint"
           [readonly]="formConfig.mode | inputReadonly"
           [inputFormControl]="form | formGet: 'url'"
         ></app-input>
