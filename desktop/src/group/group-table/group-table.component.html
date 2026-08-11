@@ -16,6 +16,7 @@
           matButtonType="iconButton"
           icon="filter_alt"
           color="accent"
+          data-testid="group-filter"
           tooltip="Filter Groups"
           (clicked)="openFilterDialog()"
         ></app-button>
@@ -65,10 +66,10 @@
       [buttonRouterLink]="[element | groupTableEditButton: appPermissions() : groupPermissions()]"
     ></app-edit-button>
     <app-delete-button
-      *hasGroupPermission="{ groupId: element.id, permission: Permission.GroupDelete }"
+      *hasGroupPermission="{ groupId: element.id, permission: Permission.GroupDelete, orApp: [Permission.AppGroupsDelete] }"
       data-testid="group-delete"
       tooltip="Delete Group"
-      [disabled]="groups()?.length === 1"
+      [disabled]="deleteDisabled()"
       (clicked)="deleteGroup(index)"
     ></app-delete-button>
   </div>

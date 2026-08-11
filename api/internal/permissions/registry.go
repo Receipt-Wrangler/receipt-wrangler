@@ -61,6 +61,7 @@ const (
 	AppGroupsCreate         = "app.groups.create"
 	AppGroupsRead           = "app.groups.read"
 	AppGroupsUpdateSettings = "app.groups.update-settings"
+	AppGroupsDelete         = "app.groups.delete"
 
 	AppApiKeysCreate    = "app.api-keys.create"
 	AppApiKeysRead      = "app.api-keys.read"
@@ -190,6 +191,7 @@ var registry = []Descriptor{
 	{AppGroupsCreate, "Create Groups", "Create new groups.", "Group Management", ScopeApp},
 	{AppGroupsRead, "Read All Groups", "List and look up groups across the system, including ones the calling user is not a member of.", "Group Management", ScopeApp},
 	{AppGroupsUpdateSettings, "Update Group System Settings", "Edit system-level settings on any group (separate from per-group ownership editing).", "Group Management", ScopeApp},
+	{AppGroupsDelete, "Delete Any Group", "Permanently delete any group in the system, including ones the calling user is not a member of. Intended for cleaning up abandoned or accidentally created groups; pairs with Read All Groups.", "Group Management", ScopeApp},
 
 	{AppApiKeysCreate, "Create API Keys", "Issue API keys for the calling user.", "Security", ScopeApp},
 	{AppApiKeysRead, "Read API Keys", "List the calling user's API keys.", "Security", ScopeApp},

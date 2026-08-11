@@ -105,6 +105,35 @@ cd ../mobile/api && flutter pub get && dart run build_runner build
 After a mobile regen, re-apply the two documented dart-dio patches (`mobile/CLAUDE.md` → "Known
 dart-dio default-value regressions") and run `flutter analyze`.
 
+**Mobile regen without Flutter (e.g. the Claude Code web sandbox):** `mobile/api/pubspec.yaml` has
+**no Flutter dependency**, so the standalone **Dart SDK** is enough to finish the regen — Flutter is
+only needed for the app itself. Point `DART_SDK` at the copy inside an existing Flutter install, or
+at a standalone SDK unpacked from the dart-archive, and confirm the version before generating
+anything:
+
+```bash
+DART_SDK=/opt/flutter/bin/cache/dart-sdk   # Flutter's own Dart; or an unpacked dart-archive SDK
+export PATH="$DART_SDK/bin:$PATH"
+dart --version                             # confirm before regenerating (verified with 3.12.2)
+cd mobile/api && dart pub get && dart run build_runner build && dart analyze
+```
+
+**Use the Dart SDK that ships inside the pinned Flutter** (`3.41.7` — `.github/workflows/ci.yml`,
+`docker/dev/Dockerfile` `FLUTTER_VERSION`); a mismatched SDK is the main thing that widens the diff.
+Under Dart 3.12.2 `dart run build_runner build` reproduced the committed `.g.dart` files exactly, so
+the diff stayed limited to the actual swagger change — but that is **not** guaranteed across
+versions: the package declares `build_runner: any` and its `pubspec.lock` is gitignored, so a
+different resolution can reformat unrelated files. The pin can't be added to
+`mobile/api/pubspec.yaml` either — that file is generator output (see `.openapi-generator/FILES`) and
+is overwritten on the next regen. So **always read the diff and revert churn unrelated to the swagger
+change**.
+
+`dart analyze` substitutes for `flutter analyze` here (it reports the same errors) and stays scoped to
+`mobile/api` — judge a regen by the **error** count, which must be **0**. The warnings are
+pre-existing generator noise: ~73 in `mobile/api` of 108 across `mobile/`, the split recorded in
+`.github/workflows/ci.yml` where the analyzer is deliberately not gated. Keep those two numbers in
+sync with that comment.
+
 ## Component Development
 
 ### Backend Development (api/)

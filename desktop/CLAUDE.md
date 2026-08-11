@@ -425,6 +425,18 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     member and 403'd on the backend; now they only render for holders, matching the receipts-table.
   - **Notification delete** (`notification/notification.component.html`): the per-notification delete
     control gates on `app.notifications.delete` via `*hasAppPermission`.
+  - **Group row actions** (`group/group-table/group-table.component.html`): edit gates on
+    `group.update` OR `app.groups.update-settings`; **delete** gates on `group.delete` OR
+    **`app.groups.delete`** (`orApp`), so an admin who switched the filter to **All Groups** can clean
+    up a group they aren't a member of. Two things follow from that view being server-paged over
+    groups the caller may not belong to: the button's `[disabled]` is a `deleteDisabled()` computed —
+    `!canDeleteAnyGroup() && groups().length <= 1`, mirroring the backend `CanDeleteGroup` rule and
+    its `app.groups.delete` escape, rather than blanket-disabling every row for a one-group admin —
+    and `deleteGroup()` refetches with **`getTableData()`** after a successful delete (the standard
+    row-mutation pattern) instead of swapping in `GroupState.groupsWithoutAll`, which would collapse
+    the table to the caller's own groups and lose pagination. The `RemoveGroup` dispatch stays, to
+    keep the `GroupState` cache in sync; it no-ops for a group the caller isn't in. E2E:
+    `e2e/group-delete-any.spec.ts`.
 
 ## Login QR (mobile app setup)
 
@@ -828,6 +840,9 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   `receipt-feature-gating.spec.ts` (Quick Scan / Poll Email / Magic Fill controls hidden for a Viewer —
   positive contrast is a `test.fixme` because all three also sit behind the `aiPoweredReceipts` feature
   flag, which is `false` in the dev/CI API),
+  `group-delete-any.spec.ts` (two app roles differing only in **Delete Any Group**: the holder deletes
+  a group it isn't a member of from the All Groups view and the table stays on that filter; the other
+  sees the same group with no `group-delete` action and its direct `DELETE /api/group/:id` **403s**),
   `receipt-action-gating.spec.ts` (a Legacy Viewer sees no duplicate/delete row action, the
   `/receipts/:id/edit` route redirects, and `POST /api/receipt` **403s** via `withApiAs('user')`).
   `legacy-user-visibility.spec.ts` likewise carries **API-403** assertions (`DELETE /api/category|tag/:id`)
