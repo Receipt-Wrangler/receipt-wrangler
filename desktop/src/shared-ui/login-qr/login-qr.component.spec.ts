@@ -93,6 +93,55 @@ describe("LoginQrComponent", () => {
     ).toContain("Set up the mobile app");
   });
 
+  it("renders the default caption, and an override when one is passed", async () => {
+    (QRCode.toDataURL as jest.Mock).mockResolvedValue(
+      "data:image/png;base64,QR"
+    );
+
+    setLoginQrUrl("https://receiptwrangler.io/app/setup#url=x");
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector(".login-qr-caption").textContent
+    ).toContain(
+      "Scan with your phone to open the app and connect it to this server."
+    );
+
+    fixture.componentRef.setInput("caption", "Scan me from the About dialog");
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector(".login-qr-caption").textContent
+    ).toContain("Scan me from the About dialog");
+  });
+
+  it("clears the QR when generation fails", async () => {
+    // Generate one successfully first, so this proves the catch CLEARS a
+    // displayed QR — rejecting on the first generation would pass even with
+    // the catch removed, since the signal starts null.
+    (QRCode.toDataURL as jest.Mock).mockResolvedValue(
+      "data:image/png;base64,QR"
+    );
+    setLoginQrUrl("https://receiptwrangler.io/app/setup#url=ok");
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector("img.login-qr-code")).toBeTruthy();
+
+    (QRCode.toDataURL as jest.Mock).mockRejectedValue(
+      new Error("generation failed")
+    );
+    setLoginQrUrl("https://receiptwrangler.io/app/setup#url=bad");
+    // Two flushes: the rejection reaches the `.catch` a microtask AFTER the
+    // (skipped) `.then`, so a single whenStable() can resolve in between.
+    await fixture.whenStable();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.qrDataUrl()).toBeNull();
+    expect(fixture.nativeElement.querySelector("img.login-qr-code")).toBeNull();
+  });
+
   it("hides the QR again when the feature is turned off", async () => {
     (QRCode.toDataURL as jest.Mock).mockResolvedValue(
       "data:image/png;base64,QR"
