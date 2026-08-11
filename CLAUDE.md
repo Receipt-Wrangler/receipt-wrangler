@@ -107,10 +107,14 @@ dart-dio default-value regressions") and run `flutter analyze`.
 
 **Mobile regen without Flutter (e.g. the Claude Code web sandbox):** `mobile/api/pubspec.yaml` has
 **no Flutter dependency**, so the standalone **Dart SDK** is enough to finish the regen — Flutter is
-only needed for the app itself. Fetch it from the dart-archive, then:
+only needed for the app itself. Point `DART_SDK` at the copy inside an existing Flutter install, or
+at a standalone SDK unpacked from the dart-archive, and confirm the version before generating
+anything:
 
 ```bash
-export PATH="<dart-sdk>/bin:$PATH"     # verified with Dart 3.12.2
+DART_SDK=/opt/flutter/bin/cache/dart-sdk   # Flutter's own Dart; or an unpacked dart-archive SDK
+export PATH="$DART_SDK/bin:$PATH"
+dart --version                             # confirm before regenerating (verified with 3.12.2)
 cd mobile/api && dart pub get && dart run build_runner build && dart analyze
 ```
 
