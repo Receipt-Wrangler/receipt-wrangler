@@ -18,6 +18,8 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
   @override
   final bool? hideImages;
   @override
+  final bool? quickScanCommentEnabled;
+  @override
   final bool? hideComments;
   @override
   final bool? hideReceiptTags;
@@ -37,6 +39,8 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
   final bool? hideItemCategories;
   @override
   final bool? hideShareTags;
+  @override
+  final bool? quickScanCommentRequired;
   @override
   final bool? hideItemTags;
   @override
@@ -68,6 +72,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
       this.quickScanPaidByEnabled,
       this.quickScanTagsRequired,
       this.hideImages,
+      this.quickScanCommentEnabled,
       this.hideComments,
       this.hideReceiptTags,
       this.quickScanDefaultStatus,
@@ -78,6 +83,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
       this.quickScanTagsEnabled,
       this.hideItemCategories,
       this.hideShareTags,
+      this.quickScanCommentRequired,
       this.hideItemTags,
       this.quickScanPaidByRequired,
       this.quickScanStatusEnabled,
@@ -107,6 +113,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
         quickScanPaidByEnabled == other.quickScanPaidByEnabled &&
         quickScanTagsRequired == other.quickScanTagsRequired &&
         hideImages == other.hideImages &&
+        quickScanCommentEnabled == other.quickScanCommentEnabled &&
         hideComments == other.hideComments &&
         hideReceiptTags == other.hideReceiptTags &&
         quickScanDefaultStatus == other.quickScanDefaultStatus &&
@@ -117,6 +124,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
         quickScanTagsEnabled == other.quickScanTagsEnabled &&
         hideItemCategories == other.hideItemCategories &&
         hideShareTags == other.hideShareTags &&
+        quickScanCommentRequired == other.quickScanCommentRequired &&
         hideItemTags == other.hideItemTags &&
         quickScanPaidByRequired == other.quickScanPaidByRequired &&
         quickScanStatusEnabled == other.quickScanStatusEnabled &&
@@ -137,6 +145,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
     _$hash = $jc(_$hash, quickScanPaidByEnabled.hashCode);
     _$hash = $jc(_$hash, quickScanTagsRequired.hashCode);
     _$hash = $jc(_$hash, hideImages.hashCode);
+    _$hash = $jc(_$hash, quickScanCommentEnabled.hashCode);
     _$hash = $jc(_$hash, hideComments.hashCode);
     _$hash = $jc(_$hash, hideReceiptTags.hashCode);
     _$hash = $jc(_$hash, quickScanDefaultStatus.hashCode);
@@ -147,6 +156,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
     _$hash = $jc(_$hash, quickScanTagsEnabled.hashCode);
     _$hash = $jc(_$hash, hideItemCategories.hashCode);
     _$hash = $jc(_$hash, hideShareTags.hashCode);
+    _$hash = $jc(_$hash, quickScanCommentRequired.hashCode);
     _$hash = $jc(_$hash, hideItemTags.hashCode);
     _$hash = $jc(_$hash, quickScanPaidByRequired.hashCode);
     _$hash = $jc(_$hash, quickScanStatusEnabled.hashCode);
@@ -169,6 +179,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
           ..add('quickScanPaidByEnabled', quickScanPaidByEnabled)
           ..add('quickScanTagsRequired', quickScanTagsRequired)
           ..add('hideImages', hideImages)
+          ..add('quickScanCommentEnabled', quickScanCommentEnabled)
           ..add('hideComments', hideComments)
           ..add('hideReceiptTags', hideReceiptTags)
           ..add('quickScanDefaultStatus', quickScanDefaultStatus)
@@ -179,6 +190,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
           ..add('quickScanTagsEnabled', quickScanTagsEnabled)
           ..add('hideItemCategories', hideItemCategories)
           ..add('hideShareTags', hideShareTags)
+          ..add('quickScanCommentRequired', quickScanCommentRequired)
           ..add('hideItemTags', hideItemTags)
           ..add('quickScanPaidByRequired', quickScanPaidByRequired)
           ..add('quickScanStatusEnabled', quickScanStatusEnabled)
@@ -223,6 +235,11 @@ class GroupReceiptSettingsBuilder
   bool? _hideImages;
   bool? get hideImages => _$this._hideImages;
   set hideImages(covariant bool? hideImages) => _$this._hideImages = hideImages;
+
+  bool? _quickScanCommentEnabled;
+  bool? get quickScanCommentEnabled => _$this._quickScanCommentEnabled;
+  set quickScanCommentEnabled(covariant bool? quickScanCommentEnabled) =>
+      _$this._quickScanCommentEnabled = quickScanCommentEnabled;
 
   bool? _hideComments;
   bool? get hideComments => _$this._hideComments;
@@ -274,6 +291,11 @@ class GroupReceiptSettingsBuilder
   bool? get hideShareTags => _$this._hideShareTags;
   set hideShareTags(covariant bool? hideShareTags) =>
       _$this._hideShareTags = hideShareTags;
+
+  bool? _quickScanCommentRequired;
+  bool? get quickScanCommentRequired => _$this._quickScanCommentRequired;
+  set quickScanCommentRequired(covariant bool? quickScanCommentRequired) =>
+      _$this._quickScanCommentRequired = quickScanCommentRequired;
 
   bool? _hideItemTags;
   bool? get hideItemTags => _$this._hideItemTags;
@@ -333,6 +355,7 @@ class GroupReceiptSettingsBuilder
       _quickScanPaidByEnabled = $v.quickScanPaidByEnabled;
       _quickScanTagsRequired = $v.quickScanTagsRequired;
       _hideImages = $v.hideImages;
+      _quickScanCommentEnabled = $v.quickScanCommentEnabled;
       _hideComments = $v.hideComments;
       _hideReceiptTags = $v.hideReceiptTags;
       _quickScanDefaultStatus = $v.quickScanDefaultStatus;
@@ -343,6 +366,7 @@ class GroupReceiptSettingsBuilder
       _quickScanTagsEnabled = $v.quickScanTagsEnabled;
       _hideItemCategories = $v.hideItemCategories;
       _hideShareTags = $v.hideShareTags;
+      _quickScanCommentRequired = $v.quickScanCommentRequired;
       _hideItemTags = $v.hideItemTags;
       _quickScanPaidByRequired = $v.quickScanPaidByRequired;
       _quickScanStatusEnabled = $v.quickScanStatusEnabled;
@@ -380,6 +404,7 @@ class GroupReceiptSettingsBuilder
           quickScanPaidByEnabled: quickScanPaidByEnabled,
           quickScanTagsRequired: quickScanTagsRequired,
           hideImages: hideImages,
+          quickScanCommentEnabled: quickScanCommentEnabled,
           hideComments: hideComments,
           hideReceiptTags: hideReceiptTags,
           quickScanDefaultStatus: quickScanDefaultStatus,
@@ -390,6 +415,7 @@ class GroupReceiptSettingsBuilder
           quickScanTagsEnabled: quickScanTagsEnabled,
           hideItemCategories: hideItemCategories,
           hideShareTags: hideShareTags,
+          quickScanCommentRequired: quickScanCommentRequired,
           hideItemTags: hideItemTags,
           quickScanPaidByRequired: quickScanPaidByRequired,
           quickScanStatusEnabled: quickScanStatusEnabled,

@@ -309,4 +309,132 @@ test.describe('Quick scan dialog behavior', () => {
     await expect(dialog).toBeVisible(); // dialog stays open
     expect(posted).toBe(false);
   });
+  // The comment field: shown per config AND the caller's group.comments.create,
+  // required blocks the submit, and the typed text rides the multipart.
+  test('a required comment blocks submit until filled, then rides the multipart', async ({
+    page,
+  }) => {
+    await injectQuickScanAppData(page, {
+      groupConfigs: [
+        {
+          groupId: groupA.id,
+          config: {
+            quickScanPaidByEnabled: false,
+            quickScanStatusEnabled: false,
+            quickScanDefaultStatus: 'OPEN',
+            quickScanCategoriesEnabled: false,
+            quickScanTagsEnabled: false,
+            quickScanCommentEnabled: true,
+            quickScanCommentRequired: true,
+          },
+        },
+      ],
+      groupPermissions: { [groupA.id]: ['group.receipts.quick-scan', 'group.comments.create'] },
+    });
+
+    const requests: { body: Buffer | null; contentType: string }[] = [];
+    await page.route('**/api/receipt/quickScan', async (route: Route) => {
+      const req = route.request();
+      requests.push({
+        body: req.postDataBuffer(),
+        contentType: req.headers()['content-type'] ?? '',
+      });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+
+    const dialog = await openQuickScanDialog(page, groupA.id);
+    await uploadQuickScanImages(dialog, 1);
+    await selectImageGroup(page, dialog, groupA.name);
+
+    const comment = dialog.getByTestId('quick-scan-comment').getByRole('textbox');
+    await expect(comment).toBeVisible();
+
+    // Empty + required → the submit is refused and nothing is sent.
+    await dialog.getByTestId('dialog-submit-button').click();
+    await expect(page.getByText('Please fill in all required fields', { exact: false })).toBeVisible();
+    expect(requests).toHaveLength(0);
+
+    await comment.fill('Client dinner, reimbursable');
+    await dialog.getByTestId('dialog-submit-button').click();
+    await expect(page.getByText('Successfully queued', { exact: false })).toBeVisible();
+
+    expect(requests).toHaveLength(1);
+    const fields = parseMultipartFields(requests[0].body!, requests[0].contentType);
+    expect(fields.get('comments')).toEqual(['Client dinner, reimbursable']);
+  });
+
+  // Without group.comments.create the field is hidden even when the group enables
+  // AND requires it — otherwise a member who cannot comment could never quick scan.
+  test('the comment field is hidden without group.comments.create and does not block submit', async ({
+    page,
+  }) => {
+    await injectQuickScanAppData(page, {
+      groupConfigs: [
+        {
+          groupId: groupA.id,
+          config: {
+            quickScanPaidByEnabled: false,
+            quickScanStatusEnabled: false,
+            quickScanDefaultStatus: 'OPEN',
+            quickScanCategoriesEnabled: false,
+            quickScanTagsEnabled: false,
+            quickScanCommentEnabled: true,
+            quickScanCommentRequired: true,
+          },
+        },
+      ],
+      groupPermissions: { [groupA.id]: ['group.receipts.quick-scan'] },
+    });
+
+    const requests: { body: Buffer | null; contentType: string }[] = [];
+    await page.route('**/api/receipt/quickScan', async (route: Route) => {
+      const req = route.request();
+      requests.push({
+        body: req.postDataBuffer(),
+        contentType: req.headers()['content-type'] ?? '',
+      });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+
+    const dialog = await openQuickScanDialog(page, groupA.id);
+    await uploadQuickScanImages(dialog, 1);
+    await selectImageGroup(page, dialog, groupA.name);
+
+    await expect(dialog.getByTestId('quick-scan-comment')).toHaveCount(0);
+
+    await dialog.getByTestId('dialog-submit-button').click();
+    await expect(page.getByText('Successfully queued', { exact: false })).toBeVisible();
+    expect(requests).toHaveLength(1);
+    const fields = parseMultipartFields(requests[0].body!, requests[0].contentType);
+    expect(fields.get('comments')).toEqual(['']);
+  });
+
+  // hideComments hides the whole group's comments, so it hides the quick-scan
+  // comment field too, without the config being changed.
+  test('the comment field is hidden when the group hides comments', async ({ page }) => {
+    await injectQuickScanAppData(page, {
+      groupConfigs: [
+        {
+          groupId: groupA.id,
+          config: {
+            quickScanPaidByEnabled: false,
+            quickScanStatusEnabled: false,
+            quickScanDefaultStatus: 'OPEN',
+            quickScanCategoriesEnabled: false,
+            quickScanTagsEnabled: false,
+            quickScanCommentEnabled: true,
+            quickScanCommentRequired: true,
+            hideComments: true,
+          },
+        },
+      ],
+      groupPermissions: { [groupA.id]: ['group.receipts.quick-scan', 'group.comments.create'] },
+    });
+
+    const dialog = await openQuickScanDialog(page, groupA.id);
+    await uploadQuickScanImages(dialog, 1);
+    await selectImageGroup(page, dialog, groupA.name);
+
+    await expect(dialog.getByTestId('quick-scan-comment')).toHaveCount(0);
+  });
 });

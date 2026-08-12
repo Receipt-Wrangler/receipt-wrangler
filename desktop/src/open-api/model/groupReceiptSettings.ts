@@ -94,6 +94,14 @@ export interface GroupReceiptSettings {
      * Require the tags field in quick scan
      */
     quickScanTagsRequired?: boolean;
+    /**
+     * Show the comment field in quick scan
+     */
+    quickScanCommentEnabled?: boolean;
+    /**
+     * Require the comment field in quick scan
+     */
+    quickScanCommentRequired?: boolean;
 }
 export namespace GroupReceiptSettings {
 }

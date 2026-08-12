@@ -215,4 +215,67 @@ void main() {
     // Tags required and left empty → submit blocked.
     await expectQuickScanSubmitBlocked(tester);
   });
+
+  testWidgets('comment shown+required blocks submit until filled',
+      (tester) async {
+    await enableAiPoweredReceiptsForTest();
+    await installDocumentScannerMock();
+    await binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => binding.setSurfaceSize(null));
+
+    await loginAsAdmin(tester);
+
+    // Only the comment shown+required, so it is the sole blocker. The admin holds
+    // group.comments.create, which the field additionally requires.
+    final group = await configureFirstGroup(tester, (b) => b
+      ..groupReceiptSettings.hideComments = false
+      ..groupReceiptSettings.quickScanPaidByEnabled = false
+      ..groupReceiptSettings.quickScanPaidByRequired = false
+      ..groupReceiptSettings.quickScanStatusEnabled = false
+      ..groupReceiptSettings.quickScanStatusRequired = false
+      ..groupReceiptSettings.quickScanCategoriesEnabled = false
+      ..groupReceiptSettings.quickScanCategoriesRequired = false
+      ..groupReceiptSettings.quickScanTagsEnabled = false
+      ..groupReceiptSettings.quickScanTagsRequired = false
+      ..groupReceiptSettings.quickScanCommentEnabled = true
+      ..groupReceiptSettings.quickScanCommentRequired = true);
+
+    await openQuickScanImageForm(tester);
+    await selectDropdown(tester, 'groupId', group.name);
+
+    expect(quickScanCommentField(), findsOneWidget, reason: 'comment shown');
+
+    // Required and empty -> submit blocked with the fix-error snackbar.
+    await expectQuickScanSubmitBlocked(tester);
+  });
+
+  testWidgets('comment field is hidden when the group hides comments',
+      (tester) async {
+    await enableAiPoweredReceiptsForTest();
+    await installDocumentScannerMock();
+    await binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => binding.setSurfaceSize(null));
+
+    await loginAsAdmin(tester);
+
+    // hideComments overrides an enabled+required quick-scan comment: the field is
+    // absent AND does not block submit (which would be unfixable).
+    final group = await configureFirstGroup(tester, (b) => b
+      ..groupReceiptSettings.hideComments = true
+      ..groupReceiptSettings.quickScanPaidByEnabled = false
+      ..groupReceiptSettings.quickScanPaidByRequired = false
+      ..groupReceiptSettings.quickScanStatusEnabled = false
+      ..groupReceiptSettings.quickScanStatusRequired = false
+      ..groupReceiptSettings.quickScanCategoriesEnabled = false
+      ..groupReceiptSettings.quickScanCategoriesRequired = false
+      ..groupReceiptSettings.quickScanTagsEnabled = false
+      ..groupReceiptSettings.quickScanTagsRequired = false
+      ..groupReceiptSettings.quickScanCommentEnabled = true
+      ..groupReceiptSettings.quickScanCommentRequired = true);
+
+    await openQuickScanImageForm(tester);
+    await selectDropdown(tester, 'groupId', group.name);
+
+    expect(quickScanCommentField(), findsNothing, reason: 'comment hidden');
+  });
 }

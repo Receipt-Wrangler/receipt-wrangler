@@ -8,9 +8,11 @@ import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/models/loading_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_preferences_model.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/quick_scan.dart';
 import 'package:receipt_wrangler_mobile/shared/classes/quick_scan_image.dart';
+import 'package:receipt_wrangler_mobile/shared/functions/permissions.dart';
 import 'package:receipt_wrangler_mobile/shared/functions/quick_scan_field_config.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/delete_button.dart';
@@ -134,6 +136,7 @@ Future<void> _submitQuickScan(
   List<api.ReceiptStatus> statuses = [];
   List<String> categoryIds = [];
   List<String> tagIds = [];
+  List<String> comments = [];
   List<MultipartFile> files = [];
 
   if (images.isEmpty) {
@@ -142,6 +145,7 @@ Future<void> _submitQuickScan(
   }
 
   final groupModel = Provider.of<GroupModel>(context, listen: false);
+  final permissionsModel = Provider.of<PermissionsModel>(context, listen: false);
 
   var errored = false;
   for (var (index, image) in images.indexed) {
@@ -159,7 +163,10 @@ Future<void> _submitQuickScan(
     // default; a shown+required field must have a value.
     final settings = groupModel.getGroupReceiptSettings(groupId);
 
-    final config = resolveQuickScanFieldConfig(settings);
+    final config = resolveQuickScanFieldConfig(
+      settings,
+      canCreateComments: canCommentCreate(permissionsModel, groupId),
+    );
     final showPaidBy = config.showPaidBy;
     final requirePaidBy = config.requirePaidBy;
     final showStatus = config.showStatus;
@@ -168,6 +175,8 @@ Future<void> _submitQuickScan(
     final requireCategories = config.requireCategories;
     final showTags = config.showTags;
     final requireTags = config.requireTags;
+    final showComment = config.showComment;
+    final requireComment = config.requireComment;
 
     int paidBy = 0;
     if (showPaidBy) {
@@ -202,6 +211,14 @@ Future<void> _submitQuickScan(
       }
     }
 
+    String comment = "";
+    if (showComment) {
+      comment = image.comment?.trim() ?? "";
+      if (requireComment && comment.isEmpty) {
+        errored = true;
+      }
+    }
+
     if (errored) {
       showErrorSnackbar(
           context, "Please fix error on quick scan ${index + 1} to continue");
@@ -214,6 +231,7 @@ Future<void> _submitQuickScan(
     statuses.add(status);
     categoryIds.add(catIds.join(","));
     tagIds.add(tgIds.join(","));
+    comments.add(comment);
   }
 
   if (errored) {
@@ -229,7 +247,8 @@ Future<void> _submitQuickScan(
         paidByUserIds: paidByUserIds.toBuiltList(),
         statuses: statuses.toBuiltList(),
         categoryIds: categoryIds.toBuiltList(),
-        tagIds: tagIds.toBuiltList());
+        tagIds: tagIds.toBuiltList(),
+        comments: comments.toBuiltList());
 
     var imageWord = images.length > 1 ? "images" : "image";
 

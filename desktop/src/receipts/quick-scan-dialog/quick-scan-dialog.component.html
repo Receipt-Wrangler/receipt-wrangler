@@ -54,6 +54,13 @@
               [creatable]="false"
             ></app-tag-autocomplete>
           }
+          @if (showComment(i)) {
+            <app-textarea
+              label="Comment"
+              data-testid="quick-scan-comment"
+              [inputFormControl]="form | formGet : 'comments.' + i"
+            ></app-textarea>
+          }
         </div>
       </slide>
     </carousel>

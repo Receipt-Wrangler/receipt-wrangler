@@ -625,6 +625,7 @@ class ReceiptApi {
   /// * [statuses] 
   /// * [categoryIds] 
   /// * [tagIds] 
+  /// * [comments] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -641,6 +642,7 @@ class ReceiptApi {
     required BuiltList<ReceiptStatus> statuses,
     BuiltList<String>? categoryIds,
     BuiltList<String>? tagIds,
+    BuiltList<String>? comments,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -683,6 +685,7 @@ class ReceiptApi {
         r'statuses': encodeFormParameter(_serializers, statuses, const FullType(BuiltList, [FullType(ReceiptStatus)])),
         if (categoryIds != null) r'categoryIds': encodeFormParameter(_serializers, categoryIds, const FullType(BuiltList, [FullType(String)])),
         if (tagIds != null) r'tagIds': encodeFormParameter(_serializers, tagIds, const FullType(BuiltList, [FullType(String)])),
+        if (comments != null) r'comments': encodeFormParameter(_serializers, comments, const FullType(BuiltList, [FullType(String)])),
       });
 
     } catch(error, stackTrace) {

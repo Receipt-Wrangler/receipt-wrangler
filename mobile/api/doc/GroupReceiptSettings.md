@@ -33,6 +33,8 @@ Name | Type | Description | Notes
 **quickScanCategoriesRequired** | **bool** | Require the categories field in quick scan | [optional] 
 **quickScanTagsEnabled** | **bool** | Show the tags field in quick scan | [optional] 
 **quickScanTagsRequired** | **bool** | Require the tags field in quick scan | [optional] 
+**quickScanCommentEnabled** | **bool** | Show the comment field in quick scan | [optional] 
+**quickScanCommentRequired** | **bool** | Require the comment field in quick scan | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

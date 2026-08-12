@@ -32,6 +32,8 @@ part 'update_group_receipt_settings_command.g.dart';
 /// * [quickScanCategoriesRequired] - Require the categories field in quick scan
 /// * [quickScanTagsEnabled] - Show the tags field in quick scan
 /// * [quickScanTagsRequired] - Require the tags field in quick scan
+/// * [quickScanCommentEnabled] - Show the comment field in quick scan
+/// * [quickScanCommentRequired] - Require the comment field in quick scan
 @BuiltValue()
 abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupReceiptSettingsCommand, UpdateGroupReceiptSettingsCommandBuilder> {
   /// Hide receipt images
@@ -109,6 +111,14 @@ abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupRec
   /// Require the tags field in quick scan
   @BuiltValueField(wireName: r'quickScanTagsRequired')
   bool? get quickScanTagsRequired;
+
+  /// Show the comment field in quick scan
+  @BuiltValueField(wireName: r'quickScanCommentEnabled')
+  bool? get quickScanCommentEnabled;
+
+  /// Require the comment field in quick scan
+  @BuiltValueField(wireName: r'quickScanCommentRequired')
+  bool? get quickScanCommentRequired;
 
   UpdateGroupReceiptSettingsCommand._();
 
@@ -263,6 +273,20 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
       yield r'quickScanTagsRequired';
       yield serializers.serialize(
         object.quickScanTagsRequired,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanCommentEnabled != null) {
+      yield r'quickScanCommentEnabled';
+      yield serializers.serialize(
+        object.quickScanCommentEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanCommentRequired != null) {
+      yield r'quickScanCommentRequired';
+      yield serializers.serialize(
+        object.quickScanCommentRequired,
         specifiedType: const FullType(bool),
       );
     }
@@ -421,6 +445,20 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
             specifiedType: const FullType(bool),
           ) as bool;
           result.quickScanTagsRequired = valueDes;
+          break;
+        case r'quickScanCommentEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanCommentEnabled = valueDes;
+          break;
+        case r'quickScanCommentRequired':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanCommentRequired = valueDes;
           break;
         default:
           unhandled.add(key);

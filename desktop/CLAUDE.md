@@ -875,18 +875,37 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
 ## Quick Scan Configuration
 
 - **Group receipt settings** (`src/group/group-receipt-settings/`) has a **Quick Scan** section: per
-  field (paid-by, status, categories, tags) a *Show* + *Require* `app-checkbox`, plus a default control
-  for paid-by (`app-select` of Uploader/Specific user + a conditional `app-user-autocomplete`) and
+  field (paid-by, status, categories, tags, comment) a *Show* + *Require* `app-checkbox`, plus a default
+  control for paid-by (`app-select` of Uploader/Specific user + a conditional `app-user-autocomplete`) and
   status (`app-status-select`) shown only when that field is not both shown+required. The component
   mirrors the backend rule as reactive validators (default required unless shown+required) and coerces an
   empty `quickScanDefaultPaidById` to `undefined` on submit. See `api/CLAUDE.md` → "Quick Scan Field
   Configuration".
+  - **The comment toggles are DISABLED (greyed out), not cleared, while `hideComments` is on** — hiding
+    comments group-wide hides the quick-scan comment too, and the derivation is self-healing: the stored
+    values stay put and apply again the moment `hideComments` is unticked. `applyQuickScanDerivedState`
+    (run on init **and** from the `valueChanges` subscription) does the enable/disable with
+    `{ emitEvent: false }` — it runs *inside* that subscription, and `enable()`/`disable()` emit by
+    default, which recurses forever — and returns early outside `FormMode.edit`, because `initForm`
+    disables the whole form *after* subscribing and that disable emits (an unguarded `enable()` would
+    make two checkboxes editable on the read-only view page).
+  - **`submit()` MUST read `form.getRawValue()`, not `form.value`.** A disabled control is omitted from
+    `form.value`, so with `hideComments` on the two comment toggles would be sent as `undefined`,
+    unmarshal server-side as `false`, and the API's unconditional assignment would **wipe the admin's
+    stored configuration**. Guarded by a spec case that submits while they are disabled.
 - **Quick scan dialog** (`src/receipts/quick-scan-dialog/`) resolves each image's config from **that
   image's selected group** (`GroupState.getGroupById(...).groupReceiptSettings`) to drive per-image
   field visibility + required validators; hidden paid-by/status are sent empty so the server backfills
   the group default. Category/tag pickers (`app-category-autocomplete`/`app-tag-autocomplete`,
   `[creatable]="false"`) source options from `AuthState.groupCategories`/`groupTags` and are serialized
-  as per-image comma-joined id strings for `quickScanReceipt(...)`.
+  as per-image comma-joined id strings for `quickScanReceipt(...)`. The **comment** is an
+  `app-textarea` (`data-testid="quick-scan-comment"`) backed by a scalar per-image `FormControl` in a
+  `comments` `FormArray` — already one string per image, so unlike categories/tags it needs no id
+  joining. `showComment(i)` ANDs the group's `quickScanCommentEnabled`, `!hideComments`, and the
+  caller's **`group.comments.create`** for that image's group (read via `selectSnapshot` and memoized
+  per group id — `AuthState.hasGroupPermission()` allocates a fresh selector per call and the getter
+  runs every change-detection pass). Without the permission the field is hidden and never required, so
+  a member who cannot comment is never locked out of quick scan; the server drops any comment they send.
   - **Each image's `categories`/`tags` control MUST be a `FormArray`** (`this.formBuilder.array([])`),
     *not* a `FormControl([])`: `app-category-autocomplete`/`app-tag-autocomplete` run in `multiple`
     mode, and the base `app-autocomlete`'s `optionSelected` **pushes** the picked option onto the
@@ -918,6 +937,14 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
     multipart the client builds via `parseMultipartFields` — e.g. a hidden paid-by is sent as the empty
     sentinel. To **change** an already-selected group in a single-select `app-autocomlete`, click its **X clear
     button** first (the input goes `readonly` once a value is chosen); `selectImageGroup` handles this.
+  - The comment axis is covered on both sides: `quick-scan-config.spec.ts` asserts the toggles grey out
+    (keeping their values) with **Hide Comments** and that the configuration **round-trips through a
+    save + reload** (the guard for the API's field-by-field persistence), and
+    `quick-scan-dialog-behavior.spec.ts` asserts a required comment blocks submit then rides the
+    multipart, and that the field is hidden both without `group.comments.create` and when the group
+    hides comments. The permission case uses the new **`groupPermissions`** option on
+    `injectQuickScanAppData` — inject a group's effective permissions client-side instead of
+    provisioning a custom role.
   - `receipt-feature-gating.spec.ts` now has the **positive** Quick Scan contrast (previously `test.fixme`):
     with the flag injected on, a **Legacy Editor** member (holds `group.receipts.quick-scan`) sees the button
     while the Viewer — same user, same flag — does not.

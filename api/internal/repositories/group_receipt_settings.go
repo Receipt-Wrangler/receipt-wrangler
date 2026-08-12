@@ -79,6 +79,8 @@ func (repository GroupReceiptSettingsRepository) UpdateGroupReceiptSettings(
 	groupReceiptSettings.QuickScanCategoriesRequired = command.QuickScanCategoriesRequired
 	groupReceiptSettings.QuickScanTagsEnabled = command.QuickScanTagsEnabled
 	groupReceiptSettings.QuickScanTagsRequired = command.QuickScanTagsRequired
+	groupReceiptSettings.QuickScanCommentEnabled = command.QuickScanCommentEnabled
+	groupReceiptSettings.QuickScanCommentRequired = command.QuickScanCommentRequired
 
 	err = db.Select("*").Model(*&groupReceiptSettings).Updates(groupReceiptSettings).Error
 	if err != nil {

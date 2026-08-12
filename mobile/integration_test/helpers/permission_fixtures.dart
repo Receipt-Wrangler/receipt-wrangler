@@ -541,6 +541,7 @@ Map<String, dynamic> _settingsToCommand(
         'quickScanStatusEnabled', 'quickScanStatusRequired',
         'quickScanCategoriesEnabled', 'quickScanCategoriesRequired',
         'quickScanTagsEnabled', 'quickScanTagsRequired',
+        'quickScanCommentEnabled', 'quickScanCommentRequired',
       ])
         k: s[k] ?? false,
       ...overrides,

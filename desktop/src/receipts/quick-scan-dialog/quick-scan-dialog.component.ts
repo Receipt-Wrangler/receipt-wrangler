@@ -6,7 +6,7 @@ import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { ReceiptFileUploadCommand } from "../../interfaces";
 import { setRequired } from "../../form";
-import { Category, GroupReceiptSettings, ReceiptService, ReceiptStatus, Tag } from "../../open-api";
+import { Category, GroupReceiptSettings, Permission, ReceiptService, ReceiptStatus, Tag } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, GroupState } from "../../store";
 import { UploadImageComponent } from "../upload-image/upload-image.component";
@@ -26,6 +26,8 @@ export class QuickScanDialogComponent implements OnInit {
   public images: ReceiptFileUploadCommand[] = [];
 
   public currentlySelectedIndex: number = 0;
+
+  private readonly commentPermissionByGroup = new Map<number, boolean>();
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -57,6 +59,10 @@ export class QuickScanDialogComponent implements OnInit {
     return this.form.get("tags") as FormArray;
   }
 
+  public get comments(): FormArray {
+    return this.form.get("comments") as FormArray;
+  }
+
   public ngOnInit(): void {
     this.initForm();
   }
@@ -68,6 +74,7 @@ export class QuickScanDialogComponent implements OnInit {
       groupIds: this.formBuilder.array<number>([]),
       categories: this.formBuilder.array<Category[]>([]),
       tags: this.formBuilder.array<Tag[]>([]),
+      comments: this.formBuilder.array<string>([]),
     });
 
     // Re-resolve each image's field config whenever anything changes (a group selection can flip
@@ -93,6 +100,8 @@ export class QuickScanDialogComponent implements OnInit {
     // FormControl has no push(), so selecting one would throw — use a FormArray.
     this.categories.push(this.formBuilder.array([]));
     this.tags.push(this.formBuilder.array([]));
+    // The comment is a scalar text field, so a plain FormControl - unlike categories/tags above.
+    this.comments.push(new FormControl(""));
 
     this.configureImages();
   }
@@ -121,6 +130,36 @@ export class QuickScanDialogComponent implements OnInit {
 
   public showTags(index: number): boolean {
     return this.settingsForIndex(index)?.quickScanTagsEnabled ?? false;
+  }
+
+  // The comment field additionally requires group.comments.create: without it the field is hidden,
+  // never required, and a comment sent anyway is dropped server-side. hideComments hides the whole
+  // group's comments, so it hides this too. Mirrors the backend's IsQuickScanCommentShown.
+  public showComment(index: number): boolean {
+    const settings = this.settingsForIndex(index);
+    if (!(settings?.quickScanCommentEnabled ?? false) || (settings?.hideComments ?? false)) {
+      return false;
+    }
+
+    return this.canCommentForIndex(index);
+  }
+
+  // Cached per group: AuthState.hasGroupPermission allocates a new selector on each call, and
+  // showComment is read from the template on every change-detection pass.
+  private canCommentForIndex(index: number): boolean {
+    const groupId = Number(this.groupIds.at(index)?.value);
+    if (!groupId) {
+      return false;
+    }
+
+    if (!this.commentPermissionByGroup.has(groupId)) {
+      this.commentPermissionByGroup.set(
+        groupId,
+        this.store.selectSnapshot(AuthState.hasGroupPermission(groupId, Permission.GroupCommentsCreate))
+      );
+    }
+
+    return this.commentPermissionByGroup.get(groupId) ?? false;
   }
 
   public categoriesForIndex(index: number): Category[] {
@@ -160,6 +199,12 @@ export class QuickScanDialogComponent implements OnInit {
       if (!tagsShown) {
         (this.form.get("tags." + i) as FormArray | null)?.clear({ emitEvent: false });
       }
+
+      const commentShown = this.showComment(i);
+      setRequired(this.form.get("comments." + i), commentShown && (settings?.quickScanCommentRequired ?? false));
+      if (!commentShown) {
+        this.form.get("comments." + i)?.setValue("", { emitEvent: false });
+      }
     }
   }
 
@@ -173,6 +218,7 @@ export class QuickScanDialogComponent implements OnInit {
     this.groupIds.removeAt(index);
     this.categories.removeAt(index);
     this.tags.removeAt(index);
+    this.comments.removeAt(index);
     this.images.splice(index, 1);
   }
 
@@ -185,7 +231,9 @@ export class QuickScanDialogComponent implements OnInit {
           this.paidByUserIds.value,
           this.statuses.value,
           this.joinIds(this.categories),
-          this.joinIds(this.tags)
+          this.joinIds(this.tags),
+          // Already one string per image - no id joining needed, unlike categories/tags.
+          this.comments.value
         )
         .pipe(
           take(1),

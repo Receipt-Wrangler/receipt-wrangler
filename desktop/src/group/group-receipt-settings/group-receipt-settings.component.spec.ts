@@ -31,6 +31,8 @@ describe("GroupReceiptSettingsComponent", () => {
     quickScanCategoriesRequired: false,
     quickScanTagsEnabled: false,
     quickScanTagsRequired: false,
+    quickScanCommentEnabled: false,
+    quickScanCommentRequired: false,
   };
 
   const testGroup = {
@@ -48,7 +50,7 @@ describe("GroupReceiptSettingsComponent", () => {
     }
   };
 
-  beforeEach(async () => {
+  const configureTestBed = async (mode: FormMode = FormMode.edit) => {
     await TestBed.configureTestingModule({
       declarations: [GroupReceiptSettingsComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -68,7 +70,7 @@ describe("GroupReceiptSettingsComponent", () => {
           useValue: {
             snapshot: {
               data: {
-                formConfig: { mode: FormMode.edit },
+                formConfig: { mode },
                 group: testGroup
               }
             }
@@ -83,6 +85,10 @@ describe("GroupReceiptSettingsComponent", () => {
     fixture = TestBed.createComponent(GroupReceiptSettingsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  };
+
+  beforeEach(async () => {
+    await configureTestBed();
   });
 
   afterEach(() => {
@@ -175,5 +181,68 @@ describe("GroupReceiptSettingsComponent", () => {
 
     expect(component.showStatusDefault).toBe(true);
     expect(component.form.get("quickScanDefaultStatus")?.valid).toBe(false);
+  });
+
+  it("should disable the quick scan comment toggles while comments are hidden", () => {
+    component.form.patchValue({
+      quickScanCommentEnabled: true,
+      quickScanCommentRequired: true,
+    });
+    component.form.patchValue({ hideComments: true });
+
+    expect(component.form.get("quickScanCommentEnabled")?.disabled).toBe(true);
+    expect(component.form.get("quickScanCommentRequired")?.disabled).toBe(true);
+    // Disabled, not cleared: the configured values must survive so they come back on un-hide, and
+    // getRawValue must still carry them so submit doesn't wipe them server-side.
+    expect(component.form.getRawValue().quickScanCommentEnabled).toBe(true);
+    expect(component.form.getRawValue().quickScanCommentRequired).toBe(true);
+  });
+
+  it("should re-enable the quick scan comment toggles with their values when comments are un-hidden", () => {
+    component.form.patchValue({
+      quickScanCommentEnabled: true,
+      quickScanCommentRequired: true,
+    });
+    component.form.patchValue({ hideComments: true });
+    component.form.patchValue({ hideComments: false });
+
+    expect(component.form.get("quickScanCommentEnabled")?.disabled).toBe(false);
+    expect(component.form.get("quickScanCommentEnabled")?.value).toBe(true);
+    expect(component.form.get("quickScanCommentRequired")?.value).toBe(true);
+  });
+
+  it("should submit the comment toggles even while they are disabled by hide comments", () => {
+    const groupsService = TestBed.inject(GroupsService);
+    const store = TestBed.inject(Store);
+
+    jest.spyOn(groupsService, "updateGroupReceiptSettings").mockReturnValue(of(testGroup.groupReceiptSettings as any));
+    jest.spyOn(store, "dispatch").mockReturnValue(of(undefined));
+
+    component.form.patchValue({
+      quickScanCommentEnabled: true,
+      quickScanCommentRequired: true,
+    });
+    component.form.patchValue({ hideComments: true });
+    component.submit();
+
+    expect(groupsService.updateGroupReceiptSettings).toHaveBeenCalledWith(
+      testGroup.id,
+      expect.objectContaining({
+        hideComments: true,
+        quickScanCommentEnabled: true,
+        quickScanCommentRequired: true,
+      })
+    );
+  });
+
+  it("should leave the whole form disabled in view mode", async () => {
+    // initForm disables the form after subscribing to valueChanges, and that disable emits - so the
+    // comment enablement must not re-enable its controls on the read-only page.
+    TestBed.resetTestingModule();
+    await configureTestBed(FormMode.view);
+
+    expect(component.form.disabled).toBe(true);
+    expect(component.form.get("quickScanCommentEnabled")?.disabled).toBe(true);
+    expect(component.form.get("quickScanCommentRequired")?.disabled).toBe(true);
   });
 });

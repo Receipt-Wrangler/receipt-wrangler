@@ -331,6 +331,7 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 					Status:           resolvedFields[i].Status,
 					CategoryIds:      resolvedFields[i].CategoryIds,
 					TagIds:           resolvedFields[i].TagIds,
+					Comment:          resolvedFields[i].Comment,
 					TempPath:         tempPath,
 					OriginalFileName: quickScanCommand.FileHeaders[i].Filename,
 				}
@@ -364,6 +365,7 @@ type resolvedQuickScanFields struct {
 	Status       models.ReceiptStatus
 	CategoryIds  []uint
 	TagIds       []uint
+	Comment      string
 }
 
 // resolveQuickScanFields walks each uploaded file, loads its target group's receipt settings
@@ -372,7 +374,11 @@ type resolvedQuickScanFields struct {
 // the request should 400 without enqueuing anything.
 func resolveQuickScanFields(command commands.QuickScanCommand, uploaderUserId uint) ([]resolvedQuickScanFields, structs.ValidatorError, error) {
 	settingsRepository := repositories.NewGroupReceiptSettingsRepository(nil)
+	permissionService := services.NewPermissionService(nil)
 	settingsCache := make(map[uint]models.GroupReceiptSettings)
+	// Only the role's permission list is cached globally; the membership lookup behind each check is
+	// not, so cache the resolved answer per group for multi-file scans.
+	commentPermissionCache := make(map[uint]bool)
 	resolved := make([]resolvedQuickScanFields, len(command.Files))
 	configErr := structs.ValidatorError{Errors: make(map[string]string)}
 
@@ -415,11 +421,46 @@ func resolveQuickScanFields(command commands.QuickScanCommand, uploaderUserId ui
 			configErr.Errors[fileKey+".tagIds"] = "At least one tag is required"
 		}
 
+		// group.comments.create acts as an extra AND on "shown": a caller who can't comment in the
+		// target group never sees the field, is never required to fill it, and any comment they
+		// submit anyway is silently dropped rather than 403'd — the comment is incidental to the
+		// receipt, so refusing the whole fire-and-forget scan over it would be a worse outcome. The
+		// permission is only resolved when the field is on, so the default (off) config costs no
+		// extra queries.
+		comment := command.CommentForFile(i)
+		commentShown := settings.IsQuickScanCommentShown()
+		if commentShown {
+			canComment, cached := commentPermissionCache[groupId]
+			if !cached {
+				allowed, err := permissionService.HasGroupPermissions(uploaderUserId, groupId, permissions.GroupCommentsCreate)
+				if err != nil {
+					return nil, structs.ValidatorError{}, err
+				}
+
+				canComment = allowed
+				commentPermissionCache[groupId] = canComment
+			}
+
+			commentShown = canComment
+		}
+
+		if !commentShown {
+			comment = ""
+		} else if settings.IsQuickScanCommentRequired() && len(comment) == 0 {
+			configErr.Errors[fileKey+".comment"] = "Comment is required"
+		} else if len(comment) > models.MaxCommentLength {
+			// Caught here rather than at the database: the receipt is created asynchronously, so an
+			// over-length comment would otherwise fail inside the background task and the user would
+			// see nothing but a "queued" toast.
+			configErr.Errors[fileKey+".comment"] = fmt.Sprintf("Comment must be %d characters or fewer", models.MaxCommentLength)
+		}
+
 		resolved[i] = resolvedQuickScanFields{
 			PaidByUserId: paidByUserId,
 			Status:       status,
 			CategoryIds:  categoryIds,
 			TagIds:       tagIds,
+			Comment:      comment,
 		}
 	}
 

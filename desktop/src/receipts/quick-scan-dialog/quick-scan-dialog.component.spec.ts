@@ -75,6 +75,7 @@ describe("QuickScanDialogComponent", () => {
       groupIds: [],
       categories: [],
       tags: [],
+      comments: [],
     });
   });
 
@@ -115,6 +116,7 @@ describe("QuickScanDialogComponent", () => {
       groupIds: [""],
       categories: [[]],
       tags: [[]],
+      comments: [""],
     });
     expect(component.images).toEqual([{} as any]);
   });
@@ -139,6 +141,7 @@ describe("QuickScanDialogComponent", () => {
       groupIds: [1],
       categories: [[]],
       tags: [[]],
+      comments: [""],
     });
     expect(component.images).toEqual([{} as any]);
   });
@@ -224,10 +227,132 @@ describe("QuickScanDialogComponent", () => {
         [""],
         [""],
         ["10"],
-        ["20"]
+        ["20"],
+        [""]
       );
     } finally {
       URL.createObjectURL = originalCreateObjectURL;
     }
+  });
+  describe("comment field", () => {
+    // The comment field needs the group config AND group.comments.create, so every case seeds both.
+    const seedStore = (
+      settings: Record<string, boolean>,
+      groupPermissions: Record<number, string[]> = { 2: ["group.comments.create"] },
+    ) => {
+      store.reset({
+        auth: { groupPermissions },
+        groups: {
+          groups: [{ id: 2, groupReceiptSettings: settings }],
+          selectedGroupId: "",
+          selectedDashboardId: "",
+        },
+      });
+    };
+
+    it("should show and require the comment per the group config", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(true);
+      // Required and empty.
+      expect(component.comments.at(0).valid).toBe(false);
+
+      component.comments.at(0).setValue("A note");
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should show an optional comment without requiring it", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: false });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(true);
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should hide the comment by default", () => {
+      seedStore({});
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(false);
+    });
+
+    it("should hide the comment when the group hides comments", () => {
+      seedStore({ hideComments: true, quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(false);
+      // Not required either - otherwise the hidden field would block every submit.
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should hide the comment without group.comments.create", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true }, { 2: [] });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(false);
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should clear a hidden comment so nothing stale is submitted", () => {
+      seedStore({ quickScanCommentEnabled: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+      component.comments.at(0).setValue("typed before the group hid the field");
+
+      seedStore({ quickScanCommentEnabled: false });
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(false);
+      expect(component.comments.at(0).value).toBe("");
+    });
+
+    it("should send the comment per image on submit", () => {
+      const originalCreateObjectURL = URL.createObjectURL;
+      try {
+        URL.createObjectURL = jest.fn().mockReturnValue("blob");
+        seedStore({
+          quickScanPaidByEnabled: false,
+          quickScanStatusEnabled: false,
+          quickScanCommentEnabled: true,
+          quickScanCommentRequired: true,
+        });
+
+        const receiptService = TestBed.inject(ReceiptService);
+        const serviceSpy = jest
+          .spyOn(receiptService, "quickScanReceipt")
+          .mockReturnValue(of({} as any));
+
+        const fileData = { file: { name: "a" } } as any;
+        component.fileLoaded(fileData);
+        component.groupIds.at(0).setValue(2);
+        component.comments.at(0).setValue("Client dinner");
+
+        component.submitButtonClicked();
+
+        expect(serviceSpy).toHaveBeenCalledWith(
+          [fileData.file],
+          [2],
+          [""],
+          [""],
+          [""],
+          [""],
+          ["Client dinner"]
+        );
+      } finally {
+        URL.createObjectURL = originalCreateObjectURL;
+      }
+    });
   });
 });

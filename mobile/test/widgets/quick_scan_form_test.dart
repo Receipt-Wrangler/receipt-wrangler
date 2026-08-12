@@ -12,6 +12,7 @@ import 'package:receipt_wrangler_mobile/models/category_model.dart';
 import 'package:receipt_wrangler_mobile/models/context_model.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/models/loading_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_preferences_model.dart';
@@ -39,6 +40,9 @@ api.GroupReceiptSettings _settings({
   bool categoriesRequired = false,
   bool tagsEnabled = false,
   bool tagsRequired = false,
+  bool commentEnabled = false,
+  bool commentRequired = false,
+  bool hideComments = false,
 }) {
   return (api.GroupReceiptSettingsBuilder()
         ..id = id
@@ -51,7 +55,10 @@ api.GroupReceiptSettings _settings({
         ..quickScanCategoriesEnabled = categoriesEnabled
         ..quickScanCategoriesRequired = categoriesRequired
         ..quickScanTagsEnabled = tagsEnabled
-        ..quickScanTagsRequired = tagsRequired)
+        ..quickScanTagsRequired = tagsRequired
+        ..quickScanCommentEnabled = commentEnabled
+        ..quickScanCommentRequired = commentRequired
+        ..hideComments = hideComments)
       .build();
 }
 
@@ -76,31 +83,38 @@ api.GroupMember _member(int userId, int groupId) =>
           ..userId = userId)
         .build();
 
-api.UserView _user(int id, String displayName) => (api.UserViewBuilder()
-      ..id = id
-      ..username = 'u$id'
-      ..displayName = displayName
-      ..isDummyUser = false)
-    .build();
+api.UserView _user(int id, String displayName) =>
+    (api.UserViewBuilder()
+          ..id = id
+          ..username = 'u$id'
+          ..displayName = displayName
+          ..isDummyUser = false)
+        .build();
 
 api.Category _category() =>
-    (api.CategoryBuilder()..id = 1..name = 'Food').build();
+    (api.CategoryBuilder()
+          ..id = 1
+          ..name = 'Food')
+        .build();
 
-api.Tag _tag() => (api.TagBuilder()..id = 1..name = 'Trip').build();
+api.Tag _tag() =>
+    (api.TagBuilder()
+          ..id = 1
+          ..name = 'Trip')
+        .build();
 
 QuickScanImage _image(
   int? groupId, {
   int? paidByUserId,
   api.ReceiptStatus? status,
-}) =>
-    QuickScanImage(
-      multipartFile: MultipartFile.fromBytes(const <int>[]),
-      bytes: Uint8List(0),
-      formKey: GlobalKey<FormBuilderState>(),
-      groupId: groupId,
-      paidByUserId: paidByUserId,
-      status: status,
-    );
+}) => QuickScanImage(
+  multipartFile: MultipartFile.fromBytes(const <int>[]),
+  bytes: Uint8List(0),
+  formKey: GlobalKey<FormBuilderState>(),
+  groupId: groupId,
+  paidByUserId: paidByUserId,
+  status: status,
+);
 
 /// Pumps [QuickScanForm] with a real [GroupModel] holding [groups] and a
 /// [UserModel] holding [users] (the latter backs the paid-by dropdown items).
@@ -113,19 +127,35 @@ Future<GlobalKey<FormBuilderState>> _pumpFormGroups(
   List<api.UserView> users = const [],
   int? imagePaidByUserId,
   api.ReceiptStatus? imageStatus,
+  // The comment field is additionally gated on group.comments.create, so every
+  // group the test uses is granted it unless a test opts out.
+  bool canCreateComments = true,
 }) async {
-  final image = _image(imageGroupId,
-      paidByUserId: imagePaidByUserId, status: imageStatus);
+  final image = _image(
+    imageGroupId,
+    paidByUserId: imagePaidByUserId,
+    status: imageStatus,
+  );
   final groupModel = GroupModel()..setGroups(groups);
   final userModel = UserModel()..setUsers(users);
+  final permissionsModel =
+      PermissionsModel()..setPermissions(const [], {
+        for (final group in groups)
+          '${group.id}':
+              canCreateComments
+                  ? const ['group.comments.create']
+                  : const <String>[],
+      });
 
   await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<GroupModel>.value(value: groupModel),
         ChangeNotifierProvider<UserModel>.value(value: userModel),
+        ChangeNotifierProvider<PermissionsModel>.value(value: permissionsModel),
         ChangeNotifierProvider<UserPreferencesModel>(
-            create: (_) => UserPreferencesModel()),
+          create: (_) => UserPreferencesModel(),
+        ),
         ChangeNotifierProvider<CategoryModel>(create: (_) => CategoryModel()),
         ChangeNotifierProvider<TagModel>(create: (_) => TagModel()),
         ChangeNotifierProvider<ContextModel>(create: (_) => ContextModel()),
@@ -141,7 +171,7 @@ Future<GlobalKey<FormBuilderState>> _pumpFormGroups(
               formKey: image.formKey,
               image: image,
               index: 0,
-              onFormChangeCallback: (_, __, ___, ____, _____) {},
+              onFormChangeCallback: (_) {},
             ),
           ),
         ),
@@ -157,12 +187,20 @@ Future<GlobalKey<FormBuilderState>> _pumpForm(
   WidgetTester tester, {
   required api.GroupReceiptSettings settings,
   int imageGroupId = _groupId,
-}) =>
-    _pumpFormGroups(tester,
-        groups: [_group(settings)], imageGroupId: imageGroupId);
+  bool canCreateComments = true,
+}) => _pumpFormGroups(
+  tester,
+  groups: [_group(settings)],
+  imageGroupId: imageGroupId,
+  canCreateComments: canCreateComments,
+);
 
-Finder _dropdown(String name) => find.byWidgetPredicate(
-    (w) => w is FormBuilderDropdown && w.name == name);
+Finder _commentField() => find.byWidgetPredicate(
+  (w) => w is FormBuilderTextField && w.name == 'comment',
+);
+
+Finder _dropdown(String name) =>
+    find.byWidgetPredicate((w) => w is FormBuilderDropdown && w.name == name);
 
 /// Opens the group dropdown and picks [name]. `.last` picks the open menu's
 /// copy of the label (the closed-state selected value also renders it).
@@ -210,15 +248,12 @@ void main() {
     expect(find.byType(TagSelectField), findsOneWidget);
   });
 
-  testWidgets('falls back to backend defaults when no group is selected',
-      (tester) async {
+  testWidgets('falls back to backend defaults when no group is selected', (
+    tester,
+  ) async {
     // imageGroupId 0 → getGroupReceiptSettings returns null → paid-by/status
     // default shown, categories/tags default hidden.
-    await _pumpForm(
-      tester,
-      settings: _settings(),
-      imageGroupId: 0,
-    );
+    await _pumpForm(tester, settings: _settings(), imageGroupId: 0);
 
     expect(_dropdown('paidByUserId'), findsOneWidget);
     expect(_dropdown('status'), findsOneWidget);
@@ -238,31 +273,40 @@ void main() {
     expect(find.byType(TagSelectField), findsNothing);
   });
 
-  testWidgets('a shown+required field carries a required validator',
-      (tester) async {
+  testWidgets('a shown+required field carries a required validator', (
+    tester,
+  ) async {
     await _pumpForm(
       tester,
       settings: _settings(paidByEnabled: true, paidByRequired: true),
     );
 
-    final paidBy = tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
+    final paidBy =
+        tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
     expect(paidBy.validator, isNotNull);
-    expect(paidBy.validator!(null), isNotNull, reason: 'empty fails validation');
+    expect(
+      paidBy.validator!(null),
+      isNotNull,
+      reason: 'empty fails validation',
+    );
   });
 
-  testWidgets('a shown+optional field has no required validator',
-      (tester) async {
+  testWidgets('a shown+optional field has no required validator', (
+    tester,
+  ) async {
     await _pumpForm(
       tester,
       settings: _settings(paidByEnabled: true, paidByRequired: false),
     );
 
-    final paidBy = tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
+    final paidBy =
+        tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
     expect(paidBy.validator, isNull);
   });
 
-  testWidgets('status shown+required carries a required validator',
-      (tester) async {
+  testWidgets('status shown+required carries a required validator', (
+    tester,
+  ) async {
     await _pumpForm(
       tester,
       settings: _settings(statusEnabled: true, statusRequired: true),
@@ -270,11 +314,16 @@ void main() {
 
     final status = tester.widget(_dropdown('status')) as FormBuilderDropdown;
     expect(status.validator, isNotNull);
-    expect(status.validator!(null), isNotNull, reason: 'empty fails validation');
+    expect(
+      status.validator!(null),
+      isNotNull,
+      reason: 'empty fails validation',
+    );
   });
 
-  testWidgets('status shown+optional has no required validator',
-      (tester) async {
+  testWidgets('status shown+optional has no required validator', (
+    tester,
+  ) async {
     await _pumpForm(
       tester,
       settings: _settings(statusEnabled: true, statusRequired: false),
@@ -284,8 +333,9 @@ void main() {
     expect(status.validator, isNull);
   });
 
-  testWidgets('re-renders fields per config when the group changes',
-      (tester) async {
+  testWidgets('re-renders fields per config when the group changes', (
+    tester,
+  ) async {
     // Group A: paid-by/status shown, categories/tags hidden.
     // Group B: the exact inverse — proves visibility is reactive to the group.
     final groupA = _group(
@@ -308,8 +358,11 @@ void main() {
       ),
       name: 'Group B',
     );
-    await _pumpFormGroups(tester,
-        groups: [groupA, groupB], imageGroupId: _groupId);
+    await _pumpFormGroups(
+      tester,
+      groups: [groupA, groupB],
+      imageGroupId: _groupId,
+    );
 
     // Group A's field set.
     expect(_dropdown('paidByUserId'), findsOneWidget);
@@ -326,25 +379,18 @@ void main() {
     expect(find.byType(TagSelectField), findsOneWidget);
   });
 
-  testWidgets('clears paid-by / categories / tags when the group changes',
-      (tester) async {
+  testWidgets('clears paid-by / categories / tags when the group changes', (
+    tester,
+  ) async {
     // Both groups show all three group-scoped fields; group A carries the
     // member that backs a valid paid-by selection.
     final groupA = _group(
-      _settings(
-        id: _groupId,
-        categoriesEnabled: true,
-        tagsEnabled: true,
-      ),
+      _settings(id: _groupId, categoriesEnabled: true, tagsEnabled: true),
       name: 'Group A',
       members: [_member(42, _groupId)],
     );
     final groupB = _group(
-      _settings(
-        id: _group2Id,
-        categoriesEnabled: true,
-        tagsEnabled: true,
-      ),
+      _settings(id: _group2Id, categoriesEnabled: true, tagsEnabled: true),
       name: 'Group B',
     );
     final formKey = await _pumpFormGroups(
@@ -355,8 +401,9 @@ void main() {
     );
 
     formKey.currentState!.fields['paidByUserId']!.didChange(42);
-    formKey.currentState!.fields['categories']!
-        .didChange(<api.Category>[_category()]);
+    formKey.currentState!.fields['categories']!.didChange(<api.Category>[
+      _category(),
+    ]);
     formKey.currentState!.fields['tags']!.didChange(<api.Tag>[_tag()]);
     await tester.pump();
     expect(formKey.currentState!.fields['paidByUserId']!.value, 42);
@@ -365,16 +412,26 @@ void main() {
 
     await _selectGroup(tester, 'Group B');
 
-    expect(formKey.currentState!.fields['paidByUserId']!.value, isNull,
-        reason: 'paid-by cleared on group change');
-    expect(formKey.currentState!.fields['categories']!.value, isEmpty,
-        reason: 'categories cleared on group change');
-    expect(formKey.currentState!.fields['tags']!.value, isEmpty,
-        reason: 'tags cleared on group change');
+    expect(
+      formKey.currentState!.fields['paidByUserId']!.value,
+      isNull,
+      reason: 'paid-by cleared on group change',
+    );
+    expect(
+      formKey.currentState!.fields['categories']!.value,
+      isEmpty,
+      reason: 'categories cleared on group change',
+    );
+    expect(
+      formKey.currentState!.fields['tags']!.value,
+      isEmpty,
+      reason: 'tags cleared on group change',
+    );
   });
 
-  testWidgets('re-evaluates the required validator after a group switch',
-      (tester) async {
+  testWidgets('re-evaluates the required validator after a group switch', (
+    tester,
+  ) async {
     // Paid-by optional in group A, required in group B.
     final groupA = _group(
       _settings(id: _groupId, paidByEnabled: true, paidByRequired: false),
@@ -384,22 +441,30 @@ void main() {
       _settings(id: _group2Id, paidByEnabled: true, paidByRequired: true),
       name: 'Group B',
     );
-    await _pumpFormGroups(tester,
-        groups: [groupA, groupB], imageGroupId: _groupId);
+    await _pumpFormGroups(
+      tester,
+      groups: [groupA, groupB],
+      imageGroupId: _groupId,
+    );
 
-    var paidBy = tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
+    var paidBy =
+        tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
     expect(paidBy.validator, isNull, reason: 'optional in group A');
 
     await _selectGroup(tester, 'Group B');
 
     paidBy = tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
     expect(paidBy.validator, isNotNull, reason: 'required in group B');
-    expect(paidBy.validator!(null), isNotNull,
-        reason: 'empty fails after switch');
+    expect(
+      paidBy.validator!(null),
+      isNotNull,
+      reason: 'empty fails after switch',
+    );
   });
 
-  testWidgets('tapping Categories opens the picker with no shell context',
-      (tester) async {
+  testWidgets('tapping Categories opens the picker with no shell context', (
+    tester,
+  ) async {
     // ContextModel.shellContext is null in this harness — the same condition as
     // the real Quick Scan flow, which never mounts the receipt-form screen that
     // sets it. Pre-fix this tap crashed via Navigator.of(null); the fix falls
@@ -412,8 +477,9 @@ void main() {
     expect(find.text('Select Categories'), findsOneWidget);
   });
 
-  testWidgets('tapping Tags opens the picker with no shell context',
-      (tester) async {
+  testWidgets('tapping Tags opens the picker with no shell context', (
+    tester,
+  ) async {
     await _pumpForm(tester, settings: _settings(tagsEnabled: true));
 
     await tester.tap(find.text('No Tags selected'));
@@ -426,8 +492,9 @@ void main() {
   // per-image form seeds paid-by/status from the image, but a field the group
   // hides must not appear -- the preset "falls off" (and _submitQuickScan sends
   // the sentinel for it).
-  testWidgets('a prefilled paid-by shows when the group shows paid-by',
-      (tester) async {
+  testWidgets('a prefilled paid-by shows when the group shows paid-by', (
+    tester,
+  ) async {
     final group = _group(
       _settings(id: _groupId, paidByEnabled: true),
       members: [_member(42, _groupId)],
@@ -440,12 +507,14 @@ void main() {
       imagePaidByUserId: 42,
     );
 
-    final paidBy = tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
+    final paidBy =
+        tester.widget(_dropdown('paidByUserId')) as FormBuilderDropdown;
     expect(paidBy.initialValue, 42, reason: 'prefill honored on a shown field');
   });
 
-  testWidgets('a prefilled paid-by falls off when the group hides paid-by',
-      (tester) async {
+  testWidgets('a prefilled paid-by falls off when the group hides paid-by', (
+    tester,
+  ) async {
     final group = _group(_settings(id: _groupId, paidByEnabled: false));
     await _pumpFormGroups(
       tester,
@@ -454,12 +523,16 @@ void main() {
       imagePaidByUserId: 42,
     );
 
-    expect(_dropdown('paidByUserId'), findsNothing,
-        reason: 'preset paid-by fell off the hidden field');
+    expect(
+      _dropdown('paidByUserId'),
+      findsNothing,
+      reason: 'preset paid-by fell off the hidden field',
+    );
   });
 
-  testWidgets('a prefilled status shows when the group shows status',
-      (tester) async {
+  testWidgets('a prefilled status shows when the group shows status', (
+    tester,
+  ) async {
     final group = _group(_settings(id: _groupId, statusEnabled: true));
     await _pumpFormGroups(
       tester,
@@ -469,12 +542,16 @@ void main() {
     );
 
     final status = tester.widget(_dropdown('status')) as FormBuilderDropdown;
-    expect(status.initialValue, api.ReceiptStatus.OPEN,
-        reason: 'prefill honored on a shown field');
+    expect(
+      status.initialValue,
+      api.ReceiptStatus.OPEN,
+      reason: 'prefill honored on a shown field',
+    );
   });
 
-  testWidgets('a prefilled status falls off when the group hides status',
-      (tester) async {
+  testWidgets('a prefilled status falls off when the group hides status', (
+    tester,
+  ) async {
     final group = _group(_settings(id: _groupId, statusEnabled: false));
     await _pumpFormGroups(
       tester,
@@ -483,7 +560,100 @@ void main() {
       imageStatus: api.ReceiptStatus.OPEN,
     );
 
-    expect(_dropdown('status'), findsNothing,
-        reason: 'preset status fell off the hidden field');
+    expect(
+      _dropdown('status'),
+      findsNothing,
+      reason: 'preset status fell off the hidden field',
+    );
+  });
+
+  testWidgets('renders an optional comment field with no required validator', (
+    tester,
+  ) async {
+    await _pumpForm(
+      tester,
+      settings: _settings(commentEnabled: true, commentRequired: false),
+    );
+
+    final comment = tester.widget(_commentField()) as FormBuilderTextField;
+    expect(comment.validator, isNull);
+  });
+
+  testWidgets('hides the comment field by default', (tester) async {
+    await _pumpForm(tester, settings: _settings());
+
+    expect(_commentField(), findsNothing);
+  });
+
+  testWidgets('a shown+required comment carries a required validator', (
+    tester,
+  ) async {
+    await _pumpForm(
+      tester,
+      settings: _settings(commentEnabled: true, commentRequired: true),
+    );
+
+    final comment = tester.widget(_commentField()) as FormBuilderTextField;
+    expect(comment.validator, isNotNull);
+    expect(
+      comment.validator!(null),
+      isNotNull,
+      reason: 'empty fails validation',
+    );
+    expect(comment.validator!('A note'), isNull);
+  });
+
+  testWidgets('hides the comment field without group.comments.create', (
+    tester,
+  ) async {
+    // Required in the group config, but the member cannot comment - the field
+    // must be absent, so a required comment can never lock them out of quick
+    // scan (the server skips the check for them too).
+    await _pumpForm(
+      tester,
+      settings: _settings(commentEnabled: true, commentRequired: true),
+      canCreateComments: false,
+    );
+
+    expect(_commentField(), findsNothing);
+  });
+
+  testWidgets('hides the comment field when the group hides comments', (
+    tester,
+  ) async {
+    await _pumpForm(
+      tester,
+      settings: _settings(
+        commentEnabled: true,
+        commentRequired: true,
+        hideComments: true,
+      ),
+    );
+
+    expect(_commentField(), findsNothing);
+  });
+
+  testWidgets('keeps a typed comment when the group changes', (tester) async {
+    // Unlike paid-by/categories/tags, a comment is not group-scoped data, so
+    // switching groups must not silently discard what the user typed.
+    await _pumpFormGroups(
+      tester,
+      groups: [
+        _group(_settings(commentEnabled: true), name: 'Group One'),
+        _group(
+          _settings(id: _group2Id, commentEnabled: true),
+          name: 'Group Two',
+        ),
+      ],
+      imageGroupId: _groupId,
+    );
+
+    await tester.enterText(_commentField(), 'Kept across groups');
+    await tester.pump();
+
+    await _selectGroup(tester, 'Group Two');
+
+    expect(_commentField(), findsOneWidget);
+    expect(find.text('Kept across groups'), findsOneWidget);
   });
 }

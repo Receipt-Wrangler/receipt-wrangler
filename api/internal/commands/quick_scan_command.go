@@ -21,6 +21,10 @@ type QuickScanCommand struct {
 	// none), keeping the payload a flat string array the generated client can encode.
 	CategoryIds [][]uint `json:"categoryIds"`
 	TagIds      [][]uint `json:"tagIds"`
+	// Comments carries the per-file comment, one entry per file (empty for none). Unlike CategoryIds
+	// and TagIds this is free text and is deliberately NOT comma-split — a comment may contain commas
+	// and newlines.
+	Comments []string `json:"comments"`
 }
 
 func (command *QuickScanCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -35,12 +39,14 @@ func (command *QuickScanCommand) LoadDataFromRequest(w http.ResponseWriter, r *h
 	var statuses = make([]models.ReceiptStatus, 0)
 	var categoryIds = make([][]uint, 0)
 	var tagIds = make([][]uint, 0)
+	var comments = make([]string, 0)
 
 	var formPaidByUserIds = form["paidByUserIds"]
 	var formGroupIds = form["groupIds"]
 	var formStatuses = form["statuses"]
 	var formCategoryIds = form["categoryIds"]
 	var formTagIds = form["tagIds"]
+	var formComments = form["comments"]
 
 	if err != nil {
 		return err
@@ -110,6 +116,12 @@ func (command *QuickScanCommand) LoadDataFromRequest(w http.ResponseWriter, r *h
 		tagIds = append(tagIds, parsedIds)
 	}
 
+	for _, comment := range formComments {
+		// Trim so a whitespace-only comment counts as empty: it then fails a required check instead
+		// of persisting a blank comment.
+		comments = append(comments, strings.TrimSpace(comment))
+	}
+
 	command.Files = files
 	command.FileHeaders = fileHeaders
 	command.PaidByUserIds = paidByUserIds
@@ -117,6 +129,7 @@ func (command *QuickScanCommand) LoadDataFromRequest(w http.ResponseWriter, r *h
 	command.Statuses = statuses
 	command.CategoryIds = categoryIds
 	command.TagIds = tagIds
+	command.Comments = comments
 
 	return nil
 }
@@ -177,14 +190,19 @@ func (command QuickScanCommand) Validate() structs.ValidatorError {
 		vErr.Errors["status"] = "Status is required."
 	}
 
-	// Category/tag selections are optional (a client may omit them entirely), but when supplied they
-	// must carry one entry per file so the handler can align them by index.
+	// Category/tag/comment selections are optional (a client may omit them entirely — notably any
+	// client released before the field existed), but when supplied they must carry one entry per file
+	// so the handler can align them by index.
 	if len(command.CategoryIds) > 0 && len(command.CategoryIds) != filesLength {
 		vErr.Errors["categoryIds"] = "Category Ids must match the number of files."
 	}
 
 	if len(command.TagIds) > 0 && len(command.TagIds) != filesLength {
 		vErr.Errors["tagIds"] = "Tag Ids must match the number of files."
+	}
+
+	if len(command.Comments) > 0 && len(command.Comments) != filesLength {
+		vErr.Errors["comments"] = "Comments must match the number of files."
 	}
 
 	return vErr
@@ -206,6 +224,15 @@ func (command QuickScanCommand) TagIdsForFile(i int) []uint {
 		return command.TagIds[i]
 	}
 	return []uint{}
+}
+
+// CommentForFile returns the comment for the file at index i, or an empty string when the client
+// omitted comments entirely (or supplied none for that file).
+func (command QuickScanCommand) CommentForFile(i int) string {
+	if i < len(command.Comments) {
+		return command.Comments[i]
+	}
+	return ""
 }
 
 func (command *QuickScanCommand) LoadDataFromRequestAndValidate(w http.ResponseWriter, r *http.Request) (structs.ValidatorError, error) {

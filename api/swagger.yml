@@ -4886,6 +4886,11 @@ components:
           items:
             type: string
             description: Comma-joined tag ids for the file at the same index
+        comments:
+          type: array
+          items:
+            type: string
+            description: Comment for the file at the same index (empty for none)
     UserPreferences:
       allOf:
         - $ref: "#/components/schemas/BaseModel"
@@ -5008,6 +5013,12 @@ components:
             quickScanTagsRequired:
               type: boolean
               description: Require the tags field in quick scan
+            quickScanCommentEnabled:
+              type: boolean
+              description: Show the comment field in quick scan
+            quickScanCommentRequired:
+              type: boolean
+              description: Require the comment field in quick scan
     UpdateGroupReceiptSettingsCommand:
       type: object
       properties:
@@ -5067,6 +5078,12 @@ components:
         quickScanTagsRequired:
           type: boolean
           description: Require the tags field in quick scan
+        quickScanCommentEnabled:
+          type: boolean
+          description: Show the comment field in quick scan
+        quickScanCommentRequired:
+          type: boolean
+          description: Require the comment field in quick scan
     GroupSettings:
       type: object
       required:

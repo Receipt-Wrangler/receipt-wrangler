@@ -230,28 +230,37 @@ func (service ReceiptService) DeleteReceipt(id string) error {
 	return nil
 }
 
-func (service ReceiptService) QuickScan(
-	token *structs.Claims,
-	paidByUserId uint,
-	groupId uint,
-	status models.ReceiptStatus,
-	categoryIds []uint,
-	tagIds []uint,
-	tempPath string,
-	originalFileName string,
-	asynqTaskId string,
-) (models.Receipt, error) {
+// QuickScanParams carries the inputs for a single quick-scanned file: the caller's claims, the
+// per-file values the handler already resolved against the group's quick-scan configuration, and the
+// uploaded file's location. Grouped into a struct rather than passed positionally because the
+// positional form ends in several interchangeable strings, which is easy to transpose silently.
+type QuickScanParams struct {
+	Token            *structs.Claims
+	PaidByUserId     uint
+	GroupId          uint
+	Status           models.ReceiptStatus
+	CategoryIds      []uint
+	TagIds           []uint
+	Comment          string
+	TempPath         string
+	OriginalFileName string
+	AsynqTaskId      string
+}
+
+func (service ReceiptService) QuickScan(params QuickScanParams) (models.Receipt, error) {
+	token := params.Token
+	groupId := params.GroupId
 	db := repositories.GetDB()
 	systemTaskService := NewSystemTaskService(service.TX)
 	var createdReceipt models.Receipt
 
 	fileRepository := repositories.NewFileRepository(service.TX)
-	fileBytes, err := utils.ReadFile(tempPath)
+	fileBytes, err := utils.ReadFile(params.TempPath)
 	if err != nil {
 		return models.Receipt{}, err
 	}
 
-	fileInfo, err := os.Stat(tempPath)
+	fileInfo, err := os.Stat(params.TempPath)
 	if err != nil {
 		return models.Receipt{}, err
 	}
@@ -263,7 +272,7 @@ func (service ReceiptService) QuickScan(
 
 	magicFillCommand := commands.MagicFillCommand{
 		ImageData: fileBytes,
-		Filename:  originalFileName,
+		Filename:  params.OriginalFileName,
 	}
 
 	receiptRepository := repositories.NewReceiptRepository(service.TX)
@@ -282,7 +291,7 @@ func (service ReceiptService) QuickScan(
 		models.QUICK_SCAN,
 		&token.UserId,
 		&groupId,
-		asynqTaskId, nil)
+		params.AsynqTaskId, nil)
 	if taskErr != nil {
 		return models.Receipt{}, taskErr
 	}
@@ -292,11 +301,11 @@ func (service ReceiptService) QuickScan(
 	}
 
 	if receiptCommand.PaidByUserID == 0 {
-		receiptCommand.PaidByUserID = paidByUserId
+		receiptCommand.PaidByUserID = params.PaidByUserId
 	}
 
 	if len(receiptCommand.Status) == 0 {
-		receiptCommand.Status = models.ReceiptStatus(status)
+		receiptCommand.Status = models.ReceiptStatus(params.Status)
 	}
 
 	receiptCommand.GroupId = groupId
@@ -325,7 +334,7 @@ func (service ReceiptService) QuickScan(
 			AssociatedEntityType:   models.RECEIPT_PROCESSING_SETTINGS,
 			AssociatedEntityId:     parentTask.AssociatedEntityId,
 			StartedAt:              finishedAt,
-			AsynqTaskId:            asynqTaskId,
+			AsynqTaskId:            params.AsynqTaskId,
 			GroupId:                &groupId,
 			AssociatedSystemTaskId: &parentId,
 		}, failureErr)
@@ -336,14 +345,28 @@ func (service ReceiptService) QuickScan(
 	// from the database (the AI returns ids only, which would otherwise fail receipt validation),
 	// ids that don't resolve are dropped (hallucinated/non-existent), and ids the triggering user
 	// isn't allowed to see are dropped too (defense-in-depth alongside the prompt's grant filter).
-	receiptCommand.Categories, err = service.resolveQuickScanCategories(receiptCommand.Categories, categoryIds, token.UserId, groupId)
+	receiptCommand.Categories, err = service.resolveQuickScanCategories(receiptCommand.Categories, params.CategoryIds, token.UserId, groupId)
 	if err != nil {
 		return models.Receipt{}, recordEarlyQuickScanFailure(err)
 	}
 
-	receiptCommand.Tags, err = service.resolveQuickScanTags(receiptCommand.Tags, tagIds, token.UserId, groupId)
+	receiptCommand.Tags, err = service.resolveQuickScanTags(receiptCommand.Tags, params.TagIds, token.UserId, groupId)
 	if err != nil {
 		return models.Receipt{}, recordEarlyQuickScanFailure(err)
+	}
+
+	// Append the user's quick-scan comment rather than replacing whatever the AI produced: the
+	// default prompt doesn't ask for comments, but the response is unmarshalled straight into an
+	// UpsertReceiptCommand, so a group running a custom prompt can produce them and they must not be
+	// dropped. UserId is required — UpsertCommentCommand.Validate rejects a nil one, which would fail
+	// the whole receipt. ReceiptId stays unset; it is only required when updating, and CreateReceipt
+	// fills the foreign key through the association.
+	if len(params.Comment) > 0 {
+		commentUserId := token.UserId
+		receiptCommand.Comments = append(receiptCommand.Comments, commands.UpsertCommentCommand{
+			Comment: params.Comment,
+			UserId:  &commentUserId,
+		})
 	}
 
 	vErr := receiptCommand.Validate(token.UserId, true)
@@ -379,7 +402,7 @@ func (service ReceiptService) QuickScan(
 		}
 
 		fileData := models.FileData{
-			Name:      originalFileName,
+			Name:      params.OriginalFileName,
 			Size:      uint(fileInfo.Size()),
 			ReceiptId: createdReceipt.ID,
 			FileType:  validatedFileType,
@@ -395,7 +418,7 @@ func (service ReceiptService) QuickScan(
 		return models.Receipt{}, err
 	}
 
-	os.Remove(tempPath)
+	os.Remove(params.TempPath)
 	return createdReceipt, nil
 }
 

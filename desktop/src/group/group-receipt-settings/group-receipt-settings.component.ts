@@ -96,20 +96,23 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
       quickScanCategoriesRequired: [receiptSettings.quickScanCategoriesRequired ?? false],
       quickScanTagsEnabled: [receiptSettings.quickScanTagsEnabled ?? false],
       quickScanTagsRequired: [receiptSettings.quickScanTagsRequired ?? false],
+      quickScanCommentEnabled: [receiptSettings.quickScanCommentEnabled ?? false],
+      quickScanCommentRequired: [receiptSettings.quickScanCommentRequired ?? false],
     });
 
-    this.applyQuickScanValidators();
+    this.applyQuickScanDerivedState();
     this.form.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.applyQuickScanValidators());
+      .subscribe(() => this.applyQuickScanDerivedState());
 
     if (this.formConfig.mode != FormMode.edit) {
       this.form.disable();
     }
   }
 
-  // Keeps the default-value controls' required validators in sync with the enabled/required toggles.
-  private applyQuickScanValidators(): void {
+  // Keeps the controls that depend on other toggles in sync: the default-value controls' required
+  // validators, and the comment toggles' enabled state. Runs on init and on every value change.
+  private applyQuickScanDerivedState(): void {
     const paidByType = this.form.get("quickScanDefaultPaidByType")?.value;
     setRequired(this.form.get("quickScanDefaultPaidByType"), this.showPaidByDefault);
     setRequired(
@@ -117,6 +120,33 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
       this.showPaidByDefault && paidByType === QuickScanDefaultPaidByType.User
     );
     setRequired(this.form.get("quickScanDefaultStatus"), this.showStatusDefault);
+    this.applyQuickScanCommentEnablement();
+  }
+
+  // Hiding comments for the group hides the quick-scan comment field too, so its toggles are greyed
+  // out rather than cleared - the configured values stay put and come back when Hide Comments is
+  // turned off again. submit() reads getRawValue() so a disabled toggle is still sent.
+  private applyQuickScanCommentEnablement(): void {
+    // In view mode the whole form is disabled (see initForm); never re-enable a control there.
+    if (this.formConfig.mode !== FormMode.edit) {
+      return;
+    }
+
+    const commentsHidden = !!this.form.get("hideComments")?.value;
+    for (const controlName of ["quickScanCommentEnabled", "quickScanCommentRequired"]) {
+      const control = this.form.get(controlName);
+      if (!control) {
+        continue;
+      }
+
+      // emitEvent: false - this runs inside the valueChanges subscription, and enable()/disable()
+      // emit valueChanges by default, which would recurse forever.
+      if (commentsHidden) {
+        control.disable({ emitEvent: false });
+      } else {
+        control.enable({ emitEvent: false });
+      }
+    }
   }
 
   private setOriginalGroup(): void {
@@ -126,7 +156,10 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
 
   public submit(): void {
     if (this.form.valid) {
-      const value = this.form.value;
+      // getRawValue, not value: a disabled control is omitted from form.value, so the comment
+      // toggles disabled by Hide Comments would be sent as undefined, unmarshal as false, and wipe
+      // the admin's stored configuration.
+      const value = this.form.getRawValue();
       const command = {
         ...value,
         // An empty user autocomplete yields "" / null; send undefined so the nullable id is omitted

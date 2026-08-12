@@ -36,6 +36,11 @@ func TestCreateGroupReceiptSettingsAppliesQuickScanDefaults(t *testing.T) {
 	if settings.QuickScanCategoriesEnabled || settings.QuickScanTagsEnabled {
 		utils.PrintTestError(t, settings, "categories + tags hidden by default")
 	}
+	// Hidden by default so upgrading installs are unchanged until an admin opts in - this is what
+	// keeps already-released mobile clients working after a server upgrade.
+	if settings.QuickScanCommentEnabled || settings.QuickScanCommentRequired {
+		utils.PrintTestError(t, settings, "comment hidden by default")
+	}
 }
 
 func TestUpdateGroupReceiptSettingsPersistsQuickScanConfig(t *testing.T) {
@@ -59,6 +64,8 @@ func TestUpdateGroupReceiptSettingsPersistsQuickScanConfig(t *testing.T) {
 		QuickScanCategoriesRequired: true,
 		QuickScanTagsEnabled:        true,
 		QuickScanTagsRequired:       false,
+		QuickScanCommentEnabled:     true,
+		QuickScanCommentRequired:    true,
 	}
 
 	updated, err := repository.UpdateGroupReceiptSettings("1", command)
@@ -84,6 +91,9 @@ func TestUpdateGroupReceiptSettingsPersistsQuickScanConfig(t *testing.T) {
 	if !updated.QuickScanTagsEnabled || updated.QuickScanTagsRequired {
 		utils.PrintTestError(t, updated, "tags enabled, not required")
 	}
+	if !updated.QuickScanCommentEnabled || !updated.QuickScanCommentRequired {
+		utils.PrintTestError(t, updated, "comment enabled + required")
+	}
 
 	// Confirm the values survive a fresh read.
 	reloaded, err := repository.GetGroupReceiptSettingsByGroupId(1)
@@ -92,5 +102,10 @@ func TestUpdateGroupReceiptSettingsPersistsQuickScanConfig(t *testing.T) {
 	}
 	if reloaded.QuickScanDefaultStatus != models.RESOLVED || reloaded.QuickScanPaidByRequired {
 		utils.PrintTestError(t, reloaded, "persisted quick scan config")
+	}
+	// A field missing from UpdateGroupReceiptSettings' assignment block silently never persists, so
+	// assert the comment toggles specifically survive a fresh read.
+	if !reloaded.QuickScanCommentEnabled || !reloaded.QuickScanCommentRequired {
+		utils.PrintTestError(t, reloaded, "persisted quick scan comment config")
 	}
 }

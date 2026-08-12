@@ -6,13 +6,27 @@ import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/constants/spacing.dart';
 import 'package:receipt_wrangler_mobile/enums/form_state.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
+import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/shared/classes/quick_scan_image.dart';
+import 'package:receipt_wrangler_mobile/shared/functions/permissions.dart';
 import 'package:receipt_wrangler_mobile/shared/functions/quick_scan_field_config.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/category_select_field.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/tag_select_field.dart';
 import 'package:receipt_wrangler_mobile/utils/forms.dart';
 
 import '../../models/user_preferences_model.dart';
+
+/// The per-image values the quick-scan form reports on every change. A record
+/// rather than positional arguments: the list already opened with two `int?`s and
+/// is only growing, so naming each value keeps callers from transposing them.
+typedef QuickScanFormValues = ({
+  int? groupId,
+  int? paidByUserId,
+  api.ReceiptStatus? status,
+  List<api.Category> categories,
+  List<api.Tag> tags,
+  String? comment,
+});
 
 class QuickScanForm extends StatefulWidget {
   const QuickScanForm(
@@ -26,9 +40,7 @@ class QuickScanForm extends StatefulWidget {
   final GlobalKey<FormBuilderState> formKey;
   final QuickScanImage image;
   final int index;
-  final void Function(
-          int?, int?, api.ReceiptStatus?, List<api.Category>, List<api.Tag>)
-      onFormChangeCallback;
+  final void Function(QuickScanFormValues values) onFormChangeCallback;
   final bool enabled;
 
   @override
@@ -49,13 +61,15 @@ class _QuickScanForm extends State<QuickScanForm> {
   void onValueChange() {
     widget.formKey.currentState!.save();
     var formValue = widget.formKey.currentState!.value;
-    widget.onFormChangeCallback(
-      formValue["groupId"],
-      formValue["paidByUserId"],
-      formValue["status"],
-      (formValue["categories"] as List?)?.cast<api.Category>() ?? const [],
-      (formValue["tags"] as List?)?.cast<api.Tag>() ?? const [],
-    );
+    widget.onFormChangeCallback((
+      groupId: formValue["groupId"],
+      paidByUserId: formValue["paidByUserId"],
+      status: formValue["status"],
+      categories:
+          (formValue["categories"] as List?)?.cast<api.Category>() ?? const [],
+      tags: (formValue["tags"] as List?)?.cast<api.Tag>() ?? const [],
+      comment: formValue["comment"] as String?,
+    ));
   }
 
   // TODO: refactor to a common Widget to use in receipt form
@@ -175,6 +189,23 @@ class _QuickScanForm extends State<QuickScanForm> {
     );
   }
 
+  Widget _buildCommentField(bool required) {
+    return FormBuilderTextField(
+      name: "comment",
+      decoration: const InputDecoration(labelText: "Comment"),
+      // A receipt note rather than a one-liner; the length cap matches the
+      // backend's models.MaxCommentLength, which rejects anything longer.
+      maxLines: 3,
+      maxLength: 500,
+      initialValue: widget.image.comment,
+      validator: required ? FormBuilderValidators.required() : null,
+      enabled: widget.enabled,
+      onChanged: (value) {
+        onValueChange();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Field visibility/requirement follows the selected group's quick-scan
@@ -184,14 +215,21 @@ class _QuickScanForm extends State<QuickScanForm> {
     // hidden.
     final settings = Provider.of<GroupModel>(context, listen: false)
         .getGroupReceiptSettings(groupId);
+    final permissionsModel =
+        Provider.of<PermissionsModel>(context, listen: false);
 
-    final config = resolveQuickScanFieldConfig(settings);
+    final config = resolveQuickScanFieldConfig(
+      settings,
+      canCreateComments: canCommentCreate(permissionsModel, groupId),
+    );
     final showPaidBy = config.showPaidBy;
     final requirePaidBy = config.requirePaidBy;
     final showStatus = config.showStatus;
     final requireStatus = config.requireStatus;
     final showCategories = config.showCategories;
     final showTags = config.showTags;
+    final showComment = config.showComment;
+    final requireComment = config.requireComment;
 
     return FormBuilder(
         key: widget.formKey,
@@ -225,6 +263,13 @@ class _QuickScanForm extends State<QuickScanForm> {
               child: Column(children: [
                 textFieldSpacing,
                 _buildTagField(),
+              ]),
+            ),
+            Visibility(
+              visible: showComment,
+              child: Column(children: [
+                textFieldSpacing,
+                _buildCommentField(requireComment),
               ]),
             ),
             submitButtonSpacing
