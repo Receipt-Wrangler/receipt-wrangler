@@ -1,12 +1,13 @@
 import 'package:openapi/openapi.dart';
 
-/// Resolved show/require flags for the four quick-scan fields (paid-by, status,
-/// categories, tags), derived from a group's [GroupReceiptSettings]. Mirrors the
-/// backend's `resolveQuickScanFields` defaults so the per-image form (visibility +
-/// validators) and the submit path (which fields to send / require) stay aligned.
+/// Resolved show/require flags for the five quick-scan fields (paid-by, status,
+/// categories, tags, comment), derived from a group's [GroupReceiptSettings].
+/// Mirrors the backend's `resolveQuickScanFields` defaults so the per-image form
+/// (visibility + validators) and the submit path (which fields to send / require)
+/// stay aligned.
 ///
 /// Null [settings] (no group selected yet) falls back to the backend defaults:
-/// paid-by/status shown, categories/tags hidden.
+/// paid-by/status shown, categories/tags/comment hidden.
 class QuickScanFieldConfig {
   final bool showPaidBy;
   final bool requirePaidBy;
@@ -16,6 +17,8 @@ class QuickScanFieldConfig {
   final bool requireCategories;
   final bool showTags;
   final bool requireTags;
+  final bool showComment;
+  final bool requireComment;
 
   const QuickScanFieldConfig({
     required this.showPaidBy,
@@ -26,14 +29,32 @@ class QuickScanFieldConfig {
     required this.requireCategories,
     required this.showTags,
     required this.requireTags,
+    required this.showComment,
+    required this.requireComment,
   });
 }
 
-QuickScanFieldConfig resolveQuickScanFieldConfig(GroupReceiptSettings? settings) {
+/// [canCreateComments] is whether the caller holds `group.comments.create` in the
+/// target group. It acts as an extra AND on the comment field's "enabled": without
+/// it the field is hidden, is never required (so a member who cannot comment is
+/// never locked out of quick scan), and a comment sent anyway is dropped by the
+/// server. It is passed in rather than read from a provider so this helper stays
+/// pure, and is a required named argument so both call sites - the form and the
+/// submit - are forced to supply it and cannot drift apart.
+QuickScanFieldConfig resolveQuickScanFieldConfig(
+  GroupReceiptSettings? settings, {
+  required bool canCreateComments,
+}) {
   final showPaidBy = settings?.quickScanPaidByEnabled ?? true;
   final showStatus = settings?.quickScanStatusEnabled ?? true;
   final showCategories = settings?.quickScanCategoriesEnabled ?? false;
   final showTags = settings?.quickScanTagsEnabled ?? false;
+  // hideComments hides comments for the whole group, so it hides the quick-scan
+  // comment too - without changing the stored toggle (mirrors the backend's
+  // GroupReceiptSettings.IsQuickScanCommentShown).
+  final showComment = (settings?.quickScanCommentEnabled ?? false) &&
+      !(settings?.hideComments ?? false) &&
+      canCreateComments;
 
   return QuickScanFieldConfig(
     showPaidBy: showPaidBy,
@@ -45,5 +66,8 @@ QuickScanFieldConfig resolveQuickScanFieldConfig(GroupReceiptSettings? settings)
         showCategories && (settings?.quickScanCategoriesRequired ?? false),
     showTags: showTags,
     requireTags: showTags && (settings?.quickScanTagsRequired ?? false),
+    showComment: showComment,
+    requireComment:
+        showComment && (settings?.quickScanCommentRequired ?? false),
   );
 }

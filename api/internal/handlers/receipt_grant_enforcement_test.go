@@ -76,7 +76,7 @@ func seedRestrictedReceiptCreatorWithGrants(t *testing.T, categoryGrantIds []uin
 
 // seedRestrictedQuickScanner creates a group (with default receipt settings) plus a member whose
 // group role grants only group.receipts.quick-scan, restricted to categoryGrantIds. It returns the
-// user id and group id. Receipt settings are seeded because resolveQuickScanFields reads them with
+// user id and group id. Receipt settings are seeded because ResolveQuickScanFields reads them with
 // .First() and would otherwise 500 on a missing row.
 func seedRestrictedQuickScanner(t *testing.T, categoryGrantIds []uint) (uint, uint) {
 	t.Helper()

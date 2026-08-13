@@ -1101,7 +1101,7 @@ See `mobile/CLAUDE.md` → "App Links / Universal Links — server-URL pre-fill 
 
 Group admins configure the quick-scan workflow per group on `GroupReceiptSettings` (gated by the
 group `GroupUpdate` permission, edited via `PUT /group/{groupId}/groupReceiptSettings`). For each of
-**paid-by, status, categories, tags** there is an `*Enabled` (show) and `*Required` toggle. When
+**paid-by, status, categories, tags, comment** there is an `*Enabled` (show) and `*Required` toggle. When
 paid-by/status is **not** both shown and required, a default backfills it, so **a receipt always has
 a real paid-by and status — neither field is ever null/empty**. This is why the `Receipt` model,
 `UpsertReceiptCommand.Validate`, and the email workflow are all unchanged by this feature.
@@ -1109,17 +1109,59 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
 - **Model** (`models/group_receipt_settings.go`): the `QuickScan*` columns. Paid-by default is a
   `QuickScanDefaultPaidByType` (`UPLOADER` | `USER`, `models/quick_scan_default_paid_by_type.go`) plus
   a nullable `QuickScanDefaultPaidById`; status default is `QuickScanDefaultStatus`. Backwards-compatible
-  GORM defaults: paid-by/status ship **enabled + required** (no default needed), categories/tags
+  GORM defaults: paid-by/status ship **enabled + required** (no default needed), categories/tags/comment
   **hidden** — so existing groups are unchanged until an admin opts in. AutoMigrate adds the columns; no
   data migration.
+  - **`UpdateGroupReceiptSettings` assigns every field one at a time** — a new setting that isn't added
+    to that block silently never persists (no compile error, no test failure). `repositories/group_receipt_settings_test.go`
+    round-trips the flags specifically to catch that.
+- **Comment (`QuickScanCommentEnabled` / `QuickScanCommentRequired`)** captures a receipt comment at
+  scan time. Two things gate it beyond its own toggle, both resolved in **one** place per runtime so
+  they can't drift — `GroupReceiptSettings.IsQuickScanCommentShown()` / `IsQuickScanCommentRequired()`
+  on the server, `resolveQuickScanFieldConfig` on mobile, `showComment(i)` on desktop:
+  - **`HideComments`** (the group-wide "hide comments" setting) overrides the toggle. It is derived,
+    never written: the stored toggles are untouched, so turning `HideComments` off restores them. The
+    desktop config UI greys the two checkboxes out for the same reason — which is why its `submit()`
+    must use `getRawValue()` (a disabled control is omitted from `form.value` and would unmarshal as
+    `false`, wiping the admin's configuration).
+  - **`group.comments.create`** acts as an extra AND on "enabled". A caller without it never sees the
+    field, is **not** subject to the required check (or they could never quick scan at all), and any
+    comment they submit anyway is **silently dropped — deliberately not a 403**, unlike
+    `enforceQuickScanGrantSelection`'s treatment of out-of-grant categories/tags: a comment is
+    incidental to the receipt, so refusing the whole fire-and-forget scan over it is the worse
+    outcome. The permission is resolved only when the field is enabled (cached per group id), so the
+    default-off config costs no extra queries.
+  - **Required is enforced strictly**, like categories/tags: a client that omits `comments` while the
+    group requires one gets a 400. Backwards compatibility comes from the columns defaulting to
+    `false/false`, so an already-released mobile build is unaffected until an admin opts in — at which
+    point those builds must update. The desktop config UI says so inline.
 - **Config validation** (`commands/update_group_receipt_settings_command.go` `Validate`, now wired into
   the handler): a default is **required** for paid-by/status unless `(enabled && required)`; categories/
-  tags never need a default (empty is fine).
-- **Ingress** (`handlers/receipts.go` `QuickScan` → `resolveQuickScanFields`): loads each file's group
+  tags/comment never need a default (empty is fine).
+- **Ingress** (`handlers/receipts.go` `QuickScan` → `ReceiptService.ResolveQuickScanFields`,
+  `services/quick_scan_fields.go`): loads each file's group
   settings, **enforces required fields synchronously (400 before enqueue)** since quick scan is
   fire-and-forget, and resolves paid-by/status defaults (`UPLOADER` ⇒ the caller's user id). Categories/
   tags ride the multipart command as **per-file comma-joined id strings** (`QuickScanCommand.CategoryIds`/
-  `TagIds`; an empty paid-by string parses to `0` = unset). The async `ReceiptService.QuickScan`
+  `TagIds`; an empty paid-by string parses to `0` = unset). The **comment** rides as a parallel
+  `comments` string array, one entry per file — free text, so it is **not** comma-split (a comment may
+  contain commas and newlines); entries are trimmed on parse so a whitespace-only comment counts as
+  empty. It is length-checked against `models.MaxCommentLength` (500, matching the `Comment` column)
+  here rather than at the database: the receipt is created in a background task, so an over-length
+  comment would otherwise fail the insert where the user only ever sees a "queued" toast. The check
+  counts **runes, not bytes** (`utf8.RuneCountInString`) — the column is `varchar(500)`, which MySQL
+  and Postgres both measure in *characters*, so a `len()` check would be stricter than the column it
+  mirrors and would reject an accented or non-Latin comment well inside its real capacity. The limit
+  is published on the contract as `maxLength: 500` on `QuickScanCommand.comments.items` (OpenAPI
+  measures `maxLength` in characters too), and both clients cap at 500 client-side — desktop via
+  `Validators.maxLength`, mobile via `FormBuilderTextField.maxLength`.
+  `ReceiptService.QuickScan` **appends** it to `receiptCommand.Comments` (with `UserId` set — a nil one
+  fails `UpsertCommentCommand.Validate` and would take the whole receipt down) rather than replacing:
+  the default prompt doesn't emit comments, but the AI response is unmarshalled straight into an
+  `UpsertReceiptCommand`, so a group running a custom prompt can produce them.
+- **`ReceiptService.QuickScan` takes a `QuickScanParams` struct**, not positional arguments — the
+  positional form ended in several interchangeable strings (temp path / file name / task id / comment),
+  which is silently transposable. The async `ReceiptService.QuickScan`
   **resolves** the union of the user's category/tag picks and the AI-assigned ones
   (`resolveQuickScanCategories`/`resolveQuickScanTags`): the ids (AI first, then user, deduped) are looked
   up via `CategoryRepository.GetByIds`/`TagsRepository.GetByIds` so each carries its real **name**. This is

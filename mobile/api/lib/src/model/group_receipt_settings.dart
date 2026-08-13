@@ -39,6 +39,8 @@ part 'group_receipt_settings.g.dart';
 /// * [quickScanCategoriesRequired] - Require the categories field in quick scan
 /// * [quickScanTagsEnabled] - Show the tags field in quick scan
 /// * [quickScanTagsRequired] - Require the tags field in quick scan
+/// * [quickScanCommentEnabled] - Show the comment field in quick scan
+/// * [quickScanCommentRequired] - Require the comment field in quick scan
 @BuiltValue()
 abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSettings, GroupReceiptSettingsBuilder> {
   @BuiltValueField(wireName: r'quickScanDefaultPaidByType')
@@ -60,6 +62,10 @@ abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSett
   /// Hide receipt images
   @BuiltValueField(wireName: r'hideImages')
   bool? get hideImages;
+
+  /// Show the comment field in quick scan
+  @BuiltValueField(wireName: r'quickScanCommentEnabled')
+  bool? get quickScanCommentEnabled;
 
   /// Hide receipt comments
   @BuiltValueField(wireName: r'hideComments')
@@ -100,6 +106,10 @@ abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSett
   /// Hide share tags
   @BuiltValueField(wireName: r'hideShareTags')
   bool? get hideShareTags;
+
+  /// Require the comment field in quick scan
+  @BuiltValueField(wireName: r'quickScanCommentRequired')
+  bool? get quickScanCommentRequired;
 
   /// Hide receipt item tags
   @BuiltValueField(wireName: r'hideItemTags')
@@ -199,6 +209,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
         specifiedType: const FullType(bool),
       );
     }
+    if (object.quickScanCommentRequired != null) {
+      yield r'quickScanCommentRequired';
+      yield serializers.serialize(
+        object.quickScanCommentRequired,
+        specifiedType: const FullType(bool),
+      );
+    }
     yield r'id';
     yield serializers.serialize(
       object.id,
@@ -257,6 +274,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
       yield r'hideImages';
       yield serializers.serialize(
         object.hideImages,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.quickScanCommentEnabled != null) {
+      yield r'quickScanCommentEnabled';
+      yield serializers.serialize(
+        object.quickScanCommentEnabled,
         specifiedType: const FullType(bool),
       );
     }
@@ -395,6 +419,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
           ) as bool;
           result.hideItemCategories = valueDes;
           break;
+        case r'quickScanCommentRequired':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanCommentRequired = valueDes;
+          break;
         case r'id':
           final valueDes = serializers.deserialize(
             value,
@@ -457,6 +488,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
             specifiedType: const FullType(bool),
           ) as bool;
           result.hideImages = valueDes;
+          break;
+        case r'quickScanCommentEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.quickScanCommentEnabled = valueDes;
           break;
         case r'hideReceiptTags':
           final valueDes = serializers.deserialize(

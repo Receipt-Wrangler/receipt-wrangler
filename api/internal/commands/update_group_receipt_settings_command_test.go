@@ -20,6 +20,18 @@ func TestUpdateGroupReceiptSettingsCommand_Validate_ValidInputs(t *testing.T) {
 				QuickScanStatusRequired: true,
 			},
 		},
+		// Unlike paid-by/status, a comment can legitimately be empty, so requiring it needs no
+		// configured default.
+		"comment shown+required needs no default": {
+			command: UpdateGroupReceiptSettingsCommand{
+				QuickScanPaidByEnabled:   true,
+				QuickScanPaidByRequired:  true,
+				QuickScanStatusEnabled:   true,
+				QuickScanStatusRequired:  true,
+				QuickScanCommentEnabled:  true,
+				QuickScanCommentRequired: true,
+			},
+		},
 		"paid by optional with uploader default": {
 			command: UpdateGroupReceiptSettingsCommand{
 				QuickScanPaidByEnabled:     true,

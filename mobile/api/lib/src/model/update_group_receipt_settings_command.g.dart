@@ -46,6 +46,10 @@ class _$UpdateGroupReceiptSettingsCommand
   final bool? quickScanTagsEnabled;
   @override
   final bool? quickScanTagsRequired;
+  @override
+  final bool? quickScanCommentEnabled;
+  @override
+  final bool? quickScanCommentRequired;
 
   factory _$UpdateGroupReceiptSettingsCommand(
           [void Function(UpdateGroupReceiptSettingsCommandBuilder)? updates]) =>
@@ -70,7 +74,9 @@ class _$UpdateGroupReceiptSettingsCommand
       this.quickScanCategoriesEnabled,
       this.quickScanCategoriesRequired,
       this.quickScanTagsEnabled,
-      this.quickScanTagsRequired})
+      this.quickScanTagsRequired,
+      this.quickScanCommentEnabled,
+      this.quickScanCommentRequired})
       : super._();
   @override
   UpdateGroupReceiptSettingsCommand rebuild(
@@ -103,7 +109,9 @@ class _$UpdateGroupReceiptSettingsCommand
         quickScanCategoriesEnabled == other.quickScanCategoriesEnabled &&
         quickScanCategoriesRequired == other.quickScanCategoriesRequired &&
         quickScanTagsEnabled == other.quickScanTagsEnabled &&
-        quickScanTagsRequired == other.quickScanTagsRequired;
+        quickScanTagsRequired == other.quickScanTagsRequired &&
+        quickScanCommentEnabled == other.quickScanCommentEnabled &&
+        quickScanCommentRequired == other.quickScanCommentRequired;
   }
 
   @override
@@ -128,6 +136,8 @@ class _$UpdateGroupReceiptSettingsCommand
     _$hash = $jc(_$hash, quickScanCategoriesRequired.hashCode);
     _$hash = $jc(_$hash, quickScanTagsEnabled.hashCode);
     _$hash = $jc(_$hash, quickScanTagsRequired.hashCode);
+    _$hash = $jc(_$hash, quickScanCommentEnabled.hashCode);
+    _$hash = $jc(_$hash, quickScanCommentRequired.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -153,7 +163,9 @@ class _$UpdateGroupReceiptSettingsCommand
           ..add('quickScanCategoriesEnabled', quickScanCategoriesEnabled)
           ..add('quickScanCategoriesRequired', quickScanCategoriesRequired)
           ..add('quickScanTagsEnabled', quickScanTagsEnabled)
-          ..add('quickScanTagsRequired', quickScanTagsRequired))
+          ..add('quickScanTagsRequired', quickScanTagsRequired)
+          ..add('quickScanCommentEnabled', quickScanCommentEnabled)
+          ..add('quickScanCommentRequired', quickScanCommentRequired))
         .toString();
   }
 }
@@ -258,6 +270,16 @@ class UpdateGroupReceiptSettingsCommandBuilder
   set quickScanTagsRequired(bool? quickScanTagsRequired) =>
       _$this._quickScanTagsRequired = quickScanTagsRequired;
 
+  bool? _quickScanCommentEnabled;
+  bool? get quickScanCommentEnabled => _$this._quickScanCommentEnabled;
+  set quickScanCommentEnabled(bool? quickScanCommentEnabled) =>
+      _$this._quickScanCommentEnabled = quickScanCommentEnabled;
+
+  bool? _quickScanCommentRequired;
+  bool? get quickScanCommentRequired => _$this._quickScanCommentRequired;
+  set quickScanCommentRequired(bool? quickScanCommentRequired) =>
+      _$this._quickScanCommentRequired = quickScanCommentRequired;
+
   UpdateGroupReceiptSettingsCommandBuilder() {
     UpdateGroupReceiptSettingsCommand._defaults(this);
   }
@@ -284,6 +306,8 @@ class UpdateGroupReceiptSettingsCommandBuilder
       _quickScanCategoriesRequired = $v.quickScanCategoriesRequired;
       _quickScanTagsEnabled = $v.quickScanTagsEnabled;
       _quickScanTagsRequired = $v.quickScanTagsRequired;
+      _quickScanCommentEnabled = $v.quickScanCommentEnabled;
+      _quickScanCommentRequired = $v.quickScanCommentRequired;
       _$v = null;
     }
     return this;
@@ -325,6 +349,8 @@ class UpdateGroupReceiptSettingsCommandBuilder
           quickScanCategoriesRequired: quickScanCategoriesRequired,
           quickScanTagsEnabled: quickScanTagsEnabled,
           quickScanTagsRequired: quickScanTagsRequired,
+          quickScanCommentEnabled: quickScanCommentEnabled,
+          quickScanCommentRequired: quickScanCommentRequired,
         );
     replace(_$result);
     return _$result;

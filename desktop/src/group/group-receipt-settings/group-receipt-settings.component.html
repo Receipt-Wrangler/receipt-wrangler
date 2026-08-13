@@ -144,5 +144,32 @@
         ></app-checkbox>
       </div>
     </div>
+
+    <div class="mb-3">
+      <strong>Comment</strong>
+      <div class="d-flex flex-wrap gap-4">
+        <app-checkbox
+          label="Show"
+          data-testid="quick-scan-comment-show"
+          [inputFormControl]="form | formGet: 'quickScanCommentEnabled'"
+        ></app-checkbox>
+        <app-checkbox
+          label="Require"
+          data-testid="quick-scan-comment-require"
+          [inputFormControl]="form | formGet: 'quickScanCommentRequired'"
+        ></app-checkbox>
+      </div>
+      @if (form.get('hideComments')?.value) {
+        <small class="text-muted d-block">
+          Disabled while "Hide Comments" is on. Your selection is kept and applies again when Hide
+          Comments is turned off.
+        </small>
+      } @else if (form.get('quickScanCommentRequired')?.value) {
+        <small class="text-muted d-block">
+          Requiring a comment blocks quick scan on mobile app versions released before this field was
+          added, until those users update.
+        </small>
+      }
+    </div>
   </app-form-section>
 </ng-template>

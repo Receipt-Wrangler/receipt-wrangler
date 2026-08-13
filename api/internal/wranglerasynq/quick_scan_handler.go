@@ -16,6 +16,7 @@ type QuickScanTaskPayload struct {
 	Status           models.ReceiptStatus
 	CategoryIds      []uint
 	TagIds           []uint
+	Comment          string
 	TempPath         string
 	OriginalFileName string
 }
@@ -34,17 +35,18 @@ func HandleQuickScanTask(context context.Context, task *asynq.Task) error {
 	}
 
 	receiptService := services.NewReceiptService(nil)
-	_, err = receiptService.QuickScan(
-		payload.Token,
-		payload.PaidByUserId,
-		payload.GroupId,
-		payload.Status,
-		payload.CategoryIds,
-		payload.TagIds,
-		payload.TempPath,
-		payload.OriginalFileName,
-		taskId,
-	)
+	_, err = receiptService.QuickScan(services.QuickScanParams{
+		Token:            payload.Token,
+		PaidByUserId:     payload.PaidByUserId,
+		GroupId:          payload.GroupId,
+		Status:           payload.Status,
+		CategoryIds:      payload.CategoryIds,
+		TagIds:           payload.TagIds,
+		Comment:          payload.Comment,
+		TempPath:         payload.TempPath,
+		OriginalFileName: payload.OriginalFileName,
+		AsynqTaskId:      taskId,
+	})
 	if err != nil {
 		return HandleError(err)
 	}

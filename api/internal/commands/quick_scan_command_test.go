@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"bytes"
 	"mime/multipart"
+	"net/http/httptest"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
 	"strings"
@@ -48,6 +50,15 @@ func TestQuickScanCommand_Validate_ValidInputs(t *testing.T) {
 				Statuses:      []models.ReceiptStatus{"OPEN", "OPEN"},
 				CategoryIds:   [][]uint{{1, 2}, {}},
 				TagIds:        [][]uint{{}, {5}},
+			},
+		},
+		"valid with comments": {
+			command: QuickScanCommand{
+				Files:         []multipart.File{newMockFile(), newMockFile()},
+				PaidByUserIds: []uint{1, 2},
+				GroupIds:      []uint{1, 1},
+				Statuses:      []models.ReceiptStatus{"OPEN", "OPEN"},
+				Comments:      []string{"a note", ""},
 			},
 		},
 	}
@@ -128,6 +139,16 @@ func TestQuickScanCommand_Validate_InvalidInputs(t *testing.T) {
 			},
 			expectedErrors: []string{"tagIds"},
 		},
+		"mismatched comments": {
+			command: QuickScanCommand{
+				Files:         []multipart.File{newMockFile(), newMockFile()},
+				PaidByUserIds: []uint{1, 2},
+				GroupIds:      []uint{1, 1},
+				Statuses:      []models.ReceiptStatus{"OPEN", "OPEN"},
+				Comments:      []string{"only one"},
+			},
+			expectedErrors: []string{"comments"},
+		},
 	}
 
 	for testName, test := range tests {
@@ -201,5 +222,61 @@ func TestParseCommaSeparatedUints(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestQuickScanCommand_CommentForFile(t *testing.T) {
+	command := QuickScanCommand{Comments: []string{"first", ""}}
+
+	if command.CommentForFile(0) != "first" {
+		utils.PrintTestError(t, command.CommentForFile(0), "first")
+	}
+	if command.CommentForFile(1) != "" {
+		utils.PrintTestError(t, command.CommentForFile(1), "")
+	}
+	// Out of range: a client that omitted comments entirely (e.g. any released before the field
+	// existed) must resolve to no comment rather than panic.
+	if command.CommentForFile(5) != "" {
+		utils.PrintTestError(t, command.CommentForFile(5), "")
+	}
+}
+
+func TestQuickScanCommand_LoadDataFromRequestTrimsComments(t *testing.T) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("files", "receipt.png")
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	part.Write([]byte("image-bytes"))
+
+	writer.WriteField("groupIds", "1")
+	writer.WriteField("paidByUserIds", "1")
+	writer.WriteField("statuses", "OPEN")
+	// A whitespace-only comment must land as empty so it fails a required check rather than
+	// persisting a blank comment.
+	writer.WriteField("comments", "   \n  ")
+	if err := writer.Close(); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	r := httptest.NewRequest("POST", "/api", body)
+	r.Header.Set("Content-Type", writer.FormDataContentType())
+
+	command := QuickScanCommand{}
+	if err := command.LoadDataFromRequest(httptest.NewRecorder(), r); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if len(command.Comments) != 1 {
+		utils.PrintTestError(t, len(command.Comments), 1)
+		return
+	}
+	if command.Comments[0] != "" {
+		utils.PrintTestError(t, command.Comments[0], "")
 	}
 }

@@ -6,10 +6,24 @@ import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { ReceiptFileUploadCommand } from "../../interfaces";
 import { setRequired } from "../../form";
-import { Category, GroupReceiptSettings, ReceiptService, ReceiptStatus, Tag } from "../../open-api";
+import { Category, GroupReceiptSettings, Permission, ReceiptService, ReceiptStatus, Tag } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, GroupState } from "../../store";
+import { codePointMaxLengthValidator, trimmedRequiredValidator } from "../../validators";
 import { UploadImageComponent } from "../upload-image/upload-image.component";
+
+// Mirrors the backend's models.MaxCommentLength (the Comment column is varchar(500), which
+// MySQL/Postgres measure in characters) and mobile's FormBuilderTextField maxLength, so an
+// over-length comment is caught here instead of coming back as a 400 after submit. Counted in
+// code points, like the backend's rune count -- Validators.maxLength counts UTF-16 code units,
+// which would reject 500 emoji the API accepts.
+export const QUICK_SCAN_COMMENT_MAX_LENGTH = 500;
+
+// Built once so setRequired can remove them by reference on a later recompute.
+const commentMaxLengthValidator = codePointMaxLengthValidator(QUICK_SCAN_COMMENT_MAX_LENGTH);
+// QuickScanCommand trims each comment on parse, so a whitespace-only one arrives empty and fails
+// the group's required check -- Validators.required would have called it valid and eaten a 400.
+const commentRequiredValidator = trimmedRequiredValidator();
 
 @Component({
     selector: "app-quick-scan-dialog",
@@ -26,6 +40,14 @@ export class QuickScanDialogComponent implements OnInit {
   public images: ReceiptFileUploadCommand[] = [];
 
   public currentlySelectedIndex: number = 0;
+
+  // base-input has no built-in message for the maxlength error, so an unmapped one would render an
+  // empty mat-error. Held as a field rather than an inline object literal so the binding is stable.
+  public readonly commentErrorMessages: { [key: string]: string } = {
+    maxlength: `Comment must be ${QUICK_SCAN_COMMENT_MAX_LENGTH} characters or fewer.`,
+  };
+
+  private readonly commentPermissionByGroup = new Map<number, boolean>();
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -57,6 +79,10 @@ export class QuickScanDialogComponent implements OnInit {
     return this.form.get("tags") as FormArray;
   }
 
+  public get comments(): FormArray {
+    return this.form.get("comments") as FormArray;
+  }
+
   public ngOnInit(): void {
     this.initForm();
   }
@@ -68,6 +94,7 @@ export class QuickScanDialogComponent implements OnInit {
       groupIds: this.formBuilder.array<number>([]),
       categories: this.formBuilder.array<Category[]>([]),
       tags: this.formBuilder.array<Tag[]>([]),
+      comments: this.formBuilder.array<string>([]),
     });
 
     // Re-resolve each image's field config whenever anything changes (a group selection can flip
@@ -93,6 +120,10 @@ export class QuickScanDialogComponent implements OnInit {
     // FormControl has no push(), so selecting one would throw — use a FormArray.
     this.categories.push(this.formBuilder.array([]));
     this.tags.push(this.formBuilder.array([]));
+    // The comment is a scalar text field, so a plain FormControl - unlike categories/tags above.
+    // maxLength is applied here rather than in configureImages because setRequired composes
+    // validators additively, so it survives every show/require recompute and is never re-added.
+    this.comments.push(new FormControl("", commentMaxLengthValidator));
 
     this.configureImages();
   }
@@ -121,6 +152,36 @@ export class QuickScanDialogComponent implements OnInit {
 
   public showTags(index: number): boolean {
     return this.settingsForIndex(index)?.quickScanTagsEnabled ?? false;
+  }
+
+  // The comment field additionally requires group.comments.create: without it the field is hidden,
+  // never required, and a comment sent anyway is dropped server-side. hideComments hides the whole
+  // group's comments, so it hides this too. Mirrors the backend's IsQuickScanCommentShown.
+  public showComment(index: number): boolean {
+    const settings = this.settingsForIndex(index);
+    if (!(settings?.quickScanCommentEnabled ?? false) || (settings?.hideComments ?? false)) {
+      return false;
+    }
+
+    return this.canCommentForIndex(index);
+  }
+
+  // Cached per group: AuthState.hasGroupPermission allocates a new selector on each call, and
+  // showComment is read from the template on every change-detection pass.
+  private canCommentForIndex(index: number): boolean {
+    const groupId = Number(this.groupIds.at(index)?.value);
+    if (!groupId) {
+      return false;
+    }
+
+    if (!this.commentPermissionByGroup.has(groupId)) {
+      this.commentPermissionByGroup.set(
+        groupId,
+        this.store.selectSnapshot(AuthState.hasGroupPermission(groupId, Permission.GroupCommentsCreate))
+      );
+    }
+
+    return this.commentPermissionByGroup.get(groupId) ?? false;
   }
 
   public categoriesForIndex(index: number): Category[] {
@@ -160,6 +221,16 @@ export class QuickScanDialogComponent implements OnInit {
       if (!tagsShown) {
         (this.form.get("tags." + i) as FormArray | null)?.clear({ emitEvent: false });
       }
+
+      const commentShown = this.showComment(i);
+      setRequired(
+        this.form.get("comments." + i),
+        commentShown && (settings?.quickScanCommentRequired ?? false),
+        commentRequiredValidator
+      );
+      if (!commentShown) {
+        this.form.get("comments." + i)?.setValue("", { emitEvent: false });
+      }
     }
   }
 
@@ -173,6 +244,7 @@ export class QuickScanDialogComponent implements OnInit {
     this.groupIds.removeAt(index);
     this.categories.removeAt(index);
     this.tags.removeAt(index);
+    this.comments.removeAt(index);
     this.images.splice(index, 1);
   }
 
@@ -185,7 +257,9 @@ export class QuickScanDialogComponent implements OnInit {
           this.paidByUserIds.value,
           this.statuses.value,
           this.joinIds(this.categories),
-          this.joinIds(this.tags)
+          this.joinIds(this.tags),
+          // Already one string per image - no id joining needed, unlike categories/tags.
+          this.comments.value
         )
         .pipe(
           take(1),

@@ -24,6 +24,10 @@ export interface QuickScanConfig {
   quickScanCategoriesRequired?: boolean;
   quickScanTagsEnabled?: boolean;
   quickScanTagsRequired?: boolean;
+  quickScanCommentEnabled?: boolean;
+  quickScanCommentRequired?: boolean;
+  /** Hides comments group-wide, which also hides the quick-scan comment field. */
+  hideComments?: boolean;
 }
 
 interface IdName {
@@ -42,6 +46,12 @@ export interface QuickScanAppData {
   groupCategories?: Record<number, IdName[]>;
   /** Per-group tag catalog the pickers read (keyed by group id). */
   groupTags?: Record<number, IdName[]>;
+  /**
+   * Per-group effective permissions (keyed by group id). Use to withhold a
+   * permission the real caller holds — e.g. `group.comments.create`, which gates
+   * the quick-scan comment field — without provisioning a custom role.
+   */
+  groupPermissions?: Record<number, string[]>;
 }
 
 /**
@@ -77,6 +87,9 @@ export async function injectQuickScanAppData(
     }
     if (data.groupTags) {
       body.groupTags = { ...body.groupTags, ...data.groupTags };
+    }
+    if (data.groupPermissions) {
+      body.groupPermissions = { ...body.groupPermissions, ...data.groupPermissions };
     }
 
     await route.fulfill({ response, json: body });

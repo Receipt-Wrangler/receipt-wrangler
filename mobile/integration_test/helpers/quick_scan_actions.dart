@@ -14,6 +14,10 @@ import 'pump.dart';
 Finder quickScanDropdown(String name) =>
     find.byWidgetPredicate((w) => w is FormBuilderDropdown && w.name == name);
 
+/// Finds the Quick Scan form's comment text field.
+Finder quickScanCommentField() => find.byWidgetPredicate(
+    (w) => w is FormBuilderTextField && w.name == 'comment');
+
 /// Injects [configure] onto the admin's first non-all group and returns the
 /// configured group (its `name` selects it in the form's group dropdown). The
 /// config is a live-`GroupModel` Provider mutation -- deterministic and

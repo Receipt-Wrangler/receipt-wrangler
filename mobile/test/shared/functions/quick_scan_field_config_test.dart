@@ -14,6 +14,9 @@ api.GroupReceiptSettings _settings({
   bool categoriesRequired = false,
   bool tagsEnabled = false,
   bool tagsRequired = false,
+  bool commentEnabled = false,
+  bool commentRequired = false,
+  bool hideComments = false,
 }) {
   return (api.GroupReceiptSettingsBuilder()
         ..id = 1
@@ -26,14 +29,18 @@ api.GroupReceiptSettings _settings({
         ..quickScanCategoriesEnabled = categoriesEnabled
         ..quickScanCategoriesRequired = categoriesRequired
         ..quickScanTagsEnabled = tagsEnabled
-        ..quickScanTagsRequired = tagsRequired)
+        ..quickScanTagsRequired = tagsRequired
+        ..quickScanCommentEnabled = commentEnabled
+        ..quickScanCommentRequired = commentRequired
+        ..hideComments = hideComments)
       .build();
 }
 
 void main() {
   group('resolveQuickScanFieldConfig', () {
     test('null settings falls back to backend defaults', () {
-      final config = resolveQuickScanFieldConfig(null);
+      final config =
+          resolveQuickScanFieldConfig(null, canCreateComments: true);
 
       // Paid-by/status shown+required; categories/tags hidden.
       expect(config.showPaidBy, isTrue);
@@ -44,20 +51,27 @@ void main() {
       expect(config.requireCategories, isFalse);
       expect(config.showTags, isFalse);
       expect(config.requireTags, isFalse);
+      expect(config.showComment, isFalse);
+      expect(config.requireComment, isFalse);
     });
 
     test('mirrors each required flag when the fields are shown', () {
       // All fields shown so require reflects the persisted required flag directly.
-      final config = resolveQuickScanFieldConfig(_settings(
-        paidByEnabled: true,
-        paidByRequired: false,
-        statusEnabled: true,
-        statusRequired: true,
-        categoriesEnabled: true,
-        categoriesRequired: true,
-        tagsEnabled: true,
-        tagsRequired: false,
-      ));
+      final config = resolveQuickScanFieldConfig(
+        _settings(
+          paidByEnabled: true,
+          paidByRequired: false,
+          statusEnabled: true,
+          statusRequired: true,
+          categoriesEnabled: true,
+          categoriesRequired: true,
+          tagsEnabled: true,
+          tagsRequired: false,
+          commentEnabled: true,
+          commentRequired: true,
+        ),
+        canCreateComments: true,
+      );
 
       expect(config.showPaidBy, isTrue);
       expect(config.requirePaidBy, isFalse);
@@ -67,20 +81,27 @@ void main() {
       expect(config.requireCategories, isTrue);
       expect(config.showTags, isTrue);
       expect(config.requireTags, isFalse);
+      expect(config.showComment, isTrue);
+      expect(config.requireComment, isTrue);
     });
 
     test('require is false when the field is hidden even if required flag set', () {
       // A hidden field can never be "required" — require is gated on show.
-      final config = resolveQuickScanFieldConfig(_settings(
-        paidByEnabled: false,
-        paidByRequired: true,
-        statusEnabled: false,
-        statusRequired: true,
-        categoriesEnabled: false,
-        categoriesRequired: true,
-        tagsEnabled: false,
-        tagsRequired: true,
-      ));
+      final config = resolveQuickScanFieldConfig(
+        _settings(
+          paidByEnabled: false,
+          paidByRequired: true,
+          statusEnabled: false,
+          statusRequired: true,
+          categoriesEnabled: false,
+          categoriesRequired: true,
+          tagsEnabled: false,
+          tagsRequired: true,
+          commentEnabled: false,
+          commentRequired: true,
+        ),
+        canCreateComments: true,
+      );
 
       expect(config.showPaidBy, isFalse);
       expect(config.requirePaidBy, isFalse);
@@ -90,6 +111,45 @@ void main() {
       expect(config.requireCategories, isFalse);
       expect(config.showTags, isFalse);
       expect(config.requireTags, isFalse);
+      expect(config.showComment, isFalse);
+      expect(config.requireComment, isFalse);
+    });
+
+    test('comment is hidden and not required without group.comments.create', () {
+      // A member who cannot comment must not be blocked from quick scanning by a
+      // required comment they can never fill; the server drops one sent anyway.
+      final config = resolveQuickScanFieldConfig(
+        _settings(commentEnabled: true, commentRequired: true),
+        canCreateComments: false,
+      );
+
+      expect(config.showComment, isFalse);
+      expect(config.requireComment, isFalse);
+    });
+
+    test('comment is hidden when the group hides comments', () {
+      // hideComments overrides the quick-scan toggle without changing it.
+      final config = resolveQuickScanFieldConfig(
+        _settings(
+          commentEnabled: true,
+          commentRequired: true,
+          hideComments: true,
+        ),
+        canCreateComments: true,
+      );
+
+      expect(config.showComment, isFalse);
+      expect(config.requireComment, isFalse);
+    });
+
+    test('a shown comment is optional unless required', () {
+      final config = resolveQuickScanFieldConfig(
+        _settings(commentEnabled: true, commentRequired: false),
+        canCreateComments: true,
+      );
+
+      expect(config.showComment, isTrue);
+      expect(config.requireComment, isFalse);
     });
   });
 }

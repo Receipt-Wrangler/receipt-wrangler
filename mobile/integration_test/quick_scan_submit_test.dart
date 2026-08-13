@@ -148,4 +148,52 @@ void main() {
 
     await expectQuickScanQueued(tester);
   });
+
+  testWidgets('a required comment is sent with the queued scan', (tester) async {
+    await enableAiPoweredReceiptsForTest();
+    await installDocumentScannerMock();
+    await binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => binding.setSurfaceSize(null));
+
+    // Persist: paid-by/status required, comment shown+REQUIRED. The backend
+    // enforces the comment against this persisted config, so a submit that
+    // reaches "queued" proves the client sent it in the aligned `comments` array
+    // (an omitted or misaligned one would 400).
+    final jwt = await apiLogin();
+    final g = await firstNonAllGroup(jwt);
+    await setGroupQuickScanConfig(groupId: g.id, jwt: jwt, overrides: const {
+      'hideComments': false,
+      'quickScanPaidByEnabled': true,
+      'quickScanPaidByRequired': true,
+      'quickScanStatusEnabled': true,
+      'quickScanStatusRequired': true,
+      'quickScanCategoriesEnabled': false,
+      'quickScanCategoriesRequired': false,
+      'quickScanTagsEnabled': false,
+      'quickScanTagsRequired': false,
+      'quickScanCommentEnabled': true,
+      'quickScanCommentRequired': true,
+    });
+
+    await loginAsAdmin(tester);
+    final target = await keepOnlyGroup(tester, g.id);
+
+    await openQuickScanImageForm(tester);
+    await selectDropdown(tester, 'groupId', target.name);
+    await selectDropdown(tester, 'paidByUserId', adminDisplayName(tester));
+    await selectDropdown(tester, 'status', 'Open');
+
+    final comment = quickScanCommentField();
+    expect(comment, findsOneWidget, reason: 'comment shown');
+
+    // Empty + required -> blocked client-side before any request is made.
+    await expectQuickScanSubmitBlocked(tester);
+
+    await tester.ensureVisible(comment);
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.enterText(comment, 'E2E quick scan comment');
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await expectQuickScanQueued(tester);
+  });
 }

@@ -128,10 +128,11 @@ func runQuickScan(
 	tagPicks []uint,
 	aiJSONFor func(user models.User, group models.Group) string,
 ) (models.Receipt, models.User, models.Group, error) {
-	return runQuickScanWithSetup(t, paidByArg, status, categoryPicks, tagPicks, aiJSONFor, nil)
+	return runQuickScanWithSetup(t, paidByArg, status, categoryPicks, tagPicks, "", aiJSONFor, nil)
 }
 
-// runQuickScanWithSetup is runQuickScan with an optional postSeed hook that runs after the pipeline +
+// runQuickScanWithSetup is runQuickScan with the user's quick-scan comment (the handler-resolved
+// value; empty for none) and an optional postSeed hook that runs after the pipeline +
 // categories/tags are seeded and before the AI body is set - so a test can, e.g., assign the seeded
 // member a grant-restricted group role to exercise the out-of-grant drop.
 func runQuickScanWithSetup(
@@ -140,6 +141,7 @@ func runQuickScanWithSetup(
 	status models.ReceiptStatus,
 	categoryPicks []uint,
 	tagPicks []uint,
+	comment string,
 	aiJSONFor func(user models.User, group models.Group) string,
 	postSeed func(t *testing.T, user models.User, group models.Group),
 ) (models.Receipt, models.User, models.Group, error) {
@@ -163,17 +165,18 @@ func runQuickScanWithSetup(
 		paidBy = paidByArg(user)
 	}
 
-	receipt, err := NewReceiptService(nil).QuickScan(
-		&structs.Claims{UserId: user.ID},
-		paidBy,
-		group.ID,
-		status,
-		categoryPicks,
-		tagPicks,
-		tempPath,
-		"test.jpg",
-		"test-task",
-	)
+	receipt, err := NewReceiptService(nil).QuickScan(QuickScanParams{
+		Token:            &structs.Claims{UserId: user.ID},
+		PaidByUserId:     paidBy,
+		GroupId:          group.ID,
+		Status:           status,
+		CategoryIds:      categoryPicks,
+		TagIds:           tagPicks,
+		Comment:          comment,
+		TempPath:         tempPath,
+		OriginalFileName: "test.jpg",
+		AsynqTaskId:      "test-task",
+	})
 	return receipt, user, group, err
 }
 
@@ -781,6 +784,7 @@ func TestQuickScan_DropsOutOfGrantAiCategory(t *testing.T) {
 		models.OPEN,
 		nil,
 		nil,
+		"",
 		func(u models.User, g models.Group) string {
 			// AI assigns categories 1 and 2; the user's role grants only category 1.
 			return `{"name": "Restricted", "amount": 7.00, "date": "2024-01-01T00:00:00Z", "categories": [{"id": 1}, {"id": 2}]}`
@@ -829,6 +833,7 @@ func TestQuickScan_DropsMemberOutOfGrantAiCategory(t *testing.T) {
 		models.OPEN,
 		nil,
 		nil,
+		"",
 		func(u models.User, g models.Group) string {
 			// AI assigns categories 1 and 2; the ROLE allows both, the MEMBER only 1.
 			return `{"name": "MemberRestricted", "amount": 7.00, "date": "2024-01-01T00:00:00Z", "categories": [{"id": 1}, {"id": 2}]}`
@@ -1053,4 +1058,122 @@ func findUpsertItemByName(items []commands.UpsertItemCommand, name string) (comm
 		}
 	}
 	return commands.UpsertItemCommand{}, false
+}
+
+// The user's quick-scan comment is persisted against the caller, attached to the receipt created by
+// the same transaction (UpsertCommentCommand.Validate requires a non-nil UserId, so a regression
+// that drops it would fail the whole receipt rather than just the comment).
+func TestQuickScan_PersistsUserComment(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	created, user, _, err := runQuickScanWithSetup(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		"Team lunch, split later",
+		func(u models.User, g models.Group) string {
+			return `{"name": "Bare", "amount": 1.00, "date": "2024-07-07T00:00:00Z"}`
+		},
+		nil,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if len(receipt.Comments) != 1 {
+		utils.PrintTestError(t, len(receipt.Comments), 1)
+		return
+	}
+	if receipt.Comments[0].Comment != "Team lunch, split later" {
+		utils.PrintTestError(t, receipt.Comments[0].Comment, "Team lunch, split later")
+	}
+	if receipt.Comments[0].UserId == nil || *receipt.Comments[0].UserId != user.ID {
+		utils.PrintTestError(t, receipt.Comments[0].UserId, user.ID)
+	}
+}
+
+// An empty comment adds nothing - the default (hidden) config sends no comment, and that must not
+// create a blank one.
+func TestQuickScan_EmptyCommentAddsNothing(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	created, _, _, err := runQuickScan(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		func(u models.User, g models.Group) string {
+			return `{"name": "Bare", "amount": 1.00, "date": "2024-07-07T00:00:00Z"}`
+		},
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(receipt.Comments) != 0 {
+		utils.PrintTestError(t, len(receipt.Comments), 0)
+	}
+}
+
+// The user's comment is APPENDED to whatever the AI produced, never replacing it: a group running a
+// custom prompt that emits comments must not lose them to a quick-scan comment.
+func TestQuickScan_AppendsUserCommentToAiComment(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	created, user, _, err := runQuickScanWithSetup(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		"User note",
+		func(u models.User, g models.Group) string {
+			return fmt.Sprintf(
+				`{"name": "Both", "amount": 5.00, "date": "2024-07-07T00:00:00Z", "comments": [{"comment": "AI note", "userId": %d}]}`,
+				u.ID)
+		},
+		nil,
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if len(receipt.Comments) != 2 {
+		utils.PrintTestError(t, len(receipt.Comments), 2)
+		return
+	}
+
+	found := map[string]bool{}
+	for _, comment := range receipt.Comments {
+		found[comment.Comment] = true
+		if comment.UserId == nil || *comment.UserId != user.ID {
+			utils.PrintTestError(t, comment.UserId, user.ID)
+		}
+	}
+	if !found["AI note"] || !found["User note"] {
+		utils.PrintTestError(t, found, "both the AI comment and the user comment")
+	}
 }

@@ -29,4 +29,21 @@ type GroupReceiptSettings struct {
 
 	QuickScanTagsEnabled  bool `gorm:"not null;default:false" json:"quickScanTagsEnabled"`
 	QuickScanTagsRequired bool `gorm:"not null;default:false" json:"quickScanTagsRequired"`
+
+	QuickScanCommentEnabled  bool `gorm:"not null;default:false" json:"quickScanCommentEnabled"`
+	QuickScanCommentRequired bool `gorm:"not null;default:false" json:"quickScanCommentRequired"`
+}
+
+// IsQuickScanCommentShown reports whether the quick-scan comment field should be shown. HideComments
+// hides comments for the whole group, so it overrides the quick-scan toggle — without mutating it,
+// which is what lets the configured value come back when HideComments is turned off again. Callers
+// must additionally check the user's group.comments.create permission (see resolveQuickScanFields).
+func (settings GroupReceiptSettings) IsQuickScanCommentShown() bool {
+	return settings.QuickScanCommentEnabled && !settings.HideComments
+}
+
+// IsQuickScanCommentRequired reports whether a comment must be supplied. A hidden field is never
+// required.
+func (settings GroupReceiptSettings) IsQuickScanCommentRequired() bool {
+	return settings.IsQuickScanCommentShown() && settings.QuickScanCommentRequired
 }

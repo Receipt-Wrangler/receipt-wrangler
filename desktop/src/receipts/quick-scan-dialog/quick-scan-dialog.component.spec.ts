@@ -16,7 +16,7 @@ import { ApiModule, ReceiptService, ReceiptStatus } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services";
 import { AuthState, GroupState } from "../../store";
-import { QuickScanDialogComponent } from "./quick-scan-dialog.component";
+import { QUICK_SCAN_COMMENT_MAX_LENGTH, QuickScanDialogComponent } from "./quick-scan-dialog.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
 describe("QuickScanDialogComponent", () => {
@@ -75,6 +75,7 @@ describe("QuickScanDialogComponent", () => {
       groupIds: [],
       categories: [],
       tags: [],
+      comments: [],
     });
   });
 
@@ -115,6 +116,7 @@ describe("QuickScanDialogComponent", () => {
       groupIds: [""],
       categories: [[]],
       tags: [[]],
+      comments: [""],
     });
     expect(component.images).toEqual([{} as any]);
   });
@@ -139,6 +141,7 @@ describe("QuickScanDialogComponent", () => {
       groupIds: [1],
       categories: [[]],
       tags: [[]],
+      comments: [""],
     });
     expect(component.images).toEqual([{} as any]);
   });
@@ -224,10 +227,216 @@ describe("QuickScanDialogComponent", () => {
         [""],
         [""],
         ["10"],
-        ["20"]
+        ["20"],
+        [""]
       );
     } finally {
       URL.createObjectURL = originalCreateObjectURL;
     }
+  });
+  describe("comment field", () => {
+    // The comment field needs the group config AND group.comments.create, so every case seeds both.
+    const seedStore = (
+      settings: Record<string, boolean>,
+      groupPermissions: Record<number, string[]> = { 2: ["group.comments.create"] },
+    ) => {
+      store.reset({
+        auth: { groupPermissions },
+        groups: {
+          groups: [{ id: 2, groupReceiptSettings: settings }],
+          selectedGroupId: "",
+          selectedDashboardId: "",
+        },
+      });
+    };
+
+    it("should show and require the comment per the group config", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(true);
+      // Required and empty.
+      expect(component.comments.at(0).valid).toBe(false);
+
+      component.comments.at(0).setValue("A note");
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should show an optional comment without requiring it", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: false });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(true);
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should hide the comment by default", () => {
+      seedStore({});
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(false);
+    });
+
+    it("should hide the comment when the group hides comments", () => {
+      seedStore({ hideComments: true, quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(false);
+      // Not required either - otherwise the hidden field would block every submit.
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should hide the comment without group.comments.create", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true }, { 2: [] });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(false);
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should accept a comment at the maximum length and reject one over it", () => {
+      seedStore({ quickScanCommentEnabled: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      component.comments.at(0).setValue("a".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH));
+      expect(component.comments.at(0).valid).toBe(true);
+
+      component.comments.at(0).setValue("a".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH + 1));
+      expect(component.comments.at(0).valid).toBe(false);
+      expect(component.comments.at(0).hasError("maxlength")).toBe(true);
+    });
+
+    // The backend counts runes, so the cap must count code points too - Validators.maxLength
+    // counts UTF-16 code units and would reject 500 emoji the API accepts.
+    it("should count the comment length in code points, not UTF-16 units", () => {
+      seedStore({ quickScanCommentEnabled: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      // 500 supplementary characters = 1000 UTF-16 units but 500 code points.
+      component.comments.at(0).setValue("😀".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH));
+      expect(component.comments.at(0).valid).toBe(true);
+
+      component.comments.at(0).setValue("😀".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH + 1));
+      expect(component.comments.at(0).hasError("maxlength")).toBe(true);
+    });
+
+    // QuickScanCommand trims each comment on parse, so whitespace-only arrives empty and the
+    // group's required check 400s - the form has to refuse it first.
+    it("should reject a whitespace-only comment when one is required", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      component.comments.at(0).setValue("   \n\t ");
+      expect(component.comments.at(0).valid).toBe(false);
+      expect(component.comments.at(0).hasError("required")).toBe(true);
+
+      component.comments.at(0).setValue("  A real note  ");
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should allow a whitespace-only comment when one is not required", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: false });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      component.comments.at(0).setValue("   ");
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    // setRequired removes by reference, so a recompute that turns required off must actually
+    // drop the trim-aware validator rather than leaving the field permanently required.
+    it("should drop the required check when the group stops requiring a comment", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+      component.comments.at(0).setValue("   ");
+      expect(component.comments.at(0).valid).toBe(false);
+
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: false });
+      component.groupIds.at(0).setValue(2);
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    // setRequired composes validators additively, so a show/require recompute must not drop the
+    // length cap that was attached when the control was created.
+    it("should keep the length cap after the group config is re-applied", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+      component.groupIds.at(0).setValue(2);
+
+      component.comments.at(0).setValue("a".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH + 1));
+      expect(component.comments.at(0).hasError("maxlength")).toBe(true);
+    });
+
+    it("should clear a hidden comment so nothing stale is submitted", () => {
+      seedStore({ quickScanCommentEnabled: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+      component.comments.at(0).setValue("typed before the group hid the field");
+
+      seedStore({ quickScanCommentEnabled: false });
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(false);
+      expect(component.comments.at(0).value).toBe("");
+    });
+
+    it("should send the comment per image on submit", () => {
+      const originalCreateObjectURL = URL.createObjectURL;
+      try {
+        URL.createObjectURL = jest.fn().mockReturnValue("blob");
+        seedStore({
+          quickScanPaidByEnabled: false,
+          quickScanStatusEnabled: false,
+          quickScanCommentEnabled: true,
+          quickScanCommentRequired: true,
+        });
+
+        const receiptService = TestBed.inject(ReceiptService);
+        const serviceSpy = jest
+          .spyOn(receiptService, "quickScanReceipt")
+          .mockReturnValue(of({} as any));
+
+        const fileData = { file: { name: "a" } } as any;
+        component.fileLoaded(fileData);
+        component.groupIds.at(0).setValue(2);
+        component.comments.at(0).setValue("Client dinner");
+
+        component.submitButtonClicked();
+
+        expect(serviceSpy).toHaveBeenCalledWith(
+          [fileData.file],
+          [2],
+          [""],
+          [""],
+          [""],
+          [""],
+          ["Client dinner"]
+        );
+      } finally {
+        URL.createObjectURL = originalCreateObjectURL;
+      }
+    });
   });
 });

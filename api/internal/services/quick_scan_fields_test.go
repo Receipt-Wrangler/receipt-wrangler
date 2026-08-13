@@ -1,4 +1,4 @@
-package handlers
+package services
 
 import (
 	"mime/multipart"
@@ -18,6 +18,7 @@ func seedQuickScanGroup(settings models.GroupReceiptSettings) {
 	}
 
 	command := commands.UpdateGroupReceiptSettingsCommand{
+		HideComments:                settings.HideComments,
 		QuickScanPaidByEnabled:      settings.QuickScanPaidByEnabled,
 		QuickScanPaidByRequired:     settings.QuickScanPaidByRequired,
 		QuickScanDefaultPaidByType:  settings.QuickScanDefaultPaidByType,
@@ -29,13 +30,15 @@ func seedQuickScanGroup(settings models.GroupReceiptSettings) {
 		QuickScanCategoriesRequired: settings.QuickScanCategoriesRequired,
 		QuickScanTagsEnabled:        settings.QuickScanTagsEnabled,
 		QuickScanTagsRequired:       settings.QuickScanTagsRequired,
+		QuickScanCommentEnabled:     settings.QuickScanCommentEnabled,
+		QuickScanCommentRequired:    settings.QuickScanCommentRequired,
 	}
 	if _, err := repository.UpdateGroupReceiptSettings("1", command); err != nil {
 		panic(err)
 	}
 }
 
-func singleFileCommand(paidBy uint, status models.ReceiptStatus, categoryIds []uint, tagIds []uint) commands.QuickScanCommand {
+func singleFileCommand(paidBy uint, status models.ReceiptStatus, categoryIds []uint, tagIds []uint, comment string) commands.QuickScanCommand {
 	return commands.QuickScanCommand{
 		Files:         []multipart.File{nil},
 		GroupIds:      []uint{1},
@@ -43,6 +46,7 @@ func singleFileCommand(paidBy uint, status models.ReceiptStatus, categoryIds []u
 		Statuses:      []models.ReceiptStatus{status},
 		CategoryIds:   [][]uint{categoryIds},
 		TagIds:        [][]uint{tagIds},
+		Comments:      []string{comment},
 	}
 }
 
@@ -59,8 +63,8 @@ func TestResolveQuickScanFields_RequiredFieldsRejected(t *testing.T) {
 		QuickScanTagsRequired:       true,
 	})
 
-	command := singleFileCommand(0, "", []uint{}, []uint{})
-	_, configErr, err := resolveQuickScanFields(command, 42)
+	command := singleFileCommand(0, "", []uint{}, []uint{}, "")
+	_, configErr, err := NewReceiptService(nil).ResolveQuickScanFields(command, 42)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -83,8 +87,8 @@ func TestResolveQuickScanFields_UploaderDefault(t *testing.T) {
 		QuickScanDefaultStatus:     models.NEEDS_ATTENTION,
 	})
 
-	command := singleFileCommand(0, "", []uint{}, []uint{})
-	resolved, configErr, err := resolveQuickScanFields(command, 42)
+	command := singleFileCommand(0, "", []uint{}, []uint{}, "")
+	resolved, configErr, err := NewReceiptService(nil).ResolveQuickScanFields(command, 42)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -111,8 +115,8 @@ func TestResolveQuickScanFields_SpecificUserDefault(t *testing.T) {
 		QuickScanStatusRequired:    true,
 	})
 
-	command := singleFileCommand(0, models.OPEN, []uint{}, []uint{})
-	resolved, configErr, err := resolveQuickScanFields(command, 42)
+	command := singleFileCommand(0, models.OPEN, []uint{}, []uint{}, "")
+	resolved, configErr, err := NewReceiptService(nil).ResolveQuickScanFields(command, 42)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -136,8 +140,8 @@ func TestResolveQuickScanFields_ProvidedValuesKept(t *testing.T) {
 	})
 
 	// User supplied a payer and status even though the fields are optional; keep them.
-	command := singleFileCommand(99, models.RESOLVED, []uint{}, []uint{})
-	resolved, _, err := resolveQuickScanFields(command, 42)
+	command := singleFileCommand(99, models.RESOLVED, []uint{}, []uint{}, "")
+	resolved, _, err := NewReceiptService(nil).ResolveQuickScanFields(command, 42)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}

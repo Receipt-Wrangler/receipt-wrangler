@@ -32,6 +32,9 @@ type UpdateGroupReceiptSettingsCommand struct {
 
 	QuickScanTagsEnabled  bool `json:"quickScanTagsEnabled"`
 	QuickScanTagsRequired bool `json:"quickScanTagsRequired"`
+
+	QuickScanCommentEnabled  bool `json:"quickScanCommentEnabled"`
+	QuickScanCommentRequired bool `json:"quickScanCommentRequired"`
 }
 
 func (command *UpdateGroupReceiptSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {

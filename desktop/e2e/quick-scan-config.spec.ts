@@ -90,4 +90,41 @@ test.describe('Quick scan group receipt settings', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page).toHaveURL(/\/receipt-settings\/view/);
   });
+
+  test('greys out the comment toggles while comments are hidden, keeping their values', async ({ page }) => {
+    const commentShow = page.getByTestId('quick-scan-comment-show').getByRole('checkbox');
+    const commentRequire = page.getByTestId('quick-scan-comment-require').getByRole('checkbox');
+    const hideComments = page.getByText('Hide Comments', { exact: true });
+
+    await commentShow.check();
+    await commentRequire.check();
+    await expect(commentShow).toBeEnabled();
+
+    // Hiding comments group-wide hides the quick-scan comment too — the toggles grey out but keep
+    // their values (derived state, nothing is cleared).
+    await hideComments.click();
+    await expect(commentShow).toBeDisabled();
+    await expect(commentRequire).toBeDisabled();
+    await expect(commentShow).toBeChecked();
+    await expect(commentRequire).toBeChecked();
+
+    // Un-hiding restores them exactly as configured.
+    await hideComments.click();
+    await expect(commentShow).toBeEnabled();
+    await expect(commentShow).toBeChecked();
+    await expect(commentRequire).toBeChecked();
+  });
+
+  test('persists the comment configuration', async ({ page }) => {
+    await page.getByTestId('quick-scan-comment-show').getByRole('checkbox').check();
+    await page.getByTestId('quick-scan-comment-require').getByRole('checkbox').check();
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page).toHaveURL(/\/receipt-settings\/view/);
+
+    // Reload the edit page: the toggles must come back checked. A field missing from the API's
+    // update assignment block persists nothing and fails only here.
+    await page.goto(`/groups/${groupId}/receipt-settings/edit`);
+    await expect(page.getByTestId('quick-scan-comment-show').getByRole('checkbox')).toBeChecked();
+    await expect(page.getByTestId('quick-scan-comment-require').getByRole('checkbox')).toBeChecked();
+  });
 });
