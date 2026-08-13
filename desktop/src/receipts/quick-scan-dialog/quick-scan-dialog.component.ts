@@ -9,12 +9,21 @@ import { setRequired } from "../../form";
 import { Category, GroupReceiptSettings, Permission, ReceiptService, ReceiptStatus, Tag } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState, GroupState } from "../../store";
+import { codePointMaxLengthValidator, trimmedRequiredValidator } from "../../validators";
 import { UploadImageComponent } from "../upload-image/upload-image.component";
 
 // Mirrors the backend's models.MaxCommentLength (the Comment column is varchar(500), which
 // MySQL/Postgres measure in characters) and mobile's FormBuilderTextField maxLength, so an
-// over-length comment is caught here instead of coming back as a 400 after submit.
+// over-length comment is caught here instead of coming back as a 400 after submit. Counted in
+// code points, like the backend's rune count -- Validators.maxLength counts UTF-16 code units,
+// which would reject 500 emoji the API accepts.
 export const QUICK_SCAN_COMMENT_MAX_LENGTH = 500;
+
+// Built once so setRequired can remove them by reference on a later recompute.
+const commentMaxLengthValidator = codePointMaxLengthValidator(QUICK_SCAN_COMMENT_MAX_LENGTH);
+// QuickScanCommand trims each comment on parse, so a whitespace-only one arrives empty and fails
+// the group's required check -- Validators.required would have called it valid and eaten a 400.
+const commentRequiredValidator = trimmedRequiredValidator();
 
 @Component({
     selector: "app-quick-scan-dialog",
@@ -114,7 +123,7 @@ export class QuickScanDialogComponent implements OnInit {
     // The comment is a scalar text field, so a plain FormControl - unlike categories/tags above.
     // maxLength is applied here rather than in configureImages because setRequired composes
     // validators additively, so it survives every show/require recompute and is never re-added.
-    this.comments.push(new FormControl("", Validators.maxLength(QUICK_SCAN_COMMENT_MAX_LENGTH)));
+    this.comments.push(new FormControl("", commentMaxLengthValidator));
 
     this.configureImages();
   }
@@ -214,7 +223,11 @@ export class QuickScanDialogComponent implements OnInit {
       }
 
       const commentShown = this.showComment(i);
-      setRequired(this.form.get("comments." + i), commentShown && (settings?.quickScanCommentRequired ?? false));
+      setRequired(
+        this.form.get("comments." + i),
+        commentShown && (settings?.quickScanCommentRequired ?? false),
+        commentRequiredValidator
+      );
       if (!commentShown) {
         this.form.get("comments." + i)?.setValue("", { emitEvent: false });
       }

@@ -318,6 +318,63 @@ describe("QuickScanDialogComponent", () => {
       expect(component.comments.at(0).hasError("maxlength")).toBe(true);
     });
 
+    // The backend counts runes, so the cap must count code points too - Validators.maxLength
+    // counts UTF-16 code units and would reject 500 emoji the API accepts.
+    it("should count the comment length in code points, not UTF-16 units", () => {
+      seedStore({ quickScanCommentEnabled: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      // 500 supplementary characters = 1000 UTF-16 units but 500 code points.
+      component.comments.at(0).setValue("😀".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH));
+      expect(component.comments.at(0).valid).toBe(true);
+
+      component.comments.at(0).setValue("😀".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH + 1));
+      expect(component.comments.at(0).hasError("maxlength")).toBe(true);
+    });
+
+    // QuickScanCommand trims each comment on parse, so whitespace-only arrives empty and the
+    // group's required check 400s - the form has to refuse it first.
+    it("should reject a whitespace-only comment when one is required", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      component.comments.at(0).setValue("   \n\t ");
+      expect(component.comments.at(0).valid).toBe(false);
+      expect(component.comments.at(0).hasError("required")).toBe(true);
+
+      component.comments.at(0).setValue("  A real note  ");
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should allow a whitespace-only comment when one is not required", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: false });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      component.comments.at(0).setValue("   ");
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    // setRequired removes by reference, so a recompute that turns required off must actually
+    // drop the trim-aware validator rather than leaving the field permanently required.
+    it("should drop the required check when the group stops requiring a comment", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+      component.comments.at(0).setValue("   ");
+      expect(component.comments.at(0).valid).toBe(false);
+
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: false });
+      component.groupIds.at(0).setValue(2);
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
     // setRequired composes validators additively, so a show/require recompute must not drop the
     // length cap that was attached when the control was created.
     it("should keep the length cap after the group config is re-applied", () => {

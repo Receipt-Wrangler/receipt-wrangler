@@ -906,6 +906,20 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   per group id — `AuthState.hasGroupPermission()` allocates a fresh selector per call and the getter
   runs every change-detection pass). Without the permission the field is hidden and never required, so
   a member who cannot comment is never locked out of quick scan; the server drops any comment they send.
+  - **The comment's two validators both mirror backend semantics, and neither is the stock Angular
+    one** (`src/validators/text-validators.ts`, shared): `codePointMaxLengthValidator(500)` counts
+    **code points** (`Array.from(v).length`) because `Validators.maxLength` counts UTF-16 code units
+    and would reject `"😀".repeat(500)` — 1000 units but 500 runes, which the API accepts;
+    `trimmedRequiredValidator()` treats whitespace-only as blank because `QuickScanCommand` **trims**
+    each comment on parse, so `"   "` reaches the required check empty and 400s while
+    `Validators.required` called it valid. Both emit the standard `maxlength` / `required` error keys
+    so the shared inputs' message mapping is unchanged. The length cap is attached where the control
+    is **created** (it must survive every show/require recompute); the required one is toggled by
+    `setRequired`, whose optional third argument overrides which validator is toggled — pass a
+    **module-level singleton**, since `removeValidators` matches by reference identity.
+  - **`base-input` has no message for the `maxlength` error**, so an unmapped one renders an *empty*
+    `mat-error`. The `app-textarea` passes `[additionalErrorMessages]` for it (same pattern as
+    `prompt-form` / `receipt-filter`). Any new non-stock error key needs the same treatment.
   - **Each image's `categories`/`tags` control MUST be a `FormArray`** (`this.formBuilder.array([])`),
     *not* a `FormControl([])`: `app-category-autocomplete`/`app-tag-autocomplete` run in `multiple`
     mode, and the base `app-autocomlete`'s `optionSelected` **pushes** the picked option onto the
