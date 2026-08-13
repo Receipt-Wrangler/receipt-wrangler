@@ -94,7 +94,7 @@ func TestResolveQuickScanFields_RequiredCommentRejectedWhenEmpty(t *testing.T) {
 		QuickScanCommentRequired: true,
 	})
 
-	_, configErr, err := resolveQuickScanFields(commentCommand(groupId, ""), userId)
+	_, configErr, err := services.NewReceiptService(nil).ResolveQuickScanFields(commentCommand(groupId, ""), userId)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -110,7 +110,7 @@ func TestResolveQuickScanFields_CommentKept(t *testing.T) {
 		QuickScanCommentRequired: true,
 	})
 
-	resolved, configErr, err := resolveQuickScanFields(commentCommand(groupId, "Lunch with the team"), userId)
+	resolved, configErr, err := services.NewReceiptService(nil).ResolveQuickScanFields(commentCommand(groupId, "Lunch with the team"), userId)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -131,7 +131,7 @@ func TestResolveQuickScanFields_CommentDroppedWhenDisabled(t *testing.T) {
 		QuickScanCommentRequired: true,
 	})
 
-	resolved, configErr, err := resolveQuickScanFields(commentCommand(groupId, "should be dropped"), userId)
+	resolved, configErr, err := services.NewReceiptService(nil).ResolveQuickScanFields(commentCommand(groupId, "should be dropped"), userId)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -153,7 +153,7 @@ func TestResolveQuickScanFields_HideCommentsOverridesConfig(t *testing.T) {
 		QuickScanCommentRequired: true,
 	})
 
-	resolved, configErr, err := resolveQuickScanFields(commentCommand(groupId, "hidden by group settings"), userId)
+	resolved, configErr, err := services.NewReceiptService(nil).ResolveQuickScanFields(commentCommand(groupId, "hidden by group settings"), userId)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -174,7 +174,7 @@ func TestResolveQuickScanFields_CommentSkippedWithoutPermission(t *testing.T) {
 		QuickScanCommentRequired: true,
 	})
 
-	resolved, configErr, err := resolveQuickScanFields(commentCommand(groupId, ""), userId)
+	resolved, configErr, err := services.NewReceiptService(nil).ResolveQuickScanFields(commentCommand(groupId, ""), userId)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -182,7 +182,7 @@ func TestResolveQuickScanFields_CommentSkippedWithoutPermission(t *testing.T) {
 		utils.PrintTestError(t, configErr.Errors, "no errors")
 	}
 
-	resolved, configErr, err = resolveQuickScanFields(commentCommand(groupId, "not allowed"), userId)
+	resolved, configErr, err = services.NewReceiptService(nil).ResolveQuickScanFields(commentCommand(groupId, "not allowed"), userId)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -203,7 +203,39 @@ func TestResolveQuickScanFields_CommentTooLongRejected(t *testing.T) {
 	})
 
 	tooLong := strings.Repeat("a", models.MaxCommentLength+1)
-	_, configErr, err := resolveQuickScanFields(commentCommand(groupId, tooLong), userId)
+	_, configErr, err := services.NewReceiptService(nil).ResolveQuickScanFields(commentCommand(groupId, tooLong), userId)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+	if _, ok := configErr.Errors["files.0.comment"]; !ok {
+		utils.PrintTestError(t, configErr.Errors, "files.0.comment")
+	}
+}
+
+// The limit counts characters, not bytes. The Comment column is varchar(500), which MySQL and
+// Postgres both measure in characters, so a byte-based check would reject an accented or non-Latin
+// comment the column has ample room for. 500 two-byte runes is 1000 bytes: accepted here, rejected
+// by a len() check.
+func TestResolveQuickScanFields_CommentLengthCountsCharactersNotBytes(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, groupId := seedQuickScanCommenter(t, true, models.GroupReceiptSettings{
+		QuickScanCommentEnabled: true,
+	})
+
+	atLimit := strings.Repeat("é", models.MaxCommentLength)
+	resolved, configErr, err := services.NewReceiptService(nil).ResolveQuickScanFields(commentCommand(groupId, atLimit), userId)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+	if _, ok := configErr.Errors["files.0.comment"]; ok {
+		utils.PrintTestError(t, configErr.Errors, "no comment error")
+	}
+	if resolved[0].Comment != atLimit {
+		utils.PrintTestError(t, resolved[0].Comment, atLimit)
+	}
+
+	overLimit := strings.Repeat("é", models.MaxCommentLength+1)
+	_, configErr, err = services.NewReceiptService(nil).ResolveQuickScanFields(commentCommand(groupId, overLimit), userId)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}

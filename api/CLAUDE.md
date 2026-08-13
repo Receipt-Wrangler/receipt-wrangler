@@ -1138,7 +1138,8 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
 - **Config validation** (`commands/update_group_receipt_settings_command.go` `Validate`, now wired into
   the handler): a default is **required** for paid-by/status unless `(enabled && required)`; categories/
   tags/comment never need a default (empty is fine).
-- **Ingress** (`handlers/receipts.go` `QuickScan` → `resolveQuickScanFields`): loads each file's group
+- **Ingress** (`handlers/receipts.go` `QuickScan` → `ReceiptService.ResolveQuickScanFields`,
+  `services/quick_scan_fields.go`): loads each file's group
   settings, **enforces required fields synchronously (400 before enqueue)** since quick scan is
   fire-and-forget, and resolves paid-by/status defaults (`UPLOADER` ⇒ the caller's user id). Categories/
   tags ride the multipart command as **per-file comma-joined id strings** (`QuickScanCommand.CategoryIds`/
@@ -1147,7 +1148,13 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   contain commas and newlines); entries are trimmed on parse so a whitespace-only comment counts as
   empty. It is length-checked against `models.MaxCommentLength` (500, matching the `Comment` column)
   here rather than at the database: the receipt is created in a background task, so an over-length
-  comment would otherwise fail the insert where the user only ever sees a "queued" toast.
+  comment would otherwise fail the insert where the user only ever sees a "queued" toast. The check
+  counts **runes, not bytes** (`utf8.RuneCountInString`) — the column is `varchar(500)`, which MySQL
+  and Postgres both measure in *characters*, so a `len()` check would be stricter than the column it
+  mirrors and would reject an accented or non-Latin comment well inside its real capacity. The limit
+  is published on the contract as `maxLength: 500` on `QuickScanCommand.comments.items` (OpenAPI
+  measures `maxLength` in characters too), and both clients cap at 500 client-side — desktop via
+  `Validators.maxLength`, mobile via `FormBuilderTextField.maxLength`.
   `ReceiptService.QuickScan` **appends** it to `receiptCommand.Comments` (with `UserId` set — a nil one
   fails `UpsertCommentCommand.Validate` and would take the whole receipt down) rather than replacing:
   the default prompt doesn't emit comments, but the AI response is unmarshalled straight into an

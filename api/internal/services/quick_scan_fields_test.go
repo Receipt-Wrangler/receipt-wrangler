@@ -1,4 +1,4 @@
-package handlers
+package services
 
 import (
 	"mime/multipart"
@@ -64,7 +64,7 @@ func TestResolveQuickScanFields_RequiredFieldsRejected(t *testing.T) {
 	})
 
 	command := singleFileCommand(0, "", []uint{}, []uint{}, "")
-	_, configErr, err := resolveQuickScanFields(command, 42)
+	_, configErr, err := NewReceiptService(nil).ResolveQuickScanFields(command, 42)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -88,7 +88,7 @@ func TestResolveQuickScanFields_UploaderDefault(t *testing.T) {
 	})
 
 	command := singleFileCommand(0, "", []uint{}, []uint{}, "")
-	resolved, configErr, err := resolveQuickScanFields(command, 42)
+	resolved, configErr, err := NewReceiptService(nil).ResolveQuickScanFields(command, 42)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -116,7 +116,7 @@ func TestResolveQuickScanFields_SpecificUserDefault(t *testing.T) {
 	})
 
 	command := singleFileCommand(0, models.OPEN, []uint{}, []uint{}, "")
-	resolved, configErr, err := resolveQuickScanFields(command, 42)
+	resolved, configErr, err := NewReceiptService(nil).ResolveQuickScanFields(command, 42)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}
@@ -141,7 +141,7 @@ func TestResolveQuickScanFields_ProvidedValuesKept(t *testing.T) {
 
 	// User supplied a payer and status even though the fields are optional; keep them.
 	command := singleFileCommand(99, models.RESOLVED, []uint{}, []uint{}, "")
-	resolved, _, err := resolveQuickScanFields(command, 42)
+	resolved, _, err := NewReceiptService(nil).ResolveQuickScanFields(command, 42)
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 	}

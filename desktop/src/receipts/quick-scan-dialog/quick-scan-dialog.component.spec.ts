@@ -16,7 +16,7 @@ import { ApiModule, ReceiptService, ReceiptStatus } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services";
 import { AuthState, GroupState } from "../../store";
-import { QuickScanDialogComponent } from "./quick-scan-dialog.component";
+import { QUICK_SCAN_COMMENT_MAX_LENGTH, QuickScanDialogComponent } from "./quick-scan-dialog.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
 describe("QuickScanDialogComponent", () => {
@@ -302,6 +302,33 @@ describe("QuickScanDialogComponent", () => {
 
       expect(component.showComment(0)).toBe(false);
       expect(component.comments.at(0).valid).toBe(true);
+    });
+
+    it("should accept a comment at the maximum length and reject one over it", () => {
+      seedStore({ quickScanCommentEnabled: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      component.comments.at(0).setValue("a".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH));
+      expect(component.comments.at(0).valid).toBe(true);
+
+      component.comments.at(0).setValue("a".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH + 1));
+      expect(component.comments.at(0).valid).toBe(false);
+      expect(component.comments.at(0).hasError("maxlength")).toBe(true);
+    });
+
+    // setRequired composes validators additively, so a show/require recompute must not drop the
+    // length cap that was attached when the control was created.
+    it("should keep the length cap after the group config is re-applied", () => {
+      seedStore({ quickScanCommentEnabled: true, quickScanCommentRequired: true });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+      component.groupIds.at(0).setValue(2);
+
+      component.comments.at(0).setValue("a".repeat(QUICK_SCAN_COMMENT_MAX_LENGTH + 1));
+      expect(component.comments.at(0).hasError("maxlength")).toBe(true);
     });
 
     it("should clear a hidden comment so nothing stale is submitted", () => {

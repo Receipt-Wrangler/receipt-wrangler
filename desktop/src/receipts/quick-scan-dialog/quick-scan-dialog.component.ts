@@ -11,6 +11,11 @@ import { SnackbarService } from "../../services";
 import { AuthState, GroupState } from "../../store";
 import { UploadImageComponent } from "../upload-image/upload-image.component";
 
+// Mirrors the backend's models.MaxCommentLength (the Comment column is varchar(500), which
+// MySQL/Postgres measure in characters) and mobile's FormBuilderTextField maxLength, so an
+// over-length comment is caught here instead of coming back as a 400 after submit.
+export const QUICK_SCAN_COMMENT_MAX_LENGTH = 500;
+
 @Component({
     selector: "app-quick-scan-dialog",
     templateUrl: "./quick-scan-dialog.component.html",
@@ -26,6 +31,12 @@ export class QuickScanDialogComponent implements OnInit {
   public images: ReceiptFileUploadCommand[] = [];
 
   public currentlySelectedIndex: number = 0;
+
+  // base-input has no built-in message for the maxlength error, so an unmapped one would render an
+  // empty mat-error. Held as a field rather than an inline object literal so the binding is stable.
+  public readonly commentErrorMessages: { [key: string]: string } = {
+    maxlength: `Comment must be ${QUICK_SCAN_COMMENT_MAX_LENGTH} characters or fewer.`,
+  };
 
   private readonly commentPermissionByGroup = new Map<number, boolean>();
 
@@ -101,7 +112,9 @@ export class QuickScanDialogComponent implements OnInit {
     this.categories.push(this.formBuilder.array([]));
     this.tags.push(this.formBuilder.array([]));
     // The comment is a scalar text field, so a plain FormControl - unlike categories/tags above.
-    this.comments.push(new FormControl(""));
+    // maxLength is applied here rather than in configureImages because setRequired composes
+    // validators additively, so it survives every show/require recompute and is never re-added.
+    this.comments.push(new FormControl("", Validators.maxLength(QUICK_SCAN_COMMENT_MAX_LENGTH)));
 
     this.configureImages();
   }

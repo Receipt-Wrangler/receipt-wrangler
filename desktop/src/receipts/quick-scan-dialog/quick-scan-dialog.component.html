@@ -59,6 +59,7 @@
               label="Comment"
               data-testid="quick-scan-comment"
               [inputFormControl]="form | formGet : 'comments.' + i"
+              [additionalErrorMessages]="commentErrorMessages"
             ></app-textarea>
           }
         </div>

@@ -4890,6 +4890,7 @@ components:
           type: array
           items:
             type: string
+            maxLength: 500
             description: Comment for the file at the same index (empty for none)
     UserPreferences:
       allOf:

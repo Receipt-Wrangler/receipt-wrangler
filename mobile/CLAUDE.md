@@ -350,8 +350,10 @@ is otherwise forbidden — these are the documented exception.)
 The Quick Scan per-image form (`lib/receipts/widgets/quick_scan_form.dart`) respects the selected
 group's quick-scan config on `GroupReceiptSettings` — the
 `quickScan{PaidBy,Status,Categories,Tags,Comment}{Enabled,Required}` fields (mirrored from the
-API/desktop; see `api/CLAUDE.md` → "Quick Scan Field Configuration"). Each field renders per its
-`*Enabled` flag and gets a `required()` validator only when shown **and** `*Required`; Categories/Tags
+API/desktop; see `api/CLAUDE.md` → "Quick Scan Field Configuration"). Every field renders per its
+`*Enabled` flag, but only paid-by, status and comment get a `required()` **validator** (when shown
+**and** `*Required`); Categories/Tags carry no field validator — their requiredness is checked at
+submit in `quick_scan.dart` (see the `quick_scan_form_test.dart` note below). Categories/Tags
 reuse the shared `CategorySelectField` / `TagSelectField`, sourced from the per-group catalogs, and the
 comment is a multi-line `FormBuilderTextField` (`name: "comment"`, `maxLength: 500` matching the
 backend's `models.MaxCommentLength`). Because the
