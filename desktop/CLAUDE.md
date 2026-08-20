@@ -1028,6 +1028,24 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   grouping levels and column rows carry the same badge (`isCustom` on `groupByLevels()` / `columnRows()`,
   resolved through the catalog rather than by matching the key's shape, so a user without
   `app.custom-fields.read` sees no badge instead of one on a field the builder cannot name).
+  - **E2E:** `e2e/report-custom-fields.spec.ts` (serial, admin storageState) seeds its own group +
+    a CURRENCY/DATE/BOOLEAN field trio + four receipts through the admin API, so the live preview
+    contains exactly its own data, and covers: the grouping picker offering every custom field badged
+    (including the three derived `(Day|Month|Year)` levels), grouping by a **currency** field, a
+    boolean rendering **Yes/No**, a date field bucketing by **calendar month**, `SUM` over a custom
+    currency measure, and a saved template naming its fields rather than showing `custom_<id>`.
+    Teardown deletes the group (cascading the receipts, whose custom field values a field-delete would
+    otherwise orphan) then the fields — a leaked field shows up in every other spec's pickers.
+    Each assertion was verified to **FAIL** with its feature reverted (the renderer's typed
+    formatting, the catalog's currency-as-dimension + period entries, and the list's field-name
+    resolver).
+    - Two gotchas it encodes: the "Custom" badge is inside the `mat-option`, so an option's accessible
+      name reads `"Tip Custom"` — `addGroupingLevel` therefore takes a `string | RegExp` (a plain
+      string still matches exactly, which is what every other caller wants). And money is asserted
+      with a **separator-tolerant** regex (`/1[,. ]500[.,]50/`) rather than a symbol, because the
+      currency configuration is a global System Setting on the shared CI backend that this spec must
+      not mutate; the seeded value is `1500.50` precisely so the thousands separator and trailing
+      zero prove formatting ran.
 - **Live preview** (`report-preview-panel`): the container debounces the form (~450ms, `switchMap`) into
   `POST /report/preview` and renders the engine's returned HTML in a **sandboxed `<iframe srcdoc>`**
   (`sandbox="allow-same-origin"`, scripts disabled; sized to content on load). The response's
