@@ -11,10 +11,15 @@ part 'upsert_custom_field_option_command.g.dart';
 /// UpsertCustomFieldOptionCommand
 ///
 /// Properties:
+/// * [id] - Id of an existing option to update. Omit it (or send 0) to add a new option. Options are never removed by an update.
 /// * [value] - Custom Field Option value
 /// * [customFieldId] - Custom Field Id
 @BuiltValue()
 abstract class UpsertCustomFieldOptionCommand implements Built<UpsertCustomFieldOptionCommand, UpsertCustomFieldOptionCommandBuilder> {
+  /// Id of an existing option to update. Omit it (or send 0) to add a new option. Options are never removed by an update.
+  @BuiltValueField(wireName: r'id')
+  int? get id;
+
   /// Custom Field Option value
   @BuiltValueField(wireName: r'value')
   String? get value;
@@ -46,6 +51,13 @@ class _$UpsertCustomFieldOptionCommandSerializer implements PrimitiveSerializer<
     UpsertCustomFieldOptionCommand object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
+    if (object.id != null) {
+      yield r'id';
+      yield serializers.serialize(
+        object.id,
+        specifiedType: const FullType(int),
+      );
+    }
     if (object.value != null) {
       yield r'value';
       yield serializers.serialize(
@@ -81,6 +93,13 @@ class _$UpsertCustomFieldOptionCommandSerializer implements PrimitiveSerializer<
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
+        case r'id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.id = valueDes;
+          break;
         case r'value':
           final valueDes = serializers.deserialize(
             value,

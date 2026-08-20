@@ -38,6 +38,14 @@
 </ng-template>
 
 <ng-template #actionsCell let-element="element" let-index="index">
+  <app-edit-button
+    *hasAppPermission="Permission.AppCustomFieldsUpdate"
+    data-testid="custom-field-edit"
+    color="accent"
+    tooltip="Edit custom field"
+    (clicked)="openCustomFieldDialog(element, FormMode.edit)"
+  >
+  </app-edit-button>
   <app-delete-button
     *hasAppPermission="Permission.AppCustomFieldsDelete"
     data-testid="custom-field-delete"

@@ -42,6 +42,8 @@ const Permission _$appPeriodCustomFieldsPeriodCreate =
     const Permission._('appPeriodCustomFieldsPeriodCreate');
 const Permission _$appPeriodCustomFieldsPeriodRead =
     const Permission._('appPeriodCustomFieldsPeriodRead');
+const Permission _$appPeriodCustomFieldsPeriodUpdate =
+    const Permission._('appPeriodCustomFieldsPeriodUpdate');
 const Permission _$appPeriodCustomFieldsPeriodDelete =
     const Permission._('appPeriodCustomFieldsPeriodDelete');
 const Permission _$appPeriodSystemSettingsPeriodRead =
@@ -224,6 +226,8 @@ Permission _$valueOf(String name) {
       return _$appPeriodCustomFieldsPeriodCreate;
     case 'appPeriodCustomFieldsPeriodRead':
       return _$appPeriodCustomFieldsPeriodRead;
+    case 'appPeriodCustomFieldsPeriodUpdate':
+      return _$appPeriodCustomFieldsPeriodUpdate;
     case 'appPeriodCustomFieldsPeriodDelete':
       return _$appPeriodCustomFieldsPeriodDelete;
     case 'appPeriodSystemSettingsPeriodRead':
@@ -394,6 +398,7 @@ final BuiltSet<Permission> _$values = BuiltSet<Permission>(const <Permission>[
   _$appPeriodTagsPeriodDelete,
   _$appPeriodCustomFieldsPeriodCreate,
   _$appPeriodCustomFieldsPeriodRead,
+  _$appPeriodCustomFieldsPeriodUpdate,
   _$appPeriodCustomFieldsPeriodDelete,
   _$appPeriodSystemSettingsPeriodRead,
   _$appPeriodSystemSettingsPeriodUpdate,
@@ -495,6 +500,8 @@ class _$PermissionMeta {
       _$appPeriodCustomFieldsPeriodCreate;
   Permission get appPeriodCustomFieldsPeriodRead =>
       _$appPeriodCustomFieldsPeriodRead;
+  Permission get appPeriodCustomFieldsPeriodUpdate =>
+      _$appPeriodCustomFieldsPeriodUpdate;
   Permission get appPeriodCustomFieldsPeriodDelete =>
       _$appPeriodCustomFieldsPeriodDelete;
   Permission get appPeriodSystemSettingsPeriodRead =>
@@ -647,6 +654,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'appPeriodTagsPeriodDelete': 'app.tags.delete',
     'appPeriodCustomFieldsPeriodCreate': 'app.custom-fields.create',
     'appPeriodCustomFieldsPeriodRead': 'app.custom-fields.read',
+    'appPeriodCustomFieldsPeriodUpdate': 'app.custom-fields.update',
     'appPeriodCustomFieldsPeriodDelete': 'app.custom-fields.delete',
     'appPeriodSystemSettingsPeriodRead': 'app.system-settings.read',
     'appPeriodSystemSettingsPeriodUpdate': 'app.system-settings.update',
@@ -745,6 +753,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'app.tags.delete': 'appPeriodTagsPeriodDelete',
     'app.custom-fields.create': 'appPeriodCustomFieldsPeriodCreate',
     'app.custom-fields.read': 'appPeriodCustomFieldsPeriodRead',
+    'app.custom-fields.update': 'appPeriodCustomFieldsPeriodUpdate',
     'app.custom-fields.delete': 'appPeriodCustomFieldsPeriodDelete',
     'app.system-settings.read': 'appPeriodSystemSettingsPeriodRead',
     'app.system-settings.update': 'appPeriodSystemSettingsPeriodUpdate',

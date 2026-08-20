@@ -8,6 +8,8 @@ part of 'upsert_custom_field_option_command.dart';
 
 class _$UpsertCustomFieldOptionCommand extends UpsertCustomFieldOptionCommand {
   @override
+  final int? id;
+  @override
   final String? value;
   @override
   final int customFieldId;
@@ -16,7 +18,8 @@ class _$UpsertCustomFieldOptionCommand extends UpsertCustomFieldOptionCommand {
           [void Function(UpsertCustomFieldOptionCommandBuilder)? updates]) =>
       (UpsertCustomFieldOptionCommandBuilder()..update(updates))._build();
 
-  _$UpsertCustomFieldOptionCommand._({this.value, required this.customFieldId})
+  _$UpsertCustomFieldOptionCommand._(
+      {this.id, this.value, required this.customFieldId})
       : super._();
   @override
   UpsertCustomFieldOptionCommand rebuild(
@@ -31,6 +34,7 @@ class _$UpsertCustomFieldOptionCommand extends UpsertCustomFieldOptionCommand {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is UpsertCustomFieldOptionCommand &&
+        id == other.id &&
         value == other.value &&
         customFieldId == other.customFieldId;
   }
@@ -38,6 +42,7 @@ class _$UpsertCustomFieldOptionCommand extends UpsertCustomFieldOptionCommand {
   @override
   int get hashCode {
     var _$hash = 0;
+    _$hash = $jc(_$hash, id.hashCode);
     _$hash = $jc(_$hash, value.hashCode);
     _$hash = $jc(_$hash, customFieldId.hashCode);
     _$hash = $jf(_$hash);
@@ -47,6 +52,7 @@ class _$UpsertCustomFieldOptionCommand extends UpsertCustomFieldOptionCommand {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'UpsertCustomFieldOptionCommand')
+          ..add('id', id)
           ..add('value', value)
           ..add('customFieldId', customFieldId))
         .toString();
@@ -58,6 +64,10 @@ class UpsertCustomFieldOptionCommandBuilder
         Builder<UpsertCustomFieldOptionCommand,
             UpsertCustomFieldOptionCommandBuilder> {
   _$UpsertCustomFieldOptionCommand? _$v;
+
+  int? _id;
+  int? get id => _$this._id;
+  set id(int? id) => _$this._id = id;
 
   String? _value;
   String? get value => _$this._value;
@@ -75,6 +85,7 @@ class UpsertCustomFieldOptionCommandBuilder
   UpsertCustomFieldOptionCommandBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
+      _id = $v.id;
       _value = $v.value;
       _customFieldId = $v.customFieldId;
       _$v = null;
@@ -98,6 +109,7 @@ class UpsertCustomFieldOptionCommandBuilder
   _$UpsertCustomFieldOptionCommand _build() {
     final _$result = _$v ??
         _$UpsertCustomFieldOptionCommand._(
+          id: id,
           value: value,
           customFieldId: BuiltValueNullFieldError.checkNotNull(customFieldId,
               r'UpsertCustomFieldOptionCommand', 'customFieldId'),

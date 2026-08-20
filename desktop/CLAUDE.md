@@ -438,6 +438,50 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     keep the `GroupState` cache in sync; it no-ops for a group the caller isn't in. E2E:
     `e2e/group-delete-any.spec.ts`.
 
+
+### Custom fields
+
+The Manage Custom Fields page (`src/custom-fields/`) is a paged `app-table` plus a single
+`app-custom-field-form` **dialog** serving all three modes. It follows the categories/tags shape (one
+dialog, table refetches on a truthy `afterClosed()`), with the differences a custom field's data model
+forces:
+
+- **The dialog is `FormMode`-driven** (`@Input() mode`, defaulting to `FormMode.add`), not the old
+  binary `readonly` flag — passing a `customField` used to make it permanently read-only, so there was
+  no way to reach an editable state. Fields bind `[readonly]="mode | inputReadonly"`, and the footer
+  renders for every mode but `view`.
+- **The Type select is locked outside add mode** (`typeReadonly`, i.e. `mode !== FormMode.add`) — in
+  *edit* as well as view. A `CustomFieldValue` lives in a type-specific column, so re-typing would
+  mis-column every stored value; the server 400s it too (see `api/CLAUDE.md` →
+  `app.custom-fields.update`).
+- **A saved option can be renamed but not removed** (`canDeleteOption`): `CustomFieldValue.SelectValue`
+  holds an option id, so the per-option delete button renders only for an option added in this session
+  (no `id` yet). New options are submitted **without** an id, which the server reads as "append";
+  existing ones carry their real id so a rename keeps every receipt's selection resolving. `buildOption`
+  therefore stores the **real server id** (or `null`) instead of the old `Math.random()` placeholder,
+  and the `@for` tracks `$index` — correct because the inner control is already bound by index.
+- **Every option value is required**, via the shared `trimmedRequiredValidator()`
+  (`src/validators/text-validators.ts`) attached to the option `value` control in `buildOption()` and
+  held as a module-level const (the `quick-scan-dialog` precedent). Reused rather than
+  `Validators.required` because the API blank-checks after trimming, so `"   "` would otherwise pass
+  the form and come back a 400. It emits the standard `required` key, so `app-input` renders "Value is
+  required." with no `additionalErrorMessages`. This is what stops a rename to blank — which would keep
+  the option id and leave every receipt that selected it with no label.
+- **Table row actions:** an `app-edit-button` (`data-testid="custom-field-edit"`) gated on
+  `Permission.AppCustomFieldsUpdate`, beside the existing delete. The **name link** opens the dialog in
+  edit mode for an update-holder and read-only for everyone else (`resolveDialogMode`). The actions
+  column is gated on `hasAnyAppPermission([...Update, ...Delete])` — gating it on delete alone would
+  hide the whole column, and with it the new edit button, from an update-only holder.
+- `setColumns()` reads permissions with a one-shot `selectSnapshot` from `ngAfterViewInit`, so a spec
+  must dispatch `SetPermissions` **before** the first change-detection pass (in the app the route guard
+  has already loaded AppData).
+
+E2E: `e2e/custom-field-edit.spec.ts` (two app roles differing only in **Update Custom Fields**; the
+holder renames a field through the dialog and it persists with the type untouched, the type control is
+non-editable and saved options expose no delete while an appended one does, the non-holder sees no
+control and its direct `PUT /api/customField/:id` 403s, and a type change 400s even for the holder).
+`e2e/legacy-user-visibility.spec.ts` pins that Legacy User sees neither edit nor delete.
+
 ## Login QR (mobile app setup)
 
 A QR that deep-links users into the mobile app to set it up. It renders in **two** places — the login

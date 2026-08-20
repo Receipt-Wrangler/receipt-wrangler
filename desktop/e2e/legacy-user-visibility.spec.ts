@@ -46,10 +46,13 @@ test.describe('Legacy User visibility', () => {
     await expect(page.getByTestId('tag-delete')).toHaveCount(0);
   });
 
-  test('custom fields: can add, cannot delete', async ({ page }) => {
+  test('custom fields: can add, cannot edit or delete', async ({ page }) => {
     await page.goto('/custom-fields');
-    // Custom fields have no update permission — only create (held) and delete (not).
+    // Legacy User holds custom-fields create + read, but editing a definition
+    // changes it for every group's receipts, so update stays admin-only — the
+    // same shape as categories and tags above.
     await expect(page.getByTestId('custom-field-add')).toBeVisible();
+    await expect(page.getByTestId('custom-field-edit')).toHaveCount(0);
     await expect(page.getByTestId('custom-field-delete')).toHaveCount(0);
   });
 

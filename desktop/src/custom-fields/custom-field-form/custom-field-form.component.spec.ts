@@ -7,6 +7,7 @@ import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { of } from "rxjs";
+import { FormMode } from "../../enums/form-mode.enum";
 import { CustomFieldOption, CustomFieldService, CustomFieldType } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SelectModule } from "../../select/select.module";
@@ -42,7 +43,8 @@ describe("CustomFieldFormComponent", () => {
         {
           provide: CustomFieldService,
           useValue: {
-            createCustomField: jest.fn().mockReturnValue(of({}))
+            createCustomField: jest.fn().mockReturnValue(of({})),
+            updateCustomField: jest.fn().mockReturnValue(of({}))
           }
         },
         {
@@ -233,5 +235,211 @@ describe("CustomFieldFormComponent", () => {
     component.form.get("type")?.setValue(CustomFieldType.Text);
 
     expect(component.form.get("options")?.validator).toBeNull();
+  });
+  describe("edit mode", () => {
+    const selectCustomField: any = {
+      id: 7,
+      name: "Test Field",
+      type: CustomFieldType.Select,
+      description: "This is a select field",
+      options: [
+        { id: 1, value: "Option 1", customFieldId: 7 },
+        { id: 2, value: "Option 2", customFieldId: 7 }
+      ]
+    };
+
+    it("should call updateCustomField with the field id when submitted", () => {
+      component.customField = {
+        id: 7,
+        name: "Test Field",
+        type: CustomFieldType.Text,
+        description: "This is a test field",
+        options: []
+      } as any;
+      component.mode = FormMode.edit;
+      component.ngOnInit();
+
+      component.form.patchValue({ name: "Renamed Field", description: "Updated" });
+      component.submit();
+
+      expect(customFieldService.updateCustomField).toHaveBeenCalledWith(7, {
+        name: "Renamed Field",
+        type: CustomFieldType.Text,
+        description: "Updated",
+        options: []
+      });
+      expect(customFieldService.createCustomField).not.toHaveBeenCalled();
+      expect(snackbarService.success).toHaveBeenCalledWith("Custom field updated");
+      expect(matDialogRef.close).toHaveBeenCalledWith(true);
+    });
+
+    it("should carry real option ids so a rename cannot orphan a stored value", () => {
+      component.customField = selectCustomField;
+      component.mode = FormMode.edit;
+      component.ngOnInit();
+
+      (component.form.get("options") as any).at(0).patchValue({ value: "Renamed Option" });
+      component.submit();
+
+      expect(customFieldService.updateCustomField).toHaveBeenCalledWith(7, {
+        name: "Test Field",
+        type: CustomFieldType.Select,
+        description: "This is a select field",
+        options: [
+          { id: 1, value: "Renamed Option", customFieldId: 7 },
+          { id: 2, value: "Option 2", customFieldId: 7 }
+        ]
+      });
+    });
+
+    it("should send a newly added option without an id so the server appends it", () => {
+      component.customField = selectCustomField;
+      component.mode = FormMode.edit;
+      component.ngOnInit();
+
+      component.addOption();
+      (component.form.get("options") as any).at(2).patchValue({ value: "Option 3" });
+      component.submit();
+
+      const command = (customFieldService.updateCustomField as jest.Mock).mock.calls[0][1];
+      expect(command.options[2]).toEqual({ id: undefined, value: "Option 3", customFieldId: 7 });
+    });
+
+    it("should not allow deleting a persisted option", () => {
+      component.customField = selectCustomField;
+      component.mode = FormMode.edit;
+      component.ngOnInit();
+
+      expect(component.canDeleteOption(0)).toBe(false);
+      expect(component.canDeleteOption(1)).toBe(false);
+    });
+
+    it("should allow deleting an option added in this session", () => {
+      component.customField = selectCustomField;
+      component.mode = FormMode.edit;
+      component.ngOnInit();
+
+      component.addOption();
+
+      expect(component.canDeleteOption(2)).toBe(true);
+    });
+
+    it("should lock the type", () => {
+      component.customField = selectCustomField;
+      component.mode = FormMode.edit;
+      component.ngOnInit();
+
+      expect(component.typeReadonly).toBe(true);
+    });
+  });
+
+  describe("view mode", () => {
+    it("should lock the type and allow no option deletion", () => {
+      component.customField = {
+        id: 7,
+        name: "Test Field",
+        type: CustomFieldType.Select,
+        description: "",
+        options: [
+          { id: 1, value: "Option 1", customFieldId: 7 },
+          { id: 2, value: "Option 2", customFieldId: 7 }
+        ]
+      } as any;
+      component.mode = FormMode.view;
+      component.ngOnInit();
+
+      expect(component.typeReadonly).toBe(true);
+      expect(component.canDeleteOption(0)).toBe(false);
+    });
+
+    it("should not render the dialog footer", () => {
+      component.customField = {
+        id: 7,
+        name: "Test Field",
+        type: CustomFieldType.Text,
+        description: "",
+        options: []
+      } as any;
+      component.mode = FormMode.view;
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector("app-dialog-footer")
+      ).toBeNull();
+    });
+  });
+
+  describe("add mode", () => {
+    it("should leave the type editable", () => {
+      component.ngOnInit();
+
+      expect(component.typeReadonly).toBe(false);
+    });
+
+    it("should allow deleting an option once more than one exists", () => {
+      component.ngOnInit();
+      component.form.get("type")?.setValue(CustomFieldType.Select);
+      component.addOption();
+
+      expect(component.canDeleteOption(0)).toBe(true);
+    });
+  });
+  describe("option values are required", () => {
+    // An update renames options in place by id, so a blank value would keep the
+    // id and leave every receipt that selected it showing no label.
+    it("is invalid while an appended option has no value", () => {
+      component.ngOnInit();
+      component.form.patchValue({ name: "Test Field" });
+      component.form.get("type")?.setValue(CustomFieldType.Select);
+
+      expect(component.form.valid).toBe(false);
+
+      component.submit();
+
+      expect(customFieldService.createCustomField).not.toHaveBeenCalled();
+    });
+
+    it("treats a whitespace-only value as blank", () => {
+      component.ngOnInit();
+      component.form.patchValue({ name: "Test Field" });
+      component.form.get("type")?.setValue(CustomFieldType.Select);
+      (component.form.get("options") as any).at(0).patchValue({ value: "   " });
+
+      expect(component.form.valid).toBe(false);
+    });
+
+    it("becomes valid once every option has a value", () => {
+      component.ngOnInit();
+      component.form.patchValue({ name: "Test Field" });
+      component.form.get("type")?.setValue(CustomFieldType.Select);
+      (component.form.get("options") as any).at(0).patchValue({ value: "Option 1" });
+
+      expect(component.form.valid).toBe(true);
+
+      component.submit();
+
+      expect(customFieldService.createCustomField).toHaveBeenCalled();
+    });
+
+    it("blocks an edit that blanks an existing option", () => {
+      component.customField = {
+        id: 7,
+        name: "Test Field",
+        type: CustomFieldType.Select,
+        description: "",
+        options: [
+          { id: 1, value: "Option 1", customFieldId: 7 },
+          { id: 2, value: "Option 2", customFieldId: 7 }
+        ]
+      } as any;
+      component.mode = FormMode.edit;
+      component.ngOnInit();
+
+      (component.form.get("options") as any).at(0).patchValue({ value: "" });
+      component.submit();
+
+      expect(component.form.valid).toBe(false);
+      expect(customFieldService.updateCustomField).not.toHaveBeenCalled();
+    });
   });
 });

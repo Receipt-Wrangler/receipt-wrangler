@@ -82,6 +82,26 @@ func TestLegacyAppUserExcludesReadAnyApiKeys(t *testing.T) {
 	}
 }
 
+func TestLegacyAppAdminIncludesCustomFieldsUpdate(t *testing.T) {
+	// Legacy Admin is every app permission, so app.custom-fields.update flows into
+	// it automatically — an upgrading install's admin can edit custom fields on the
+	// next boot via the seeder's add-only reconciliation, with no data migration.
+	if !slices.Contains(LegacyAppAdminKeys(), AppCustomFieldsUpdate) {
+		utilPrint(t, "Legacy Admin missing "+AppCustomFieldsUpdate, "present")
+	}
+}
+
+func TestLegacyAppUserExcludesCustomFieldsUpdate(t *testing.T) {
+	// Legacy User is a fixed subset. It holds custom-fields create + read so a
+	// normal user can add a field for their own receipts, but editing an existing
+	// definition changes it for every group's receipts, so it stays admin-only —
+	// the same shape as categories and tags, where create is granted and
+	// update/delete are not.
+	if slices.Contains(LegacyAppUserKeys(), AppCustomFieldsUpdate) {
+		utilPrint(t, "Legacy User contains "+AppCustomFieldsUpdate, "absent")
+	}
+}
+
 func TestLegacyAppAdminIncludesReportsRead(t *testing.T) {
 	// Legacy Admin is every app permission, so the newly added app.reports.read
 	// must flow into it automatically — an upgrading install's admin keeps access
