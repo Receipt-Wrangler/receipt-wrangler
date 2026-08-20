@@ -963,6 +963,12 @@ beside the create rules rather than in the handler) and re-asserted by the repos
   An option id the field does not own is a **400**, and the repository's option update is additionally
   scoped `WHERE id = ? AND custom_field_id = ?` so a foreign option is unwritable even if that check
   raced.
+- **An option value is required and blank-checked after trimming.** Because a rename keeps the option
+  id, an empty value would preserve the id and silently blank the label on every receipt whose
+  `SelectValue` points at it. The rule lives in `Validate()` — **not** `ValidateUpdate()` — so create
+  and update share one check (`UpdateCustomField` runs `Validate` first); it therefore also closes the
+  older hole where a SELECT field could be *created* with blank options. `strings.TrimSpace` is used so
+  the server agrees with the desktop's `trimmedRequiredValidator()`; the stored value is not trimmed.
 
 `UpdateCustomField` uses the **map form** of `Updates` so a cleared description actually clears (the
 struct form skips zero values — the same reason `UpdateAppRole` does), and maps

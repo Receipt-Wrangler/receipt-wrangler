@@ -384,4 +384,62 @@ describe("CustomFieldFormComponent", () => {
       expect(component.canDeleteOption(0)).toBe(true);
     });
   });
+  describe("option values are required", () => {
+    // An update renames options in place by id, so a blank value would keep the
+    // id and leave every receipt that selected it showing no label.
+    it("is invalid while an appended option has no value", () => {
+      component.ngOnInit();
+      component.form.patchValue({ name: "Test Field" });
+      component.form.get("type")?.setValue(CustomFieldType.Select);
+
+      expect(component.form.valid).toBe(false);
+
+      component.submit();
+
+      expect(customFieldService.createCustomField).not.toHaveBeenCalled();
+    });
+
+    it("treats a whitespace-only value as blank", () => {
+      component.ngOnInit();
+      component.form.patchValue({ name: "Test Field" });
+      component.form.get("type")?.setValue(CustomFieldType.Select);
+      (component.form.get("options") as any).at(0).patchValue({ value: "   " });
+
+      expect(component.form.valid).toBe(false);
+    });
+
+    it("becomes valid once every option has a value", () => {
+      component.ngOnInit();
+      component.form.patchValue({ name: "Test Field" });
+      component.form.get("type")?.setValue(CustomFieldType.Select);
+      (component.form.get("options") as any).at(0).patchValue({ value: "Option 1" });
+
+      expect(component.form.valid).toBe(true);
+
+      component.submit();
+
+      expect(customFieldService.createCustomField).toHaveBeenCalled();
+    });
+
+    it("blocks an edit that blanks an existing option", () => {
+      component.customField = {
+        id: 7,
+        name: "Test Field",
+        type: CustomFieldType.Select,
+        description: "",
+        options: [
+          { id: 1, value: "Option 1", customFieldId: 7 },
+          { id: 2, value: "Option 2", customFieldId: 7 }
+        ]
+      } as any;
+      component.mode = FormMode.edit;
+      component.ngOnInit();
+
+      (component.form.get("options") as any).at(0).patchValue({ value: "" });
+      component.submit();
+
+      expect(component.form.valid).toBe(false);
+      expect(customFieldService.updateCustomField).not.toHaveBeenCalled();
+    });
+  });
 });

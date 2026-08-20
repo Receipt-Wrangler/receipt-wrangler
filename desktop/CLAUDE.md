@@ -460,6 +460,13 @@ forces:
   existing ones carry their real id so a rename keeps every receipt's selection resolving. `buildOption`
   therefore stores the **real server id** (or `null`) instead of the old `Math.random()` placeholder,
   and the `@for` tracks `$index` — correct because the inner control is already bound by index.
+- **Every option value is required**, via the shared `trimmedRequiredValidator()`
+  (`src/validators/text-validators.ts`) attached to the option `value` control in `buildOption()` and
+  held as a module-level const (the `quick-scan-dialog` precedent). Reused rather than
+  `Validators.required` because the API blank-checks after trimming, so `"   "` would otherwise pass
+  the form and come back a 400. It emits the standard `required` key, so `app-input` renders "Value is
+  required." with no `additionalErrorMessages`. This is what stops a rename to blank — which would keep
+  the option id and leave every receipt that selected it with no label.
 - **Table row actions:** an `app-edit-button` (`data-testid="custom-field-edit"`) gated on
   `Permission.AppCustomFieldsUpdate`, beside the existing delete. The **name link** opens the dialog in
   edit mode for an update-holder and read-only for everyone else (`resolveDialogMode`). The actions

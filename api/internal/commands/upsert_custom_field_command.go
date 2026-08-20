@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
+	"strings"
 )
 
 type UpsertCustomFieldCommand struct {
@@ -45,8 +46,24 @@ func (command *UpsertCustomFieldCommand) Validate() structs.ValidatorError {
 		errors["type"] = "Type is required"
 	}
 
-	if command.Type == models.SELECT && len(command.Options) == 0 {
-		errors["options"] = "Options are required"
+	// An option's value is its only label. It is required -- and blank-checked
+	// after trimming, matching the desktop's trimmedRequiredValidator -- because
+	// an update matches options by id in order to rename them in place, so an
+	// empty value would keep the id and silently blank the label on every receipt
+	// whose CustomFieldValue.SelectValue points at it. Checked here rather than in
+	// ValidateUpdate so create and update share one rule: UpdateCustomField runs
+	// Validate before ValidateUpdate.
+	if command.Type == models.SELECT {
+		if len(command.Options) == 0 {
+			errors["options"] = "Options are required"
+		} else {
+			for _, optionCommand := range command.Options {
+				if len(strings.TrimSpace(optionCommand.Value)) == 0 {
+					errors["options"] = "Option values are required"
+					break
+				}
+			}
+		}
 	}
 
 	vErr.Errors = errors

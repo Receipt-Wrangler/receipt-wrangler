@@ -88,6 +88,40 @@ func TestUpsertCustomFieldCommand_Validate_InvalidInputs(t *testing.T) {
 			},
 			expectedError: "options",
 		},
+		// An option's value is its only label, and an update renames options in
+		// place by id -- a blank value would keep the id and leave every receipt
+		// that selected it showing nothing.
+		"SELECT with a blank option value": {
+			command: UpsertCustomFieldCommand{
+				Name: "Test Field",
+				Type: models.SELECT,
+				Options: []UpsertCustomFieldOptionCommand{
+					{Value: "Option 1"},
+					{Value: ""},
+				},
+			},
+			expectedError: "options",
+		},
+		"SELECT with a whitespace-only option value": {
+			command: UpsertCustomFieldCommand{
+				Name: "Test Field",
+				Type: models.SELECT,
+				Options: []UpsertCustomFieldOptionCommand{
+					{Value: "   "},
+				},
+			},
+			expectedError: "options",
+		},
+		"SELECT renaming an existing option to blank": {
+			command: UpsertCustomFieldCommand{
+				Name: "Test Field",
+				Type: models.SELECT,
+				Options: []UpsertCustomFieldOptionCommand{
+					{Id: 10, Value: ""},
+				},
+			},
+			expectedError: "options",
+		},
 	}
 
 	for testName, test := range tests {

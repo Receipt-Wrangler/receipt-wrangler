@@ -801,6 +801,51 @@ func TestUpdateCustomFieldHandlerRejectsForeignOptionId(t *testing.T) {
 	}
 }
 
+func TestUpdateCustomFieldHandlerRejectsBlankOptionValue(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+	setupCustomFieldHandlerTest()
+
+	db := repositories.GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Select Field").First(&customField)
+
+	var options []models.CustomFieldOption
+	db.Where("custom_field_id = ?", customField.ID).Order("id asc").Find(&options)
+	if len(options) != 2 {
+		utils.PrintTestError(t, len(options), 2)
+		return
+	}
+
+	// grantAllAppPerms creates a uniquely-named role, so it must run once rather
+	// than per iteration.
+	grantAllAppPerms(t, 1)
+
+	// Renaming an option to blank would keep its id -- so every receipt whose
+	// CustomFieldValue.SelectValue points at it would render an empty label.
+	for _, blankValue := range []string{"", "   "} {
+		body := `{"name":"Test Select Field","type":"SELECT","options":[` +
+			`{"id":` + utils.UintToString(options[0].ID) + `,"value":"` + blankValue + `"},` +
+			`{"id":` + utils.UintToString(options[1].ID) + `,"value":"Option 2"}]}`
+
+		req, rr := updateCustomFieldRequest(utils.UintToString(customField.ID), body)
+
+		UpdateCustomField(rr, req)
+
+		if status := rr.Code; status != http.StatusBadRequest {
+			utils.PrintTestError(t, status, http.StatusBadRequest)
+			return
+		}
+	}
+
+	// The stored option keeps its original label.
+	var persisted models.CustomFieldOption
+	db.First(&persisted, options[0].ID)
+	if persisted.Value != options[0].Value {
+		utils.PrintTestError(t, persisted.Value, options[0].Value)
+	}
+}
+
 func TestUpdateCustomFieldHandlerWithInvalidBody(t *testing.T) {
 	defer teardownCustomFieldHandlerTest()
 	setupCustomFieldHandlerTest()

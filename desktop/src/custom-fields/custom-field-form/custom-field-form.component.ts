@@ -13,6 +13,14 @@ import {
   UpsertCustomFieldCommand,
 } from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
+import { trimmedRequiredValidator } from "../../validators/index";
+
+// Built once and shared by every option control: an option's value is its only
+// label, and an update matches options by id to rename them in place, so a blank
+// value would keep the id and leave every receipt that selected it showing
+// nothing. Trimmed because the API blank-checks after trimming -- plain
+// Validators.required would call "   " valid and eat a 400.
+const optionValueRequiredValidator = trimmedRequiredValidator();
 
 @UntilDestroy()
 @Component({
@@ -159,7 +167,7 @@ export class CustomFieldFormComponent implements OnInit {
       // The real server id, or null for an option that does not exist yet. The
       // template tracks by index, so this never needs to be a synthetic key.
       id: option?.id ?? null,
-      value: option?.value,
+      value: [option?.value, [optionValueRequiredValidator]],
     });
   }
 }
