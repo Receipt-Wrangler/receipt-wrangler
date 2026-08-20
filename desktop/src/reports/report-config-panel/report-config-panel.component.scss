@@ -277,6 +277,13 @@
     flex: none;
   }
 
+  // Marks a grouping level or column that reads a custom field, so a custom field
+  // stays identifiable after it has been picked — not only in the dropdown.
+  &__custom-badge {
+    color: #7c5cd6;
+    background: rgba(124, 92, 214, 0.13);
+  }
+
   &__col-text {
     flex: 1;
     min-width: 0;

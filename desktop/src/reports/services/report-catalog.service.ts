@@ -9,10 +9,16 @@ import {
 
 /**
  * Supplies the dimension and measure catalog the builder's dropdowns bind to: the
- * built-in engine fields plus every custom field (currency custom fields become
- * measures, all other kinds become dimensions), keyed `custom_<id>` to match the
+ * built-in engine fields plus every custom field, keyed `custom_<id>` to match the
  * backend. The backend validates every field key, so this is the picker's option
  * source, not the authorization gate.
+ *
+ * Every custom field is a dimension, whatever its type — the engine restricts
+ * measuring, not cutting, so a currency field is groupable as well as summable and
+ * appears in *both* lists. A date field additionally contributes the three
+ * calendar-period fields the backend derives for it (`custom_<id>_month` and
+ * friends): grouping by the raw date buckets on the exact instant, which puts
+ * every receipt in its own group.
  */
 @Injectable({ providedIn: "root" })
 export class ReportCatalogService {
@@ -22,9 +28,7 @@ export class ReportCatalogService {
 
   public readonly dimensions = computed<ReportField[]>(() => [
     ...REPORT_BUILTIN_DIMENSIONS,
-    ...this.customFields()
-      .filter((field) => field.type !== CustomFieldType.Currency)
-      .map(customFieldToField),
+    ...this.customFields().flatMap(customFieldDimensions),
   ]);
 
   public readonly measures = computed<ReportField[]>(() => [
@@ -56,5 +60,24 @@ export class ReportCatalogService {
 }
 
 function customFieldToField(field: CustomField): ReportField {
-  return { key: "custom_" + field.id, label: field.name };
+  return { key: "custom_" + field.id, label: field.name, isCustom: true };
+}
+
+/**
+ * The dimensions one custom field offers: itself, plus — for a date field — the
+ * day/month/year fields the backend derives from it. The keys and labels mirror
+ * `receiptsource.CustomFieldPeriodKeys` / `dateFieldRefs`; a mismatch here is a
+ * 400 from the engine, not a silent fallback.
+ */
+function customFieldDimensions(field: CustomField): ReportField[] {
+  const self = customFieldToField(field);
+  if (field.type !== CustomFieldType.Date) {
+    return [self];
+  }
+  return [
+    self,
+    { key: self.key + "_day", label: field.name + " (Day)", isCustom: true },
+    { key: self.key + "_month", label: field.name + " (Month)", isCustom: true },
+    { key: self.key + "_year", label: field.name + " (Year)", isCustom: true },
+  ];
 }

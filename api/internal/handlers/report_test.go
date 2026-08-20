@@ -150,9 +150,10 @@ func TestGenerateReport_MapsInvalidSpecToBadRequest(t *testing.T) {
 	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	seedReportReceipt(1, 1)
 
-	// The command validates, but grouping by a measure is an invalid spec the
-	// engine rejects — the handler must map that ReportSpecError to a 400, not a 500.
-	body := strings.Replace(recordsReportBody, `"detail": {"mode": "records"},`, `"groupBy": ["amount"],
+	// The command validates, but grouping by a field the catalog does not know is an
+	// invalid spec the engine rejects — the handler must map that ReportSpecError to a
+	// 400, not a 500.
+	body := strings.Replace(recordsReportBody, `"detail": {"mode": "records"},`, `"groupBy": ["not_a_field"],
   "detail": {"mode": "records"},`, 1)
 	w, r := generateReportRequest(1, body)
 	GenerateReport(w, r)
@@ -236,7 +237,7 @@ func TestPreviewReport_MapsInvalidSpecToBadRequest(t *testing.T) {
 	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 	seedReportReceipt(1, 1)
 
-	body := strings.Replace(recordsReportBody, `"detail": {"mode": "records"},`, `"groupBy": ["amount"],
+	body := strings.Replace(recordsReportBody, `"detail": {"mode": "records"},`, `"groupBy": ["not_a_field"],
   "detail": {"mode": "records"},`, 1)
 	w, r := generateReportRequest(1, body)
 	PreviewReport(w, r)
@@ -1009,9 +1010,9 @@ func TestRenderReportTemplate_RestrictedWhenTemplateAccessRevoked(t *testing.T) 
 	}
 }
 
-// A stored config that is valid JSON but an invalid spec (grouping by a measure) is
-// caught by the engine as a *ReportSpecError, which the handler maps to 400 — not the
-// 500 a generic failure would produce.
+// A stored config that is valid JSON but an invalid spec (grouping by a field the
+// catalog does not know) is caught by the engine as a *ReportSpecError, which the
+// handler maps to 400 — not the 500 a generic failure would produce.
 func TestRenderReportTemplate_MapsInvalidSpecToBadRequest(t *testing.T) {
 	defer tearDownReportTest()
 	repositories.CreateTestGroupWithUsers()
@@ -1025,7 +1026,7 @@ func TestRenderReportTemplate_MapsInvalidSpecToBadRequest(t *testing.T) {
 		Name:     "Invalid Spec",
 		GroupIds: []string{"1"},
 		Period:   commands.ReportPeriod{Preset: "this_month"},
-		GroupBy:  []string{"amount"}, // grouping by a measure is rejected by the engine
+		GroupBy:  []string{"not_a_field"}, // no such field in the catalog
 		Detail:   commands.ReportDetail{Mode: "records"},
 		Columns:  []commands.ReportColumn{{Kind: "dimension", Name: "Name", Label: "Name", Field: "name"}},
 		Formats:  []string{"csv"},

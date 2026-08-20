@@ -506,15 +506,20 @@ func aggregateSource(aggFunc string, measure string) string {
 }
 
 // buildDimensions mirrors the spec's group-by into render dimensions, pulling each
-// heading label from the catalog.
+// heading label and data type from the catalog. The data type is what lets a
+// renderer present a bucket — a boolean as Yes/No, a date as a calendar day,
+// money per the report's currency configuration — instead of dumping the engine's
+// raw value. A key the catalog does not know falls back to the key as its own
+// heading and to plain text, which is what an unresolvable dimension can offer.
 func buildDimensions(groupBy []reporting.FieldKey, catalog reporting.FieldCatalog) []render.Dimension {
 	dimensions := make([]render.Dimension, len(groupBy))
 	for index, key := range groupBy {
-		label := string(key)
+		dimension := render.Dimension{Key: key, Label: string(key)}
 		if field, ok := catalog.Get(key); ok {
-			label = field.Label
+			dimension.Label = field.Label
+			dimension.DataType = field.DataType
 		}
-		dimensions[index] = render.Dimension{Key: key, Label: label}
+		dimensions[index] = dimension
 	}
 	return dimensions
 }

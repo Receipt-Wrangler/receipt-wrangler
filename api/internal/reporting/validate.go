@@ -16,14 +16,12 @@ var (
 	ErrDuplicateColumn    = errors.New("duplicate column name")
 	ErrUnknownColumnKind  = errors.New("unknown column kind")
 
-	ErrUnknownField        = errors.New("field not found in catalog")
-	ErrGroupByNotDimension = errors.New("groupBy field is not a dimension")
-	ErrDuplicateGroupBy    = errors.New("duplicate groupBy field")
+	ErrUnknownField     = errors.New("field not found in catalog")
+	ErrDuplicateGroupBy = errors.New("duplicate groupBy field")
 
-	ErrUnknownDetailMode    = errors.New("unknown detail mode")
-	ErrDetailByRequired     = errors.New("aggregate detail mode requires a dimension")
-	ErrDetailByOnRecords    = errors.New("records detail mode must not set a dimension")
-	ErrDetailByNotDimension = errors.New("detail field is not a dimension")
+	ErrUnknownDetailMode = errors.New("unknown detail mode")
+	ErrDetailByRequired  = errors.New("aggregate detail mode requires a dimension")
+	ErrDetailByOnRecords = errors.New("records detail mode must not set a dimension")
 
 	ErrLabelFieldRequired      = errors.New("label column requires a field")
 	ErrLabelColumnUnresolvable = errors.New("label column has no value on an aggregated detail row")
@@ -168,6 +166,13 @@ func validateConfig(config EngineConfig) error {
 	return nil
 }
 
+// compileGroupBy resolves the grouping levels against the catalog.
+//
+// Any field may cut the data, including a numeric one: bucket keys are canonical
+// for decimals and compareValues orders them, so grouping by a currency field
+// buckets receipts by value the same way grouping by a category buckets them by
+// name. Only measuring is type-restricted (see compileAggregateColumn), which is
+// what makes a custom field of any kind a usable grouping level.
 func compileGroupBy(keys []FieldKey, catalog FieldCatalog) ([]FieldRef, error) {
 	seen := make(map[FieldKey]struct{}, len(keys))
 	refs := make([]FieldRef, 0, len(keys))
@@ -176,9 +181,6 @@ func compileGroupBy(keys []FieldKey, catalog FieldCatalog) ([]FieldRef, error) {
 		field, exists := catalog.Get(key)
 		if !exists {
 			return nil, fmt.Errorf("%w: groupBy %s", ErrUnknownField, key)
-		}
-		if field.Role() != RoleDimension {
-			return nil, fmt.Errorf("%w: %s is a %s", ErrGroupByNotDimension, key, field.DataType)
 		}
 		if _, duplicate := seen[key]; duplicate {
 			return nil, fmt.Errorf("%w: %s", ErrDuplicateGroupBy, key)
@@ -210,10 +212,6 @@ func compileDetail(detail DetailSpec, catalog FieldCatalog) (FieldRef, error) {
 	if !exists {
 		return FieldRef{}, fmt.Errorf("%w: detail %s", ErrUnknownField, detail.By)
 	}
-	if field.Role() != RoleDimension {
-		return FieldRef{}, fmt.Errorf("%w: %s is a %s", ErrDetailByNotDimension, detail.By, field.DataType)
-	}
-
 	return field, nil
 }
 

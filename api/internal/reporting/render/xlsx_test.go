@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"reflect"
 	"testing"
+	"time"
 
 	"receipt-wrangler/api/internal/reporting"
 
@@ -98,6 +99,19 @@ func oneLevelRows() []reporting.Row {
 }
 
 func paidByDimension() []Dimension { return []Dimension{{Key: "paid_by", Label: "Paid By"}} }
+
+// typedCatalog is the fixture for the non-string dimensions: a boolean, a date,
+// and a currency custom field, each of which a report may group by.
+func typedCatalog(t *testing.T) reporting.FieldCatalog {
+	t.Helper()
+	return mustCatalog(t,
+		reporting.FieldRef{Key: "reimbursable", Label: "Reimbursable", DataType: reporting.TypeBool},
+		reporting.FieldRef{Key: "due", Label: "Due Date", DataType: reporting.TypeDate},
+		reporting.FieldRef{Key: "custom_1", Label: "HST", DataType: reporting.TypeCurrency},
+		reporting.FieldRef{Key: "category", Label: "Category", DataType: reporting.TypeString, Multi: true},
+		reporting.FieldRef{Key: "amount", Label: "Amount", DataType: reporting.TypeCurrency},
+	)
+}
 
 // --- headline: sums, aggregates, non-linear roll-up -----------------------
 
@@ -440,4 +454,65 @@ func TestXLSX_NativeTypesFormatsAndBold(t *testing.T) {
 	if isBold(cellStyle(t, file, "D2")) {
 		t.Error("detail D2 should not be bold")
 	}
+}
+
+// A dimension and a label column are presented by their declared type — a
+// boolean as Yes/No, a date as its calendar day, and money per the report's
+// currency configuration — rather than by the engine's raw rendering. Label
+// cells stay strings even when they hold money: they name a bucket, they do not
+// measure one.
+func TestXLSX_TypedDimensionsAndLabels(t *testing.T) {
+	due := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{"reimbursable"},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "due"},
+		Columns: []reporting.Column{
+			{Name: "Due", Label: "Due", Kind: reporting.ColumnLabel, Field: "due"},
+			{Name: "Reimbursable", Label: "Reimbursable", Kind: reporting.ColumnLabel, Field: "reimbursable"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(custom_1)"},
+		},
+	}
+	rows := []reporting.Row{
+		{"reimbursable": {reporting.Bool(true)}, "due": {reporting.DateVal(due)}, "custom_1": {money("1500.5")}},
+		{"reimbursable": {reporting.Bool(false)}, "due": {reporting.DateVal(due)}, "custom_1": {money("2")}},
+	}
+
+	model := mustRun(t, spec, typedCatalog(t), rows)
+	model.Meta.Currency = &reporting.CurrencyFormat{Symbol: "$", ThousandsSeparator: ",", DecimalSeparator: "."}
+
+	grid := xlsxGrid(t, model, []Dimension{{Key: "reimbursable", Label: "Reimbursable", DataType: reporting.TypeBool}})
+	assertGrid(t, grid, [][]string{
+		{"Reimbursable", "Due", "Reimbursable", "Total"},
+		{"No", "2026-06-01", "No", "$2.00"},
+		{"Yes", "2026-06-01", "Yes", "$1,500.50"},
+	})
+}
+
+// Grouping by a currency field renders its buckets as money, and a receipt with
+// no value for it falls into the (None) bucket like any other dimension.
+func TestXLSX_CurrencyGroupDimension(t *testing.T) {
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{"custom_1"},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "category"},
+		Columns: []reporting.Column{
+			{Name: "Category", Label: "Category", Kind: reporting.ColumnLabel, Field: "category"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"},
+		},
+	}
+	rows := []reporting.Row{
+		{"custom_1": {money("15.60")}, "category": {reporting.Str("Food")}, "amount": {money("100")}},
+		{"custom_1": {money("15.6")}, "category": {reporting.Str("Food")}, "amount": {money("50")}},
+		{"category": {reporting.Str("Gas")}, "amount": {money("10")}},
+	}
+
+	model := mustRun(t, spec, typedCatalog(t), rows)
+	model.Meta.Currency = &reporting.CurrencyFormat{Symbol: "$", ThousandsSeparator: ",", DecimalSeparator: "."}
+
+	grid := xlsxGrid(t, model, []Dimension{{Key: "custom_1", Label: "HST", DataType: reporting.TypeCurrency}})
+	assertGrid(t, grid, [][]string{
+		{"HST", "Category", "Total"},
+		// 15.60 and 15.6 are one bucket, so the two receipts sum together.
+		{"$15.60", "Food", "$150.00"},
+		{"(None)", "Gas", "$10.00"},
+	})
 }

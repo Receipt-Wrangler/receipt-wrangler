@@ -42,8 +42,77 @@ const formulaData: ColumnPickerDialogData = {
   ],
 };
 
+// The same picker over a catalog that includes custom fields. A currency custom
+// field is both a dimension and a measure, so it appears in both lists.
+const customFieldData: ColumnPickerDialogData = {
+  dimensions: [
+    { key: "category", label: "Category" },
+    { key: "custom_7", label: "HST", isCustom: true },
+    { key: "custom_8", label: "Vendor", isCustom: true },
+  ],
+  measures: [
+    { key: "amount", label: "Amount" },
+    { key: "custom_7", label: "HST", isCustom: true },
+  ],
+  existingColumns: [],
+};
+
 describe("ColumnPickerDialogComponent", () => {
   afterEach(() => TestBed.resetTestingModule());
+
+  it("badges custom fields in the field and measure pickers", async () => {
+    const { fixture, component } = configure(customFieldData);
+    await fixture.whenStable();
+
+    const dimensions = new Map(component.dimensionOptions.map((o) => [o.value, o.badge]));
+    expect(dimensions.get("custom_7")).toBe("Custom");
+    expect(dimensions.get("custom_8")).toBe("Custom");
+    expect(dimensions.get("category")).toBe("");
+
+    const measures = new Map(component.measureOptions.map((o) => [o.value, o.badge]));
+    expect(measures.get("custom_7")).toBe("Custom");
+    expect(measures.get("amount")).toBe("");
+  });
+
+  it("saves an aggregate over a custom currency measure", async () => {
+    const { fixture, component, close } = configure(customFieldData);
+    await fixture.whenStable();
+
+    component.pickAggregate();
+    await fixture.whenStable();
+    component.selectFunction(ReportColumn.AggFuncEnum.Sum);
+    component.pickerForm.get("measure")!.setValue("custom_7");
+    await fixture.whenStable();
+
+    // The label is suggested from the custom field's name.
+    expect(component.pickerForm.get("label")!.value).toContain("HST");
+    component.save();
+
+    expect(close).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: ReportColumn.KindEnum.Aggregate,
+        aggFunc: ReportColumn.AggFuncEnum.Sum,
+        measure: "custom_7",
+      })
+    );
+  });
+
+  it("saves a dimension column over a custom field", async () => {
+    const { fixture, component, close } = configure(customFieldData);
+    await fixture.whenStable();
+
+    component.pickDimension();
+    await fixture.whenStable();
+    component.pickerForm.get("field")!.setValue("custom_8");
+    await fixture.whenStable();
+
+    expect(component.pickerForm.get("label")!.value).toBe("Vendor");
+    component.save();
+
+    expect(close).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: ReportColumn.KindEnum.Dimension, field: "custom_8" })
+    );
+  });
 
   it("opens on the kind step and cannot save yet", async () => {
     const { fixture, component } = configure(baseData);

@@ -73,12 +73,21 @@ report full of empty cells.
 DataType                Role         May be used as
 ────────────────────────────────────────────────────────────────
 TypeNumber, TypeCurrency  →  Measure    the input to SUM/AVG/MIN/MAX
-TypeString, TypeDate,     →  Dimension  a groupBy level, or the key
-TypeBool                                of an aggregated detail row
+TypeString, TypeDate,     →  Dimension  cutting only
+TypeBool
 ```
 
-`RoleForDataType` (`field.go`) is the whole rule. A template can therefore never group by a dollar
-amount or sum a status — the spec simply will not compile.
+`RoleForDataType` (`field.go`) is the whole rule, and it bounds **measuring only**: a template can
+never sum a status — the spec will not compile.
+
+**Every field can cut, measures included.** A groupBy level, an aggregate detail row's key, and a
+label column accept any field in the catalog. Grouping by a number is well defined — bucket keys are
+canonical for decimals (`decimal.String()`) and `compareValues` orders them — so grouping by a
+currency custom field buckets receipts by amount exactly as grouping by a category buckets them by
+name. The alternative would make a custom field's *type* decide whether it is reportable at all,
+which is not a distinction the engine should be making. Presenting those buckets is a renderer's job:
+`render.Dimension` carries the field's `DataType` so a bool reads Yes/No, a date reads as a calendar
+day, and money reads per the report's currency configuration.
 
 ### Three column kinds, declared not inferred
 

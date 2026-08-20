@@ -4,8 +4,15 @@ import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { of } from "rxjs";
-import { CustomFieldService, ReportColumn, ReportDetail, ReportPeriod } from "../../open-api";
+import {
+  CustomFieldService,
+  CustomFieldType,
+  ReportColumn,
+  ReportDetail,
+  ReportPeriod,
+} from "../../open-api";
 import { buildColumnGroup } from "../models/report-form.factory";
+import { ReportCatalogService } from "../services/report-catalog.service";
 import { ReportConfigPanelComponent } from "./report-config-panel.component";
 
 const GROUPS = [
@@ -39,9 +46,11 @@ describe("ReportConfigPanelComponent", () => {
   let form: FormGroup;
   let formBuilder: FormBuilder;
   let dialog: { open: jest.Mock };
+  let customFieldService: { getPagedCustomFields: jest.Mock };
 
   beforeEach(async () => {
     dialog = { open: jest.fn() };
+    customFieldService = { getPagedCustomFields: jest.fn(() => of({ data: [], totalCount: 0 })) };
 
     await TestBed.configureTestingModule({
       declarations: [ReportConfigPanelComponent],
@@ -50,7 +59,7 @@ describe("ReportConfigPanelComponent", () => {
         FormBuilder,
         { provide: Store, useValue: { selectSignal: () => signal(GROUPS) } },
         { provide: MatDialog, useValue: dialog },
-        { provide: CustomFieldService, useValue: { getPagedCustomFields: jest.fn(() => of({ data: [], totalCount: 0 })) } },
+        { provide: CustomFieldService, useValue: customFieldService },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     })
@@ -138,6 +147,88 @@ describe("ReportConfigPanelComponent", () => {
   it("addGroupBy ignores an empty key", () => {
     component.addGroupBy("");
     expect(component.groupByLevels().length).toBe(0);
+  });
+
+  // ---- custom fields ------------------------------------------------------
+
+  /** Loads a custom-field pool into the catalog the component is already bound to. */
+  function loadCustomFields(): void {
+    customFieldService.getPagedCustomFields.mockReturnValue(
+      of({
+        data: [
+          { id: 7, name: "HST", type: CustomFieldType.Currency },
+          { id: 8, name: "Vendor", type: CustomFieldType.Text },
+        ],
+        totalCount: 2,
+      })
+    );
+    TestBed.inject(ReportCatalogService).load();
+  }
+
+  // A currency custom field is a measure, but measuring is the only thing its type
+  // restricts — it is groupable too.
+  it("offers a currency custom field as a grouping level and as a measure", () => {
+    loadCustomFields();
+
+    expect(component.addableDimensions().map((field) => field.key)).toContain("custom_7");
+    expect(component.measures().map((field) => field.key)).toContain("custom_7");
+
+    component.addGroupBy("custom_7");
+    expect(component.groupByLevels().map((level) => level.label)).toEqual(["HST"]);
+  });
+
+  it("flags grouping levels and columns that read a custom field", () => {
+    loadCustomFields();
+
+    component.addGroupBy("custom_8");
+    component.addGroupBy("paid_by");
+    expect(component.groupByLevels().map((level) => level.isCustom)).toEqual([true, false]);
+
+    columnsArray().push(
+      buildColumnGroup(formBuilder, {
+        kind: ReportColumn.KindEnum.Dimension,
+        name: "Vendor",
+        label: "Vendor",
+        field: "custom_8",
+      })
+    );
+    columnsArray().push(
+      buildColumnGroup(formBuilder, {
+        kind: ReportColumn.KindEnum.Aggregate,
+        name: "Hst",
+        label: "HST",
+        aggFunc: ReportColumn.AggFuncEnum.Sum,
+        measure: "custom_7",
+      })
+    );
+    columnsArray().push(
+      buildColumnGroup(formBuilder, {
+        kind: ReportColumn.KindEnum.Aggregate,
+        name: "Total",
+        label: "Total",
+        aggFunc: ReportColumn.AggFuncEnum.Sum,
+        measure: "amount",
+      })
+    );
+    form.get("detail.by")!.setValue("custom_8");
+
+    const byLabel = new Map(component.columnRows().map((row) => [row.label, row.isCustom]));
+    expect(byLabel.get("Vendor")).toBe(true);
+    expect(byLabel.get("HST")).toBe(true);
+    expect(byLabel.get("Total")).toBe(false);
+  });
+
+  it("badges custom fields in the dropdown options", () => {
+    loadCustomFields();
+
+    const options = new Map(
+      component.addableDimensionOptions().map((option) => [option.value, option.badge])
+    );
+    expect(options.get("custom_7")).toBe("Custom");
+    expect(options.get("category")).toBe("");
+    expect(
+      component.dimensionOptions().find((option) => option.value === "custom_8")?.badge
+    ).toBe("Custom");
   });
 
   // ---- detail mode -------------------------------------------------------

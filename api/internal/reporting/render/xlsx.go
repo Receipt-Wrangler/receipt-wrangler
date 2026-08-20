@@ -100,7 +100,7 @@ func (s *xlsxSink) writeRow(kind rowKind, cells []faithfulCell) error {
 // left blank. bold styles the whole cell (subtotal/grand-total rows).
 func (s *xlsxSink) writeReportCell(column, row int, descriptor reporting.ColumnDescriptor, cell reporting.Cell, bold bool) error {
 	if descriptor.Kind == reporting.ColumnLabel {
-		return s.setString(column, row, joinLabel(cell, s.model.Meta.NoneLabel), bold)
+		return s.setString(column, row, joinLabel(cell, descriptor, s.model.Meta.Currency, s.model.Meta.NoneLabel), bold)
 	}
 
 	value := cell.Value()
@@ -192,19 +192,21 @@ func (s *xlsxSink) styleID(numberFormat string, bold bool) (int, error) {
 	return id, nil
 }
 
-// joinLabel renders a label cell: its values joined with commas, a null as the
-// report's (None) name, and no values (a subtotal's label column) as empty.
-func joinLabel(cell reporting.Cell, noneLabel string) string {
+// joinLabel renders a label cell: its values formatted per the column's declared
+// type and joined with commas, a null as the report's (None) name, and no values
+// (a subtotal's label column) as empty.
+//
+// A label column is always a string cell, even when it displays money — its
+// values name a bucket rather than measure one, and a comma-joined multi-value
+// label has no numeric reading at all. Aggregate columns are what carry native,
+// analyzable numbers into the workbook.
+func joinLabel(cell reporting.Cell, descriptor reporting.ColumnDescriptor, currency *reporting.CurrencyFormat, noneLabel string) string {
 	if len(cell.Values) == 0 {
 		return ""
 	}
 	parts := make([]string, 0, len(cell.Values))
 	for _, value := range cell.Values {
-		if value.IsNull() {
-			parts = append(parts, noneLabel)
-			continue
-		}
-		parts = append(parts, value.String())
+		parts = append(parts, formatLabelValue(value, descriptor.DataType, currency, noneLabel))
 	}
 	return strings.Join(parts, ", ")
 }

@@ -2,15 +2,28 @@ import { ReportDetail, ReportRequestCommand } from "../../open-api";
 import { REPORT_BUILTIN_DIMENSIONS, REPORT_FORMATS } from "./report-catalog.constants";
 
 // Field-key -> label for the built-in dimensions the list renders. Custom-field
-// grouping keys (custom_<id>) aren't in this map and fall back to the raw key.
+// keys (custom_<id>) are only resolvable against the loaded custom-field pool, so
+// callers that have it pass a resolver.
 const DIMENSION_LABELS = new Map(REPORT_BUILTIN_DIMENSIONS.map((d) => [d.key, d.label]));
 
-/** The human label for an engine field key, or the raw key when it isn't a built-in. */
-export function fieldLabel(key: string | undefined): string {
+/**
+ * Resolves a field key the built-in map doesn't cover — a custom field's
+ * `custom_<id>`. Returning undefined means "I don't know it", which falls back to
+ * the raw key.
+ */
+export type FieldLabelResolver = (key: string) => string | undefined;
+
+/**
+ * The human label for an engine field key: a built-in's name, else whatever the
+ * caller's resolver knows, else the raw key. The raw-key fallback is what a
+ * caller without the custom-field pool (no resolver, or no permission to read it)
+ * gets, so a row still renders something rather than nothing.
+ */
+export function fieldLabel(key: string | undefined, resolve?: FieldLabelResolver): string {
   if (!key) {
     return "";
   }
-  return DIMENSION_LABELS.get(key) ?? key;
+  return DIMENSION_LABELS.get(key) ?? resolve?.(key) ?? key;
 }
 
 /** How many columns the stored report defines. */
@@ -19,18 +32,24 @@ export function columnCount(configuration: ReportRequestCommand): number {
 }
 
 /** The grouping levels as a readable label list, or a "no grouping" hint. */
-export function groupingSummary(configuration: ReportRequestCommand): string {
+export function groupingSummary(
+  configuration: ReportRequestCommand,
+  resolve?: FieldLabelResolver
+): string {
   const groupBy = configuration.groupBy ?? [];
   if (groupBy.length === 0) {
     return "No grouping";
   }
-  return groupBy.map(fieldLabel).join(", ");
+  return groupBy.map((key) => fieldLabel(key, resolve)).join(", ");
 }
 
 /** Whether the report aggregates (and by what) or lists individual receipts. */
-export function detailSummary(configuration: ReportRequestCommand): string {
+export function detailSummary(
+  configuration: ReportRequestCommand,
+  resolve?: FieldLabelResolver
+): string {
   if (configuration.detail?.mode === ReportDetail.ModeEnum.Aggregate) {
-    return `Aggregate by ${fieldLabel(configuration.detail.by)}`;
+    return `Aggregate by ${fieldLabel(configuration.detail.by, resolve)}`;
   }
   return "Record-level";
 }

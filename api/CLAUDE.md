@@ -1248,7 +1248,34 @@ association resolves to no value, which surfaces as a `(None)` bucket — not an
 calendar period, `receiptsource` also offers derived **string** fields `<base>_day` / `_month` /
 `_year` (e.g. `date_month`, `created_at_year`, `resolved_date_day`) — zero-padded ISO in **UTC**, so
 they sort chronologically as plain text. A report groups by one of these instead of the raw date field;
-a nil `resolved_date` emits none of its period fields (→ `(None)`).
+a nil `resolved_date` emits none of its period fields (→ `(None)`). A **date custom field** gets the
+same treatment: `CustomFieldPeriodKeys(id)` yields `custom_<id>_day` / `_month` / `_year`, labelled off
+the field's own name (`"Due Date (Month)"`) through the shared `dateFieldRefs` / `setDateParts` helpers.
+They cannot collide with another field's key — `CustomFieldKey` is always `custom_` plus digits alone —
+and only a `models.DATE` field derives them. When duplicate values force the lowest-id-wins tie-break,
+the period parts are rewritten with the winner, so they always describe the value that survived.
+
+**Every field can cut; only numeric fields can be measured.** `Role` (`field.go`) bounds *measuring*
+only — `compileGroupBy` / `compileDetail` accept any field in the catalog, so a **currency custom field
+is both groupable and summable** (and a plain label column always accepted any field). Grouping by a
+number is well defined: bucket keys are canonical for decimals and `compareValues` orders them, so
+`15.60` and `15.6` share one bucket. `ErrGroupByNotDimension` / `ErrDetailByNotDimension` are **gone** —
+a spec that used to be rejected for grouping by a measure now compiles. Tests that needed an
+*invalid* spec use an unknown field key (`ErrUnknownField`) instead; don't reintroduce "group by
+amount" as the invalid-spec fixture.
+
+**Typed dimension and label rendering.** The engine emits raw typed values, so a renderer needs the
+field's type to present them: without it a bool prints `true`, a date an RFC 3339 instant, and money a
+bare decimal. `render.Dimension` therefore carries a `DataType` (populated by `buildDimensions` from the
+catalog), and `render/value.go`'s shared `formatLabelValue` is used by **every** label-ish cell —
+`formatDimension` (the CSV walk *and* `walk.go`, so HTML/PDF and XLSX too) and `joinLabel` (XLSX) —
+mapping bool → `Yes`/`No`, date → `2006-01-02` **UTC** (matching the derived `_day` field), currency →
+`Meta.Currency`'s format (bare 2dp when unset). A declared type that disagrees with a value's payload
+falls through to the value's own rendering rather than substituting a zero. A label column is still a
+**string** cell in XLSX even when it holds money — it names a bucket rather than measuring one, and a
+multi-value label has no numeric reading; aggregate columns are what carry native numbers. Note this
+changed existing reports that group by the built-in `date` / `resolved_date` / `created_at`: their
+bucket text went from RFC 3339 to a plain calendar day.
 
 **`services.ReportDataService`** (`internal/services/report_data.go`) is the first DB-backed caller of
 the engine — it follows the `pie_chart.go` pattern. `Rows(userId, groupId, filter)` fetches the group's

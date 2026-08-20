@@ -17,9 +17,11 @@ import { DEFAULT_DIALOG_CONFIG } from "src/constants/dialog.constant";
 import { GroupState } from "src/store";
 import { ReportColumn, ReportDetail, ReportPeriod } from "../../open-api";
 import {
+  CUSTOM_FIELD_BADGE,
   REPORT_DOCUMENT_VARIABLES,
   REPORT_PERIOD_PRESETS,
   ReportField,
+  toFieldOptions,
 } from "../models/report-catalog.constants";
 import { CHIP_COLORS, groupInitials } from "../models/report-chip.util";
 import { isDimensionColumnDisabled, ReportColumnValue } from "../models/report-command.mapper";
@@ -45,6 +47,7 @@ interface ScopeChip {
 interface GroupByLevel {
   index: number;
   label: string;
+  isCustom: boolean;
   isFirst: boolean;
   isLast: boolean;
 }
@@ -57,6 +60,7 @@ interface ColumnRow {
   kindLabel: string;
   kindIcon: string;
   kindClass: string;
+  isCustom: boolean;
   isFirst: boolean;
   isLast: boolean;
   disabled: boolean;
@@ -104,6 +108,7 @@ export class ReportConfigPanelComponent implements OnInit {
     displayValue: preset.label,
   }));
   public readonly documentVariables = REPORT_DOCUMENT_VARIABLES;
+  public readonly customFieldBadge = CUSTOM_FIELD_BADGE;
   public readonly ReportPeriodPreset = ReportPeriod.PresetEnum;
   public readonly ReportDetailMode = ReportDetail.ModeEnum;
 
@@ -112,9 +117,9 @@ export class ReportConfigPanelComponent implements OnInit {
   // into addGroupBy and is reset to the blank option afterward.
   public readonly addGroupControl = new FormControl<string | null>(null);
 
-  public readonly dimensionOptions = computed(() =>
-    this.dimensions().map((field) => ({ value: field.key, displayValue: field.label }))
-  );
+  public readonly dimensionOptions = computed(() => toFieldOptions(this.dimensions()));
+
+  public readonly addableDimensionOptions = computed(() => toFieldOptions(this.addableDimensions()));
 
   public readonly scopeChips = computed<ScopeChip[]>(() => {
     this.revision();
@@ -133,6 +138,7 @@ export class ReportConfigPanelComponent implements OnInit {
     return controls.map((control, index) => ({
       index,
       label: this.labelForField(control.value as string),
+      isCustom: this.isCustomField(control.value as string),
       isFirst: index === 0,
       isLast: index === controls.length - 1,
     }));
@@ -162,6 +168,7 @@ export class ReportConfigPanelComponent implements OnInit {
         kindLabel: meta.label,
         kindIcon: meta.icon,
         kindClass: meta.cssClass,
+        isCustom: this.columnReadsACustomField(value),
         isFirst: index === 0,
         isLast: index === controls.length - 1,
         disabled,
@@ -329,6 +336,30 @@ export class ReportConfigPanelComponent implements OnInit {
 
   private labelForField(key: string): string {
     return this.dimensions().find((field) => field.key === key)?.label ?? key;
+  }
+
+  /**
+   * Whether a field key names a custom field. Resolved through the catalog rather
+   * than by matching the key's shape, so a user who cannot read the custom-field
+   * pool (the catalog swallows that 403) sees no badge instead of a badge on a
+   * field the builder cannot even name.
+   */
+  private isCustomField(key: string): boolean {
+    const field =
+      this.dimensions().find((candidate) => candidate.key === key) ??
+      this.measures().find((candidate) => candidate.key === key);
+    return field?.isCustom === true;
+  }
+
+  /** A column is custom when the field it reads is — a dimension's or an aggregate's measure. */
+  private columnReadsACustomField(column: ReportColumnValue): boolean {
+    if (column.kind === ReportColumn.KindEnum.Dimension) {
+      return this.isCustomField(column.field ?? "");
+    }
+    if (column.kind === ReportColumn.KindEnum.Aggregate) {
+      return this.isCustomField(column.measure ?? "");
+    }
+    return false;
   }
 
   private describeColumn(column: ReportColumnValue): string {

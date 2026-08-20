@@ -515,6 +515,9 @@ func TestFormatCell_ByTypeAndKind(t *testing.T) {
 	currency := reporting.ColumnDescriptor{Kind: reporting.ColumnAggregate, DataType: reporting.TypeCurrency}
 	number := reporting.ColumnDescriptor{Kind: reporting.ColumnAggregate, DataType: reporting.TypeNumber}
 	label := reporting.ColumnDescriptor{Kind: reporting.ColumnLabel, DataType: reporting.TypeString}
+	dateLabel := reporting.ColumnDescriptor{Kind: reporting.ColumnLabel, DataType: reporting.TypeDate}
+	boolLabel := reporting.ColumnDescriptor{Kind: reporting.ColumnLabel, DataType: reporting.TypeBool}
+	currencyLabel := reporting.ColumnDescriptor{Kind: reporting.ColumnLabel, DataType: reporting.TypeCurrency}
 
 	date := time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC)
 
@@ -530,8 +533,14 @@ func TestFormatCell_ByTypeAndKind(t *testing.T) {
 		{"plain integer", number, reporting.Cell{Values: []reporting.Value{num(2)}}, "2"},
 		{"non-number in a measure column", number, reporting.Cell{Values: []reporting.Value{reporting.Str("n/a")}}, "n/a"},
 		{"string label", label, reporting.Cell{Values: []reporting.Value{reporting.Str("Food")}}, "Food"},
-		{"date label utc", label, reporting.Cell{Values: []reporting.Value{reporting.DateVal(date)}}, "2026-05-15T00:00:00Z"},
-		{"bool label", label, reporting.Cell{Values: []reporting.Value{reporting.Bool(true)}}, "true"},
+		{"date label utc", dateLabel, reporting.Cell{Values: []reporting.Value{reporting.DateVal(date)}}, "2026-05-15"},
+		{"bool label true", boolLabel, reporting.Cell{Values: []reporting.Value{reporting.Bool(true)}}, "Yes"},
+		{"bool label false", boolLabel, reporting.Cell{Values: []reporting.Value{reporting.Bool(false)}}, "No"},
+		{"currency label two places", currencyLabel, reporting.Cell{Values: []reporting.Value{money("15.6")}}, "15.60"},
+		// A value whose payload disagrees with the column's declared type falls
+		// back to its own rendering rather than to a zero of the declared type.
+		{"date payload in a string label", label, reporting.Cell{Values: []reporting.Value{reporting.DateVal(date)}}, "2026-05-15T00:00:00Z"},
+		{"string payload in a bool label", boolLabel, reporting.Cell{Values: []reporting.Value{reporting.Str("maybe")}}, "maybe"},
 		{"null measure is blank", currency, reporting.Cell{Values: []reporting.Value{reporting.Null()}}, ""},
 		{"null label is none", label, reporting.Cell{Values: []reporting.Value{reporting.Null()}}, "(None)"},
 		{"no values is blank", label, reporting.Cell{}, ""},
@@ -547,10 +556,12 @@ func TestFormatCell_ByTypeAndKind(t *testing.T) {
 }
 
 func TestFormatDimension_NullIsNoneLabel(t *testing.T) {
-	if got := formatDimension(reporting.Null(), "(None)"); got != "(None)" {
+	paidBy := Dimension{Key: "paid_by", Label: "Paid By", DataType: reporting.TypeString}
+
+	if got := formatDimension(reporting.Null(), paidBy, nil, "(None)"); got != "(None)" {
 		t.Errorf("null dimension = %q, want (None)", got)
 	}
-	if got := formatDimension(reporting.Str("Dana"), "(None)"); got != "Dana" {
+	if got := formatDimension(reporting.Str("Dana"), paidBy, nil, "(None)"); got != "Dana" {
 		t.Errorf("string dimension = %q, want Dana", got)
 	}
 }
@@ -632,8 +643,8 @@ func TestCSV_SubtotalsWithoutGrandTotal(t *testing.T) {
 	}
 }
 
-// A boolean grouping dimension renders its bucket value as true/false, with
-// false sorting before true.
+// A boolean grouping dimension renders its bucket value as Yes/No, with false
+// sorting before true.
 func TestCSV_BoolGroupDimension(t *testing.T) {
 	catalog := mustCatalog(t,
 		reporting.FieldRef{Key: "reimbursable", Label: "Reimbursable", DataType: reporting.TypeBool},
@@ -653,19 +664,21 @@ func TestCSV_BoolGroupDimension(t *testing.T) {
 		{"reimbursable": {reporting.Bool(true)}, "category": {reporting.Str("Food")}, "amount": {money("50")}},
 	}
 
-	got := mustCSV(t, mustRun(t, spec, catalog, rows), []Dimension{{Key: "reimbursable", Label: "Reimbursable"}})
+	got := mustCSV(t, mustRun(t, spec, catalog, rows),
+		[]Dimension{{Key: "reimbursable", Label: "Reimbursable", DataType: reporting.TypeBool}})
 	want := crlf(
 		"Row Type,Reimbursable,Category,Total",
-		"Detail,false,Food,100.00",
-		"Detail,true,Food,50.00",
+		"Detail,No,Food,100.00",
+		"Detail,Yes,Food,50.00",
 	)
 	if got != want {
 		t.Errorf("csv mismatch\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
 }
 
-// A date grouping dimension renders its bucket as the instant in UTC (RFC 3339),
-// which sorts chronologically.
+// A date grouping dimension renders its bucket as the calendar day in UTC, the
+// same text the derived date-period fields carry. Buckets still sort by instant,
+// so the rows stay chronological.
 func TestCSV_DateGroupDimension(t *testing.T) {
 	catalog := mustCatalog(t,
 		reporting.FieldRef{Key: "date", Label: "Date", DataType: reporting.TypeDate},
@@ -685,11 +698,49 @@ func TestCSV_DateGroupDimension(t *testing.T) {
 		{"date": {reporting.DateVal(time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC))}, "category": {reporting.Str("Food")}, "amount": {money("100")}},
 	}
 
-	got := mustCSV(t, mustRun(t, spec, catalog, rows), []Dimension{{Key: "date", Label: "Date"}})
+	got := mustCSV(t, mustRun(t, spec, catalog, rows),
+		[]Dimension{{Key: "date", Label: "Date", DataType: reporting.TypeDate}})
 	want := crlf(
 		"Row Type,Date,Category,Total",
-		"Detail,2026-01-15T00:00:00Z,Food,100.00",
-		"Detail,2026-02-20T00:00:00Z,Food,50.00",
+		"Detail,2026-01-15,Food,100.00",
+		"Detail,2026-02-20,Food,50.00",
+	)
+	if got != want {
+		t.Errorf("csv mismatch\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}
+
+// Grouping by a currency custom field is legal, and its buckets read as money —
+// per the report's currency configuration, exactly like an aggregate column.
+func TestCSV_CurrencyGroupDimension(t *testing.T) {
+	catalog := mustCatalog(t,
+		reporting.FieldRef{Key: "custom_1", Label: "HST", DataType: reporting.TypeCurrency},
+		reporting.FieldRef{Key: "category", Label: "Category", DataType: reporting.TypeString, Multi: true},
+		reporting.FieldRef{Key: "amount", Label: "Amount", DataType: reporting.TypeCurrency},
+	)
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{"custom_1"},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "category"},
+		Columns: []reporting.Column{
+			{Name: "Hst", Label: "HST", Kind: reporting.ColumnLabel, Field: "custom_1"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(amount)"},
+		},
+	}
+	rows := []reporting.Row{
+		{"custom_1": {money("1500.5")}, "category": {reporting.Str("Food")}, "amount": {money("50")}},
+		{"custom_1": {money("2")}, "category": {reporting.Str("Food")}, "amount": {money("100")}},
+		{"category": {reporting.Str("Food")}, "amount": {money("10")}},
+	}
+
+	model := mustRun(t, spec, catalog, rows)
+	model.Meta.Currency = &reporting.CurrencyFormat{Symbol: "$", ThousandsSeparator: ",", DecimalSeparator: "."}
+
+	got := mustCSV(t, model, []Dimension{{Key: "custom_1", Label: "HST", DataType: reporting.TypeCurrency}})
+	want := crlf(
+		"Row Type,HST,HST,Total",
+		"Detail,$2.00,$2.00,$100.00",
+		`Detail,"$1,500.50","$1,500.50",$50.00`,
+		"Detail,(None),(None),$10.00",
 	)
 	if got != want {
 		t.Errorf("csv mismatch\n--- got ---\n%s\n--- want ---\n%s", got, want)

@@ -52,17 +52,23 @@ func (d DataType) IsNumeric() bool {
 	return d == TypeNumber || d == TypeCurrency
 }
 
-// Role is what a field may be used for. It is derived from the data type rather
-// than declared, so a template can never group by a dollar amount or sum a
-// status.
+// Role is what a field is for. It is derived from the data type rather than
+// declared, so a template can never sum a status.
+//
+// It bounds measuring only: every field can cut the data, so a dimension is not
+// restricted to RoleDimension fields. Grouping by a currency custom field is as
+// meaningful as grouping by a category, and refusing it would make a custom
+// field's type decide whether it is reportable at all.
 type Role uint8
 
 const (
-	// RoleDimension is a way to cut the data: a groupBy level, or the dimension
-	// an aggregated detail row is keyed on.
+	// RoleDimension is a field that only cuts: it can be a groupBy level, the
+	// dimension an aggregated detail row is keyed on, or a label column, but it
+	// cannot be measured.
 	RoleDimension Role = iota
 
-	// RoleMeasure is a thing to measure: the input to an aggregate column.
+	// RoleMeasure is a thing to measure: the input to an aggregate column. A
+	// measure can still cut, so a currency field is both summable and groupable.
 	RoleMeasure
 )
 
@@ -77,7 +83,7 @@ func (r Role) String() string {
 }
 
 // RoleForDataType derives a field's role from its type. Numbers measure;
-// everything else cuts.
+// everything else only cuts.
 func RoleForDataType(dataType DataType) Role {
 	if dataType.IsNumeric() {
 		return RoleMeasure

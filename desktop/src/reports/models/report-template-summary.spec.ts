@@ -32,6 +32,16 @@ describe("report-template-summary", () => {
     expect(fieldLabel(undefined)).toBe("");
   });
 
+  it("resolves custom field keys through the caller's resolver", () => {
+    const resolve = (key: string) => (key === "custom_42" ? "Due Date" : undefined);
+
+    expect(fieldLabel("custom_42", resolve)).toBe("Due Date");
+    // A resolver that doesn't know the key still falls back to the raw key.
+    expect(fieldLabel("custom_99", resolve)).toBe("custom_99");
+    // A built-in never consults the resolver.
+    expect(fieldLabel("category", () => "Wrong")).toBe("Category");
+  });
+
   it("counts columns", () => {
     expect(columnCount(command({ columns: [] }))).toBe(0);
     expect(
@@ -49,6 +59,17 @@ describe("report-template-summary", () => {
   it("summarizes grouping levels or reports none", () => {
     expect(groupingSummary(command({ groupBy: [] }))).toBe("No grouping");
     expect(groupingSummary(command({ groupBy: ["group", "category"] }))).toBe("Group, Category");
+  });
+
+  it("names custom fields in the grouping and detail summaries", () => {
+    const resolve = (key: string) => ({ custom_42: "Due Date", custom_7: "HST" })[key];
+
+    expect(groupingSummary(command({ groupBy: ["group", "custom_42"] }), resolve)).toBe(
+      "Group, Due Date"
+    );
+    expect(
+      detailSummary(command({ detail: { mode: ReportDetail.ModeEnum.Aggregate, by: "custom_7" } }), resolve)
+    ).toBe("Aggregate by HST");
   });
 
   it("summarizes the detail mode", () => {

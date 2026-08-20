@@ -82,6 +82,7 @@ func faithfulWalk(model reporting.ReportModel, groupBy []Dimension, sink faithfu
 
 	walker := &faithfulWalker{
 		model:     model,
+		groupBy:   groupBy,
 		numDims:   len(groupBy),
 		totalCols: len(groupBy) + len(model.Columns),
 		sink:      sink,
@@ -98,7 +99,10 @@ func faithfulWalk(model reporting.ReportModel, groupBy []Dimension, sink faithfu
 // faithfulWalker carries the walk's running state: the sink, the grid width, and
 // the previous detail row's group path for dimension blanking.
 type faithfulWalker struct {
-	model     reporting.ReportModel
+	model reporting.ReportModel
+	// groupBy carries each level's data type, which is what turns a bucket value
+	// into the text a reader expects rather than the engine's raw rendering.
+	groupBy   []Dimension
 	numDims   int
 	totalCols int
 	sink      faithfulSink
@@ -141,7 +145,10 @@ func (w *faithfulWalker) walk(node reporting.GroupNode, level int, path []report
 func (w *faithfulWalker) emitDetail(path []reporting.Value, cells []reporting.Cell) error {
 	row := make([]faithfulCell, w.totalCols)
 	for index := w.firstDiff(path); index < len(path); index++ {
-		row[index] = faithfulCell{kind: textCell, text: formatDimension(path[index], w.model.Meta.NoneLabel)}
+		row[index] = faithfulCell{
+			kind: textCell,
+			text: formatDimension(path[index], w.groupBy[index], w.model.Meta.Currency, w.model.Meta.NoneLabel),
+		}
 	}
 	for offset, descriptor := range w.model.Columns {
 		row[w.numDims+offset] = faithfulCell{kind: reportCell, descriptor: descriptor, cell: cells[offset]}
