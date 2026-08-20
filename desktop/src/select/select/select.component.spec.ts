@@ -62,6 +62,26 @@ describe('SelectComponent', () => {
     expect(component.selectedIndex()).toBe(-1);
   });
 
+  // Without an optionValueKey the control holds the option OBJECT itself, so the
+  // match is by reference — the other half of selectedIndex()'s branch.
+  it('resolves the selection by identity when there is no value key', () => {
+    component.inputFormControl = new FormControl(options[1]);
+    component.optionValueKey = '';
+    fixture.componentRef.setInput('options', options);
+    fixture.componentRef.setInput('optionDisplayKey', 'displayValue');
+    fixture.componentRef.setInput('optionBadgeKey', 'badge');
+
+    expect(component.selectedIndex()).toBe(1);
+
+    // An equal-looking copy is a different reference, so it does not match —
+    // which is the same rule mat-select itself applies without a compareWith.
+    component.inputFormControl.setValue({ ...options[1] });
+    expect(component.selectedIndex()).toBe(-1);
+
+    component.inputFormControl.setValue('nope');
+    expect(component.selectedIndex()).toBe(-1);
+  });
+
   // The closed select renders the selected option's text content, so a badged
   // option would otherwise read "HSTCustom". A badged select draws its own
   // trigger to keep the two apart.

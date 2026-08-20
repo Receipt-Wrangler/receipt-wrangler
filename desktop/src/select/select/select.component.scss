@@ -11,6 +11,9 @@
   text-transform: uppercase;
   border-radius: 5px;
   padding: 2px 6px;
-  color: #64748b;
+  // Same WCAG reasoning as the report config panel's badge: 9.5px/700 is small
+  // text, so it needs 4.5:1 against the composited fill (#e2e4e7 over white).
+  // The lighter slate was 3.90:1; this is 5.95:1.
+  color: #475569;
   background: rgba(100, 116, 139, 0.16);
 }
