@@ -38,6 +38,7 @@ const (
 
 	AppCustomFieldsCreate = "app.custom-fields.create"
 	AppCustomFieldsRead   = "app.custom-fields.read"
+	AppCustomFieldsUpdate = "app.custom-fields.update"
 	AppCustomFieldsDelete = "app.custom-fields.delete"
 
 	AppSystemSettingsRead              = "app.system-settings.read"
@@ -169,6 +170,7 @@ var registry = []Descriptor{
 
 	{AppCustomFieldsCreate, "Create Custom Fields", "Create new custom field definitions.", "Catalog", ScopeApp},
 	{AppCustomFieldsRead, "Read Custom Fields", "List and look up custom fields.", "Catalog", ScopeApp},
+	{AppCustomFieldsUpdate, "Update Custom Fields", "Edit an existing custom field's name, description, and select options. The field's type can never be changed.", "Catalog", ScopeApp},
 	{AppCustomFieldsDelete, "Delete Custom Fields", "Remove custom field definitions.", "Catalog", ScopeApp},
 
 	{AppSystemSettingsRead, "Read System Settings", "View system settings.", "System", ScopeApp},

@@ -936,6 +936,42 @@ it (its set is every app permission); **Legacy User deliberately does not**. It 
 the delete control lives on the Manage Groups page, which is reached behind `app.groups.read`. The
 `IsAllGroup` → 400 guard is unaffected, so the virtual "All" group stays undeletable for everyone.
 
+**`app.custom-fields.update` — editing a custom field (Custom Fields):** custom fields could be
+created and deleted but never corrected, and deleting one also deletes every `CustomFieldValue`
+attached to it across every receipt — so a typo in a name or an option was unfixable. `PUT
+/customField/{id}` (`UpdateCustomField`, gated by `AppPermissions: [app.custom-fields.update]`) edits
+the **name, description, and select options**. Legacy Admin auto-includes it (its set is every app
+permission); **Legacy User deliberately does not** — it holds custom-fields create + read, matching
+categories and tags, where create is granted and update/delete are not. No seed change and no data
+migration: `SeedSystemRoles`' add-only reconciliation delivers it to an upgraded install on the next
+boot.
+
+Two invariants make the edit safe, enforced by `UpsertCustomFieldCommand.ValidateUpdate` (a **pure**
+companion to `Validate` that takes the currently-stored `models.CustomField`, so the update rules sit
+beside the create rules rather than in the handler) and re-asserted by the repository:
+
+- **The type is immutable.** A `CustomFieldValue` stores its data in one of five type-specific columns
+  (`StringValue` / `DateValue` / `SelectValue` / `CurrencyValue` / `BooleanValue`), so re-typing a
+  field would silently mis-column every value already recorded against it. A differing `type` is a
+  **400** (`{"type": "Type cannot be changed"}`), and `UpdateCustomField` never puts the column in its
+  `Updates` map, so a caller that skips validation still cannot change it.
+- **Options are renamed or appended, never removed.** `CustomFieldValue.SelectValue` holds an option
+  **id**, so options are matched by a new `UpsertCustomFieldOptionCommand.Id` (zero = append) and a
+  rename keeps the id — every receipt that picked it still resolves, now showing the corrected text.
+  An option the command **omits is left untouched, not deleted**: that is the no-orphan guarantee, and
+  it also makes a stale form (another admin appending an option meanwhile) a no-op rather than a 400.
+  An option id the field does not own is a **400**, and the repository's option update is additionally
+  scoped `WHERE id = ? AND custom_field_id = ?` so a foreign option is unwritable even if that check
+  raced.
+
+`UpdateCustomField` uses the **map form** of `Updates` so a cleared description actually clears (the
+struct form skips zero values — the same reason `UpdateAppRole` does), and maps
+`gorm.ErrRecordNotFound` to **404**. (The older `GetCustomFieldById` handler still returns 500 for a
+missing id; its test pins that and it was left alone.) `UpsertCustomFieldOptionCommand.CustomFieldId`
+also had its json tag corrected from `custom_field_id` to `customFieldId` to match swagger — it is
+never trusted either way, since create derives the FK from the parent association and update from the
+request URL.
+
 **`middleware.CanDeleteGroup` is permission-aware.** That middleware (`middleware/group.go`, wrapping
 only the DELETE route) rejects when the **caller** belongs to ≤1 group — self-protection so a user
 can't delete themselves out of every group. It ignores `{groupId}` and runs *before* `HandleRequest`,

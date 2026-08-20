@@ -66,6 +66,9 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'app.custom-fields.read')
   static const Permission appPeriodCustomFieldsPeriodRead = _$appPeriodCustomFieldsPeriodRead;
   /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.custom-fields.update')
+  static const Permission appPeriodCustomFieldsPeriodUpdate = _$appPeriodCustomFieldsPeriodUpdate;
+  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'app.custom-fields.delete')
   static const Permission appPeriodCustomFieldsPeriodDelete = _$appPeriodCustomFieldsPeriodDelete;
   /// All permission keys the API recognizes.

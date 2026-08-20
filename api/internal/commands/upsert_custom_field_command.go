@@ -52,3 +52,44 @@ func (command *UpsertCustomFieldCommand) Validate() structs.ValidatorError {
 	vErr.Errors = errors
 	return vErr
 }
+
+// ValidateUpdate applies the rules that only exist for an edit, given the custom
+// field as it is currently stored. It is deliberately pure -- the caller loads
+// the existing record (options included) and passes it in -- so the update rules
+// live beside Validate rather than in the handler.
+//
+// Two invariants are enforced here:
+//
+//   - The type is immutable. A CustomFieldValue stores its data in one of five
+//     type-specific columns, so re-typing a field would mis-column every value
+//     already recorded against it.
+//   - An option must belong to this custom field. Options are matched by id so an
+//     edit can rename them in place; an id from another field would otherwise let
+//     a caller rewrite an unrelated field's option.
+//
+// Removing an option is not an error -- the repository leaves any option the
+// command omits untouched, because CustomFieldValue.SelectValue holds an option
+// id that a delete would orphan.
+func (command *UpsertCustomFieldCommand) ValidateUpdate(existing models.CustomField) structs.ValidatorError {
+	errors := make(map[string]string)
+	vErr := structs.ValidatorError{}
+
+	if command.Type != existing.Type {
+		errors["type"] = "Type cannot be changed"
+	}
+
+	existingOptionIds := make(map[uint]bool, len(existing.Options))
+	for _, option := range existing.Options {
+		existingOptionIds[option.ID] = true
+	}
+
+	for _, optionCommand := range command.Options {
+		if optionCommand.Id != 0 && !existingOptionIds[optionCommand.Id] {
+			errors["options"] = "One or more options do not belong to this custom field"
+			break
+		}
+	}
+
+	vErr.Errors = errors
+	return vErr
+}

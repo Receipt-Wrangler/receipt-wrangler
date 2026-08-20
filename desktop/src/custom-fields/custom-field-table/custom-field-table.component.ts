@@ -7,9 +7,9 @@ import { Store } from "@ngxs/store";
 import { of, switchMap, take, tap } from "rxjs";
 import { CustomField, CustomFieldService, PagedDataDataInner, PagedRequestCommand, Permission } from "src/open-api";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
-import { CategoryTableState } from "src/store/category-table.state";
 import { TableComponent } from "src/table/table/table.component";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants/index";
+import { FormMode } from "../../enums/form-mode.enum";
 import { SnackbarService } from "../../services/index";
 import { CustomFieldTableState } from "../../store/custom-field-table.state";
 import { SetOrderBy, SetPage, SetPageSize, SetSortDirection } from "../../store/custom-field-table.state.actions";
@@ -34,7 +34,7 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
 
   public readonly table = viewChild.required(TableComponent);
 
-  public state = this.store.selectSignal(CategoryTableState.state);
+  public state = this.store.selectSignal(CustomFieldTableState.state);
 
   public dataSource = signal(new MatTableDataSource<PagedDataDataInner>([]));
 
@@ -45,6 +45,12 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
   public totalCount = signal(0);
 
   protected readonly Permission = Permission;
+
+  protected readonly FormMode = FormMode;
+
+  private readonly canUpdate = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppCustomFieldsUpdate)
+  );
 
   constructor(
     private customFieldService: CustomFieldService,
@@ -77,11 +83,13 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
     this.getCustomFields();
   }
 
-  public openCustomFieldDialog(customField?: CustomField): void {
+  public openCustomFieldDialog(customField?: CustomField, mode?: FormMode): void {
     const dialogRef = this.matDialog.open(CustomFieldFormComponent, DEFAULT_DIALOG_CONFIG);
+    const resolvedMode = mode ?? this.resolveDialogMode(customField);
 
-    dialogRef.componentInstance.headerText = customField ? "View Custom Field" : "Add Custom Field";
+    dialogRef.componentInstance.headerText = this.buildDialogHeaderText(customField, resolvedMode);
     dialogRef.componentInstance.customField = customField;
+    dialogRef.componentInstance.mode = resolvedMode;
 
     dialogRef
       .afterClosed()
@@ -94,6 +102,24 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
         })
       )
       .subscribe();
+  }
+
+  // Clicking a custom field's name opens the editor for anyone who may edit it,
+  // and the read-only view for everyone else.
+  private resolveDialogMode(customField?: CustomField): FormMode {
+    if (!customField) {
+      return FormMode.add;
+    }
+
+    return this.canUpdate() ? FormMode.edit : FormMode.view;
+  }
+
+  private buildDialogHeaderText(customField: CustomField | undefined, mode: FormMode): string {
+    if (!customField) {
+      return "Add Custom Field";
+    }
+
+    return mode === FormMode.edit ? `Edit ${customField.name}` : "View Custom Field";
   }
 
   private initTableData(): void {
@@ -167,7 +193,13 @@ export class CustomFieldTableComponent implements OnInit, AfterViewInit {
       "description",
     ];
 
-    if (this.store.selectSnapshot(AuthState.hasAppPermission(Permission.AppCustomFieldsDelete))) {
+    const canUseRowActions = this.store.selectSnapshot(
+      AuthState.hasAnyAppPermission([
+        Permission.AppCustomFieldsUpdate,
+        Permission.AppCustomFieldsDelete,
+      ])
+    );
+    if (canUseRowActions) {
       this.displayedColumns.push("actions");
     }
   }

@@ -7,19 +7,19 @@
       >
         <app-input
           label="Name"
-          [readonly]="readonly"
+          [readonly]="mode | inputReadonly"
           [inputFormControl]="form | formGet : 'name'"
         ></app-input>
         <app-input
           label="Description"
-          [readonly]="readonly"
+          [readonly]="mode | inputReadonly"
           [inputFormControl]="form | formGet : 'description'"
         ></app-input>
         <app-select
           label="Type"
           optionDisplayKey="displayValue"
           optionValueKey="value"
-          [readonly]="readonly"
+          [readonly]="typeReadonly"
           [options]="typeOptions"
           [inputFormControl]="form | formGet:'type'"
         ></app-select>
@@ -30,16 +30,17 @@
           [headerButtonsTemplate]="optionsButtonTemplate"
           [indent]="false"
         >
-          @for (option of options; track option.id; let index = $index) {
+          @for (option of options; track $index; let index = $index) {
             <div class="d-flex align-items-center">
               <app-input
                 class="w-100"
                 label="Value"
-                [readonly]="readonly"
+                [readonly]="mode | inputReadonly"
                 [inputFormControl]="form | formGet: 'options.' + index + '.value'"
               ></app-input>
-              @if (options.length > 1 && !readonly) {
+              @if (canDeleteOption(index)) {
                 <app-delete-button
+                  data-testid="custom-field-option-delete"
                   (clicked)="deleteOption(index)"
                 ></app-delete-button>
               }
@@ -49,7 +50,7 @@
       }
     </div>
 
-    @if (!readonly) {
+    @if (mode !== FormMode.view) {
       <app-dialog-footer
         (cancelClicked)="closeDialog()"
         (submitClicked)="submit()"
@@ -61,9 +62,10 @@
 <ng-template
   #optionsButtonTemplate
 >
-  @if (!readonly) {
+  @if (mode !== FormMode.view) {
     <app-add-button
       tooltip="Add option"
+      data-testid="custom-field-option-add"
       (clicked)="addOption()"
     ></app-add-button>
   }

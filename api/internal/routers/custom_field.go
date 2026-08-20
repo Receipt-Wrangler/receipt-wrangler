@@ -12,6 +12,7 @@ func BuildCustomFieldRouter() *chi.Mux {
 	router.Use(middleware.UnifiedAuthMiddleware)
 
 	router.Get("/{id}", handlers.GetCustomFieldById)
+	router.Put("/{id}", handlers.UpdateCustomField)
 	router.Delete("/{id}", handlers.DeleteCustomField)
 	router.Post("/getPagedCustomFields", handlers.GetPagedCustomFields)
 	router.Post("/", handlers.CreateCustomField)

@@ -85,6 +85,7 @@ Class | Method | HTTP request | Description
 [*CustomFieldApi*](doc/CustomFieldApi.md) | [**deleteCustomField**](doc/CustomFieldApi.md#deletecustomfield) | **DELETE** /customField/{customFieldId} | Delete custom field
 [*CustomFieldApi*](doc/CustomFieldApi.md) | [**getCustomFieldById**](doc/CustomFieldApi.md#getcustomfieldbyid) | **GET** /customField/{customFieldId} | Get custom field
 [*CustomFieldApi*](doc/CustomFieldApi.md) | [**getPagedCustomFields**](doc/CustomFieldApi.md#getpagedcustomfields) | **POST** /customField/getPagedCustomFields | Get paged custom fields
+[*CustomFieldApi*](doc/CustomFieldApi.md) | [**updateCustomField**](doc/CustomFieldApi.md#updatecustomfield) | **PUT** /customField/{customFieldId} | Update custom field
 [*DashboardApi*](doc/DashboardApi.md) | [**createDashboard**](doc/DashboardApi.md#createdashboard) | **POST** /dashboard/ | Create dashboard
 [*DashboardApi*](doc/DashboardApi.md) | [**deleteDashboard**](doc/DashboardApi.md#deletedashboard) | **DELETE** /dashboard/{dashboardId} | Delete dashboard
 [*DashboardApi*](doc/DashboardApi.md) | [**getDashboardsForUserByGroupId**](doc/DashboardApi.md#getdashboardsforuserbygroupid) | **GET** /dashboard/{groupId} | Get dashboards for a user by group id

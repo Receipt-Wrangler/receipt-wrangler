@@ -545,3 +545,336 @@ func TestShouldDeleteCustomFieldWithOptions(t *testing.T) {
 		utils.PrintTestError(t, "Custom field options should be deleted", nil)
 	}
 }
+
+func TestShouldUpdateCustomFieldNameAndDescription(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+	setupCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+	db := GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Text Field").First(&customField)
+
+	command := commands.UpsertCustomFieldCommand{
+		Name:        "Renamed Text Field",
+		Type:        models.TEXT,
+		Description: "An updated description",
+	}
+
+	updatedCustomField, err := repository.UpdateCustomField(customField.ID, command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if updatedCustomField.Name != "Renamed Text Field" {
+		utils.PrintTestError(t, updatedCustomField.Name, "Renamed Text Field")
+	}
+
+	if updatedCustomField.Description != "An updated description" {
+		utils.PrintTestError(t, updatedCustomField.Description, "An updated description")
+	}
+
+	// Read it back so the assertion covers what was persisted, not just what was
+	// returned.
+	persisted, err := repository.GetCustomFieldById(customField.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if persisted.Name != "Renamed Text Field" {
+		utils.PrintTestError(t, persisted.Name, "Renamed Text Field")
+	}
+}
+
+func TestShouldClearCustomFieldDescriptionOnUpdate(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+	setupCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+	db := GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Text Field").First(&customField)
+
+	// An empty description is the zero value, which GORM's struct-form Updates
+	// would skip -- the update must use the map form so a cleared description
+	// actually clears.
+	command := commands.UpsertCustomFieldCommand{
+		Name: "Test Text Field",
+		Type: models.TEXT,
+	}
+
+	updatedCustomField, err := repository.UpdateCustomField(customField.ID, command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if updatedCustomField.Description != "" {
+		utils.PrintTestError(t, updatedCustomField.Description, "")
+	}
+}
+
+func TestShouldNotChangeCustomFieldTypeOnUpdate(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+	setupCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+	db := GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Text Field").First(&customField)
+
+	// The handler rejects a type change before reaching the repository; this pins
+	// the repository's own guarantee that the column is never written, so a caller
+	// that skips validation still cannot mis-column existing values.
+	command := commands.UpsertCustomFieldCommand{
+		Name: "Test Text Field",
+		Type: models.CURRENCY,
+	}
+
+	updatedCustomField, err := repository.UpdateCustomField(customField.ID, command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if updatedCustomField.Type != models.TEXT {
+		utils.PrintTestError(t, updatedCustomField.Type, models.TEXT)
+	}
+}
+
+func TestShouldRenameCustomFieldOptionOnUpdate(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+	setupCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+	db := GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Select Field").First(&customField)
+
+	existing, err := repository.GetCustomFieldById(customField.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	optionToRename := existing.Options[0]
+
+	command := commands.UpsertCustomFieldCommand{
+		Name: "Test Select Field",
+		Type: models.SELECT,
+		Options: []commands.UpsertCustomFieldOptionCommand{
+			{Id: optionToRename.ID, Value: "Renamed Option"},
+			{Id: existing.Options[1].ID, Value: existing.Options[1].Value},
+		},
+	}
+
+	updatedCustomField, err := repository.UpdateCustomField(customField.ID, command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(updatedCustomField.Options) != 2 {
+		utils.PrintTestError(t, len(updatedCustomField.Options), 2)
+		return
+	}
+
+	// The option keeps its id, which is what CustomFieldValue.SelectValue points
+	// at -- a rename must never orphan a stored value.
+	var renamed *models.CustomFieldOption
+	for i := range updatedCustomField.Options {
+		if updatedCustomField.Options[i].ID == optionToRename.ID {
+			renamed = &updatedCustomField.Options[i]
+		}
+	}
+
+	if renamed == nil {
+		utils.PrintTestError(t, "Renamed option no longer exists", optionToRename.ID)
+		return
+	}
+
+	if renamed.Value != "Renamed Option" {
+		utils.PrintTestError(t, renamed.Value, "Renamed Option")
+	}
+}
+
+func TestShouldAppendCustomFieldOptionOnUpdate(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+	setupCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+	db := GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Select Field").First(&customField)
+
+	existing, err := repository.GetCustomFieldById(customField.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	command := commands.UpsertCustomFieldCommand{
+		Name: "Test Select Field",
+		Type: models.SELECT,
+		Options: []commands.UpsertCustomFieldOptionCommand{
+			{Id: existing.Options[0].ID, Value: existing.Options[0].Value},
+			{Id: existing.Options[1].ID, Value: existing.Options[1].Value},
+			{Value: "Option 3"},
+		},
+	}
+
+	updatedCustomField, err := repository.UpdateCustomField(customField.ID, command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(updatedCustomField.Options) != 3 {
+		utils.PrintTestError(t, len(updatedCustomField.Options), 3)
+		return
+	}
+
+	var appended *models.CustomFieldOption
+	for i := range updatedCustomField.Options {
+		if updatedCustomField.Options[i].Value == "Option 3" {
+			appended = &updatedCustomField.Options[i]
+		}
+	}
+
+	if appended == nil {
+		utils.PrintTestError(t, "Appended option not found", "Option 3")
+		return
+	}
+
+	if appended.CustomFieldId != customField.ID {
+		utils.PrintTestError(t, appended.CustomFieldId, customField.ID)
+	}
+}
+
+func TestShouldPreserveOmittedCustomFieldOptionOnUpdate(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+	setupCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+	db := GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Select Field").First(&customField)
+
+	existing, err := repository.GetCustomFieldById(customField.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	omittedOptionId := existing.Options[1].ID
+
+	// Options are never deleted by an update: CustomFieldValue.SelectValue holds
+	// an option id, so a removal would orphan every receipt that picked it.
+	command := commands.UpsertCustomFieldCommand{
+		Name: "Test Select Field",
+		Type: models.SELECT,
+		Options: []commands.UpsertCustomFieldOptionCommand{
+			{Id: existing.Options[0].ID, Value: existing.Options[0].Value},
+		},
+	}
+
+	updatedCustomField, err := repository.UpdateCustomField(customField.ID, command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if len(updatedCustomField.Options) != 2 {
+		utils.PrintTestError(t, len(updatedCustomField.Options), 2)
+		return
+	}
+
+	var omittedStillExists bool
+	for _, option := range updatedCustomField.Options {
+		if option.ID == omittedOptionId {
+			omittedStillExists = true
+		}
+	}
+
+	if !omittedStillExists {
+		utils.PrintTestError(t, "Omitted option was deleted", omittedOptionId)
+	}
+}
+
+func TestShouldNotWriteAnotherCustomFieldsOptionOnUpdate(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+	setupCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+	db := GetDB()
+
+	var selectField models.CustomField
+	db.Where("name = ?", "Test Select Field").First(&selectField)
+
+	var textField models.CustomField
+	db.Where("name = ?", "Test Text Field").First(&textField)
+
+	existing, err := repository.GetCustomFieldById(selectField.ID)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	foreignOption := existing.Options[0]
+
+	// The handler rejects a foreign option id, but the repository's
+	// custom_field_id predicate must make the write impossible on its own.
+	command := commands.UpsertCustomFieldCommand{
+		Name: "Test Text Field",
+		Type: models.TEXT,
+		Options: []commands.UpsertCustomFieldOptionCommand{
+			{Id: foreignOption.ID, Value: "Hijacked"},
+		},
+	}
+
+	_, err = repository.UpdateCustomField(textField.ID, command)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var untouchedOption models.CustomFieldOption
+	err = db.First(&untouchedOption, foreignOption.ID).Error
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if untouchedOption.Value != foreignOption.Value {
+		utils.PrintTestError(t, untouchedOption.Value, foreignOption.Value)
+	}
+
+	if untouchedOption.CustomFieldId != selectField.ID {
+		utils.PrintTestError(t, untouchedOption.CustomFieldId, selectField.ID)
+	}
+}
+
+func TestShouldReturnErrorWhenUpdatingNonExistentCustomField(t *testing.T) {
+	defer teardownCustomFieldRepositoryTest()
+	setupCustomFieldRepositoryTest()
+
+	repository := NewCustomFieldRepository(nil)
+
+	command := commands.UpsertCustomFieldCommand{
+		Name: "Does Not Exist",
+		Type: models.TEXT,
+	}
+
+	_, err := repository.UpdateCustomField(99999, command)
+	if err == nil {
+		utils.PrintTestError(t, "Expected error for non-existent ID", nil)
+	}
+}

@@ -781,6 +781,40 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+    put:
+      tags:
+        - CustomField
+      summary: Update custom field
+      description:
+        This will update a custom field's name, description, and select options.
+        The custom field's type is immutable and cannot be changed. Options may be
+        renamed or added, but never removed.
+      operationId: updateCustomField
+      requestBody:
+        description: Custom field data to update
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertCustomFieldCommand"
+      responses:
+        200:
+          description: The updated custom field
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomField"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
     delete:
       tags:
         - CustomField
@@ -3418,6 +3452,7 @@ components:
         - "app.tags.delete"
         - "app.custom-fields.create"
         - "app.custom-fields.read"
+        - "app.custom-fields.update"
         - "app.custom-fields.delete"
         - "app.system-settings.read"
         - "app.system-settings.update"
@@ -6030,6 +6065,11 @@ components:
       required:
         - customFieldId
       properties:
+        id:
+          type: integer
+          description:
+            Id of an existing option to update. Omit it (or send 0) to add a new
+            option. Options are never removed by an update.
         value:
           type: string
           description: Custom Field Option value

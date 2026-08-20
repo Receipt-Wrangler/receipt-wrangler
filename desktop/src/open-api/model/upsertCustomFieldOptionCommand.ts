@@ -11,6 +11,10 @@
 
 export interface UpsertCustomFieldOptionCommand { 
     /**
+     * Id of an existing option to update. Omit it (or send 0) to add a new option. Options are never removed by an update.
+     */
+    id?: number;
+    /**
      * Custom Field Option value
      */
     value?: string;

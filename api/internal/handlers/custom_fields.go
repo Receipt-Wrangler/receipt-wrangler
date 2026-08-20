@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -11,6 +12,7 @@ import (
 	"receipt-wrangler/api/internal/utils"
 
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 )
 
 func GetPagedCustomFields(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +91,67 @@ func CreateCustomField(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
+			bytes, err := json.Marshal(customField)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
+
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+func UpdateCustomField(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage:   "Error updating custom field",
+		Writer:         w,
+		Request:        r,
+		ResponseType:   constants.ApplicationJson,
+		AppPermissions: []string{permissions.AppCustomFieldsUpdate},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			customFieldId := chi.URLParam(r, "id")
+			customFieldIdUint, err := utils.StringToUint(customFieldId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			command := commands.UpsertCustomFieldCommand{}
+			err = command.LoadDataFromRequest(w, r)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			vErrs := command.Validate()
+			if len(vErrs.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, vErrs, http.StatusBadRequest)
+				return 0, nil
+			}
+
+			customFieldsRepository := repositories.NewCustomFieldRepository(nil)
+			existingCustomField, err := customFieldsRepository.GetCustomFieldById(customFieldIdUint)
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return http.StatusNotFound, err
+				}
+				return http.StatusInternalServerError, err
+			}
+
+			vErrs = command.ValidateUpdate(existingCustomField)
+			if len(vErrs.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, vErrs, http.StatusBadRequest)
+				return 0, nil
+			}
+
+			customField, err := customFieldsRepository.UpdateCustomField(customFieldIdUint, command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			bytes, err := json.Marshal(customField)
 			if err != nil {
 				return http.StatusInternalServerError, err

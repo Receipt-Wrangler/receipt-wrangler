@@ -13,6 +13,7 @@ Method | HTTP request | Description
 [**deleteCustomField**](CustomFieldApi.md#deletecustomfield) | **DELETE** /customField/{customFieldId} | Delete custom field
 [**getCustomFieldById**](CustomFieldApi.md#getcustomfieldbyid) | **GET** /customField/{customFieldId} | Get custom field
 [**getPagedCustomFields**](CustomFieldApi.md#getpagedcustomfields) | **POST** /customField/getPagedCustomFields | Get paged custom fields
+[**updateCustomField**](CustomFieldApi.md#updatecustomfield) | **PUT** /customField/{customFieldId} | Update custom field
 
 
 # **createCustomField**
@@ -190,6 +191,55 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**PagedData**](PagedData.md)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **updateCustomField**
+> CustomField updateCustomField(customFieldId, upsertCustomFieldCommand)
+
+Update custom field
+
+This will update a custom field's name, description, and select options. The custom field's type is immutable and cannot be changed. Options may be renamed or added, but never removed.
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getCustomFieldApi();
+final int customFieldId = 56; // int | Custom field Id to get
+final UpsertCustomFieldCommand upsertCustomFieldCommand = ; // UpsertCustomFieldCommand | Custom field data to update
+
+try {
+    final response = api.updateCustomField(customFieldId, upsertCustomFieldCommand);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling CustomFieldApi->updateCustomField: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **customFieldId** | **int**| Custom field Id to get | 
+ **upsertCustomFieldCommand** | [**UpsertCustomFieldCommand**](UpsertCustomFieldCommand.md)| Custom field data to update | 
+
+### Return type
+
+[**CustomField**](CustomField.md)
 
 ### Authorization
 

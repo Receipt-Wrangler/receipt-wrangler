@@ -80,6 +80,77 @@ func (repository CustomFieldRepository) CreateCustomField(
 	return customFieldToCreate, nil
 }
 
+// UpdateCustomField applies an edit to a custom field's name, description, and
+// select options.
+//
+// Two columns are deliberately never written: the custom field's type (a
+// CustomFieldValue is stored in a type-specific column, so re-typing a field
+// would mis-column every value already recorded against it) and an option's
+// custom_field_id. Options are matched by id so they can be renamed in place,
+// and an option the command omits is left alone rather than deleted, because
+// CustomFieldValue.SelectValue holds an option id that a delete would orphan.
+//
+// The caller is expected to have validated the command with
+// UpsertCustomFieldCommand.ValidateUpdate first; the custom_field_id predicate
+// on the option update is a second line of defense, so an option belonging to
+// another field is unwritable even if that check raced.
+func (repository CustomFieldRepository) UpdateCustomField(
+	id uint,
+	command commands.UpsertCustomFieldCommand,
+) (models.CustomField, error) {
+	db := repository.GetDB()
+	var updatedCustomField models.CustomField
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// The map form is required: GORM's struct form skips zero values, so a
+		// description the user cleared would silently keep its old text.
+		err := tx.Model(&models.CustomField{}).
+			Where("id = ?", id).
+			Updates(map[string]any{
+				"name":        command.Name,
+				"description": command.Description,
+			}).Error
+		if err != nil {
+			return err
+		}
+
+		for _, optionCommand := range command.Options {
+			if optionCommand.Id > 0 {
+				err = tx.Model(&models.CustomFieldOption{}).
+					Where("id = ? AND custom_field_id = ?", optionCommand.Id, id).
+					Update("value", optionCommand.Value).Error
+				if err != nil {
+					return err
+				}
+
+				continue
+			}
+
+			option := models.CustomFieldOption{
+				CustomFieldId: id,
+				Value:         optionCommand.Value,
+			}
+
+			err = tx.Create(&option).Error
+			if err != nil {
+				return err
+			}
+		}
+
+		updatedCustomField, err = NewCustomFieldRepository(tx).GetCustomFieldById(id)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return models.CustomField{}, err
+	}
+
+	return updatedCustomField, nil
+}
+
 func (repository CustomFieldRepository) GetCustomFieldById(id uint) (models.CustomField, error) {
 	db := repository.GetDB()
 	var customField models.CustomField

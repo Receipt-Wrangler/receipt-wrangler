@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -623,5 +624,247 @@ func TestDeleteCustomFieldHandlerWithNonExistentId(t *testing.T) {
 	// Should still return OK because deleting a non-existent record is not an error in this implementation
 	if status := rr.Code; status != http.StatusOK {
 		utils.PrintTestError(t, status, http.StatusOK)
+	}
+}
+
+// updateCustomFieldRequest builds a PUT request for customFieldId with body as
+// the JSON payload, wiring the chi URL param the handler reads.
+func updateCustomFieldRequest(customFieldId string, body string) (*http.Request, *httptest.ResponseRecorder) {
+	req, rr := createCustomFieldHandlerTestRequest(
+		"PUT",
+		"/api/customField/"+customFieldId,
+		body,
+	)
+
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
+	chiCtx := chi.RouteContext(req.Context())
+	chiCtx.URLParams.Add("id", customFieldId)
+
+	return req, rr
+}
+
+func TestUpdateCustomFieldHandler(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+	setupCustomFieldHandlerTest()
+
+	db := repositories.GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Text Field").First(&customField)
+
+	body := `{"name":"Renamed Text Field","type":"TEXT","description":"An updated description"}`
+	req, rr := updateCustomFieldRequest(utils.UintToString(customField.ID), body)
+
+	grantAllAppPerms(t, 1)
+
+	UpdateCustomField(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		utils.PrintTestError(t, status, http.StatusOK)
+		return
+	}
+
+	var response models.CustomField
+	err := json.Unmarshal(rr.Body.Bytes(), &response)
+	if err != nil {
+		utils.PrintTestError(t, err.Error(), nil)
+		return
+	}
+
+	if response.Name != "Renamed Text Field" {
+		utils.PrintTestError(t, response.Name, "Renamed Text Field")
+	}
+
+	if response.Description != "An updated description" {
+		utils.PrintTestError(t, response.Description, "An updated description")
+	}
+
+	var persisted models.CustomField
+	db.First(&persisted, customField.ID)
+	if persisted.Name != "Renamed Text Field" {
+		utils.PrintTestError(t, persisted.Name, "Renamed Text Field")
+	}
+}
+
+func TestUpdateCustomFieldHandlerRenamesAndAppendsOptions(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+	setupCustomFieldHandlerTest()
+
+	db := repositories.GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Select Field").First(&customField)
+
+	var options []models.CustomFieldOption
+	db.Where("custom_field_id = ?", customField.ID).Order("id asc").Find(&options)
+	if len(options) != 2 {
+		utils.PrintTestError(t, len(options), 2)
+		return
+	}
+
+	body := `{"name":"Test Select Field","type":"SELECT","options":[` +
+		`{"id":` + utils.UintToString(options[0].ID) + `,"value":"Renamed Option"},` +
+		`{"id":` + utils.UintToString(options[1].ID) + `,"value":"Option 2"},` +
+		`{"value":"Option 3"}]}`
+
+	req, rr := updateCustomFieldRequest(utils.UintToString(customField.ID), body)
+
+	grantAllAppPerms(t, 1)
+
+	UpdateCustomField(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		utils.PrintTestError(t, status, http.StatusOK)
+		return
+	}
+
+	var persistedOptions []models.CustomFieldOption
+	db.Where("custom_field_id = ?", customField.ID).Order("id asc").Find(&persistedOptions)
+
+	if len(persistedOptions) != 3 {
+		utils.PrintTestError(t, len(persistedOptions), 3)
+		return
+	}
+
+	// The renamed option keeps its id, so any CustomFieldValue pointing at it
+	// still resolves.
+	if persistedOptions[0].ID != options[0].ID {
+		utils.PrintTestError(t, persistedOptions[0].ID, options[0].ID)
+	}
+
+	if persistedOptions[0].Value != "Renamed Option" {
+		utils.PrintTestError(t, persistedOptions[0].Value, "Renamed Option")
+	}
+
+	if persistedOptions[2].Value != "Option 3" {
+		utils.PrintTestError(t, persistedOptions[2].Value, "Option 3")
+	}
+}
+
+func TestUpdateCustomFieldHandlerRejectsTypeChange(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+	setupCustomFieldHandlerTest()
+
+	db := repositories.GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Text Field").First(&customField)
+
+	body := `{"name":"Test Text Field","type":"CURRENCY"}`
+	req, rr := updateCustomFieldRequest(utils.UintToString(customField.ID), body)
+
+	grantAllAppPerms(t, 1)
+
+	UpdateCustomField(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		utils.PrintTestError(t, status, http.StatusBadRequest)
+		return
+	}
+
+	// The stored type must be untouched -- a CustomFieldValue lives in a
+	// type-specific column, so a re-type would mis-column every existing value.
+	var persisted models.CustomField
+	db.First(&persisted, customField.ID)
+	if persisted.Type != models.TEXT {
+		utils.PrintTestError(t, persisted.Type, models.TEXT)
+	}
+}
+
+func TestUpdateCustomFieldHandlerRejectsForeignOptionId(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+	setupCustomFieldHandlerTest()
+
+	db := repositories.GetDB()
+
+	var selectField models.CustomField
+	db.Where("name = ?", "Test Select Field").First(&selectField)
+
+	// An option id the field does not own is rejected outright, so an edit can
+	// never rewrite an unrelated field's option.
+	body := `{"name":"Test Select Field","type":"SELECT","options":[{"id":99999,"value":"Hijacked"}]}`
+	req, rr := updateCustomFieldRequest(utils.UintToString(selectField.ID), body)
+
+	grantAllAppPerms(t, 1)
+
+	UpdateCustomField(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		utils.PrintTestError(t, status, http.StatusBadRequest)
+		return
+	}
+
+	var optionCount int64
+	db.Model(&models.CustomFieldOption{}).Where("custom_field_id = ?", selectField.ID).Count(&optionCount)
+	if optionCount != 2 {
+		utils.PrintTestError(t, optionCount, 2)
+	}
+}
+
+func TestUpdateCustomFieldHandlerWithInvalidBody(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+	setupCustomFieldHandlerTest()
+
+	db := repositories.GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Text Field").First(&customField)
+
+	// Name and type are both required.
+	body := `{"description":"Only a description"}`
+	req, rr := updateCustomFieldRequest(utils.UintToString(customField.ID), body)
+
+	grantAllAppPerms(t, 1)
+
+	UpdateCustomField(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		utils.PrintTestError(t, status, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateCustomFieldHandlerWithNonExistentId(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+	setupCustomFieldHandlerTest()
+
+	body := `{"name":"Does Not Exist","type":"TEXT"}`
+	req, rr := updateCustomFieldRequest("999", body)
+
+	grantAllAppPerms(t, 1)
+
+	UpdateCustomField(rr, req)
+
+	if status := rr.Code; status != http.StatusNotFound {
+		utils.PrintTestError(t, status, http.StatusNotFound)
+	}
+}
+
+func TestUpdateCustomFieldHandlerWithoutUpdatePermission(t *testing.T) {
+	defer teardownCustomFieldHandlerTest()
+	setupCustomFieldHandlerTest()
+
+	db := repositories.GetDB()
+
+	var customField models.CustomField
+	db.Where("name = ?", "Test Text Field").First(&customField)
+
+	body := `{"name":"Renamed Text Field","type":"TEXT"}`
+	req, rr := updateCustomFieldRequest(utils.UintToString(customField.ID), body)
+
+	// Reading custom fields is not enough to edit one: editing a definition
+	// changes it for every group's receipts, so it is a distinct permission.
+	grantAppPerms(t, 1, permissions.AppCustomFieldsRead, permissions.AppCustomFieldsCreate)
+
+	UpdateCustomField(rr, req)
+
+	if status := rr.Code; status != http.StatusForbidden {
+		utils.PrintTestError(t, status, http.StatusForbidden)
+		return
+	}
+
+	var persisted models.CustomField
+	db.First(&persisted, customField.ID)
+	if persisted.Name != "Test Text Field" {
+		utils.PrintTestError(t, persisted.Name, "Test Text Field")
 	}
 }
