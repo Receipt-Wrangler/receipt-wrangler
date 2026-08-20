@@ -13,17 +13,23 @@ import (
 	"receipt-wrangler/api/internal/reporting"
 )
 
-// Dimension is one group-by level: the field it cuts on and the header a
-// renderer prints for it.
+// Dimension is one group-by level: the field it cuts on, the header a renderer
+// prints for it, and the type of the values it buckets.
 //
 // The ReportModel carries a dimension key on each group node but not its label,
 // and a flat table needs the levels up front and in order — an empty report
 // still needs its dimension columns. So a caller supplies them, in the same
-// order as the spec's GroupBy. A future orchestrator builds this from the spec
-// and the field catalog.
+// order as the spec's GroupBy, reading both the label and the data type off the
+// field catalog.
+//
+// DataType is what lets a bucket value be presented rather than dumped: without
+// it a date bucket prints an RFC 3339 instant and a currency bucket a bare
+// decimal. Leaving it at its zero value (TypeString) renders every bucket as
+// plain text, which is what a caller that has no catalog gets.
 type Dimension struct {
-	Key   reporting.FieldKey
-	Label string
+	Key      reporting.FieldKey
+	Label    string
+	DataType reporting.DataType
 }
 
 const (
@@ -156,7 +162,7 @@ func buildRecord(model reporting.ReportModel, groupBy []Dimension, rowType strin
 
 	for index := range groupBy {
 		if index < len(path) {
-			record = append(record, formatDimension(path[index], model.Meta.NoneLabel))
+			record = append(record, formatDimension(path[index], groupBy[index], model.Meta.Currency, model.Meta.NoneLabel))
 		} else {
 			record = append(record, "")
 		}
@@ -175,13 +181,11 @@ func columnHeading(column reporting.ColumnDescriptor) string {
 	return SanitizeCSVField(column.Name)
 }
 
-// formatDimension renders a group bucket's value for a leading column. The
-// (None) bucket — a null value — gets the report's name for it.
-func formatDimension(value reporting.Value, noneLabel string) string {
-	if value.IsNull() {
-		return SanitizeCSVField(noneLabel)
-	}
-	return SanitizeCSVField(value.String())
+// formatDimension renders a group bucket's value for a leading column, per the
+// dimension's declared type. The (None) bucket — a null value — gets the
+// report's name for it.
+func formatDimension(value reporting.Value, dimension Dimension, currency *reporting.CurrencyFormat, noneLabel string) string {
+	return SanitizeCSVField(formatLabelValue(value, dimension.DataType, currency, noneLabel))
 }
 
 // formatCell renders one report cell the way this format presents it: money per
@@ -201,11 +205,7 @@ func formatCell(column reporting.ColumnDescriptor, cell reporting.Cell, noneLabe
 	if column.Kind == reporting.ColumnLabel {
 		parts := make([]string, 0, len(cell.Values))
 		for _, value := range cell.Values {
-			if value.IsNull() {
-				parts = append(parts, SanitizeCSVField(noneLabel))
-				continue
-			}
-			parts = append(parts, SanitizeCSVField(value.String()))
+			parts = append(parts, SanitizeCSVField(formatLabelValue(value, column.DataType, currency, noneLabel)))
 		}
 		return strings.Join(parts, ", ")
 	}

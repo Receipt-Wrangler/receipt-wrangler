@@ -11,7 +11,12 @@ import { FormBuilder, FormGroup } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { startWith } from "rxjs";
 import { ReportColumn } from "../../../open-api";
-import { aggregateNeedsMeasure, ReportField } from "../../models/report-catalog.constants";
+import {
+  aggregateNeedsMeasure,
+  ReportField,
+  ReportFieldOption,
+  toFieldOptions,
+} from "../../models/report-catalog.constants";
 import { ReportColumnValue } from "../../models/report-command.mapper";
 import { deriveColumnName, validateFormulaExpr } from "../../models/report-column.util";
 import { nextReportRowId } from "../../models/report-form.factory";
@@ -71,8 +76,8 @@ export class ColumnPickerDialogComponent {
 
   public readonly dimensions: ReportField[];
   public readonly measures: ReportField[];
-  public readonly dimensionOptions: { value: string; displayValue: string }[];
-  public readonly measureOptions: { value: string; displayValue: string }[];
+  public readonly dimensionOptions: ReportFieldOption[];
+  public readonly measureOptions: ReportFieldOption[];
   public readonly referenceableColumns: ReportColumnValue[];
 
   private readonly availableNames: string[];
@@ -120,8 +125,8 @@ export class ColumnPickerDialogComponent {
   constructor(@Inject(MAT_DIALOG_DATA) data: ColumnPickerDialogData) {
     this.dimensions = data.dimensions;
     this.measures = data.measures;
-    this.dimensionOptions = data.dimensions.map((field) => ({ value: field.key, displayValue: field.label }));
-    this.measureOptions = data.measures.map((field) => ({ value: field.key, displayValue: field.label }));
+    this.dimensionOptions = toFieldOptions(data.dimensions);
+    this.measureOptions = toFieldOptions(data.measures);
     this.referenceableColumns = data.existingColumns.filter(
       (column) => column.kind !== ReportColumn.KindEnum.Dimension
     );

@@ -12,12 +12,34 @@
       (blur)="inputBlur.emit($event)"
       readonly
     >
+      <!--
+        A badged option's text content would otherwise leak into the closed
+        select, which renders the selected option's textContent, so a badged
+        select draws its own trigger. Without optionBadgeKey the trigger is
+        omitted and mat-select's default is used, unchanged.
+      -->
+      @if (optionBadgeKey()) {
+        <mat-select-trigger>
+          @let selected = selectedIndex();
+          @if (selected >= 0) {
+            {{ selected | optionDisplay : options()[selected] : optionDisplayKey() : optionsDisplayArray() }}
+            @let selectedBadge = badgeFor(options()[selected]);
+            @if (selectedBadge) {
+              <span class="select__badge">{{ selectedBadge }}</span>
+            }
+          }
+        </mat-select-trigger>
+      }
       <mat-option *ngIf="addEmptyOption()" [value]="null"></mat-option>
       <mat-option
         *ngFor="let option of options(); let i = index"
         [value]="optionValueKey ? option[optionValueKey] : option"
       >
         {{ i | optionDisplay : option : optionDisplayKey() : optionsDisplayArray() }}
+        @let badge = badgeFor(option);
+        @if (badge) {
+          <span class="select__badge">{{ badge }}</span>
+        }
       </mat-option>
     </mat-select>
   }

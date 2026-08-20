@@ -6,6 +6,8 @@ import { Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { of, Subject, throwError } from "rxjs";
 import {
+  CustomFieldService,
+  CustomFieldType,
   Permission,
   ReportColumn,
   ReportDetail,
@@ -103,6 +105,18 @@ describe("ReportTemplateListComponent", () => {
         { provide: Router, useValue: router },
         { provide: SnackbarService, useValue: snackbar },
         { provide: MatDialog, useValue: matDialog },
+        // The Grouping/Detail columns name custom fields out of this pool.
+        {
+          provide: CustomFieldService,
+          useValue: {
+            getPagedCustomFields: jest.fn(() =>
+              of({
+                data: [{ id: 7, name: "Due Date", type: CustomFieldType.Date }],
+                totalCount: 1,
+              })
+            ),
+          },
+        },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
@@ -248,6 +262,31 @@ describe("ReportTemplateListComponent", () => {
     expect(component.formatChipsFor(templates[0])).toEqual(["CSV", "PDF"]);
     expect(component.detailSummaryFor(templates[0])).toBe("Record-level");
     expect(component.groupingSummaryFor(templates[0])).toBe("Group");
+  });
+
+  // A stored config references a custom field by key; the list resolves it to the
+  // field's name so a row does not read "custom_7".
+  it("names custom fields in the grouping and detail summaries", () => {
+    const custom: ReportTemplate = {
+      ...templates[0],
+      configuration: {
+        ...templates[0].configuration,
+        groupBy: ["group", "custom_7_month"],
+        detail: { mode: ReportDetail.ModeEnum.Aggregate, by: "custom_7" },
+      },
+    };
+
+    expect(component.groupingSummaryFor(custom)).toBe("Group, Due Date (Month)");
+    expect(component.detailSummaryFor(custom)).toBe("Aggregate by Due Date");
+  });
+
+  it("falls back to the raw key for a custom field the catalog cannot name", () => {
+    const missing: ReportTemplate = {
+      ...templates[0],
+      configuration: { ...templates[0].configuration, groupBy: ["custom_999"] },
+    };
+
+    expect(component.groupingSummaryFor(missing)).toBe("custom_999");
   });
 
   it("summarizes scope by group count (unresolved groups fall back to the raw id)", () => {

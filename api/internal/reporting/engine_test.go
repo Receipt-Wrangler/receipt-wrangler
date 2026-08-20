@@ -1054,3 +1054,48 @@ func TestRun_NumbersDifferingOnlyInScaleShareABucket(t *testing.T) {
 	model := mustRun(t, spec, []Row{{"category": {Str("Clothing")}, "amount": {Num(dec("200.00"))}}})
 	assertRow(t, model.Root.Children[0].DetailRows[0].Cells, map[string]string{"Total": "200"})
 }
+
+// A currency custom field is a measure, but measuring is the only thing its type
+// restricts: a report may cut by it too. Buckets key on the canonical decimal, so
+// 15.60 and 15.6 are one bucket, and a receipt carrying no value lands in (None).
+func TestRun_GroupByACurrencyField(t *testing.T) {
+	spec := ReportSpec{
+		GroupBy: []FieldKey{"custom_1"},
+		Columns: []Column{
+			{Name: "Hst", Kind: ColumnLabel, Field: "custom_1"},
+			{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}},
+			{Name: "Total", Kind: ColumnAggregate, Agg: Aggregate{Func: AggSum, Field: "amount"}},
+		},
+		GrandTotals: true,
+	}
+
+	rows := []Row{
+		receiptRow("Dana", "Alex", "Clothing", "100.00", "15.60"),
+		receiptRow("Sam", "Alex", "Medical", "50.00", "15.6"),
+		receiptRow("Dana", "Sam", "Clothing", "20.00", "2.00"),
+		receiptRow("Sam", "Sam", "Medical", "10.00", ""),
+	}
+
+	model := mustRun(t, spec, rows)
+
+	if len(model.Root.Children) != 3 {
+		t.Fatalf("got %d buckets, want 3 (2.00, 15.60, (None))", len(model.Root.Children))
+	}
+
+	two, fifteen, none := model.Root.Children[0], model.Root.Children[1], model.Root.Children[2]
+
+	if number, isNumber := two.Value.Decimal(); !isNumber || !number.Equal(dec("2.00")) {
+		t.Errorf("first bucket = %v, want 2.00 (numbers sort ascending)", two.Value)
+	}
+	// 15.60 and 15.6 are the same amount, so they share one bucket.
+	if number, _ := fifteen.Value.Decimal(); !number.Equal(dec("15.60")) || fifteen.RecordCount != 2 {
+		t.Errorf("second bucket = %v with %d records, want 15.60 with 2", fifteen.Value, fifteen.RecordCount)
+	}
+	if !none.IsNone || none.RecordCount != 1 {
+		t.Errorf("(None) bucket = %+v, want 1 record", none)
+	}
+
+	// The label column reads the bucket, so a grouped currency value is displayable.
+	assertRow(t, fifteen.DetailRows[0].Cells, map[string]string{"Hst": "15.60"})
+	assertRow(t, model.GrandTotals, map[string]string{"Count": "4", "Total": "180.00"})
+}

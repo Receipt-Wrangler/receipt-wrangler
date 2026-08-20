@@ -14,6 +14,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/reporting"
+	"receipt-wrangler/api/internal/reporting/render"
 	"receipt-wrangler/api/internal/repositories"
 )
 
@@ -239,6 +240,38 @@ func TestReportService_AggregateSource(t *testing.T) {
 		if got := aggregateSource(test.fn, test.measure); got != test.want {
 			t.Errorf("aggregateSource(%q,%q) = %q, want %q", test.fn, test.measure, got, test.want)
 		}
+	}
+}
+
+// A render dimension carries the catalog's label AND data type, which is what
+// lets a renderer present a bucket rather than dump it — a boolean as Yes/No, a
+// date as a calendar day, money per the report's currency configuration. A key
+// the catalog does not know falls back to itself as the heading, and to plain
+// text.
+func TestReportService_BuildDimensions(t *testing.T) {
+	catalog, err := reporting.NewFieldCatalog(
+		reporting.FieldRef{Key: "paid_by", Label: "Paid By", DataType: reporting.TypeString},
+		reporting.FieldRef{Key: "date", Label: "Date", DataType: reporting.TypeDate},
+		reporting.FieldRef{Key: "custom_1", Label: "HST", DataType: reporting.TypeCurrency},
+		reporting.FieldRef{Key: "custom_5", Label: "Reimbursed", DataType: reporting.TypeBool},
+	)
+	if err != nil {
+		t.Fatalf("NewFieldCatalog() error = %v", err)
+	}
+
+	got := buildDimensions(
+		[]reporting.FieldKey{"paid_by", "date", "custom_1", "custom_5", "gone"},
+		catalog,
+	)
+	want := []render.Dimension{
+		{Key: "paid_by", Label: "Paid By", DataType: reporting.TypeString},
+		{Key: "date", Label: "Date", DataType: reporting.TypeDate},
+		{Key: "custom_1", Label: "HST", DataType: reporting.TypeCurrency},
+		{Key: "custom_5", Label: "Reimbursed", DataType: reporting.TypeBool},
+		{Key: "gone", Label: "gone", DataType: reporting.TypeString},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("buildDimensions() = %+v, want %+v", got, want)
 	}
 }
 
@@ -486,11 +519,11 @@ func TestReportService_Generate_InvalidSpecIsClientError(t *testing.T) {
 	createReportReceipt(t, "household-1", userId, groupIds[0], nil)
 
 	command := aggregateReportCommand("Bad", groupIds, []string{commands.ReportFormatCsv})
-	command.GroupBy = []string{"amount"} // a measure cannot be grouped by
+	command.GroupBy = []string{"not_a_field"} // no such field in the catalog
 
 	_, err := NewReportService(nil).Generate(userId, command)
 	if err == nil {
-		t.Fatal("expected an error grouping by a measure, got none")
+		t.Fatal("expected an error grouping by an unknown field, got none")
 	}
 	var specErr *ReportSpecError
 	if !errors.As(err, &specErr) {
@@ -612,7 +645,7 @@ func TestReportService_Preview_InvalidSpecIsClientError(t *testing.T) {
 	createReportReceipt(t, "household-1", userId, groupIds[0], nil)
 
 	command := aggregateReportCommand("Bad", groupIds, nil)
-	command.GroupBy = []string{"amount"} // a measure cannot be grouped by
+	command.GroupBy = []string{"not_a_field"} // no such field in the catalog
 
 	_, err := NewReportService(nil).Preview(userId, command)
 	var specErr *ReportSpecError

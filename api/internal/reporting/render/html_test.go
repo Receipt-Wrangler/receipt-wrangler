@@ -589,3 +589,36 @@ func TestHTML_ChromeIsEscaped(t *testing.T) {
 		t.Errorf("unescaped markup leaked from chrome:\n%s", rendered)
 	}
 }
+
+// The live preview and the PDF share the faithful walk with XLSX, so a typed
+// dimension and a typed label column read the same in both: a boolean as Yes/No,
+// a date as its calendar day, and money per the report's currency configuration.
+func TestHTML_TypedDimensionsAndLabels(t *testing.T) {
+	due := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	spec := reporting.ReportSpec{
+		GroupBy: []reporting.FieldKey{"reimbursable", "custom_1"},
+		Detail:  reporting.DetailSpec{Mode: reporting.DetailAggregate, By: "due"},
+		Columns: []reporting.Column{
+			{Name: "Due", Label: "Due", Kind: reporting.ColumnLabel, Field: "due"},
+			{Name: "Hst", Label: "HST", Kind: reporting.ColumnLabel, Field: "custom_1"},
+			{Name: "Total", Label: "Total", Kind: reporting.ColumnAggregate, AggSrc: "SUM(custom_1)"},
+		},
+	}
+	rows := []reporting.Row{
+		{"reimbursable": {reporting.Bool(true)}, "due": {reporting.DateVal(due)}, "custom_1": {money("1500.5")}},
+		{"reimbursable": {reporting.Bool(false)}, "due": {reporting.DateVal(due)}, "custom_1": {money("2")}},
+	}
+
+	model := mustRun(t, spec, typedCatalog(t), rows)
+	model.Meta.Currency = &reporting.CurrencyFormat{Symbol: "$", ThousandsSeparator: ",", DecimalSeparator: "."}
+
+	grid := htmlGrid(t, model, []Dimension{
+		{Key: "reimbursable", Label: "Reimbursable", DataType: reporting.TypeBool},
+		{Key: "custom_1", Label: "HST", DataType: reporting.TypeCurrency},
+	})
+	assertGrid(t, grid, [][]string{
+		{"Reimbursable", "HST", "Due", "HST", "Total"},
+		{"No", "$2.00", "2026-06-01", "$2.00", "$2.00"},
+		{"Yes", "$1,500.50", "2026-06-01", "$1,500.50", "$1,500.50"},
+	})
+}

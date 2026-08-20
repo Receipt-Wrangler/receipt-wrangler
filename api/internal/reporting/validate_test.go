@@ -143,6 +143,28 @@ func TestValidate_AcceptsVariations(t *testing.T) {
 			},
 		},
 		{
+			// A currency custom field is a measure, but measuring is the only
+			// thing its type restricts: it still cuts, so a report can group by
+			// a tax or tip field the same way it groups by a category.
+			name: "a measure may be grouped on and aggregated by",
+			spec: ReportSpec{
+				GroupBy: []FieldKey{"custom_1"},
+				Detail:  DetailSpec{Mode: DetailAggregate, By: "amount"},
+				Columns: []Column{
+					{Name: "Hst", Kind: ColumnLabel, Field: "custom_1"},
+					{Name: "Amount", Kind: ColumnLabel, Field: "amount"},
+					{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}},
+				},
+			},
+		},
+		{
+			name: "a date or boolean may be grouped on",
+			spec: ReportSpec{
+				GroupBy: []FieldKey{"date", "resolved"},
+				Columns: []Column{{Name: "Count", Kind: ColumnAggregate, Agg: Aggregate{Func: AggCount}}},
+			},
+		},
+		{
 			name: "COUNT is unaffected by multi-valued fields",
 			spec: ReportSpec{
 				GroupBy: []FieldKey{"category"},
@@ -253,12 +275,6 @@ func TestValidate_Rejects(t *testing.T) {
 			wantErr: ErrUnknownField,
 		},
 		{
-			// You cut by a tag; you sum a dollar amount.
-			name:    "groupBy a measure",
-			spec:    ReportSpec{GroupBy: []FieldKey{"amount"}, Columns: []Column{countColumn}},
-			wantErr: ErrGroupByNotDimension,
-		},
-		{
 			name:    "duplicate groupBy level",
 			spec:    ReportSpec{GroupBy: []FieldKey{"tag", "tag"}, Columns: []Column{countColumn}},
 			wantErr: ErrDuplicateGroupBy,
@@ -279,11 +295,6 @@ func TestValidate_Rejects(t *testing.T) {
 			name:    "aggregate detail on an unknown field",
 			spec:    ReportSpec{Detail: DetailSpec{Mode: DetailAggregate, By: "nope"}, Columns: []Column{countColumn}},
 			wantErr: ErrUnknownField,
-		},
-		{
-			name:    "aggregate detail on a measure",
-			spec:    ReportSpec{Detail: DetailSpec{Mode: DetailAggregate, By: "amount"}, Columns: []Column{countColumn}},
-			wantErr: ErrDetailByNotDimension,
 		},
 
 		// label columns

@@ -186,13 +186,22 @@ export async function createUserWithRole(
   const password = dialog.getByLabel('Password', { exact: true });
   await expect(password).toBeVisible();
 
-  await dialog.getByLabel('Username').fill(opts.username);
-  await dialog.getByLabel('Displayname').fill(opts.username);
-  await password.fill(opts.password);
-  // Fail here, with the actual values, rather than later on an unexplained
-  // "dialog never closed".
-  await expect(dialog.getByLabel('Username')).toHaveValue(opts.username);
-  await expect(password).toHaveValue(opts.password);
+  // Waiting for the password field narrows that race but does not close it — a
+  // fill can still land in a neighbouring input while the dialog settles, and
+  // because Username and Displayname carry the SAME value the damage reads as a
+  // doubled username ("<name><name>") rather than as an obvious mis-type. So
+  // fill and verify as one retryable unit: a misdirected round re-fills from
+  // scratch instead of failing the whole spec's beforeAll. Same idiom as
+  // openComboboxAndPick in helpers/reports.ts.
+  await expect(async () => {
+    await dialog.getByLabel('Username').fill(opts.username);
+    await dialog.getByLabel('Displayname').fill(opts.username);
+    await password.fill(opts.password);
+
+    await expect(dialog.getByLabel('Username')).toHaveValue(opts.username, { timeout: 2000 });
+    await expect(dialog.getByLabel('Displayname')).toHaveValue(opts.username, { timeout: 2000 });
+    await expect(password).toHaveValue(opts.password, { timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
   await dialog.getByRole('combobox', { name: 'App Role' }).click();
   // The option panel is a floating overlay rendered on the page, not the dialog.
   await page.getByRole('option', { name: opts.role, exact: true }).click();
@@ -326,10 +335,30 @@ export async function apiGroupNames(api: APIRequestContext): Promise<string[]> {
   return groups.map((group) => group.name);
 }
 
+/**
+ * One custom field value on a receipt. Exactly one of the typed columns is
+ * populated, chosen by the field's own type — a currency field reads
+ * currencyValue, a date field dateValue, and so on (the server stores whatever
+ * it is given, so a mismatched column simply resolves to no value in a report).
+ */
+export interface ReceiptCustomFieldValue {
+  customFieldId: number;
+  stringValue?: string;
+  dateValue?: string;
+  selectValue?: number;
+  currencyValue?: string;
+  booleanValue?: boolean;
+}
+
 /** Creates a minimal OPEN receipt and returns its id. */
 export async function apiCreateReceipt(
   api: APIRequestContext,
-  opts: { groupId: number | string; paidByUserId: number; name: string },
+  opts: {
+    groupId: number | string;
+    paidByUserId: number;
+    name: string;
+    customFields?: ReceiptCustomFieldValue[];
+  },
 ): Promise<number> {
   const res = await api.post('/api/receipt', {
     data: {
@@ -339,6 +368,7 @@ export async function apiCreateReceipt(
       groupId: Number(opts.groupId),
       paidByUserId: opts.paidByUserId,
       status: 'OPEN',
+      ...(opts.customFields ? { customFields: opts.customFields } : {}),
     },
   });
   if (!res.ok()) {
@@ -464,7 +494,18 @@ export async function apiFirstReportCategory(
  */
 export async function apiCreateReportTemplate(
   api: APIRequestContext,
-  opts?: { name?: string; groupIds?: string[]; formats?: string[]; filter?: unknown },
+  opts?: {
+    name?: string;
+    groupIds?: string[];
+    formats?: string[];
+    filter?: unknown;
+    // The shape of the report itself. Defaulted to the records-mode config every
+    // caller wanted before; override to store a grouped/aggregated template, e.g.
+    // one grouped by a custom field's `custom_<id>` key.
+    groupBy?: string[];
+    detail?: { mode: 'records' | 'aggregate'; by?: string };
+    columns?: unknown[];
+  },
 ): Promise<{ id: number; name: string }> {
   const name = opts?.name ?? uniqueName('report-template');
   // Scope a real group the caller can report on, so generating over it isn't
@@ -475,9 +516,12 @@ export async function apiCreateReportTemplate(
       name,
       groupIds,
       period: { preset: 'this_month' },
-      detail: { mode: 'records' },
-      columns: [{ kind: 'dimension', name: 'Name', label: 'Name', field: 'name' }],
+      detail: opts?.detail ?? { mode: 'records' },
+      columns: opts?.columns ?? [
+        { kind: 'dimension', name: 'Name', label: 'Name', field: 'name' },
+      ],
       formats: opts?.formats ?? ['csv'],
+      ...(opts?.groupBy ? { groupBy: opts.groupBy } : {}),
       ...(opts?.filter ? { filter: opts.filter } : {}),
     },
   });
@@ -681,6 +725,46 @@ export async function apiDeleteTagById(
   id: number,
 ): Promise<void> {
   await warnOnFailedDelete(api, `/api/tag/${id}`, `tag ${id}`);
+}
+
+// --- Custom fields -----------------------------------------------------------
+//
+// Like categories and tags the pool is GLOBAL, so mint uniqueName-suffixed fields
+// and delete them in teardown — a leaked one shows up in every other spec's
+// pickers. There is no update endpoint, and deleting a field destroys every value
+// stored against it, so a spec that seeds receipts with values must delete those
+// receipts (or their group) too.
+
+export type CustomFieldType = 'TEXT' | 'DATE' | 'SELECT' | 'CURRENCY' | 'BOOLEAN';
+
+/** Creates a custom field and returns its id + name. */
+export async function apiCreateCustomField(
+  api: APIRequestContext,
+  opts: { name: string; type: CustomFieldType; options?: string[] },
+): Promise<{ id: number; name: string }> {
+  const res = await api.post('/api/customField/', {
+    data: {
+      name: opts.name,
+      type: opts.type,
+      description: '',
+      options: (opts.options ?? []).map((value) => ({ value })),
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `create custom field failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  const customField = (await res.json()) as { id: number; name: string };
+  return { id: customField.id, name: customField.name };
+}
+
+/** Deletes a custom field. Requires app.custom-fields.delete (admin-only). */
+export async function apiDeleteCustomFieldById(
+  api: APIRequestContext,
+  id: number,
+): Promise<void> {
+  await warnOnFailedDelete(api, `/api/customField/${id}`, `custom field ${id}`);
 }
 
 // --- Per-member category/tag grants ------------------------------------------

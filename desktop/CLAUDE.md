@@ -1055,8 +1055,41 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   generate/preview are one-shot calls through `ReportRunnerService` (mirrors `ReceiptExportService`:
   generate → `Blob` → `downloadFile`). `ReportCatalogService` supplies the dimension/measure dropdown
   options: a built-in engine-key→label constant (`report-catalog.constants.ts`) plus custom fields from
-  `CustomFieldService` (CURRENCY → measure, else dimension, keyed `custom_<id>`). `report-command.mapper.ts`
-  maps the form to the generated `ReportRequestCommand`.
+  `CustomFieldService`, keyed `custom_<id>`. `report-command.mapper.ts` maps the form to the generated
+  `ReportRequestCommand`.
+- **Custom fields in the catalog.** *Every* custom field is a **dimension** whatever its type — the
+  engine restricts measuring, not cutting — so a **CURRENCY** field appears in **both** lists (groupable
+  *and* summable), and a **DATE** field additionally contributes the three calendar-period dimensions the
+  backend derives (`custom_<id>_day|_month|_year`, labelled `"Due Date (Month)"`); grouping by the raw
+  date buckets on the exact instant, i.e. one bucket per receipt. Keys and labels mirror
+  `receiptsource.CustomFieldPeriodKeys` / `dateFieldRefs` — a mismatch is a 400 from the engine, not a
+  silent fallback. Every custom-field entry carries `isCustom: true`, which drives the **"Custom" badge**:
+  `toFieldOptions()` (the one mapping all four field dropdowns share) turns it into an option `badge`,
+  and the shared **`app-select` gained an optional `optionBadgeKey`** input that draws it beside the
+  option text. Because `MatOption.viewValue` is the option's `textContent`, a badged option would read
+  "HSTCustom" in the closed select — so a badged select also renders its own `<mat-select-trigger>`.
+  Both are opt-in and default off, so every other `app-select` call site is unchanged. The already-picked
+  grouping levels and column rows carry the same badge (`isCustom` on `groupByLevels()` / `columnRows()`,
+  resolved through the catalog rather than by matching the key's shape, so a user without
+  `app.custom-fields.read` sees no badge instead of one on a field the builder cannot name).
+  - **E2E:** `e2e/report-custom-fields.spec.ts` (serial, admin storageState) seeds its own group +
+    a CURRENCY/DATE/BOOLEAN field trio + four receipts through the admin API, so the live preview
+    contains exactly its own data, and covers: the grouping picker offering every custom field badged
+    (including the three derived `(Day|Month|Year)` levels), grouping by a **currency** field, a
+    boolean rendering **Yes/No**, a date field bucketing by **calendar month**, `SUM` over a custom
+    currency measure, and a saved template naming its fields rather than showing `custom_<id>`.
+    Teardown deletes the group (cascading the receipts, whose custom field values a field-delete would
+    otherwise orphan) then the fields — a leaked field shows up in every other spec's pickers.
+    Each assertion was verified to **FAIL** with its feature reverted (the renderer's typed
+    formatting, the catalog's currency-as-dimension + period entries, and the list's field-name
+    resolver).
+    - Two gotchas it encodes: the "Custom" badge is inside the `mat-option`, so an option's accessible
+      name reads `"Tip Custom"` — `addGroupingLevel` therefore takes a `string | RegExp` (a plain
+      string still matches exactly, which is what every other caller wants). And money is asserted
+      with a **separator-tolerant** regex (`/1[,. ]500[.,]50/`) rather than a symbol, because the
+      currency configuration is a global System Setting on the shared CI backend that this spec must
+      not mutate; the seeded value is `1500.50` precisely so the thousands separator and trailing
+      zero prove formatting ran.
 - **Live preview** (`report-preview-panel`): the container debounces the form (~450ms, `switchMap`) into
   `POST /report/preview` and renders the engine's returned HTML in a **sandboxed `<iframe srcdoc>`**
   (`sandbox="allow-same-origin"`, scripts disabled; sized to content on load). The response's
@@ -1118,8 +1151,12 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   (`BaseTableComponent` + `ReportTemplateTableService` + the NGXS `ReportTemplateTableState`, mirroring the
   groups/roles list pages) of saved templates. Columns Name (+ column count), Scope, Grouping, Detail,
   Formats, Updated — the JSON-blob-derived ones are non-sortable; only `name`/`updated_at` sort
-  server-side. The derived display strings come from a pure `report-template-summary.ts` util (group ids →
-  names via `GroupState.groupsWithoutAll`). Row actions carry `data-testid="report-template-<action>"` and
+  server-side. The derived display strings come from a pure `report-template-summary.ts` util, which takes
+  its lookups as arguments (group ids → names via `GroupState.groupsWithoutAll`; custom-field keys → names
+  via a `FieldLabelResolver` the page builds from `ReportCatalogService`, whose `load()` this page calls
+  too — otherwise a stored `custom_7` grouping renders as the raw key). An unresolvable key still falls
+  back to itself, which is what a user without `app.custom-fields.read` gets. The list shows names only;
+  the Custom badge is builder-only. Row actions carry `data-testid="report-template-<action>"` and
   gate on the matching permission: **generate** (`AppReportsGenerate`, runs the stored config through the
   builder's generate path), **open/edit** (read — routes to `/reports/:id/edit`), **duplicate**
   (`AppReportsDuplicate`), **delete** (`AppReportsDelete`, via `ConfirmationDialogComponent`). The header

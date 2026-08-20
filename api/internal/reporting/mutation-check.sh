@@ -371,10 +371,15 @@ add 'cycle-path-truncated' 'validate.go' \
 'strings.Join(append(path, columns[index].name), " -> ")' \
 'strings.Join(path, " -> ")'
 
-# TestValidate_Rejects/groupBy a measure
-add 'groupby-accepts-a-measure' 'validate.go' \
-'		if field.Role() != RoleDimension {
-			return nil, fmt.Errorf("%w: %s is a %s", ErrGroupByNotDimension, key, field.DataType)
+# TestValidate_Rejects/duplicate groupBy level
+#
+# There is deliberately no "groupBy a measure" mutation: every field may cut, so
+# a numeric groupBy is accepted by design (TestValidate_AcceptsVariations/a
+# measure may be grouped on and aggregated by). The duplicate guard is what is
+# left to break here.
+add 'groupby-accepts-duplicates' 'validate.go' \
+'		if _, duplicate := seen[key]; duplicate {
+			return nil, fmt.Errorf("%w: %s", ErrDuplicateGroupBy, key)
 		}
 ' \
 ''
