@@ -186,13 +186,22 @@ export async function createUserWithRole(
   const password = dialog.getByLabel('Password', { exact: true });
   await expect(password).toBeVisible();
 
-  await dialog.getByLabel('Username').fill(opts.username);
-  await dialog.getByLabel('Displayname').fill(opts.username);
-  await password.fill(opts.password);
-  // Fail here, with the actual values, rather than later on an unexplained
-  // "dialog never closed".
-  await expect(dialog.getByLabel('Username')).toHaveValue(opts.username);
-  await expect(password).toHaveValue(opts.password);
+  // Waiting for the password field narrows that race but does not close it — a
+  // fill can still land in a neighbouring input while the dialog settles, and
+  // because Username and Displayname carry the SAME value the damage reads as a
+  // doubled username ("<name><name>") rather than as an obvious mis-type. So
+  // fill and verify as one retryable unit: a misdirected round re-fills from
+  // scratch instead of failing the whole spec's beforeAll. Same idiom as
+  // openComboboxAndPick in helpers/reports.ts.
+  await expect(async () => {
+    await dialog.getByLabel('Username').fill(opts.username);
+    await dialog.getByLabel('Displayname').fill(opts.username);
+    await password.fill(opts.password);
+
+    await expect(dialog.getByLabel('Username')).toHaveValue(opts.username, { timeout: 2000 });
+    await expect(dialog.getByLabel('Displayname')).toHaveValue(opts.username, { timeout: 2000 });
+    await expect(password).toHaveValue(opts.password, { timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
   await dialog.getByRole('combobox', { name: 'App Role' }).click();
   // The option panel is a floating overlay rendered on the page, not the dialog.
   await page.getByRole('option', { name: opts.role, exact: true }).click();
