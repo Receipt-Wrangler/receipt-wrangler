@@ -398,6 +398,68 @@ mounts it, so a raw `shellContext` is **null** and tapping Categories/Tags would
 by `test/widgets/quick_scan_form_test.dart` (tap-opens-picker, shellContext null) and on-device by
 `quick_scan_submit_test.dart`.
 
+### Group default custom fields
+
+A group can declare custom fields that are pre-added to its receipts
+(`GroupReceiptSettings.defaultCustomFieldIds`, configured on desktop's Group Receipt Settings — see
+the root `CLAUDE.md` → "Group Default Custom Fields" for the cross-component contract). The receipt
+form (`lib/receipts/widgets/receipt_form.dart`) applies the selected group's set on **create** and on
+every **active group change**, because each group is effectively its own receipt template.
+
+- **The swap is conservative.** `_applyGroupDefaultCustomFields(newGroupId)` only takes back a field
+  **this form added itself** (`_autoAppliedCustomFieldIds`) that is **still empty**. A default the
+  user typed into is kept and handed over to them (dropped from the auto set); so is anything they
+  added by hand. Adding or removing a field by hand (`_addCustomField` / `_removeCustomField`) removes
+  its id from the auto set, so the swap never fights a decision the user made.
+- **It runs on an active change, never on load in edit/view.** `initState` seeds only when
+  `formState == add` and the form already knows its group; the dropdown's `onChanged` runs it **before**
+  its `setState`, because it writes to `ReceiptModel` and `notifyListeners()` must not fire from inside
+  a setState callback. View mode returns early.
+- **One model write per swap.** `_customFieldValuesWith(add:, remove:)` is pure and every caller hands
+  the whole result to a single `_setCustomFieldValues`, so a multi-field swap rebuilds the form once
+  instead of once per field, with its fields half-mounted in between.
+- **Each row is keyed `ValueKey("customFieldValue_<id>")`** so the element tree follows field identity,
+  not list position. Without the key, removing a field re-uses its element for whatever shifted into the
+  slot and — since `FormBuilderTextField` has no `didUpdateWidget` — the old `TextEditingController` text
+  shows under the new field's label.
+- **Removal clears the form value first.** FormBuilder's `clearValueOnUnregister` defaults to **false**,
+  so an unregistered field's value stays in the form's value map and is handed straight back to any field
+  that later re-registers under the same name; `_clearCustomFieldFormValue` (`didChange(null)`) is what
+  stops a re-added default from resurrecting what was typed into it.
+- **Ids missing from the `CustomFieldModel` catalog are skipped**, which is also the permission gate: the
+  catalog is empty for a caller without `app.custom-fields.read` (the 403 is swallowed into an empty
+  list), and auto-adding for them would make their receipts unsaveable — the backend's
+  `enforceReceiptCustomFieldSelection` **403s** any save that changes the attached id set for such a
+  caller. There is no separate `PermissionsModel` check; the empty catalog is the gate.
+- **An empty attached value is still submitted.** `buildCustomFieldValueUpsertCommands` emits one entry
+  per attached value with null columns for the empty ones — dropping them would fail that same 403,
+  because the backend REPLACES the whole association on update.
+
+**Tests.** `test/widgets/receipt_form_default_custom_fields_test.dart` covers the rules exhaustively
+against injected models (13 cases: seeding, each keep/drop rule, A→B→A leaving no residue, an unchecked
+BOOLEAN counting as empty, a missing/empty catalog, view mode, edit-mode-on-change-only). **E2E:**
+`integration_test/receipt_default_custom_fields_test.dart` — three specs proving the ids survive the
+wire (persisted, hydrated onto `GroupModel` via AppData at login, applied by the real form, accepted on
+save): the full swap matrix ending in an API read-back of the saved values, the stale-value guard (type
+into a default → remove it by hand → switch away and back → it returns **blank**), and view-never /
+edit-only-on-change. Every step also asserts no UI error survived it.
+
+Three things that spec encodes, all of which cost a debugging cycle:
+- **Do not install a `FlutterError.onError` collector to catch UI errors.** It takes the handler away
+  from `TestWidgetsFlutterBinding`, whose `_runTest` then trips its own
+  `'_pendingExceptionDetails != null'` assertion on **any** failure — so a plain `expect` mismatch is
+  reported as an unreadable framework assertion instead of its own message. The binding already
+  hard-fails on an uncaught framework error; `expect(tester.takeException(), isNull)` plus
+  `expect(find.byType(ErrorWidget), findsNothing)` per step adds the step name and the red-screen case.
+- **`pumpAndSettle`'s first positional argument is the frame interval, not a timeout** (the timeout
+  defaults to **10 minutes**). The receipt form hosts a `CircularLoadingProgress` that spins while
+  `customFieldModel` reloads, so a tree that never settles hangs the whole run — use
+  `pumpUntilFound(tester, find.byType(BottomSubmitButton).hitTestable())` instead.
+- **Provision a user in exactly the groups the spec switches between**, rather than logging in as the
+  shared admin. The group dropdown is a Material menu whose scrollable does not build off-screen items
+  into the element tree, so the admin's accumulated groups can push the target below the viewport where
+  `find.text` can't reach it (the same problem `keepOnlyGroup` works around for Quick Scan).
+
 ### `integration_test` is a regular dependency on purpose (Android Studio signed-bundle builds)
 
 `integration_test` is listed under **`dependencies`**, not `dev_dependencies`, in `pubspec.yaml`.
@@ -819,12 +881,22 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - `integration_test/permission_paid_by_visibility_test.dart` — group-role paid-by visibility: a member restricted to "their own receipts" (via `provisionPaidByOwnMember` → `createRole(..., includeOwnPaidReceipts: true)`) sees only their own receipt in the group list; the admin-paid receipt is filtered out server-side. Mirrors desktop `paid-by-visibility.spec.ts` (list axis).
 - `integration_test/permission_receipt_category_visibility_test.dart` — non-admin sees the per-group **category and tag** catalogs in the receipt-form pickers (sourced from `groupCategories` / `groupTags`, not the admin-only flat lists).
 - `integration_test/reports_list_test.dart` — the Reports **list** view: seeds a template via `createReportTemplate` and asserts the row renders (regression guard for the `aggFunc` omitempty deserialization fix), the "No reports found" empty state, and the avatar-menu gate (`app.reports.read`/`readAll` shown, Legacy User hidden). Uses `provisionUserWithAppPermissions` in `permission_fixtures.dart`.
+- `integration_test/receipt_default_custom_fields_test.dart` — **group default custom fields** end to
+  end: the swap matrix across a group change (with an API read-back of the saved values), the
+  stale-value guard, and view-never / edit-only-on-change. See "Group default custom fields" above for
+  the three gotchas it encodes. Seeds via `setGroupDefaultCustomFields` (`permission_fixtures.dart`) and
+  `createCustomField` / `deleteCustomField` (`api.dart`) — the field teardown is registered **before**
+  the user/group ones so LIFO runs it last, since deleting a field destroys every value stored against
+  it and the receipts holding those values have to be cascaded away first.
 - `integration_test/helpers/env.dart` — dart-define consumption + guards.
 - `integration_test/helpers/pump.dart` — `pumpUntilFound` polling helper.
 - `integration_test/helpers/platform_mocks.dart` — Linux-desktop platform-channel stubs for `permission_handler`, `gal`, `flutter_secure_storage`.
 - `integration_test/login_qr_deep_link_test.dart` — the login-QR **deep link** end to end: reads the real `loginQrUrl` off `GET /featureConfig` and injects it via the `buildApp` seam. See "App Links / Universal Links" above.
 - `integration_test/helpers/login.dart` / `api.dart` — UI + API login as admin, the shared e2e-user, or arbitrary credentials (`loginAs` / `apiLoginAs`). `login.dart` also exposes the two halves `loginAs` is built from — `resetPersistedAppState()` (wipe secure storage + `basePath` so the app boots to the Connect screen) and `loginFromLoginScreen()` (credentials + `GroupSelect` landing) — for specs that reach the login screen some other way. `api.dart` carries the shared `getSystemSettings` / `putSystemSettings` (the PUT is an **upsert**: patch a fetched object, never send a partial body).
-- `integration_test/helpers/permission_fixtures.dart` — admin-API provisioning for permission specs. **`_settingsToCommand` carries a hardcoded key list** — a new `GroupReceiptSettings` flag must be added there or every persisted e2e config silently resets it to `false`. Also: fresh user + group with a chosen system group role ("Legacy Viewer"/"Legacy Editor"), optional seeded receipt, `addTearDown` cleanup. Also mints **custom roles** for negative specs: `createRole`/`deleteRole`, `rolePermissionsByName`, and the convenience `provisionUserWithoutAppPermission` / `provisionGroupMemberWithoutPermission` (build a role = a Legacy role **minus one permission**). The backend won't delete an assigned role, so the role-delete teardown is registered **before** the user/group ones — LIFO makes it run last, after the assignments are gone.
+- `integration_test/helpers/permission_fixtures.dart` — admin-API provisioning for permission specs. `PermFixture`
+  carries the provisioned user's **`displayName`**, which the paid-by / charged-to dropdowns render —
+  `users.dart`'s lookup helpers only cover the two fixed `E2E_*` accounts, so a spec that submits a form
+  as a fixture user has no other way to name it. **`_settingsToCommand` carries a hardcoded key list** — a new `GroupReceiptSettings` flag must be added there or every persisted e2e config silently resets it to `false`. Also: fresh user + group with a chosen system group role ("Legacy Viewer"/"Legacy Editor"), optional seeded receipt, `addTearDown` cleanup. Also mints **custom roles** for negative specs: `createRole`/`deleteRole`, `rolePermissionsByName`, and the convenience `provisionUserWithoutAppPermission` / `provisionGroupMemberWithoutPermission` (build a role = a Legacy role **minus one permission**). The backend won't delete an assigned role, so the role-delete teardown is registered **before** the user/group ones — LIFO makes it run last, after the assignments are gone.
 - `integration_test/helpers/feature_flags.dart` — `enableAiPoweredReceiptsForTest()`: toggles the Quick Scan flag by pointing systemSettings at a junk receiptProcessingSettings record, restoring on teardown.
 - `integration_test/helpers/login_qr_fixtures.dart` — `enableLoginQrForTest(serverUrl)`: flips the **global** `showLoginQr` / `mobileServerUrl` system settings, restores them on teardown (re-reads current settings rather than replaying a stale snapshot, like `feature_flags.dart`), and returns the backend-composed `loginQrUrl`. Plus `getLoginQrUrl()` — the unauthenticated `GET /featureConfig` read. **These are the same two settings the desktop suite's `login-qr.spec.ts` drives on the same shared backend** (both workflows read `secrets.E2E_BASE_URL`), so the `android-e2e` job and `e2e.yml`'s `e2e` job share a job-level concurrency group (`e2e-shared-backend`, `cancel-in-progress: false`) to keep the two suites from racing. The group is **ref-independent on purpose** — this workflow also fires on `tech/mobile-e2e` / `workflow_dispatch` while `e2e.yml` fires only on `main`, so a `${{ github.ref }}`-scoped group would separate them and defeat the lock; keep both groups byte-identical. `ios-e2e` doesn't need it — it doesn't run this spec.
 - `integration_test/quick_scan_config_response_test.dart` — the Quick Scan per-image **form** shows/hides/requires fields per the selected group's `GroupReceiptSettings.quickScan*`, **without hitting the backend** (visibility assertions + client-side required-empty blocking, which short-circuits before the API call). Green on **all** targets (Linux/iOS/Android): it feeds an image via the mocked document-scanner channel (not the desktop-blocked gallery path) and injects the group config by mutating the live `GroupModel` via Provider (the same technique `quick_scan_disabled_test` uses for the AI flag — deterministic, no reliance on the local API persisting the fields). Six `testWidgets`: (1) single-group visibility + a categories-required fix-error snackbar; (2) **group switch** — two groups with opposite configs, asserts the field set **flips** when the dropdown changes; (3)+(4) **paid-by** / **tags** required+empty each block submit; (5) a required **comment** blocks submit; (6) `hideComments` hides the comment field even when the quick-scan toggle enables and requires it. Shared actions live in `helpers/quick_scan_actions.dart`. **Client injection only works for these no-backend tests** — successful submits must persist the config (see the submit spec). When injecting a synthetic group for a dropdown assertion, **trim `GroupModel.groups` to the all-group placeholder(s) + your target group(s)** (`keepOnlyGroup`) — the seeded admin accumulates many groups and an appended entry lands below the dropdown menu's viewport, where `find.text` can't reach it (a Material dropdown's scrollable doesn't build off-screen items into the element tree).

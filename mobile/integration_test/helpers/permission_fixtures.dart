@@ -28,6 +28,7 @@ class PermFixture {
     required this.username,
     required this.password,
     required this.userId,
+    required this.displayName,
     this.groupId,
     this.groupName,
     this.receiptId,
@@ -39,6 +40,12 @@ class PermFixture {
   final String username;
   final String password;
   final int userId;
+
+  /// The name the user dropdowns (paid-by, charged-to) render for this user.
+  /// Carried here rather than derived in a spec because the fixture is the only
+  /// thing that knows it — the `users.dart` lookup helpers only cover the two
+  /// fixed `E2E_*` accounts.
+  final String displayName;
 
   /// The fixture group the user belongs to (null when provisioned with no group,
   /// e.g. the "user in no group" add-menu negative case).
@@ -697,11 +704,13 @@ Future<PermFixture> provisionPermUser({
   final suffix = _unique();
   final username = 'perm-$suffix';
 
+  final displayName = 'Perm $suffix';
+
   final adminId = await userIdByUsername(E2eEnv.adminUsername, jwt: jwt);
   final userId = await createUser(
     username: username,
     password: _password,
-    displayName: 'Perm $suffix',
+    displayName: displayName,
     jwt: jwt,
     appRoleId: appRoleId,
   );
@@ -743,6 +752,7 @@ Future<PermFixture> provisionPermUser({
     username: username,
     password: _password,
     userId: userId,
+    displayName: displayName,
     groupId: groupId,
     groupName: groupName,
     receiptId: receiptId,

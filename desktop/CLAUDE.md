@@ -520,6 +520,27 @@ Custom Fields** `app-form-section` on `src/group/group-receipt-settings/` (betwe
   and leaves the auto set, becoming user data. `customFieldChanged` deletes the id from the auto set
   in **both** branches, so a default toggled off and back on is user-owned forever after.
 
+**E2E:** `e2e/group-default-custom-fields.spec.ts` (serial, admin storageState) covers the two
+delivery paths, which the Jest specs cannot — they inject settings into a mocked store:
+- The **settings page** round-trips a set and the ingest toggle through a save, asserted after a
+  re-navigation so the values have to come back out of `GET /group/{id}` (`groupResolverFn`), and
+  shrinking the set persists too (the command carries the whole id list).
+- The **receipt form** walks the swap matrix on `/receipts/add` against `GroupState`, hydrated from
+  AppData on every navigation: select group A (defaults A+B) → type into A → add C by hand → switch
+  to group B (defaults C) → **only B is dropped**, A keeps its value and C is not duplicated →
+  switch back → B returns **blank** and C survives → save. Reaching `/receipts/:id/view` is itself
+  the proof the client sent every attached field (an id set that doesn't match the stored one is a
+  403 from `enforceReceiptCustomFieldSelection`). Verified to FAIL with the empty-check inverted.
+- Deleting a custom field prunes it from the group's stored set.
+
+Two `data-testid`s exist for it: **`autocomplete-clear`** on the shared `app-autocomlete`'s clear
+button and **`receipt-group`** on the receipt form's group picker. Both are load-bearing rather than
+convenience — a single-select autocomplete marks its input `readonly` once a value is chosen, so the
+group cannot be *changed* without clicking that clear button first, and a spec that skips it silently
+asserts against the old group. Note `getByTestId('receipt-manage-custom-fields').getByRole('button')`
+is a **strict-mode violation**: the `cdkMenuTrigger` also puts `role="button"` on the `<app-button>`
+host, so use `.locator('button')`.
+
 ## Login QR (mobile app setup)
 
 A QR that deep-links users into the mobile app to set it up. It renders in **two** places — the login

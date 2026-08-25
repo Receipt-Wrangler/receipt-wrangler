@@ -257,6 +257,10 @@ A group can declare custom fields that are **always pre-added** to its receipts,
 - **The command fields are pointers** (`*[]uint` / `*bool`): omitting a key leaves the stored value
   alone. A client that hides the section must omit them rather than send zero values, or it wipes
   another admin's configuration.
+- **Each client has its own e2e for the group switch**, because the unit/widget tests on both sides
+  inject group settings into a mocked store and so prove nothing about the wire:
+  `desktop/e2e/group-default-custom-fields.spec.ts` and
+  `mobile/integration_test/receipt_default_custom_fields_test.dart`.
 
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
