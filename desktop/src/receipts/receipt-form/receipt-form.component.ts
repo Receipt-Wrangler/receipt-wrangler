@@ -110,6 +110,16 @@ export class ReceiptFormComponent implements OnInit {
 
   public customFieldsStatefulMenuItems: StatefulMenuItem[] = [];
 
+  // Custom fields this form added on its own from the selected group's defaults.
+  // Only these are candidates for removal when the group changes - anything the
+  // user added, or typed into, is theirs and is left alone.
+  private autoAppliedCustomFieldIds = new Set<number>();
+
+  // listenForGroupChanges() replays the current group id via startWith() in every
+  // mode, so the first emission is "the form just initialised", not "the user
+  // picked a group". Reset with the form in initForm().
+  private groupChangeIsInitialEmission = true;
+
   public originalReceipt?: Receipt;
 
   public images = signal<FileDataView[]>([]);
@@ -400,6 +410,12 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   private initForm(): void {
+    // Reset BEFORE the form is built: initForm() re-runs on every route-data
+    // emission and ends by calling listenForGroupChanges(), whose startWith()
+    // fires synchronously - so both must already describe the new form.
+    this.autoAppliedCustomFieldIds.clear();
+    this.groupChangeIsInitialEmission = true;
+
     let selectedGroupId: number | string = this.store.selectSnapshot(
       GroupState.selectedGroupId
     );
@@ -505,9 +521,65 @@ export class ReceiptFormComponent implements OnInit {
             .filter((u) => !groupMembers?.includes(u.id.toString()))
             .map((u) => u.id.toString()));
         }
+
+        // Inside this tap, after the selectedGroup signal write: under zoneless
+        // CD that write is what schedules the render, and a FormArray mutation
+        // on its own has no change-detection trigger.
+        this.applyGroupDefaultCustomFields(groupId);
+        this.groupChangeIsInitialEmission = false;
       })
     )
       .subscribe();
+  }
+
+  // Applies the selected group's configured default custom fields to the form -
+  // a "smart swap": a default this form added and the user never filled in is
+  // dropped when the new group doesn't want it, anything with a value (or that
+  // the user added themselves) stays, and the new group's missing defaults are
+  // appended.
+  private applyGroupDefaultCustomFields(groupId: number | string | null | undefined): void {
+    // Never on a read-only receipt, and never without the catalog permission -
+    // such a user's save would 403 on the backend's custom field selection check.
+    if (this.mode === FormMode.view || !this.canManageCustomFields()) {
+      return;
+    }
+
+    // The initial emission is the form loading, not a user choice: only the add
+    // form seeds defaults then, so an existing receipt opens exactly as saved.
+    if (!groupId || (this.groupChangeIsInitialEmission && this.mode !== FormMode.add)) {
+      return;
+    }
+
+    const group = this.store.selectSnapshot(GroupState.getGroupById(groupId.toString()));
+    const defaultIds = group?.groupReceiptSettings?.defaultCustomFieldIds ?? [];
+    const targetIds = new Set(defaultIds);
+
+    for (const autoAppliedId of Array.from(this.autoAppliedCustomFieldIds)) {
+      if (targetIds.has(autoAppliedId)) {
+        continue;
+      }
+
+      const index = this.findCustomFieldControlIndex(autoAppliedId);
+      const control = index >= 0 ? this.customFieldsFormArray.at(index) : undefined;
+      if (control && this.isCustomFieldControlEmpty(control)) {
+        this.removeCustomFieldControl(autoAppliedId);
+        this.markCustomFieldMenuItemDeselected(autoAppliedId);
+      }
+      // Dropped from the auto set either way: a field the user filled in is now
+      // their data and must survive every later group change.
+      this.autoAppliedCustomFieldIds.delete(autoAppliedId);
+    }
+
+    for (const defaultId of targetIds) {
+      // Skips a field missing from the loaded catalog, and one the form already
+      // carries (user-added, or kept from the group switched away from).
+      if (!this.addCustomFieldControl(defaultId)) {
+        continue;
+      }
+
+      this.markCustomFieldMenuItemSelected(defaultId);
+      this.autoAppliedCustomFieldIds.add(defaultId);
+    }
   }
 
   private getImageFiles(): void {
@@ -703,6 +775,11 @@ export class ReceiptFormComponent implements OnInit {
   // catalog pool (otherwise it can't be rendered or edited); a field the receipt
   // already has a value for is skipped to avoid duplicates. Returns whether any
   // were added.
+  //
+  // A control the group's defaults auto-added is a special case: it is already on
+  // the form but still EMPTY, so plain "skip what's present" would silently drop
+  // the magic value for exactly the fields a group pre-adds. Those get filled in
+  // place instead. Anything the user typed into, or added by hand, is left alone.
   private patchMagicCustomFields(magicReceipt: Receipt): boolean {
     const values = magicReceipt.customFields ?? [];
     if (values.length === 0) {
@@ -711,31 +788,138 @@ export class ReceiptFormComponent implements OnInit {
 
     let filledAny = false;
     values.forEach((value) => {
-      const definition = this.customFields.find(
-        (field) => field.id === value.customFieldId
-      );
-      if (!definition) {
+      if (this.fillEmptyAutoAppliedCustomField(value)) {
+        filledAny = true;
         return;
       }
 
-      const alreadyPresent = this.customFieldsFormArray.controls.some(
-        (control) => control.value?.["customFieldId"] === value.customFieldId
-      );
-      if (alreadyPresent) {
+      if (!this.addCustomFieldControl(value.customFieldId, value)) {
         return;
       }
 
-      this.customFieldsFormArray.push(this.buildCustomOptionFormGroup(value));
       this.markCustomFieldMenuItemSelected(value.customFieldId);
       filledAny = true;
     });
     return filledAny;
   }
 
+  // Fills a still-empty, auto-applied custom field control with [value], returning
+  // whether it did. The control is REPLACED rather than patched so it goes through
+  // buildCustomOptionFormGroup's `?? null` / `?? false` normalization, like every
+  // other creation path - patchValue with a partially populated CustomFieldValue
+  // would write undefined into the value columns it doesn't carry.
+  //
+  // Filling it makes it the user's data, so it leaves autoAppliedCustomFieldIds and
+  // a later group switch will no longer drop it.
+  private fillEmptyAutoAppliedCustomField(value: CustomFieldValue): boolean {
+    if (!this.autoAppliedCustomFieldIds.has(value.customFieldId)) {
+      return false;
+    }
+
+    const index = this.findCustomFieldControlIndex(value.customFieldId);
+    if (index < 0) {
+      return false;
+    }
+
+    const control = this.customFieldsFormArray.at(index);
+    if (!this.isCustomFieldControlEmpty(control)) {
+      return false;
+    }
+
+    this.customFieldsFormArray.setControl(
+      index,
+      this.buildCustomOptionFormGroup(value)
+    );
+    this.autoAppliedCustomFieldIds.delete(value.customFieldId);
+    this.markCustomFieldMenuItemSelected(value.customFieldId);
+    return true;
+  }
+
+  // Appends a control for [customFieldId] to the custom fields form array,
+  // returning whether one was added. A field missing from the loaded catalog
+  // (this.customFields) can't be rendered or edited, and a field the form
+  // already carries would render twice, so both are skipped. [value] seeds the
+  // control (magic fill supplies one); omit it for an empty field.
+  private addCustomFieldControl(
+    customFieldId: number,
+    value?: CustomFieldValue
+  ): boolean {
+    const definition = this.customFields.find(
+      (field) => field.id === customFieldId
+    );
+    if (!definition) {
+      return false;
+    }
+
+    const alreadyPresent = this.customFieldsFormArray.controls.some(
+      (control) => control.value?.["customFieldId"] === customFieldId
+    );
+    if (alreadyPresent) {
+      return false;
+    }
+
+    this.customFieldsFormArray.push(
+      this.buildCustomOptionFormGroup(
+        value ?? ({ customFieldId } as CustomFieldValue)
+      )
+    );
+    return true;
+  }
+
+  // Removes [customFieldId]'s control, if the form carries one. The index guard
+  // is load-bearing: FormArray.removeAt(-1) splices off the LAST control, so an
+  // unguarded findIndex would drop an unrelated field.
+  private removeCustomFieldControl(customFieldId: number): void {
+    const index = this.findCustomFieldControlIndex(customFieldId);
+    if (index >= 0) {
+      this.customFieldsFormArray.removeAt(index);
+    }
+  }
+
+  // Index of [customFieldId]'s control in the custom fields form array, or -1.
+  private findCustomFieldControlIndex(customFieldId: number): number {
+    return this.customFieldsFormArray.controls.findIndex(
+      (control) =>
+        control.value?.["customFieldId"]?.toString() === customFieldId.toString()
+    );
+  }
+
+  // Whether a custom field control holds nothing the user typed. Every typed
+  // column must be null-or-empty AND booleanValue falsy — buildCustomOptionFormGroup
+  // seeds booleanValue to false, so a naive "every value is null" check would call
+  // every control non-empty. A BOOLEAN deliberately left false counts as empty.
+  private isCustomFieldControlEmpty(group: AbstractControl): boolean {
+    const value = group.value ?? {};
+    const isBlank = (columnValue: unknown): boolean =>
+      columnValue === null || columnValue === undefined || columnValue === "";
+
+    return (
+      isBlank(value["stringValue"]) &&
+      isBlank(value["dateValue"]) &&
+      isBlank(value["selectValue"]) &&
+      isBlank(value["currencyValue"]) &&
+      !value["booleanValue"]
+    );
+  }
+
   // Flips the manage-fields menu entry to selected so the newly added custom
-  // field renders, using an immutable array replace (required under zoneless CD,
-  // mirroring customFieldChanged).
+  // field renders.
   private markCustomFieldMenuItemSelected(customFieldId: number): void {
+    this.setCustomFieldMenuItemSelection(customFieldId, true);
+  }
+
+  // Clears the manage-fields menu entry for a custom field the form no longer
+  // carries, so the menu keeps matching the rendered fields.
+  private markCustomFieldMenuItemDeselected(customFieldId: number): void {
+    this.setCustomFieldMenuItemSelection(customFieldId, false);
+  }
+
+  // Immutable array replace - required under zoneless CD, mirroring
+  // customFieldChanged.
+  private setCustomFieldMenuItemSelection(
+    customFieldId: number,
+    selected: boolean
+  ): void {
     const menuValue = customFieldId.toString();
     const index = this.customFieldsStatefulMenuItems.findIndex(
       (item) => item.value === menuValue
@@ -745,7 +929,7 @@ export class ReceiptFormComponent implements OnInit {
     }
 
     const updated = Array.from(this.customFieldsStatefulMenuItems);
-    updated[index] = { ...updated[index], selected: true };
+    updated[index] = { ...updated[index], selected: selected };
     this.customFieldsStatefulMenuItems = updated;
   }
 
@@ -1038,30 +1222,19 @@ export class ReceiptFormComponent implements OnInit {
 
     this.customFieldsStatefulMenuItems = newCustomFields;
 
+    const customFieldId = Number(item.value);
+    // Either direction hands the field to the user: a group default they toggled
+    // off - or off and back on - must never be swapped out by a later group
+    // change.
+    this.autoAppliedCustomFieldIds.delete(customFieldId);
+
     // Custom field was just selected
     if (this.customFieldsStatefulMenuItems[selectedItemIndex].selected) {
-      const customField = this.customFields.find(customField => customField.id === Number(item.value));
-      if (customField) {
-        const customFieldValue = {
-          customFieldId: customField.id,
-          receiptId: this.originalReceipt?.id ?? 0,
-          value: null
-        } as any as CustomFieldValue;
-        this.customFieldsFormArray.push(this.buildCustomOptionFormGroup(customFieldValue));
-      }
+      this.addCustomFieldControl(customFieldId);
     } else {
       // Custom field was just removed
-      const formArrayIndex = this.customFieldsFormArray.controls.findIndex(control => control.value?.["customFieldId"]?.toString() === item.value);
-      this.customFieldsFormArray.removeAt(formArrayIndex);
+      this.removeCustomFieldControl(customFieldId);
     }
-  }
-
-  private updateCustomFields(): void {
-    const formArray = this.customFieldsFormArray;
-
-    this.customFieldsStatefulMenuItems.forEach((item) => {
-
-    });
   }
 
   public submit(): void {

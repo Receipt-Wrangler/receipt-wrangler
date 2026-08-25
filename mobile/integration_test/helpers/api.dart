@@ -148,6 +148,24 @@ Future<Map<String, dynamic>> createCustomField({
   return jsonDecode(res.body) as Map<String, dynamic>;
 }
 
+/// Best-effort `DELETE /api/customField/{id}`. Swallows errors so a cleanup
+/// failure doesn't mask the test result, matching [deleteReceipt].
+///
+/// Deleting a custom field destroys every value stored against it, so a spec
+/// that seeded receipts holding those values must delete the receipts FIRST.
+Future<void> deleteCustomField(int customFieldId, {required String jwt}) async {
+  try {
+    await http
+        .delete(
+          Uri.parse('${E2eEnv.baseUrl}/customField/$customFieldId'),
+          headers: {'Cookie': 'jwt=$jwt'},
+        )
+        .timeout(const Duration(seconds: 5));
+  } catch (_) {
+    // Swallowed on purpose -- best-effort cleanup.
+  }
+}
+
 /// Idempotent: returns the existing custom field with [name] if one
 /// exists, otherwise creates one with [type]. Lets tests provision their
 /// own fixtures instead of relying on hand-seeded data on the demo

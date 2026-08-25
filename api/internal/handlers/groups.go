@@ -62,6 +62,17 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// DefaultCustomFieldIds is `gorm:"-"`, so Preload(clause.Associations) loads the
+			// settings row but leaves the slice nil -- and it carries no omitempty, so a nil
+			// serializes as `null` rather than being absent. Swagger declares an array that is
+			// always present, and the generated Dart deserializer has no null guard. Hydrate
+			// BEFORE the copy below: anyData takes each group by value, so mutating afterwards
+			// would update rows nobody serializes.
+			if err := repositories.NewGroupReceiptSettingsRepository(nil).
+				LoadDefaultCustomFieldIdsForGroups(groups); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			anyData := make([]any, len(groups))
 			for i := 0; i < len(groups); i++ {
 				anyData[i] = groups[i]
@@ -134,6 +145,14 @@ func GetGroupsForUser(w http.ResponseWriter, r *http.Request) {
 
 			// Attach each visible member's per-member category/tag grants.
 			if err := repositories.NewGroupMemberRepository(nil).LoadMemberGrantsForGroups(groups); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// Same treatment for each group's default custom field ids, which are also
+			// `gorm:"-"`. The desktop feeds this response into GroupState, which is what the
+			// receipt form reads a group's defaults from — an unloaded response would blank
+			// them, and would put a null where swagger promises an array.
+			if err := repositories.NewGroupReceiptSettingsRepository(nil).LoadDefaultCustomFieldIdsForGroups(groups); err != nil {
 				return http.StatusInternalServerError, err
 			}
 
@@ -231,6 +250,17 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 			// A brand-new group has no grants yet, but the response must still carry
 			// the empty arrays swagger declares rather than null.
 			if err := repositories.NewGroupMemberRepository(nil).LoadMemberGrantsForGroup(&group); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// Same reasoning for the group's default custom fields, with one wrinkle: CreateGroup
+			// returns a Find that only preloads GroupMembers, so the settings object is zero-valued
+			// and its GroupId is 0. Set it first, or the loader keys the lookup on group 0 and the
+			// empty result would be right by accident rather than by computation.
+			group.GroupReceiptSettings.GroupId = group.ID
+			if err := repositories.NewGroupReceiptSettingsRepository(nil).LoadDefaultCustomFieldIds(
+				[]*models.GroupReceiptSettings{&group.GroupReceiptSettings},
+			); err != nil {
 				return http.StatusInternalServerError, err
 			}
 
@@ -400,6 +430,46 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			if err != nil {
 				return http.StatusInternalServerError, err
+			}
+
+			// The endpoint is gated on GroupUpdate only. Touching the group's default custom field
+			// configuration additionally requires app.custom-fields.read, mirroring
+			// enforceReceiptCustomFieldSelection: without it a group admin could attach fields
+			// whose catalog they are not allowed to read.
+			//
+			// This covers the ingest toggle as well as the selection. The toggle decides whether
+			// the (to that caller invisible) default set gets attached to every quick-scan and
+			// email receipt, so gating only the id list would leave a caller without the
+			// permission able to change what those fields do. Both are pointers, so a nil one
+			// means the client did not touch that key and stays allowed.
+			if command.DefaultCustomFieldIds != nil || command.ApplyDefaultCustomFieldsOnIngest != nil {
+				token := structs.GetClaims(r)
+				canReadCustomFields, err := services.NewPermissionService(nil).
+					HasAppPermissions(token.UserId, permissions.AppCustomFieldsRead)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				if !canReadCustomFields {
+					utils.WriteCustomErrorResponse(
+						w,
+						"You do not have permission to configure default custom fields",
+						http.StatusForbidden,
+					)
+					return 0, nil
+				}
+
+				// Scoped to the selection: a toggle-only request has no ids to validate, and
+				// dereferencing the nil pointer here would panic.
+				if command.DefaultCustomFieldIds != nil {
+					vErr, err := validateDefaultCustomFieldIds(*command.DefaultCustomFieldIds)
+					if err != nil {
+						return http.StatusInternalServerError, err
+					}
+					if len(vErr.Errors) > 0 {
+						structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
+						return 0, nil
+					}
+				}
 			}
 
 			groupReceiptSettingsRepository := repositories.NewGroupReceiptSettingsRepository(nil)
@@ -635,4 +705,36 @@ func UpdateGroupMemberGrants(w http.ResponseWriter, r *http.Request) {
 	}
 
 	HandleRequest(handler)
+}
+
+// validateDefaultCustomFieldIds rejects a default-custom-field selection referencing
+// an id that does not exist in the catalog. The join table carries no foreign key to
+// custom_fields on the delete side (deletion is cascaded explicitly), so an unknown id
+// would otherwise persist as a row nothing can ever resolve — the receipt form would
+// silently skip it forever. Returns a populated ValidatorError keyed on
+// "defaultCustomFieldIds" when any id is unknown.
+func validateDefaultCustomFieldIds(customFieldIds []uint) (structs.ValidatorError, error) {
+	vErr := structs.ValidatorError{Errors: make(map[string]string)}
+	if len(customFieldIds) == 0 {
+		return vErr, nil
+	}
+
+	customFields, err := repositories.NewCustomFieldRepository(nil).GetCustomFieldsByIds(customFieldIds)
+	if err != nil {
+		return structs.ValidatorError{}, err
+	}
+
+	found := make(map[uint]struct{}, len(customFields))
+	for _, customField := range customFields {
+		found[customField.ID] = struct{}{}
+	}
+
+	for _, customFieldId := range customFieldIds {
+		if _, ok := found[customFieldId]; !ok {
+			vErr.Errors["defaultCustomFieldIds"] = "One or more selected custom fields do not exist"
+			break
+		}
+	}
+
+	return vErr, nil
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:receipt_wrangler_mobile/enums/form_state.dart';
+import 'package:receipt_wrangler_mobile/shared/functions/custom_field_values.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/amount_field.dart';
 import 'package:receipt_wrangler_mobile/utils/date.dart';
 
@@ -19,7 +20,7 @@ class CustomFieldWidget extends StatelessWidget {
     this.onRemove,
   });
 
-  String get fieldName => "customField_${customField.id}";
+  String get fieldName => customFieldFormFieldName(customField.id);
 
   bool get isReadOnly => formState == WranglerFormState.view;
 

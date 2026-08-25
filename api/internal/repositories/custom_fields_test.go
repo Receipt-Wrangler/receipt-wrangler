@@ -878,3 +878,112 @@ func TestShouldReturnErrorWhenUpdatingNonExistentCustomField(t *testing.T) {
 		utils.PrintTestError(t, "Expected error for non-existent ID", nil)
 	}
 }
+
+// TestShouldRemoveDeletedCustomFieldFromEveryGroupDefaultSet pins the "deleting a custom field
+// removes it from every group's default set" requirement. Two groups are seeded so a cascade scoped
+// to a single group (or keyed on the wrong column) fails here.
+func TestShouldRemoveDeletedCustomFieldFromEveryGroupDefaultSet(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	CreateTestGroup()
+
+	settingsRepository := NewGroupReceiptSettingsRepository(nil)
+	for _, groupId := range []uint{1, 2} {
+		if _, err := settingsRepository.CreateGroupReceiptSettings(groupId); err != nil {
+			utils.PrintTestError(t, err, "no error")
+		}
+	}
+
+	shared := seedDefaultCustomField(t, "Shared Field")
+	groupTwoOnly := seedDefaultCustomField(t, "Group Two Field")
+
+	commandOne := baseSettingsCommand()
+	commandOne.DefaultCustomFieldIds = &[]uint{shared}
+	if _, err := settingsRepository.UpdateGroupReceiptSettings("1", commandOne); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	commandTwo := baseSettingsCommand()
+	commandTwo.DefaultCustomFieldIds = &[]uint{shared, groupTwoOnly}
+	if _, err := settingsRepository.UpdateGroupReceiptSettings("2", commandTwo); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	err := NewCustomFieldRepository(nil).DeleteCustomField(shared)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	settingsOne, err := settingsRepository.GetGroupReceiptSettingsByGroupId(1)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(settingsOne.DefaultCustomFieldIds) != 0 {
+		utils.PrintTestError(t, settingsOne.DefaultCustomFieldIds, "empty set")
+	}
+
+	// The other group keeps its unrelated field.
+	settingsTwo, err := settingsRepository.GetGroupReceiptSettingsByGroupId(2)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(settingsTwo.DefaultCustomFieldIds) != 1 || settingsTwo.DefaultCustomFieldIds[0] != groupTwoOnly {
+		utils.PrintTestError(t, settingsTwo.DefaultCustomFieldIds, []uint{groupTwoOnly})
+	}
+
+	var remaining int64
+	GetDB().Model(&models.GroupReceiptSettingsCustomField{}).Where("custom_field_id = ?", shared).Count(&remaining)
+	if remaining != 0 {
+		utils.PrintTestError(t, remaining, 0)
+	}
+}
+
+func TestShouldGetCustomFieldsByIds(t *testing.T) {
+	defer TruncateTestDb()
+	setupCustomFieldRepositoryTest()
+	repository := NewCustomFieldRepository(nil)
+
+	// An empty selection short-circuits to an empty, non-nil result.
+	empty, err := repository.GetCustomFieldsByIds(nil)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+	if empty == nil || len(empty) != 0 {
+		utils.PrintTestError(t, empty, "an empty, non-nil slice")
+	}
+
+	// Resolve the seeded ids rather than assuming 1 and 3: setupCustomFieldRepositoryTest only
+	// creates rows, it never truncates, so the ids are whatever the sequence is at.
+	db := GetDB()
+	var textField, selectField models.CustomField
+	if err := db.Where("name = ?", "Test Text Field").First(&textField).Error; err != nil {
+		utils.PrintTestError(t, err, "the seeded TEXT field")
+		return
+	}
+	if err := db.Where("name = ?", "Test Select Field").First(&selectField).Error; err != nil {
+		utils.PrintTestError(t, err, "the seeded SELECT field")
+		return
+	}
+
+	// Unknown ids are simply absent, which is what lets the handler detect them by comparison.
+	found, err := repository.GetCustomFieldsByIds([]uint{textField.ID, selectField.ID, 9999})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(found) != 2 {
+		utils.PrintTestError(t, len(found), 2)
+		return
+	}
+	for _, customField := range found {
+		if customField.ID != textField.ID && customField.ID != selectField.ID {
+			utils.PrintTestError(t, customField.ID, "the seeded TEXT or SELECT field id")
+		}
+		if len(customField.Name) == 0 {
+			utils.PrintTestError(t, customField, "a custom field carrying its name")
+		}
+	}
+}

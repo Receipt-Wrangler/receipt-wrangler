@@ -181,6 +181,13 @@ func HandleEmailProcessTask(context context.Context, task *asynq.Task) error {
 
 	command.CreatedByString = "Email Integration"
 
+	// Attach the group's default custom fields (as empty values) when the group opted into applying
+	// them to server-created receipts. Same helper as quick scan so the two ingest paths cannot drift.
+	err = services.ApplyGroupDefaultCustomFields(nil, command.GroupId, &command)
+	if err != nil {
+		return HandleError(err)
+	}
+
 	vErr := command.Validate(0, true)
 	if len(vErr.Errors) > 0 {
 		errBytes, _ := json.Marshal(vErr.Errors)

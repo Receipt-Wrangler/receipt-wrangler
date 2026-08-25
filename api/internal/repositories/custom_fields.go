@@ -163,6 +163,25 @@ func (repository CustomFieldRepository) GetCustomFieldById(id uint) (models.Cust
 	return customField, nil
 }
 
+// GetCustomFieldsByIds returns the custom fields matching the given ids. Ids that
+// don't exist are simply absent from the result, so callers validating a submitted
+// selection can compare lengths (or index the result) to find the unknown ones.
+func (repository CustomFieldRepository) GetCustomFieldsByIds(ids []uint) ([]models.CustomField, error) {
+	if len(ids) == 0 {
+		return []models.CustomField{}, nil
+	}
+
+	db := repository.GetDB()
+	var customFields []models.CustomField
+
+	err := db.Model(&models.CustomField{}).Where("id IN ?", ids).Find(&customFields).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return customFields, nil
+}
+
 func (repository CustomFieldRepository) DeleteCustomField(id uint) error {
 	db := repository.GetDB()
 
@@ -173,6 +192,13 @@ func (repository CustomFieldRepository) DeleteCustomField(id uint) error {
 		}
 
 		err = tx.Delete(&models.CustomFieldValue{}, "custom_field_id = ?", id).Error
+		if err != nil {
+			return err
+		}
+
+		// Drop the field from EVERY group's default set. Explicit rather than relying on
+		// the FK cascade, matching the other cascades in this transaction.
+		err = tx.Delete(&models.GroupReceiptSettingsCustomField{}, "custom_field_id = ?", id).Error
 		if err != nil {
 			return err
 		}

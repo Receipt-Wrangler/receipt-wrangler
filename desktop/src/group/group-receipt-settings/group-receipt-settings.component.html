@@ -52,6 +52,31 @@
     ></app-checkbox>
   </app-form-section>
 
+  @if (canManageDefaultCustomFields) {
+    <app-form-section
+      headerText="Default Custom Fields"
+      subtitle="These custom fields are pre-added to receipts created for this group, so members don't have to remember them. They only apply for members who can manage custom fields; for everyone else receipts are created without them."
+    >
+      <app-autocomlete
+        class="w-100"
+        label="Default Custom Fields"
+        data-testid="group-default-custom-fields"
+        optionFilterKey="name"
+        optionDisplayKey="name"
+        [inputFormControl]="$any(defaultCustomFieldsFormArray)"
+        [options]="customFields"
+        [multiple]="true"
+        [creatable]="false"
+        [readonly]="formConfig.mode !== FormMode.edit"
+      ></app-autocomlete>
+      <app-checkbox
+        label="Also add them to quick scan and email created receipts"
+        data-testid="apply-default-custom-fields-on-ingest"
+        [inputFormControl]="form | formGet: 'applyDefaultCustomFieldsOnIngest'"
+      ></app-checkbox>
+    </app-form-section>
+  }
+
   <app-form-section
     headerText="Quick Scan"
     subtitle="Choose which fields appear in quick scan and which are required. Paid by and status always resolve to a value, so set a default for when they are optional."

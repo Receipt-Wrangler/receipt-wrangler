@@ -78,6 +78,7 @@
             ></app-datepicker>
             <app-group-autocomplete
               class="w-100"
+              data-testid="receipt-group"
               [inputFormControl]="form | formGet : 'groupId'"
               [readonly]="mode | inputReadonly"
             >
@@ -286,6 +287,7 @@
   ></app-button>
   @if (canManageCustomFields()) {
     <app-filtered-stateful-menu
+      data-testid="receipt-manage-custom-fields"
       filterLabel="Filter custom fields"
       matButtonType="iconButton"
       icon="list_alt"

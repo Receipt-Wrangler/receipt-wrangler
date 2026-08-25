@@ -14,6 +14,7 @@ import '../../models/auth_model.dart';
 import '../../models/custom_field_model.dart';
 import '../../models/loading_model.dart';
 import '../../models/receipt_model.dart';
+import '../../shared/functions/custom_field_values.dart';
 import '../../shared/widgets/bottom_submit_button.dart';
 import '../../utils/date.dart';
 import '../../utils/forms.dart';
@@ -230,67 +231,13 @@ class ReceiptBottomSheetBuilder {
   List<api.UpsertCustomFieldValueCommand> buildCustomFieldValueUpsertCommand(
       Map<String, dynamic> form) {
     var customFieldModel = Provider.of<CustomFieldModel>(context, listen: false);
-    List<api.UpsertCustomFieldValueCommand> upsertCustomFieldValues = [];
 
-    // Process custom field values - only process fields that are currently part of the receipt
-    for (var existingCustomFieldValue in receiptModel.modifiedReceipt.customFields) {
-      // Find the custom field template
-      var customField = customFieldModel.customFields
-          .where((cf) => cf.id == existingCustomFieldValue.customFieldId)
-          .firstOrNull;
-      
-      if (customField == null) continue; // Skip if template not found
-
-      var fieldKey = "customField_${customField.id}";
-      var fieldValue = form[fieldKey];
-
-      // Only process if the field has a value (for text/currency fields) or for boolean/select fields
-      bool shouldProcess = false;
-      if (customField.type == api.CustomFieldType.BOOLEAN && fieldValue is bool) {
-        shouldProcess = true;
-      } else if (customField.type == api.CustomFieldType.SELECT && fieldValue is int) {
-        shouldProcess = true;
-      } else if (fieldValue != null && fieldValue.toString().isNotEmpty) {
-        shouldProcess = true;
-      }
-
-      if (shouldProcess) {
-        var customFieldValueBuilder = api.UpsertCustomFieldValueCommandBuilder()
-          ..customFieldId = customField.id
-          ..receiptId = receiptModel.receipt.id;
-
-        // Set the appropriate value based on the field type
-        switch (customField.type) {
-          case api.CustomFieldType.TEXT:
-            customFieldValueBuilder.stringValue = fieldValue.toString();
-            break;
-          case api.CustomFieldType.DATE:
-            if (fieldValue is DateTime) {
-              customFieldValueBuilder.dateValue = formatDate(zuluDateFormat, fieldValue);
-            } else if (fieldValue is String) {
-              customFieldValueBuilder.dateValue = fieldValue;
-            }
-            break;
-          case api.CustomFieldType.SELECT:
-            if (fieldValue is int) {
-              customFieldValueBuilder.selectValue = fieldValue;
-            }
-            break;
-          case api.CustomFieldType.CURRENCY:
-            customFieldValueBuilder.currencyValue = fieldValue.toString();
-            break;
-          case api.CustomFieldType.BOOLEAN:
-            if (fieldValue is bool) {
-              customFieldValueBuilder.booleanValue = fieldValue;
-            }
-            break;
-        }
-
-        upsertCustomFieldValues.add(customFieldValueBuilder.build());
-      }
-    }
-
-    return upsertCustomFieldValues;
+    return buildCustomFieldValueUpsertCommands(
+      attachedValues: receiptModel.modifiedReceipt.customFields,
+      customFields: customFieldModel.customFields,
+      form: form,
+      receiptId: receiptModel.receipt.id,
+    );
   }
 
   api.UpsertReceiptCommand buildReceiptUpsertCommand() {

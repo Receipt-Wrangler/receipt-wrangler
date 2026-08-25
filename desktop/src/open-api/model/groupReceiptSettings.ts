@@ -102,6 +102,14 @@ export interface GroupReceiptSettings {
      * Require the comment field in quick scan
      */
     quickScanCommentRequired?: boolean;
+    /**
+     * Custom field ids that are pre-added to every receipt created for this group. Always present; an empty array means the group has configured none. Read only here - write via UpdateGroupReceiptSettingsCommand.defaultCustomFieldIds.
+     */
+    defaultCustomFieldIds?: Array<number>;
+    /**
+     * Also attach the group\'s default custom fields to receipts the SERVER creates (quick scan, email integration). Off by default.
+     */
+    applyDefaultCustomFieldsOnIngest?: boolean;
 }
 export namespace GroupReceiptSettings {
 }

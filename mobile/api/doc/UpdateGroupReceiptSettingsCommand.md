@@ -29,6 +29,8 @@ Name | Type | Description | Notes
 **quickScanTagsRequired** | **bool** | Require the tags field in quick scan | [optional] 
 **quickScanCommentEnabled** | **bool** | Show the comment field in quick scan | [optional] 
 **quickScanCommentRequired** | **bool** | Require the comment field in quick scan | [optional] 
+**defaultCustomFieldIds** | **BuiltList&lt;int&gt;** | Custom field ids to pre-add to every receipt created for this group. OMIT the key to leave the configured set unchanged (clients that hide this section, e.g. for a user without app.custom-fields.read, must omit it); send an empty array to clear it. Requires app.custom-fields.read - a caller without it gets a 403. | [optional] 
+**applyDefaultCustomFieldsOnIngest** | **bool** | Also attach the group's default custom fields to receipts the SERVER creates (quick scan, email integration). OMIT the key to leave the stored value unchanged. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

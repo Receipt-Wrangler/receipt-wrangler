@@ -677,9 +677,9 @@ export async function apiDeleteTagById(
 //
 // Like categories and tags the pool is GLOBAL, so mint uniqueName-suffixed fields
 // and delete them in teardown — a leaked one shows up in every other spec's
-// pickers. There is no update endpoint, and deleting a field destroys every value
-// stored against it, so a spec that seeds receipts with values must delete those
-// receipts (or their group) too.
+// pickers. Deleting a field destroys every value stored against it, so a spec
+// that seeds receipts with values must delete those receipts (or their group)
+// too.
 
 export type CustomFieldType = 'TEXT' | 'DATE' | 'SELECT' | 'CURRENCY' | 'BOOLEAN';
 
@@ -731,6 +731,76 @@ export async function apiDeleteCustomFieldById(
   id: number,
 ): Promise<void> {
   await warnOnFailedDelete(api, `/api/customField/${id}`, `custom field ${id}`);
+}
+
+// --- Group default custom fields ---------------------------------------------
+
+/**
+ * Persists [customFieldIds] as [groupId]'s default custom fields, optionally
+ * flipping the "apply on ingest" toggle with [applyOnIngest].
+ *
+ * `PUT /group/{id}/groupReceiptSettings` is an UPSERT over the whole settings
+ * object, so this reads the group's current settings back and echoes them
+ * unchanged around the override — sending a partial body would reset every
+ * quick-scan flag to false. Only the boolean flags are echoed: the enum
+ * defaults (`quickScanDefaultPaidByType` / `...Status`) are omitted because the
+ * backend keeps its stored value and rejects an empty enum, which is also why
+ * paid-by and status stay shown+required here (making either optional would
+ * need a configured default). Mirrors the mobile suite's
+ * `setGroupDefaultCustomFields` fixture.
+ *
+ * Pass `[]` to clear the group's set.
+ */
+export async function apiSetGroupDefaultCustomFields(
+  api: APIRequestContext,
+  groupId: number | string,
+  customFieldIds: number[],
+  applyOnIngest?: boolean,
+): Promise<void> {
+  const groupsRes = await api.get('/api/group/');
+  if (!groupsRes.ok()) {
+    throw new Error(
+      `set default custom fields: GET /api/group/ failed: HTTP ${groupsRes.status()} ${await groupsRes.text()}`,
+    );
+  }
+  const groups = (await groupsRes.json()) as {
+    id: number;
+    groupReceiptSettings?: Record<string, unknown>;
+  }[];
+  const group = groups.find((g) => String(g.id) === String(groupId));
+  if (!group) {
+    throw new Error(`set default custom fields: group ${groupId} not visible`);
+  }
+
+  const settings = group.groupReceiptSettings ?? {};
+  const command: Record<string, unknown> = {
+    defaultCustomFieldIds: customFieldIds,
+  };
+  for (const key of [
+    'hideImages', 'hideReceiptCategories', 'hideReceiptTags',
+    'hideItemCategories', 'hideItemTags', 'hideComments',
+    'hideShareCategories', 'hideShareTags',
+    'quickScanPaidByEnabled', 'quickScanPaidByRequired',
+    'quickScanStatusEnabled', 'quickScanStatusRequired',
+    'quickScanCategoriesEnabled', 'quickScanCategoriesRequired',
+    'quickScanTagsEnabled', 'quickScanTagsRequired',
+    'quickScanCommentEnabled', 'quickScanCommentRequired',
+    'applyDefaultCustomFieldsOnIngest',
+  ]) {
+    command[key] = settings[key] ?? false;
+  }
+  if (applyOnIngest !== undefined) {
+    command['applyDefaultCustomFieldsOnIngest'] = applyOnIngest;
+  }
+
+  const res = await api.put(`/api/group/${groupId}/groupReceiptSettings`, {
+    data: command,
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `set default custom fields failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
 }
 
 // --- Per-member category/tag grants ------------------------------------------

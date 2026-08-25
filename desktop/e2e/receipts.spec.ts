@@ -158,8 +158,10 @@ test.describe('receipts', () => {
     await fillBasics(page, name);
 
     // Attach the first available custom field to this receipt via the
-    // "Manage custom fields" menu (list_alt icon near the form title).
-    await page.locator('button:has(mat-icon:has-text("list_alt"))').first().click();
+    // "Manage custom fields" menu near the form title.
+    // .locator('button'): the cdkMenuTrigger also puts role="button" on the <app-button> host, so
+    // getByRole('button') here matches two elements and fails Playwright's strict mode.
+    await page.getByTestId('receipt-manage-custom-fields').locator('button').click();
     // Menu renders a disabled "No items found" div when filteredItems is empty;
     // skip that and click the first real (non-pe-none) menuitem.
     await page.locator('[role="menuitem"]:not(.pe-none)').first().click();
