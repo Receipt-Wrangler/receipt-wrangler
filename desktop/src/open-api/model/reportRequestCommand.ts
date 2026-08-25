@@ -32,6 +32,10 @@ export interface ReportRequestCommand {
      * Ordered engine field keys to nest the report by
      */
     groupBy?: Array<string>;
+    /**
+     * Column-heading overrides for the grouping levels, keyed by the groupBy field key. A key that is absent, blank, or not present in groupBy falls back to the field catalog\'s label.
+     */
+    groupByLabels?: { [key: string]: string; };
     detail: ReportDetail;
     columns: Array<ReportColumn>;
     /**

@@ -20,7 +20,11 @@ import { AuthState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
-import { buildColumnGroup, readStringArray } from "../models/report-form.factory";
+import {
+  buildColumnGroup,
+  readGroupByFields,
+  readStringArray,
+} from "../models/report-form.factory";
 import { ReportRunnerService } from "../services/report-runner.service";
 import { ReportBuilderComponent } from "./report-builder.component";
 
@@ -486,7 +490,7 @@ describe("ReportBuilderComponent", () => {
     expect(form.get("filter.status.value")!.value).toEqual(["OPEN"]);
 
     // Group-by (values), detail mode + by.
-    expect(readStringArray(form.get("groupBy") as FormArray)).toEqual(["group", "category"]);
+    expect(readGroupByFields(form.get("groupBy") as FormArray)).toEqual(["group", "category"]);
     expect(form.get("detail.mode")!.value).toBe(ReportDetail.ModeEnum.Aggregate);
     expect(form.get("detail.by")!.value).toBe("category");
 

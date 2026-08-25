@@ -74,17 +74,23 @@ var validAggFuncs = map[string]bool{"SUM": true, "COUNT": true, "AVG": true, "MI
 // submitting. The deep validity of the spec (that a field key exists, has the
 // right role, and that formulas form no cycle) is left to reporting.Run.
 type ReportRequestCommand struct {
-	Name        string                    `json:"name"`
-	GroupIds    []string                  `json:"groupIds"`
-	Period      ReportPeriod              `json:"period"`
-	Filter      ReceiptPagedRequestFilter `json:"filter"`
-	GroupBy     []string                  `json:"groupBy"`
-	Detail      ReportDetail              `json:"detail"`
-	Columns     []ReportColumn            `json:"columns"`
-	Subtotals   bool                      `json:"subtotals"`
-	GrandTotals bool                      `json:"grandTotals"`
-	Document    ReportDocument            `json:"document"`
-	Formats     []string                  `json:"formats"`
+	Name     string                    `json:"name"`
+	GroupIds []string                  `json:"groupIds"`
+	Period   ReportPeriod              `json:"period"`
+	Filter   ReceiptPagedRequestFilter `json:"filter"`
+	GroupBy  []string                  `json:"groupBy"`
+	// GroupByLabels overrides the column heading a grouping level renders with,
+	// keyed by its GroupBy field key. A level with no entry (or a blank one) uses
+	// the field catalog's own label. It is keyed rather than index-aligned because
+	// grouping keys are unique (reporting.ErrDuplicateGroupBy), so reordering the
+	// levels cannot desynchronize it; a key not in GroupBy is simply ignored.
+	GroupByLabels map[string]string `json:"groupByLabels,omitempty"`
+	Detail        ReportDetail      `json:"detail"`
+	Columns       []ReportColumn    `json:"columns"`
+	Subtotals     bool              `json:"subtotals"`
+	GrandTotals   bool              `json:"grandTotals"`
+	Document      ReportDocument    `json:"document"`
+	Formats       []string          `json:"formats"`
 }
 
 // ReportPeriod is the reporting window. Preset is one of the ReportPeriod*

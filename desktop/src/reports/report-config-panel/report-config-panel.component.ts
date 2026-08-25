@@ -25,7 +25,11 @@ import {
 } from "../models/report-catalog.constants";
 import { CHIP_COLORS, groupInitials } from "../models/report-chip.util";
 import { isDimensionColumnDisabled, ReportColumnValue } from "../models/report-command.mapper";
-import { buildColumnGroup } from "../models/report-form.factory";
+import {
+  buildColumnGroup,
+  buildGroupByGroup,
+  readGroupByFields,
+} from "../models/report-form.factory";
 import { formatPeriodRange, resolvePeriodRange } from "../models/report-period.util";
 import { ReportCatalogService } from "../services/report-catalog.service";
 import {
@@ -66,6 +70,11 @@ interface ColumnRow {
   disabled: boolean;
   disabledReason: string;
 }
+
+// The id the grouping level's synthetic column carries into the picker. The
+// picker only reads it as "this is an edit, not a new column" (and hands it back
+// untouched), so it is a constant rather than a real row id.
+const GROUPING_LEVEL_COLUMN_ID = "grouping-level";
 
 const KIND_META: Record<ReportColumn.KindEnum, { label: string; icon: string; cssClass: string }> = {
   dimension: { label: "Dim", icon: "sell", cssClass: "kind-dimension" },
@@ -135,10 +144,12 @@ export class ReportConfigPanelComponent implements OnInit {
   public readonly groupByLevels = computed<GroupByLevel[]>(() => {
     this.revision();
     const controls = this.groupByArray.controls;
-    return controls.map((control, index) => ({
+    return controls.map((_, index) => ({
       index,
-      label: this.labelForField(control.value as string),
-      isCustom: this.isCustomField(control.value as string),
+      // A level renders as a leading column in the report, so it shows the
+      // heading that column will carry: the user's override when set.
+      label: this.headingForLevel(index),
+      isCustom: this.isCustomField(this.fieldForLevel(index)),
       isFirst: index === 0,
       isLast: index === controls.length - 1,
     }));
@@ -146,7 +157,7 @@ export class ReportConfigPanelComponent implements OnInit {
 
   public readonly addableDimensions = computed<ReportField[]>(() => {
     this.revision();
-    const used = new Set(this.groupByArray.controls.map((control) => control.value as string));
+    const used = new Set(readGroupByFields(this.groupByArray));
     return this.dimensions().filter((field) => !used.has(field.key));
   });
 
@@ -154,7 +165,7 @@ export class ReportConfigPanelComponent implements OnInit {
     this.revision();
     const mode = this.detailMode;
     const detailBy = this.form().get("detail.by")!.value as string;
-    const groupBy = this.groupByArray.controls.map((control) => control.value as string);
+    const groupBy = readGroupByFields(this.groupByArray);
     const controls = this.columnsArray.controls;
     return controls.map((control, index) => {
       const value = control.value as ReportColumnValue;
@@ -266,8 +277,48 @@ export class ReportConfigPanelComponent implements OnInit {
     if (!key) {
       return;
     }
-    this.groupByArray.push(this.formBuilder.control(key));
+    this.groupByArray.push(buildGroupByGroup(this.formBuilder, key));
     this.bump();
+  }
+
+  /**
+   * Renames the column this grouping level renders as, through the same picker a
+   * regular dimension column uses — with its field locked, since the field is
+   * chosen by the grouping level itself. The override is dropped when the entered
+   * label is the field's own catalog label, so retyping the default resets it.
+   */
+  public openGroupingLabelPicker(index: number): void {
+    const level = this.groupByArray.at(index);
+    const field = this.fieldForLevel(index);
+    const data: ColumnPickerDialogData = {
+      dimensions: this.dimensions(),
+      measures: this.measures(),
+      existingColumns: this.columnsArray.controls.map(
+        (control) => control.value as ReportColumnValue
+      ),
+      // A grouping level *is* a dimension column, so it is handed to the picker as
+      // one: an id makes the picker treat it as an edit (seeding the label and
+      // opening straight on the dimension step) rather than a new column.
+      column: {
+        id: GROUPING_LEVEL_COLUMN_ID,
+        kind: ReportColumn.KindEnum.Dimension,
+        name: field,
+        label: this.headingForLevel(index),
+        field,
+      },
+      lockField: true,
+    };
+    this.dialog
+      .open(ColumnPickerDialogComponent, { ...DEFAULT_DIALOG_CONFIG, data })
+      .afterClosed()
+      .subscribe((result?: ReportColumnValue) => {
+        if (!result) {
+          return;
+        }
+        const label = result.label.trim();
+        level.get("label")!.setValue(label === this.labelForField(field) ? "" : label);
+        this.bump();
+      });
   }
 
   public moveGroupBy(index: number, delta: number): void {
@@ -336,6 +387,21 @@ export class ReportConfigPanelComponent implements OnInit {
 
   private labelForField(key: string): string {
     return this.dimensions().find((field) => field.key === key)?.label ?? key;
+  }
+
+  /** The engine field key the grouping level at [index] nests by. */
+  private fieldForLevel(index: number): string {
+    return this.groupByArray.at(index).get("field")!.value as string;
+  }
+
+  /**
+   * The heading the grouping level's column carries: the user's override when
+   * set, otherwise the field catalog's label. Mirrors the backend's
+   * buildDimensions, which resolves the same way when rendering the report.
+   */
+  private headingForLevel(index: number): string {
+    const override = ((this.groupByArray.at(index).get("label")!.value as string) ?? "").trim();
+    return override || this.labelForField(this.fieldForLevel(index));
   }
 
   /**

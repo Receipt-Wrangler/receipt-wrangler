@@ -61,6 +61,33 @@ describe("report-template-summary", () => {
     expect(groupingSummary(command({ groupBy: ["group", "category"] }))).toBe("Group, Category");
   });
 
+  it("shows a grouping level's renamed column heading", () => {
+    // The list must agree with the report it describes: a level whose column the
+    // report renames shows that name, not the underlying field's.
+    expect(
+      groupingSummary(
+        command({ groupBy: ["group", "category"], groupByLabels: { category: "Expense Type" } })
+      )
+    ).toBe("Group, Expense Type");
+
+    // A blank or unrelated entry changes nothing.
+    expect(
+      groupingSummary(
+        command({ groupBy: ["group"], groupByLabels: { group: "  ", status: "Ignored" } })
+      )
+    ).toBe("Group");
+  });
+
+  it("prefers a renamed heading over a resolved custom-field name", () => {
+    const resolve = (key: string) => ({ custom_42: "Due Date" })[key];
+    expect(
+      groupingSummary(
+        command({ groupBy: ["custom_42"], groupByLabels: { custom_42: "Deadline" } }),
+        resolve
+      )
+    ).toBe("Deadline");
+  });
+
   it("names custom fields in the grouping and detail summaries", () => {
     const resolve = (key: string) => ({ custom_42: "Due Date", custom_7: "HST" })[key];
 

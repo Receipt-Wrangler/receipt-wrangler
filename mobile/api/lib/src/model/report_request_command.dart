@@ -22,6 +22,7 @@ part 'report_request_command.g.dart';
 /// * [period] 
 /// * [filter] - Which receipts go into the report
 /// * [groupBy] - Ordered engine field keys to nest the report by
+/// * [groupByLabels] - Column-heading overrides for the grouping levels, keyed by the groupBy field key. A key that is absent, blank, or not present in groupBy falls back to the field catalog's label.
 /// * [detail] 
 /// * [columns] 
 /// * [subtotals] - Emit a subtotal row at each grouping level
@@ -48,6 +49,10 @@ abstract class ReportRequestCommand implements Built<ReportRequestCommand, Repor
   /// Ordered engine field keys to nest the report by
   @BuiltValueField(wireName: r'groupBy')
   BuiltList<String>? get groupBy;
+
+  /// Column-heading overrides for the grouping levels, keyed by the groupBy field key. A key that is absent, blank, or not present in groupBy falls back to the field catalog's label.
+  @BuiltValueField(wireName: r'groupByLabels')
+  BuiltMap<String, String>? get groupByLabels;
 
   @BuiltValueField(wireName: r'detail')
   ReportDetail get detail;
@@ -123,6 +128,13 @@ class _$ReportRequestCommandSerializer implements PrimitiveSerializer<ReportRequ
       yield serializers.serialize(
         object.groupBy,
         specifiedType: const FullType(BuiltList, [FullType(String)]),
+      );
+    }
+    if (object.groupByLabels != null) {
+      yield r'groupByLabels';
+      yield serializers.serialize(
+        object.groupByLabels,
+        specifiedType: const FullType(BuiltMap, [FullType(String), FullType(String)]),
       );
     }
     yield r'detail';
@@ -218,6 +230,13 @@ class _$ReportRequestCommandSerializer implements PrimitiveSerializer<ReportRequ
             specifiedType: const FullType(BuiltList, [FullType(String)]),
           ) as BuiltList<String>;
           result.groupBy.replace(valueDes);
+          break;
+        case r'groupByLabels':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltMap, [FullType(String), FullType(String)]),
+          ) as BuiltMap<String, String>;
+          result.groupByLabels.replace(valueDes);
           break;
         case r'detail':
           final valueDes = serializers.deserialize(

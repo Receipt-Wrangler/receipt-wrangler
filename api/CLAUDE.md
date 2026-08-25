@@ -1430,6 +1430,21 @@ multi-value label has no numeric reading; aggregate columns are what carry nativ
 changed existing reports that group by the built-in `date` / `resolved_date` / `created_at`: their
 bucket text went from RFC 3339 to a plain calendar day.
 
+**Grouping-level column headings are overridable.** Because a grouping level renders as a *leading
+column*, the request may name that column itself: `ReportRequestCommand.GroupByLabels`
+(`map[string]string`, `omitempty`) overrides `render.Dimension.Label` per grouping field key, resolved
+in `buildDimensions` (`services/report_service.go`). It is **keyed by field key rather than
+index-aligned** with `GroupBy` — grouping keys are unique (`reporting.ErrDuplicateGroupBy`), so
+reordering the levels can't desynchronize it. A key that is absent, blank after trimming, or names no
+grouping level falls back to the catalog label; a stale entry is ignored rather than failing an
+otherwise valid report, so there is **no validation** for it (matching the unvalidated
+`ReportColumn.Label`). Only the heading changes — `DataType` is untouched, so buckets still format by
+type. It is purely additive and optional, so stored templates deserialize unchanged and
+`CurrentReportConfigurationVersion` stays `1`. The user-supplied text is already covered by the two
+escaping paths every column label goes through: `html/template` for HTML/PDF and `SanitizeCSVField` in
+`dimensionHeading` for CSV. Nothing in `internal/reporting/` is involved — this is a renderer concern.
+The desktop drives it from the pencil on each Grouping row (see `desktop/CLAUDE.md` → "Reports").
+
 **`services.ReportDataService`** (`internal/services/report_data.go`) is the first DB-backed caller of
 the engine — it follows the `pie_chart.go` pattern. `Rows(userId, groupId, filter)` fetches the group's
 receipts unpaged and applies the reporting access controls **in order**: narrow the request filter to
