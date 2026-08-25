@@ -24,6 +24,7 @@ import '../../models/custom_field_model.dart';
 import '../../models/group_model.dart';
 import '../../models/receipt_model.dart';
 import '../../models/tag_model.dart';
+import '../../shared/functions/custom_field_values.dart';
 import '../../shared/functions/forms.dart';
 import '../../shared/functions/status_field.dart';
 import '../../shared/widgets/audit_detail_section.dart';
@@ -132,7 +133,10 @@ class _ReceiptForm extends State<ReceiptForm> {
       validator: FormBuilderValidators.required(),
       onChanged: (value) {
         setState(() {
-          formKey.currentState!.fields["paidByUserId"]!.setValue(null);
+          // The paid-by members are group-scoped, so clear the selection when
+          // the group changes. Guard the access: the field may not be mounted
+          // (matching quick_scan_form.dart's group dropdown).
+          formKey.currentState?.fields["paidByUserId"]?.setValue(null);
           groupId = value as int;
         });
       },
@@ -353,6 +357,14 @@ class _ReceiptForm extends State<ReceiptForm> {
   }
 
   void _removeCustomField(int customFieldId) {
+    // Clear the form value BEFORE the field unmounts. FormBuilder's
+    // `clearValueOnUnregister` defaults to false, so an unregistered field's
+    // value stays in the form's value map and is handed straight back to any
+    // field that later re-registers under the same name -- re-adding a removed
+    // custom field would silently resurrect what was typed into it.
+    formKey.currentState?.fields[customFieldFormFieldName(customFieldId)]
+        ?.didChange(null);
+
     // Remove the custom field from the modified receipt
     final updatedCustomFields = modifiedReceipt.customFields
         .where((cfv) => cfv.customFieldId != customFieldId)
@@ -363,6 +375,31 @@ class _ReceiptForm extends State<ReceiptForm> {
 
     receiptModel.setModifiedReceipt(updatedReceipt);
     setState(() {});
+  }
+
+  /// Whether the mounted form field for [customFieldId] currently holds no
+  /// meaningful value.
+  ///
+  /// Type-aware: a BOOLEAN left unchecked counts as empty. `CustomFieldWidget`
+  /// seeds checkboxes with `false`, so a plain null check would call every
+  /// checkbox non-empty. Mirrors the desktop emptiness rule (empty <=> every
+  /// value column null-or-"" and `booleanValue` falsy).
+  // Staged for the group-default swap, which is the only thing that needs to
+  // ask whether an auto-added field is safe to drop; nothing calls it yet.
+  // ignore: unused_element
+  bool _isCustomFieldEmpty(int customFieldId) {
+    final value = formKey
+        .currentState?.fields[customFieldFormFieldName(customFieldId)]?.value;
+
+    final customField = customFieldModel.customFields
+        .where((cf) => cf.id == customFieldId)
+        .firstOrNull;
+
+    if (value is bool || customField?.type == api.CustomFieldType.BOOLEAN) {
+      return value != true;
+    }
+
+    return value == null || (value is String && value.isEmpty);
   }
 
   Widget buildReceiptItemList() {
