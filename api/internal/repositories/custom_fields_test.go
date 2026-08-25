@@ -940,3 +940,37 @@ func TestShouldRemoveDeletedCustomFieldFromEveryGroupDefaultSet(t *testing.T) {
 		utils.PrintTestError(t, remaining, 0)
 	}
 }
+
+func TestShouldGetCustomFieldsByIds(t *testing.T) {
+	defer TruncateTestDb()
+	setupCustomFieldRepositoryTest()
+	repository := NewCustomFieldRepository(nil)
+
+	// An empty selection short-circuits to an empty, non-nil result.
+	empty, err := repository.GetCustomFieldsByIds(nil)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+	if empty == nil || len(empty) != 0 {
+		utils.PrintTestError(t, empty, "an empty, non-nil slice")
+	}
+
+	// Unknown ids are simply absent, which is what lets the handler detect them by comparison.
+	found, err := repository.GetCustomFieldsByIds([]uint{1, 3, 9999})
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(found) != 2 {
+		utils.PrintTestError(t, len(found), 2)
+		return
+	}
+	for _, customField := range found {
+		if customField.ID != 1 && customField.ID != 3 {
+			utils.PrintTestError(t, customField.ID, "1 or 3")
+		}
+		if len(customField.Name) == 0 {
+			utils.PrintTestError(t, customField, "a custom field carrying its name")
+		}
+	}
+}
