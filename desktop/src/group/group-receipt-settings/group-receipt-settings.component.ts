@@ -1,12 +1,12 @@
 import { Component, DestroyRef, OnInit, inject } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { FormBuilder } from "@angular/forms";
+import { FormArray, FormBuilder, FormControl } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { switchMap, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { BaseFormComponent, setRequired } from "../../form/index";
-import { Group, GroupsService, Permission, QuickScanDefaultPaidByType } from "../../open-api/index";
+import { CustomField, Group, GroupsService, Permission, QuickScanDefaultPaidByType } from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
 import { AuthState, UpdateGroup } from "../../store/index";
 
@@ -22,6 +22,13 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
   public editLink: string = "";
 
   public canEdit = false;
+
+  // The default-custom-fields section reads the custom field catalog, so it only
+  // exists for holders of app.custom-fields.read. Resolved once in ngOnInit
+  // because initForm() decides which controls to build from it.
+  public canManageDefaultCustomFields = false;
+
+  public customFields: CustomField[] = [];
 
   public readonly paidByTypeOptions = [
     { value: QuickScanDefaultPaidByType.Uploader, display: "Uploader" },
@@ -58,6 +65,10 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
     );
   }
 
+  public get defaultCustomFieldsFormArray(): FormArray {
+    return this.form.get("defaultCustomFields") as FormArray;
+  }
+
   public get showStatusDefault(): boolean {
     return !(
       this.form?.get("quickScanStatusEnabled")?.value &&
@@ -68,6 +79,10 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
   public ngOnInit(): void {
     this.setFormConfigFromRoute(this.activatedRoute);
     this.setOriginalGroup();
+    this.customFields = this.activatedRoute.snapshot.data["customFields"] ?? [];
+    this.canManageDefaultCustomFields = this.store.selectSnapshot(
+      AuthState.hasAppPermission(Permission.AppCustomFieldsRead)
+    );
     this.initForm();
     this.canEdit = this.store.selectSnapshot(
       AuthState.hasGroupPermission(this.originalGroup.id, Permission.GroupUpdate)
@@ -100,6 +115,17 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
       quickScanCommentRequired: [receiptSettings.quickScanCommentRequired ?? false],
     });
 
+    // Added conditionally on purpose: the command treats a missing key as "leave
+    // unchanged", so an admin without app.custom-fields.read submits neither key
+    // and can never wipe a configuration they cannot see.
+    if (this.canManageDefaultCustomFields) {
+      this.form.addControl("defaultCustomFields", this.buildDefaultCustomFieldsArray());
+      this.form.addControl(
+        "applyDefaultCustomFieldsOnIngest",
+        new FormControl(receiptSettings.applyDefaultCustomFieldsOnIngest ?? false)
+      );
+    }
+
     this.applyQuickScanDerivedState();
     this.form.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -108,6 +134,24 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
     if (this.formConfig.mode != FormMode.edit) {
       this.form.disable();
     }
+  }
+
+  // Seeds the picker from the catalog objects themselves rather than rebuilt
+  // literals: app-autocomlete filters out already-selected options by reference
+  // equality (!selectedValues.includes(option)), so a copy would leave a selected
+  // field in the dropdown and let it be added twice.
+  private buildDefaultCustomFieldsArray(): FormArray {
+    const configuredIds = this.originalGroup.groupReceiptSettings?.defaultCustomFieldIds ?? [];
+    const array = new FormArray<FormControl>([]);
+
+    for (const id of configuredIds) {
+      const customField = this.customFields.find((field) => field.id === id);
+      if (customField) {
+        array.push(new FormControl(customField), { emitEvent: false });
+      }
+    }
+
+    return array;
   }
 
   // Keeps the controls that depend on other toggles in sync: the default-value controls' required
@@ -159,7 +203,9 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
       // getRawValue, not value: a disabled control is omitted from form.value, so the comment
       // toggles disabled by Hide Comments would be sent as undefined, unmarshal as false, and wipe
       // the admin's stored configuration.
-      const value = this.form.getRawValue();
+      // defaultCustomFields is destructured out rather than spread: it holds whole
+      // CustomField objects, and only their ids belong on the command.
+      const { defaultCustomFields, ...value } = this.form.getRawValue();
       const command = {
         ...value,
         // An empty user autocomplete yields "" / null; send undefined so the nullable id is omitted
@@ -167,6 +213,13 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
         quickScanDefaultPaidById: value.quickScanDefaultPaidById
           ? Number(value.quickScanDefaultPaidById)
           : undefined,
+        ...(this.canManageDefaultCustomFields
+          ? {
+            defaultCustomFieldIds: ((defaultCustomFields ?? []) as CustomField[]).map(
+              (field) => field.id
+            ),
+          }
+          : {}),
       };
 
       this.groupsService.updateGroupReceiptSettings(this.originalGroup.id, command)

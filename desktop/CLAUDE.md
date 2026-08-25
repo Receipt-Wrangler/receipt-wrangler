@@ -482,6 +482,44 @@ non-editable and saved options expose no delete while an appended one does, the 
 control and its direct `PUT /api/customField/:id` 403s, and a type change 400s even for the holder).
 `e2e/legacy-user-visibility.spec.ts` pins that Legacy User sees neither edit nor delete.
 
+### Per-group default custom fields
+
+A group can declare custom fields that are pre-added to its receipts, configured in a **Default
+Custom Fields** `app-form-section` on `src/group/group-receipt-settings/` (between "Settings" and
+"Quick Scan") and applied by `src/receipts/receipt-form/`.
+
+- **Settings page.** An `app-autocomlete` `[multiple]="true" [creatable]="false"` over the route's
+  `customFields` resolver output (`customFieldResolverFn`, wired onto both `receipt-settings` routes),
+  bound to a **`FormArray`** named `defaultCustomFields` — multiple mode calls
+  `inputFormControl.push(...)`, so a plain `FormControl([])` throws. It is seeded with the **same
+  object instances** as the resolved catalog (`buildDefaultCustomFieldsArray`), because
+  `app-autocomlete` filters already-selected options by **reference equality**; rebuilt literals leave
+  a selected field in the dropdown and let it be added twice. `[readonly]` is bound **explicitly** —
+  `readonly` is a plain `@Input` and is not derived from `inputFormControl.disabled`, so the page's
+  view-mode `form.disable()` alone would still let a viewer remove chips. A second `app-checkbox`
+  binds `applyDefaultCustomFieldsOnIngest` (quick scan / email-created receipts).
+- **Both controls exist only for holders of `app.custom-fields.read`** (added in `initForm()`, the
+  whole section `@if`-gated on the same flag), and `submit()` builds the command explicitly —
+  destructuring `defaultCustomFields` out and mapping to `defaultCustomFieldIds` only when the
+  permission is held. This is load-bearing: `UpdateGroupReceiptSettingsCommand` treats a **missing
+  key as "leave unchanged"**, so an admin who cannot see the catalog can never wipe another admin's
+  configuration (the `hideComments` bug shape). The FormArray of whole `CustomField` objects must
+  never ride the payload.
+- **Receipt form "smart swap".** `applyGroupDefaultCustomFields(groupId)` runs **inside**
+  `listenForGroupChanges()`'s `tap`, **after** the `selectedGroup.set(group)` write — under zoneless
+  CD that signal write is the only change-detection trigger; a FormArray mutation has none of its own.
+  It returns early in view mode, without `canManageCustomFields()`, on a falsy group id, and — via
+  `groupChangeIsInitialEmission` — on the listener's `startWith()` replay unless the mode is `add`.
+  That guard is the **only** thing keeping an edit-mode receipt untouched on load, since `startWith`
+  fires at init in every mode. Both it and `autoAppliedCustomFieldIds` are reset at the **top** of
+  `initForm()` (which re-runs on every route-data emission) so a stale auto set can never strip a
+  saved receipt's own fields.
+- The swap drops a previously auto-added default only while it is still **empty**
+  (`isCustomFieldControlEmpty`: every typed column null-or-`""` **and** `booleanValue` falsy — so a
+  BOOLEAN deliberately left `false` counts as empty and is swapped out); anything with a value stays
+  and leaves the auto set, becoming user data. `customFieldChanged` deletes the id from the auto set
+  in **both** branches, so a default toggled off and back on is user-owned forever after.
+
 ## Login QR (mobile app setup)
 
 A QR that deep-links users into the mobile app to set it up. It renders in **two** places — the login

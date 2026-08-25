@@ -7,13 +7,17 @@ import { MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
+import { Store } from "@ngxs/store";
 import { BehaviorSubject, of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
 import { PipesModule } from "src/pipes/pipes.module";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
-import { ApiModule, CustomFieldType, ReceiptImageService, ReceiptStatus } from "../../open-api";
+import { ApiModule, CustomFieldType, Permission, ReceiptImageService, ReceiptStatus } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { QueueMode } from "../../services/receipt-queue.service";
+import { StatefulMenuItem } from "../../standalone/components/filtered-stateful-menu/stateful-menu-item";
+import { SetPermissions } from "../../store/auth.state.actions";
+import { SetGroups, SetSelectedGroupId } from "../../store/group.state.actions";
 import { StoreModule } from "../../store/store.module";
 import { ReceiptFormComponent } from "./receipt-form.component";
 
@@ -780,6 +784,204 @@ describe("ReceiptFormComponent", () => {
         "Magic fill successfully filled name, amount, date from selected image!",
         { duration: 10000 }
       );
+    });
+  });
+
+  // The group's configured default custom fields, applied to the receipt form as
+  // a "smart swap" when the group is chosen or changed.
+  describe("group default custom fields", () => {
+    let store: Store;
+
+    const catalog = [
+      { id: 1, name: "Cost Centre", type: CustomFieldType.Text },
+      { id: 2, name: "PO Number", type: CustomFieldType.Text },
+      { id: 3, name: "Reimbursable", type: CustomFieldType.Boolean },
+    ] as any[];
+
+    const groupWithDefaults = (id: number, defaultCustomFieldIds: number[]): any => ({
+      id,
+      name: `Group ${id}`,
+      isAllGroup: false,
+      groupMembers: [],
+      groupReceiptSettings: { defaultCustomFieldIds },
+    });
+
+    const attachedIds = (): number[] =>
+      component.customFieldsFormArray.value.map((value: any) => value.customFieldId);
+
+    const menuItemFor = (customFieldId: number): StatefulMenuItem =>
+      component.customFieldsStatefulMenuItems.find(
+        (item) => item.value === customFieldId.toString()
+      ) as StatefulMenuItem;
+
+    const openAddForm = (selectedGroupId: string, customFields: any[] = catalog): void => {
+      store.dispatch(new SetSelectedGroupId(selectedGroupId));
+      routeDataSubject.next({ mode: FormMode.add, customFields });
+    };
+
+    beforeEach(() => {
+      store = TestBed.inject(Store);
+      store.dispatch(new SetPermissions([Permission.AppCustomFieldsRead], {}));
+      store.dispatch(
+        new SetGroups([
+          groupWithDefaults(1, [1]),
+          groupWithDefaults(2, [2]),
+          groupWithDefaults(3, []),
+          groupWithDefaults(4, [3]),
+        ])
+      );
+    });
+
+    it("seeds the selected group's defaults on an add form", () => {
+      openAddForm("1");
+
+      expect(attachedIds()).toEqual([1]);
+      expect(menuItemFor(1).selected).toBe(true);
+    });
+
+    it("swaps an untouched default out for the new group's on a group change", () => {
+      openAddForm("1");
+
+      component.form.get("groupId")!.setValue(2);
+
+      expect(attachedIds()).toEqual([2]);
+      expect(menuItemFor(1).selected).toBe(false);
+      expect(menuItemFor(2).selected).toBe(true);
+    });
+
+    it("keeps a default the user typed into when the group changes", () => {
+      openAddForm("1");
+      component.customFieldsFormArray.at(0).get("stringValue")!.setValue("R&D");
+
+      component.form.get("groupId")!.setValue(2);
+
+      expect(attachedIds()).toEqual([1, 2]);
+      expect(component.customFieldsFormArray.at(0).value.stringValue).toEqual("R&D");
+      expect(menuItemFor(1).selected).toBe(true);
+    });
+
+    it("keeps a manually added custom field when the group changes", () => {
+      // Group 3 configures no defaults, so field 2 can only be there because the
+      // user added it.
+      openAddForm("3");
+      component.customFieldChanged(menuItemFor(2));
+      expect(attachedIds()).toEqual([2]);
+
+      component.form.get("groupId")!.setValue(1);
+
+      expect(attachedIds()).toEqual([2, 1]);
+    });
+
+    it("keeps a default the user toggled off and back on across a later group change", () => {
+      openAddForm("1");
+
+      component.customFieldChanged(menuItemFor(1));
+      expect(attachedIds()).toEqual([]);
+      component.customFieldChanged(menuItemFor(1));
+      expect(attachedIds()).toEqual([1]);
+
+      component.form.get("groupId")!.setValue(2);
+
+      // Empty, but user-owned since they re-added it by hand - never swapped out.
+      expect(attachedIds()).toEqual([1, 2]);
+    });
+
+    it("treats a boolean default left false as empty and swaps it out", () => {
+      openAddForm("4");
+
+      expect(attachedIds()).toEqual([3]);
+      expect(component.customFieldsFormArray.at(0).value.booleanValue).toBe(false);
+
+      component.form.get("groupId")!.setValue(2);
+
+      expect(attachedIds()).toEqual([2]);
+    });
+
+    it("applies nothing to an edit-mode receipt on load", () => {
+      routeDataSubject.next({
+        mode: FormMode.edit,
+        customFields: catalog,
+        receipt: { id: 9, name: "R", amount: "1.00", groupId: 1, customFields: [] } as any,
+      });
+
+      expect(attachedIds()).toEqual([]);
+    });
+
+    it("applies the new group's defaults on an active group change in edit mode", () => {
+      routeDataSubject.next({
+        mode: FormMode.edit,
+        customFields: catalog,
+        receipt: { id: 9, name: "R", amount: "1.00", groupId: 1, customFields: [] } as any,
+      });
+
+      component.form.get("groupId")!.setValue(2);
+
+      expect(attachedIds()).toEqual([2]);
+    });
+
+    it("never applies defaults in view mode", () => {
+      routeDataSubject.next({
+        mode: FormMode.view,
+        customFields: catalog,
+        receipt: { id: 9, name: "R", amount: "1.00", groupId: 1, customFields: [] } as any,
+      });
+
+      component.form.get("groupId")!.setValue(2);
+
+      expect(attachedIds()).toEqual([]);
+    });
+
+    it("never applies defaults without app.custom-fields.read", () => {
+      store.dispatch(new SetPermissions([], {}));
+
+      openAddForm("1");
+      expect(attachedIds()).toEqual([]);
+
+      component.form.get("groupId")!.setValue(2);
+      expect(attachedIds()).toEqual([]);
+    });
+
+    it("skips a default id that is missing from the loaded catalog", () => {
+      // Group 1 defaults to field 1, which is not in this (restricted) catalog.
+      openAddForm("2", [catalog[1]]);
+      expect(attachedIds()).toEqual([2]);
+
+      component.form.get("groupId")!.setValue(1);
+
+      expect(attachedIds()).toEqual([]);
+    });
+
+    it("is a no-op when the group is cleared", () => {
+      openAddForm("1");
+
+      component.form.get("groupId")!.setValue("");
+
+      expect(attachedIds()).toEqual([1]);
+      expect(menuItemFor(1).selected).toBe(true);
+    });
+
+    it("resets the auto-applied set when route data re-emits", () => {
+      openAddForm("1");
+      expect(attachedIds()).toEqual([1]);
+
+      // A fresh navigation rebuilds the form: field 1 is now the SAVED receipt's
+      // own value, so a stale auto-applied set would wrongly swap it out below.
+      routeDataSubject.next({
+        mode: FormMode.edit,
+        customFields: catalog,
+        receipt: {
+          id: 9,
+          name: "R",
+          amount: "1.00",
+          groupId: 1,
+          customFields: [{ customFieldId: 1 }],
+        } as any,
+      });
+      expect(attachedIds()).toEqual([1]);
+
+      component.form.get("groupId")!.setValue(2);
+
+      expect(attachedIds()).toEqual([1, 2]);
     });
   });
 });
