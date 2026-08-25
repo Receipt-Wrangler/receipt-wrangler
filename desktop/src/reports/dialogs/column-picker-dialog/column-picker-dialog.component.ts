@@ -26,6 +26,13 @@ export interface ColumnPickerDialogData {
   measures: ReportField[];
   existingColumns: ReportColumnValue[];
   column?: ReportColumnValue;
+  /**
+   * Opens the dialog with its field fixed: the kind step is unreachable (no Back)
+   * and the Field picker is read-only, so only the label can be changed. Used to
+   * rename the column a grouping level renders as — the level's field is chosen
+   * in the Grouping section, not here.
+   */
+  lockField?: boolean;
 }
 
 type PickerStep = "kind" | "dim" | "agg" | "formula";
@@ -43,6 +50,11 @@ const STEP_SUBTITLES: Record<PickerStep, string> = {
   agg: "A number summed across rows",
   formula: "Computed from other columns",
 };
+
+// A locked-field dialog is always on the dimension step, but it is not adding a
+// dimension column — it renames the column a grouping level already produces.
+const LOCKED_TITLE = "Grouping column";
+const LOCKED_SUBTITLE = "The column this grouping level adds to the report";
 
 /**
  * The column builder: pick a kind (dimension / aggregate / formula), then configure
@@ -101,8 +113,15 @@ export class ColumnPickerDialogComponent {
     validateFormulaExpr(this.exprValue() ?? "", this.availableNames)
   );
 
-  public readonly title = computed(() => STEP_TITLES[this.step()]);
-  public readonly subtitle = computed(() => STEP_SUBTITLES[this.step()]);
+  /** True when the dialog only edits the label (see ColumnPickerDialogData.lockField). */
+  public readonly lockField: boolean;
+
+  public readonly title = computed(() =>
+    this.lockField ? LOCKED_TITLE : STEP_TITLES[this.step()]
+  );
+  public readonly subtitle = computed(() =>
+    this.lockField ? LOCKED_SUBTITLE : STEP_SUBTITLES[this.step()]
+  );
 
   public readonly canSave = computed<boolean>(() => {
     this.formTick();
@@ -132,9 +151,16 @@ export class ColumnPickerDialogComponent {
     );
     this.availableNames = data.existingColumns.map((column) => column.name);
     this.editingId = data.column?.id ?? null;
+    this.lockField = data.lockField === true;
 
     if (data.column) {
       this.seedFromColumn(data.column);
+    }
+    if (this.lockField) {
+      // Disabled rather than merely presented read-only, so the field cannot be
+      // changed through the control either. save() reads getRawValue(), so the
+      // fixed field still rides the result.
+      this.pickerForm.get("field")!.disable({ emitEvent: false });
     }
 
     // Auto-suggest the label on user-driven field/measure/function changes (seeds

@@ -6316,6 +6316,14 @@ components:
           items:
             type: string
           description: Ordered engine field keys to nest the report by
+        groupByLabels:
+          type: object
+          additionalProperties:
+            type: string
+          description: >-
+            Column-heading overrides for the grouping levels, keyed by the
+            groupBy field key. A key that is absent, blank, or not present in
+            groupBy falls back to the field catalog's label.
         detail:
           $ref: "#/components/schemas/ReportDetail"
         columns:

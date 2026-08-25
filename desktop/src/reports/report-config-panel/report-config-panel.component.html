@@ -60,6 +60,8 @@
         (clicked)="moveGroupBy(level.index, -1)" data-testid="report-grouping-up"></app-button>
       <app-button matButtonType="iconButton" icon="arrow_downward" tooltip="Move down" [disabled]="level.isLast"
         (clicked)="moveGroupBy(level.index, 1)" data-testid="report-grouping-down"></app-button>
+      <app-button matButtonType="iconButton" icon="edit" tooltip="Edit"
+        (clicked)="openGroupingLabelPicker(level.index)" data-testid="report-grouping-edit"></app-button>
       <app-button matButtonType="iconButton" icon="close" color="warn" tooltip="Remove"
         (clicked)="removeGroupBy(level.index)" data-testid="report-grouping-remove"></app-button>
     </div>

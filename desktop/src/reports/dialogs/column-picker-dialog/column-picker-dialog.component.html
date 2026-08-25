@@ -33,6 +33,7 @@
 
     @case ("dim") {
       <app-select label="Field" optionValueKey="value" optionDisplayKey="displayValue" optionBadgeKey="badge"
+        [readonly]="lockField"
         [options]="dimensionOptions" [inputFormControl]="pickerForm | formGet: 'field'"></app-select>
       <app-input label="Column label" [inputFormControl]="pickerForm | formGet: 'label'"></app-input>
     }
@@ -94,8 +95,9 @@
   }
 
   <div class="picker__footer">
-    @if (step() !== "kind") {
-      <app-button matButtonType="basic" buttonText="Back" icon="arrow_back" (clicked)="back()"></app-button>
+    @if (step() !== "kind" && !lockField) {
+      <app-button matButtonType="basic" buttonText="Back" icon="arrow_back" (clicked)="back()"
+        data-testid="picker-back"></app-button>
     }
     <span class="picker__footer-spacer"></span>
     <app-button matButtonType="basic" buttonText="Cancel" (clicked)="cancel()"></app-button>

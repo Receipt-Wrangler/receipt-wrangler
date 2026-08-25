@@ -31,7 +31,11 @@ export function columnCount(configuration: ReportRequestCommand): number {
   return configuration.columns?.length ?? 0;
 }
 
-/** The grouping levels as a readable label list, or a "no grouping" hint. */
+/**
+ * The grouping levels as a readable label list, or a "no grouping" hint. A level
+ * whose column heading the report renames shows that name, so the list agrees
+ * with the report it describes.
+ */
 export function groupingSummary(
   configuration: ReportRequestCommand,
   resolve?: FieldLabelResolver
@@ -40,7 +44,9 @@ export function groupingSummary(
   if (groupBy.length === 0) {
     return "No grouping";
   }
-  return groupBy.map((key) => fieldLabel(key, resolve)).join(", ");
+  return groupBy
+    .map((key) => (configuration.groupByLabels?.[key] ?? "").trim() || fieldLabel(key, resolve))
+    .join(", ");
 }
 
 /** Whether the report aggregates (and by what) or lists individual receipts. */

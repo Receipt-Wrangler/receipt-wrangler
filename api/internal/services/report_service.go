@@ -266,7 +266,7 @@ func (service ReportService) buildModel(
 
 	return reportBuild{
 		model:        model,
-		dimensions:   buildDimensions(spec.GroupBy, catalog),
+		dimensions:   buildDimensions(spec.GroupBy, catalog, command.GroupByLabels),
 		chrome:       chrome,
 		receiptCount: receiptCount,
 	}, nil
@@ -511,13 +511,20 @@ func aggregateSource(aggFunc string, measure string) string {
 // money per the report's currency configuration — instead of dumping the engine's
 // raw value. A key the catalog does not know falls back to the key as its own
 // heading and to plain text, which is what an unresolvable dimension can offer.
-func buildDimensions(groupBy []reporting.FieldKey, catalog reporting.FieldCatalog) []render.Dimension {
+func buildDimensions(groupBy []reporting.FieldKey, catalog reporting.FieldCatalog, labels map[string]string) []render.Dimension {
 	dimensions := make([]render.Dimension, len(groupBy))
 	for index, key := range groupBy {
 		dimension := render.Dimension{Key: key, Label: string(key)}
 		if field, ok := catalog.Get(key); ok {
 			dimension.Label = field.Label
 			dimension.DataType = field.DataType
+		}
+		// A grouping level renders as a leading column, and the request may name
+		// that column itself. A blank override means "use the catalog label", and
+		// a key naming no grouping level is simply never looked up — a stale
+		// entry must not fail an otherwise valid report.
+		if override := strings.TrimSpace(labels[string(key)]); len(override) > 0 {
+			dimension.Label = override
 		}
 		dimensions[index] = dimension
 	}

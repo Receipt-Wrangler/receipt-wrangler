@@ -83,6 +83,8 @@ class _$ReportRequestCommand extends ReportRequestCommand {
   @override
   final BuiltList<String>? groupBy;
   @override
+  final BuiltMap<String, String>? groupByLabels;
+  @override
   final ReportDetail detail;
   @override
   final BuiltList<ReportColumn> columns;
@@ -105,6 +107,7 @@ class _$ReportRequestCommand extends ReportRequestCommand {
       required this.period,
       this.filter,
       this.groupBy,
+      this.groupByLabels,
       required this.detail,
       required this.columns,
       this.subtotals,
@@ -130,6 +133,7 @@ class _$ReportRequestCommand extends ReportRequestCommand {
         period == other.period &&
         filter == other.filter &&
         groupBy == other.groupBy &&
+        groupByLabels == other.groupByLabels &&
         detail == other.detail &&
         columns == other.columns &&
         subtotals == other.subtotals &&
@@ -146,6 +150,7 @@ class _$ReportRequestCommand extends ReportRequestCommand {
     _$hash = $jc(_$hash, period.hashCode);
     _$hash = $jc(_$hash, filter.hashCode);
     _$hash = $jc(_$hash, groupBy.hashCode);
+    _$hash = $jc(_$hash, groupByLabels.hashCode);
     _$hash = $jc(_$hash, detail.hashCode);
     _$hash = $jc(_$hash, columns.hashCode);
     _$hash = $jc(_$hash, subtotals.hashCode);
@@ -164,6 +169,7 @@ class _$ReportRequestCommand extends ReportRequestCommand {
           ..add('period', period)
           ..add('filter', filter)
           ..add('groupBy', groupBy)
+          ..add('groupByLabels', groupByLabels)
           ..add('detail', detail)
           ..add('columns', columns)
           ..add('subtotals', subtotals)
@@ -200,6 +206,12 @@ class ReportRequestCommandBuilder
   ListBuilder<String>? _groupBy;
   ListBuilder<String> get groupBy => _$this._groupBy ??= ListBuilder<String>();
   set groupBy(ListBuilder<String>? groupBy) => _$this._groupBy = groupBy;
+
+  MapBuilder<String, String>? _groupByLabels;
+  MapBuilder<String, String> get groupByLabels =>
+      _$this._groupByLabels ??= MapBuilder<String, String>();
+  set groupByLabels(MapBuilder<String, String>? groupByLabels) =>
+      _$this._groupByLabels = groupByLabels;
 
   ReportDetailBuilder? _detail;
   ReportDetailBuilder get detail => _$this._detail ??= ReportDetailBuilder();
@@ -241,6 +253,7 @@ class ReportRequestCommandBuilder
       _period = $v.period.toBuilder();
       _filter = $v.filter?.toBuilder();
       _groupBy = $v.groupBy?.toBuilder();
+      _groupByLabels = $v.groupByLabels?.toBuilder();
       _detail = $v.detail.toBuilder();
       _columns = $v.columns.toBuilder();
       _subtotals = $v.subtotals;
@@ -275,6 +288,7 @@ class ReportRequestCommandBuilder
             period: period.build(),
             filter: _filter?.build(),
             groupBy: _groupBy?.build(),
+            groupByLabels: _groupByLabels?.build(),
             detail: detail.build(),
             columns: columns.build(),
             subtotals: subtotals,
@@ -293,6 +307,8 @@ class ReportRequestCommandBuilder
         _filter?.build();
         _$failedField = 'groupBy';
         _groupBy?.build();
+        _$failedField = 'groupByLabels';
+        _groupByLabels?.build();
         _$failedField = 'detail';
         detail.build();
         _$failedField = 'columns';

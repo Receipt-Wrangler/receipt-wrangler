@@ -13,6 +13,7 @@ Name | Type | Description | Notes
 **period** | [**ReportPeriod**](ReportPeriod.md) |  | 
 **filter** | [**ReceiptPagedRequestFilter**](ReceiptPagedRequestFilter.md) | Which receipts go into the report | [optional] 
 **groupBy** | **BuiltList&lt;String&gt;** | Ordered engine field keys to nest the report by | [optional] 
+**groupByLabels** | **BuiltMap&lt;String, String&gt;** | Column-heading overrides for the grouping levels, keyed by the groupBy field key. A key that is absent, blank, or not present in groupBy falls back to the field catalog's label. | [optional] 
 **detail** | [**ReportDetail**](ReportDetail.md) |  | 
 **columns** | [**BuiltList&lt;ReportColumn&gt;**](ReportColumn.md) |  | 
 **subtotals** | **bool** | Emit a subtotal row at each grouping level | [optional] 
