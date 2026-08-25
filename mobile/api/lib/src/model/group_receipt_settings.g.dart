@@ -24,6 +24,8 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
   @override
   final bool? hideReceiptTags;
   @override
+  final bool? applyDefaultCustomFieldsOnIngest;
+  @override
   final ReceiptStatus? quickScanDefaultStatus;
   @override
   final bool? quickScanCategoriesRequired;
@@ -47,6 +49,8 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
   final bool? quickScanPaidByRequired;
   @override
   final bool? quickScanStatusEnabled;
+  @override
+  final BuiltList<int>? defaultCustomFieldIds;
   @override
   final int? quickScanDefaultPaidById;
   @override
@@ -75,6 +79,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
       this.quickScanCommentEnabled,
       this.hideComments,
       this.hideReceiptTags,
+      this.applyDefaultCustomFieldsOnIngest,
       this.quickScanDefaultStatus,
       this.quickScanCategoriesRequired,
       this.hideReceiptCategories,
@@ -87,6 +92,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
       this.hideItemTags,
       this.quickScanPaidByRequired,
       this.quickScanStatusEnabled,
+      this.defaultCustomFieldIds,
       this.quickScanDefaultPaidById,
       this.hideShareCategories,
       required this.id,
@@ -116,6 +122,8 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
         quickScanCommentEnabled == other.quickScanCommentEnabled &&
         hideComments == other.hideComments &&
         hideReceiptTags == other.hideReceiptTags &&
+        applyDefaultCustomFieldsOnIngest ==
+            other.applyDefaultCustomFieldsOnIngest &&
         quickScanDefaultStatus == other.quickScanDefaultStatus &&
         quickScanCategoriesRequired == other.quickScanCategoriesRequired &&
         hideReceiptCategories == other.hideReceiptCategories &&
@@ -128,6 +136,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
         hideItemTags == other.hideItemTags &&
         quickScanPaidByRequired == other.quickScanPaidByRequired &&
         quickScanStatusEnabled == other.quickScanStatusEnabled &&
+        defaultCustomFieldIds == other.defaultCustomFieldIds &&
         quickScanDefaultPaidById == other.quickScanDefaultPaidById &&
         hideShareCategories == other.hideShareCategories &&
         id == other.id &&
@@ -148,6 +157,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
     _$hash = $jc(_$hash, quickScanCommentEnabled.hashCode);
     _$hash = $jc(_$hash, hideComments.hashCode);
     _$hash = $jc(_$hash, hideReceiptTags.hashCode);
+    _$hash = $jc(_$hash, applyDefaultCustomFieldsOnIngest.hashCode);
     _$hash = $jc(_$hash, quickScanDefaultStatus.hashCode);
     _$hash = $jc(_$hash, quickScanCategoriesRequired.hashCode);
     _$hash = $jc(_$hash, hideReceiptCategories.hashCode);
@@ -160,6 +170,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
     _$hash = $jc(_$hash, hideItemTags.hashCode);
     _$hash = $jc(_$hash, quickScanPaidByRequired.hashCode);
     _$hash = $jc(_$hash, quickScanStatusEnabled.hashCode);
+    _$hash = $jc(_$hash, defaultCustomFieldIds.hashCode);
     _$hash = $jc(_$hash, quickScanDefaultPaidById.hashCode);
     _$hash = $jc(_$hash, hideShareCategories.hashCode);
     _$hash = $jc(_$hash, id.hashCode);
@@ -182,6 +193,8 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
           ..add('quickScanCommentEnabled', quickScanCommentEnabled)
           ..add('hideComments', hideComments)
           ..add('hideReceiptTags', hideReceiptTags)
+          ..add('applyDefaultCustomFieldsOnIngest',
+              applyDefaultCustomFieldsOnIngest)
           ..add('quickScanDefaultStatus', quickScanDefaultStatus)
           ..add('quickScanCategoriesRequired', quickScanCategoriesRequired)
           ..add('hideReceiptCategories', hideReceiptCategories)
@@ -194,6 +207,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
           ..add('hideItemTags', hideItemTags)
           ..add('quickScanPaidByRequired', quickScanPaidByRequired)
           ..add('quickScanStatusEnabled', quickScanStatusEnabled)
+          ..add('defaultCustomFieldIds', defaultCustomFieldIds)
           ..add('quickScanDefaultPaidById', quickScanDefaultPaidById)
           ..add('hideShareCategories', hideShareCategories)
           ..add('id', id)
@@ -250,6 +264,14 @@ class GroupReceiptSettingsBuilder
   bool? get hideReceiptTags => _$this._hideReceiptTags;
   set hideReceiptTags(covariant bool? hideReceiptTags) =>
       _$this._hideReceiptTags = hideReceiptTags;
+
+  bool? _applyDefaultCustomFieldsOnIngest;
+  bool? get applyDefaultCustomFieldsOnIngest =>
+      _$this._applyDefaultCustomFieldsOnIngest;
+  set applyDefaultCustomFieldsOnIngest(
+          covariant bool? applyDefaultCustomFieldsOnIngest) =>
+      _$this._applyDefaultCustomFieldsOnIngest =
+          applyDefaultCustomFieldsOnIngest;
 
   ReceiptStatus? _quickScanDefaultStatus;
   ReceiptStatus? get quickScanDefaultStatus => _$this._quickScanDefaultStatus;
@@ -312,6 +334,13 @@ class GroupReceiptSettingsBuilder
   set quickScanStatusEnabled(covariant bool? quickScanStatusEnabled) =>
       _$this._quickScanStatusEnabled = quickScanStatusEnabled;
 
+  ListBuilder<int>? _defaultCustomFieldIds;
+  ListBuilder<int> get defaultCustomFieldIds =>
+      _$this._defaultCustomFieldIds ??= ListBuilder<int>();
+  set defaultCustomFieldIds(
+          covariant ListBuilder<int>? defaultCustomFieldIds) =>
+      _$this._defaultCustomFieldIds = defaultCustomFieldIds;
+
   int? _quickScanDefaultPaidById;
   int? get quickScanDefaultPaidById => _$this._quickScanDefaultPaidById;
   set quickScanDefaultPaidById(covariant int? quickScanDefaultPaidById) =>
@@ -358,6 +387,7 @@ class GroupReceiptSettingsBuilder
       _quickScanCommentEnabled = $v.quickScanCommentEnabled;
       _hideComments = $v.hideComments;
       _hideReceiptTags = $v.hideReceiptTags;
+      _applyDefaultCustomFieldsOnIngest = $v.applyDefaultCustomFieldsOnIngest;
       _quickScanDefaultStatus = $v.quickScanDefaultStatus;
       _quickScanCategoriesRequired = $v.quickScanCategoriesRequired;
       _hideReceiptCategories = $v.hideReceiptCategories;
@@ -370,6 +400,7 @@ class GroupReceiptSettingsBuilder
       _hideItemTags = $v.hideItemTags;
       _quickScanPaidByRequired = $v.quickScanPaidByRequired;
       _quickScanStatusEnabled = $v.quickScanStatusEnabled;
+      _defaultCustomFieldIds = $v.defaultCustomFieldIds?.toBuilder();
       _quickScanDefaultPaidById = $v.quickScanDefaultPaidById;
       _hideShareCategories = $v.hideShareCategories;
       _id = $v.id;
@@ -396,39 +427,54 @@ class GroupReceiptSettingsBuilder
   GroupReceiptSettings build() => _build();
 
   _$GroupReceiptSettings _build() {
-    final _$result = _$v ??
-        _$GroupReceiptSettings._(
-          quickScanDefaultPaidByType: quickScanDefaultPaidByType,
-          groupId: BuiltValueNullFieldError.checkNotNull(
-              groupId, r'GroupReceiptSettings', 'groupId'),
-          quickScanPaidByEnabled: quickScanPaidByEnabled,
-          quickScanTagsRequired: quickScanTagsRequired,
-          hideImages: hideImages,
-          quickScanCommentEnabled: quickScanCommentEnabled,
-          hideComments: hideComments,
-          hideReceiptTags: hideReceiptTags,
-          quickScanDefaultStatus: quickScanDefaultStatus,
-          quickScanCategoriesRequired: quickScanCategoriesRequired,
-          hideReceiptCategories: hideReceiptCategories,
-          quickScanStatusRequired: quickScanStatusRequired,
-          quickScanCategoriesEnabled: quickScanCategoriesEnabled,
-          quickScanTagsEnabled: quickScanTagsEnabled,
-          hideItemCategories: hideItemCategories,
-          hideShareTags: hideShareTags,
-          quickScanCommentRequired: quickScanCommentRequired,
-          hideItemTags: hideItemTags,
-          quickScanPaidByRequired: quickScanPaidByRequired,
-          quickScanStatusEnabled: quickScanStatusEnabled,
-          quickScanDefaultPaidById: quickScanDefaultPaidById,
-          hideShareCategories: hideShareCategories,
-          id: BuiltValueNullFieldError.checkNotNull(
-              id, r'GroupReceiptSettings', 'id'),
-          createdAt: BuiltValueNullFieldError.checkNotNull(
-              createdAt, r'GroupReceiptSettings', 'createdAt'),
-          createdBy: createdBy,
-          createdByString: createdByString,
-          updatedAt: updatedAt,
-        );
+    _$GroupReceiptSettings _$result;
+    try {
+      _$result = _$v ??
+          _$GroupReceiptSettings._(
+            quickScanDefaultPaidByType: quickScanDefaultPaidByType,
+            groupId: BuiltValueNullFieldError.checkNotNull(
+                groupId, r'GroupReceiptSettings', 'groupId'),
+            quickScanPaidByEnabled: quickScanPaidByEnabled,
+            quickScanTagsRequired: quickScanTagsRequired,
+            hideImages: hideImages,
+            quickScanCommentEnabled: quickScanCommentEnabled,
+            hideComments: hideComments,
+            hideReceiptTags: hideReceiptTags,
+            applyDefaultCustomFieldsOnIngest: applyDefaultCustomFieldsOnIngest,
+            quickScanDefaultStatus: quickScanDefaultStatus,
+            quickScanCategoriesRequired: quickScanCategoriesRequired,
+            hideReceiptCategories: hideReceiptCategories,
+            quickScanStatusRequired: quickScanStatusRequired,
+            quickScanCategoriesEnabled: quickScanCategoriesEnabled,
+            quickScanTagsEnabled: quickScanTagsEnabled,
+            hideItemCategories: hideItemCategories,
+            hideShareTags: hideShareTags,
+            quickScanCommentRequired: quickScanCommentRequired,
+            hideItemTags: hideItemTags,
+            quickScanPaidByRequired: quickScanPaidByRequired,
+            quickScanStatusEnabled: quickScanStatusEnabled,
+            defaultCustomFieldIds: _defaultCustomFieldIds?.build(),
+            quickScanDefaultPaidById: quickScanDefaultPaidById,
+            hideShareCategories: hideShareCategories,
+            id: BuiltValueNullFieldError.checkNotNull(
+                id, r'GroupReceiptSettings', 'id'),
+            createdAt: BuiltValueNullFieldError.checkNotNull(
+                createdAt, r'GroupReceiptSettings', 'createdAt'),
+            createdBy: createdBy,
+            createdByString: createdByString,
+            updatedAt: updatedAt,
+          );
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'defaultCustomFieldIds';
+        _defaultCustomFieldIds?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+            r'GroupReceiptSettings', _$failedField, e.toString());
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

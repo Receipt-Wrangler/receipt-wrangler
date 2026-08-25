@@ -35,6 +35,8 @@ Name | Type | Description | Notes
 **quickScanTagsRequired** | **bool** | Require the tags field in quick scan | [optional] 
 **quickScanCommentEnabled** | **bool** | Show the comment field in quick scan | [optional] 
 **quickScanCommentRequired** | **bool** | Require the comment field in quick scan | [optional] 
+**defaultCustomFieldIds** | **BuiltList&lt;int&gt;** | Custom field ids that are pre-added to every receipt created for this group. Always present; an empty array means the group has configured none. Read only here - write via UpdateGroupReceiptSettingsCommand.defaultCustomFieldIds. | [optional] 
+**applyDefaultCustomFieldsOnIngest** | **bool** | Also attach the group's default custom fields to receipts the SERVER creates (quick scan, email integration). Off by default. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

@@ -50,6 +50,10 @@ class _$UpdateGroupReceiptSettingsCommand
   final bool? quickScanCommentEnabled;
   @override
   final bool? quickScanCommentRequired;
+  @override
+  final BuiltList<int>? defaultCustomFieldIds;
+  @override
+  final bool? applyDefaultCustomFieldsOnIngest;
 
   factory _$UpdateGroupReceiptSettingsCommand(
           [void Function(UpdateGroupReceiptSettingsCommandBuilder)? updates]) =>
@@ -76,7 +80,9 @@ class _$UpdateGroupReceiptSettingsCommand
       this.quickScanTagsEnabled,
       this.quickScanTagsRequired,
       this.quickScanCommentEnabled,
-      this.quickScanCommentRequired})
+      this.quickScanCommentRequired,
+      this.defaultCustomFieldIds,
+      this.applyDefaultCustomFieldsOnIngest})
       : super._();
   @override
   UpdateGroupReceiptSettingsCommand rebuild(
@@ -111,7 +117,10 @@ class _$UpdateGroupReceiptSettingsCommand
         quickScanTagsEnabled == other.quickScanTagsEnabled &&
         quickScanTagsRequired == other.quickScanTagsRequired &&
         quickScanCommentEnabled == other.quickScanCommentEnabled &&
-        quickScanCommentRequired == other.quickScanCommentRequired;
+        quickScanCommentRequired == other.quickScanCommentRequired &&
+        defaultCustomFieldIds == other.defaultCustomFieldIds &&
+        applyDefaultCustomFieldsOnIngest ==
+            other.applyDefaultCustomFieldsOnIngest;
   }
 
   @override
@@ -138,6 +147,8 @@ class _$UpdateGroupReceiptSettingsCommand
     _$hash = $jc(_$hash, quickScanTagsRequired.hashCode);
     _$hash = $jc(_$hash, quickScanCommentEnabled.hashCode);
     _$hash = $jc(_$hash, quickScanCommentRequired.hashCode);
+    _$hash = $jc(_$hash, defaultCustomFieldIds.hashCode);
+    _$hash = $jc(_$hash, applyDefaultCustomFieldsOnIngest.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -165,7 +176,10 @@ class _$UpdateGroupReceiptSettingsCommand
           ..add('quickScanTagsEnabled', quickScanTagsEnabled)
           ..add('quickScanTagsRequired', quickScanTagsRequired)
           ..add('quickScanCommentEnabled', quickScanCommentEnabled)
-          ..add('quickScanCommentRequired', quickScanCommentRequired))
+          ..add('quickScanCommentRequired', quickScanCommentRequired)
+          ..add('defaultCustomFieldIds', defaultCustomFieldIds)
+          ..add('applyDefaultCustomFieldsOnIngest',
+              applyDefaultCustomFieldsOnIngest))
         .toString();
   }
 }
@@ -280,6 +294,20 @@ class UpdateGroupReceiptSettingsCommandBuilder
   set quickScanCommentRequired(bool? quickScanCommentRequired) =>
       _$this._quickScanCommentRequired = quickScanCommentRequired;
 
+  ListBuilder<int>? _defaultCustomFieldIds;
+  ListBuilder<int> get defaultCustomFieldIds =>
+      _$this._defaultCustomFieldIds ??= ListBuilder<int>();
+  set defaultCustomFieldIds(ListBuilder<int>? defaultCustomFieldIds) =>
+      _$this._defaultCustomFieldIds = defaultCustomFieldIds;
+
+  bool? _applyDefaultCustomFieldsOnIngest;
+  bool? get applyDefaultCustomFieldsOnIngest =>
+      _$this._applyDefaultCustomFieldsOnIngest;
+  set applyDefaultCustomFieldsOnIngest(
+          bool? applyDefaultCustomFieldsOnIngest) =>
+      _$this._applyDefaultCustomFieldsOnIngest =
+          applyDefaultCustomFieldsOnIngest;
+
   UpdateGroupReceiptSettingsCommandBuilder() {
     UpdateGroupReceiptSettingsCommand._defaults(this);
   }
@@ -308,6 +336,8 @@ class UpdateGroupReceiptSettingsCommandBuilder
       _quickScanTagsRequired = $v.quickScanTagsRequired;
       _quickScanCommentEnabled = $v.quickScanCommentEnabled;
       _quickScanCommentRequired = $v.quickScanCommentRequired;
+      _defaultCustomFieldIds = $v.defaultCustomFieldIds?.toBuilder();
+      _applyDefaultCustomFieldsOnIngest = $v.applyDefaultCustomFieldsOnIngest;
       _$v = null;
     }
     return this;
@@ -328,30 +358,45 @@ class UpdateGroupReceiptSettingsCommandBuilder
   UpdateGroupReceiptSettingsCommand build() => _build();
 
   _$UpdateGroupReceiptSettingsCommand _build() {
-    final _$result = _$v ??
-        _$UpdateGroupReceiptSettingsCommand._(
-          hideImages: hideImages,
-          hideReceiptCategories: hideReceiptCategories,
-          hideReceiptTags: hideReceiptTags,
-          hideItemCategories: hideItemCategories,
-          hideItemTags: hideItemTags,
-          hideComments: hideComments,
-          hideShareCategories: hideShareCategories,
-          hideShareTags: hideShareTags,
-          quickScanPaidByEnabled: quickScanPaidByEnabled,
-          quickScanPaidByRequired: quickScanPaidByRequired,
-          quickScanDefaultPaidByType: quickScanDefaultPaidByType,
-          quickScanDefaultPaidById: quickScanDefaultPaidById,
-          quickScanStatusEnabled: quickScanStatusEnabled,
-          quickScanStatusRequired: quickScanStatusRequired,
-          quickScanDefaultStatus: quickScanDefaultStatus,
-          quickScanCategoriesEnabled: quickScanCategoriesEnabled,
-          quickScanCategoriesRequired: quickScanCategoriesRequired,
-          quickScanTagsEnabled: quickScanTagsEnabled,
-          quickScanTagsRequired: quickScanTagsRequired,
-          quickScanCommentEnabled: quickScanCommentEnabled,
-          quickScanCommentRequired: quickScanCommentRequired,
-        );
+    _$UpdateGroupReceiptSettingsCommand _$result;
+    try {
+      _$result = _$v ??
+          _$UpdateGroupReceiptSettingsCommand._(
+            hideImages: hideImages,
+            hideReceiptCategories: hideReceiptCategories,
+            hideReceiptTags: hideReceiptTags,
+            hideItemCategories: hideItemCategories,
+            hideItemTags: hideItemTags,
+            hideComments: hideComments,
+            hideShareCategories: hideShareCategories,
+            hideShareTags: hideShareTags,
+            quickScanPaidByEnabled: quickScanPaidByEnabled,
+            quickScanPaidByRequired: quickScanPaidByRequired,
+            quickScanDefaultPaidByType: quickScanDefaultPaidByType,
+            quickScanDefaultPaidById: quickScanDefaultPaidById,
+            quickScanStatusEnabled: quickScanStatusEnabled,
+            quickScanStatusRequired: quickScanStatusRequired,
+            quickScanDefaultStatus: quickScanDefaultStatus,
+            quickScanCategoriesEnabled: quickScanCategoriesEnabled,
+            quickScanCategoriesRequired: quickScanCategoriesRequired,
+            quickScanTagsEnabled: quickScanTagsEnabled,
+            quickScanTagsRequired: quickScanTagsRequired,
+            quickScanCommentEnabled: quickScanCommentEnabled,
+            quickScanCommentRequired: quickScanCommentRequired,
+            defaultCustomFieldIds: _defaultCustomFieldIds?.build(),
+            applyDefaultCustomFieldsOnIngest: applyDefaultCustomFieldsOnIngest,
+          );
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'defaultCustomFieldIds';
+        _defaultCustomFieldIds?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+            r'UpdateGroupReceiptSettingsCommand', _$failedField, e.toString());
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

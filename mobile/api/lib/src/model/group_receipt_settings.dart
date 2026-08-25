@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:openapi/src/model/base_model.dart';
 import 'package:openapi/src/model/receipt_status.dart';
+import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/quick_scan_default_paid_by_type.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -41,6 +42,8 @@ part 'group_receipt_settings.g.dart';
 /// * [quickScanTagsRequired] - Require the tags field in quick scan
 /// * [quickScanCommentEnabled] - Show the comment field in quick scan
 /// * [quickScanCommentRequired] - Require the comment field in quick scan
+/// * [defaultCustomFieldIds] - Custom field ids that are pre-added to every receipt created for this group. Always present; an empty array means the group has configured none. Read only here - write via UpdateGroupReceiptSettingsCommand.defaultCustomFieldIds.
+/// * [applyDefaultCustomFieldsOnIngest] - Also attach the group's default custom fields to receipts the SERVER creates (quick scan, email integration). Off by default.
 @BuiltValue()
 abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSettings, GroupReceiptSettingsBuilder> {
   @BuiltValueField(wireName: r'quickScanDefaultPaidByType')
@@ -74,6 +77,10 @@ abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSett
   /// Hide receipt tags
   @BuiltValueField(wireName: r'hideReceiptTags')
   bool? get hideReceiptTags;
+
+  /// Also attach the group's default custom fields to receipts the SERVER creates (quick scan, email integration). Off by default.
+  @BuiltValueField(wireName: r'applyDefaultCustomFieldsOnIngest')
+  bool? get applyDefaultCustomFieldsOnIngest;
 
   @BuiltValueField(wireName: r'quickScanDefaultStatus')
   ReceiptStatus? get quickScanDefaultStatus;
@@ -122,6 +129,10 @@ abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSett
   /// Show the status field in quick scan
   @BuiltValueField(wireName: r'quickScanStatusEnabled')
   bool? get quickScanStatusEnabled;
+
+  /// Custom field ids that are pre-added to every receipt created for this group. Always present; an empty array means the group has configured none. Read only here - write via UpdateGroupReceiptSettingsCommand.defaultCustomFieldIds.
+  @BuiltValueField(wireName: r'defaultCustomFieldIds')
+  BuiltList<int>? get defaultCustomFieldIds;
 
   /// Default paid by user id when paid by is optional and type is USER
   @BuiltValueField(wireName: r'quickScanDefaultPaidById')
@@ -173,6 +184,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
       yield r'hideComments';
       yield serializers.serialize(
         object.hideComments,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.applyDefaultCustomFieldsOnIngest != null) {
+      yield r'applyDefaultCustomFieldsOnIngest';
+      yield serializers.serialize(
+        object.applyDefaultCustomFieldsOnIngest,
         specifiedType: const FullType(bool),
       );
     }
@@ -333,6 +351,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
         specifiedType: const FullType(bool),
       );
     }
+    if (object.defaultCustomFieldIds != null) {
+      yield r'defaultCustomFieldIds';
+      yield serializers.serialize(
+        object.defaultCustomFieldIds,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
     if (object.hideShareCategories != null) {
       yield r'hideShareCategories';
       yield serializers.serialize(
@@ -383,6 +408,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
             specifiedType: const FullType(bool),
           ) as bool;
           result.hideComments = valueDes;
+          break;
+        case r'applyDefaultCustomFieldsOnIngest':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.applyDefaultCustomFieldsOnIngest = valueDes;
           break;
         case r'createdAt':
           final valueDes = serializers.deserialize(
@@ -544,6 +576,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
             specifiedType: const FullType(bool),
           ) as bool;
           result.quickScanStatusEnabled = valueDes;
+          break;
+        case r'defaultCustomFieldIds':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.defaultCustomFieldIds.replace(valueDes);
           break;
         case r'hideShareCategories':
           final valueDes = serializers.deserialize(

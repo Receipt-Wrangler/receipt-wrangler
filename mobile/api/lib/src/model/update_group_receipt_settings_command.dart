@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:openapi/src/model/receipt_status.dart';
+import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/quick_scan_default_paid_by_type.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -34,6 +35,8 @@ part 'update_group_receipt_settings_command.g.dart';
 /// * [quickScanTagsRequired] - Require the tags field in quick scan
 /// * [quickScanCommentEnabled] - Show the comment field in quick scan
 /// * [quickScanCommentRequired] - Require the comment field in quick scan
+/// * [defaultCustomFieldIds] - Custom field ids to pre-add to every receipt created for this group. OMIT the key to leave the configured set unchanged (clients that hide this section, e.g. for a user without app.custom-fields.read, must omit it); send an empty array to clear it. Requires app.custom-fields.read - a caller without it gets a 403.
+/// * [applyDefaultCustomFieldsOnIngest] - Also attach the group's default custom fields to receipts the SERVER creates (quick scan, email integration). OMIT the key to leave the stored value unchanged.
 @BuiltValue()
 abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupReceiptSettingsCommand, UpdateGroupReceiptSettingsCommandBuilder> {
   /// Hide receipt images
@@ -119,6 +122,14 @@ abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupRec
   /// Require the comment field in quick scan
   @BuiltValueField(wireName: r'quickScanCommentRequired')
   bool? get quickScanCommentRequired;
+
+  /// Custom field ids to pre-add to every receipt created for this group. OMIT the key to leave the configured set unchanged (clients that hide this section, e.g. for a user without app.custom-fields.read, must omit it); send an empty array to clear it. Requires app.custom-fields.read - a caller without it gets a 403.
+  @BuiltValueField(wireName: r'defaultCustomFieldIds')
+  BuiltList<int>? get defaultCustomFieldIds;
+
+  /// Also attach the group's default custom fields to receipts the SERVER creates (quick scan, email integration). OMIT the key to leave the stored value unchanged.
+  @BuiltValueField(wireName: r'applyDefaultCustomFieldsOnIngest')
+  bool? get applyDefaultCustomFieldsOnIngest;
 
   UpdateGroupReceiptSettingsCommand._();
 
@@ -287,6 +298,20 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
       yield r'quickScanCommentRequired';
       yield serializers.serialize(
         object.quickScanCommentRequired,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.defaultCustomFieldIds != null) {
+      yield r'defaultCustomFieldIds';
+      yield serializers.serialize(
+        object.defaultCustomFieldIds,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
+    if (object.applyDefaultCustomFieldsOnIngest != null) {
+      yield r'applyDefaultCustomFieldsOnIngest';
+      yield serializers.serialize(
+        object.applyDefaultCustomFieldsOnIngest,
         specifiedType: const FullType(bool),
       );
     }
@@ -459,6 +484,20 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
             specifiedType: const FullType(bool),
           ) as bool;
           result.quickScanCommentRequired = valueDes;
+          break;
+        case r'defaultCustomFieldIds':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.defaultCustomFieldIds.replace(valueDes);
+          break;
+        case r'applyDefaultCustomFieldsOnIngest':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.applyDefaultCustomFieldsOnIngest = valueDes;
           break;
         default:
           unhandled.add(key);
