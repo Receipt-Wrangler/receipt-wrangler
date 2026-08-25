@@ -1177,3 +1177,131 @@ func TestQuickScan_AppendsUserCommentToAiComment(t *testing.T) {
 		utils.PrintTestError(t, found, "both the AI comment and the user comment")
 	}
 }
+
+// --- Group default custom fields on ingest -----------------------------------
+
+// configureGroupDefaultCustomFields is a runQuickScanWithSetup postSeed hook factory: it creates the
+// group's receipt settings row (seedReceiptImagePipeline does not) and writes the given default
+// custom field set plus the on-ingest toggle. The created field ids are handed back through
+// *createdIds so the assertion can reference them.
+func configureGroupDefaultCustomFields(t *testing.T, applyOnIngest bool, fieldNames []string, createdIds *[]uint) func(*testing.T, models.User, models.Group) {
+	t.Helper()
+
+	return func(t *testing.T, user models.User, group models.Group) {
+		t.Helper()
+		db := repositories.GetDB()
+
+		ids := make([]uint, 0, len(fieldNames))
+		for _, name := range fieldNames {
+			customField := models.CustomField{Name: name, Type: models.TEXT}
+			if err := db.Create(&customField).Error; err != nil {
+				t.Fatalf("seed custom field: %v", err)
+			}
+			ids = append(ids, customField.ID)
+		}
+		*createdIds = ids
+
+		settingsRepository := repositories.NewGroupReceiptSettingsRepository(nil)
+		if _, err := settingsRepository.CreateGroupReceiptSettings(group.ID); err != nil {
+			t.Fatalf("seed group receipt settings: %v", err)
+		}
+
+		command := commands.UpdateGroupReceiptSettingsCommand{
+			QuickScanPaidByEnabled:           true,
+			QuickScanPaidByRequired:          true,
+			QuickScanStatusEnabled:           true,
+			QuickScanStatusRequired:          true,
+			QuickScanDefaultPaidByType:       models.QUICK_SCAN_PAID_BY_UPLOADER,
+			QuickScanDefaultStatus:           models.OPEN,
+			DefaultCustomFieldIds:            &ids,
+			ApplyDefaultCustomFieldsOnIngest: &applyOnIngest,
+		}
+		if _, err := settingsRepository.UpdateGroupReceiptSettings(utils.UintToString(group.ID), command); err != nil {
+			t.Fatalf("configure default custom fields: %v", err)
+		}
+	}
+}
+
+const defaultCustomFieldsReceiptAiJSON = `{"name": "Ingested", "amount": 5.00, "date": "2024-02-02T00:00:00Z", "paidByUserId": %d, "status": "OPEN"}`
+
+// TestQuickScan_AppliesGroupDefaultCustomFieldsWhenEnabled proves an opted-in group gets exactly one
+// EMPTY custom field value per configured default on a server-created receipt.
+func TestQuickScan_AppliesGroupDefaultCustomFieldsWhenEnabled(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	var defaultIds []uint
+	created, _, _, err := runQuickScanWithSetup(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		"",
+		func(u models.User, g models.Group) string {
+			return fmt.Sprintf(defaultCustomFieldsReceiptAiJSON, u.ID)
+		},
+		configureGroupDefaultCustomFields(t, true, []string{"Cost Centre", "PO Number"}, &defaultIds),
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if len(receipt.CustomFields) != len(defaultIds) {
+		utils.PrintTestError(t, len(receipt.CustomFields), len(defaultIds))
+		return
+	}
+	for _, customFieldId := range defaultIds {
+		value, found := findCustomFieldValue(receipt.CustomFields, customFieldId)
+		if !found {
+			utils.PrintTestError(t, receipt.CustomFields, fmt.Sprintf("a value for custom field %d", customFieldId))
+			continue
+		}
+		// The default is a placeholder the user fills in, so every value column stays empty.
+		if value.StringValue != nil || value.DateValue != nil || value.SelectValue != nil ||
+			value.CurrencyValue != nil || value.BooleanValue != nil {
+			utils.PrintTestError(t, value, "an empty custom field value")
+		}
+	}
+}
+
+// TestQuickScan_SkipsGroupDefaultCustomFieldsWhenDisabled is the backwards-compatibility guard: a
+// group that configured defaults for its receipt FORM but never opted into applying them on ingest
+// must see server-created receipts unchanged.
+func TestQuickScan_SkipsGroupDefaultCustomFieldsWhenDisabled(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	var defaultIds []uint
+	created, _, _, err := runQuickScanWithSetup(
+		t,
+		func(u models.User) uint { return u.ID },
+		models.OPEN,
+		nil,
+		nil,
+		"",
+		func(u models.User, g models.Group) string {
+			return fmt.Sprintf(defaultCustomFieldsReceiptAiJSON, u.ID)
+		},
+		configureGroupDefaultCustomFields(t, false, []string{"Cost Centre", "PO Number"}, &defaultIds),
+	)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(created.ID))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if len(receipt.CustomFields) != 0 {
+		utils.PrintTestError(t, receipt.CustomFields, "no custom field values")
+	}
+}

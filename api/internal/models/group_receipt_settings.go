@@ -32,6 +32,18 @@ type GroupReceiptSettings struct {
 
 	QuickScanCommentEnabled  bool `gorm:"not null;default:false" json:"quickScanCommentEnabled"`
 	QuickScanCommentRequired bool `gorm:"not null;default:false" json:"quickScanCommentRequired"`
+
+	// Default custom fields. ApplyDefaultCustomFieldsOnIngest extends the group's default set to
+	// receipts the SERVER creates (quick scan, email integration); it is off by default so existing
+	// installs are unchanged until an admin opts in.
+	//
+	// DefaultCustomFieldIds is transient (`gorm:"-"`) and lives in GroupReceiptSettingsCustomField
+	// rows. It is filled explicitly by GroupReceiptSettingsRepository.LoadDefaultCustomFieldIds at
+	// the serialization boundaries — never by a GORM hook — so nothing loads it implicitly. It must
+	// always serialize as `[]` when empty, never `null`: the generated Dart client has no null guard
+	// and a null would fail the whole AppData payload on already-released Android builds.
+	ApplyDefaultCustomFieldsOnIngest bool   `gorm:"not null;default:false" json:"applyDefaultCustomFieldsOnIngest"`
+	DefaultCustomFieldIds            []uint `gorm:"-" json:"defaultCustomFieldIds"`
 }
 
 // IsQuickScanCommentShown reports whether the quick-scan comment field should be shown. HideComments

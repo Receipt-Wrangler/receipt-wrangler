@@ -1256,6 +1256,117 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   produced by the default prompt and aren't resolved here, so a future prompt emitting id-only item-level
   categories would hit the same validation failure.
 
+## Group Default Custom Fields
+
+Group admins declare, in **Group Receipt Settings**, the set of custom fields that should always be
+present on that group's receipts (a tax field, a PO number, a cost centre). The receipt form pre-adds
+them on create and re-applies the target group's set when the user switches groups — each group is
+effectively its own receipt template. A second, opt-in toggle
+(`applyDefaultCustomFieldsOnIngest`) extends the same set to receipts the **server** creates (quick
+scan and email integration).
+
+A default is a **starting point, never a requirement**: the user may remove any of them and nothing
+validates their presence. There is deliberately **no notion of a required custom field** — custom
+field validation does not exist in this codebase and would belong on the custom field itself, not on
+this screen. `UpdateGroupReceiptSettingsCommand.Validate` therefore checks nothing here.
+
+- **Join model** (`models/group_receipt_settings_custom_field.go`): `GroupReceiptSettingsCustomField
+  {GroupId, CustomFieldId}`, composite primary key, `CustomFieldId` indexed. Two deliberate choices,
+  both spelled out in the model's doc comment:
+  - **Keyed on `GroupId`, NOT the `GroupReceiptSettings` row id.** `GroupRepository.GetGroupById`
+    lazily creates a missing settings row and **discards** the created record, so
+    `group.GroupReceiptSettings.ID` is still `0` on the very call that created it — keying on it
+    would silently write rows against id `0`. `GroupId` is `not null;unique` on the settings model
+    and is what every caller already holds (quick scan, the email handler, group delete, the PUT).
+  - **An explicit join model, not a GORM `many2many []CustomField`.** `UpdateGroupReceiptSettings`
+    does `Preload(clause.Associations)` then `db.Select("*").Model(...).Updates(...)`, which
+    full-save-associates every loaded association — that would upsert the joined `CustomField` rows
+    and can blank a `not null` `CustomField.Name` (the same failure documented above for AI-assigned
+    categories). Inserts therefore use **`Omit("CustomField").Create(&rows)`**, matching
+    `replaceReportTemplateGroups`. Pinned by
+    `TestUpdateGroupReceiptSettingsDoesNotBlankCustomFieldName`.
+- **Model** (`models/group_receipt_settings.go`): `ApplyDefaultCustomFieldsOnIngest bool`
+  (`not null;default:false`, so upgrading installs are unchanged until an admin opts in) and the
+  transient `DefaultCustomFieldIds []uint` (`gorm:"-"`).
+- **Hydration is an explicit batched loader, NOT a GORM `AfterFind` hook.**
+  `GroupReceiptSettingsRepository.LoadDefaultCustomFieldIds([]*GroupReceiptSettings)` runs **one**
+  `WHERE group_id IN (?)` query (`ORDER BY custom_field_id` for a deterministic order) and mutates
+  the rows in place; `LoadDefaultCustomFieldIdsForGroups([]Group)` is the convenience wrapper. This
+  mirrors `GroupMemberRepository.LoadMemberGrants`, which fills `GroupMember.CategoryGrants`/
+  `TagGrants` the same way. A hook was considered and rejected: it would be the only `AfterFind` in
+  the codebase, adds an N+1 inside `Preload(clause.Associations)`, needs a `NewDB` session to avoid
+  inheriting the preload's statement, **and would not even be correct** —
+  `UpdateGroupReceiptSettings` returns the in-memory struct it mutated rather than re-reading, so
+  the PUT response would carry the *old* ids, which the desktop writes straight into its group state.
+  Called at every boundary that serializes a group's receipt settings, mirroring the
+  `LoadMemberGrantsFor*` call sites: `services/auth.go` (AppData, beside
+  `LoadMemberGrantsForGroups`), `handlers/groups.go` `GetGroupsForUser`, `repositories/groups.go`
+  `GetGroupById` (which `UpdateGroup` also returns through), `GetGroupReceiptSettingsByGroupId`, and
+  the `UpdateGroupReceiptSettings` return value.
+- **An empty set must serialize as `[]`, never `null`.** `defaultCustomFieldIdsOrEmpty` normalizes it
+  inside the loader (mirroring `grantIdsOrEmpty`) so every read path is covered at once. The
+  generated Dart deserializer has **no null guard**, so a `null` would fail the **whole** AppData
+  payload on already-released Android builds — the exact class of the two documented login outages.
+  Guarded by a `json.Marshal` test in `repositories/group_receipt_settings_test.go` and a
+  response-shape test in `handlers/group_default_custom_fields_test.go`.
+- **Command semantics: BOTH new fields are POINTERS, and `nil` means LEAVE UNCHANGED.**
+  `UpdateGroupReceiptSettingsCommand.DefaultCustomFieldIds *[]uint` and
+  `ApplyDefaultCustomFieldsOnIngest *bool`. The desktop hides this whole section from an admin
+  without `app.custom-fields.read`, so its `getRawValue()` omits both keys; a non-pointer `bool`
+  would unmarshal as `false` and the repository's unconditional field-by-field assignment would
+  **wipe the stored toggle** — byte for byte the `hideComments` bug documented in
+  `desktop/CLAUDE.md`. An explicit `[]` clears the set.
+  - **Same field-by-field assignment hazard as the quick-scan config:**
+    `UpdateGroupReceiptSettings` assigns every setting one at a time, so a new setting that isn't
+    added to that block silently never persists (no compile error, no test failure). The
+    round-trip + `nil`-leaves-unchanged tests exist specifically to catch that.
+- **Transaction**: `UpdateGroupReceiptSettings` wraps the scalar update **and** the join replace in
+  one `db.Transaction(...)` (precedent: `CreateReportTemplate`), so a rejected save changes nothing.
+  Callers pass a `nil` TX today, and a nested GORM transaction degrades to a savepoint, so this is
+  safe either way. `replaceGroupDefaultCustomFields` is delete-by-`group_id`-then-insert, deduping
+  the submitted ids so a repeated id can't violate the composite primary key.
+- **Handler guards** (`handlers/groups.go` `UpdateGroupReceiptSettings`) — the endpoint is gated on
+  the group's `GroupUpdate` only, so two extra checks run when `DefaultCustomFieldIds != nil`
+  (a `nil` pointer means the client didn't touch the selection and stays allowed):
+  - **403** without the app-level `app.custom-fields.read`. Without this a group admin could attach
+    fields whose catalog they cannot read, mirroring `enforceReceiptCustomFieldSelection`.
+  - **400** with error key `defaultCustomFieldIds` when any submitted id doesn't exist (via the new
+    `CustomFieldRepository.GetCustomFieldsByIds`). An unknown id would otherwise persist as a row
+    nothing can ever resolve, and the receipt form would silently skip it forever.
+- **Delete cascades**, both explicit rather than FK-driven, matching every other cascade nearby:
+  - `CustomFieldRepository.DeleteCustomField` gains a fourth delete inside its existing transaction,
+    before the `CustomField` row: the field is removed from **every** group's default set.
+  - `GroupService.DeleteGroup` deletes the join rows beside the member-grant cleanup. The receipt
+    settings delete uses `Select(clause.Associations)`, which cannot reach them — `gorm:"-"` means
+    the join is not an association of the settings model at all.
+- **Server-side ingest** (`services/default_custom_fields.go`) — one helper shared by both ingest
+  paths so they cannot drift. `ApplyDefaultCustomFields(settings, *command)` is pure: it no-ops
+  unless `ApplyDefaultCustomFieldsOnIngest`, then appends an **empty**
+  `UpsertCustomFieldValueCommand{CustomFieldId: id}` for each default id the command doesn't already
+  carry. **De-duplication matters** — the AI response is unmarshalled straight into an
+  `UpsertReceiptCommand`, so a group running a custom prompt can already have produced a value for a
+  defaulted field. `ApplyGroupDefaultCustomFields(tx, groupId, *command)` is the thin loader wrapper;
+  it treats a **missing settings row as "not opted in" rather than an error**, because the row is
+  created lazily and a group never opened in the settings UI legitimately has none. Call sites, both
+  immediately before `Validate`:
+  - `ReceiptService.QuickScan` — after the `resolveQuickScanCategories`/`resolveQuickScanTags`/
+    comment-append block.
+  - `wranglerasynq/email_process_handler.go` — after `command.CreatedByString = "Email Integration"`.
+  `services/import.go` deliberately does **not** apply defaults — it replays existing receipts.
+  `rerun_task_payload.go` routes through `ReceiptService.QuickScan`, so it inherits the behaviour.
+- **Users without `app.custom-fields.read` are gated out client-side**: the desktop and mobile
+  receipt forms skip ids absent from their loaded catalog, which is empty without the permission, so
+  their save would never have passed `enforceReceiptCustomFieldSelection` anyway.
+- **Tests**: `repositories/group_receipt_settings_test.go` (round-trip, replace, `[]` clears, `nil`
+  leaves both unchanged, `json.Marshal` gives `[]`, the not-blanked custom field name, the batched
+  loader across two groups, `GetGroupById` hydration), `repositories/custom_fields_test.go` (a
+  deleted field leaves every group's set, two groups seeded), `services/default_custom_fields_test.go`
+  (toggle-off no-op, appends only missing ids, no duplicate, missing settings row, group delete
+  leaves zero join rows), `services/quick_scan_ingest_test.go`
+  (`TestQuickScan_{Applies,Skips}GroupDefaultCustomFields*`), and
+  `handlers/group_default_custom_fields_test.go` (400 unknown id writes nothing, 403 without the
+  permission, a save omitting both keys leaves the stored config untouched, `[]` on the wire).
+
 ## Reporting Engine (`internal/reporting`)
 
 A **pure** report engine: `(ReportSpec + FieldCatalog + []Row + MetaInput) → ReportModel`. It

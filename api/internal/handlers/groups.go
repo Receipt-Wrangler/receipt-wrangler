@@ -137,6 +137,14 @@ func GetGroupsForUser(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// Same treatment for each group's default custom field ids, which are also
+			// `gorm:"-"`. The desktop feeds this response into GroupState, which is what the
+			// receipt form reads a group's defaults from — an unloaded response would blank
+			// them, and would put a null where swagger promises an array.
+			if err := repositories.NewGroupReceiptSettingsRepository(nil).LoadDefaultCustomFieldIdsForGroups(groups); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			bytes, err := utils.MarshalResponseData(groups)
 			if err != nil {
 				return http.StatusInternalServerError, err
@@ -402,6 +410,37 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// The endpoint is gated on GroupUpdate only. Configuring the group's default custom
+			// fields additionally requires app.custom-fields.read, mirroring
+			// enforceReceiptCustomFieldSelection: without it a group admin could attach fields
+			// whose catalog they are not allowed to read. A nil pointer means the client did not
+			// touch the selection, so it stays allowed.
+			if command.DefaultCustomFieldIds != nil {
+				token := structs.GetClaims(r)
+				canReadCustomFields, err := services.NewPermissionService(nil).
+					HasAppPermissions(token.UserId, permissions.AppCustomFieldsRead)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				if !canReadCustomFields {
+					utils.WriteCustomErrorResponse(
+						w,
+						"You do not have permission to configure default custom fields",
+						http.StatusForbidden,
+					)
+					return 0, nil
+				}
+
+				vErr, err := validateDefaultCustomFieldIds(*command.DefaultCustomFieldIds)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				if len(vErr.Errors) > 0 {
+					structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
+					return 0, nil
+				}
+			}
+
 			groupReceiptSettingsRepository := repositories.NewGroupReceiptSettingsRepository(nil)
 			updatedGroupReceiptSettings, err := groupReceiptSettingsRepository.UpdateGroupReceiptSettings(groupId, command)
 			if err != nil {
@@ -635,4 +674,36 @@ func UpdateGroupMemberGrants(w http.ResponseWriter, r *http.Request) {
 	}
 
 	HandleRequest(handler)
+}
+
+// validateDefaultCustomFieldIds rejects a default-custom-field selection referencing
+// an id that does not exist in the catalog. The join table carries no foreign key to
+// custom_fields on the delete side (deletion is cascaded explicitly), so an unknown id
+// would otherwise persist as a row nothing can ever resolve — the receipt form would
+// silently skip it forever. Returns a populated ValidatorError keyed on
+// "defaultCustomFieldIds" when any id is unknown.
+func validateDefaultCustomFieldIds(customFieldIds []uint) (structs.ValidatorError, error) {
+	vErr := structs.ValidatorError{Errors: make(map[string]string)}
+	if len(customFieldIds) == 0 {
+		return vErr, nil
+	}
+
+	customFields, err := repositories.NewCustomFieldRepository(nil).GetCustomFieldsByIds(customFieldIds)
+	if err != nil {
+		return structs.ValidatorError{}, err
+	}
+
+	found := make(map[uint]struct{}, len(customFields))
+	for _, customField := range customFields {
+		found[customField.ID] = struct{}{}
+	}
+
+	for _, customFieldId := range customFieldIds {
+		if _, ok := found[customFieldId]; !ok {
+			vErr.Errors["defaultCustomFieldIds"] = "One or more selected custom fields do not exist"
+			break
+		}
+	}
+
+	return vErr, nil
 }

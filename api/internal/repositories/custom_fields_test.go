@@ -878,3 +878,65 @@ func TestShouldReturnErrorWhenUpdatingNonExistentCustomField(t *testing.T) {
 		utils.PrintTestError(t, "Expected error for non-existent ID", nil)
 	}
 }
+
+// TestShouldRemoveDeletedCustomFieldFromEveryGroupDefaultSet pins the "deleting a custom field
+// removes it from every group's default set" requirement. Two groups are seeded so a cascade scoped
+// to a single group (or keyed on the wrong column) fails here.
+func TestShouldRemoveDeletedCustomFieldFromEveryGroupDefaultSet(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	CreateTestGroup()
+
+	settingsRepository := NewGroupReceiptSettingsRepository(nil)
+	for _, groupId := range []uint{1, 2} {
+		if _, err := settingsRepository.CreateGroupReceiptSettings(groupId); err != nil {
+			utils.PrintTestError(t, err, "no error")
+		}
+	}
+
+	shared := seedDefaultCustomField(t, "Shared Field")
+	groupTwoOnly := seedDefaultCustomField(t, "Group Two Field")
+
+	commandOne := baseSettingsCommand()
+	commandOne.DefaultCustomFieldIds = &[]uint{shared}
+	if _, err := settingsRepository.UpdateGroupReceiptSettings("1", commandOne); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	commandTwo := baseSettingsCommand()
+	commandTwo.DefaultCustomFieldIds = &[]uint{shared, groupTwoOnly}
+	if _, err := settingsRepository.UpdateGroupReceiptSettings("2", commandTwo); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	err := NewCustomFieldRepository(nil).DeleteCustomField(shared)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	settingsOne, err := settingsRepository.GetGroupReceiptSettingsByGroupId(1)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(settingsOne.DefaultCustomFieldIds) != 0 {
+		utils.PrintTestError(t, settingsOne.DefaultCustomFieldIds, "empty set")
+	}
+
+	// The other group keeps its unrelated field.
+	settingsTwo, err := settingsRepository.GetGroupReceiptSettingsByGroupId(2)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(settingsTwo.DefaultCustomFieldIds) != 1 || settingsTwo.DefaultCustomFieldIds[0] != groupTwoOnly {
+		utils.PrintTestError(t, settingsTwo.DefaultCustomFieldIds, []uint{groupTwoOnly})
+	}
+
+	var remaining int64
+	GetDB().Model(&models.GroupReceiptSettingsCustomField{}).Where("custom_field_id = ?", shared).Count(&remaining)
+	if remaining != 0 {
+		utils.PrintTestError(t, remaining, 0)
+	}
+}

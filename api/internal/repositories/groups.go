@@ -289,13 +289,24 @@ func (repository GroupRepository) GetGroupById(id string,
 		}
 	}
 
-	if group.GroupReceiptSettings.ID == 0 && createMissingGroupReceiptSettings {
-		groupReceiptSettingsRepository := NewGroupReceiptSettingsRepository(repository.TX)
+	groupReceiptSettingsRepository := NewGroupReceiptSettingsRepository(repository.TX)
 
+	if group.GroupReceiptSettings.ID == 0 && createMissingGroupReceiptSettings {
 		_, err := groupReceiptSettingsRepository.CreateGroupReceiptSettings(group.ID)
 		if err != nil {
 			return models.Group{}, err
 		}
+	}
+
+	// DefaultCustomFieldIds is `gorm:"-"`, so nothing preloads it. Hydrate it explicitly at this
+	// serialization boundary. Keyed on GroupId rather than the settings row id precisely because
+	// the settings row above is created and DISCARDED, leaving its ID at 0 on the very call that
+	// created it (a freshly created row has no defaults, so an empty [] is the right answer there).
+	err = groupReceiptSettingsRepository.LoadDefaultCustomFieldIds(
+		[]*models.GroupReceiptSettings{&group.GroupReceiptSettings},
+	)
+	if err != nil {
+		return models.Group{}, err
 	}
 
 	return group, nil

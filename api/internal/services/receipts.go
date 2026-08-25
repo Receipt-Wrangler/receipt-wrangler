@@ -369,6 +369,14 @@ func (service ReceiptService) QuickScan(params QuickScanParams) (models.Receipt,
 		})
 	}
 
+	// Attach the group's default custom fields (as empty values) when the group opted into applying
+	// them to server-created receipts. Runs after the AI's own custom fields are in the command so
+	// a field the prompt already produced is not duplicated.
+	err = ApplyGroupDefaultCustomFields(service.TX, groupId, &receiptCommand)
+	if err != nil {
+		return models.Receipt{}, recordEarlyQuickScanFailure(err)
+	}
+
 	vErr := receiptCommand.Validate(token.UserId, true)
 	if len(vErr.Errors) > 0 {
 		errBytes, _ := json.Marshal(vErr.Errors)

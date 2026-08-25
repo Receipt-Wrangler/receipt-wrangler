@@ -35,6 +35,18 @@ type UpdateGroupReceiptSettingsCommand struct {
 
 	QuickScanCommentEnabled  bool `json:"quickScanCommentEnabled"`
 	QuickScanCommentRequired bool `json:"quickScanCommentRequired"`
+
+	// Default custom fields. BOTH are pointers, and `nil` means LEAVE UNCHANGED — the desktop hides
+	// this whole section from an admin without app.custom-fields.read, so its getRawValue() omits
+	// both keys. A non-pointer bool would unmarshal as `false` and the repository's unconditional
+	// field-by-field assignment would wipe the stored toggle (byte for byte the documented
+	// hideComments bug). An explicit empty `defaultCustomFieldIds: []` clears the set.
+	//
+	// Validate() deliberately does not check these: the feature has no notion of a REQUIRED custom
+	// field. The handler does check that every submitted id exists (400) and that the caller holds
+	// app.custom-fields.read (403).
+	DefaultCustomFieldIds            *[]uint `json:"defaultCustomFieldIds"`
+	ApplyDefaultCustomFieldsOnIngest *bool   `json:"applyDefaultCustomFieldsOnIngest"`
 }
 
 func (command *UpdateGroupReceiptSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
