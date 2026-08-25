@@ -86,6 +86,11 @@ api.CustomFieldValue buildCustomFieldValue({
 
 /// Builds a [api.GroupReceiptSettings]. Categories/tags are shown by default
 /// (`hide* == false`) so the pickers mount, matching the backend defaults.
+///
+/// [defaultCustomFieldIds] is the group's default custom field set. Leave it
+/// null to model a group that has none — the backend always serializes `[]`,
+/// but an absent value has to behave identically (a released build predating
+/// the field would see null).
 api.GroupReceiptSettings buildGroupReceiptSettings({
   required int groupId,
   int? id,
@@ -93,6 +98,8 @@ api.GroupReceiptSettings buildGroupReceiptSettings({
   bool hideReceiptTags = false,
   bool hideComments = false,
   bool hideImages = false,
+  List<int>? defaultCustomFieldIds,
+  bool? applyDefaultCustomFieldsOnIngest,
 }) =>
     (api.GroupReceiptSettingsBuilder()
           ..id = id ?? groupId
@@ -101,7 +108,11 @@ api.GroupReceiptSettings buildGroupReceiptSettings({
           ..hideReceiptCategories = hideReceiptCategories
           ..hideReceiptTags = hideReceiptTags
           ..hideComments = hideComments
-          ..hideImages = hideImages)
+          ..hideImages = hideImages
+          ..applyDefaultCustomFieldsOnIngest = applyDefaultCustomFieldsOnIngest
+          ..defaultCustomFieldIds = defaultCustomFieldIds == null
+              ? null
+              : ListBuilder<int>(defaultCustomFieldIds))
         .build();
 
 /// Builds a [api.GroupMember] (backs the paid-by dropdown items).
@@ -117,6 +128,7 @@ api.Group buildGroup({
   String name = 'Test Group',
   api.GroupReceiptSettings? receiptSettings,
   List<api.GroupMember> members = const [],
+  List<int>? defaultCustomFieldIds,
 }) =>
     (api.GroupBuilder()
           ..id = id
@@ -125,8 +137,11 @@ api.Group buildGroup({
           ..isAllGroup = false
           ..status = api.GroupStatus.ACTIVE
           ..groupMembers = ListBuilder<api.GroupMember>(members)
-          ..groupReceiptSettings
-              .replace(receiptSettings ?? buildGroupReceiptSettings(groupId: id)))
+          ..groupReceiptSettings.replace(receiptSettings ??
+              buildGroupReceiptSettings(
+                groupId: id,
+                defaultCustomFieldIds: defaultCustomFieldIds,
+              )))
         .build();
 
 api.UserView buildUserView({required int id, String? displayName}) =>

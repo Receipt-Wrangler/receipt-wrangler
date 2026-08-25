@@ -55,12 +55,33 @@ class _ReceiptForm extends State<ReceiptForm> {
   int groupId = 0;
   bool isAddingShare = false;
 
+  /// The custom fields this form attached on the user's behalf because the
+  /// selected group declares them as defaults. Only these are candidates for
+  /// removal when the group changes -- anything the user added by hand, or
+  /// typed a value into, is theirs (see [_applyGroupDefaultCustomFields]).
+  final Set<int> _autoAppliedCustomFieldIds = {};
+
   @override
   void initState() {
     super.initState();
     Provider.of<ReceiptModel>(context, listen: false);
 
     groupId = modifiedReceipt.groupId;
+
+    if (groupId > 0) {
+      // Seed the group's defaults on an add form that already knows its group
+      // (opened from inside a group, or prefilled). Deferred to after the first
+      // frame because applying mutates ReceiptModel, and notifying its
+      // listeners while the tree is still building throws -- and because
+      // `formState` reads the route, which needs a mounted element.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || formState != WranglerFormState.add) {
+          return;
+        }
+
+        _applyGroupDefaultCustomFields(groupId);
+      });
+    }
   }
 
   Widget buildAuditDetailSection() {
@@ -132,12 +153,20 @@ class _ReceiptForm extends State<ReceiptForm> {
       enabled: !isFieldReadOnly(formState),
       validator: FormBuilderValidators.required(),
       onChanged: (value) {
+        var newGroupId = value as int;
+
+        // Each group is effectively its own receipt template, so re-apply the
+        // target group's default custom fields. Done BEFORE the setState below
+        // because it writes to ReceiptModel, and notifyListeners() must not run
+        // from inside a setState callback.
+        _applyGroupDefaultCustomFields(newGroupId);
+
         setState(() {
           // The paid-by members are group-scoped, so clear the selection when
           // the group changes. Guard the access: the field may not be mounted
           // (matching quick_scan_form.dart's group dropdown).
           formKey.currentState?.fields["paidByUserId"]?.setValue(null);
-          groupId = value as int;
+          groupId = newGroupId;
         });
       },
     );
@@ -235,6 +264,14 @@ class _ReceiptForm extends State<ReceiptForm> {
           }
 
           return Column(
+            // Keyed by custom field id so the element tree follows identity,
+            // not list position. Without it, removing a field re-uses its
+            // element for whatever field shifted into its slot: FormBuilder
+            // re-registers the field under the new name, but a
+            // FormBuilderTextField has no didUpdateWidget and keeps the old
+            // TextEditingController text -- so a group swap would show one
+            // field's text under another field's label.
+            key: ValueKey("customFieldValue_${customFieldValue.customFieldId}"),
             children: [
               CustomFieldWidget(
                 customField: customField,
@@ -328,9 +365,11 @@ class _ReceiptForm extends State<ReceiptForm> {
     );
   }
 
-  void _addCustomField(int customFieldId) {
-    // Create a new empty custom field value with all required fields
-    final newCustomFieldValue = (api.CustomFieldValueBuilder()
+  /// A brand-new, empty value row for [customFieldId]. Empty is a meaningful
+  /// state, not a placeholder -- see
+  /// `lib/shared/functions/custom_field_values.dart`.
+  api.CustomFieldValue _buildEmptyCustomFieldValue(int customFieldId) {
+    return (api.CustomFieldValueBuilder()
           ..id = 0  // Use 0 for new custom field values
           ..customFieldId = customFieldId
           ..receiptId = modifiedReceipt.id
@@ -339,42 +378,119 @@ class _ReceiptForm extends State<ReceiptForm> {
           ..createdByString = ''  // Empty string placeholder
           ..updatedAt = '')  // Empty string placeholder
         .build();
+  }
 
-    // Add it to the modified receipt
-    final updatedCustomFields = [
-      ...modifiedReceipt.customFields,
-      newCustomFieldValue,
+  /// The receipt's custom field values with [remove] dropped and [add]
+  /// appended, keeping the order of the values already attached.
+  ///
+  /// Pure on purpose: every caller hands the whole result to a single
+  /// [_setCustomFieldValues], so a multi-field change (the group-default swap)
+  /// costs one model write instead of one per field.
+  List<api.CustomFieldValue> _customFieldValuesWith({
+    Set<int> add = const {},
+    Set<int> remove = const {},
+  }) {
+    return [
+      ...modifiedReceipt.customFields
+          .where((cfv) => !remove.contains(cfv.customFieldId)),
+      ...add.map(_buildEmptyCustomFieldValue),
     ];
+  }
 
-    final updatedReceipt = modifiedReceipt.rebuild((b) => b
-      ..customFields = ListBuilder(updatedCustomFields));
+  /// Clears the form value backing [customFieldId] BEFORE its field unmounts.
+  /// FormBuilder's `clearValueOnUnregister` defaults to false, so an
+  /// unregistered field's value stays in the form's value map and is handed
+  /// straight back to any field that later re-registers under the same name --
+  /// a re-added custom field would silently resurrect what was typed into it.
+  void _clearCustomFieldFormValue(int customFieldId) {
+    formKey.currentState?.fields[customFieldFormFieldName(customFieldId)]
+        ?.didChange(null);
+  }
 
-    receiptModel.setModifiedReceipt(updatedReceipt);
-    // The form reads the model with listen:false, so rebuild it explicitly to
-    // mount the newly added custom-field widget (otherwise it only appears
-    // after some unrelated rebuild).
+  /// Writes [values] back to the receipt being edited. The form reads the model
+  /// with listen:false, so rebuild it explicitly -- otherwise a newly added
+  /// custom-field widget only appears after some unrelated rebuild.
+  void _setCustomFieldValues(List<api.CustomFieldValue> values) {
+    receiptModel.setModifiedReceipt(
+        modifiedReceipt.rebuild((b) => b..customFields = ListBuilder(values)));
     setState(() {});
   }
 
+  void _addCustomField(int customFieldId) {
+    // Adding a field by hand makes it the user's, so the group-default swap
+    // must never take it back out from under them.
+    _autoAppliedCustomFieldIds.remove(customFieldId);
+
+    _setCustomFieldValues(_customFieldValuesWith(add: {customFieldId}));
+  }
+
   void _removeCustomField(int customFieldId) {
-    // Clear the form value BEFORE the field unmounts. FormBuilder's
-    // `clearValueOnUnregister` defaults to false, so an unregistered field's
-    // value stays in the form's value map and is handed straight back to any
-    // field that later re-registers under the same name -- re-adding a removed
-    // custom field would silently resurrect what was typed into it.
-    formKey.currentState?.fields[customFieldFormFieldName(customFieldId)]
-        ?.didChange(null);
+    _clearCustomFieldFormValue(customFieldId);
 
-    // Remove the custom field from the modified receipt
-    final updatedCustomFields = modifiedReceipt.customFields
-        .where((cfv) => cfv.customFieldId != customFieldId)
-        .toList();
+    // Removing a field by hand is a decision the swap must not fight: forget
+    // that this form ever auto-applied it.
+    _autoAppliedCustomFieldIds.remove(customFieldId);
 
-    final updatedReceipt = modifiedReceipt.rebuild((b) => b
-      ..customFields = ListBuilder(updatedCustomFields));
+    _setCustomFieldValues(_customFieldValuesWith(remove: {customFieldId}));
+  }
 
-    receiptModel.setModifiedReceipt(updatedReceipt);
-    setState(() {});
+  /// Applies [newGroupId]'s default custom fields to the form, swapping out the
+  /// ones the previously selected group put there. Each group is effectively
+  /// its own receipt template, so this runs on every group change (and once on
+  /// load for an add form that already knows its group).
+  ///
+  /// The swap is deliberately conservative. It only removes a field this form
+  /// added itself ([_autoAppliedCustomFieldIds]) that is still **empty**; a
+  /// default the user typed into is kept and handed over to them (dropped from
+  /// the auto set), as is anything they added by hand.
+  ///
+  /// Ids missing from the [CustomFieldModel] catalog are skipped. That catalog
+  /// is empty for a caller without `app.custom-fields.read` (the 403 is
+  /// swallowed into an empty list), which is exactly the gate we want here: the
+  /// backend's `enforceReceiptCustomFieldSelection` would 403 their save.
+  void _applyGroupDefaultCustomFields(int newGroupId) {
+    if (formState == WranglerFormState.view) {
+      return;
+    }
+
+    var knownCustomFieldIds =
+        customFieldModel.customFields.map((cf) => cf.id).toSet();
+    var defaultIds = <int>[
+      ...?groupModel.getGroupReceiptSettings(newGroupId)?.defaultCustomFieldIds
+    ].where(knownCustomFieldIds.contains).toSet();
+
+    var toRemove = <int>{};
+    for (var customFieldId in _autoAppliedCustomFieldIds.toList()) {
+      if (defaultIds.contains(customFieldId)) {
+        continue;
+      }
+
+      // Ours to take back only while it is untouched; the moment it holds a
+      // value it is the user's data and stays, unowned by the swap.
+      if (_isCustomFieldEmpty(customFieldId)) {
+        toRemove.add(customFieldId);
+      }
+      _autoAppliedCustomFieldIds.remove(customFieldId);
+    }
+
+    var attachedIds =
+        modifiedReceipt.customFields.map((cfv) => cfv.customFieldId).toSet();
+    var toAdd = defaultIds.difference(attachedIds);
+    _autoAppliedCustomFieldIds.addAll(toAdd);
+
+    if (toRemove.isEmpty && toAdd.isEmpty) {
+      return;
+    }
+
+    for (var customFieldId in toRemove) {
+      _clearCustomFieldFormValue(customFieldId);
+    }
+
+    // ONE model write for the whole swap: setModifiedReceipt notifies its
+    // listeners and _setCustomFieldValues rebuilds the form, so adding and
+    // removing field by field would rebuild the form repeatedly with its
+    // fields half-mounted.
+    _setCustomFieldValues(_customFieldValuesWith(add: toAdd, remove: toRemove));
   }
 
   /// Whether the mounted form field for [customFieldId] currently holds no
@@ -384,9 +500,6 @@ class _ReceiptForm extends State<ReceiptForm> {
   /// seeds checkboxes with `false`, so a plain null check would call every
   /// checkbox non-empty. Mirrors the desktop emptiness rule (empty <=> every
   /// value column null-or-"" and `booleanValue` falsy).
-  // Staged for the group-default swap, which is the only thing that needs to
-  // ask whether an auto-added field is safe to drop; nothing calls it yet.
-  // ignore: unused_element
   bool _isCustomFieldEmpty(int customFieldId) {
     final value = formKey
         .currentState?.fields[customFieldFormFieldName(customFieldId)]?.value;

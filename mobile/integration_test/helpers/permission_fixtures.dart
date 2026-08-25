@@ -523,11 +523,16 @@ Future<List<Map<String, dynamic>>> _adminGroups(String jwt) async {
 }
 
 /// Builds an `UpdateGroupReceiptSettingsCommand` from a settings map, applying
-/// [overrides]. Only the hide* + quick-scan enabled/required flags are sent -- the
+/// [overrides]. Only the hide* + quick-scan/ingest boolean flags are sent -- the
 /// default enum fields (`quickScanDefaultPaidByType` / `...Status`) are omitted
 /// because the backend keeps them and rejects an empty enum, so we never echo one
 /// back. (This is why persisted configs keep paid-by/status *required*: making
 /// them optional would need a persisted default the backend enforces.)
+///
+/// `defaultCustomFieldIds` is deliberately NOT in the list either: it is a list,
+/// not a bool, and the command treats an omitted key as "leave unchanged", which
+/// is exactly what every caller that isn't [setGroupDefaultCustomFields] wants.
+/// The `?? false` fallback would otherwise send `false` for it.
 Map<String, dynamic> _settingsToCommand(
   Map<String, dynamic> s, {
   Map<String, dynamic> overrides = const {},
@@ -542,6 +547,7 @@ Map<String, dynamic> _settingsToCommand(
         'quickScanCategoriesEnabled', 'quickScanCategoriesRequired',
         'quickScanTagsEnabled', 'quickScanTagsRequired',
         'quickScanCommentEnabled', 'quickScanCommentRequired',
+        'applyDefaultCustomFieldsOnIngest',
       ])
         k: s[k] ?? false,
       ...overrides,
@@ -582,6 +588,46 @@ Future<void> setGroupQuickScanConfig({
   addTearDown(() async {
     final j = await apiLogin();
     await _putGroupReceiptSettings(groupId, j, _settingsToCommand(original));
+  });
+}
+
+/// Persists [customFieldIds] as [groupId]'s default custom fields, restoring the
+/// group's original set on teardown.
+///
+/// Like [setGroupQuickScanConfig] this goes through the real API rather than
+/// mutating `GroupModel`: the client learns the set from AppData at login and the
+/// backend enforces the submitted custom field set on save
+/// (`enforceReceiptCustomFieldSelection`), so client and server have to agree, as
+/// they do in production. Pass `[]` to clear the group's set.
+Future<void> setGroupDefaultCustomFields({
+  required int groupId,
+  required String jwt,
+  required List<int> customFieldIds,
+}) async {
+  final groups = await _adminGroups(jwt);
+  final original = ((groups.firstWhere((x) => x['id'] == groupId,
+              orElse: () => throw StateError('group $groupId not found'))[
+          'groupReceiptSettings']) as Map)
+      .cast<String, dynamic>();
+  // `GET /group/` hydrates this (handlers/groups.go calls
+  // LoadDefaultCustomFieldIdsForGroups), and the backend always serializes an
+  // array rather than null -- the `?? const []` is belt and braces so a teardown
+  // can never throw on a group that has none.
+  final originalIds =
+      ((original['defaultCustomFieldIds'] as List?) ?? const []).cast<int>();
+
+  await _putGroupReceiptSettings(
+      groupId,
+      jwt,
+      _settingsToCommand(original,
+          overrides: {'defaultCustomFieldIds': customFieldIds}));
+  addTearDown(() async {
+    final j = await apiLogin();
+    await _putGroupReceiptSettings(
+        groupId,
+        j,
+        _settingsToCommand(original,
+            overrides: {'defaultCustomFieldIds': originalIds}));
   });
 }
 
