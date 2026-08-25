@@ -49,18 +49,37 @@ test.describe('Report Builder — configuration', () => {
     await expect(labels).toHaveText(['Tag', 'Paid By']);
   });
 
-  test('switching detail mode shows or hides the columns section', async ({ page }) => {
-    // Default is Aggregate: the custom-column UI is present.
+  test('the columns section stays configurable in both detail modes', async ({ page }) => {
+    const note = page.getByTestId('report-columns-records-note');
+    const aggregateBy = page.getByTestId('report-detail-aggregate-by');
+
+    // Default is Aggregate: columns are editable, and the records hint is absent.
     await expect(page.getByTestId('report-add-column')).toBeVisible();
+    await expect(aggregateBy).toBeVisible();
+    await expect(note).toHaveCount(0);
 
-    // Records mode: columns are the receipt fields, so the custom-column UI is gone.
+    // Records mode keeps the same columns UI, adding a hint about what a column
+    // means on a record row. The aggregate-only "aggregate by" select is what goes.
     await page.getByTestId('report-detail-records').click();
-    await expect(page.getByTestId('report-add-column')).toHaveCount(0);
-    await expect(page.getByText('Switch to Aggregate to define custom columns')).toBeVisible();
+    await expect(page.getByTestId('report-add-column')).toBeVisible();
+    await expect(note).toBeVisible();
+    await expect(aggregateBy).toHaveCount(0);
 
-    // Back to Aggregate: the Add column control returns.
+    // A record row reads the field off the receipt, so a dimension column over a
+    // field that is neither grouped nor summarized by is valid here. The picker
+    // presets the first dimension (Paid By); nothing groups by it.
+    await page.getByTestId('report-add-column').click();
+    await page.getByTestId('picker-kind-dimension').click();
+    await page.getByTestId('picker-save').click();
+    await expect(page.getByTestId('report-column-row').filter({ hasText: 'Paid By' })).toBeVisible();
+    await expect(page.getByTestId('report-column-disabled')).toHaveCount(0);
+
+    // Back in Aggregate mode that same column can no longer be resolved, so it
+    // greys out rather than disappearing — the existing self-healing behaviour.
     await page.getByTestId('report-detail-aggregate').click();
     await expect(page.getByTestId('report-add-column')).toBeVisible();
+    await expect(note).toHaveCount(0);
+    await expect(page.getByTestId('report-column-disabled').filter({ hasText: 'Paid By' })).toBeVisible();
   });
 
   test('the custom period range reveals date pickers', async ({ page }) => {

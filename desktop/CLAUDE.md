@@ -1121,6 +1121,19 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   derived identifier kept stable across label edits (`report-column.util.ts`); formula validation is
   lightweight inline feedback — the backend is the authoritative validator (a bad spec → 400, surfaced by
   the interceptor). Grouping levels and columns reorder via up/down (no drag-and-drop).
+  - **The section is editable in *both* detail modes.** It used to be replaced by a note in Records mode
+    ("columns are the receipt fields") — which was never true: the `columns` FormArray was still posted,
+    the user just could not see or change it. In Records mode a detail row *is* one receipt, so the
+    engine reads a dimension column straight off that record (`emitRecordRows` →
+    `record.Get(column.field)`) and the disabled-dimension rule below does not apply — a column may read
+    **any** catalog field with no grouping level for it. Aggregates and formulas are configurable there
+    too: each record gets its own accumulator set (so `SUM(amount)` is that receipt's amount and
+    `COUNT()` is 1), and they still roll up correctly across subtotal/grand-total rows. A Records-only
+    hint (`report-columns-records-note`) explains this above the list; the aggregate-only "aggregate by"
+    select (`report-detail-aggregate-by` — it has no `label`, so per the e2e locator rules it carries a
+    `data-testid` rather than being matched on its sibling span's copy) is the one control the mode still
+    toggles. One shared column set spans both modes — switching modes never rewrites it, it just
+    re-derives which columns are disabled.
   - **Aggregate dimension-column rule**: in aggregate mode the engine can only label an (aggregated) row
     by a field it's grouped/aggregated by, so a dimension column is valid only when its `field` is the
     `detail.by` dimension or one of the `groupBy` levels. Rather than error, such a column is **disabled**
