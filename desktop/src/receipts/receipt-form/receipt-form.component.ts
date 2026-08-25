@@ -711,25 +711,76 @@ export class ReceiptFormComponent implements OnInit {
 
     let filledAny = false;
     values.forEach((value) => {
-      const definition = this.customFields.find(
-        (field) => field.id === value.customFieldId
-      );
-      if (!definition) {
+      if (!this.addCustomFieldControl(value.customFieldId, value)) {
         return;
       }
 
-      const alreadyPresent = this.customFieldsFormArray.controls.some(
-        (control) => control.value?.["customFieldId"] === value.customFieldId
-      );
-      if (alreadyPresent) {
-        return;
-      }
-
-      this.customFieldsFormArray.push(this.buildCustomOptionFormGroup(value));
       this.markCustomFieldMenuItemSelected(value.customFieldId);
       filledAny = true;
     });
     return filledAny;
+  }
+
+  // Appends a control for [customFieldId] to the custom fields form array,
+  // returning whether one was added. A field missing from the loaded catalog
+  // (this.customFields) can't be rendered or edited, and a field the form
+  // already carries would render twice, so both are skipped. [value] seeds the
+  // control (magic fill supplies one); omit it for an empty field.
+  private addCustomFieldControl(
+    customFieldId: number,
+    value?: CustomFieldValue
+  ): boolean {
+    const definition = this.customFields.find(
+      (field) => field.id === customFieldId
+    );
+    if (!definition) {
+      return false;
+    }
+
+    const alreadyPresent = this.customFieldsFormArray.controls.some(
+      (control) => control.value?.["customFieldId"] === customFieldId
+    );
+    if (alreadyPresent) {
+      return false;
+    }
+
+    this.customFieldsFormArray.push(
+      this.buildCustomOptionFormGroup(
+        value ?? ({ customFieldId } as CustomFieldValue)
+      )
+    );
+    return true;
+  }
+
+  // Removes [customFieldId]'s control, if the form carries one. The index guard
+  // is load-bearing: FormArray.removeAt(-1) splices off the LAST control, so an
+  // unguarded findIndex would drop an unrelated field.
+  private removeCustomFieldControl(customFieldId: number): void {
+    const index = this.customFieldsFormArray.controls.findIndex(
+      (control) =>
+        control.value?.["customFieldId"]?.toString() === customFieldId.toString()
+    );
+    if (index >= 0) {
+      this.customFieldsFormArray.removeAt(index);
+    }
+  }
+
+  // Whether a custom field control holds nothing the user typed. Every typed
+  // column must be null-or-empty AND booleanValue falsy — buildCustomOptionFormGroup
+  // seeds booleanValue to false, so a naive "every value is null" check would call
+  // every control non-empty. A BOOLEAN deliberately left false counts as empty.
+  private isCustomFieldControlEmpty(group: AbstractControl): boolean {
+    const value = group.value ?? {};
+    const isBlank = (columnValue: unknown): boolean =>
+      columnValue === null || columnValue === undefined || columnValue === "";
+
+    return (
+      isBlank(value["stringValue"]) &&
+      isBlank(value["dateValue"]) &&
+      isBlank(value["selectValue"]) &&
+      isBlank(value["currencyValue"]) &&
+      !value["booleanValue"]
+    );
   }
 
   // Flips the manage-fields menu entry to selected so the newly added custom
@@ -1040,28 +1091,11 @@ export class ReceiptFormComponent implements OnInit {
 
     // Custom field was just selected
     if (this.customFieldsStatefulMenuItems[selectedItemIndex].selected) {
-      const customField = this.customFields.find(customField => customField.id === Number(item.value));
-      if (customField) {
-        const customFieldValue = {
-          customFieldId: customField.id,
-          receiptId: this.originalReceipt?.id ?? 0,
-          value: null
-        } as any as CustomFieldValue;
-        this.customFieldsFormArray.push(this.buildCustomOptionFormGroup(customFieldValue));
-      }
+      this.addCustomFieldControl(Number(item.value));
     } else {
       // Custom field was just removed
-      const formArrayIndex = this.customFieldsFormArray.controls.findIndex(control => control.value?.["customFieldId"]?.toString() === item.value);
-      this.customFieldsFormArray.removeAt(formArrayIndex);
+      this.removeCustomFieldControl(Number(item.value));
     }
-  }
-
-  private updateCustomFields(): void {
-    const formArray = this.customFieldsFormArray;
-
-    this.customFieldsStatefulMenuItems.forEach((item) => {
-
-    });
   }
 
   public submit(): void {

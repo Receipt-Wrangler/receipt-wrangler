@@ -666,22 +666,34 @@ export async function apiDeleteCategoryById(
   await warnOnFailedDelete(api, `/api/category/${id}`, `category ${id}`);
 }
 
-/**
- * Creates a custom field and returns its id + name. [options] are only meaningful
- * for a SELECT field; the server clears them for every other type.
- */
+export async function apiDeleteTagById(
+  api: APIRequestContext,
+  id: number,
+): Promise<void> {
+  await warnOnFailedDelete(api, `/api/tag/${id}`, `tag ${id}`);
+}
+
+// --- Custom fields -----------------------------------------------------------
+//
+// Like categories and tags the pool is GLOBAL, so mint uniqueName-suffixed fields
+// and delete them in teardown — a leaked one shows up in every other spec's
+// pickers. Deleting a field destroys every value stored against it, so a spec
+// that seeds receipts with values must delete those receipts (or their group)
+// too.
+
+export type CustomFieldType = 'TEXT' | 'DATE' | 'SELECT' | 'CURRENCY' | 'BOOLEAN';
+
+/** Creates a custom field and returns its id + name. */
 export async function apiCreateCustomField(
   api: APIRequestContext,
-  name: string,
-  type: 'TEXT' | 'DATE' | 'SELECT' | 'CURRENCY' | 'BOOLEAN' = 'TEXT',
-  options: string[] = [],
+  opts: { name: string; type: CustomFieldType; options?: string[] },
 ): Promise<{ id: number; name: string }> {
   const res = await api.post('/api/customField/', {
     data: {
-      name,
-      type,
+      name: opts.name,
+      type: opts.type,
       description: '',
-      options: options.map((value) => ({ value, customFieldId: 0 })),
+      options: (opts.options ?? []).map((value) => ({ value })),
     },
   });
   if (!res.ok()) {
@@ -711,52 +723,6 @@ export async function apiGetCustomFieldById(
     );
   }
   return res.json();
-}
-
-export async function apiDeleteCustomFieldById(
-  api: APIRequestContext,
-  id: number,
-): Promise<void> {
-  await warnOnFailedDelete(api, `/api/customField/${id}`, `custom field ${id}`);
-}
-
-export async function apiDeleteTagById(
-  api: APIRequestContext,
-  id: number,
-): Promise<void> {
-  await warnOnFailedDelete(api, `/api/tag/${id}`, `tag ${id}`);
-}
-
-// --- Custom fields -----------------------------------------------------------
-//
-// Like categories and tags the pool is GLOBAL, so mint uniqueName-suffixed fields
-// and delete them in teardown — a leaked one shows up in every other spec's
-// pickers. There is no update endpoint, and deleting a field destroys every value
-// stored against it, so a spec that seeds receipts with values must delete those
-// receipts (or their group) too.
-
-export type CustomFieldType = 'TEXT' | 'DATE' | 'SELECT' | 'CURRENCY' | 'BOOLEAN';
-
-/** Creates a custom field and returns its id + name. */
-export async function apiCreateCustomField(
-  api: APIRequestContext,
-  opts: { name: string; type: CustomFieldType; options?: string[] },
-): Promise<{ id: number; name: string }> {
-  const res = await api.post('/api/customField/', {
-    data: {
-      name: opts.name,
-      type: opts.type,
-      description: '',
-      options: (opts.options ?? []).map((value) => ({ value })),
-    },
-  });
-  if (!res.ok()) {
-    throw new Error(
-      `create custom field failed: HTTP ${res.status()} ${await res.text()}`,
-    );
-  }
-  const customField = (await res.json()) as { id: number; name: string };
-  return { id: customField.id, name: customField.name };
 }
 
 /** Deletes a custom field. Requires app.custom-fields.delete (admin-only). */
