@@ -262,6 +262,7 @@ func TestReportService_BuildDimensions(t *testing.T) {
 	got := buildDimensions(
 		[]reporting.FieldKey{"paid_by", "date", "custom_1", "custom_5", "gone"},
 		catalog,
+		nil,
 	)
 	want := []render.Dimension{
 		{Key: "paid_by", Label: "Paid By", DataType: reporting.TypeString},
@@ -269,6 +270,42 @@ func TestReportService_BuildDimensions(t *testing.T) {
 		{Key: "custom_1", Label: "HST", DataType: reporting.TypeCurrency},
 		{Key: "custom_5", Label: "Reimbursed", DataType: reporting.TypeBool},
 		{Key: "gone", Label: "gone", DataType: reporting.TypeString},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("buildDimensions() = %+v, want %+v", got, want)
+	}
+}
+
+// A grouping level renders as a leading column, so the request may name that
+// column itself. Only a non-blank override for a key that is actually grouped
+// takes effect: a blank one means "use the catalog label", and an entry naming
+// no grouping level is ignored rather than failing the report. The data type is
+// never affected — a renamed column still formats its buckets by type.
+func TestReportService_BuildDimensions_LabelOverrides(t *testing.T) {
+	catalog, err := reporting.NewFieldCatalog(
+		reporting.FieldRef{Key: "category", Label: "Category", DataType: reporting.TypeString},
+		reporting.FieldRef{Key: "date", Label: "Date", DataType: reporting.TypeDate},
+		reporting.FieldRef{Key: "paid_by", Label: "Paid By", DataType: reporting.TypeString},
+	)
+	if err != nil {
+		t.Fatalf("NewFieldCatalog() error = %v", err)
+	}
+
+	got := buildDimensions(
+		[]reporting.FieldKey{"category", "date", "paid_by", "gone"},
+		catalog,
+		map[string]string{
+			"category": "Expense Type", // renamed
+			"date":     "   ",          // blank after trimming -> catalog label
+			"gone":     "Renamed Key",  // unknown key still falls back to itself
+			"status":   "Never Used",   // not a grouping level at all
+		},
+	)
+	want := []render.Dimension{
+		{Key: "category", Label: "Expense Type", DataType: reporting.TypeString},
+		{Key: "date", Label: "Date", DataType: reporting.TypeDate},
+		{Key: "paid_by", Label: "Paid By", DataType: reporting.TypeString},
+		{Key: "gone", Label: "Renamed Key", DataType: reporting.TypeString},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("buildDimensions() = %+v, want %+v", got, want)

@@ -1133,6 +1133,30 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
     instead of being silently dropped. The backend applies the same projection when a stored template is
     generated (see `api/CLAUDE.md` → "Report templates"), so a template holding a currently-disabled
     column still generates with it omitted.
+  - **Grouping levels are columns too, and can be renamed.** Every grouping level also renders as a
+    *leading* column in the report, headed server-side from the field catalog (`buildDimensions`) — it
+    is not in the `columns` FormArray and was previously unnameable. Each Grouping row therefore carries
+    an edit pencil (`data-testid="report-grouping-edit"`) beside move-up/down/remove that reuses the
+    **same** `ColumnPickerDialogComponent` in a locked-field mode: `ColumnPickerDialogData.lockField`
+    hides the Back button (the kind step is unreachable — the field is chosen by the grouping level, not
+    the dialog), binds the Field `app-select` `[readonly]`, disables the `field` control, and retitles the
+    dialog "Grouping column". The panel hands the level in as the dimension column it *is* — a synthetic
+    `ReportColumnValue` with an id — so the picker's existing edit path seeds the label and opens straight
+    on the dimension step; only `label` is read back.
+    - **The form's `groupBy` is a `FormArray<FormGroup>` of `{ field, label }`**, not bare field keys, so
+      a heading cannot outlive its level (removing a level drops its rename; reordering carries it along).
+      Read the keys with `readGroupByFields()` (`report-form.factory.ts`), never `readStringArray`.
+    - **A blank `label` means "use the field catalog's label"**, and that is how a user resets: entering
+      the field's own label stores nothing. The mapper emits `groupByLabels` (a `{ [fieldKey]: label }`
+      map on `ReportRequestCommand`) **only** when at least one level is renamed, so an untouched report
+      maps to byte-identical the command it always did and the round-trip spec still holds. Keyed by
+      field, not index-aligned, because grouping keys are unique — reordering can't desynchronize it.
+    - The templates list's Grouping summary (`report-template-summary.ts`) prefers the override, so the
+      list agrees with the report it describes. See `api/CLAUDE.md` → "Reporting Engine".
+    - **E2E:** `e2e/report-grouping-label.spec.ts` — the rename reaches the real rendered report (asserted
+      against the preview iframe's `srcdoc`, which is the engine's own HTML), the dialog is locked/Back-less,
+      retyping the default resets it, and a saved template round-trips the heading into both its list row
+      and a reopened builder. The first two were verified to **FAIL** with the backend override reverted.
 - **Save Template**: the generate bar's secondary button (left of Generate) persists the current
   configuration. Its gate and label follow the builder's mode, driven by two inputs from
   `report-builder` (`isEditMode` + `saveButtonPermission`): on the **new** route it **creates** a

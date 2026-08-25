@@ -5,7 +5,11 @@ import { UntilDestroy } from "@ngneat/until-destroy";
 import { FilterOperation, ReportColumn, ReportDetail, ReportPeriod, ReportRequestCommand } from "../../open-api";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { ReportBuilderValue, toReportRequestCommand, toReportRequestCommandForSave } from "./report-command.mapper";
-import { buildReportFormFromCommand, readStringArray } from "./report-form.factory";
+import {
+  buildReportFormFromCommand,
+  readGroupByFields,
+  readStringArray,
+} from "./report-form.factory";
 
 // buildReceiptFilterForm wires untilDestroyed subscriptions, so it needs an
 // @UntilDestroy()-decorated context — a throwaway host, exactly as the receipt
@@ -166,7 +170,7 @@ describe("buildReportFormFromCommand", () => {
     const form = buildReportFormFromCommand(fb, host, command);
     // Assert the array CONTENTS carried over, not just the lengths.
     expect(readStringArray(form.get("scope") as FormArray)).toEqual(["3", "4", "9"]);
-    expect(readStringArray(form.get("groupBy") as FormArray)).toEqual(["group", "status"]);
+    expect(readGroupByFields(form.get("groupBy") as FormArray)).toEqual(["group", "status"]);
 
     const columns = form.get("columns") as FormArray;
     expect(columns.length).toBe(2);
@@ -186,6 +190,50 @@ describe("buildReportFormFromCommand", () => {
     expect(form.get("columns.0.id")!.value).toBeTruthy();
     expect(form.get("columns.1.id")!.value).toBeTruthy();
     expect(form.get("columns.0.id")!.value).not.toBe(form.get("columns.1.id")!.value);
+  });
+
+  it("hydrates a grouping level's column-heading override, and leaves the rest blank", () => {
+    const command: ReportRequestCommand = {
+      name: "Renamed",
+      groupIds: ["1"],
+      period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+      filter: canonicalFilter({}),
+      groupBy: ["group", "category"],
+      groupByLabels: { category: "Expense Type" },
+      detail: { mode: ReportDetail.ModeEnum.Aggregate, by: "category" },
+      columns: [{ kind: ReportColumn.KindEnum.Aggregate, name: "Count", label: "Count", aggFunc: ReportColumn.AggFuncEnum.Count }],
+      subtotals: false,
+      grandTotals: false,
+      formats: [ReportRequestCommand.FormatsEnum.Csv],
+    };
+
+    const form = buildReportFormFromCommand(fb, host, command);
+    expect(readGroupByFields(form.get("groupBy") as FormArray)).toEqual(["group", "category"]);
+    // A level the stored config does not rename holds a blank label, which maps
+    // back to no override at all.
+    expect(form.get("groupBy.0.label")!.value).toBe("");
+    expect(form.get("groupBy.1.label")!.value).toBe("Expense Type");
+
+    expect(roundTrip(command)).toEqual(command);
+  });
+
+  it("round-trips a command with no groupByLabels without inventing the key", () => {
+    const command: ReportRequestCommand = {
+      name: "Untouched",
+      groupIds: ["1"],
+      period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+      filter: canonicalFilter({}),
+      groupBy: ["group"],
+      detail: { mode: ReportDetail.ModeEnum.Aggregate, by: "group" },
+      columns: [{ kind: ReportColumn.KindEnum.Aggregate, name: "Count", label: "Count", aggFunc: ReportColumn.AggFuncEnum.Count }],
+      subtotals: false,
+      grandTotals: false,
+      formats: [ReportRequestCommand.FormatsEnum.Csv],
+    };
+
+    const mapped = roundTrip(command);
+    expect(mapped).toEqual(command);
+    expect("groupByLabels" in mapped).toBe(false);
   });
 
   // A saved filter can touch any receipt-filter field, over every editor type: text

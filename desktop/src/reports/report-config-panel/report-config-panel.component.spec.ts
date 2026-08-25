@@ -89,7 +89,7 @@ describe("ReportConfigPanelComponent", () => {
     component.addGroupControl.setValue("paid_by");
 
     expect(groupBy.length).toBe(1);
-    expect(groupBy.at(0).value).toBe("paid_by");
+    expect(groupBy.at(0).value).toEqual({ field: "paid_by", label: "" });
     expect(component.addGroupControl.value).toBeNull();
   });
 
@@ -147,6 +147,106 @@ describe("ReportConfigPanelComponent", () => {
   it("addGroupBy ignores an empty key", () => {
     component.addGroupBy("");
     expect(component.groupByLevels().length).toBe(0);
+  });
+
+  // ---- grouping column headings ------------------------------------------
+
+  function groupByArray(): FormArray {
+    return form.get("groupBy") as FormArray;
+  }
+
+  it("opens the column picker for a grouping level with its field locked and seeded", () => {
+    component.addGroupBy("paid_by");
+    dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+
+    component.openGroupingLabelPicker(0);
+
+    const data = dialog.open.mock.calls[0][1].data;
+    expect(data.lockField).toBe(true);
+    // Handed to the picker as the dimension column it is, seeded with the heading
+    // the level currently renders with, so the picker opens straight on the
+    // dimension step in edit mode.
+    expect(data.column).toEqual(
+      expect.objectContaining({
+        kind: ReportColumn.KindEnum.Dimension,
+        field: "paid_by",
+        label: "Paid By",
+      })
+    );
+    expect(data.column.id).toBeTruthy();
+  });
+
+  it("stores a renamed heading on the level and shows it in the grouping list", () => {
+    component.addGroupBy("paid_by");
+    dialog.open.mockReturnValue({
+      afterClosed: () =>
+        of({ id: "x", kind: ReportColumn.KindEnum.Dimension, name: "paid_by", label: "  Payer  ", field: "paid_by" }),
+    });
+
+    component.openGroupingLabelPicker(0);
+
+    expect(groupByArray().at(0).get("label")!.value).toBe("Payer");
+    expect(component.groupByLevels().map((level) => level.label)).toEqual(["Payer"]);
+  });
+
+  it("clears the override when the entered heading is the field's own label", () => {
+    component.addGroupBy("paid_by");
+    dialog.open.mockReturnValue({
+      afterClosed: () =>
+        of({ id: "x", kind: ReportColumn.KindEnum.Dimension, name: "paid_by", label: "Payer", field: "paid_by" }),
+    });
+    component.openGroupingLabelPicker(0);
+    expect(groupByArray().at(0).get("label")!.value).toBe("Payer");
+
+    // Retyping the catalog label is how a user resets to the default — nothing is
+    // stored, so the report falls back to the field's own heading.
+    dialog.open.mockReturnValue({
+      afterClosed: () =>
+        of({ id: "x", kind: ReportColumn.KindEnum.Dimension, name: "paid_by", label: "Paid By", field: "paid_by" }),
+    });
+    component.openGroupingLabelPicker(0);
+
+    expect(groupByArray().at(0).get("label")!.value).toBe("");
+    expect(component.groupByLevels().map((level) => level.label)).toEqual(["Paid By"]);
+  });
+
+  it("is a no-op when the picker is cancelled", () => {
+    component.addGroupBy("paid_by");
+    dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+
+    component.openGroupingLabelPicker(0);
+
+    expect(groupByArray().at(0).get("label")!.value).toBe("");
+  });
+
+  it("keeps a heading with its level when the levels are reordered", () => {
+    component.addGroupBy("paid_by");
+    component.addGroupBy("tag");
+    dialog.open.mockReturnValue({
+      afterClosed: () =>
+        of({ id: "x", kind: ReportColumn.KindEnum.Dimension, name: "tag", label: "Label", field: "tag" }),
+    });
+    component.openGroupingLabelPicker(1);
+
+    component.moveGroupBy(1, -1);
+
+    expect(component.groupByLevels().map((level) => level.label)).toEqual(["Label", "Paid By"]);
+  });
+
+  it("drops the heading with the level it belongs to", () => {
+    component.addGroupBy("paid_by");
+    dialog.open.mockReturnValue({
+      afterClosed: () =>
+        of({ id: "x", kind: ReportColumn.KindEnum.Dimension, name: "paid_by", label: "Payer", field: "paid_by" }),
+    });
+    component.openGroupingLabelPicker(0);
+
+    // Removing then re-adding the field must not resurrect the old rename.
+    component.removeGroupBy(0);
+    component.addGroupBy("paid_by");
+
+    expect(groupByArray().at(0).get("label")!.value).toBe("");
+    expect(component.groupByLevels().map((level) => level.label)).toEqual(["Paid By"]);
   });
 
   // ---- custom fields ------------------------------------------------------

@@ -229,6 +229,80 @@ describe("ColumnPickerDialogComponent", () => {
     expect(component.canSave()).toBe(false);
   });
 
+  // ---- locked-field mode (renaming a grouping level's column) --------------
+
+  // The grouping section hands the level in as the dimension column it is, so the
+  // picker opens on the dimension step in edit mode with only the label editable.
+  const lockedData: ColumnPickerDialogData = {
+    ...baseData,
+    column: {
+      id: "g1",
+      kind: ReportColumn.KindEnum.Dimension,
+      name: "category",
+      label: "Category",
+      field: "category",
+    },
+    lockField: true,
+  };
+
+  it("opens on the dimension step with the field locked and no way back", async () => {
+    const { fixture, component } = configure(lockedData);
+    await fixture.whenStable();
+
+    expect(component.step()).toBe("dim");
+    expect(component.lockField).toBe(true);
+    // Disabled as well as presented read-only, so the field cannot be changed
+    // through the control either.
+    expect(component.pickerForm.get("field")!.disabled).toBe(true);
+    // It still names the grouping column rather than claiming to add one.
+    expect(component.title()).toBe("Grouping column");
+  });
+
+  it("saves the edited label while keeping the locked field and name", async () => {
+    const { fixture, component, close } = configure(lockedData);
+    await fixture.whenStable();
+
+    component.pickerForm.get("label")!.setValue("Expense Type");
+    await fixture.whenStable();
+    expect(component.canSave()).toBe(true);
+
+    component.save();
+    expect(close).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "g1",
+        kind: ReportColumn.KindEnum.Dimension,
+        // A disabled control is omitted from form.value, so save() must read
+        // getRawValue() or the field would ride out empty and fail canSave().
+        field: "category",
+        name: "category",
+        label: "Expense Type",
+      })
+    );
+  });
+
+  it("still requires a non-empty label", async () => {
+    const { fixture, component } = configure(lockedData);
+    await fixture.whenStable();
+
+    component.pickerForm.get("label")!.setValue("   ");
+    await fixture.whenStable();
+
+    expect(component.canSave()).toBe(false);
+  });
+
+  it("leaves the field editable and the kind step reachable for a normal column", async () => {
+    const { fixture, component } = configure(baseData);
+    await fixture.whenStable();
+    component.pickDimension();
+    await fixture.whenStable();
+
+    expect(component.lockField).toBe(false);
+    expect(component.pickerForm.get("field")!.disabled).toBe(false);
+    expect(component.title()).toBe("Dimension column");
+    component.back();
+    expect(component.step()).toBe("kind");
+  });
+
   it("keeps an edited column's existing name", async () => {
     const { fixture, component, close } = configure({
       ...baseData,

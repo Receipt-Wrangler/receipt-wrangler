@@ -666,60 +666,6 @@ export async function apiDeleteCategoryById(
   await warnOnFailedDelete(api, `/api/category/${id}`, `category ${id}`);
 }
 
-/**
- * Creates a custom field and returns its id + name. [options] are only meaningful
- * for a SELECT field; the server clears them for every other type.
- */
-export async function apiCreateCustomField(
-  api: APIRequestContext,
-  name: string,
-  type: 'TEXT' | 'DATE' | 'SELECT' | 'CURRENCY' | 'BOOLEAN' = 'TEXT',
-  options: string[] = [],
-): Promise<{ id: number; name: string }> {
-  const res = await api.post('/api/customField/', {
-    data: {
-      name,
-      type,
-      description: '',
-      options: options.map((value) => ({ value, customFieldId: 0 })),
-    },
-  });
-  if (!res.ok()) {
-    throw new Error(
-      `create custom field failed: HTTP ${res.status()} ${await res.text()}`,
-    );
-  }
-  const customField = (await res.json()) as { id: number; name: string };
-  return { id: customField.id, name: customField.name };
-}
-
-/** Reads one custom field back, so a spec can assert what an edit persisted. */
-export async function apiGetCustomFieldById(
-  api: APIRequestContext,
-  id: number,
-): Promise<{
-  id: number;
-  name: string;
-  type: string;
-  description?: string;
-  options?: { id: number; value: string }[];
-}> {
-  const res = await api.get(`/api/customField/${id}`);
-  if (!res.ok()) {
-    throw new Error(
-      `get custom field failed: HTTP ${res.status()} ${await res.text()}`,
-    );
-  }
-  return res.json();
-}
-
-export async function apiDeleteCustomFieldById(
-  api: APIRequestContext,
-  id: number,
-): Promise<void> {
-  await warnOnFailedDelete(api, `/api/customField/${id}`, `custom field ${id}`);
-}
-
 export async function apiDeleteTagById(
   api: APIRequestContext,
   id: number,
@@ -757,6 +703,26 @@ export async function apiCreateCustomField(
   }
   const customField = (await res.json()) as { id: number; name: string };
   return { id: customField.id, name: customField.name };
+}
+
+/** Reads one custom field back, so a spec can assert what an edit persisted. */
+export async function apiGetCustomFieldById(
+  api: APIRequestContext,
+  id: number,
+): Promise<{
+  id: number;
+  name: string;
+  type: string;
+  description?: string;
+  options?: { id: number; value: string }[];
+}> {
+  const res = await api.get(`/api/customField/${id}`);
+  if (!res.ok()) {
+    throw new Error(
+      `get custom field failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  return res.json();
 }
 
 /** Deletes a custom field. Requires app.custom-fields.delete (admin-only). */

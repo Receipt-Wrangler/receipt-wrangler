@@ -115,14 +115,19 @@ test.describe('Edit custom fields (app.custom-fields.update)', () => {
     await admin.close();
 
     await withAdminApi(async (api) => {
-      editableField = await apiCreateCustomField(api, uniqueName('editable-field'));
-      untouchedField = await apiCreateCustomField(api, uniqueName('leftover-field'));
-      selectField = await apiCreateCustomField(
-        api,
-        uniqueName('select-field'),
-        'SELECT',
-        ['Option 1', 'Option 2'],
-      );
+      editableField = await apiCreateCustomField(api, {
+        name: uniqueName('editable-field'),
+        type: 'TEXT',
+      });
+      untouchedField = await apiCreateCustomField(api, {
+        name: uniqueName('leftover-field'),
+        type: 'TEXT',
+      });
+      selectField = await apiCreateCustomField(api, {
+        name: uniqueName('select-field'),
+        type: 'SELECT',
+        options: ['Option 1', 'Option 2'],
+      });
     });
 
     await captureSession(
