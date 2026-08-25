@@ -101,40 +101,41 @@
 <!-- Columns -->
 <app-report-section icon="view_column" headerText="Columns" subtitle="Dimensions, aggregates & formulas">
   @if (detailMode === ReportDetailMode.Records) {
-    <div class="report-config__note">
+    <div class="report-config__note" data-testid="report-columns-records-note">
       <mat-icon>info</mat-icon>
-      In Records mode columns are the receipt fields. Switch to Aggregate to define custom columns.
+      Each row is one receipt, so a dimension column shows that receipt's own value — it doesn't have to be
+      something you group by. Aggregates and formulas read a single receipt per row, and still roll up across
+      the subtotal and grand total rows.
     </div>
-  } @else {
-    @for (column of columnRows(); track column.id) {
-      <div class="report-config__list-row" [class.report-config__list-row--disabled]="column.disabled"
-        [attr.data-testid]="column.disabled ? 'report-column-disabled' : 'report-column-row'">
-        <span class="report-config__kind" [ngClass]="column.kindClass">
-          <mat-icon>{{ column.kindIcon }}</mat-icon>
-        </span>
-        <div class="report-config__col-text">
-          <div class="report-config__col-label">{{ column.label }}</div>
-          <div class="report-config__col-desc">{{ column.disabled ? column.disabledReason : column.description }}</div>
-        </div>
-        @if (column.isCustom) {
-          <span class="report-config__kind-badge report-config__custom-badge"
-            data-testid="report-column-custom">{{ customFieldBadge }}</span>
-        }
-        <span class="report-config__kind-badge" [ngClass]="column.kindClass">{{ column.kindLabel }}</span>
-        <app-button matButtonType="iconButton" icon="arrow_upward" tooltip="Move up" [disabled]="column.isFirst"
-          (clicked)="moveColumn(column.index, -1)" data-testid="report-column-up"></app-button>
-        <app-button matButtonType="iconButton" icon="arrow_downward" tooltip="Move down" [disabled]="column.isLast"
-          (clicked)="moveColumn(column.index, 1)" data-testid="report-column-down"></app-button>
-        <app-button matButtonType="iconButton" icon="edit" tooltip="Edit"
-          (clicked)="openColumnPicker(column.index)" data-testid="report-column-edit"></app-button>
-        <app-button matButtonType="iconButton" icon="close" color="warn" tooltip="Remove"
-          (clicked)="removeColumn(column.index)" data-testid="report-column-remove"></app-button>
-      </div>
-    }
-    <button type="button" class="report-config__add-block" (click)="openColumnPicker()" data-testid="report-add-column">
-      <mat-icon>add</mat-icon>Add column
-    </button>
   }
+  @for (column of columnRows(); track column.id) {
+    <div class="report-config__list-row" [class.report-config__list-row--disabled]="column.disabled"
+      [attr.data-testid]="column.disabled ? 'report-column-disabled' : 'report-column-row'">
+      <span class="report-config__kind" [ngClass]="column.kindClass">
+        <mat-icon>{{ column.kindIcon }}</mat-icon>
+      </span>
+      <div class="report-config__col-text">
+        <div class="report-config__col-label">{{ column.label }}</div>
+        <div class="report-config__col-desc">{{ column.disabled ? column.disabledReason : column.description }}</div>
+      </div>
+      @if (column.isCustom) {
+        <span class="report-config__kind-badge report-config__custom-badge"
+          data-testid="report-column-custom">{{ customFieldBadge }}</span>
+      }
+      <span class="report-config__kind-badge" [ngClass]="column.kindClass">{{ column.kindLabel }}</span>
+      <app-button matButtonType="iconButton" icon="arrow_upward" tooltip="Move up" [disabled]="column.isFirst"
+        (clicked)="moveColumn(column.index, -1)" data-testid="report-column-up"></app-button>
+      <app-button matButtonType="iconButton" icon="arrow_downward" tooltip="Move down" [disabled]="column.isLast"
+        (clicked)="moveColumn(column.index, 1)" data-testid="report-column-down"></app-button>
+      <app-button matButtonType="iconButton" icon="edit" tooltip="Edit"
+        (clicked)="openColumnPicker(column.index)" data-testid="report-column-edit"></app-button>
+      <app-button matButtonType="iconButton" icon="close" color="warn" tooltip="Remove"
+        (clicked)="removeColumn(column.index)" data-testid="report-column-remove"></app-button>
+    </div>
+  }
+  <button type="button" class="report-config__add-block" (click)="openColumnPicker()" data-testid="report-add-column">
+    <mat-icon>add</mat-icon>Add column
+  </button>
 </app-report-section>
 
 <!-- Totals -->

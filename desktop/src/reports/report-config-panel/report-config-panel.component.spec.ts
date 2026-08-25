@@ -281,6 +281,20 @@ describe("ReportConfigPanelComponent", () => {
     expect(total.disabled).toBe(false);
   });
 
+  it("columnRows leaves every dimension column enabled in records mode", () => {
+    columnsArray().push(buildColumnGroup(formBuilder, { kind: ReportColumn.KindEnum.Dimension, name: "Category", label: "Category", field: "category" }));
+
+    // The same config that disables the column in aggregate mode: summarizing by
+    // tag, no grouping. A record row reads the field off the receipt itself, so
+    // the column stays enabled and configurable.
+    form.get("detail.by")!.setValue("tag");
+    component.setDetailMode(ReportDetail.ModeEnum.Records);
+
+    const category = component.columnRows().find((row) => row.label === "Category")!;
+    expect(category.disabled).toBe(false);
+    expect(category.disabledReason).toBe("");
+  });
+
   // ---- parameters + document --------------------------------------------
 
   it("periodLabel resolves the preset, and reports a custom range with no dates", () => {
