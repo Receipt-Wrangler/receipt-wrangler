@@ -533,13 +533,16 @@ delivery paths, which the Jest specs cannot — they inject settings into a mock
   403 from `enforceReceiptCustomFieldSelection`). Verified to FAIL with the empty-check inverted.
 - Deleting a custom field prunes it from the group's stored set.
 
-Two `data-testid`s exist for it: **`autocomplete-clear`** on the shared `app-autocomlete`'s clear
-button and **`receipt-group`** on the receipt form's group picker. Both are load-bearing rather than
-convenience — a single-select autocomplete marks its input `readonly` once a value is chosen, so the
-group cannot be *changed* without clicking that clear button first, and a spec that skips it silently
-asserts against the old group. Note `getByTestId('receipt-manage-custom-fields').getByRole('button')`
-is a **strict-mode violation**: the `cdkMenuTrigger` also puts `role="button"` on the `<app-button>`
-host, so use `.locator('button')`.
+Three `data-testid`s were added for it, none of them pre-existing: **`autocomplete-clear`** on the
+shared `app-autocomlete`'s clear button, **`receipt-group`** on the receipt form's group picker, and
+**`receipt-manage-custom-fields`** on the form's "Manage custom fields" menu (which both
+`receipts.spec.ts` and `group-default-custom-fields.spec.ts` now use). The first two are load-bearing
+rather than convenience — a single-select autocomplete marks its input `readonly` once a value is
+chosen, so the group cannot be *changed* without clicking that clear button first, and a spec that
+skips it silently asserts against the old group. The third replaced a
+`button:has(mat-icon:has-text("list_alt"))` locator. Note
+`getByTestId('receipt-manage-custom-fields').getByRole('button')` is a **strict-mode violation**: the
+`cdkMenuTrigger` also puts `role="button"` on the `<app-button>` host, so use `.locator('button')`.
 
 ## Login QR (mobile app setup)
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
@@ -265,4 +266,168 @@ func TestUpdateGroupReceiptSettingsSerializesEmptyDefaultCustomFieldsAsArray(t *
 var _ = commands.UpdateGroupReceiptSettingsCommand{
 	DefaultCustomFieldIds:            &[]uint{},
 	ApplyDefaultCustomFieldsOnIngest: new(bool),
+}
+
+// The group serialization boundaries must all hydrate GroupReceiptSettings.DefaultCustomFieldIds.
+// It is `gorm:"-"`, so nothing loads it implicitly, and it carries no `omitempty` — an unhydrated
+// slice therefore serializes as `null` rather than being absent, which swagger does not allow (the
+// property is documented as always present) and which the generated Dart deserializer has no null
+// guard for. GetGroupsForUser, GetGroupById and UpdateGroupReceiptSettings already hydrate;
+// GetPagedGroups and CreateGroup are covered here.
+
+// rawDefaultCustomFieldIds pulls groupReceiptSettings.defaultCustomFieldIds out of a serialized
+// group as its RAW json value.
+//
+// Reading it raw is the whole point: `[]uint(nil)` and `[]uint{}` are indistinguishable once
+// unmarshalled back into the model, so a struct-level assertion passes whether or not the field was
+// hydrated. Decoded into `any`, encoding/json turns `null` into nil and `[]` into `[]any{}` — the
+// one place the difference survives.
+func rawDefaultCustomFieldIds(t *testing.T, group map[string]any) any {
+	t.Helper()
+
+	settings, ok := group["groupReceiptSettings"].(map[string]any)
+	if !ok {
+		t.Fatalf("serialized group carries no groupReceiptSettings object: %v", group)
+	}
+
+	value, present := settings["defaultCustomFieldIds"]
+	if !present {
+		t.Fatalf("groupReceiptSettings omits defaultCustomFieldIds entirely: %v", settings)
+	}
+
+	return value
+}
+
+// expectDefaultCustomFieldIds asserts the raw value is a json ARRAY holding exactly wantIds. A nil
+// (i.e. `null` on the wire) fails here, which is the regression being guarded.
+func expectDefaultCustomFieldIds(t *testing.T, group map[string]any, wantIds []uint) {
+	t.Helper()
+
+	raw := rawDefaultCustomFieldIds(t, group)
+	ids, ok := raw.([]any)
+	if !ok {
+		t.Errorf("defaultCustomFieldIds should serialize as an array, got %#v", raw)
+		return
+	}
+
+	if len(ids) != len(wantIds) {
+		t.Errorf("Expected %v, but got %v", wantIds, ids)
+		return
+	}
+
+	for i, want := range wantIds {
+		got, isNumber := ids[i].(float64)
+		if !isNumber || uint(got) != want {
+			t.Errorf("Expected %v, but got %v", wantIds, ids)
+			return
+		}
+	}
+}
+
+func TestGetPagedGroupsHydratesDefaultCustomFieldIds(t *testing.T) {
+	defer tearDownGroupTests()
+	db := repositories.GetDB()
+
+	// Two groups so both branches are covered in one response: one with a configured set, one
+	// with none — the second is the case that used to serialize as null.
+	configured := models.Group{Name: "aaa-paged-with-defaults"}
+	if err := db.Create(&configured).Error; err != nil {
+		t.Fatalf("seed configured group: %v", err)
+	}
+	bare := models.Group{Name: "bbb-paged-without-defaults"}
+	if err := db.Create(&bare).Error; err != nil {
+		t.Fatalf("seed bare group: %v", err)
+	}
+
+	settingsRepository := repositories.NewGroupReceiptSettingsRepository(nil)
+	for _, groupId := range []uint{configured.ID, bare.ID} {
+		if _, err := settingsRepository.CreateGroupReceiptSettings(groupId); err != nil {
+			t.Fatalf("seed group receipt settings: %v", err)
+		}
+	}
+
+	customFieldId := seedHandlerCustomField(t, "Paged Default Field")
+	if err := db.Create(&models.GroupReceiptSettingsCustomField{
+		GroupId:       configured.ID,
+		CustomFieldId: customFieldId,
+	}).Error; err != nil {
+		t.Fatalf("seed default custom field: %v", err)
+	}
+
+	grantAppPerms(t, 1, permissions.AppAccountRead)
+	grantGroupPerms(t, 1, configured.ID, permissions.GroupView)
+	grantGroupPerms(t, 1, bare.ID, permissions.GroupView)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api", bytes.NewReader([]byte(
+		`{"page":1,"pageSize":10,"orderBy":"name","sortDirection":"asc","filter":{"associatedGroup":"MINE"}}`,
+	)))
+	r = r.WithContext(context.WithValue(
+		r.Context(),
+		jwtmiddleware.ContextKey{},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
+	))
+
+	GetPagedGroups(w, r)
+
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+		return
+	}
+
+	var paged struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &paged); err != nil {
+		t.Fatalf("unmarshal paged response: %v", err)
+	}
+	if len(paged.Data) != 2 {
+		utils.PrintTestError(t, len(paged.Data), 2)
+		return
+	}
+
+	// Ordered by name ascending, so the configured group comes first.
+	expectDefaultCustomFieldIds(t, paged.Data[0], []uint{customFieldId})
+	expectDefaultCustomFieldIds(t, paged.Data[1], []uint{})
+}
+
+func TestCreateGroupHydratesDefaultCustomFieldIds(t *testing.T) {
+	defer tearDownGroupTests()
+
+	// CreateGroup makes the group's on-disk directory after marshalling the response, and the
+	// data root does not exist in the test package. Without it the handler 500s before writing
+	// the body this test is about. Removed again so the package leaves no untracked directory
+	// behind (api/.gitignore only covers api/data).
+	if err := os.MkdirAll("data", 0o755); err != nil {
+		t.Fatalf("create test data directory: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll("data") })
+
+	grantAppPerms(t, 1, permissions.AppGroupsCreate)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api", bytes.NewReader([]byte(
+		`{"name":"created-group","status":"ACTIVE","groupMembers":[]}`,
+	)))
+	r = r.WithContext(context.WithValue(
+		r.Context(),
+		jwtmiddleware.ContextKey{},
+		&validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}},
+	))
+
+	CreateGroup(w, r)
+
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Body.String(), http.StatusOK)
+		return
+	}
+
+	var group map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &group); err != nil {
+		t.Fatalf("unmarshal created group: %v", err)
+	}
+
+	// A brand-new group has no defaults, so the assertion is precisely that the empty case is an
+	// empty ARRAY rather than null.
+	expectDefaultCustomFieldIds(t, group, []uint{})
 }

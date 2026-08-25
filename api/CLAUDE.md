@@ -1300,9 +1300,16 @@ this screen. `UpdateGroupReceiptSettingsCommand.Validate` therefore checks nothi
   the PUT response would carry the *old* ids, which the desktop writes straight into its group state.
   Called at every boundary that serializes a group's receipt settings, mirroring the
   `LoadMemberGrantsFor*` call sites: `services/auth.go` (AppData, beside
-  `LoadMemberGrantsForGroups`), `handlers/groups.go` `GetGroupsForUser`, `repositories/groups.go`
-  `GetGroupById` (which `UpdateGroup` also returns through), `GetGroupReceiptSettingsByGroupId`, and
-  the `UpdateGroupReceiptSettings` return value.
+  `LoadMemberGrantsForGroups`), `handlers/groups.go` `GetGroupsForUser`, `GetPagedGroups` and
+  `CreateGroup`, `repositories/groups.go` `GetGroupById` (which `UpdateGroup` also returns through),
+  `GetGroupReceiptSettingsByGroupId`, and the `UpdateGroupReceiptSettings` return value.
+  - **The two easy ones to miss are `GetPagedGroups` and `CreateGroup`**, and both shipped without
+    the call at first. `GetPagedGroups` looks covered because it uses `Preload(clause.Associations)`
+    — which loads the settings *row* but cannot touch a `gorm:"-"` field — and its load must run
+    **before** the `anyData[i] = groups[i]` copy, which takes each group by value. `CreateGroup`
+    returns a `Find` that preloads only `GroupMembers`, so its settings object is zero-valued
+    **including `GroupId`**; set that first or the loader keys its lookup on group 0 and the empty
+    result is right by accident. Both are pinned by response-shape tests (below).
 - **An empty set must serialize as `[]`, never `null`.** `defaultCustomFieldIdsOrEmpty` normalizes it
   inside the loader (mirroring `grantIdsOrEmpty`) so every read path is covered at once. The
   generated Dart deserializer has **no null guard**, so a `null` would fail the **whole** AppData

@@ -62,6 +62,17 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// DefaultCustomFieldIds is `gorm:"-"`, so Preload(clause.Associations) loads the
+			// settings row but leaves the slice nil -- and it carries no omitempty, so a nil
+			// serializes as `null` rather than being absent. Swagger declares an array that is
+			// always present, and the generated Dart deserializer has no null guard. Hydrate
+			// BEFORE the copy below: anyData takes each group by value, so mutating afterwards
+			// would update rows nobody serializes.
+			if err := repositories.NewGroupReceiptSettingsRepository(nil).
+				LoadDefaultCustomFieldIdsForGroups(groups); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			anyData := make([]any, len(groups))
 			for i := 0; i < len(groups); i++ {
 				anyData[i] = groups[i]
@@ -239,6 +250,17 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 			// A brand-new group has no grants yet, but the response must still carry
 			// the empty arrays swagger declares rather than null.
 			if err := repositories.NewGroupMemberRepository(nil).LoadMemberGrantsForGroup(&group); err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// Same reasoning for the group's default custom fields, with one wrinkle: CreateGroup
+			// returns a Find that only preloads GroupMembers, so the settings object is zero-valued
+			// and its GroupId is 0. Set it first, or the loader keys the lookup on group 0 and the
+			// empty result would be right by accident rather than by computation.
+			group.GroupReceiptSettings.GroupId = group.ID
+			if err := repositories.NewGroupReceiptSettingsRepository(nil).LoadDefaultCustomFieldIds(
+				[]*models.GroupReceiptSettings{&group.GroupReceiptSettings},
+			); err != nil {
 				return http.StatusInternalServerError, err
 			}
 

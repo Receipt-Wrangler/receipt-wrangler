@@ -757,7 +757,13 @@ export async function apiSetGroupDefaultCustomFields(
   customFieldIds: number[],
   applyOnIngest?: boolean,
 ): Promise<void> {
-  const groups = (await (await api.get('/api/group/')).json()) as {
+  const groupsRes = await api.get('/api/group/');
+  if (!groupsRes.ok()) {
+    throw new Error(
+      `set default custom fields: GET /api/group/ failed: HTTP ${groupsRes.status()} ${await groupsRes.text()}`,
+    );
+  }
+  const groups = (await groupsRes.json()) as {
     id: number;
     groupReceiptSettings?: Record<string, unknown>;
   }[];
