@@ -230,6 +230,34 @@ dev libs must be installed by hand.
   the `AuthState.userRole`/`hasRole` selectors plus the group-member legacy-enum bridge are removed.
   See `api/CLAUDE.md` → "Roles & Permissions" and `desktop/CLAUDE.md`.
 
+### Group Default Custom Fields
+
+A group can declare custom fields that are **always pre-added** to its receipts, configured on
+**Group Receipt Settings**. This is a three-component feature; the pieces have to agree:
+
+- **Backend** owns the config and the cleanup — `GroupReceiptSettings.defaultCustomFieldIds` (a
+  `gorm:"-"` projection hydrated by an explicit batched loader, never a GORM hook) plus
+  `applyDefaultCustomFieldsOnIngest`, which attaches the set to receipts the **server** creates
+  (quick scan, email). Deleting a custom field removes it from every group's set. See
+  `api/CLAUDE.md` → "Group Default Custom Fields".
+- **Both clients apply the set on the receipt form**, on create and whenever the group changes, with
+  the same "smart swap" rule: an auto-added field that is still **empty** is dropped when you switch
+  away, anything you typed into or added by hand is kept, and the new group's missing defaults are
+  added. A field the user adds or removes by hand stops being auto-managed. See
+  `desktop/CLAUDE.md` → "Per-group default custom fields" and `mobile/CLAUDE.md` → "Group default
+  custom fields".
+- **Both clients gate on `app.custom-fields.read`.** The server's
+  `enforceReceiptCustomFieldSelection` **403s** any save that changes the set of attached custom
+  field ids for a caller without it, so auto-adding fields for such a user would make their receipts
+  unsaveable. Desktop checks the permission directly; mobile self-gates because its catalog fetch
+  403s into an empty list. The seeded Legacy User role holds the permission, so default installs are
+  unaffected — but this is why the feature is a no-op for a hand-built role that drops it.
+- **An empty set must serialize as `[]`, never `null`** — the generated Dart deserializer has no null
+  guard, so a null would fail the whole AppData payload on already-released Android builds.
+- **The command fields are pointers** (`*[]uint` / `*bool`): omitting a key leaves the stored value
+  alone. A client that hides the section must omit them rather than send zero values, or it wipes
+  another admin's configuration.
+
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
 - **Desktop**: NGXS store with actions/selectors, persistent storage for auth/preferences
