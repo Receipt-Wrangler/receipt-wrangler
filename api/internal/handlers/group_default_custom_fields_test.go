@@ -153,6 +153,33 @@ func TestUpdateGroupReceiptSettingsForbidsDefaultCustomFieldsWithoutCustomFields
 	}
 }
 
+// TestUpdateGroupReceiptSettingsForbidsIngestToggleWithoutCustomFieldsRead pins that the
+// app.custom-fields.read gate covers the ingest toggle, not just the id list. The toggle decides
+// whether the group's default fields ride every quick-scan and email receipt, so a caller who
+// cannot read the catalog must not be able to flip it -- gating only defaultCustomFieldIds would
+// let them change what those (to them invisible) fields do by sending this key alone.
+func TestUpdateGroupReceiptSettingsForbidsIngestToggleWithoutCustomFieldsRead(t *testing.T) {
+	defer tearDownGroupTests()
+
+	groupId := seedDefaultCustomFieldGroup(t, 1, false)
+
+	// Only the toggle - no defaultCustomFieldIds. This is the request that used to slip through.
+	w := callUpdateGroupReceiptSettings(t, 1, groupId,
+		`{`+baseSettingsBody+`,"applyDefaultCustomFieldsOnIngest":true}`)
+	if w.Result().StatusCode != http.StatusForbidden {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
+	}
+
+	settings, err := repositories.NewGroupReceiptSettingsRepository(nil).GetGroupReceiptSettingsByGroupId(groupId)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if settings.ApplyDefaultCustomFieldsOnIngest {
+		utils.PrintTestError(t, settings.ApplyDefaultCustomFieldsOnIngest, false)
+	}
+}
+
 // TestUpdateGroupReceiptSettingsOmittingDefaultCustomFieldKeysLeavesConfigUntouched is the reason
 // both command fields are pointers: the desktop hides this whole section from an admin without
 // app.custom-fields.read, so its payload omits both keys. A non-pointer bool would unmarshal as

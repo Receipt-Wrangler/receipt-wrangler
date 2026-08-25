@@ -983,5 +983,68 @@ describe("ReceiptFormComponent", () => {
 
       expect(attachedIds()).toEqual([1, 2]);
     });
+
+    // Magic fill and group defaults interact: the default has already put an EMPTY
+    // control on the form, so a plain "skip what's present" would drop the magic
+    // value for exactly the fields a group pre-adds.
+    describe("magic fill interaction", () => {
+      const magicFillWith = (customFields: any[]): void => {
+        // magicFill() reads the carousel viewChild for the current image index and,
+        // in add mode, the file at that index off filesToUpload.
+        Object.defineProperty(component, "carouselComponent", {
+          value: () => ({ currentlyShownImageIndex: 0 }),
+          configurable: true,
+        });
+        component.filesToUpload.set([{ file: new Blob() } as any]);
+        jest
+          .spyOn(TestBed.inject(ReceiptImageService), "magicFillReceipt")
+          .mockReturnValue(of({ customFields } as any));
+        jest
+          .spyOn(TestBed.inject(SnackbarService), "success")
+          .mockReturnValue(undefined);
+        component.magicFill();
+      };
+
+      it("fills a blank auto-applied default instead of discarding the value", () => {
+        openAddForm("1");
+        expect(attachedIds()).toEqual([1]);
+
+        magicFillWith([{ customFieldId: 1, stringValue: "R&D" }]);
+
+        expect(attachedIds()).toEqual([1]);
+        expect(component.customFieldsFormArray.at(0).value.stringValue).toEqual("R&D");
+        expect(menuItemFor(1).selected).toBe(true);
+      });
+
+      it("does not overwrite a default the user already typed into", () => {
+        openAddForm("1");
+        component.customFieldsFormArray.at(0).get("stringValue")!.setValue("mine");
+
+        magicFillWith([{ customFieldId: 1, stringValue: "R&D" }]);
+
+        expect(component.customFieldsFormArray.at(0).value.stringValue).toEqual("mine");
+      });
+
+      // Filling it makes it the user's data, so the swap must stop managing it.
+      it("keeps a magic-filled default when the group then changes", () => {
+        openAddForm("1");
+        magicFillWith([{ customFieldId: 1, stringValue: "R&D" }]);
+
+        component.form.get("groupId")!.setValue(2);
+
+        expect(attachedIds()).toEqual([1, 2]);
+        expect(component.customFieldsFormArray.at(0).value.stringValue).toEqual("R&D");
+      });
+
+      it("still appends a magic value for a field not already on the form", () => {
+        openAddForm("3");
+        expect(attachedIds()).toEqual([]);
+
+        magicFillWith([{ customFieldId: 2, stringValue: "PO-1" }]);
+
+        expect(attachedIds()).toEqual([2]);
+        expect(component.customFieldsFormArray.at(0).value.stringValue).toEqual("PO-1");
+      });
+    });
   });
 });

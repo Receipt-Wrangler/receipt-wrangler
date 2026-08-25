@@ -158,24 +158,3 @@ List<api.UpsertCustomFieldValueCommand> buildCustomFieldValueUpsertCommands({
         .build();
   }).toList();
 }
-
-/// The in-memory twin of [buildCustomFieldValueUpsertCommands]: refreshes the
-/// receipt's attached [api.CustomFieldValue]s from the live form, keeping the
-/// same entries (and their ids / audit fields) and applying the same
-/// empty-is-meaningful and missing-template rules.
-List<api.CustomFieldValue> buildCustomFieldValues({
-  required Iterable<api.CustomFieldValue> attachedValues,
-  required List<api.CustomField> customFields,
-  required Map<String, dynamic> form,
-}) {
-  return attachedValues.map((attachedValue) {
-    var columns = _resolveColumns(attachedValue, customFields, form);
-
-    return attachedValue.rebuild((b) => b
-      ..stringValue = columns.stringValue
-      ..dateValue = columns.dateValue
-      ..selectValue = columns.selectValue
-      ..currencyValue = columns.currencyValue
-      ..booleanValue = columns.booleanValue);
-  }).toList();
-}

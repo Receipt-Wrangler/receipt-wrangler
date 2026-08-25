@@ -410,12 +410,17 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
-			// The endpoint is gated on GroupUpdate only. Configuring the group's default custom
-			// fields additionally requires app.custom-fields.read, mirroring
+			// The endpoint is gated on GroupUpdate only. Touching the group's default custom field
+			// configuration additionally requires app.custom-fields.read, mirroring
 			// enforceReceiptCustomFieldSelection: without it a group admin could attach fields
-			// whose catalog they are not allowed to read. A nil pointer means the client did not
-			// touch the selection, so it stays allowed.
-			if command.DefaultCustomFieldIds != nil {
+			// whose catalog they are not allowed to read.
+			//
+			// This covers the ingest toggle as well as the selection. The toggle decides whether
+			// the (to that caller invisible) default set gets attached to every quick-scan and
+			// email receipt, so gating only the id list would leave a caller without the
+			// permission able to change what those fields do. Both are pointers, so a nil one
+			// means the client did not touch that key and stays allowed.
+			if command.DefaultCustomFieldIds != nil || command.ApplyDefaultCustomFieldsOnIngest != nil {
 				token := structs.GetClaims(r)
 				canReadCustomFields, err := services.NewPermissionService(nil).
 					HasAppPermissions(token.UserId, permissions.AppCustomFieldsRead)
@@ -431,13 +436,17 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 					return 0, nil
 				}
 
-				vErr, err := validateDefaultCustomFieldIds(*command.DefaultCustomFieldIds)
-				if err != nil {
-					return http.StatusInternalServerError, err
-				}
-				if len(vErr.Errors) > 0 {
-					structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
-					return 0, nil
+				// Scoped to the selection: a toggle-only request has no ids to validate, and
+				// dereferencing the nil pointer here would panic.
+				if command.DefaultCustomFieldIds != nil {
+					vErr, err := validateDefaultCustomFieldIds(*command.DefaultCustomFieldIds)
+					if err != nil {
+						return http.StatusInternalServerError, err
+					}
+					if len(vErr.Errors) > 0 {
+						structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
+						return 0, nil
+					}
 				}
 			}
 

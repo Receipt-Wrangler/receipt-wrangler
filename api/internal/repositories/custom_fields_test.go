@@ -955,8 +955,21 @@ func TestShouldGetCustomFieldsByIds(t *testing.T) {
 		utils.PrintTestError(t, empty, "an empty, non-nil slice")
 	}
 
+	// Resolve the seeded ids rather than assuming 1 and 3: setupCustomFieldRepositoryTest only
+	// creates rows, it never truncates, so the ids are whatever the sequence is at.
+	db := GetDB()
+	var textField, selectField models.CustomField
+	if err := db.Where("name = ?", "Test Text Field").First(&textField).Error; err != nil {
+		utils.PrintTestError(t, err, "the seeded TEXT field")
+		return
+	}
+	if err := db.Where("name = ?", "Test Select Field").First(&selectField).Error; err != nil {
+		utils.PrintTestError(t, err, "the seeded SELECT field")
+		return
+	}
+
 	// Unknown ids are simply absent, which is what lets the handler detect them by comparison.
-	found, err := repository.GetCustomFieldsByIds([]uint{1, 3, 9999})
+	found, err := repository.GetCustomFieldsByIds([]uint{textField.ID, selectField.ID, 9999})
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 		return
@@ -966,8 +979,8 @@ func TestShouldGetCustomFieldsByIds(t *testing.T) {
 		return
 	}
 	for _, customField := range found {
-		if customField.ID != 1 && customField.ID != 3 {
-			utils.PrintTestError(t, customField.ID, "1 or 3")
+		if customField.ID != textField.ID && customField.ID != selectField.ID {
+			utils.PrintTestError(t, customField.ID, "the seeded TEXT or SELECT field id")
 		}
 		if len(customField.Name) == 0 {
 			utils.PrintTestError(t, customField, "a custom field carrying its name")

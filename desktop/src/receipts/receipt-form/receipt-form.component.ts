@@ -775,6 +775,11 @@ export class ReceiptFormComponent implements OnInit {
   // catalog pool (otherwise it can't be rendered or edited); a field the receipt
   // already has a value for is skipped to avoid duplicates. Returns whether any
   // were added.
+  //
+  // A control the group's defaults auto-added is a special case: it is already on
+  // the form but still EMPTY, so plain "skip what's present" would silently drop
+  // the magic value for exactly the fields a group pre-adds. Those get filled in
+  // place instead. Anything the user typed into, or added by hand, is left alone.
   private patchMagicCustomFields(magicReceipt: Receipt): boolean {
     const values = magicReceipt.customFields ?? [];
     if (values.length === 0) {
@@ -783,6 +788,11 @@ export class ReceiptFormComponent implements OnInit {
 
     let filledAny = false;
     values.forEach((value) => {
+      if (this.fillEmptyAutoAppliedCustomField(value)) {
+        filledAny = true;
+        return;
+      }
+
       if (!this.addCustomFieldControl(value.customFieldId, value)) {
         return;
       }
@@ -791,6 +801,38 @@ export class ReceiptFormComponent implements OnInit {
       filledAny = true;
     });
     return filledAny;
+  }
+
+  // Fills a still-empty, auto-applied custom field control with [value], returning
+  // whether it did. The control is REPLACED rather than patched so it goes through
+  // buildCustomOptionFormGroup's `?? null` / `?? false` normalization, like every
+  // other creation path - patchValue with a partially populated CustomFieldValue
+  // would write undefined into the value columns it doesn't carry.
+  //
+  // Filling it makes it the user's data, so it leaves autoAppliedCustomFieldIds and
+  // a later group switch will no longer drop it.
+  private fillEmptyAutoAppliedCustomField(value: CustomFieldValue): boolean {
+    if (!this.autoAppliedCustomFieldIds.has(value.customFieldId)) {
+      return false;
+    }
+
+    const index = this.findCustomFieldControlIndex(value.customFieldId);
+    if (index < 0) {
+      return false;
+    }
+
+    const control = this.customFieldsFormArray.at(index);
+    if (!this.isCustomFieldControlEmpty(control)) {
+      return false;
+    }
+
+    this.customFieldsFormArray.setControl(
+      index,
+      this.buildCustomOptionFormGroup(value)
+    );
+    this.autoAppliedCustomFieldIds.delete(value.customFieldId);
+    this.markCustomFieldMenuItemSelected(value.customFieldId);
+    return true;
   }
 
   // Appends a control for [customFieldId] to the custom fields form array,

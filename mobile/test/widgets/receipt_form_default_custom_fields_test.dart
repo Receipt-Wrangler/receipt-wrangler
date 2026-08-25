@@ -84,9 +84,12 @@ api.Receipt _receiptInGroup(int groupId, {int id = 0}) =>
 Finder _dropdown(String name) =>
     find.byWidgetPredicate((w) => w is FormBuilderDropdown && w.name == name);
 
-Finder _customFieldWidget(int customFieldId) => find.byWidgetPredicate(
-      (w) => w is CustomFieldWidget && w.customField.id == customFieldId,
-    );
+/// Locates a custom field row by the ValueKey the receipt form stamps on it,
+/// rather than by widget type -- per mobile/CLAUDE.md, prefer find.byKey where a
+/// key exists. (The FormBuilder field finders below stay name-predicates: those
+/// fields carry no Key, which is the documented exception.)
+Finder _customFieldWidget(int customFieldId) =>
+    find.byKey(ValueKey('customFieldValue_$customFieldId'));
 
 Finder _textInput(int customFieldId) => find.byWidgetPredicate(
       (w) => w is FormBuilderTextField && w.name == 'customField_$customFieldId',
