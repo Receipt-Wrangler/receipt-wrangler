@@ -51,9 +51,7 @@ test.describe('Report Builder — configuration', () => {
 
   test('the columns section stays configurable in both detail modes', async ({ page }) => {
     const note = page.getByTestId('report-columns-records-note');
-    // The "aggregate by" picker is a bare span + unlabelled app-select, so it has
-    // no accessible name — locate it by its own text.
-    const aggregateBy = page.getByText('aggregate by', { exact: true });
+    const aggregateBy = page.getByTestId('report-detail-aggregate-by');
 
     // Default is Aggregate: columns are editable, and the records hint is absent.
     await expect(page.getByTestId('report-add-column')).toBeVisible();
