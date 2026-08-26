@@ -81,6 +81,14 @@ export interface SystemSettings {
      * Server/API URL mobile clients connect to; encoded into the login QR\'s deep link
      */
     mobileServerUrl?: string;
+    /**
+     * How long a refresh token stays valid, in hours. Refresh tokens rotate on every use, so this is how long a user can be away and still return signed in, not an absolute session cap. 1-720 (30 days); 0 means unset and falls back to the default.
+     */
+    refreshTokenValidForHours?: number;
+    /**
+     * The same for MCP/OAuth connector refresh tokens, kept separate so a long window chosen for human convenience does not extend third-party client tokens. 1-720 (30 days); 0 means unset and falls back to the default.
+     */
+    mcpRefreshTokenValidForHours?: number;
 }
 export namespace SystemSettings {
 }

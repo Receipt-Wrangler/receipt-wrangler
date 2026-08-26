@@ -5,3 +5,4 @@ export * from "./permission.utils";
 export * from "./sort-by-displayname";
 export * from "./status.utils";
 export * from "./app-data.utill";
+export * from "./duration.utils";

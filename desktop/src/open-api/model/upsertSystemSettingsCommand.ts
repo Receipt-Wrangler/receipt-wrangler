@@ -70,6 +70,14 @@ export interface UpsertSystemSettingsCommand {
      * Server/API URL mobile clients connect to; encoded into the login QR\'s deep link
      */
     mobileServerUrl?: string;
+    /**
+     * How long a refresh token stays valid, in hours. 0 means unset and falls back to the default of 24.
+     */
+    refreshTokenValidForHours?: number;
+    /**
+     * How long an MCP/OAuth connector refresh token stays valid, in hours. 0 means unset and falls back to the default of 24.
+     */
+    mcpRefreshTokenValidForHours?: number;
 }
 export namespace UpsertSystemSettingsCommand {
 }

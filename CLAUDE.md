@@ -210,6 +210,13 @@ dev libs must be installed by hand.
 - Desktop stores tokens via NGXS persistent storage
 - Mobile uses `flutter_secure_storage` for secure token storage
 - All API endpoints except `/api/auth/login` and `/api/auth/signup` require authentication
+- **The refresh-token lifetime is a System Setting** (`refreshTokenValidForHours`, plus a separate
+  `mcpRefreshTokenValidForHours` for connector tokens) so each install can pick its own security
+  posture. Because refresh tokens rotate on every use, it is an **inactivity timeout, not an
+  absolute session cap**. The **access token is deliberately fixed at 20 minutes** — both clients
+  size their 15-minute proactive refresh timer against it, and neither client needed any change for
+  this. See `api/CLAUDE.md` → "Session lifetime" and `desktop/CLAUDE.md` → "Session lifetime
+  settings".
 
 ### Authorization (Roles & Permissions)
 - A configurable role system layers on top of auth: administrators define **app-level** and

@@ -1108,6 +1108,63 @@ Claude can read a user's data. It is **off by default** and Go-native (no separa
 - **Production**: `docker/default.conf` proxies the new root paths to the backend; the `/mcp`
   location disables buffering and raises the read timeout for SSE streams.
 
+## Session lifetime (configurable refresh-token expiry)
+
+How long a signed-in user stays signed in is an admin setting rather than a compile-time constant.
+Two System Settings drive it (`models.SystemSettings`, edited via the System Settings UI, validated
+in `commands.UpsertSystemSettingsCommand.Validate`):
+
+- `refreshTokenValidForHours` (int, default 24) — the REST/app refresh-token lifetime.
+- `mcpRefreshTokenValidForHours` (int, default 24) — the same for MCP/OAuth connector tokens, kept
+  **separate on purpose** so a long window chosen for human convenience does not silently extend
+  tokens held by third-party clients.
+
+Both are **whole hours**, bounded to **1-720 (30 days)**, and `0` means "unset, use the default"
+(the `pdfDpi` convention) so a client that omits the field is tolerated rather than 400'd.
+
+**It is an inactivity timeout, not an absolute session cap.** Refresh tokens rotate on every use and
+both clients proactively refresh on a 15-minute timer, so an actively-used session re-mints itself
+indefinitely; the window only bites once a client has been away longer than it. There is no
+absolute cap — adding one would need a session-start timestamp threaded through every rotation.
+A useful corollary: **lowering** the setting takes effect for active sessions at their next refresh
+(~15 min), so only genuinely idle sessions coast on their original expiry. Nothing is bulk-revoked.
+
+**The access token is deliberately NOT configurable** and stays at 20 minutes
+(`utils.GetAccessTokenExpiryDate`). It is stateless and unrevocable, and both clients size their
+15-minute refresh timer against that fixed window — making it configurable would break them and
+widen the blast radius of a leaked token. This is also why `oauth.accessTokenExpiresIn` (the OAuth
+`expires_in`, RFC 6749 — which describes the access token only) still mirrors 20 minutes correctly.
+
+**Where the value is resolved.** `internal/utils` imports nothing from `internal/`, so it cannot
+read System Settings without an import cycle; `utils.GetRefreshTokenExpiryDate(lifetime)` therefore
+takes the duration as a parameter. `services.GetRefreshTokenLifetime()` /
+`GetMcpRefreshTokenLifetime()` do the live read and hand it to `generateTokenPair`, falling back to
+24h on error/unset/out-of-range via `clampRefreshTokenLifetime` — the same clamp-with-fallback shape
+as `repositories.pdfRasterizationDpi`. **The clamp, not the validator, is the real safety net**: it
+stops a bad stored value from ever producing a token regardless of how it got there. The bounds
+themselves live in `commands` (`Min`/`MaxRefreshTokenValidForHours`) and are imported by `services`,
+so validation and the clamp cannot drift. `BuildTokenCookies` resolves the app lifetime itself for
+the refresh cookie's `Expires` — both its call sites (login, token refresh) are REST-only, never
+MCP.
+
+The `@every 24h` refresh-token cleanup cron is unaffected: it deletes on `is_used = true` as well as
+expiry, and rotation marks the previous token used immediately, so the table stays small at any TTL.
+
+**Refresh-token consumption is atomic.** `middleware.RevokeRefreshToken` marks the token used with a
+single `UPDATE ... WHERE token = ? AND is_used = false` and checks `RowsAffected`, mirroring
+`oauth.rotateRefreshToken`. It used to read then update separately, which let two concurrent
+refreshes both observe `is_used = false` and rotate — defeating replay detection, and logging the
+loser out of every tab once the rotation it lost landed. Unknown and already-used tokens are
+deliberately indistinguishable (both already returned the same response). Guarded by
+`TestRevokeRefreshToken_ConcurrentRefreshesOnlyOneSucceeds`.
+
+Tests: `services/refresh_token_lifetime_test.go` (clamp table, per-field isolation, expiry stamped
+on both the JWT claim and the persisted row, MCP using its own setting, access token unchanged),
+`commands/upsert_system_settings_command_test.go` (bounds + the `0` escape hatch),
+`middleware/refresh_token_test.go` (the concurrency guard), `utils/auth_test.go` (the helper honors
+whatever lifetime it is handed), and `desktop/e2e/session-lifetime.spec.ts` (the only end-to-end
+proof that the setting reaches the `Set-Cookie` header).
+
 ## Login QR & mobile deep link
 
 The desktop login page can show a self-contained QR that sets up the mobile app. Two System Settings

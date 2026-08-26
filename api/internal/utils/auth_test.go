@@ -97,23 +97,33 @@ func TestHashPasswordShouldProduceDifferentHashesForSamePassword(t *testing.T) {
 	}
 }
 
-func TestGetRefreshTokenExpiryDateShouldReturn24HoursFromNow(t *testing.T) {
-	before := time.Now().Truncate(time.Second)
-	expiryDate := GetRefreshTokenExpiryDate()
-	after := time.Now().Add(time.Second).Truncate(time.Second)
-
-	if expiryDate == nil {
-		t.Errorf("Expected non-nil expiry date, got nil")
-		return
+func TestGetRefreshTokenExpiryDateShouldHonorTheGivenLifetime(t *testing.T) {
+	// The lifetime is configurable per install (System Settings), so this helper
+	// must apply whatever it is handed rather than a baked-in constant.
+	lifetimes := map[string]time.Duration{
+		"one hour":             time.Hour,
+		"the default 24 hours": 24 * time.Hour,
+		"the 30 day maximum":   720 * time.Hour,
 	}
 
-	expected24HoursFromBefore := before.Add(24 * time.Hour)
-	expected24HoursFromAfter := after.Add(24 * time.Hour)
+	for name, lifetime := range lifetimes {
+		t.Run(name, func(t *testing.T) {
+			before := time.Now().Truncate(time.Second)
+			expiryDate := GetRefreshTokenExpiryDate(lifetime)
+			after := time.Now().Add(time.Second).Truncate(time.Second)
 
-	// The expiry date should be between 24 hours from before and 24 hours from after
-	// JWT NumericDate has second precision, so we truncate comparisons to seconds
-	if expiryDate.Time.Before(expected24HoursFromBefore) || expiryDate.Time.After(expected24HoursFromAfter) {
-		t.Errorf("Expected expiry date to be approximately 24 hours from now, got %v", expiryDate.Time)
+			if expiryDate == nil {
+				t.Errorf("Expected non-nil expiry date, got nil")
+				return
+			}
+
+			// The expiry date should be between <lifetime> from before and <lifetime>
+			// from after. JWT NumericDate has second precision, so we truncate
+			// comparisons to seconds.
+			if expiryDate.Time.Before(before.Add(lifetime)) || expiryDate.Time.After(after.Add(lifetime)) {
+				t.Errorf("Expected expiry date to be approximately %v from now, got %v", lifetime, expiryDate.Time)
+			}
+		})
 	}
 }
 

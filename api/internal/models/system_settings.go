@@ -29,4 +29,14 @@ type SystemSettings struct {
 	// MobileServerUrl is the server/API URL mobile clients connect to. It is
 	// encoded (in the login QR's deep link) so scanning it sets up the app.
 	MobileServerUrl string `json:"mobileServerUrl"`
+	// RefreshTokenValidForHours is how long a refresh token stays valid, i.e. how
+	// long a user can be away and still return signed in. Refresh tokens rotate on
+	// every use, so this is an inactivity window rather than an absolute session
+	// cap. Zero means "unset" and falls back to the built-in default.
+	RefreshTokenValidForHours int `json:"refreshTokenValidForHours" gorm:"default:24"`
+	// McpRefreshTokenValidForHours is the same for MCP/OAuth connector tokens. It
+	// is kept separate from RefreshTokenValidForHours so a long window chosen for
+	// human convenience does not silently extend tokens held by third-party
+	// clients. Zero means "unset" and falls back to the built-in default.
+	McpRefreshTokenValidForHours int `json:"mcpRefreshTokenValidForHours" gorm:"default:24"`
 }

@@ -21,7 +21,8 @@ import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 import { SnackbarService } from "../../services";
 import { SetFeatureConfig } from "../../store";
 import { SetCurrencyData, SetCurrencyDisplay } from "../../store/system-settings.state.actions";
-import { absoluteUrlValidator } from "../../validators";
+import { DurationUnit, maxForUnit, splitHours, toHours } from "../../utils";
+import { absoluteUrlValidator, durationValueValidator } from "../../validators";
 
 interface QueueData extends FormOption {
   description: string;
@@ -69,6 +70,22 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       value: QueueName.QuickScan,
       displayValue: "Quick Scan",
       description: "Processes quick scan receipts"
+    }
+  ];
+
+  // The backend caps a refresh-token lifetime at 720 hours (30 days) and treats
+  // 0 as "unset, use the default". Mirrored here so the form rejects what the
+  // server would reject.
+  public static readonly MAX_TOKEN_LIFETIME_HOURS = 720;
+
+  public readonly durationUnits: FormOption[] = [
+    {
+      displayValue: "Hours",
+      value: "HOURS"
+    },
+    {
+      displayValue: "Days",
+      value: "DAYS"
     }
   ];
 
@@ -126,6 +143,9 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
   }
 
   private initForm(): void {
+    const refreshTokenLifetime = splitHours(this.originalSystemSettings?.refreshTokenValidForHours);
+    const mcpRefreshTokenLifetime = splitHours(this.originalSystemSettings?.mcpRefreshTokenValidForHours);
+
     this.form = this.formBuilder.group({
       enableLocalSignUp: [this.originalSystemSettings?.enableLocalSignUp],
       debugOcr: [this.originalSystemSettings?.debugOcr],
@@ -144,6 +164,12 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       mcpPublicUrl: [this.originalSystemSettings?.mcpPublicUrl],
       showLoginQr: [this.originalSystemSettings?.showLoginQr],
       mobileServerUrl: [this.originalSystemSettings?.mobileServerUrl],
+      // Form-only controls. The API stores hours; the unit is presentation and
+      // is folded back into `<name>Hours` in submit().
+      refreshTokenValidForValue: [refreshTokenLifetime.value],
+      refreshTokenValidForUnit: [refreshTokenLifetime.unit],
+      mcpRefreshTokenValidForValue: [mcpRefreshTokenLifetime.value],
+      mcpRefreshTokenValidForUnit: [mcpRefreshTokenLifetime.unit],
     });
 
     if (this.inputReadonlyPipe.transform(this.formConfig.mode)) {
@@ -157,12 +183,40 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       this.form.get("mcpPublicUrl")?.disable();
       this.form.get("showLoginQr")?.disable();
       this.form.get("mobileServerUrl")?.disable();
+      this.form.get("refreshTokenValidForValue")?.disable();
+      this.form.get("refreshTokenValidForUnit")?.disable();
+      this.form.get("mcpRefreshTokenValidForValue")?.disable();
+      this.form.get("mcpRefreshTokenValidForUnit")?.disable();
     }
 
     this.listenForReceiptProcessingSettingsChanges();
     this.listenForHideDecimalPlacesChanges();
     this.listenForMcpEnabledChanges();
     this.listenForShowLoginQrChanges();
+    this.listenForDurationUnitChanges("refreshTokenValidForValue", "refreshTokenValidForUnit");
+    this.listenForDurationUnitChanges("mcpRefreshTokenValidForValue", "mcpRefreshTokenValidForUnit");
+  }
+
+  // The maximum depends on the selected unit (720 hours === 30 days), so the
+  // value control's validators are re-applied whenever the unit flips. Like
+  // urlValidators() below, setValidators replaces the whole list, so required
+  // has to be re-supplied each time rather than declared in initForm.
+  private listenForDurationUnitChanges(valueControlName: string, unitControlName: string): void {
+    const valueControl = this.form.get(valueControlName);
+
+    this.form.get(unitControlName)?.valueChanges
+      .pipe(
+        startWith(this.form.get(unitControlName)?.value),
+        untilDestroyed(this),
+        tap((unit: DurationUnit) => {
+          valueControl?.setValidators([
+            Validators.required,
+            durationValueValidator(maxForUnit(SystemSettingsFormComponent.MAX_TOKEN_LIFETIME_HOURS, unit)),
+          ]);
+          valueControl?.updateValueAndValidity({ emitEvent: false });
+        })
+      )
+      .subscribe();
   }
 
   // TODO: finish implementing UI for taskQueueConfigurations
@@ -272,6 +326,20 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
 
   public submit(): void {
     const formValue = this.form.getRawValue();
+    // Fold the value/unit pairs back into the hours the API stores, then drop
+    // the presentation-only controls so they never reach the wire.
+    formValue["refreshTokenValidForHours"] = toHours(
+      formValue["refreshTokenValidForValue"],
+      formValue["refreshTokenValidForUnit"]
+    );
+    formValue["mcpRefreshTokenValidForHours"] = toHours(
+      formValue["mcpRefreshTokenValidForValue"],
+      formValue["mcpRefreshTokenValidForUnit"]
+    );
+    delete formValue["refreshTokenValidForValue"];
+    delete formValue["refreshTokenValidForUnit"];
+    delete formValue["mcpRefreshTokenValidForValue"];
+    delete formValue["mcpRefreshTokenValidForUnit"];
     formValue["emailPollingInterval"] = Number.parseInt(formValue["emailPollingInterval"]);
     formValue["taskConcurrency"] = Number.parseInt(formValue["taskConcurrency"]);
     formValue["pdfDpi"] = Number.parseInt(formValue["pdfDpi"]);

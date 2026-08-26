@@ -10,6 +10,14 @@ import (
 	"strings"
 )
 
+// Bounds on the configurable refresh-token lifetimes. They live here rather than
+// alongside the resolver in services/ because internal/commands cannot import
+// internal/services, and the validation and the read-side clamp must agree.
+const (
+	MinRefreshTokenValidForHours = 1
+	MaxRefreshTokenValidForHours = 720 // 30 days
+)
+
 type UpsertSystemSettingsCommand struct {
 	EnableLocalSignUp                   bool                                  `json:"enableLocalSignUp"`
 	DebugOcr                            bool                                  `json:"debugOcr"`
@@ -29,6 +37,8 @@ type UpsertSystemSettingsCommand struct {
 	McpPublicUrl                        string                                `json:"mcpPublicUrl"`
 	ShowLoginQr                         bool                                  `json:"showLoginQr"`
 	MobileServerUrl                     string                                `json:"mobileServerUrl"`
+	RefreshTokenValidForHours           int                                   `json:"refreshTokenValidForHours"`
+	McpRefreshTokenValidForHours        int                                   `json:"mcpRefreshTokenValidForHours"`
 }
 
 func (command *UpsertSystemSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -112,7 +122,32 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 		errorMap["mobileServerUrl"] = "Mobile server URL must be an absolute URL like https://receipts.example.com/api"
 	}
 
+	if msg := validateRefreshTokenValidForHours(command.RefreshTokenValidForHours); len(msg) > 0 {
+		errorMap["refreshTokenValidForHours"] = msg
+	}
+
+	if msg := validateRefreshTokenValidForHours(command.McpRefreshTokenValidForHours); len(msg) > 0 {
+		errorMap["mcpRefreshTokenValidForHours"] = msg
+	}
+
 	return vErr
+}
+
+// validateRefreshTokenValidForHours bounds a refresh-token lifetime, returning an
+// empty string when the value is acceptable. Zero is deliberately allowed and
+// means "unset": the read side falls back to the built-in default, so a client
+// that omits the field (an older desktop build, say) is tolerated rather than
+// rejected. Shared by the app and MCP settings so the two cannot drift.
+func validateRefreshTokenValidForHours(hours int) string {
+	if hours == 0 {
+		return ""
+	}
+
+	if hours < MinRefreshTokenValidForHours || hours > MaxRefreshTokenValidForHours {
+		return "Refresh token lifetime must be between 1 and 720 hours (30 days)"
+	}
+
+	return ""
 }
 
 // isValidAbsoluteUrl reports whether the value is an absolute http(s) URL.

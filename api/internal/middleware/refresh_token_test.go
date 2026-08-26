@@ -13,6 +13,8 @@ import (
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/utils"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -343,5 +345,57 @@ func TestRevokeRefreshToken_UsesContextValue(t *testing.T) {
 	}
 	if w.Result().StatusCode != http.StatusOK {
 		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+	}
+}
+
+// Refresh tokens are single-use. Consumption used to be a read followed by a
+// separate update, so two concurrent refreshes of the same token could both see
+// is_used = false and rotate — defeating replay detection, and logging the loser
+// out of every tab once the rotation it lost landed. Exactly one racer must win.
+func TestRevokeRefreshToken_ConcurrentRefreshesOnlyOneSucceeds(t *testing.T) {
+	defer teardownAuthTest()
+	setupAuthTest()
+
+	user := newRefreshUser(t)
+	raw := seedRefreshToken(t, user.ID, false)
+
+	const racers = 8
+	var passed atomic.Int32
+	var start sync.WaitGroup
+	var done sync.WaitGroup
+	start.Add(1)
+
+	for i := 0; i < racers; i++ {
+		done.Add(1)
+		go func() {
+			defer done.Done()
+
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				passed.Add(1)
+				w.WriteHeader(http.StatusOK)
+			})
+
+			r := httptest.NewRequest(http.MethodPost, "/api/refresh", nil)
+			r.AddCookie(&http.Cookie{Name: constants.RefreshTokenKey, Value: raw})
+			w := httptest.NewRecorder()
+
+			start.Wait()
+			RevokeRefreshToken(next).ServeHTTP(w, r)
+		}()
+	}
+
+	start.Done()
+	done.Wait()
+
+	if got := passed.Load(); got != 1 {
+		utils.PrintTestError(t, got, "exactly 1 racer to pass through")
+	}
+
+	var dbToken models.RefreshToken
+	if err := repositories.GetDB().Where("token = ?", utils.Sha256Hash([]byte(raw))).First(&dbToken).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if !dbToken.IsUsed {
+		utils.PrintTestError(t, dbToken.IsUsed, true)
 	}
 }

@@ -31,6 +31,8 @@ Name | Type | Description | Notes
 **mcpPublicUrl** | **String** | Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience | [optional] 
 **showLoginQr** | **bool** | Whether to show the mobile-setup QR code on the desktop login page | [optional] [default to false]
 **mobileServerUrl** | **String** | Server/API URL mobile clients connect to; encoded into the login QR's deep link | [optional] 
+**refreshTokenValidForHours** | **int** | How long a refresh token stays valid, in hours. Refresh tokens rotate on every use, so this is how long a user can be away and still return signed in, not an absolute session cap. 1-720 (30 days); 0 means unset and falls back to the default. | [optional] [default to 24]
+**mcpRefreshTokenValidForHours** | **int** | The same for MCP/OAuth connector refresh tokens, kept separate so a long window chosen for human convenience does not extend third-party client tokens. 1-720 (30 days); 0 means unset and falls back to the default. | [optional] [default to 24]
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

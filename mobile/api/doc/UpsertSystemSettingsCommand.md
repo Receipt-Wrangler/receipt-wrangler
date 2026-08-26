@@ -26,6 +26,8 @@ Name | Type | Description | Notes
 **mcpPublicUrl** | **String** | Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience | [optional] 
 **showLoginQr** | **bool** | Whether to show the mobile-setup QR code on the desktop login page | [optional] 
 **mobileServerUrl** | **String** | Server/API URL mobile clients connect to; encoded into the login QR's deep link | [optional] 
+**refreshTokenValidForHours** | **int** | How long a refresh token stays valid, in hours. 0 means unset and falls back to the default of 24. | [optional] 
+**mcpRefreshTokenValidForHours** | **int** | How long an MCP/OAuth connector refresh token stays valid, in hours. 0 means unset and falls back to the default of 24. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

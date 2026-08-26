@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	config "receipt-wrangler/api/internal/env"
+	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
@@ -29,6 +30,52 @@ const jwtIssuer = "https://receiptWrangler.io"
 // distinct, runtime-derived audience instead (see GenerateMcpJWT) so an MCP
 // token is rejected everywhere except the MCP endpoints.
 const defaultAudience = "https://receiptWrangler.io"
+
+// defaultRefreshTokenLifetime is the fallback refresh-token lifetime, used when
+// the System Settings value is unset (0), out of range, or unreadable.
+const defaultRefreshTokenLifetime = 24 * time.Hour
+
+// GetRefreshTokenLifetime returns how long a REST refresh token stays valid.
+//
+// Refresh tokens rotate on every use, so this is an inactivity window rather
+// than an absolute session cap: an actively refreshing client is never logged
+// out, while an idle one must re-authenticate once it exceeds the window.
+func GetRefreshTokenLifetime() time.Duration {
+	systemSettings, err := repositories.NewSystemSettingsRepository(nil).GetSystemSettings()
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_ERROR, "Could not read refresh token lifetime, using default: "+err.Error())
+		return defaultRefreshTokenLifetime
+	}
+
+	return clampRefreshTokenLifetime(systemSettings.RefreshTokenValidForHours)
+}
+
+// GetMcpRefreshTokenLifetime returns how long an MCP/OAuth connector refresh
+// token stays valid. It is a separate setting from GetRefreshTokenLifetime so a
+// long window chosen for human convenience does not silently extend tokens held
+// by third-party clients.
+func GetMcpRefreshTokenLifetime() time.Duration {
+	systemSettings, err := repositories.NewSystemSettingsRepository(nil).GetSystemSettings()
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_ERROR, "Could not read MCP refresh token lifetime, using default: "+err.Error())
+		return defaultRefreshTokenLifetime
+	}
+
+	return clampRefreshTokenLifetime(systemSettings.McpRefreshTokenValidForHours)
+}
+
+// clampRefreshTokenLifetime converts a configured hour count into a duration,
+// falling back to the default for anything outside the supported range. This is
+// the real safety net — it stops a bad stored value (0, negative, absurd) from
+// ever producing a token, independent of whether the value passed command
+// validation on the way in.
+func clampRefreshTokenLifetime(hours int) time.Duration {
+	if hours < commands.MinRefreshTokenValidForHours || hours > commands.MaxRefreshTokenValidForHours {
+		return defaultRefreshTokenLifetime
+	}
+
+	return time.Duration(hours) * time.Hour
+}
 
 func InitTokenValidator() (*validator.Validator, error) {
 	return initTokenValidator(defaultAudience)
@@ -111,7 +158,10 @@ func BuildTokenCookies(jwt string, refreshToken string) (http.Cookie, http.Cooki
 	}
 
 	accessTokenCookie := http.Cookie{Name: constants.JwtKey, Value: jwt, HttpOnly: true, Path: "/", Expires: utils.GetAccessTokenExpiryDate().Time, SameSite: sameSite, Secure: secure}
-	refreshTokenCookie := http.Cookie{Name: constants.RefreshTokenKey, Value: refreshToken, HttpOnly: true, Path: "/", Expires: utils.GetRefreshTokenExpiryDate().Time, SameSite: sameSite, Secure: secure}
+	// Resolved here rather than threaded in from the caller: both call sites
+	// (login and token refresh) are REST-only, never MCP, so the app setting is
+	// always the right one. Costs one extra System Settings read per login.
+	refreshTokenCookie := http.Cookie{Name: constants.RefreshTokenKey, Value: refreshToken, HttpOnly: true, Path: "/", Expires: utils.GetRefreshTokenExpiryDate(GetRefreshTokenLifetime()).Time, SameSite: sameSite, Secure: secure}
 
 	return accessTokenCookie, refreshTokenCookie
 }
@@ -130,7 +180,7 @@ func GetEmptyRefreshTokenCookie() http.Cookie {
 }
 
 func GenerateJWT(userId uint) (string, string, structs.Claims, error) {
-	return generateTokenPair(userId, defaultAudience)
+	return generateTokenPair(userId, defaultAudience, GetRefreshTokenLifetime())
 }
 
 // GenerateMcpJWT mints an access + refresh token pair bound to the given MCP
@@ -140,10 +190,10 @@ func GenerateJWT(userId uint) (string, string, structs.Claims, error) {
 // Replacing (not appending) the audience ensures the resulting tokens are
 // accepted only by the MCP endpoints, which verify this exact audience.
 func GenerateMcpJWT(userId uint, audience string) (string, string, structs.Claims, error) {
-	return generateTokenPair(userId, audience)
+	return generateTokenPair(userId, audience, GetMcpRefreshTokenLifetime())
 }
 
-func generateTokenPair(userId uint, audience string) (string, string, structs.Claims, error) {
+func generateTokenPair(userId uint, audience string, refreshLifetime time.Duration) (string, string, structs.Claims, error) {
 	db := repositories.GetDB()
 	var user models.User
 
@@ -184,7 +234,7 @@ func generateTokenPair(userId uint, audience string) (string, string, structs.Cl
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    jwtIssuer,
 			Audience:  []string{audience},
-			ExpiresAt: utils.GetRefreshTokenExpiryDate(),
+			ExpiresAt: utils.GetRefreshTokenExpiryDate(refreshLifetime),
 			ID:        refreshTokenId,
 		},
 	}

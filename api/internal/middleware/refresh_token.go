@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/logging"
@@ -10,8 +9,6 @@ import (
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/utils"
-
-	"gorm.io/gorm"
 )
 
 func ValidateRefreshToken(next http.Handler) http.Handler {
@@ -47,7 +44,6 @@ func ValidateRefreshToken(next http.Handler) http.Handler {
 func RevokeRefreshToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		db := repositories.GetDB()
-		dbToken := models.RefreshToken{}
 		err := error(nil)
 		errMessage := "Error refreshing token"
 
@@ -62,25 +58,25 @@ func RevokeRefreshToken(next http.Handler) http.Handler {
 		}
 
 		hashTokenString := utils.Sha256Hash([]byte(refreshTokenString.(string)))
-		err = db.Model(&models.RefreshToken{}).Where("token = ?", hashTokenString).First(&dbToken).Error
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				emptyAccessTokenCookie := services.GetEmptyAccessTokenCookie()
-				emptyRefreshTokenCookie := services.GetEmptyRefreshTokenCookie()
 
-				http.SetCookie(w, &emptyAccessTokenCookie)
-				http.SetCookie(w, &emptyRefreshTokenCookie)
-
-				utils.WriteCustomErrorResponse(w, errMessage, http.StatusInternalServerError)
-				logging.LogStd(logging.LOG_LEVEL_ERROR, "Refresh token not found")
-				return
-			}
+		// Atomically mark the stored token used via the WHERE clause so two
+		// concurrent refreshes of the same token cannot both succeed. A read
+		// followed by a separate update lets both racers observe is_used = false
+		// and rotate, which defeats replay detection; it also logs the loser out
+		// of every tab once the rotation it lost lands. Mirrors the same fix in
+		// oauth.rotateRefreshToken. A zero row count means the token is unknown
+		// or already used — indistinguishable on purpose, and both already
+		// produced this identical response.
+		result := db.Model(&models.RefreshToken{}).
+			Where("token = ? AND is_used = ?", hashTokenString, false).
+			Update("is_used", true)
+		if result.Error != nil {
 			utils.WriteCustomErrorResponse(w, errMessage, http.StatusInternalServerError)
-			logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
+			logging.LogStd(logging.LOG_LEVEL_ERROR, result.Error.Error())
 			return
 		}
 
-		if dbToken.IsUsed {
+		if result.RowsAffected == 0 {
 			emptyAccessTokenCookie := services.GetEmptyAccessTokenCookie()
 			emptyRefreshTokenCookie := services.GetEmptyRefreshTokenCookie()
 
@@ -88,16 +84,9 @@ func RevokeRefreshToken(next http.Handler) http.Handler {
 			http.SetCookie(w, &emptyRefreshTokenCookie)
 
 			utils.WriteCustomErrorResponse(w, errMessage, http.StatusInternalServerError)
-			logging.LogStd(logging.LOG_LEVEL_ERROR, "Refresh token has been used already.")
+			logging.LogStd(logging.LOG_LEVEL_ERROR, "Refresh token is invalid or has already been used.")
 
 			return
-		} else {
-			err = db.Model(&dbToken).Update("is_used", true).Error
-			if err != nil {
-				utils.WriteCustomErrorResponse(w, errMessage, http.StatusInternalServerError)
-				logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-				return
-			}
 		}
 
 		next.ServeHTTP(w, r)
