@@ -92,12 +92,16 @@ func (repository SystemSettingsRepository) UpdateSystemSettings(command commands
 	}
 
 	// Select("*") below writes every column, so any field the request omitted
-	// would be persisted as its zero value. Carry the stored lifetimes forward
-	// for keys the caller did not send.
+	// would be persisted as its zero value. Two things guard the lifetimes:
+	// the columns the caller did not send are dropped from the UPDATE entirely
+	// (so a concurrent update that DID set one is never clobbered by a value we
+	// read before the write), and the in-memory copy is back-filled so the
+	// response echoes the stored value rather than a 0.
+	omittedColumns := append([]string{"TaskQueueConfigurations"}, command.OmittedLifetimeColumns()...)
 	command.ApplyOmittedLifetimes(existingSettings, &updatedSettings)
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		txErr := tx.Model(&updatedSettings).Select("*").Omit("TaskQueueConfigurations").Where("id = ?", existingSettings.ID).Updates(&updatedSettings).Error
+		txErr := tx.Model(&updatedSettings).Select("*").Omit(omittedColumns...).Where("id = ?", existingSettings.ID).Updates(&updatedSettings).Error
 		if txErr != nil {
 			return txErr
 		}

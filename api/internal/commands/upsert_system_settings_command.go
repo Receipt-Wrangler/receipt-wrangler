@@ -194,13 +194,36 @@ func (command *UpsertSystemSettingsCommand) ToSystemSettings(id uint) (models.Sy
 	return systemSettings, nil
 }
 
+// OmittedLifetimeColumns names the refresh-token lifetime fields the request did
+// not send, so the repository can leave those columns out of the UPDATE entirely.
+//
+// Skipping the column is what makes a concurrent update safe. Copying the stored
+// value onto the row instead (see ApplyOmittedLifetimes) would still write it,
+// so two requests that each set one lifetime and omit the other would clobber
+// each other with the values they read before the write. A column that is never
+// written cannot be clobbered, and unlike a row lock this works identically on
+// SQLite, MySQL and Postgres.
+func (command *UpsertSystemSettingsCommand) OmittedLifetimeColumns() []string {
+	columns := make([]string, 0, 2)
+
+	if command.RefreshTokenValidForHours == nil {
+		columns = append(columns, "RefreshTokenValidForHours")
+	}
+
+	if command.McpRefreshTokenValidForHours == nil {
+		columns = append(columns, "McpRefreshTokenValidForHours")
+	}
+
+	return columns
+}
+
 // ApplyOmittedLifetimes carries the stored refresh-token lifetimes onto the
 // settings a PUT is about to write for any key the request omitted.
 //
 // ToSystemSettings round-trips the command through JSON, so a nil pointer lands
-// as 0 on the model; the repository then writes every column with Select("*").
-// Without this, a client that PUTs a body lacking these keys would silently
-// reset an admin's configured session length to the default.
+// as 0 on the model. The columns themselves are excluded from the UPDATE by
+// OmittedLifetimeColumns, so this exists purely so the object echoed back in the
+// response carries the stored value rather than a misleading 0.
 func (command *UpsertSystemSettingsCommand) ApplyOmittedLifetimes(existing models.SystemSettings, updated *models.SystemSettings) {
 	if command.RefreshTokenValidForHours == nil {
 		updated.RefreshTokenValidForHours = existing.RefreshTokenValidForHours

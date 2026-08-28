@@ -1123,13 +1123,27 @@ Both are **whole hours**, bounded to **1-720 (30 days)**. There are two distinct
 and the difference matters:
 
 - **Key omitted from the PUT body** (`nil` on the command) — the stored value is left alone. The
-  command fields are `*int` and `ApplyOmittedLifetimes` carries the existing value onto the update,
-  because `UpdateSystemSettings` writes every column with `Select("*")`: a plain `int` would persist
-  as `0` and silently reset a configured lifetime whenever any client PUT a partial body. Same
-  hazard and same fix as the pointer fields on `UpdateGroupReceiptSettingsCommand` (see the root
-  `CLAUDE.md` → "Group Default Custom Fields"). Guarded by
-  `TestUpdateSystemSettingsPreservesOmittedRefreshTokenLifetimes`, which drives a **raw JSON body**
-  through the handler — a typed command literal cannot express an absent key.
+  command fields are `*int`, because `UpdateSystemSettings` writes every column with `Select("*")`:
+  a plain `int` would persist as `0` and silently reset a configured lifetime whenever any client
+  PUT a partial body. Same hazard and same fix as the pointer fields on
+  `UpdateGroupReceiptSettingsCommand` (see the root `CLAUDE.md` → "Group Default Custom Fields").
+
+  **An omitted lifetime is dropped from the UPDATE entirely**, via
+  `OmittedLifetimeColumns()` feeding the existing `Omit(...)` on that statement — *not* by copying
+  the stored value onto the row. The distinction matters under concurrency: `existingSettings` is
+  read before the transaction, so two admins each setting one lifetime and omitting the other would
+  both write a full row and clobber each other's explicit value. A column that is never written
+  cannot be clobbered. This is deliberately **not** a `SELECT ... FOR UPDATE` row lock — SQLite is a
+  supported engine and rejects that syntax, there is no locking precedent anywhere in the codebase,
+  and a lock would only protect these two fields while every other column on this full-object upsert
+  stays last-write-wins. `ApplyOmittedLifetimes` still runs, but only so the response body echoes the
+  stored value instead of a misleading `0`.
+
+  Guarded by `TestUpdateSystemSettingsPreservesOmittedRefreshTokenLifetimes` (a **raw JSON body**
+  through the handler — a typed command literal cannot express an absent key),
+  `TestUpdateSystemSettingsOmitsUnsentLifetimeColumns` (the generated SQL), and
+  `TestUpdateSystemSettingsConcurrentLifetimeUpdatesBothSurvive` (two concurrent updates; fails on
+  the first attempt without the column skip).
 - **Explicit `0`** — means "unset, use the built-in default" (the `pdfDpi` convention). Valid, and
   resolved by the clamp on read.
 
@@ -1174,7 +1188,8 @@ on both the JWT claim and the persisted row, MCP using its own setting, access t
 `commands/upsert_system_settings_command_test.go` (bounds + the `0` escape hatch),
 `middleware/refresh_token_test.go` (the concurrency guard), `utils/auth_test.go` (the helper honors
 whatever lifetime it is handed), `handlers/system_settings_handler_test.go` (the omitted-key and
-explicit-value endpoint round trips), and `desktop/e2e/session-lifetime.spec.ts` (the only
+explicit-value endpoint round trips), `repositories/system_settings_test.go` (the omitted-column SQL
+shape and the concurrent-update guard), and `desktop/e2e/session-lifetime.spec.ts` (the only
 end-to-end proof that the setting reaches the `Set-Cookie` header).
 
 ## Login QR & mobile deep link
