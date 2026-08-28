@@ -37,8 +37,13 @@ type UpsertSystemSettingsCommand struct {
 	McpPublicUrl                        string                                `json:"mcpPublicUrl"`
 	ShowLoginQr                         bool                                  `json:"showLoginQr"`
 	MobileServerUrl                     string                                `json:"mobileServerUrl"`
-	RefreshTokenValidForHours           int                                   `json:"refreshTokenValidForHours"`
-	McpRefreshTokenValidForHours        int                                   `json:"mcpRefreshTokenValidForHours"`
+	// Pointers so an omitted key is distinguishable from an explicit 0. The
+	// repository writes every column (Select("*")), so a plain int would persist
+	// as 0 and silently reset a configured lifetime to the default whenever a
+	// client PUTs a body without these keys. Same reasoning as the pointer
+	// fields on UpdateGroupReceiptSettingsCommand.
+	RefreshTokenValidForHours    *int `json:"refreshTokenValidForHours"`
+	McpRefreshTokenValidForHours *int `json:"mcpRefreshTokenValidForHours"`
 }
 
 func (command *UpsertSystemSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -134,16 +139,18 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 }
 
 // validateRefreshTokenValidForHours bounds a refresh-token lifetime, returning an
-// empty string when the value is acceptable. Zero is deliberately allowed and
-// means "unset": the read side falls back to the built-in default, so a client
-// that omits the field (an older desktop build, say) is tolerated rather than
-// rejected. Shared by the app and MCP settings so the two cannot drift.
-func validateRefreshTokenValidForHours(hours int) string {
-	if hours == 0 {
+// empty string when the value is acceptable.
+//
+// A nil pointer means the key was omitted, which leaves the stored value alone
+// (see ApplyOmittedLifetimes) and is always valid. An explicit 0 means "unset":
+// the read side falls back to the built-in default. Shared by the app and MCP
+// settings so the two cannot drift.
+func validateRefreshTokenValidForHours(hours *int) string {
+	if hours == nil || *hours == 0 {
 		return ""
 	}
 
-	if hours < MinRefreshTokenValidForHours || hours > MaxRefreshTokenValidForHours {
+	if *hours < MinRefreshTokenValidForHours || *hours > MaxRefreshTokenValidForHours {
 		return "Refresh token lifetime must be between 1 and 720 hours (30 days)"
 	}
 
@@ -185,4 +192,21 @@ func (command *UpsertSystemSettingsCommand) ToSystemSettings(id uint) (models.Sy
 	}
 
 	return systemSettings, nil
+}
+
+// ApplyOmittedLifetimes carries the stored refresh-token lifetimes onto the
+// settings a PUT is about to write for any key the request omitted.
+//
+// ToSystemSettings round-trips the command through JSON, so a nil pointer lands
+// as 0 on the model; the repository then writes every column with Select("*").
+// Without this, a client that PUTs a body lacking these keys would silently
+// reset an admin's configured session length to the default.
+func (command *UpsertSystemSettingsCommand) ApplyOmittedLifetimes(existing models.SystemSettings, updated *models.SystemSettings) {
+	if command.RefreshTokenValidForHours == nil {
+		updated.RefreshTokenValidForHours = existing.RefreshTokenValidForHours
+	}
+
+	if command.McpRefreshTokenValidForHours == nil {
+		updated.McpRefreshTokenValidForHours = existing.McpRefreshTokenValidForHours
+	}
 }

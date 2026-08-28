@@ -33,8 +33,8 @@ part 'upsert_system_settings_command.g.dart';
 /// * [mcpPublicUrl] - Externally reachable origin used for MCP OAuth/metadata/redirect URLs and token audience
 /// * [showLoginQr] - Whether to show the mobile-setup QR code on the desktop login page
 /// * [mobileServerUrl] - Server/API URL mobile clients connect to; encoded into the login QR's deep link
-/// * [refreshTokenValidForHours] - How long a refresh token stays valid, in hours. 0 means unset and falls back to the default of 24.
-/// * [mcpRefreshTokenValidForHours] - How long an MCP/OAuth connector refresh token stays valid, in hours. 0 means unset and falls back to the default of 24.
+/// * [refreshTokenValidForHours] - How long a refresh token stays valid, in hours. Accepted values are 1-720 (30 days), or 0 meaning unset, which falls back to the default of 24. Omit the key entirely to leave the currently configured value unchanged.
+/// * [mcpRefreshTokenValidForHours] - How long an MCP/OAuth connector refresh token stays valid, in hours. Accepted values are 1-720 (30 days), or 0 meaning unset, which falls back to the default of 24. Omit the key entirely to leave the currently configured value unchanged.
 @BuiltValue()
 abstract class UpsertSystemSettingsCommand implements Built<UpsertSystemSettingsCommand, UpsertSystemSettingsCommandBuilder> {
   /// Whether local sign up is enabled
@@ -107,11 +107,11 @@ abstract class UpsertSystemSettingsCommand implements Built<UpsertSystemSettings
   @BuiltValueField(wireName: r'mobileServerUrl')
   String? get mobileServerUrl;
 
-  /// How long a refresh token stays valid, in hours. 0 means unset and falls back to the default of 24.
+  /// How long a refresh token stays valid, in hours. Accepted values are 1-720 (30 days), or 0 meaning unset, which falls back to the default of 24. Omit the key entirely to leave the currently configured value unchanged.
   @BuiltValueField(wireName: r'refreshTokenValidForHours')
   int? get refreshTokenValidForHours;
 
-  /// How long an MCP/OAuth connector refresh token stays valid, in hours. 0 means unset and falls back to the default of 24.
+  /// How long an MCP/OAuth connector refresh token stays valid, in hours. Accepted values are 1-720 (30 days), or 0 meaning unset, which falls back to the default of 24. Omit the key entirely to leave the currently configured value unchanged.
   @BuiltValueField(wireName: r'mcpRefreshTokenValidForHours')
   int? get mcpRefreshTokenValidForHours;
 

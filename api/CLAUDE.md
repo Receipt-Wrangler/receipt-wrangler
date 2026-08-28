@@ -1119,8 +1119,19 @@ in `commands.UpsertSystemSettingsCommand.Validate`):
   **separate on purpose** so a long window chosen for human convenience does not silently extend
   tokens held by third-party clients.
 
-Both are **whole hours**, bounded to **1-720 (30 days)**, and `0` means "unset, use the default"
-(the `pdfDpi` convention) so a client that omits the field is tolerated rather than 400'd.
+Both are **whole hours**, bounded to **1-720 (30 days)**. There are two distinct "no value" cases,
+and the difference matters:
+
+- **Key omitted from the PUT body** (`nil` on the command) — the stored value is left alone. The
+  command fields are `*int` and `ApplyOmittedLifetimes` carries the existing value onto the update,
+  because `UpdateSystemSettings` writes every column with `Select("*")`: a plain `int` would persist
+  as `0` and silently reset a configured lifetime whenever any client PUT a partial body. Same
+  hazard and same fix as the pointer fields on `UpdateGroupReceiptSettingsCommand` (see the root
+  `CLAUDE.md` → "Group Default Custom Fields"). Guarded by
+  `TestUpdateSystemSettingsPreservesOmittedRefreshTokenLifetimes`, which drives a **raw JSON body**
+  through the handler — a typed command literal cannot express an absent key.
+- **Explicit `0`** — means "unset, use the built-in default" (the `pdfDpi` convention). Valid, and
+  resolved by the clamp on read.
 
 **It is an inactivity timeout, not an absolute session cap.** Refresh tokens rotate on every use and
 both clients proactively refresh on a 15-minute timer, so an actively-used session re-mints itself
@@ -1162,8 +1173,9 @@ Tests: `services/refresh_token_lifetime_test.go` (clamp table, per-field isolati
 on both the JWT claim and the persisted row, MCP using its own setting, access token unchanged),
 `commands/upsert_system_settings_command_test.go` (bounds + the `0` escape hatch),
 `middleware/refresh_token_test.go` (the concurrency guard), `utils/auth_test.go` (the helper honors
-whatever lifetime it is handed), and `desktop/e2e/session-lifetime.spec.ts` (the only end-to-end
-proof that the setting reaches the `Set-Cookie` header).
+whatever lifetime it is handed), `handlers/system_settings_handler_test.go` (the omitted-key and
+explicit-value endpoint round trips), and `desktop/e2e/session-lifetime.spec.ts` (the only
+end-to-end proof that the setting reaches the `Set-Cookie` header).
 
 ## Login QR & mobile deep link
 

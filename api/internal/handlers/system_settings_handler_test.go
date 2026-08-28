@@ -240,3 +240,135 @@ func TestShouldValidateUpsertSystemSettingsCommand(t *testing.T) {
 		}
 	}
 }
+
+// Regression: the update writes every column via Select("*"), so a PUT body that
+// omits a configured lifetime used to persist 0 and silently reset an admin's
+// session length to the default. Driven through the handler with a RAW JSON body
+// rather than a typed command, because the whole point is which keys are absent
+// from the wire -- a struct literal cannot express that.
+func TestUpdateSystemSettingsPreservesOmittedRefreshTokenLifetimes(t *testing.T) {
+	defer tearDownSystemSettingsTest()
+
+	db := repositories.GetDB()
+	db.Create(&models.SystemSettings{})
+	grantAllAppPerms(t, 1)
+
+	// An admin has configured both lifetimes away from the defaults.
+	err := db.Model(&models.SystemSettings{}).
+		Where("id = ?", 1).
+		Updates(map[string]interface{}{
+			"refresh_token_valid_for_hours":     720,
+			"mcp_refresh_token_valid_for_hours": 6,
+		}).Error
+	if err != nil {
+		t.Fatalf("failed to seed configured lifetimes: %v", err)
+	}
+
+	queueConfigs := make([]map[string]interface{}, 0)
+	for _, config := range models.GetAllDefaultQueueConfigurations() {
+		queueConfigs = append(queueConfigs, map[string]interface{}{
+			"name":     config.Name,
+			"priority": 1,
+		})
+	}
+
+	// A valid body that simply does not mention either lifetime key.
+	body := map[string]interface{}{
+		"currencyDisplay":              "$",
+		"currencySymbolPosition":       models.START,
+		"currencyThousandthsSeparator": models.COMMA,
+		"currencyDecimalSeparator":     models.DOT,
+		"currencyHideDecimalPlaces":    false,
+		"taskConcurrency":              1,
+		"emailPollingInterval":         60,
+		"taskQueueConfigurations":      queueConfigs,
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal body: %v", err)
+	}
+
+	r := httptest.NewRequest("PUT", "/api", strings.NewReader(string(bodyBytes)))
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
+	r = r.WithContext(newContext)
+	w := httptest.NewRecorder()
+
+	UpdateSystemSettings(w, r)
+
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+	}
+
+	updated, err := repositories.NewSystemSettingsRepository(nil).GetSystemSettings()
+	if err != nil {
+		t.Fatalf("failed to read back system settings: %v", err)
+	}
+
+	if updated.RefreshTokenValidForHours != 720 {
+		utils.PrintTestError(t, updated.RefreshTokenValidForHours, 720)
+	}
+
+	if updated.McpRefreshTokenValidForHours != 6 {
+		utils.PrintTestError(t, updated.McpRefreshTokenValidForHours, 6)
+	}
+}
+
+// The flip side: an explicitly sent value must still be written, so the merge
+// above cannot be mistaken for "these fields are read-only".
+func TestUpdateSystemSettingsPersistsExplicitRefreshTokenLifetimes(t *testing.T) {
+	defer tearDownSystemSettingsTest()
+
+	db := repositories.GetDB()
+	db.Create(&models.SystemSettings{})
+	grantAllAppPerms(t, 1)
+
+	queueConfigs := make([]commands.UpsertTaskQueueConfigurationCommand, 0)
+	for _, config := range models.GetAllDefaultQueueConfigurations() {
+		queueConfigs = append(queueConfigs, commands.UpsertTaskQueueConfigurationCommand{
+			Name:     config.Name,
+			Priority: 1,
+		})
+	}
+
+	appHours := 168
+	mcpHours := 12
+	command := commands.UpsertSystemSettingsCommand{
+		CurrencyDisplay:              "$",
+		CurrencySymbolPosition:       models.START,
+		CurrencyThousandthsSeparator: models.COMMA,
+		CurrencyDecimalSeparator:     models.DOT,
+		TaskConcurrency:              1,
+		EmailPollingInterval:         60,
+		TaskQueueConfigurations:      queueConfigs,
+		RefreshTokenValidForHours:    &appHours,
+		McpRefreshTokenValidForHours: &mcpHours,
+	}
+	bodyBytes, err := json.Marshal(command)
+	if err != nil {
+		t.Fatalf("failed to marshal command: %v", err)
+	}
+
+	r := httptest.NewRequest("PUT", "/api", strings.NewReader(string(bodyBytes)))
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
+	r = r.WithContext(newContext)
+	w := httptest.NewRecorder()
+
+	UpdateSystemSettings(w, r)
+
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+	}
+
+	updated, err := repositories.NewSystemSettingsRepository(nil).GetSystemSettings()
+	if err != nil {
+		t.Fatalf("failed to read back system settings: %v", err)
+	}
+
+	if updated.RefreshTokenValidForHours != appHours {
+		utils.PrintTestError(t, updated.RefreshTokenValidForHours, appHours)
+	}
+
+	if updated.McpRefreshTokenValidForHours != mcpHours {
+		utils.PrintTestError(t, updated.McpRefreshTokenValidForHours, mcpHours)
+	}
+}

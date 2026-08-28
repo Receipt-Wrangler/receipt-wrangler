@@ -84,29 +84,39 @@ func TestUpsertSystemSettingsCommand_Validate_ValidInputs(t *testing.T) {
 				return cmd
 			}(),
 		},
-		// Zero means "unset": a client that omits the field must not be rejected,
-		// the read side falls back to the default instead.
+		// A nil pointer means the key was absent from the request body. It must
+		// validate, because omission leaves the stored value alone.
+		"valid with omitted refresh token lifetimes": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.RefreshTokenValidForHours = nil
+				cmd.McpRefreshTokenValidForHours = nil
+				return cmd
+			}(),
+		},
+		// An explicit zero means "unset": the read side falls back to the
+		// default instead.
 		"valid with unset refresh token lifetimes": {
 			command: func() UpsertSystemSettingsCommand {
 				cmd := validSystemSettingsCommand()
-				cmd.RefreshTokenValidForHours = 0
-				cmd.McpRefreshTokenValidForHours = 0
+				cmd.RefreshTokenValidForHours = intPtr(0)
+				cmd.McpRefreshTokenValidForHours = intPtr(0)
 				return cmd
 			}(),
 		},
 		"valid with the minimum refresh token lifetimes": {
 			command: func() UpsertSystemSettingsCommand {
 				cmd := validSystemSettingsCommand()
-				cmd.RefreshTokenValidForHours = 1
-				cmd.McpRefreshTokenValidForHours = 1
+				cmd.RefreshTokenValidForHours = intPtr(1)
+				cmd.McpRefreshTokenValidForHours = intPtr(1)
 				return cmd
 			}(),
 		},
 		"valid with the maximum refresh token lifetimes": {
 			command: func() UpsertSystemSettingsCommand {
 				cmd := validSystemSettingsCommand()
-				cmd.RefreshTokenValidForHours = 720
-				cmd.McpRefreshTokenValidForHours = 720
+				cmd.RefreshTokenValidForHours = intPtr(720)
+				cmd.McpRefreshTokenValidForHours = intPtr(720)
 				return cmd
 			}(),
 		},
@@ -225,19 +235,19 @@ func TestUpsertSystemSettingsCommand_Validate_InvalidInputs(t *testing.T) {
 			expectedError: "mobileServerUrl",
 		},
 		"negative refresh token lifetime": {
-			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.RefreshTokenValidForHours = -1 },
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.RefreshTokenValidForHours = intPtr(-1) },
 			expectedError: "refreshTokenValidForHours",
 		},
 		"refresh token lifetime above the maximum": {
-			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.RefreshTokenValidForHours = 721 },
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.RefreshTokenValidForHours = intPtr(721) },
 			expectedError: "refreshTokenValidForHours",
 		},
 		"negative mcp refresh token lifetime": {
-			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpRefreshTokenValidForHours = -1 },
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpRefreshTokenValidForHours = intPtr(-1) },
 			expectedError: "mcpRefreshTokenValidForHours",
 		},
 		"mcp refresh token lifetime above the maximum": {
-			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpRefreshTokenValidForHours = 721 },
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpRefreshTokenValidForHours = intPtr(721) },
 			expectedError: "mcpRefreshTokenValidForHours",
 		},
 	}
@@ -306,11 +316,11 @@ func TestUpsertSystemSettingsCommand_Validate_RefreshTokenLifetimes(t *testing.T
 		errorKey string
 	}{
 		"refreshTokenValidForHours": {
-			set:      func(cmd *UpsertSystemSettingsCommand, hours int) { cmd.RefreshTokenValidForHours = hours },
+			set:      func(cmd *UpsertSystemSettingsCommand, hours int) { cmd.RefreshTokenValidForHours = &hours },
 			errorKey: "refreshTokenValidForHours",
 		},
 		"mcpRefreshTokenValidForHours": {
-			set:      func(cmd *UpsertSystemSettingsCommand, hours int) { cmd.McpRefreshTokenValidForHours = hours },
+			set:      func(cmd *UpsertSystemSettingsCommand, hours int) { cmd.McpRefreshTokenValidForHours = &hours },
 			errorKey: "mcpRefreshTokenValidForHours",
 		},
 	}
@@ -342,4 +352,8 @@ func TestUpsertSystemSettingsCommand_Validate_RefreshTokenLifetimes(t *testing.T
 			})
 		}
 	}
+}
+
+func intPtr(value int) *int {
+	return &value
 }

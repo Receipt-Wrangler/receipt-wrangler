@@ -91,6 +91,11 @@ func (repository SystemSettingsRepository) UpdateSystemSettings(command commands
 		return models.SystemSettings{}, err
 	}
 
+	// Select("*") below writes every column, so any field the request omitted
+	// would be persisted as its zero value. Carry the stored lifetimes forward
+	// for keys the caller did not send.
+	command.ApplyOmittedLifetimes(existingSettings, &updatedSettings)
+
 	err = db.Transaction(func(tx *gorm.DB) error {
 		txErr := tx.Model(&updatedSettings).Select("*").Omit("TaskQueueConfigurations").Where("id = ?", existingSettings.ID).Updates(&updatedSettings).Error
 		if txErr != nil {
