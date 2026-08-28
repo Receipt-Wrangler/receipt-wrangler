@@ -32,6 +32,8 @@ class _$SystemSettings extends SystemSettings {
   @override
   final String? mobileServerUrl;
   @override
+  final int? refreshTokenValidForHours;
+  @override
   final CurrencySymbolPosition? currencySymbolPosition;
   @override
   final int? taskConcurrency;
@@ -41,6 +43,8 @@ class _$SystemSettings extends SystemSettings {
   final int? numWorkers;
   @override
   final bool? enableLocalSignUp;
+  @override
+  final int? mcpRefreshTokenValidForHours;
   @override
   final BuiltList<TaskQueueConfiguration> taskQueueConfigurations;
   @override
@@ -70,11 +74,13 @@ class _$SystemSettings extends SystemSettings {
       this.fallbackReceiptProcessingSettingsId,
       this.receiptProcessingSettingsId,
       this.mobileServerUrl,
+      this.refreshTokenValidForHours,
       this.currencySymbolPosition,
       this.taskConcurrency,
       this.emailPollingInterval,
       this.numWorkers,
       this.enableLocalSignUp,
+      this.mcpRefreshTokenValidForHours,
       required this.taskQueueConfigurations,
       required this.id,
       required this.createdAt,
@@ -106,11 +112,13 @@ class _$SystemSettings extends SystemSettings {
             other.fallbackReceiptProcessingSettingsId &&
         receiptProcessingSettingsId == other.receiptProcessingSettingsId &&
         mobileServerUrl == other.mobileServerUrl &&
+        refreshTokenValidForHours == other.refreshTokenValidForHours &&
         currencySymbolPosition == other.currencySymbolPosition &&
         taskConcurrency == other.taskConcurrency &&
         emailPollingInterval == other.emailPollingInterval &&
         numWorkers == other.numWorkers &&
         enableLocalSignUp == other.enableLocalSignUp &&
+        mcpRefreshTokenValidForHours == other.mcpRefreshTokenValidForHours &&
         taskQueueConfigurations == other.taskQueueConfigurations &&
         id == other.id &&
         createdAt == other.createdAt &&
@@ -134,11 +142,13 @@ class _$SystemSettings extends SystemSettings {
     _$hash = $jc(_$hash, fallbackReceiptProcessingSettingsId.hashCode);
     _$hash = $jc(_$hash, receiptProcessingSettingsId.hashCode);
     _$hash = $jc(_$hash, mobileServerUrl.hashCode);
+    _$hash = $jc(_$hash, refreshTokenValidForHours.hashCode);
     _$hash = $jc(_$hash, currencySymbolPosition.hashCode);
     _$hash = $jc(_$hash, taskConcurrency.hashCode);
     _$hash = $jc(_$hash, emailPollingInterval.hashCode);
     _$hash = $jc(_$hash, numWorkers.hashCode);
     _$hash = $jc(_$hash, enableLocalSignUp.hashCode);
+    _$hash = $jc(_$hash, mcpRefreshTokenValidForHours.hashCode);
     _$hash = $jc(_$hash, taskQueueConfigurations.hashCode);
     _$hash = $jc(_$hash, id.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
@@ -165,11 +175,13 @@ class _$SystemSettings extends SystemSettings {
               fallbackReceiptProcessingSettingsId)
           ..add('receiptProcessingSettingsId', receiptProcessingSettingsId)
           ..add('mobileServerUrl', mobileServerUrl)
+          ..add('refreshTokenValidForHours', refreshTokenValidForHours)
           ..add('currencySymbolPosition', currencySymbolPosition)
           ..add('taskConcurrency', taskConcurrency)
           ..add('emailPollingInterval', emailPollingInterval)
           ..add('numWorkers', numWorkers)
           ..add('enableLocalSignUp', enableLocalSignUp)
+          ..add('mcpRefreshTokenValidForHours', mcpRefreshTokenValidForHours)
           ..add('taskQueueConfigurations', taskQueueConfigurations)
           ..add('id', id)
           ..add('createdAt', createdAt)
@@ -250,6 +262,11 @@ class SystemSettingsBuilder
   set mobileServerUrl(covariant String? mobileServerUrl) =>
       _$this._mobileServerUrl = mobileServerUrl;
 
+  int? _refreshTokenValidForHours;
+  int? get refreshTokenValidForHours => _$this._refreshTokenValidForHours;
+  set refreshTokenValidForHours(covariant int? refreshTokenValidForHours) =>
+      _$this._refreshTokenValidForHours = refreshTokenValidForHours;
+
   CurrencySymbolPosition? _currencySymbolPosition;
   CurrencySymbolPosition? get currencySymbolPosition =>
       _$this._currencySymbolPosition;
@@ -275,6 +292,12 @@ class SystemSettingsBuilder
   bool? get enableLocalSignUp => _$this._enableLocalSignUp;
   set enableLocalSignUp(covariant bool? enableLocalSignUp) =>
       _$this._enableLocalSignUp = enableLocalSignUp;
+
+  int? _mcpRefreshTokenValidForHours;
+  int? get mcpRefreshTokenValidForHours => _$this._mcpRefreshTokenValidForHours;
+  set mcpRefreshTokenValidForHours(
+          covariant int? mcpRefreshTokenValidForHours) =>
+      _$this._mcpRefreshTokenValidForHours = mcpRefreshTokenValidForHours;
 
   ListBuilder<TaskQueueConfiguration>? _taskQueueConfigurations;
   ListBuilder<TaskQueueConfiguration> get taskQueueConfigurations =>
@@ -325,11 +348,13 @@ class SystemSettingsBuilder
           $v.fallbackReceiptProcessingSettingsId;
       _receiptProcessingSettingsId = $v.receiptProcessingSettingsId;
       _mobileServerUrl = $v.mobileServerUrl;
+      _refreshTokenValidForHours = $v.refreshTokenValidForHours;
       _currencySymbolPosition = $v.currencySymbolPosition;
       _taskConcurrency = $v.taskConcurrency;
       _emailPollingInterval = $v.emailPollingInterval;
       _numWorkers = $v.numWorkers;
       _enableLocalSignUp = $v.enableLocalSignUp;
+      _mcpRefreshTokenValidForHours = $v.mcpRefreshTokenValidForHours;
       _taskQueueConfigurations = $v.taskQueueConfigurations.toBuilder();
       _id = $v.id;
       _createdAt = $v.createdAt;
@@ -372,11 +397,13 @@ class SystemSettingsBuilder
                 fallbackReceiptProcessingSettingsId,
             receiptProcessingSettingsId: receiptProcessingSettingsId,
             mobileServerUrl: mobileServerUrl,
+            refreshTokenValidForHours: refreshTokenValidForHours,
             currencySymbolPosition: currencySymbolPosition,
             taskConcurrency: taskConcurrency,
             emailPollingInterval: emailPollingInterval,
             numWorkers: numWorkers,
             enableLocalSignUp: enableLocalSignUp,
+            mcpRefreshTokenValidForHours: mcpRefreshTokenValidForHours,
             taskQueueConfigurations: taskQueueConfigurations.build(),
             id: BuiltValueNullFieldError.checkNotNull(
                 id, r'SystemSettings', 'id'),

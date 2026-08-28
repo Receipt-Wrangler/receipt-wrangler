@@ -136,6 +136,33 @@
     ></app-checkbox>
   </app-form-section>
   <app-form-section
+    headerText="Session"
+  >
+    <p class="text-muted mb-3">
+      How long a signed-in user can be away before they have to log in again. Sessions renew
+      themselves while the app is in use, so this is an inactivity window rather than a hard limit —
+      someone who uses Receipt Wrangler regularly is never signed out. Lower it for a tighter
+      security posture, raise it so people stay signed in longer. Maximum 720 hours (30 days).
+    </p>
+    <div class="d-flex gap-3">
+      <app-input
+        class="flex-grow-1"
+        label="Stay signed in for"
+        type="number"
+        [inputFormControl]="form | formGet:'refreshTokenValidForValue'"
+        [readonly]="formConfig.mode | inputReadonly"
+      ></app-input>
+      <app-select
+        class="flex-grow-1"
+        label="Unit"
+        optionValueKey="value"
+        optionDisplayKey="displayValue"
+        [inputFormControl]="form | formGet:'refreshTokenValidForUnit'"
+        [options]="durationUnits"
+      ></app-select>
+    </div>
+  </app-form-section>
+  <app-form-section
     headerText="MCP Server"
   >
     <p class="text-muted mb-3">
@@ -154,6 +181,24 @@
       [readonly]="formConfig.mode | inputReadonly"
       [inputFormControl]="form | formGet:'mcpPublicUrl'"
     ></app-input>
+    <div class="d-flex gap-3">
+      <app-input
+        class="flex-grow-1"
+        label="Connector sign-in lasts"
+        type="number"
+        hint="How long a connected client stays authorized before it has to sign in again. Kept separate from the app session above so a long user-facing window does not extend third-party access. Maximum 720 hours (30 days)."
+        [inputFormControl]="form | formGet:'mcpRefreshTokenValidForValue'"
+        [readonly]="formConfig.mode | inputReadonly"
+      ></app-input>
+      <app-select
+        class="flex-grow-1"
+        label="Unit"
+        optionValueKey="value"
+        optionDisplayKey="displayValue"
+        [inputFormControl]="form | formGet:'mcpRefreshTokenValidForUnit'"
+        [options]="durationUnits"
+      ></app-select>
+    </div>
     @if ((form | formGet:'mcpEnabled').value && (form | formGet:'mcpPublicUrl').value) {
       <div class="d-flex flex-column mb-2">
         <strong>Connector URL</strong>

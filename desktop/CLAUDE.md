@@ -609,6 +609,52 @@ divider-only-with-`headerText`, turned back off, and the stale-generation guard)
 `feature-config.state.spec.ts`, `auth-form.component.spec.ts` and `about.component.spec.ts` (each
 pinning that its page wires the shared component up), and `system-settings-form.component.spec.ts`.
 
+## Session lifetime settings (Hours/Days selector over an hours-based API)
+
+The System Settings form exposes two configurable refresh-token lifetimes (see `api/CLAUDE.md` →
+"Session lifetime"): a **Session** `app-form-section` with **"Stay signed in for"**
+(`refreshTokenValidForHours`) and, inside the existing **MCP Server** section, **"Connector sign-in
+lasts"** (`mcpRefreshTokenValidForHours`).
+
+**Hours are the wire format; the unit is presentation only.** Each setting is edited as a pair of
+**form-only** controls — `<name>Value` (an `app-input type="number"`) and `<name>Unit` (an
+`app-select` over `durationUnits`) — which `submit()` folds back into `<name>Hours` via `toHours(...)`
+before `delete`-ing the four helper keys from the payload. The exact-payload assertion in
+`system-settings-form.component.spec.ts` fails if any of them leak.
+
+The conversion lives in **`src/utils/duration.utils.ts`** (`splitHours` / `toHours` / `maxForUnit`),
+shared by both settings so they cannot drift. `splitHours` renders a value as Days only when it
+divides evenly into whole days and is at least 24 (720 → 30 Days, 36 → 36 Hours), and falls back to
+the 24h default for the `0`/null the API sends when the setting is unset — so the view page shows
+"1 Days", not "0 Hours". Note `toHours` guards on `parsed <= 0`, not just `Number.isFinite`:
+`Number(null)` and `Number("")` are both `0`, so an emptied number field would otherwise submit a
+zero-length lifetime.
+
+**The max tracks the selected unit** (720 hours === 30 days). `listenForDurationUnitChanges(value,
+unit)` — one parameterised method called twice — re-applies
+`[Validators.required, durationValueValidator(maxForUnit(...))]` whenever the unit flips, the same
+shape as `urlValidators()` above (`setValidators` replaces the whole list, so `required` must be
+re-supplied each time rather than declared in `initForm`). All four controls are also added to the
+**view-mode disable block**, or they stay editable on the read-only page.
+
+**E2E:** `e2e/session-lifetime.spec.ts` (serial, admin `storageState`; the setting is **global**, so
+`afterAll` re-reads live settings and restores only the captured field). It is the only test that
+proves the value survives **model → command → DB → JWT → Set-Cookie**: an admin saves "2 Days", the
+API stores `48`, the view page renders it back as "2 Days", and a fresh login's `refresh_token`
+cookie expiry lands in the configured window while the `jwt` cookie stays inside 20 minutes.
+
+**`durationValueValidator`** (`src/validators/duration-validators.ts`) replaces
+`Validators.min`/`max` here for two reasons, both of which cost real UX:
+
+- **Whole numbers.** The API field is a Go `int`, so a fractional entry (`type="number"` accepts
+  decimals) fails `json.Unmarshal` outright and returns an unparseable-body error rather than a
+  field-level message.
+- **Visible messages.** `BaseInputComponent.errorMessages` only maps `required`/`email`/`duplicate`/
+  `min`, so a `Validators.max` failure renders as an **empty** `mat-error` — a red field with no
+  explanation. This validator emits its message as the error *value*, which takes that component's
+  `typeof value === "string"` path and renders verbatim. Reach for the same trick for any new
+  validator whose error key is not in that map.
+
 ## Signals & Zoneless Change Detection
 
 This application uses Angular's signal-based reactivity model with zoneless change detection (`provideZonelessChangeDetection()`). All new code MUST follow these patterns.

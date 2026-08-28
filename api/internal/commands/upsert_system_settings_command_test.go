@@ -84,6 +84,42 @@ func TestUpsertSystemSettingsCommand_Validate_ValidInputs(t *testing.T) {
 				return cmd
 			}(),
 		},
+		// A nil pointer means the key was absent from the request body. It must
+		// validate, because omission leaves the stored value alone.
+		"valid with omitted refresh token lifetimes": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.RefreshTokenValidForHours = nil
+				cmd.McpRefreshTokenValidForHours = nil
+				return cmd
+			}(),
+		},
+		// An explicit zero means "unset": the read side falls back to the
+		// default instead.
+		"valid with unset refresh token lifetimes": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.RefreshTokenValidForHours = intPtr(0)
+				cmd.McpRefreshTokenValidForHours = intPtr(0)
+				return cmd
+			}(),
+		},
+		"valid with the minimum refresh token lifetimes": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.RefreshTokenValidForHours = intPtr(1)
+				cmd.McpRefreshTokenValidForHours = intPtr(1)
+				return cmd
+			}(),
+		},
+		"valid with the maximum refresh token lifetimes": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.RefreshTokenValidForHours = intPtr(720)
+				cmd.McpRefreshTokenValidForHours = intPtr(720)
+				return cmd
+			}(),
+		},
 	}
 
 	for testName, test := range tests {
@@ -153,7 +189,9 @@ func TestUpsertSystemSettingsCommand_Validate_InvalidInputs(t *testing.T) {
 			expectedError: "taskConcurrency",
 		},
 		"wrong queue config count": {
-			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.TaskQueueConfigurations = []UpsertTaskQueueConfigurationCommand{} },
+			modify: func(cmd *UpsertSystemSettingsCommand) {
+				cmd.TaskQueueConfigurations = []UpsertTaskQueueConfigurationCommand{}
+			},
 			expectedError: "taskQueueConfigurations",
 		},
 		"mcp enabled without a public url": {
@@ -187,12 +225,30 @@ func TestUpsertSystemSettingsCommand_Validate_InvalidInputs(t *testing.T) {
 		// The login QR is served to unauthenticated clients, so credentials in
 		// the URL would be published as a scannable code.
 		"mobile server url with embedded credentials": {
-			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.MobileServerUrl = "https://user:token@receipts.example.com/api" },
+			modify: func(cmd *UpsertSystemSettingsCommand) {
+				cmd.MobileServerUrl = "https://user:token@receipts.example.com/api"
+			},
 			expectedError: "mobileServerUrl",
 		},
 		"mobile server url with an embedded username only": {
 			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.MobileServerUrl = "https://user@receipts.example.com/api" },
 			expectedError: "mobileServerUrl",
+		},
+		"negative refresh token lifetime": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.RefreshTokenValidForHours = intPtr(-1) },
+			expectedError: "refreshTokenValidForHours",
+		},
+		"refresh token lifetime above the maximum": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.RefreshTokenValidForHours = intPtr(721) },
+			expectedError: "refreshTokenValidForHours",
+		},
+		"negative mcp refresh token lifetime": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpRefreshTokenValidForHours = intPtr(-1) },
+			expectedError: "mcpRefreshTokenValidForHours",
+		},
+		"mcp refresh token lifetime above the maximum": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpRefreshTokenValidForHours = intPtr(721) },
+			expectedError: "mcpRefreshTokenValidForHours",
 		},
 	}
 
@@ -249,4 +305,55 @@ func TestUpsertSystemSettingsCommand_Validate_PdfDpi(t *testing.T) {
 			utils.PrintTestError(t, "no pdfDpi error for invalid value "+utils.UintToString(uint(v)), "pdfDpi error")
 		}
 	}
+}
+
+func TestUpsertSystemSettingsCommand_Validate_RefreshTokenLifetimes(t *testing.T) {
+	// 0 means "unset / use default" and must be allowed; 1-720 pass; anything
+	// else is rejected. Both fields share one helper, so both are exercised to
+	// prove the two error keys are wired to the right field.
+	fields := map[string]struct {
+		set      func(cmd *UpsertSystemSettingsCommand, hours int)
+		errorKey string
+	}{
+		"refreshTokenValidForHours": {
+			set:      func(cmd *UpsertSystemSettingsCommand, hours int) { cmd.RefreshTokenValidForHours = &hours },
+			errorKey: "refreshTokenValidForHours",
+		},
+		"mcpRefreshTokenValidForHours": {
+			set:      func(cmd *UpsertSystemSettingsCommand, hours int) { cmd.McpRefreshTokenValidForHours = &hours },
+			errorKey: "mcpRefreshTokenValidForHours",
+		},
+	}
+
+	validValues := []int{0, 1, 24, 168, 720}
+	invalidValues := []int{-100, -1, 721, 100000}
+
+	for fieldName, field := range fields {
+		for _, hours := range validValues {
+			t.Run(fieldName+" accepts "+utils.UintToString(uint(hours)), func(t *testing.T) {
+				cmd := validSystemSettingsCommand()
+				field.set(&cmd, hours)
+
+				if vErr := cmd.Validate(); len(vErr.Errors) > 0 {
+					utils.PrintTestError(t, vErr.Errors, "no errors")
+				}
+			})
+		}
+
+		for _, hours := range invalidValues {
+			t.Run(fieldName+" rejects out of range value", func(t *testing.T) {
+				cmd := validSystemSettingsCommand()
+				field.set(&cmd, hours)
+
+				vErr := cmd.Validate()
+				if _, exists := vErr.Errors[field.errorKey]; !exists {
+					utils.PrintTestError(t, vErr.Errors, "an error for "+field.errorKey)
+				}
+			})
+		}
+	}
+}
+
+func intPtr(value int) *int {
+	return &value
 }

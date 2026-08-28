@@ -102,6 +102,12 @@ describe("SystemSettingsFormComponent", () => {
       mcpPublicUrl: null,
       showLoginQr: null,
       mobileServerUrl: null,
+      // With no stored value, splitHours falls back to the 24h default and
+      // renders it as the friendlier "1 Days".
+      refreshTokenValidForValue: 1,
+      refreshTokenValidForUnit: "DAYS",
+      mcpRefreshTokenValidForValue: 1,
+      mcpRefreshTokenValidForUnit: "DAYS",
     });
   });
 
@@ -128,6 +134,8 @@ describe("SystemSettingsFormComponent", () => {
       mcpPublicUrl: "https://receipts.example.com",
       showLoginQr: true,
       mobileServerUrl: "https://receipts.example.com/api",
+      refreshTokenValidForHours: 720,
+      mcpRefreshTokenValidForHours: 6,
     };
 
     component.ngOnInit();
@@ -153,6 +161,12 @@ describe("SystemSettingsFormComponent", () => {
       mcpPublicUrl: "https://receipts.example.com",
       showLoginQr: true,
       mobileServerUrl: "https://receipts.example.com/api",
+      // 720 hours divides evenly into days, so it renders as 30 Days; 6 does
+      // not, so it stays in hours.
+      refreshTokenValidForValue: 30,
+      refreshTokenValidForUnit: "DAYS",
+      mcpRefreshTokenValidForValue: 6,
+      mcpRefreshTokenValidForUnit: "HOURS",
     });
   });
 
@@ -270,6 +284,78 @@ describe("SystemSettingsFormComponent", () => {
     expect(mcpPublicUrl.valid).toBe(true);
   });
 
+  it("caps the session lifetime at 720 hours or 30 days depending on the unit", () => {
+    component.ngOnInit();
+
+    const value = component.form.get("refreshTokenValidForValue")!;
+    const unit = component.form.get("refreshTokenValidForUnit")!;
+
+    unit.setValue("HOURS");
+    value.setValue(720);
+    expect(value.valid).toBe(true);
+
+    value.setValue(721);
+    expect(value.valid).toBe(false);
+
+    // Flipping the unit has to retarget the max, or 30 days would be rejected
+    // as if it were 30 hours over the limit.
+    unit.setValue("DAYS");
+    value.setValue(30);
+    expect(value.valid).toBe(true);
+
+    value.setValue(31);
+    expect(value.valid).toBe(false);
+  });
+
+  it("requires a positive whole-number session lifetime", () => {
+    component.ngOnInit();
+
+    const value = component.form.get("refreshTokenValidForValue")!;
+
+    value.setValue(0);
+    expect(value.valid).toBe(false);
+
+    value.setValue(null);
+    expect(value.valid).toBe(false);
+
+    // The API stores this as a Go int, so a fractional value would fail
+    // json.Unmarshal instead of coming back as a field error.
+    value.setValue(1.5);
+    expect(value.valid).toBe(false);
+
+    value.setValue(1);
+    expect(value.valid).toBe(true);
+  });
+
+  it("surfaces a readable message when the lifetime is out of range", () => {
+    component.ngOnInit();
+
+    const value = component.form.get("refreshTokenValidForValue")!;
+    component.form.get("refreshTokenValidForUnit")!.setValue("DAYS");
+
+    value.setValue(31);
+
+    // The message rides on the error value so BaseInputComponent renders it —
+    // Validators.max has no message mapping and would show a blank error.
+    expect(value.errors?.["duration"]).toBe("Must be at most 30.");
+  });
+
+  it("caps the mcp connector lifetime independently of the session lifetime", () => {
+    component.ngOnInit();
+
+    component.form.get("mcpRefreshTokenValidForUnit")!.setValue("DAYS");
+    const mcpValue = component.form.get("mcpRefreshTokenValidForValue")!;
+
+    mcpValue.setValue(31);
+    expect(mcpValue.valid).toBe(false);
+
+    mcpValue.setValue(30);
+    expect(mcpValue.valid).toBe(true);
+
+    // The app-session control keeps its own unit and bound.
+    expect(component.form.get("refreshTokenValidForUnit")!.value).toBe("DAYS");
+  });
+
   it("should submit form", () => {
     const systemSettingsService = TestBed.inject(SystemSettingsService);
     const snackbarService = TestBed.inject(SnackbarService);
@@ -301,6 +387,10 @@ describe("SystemSettingsFormComponent", () => {
       mcpPublicUrl: "https://receipts.example.com",
       showLoginQr: true,
       mobileServerUrl: "https://receipts.example.com/api",
+      refreshTokenValidForValue: "14",
+      refreshTokenValidForUnit: "DAYS",
+      mcpRefreshTokenValidForValue: "12",
+      mcpRefreshTokenValidForUnit: "HOURS",
     });
 
     // Update the quick_scan queue priority specifically
@@ -337,6 +427,10 @@ describe("SystemSettingsFormComponent", () => {
       mcpPublicUrl: "https://receipts.example.com",
       showLoginQr: true,
       mobileServerUrl: "https://receipts.example.com/api",
+      // The value/unit pairs are folded into hours and the presentation-only
+      // controls are stripped — toEqual would fail if any of them leaked.
+      refreshTokenValidForHours: 336,
+      mcpRefreshTokenValidForHours: 12,
     });
 
     expect(snackbarServiceSpy).toHaveBeenCalled();

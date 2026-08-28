@@ -43,6 +43,10 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
   final bool? showLoginQr;
   @override
   final String? mobileServerUrl;
+  @override
+  final int? refreshTokenValidForHours;
+  @override
+  final int? mcpRefreshTokenValidForHours;
 
   factory _$UpsertSystemSettingsCommand(
           [void Function(UpsertSystemSettingsCommandBuilder)? updates]) =>
@@ -66,7 +70,9 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
       this.mcpEnabled,
       this.mcpPublicUrl,
       this.showLoginQr,
-      this.mobileServerUrl})
+      this.mobileServerUrl,
+      this.refreshTokenValidForHours,
+      this.mcpRefreshTokenValidForHours})
       : super._();
   @override
   UpsertSystemSettingsCommand rebuild(
@@ -99,7 +105,9 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
         mcpEnabled == other.mcpEnabled &&
         mcpPublicUrl == other.mcpPublicUrl &&
         showLoginQr == other.showLoginQr &&
-        mobileServerUrl == other.mobileServerUrl;
+        mobileServerUrl == other.mobileServerUrl &&
+        refreshTokenValidForHours == other.refreshTokenValidForHours &&
+        mcpRefreshTokenValidForHours == other.mcpRefreshTokenValidForHours;
   }
 
   @override
@@ -123,6 +131,8 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
     _$hash = $jc(_$hash, mcpPublicUrl.hashCode);
     _$hash = $jc(_$hash, showLoginQr.hashCode);
     _$hash = $jc(_$hash, mobileServerUrl.hashCode);
+    _$hash = $jc(_$hash, refreshTokenValidForHours.hashCode);
+    _$hash = $jc(_$hash, mcpRefreshTokenValidForHours.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -148,7 +158,9 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
           ..add('mcpEnabled', mcpEnabled)
           ..add('mcpPublicUrl', mcpPublicUrl)
           ..add('showLoginQr', showLoginQr)
-          ..add('mobileServerUrl', mobileServerUrl))
+          ..add('mobileServerUrl', mobileServerUrl)
+          ..add('refreshTokenValidForHours', refreshTokenValidForHours)
+          ..add('mcpRefreshTokenValidForHours', mcpRefreshTokenValidForHours))
         .toString();
   }
 }
@@ -253,6 +265,16 @@ class UpsertSystemSettingsCommandBuilder
   set mobileServerUrl(String? mobileServerUrl) =>
       _$this._mobileServerUrl = mobileServerUrl;
 
+  int? _refreshTokenValidForHours;
+  int? get refreshTokenValidForHours => _$this._refreshTokenValidForHours;
+  set refreshTokenValidForHours(int? refreshTokenValidForHours) =>
+      _$this._refreshTokenValidForHours = refreshTokenValidForHours;
+
+  int? _mcpRefreshTokenValidForHours;
+  int? get mcpRefreshTokenValidForHours => _$this._mcpRefreshTokenValidForHours;
+  set mcpRefreshTokenValidForHours(int? mcpRefreshTokenValidForHours) =>
+      _$this._mcpRefreshTokenValidForHours = mcpRefreshTokenValidForHours;
+
   UpsertSystemSettingsCommandBuilder() {
     UpsertSystemSettingsCommand._defaults(this);
   }
@@ -279,6 +301,8 @@ class UpsertSystemSettingsCommandBuilder
       _mcpPublicUrl = $v.mcpPublicUrl;
       _showLoginQr = $v.showLoginQr;
       _mobileServerUrl = $v.mobileServerUrl;
+      _refreshTokenValidForHours = $v.refreshTokenValidForHours;
+      _mcpRefreshTokenValidForHours = $v.mcpRefreshTokenValidForHours;
       _$v = null;
     }
     return this;
@@ -336,6 +360,8 @@ class UpsertSystemSettingsCommandBuilder
             mcpPublicUrl: mcpPublicUrl,
             showLoginQr: showLoginQr,
             mobileServerUrl: mobileServerUrl,
+            refreshTokenValidForHours: refreshTokenValidForHours,
+            mcpRefreshTokenValidForHours: mcpRefreshTokenValidForHours,
           );
     } catch (_) {
       late String _$failedField;

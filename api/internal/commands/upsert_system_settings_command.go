@@ -10,6 +10,14 @@ import (
 	"strings"
 )
 
+// Bounds on the configurable refresh-token lifetimes. They live here rather than
+// alongside the resolver in services/ because internal/commands cannot import
+// internal/services, and the validation and the read-side clamp must agree.
+const (
+	MinRefreshTokenValidForHours = 1
+	MaxRefreshTokenValidForHours = 720 // 30 days
+)
+
 type UpsertSystemSettingsCommand struct {
 	EnableLocalSignUp                   bool                                  `json:"enableLocalSignUp"`
 	DebugOcr                            bool                                  `json:"debugOcr"`
@@ -29,6 +37,13 @@ type UpsertSystemSettingsCommand struct {
 	McpPublicUrl                        string                                `json:"mcpPublicUrl"`
 	ShowLoginQr                         bool                                  `json:"showLoginQr"`
 	MobileServerUrl                     string                                `json:"mobileServerUrl"`
+	// Pointers so an omitted key is distinguishable from an explicit 0. The
+	// repository writes every column (Select("*")), so a plain int would persist
+	// as 0 and silently reset a configured lifetime to the default whenever a
+	// client PUTs a body without these keys. Same reasoning as the pointer
+	// fields on UpdateGroupReceiptSettingsCommand.
+	RefreshTokenValidForHours    *int `json:"refreshTokenValidForHours"`
+	McpRefreshTokenValidForHours *int `json:"mcpRefreshTokenValidForHours"`
 }
 
 func (command *UpsertSystemSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -112,7 +127,34 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 		errorMap["mobileServerUrl"] = "Mobile server URL must be an absolute URL like https://receipts.example.com/api"
 	}
 
+	if msg := validateRefreshTokenValidForHours(command.RefreshTokenValidForHours); len(msg) > 0 {
+		errorMap["refreshTokenValidForHours"] = msg
+	}
+
+	if msg := validateRefreshTokenValidForHours(command.McpRefreshTokenValidForHours); len(msg) > 0 {
+		errorMap["mcpRefreshTokenValidForHours"] = msg
+	}
+
 	return vErr
+}
+
+// validateRefreshTokenValidForHours bounds a refresh-token lifetime, returning an
+// empty string when the value is acceptable.
+//
+// A nil pointer means the key was omitted, which leaves the stored value alone
+// (see ApplyOmittedLifetimes) and is always valid. An explicit 0 means "unset":
+// the read side falls back to the built-in default. Shared by the app and MCP
+// settings so the two cannot drift.
+func validateRefreshTokenValidForHours(hours *int) string {
+	if hours == nil || *hours == 0 {
+		return ""
+	}
+
+	if *hours < MinRefreshTokenValidForHours || *hours > MaxRefreshTokenValidForHours {
+		return "Refresh token lifetime must be between 1 and 720 hours (30 days)"
+	}
+
+	return ""
 }
 
 // isValidAbsoluteUrl reports whether the value is an absolute http(s) URL.
@@ -150,4 +192,44 @@ func (command *UpsertSystemSettingsCommand) ToSystemSettings(id uint) (models.Sy
 	}
 
 	return systemSettings, nil
+}
+
+// OmittedLifetimeColumns names the refresh-token lifetime fields the request did
+// not send, so the repository can leave those columns out of the UPDATE entirely.
+//
+// Skipping the column is what makes a concurrent update safe. Copying the stored
+// value onto the row instead (see ApplyOmittedLifetimes) would still write it,
+// so two requests that each set one lifetime and omit the other would clobber
+// each other with the values they read before the write. A column that is never
+// written cannot be clobbered, and unlike a row lock this works identically on
+// SQLite, MySQL and Postgres.
+func (command *UpsertSystemSettingsCommand) OmittedLifetimeColumns() []string {
+	columns := make([]string, 0, 2)
+
+	if command.RefreshTokenValidForHours == nil {
+		columns = append(columns, "RefreshTokenValidForHours")
+	}
+
+	if command.McpRefreshTokenValidForHours == nil {
+		columns = append(columns, "McpRefreshTokenValidForHours")
+	}
+
+	return columns
+}
+
+// ApplyOmittedLifetimes carries the stored refresh-token lifetimes onto the
+// settings a PUT is about to write for any key the request omitted.
+//
+// ToSystemSettings round-trips the command through JSON, so a nil pointer lands
+// as 0 on the model. The columns themselves are excluded from the UPDATE by
+// OmittedLifetimeColumns, so this exists purely so the object echoed back in the
+// response carries the stored value rather than a misleading 0.
+func (command *UpsertSystemSettingsCommand) ApplyOmittedLifetimes(existing models.SystemSettings, updated *models.SystemSettings) {
+	if command.RefreshTokenValidForHours == nil {
+		updated.RefreshTokenValidForHours = existing.RefreshTokenValidForHours
+	}
+
+	if command.McpRefreshTokenValidForHours == nil {
+		updated.McpRefreshTokenValidForHours = existing.McpRefreshTokenValidForHours
+	}
 }
