@@ -172,7 +172,7 @@ void main() {
       ScaffoldMessenger.of(capturedContext).removeCurrentSnackBar();
       await tester.pump();
 
-      expect(find.text(galleryUnsupportedPlatformMessage), findsOneWidget);
+      expect(find.text(galleryUnavailableMessage), findsOneWidget);
       expect(visited, isEmpty);
     }, skip: Platform.isAndroid || Platform.isIOS);
 

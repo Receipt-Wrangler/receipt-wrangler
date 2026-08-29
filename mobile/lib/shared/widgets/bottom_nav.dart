@@ -16,7 +16,7 @@ class NavDestinationItem {
     this.onLongPress,
   });
 
-  /// Stable identifier, unique within one nav (see `NavDestinationId`).
+  /// Stable identifier, unique within one nav.
   final String id;
 
   final NavigationDestination destination;

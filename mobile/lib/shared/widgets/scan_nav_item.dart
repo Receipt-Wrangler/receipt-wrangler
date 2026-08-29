@@ -7,6 +7,10 @@ import 'bottom_nav.dart';
 /// Identity of the scan/add slot within a bottom nav.
 const scanNavDestinationId = "scan";
 
+/// Names the hold gesture for assistive tech. The gesture is undiscoverable on
+/// its own, and the receipts-screen overflow menu is its accessible equivalent.
+const scanNavLongPressHint = "Press and hold for more ways to add a receipt";
+
 /// Builds the receipt-entry slot for a bottom nav, or `null` when the user can
 /// neither quick-scan nor create receipts here.
 ///
@@ -41,14 +45,19 @@ NavDestinationItem? buildScanNavItem(
     onLongPress: () => showReceiptEntryMenu(context, anchorKey),
     destination: NavigationDestination(
       key: anchorKey,
-      icon: Icon(canQuickScan ? Icons.document_scanner : Icons.add),
+      // The hint rides on Semantics rather than the destination's `tooltip`,
+      // which is disabled just below -- see there for why.
+      icon: Semantics(
+        hint: scanNavLongPressHint,
+        child: Icon(canQuickScan ? Icons.document_scanner : Icons.add),
+      ),
       label: canQuickScan ? "Scan" : "Add",
-      // Long-press is not reachable by every input method, so the hint names the
-      // gesture and the receipts screen's overflow menu offers the same actions
-      // without it.
-      tooltip: canQuickScan
-          ? "Scan a receipt. Press and hold for more ways to add one."
-          : "Add a receipt. Press and hold for more ways to add one.",
+      // Empty string = no tooltip. A NavigationDestination otherwise shows one
+      // on **long press** (falling back to the label), which would put a second
+      // long-press recognizer in the gesture arena against the one that opens
+      // this slot's menu. Rather than rely on which of them wins, take Material's
+      // out of the running.
+      tooltip: "",
     ),
   );
 }

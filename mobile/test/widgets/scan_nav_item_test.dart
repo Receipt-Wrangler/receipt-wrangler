@@ -143,7 +143,42 @@ void main() {
   testWidgets('names the hold gesture for assistive tech', (tester) async {
     await pumpSlot(tester, aiEnabled: true, permissions: [quickScan, create]);
 
-    expect(item!.destination.tooltip, contains('hold'),
-        reason: 'a long-press is undiscoverable without being described');
+    final handle = tester.ensureSemantics();
+    expect(
+      find.bySemanticsLabel(RegExp('Scan')),
+      findsWidgets,
+    );
+    expect(
+      tester
+          .getSemantics(find.byIcon(Icons.document_scanner))
+          .hint,
+      contains('hold'),
+      reason: 'a long-press is undiscoverable without being described',
+    );
+    handle.dispose();
+  });
+
+  testWidgets("Material's own long-press tooltip is disabled on the slot",
+      (tester) async {
+    // A NavigationDestination shows a tooltip on long press (falling back to
+    // its label), which would put a competing long-press recognizer in the
+    // gesture arena against the one that opens the menu.
+    await pumpSlot(tester, aiEnabled: true, permissions: [quickScan, create]);
+
+    expect(item!.destination.tooltip, '');
+
+    await tester.longPress(find.text('Scan'));
+    await tester.pumpAndSettle();
+
+    // The filler destination keeps its default tooltip; only the scan slot's
+    // must be gone.
+    expect(
+      find.byWidgetPredicate(
+          (w) => w is Tooltip && (w.message == 'Scan' || w.message == 'Add')),
+      findsNothing,
+      reason: 'no tooltip should be competing for the hold',
+    );
+    expect(find.text(quickScanLabel), findsOneWidget,
+        reason: 'the hold reached the menu');
   });
 }

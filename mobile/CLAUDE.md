@@ -375,6 +375,11 @@ backend enforces the two permissions **separately** (`handlers.QuickScan` → `g
   equal-flex `Row` of `GestureDetector`s with `HitTestBehavior.translucent`. A tap loses the gesture
   arena to the bar's own `InkWell` (so selection still works); a hold is claimed by the long-press
   recognizer at 500ms before the tap can complete.
+  **The slot sets `tooltip: ""`** (empty = none). A `NavigationDestination` otherwise shows a tooltip
+  **on long press**, falling back to its label when `tooltip` is null — a second long-press recognizer
+  in the arena against the one that opens the menu. Rather than depend on which wins, Material's is
+  taken out of the running, and the gesture hint rides on a `Semantics(hint: scanNavLongPressHint)`
+  wrapper around the icon instead (`Semantics` installs no recognizer).
 - **Actions** live in `lib/shared/functions/receipt_entry.dart`; copy lives in
   `lib/constants/receipt_entry.dart` (shared so the sheet's snackbar and the form's banner can't
   drift). `startScanEntry` is the tap: blocked → the manual form carrying the reason; otherwise

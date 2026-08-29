@@ -29,8 +29,8 @@ const noReceiptEntryPermissionMessage =
 const cameraDeniedFallbackMessage =
     "Camera access is off — pick from your gallery instead.";
 
-const galleryUnsupportedPlatformMessage =
-    "Picking images from the gallery isn't supported on this device.";
+const galleryUnavailableMessage =
+    "Couldn't open the gallery on this device.";
 
 const addManualReceiptLabel = "Add Manual Receipt";
 const quickScanLabel = "Quick Scan";

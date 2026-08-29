@@ -114,19 +114,20 @@ Future<void> openQuickScanFromGallery(BuildContext context) async {
       initialImages: buildQuickScanImages(context, images));
 }
 
-/// [getGalleryImages] with the unsupported-platform throw turned into a message.
+/// [getGalleryImages] with any failure turned into a message.
 ///
 /// It hard-throws off android/ios (`lib/utils/scan.dart`'s
 /// `Platform.operatingSystem` switch), which the nav's camera-denied fallback
-/// now makes reachable — an unhandled async error there would surface as a red
-/// screen rather than an explanation.
+/// now makes reachable, and the picker itself can fail on a real device — an
+/// unhandled async error either way would surface as a red screen rather than
+/// an explanation.
 Future<List<UploadMultipartFileData>> pickGalleryImages(
     BuildContext context) async {
   try {
     return await getGalleryImages();
   } catch (_) {
     if (context.mounted) {
-      showErrorSnackbar(context, galleryUnsupportedPlatformMessage);
+      showErrorSnackbar(context, galleryUnavailableMessage);
     }
     return [];
   }
@@ -172,10 +173,19 @@ void showReceiptEntryMenu(BuildContext context, GlobalKey anchorKey) {
     offset.dy + size.height,
   );
 
+  final items = buildReceiptEntryMenuItems(context);
+  // showMenu asserts on an empty list. Unreachable through the UI (the slot this
+  // menu hangs off is omitted when there is nothing to offer), but a stale
+  // permission set must not crash the app.
+  if (items.isEmpty) {
+    showErrorSnackbar(context, noReceiptEntryPermissionMessage);
+    return;
+  }
+
   showMenu(
     context: context,
     position: position,
-    items: buildReceiptEntryMenuItems(context),
+    items: items,
   );
 }
 
