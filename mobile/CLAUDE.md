@@ -399,6 +399,14 @@ backend enforces the two permissions **separately** (`handlers.QuickScan` → `g
   `GroupSelectAppBar`.
 - **Gallery upload is gated on quick-scan, not create** — that flow feeds the Quick Scan sheet, so
   offering it to a create-only user would produce a sheet they cannot submit.
+- **A submitted sheet confirms itself** (`quick-scan-queued-confirmation`). Submitting disables every
+  field and hides the submit button, so once the success snackbar fades the sheet would otherwise sit
+  there greyed out with nothing saying why. Extraction is an async backend job, so the wording
+  promises a result rather than showing one.
+- **The sheet shows a page counter** (`quick-scan-page-indicator`) when a scan carries more than one
+  page. A scan can carry up to 100, and the carousel gives no other hint that the pages after the
+  first exist — without it a multi-page scan reads as a single-page one and the forms behind it go
+  unfilled.
 - **The sheet re-checks its own gate** and resolves `canCreateManual` **at the caller's context**.
   Its `bottomSheetWidget` is built inside the modal route, which is outside the GoRouter subtree, so
   `GoRouterState.of` throws there — resolve before opening and pass the result down.

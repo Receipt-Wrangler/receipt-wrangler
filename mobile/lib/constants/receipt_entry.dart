@@ -36,6 +36,7 @@ const addManualReceiptLabel = "Add Manual Receipt";
 const quickScanLabel = "Quick Scan";
 const uploadFromGalleryLabel = "Upload from Gallery";
 const enterDetailsManuallyLabel = "Enter details manually instead";
+const quickScanQueuedMessage = "Queued — we'll fill in the details for you.";
 
 /// Extra key carrying a [QuickScanBlockedReason] into `/receipts/add`, so the
 /// form can explain why the Scan tap landed there. Only the tap path sets it —

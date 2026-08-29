@@ -96,6 +96,15 @@ void main() {
         reason: 'the manual form would only reject their save');
   });
 
+  testWidgets('nothing confirms a queued scan until one is submitted',
+      (tester) async {
+    await pumpSheet(tester, aiEnabled: true, permissions: [quickScan, create]);
+
+    expect(find.byKey(const ValueKey('quick-scan-queued-confirmation')),
+        findsNothing);
+    expect(find.text(quickScanQueuedMessage), findsNothing);
+  });
+
   testWidgets('a single-page scan gets no page counter', (tester) async {
     await pumpSheet(tester, aiEnabled: true, permissions: [quickScan, create]);
 

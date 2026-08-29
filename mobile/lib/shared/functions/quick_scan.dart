@@ -305,6 +305,48 @@ Widget _getDeleteIcon(
 /// Offers manual entry as a way out of the sheet, for a user who would rather
 /// type the receipt than have it extracted. Gated on `group.receipts.create`:
 /// without it the manual form would only reject the save.
+/// Confirms the scan was accepted, and stays put once the success snackbar
+/// fades.
+///
+/// Submitting disables every field and hides the submit button; without this the
+/// sheet would just sit there greyed out with nothing saying why. Extraction is
+/// an async backend job, so the wording promises a result rather than showing
+/// one.
+Widget _getQueuedConfirmation(BehaviorSubject<bool> isCompletedSubject) {
+  return StreamBuilder<bool>(
+    stream: isCompletedSubject.stream,
+    builder: (context, snapshot) {
+      if (!(snapshot.hasData && snapshot.data == true)) {
+        return const SizedBox.shrink();
+      }
+
+      final colors = Theme.of(context).colorScheme;
+      return Container(
+        key: const ValueKey("quick-scan-queued-confirmation"),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        color: colors.secondaryContainer,
+        child: Row(
+          children: [
+            Icon(Icons.check_circle_outline,
+                size: 20, color: colors.onSecondaryContainer),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                quickScanQueuedMessage,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: colors.onSecondaryContainer),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
 /// [canCreateManual] is resolved by the caller rather than here: this widget is
 /// built inside the modal sheet's route, which sits outside the GoRouter subtree
 /// the gate reads the current group from.
@@ -387,6 +429,7 @@ showQuickScanBottomSheet(BuildContext context,
       bottomSheetWidget: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          _getQueuedConfirmation(isCompletedSubject),
           _getManualEntryLink(
               context, availability.canCreateManual, isCompletedSubject),
           _getSubmitButton(context, imageSubject, isCompletedSubject),
