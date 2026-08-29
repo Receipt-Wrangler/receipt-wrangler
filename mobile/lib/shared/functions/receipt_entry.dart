@@ -42,7 +42,16 @@ Future<void> startScanEntry(BuildContext context) async {
     return;
   }
 
-  final access = await ensureCameraAccess();
+  CameraAccess access;
+  try {
+    access = await ensureCameraAccess();
+  } catch (_) {
+    // permission_handler talks over a platform channel and has thrown here
+    // before (`ERROR_ALREADY_REQUESTING_PERMISSIONS`; see requestPermissions).
+    // Treat an unanswerable camera as an unavailable one rather than letting an
+    // unhandled async error reach the user.
+    access = CameraAccess.denied;
+  }
   if (!context.mounted) {
     return;
   }

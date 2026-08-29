@@ -191,6 +191,21 @@ void main() {
               'settings screen is the only way back to the camera');
     });
 
+    testWidgets('a camera check that throws degrades to the gallery fallback',
+        (tester) async {
+      // permission_handler talks over a platform channel and has thrown here
+      // before; an unhandled async error would reach the user as a red screen.
+      debugCameraAccessOverride = () async => throw StateError('channel down');
+      await pumpEntry(tester,
+          aiEnabled: true, permissions: [quickScan, create]);
+
+      await startScanEntry(capturedContext);
+      await tester.pump();
+
+      expect(find.text(cameraDeniedFallbackMessage), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('a user with quick scan but no create still reaches the camera',
         (tester) async {
       debugCameraAccessOverride = () async => CameraAccess.granted;
