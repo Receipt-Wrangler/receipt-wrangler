@@ -85,9 +85,13 @@ void main() {
     expect(find.text(uploadFromGalleryLabel), findsNothing,
         reason: 'gallery upload feeds Quick Scan, so it goes with it');
 
-    // Dismiss the popup before reopening with the flag flipped on.
+    // Dismiss the popup before reopening with the flag flipped on. Waiting for
+    // the items to actually leave -- rather than pumping a fixed duration -- is
+    // what makes the second long-press land on the nav rather than on the
+    // dismissing route's barrier.
     await tester.tapAt(const Offset(10, 10));
-    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    await pumpUntilGone(tester, find.text(addManualReceiptLabel));
+    await tester.pumpAndSettle();
 
     setAi(true);
     await tester.pump();

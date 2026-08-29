@@ -78,6 +78,15 @@ class _BottomNav extends State<BottomNav> {
   /// the destination as usual, while a hold is claimed by the long-press
   /// recognizer at the 500ms mark before the tap can complete. Slices without a
   /// long-press action stay inert so they never interfere.
+  ///
+  /// The action runs on **`onLongPressUp`**, not `onLongPress`. `onLongPress`
+  /// fires at the 500ms mark with the finger still down, and these actions open
+  /// a route — pushing one mid-gesture leaves the recognizer holding the pointer
+  /// it never saw released, after which that slice ignores every later tap and
+  /// hold. (Observed as a slot that worked once and then went dead;
+  /// bottom_nav_test covers it.) Waiting for the release costs nothing: the
+  /// recognizer has already won the arena at 500ms, so the tap underneath stays
+  /// suppressed either way.
   Widget buildLongPressOverlay() {
     return Row(
       children: widget.items.map((item) {
@@ -87,7 +96,7 @@ class _BottomNav extends State<BottomNav> {
               ? const SizedBox.expand()
               : GestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  onLongPress: onLongPress,
+                  onLongPressUp: onLongPress,
                   child: const SizedBox.expand(),
                 ),
         );

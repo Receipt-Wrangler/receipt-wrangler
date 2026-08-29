@@ -375,6 +375,14 @@ backend enforces the two permissions **separately** (`handlers.QuickScan` → `g
   equal-flex `Row` of `GestureDetector`s with `HitTestBehavior.translucent`. A tap loses the gesture
   arena to the bar's own `InkWell` (so selection still works); a hold is claimed by the long-press
   recognizer at 500ms before the tap can complete.
+  **The action runs on `onLongPressUp`, not `onLongPress`.** `onLongPress` fires at the 500ms mark
+  with the finger still down, and these actions open a route — pushing one mid-gesture leaves the
+  recognizer holding a pointer it never saw released, after which that slice ignores every later tap
+  *and* hold. The slot worked exactly once per launch. Waiting for the release costs nothing: the
+  recognizer has already won the arena at 500ms, so the tap underneath stays suppressed either way.
+  The guard is `integration_test/receipt_entry_menu_reopen_test.dart` and has to be an e2e — a
+  minimal widget harness delivers the pointer-up cleanly enough that the recognizer recovers, so the
+  equivalent widget test passes with the bug present.
   **The slot sets `tooltip: ""`** (empty = none). A `NavigationDestination` otherwise shows a tooltip
   **on long press**, falling back to its label when `tooltip` is null — a second long-press recognizer
   in the arena against the one that opens the menu. Rather than depend on which wins, Material's is

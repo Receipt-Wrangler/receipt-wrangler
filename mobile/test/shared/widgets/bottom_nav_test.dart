@@ -94,6 +94,13 @@ void main() {
     expect(tapped, [2]);
   });
 
+  // NOTE: the "slot dies after its menu closes" regression (see
+  // buildLongPressOverlay's onLongPressUp comment) is NOT covered here. It was
+  // reproduced only against the real app -- a minimal harness delivers the
+  // pointer-up cleanly enough that the recognizer recovers, and the test passes
+  // with the bug present. The guard lives in
+  // integration_test/receipt_entry_menu_reopen_test.dart instead.
+
   testWidgets('no overlay is built when nothing is long-pressable',
       (tester) async {
     await tester.pumpWidget(harness(withLongPress: false));
