@@ -27,6 +27,14 @@ func (command *UpsertPromptCommand) LoadDataFromRequest(w http.ResponseWriter, r
 	return nil
 }
 
+var allowedTemplateVariables = map[structs.PromptTemplateVariable]bool{
+	structs.CATEGORIES:    true,
+	structs.TAGS:          true,
+	structs.OCR_TEXT:      true,
+	structs.CURRENT_YEAR:  true,
+	structs.CUSTOM_FIELDS: true,
+}
+
 func (command *UpsertPromptCommand) Validate() structs.ValidatorError {
 	vErr := structs.ValidatorError{}
 	errorMap := make(map[string]string)
@@ -42,8 +50,9 @@ func (command *UpsertPromptCommand) Validate() structs.ValidatorError {
 		templateVariables := regex.FindAllString(command.Prompt, -1)
 		for i := 0; i < len(templateVariables); i++ {
 			variable := templateVariables[i]
-			if variable != string(structs.CATEGORIES) && variable != string(structs.TAGS) && variable != string(structs.OCR_TEXT) && variable != string(structs.CURRENT_YEAR) {
+			if !allowedTemplateVariables[structs.PromptTemplateVariable(variable)] {
 				errorMap["prompt"] = "Invalid template variables found"
+				break
 			}
 		}
 	}
