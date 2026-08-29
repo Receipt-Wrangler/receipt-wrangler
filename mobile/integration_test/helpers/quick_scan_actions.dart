@@ -7,6 +7,7 @@ import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 
 import 'pump.dart';
+import 'receipt_test_helpers.dart';
 
 /// Shared Quick Scan e2e actions, used by the config + submit specs.
 
@@ -51,22 +52,22 @@ Future<api.Group> keepOnlyGroup(WidgetTester tester, int groupId) async {
   return target;
 }
 
-/// Opens the Quick Scan sheet from the bottom-nav Add menu and adds one image
-/// via the mocked document scanner, leaving the per-image form mounted (the
-/// "Group" field is on screen). Requires the AI flag already enabled and
-/// `installDocumentScannerMock()` already installed. The hitTestable +
-/// frame-drain hardening handles the sheet/popup slide-in (a deterministic
-/// tap-flake on iOS Cupertino transitions).
+/// Taps the bottom-nav scan slot to capture one image via the mocked document
+/// scanner, leaving the Quick Scan sheet open with its per-image form mounted
+/// (the "Group" field is on screen).
+///
+/// The tap is the direct scan action, so the sheet arrives already seeded --
+/// there is no menu step and no separate "add a photo" tap any more. Requires
+/// the AI flag already enabled and `installDocumentScannerMock()` already
+/// installed. The hitTestable + frame-drain hardening handles the sheet
+/// slide-in (a deterministic tap-flake on iOS Cupertino transitions).
 Future<void> openQuickScanImageForm(WidgetTester tester) async {
-  await tester.tap(find.text('Add').hitTestable());
-  await pumpUntilFound(tester, find.text('Quick Scan').hitTestable());
+  await pumpUntilFound(tester, scanNavSlot());
+  await tester.tap(scanNavSlot());
   for (int i = 0; i < 5; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
-  await tester.tap(find.text('Quick Scan').hitTestable());
 
-  await pumpUntilFound(tester, find.byIcon(Icons.add_a_photo));
-  await tester.tap(find.byIcon(Icons.add_a_photo));
   await pumpUntilFound(tester, find.text('Group'));
 }
 

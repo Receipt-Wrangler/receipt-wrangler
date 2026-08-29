@@ -67,7 +67,7 @@ void main() {
     // GroupBottomNav also has an "Add" destination -- waiting on that
     // text is both the destination-mounted check and the target for
     // the next addManualReceiptViaUI call.
-    await pumpUntilFound(tester, find.text('Add'));
+    await pumpUntilFound(tester, scanNavSlot());
 
     // Add receipt 2.
     final id2 = await addManualReceiptViaUI(tester, name2, amount: '22.22');

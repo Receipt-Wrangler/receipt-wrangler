@@ -10,6 +10,7 @@ import 'helpers/nav.dart';
 import 'helpers/permission_fixtures.dart';
 import 'helpers/platform_mocks.dart';
 import 'helpers/pump.dart';
+import 'helpers/receipt_test_helpers.dart';
 
 /// Regression coverage for the receipt-form category picker (M2).
 ///
@@ -62,12 +63,7 @@ void main() {
     await enterGroup(tester, fixture.groupName!);
 
     // Open the add-receipt form via the bottom-nav Add menu.
-    await tester.tap(find.text('Add').hitTestable());
-    await pumpUntilFound(tester, find.text('Add Manual Receipt').hitTestable());
-    for (int i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    await tester.tap(find.text('Add Manual Receipt').hitTestable());
+    await openManualReceiptForm(tester);
     await pumpUntilFound(tester, find.text('Name'));
 
     // Selecting the group makes the picker field visible (gated on the group's

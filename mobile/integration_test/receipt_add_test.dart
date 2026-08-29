@@ -37,11 +37,9 @@ void main() {
     final receiptName =
         'e2e-manual-${DateTime.now().millisecondsSinceEpoch}';
 
-    // Open the bottom-nav Add popup menu and pick "Add Manual Receipt".
-    await tester.tap(find.text('Add'));
-    await pumpUntilFound(tester, find.text('Add Manual Receipt'));
-    await tester.tap(find.text('Add Manual Receipt'));
-    await pumpUntilFound(tester, find.text('Name'));
+    // Hold the bottom-nav scan/add slot and pick "Add Manual Receipt" -- a tap
+    // is a direct action now.
+    await openManualReceiptForm(tester);
 
     // Fill required fields. Date defaults to now and status defaults to
     // OPEN via getDefaultReceipt() (mobile/lib/utils/receipts.dart:16),

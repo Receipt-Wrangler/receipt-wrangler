@@ -70,6 +70,44 @@ void scheduleReceiptCleanup(int receiptId) {
   });
 }
 
+/// The bottom-nav scan/add slot, whichever label it is currently wearing.
+///
+/// It reads "Scan" when Quick Scan can run for the caller and "Add" when it
+/// can't, so a spec that only cares about *reaching* the entry point must not
+/// pin the label. Inside a group two bottom navs are mounted (the group-select
+/// shell sits under the group shell), so two slots match; `.hitTestable()`
+/// targets the visible one.
+Finder scanNavSlot() => find
+    .byWidgetPredicate((w) =>
+        w is NavigationDestination && (w.label == 'Scan' || w.label == 'Add'))
+    .hitTestable();
+
+/// Opens the manual receipt form from the bottom-nav scan/add slot.
+///
+/// A **tap** on that slot is a direct action now -- it opens the document
+/// scanner when Quick Scan can run, and the manual form when it can't -- so
+/// manual entry is reached by **holding** it. The hold works on every screen and
+/// in every feature-flag state, unlike the receipts-screen overflow menu, which
+/// is why it is the path used here.
+///
+/// Pre-condition: the caller holds `group.receipts.create`, so the slot is
+/// present and the menu carries the entry.
+Future<void> openManualReceiptForm(WidgetTester tester) async {
+  await pumpUntilFound(tester, scanNavSlot());
+  await tester.longPress(scanNavSlot());
+
+  // The menu's items mount on the popup's first frame while it is still
+  // growing, so a tap computed then lands short and misses (observed as
+  // "Offset(411.6, 852.0) ... would not hit test"). Wait for hittability, then
+  // drain the animation.
+  await pumpUntilFound(tester, find.text('Add Manual Receipt').hitTestable());
+  for (int i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await tester.tap(find.text('Add Manual Receipt').hitTestable());
+  await pumpUntilFound(tester, find.text('Name'));
+}
+
 /// Drives the receipt-add UI from `/groups`: opens the bottom-nav Add
 /// menu, fills the required fields, taps Submit, waits for navigation
 /// to `/receipts/<id>/view`. Returns the new receipt's id.
@@ -85,21 +123,7 @@ Future<int> addManualReceiptViaUI(
   String amount = '12.34',
   String groupName = 'My Receipts',
 }) async {
-  // Inside a group two bottom navs are mounted (the group-select shell sits
-  // under the group shell), so two "Add" destinations match; `.hitTestable()`
-  // taps the visible one. On group-select there is just one, so this is safe
-  // there too.
-  await tester.tap(find.text('Add').hitTestable());
-  // The add menu is a modal bottom sheet; its items mount on the slide-in's
-  // first frame while the sheet is still rising, so a tap computed then lands
-  // at the bottom edge and misses (observed as "Offset(411.6, 852.0) ...
-  // would not hit test"). Wait for hittability, then drain the slide-in.
-  await pumpUntilFound(tester, find.text('Add Manual Receipt').hitTestable());
-  for (int i = 0; i < 5; i++) {
-    await tester.pump(const Duration(milliseconds: 100));
-  }
-  await tester.tap(find.text('Add Manual Receipt').hitTestable());
-  await pumpUntilFound(tester, find.text('Name'));
+  await openManualReceiptForm(tester);
 
   await tester.enterText(formField('name'), name);
   await tester.enterText(formField('amount'), amount);

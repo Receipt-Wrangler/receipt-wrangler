@@ -152,12 +152,14 @@ a stale action at worst returns 403.
   - Activity rerun (`group_activity_list_item.dart`) → `group.activities.rerun`. Covered by a widget
     test (`test/widgets/group_activity_list_item_test.dart`) only — there is **no e2e** for it because
     a failed activity's `canBeRestarted` backend state isn't deterministically seedable from the API.
-  - The add menu (`show_add_menu.dart`) shows "Add Manual Receipt" on `group.receipts.create` and
-    "Quick Scan" on `group.receipts.quick-scan` — per-group when inside a group, or "held in any
-    group" on the group-select / all-groups view, where there is no single current group.
+  - The **receipt-entry affordances** — the scan/add bottom-nav slot, its long-press menu, the
+    receipts-screen overflow menu, and the Quick Scan sheet — all read one resolver,
+    `resolveReceiptEntryAvailability` (`lib/shared/functions/receipt_entry_availability.dart`). See
+    "Receipt entry (Scan / Add)" below.
   - The **Search** bottom-nav destination (`group_bottom_nav.dart`, `group_select_bottom_nav.dart`) is
-    shown only on `app.receipts.search`. It is the **trailing** destination in both navs, so gating it
-    out doesn't shift the other indices and the `switch`/`setIndexSelected` logic is unchanged.
+    shown only on `app.receipts.search`. It is the **trailing** destination in both navs; the scan
+    slot ahead of it is also gated, so both navs resolve destinations by **id** rather than by index
+    (`NavDestinationItem` in `bottom_nav.dart`).
   - The **Reports** avatar-menu entry (`top_app_bar.dart`'s `getUserAvatar`) is shown only when the
     caller holds `app.reports.read` **or** `app.reports.readAll` (`hasAnyAppPermission`), mirroring
     desktop's `canViewReports` sidebar gate. Base and `*All` are unrelated matcher keys, so the two are
@@ -344,6 +346,73 @@ the swagger, so `Claims` carries only identity claims and the field is gone from
 
 Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
 is otherwise forbidden — these are the documented exception.)
+
+### Receipt entry (Scan / Add)
+
+The bottom-nav slot that used to open an "Add" menu is a **direct action**. A **tap** scans; a
+**long-press** opens the menu. The whole feature is gated on three independent inputs, and the
+backend enforces the two permissions **separately** (`handlers.QuickScan` → `group.receipts.quick-scan`,
+`handlers.CreateReceipt` → `group.receipts.create`), so a role can hold either without the other.
+
+- **One resolver.** `resolveReceiptEntryAvailability(context)`
+  (`lib/shared/functions/receipt_entry_availability.dart`) returns `canQuickScan`
+  (`aiPoweredReceipts` **and** `group.receipts.quick-scan`), `canCreateManual`
+  (`group.receipts.create`), a `QuickScanBlockedReason?` and the group name. Scoping is the rule the
+  old add menu had: per-group inside a group, "held in **any** group" on group-select / the
+  all-groups view. **Every** affordance reads this — never re-derive the gates.
+- **`blockedReason` prefers `aiDisabled`** when both are missing: it is the install-wide,
+  administrator-level explanation, and pointing the user at a permission they still could not use
+  would send them to the wrong person.
+- **The slot is built once**, by `buildScanNavItem` (`lib/shared/widgets/scan_nav_item.dart`):
+  `Icons.document_scanner` / "Scan" when `canQuickScan`, `Icons.add` / "Add" otherwise, and **`null`
+  when neither permission is held** — the destination is omitted rather than shown and then refused.
+  Both navs mount what it returns, so the behaviour is identical everywhere.
+- **Index safety.** Because the slot can vanish from the middle, `BottomNav` takes
+  `NavDestinationItem`s (id + destination) and both navs switch on the id. `BottomNav` also renders
+  **nothing** below two destinations: Material's `NavigationBar` asserts there, and on group-select a
+  user with neither entry permission nor `app.receipts.search` is left with "Groups" alone.
+- **Long-press mechanics.** `NavigationBar` has no long-press API, so `BottomNav` overlays an
+  equal-flex `Row` of `GestureDetector`s with `HitTestBehavior.translucent`. A tap loses the gesture
+  arena to the bar's own `InkWell` (so selection still works); a hold is claimed by the long-press
+  recognizer at 500ms before the tap can complete.
+- **Actions** live in `lib/shared/functions/receipt_entry.dart`; copy lives in
+  `lib/constants/receipt_entry.dart` (shared so the sheet's snackbar and the form's banner can't
+  drift). `startScanEntry` is the tap: blocked → the manual form carrying the reason; otherwise
+  `ensureCameraAccess()` decides camera vs. gallery fallback.
+- **The banner only appears on the fall-through.** `openManualReceipt` attaches the reason to the
+  route `extra` **only** from the tap path, so a deliberate "Add Manual Receipt" is never nagged.
+  `ReceiptFormScreen` renders `QuickScanUnavailableBanner.fromRouteExtra(state.extra)`.
+- **The overflow menu is the receipts screen's only.** `GroupAppBar` is shared with the dashboards
+  route, so it gates on `GoRouterState.of(context).fullPath`. It is the accessible equivalent of the
+  long-press, and carries the same items from `buildReceiptEntryMenuItems`. It is **not** on
+  `GroupSelectAppBar`.
+- **Gallery upload is gated on quick-scan, not create** — that flow feeds the Quick Scan sheet, so
+  offering it to a create-only user would produce a sheet they cannot submit.
+- **The sheet re-checks its own gate** and resolves `canCreateManual` **at the caller's context**.
+  Its `bottomSheetWidget` is built inside the modal route, which is outside the GoRouter subtree, so
+  `GoRouterState.of` throws there — resolve before opening and pass the result down.
+
+#### Camera permission
+
+`ensureCameraAccess()` (`lib/utils/permissions.dart`) maps the OS state to
+`CameraAccess.granted | denied | permanentlyDenied`. `limited`/`provisional` count as granted;
+`restricted` (parental controls / MDM) behaves as permanently denied, since the user cannot grant it
+themselves. It requests **only** when the permission is undecided — a request in the permanently
+denied state resolves instantly with no dialog, which reads to the user as the tap doing nothing —
+and shares a single in-flight future for the same
+`ERROR_ALREADY_REQUESTING_PERMISSIONS` reason `requestPermissions()` does.
+
+Denied falls back to the gallery with a notice; permanently denied adds an **Open Settings**
+snackbar action (`openAppSettings`). **Keep the request lazy** — a launch-time request was removed
+deliberately for the iOS 26.x render-pause freeze (GitHub #617).
+
+`debugCameraAccessOverride` is the test seam (the plugins are statics with no injectable seam),
+mirroring the settable `OpenApiClient.client` and `QrScannerScreen`'s `debugForce*` flags.
+
+Three latent bugs on this path were fixed alongside: `scanImagesMultiPart` dereferenced a null with
+`!` (the scanner returns null on cancel, now an ordinary flow), `getPictures` re-requests camera
+permission itself and **throws** when it is missing (now caught → gallery fallback), and
+`getGalleryImages` throws off android/ios and is newly reachable (now caught → message).
 
 ### Quick Scan field configuration
 
@@ -860,7 +929,10 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - **Destination markers must be unique to the destination.** `find.text('Name')` matches on BOTH `/view` and
   `/edit` receipt forms, so it cannot prove an Edit navigation happened — use `find.byType(BottomSubmitButton)`
   (only mounted on edit/add paths) instead.
-- **Quick Scan image input on Linux:** the sheet's gallery-upload icon (`getGalleryImages` in `lib/utils/scan.dart`) throws `"Unsupported platform"` on desktop via a `Platform.operatingSystem` switch **before** it reaches `file_selector`, so the file-selector mock can't help and `quick_scan_test.dart` (the gallery happy-path) is `skip: Platform.isLinux`. To reach the Quick Scan form headlessly, feed an image through the **document-scanner** icon (`Icons.add_a_photo`) with `installDocumentScannerMock()`, which works on **all** targets (Linux/iOS/Android).
+- **Quick Scan image input on Linux:** `getGalleryImages` (`lib/utils/scan.dart`) throws `"Unsupported platform"` on desktop via a `Platform.operatingSystem` switch **before** it reaches `file_selector`, so the file-selector mock can't help and `quick_scan_test.dart` (the gallery happy-path) is `skip: Platform.isLinux`. To reach the Quick Scan form headlessly, go through the **document scanner** — tap the scan slot with `installDocumentScannerMock()` installed (`openQuickScanImageForm` in `helpers/quick_scan_actions.dart`), which works on **all** targets (Linux/iOS/Android).
+- **Reaching the receipt entry points:** a **tap** on the scan slot is a direct action, so manual entry is reached by **holding** it — `openManualReceiptForm(tester)` (`helpers/receipt_test_helpers.dart`) is the shared path, and it works on every screen and in every flag state (the receipts-screen overflow menu does not). Use `scanNavSlot()` rather than `find.text('Add')` when you only need to *reach* the slot: its label is "Scan" or "Add" depending on the caller's gates.
+- **Driving camera permission states:** set `debugCameraAccessOverride` (`lib/utils/permissions.dart`) rather than swapping the permission channel mock — login bootstrap also touches permission_handler, and the override pins only the branch under test. See `quick_scan_camera_denied_test.dart`. The suite uses the first-party `integration_test` package, which **cannot** drive native OS permission dialogs; that would need Patrol.
+- **Shared channel mocks live in `test/helpers/channel_mocks.dart`,** not here: the widget suite is the gating one and must not import from `integration_test/`. `helpers/platform_mocks.dart` re-exports them. `installPermissionMocks(status:, requestStatus:)` is the parameterised variant (`PermissionStatusWire` names the wire ints); `installCameraGalleryPermissionMocks()` is the always-granted one the scanner path needs.
 - **Document-scanner mock must grant camera permission on every platform:** `CunningDocumentScanner.getPictures` requests `Permission.camera` **itself** (Dart-side, via `permission_handler`) before invoking its native channel, so `installDocumentScannerMock()` also calls `installCameraGalleryPermissionMocks()` (extracted from `installLinuxDesktopMocks`) on **all** platforms — not just Linux. Without it, iOS/Android hit the real permission_handler: the fire-and-forget `requestPermissions()` in `main.dart` leaves an app-init camera request **pending** (its native dialog is never dismissed in a headless test), and `getPictures`' own camera request then collides with it → `PlatformException(ERROR_ALREADY_REQUESTING_PERMISSIONS)`. Granting up front makes both requests resolve instantly with no dialog. Only this scan path needs the mobile grant; every other spec hits permission_handler natively (one fire-and-forget request, never a second) and stays green. `flutter_secure_storage` stays **real** on iOS/Android (only Linux mocks it).
 - **Linux build linker/ar:** the desktop build resolves its toolchain from the installed clang's dir (e.g. `/usr/lib/llvm-19/bin`). With only `clang` installed you get `Failed to find any of [ld.lld, ld]` then `[llvm-ar, ar]` — install `lld` **and** the matching `llvm` package (see the Flutter SDK Setup apt line above) so `ld.lld` / `llvm-ar` land in that dir.
 - **Headless display:** Flutter Linux desktop apps render through GTK and exit immediately without a display. `run-e2e.sh` auto-wraps in `xvfb-run` when `$DISPLAY` is unset. If you see "The log reader stopped unexpectedly, or never started," your display setup isn't working — check `xvfb-run --help` or set `DISPLAY` to a real X server.
@@ -874,6 +946,10 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 #### Reference files
 
 - `integration_test/smoke_login_test.dart` — canonical smoke test.
+- `integration_test/quick_scan_entry_test.dart` — the scan slot's tap (captures → seeded sheet) and hold (menu contents), against real roles.
+- `integration_test/quick_scan_entry_gated_test.dart` — the tap falling through to the manual form, with the right banner for each of the two blocked reasons.
+- `integration_test/receipt_entry_hidden_test.dart` — a Legacy Viewer gets no scan slot and no overflow at all.
+- `integration_test/quick_scan_camera_denied_test.dart` — the denied / permanently-denied camera fallbacks (the Settings action appears only in the latter).
 - `integration_test/permission_add_menu_test.dart` / `permission_receipt_edit_test.dart` — permission-gating coverage (add-menu gate, edit-popup gate, swipe-to-edit gate) using per-spec provisioned users/groups. The add-menu spec also gates **"Quick Scan"** on `group.receipts.quick-scan` (flag on via `enableAiPoweredReceiptsForTest`, isolating the permission from the `aiPoweredReceipts` flag): a Legacy Editor **minus** quick-scan hides it while "Add Manual Receipt" stays; a full Legacy Editor shows it.
 - `integration_test/permission_search_test.dart` — search bottom-nav destination gated on `app.receipts.search` (deny via a custom app role minus that permission; allow via a Legacy User).
 - `integration_test/permission_dashboard_redirect_test.dart` — group dashboards route gated on `group.dashboards.read` (deny → redirected to the receipts list via a custom group role minus that permission; allow via a Legacy Viewer). Landing is told apart by `GroupReceiptsList` vs `GroupDashboardWrapper`.

@@ -55,9 +55,7 @@ void main() {
     // addManualReceiptViaUI because that helper taps Submit only once
     // and waits for navigation; this test needs to inject a SECOND tap
     // before the wait.
-    await tester.tap(find.text('Add'));
-    await pumpUntilFound(tester, find.text('Add Manual Receipt'));
-    await tester.tap(find.text('Add Manual Receipt'));
+    await openManualReceiptForm(tester);
     await pumpUntilFound(tester, find.text('Name'));
 
     await tester.enterText(formField('name'), receiptName);
