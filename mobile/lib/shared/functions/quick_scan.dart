@@ -302,9 +302,6 @@ Widget _getDeleteIcon(
   );
 }
 
-/// Offers manual entry as a way out of the sheet, for a user who would rather
-/// type the receipt than have it extracted. Gated on `group.receipts.create`:
-/// without it the manual form would only reject the save.
 /// Confirms the scan was accepted, and stays put once the success snackbar
 /// fades.
 ///
@@ -347,6 +344,10 @@ Widget _getQueuedConfirmation(BehaviorSubject<bool> isCompletedSubject) {
   );
 }
 
+/// Offers manual entry as a way out of the sheet, for a user who would rather
+/// type the receipt than have it extracted. Gated on `group.receipts.create`:
+/// without it the manual form would only reject the save.
+///
 /// [canCreateManual] is resolved by the caller rather than here: this widget is
 /// built inside the modal sheet's route, which sits outside the GoRouter subtree
 /// the gate reads the current group from.
