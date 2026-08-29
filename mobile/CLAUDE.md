@@ -387,6 +387,12 @@ backend enforces the two permissions **separately** (`handlers.QuickScan` → `g
 - **The banner only appears on the fall-through.** `openManualReceipt` attaches the reason to the
   route `extra` **only** from the tap path, so a deliberate "Add Manual Receipt" is never nagged.
   `ReceiptFormScreen` renders `QuickScanUnavailableBanner.fromRouteExtra(state.extra)`.
+- **The gates are read with `listen: false`**, the house pattern — permissions and `featureConfig`
+  hydrate before first paint (`main.dart`'s `FutureBuilder`) and don't change during a session. So
+  the slot's **label** is fixed when the nav builds, while the **menu** is built fresh on each open.
+  A test that mutates `AuthModel.featureConfig` live will see the menu move but not the label; assert
+  the label where the flag is real (set server-side before login), as
+  `permission_add_menu_test` and `quick_scan_entry_gated_test` do.
 - **The overflow menu is the receipts screen's only.** `GroupAppBar` is shared with the dashboards
   route, so it gates on `GoRouterState.of(context).fullPath`. It is the accessible equivalent of the
   long-press, and carries the same items from `buildReceiptEntryMenuItems`. It is **not** on

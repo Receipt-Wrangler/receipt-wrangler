@@ -96,6 +96,13 @@ void main() {
         reason: 'the manual form would only reject their save');
   });
 
+  testWidgets('a single-page scan gets no page counter', (tester) async {
+    await pumpSheet(tester, aiEnabled: true, permissions: [quickScan, create]);
+
+    expect(find.byKey(const ValueKey('quick-scan-page-indicator')), findsNothing,
+        reason: 'nothing to swipe to');
+  });
+
   testWidgets('the manual link closes the sheet and opens the form',
       (tester) async {
     await pumpSheet(tester, aiEnabled: true, permissions: [quickScan, create]);

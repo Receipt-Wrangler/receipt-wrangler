@@ -24,6 +24,11 @@ class QuickScan extends StatefulWidget {
 }
 
 class _QuickScan extends State<QuickScan> {
+  /// Which page the carousel is showing, so the counter below the preview can
+  /// say so. Tracked here because `InfiniteScrollController.selectedItem` only
+  /// updates the controller -- it doesn't rebuild anything.
+  int _visibleIndex = 0;
+
   Widget _buildImagePreview(int index) {
     var image = Image.memory(widget.imageSubject.value[index].bytes);
     return SizedBox(
@@ -32,13 +37,37 @@ class _QuickScan extends State<QuickScan> {
         child: ImageViewer(image: image));
   }
 
+  /// Tells the user there is more than one page and that swiping reaches it.
+  ///
+  /// A scan can carry up to 100 pages, and the carousel gives no other hint
+  /// that the pages after the first exist -- so without this a multi-page scan
+  /// looks like a single-page one, and the forms behind it go unfilled.
+  Widget _buildPageIndicator(int pageCount) {
+    if (pageCount < 2) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        key: const ValueKey('quick-scan-page-indicator'),
+        '${_visibleIndex + 1} of $pageCount \u00b7 swipe for the next',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+    );
+  }
+
   Widget _buildCarousel(bool isCompleted) {
     return InfiniteCarousel.builder(
       itemCount: widget.imageSubject.value.length,
       itemExtent: MediaQuery.of(context).size.width,
       center: false,
       velocityFactor: 0.2,
-      onIndexChanged: (index) {},
+      onIndexChanged: (index) {
+        if (mounted && index != _visibleIndex) {
+          setState(() => _visibleIndex = index);
+        }
+      },
       controller: widget.infiniteScrollController,
       axisDirection: Axis.horizontal,
       loop: false,
@@ -47,6 +76,7 @@ class _QuickScan extends State<QuickScan> {
           child: Column(
             children: [
               _buildImagePreview(realIndex),
+              _buildPageIndicator(widget.imageSubject.value.length),
               Padding(
                 padding: getImageDataPadding(),
                 child: QuickScanForm(

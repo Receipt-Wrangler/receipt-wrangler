@@ -44,7 +44,7 @@ void main() {
 
     expect(scanNavSlot(), findsNothing,
         reason: 'a Viewer holds neither create nor quick-scan in this group');
-    expect(find.text('Scan'), findsNothing);
+    expect(find.text('Scan').hitTestable(), findsNothing);
 
     // The other destinations are unaffected -- the nav resolves by destination
     // id, so removing a middle slot must not disturb them.

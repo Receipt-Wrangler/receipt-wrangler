@@ -72,10 +72,13 @@ void main() {
     setAi(false);
     await tester.pump();
 
-    // The slot must not advertise a scanner the install cannot run.
-    expect(find.text('Add').hitTestable(), findsWidgets);
-    expect(find.text('Scan'), findsNothing);
-
+    // Only the MENU is asserted here, not the slot's label. The gates are read
+    // with `listen: false` (the house pattern -- permissions and featureConfig
+    // hydrate before first paint and don't change during a session), so the
+    // label is fixed at nav build time while the menu is built fresh on each
+    // open. Flipping the flag live therefore moves the menu but not the label.
+    // The label is covered where the flag is real: permission_add_menu_test and
+    // quick_scan_entry_gated_test set it server-side before login.
     await openEntryMenu();
     expect(find.text(quickScanLabel), findsNothing,
         reason: 'Quick Scan must not appear when aiPoweredReceipts=false');
@@ -89,11 +92,10 @@ void main() {
     setAi(true);
     await tester.pump();
 
-    expect(find.text('Scan').hitTestable(), findsWidgets,
-        reason: 'the slot switches to the direct scan action');
-
     await openEntryMenu();
     expect(find.text(quickScanLabel), findsOneWidget,
         reason: 'Quick Scan must reappear when aiPoweredReceipts=true');
+    expect(find.text(uploadFromGalleryLabel), findsOneWidget,
+        reason: 'and gallery upload comes back with it');
   });
 }

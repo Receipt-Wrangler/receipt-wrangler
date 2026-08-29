@@ -120,8 +120,13 @@ void main() {
       await enterGroup(tester, fixture.groupName!);
 
       // The slot advertises what it will do: no scanner, so no "Scan" label.
+      // `.hitTestable()` on both halves matters here: inside a group TWO navs
+      // are mounted (the group-select shell sits under the group shell), and the
+      // hidden one scopes to "held in any group" -- which this user satisfies
+      // through their personal "My Receipts" group, so it legitimately reads
+      // "Scan". Only the visible nav describes the group they are in.
       expect(find.text('Add').hitTestable(), findsWidgets);
-      expect(find.text('Scan'), findsNothing);
+      expect(find.text('Scan').hitTestable(), findsNothing);
 
       await openEntryMenu(tester);
       await pumpUntilFound(tester, find.text(addManualReceiptLabel));
