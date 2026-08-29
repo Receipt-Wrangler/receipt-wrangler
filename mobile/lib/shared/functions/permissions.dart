@@ -25,3 +25,19 @@ bool canCommentDelete(PermissionsModel permissionsModel, int groupId) {
   return permissionsModel.hasGroupPermission(
       groupId, Permission.groupPeriodCommentsPeriodDelete);
 }
+
+/// Whether the current user may create receipts in [groupId]. Gates on
+/// `group.receipts.create`, mirroring `handlers.CreateReceipt`'s enforcement.
+bool canCreateReceipt(PermissionsModel permissionsModel, int groupId) {
+  return permissionsModel.hasGroupPermission(
+      groupId, Permission.groupPeriodReceiptsPeriodCreate);
+}
+
+/// Whether the current user may quick-scan receipts into [groupId]. Gates on
+/// `group.receipts.quick-scan`, mirroring `handlers.QuickScan`'s enforcement.
+/// Deliberately independent of [canCreateReceipt] — the backend enforces the two
+/// permissions separately, so a role may hold either without the other.
+bool canQuickScanReceipt(PermissionsModel permissionsModel, int groupId) {
+  return permissionsModel.hasGroupPermission(
+      groupId, Permission.groupPeriodReceiptsPeriodQuickScan);
+}

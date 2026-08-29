@@ -7,9 +7,12 @@ import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/constants/search.dart';
 import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_nav.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/scan_nav_item.dart';
 import 'package:receipt_wrangler_mobile/utils/group.dart';
 
-import '../../../shared/functions/show_add_menu.dart';
+const _dashboardsId = "dashboards";
+const _receiptsId = "receipts";
+const _searchId = "search";
 
 class GroupBottomNav extends StatefulWidget {
   const GroupBottomNav({super.key});
@@ -29,23 +32,50 @@ class _GroupBottomNav extends State<GroupBottomNav> {
     final canSearch = permissionsModel
         .hasAppPermission(Permission.appPeriodReceiptsPeriodSearch);
 
+    // Both the scan slot and Search are permission-gated, so a destination can be
+    // missing and every index after it shifts. Everything below therefore keys
+    // off the item ids rather than a hardcoded position.
+    final scanItem = buildScanNavItem(context, addButtonKey);
+
+    var items = <NavDestinationItem>[
+      const NavDestinationItem(
+        id: _dashboardsId,
+        destination: NavigationDestination(
+          icon: Icon(Icons.dashboard),
+          label: "Dashboards",
+        ),
+      ),
+      if (scanItem != null) scanItem,
+      const NavDestinationItem(
+        id: _receiptsId,
+        destination: NavigationDestination(
+          icon: Icon(Icons.receipt),
+          label: "Receipts",
+        ),
+      ),
+      if (canSearch)
+        const NavDestinationItem(
+          id: _searchId,
+          destination: NavigationDestination(
+            icon: Icon(Icons.search),
+            label: "Search",
+          ),
+        ),
+    ];
+
     onDestinationSelected(int indexSelected) {
       var groupId = getGroupId(context);
 
-      switch (indexSelected) {
-        case 0:
+      switch (items[indexSelected].id) {
+        case _dashboardsId:
           context.go("/groups/$groupId/dashboards");
-          break;
-        case 1:
-          showAddMenu(context, addButtonKey);
-          break;
-        case 2:
+        case scanNavDestinationId:
+          onScanNavItemSelected(context);
+        case _receiptsId:
           context.go("/groups/$groupId/receipts");
-          break;
-        case 3:
+        case _searchId:
           context.go("/search",
               extra: {"from": fromGroupBottomNav, "groupId": groupId});
-          break;
         default:
           context.go("/groups");
       }
@@ -56,47 +86,27 @@ class _GroupBottomNav extends State<GroupBottomNav> {
     setIndexSelected() {
       var uri =
           GoRouter.of(context).routeInformationProvider.value.uri.toString();
-      var index = 0;
+      var id = _dashboardsId;
 
       if (uri.contains("dashboards")) {
-        index = 0;
+        id = _dashboardsId;
       } else if (uri.contains("/add")) {
-        index = 1;
+        id = scanNavDestinationId;
       } else if (uri.contains("receipts")) {
-        index = 2;
+        id = _receiptsId;
       } else if (uri.contains("/search")) {
-        index = 3;
+        id = _searchId;
       }
 
-      return index;
+      // A route whose slot is hidden (e.g. /receipts/add reached by a deep link
+      // after the permission was revoked) has no destination to highlight, so
+      // fall back to the first one.
+      final index = items.indexWhere((item) => item.id == id);
+      return index < 0 ? 0 : index;
     }
 
-    var destinations = [
-      const NavigationDestination(
-        icon: Icon(Icons.dashboard),
-        label: "Dashboards",
-      ),
-      NavigationDestination(
-        key: addButtonKey,
-        icon: Icon(Icons.add),
-        label: "Add",
-      ),
-      const NavigationDestination(
-        icon: Icon(Icons.receipt),
-        label: "Receipts",
-      ),
-      // Search is the trailing destination; gating it on app.receipts.search
-      // keeps the earlier indices stable, so the switch/setIndexSelected logic
-      // needs no remap.
-      if (canSearch)
-        const NavigationDestination(
-          icon: Icon(Icons.search),
-          label: "Search",
-        ),
-    ];
-
     return BottomNav(
-      destinations: destinations,
+      items: items,
       onDestinationSelected: onDestinationSelected,
       getInitialSelectedIndex: setIndexSelected,
       indexSelectedController: indexSelectedController,

@@ -16,13 +16,16 @@ import 'package:receipt_wrangler_mobile/shared/functions/permissions.dart';
 import 'package:receipt_wrangler_mobile/shared/functions/quick_scan_field_config.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/delete_button.dart';
-import 'package:receipt_wrangler_mobile/utils/has_feature.dart';
 import 'package:receipt_wrangler_mobile/utils/scan.dart';
 import 'package:receipt_wrangler_mobile/utils/snackbar.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../../client/client.dart';
+import '../../constants/receipt_entry.dart';
+import '../../interfaces/upload_multipart_file_data.dart';
 import '../../utils/bottom_sheet.dart';
+import 'receipt_entry.dart';
+import 'receipt_entry_availability.dart';
 
 Widget _getUploadIcon(
     context,
@@ -39,18 +42,9 @@ Widget _getUploadIcon(
             ? null
             : () async {
                 var uploadedImages = await scanImagesMultiPart(100);
-                if (uploadedImages.isNotEmpty) {
-                  List<QuickScanImage> quickScanImages = [];
-                  var initialQuickScanValues = _getInitialQuickScanValues(context);
-                  for (var image in uploadedImages) {
-                    var quickScanImage = QuickScanImage.fromUploadMultipartFileData(
-                        image,
-                        initialQuickScanValues.groupId,
-                        initialQuickScanValues.paidByUserId,
-                        initialQuickScanValues.status);
-                    quickScanImages.add(quickScanImage);
-                  }
-                  imageSubject.add(imageSubject.value + quickScanImages);
+                if (uploadedImages.isNotEmpty && context.mounted) {
+                  imageSubject.add(imageSubject.value +
+                      buildQuickScanImages(context, uploadedImages));
                 }
               },
       );
@@ -72,25 +66,34 @@ Widget _getGalleryUploadImage(
         onPressed: isCompleted
             ? null
             : () async {
-                var uploadedImages = await getGalleryImages();
-                if (uploadedImages.isNotEmpty) {
-                  List<QuickScanImage> quickScanImages = [];
-                  var initialQuickScanValues = _getInitialQuickScanValues(context);
-                  for (var image in uploadedImages) {
-                    var quickScanImage = QuickScanImage.fromUploadMultipartFileData(
-                        image,
-                        initialQuickScanValues.groupId,
-                        initialQuickScanValues.paidByUserId,
-                        initialQuickScanValues.status);
-                    quickScanImages.add(quickScanImage);
-                  }
-
-                  imageSubject.add(imageSubject.value + quickScanImages);
+                var uploadedImages = await pickGalleryImages(context);
+                if (uploadedImages.isNotEmpty && context.mounted) {
+                  imageSubject.add(imageSubject.value +
+                      buildQuickScanImages(context, uploadedImages));
                 }
               },
       );
     },
   );
+}
+
+/// Wraps freshly picked files as [QuickScanImage]s, seeding each one from the
+/// caller's quick-scan user preferences.
+///
+/// Shared by the sheet's own camera/gallery icons and by the nav entry points
+/// that open the sheet already seeded, so a scan started from the bottom nav and
+/// one started from inside the sheet prefill identically.
+List<QuickScanImage> buildQuickScanImages(
+    BuildContext context, List<UploadMultipartFileData> uploadedImages) {
+  final initialQuickScanValues = _getInitialQuickScanValues(context);
+  return uploadedImages
+      .map((image) => QuickScanImage.fromUploadMultipartFileData(
+            image,
+            initialQuickScanValues.groupId,
+            initialQuickScanValues.paidByUserId,
+            initialQuickScanValues.status,
+          ))
+      .toList();
 }
 
 ({int? groupId, int? paidByUserId, api.ReceiptStatus? status})
@@ -299,16 +302,69 @@ Widget _getDeleteIcon(
   );
 }
 
-showQuickScanBottomSheet(context) {
-  if (!hasAiPoweredReceipts(context)) {
-    showErrorSnackbar(context,
-        "A configured Receipt Processing Settings is required to use Quick Scan. Contact your administrator for more information.");
+/// Offers manual entry as a way out of the sheet, for a user who would rather
+/// type the receipt than have it extracted. Gated on `group.receipts.create`:
+/// without it the manual form would only reject the save.
+/// [canCreateManual] is resolved by the caller rather than here: this widget is
+/// built inside the modal sheet's route, which sits outside the GoRouter subtree
+/// the gate reads the current group from.
+Widget _getManualEntryLink(
+  BuildContext callerContext,
+  bool canCreateManual,
+  BehaviorSubject<bool> isCompletedSubject,
+) {
+  if (!canCreateManual) {
+    return const SizedBox.shrink();
+  }
+
+  return StreamBuilder<bool>(
+    stream: isCompletedSubject.stream,
+    builder: (sheetContext, snapshot) {
+      final isCompleted = snapshot.hasData && snapshot.data == true;
+      if (isCompleted) {
+        return const SizedBox.shrink();
+      }
+
+      return TextButton(
+        key: const ValueKey("quick-scan-manual-entry-link"),
+        onPressed: () {
+          // Close the sheet first: the form is a route, and leaving the modal
+          // above it would hide the screen the user just asked for. The pop
+          // needs the sheet's own context; the navigation needs the caller's,
+          // which is the one under the router.
+          Navigator.of(sheetContext).pop();
+          openManualReceipt(callerContext);
+        },
+        child: const Text(enterDetailsManuallyLabel),
+      );
+    },
+  );
+}
+
+/// Opens the Quick Scan sheet, optionally already seeded with [initialImages]
+/// (the nav's Scan tap captures first, then opens the sheet on the result).
+///
+/// Re-checks both gates rather than trusting the caller: the sheet is reachable
+/// from the nav tap, the long-press menu and the overflow menu, and the server
+/// enforces `group.receipts.quick-scan` on submit regardless.
+showQuickScanBottomSheet(BuildContext context,
+    {List<QuickScanImage> initialImages = const []}) {
+  final availability = resolveReceiptEntryAvailability(context);
+  if (!availability.canQuickScan) {
+    showErrorSnackbar(
+        context,
+        availability.blockedReason == QuickScanBlockedReason.aiDisabled
+            ? quickScanAiDisabledMessage
+            : availability.groupName == null
+                ? quickScanNoPermissionMessage
+                : quickScanNoPermissionMessageForGroup(availability.groupName!));
     return;
   }
 
   var infiniteScrollController = InfiniteScrollController();
   BehaviorSubject<List<QuickScanImage>> imageSubject =
-      BehaviorSubject<List<QuickScanImage>>.seeded([]);
+      BehaviorSubject<List<QuickScanImage>>.seeded(
+          List<QuickScanImage>.from(initialImages));
   BehaviorSubject<bool> isCompletedSubject =
       BehaviorSubject<bool>.seeded(false);
 
@@ -325,8 +381,15 @@ showQuickScanBottomSheet(context) {
         infiniteScrollController: infiniteScrollController,
         isCompletedSubject: isCompletedSubject,
       ),
-      "Quick Scan",
+      quickScanLabel,
       actions: actions,
       bodyPadding: EdgeInsets.zero,
-      bottomSheetWidget: _getSubmitButton(context, imageSubject, isCompletedSubject));
+      bottomSheetWidget: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _getManualEntryLink(
+              context, availability.canCreateManual, isCompletedSubject),
+          _getSubmitButton(context, imageSubject, isCompletedSubject),
+        ],
+      ));
 }

@@ -1,50 +1,19 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Grants camera (**permission_handler**) and image-gallery (**gal**) access by
-/// stubbing their method channels to a "granted"-equivalent response. Both
-/// channels are touched by `main.dart`'s init-time `requestPermissions()`, and
-/// permission_handler is *also* hit directly by `cunning_document_scanner`'s
-/// `getPictures()` — so this is shared by [installLinuxDesktopMocks] (which has
-/// no native backing for these on desktop) and [installDocumentScannerMock]
-/// (which needs the grant on **every** platform to drive the scanner headlessly;
-/// see that helper for the iOS/Android `ERROR_ALREADY_REQUESTING_PERMISSIONS`
-/// race it avoids). Idempotent — `setMockMethodCallHandler` just replaces any
-/// prior handler with an equivalent one.
-///
-/// `requestPermissions` returns an EMPTY map deliberately: permission_handler
-/// decodes an absent entry as "denied", but our only consumers either ignore the
-/// result (`main.dart`) or check solely for the *presence* of a denied value
-/// (`cunning_document_scanner`), so an empty map reads as "nothing denied"
-/// without pinning a specific `PermissionStatus` wire int.
-void installCameraGalleryPermissionMocks() {
-  final messenger =
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+import '../../test/helpers/channel_mocks.dart';
 
-  const permissions = MethodChannel('flutter.baseflow.com/permissions/methods');
-  messenger.setMockMethodCallHandler(permissions, (call) async {
-    switch (call.method) {
-      case 'requestPermissions':
-        return <int, int>{};
-      case 'checkPermissionStatus':
-      case 'checkServiceStatus':
-        return 1;
-      default:
-        return null;
-    }
-  });
-
-  const gal = MethodChannel('gal');
-  messenger.setMockMethodCallHandler(gal, (call) async {
-    switch (call.method) {
-      case 'requestAccess':
-      case 'hasAccess':
-        return true;
-      default:
-        return null;
-    }
-  });
-}
+/// Re-exported so e2e specs keep importing it from here while the single
+/// implementation lives in `test/helpers/channel_mocks.dart` — the widget suite
+/// is the gating one and must not reach into `integration_test/`.
+export '../../test/helpers/channel_mocks.dart'
+    show
+        installCameraGalleryPermissionMocks,
+        installPermissionMocks,
+        installDocumentScannerChannelMock,
+        clearPermissionMocks,
+        PermissionMockCalls,
+        PermissionStatusWire;
 
 /// Installs mock [MethodChannel] handlers for plugins that don't have a working
 /// Linux desktop implementation in this project's runtime environment:
