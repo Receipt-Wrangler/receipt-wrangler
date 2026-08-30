@@ -21,6 +21,7 @@ import 'package:receipt_wrangler_mobile/utils/snackbar.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../../client/client.dart';
+import '../../constants/colors.dart';
 import '../../constants/receipt_entry.dart';
 import '../../interfaces/upload_multipart_file_data.dart';
 import '../../utils/bottom_sheet.dart';
@@ -317,16 +318,15 @@ Widget _getQueuedConfirmation(BehaviorSubject<bool> isCompletedSubject) {
         return const SizedBox.shrink();
       }
 
-      final colors = Theme.of(context).colorScheme;
       return Container(
         key: const ValueKey("quick-scan-queued-confirmation"),
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        color: colors.secondaryContainer,
+        color: noticeSurface,
         child: Row(
           children: [
-            Icon(Icons.check_circle_outline,
-                size: 20, color: colors.onSecondaryContainer),
+            const Icon(Icons.check_circle_outline,
+                size: 20, color: onNoticeSurface),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -334,7 +334,7 @@ Widget _getQueuedConfirmation(BehaviorSubject<bool> isCompletedSubject) {
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
-                    ?.copyWith(color: colors.onSecondaryContainer),
+                    ?.copyWith(color: onNoticeSurface),
               ),
             ),
           ],

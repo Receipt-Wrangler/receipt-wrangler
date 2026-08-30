@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../constants/colors.dart';
 import '../../constants/receipt_entry.dart';
 import '../../shared/functions/receipt_entry_availability.dart';
 
@@ -63,20 +64,18 @@ class _QuickScanUnavailableBanner extends State<QuickScanUnavailableBanner> {
       return const SizedBox.shrink();
     }
 
-    final colors = Theme.of(context).colorScheme;
-
     return Container(
       key: const ValueKey("quick-scan-unavailable-banner"),
       margin: const EdgeInsets.only(top: 12, bottom: 4),
       padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
       decoration: BoxDecoration(
-        color: colors.secondaryContainer,
+        color: noticeSurface,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 20, color: colors.onSecondaryContainer),
+          const Icon(Icons.info_outline, size: 20, color: onNoticeSurface),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -85,14 +84,14 @@ class _QuickScanUnavailableBanner extends State<QuickScanUnavailableBanner> {
                 Text(
                   quickScanUnavailableTitle,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: colors.onSecondaryContainer,
+                        color: onNoticeSurface,
                       ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   _message,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.onSecondaryContainer,
+                        color: onNoticeSurface,
                       ),
                 ),
               ],
@@ -101,7 +100,7 @@ class _QuickScanUnavailableBanner extends State<QuickScanUnavailableBanner> {
           IconButton(
             key: const ValueKey("quick-scan-unavailable-banner-dismiss"),
             icon: const Icon(Icons.close, size: 18),
-            color: colors.onSecondaryContainer,
+            color: onNoticeSurface,
             tooltip: "Dismiss",
             onPressed: () => setState(() => _dismissed = true),
           ),

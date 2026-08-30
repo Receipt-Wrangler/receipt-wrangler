@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:receipt_wrangler_mobile/constants/colors.dart';
 import 'package:receipt_wrangler_mobile/constants/receipt_entry.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/quick_scan_unavailable_banner.dart';
 import 'package:receipt_wrangler_mobile/shared/functions/receipt_entry_availability.dart';
@@ -43,6 +46,51 @@ void main() {
         reason: QuickScanBlockedReason.noPermission)));
 
     expect(find.text(quickScanNoPermissionMessage), findsOneWidget);
+  });
+
+  testWidgets('reads as white on the dark notice surface', (tester) async {
+    // The theme's ColorScheme never defines secondaryContainer, so the tokens
+    // fall back to `secondary` (#8EA1AC) with black `onSecondary` -- muddy at
+    // this type size. White on #8EA1AC would be worse still (2.7:1), so the
+    // surface is darkened to carry white text at ~8.9:1.
+    await tester.pumpWidget(wrap(const QuickScanUnavailableBanner(
+        reason: QuickScanBlockedReason.aiDisabled)));
+
+    final container = tester.widget<Container>(find.byKey(bannerKey));
+    // The banner is rounded, so its colour rides on the decoration.
+    expect((container.decoration as BoxDecoration).color, noticeSurface);
+
+    for (final text in <String>[
+      quickScanUnavailableTitle,
+      quickScanAiDisabledMessage,
+    ]) {
+      expect(tester.widget<Text>(find.text(text)).style?.color, onNoticeSurface,
+          reason: '"$text" must be white on the notice surface');
+    }
+
+    expect(tester.widget<Icon>(find.byIcon(Icons.info_outline)).color,
+        onNoticeSurface);
+  });
+
+  testWidgets('the notice surface carries white text at readable contrast',
+      (tester) async {
+    // Guards the pair itself: a later palette tweak that drops contrast below
+    // the WCAG AA threshold for normal text should fail here, not in review.
+    double luminance(Color c) {
+      double channel(double v) =>
+          v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4) as double;
+      return 0.2126 * channel(c.r) +
+          0.7152 * channel(c.g) +
+          0.0722 * channel(c.b);
+    }
+
+    final a = luminance(noticeSurface);
+    final b = luminance(onNoticeSurface);
+    final contrast =
+        (math.max(a, b) + 0.05) / (math.min(a, b) + 0.05);
+
+    expect(contrast, greaterThanOrEqualTo(4.5),
+        reason: 'WCAG AA for normal text');
   });
 
   testWidgets('dismissing removes it', (tester) async {
