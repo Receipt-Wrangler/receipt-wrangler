@@ -9,6 +9,7 @@ import 'package:receipt_wrangler_mobile/profile/widgets/delete_account_dialog.da
 // so what auth_form_test asserts about the login field is asserted here too.
 void main() {
   const toggleKey = ValueKey('password-visibility-toggle');
+  const passwordFieldKey = ValueKey('password-field');
 
   /// Opens the dialog through its public entry point -- the widget itself is
   /// private, so `showDeleteAccountDialog` is the only way in, and it is also
@@ -34,7 +35,7 @@ void main() {
   }
 
   bool isObscured(WidgetTester tester) =>
-      tester.widget<TextField>(find.byType(TextField)).obscureText;
+      tester.widget<TextField>(find.byKey(passwordFieldKey)).obscureText;
 
   Future<void> tapToggle(WidgetTester tester) async {
     await tester.tap(find.byKey(toggleKey));
@@ -93,7 +94,7 @@ void main() {
   testWidgets('revealing does not submit the dialog', (tester) async {
     await pumpDialog(tester);
 
-    await tester.enterText(find.byType(TextField), 'MySecretPass123');
+    await tester.enterText(find.byKey(passwordFieldKey), 'MySecretPass123');
     await tester.pump();
 
     await tapToggle(tester);
