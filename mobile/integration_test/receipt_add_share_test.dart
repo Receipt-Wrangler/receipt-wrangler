@@ -42,9 +42,7 @@ void main() {
     final receiptName =
         'e2e-share-${DateTime.now().millisecondsSinceEpoch}';
 
-    await tester.tap(find.text('Add'));
-    await pumpUntilFound(tester, find.text('Add Manual Receipt'));
-    await tester.tap(find.text('Add Manual Receipt'));
+    await openManualReceiptForm(tester);
     await pumpUntilFound(tester, find.text('Name'));
 
     // Fill required fields. groupId MUST be set before the Add Share

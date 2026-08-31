@@ -61,9 +61,7 @@ void main() {
     final fieldValue =
         'note-${DateTime.now().millisecondsSinceEpoch}';
 
-    await tester.tap(find.text('Add'));
-    await pumpUntilFound(tester, find.text('Add Manual Receipt'));
-    await tester.tap(find.text('Add Manual Receipt'));
+    await openManualReceiptForm(tester);
     await pumpUntilFound(tester, find.text('Name'));
 
     // Fill required fields first -- the custom field add UI is below

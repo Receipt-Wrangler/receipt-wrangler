@@ -65,8 +65,18 @@ loader cache. You do **not** need `PKG_CONFIG_PATH` or `LD_LIBRARY_PATH` once `l
 (fallbacks if it somehow didn't: `PKG_CONFIG_PATH=/usr/local/lib/pkgconfig` for the build,
 `LD_LIBRARY_PATH=/usr/local/lib` for the run). Verify: `magick -version` shows `7.1.2 ... Q16-HDRI`.
 
-**Step 5 — Run the Go server from the `api/` directory** (paths like `logs/` and `./sqlite/` are
-relative to the working directory, so cwd **must** be `api/`):
+**Step 5 — Create `api/data/`** (gitignored via `/data/*`, so a fresh clone doesn't have it):
+```bash
+mkdir -p /home/user/receipt-wrangler/api/data
+```
+The server starts fine without it and only fails later, when something writes there — creating a
+group makes a per-group directory under it, so `POST /group/` returns **HTTP 500 "Error creating
+group"** with `mkdir .../api/data/<id>-<name>: no such file or directory` in `api/logs/app.log`.
+That takes down every e2e fixture that provisions a group (`provisionPermUser` and friends), which
+looks like a broken test rather than a missing directory.
+
+**Step 6 — Run the Go server from the `api/` directory** (paths like `logs/`, `data/` and `./sqlite/`
+are relative to the working directory, so cwd **must** be `api/`):
 ```bash
 cd /home/user/receipt-wrangler/api
 DB_ENGINE=sqlite DB_FILENAME=wrangler.db \

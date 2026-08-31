@@ -9,7 +9,7 @@ import 'env.dart';
 /// Admin-API fixtures for the permission-gating e2e specs.
 ///
 /// The permission gates (`receipt_edit_popup_menu.dart`, `receipt_list_item.dart`,
-/// `group_activity_list_item.dart`, `show_add_menu.dart`) read the caller's
+/// `group_activity_list_item.dart`, `receipt_entry_availability.dart`) read the caller's
 /// *group-scoped* permissions, so to exercise them we need a logged-in user whose
 /// group membership/role we control.
 ///

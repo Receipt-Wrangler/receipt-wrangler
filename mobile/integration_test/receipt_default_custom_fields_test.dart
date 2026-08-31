@@ -193,14 +193,10 @@ Future<void> _drain(WidgetTester tester) async {
   }
 }
 
-/// Opens an empty Add Manual Receipt form from the bottom-nav Add menu and
+/// Opens an empty Add Manual Receipt form from the bottom-nav scan/add slot and
 /// returns once the custom field catalog has loaded.
 Future<void> _openAddReceiptForm(WidgetTester tester) async {
-  await tester.tap(find.text('Add').hitTestable());
-  await pumpUntilFound(tester, find.text('Add Manual Receipt').hitTestable());
-  await _drain(tester);
-  await tester.tap(find.text('Add Manual Receipt').hitTestable());
-  await pumpUntilFound(tester, find.text('Name'));
+  await openManualReceiptForm(tester);
   // The form screen's FutureBuilder awaits loadCustomFields before it builds,
   // so this button's presence means the catalog is in -- and the swap skips ids
   // it can't find in the catalog, which would otherwise be a silent race.

@@ -9,6 +9,7 @@ import 'package:receipt_wrangler_mobile/models/receipt_model.dart';
 import 'package:receipt_wrangler_mobile/receipts/nav/receipt_app_bar.dart';
 import 'package:receipt_wrangler_mobile/receipts/nav/receipt_app_bar_action_builder.dart';
 import 'package:receipt_wrangler_mobile/receipts/nav/receipt_bottom_sheet_builder.dart';
+import 'package:receipt_wrangler_mobile/receipts/widgets/quick_scan_unavailable_banner.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_form.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/circular_loading_progress.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/screen_wrapper.dart';
@@ -120,13 +121,25 @@ class _ReceiptFormScreen extends State<ReceiptFormScreen> {
 
           var showChild = isReady && !customFieldModel.isLoading;
 
+          // Present only when the Scan entry point fell through to manual entry
+          // because Quick Scan couldn't run -- it explains why.
+          final quickScanBanner =
+              QuickScanUnavailableBanner.fromRouteExtra(state.extra);
+
           return ScreenWrapper(
             appBarWidget:
                 ReceiptAppBar(actions: actionBuilder.buildAppBarMenu(state)),
             bodyPadding: padding,
             bottomSheetWidget: bottomSheetBuilder.buildBottomSheet(state),
             child: showChild
-                ? SingleChildScrollView(child: const ReceiptForm())
+                ? SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        if (quickScanBanner != null) quickScanBanner,
+                        const ReceiptForm(),
+                      ],
+                    ),
+                  )
                 : const CircularLoadingProgress(),
           );
         });

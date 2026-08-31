@@ -66,7 +66,7 @@ void main() {
     // the bottom-nav "Add" entry as the destination-mounted marker
     // (the same target addManualReceiptViaUI taps next).
     await _tapBackArrow(tester);
-    await pumpUntilFound(tester, find.text('Add'));
+    await pumpUntilFound(tester, scanNavSlot());
 
     // Receipt B: created from the list. The bottom-nav "Add" entry is
     // present on both /groups and /groups/<id>/receipts (group_select_bottom_nav.dart

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
 import 'env.dart';
@@ -262,4 +263,51 @@ Future<void> putSystemSettings(
     throw StateError(
         'PUT systemSettings failed: HTTP ${res.statusCode}: ${res.body}');
   }
+}
+
+/// Applies [overrides] to the global system settings for the duration of the
+/// current test, and registers an `addTearDown` that re-reads the CURRENT
+/// settings and applies [restoreTo] to them.
+///
+/// [settings] is the object the caller already fetched with [getSystemSettings]
+/// to capture its original values -- passing it in rather than re-fetching keeps
+/// the capture and the write looking at the same snapshot.
+///
+/// Both directions are "fetched object + patch" because the PUT is an upsert
+/// requiring a full body. The restore deliberately patches onto a FRESH read
+/// rather than replaying [settings] wholesale, so a concurrent change to an
+/// unrelated setting isn't clobbered.
+///
+/// [restoreTo] is required rather than defaulted to the captured values: what to
+/// put back is a real decision, not a formality. `feature_flags.dart`
+/// deliberately declines to replay a pointer at a leaked fixture record, and
+/// defaulting would hide that choice at the call sites.
+///
+/// The restore reuses [jwt] rather than logging in again. Login is rate-limited
+/// (429s on tight reruns) and `apiLogin` throws on a non-200, which would abort
+/// the teardown BEFORE the restore PUT and leave the override applied for every
+/// later run -- the exact install-wide leak this helper exists to prevent. The
+/// token is stateless with a fixed 20-minute life, so it outlives any single
+/// test by a wide margin; `feature_flags.dart` reuses it for the same reason.
+///
+/// Teardowns run LIFO, so register anything that must run AFTER the restore
+/// (e.g. deleting a record the settings still point at) BEFORE calling this.
+Future<void> overrideSystemSettingsForTest(
+  String jwt,
+  Map<String, dynamic> settings, {
+  required Map<String, dynamic> overrides,
+  required Map<String, dynamic> restoreTo,
+}) async {
+  await putSystemSettings(
+    jwt,
+    Map<String, dynamic>.from(settings)..addAll(overrides),
+  );
+
+  addTearDown(() async {
+    final current = await getSystemSettings(jwt);
+    await putSystemSettings(
+      jwt,
+      Map<String, dynamic>.from(current)..addAll(restoreTo),
+    );
+  });
 }

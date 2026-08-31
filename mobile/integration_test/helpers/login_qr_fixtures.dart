@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
 import 'api.dart';
@@ -12,10 +11,10 @@ import 'env.dart';
 ///
 /// `showLoginQr` / `mobileServerUrl` are GLOBAL system settings, so this mutates
 /// shared server state -- the same caution the desktop suite documents in
-/// `desktop/e2e/login-qr.spec.ts`. Teardown re-reads the current settings and
-/// restores only these two fields (rather than replaying a stale snapshot), so a
-/// concurrent change to an unrelated setting isn't clobbered -- mirroring
-/// `enableAiPoweredReceiptsForTest`.
+/// `desktop/e2e/login-qr.spec.ts`. Both this and the `aiPoweredReceipts`
+/// fixtures in `feature_flags.dart` go through `overrideSystemSettingsForTest`,
+/// which restores by patching onto a FRESH read rather than replaying a stale
+/// snapshot, so a concurrent change to an unrelated setting isn't clobbered.
 ///
 /// The returned string is the REAL production link
 /// (`https://receiptwrangler.io/app/setup#url=<url.QueryEscape(serverUrl)>`,
@@ -25,26 +24,19 @@ import 'env.dart';
 Future<String> enableLoginQrForTest(String serverUrl) async {
   final jwt = await apiLogin();
   final settings = await getSystemSettings(jwt);
-  final originalShow = settings['showLoginQr'];
-  final originalUrl = settings['mobileServerUrl'];
 
-  await putSystemSettings(
+  await overrideSystemSettingsForTest(
     jwt,
-    Map<String, dynamic>.from(settings)
-      ..['showLoginQr'] = true
-      ..['mobileServerUrl'] = serverUrl,
+    settings,
+    overrides: {
+      'showLoginQr': true,
+      'mobileServerUrl': serverUrl,
+    },
+    restoreTo: {
+      'showLoginQr': settings['showLoginQr'] ?? false,
+      'mobileServerUrl': settings['mobileServerUrl'] ?? '',
+    },
   );
-
-  addTearDown(() async {
-    final j = await apiLogin();
-    final current = await getSystemSettings(j);
-    await putSystemSettings(
-      j,
-      Map<String, dynamic>.from(current)
-        ..['showLoginQr'] = originalShow ?? false
-        ..['mobileServerUrl'] = originalUrl ?? '',
-    );
-  });
 
   final loginQrUrl = await getLoginQrUrl();
   if (loginQrUrl == null || loginQrUrl.isEmpty) {

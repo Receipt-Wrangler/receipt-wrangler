@@ -1,7 +1,9 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:receipt_wrangler_mobile/constants/receipt_entry.dart';
 
 import 'helpers/feature_flags.dart';
 import 'helpers/login.dart';
@@ -9,28 +11,22 @@ import 'helpers/nav.dart';
 import 'helpers/permission_fixtures.dart';
 import 'helpers/platform_mocks.dart';
 import 'helpers/pump.dart';
+import 'helpers/receipt_test_helpers.dart';
 
-/// Permission-gating coverage for the add menu (`show_add_menu.dart`).
+/// Permission gating of the receipt-entry affordances against a real backend.
 ///
-/// "Add Manual Receipt" is gated on `group.receipts.create`. Inside a group the
-/// menu checks that permission for THAT group; on the group-select screen it
-/// falls back to "held in any group". When no item is permitted it shows the
-/// error snackbar instead of a menu.
+/// The widget suite covers the full gate matrix; this proves the same decisions
+/// hold when the permissions come from real roles over the wire rather than a
+/// seeded model -- including the case the widget tests cannot reach, where the
+/// backend's own role definitions decide what the user holds.
 ///
-/// Notes:
-///   - Every account owns a personal "My Receipts" group (create allowed), so
-///     the "held in any group" check is always satisfiable — we exercise that
-///     branch positively from group-select and the *deny* path per-group via a
-///     Legacy Viewer (read but not create).
-///   - Inside a group two bottom navs are mounted (the group-select shell sits
-///     under the group shell), so two "Add" destinations match; `.hitTestable()`
-///     taps the visible one.
-///   - "Quick Scan" is gated on BOTH the `aiPoweredReceipts` flag AND
-///     `group.receipts.quick-scan`. The first three tests keep the flag off, so
-///     Quick Scan is always absent (not asserted). The last two turn the flag ON
-///     (`enableAiPoweredReceiptsForTest`) and isolate the *permission* half: a
-///     Legacy Editor minus quick-scan (still holds `receipts.create`, so "Add
-///     Manual Receipt" stays) sees no Quick Scan; a full Legacy Editor does.
+/// The slot is a direct action now: a **tap** scans (or opens the manual form
+/// when Quick Scan is blocked), and a **hold** opens the menu. What the menu
+/// offers is what these assert.
+///
+/// Note: every account owns a personal "My Receipts" group with create allowed,
+/// so the "held in any group" fallback is always satisfiable -- the deny cases
+/// are therefore exercised per-group, from inside a group.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -40,12 +36,17 @@ void main() {
     }
   });
 
-  const noPermissionSnack = "You don't have permission to add receipts here.";
-
-  Finder addButton() => find.text('Add').hitTestable();
+  /// Holds the scan/add slot and returns once its menu is on screen.
+  Future<void> openEntryMenu(WidgetTester tester) async {
+    await pumpUntilFound(tester, scanNavSlot());
+    await tester.longPress(scanNavSlot());
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
 
   testWidgets(
-    'add menu: a Legacy Viewer cannot add a receipt in their group',
+    'entry: a Legacy Viewer gets no scan/add slot at all in their group',
     (tester) async {
       final fixture = await provisionPermUser(roleName: 'Legacy Viewer');
       await loginAs(
@@ -55,20 +56,22 @@ void main() {
       );
       await enterGroup(tester, fixture.groupName!);
 
-      // Inside the group the menu checks group.receipts.create for THIS group;
-      // a Viewer lacks it, so the menu is empty -> error snackbar.
-      await tester.tap(addButton());
-      await pumpUntilFound(tester, find.text(noPermissionSnack));
-      // Presence, not an exact count: two bottom-nav shells are mounted in a
-      // group, so the snackbar can render once per ScaffoldMessenger. The gate
-      // outcome (denied -> snackbar, no menu) is what matters.
-      expect(find.text(noPermissionSnack), findsWidgets);
-      expect(find.text('Add Manual Receipt'), findsNothing);
+      // A Viewer holds neither group.receipts.create nor quick-scan here, so
+      // there is no action to offer -- the destination is omitted rather than
+      // shown and then refused.
+      expect(scanNavSlot(), findsNothing);
+      // The receipts screen's overflow is gated on the same reading.
+      expect(find.byKey(const ValueKey('receipt-entry-overflow-menu')),
+          findsNothing);
     },
   );
 
+  // Asserts the slot's menu OFFERS manual entry, not that tapping opens the
+  // form -- that belongs where the feature flag is pinned, since it decides
+  // whether a tap scans or falls through. Covered by quick_scan_entry_gated_test
+  // (both blocked reasons) and receipt_entry_menu_reopen_test.
   testWidgets(
-    'add menu: a Legacy Editor can add a manual receipt in their group',
+    'entry: a Legacy Editor is offered manual entry from the slot menu',
     (tester) async {
       final fixture = await provisionPermUser(roleName: 'Legacy Editor');
       await loginAs(
@@ -78,20 +81,17 @@ void main() {
       );
       await enterGroup(tester, fixture.groupName!);
 
-      // An Editor holds group.receipts.create -> the menu offers the item.
-      await tester.tap(addButton());
-      await pumpUntilFound(tester, find.text('Add Manual Receipt'));
-      expect(find.text('Add Manual Receipt'), findsOneWidget);
-      expect(find.text(noPermissionSnack), findsNothing);
+      await openEntryMenu(tester);
+      await pumpUntilFound(tester, find.text(addManualReceiptLabel));
+      expect(find.text(addManualReceiptLabel), findsOneWidget);
     },
   );
 
   testWidgets(
-    'add menu: group-select offers add when the user can create in any group',
+    'entry: group-select offers add when the user can create in any group',
     (tester) async {
-      // A fresh account is the owner of its personal "My Receipts" group, so
-      // the group-select "held in any group" check passes and the menu offers
-      // the item (no current group is selected here).
+      // A fresh account owns its personal "My Receipts" group, so the
+      // "held in any group" check passes with no current group selected.
       final fixture = await provisionPermUser();
       await loginAs(
         tester,
@@ -99,20 +99,19 @@ void main() {
         password: fixture.password,
       );
 
-      await tester.tap(addButton());
-      await pumpUntilFound(tester, find.text('Add Manual Receipt'));
-      expect(find.text('Add Manual Receipt'), findsOneWidget);
-      expect(find.text(noPermissionSnack), findsNothing);
+      await openEntryMenu(tester);
+      await pumpUntilFound(tester, find.text(addManualReceiptLabel));
+      expect(find.text(addManualReceiptLabel), findsOneWidget);
     },
   );
 
   testWidgets(
-    'add menu: no Quick Scan without group.receipts.quick-scan (flag on)',
+    'entry: no Quick Scan without group.receipts.quick-scan (flag on)',
     (tester) async {
       await enableAiPoweredReceiptsForTest();
-      // Legacy Editor MINUS quick-scan: keeps receipts.create (so "Add Manual
-      // Receipt" still shows) but not quick-scan -> Quick Scan hidden by the
-      // permission, not the flag.
+      // Legacy Editor MINUS quick-scan: keeps receipts.create (so the slot is
+      // still there and manual entry is still offered) but not quick-scan, so
+      // Quick Scan is hidden by the permission rather than the flag.
       final fixture = await provisionGroupMemberWithoutPermission(
         'group.receipts.quick-scan',
         baselineRole: 'Legacy Editor',
@@ -124,17 +123,29 @@ void main() {
       );
       await enterGroup(tester, fixture.groupName!);
 
-      await tester.tap(addButton());
-      await pumpUntilFound(tester, find.text('Add Manual Receipt'));
-      expect(find.text('Add Manual Receipt'), findsOneWidget,
+      // The slot advertises what it will do: no scanner, so no "Scan" label.
+      // `.hitTestable()` on both halves matters here: inside a group TWO navs
+      // are mounted (the group-select shell sits under the group shell), and the
+      // hidden one scopes to "held in any group" -- which this user satisfies
+      // through their personal "My Receipts" group, so it legitimately reads
+      // "Scan". Only the visible nav describes the group they are in.
+      expect(find.text('Add').hitTestable(), findsWidgets);
+      expect(find.text('Scan').hitTestable(), findsNothing);
+
+      await openEntryMenu(tester);
+      await pumpUntilFound(tester, find.text(addManualReceiptLabel));
+      expect(find.text(addManualReceiptLabel), findsOneWidget,
           reason: 'still holds receipts.create');
-      expect(find.text('Quick Scan'), findsNothing,
+      expect(find.text(quickScanLabel), findsNothing,
           reason: 'lacks group.receipts.quick-scan');
+      expect(find.text(uploadFromGalleryLabel), findsNothing,
+          reason: 'gallery upload feeds Quick Scan, so it needs the same '
+              'permission');
     },
   );
 
   testWidgets(
-    'add menu: Quick Scan shown with group.receipts.quick-scan (flag on)',
+    'entry: Quick Scan shown with group.receipts.quick-scan (flag on)',
     (tester) async {
       await enableAiPoweredReceiptsForTest();
       // A full Legacy Editor holds group.receipts.quick-scan.
@@ -146,9 +157,13 @@ void main() {
       );
       await enterGroup(tester, fixture.groupName!);
 
-      await tester.tap(addButton());
-      await pumpUntilFound(tester, find.text('Quick Scan'));
-      expect(find.text('Quick Scan'), findsOneWidget);
+      expect(find.text('Scan').hitTestable(), findsWidgets,
+          reason: 'the slot advertises the direct scan action');
+
+      await openEntryMenu(tester);
+      await pumpUntilFound(tester, find.text(quickScanLabel));
+      expect(find.text(quickScanLabel), findsOneWidget);
+      expect(find.text(uploadFromGalleryLabel), findsOneWidget);
     },
   );
 }

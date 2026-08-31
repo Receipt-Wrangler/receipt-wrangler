@@ -17,10 +17,13 @@ Future<List<String>> scanImages(int numberOfPages) async {
 Future<List<UploadMultipartFileData>> scanImagesMultiPart(
     int numberOfPages) async {
   var files = <UploadMultipartFileData>[];
+  // Null is what the scanner returns when the user backs out of it, which the
+  // Scan entry point makes an ordinary flow rather than an edge case -- so it
+  // must read as "no pages", not as a null dereference.
   var filePaths =
-      await CunningDocumentScanner.getPictures(noOfPages: numberOfPages);
+      await CunningDocumentScanner.getPictures(noOfPages: numberOfPages) ?? [];
 
-  if (filePaths!.isEmpty) {
+  if (filePaths.isEmpty) {
     return files;
   }
 

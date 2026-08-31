@@ -68,9 +68,7 @@ void main() {
     final receiptName =
         'e2e-partial-${DateTime.now().millisecondsSinceEpoch}';
 
-    await tester.tap(find.text('Add'));
-    await pumpUntilFound(tester, find.text('Add Manual Receipt'));
-    await tester.tap(find.text('Add Manual Receipt'));
+    await openManualReceiptForm(tester);
     await pumpUntilFound(tester, find.text('Name'));
 
     // Open the Images sub-screen + attach the mocked image. Tap the

@@ -129,12 +129,13 @@ api.Group buildGroup({
   api.GroupReceiptSettings? receiptSettings,
   List<api.GroupMember> members = const [],
   List<int>? defaultCustomFieldIds,
+  bool isAllGroup = false,
 }) =>
     (api.GroupBuilder()
           ..id = id
           ..createdAt = ''
           ..name = name
-          ..isAllGroup = false
+          ..isAllGroup = isAllGroup
           ..status = api.GroupStatus.ACTIVE
           ..groupMembers = ListBuilder<api.GroupMember>(members)
           ..groupReceiptSettings.replace(receiptSettings ??

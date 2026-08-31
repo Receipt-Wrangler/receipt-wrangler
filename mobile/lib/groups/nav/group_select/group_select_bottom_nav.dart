@@ -6,9 +6,12 @@ import 'package:openapi/openapi.dart' show Permission;
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_nav.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/scan_nav_item.dart';
 
 import '../../../constants/search.dart';
-import '../../../shared/functions/show_add_menu.dart';
+
+const _groupsId = "groups";
+const _searchId = "search";
 
 class GroupSelectBottomNav extends StatefulWidget {
   const GroupSelectBottomNav({super.key});
@@ -28,17 +31,37 @@ class _GroupSelectBottomNav extends State<GroupSelectBottomNav> {
     final canSearch = permissionsModel
         .hasAppPermission(Permission.appPeriodReceiptsPeriodSearch);
 
+    // Same id-keyed layout as the group nav: the scan slot and Search are both
+    // permission-gated, so positions are not stable.
+    final scanItem = buildScanNavItem(context, addButtonKey);
+
+    var items = <NavDestinationItem>[
+      const NavDestinationItem(
+        id: _groupsId,
+        destination: NavigationDestination(
+          icon: Icon(Icons.group),
+          label: "Groups",
+        ),
+      ),
+      if (scanItem != null) scanItem,
+      if (canSearch)
+        const NavDestinationItem(
+          id: _searchId,
+          destination: NavigationDestination(
+            icon: Icon(Icons.search),
+            label: "Search",
+          ),
+        ),
+    ];
+
     onDestinationSelected(int indexSelected) {
-      switch (indexSelected) {
-        case 0:
+      switch (items[indexSelected].id) {
+        case _groupsId:
           context.go("/groups");
-          break;
-        case 1:
-          showAddMenu(context, addButtonKey);
-          break;
-        case 2:
+        case scanNavDestinationId:
+          onScanNavItemSelected(context);
+        case _searchId:
           context.go("/search", extra: {"from": fromGroupSelectBottomNav});
-          break;
         default:
           context.go("/groups");
       }
@@ -49,41 +72,22 @@ class _GroupSelectBottomNav extends State<GroupSelectBottomNav> {
     setIndexSelected() {
       var uri =
           GoRouter.of(context).routeInformationProvider.value.uri.toString();
-      var index = 0;
+      var id = _groupsId;
 
       if (uri.contains("/groups")) {
-        index = 0;
+        id = _groupsId;
       } else if (uri.contains("/add")) {
-        index = 1;
+        id = scanNavDestinationId;
       } else if (uri.contains("/search")) {
-        index = 2;
+        id = _searchId;
       }
 
-      return index;
+      final index = items.indexWhere((item) => item.id == id);
+      return index < 0 ? 0 : index;
     }
 
-    var destinations = [
-      const NavigationDestination(
-        icon: Icon(Icons.group),
-        label: "Groups",
-      ),
-      NavigationDestination(
-        key: addButtonKey,
-        icon: Icon(Icons.add),
-        label: "Add",
-      ),
-      // Search is the trailing destination; gating it on app.receipts.search
-      // keeps the earlier indices stable, so the switch/setIndexSelected logic
-      // needs no remap.
-      if (canSearch)
-        const NavigationDestination(
-          icon: Icon(Icons.search),
-          label: "Search",
-        ),
-    ];
-
     return BottomNav(
-      destinations: destinations,
+      items: items,
       onDestinationSelected: onDestinationSelected,
       getInitialSelectedIndex: setIndexSelected,
       indexSelectedController: indexSelectedController,

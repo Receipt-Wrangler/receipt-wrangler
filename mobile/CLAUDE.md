@@ -152,12 +152,14 @@ a stale action at worst returns 403.
   - Activity rerun (`group_activity_list_item.dart`) → `group.activities.rerun`. Covered by a widget
     test (`test/widgets/group_activity_list_item_test.dart`) only — there is **no e2e** for it because
     a failed activity's `canBeRestarted` backend state isn't deterministically seedable from the API.
-  - The add menu (`show_add_menu.dart`) shows "Add Manual Receipt" on `group.receipts.create` and
-    "Quick Scan" on `group.receipts.quick-scan` — per-group when inside a group, or "held in any
-    group" on the group-select / all-groups view, where there is no single current group.
+  - The **receipt-entry affordances** — the scan/add bottom-nav slot, its long-press menu, the
+    receipts-screen overflow menu, and the Quick Scan sheet — all read one resolver,
+    `resolveReceiptEntryAvailability` (`lib/shared/functions/receipt_entry_availability.dart`). See
+    "Receipt entry (Scan / Add)" below.
   - The **Search** bottom-nav destination (`group_bottom_nav.dart`, `group_select_bottom_nav.dart`) is
-    shown only on `app.receipts.search`. It is the **trailing** destination in both navs, so gating it
-    out doesn't shift the other indices and the `switch`/`setIndexSelected` logic is unchanged.
+    shown only on `app.receipts.search`. It is the **trailing** destination in both navs; the scan
+    slot ahead of it is also gated, so both navs resolve destinations by **id** rather than by index
+    (`NavDestinationItem` in `bottom_nav.dart`).
   - The **Reports** avatar-menu entry (`top_app_bar.dart`'s `getUserAvatar`) is shown only when the
     caller holds `app.reports.read` **or** `app.reports.readAll` (`hasAnyAppPermission`), mirroring
     desktop's `canViewReports` sidebar gate. Base and `*All` are unrelated matcher keys, so the two are
@@ -344,6 +346,100 @@ the swagger, so `Claims` carries only identity claims and the field is gone from
 
 Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
 is otherwise forbidden — these are the documented exception.)
+
+### Receipt entry (Scan / Add)
+
+The bottom-nav slot that used to open an "Add" menu is a **direct action**. A **tap** scans; a
+**long-press** opens the menu. The whole feature is gated on three independent inputs, and the
+backend enforces the two permissions **separately** (`handlers.QuickScan` → `group.receipts.quick-scan`,
+`handlers.CreateReceipt` → `group.receipts.create`), so a role can hold either without the other.
+
+- **One resolver.** `resolveReceiptEntryAvailability(context)`
+  (`lib/shared/functions/receipt_entry_availability.dart`) returns `canQuickScan`
+  (`aiPoweredReceipts` **and** `group.receipts.quick-scan`), `canCreateManual`
+  (`group.receipts.create`), a `QuickScanBlockedReason?` and the group name. Scoping is the rule the
+  old add menu had: per-group inside a group, "held in **any** group" on group-select / the
+  all-groups view. **Every** affordance reads this — never re-derive the gates.
+- **`blockedReason` prefers `aiDisabled`** when both are missing: it is the install-wide,
+  administrator-level explanation, and pointing the user at a permission they still could not use
+  would send them to the wrong person.
+- **The slot is built once**, by `buildScanNavItem` (`lib/shared/widgets/scan_nav_item.dart`):
+  `Icons.document_scanner` / "Scan" when `canQuickScan`, `Icons.add` / "Add" otherwise, and **`null`
+  when neither permission is held** — the destination is omitted rather than shown and then refused.
+  Both navs mount what it returns, so the behaviour is identical everywhere.
+- **Index safety.** Because the slot can vanish from the middle, `BottomNav` takes
+  `NavDestinationItem`s (id + destination) and both navs switch on the id. `BottomNav` also renders
+  **nothing** below two destinations: Material's `NavigationBar` asserts there, and on group-select a
+  user with neither entry permission nor `app.receipts.search` is left with "Groups" alone.
+- **Long-press mechanics.** `NavigationBar` has no long-press API, so `BottomNav` overlays an
+  equal-flex `Row` of `GestureDetector`s with `HitTestBehavior.translucent`. A tap loses the gesture
+  arena to the bar's own `InkWell` (so selection still works); a hold is claimed by the long-press
+  recognizer at 500ms before the tap can complete.
+  **The action runs on `onLongPressUp`, not `onLongPress`.** `onLongPress` fires at the 500ms mark
+  with the finger still down, and these actions open a route — pushing one mid-gesture leaves the
+  recognizer holding a pointer it never saw released, after which that slice ignores every later tap
+  *and* hold. The slot worked exactly once per launch. Waiting for the release costs nothing: the
+  recognizer has already won the arena at 500ms, so the tap underneath stays suppressed either way.
+  The guard is `integration_test/receipt_entry_menu_reopen_test.dart` and has to be an e2e — a
+  minimal widget harness delivers the pointer-up cleanly enough that the recognizer recovers, so the
+  equivalent widget test passes with the bug present.
+  **The slot sets `tooltip: ""`** (empty = none). A `NavigationDestination` otherwise shows a tooltip
+  **on long press**, falling back to its label when `tooltip` is null — a second long-press recognizer
+  in the arena against the one that opens the menu. Rather than depend on which wins, Material's is
+  taken out of the running, and the gesture hint rides on a `Semantics(hint: scanNavLongPressHint)`
+  wrapper around the icon instead (`Semantics` installs no recognizer).
+- **Actions** live in `lib/shared/functions/receipt_entry.dart`; copy lives in
+  `lib/constants/receipt_entry.dart` (shared so the sheet's snackbar and the form's banner can't
+  drift). `startScanEntry` is the tap: blocked → the manual form carrying the reason; otherwise
+  `ensureCameraAccess()` decides camera vs. gallery fallback.
+- **The banner only appears on the fall-through.** `openManualReceipt` attaches the reason to the
+  route `extra` **only** from the tap path, so a deliberate "Add Manual Receipt" is never nagged.
+  `ReceiptFormScreen` renders `QuickScanUnavailableBanner.fromRouteExtra(state.extra)`.
+- **The gates are read with `listen: false`**, the house pattern — permissions and `featureConfig`
+  hydrate before first paint (`main.dart`'s `FutureBuilder`) and don't change during a session. So
+  the slot's **label** is fixed when the nav builds, while the **menu** is built fresh on each open.
+  A test that mutates `AuthModel.featureConfig` live will see the menu move but not the label; assert
+  the label where the flag is real (set server-side before login), as
+  `permission_add_menu_test` and `quick_scan_entry_gated_test` do.
+- **The overflow menu is the receipts screen's only.** `GroupAppBar` is shared with the dashboards
+  route, so it gates on `GoRouterState.of(context).fullPath`. It is the accessible equivalent of the
+  long-press, and carries the same items from `buildReceiptEntryMenuItems`. It is **not** on
+  `GroupSelectAppBar`.
+- **Gallery upload is gated on quick-scan, not create** — that flow feeds the Quick Scan sheet, so
+  offering it to a create-only user would produce a sheet they cannot submit.
+- **A submitted sheet confirms itself** (`quick-scan-queued-confirmation`). Submitting disables every
+  field and hides the submit button, so once the success snackbar fades the sheet would otherwise sit
+  there greyed out with nothing saying why. Extraction is an async backend job, so the wording
+  promises a result rather than showing one.
+- **The sheet shows a page counter** (`quick-scan-page-indicator`) when a scan carries more than one
+  page. A scan can carry up to 100, and the carousel gives no other hint that the pages after the
+  first exist — without it a multi-page scan reads as a single-page one and the forms behind it go
+  unfilled.
+- **The sheet re-checks its own gate** and resolves `canCreateManual` **at the caller's context**.
+  Its `bottomSheetWidget` is built inside the modal route, which is outside the GoRouter subtree, so
+  `GoRouterState.of` throws there — resolve before opening and pass the result down.
+
+#### Camera permission
+
+`ensureCameraAccess()` (`lib/utils/permissions.dart`) maps the OS state to
+`CameraAccess.granted | denied | permanentlyDenied`. `limited`/`provisional` count as granted;
+`restricted` (parental controls / MDM) behaves as permanently denied, since the user cannot grant it
+themselves. It requests **only** when the permission is undecided — a request in the permanently
+denied state resolves instantly with no dialog, which reads to the user as the tap doing nothing —
+and shares a single in-flight future for the same
+`ERROR_ALREADY_REQUESTING_PERMISSIONS` reason `requestPermissions()` does.
+
+Denied falls back to the gallery with a notice; permanently denied adds an **Open Settings**
+snackbar action (`openAppSettings`). **Keep the request lazy** — a launch-time request was removed
+deliberately for the iOS 26.x render-pause freeze (GitHub #617).
+
+`debugCameraAccessOverride` is the test seam (the plugins are statics with no injectable seam),
+mirroring the settable `OpenApiClient.client` and `QrScannerScreen`'s `debugForce*` flags.
+
+Three latent bugs on this path were fixed alongside: `scanImagesMultiPart` dereferenced a null with
+`!` (the scanner returns null on cancel, now an ordinary flow), `getPictures` re-requests camera
+permission itself and **throws** when it is missing (now caught → gallery fallback), and
+`getGalleryImages` throws off android/ios and is newly reachable (now caught → message).
 
 ### Quick Scan field configuration
 
@@ -748,7 +844,7 @@ End-to-end tests live in `integration_test/` (sibling of `test/`) and use Flutte
 - **Local Android emulator** via `./run-e2e-android.sh` (macOS, auto-boots an AVD).
 - **Local iOS Simulator** via `./run-e2e-ios.sh` (macOS, auto-boots a sim).
 - **Local Linux desktop** via `./run-e2e.sh` (containers/CI Linux). Originally the primary target; kept for the dev container's headless flow.
-- **CI Android + iOS** via `.github/workflows/mobile-e2e.yml`, currently **advisory** (`continue-on-error: true`). Triggers: `pull_request` against `main`, `push` to `main` (post-merge), `push` to `tech/mobile-e2e` (iteration on the e2e setup itself), and `workflow_dispatch`. The formerly skipped specs (`receipt_comments_test`, `receipt_cost_split_test`) are un-skipped and green — the product bugs they tracked are fixed — so nothing blocks flipping `continue-on-error` once CI demonstrates stability.
+- **CI Android + iOS** via `.github/workflows/mobile-e2e.yml`, currently **advisory** (`continue-on-error: true`). Triggers: `push` to `main` (post-merge), `push` to `tech/mobile-e2e` (iteration on the e2e setup itself), and `workflow_dispatch`. Deliberately **not** `pull_request` — the suite is advisory and slow, so it runs post-merge / on demand rather than gating every PR. The formerly skipped specs (`receipt_comments_test`, `receipt_cost_split_test`) are un-skipped and green — the product bugs they tracked are fixed — so nothing blocks flipping `continue-on-error` once CI demonstrates stability.
 
 Screenshot/video capture on failure is still deferred — see the "Out of scope" note at the bottom of this section.
 
@@ -860,12 +956,29 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - **Destination markers must be unique to the destination.** `find.text('Name')` matches on BOTH `/view` and
   `/edit` receipt forms, so it cannot prove an Edit navigation happened — use `find.byType(BottomSubmitButton)`
   (only mounted on edit/add paths) instead.
-- **Quick Scan image input on Linux:** the sheet's gallery-upload icon (`getGalleryImages` in `lib/utils/scan.dart`) throws `"Unsupported platform"` on desktop via a `Platform.operatingSystem` switch **before** it reaches `file_selector`, so the file-selector mock can't help and `quick_scan_test.dart` (the gallery happy-path) is `skip: Platform.isLinux`. To reach the Quick Scan form headlessly, feed an image through the **document-scanner** icon (`Icons.add_a_photo`) with `installDocumentScannerMock()`, which works on **all** targets (Linux/iOS/Android).
+- **Quick Scan image input on Linux:** `getGalleryImages` (`lib/utils/scan.dart`) throws `"Unsupported platform"` on desktop via a `Platform.operatingSystem` switch **before** it reaches `file_selector`, so the file-selector mock can't help and `quick_scan_test.dart` (the gallery happy-path) is `skip: Platform.isLinux`. To reach the Quick Scan form headlessly, go through the **document scanner** — tap the scan slot with `installDocumentScannerMock()` installed (`openQuickScanImageForm` in `helpers/quick_scan_actions.dart`), which works on **all** targets (Linux/iOS/Android).
+- **Reaching the receipt entry points:** a **tap** on the scan slot is a direct action, so manual entry is reached by **holding** it — `openManualReceiptForm(tester)` (`helpers/receipt_test_helpers.dart`) is the shared path, and it works on every screen and in every flag state (the receipts-screen overflow menu does not). Use `scanNavSlot()` rather than `find.text('Add')` when you only need to *reach* the slot: its label is "Scan" or "Add" depending on the caller's gates.
+- **Driving camera permission states:** set `debugCameraAccessOverride` (`lib/utils/permissions.dart`) rather than swapping the permission channel mock — login bootstrap also touches permission_handler, and the override pins only the branch under test. See `quick_scan_camera_denied_test.dart`. The suite uses the first-party `integration_test` package, which **cannot** drive native OS permission dialogs; that would need Patrol.
+- **Shared channel mocks live in `test/helpers/channel_mocks.dart`,** not here: the widget suite is the gating one and must not import from `integration_test/`. `helpers/platform_mocks.dart` re-exports them. `installPermissionMocks(status:, requestStatus:)` is the parameterised variant (`PermissionStatusWire` names the wire ints); `installCameraGalleryPermissionMocks()` is the always-granted one the scanner path needs.
 - **Document-scanner mock must grant camera permission on every platform:** `CunningDocumentScanner.getPictures` requests `Permission.camera` **itself** (Dart-side, via `permission_handler`) before invoking its native channel, so `installDocumentScannerMock()` also calls `installCameraGalleryPermissionMocks()` (extracted from `installLinuxDesktopMocks`) on **all** platforms — not just Linux. Without it, iOS/Android hit the real permission_handler: the fire-and-forget `requestPermissions()` in `main.dart` leaves an app-init camera request **pending** (its native dialog is never dismissed in a headless test), and `getPictures`' own camera request then collides with it → `PlatformException(ERROR_ALREADY_REQUESTING_PERMISSIONS)`. Granting up front makes both requests resolve instantly with no dialog. Only this scan path needs the mobile grant; every other spec hits permission_handler natively (one fire-and-forget request, never a second) and stays green. `flutter_secure_storage` stays **real** on iOS/Android (only Linux mocks it).
 - **Linux build linker/ar:** the desktop build resolves its toolchain from the installed clang's dir (e.g. `/usr/lib/llvm-19/bin`). With only `clang` installed you get `Failed to find any of [ld.lld, ld]` then `[llvm-ar, ar]` — install `lld` **and** the matching `llvm` package (see the Flutter SDK Setup apt line above) so `ld.lld` / `llvm-ar` land in that dir.
 - **Headless display:** Flutter Linux desktop apps render through GTK and exit immediately without a display. `run-e2e.sh` auto-wraps in `xvfb-run` when `$DISPLAY` is unset. If you see "The log reader stopped unexpectedly, or never started," your display setup isn't working — check `xvfb-run --help` or set `DISPLAY` to a real X server.
 - **`libsecret-1-dev` at build time:** the `flutter_secure_storage_linux` plugin's CMakeLists.txt does a `pkg_check_modules(libsecret-1>=0.18.4)` — if the dev headers aren't installed, the build fails with "The following required packages were not found: libsecret-1". Installed as a prereq above.
 - **`libsecret` at runtime is avoided via mocks.** We don't bring up gnome-keyring + dbus for tests. `installLinuxDesktopMocks()` intercepts the platform channel with an in-memory map. If you ever want to exercise the real storage path (e.g. to reproduce a token-persistence bug), start a dbus session + gnome-keyring-daemon before the test — but don't do that by default; it adds a lot of fragile state.
+- **Install-wide settings are AMBIENT, not defaults — pin them, don't assume them.** `showLoginQr`,
+  `mobileServerUrl` and `receiptProcessingSettingsId` (the `aiPoweredReceipts` flag) are single
+  install-wide values shared by every spec, every runner and every CI job on a backend. A spec that
+  needs one in a particular state must **declare it with a fixture**; a comment reasoning about "the
+  default local backend" is not a precondition. This is not theoretical: a run aborted on 2026-07-06
+  left the AI pointer aimed at a leaked `e2e-ai-flag-*` record, so the flag was stuck **on for eight
+  weeks**, and the two specs that silently assumed it was off failed with
+  `Timed out after 10s waiting for text "Name"` — which reads exactly like a product bug, since the
+  scan slot really *was* opening a scanner instead of falling through to the manual form.
+  Corollary for the fixture side: **any fixture that mutates a global must be able to tell its own
+  leaked artifacts from real configuration**, and heal rather than replay the former — otherwise the
+  restore faithfully re-wedges the backend for the next spec. `feature_flags.dart` does this with the
+  `e2e-ai-flag-` name prefix, and heals in **setup**, not teardown (the state being healed was itself
+  produced by a teardown that never ran).
 - **Go API rate-limiter:** login is rate-limited. Rerunning the same test in tight succession can 429 — give it a few seconds between runs. The desktop suite notes the same issue in `desktop/e2e/helpers/auth.ts`.
 - **DB accumulation:** tests write real rows (sessions, refresh tokens). Fine for a smoke test; when specs start creating receipts/groups/etc., build per-test uniqueness (UUIDs) into the data, mirroring the Playwright conventions.
 - **Never commit credentials or the generated JSON.** `.e2e-env.json` is gitignored as belt-and-suspenders — the script already uses `mktemp`.
@@ -874,6 +987,11 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 #### Reference files
 
 - `integration_test/smoke_login_test.dart` — canonical smoke test.
+- `integration_test/quick_scan_entry_test.dart` — the scan slot's tap (captures → seeded sheet) and hold (menu contents), against real roles.
+- `integration_test/quick_scan_entry_gated_test.dart` — the tap falling through to the manual form, with the right banner for each of the two blocked reasons. Exercises **both** feature-flag fixtures: the permission case enables the flag (to isolate the permission from it), the ai-disabled case **pins it off** with `disableAiPoweredReceiptsForTest()` rather than assuming — which also removes its dependency on the preceding test's teardown having succeeded, since they share the one global.
+- `integration_test/receipt_entry_hidden_test.dart` — a Legacy Viewer gets no scan slot and no overflow at all. Flag-independent: the slot is hidden when the caller holds *neither* entry permission, whatever `aiPoweredReceipts` says.
+- `integration_test/receipt_entry_menu_reopen_test.dart` — the long-press regression guard (`onLongPressUp`, not `onLongPress`): three open/dismiss cycles then a plain tap, proving the slot isn't left dead. **Pins `aiPoweredReceipts` off** — it logs in as the admin (who holds `group.receipts.quick-scan`) and installs no document-scanner mock, so the closing tap only reaches the manual form while Quick Scan is unavailable.
+- `integration_test/quick_scan_camera_denied_test.dart` — the denied / permanently-denied camera fallbacks (the Settings action appears only in the latter).
 - `integration_test/permission_add_menu_test.dart` / `permission_receipt_edit_test.dart` — permission-gating coverage (add-menu gate, edit-popup gate, swipe-to-edit gate) using per-spec provisioned users/groups. The add-menu spec also gates **"Quick Scan"** on `group.receipts.quick-scan` (flag on via `enableAiPoweredReceiptsForTest`, isolating the permission from the `aiPoweredReceipts` flag): a Legacy Editor **minus** quick-scan hides it while "Add Manual Receipt" stays; a full Legacy Editor shows it.
 - `integration_test/permission_search_test.dart` — search bottom-nav destination gated on `app.receipts.search` (deny via a custom app role minus that permission; allow via a Legacy User).
 - `integration_test/permission_dashboard_redirect_test.dart` — group dashboards route gated on `group.dashboards.read` (deny → redirected to the receipts list via a custom group role minus that permission; allow via a Legacy Viewer). Landing is told apart by `GroupReceiptsList` vs `GroupDashboardWrapper`.
@@ -892,13 +1010,13 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - `integration_test/helpers/pump.dart` — `pumpUntilFound` polling helper.
 - `integration_test/helpers/platform_mocks.dart` — Linux-desktop platform-channel stubs for `permission_handler`, `gal`, `flutter_secure_storage`.
 - `integration_test/login_qr_deep_link_test.dart` — the login-QR **deep link** end to end: reads the real `loginQrUrl` off `GET /featureConfig` and injects it via the `buildApp` seam. See "App Links / Universal Links" above.
-- `integration_test/helpers/login.dart` / `api.dart` — UI + API login as admin, the shared e2e-user, or arbitrary credentials (`loginAs` / `apiLoginAs`). `login.dart` also exposes the two halves `loginAs` is built from — `resetPersistedAppState()` (wipe secure storage + `basePath` so the app boots to the Connect screen) and `loginFromLoginScreen()` (credentials + `GroupSelect` landing) — for specs that reach the login screen some other way. `api.dart` carries the shared `getSystemSettings` / `putSystemSettings` (the PUT is an **upsert**: patch a fetched object, never send a partial body).
+- `integration_test/helpers/login.dart` / `api.dart` — UI + API login as admin, the shared e2e-user, or arbitrary credentials (`loginAs` / `apiLoginAs`). `login.dart` also exposes the two halves `loginAs` is built from — `resetPersistedAppState()` (wipe secure storage + `basePath` so the app boots to the Connect screen) and `loginFromLoginScreen()` (credentials + `GroupSelect` landing) — for specs that reach the login screen some other way. `api.dart` carries the shared `getSystemSettings` / `putSystemSettings` (the PUT is an **upsert**: patch a fetched object, never send a partial body) plus `overrideSystemSettingsForTest(jwt, settings, overrides:, restoreTo:)` — the one save/restore choreography behind **both** global-settings fixtures (`feature_flags.dart`, `login_qr_fixtures.dart`). It patches `overrides` onto the captured object on the way in and `restoreTo` onto a **fresh read** on the way out, so a concurrent change to an unrelated setting isn't clobbered. `restoreTo` is a required argument rather than defaulting to the captured values, because *what to put back* is a real decision — `feature_flags.dart` deliberately declines to replay a leaked pointer. Teardowns run **LIFO**, so anything that must run *after* the restore (e.g. deleting a record the settings still point at) has to be registered **before** the call.
 - `integration_test/helpers/permission_fixtures.dart` — admin-API provisioning for permission specs. `PermFixture`
   carries the provisioned user's **`displayName`**, which the paid-by / charged-to dropdowns render —
   `users.dart`'s lookup helpers only cover the two fixed `E2E_*` accounts, so a spec that submits a form
   as a fixture user has no other way to name it. **`_settingsToCommand` carries a hardcoded key list** — a new `GroupReceiptSettings` flag must be added there or every persisted e2e config silently resets it to `false`. Also: fresh user + group with a chosen system group role ("Legacy Viewer"/"Legacy Editor"), optional seeded receipt, `addTearDown` cleanup. Also mints **custom roles** for negative specs: `createRole`/`deleteRole`, `rolePermissionsByName`, and the convenience `provisionUserWithoutAppPermission` / `provisionGroupMemberWithoutPermission` (build a role = a Legacy role **minus one permission**). The backend won't delete an assigned role, so the role-delete teardown is registered **before** the user/group ones — LIFO makes it run last, after the assignments are gone.
-- `integration_test/helpers/feature_flags.dart` — `enableAiPoweredReceiptsForTest()`: toggles the Quick Scan flag by pointing systemSettings at a junk receiptProcessingSettings record, restoring on teardown.
-- `integration_test/helpers/login_qr_fixtures.dart` — `enableLoginQrForTest(serverUrl)`: flips the **global** `showLoginQr` / `mobileServerUrl` system settings, restores them on teardown (re-reads current settings rather than replaying a stale snapshot, like `feature_flags.dart`), and returns the backend-composed `loginQrUrl`. Plus `getLoginQrUrl()` — the unauthenticated `GET /featureConfig` read. **These are the same two settings the desktop suite's `login-qr.spec.ts` drives on the same shared backend** (both workflows read `secrets.E2E_BASE_URL`), so the `android-e2e` job and `e2e.yml`'s `e2e` job share a job-level concurrency group (`e2e-shared-backend`, `cancel-in-progress: false`) to keep the two suites from racing. The group is **ref-independent on purpose** — this workflow also fires on `tech/mobile-e2e` / `workflow_dispatch` while `e2e.yml` fires only on `main`, so a `${{ github.ref }}`-scoped group would separate them and defeat the lock; keep both groups byte-identical. `ios-e2e` doesn't need it — it doesn't run this spec.
+- `integration_test/helpers/feature_flags.dart` — `enableAiPoweredReceiptsForTest()` / `disableAiPoweredReceiptsForTest()`: the Quick Scan flag is `systemSettings.receiptProcessingSettingsId != null`, so **enable** points it at a junk `receiptProcessingSettings` record named `e2e-ai-flag-<micros>`. Both restore on teardown, and both must be called **before login** (`featureConfig` hydrates from AppData there). The flag is **install-wide, so OFF is ambient state, not a default** — a spec that needs it off must call the disable fixture rather than assume (see the caveat above). **The restore is self-healing:** if the captured pointer names an `e2e-ai-flag-` record, that capture is a leak from a run that aborted before its teardown, so **both** fixtures restore `null` instead of faithfully replaying it — replaying would re-wedge the backend for the very next spec. A pointer at any *other* record is a real AI configuration and is restored exactly. The name prefix is the whole distinction, which is why it lives in one `_fixtureRpsNamePrefix` constant. Healing runs in **setup**, not teardown: the state being healed was itself produced by a teardown that never ran. **Only `disable` also deletes the orphaned record**, and only when it was the live pointer at setup; `enable` heals the pointer but leaves the row, because under a concurrent run it cannot tell a leaked orphan from *another job's live fixture row*, and deleting the latter would leave a dangling pointer (id set, row gone) that the name check can never heal. An orphaned row is inert — the flag depends only on the pointer — and gets swept the next time a `disable` finds it live. `disable` **no-ops entirely** (no write, no teardown) when the flag is already off, so it costs nothing on a healthy backend. Both pointers are always written as a **pair**: the backend rejects a fallback without a primary, so nulling only the primary 400s on a backend that has one.
+- `integration_test/helpers/login_qr_fixtures.dart` — `enableLoginQrForTest(serverUrl)`: flips the **global** `showLoginQr` / `mobileServerUrl` system settings, restores them on teardown (via the shared `overrideSystemSettingsForTest`, which patches onto a fresh read rather than replaying a stale snapshot — same helper `feature_flags.dart` uses), and returns the backend-composed `loginQrUrl`. Plus `getLoginQrUrl()` — the unauthenticated `GET /featureConfig` read. **These are the same two settings the desktop suite's `login-qr.spec.ts` drives on the same shared backend** (both workflows read `secrets.E2E_BASE_URL`), so the `android-e2e` job and `e2e.yml`'s `e2e` job share a job-level concurrency group (`e2e-shared-backend`, `cancel-in-progress: false`) to keep the two suites from racing. The group is **ref-independent on purpose** — this workflow also fires on `tech/mobile-e2e` / `workflow_dispatch` while `e2e.yml` fires only on `main`, so a `${{ github.ref }}`-scoped group would separate them and defeat the lock; keep both groups byte-identical. **`ios-e2e` deliberately carries no lock and runs concurrently against the same backend — that is safe only because its spec list contains nothing that mutates or depends on a global system setting** (`showLoginQr` / `mobileServerUrl`, and `receiptProcessingSettingsId` a.k.a. the `aiPoweredReceipts` flag). Adding such a spec to `ios-e2e` requires serializing it against `android-e2e` first (`needs: [android-e2e]` + `if: always()`) — **not** a second `e2e-shared-backend` member: GitHub keeps only one *pending* job per group, so a third contender cancels the older pending job outright and silently drops a whole suite's coverage.
 - `integration_test/quick_scan_config_response_test.dart` — the Quick Scan per-image **form** shows/hides/requires fields per the selected group's `GroupReceiptSettings.quickScan*`, **without hitting the backend** (visibility assertions + client-side required-empty blocking, which short-circuits before the API call). Green on **all** targets (Linux/iOS/Android): it feeds an image via the mocked document-scanner channel (not the desktop-blocked gallery path) and injects the group config by mutating the live `GroupModel` via Provider (the same technique `quick_scan_disabled_test` uses for the AI flag — deterministic, no reliance on the local API persisting the fields). Six `testWidgets`: (1) single-group visibility + a categories-required fix-error snackbar; (2) **group switch** — two groups with opposite configs, asserts the field set **flips** when the dropdown changes; (3)+(4) **paid-by** / **tags** required+empty each block submit; (5) a required **comment** blocks submit; (6) `hideComments` hides the comment field even when the quick-scan toggle enables and requires it. Shared actions live in `helpers/quick_scan_actions.dart`. **Client injection only works for these no-backend tests** — successful submits must persist the config (see the submit spec). When injecting a synthetic group for a dropdown assertion, **trim `GroupModel.groups` to the all-group placeholder(s) + your target group(s)** (`keepOnlyGroup`) — the seeded admin accumulates many groups and an appended entry lands below the dropdown menu's viewport, where `find.text` can't reach it (a Material dropdown's scrollable doesn't build off-screen items into the element tree).
 - `integration_test/quick_scan_submit_test.dart` — Quick Scan **submit** outcomes that actually POST to the API. The backend's `resolveQuickScanFields` validates against the group's **persisted** config, so these tests **persist** the config via `PUT /group/{id}/groupReceiptSettings` (`setGroupQuickScanConfig`, restored on teardown) instead of client-injecting — client (via AppData at login) and server then agree, as in production. Three `testWidgets`, all keeping paid-by/status **required** (making them optional needs a persisted default the backend enforces): (1) required paid-by+status filled + an **optional** category left empty still queues; (2) a **required** category **selected via the picker** queues — this is the on-device regression guard for the shellContext crash fix (see caveat below); (3) a **required comment** blocks submit while empty and queues once typed, which is the end-to-end proof the client sends the aligned `comments` array (an omitted or misaligned one would 400 against the persisted config). Uses `firstNonAllGroup` + `keepOnlyGroup`, seeds the category via `createCategory`, and drives the multi-select via the filter field + `ChoiceChip` (mirroring `receipt_cost_split_test`).
 - `integration_test/quick_scan_prefill_test.dart` — Quick Scan per-image **prefill** from user preferences vs group config. Each added image seeds group/paid-by/status from `userPreferences.quickScanDefault*` (`_getInitialQuickScanValues`, delivered via AppData). Persists a group that **hides** paid-by (real prefs→AppData→form path via `setUserQuickScanPrefs` + `setGroupQuickScanConfig`, both restored) and asserts a **preset paid-by falls off** (field absent) while a **preset status is kept** (shown), then that submit **queues** (the hidden paid-by is backfilled from the group's `UPLOADER` default). Hiding paid-by/status in a persisted config **requires a group default** (`quickScanDefaultPaidByType: 'UPLOADER'` needs no id; `quickScanDefaultStatus` for status) — the backend rejects hiding/optional without one.

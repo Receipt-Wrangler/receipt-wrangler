@@ -3,10 +3,12 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
+import 'package:receipt_wrangler_mobile/constants/receipt_entry.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 
 import 'pump.dart';
+import 'receipt_test_helpers.dart';
 
 /// Shared Quick Scan e2e actions, used by the config + submit specs.
 
@@ -51,22 +53,22 @@ Future<api.Group> keepOnlyGroup(WidgetTester tester, int groupId) async {
   return target;
 }
 
-/// Opens the Quick Scan sheet from the bottom-nav Add menu and adds one image
-/// via the mocked document scanner, leaving the per-image form mounted (the
-/// "Group" field is on screen). Requires the AI flag already enabled and
-/// `installDocumentScannerMock()` already installed. The hitTestable +
-/// frame-drain hardening handles the sheet/popup slide-in (a deterministic
-/// tap-flake on iOS Cupertino transitions).
+/// Taps the bottom-nav scan slot to capture one image via the mocked document
+/// scanner, leaving the Quick Scan sheet open with its per-image form mounted
+/// (the "Group" field is on screen).
+///
+/// The tap is the direct scan action, so the sheet arrives already seeded --
+/// there is no menu step and no separate "add a photo" tap any more. Requires
+/// the AI flag already enabled and `installDocumentScannerMock()` already
+/// installed. The hitTestable + frame-drain hardening handles the sheet
+/// slide-in (a deterministic tap-flake on iOS Cupertino transitions).
 Future<void> openQuickScanImageForm(WidgetTester tester) async {
-  await tester.tap(find.text('Add').hitTestable());
-  await pumpUntilFound(tester, find.text('Quick Scan').hitTestable());
+  await pumpUntilFound(tester, scanNavSlot());
+  await tester.tap(scanNavSlot());
   for (int i = 0; i < 5; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
-  await tester.tap(find.text('Quick Scan').hitTestable());
 
-  await pumpUntilFound(tester, find.byIcon(Icons.add_a_photo));
-  await tester.tap(find.byIcon(Icons.add_a_photo));
   await pumpUntilFound(tester, find.text('Group'));
 }
 
@@ -83,7 +85,15 @@ Future<void> expectQuickScanSubmitBlocked(WidgetTester tester) async {
 }
 
 /// Taps the form's submit button and waits for the success snackbar (the scan
-/// was accepted and queued server-side).
+/// was accepted and queued server-side), then asserts the sheet confirms it
+/// inline.
+///
+/// The snackbar alone is not enough: submitting disables every field and hides
+/// the submit button, so once it fades the sheet would sit greyed out with
+/// nothing saying why. This is the only positive assertion on
+/// `quick-scan-queued-confirmation` -- the widget suite can only assert its
+/// absence, since the sheet builds its `isCompletedSubject` internally and a
+/// real submit is what sets it.
 Future<void> expectQuickScanQueued(WidgetTester tester) async {
   await pumpUntilFound(tester, find.byType(BottomSubmitButton).hitTestable());
   await tester.tap(find.byType(BottomSubmitButton));
@@ -92,4 +102,11 @@ Future<void> expectQuickScanQueued(WidgetTester tester) async {
     find.textContaining('Successfully queued'),
     timeout: const Duration(seconds: 15),
   );
+
+  await pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('quick-scan-queued-confirmation')),
+    timeout: const Duration(seconds: 10),
+  );
+  expect(find.text(quickScanQueuedMessage), findsOneWidget);
 }

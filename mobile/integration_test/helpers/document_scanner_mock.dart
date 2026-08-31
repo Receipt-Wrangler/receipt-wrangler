@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart' show MethodChannel, rootBundle;
-import 'package:flutter_test/flutter_test.dart';
-
+import 'package:flutter/services.dart' show rootBundle;
 import 'platform_mocks.dart';
 
 /// Stubs the `cunning_document_scanner` method channel so Quick Scan's
@@ -44,12 +42,5 @@ Future<void> installDocumentScannerMock({
   final tempFile = File('${tempDir.path}/$name');
   await tempFile.writeAsBytes(pngBytes, flush: true);
 
-  const channel = MethodChannel('cunning_document_scanner');
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMethodCallHandler(channel, (call) async {
-    if (call.method == 'getPictures') {
-      return <String>[tempFile.path];
-    }
-    return null;
-  });
+  installDocumentScannerChannelMock(<String>[tempFile.path]);
 }
