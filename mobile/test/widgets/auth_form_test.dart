@@ -18,17 +18,23 @@ void main() {
 
   const toggleKey = ValueKey('password-visibility-toggle');
 
-  /// Locates a `FormBuilderTextField` by its `name`.
+  const passwordFieldKey = ValueKey('password-field');
+
+  /// Locates the password field the way the E2E SUITE does -- by type and
+  /// `name`, not by key.
   ///
-  /// Deliberately a local copy of the e2e suite's `formField` helper rather than
-  /// an import: the widget suite is the gating one and must not depend on
-  /// `integration_test/`.
-  Finder formField(String name) => find.byWidgetPredicate(
+  /// Used only by the contract test at the bottom, which exists to prove that
+  /// locator still resolves; asserting it any other way would defeat the point.
+  /// Deliberately a local copy of `integration_test/helpers/form_actions.dart`'s
+  /// `formField` rather than an import: the widget suite is the gating one and
+  /// must not depend on `integration_test/`.
+  Finder e2eFormFieldLocator(String name) => find.byWidgetPredicate(
         (w) => w is FormBuilderTextField && w.name == name,
       );
 
   bool isObscured(WidgetTester tester) =>
-      tester.widget<FormBuilderTextField>(formField('password')).obscureText;
+      tester.widget<FormBuilderTextField>(find.byKey(passwordFieldKey))
+          .obscureText;
 
   setUp(() async {
     // AuthModel.basePath reads GlobalSharedPreferences during build.
@@ -150,6 +156,16 @@ void main() {
     // find.byWidgetPredicate(w is FormBuilderTextField && w.name == 'password').
     // Renaming it, or wrapping it in a way that mounts a second one, takes out
     // the whole integration suite.
-    expect(formField('password'), findsOneWidget);
+    //
+    // This is the one assertion that must NOT go through the key: it is pinning
+    // the e2e locator itself, so it has to use the same shape the e2e uses.
+    expect(e2eFormFieldLocator('password'), findsOneWidget);
+
+    // ...and the keyed field is that same one, so the rest of this file's
+    // key-based assertions are talking about the field e2e drives.
+    expect(
+      tester.widget<FormBuilderTextField>(find.byKey(passwordFieldKey)).name,
+      'password',
+    );
   });
 }

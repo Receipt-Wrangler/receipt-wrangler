@@ -211,6 +211,7 @@ class _Login extends State<AuthForm> {
                 ])),
             textFieldSpacing,
             FormBuilderTextField(
+                key: const ValueKey("password-field"),
                 name: "password",
                 autofillHints: const [AutofillHints.password],
                 obscureText: obscurePassword,
