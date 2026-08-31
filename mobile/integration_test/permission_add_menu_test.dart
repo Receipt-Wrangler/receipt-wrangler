@@ -66,8 +66,12 @@ void main() {
     },
   );
 
+  // Asserts the slot's menu OFFERS manual entry, not that tapping opens the
+  // form -- that belongs where the feature flag is pinned, since it decides
+  // whether a tap scans or falls through. Covered by quick_scan_entry_gated_test
+  // (both blocked reasons) and receipt_entry_menu_reopen_test.
   testWidgets(
-    'entry: a Legacy Editor can open the manual form from the slot',
+    'entry: a Legacy Editor is offered manual entry from the slot menu',
     (tester) async {
       final fixture = await provisionPermUser(roleName: 'Legacy Editor');
       await loginAs(

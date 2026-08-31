@@ -7,8 +7,12 @@
 /// shown when the Scan tap falls through to manual entry — and the two drifting
 /// apart would read as two different problems.
 
+// "Receipt Processing Settings" is the product's name for the entity and stays
+// plural even for a single record ("Create Receipt Processing Settings", "...
+// deleted successfully" on desktop), so the sentence is built around it rather
+// than given a singular article.
 const quickScanAiDisabledMessage =
-    "A configured Receipt Processing Settings is required to use Quick Scan. "
+    "Receipt Processing Settings must be configured to use Quick Scan. "
     "Contact your administrator for more information.";
 
 const quickScanNoPermissionMessage =

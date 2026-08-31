@@ -27,6 +27,20 @@ void main() {
   late NavDestinationItem? item;
   late GlobalKey anchorKey;
 
+  // One controller per test, closed afterwards. Built here rather than inside
+  // the route builder below, which can re-run: a fresh controller per rebuild
+  // would leave BottomNav subscribed to the previous one. Mirrors
+  // test/shared/widgets/bottom_nav_test.dart.
+  //
+  // Broadcast, unlike that file's: the slot is omitted when the user holds
+  // neither permission, so BottomNav is never mounted and never listens. A
+  // single-subscription controller's close() future does not complete until
+  // something has listened, which hangs tearDown forever.
+  late StreamController<int> indexSelectedController;
+
+  setUp(() => indexSelectedController = StreamController<int>.broadcast());
+  tearDown(() => indexSelectedController.close());
+
   Future<void> pumpSlot(
     WidgetTester tester, {
     required bool aiEnabled,
@@ -52,7 +66,7 @@ void main() {
                       items: [built, _filler],
                       onDestinationSelected: (_) {},
                       getInitialSelectedIndex: () => 0,
-                      indexSelectedController: StreamController<int>(),
+                      indexSelectedController: indexSelectedController,
                     ),
             );
           },

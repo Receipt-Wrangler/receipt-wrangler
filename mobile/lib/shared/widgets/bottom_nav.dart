@@ -49,15 +49,27 @@ class BottomNav extends StatefulWidget {
 class _BottomNav extends State<BottomNav> {
   var indexSelected = 0;
 
+  /// Held so it can be cancelled: the controller is owned by the caller and
+  /// outlives this State, so an uncancelled subscription both leaks and calls
+  /// setState after dispose.
+  StreamSubscription<int>? _indexSelectedSubscription;
+
   @override
   void initState() {
     super.initState();
 
-    widget.indexSelectedController.stream.listen((index) {
+    _indexSelectedSubscription =
+        widget.indexSelectedController.stream.listen((index) {
       setState(() {
         indexSelected = index;
       });
     });
+  }
+
+  @override
+  void dispose() {
+    _indexSelectedSubscription?.cancel();
+    super.dispose();
   }
 
   Widget buildNavigationBar() {

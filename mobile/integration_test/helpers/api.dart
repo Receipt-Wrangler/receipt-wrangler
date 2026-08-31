@@ -283,6 +283,13 @@ Future<void> putSystemSettings(
 /// deliberately declines to replay a pointer at a leaked fixture record, and
 /// defaulting would hide that choice at the call sites.
 ///
+/// The restore reuses [jwt] rather than logging in again. Login is rate-limited
+/// (429s on tight reruns) and `apiLogin` throws on a non-200, which would abort
+/// the teardown BEFORE the restore PUT and leave the override applied for every
+/// later run -- the exact install-wide leak this helper exists to prevent. The
+/// token is stateless with a fixed 20-minute life, so it outlives any single
+/// test by a wide margin; `feature_flags.dart` reuses it for the same reason.
+///
 /// Teardowns run LIFO, so register anything that must run AFTER the restore
 /// (e.g. deleting a record the settings still point at) BEFORE calling this.
 Future<void> overrideSystemSettingsForTest(
@@ -297,10 +304,9 @@ Future<void> overrideSystemSettingsForTest(
   );
 
   addTearDown(() async {
-    final j = await apiLogin();
-    final current = await getSystemSettings(j);
+    final current = await getSystemSettings(jwt);
     await putSystemSettings(
-      j,
+      jwt,
       Map<String, dynamic>.from(current)..addAll(restoreTo),
     );
   });

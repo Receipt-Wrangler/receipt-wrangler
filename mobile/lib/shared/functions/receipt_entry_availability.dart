@@ -9,7 +9,7 @@ import '../../utils/group.dart';
 
 /// Why Quick Scan cannot run for the current user in the current group.
 enum QuickScanBlockedReason {
-  /// No Receipt Processing Setting is configured server-side, so the
+  /// No Receipt Processing Settings are configured server-side, so the
   /// `aiPoweredReceipts` feature flag is off for the whole install.
   aiDisabled,
 

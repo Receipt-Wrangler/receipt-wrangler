@@ -3,6 +3,7 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
+import 'package:receipt_wrangler_mobile/constants/receipt_entry.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 
@@ -84,7 +85,15 @@ Future<void> expectQuickScanSubmitBlocked(WidgetTester tester) async {
 }
 
 /// Taps the form's submit button and waits for the success snackbar (the scan
-/// was accepted and queued server-side).
+/// was accepted and queued server-side), then asserts the sheet confirms it
+/// inline.
+///
+/// The snackbar alone is not enough: submitting disables every field and hides
+/// the submit button, so once it fades the sheet would sit greyed out with
+/// nothing saying why. This is the only positive assertion on
+/// `quick-scan-queued-confirmation` -- the widget suite can only assert its
+/// absence, since the sheet builds its `isCompletedSubject` internally and a
+/// real submit is what sets it.
 Future<void> expectQuickScanQueued(WidgetTester tester) async {
   await pumpUntilFound(tester, find.byType(BottomSubmitButton).hitTestable());
   await tester.tap(find.byType(BottomSubmitButton));
@@ -93,4 +102,11 @@ Future<void> expectQuickScanQueued(WidgetTester tester) async {
     find.textContaining('Successfully queued'),
     timeout: const Duration(seconds: 15),
   );
+
+  await pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('quick-scan-queued-confirmation')),
+    timeout: const Duration(seconds: 10),
+  );
+  expect(find.text(quickScanQueuedMessage), findsOneWidget);
 }
