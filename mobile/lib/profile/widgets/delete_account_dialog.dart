@@ -56,9 +56,11 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
             decoration: InputDecoration(
               labelText: 'Password',
               suffixIcon: IconButton(
+                key: const ValueKey('password-visibility-toggle'),
                 icon: Icon(
                   _obscurePassword ? Icons.visibility : Icons.visibility_off,
                 ),
+                tooltip: _obscurePassword ? 'Show Password' : 'Hide Password',
                 onPressed: () {
                   setState(() {
                     _obscurePassword = !_obscurePassword;
