@@ -51,14 +51,20 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
           const Text('Please enter your password to confirm account deletion.'),
           const SizedBox(height: 16),
           TextField(
+            // Same key the login form's password field uses -- the two never
+            // share a tree, and matching them keeps both password fields
+            // addressable the same way, as their eye toggles already are.
+            key: const ValueKey('password-field'),
             controller: _passwordController,
             obscureText: _obscurePassword,
             decoration: InputDecoration(
               labelText: 'Password',
               suffixIcon: IconButton(
+                key: const ValueKey('password-visibility-toggle'),
                 icon: Icon(
                   _obscurePassword ? Icons.visibility : Icons.visibility_off,
                 ),
+                tooltip: _obscurePassword ? 'Show Password' : 'Hide Password',
                 onPressed: () {
                   setState(() {
                     _obscurePassword = !_obscurePassword;

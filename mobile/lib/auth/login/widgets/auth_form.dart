@@ -34,6 +34,11 @@ class _Login extends State<AuthForm> {
   bool isSignUp = false;
   bool isLoading = false;
 
+  /// Whether the password field is masked. Mirrors the desktop auth screen's
+  /// visibility eye (`app-input`'s `showVisibilityEye`), which starts masked and
+  /// stays however the user left it across a submit or a failed validation.
+  bool obscurePassword = true;
+
   Future<void> _submit() async {
     _formKey.currentState!.save();
 
@@ -135,6 +140,12 @@ class _Login extends State<AuthForm> {
         onPressed: () {
           setState(() {
             isSignUp = !isSignUp;
+            // Desktop re-masks here because Login and Sign Up are separate
+            // routes, so the form is destroyed and rebuilt. This form only
+            // flips a flag and keeps what was typed, so without this a
+            // revealed password would stay on screen across a deliberate
+            // switch -- worse than desktop rather than equal to it.
+            obscurePassword = true;
           });
         },
         child: Text(buttonText));
@@ -200,11 +211,30 @@ class _Login extends State<AuthForm> {
                 ])),
             textFieldSpacing,
             FormBuilderTextField(
+                key: const ValueKey("password-field"),
                 name: "password",
                 autofillHints: const [AutofillHints.password],
-                obscureText: true,
-                decoration: const InputDecoration(
-                    labelText: "Password", border: OutlineInputBorder()),
+                obscureText: obscurePassword,
+                decoration: InputDecoration(
+                    labelText: "Password",
+                    border: const OutlineInputBorder(),
+                    // The icon names the ACTION, not the state: an open eye
+                    // while masked ("show me"), a crossed-out one while
+                    // revealed ("hide it"). Same polarity as the desktop eye
+                    // and the delete-account dialog.
+                    suffixIcon: IconButton(
+                      key: const ValueKey("password-visibility-toggle"),
+                      icon: Icon(obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      tooltip:
+                          obscurePassword ? "Show Password" : "Hide Password",
+                      onPressed: () {
+                        setState(() {
+                          obscurePassword = !obscurePassword;
+                        });
+                      },
+                    )),
                 validator: FormBuilderValidators.compose([
                   FormBuilderValidators.required(),
                 ])),
