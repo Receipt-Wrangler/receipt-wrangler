@@ -72,8 +72,11 @@ void main() {
 
   testWidgets('with the ai flag off, the banner points at the server config',
       (tester) async {
-    // The local backend ships with no receipt-processing settings, so
-    // aiPoweredReceipts is off by default -- no fixture needed.
+    // aiPoweredReceipts is install-wide, so "off" is ambient state on a shared
+    // backend, not a default -- an aborted run leaves it stuck on and this test
+    // then fails looking like a product bug. Pinning it also removes the
+    // dependency on the test ABOVE having torn down successfully: same global.
+    await disableAiPoweredReceiptsForTest();
     await binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => binding.setSurfaceSize(null));
 

@@ -37,13 +37,24 @@ jobs:
   android-e2e:
     runs-on: ubuntu-latest
     continue-on-error: true
-    timeout-minutes: 45
+    timeout-minutes: 70
     # Shared with e2e.yml's `e2e` job: both drive the same backend
-    # (secrets.E2E_BASE_URL) and both run a login-QR spec that flips the global
-    # showLoginQr / mobileServerUrl settings. The workflow-level groups above
-    # only serialize each workflow against itself, so this job-level group is
-    # what keeps the two suites from racing on that shared state. Only this job
-    # needs it -- ios-e2e does not run integration_test/login_qr_deep_link_test.dart.
+    # (secrets.E2E_BASE_URL) and both mutate GLOBAL system settings. The
+    # workflow-level groups above only serialize each workflow against itself,
+    # so this job-level group is what keeps the two suites from racing on that
+    # shared state. Three settings are install-wide and shared by every spec on
+    # a given backend: showLoginQr / mobileServerUrl (login_qr_fixtures.dart)
+    # and receiptProcessingSettingsId, which IS the aiPoweredReceipts flag
+    # (feature_flags.dart).
+    #
+    # INVARIANT: ios-e2e deliberately carries NO lock, and runs concurrently
+    # with this job against the same backend. That is safe ONLY because its
+    # spec list contains nothing that mutates or depends on those settings.
+    # Adding such a spec to ios-e2e REQUIRES serializing it against this job
+    # first -- `needs: [android-e2e]` + `if: always()`, NOT a second
+    # e2e-shared-backend member: GitHub keeps only one PENDING job per group,
+    # so a third contender cancels the older pending job outright and silently
+    # drops a whole suite's coverage (see e2e.yml's cancel-in-progress note).
     #
     # REF-INDEPENDENT on purpose (no github.ref), and must stay byte-identical
     # to e2e.yml's group. This workflow also fires on tech/mobile-e2e and
@@ -173,7 +184,11 @@ jobs:
       # script-parser does that killed the previous inline loop with
       # `exit code null` on the first iteration.
       #
-      # 12 specs below match the prior inline list -- no scope change.
+      # 18 specs below: the original 13, plus the five receipt-entry specs
+      # (quick_scan_entry, quick_scan_entry_gated, quick_scan_camera_denied,
+      # receipt_entry_hidden, receipt_entry_menu_reopen). They run here rather
+      # than on ios-e2e because two of them pin the global aiPoweredReceipts
+      # flag -- see the concurrency comment above.
       - name: Run Flutter integration tests on Android
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -208,6 +223,11 @@ jobs:
             integration_test/receipt_view_to_groups_navigation_test.dart
             integration_test/quick_scan_test.dart
             integration_test/quick_scan_disabled_test.dart
+            integration_test/quick_scan_entry_test.dart
+            integration_test/quick_scan_entry_gated_test.dart
+            integration_test/quick_scan_camera_denied_test.dart
+            integration_test/receipt_entry_hidden_test.dart
+            integration_test/receipt_entry_menu_reopen_test.dart
             integration_test/login_qr_deep_link_test.dart
 
   ios-e2e:

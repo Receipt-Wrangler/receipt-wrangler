@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:receipt_wrangler_mobile/constants/receipt_entry.dart';
 
+import 'helpers/feature_flags.dart';
 import 'helpers/login.dart';
 import 'helpers/platform_mocks.dart';
 import 'helpers/pump.dart';
@@ -33,6 +34,14 @@ void main() {
 
   testWidgets('the scan slot survives its menu being opened and dismissed',
       (tester) async {
+    // The closing assertion needs the scan TAP to fall through to the manual
+    // form, which it only does while Quick Scan is unavailable: this spec logs
+    // in as the admin (who holds group.receipts.quick-scan) and installs no
+    // document-scanner mock, so with the flag on the tap launches the real
+    // scanner and `find.text('Name')` times out. That is not what this
+    // regression is about -- pin the flag rather than depend on the install.
+    await disableAiPoweredReceiptsForTest();
+
     await binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => binding.setSurfaceSize(null));
 
