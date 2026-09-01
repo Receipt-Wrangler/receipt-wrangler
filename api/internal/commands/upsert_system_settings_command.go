@@ -37,13 +37,19 @@ type UpsertSystemSettingsCommand struct {
 	McpPublicUrl                        string                                `json:"mcpPublicUrl"`
 	ShowLoginQr                         bool                                  `json:"showLoginQr"`
 	MobileServerUrl                     string                                `json:"mobileServerUrl"`
-	// Pointers so an omitted key is distinguishable from an explicit 0. The
-	// repository writes every column (Select("*")), so a plain int would persist
-	// as 0 and silently reset a configured lifetime to the default whenever a
-	// client PUTs a body without these keys. Same reasoning as the pointer
-	// fields on UpdateGroupReceiptSettingsCommand.
+	// Pointers so an omitted key is distinguishable from an explicit zero value.
+	// The repository writes every column (Select("*")), so a plain field would
+	// persist as its zero value and silently reset a configured setting whenever a
+	// client PUTs a body without these keys. Same reasoning as the pointer fields
+	// on UpdateGroupReceiptSettingsCommand.
 	RefreshTokenValidForHours    *int `json:"refreshTokenValidForHours"`
 	McpRefreshTokenValidForHours *int `json:"mcpRefreshTokenValidForHours"`
+	// ServerPublicUrl is a pointer for the same reason, and the stakes are higher
+	// than a reset default: it builds the OIDC redirect URI registered at each
+	// identity provider, so clearing it makes every provider reject the callback
+	// with a redirect_uri mismatch — a failure that surfaces at the IdP rather
+	// than in our logs.
+	ServerPublicUrl *string `json:"serverPublicUrl"`
 }
 
 func (command *UpsertSystemSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -127,6 +133,18 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 		errorMap["mobileServerUrl"] = "Mobile server URL must be an absolute URL like https://receipts.example.com/api"
 	}
 
+	// A nil pointer means the key was omitted, which leaves the stored value alone
+	// and is always valid. An explicit empty string clears it, which is allowed —
+	// it is only required once an OIDC provider is enabled, and that cross-setting
+	// rule is enforced where providers are saved (OidcProviderService), so an admin
+	// cannot save a provider that has no redirect URI to register.
+	if command.ServerPublicUrl != nil {
+		trimmedServerPublicUrl := strings.TrimSpace(*command.ServerPublicUrl)
+		if len(trimmedServerPublicUrl) > 0 && !isValidAbsoluteUrl(trimmedServerPublicUrl) {
+			errorMap["serverPublicUrl"] = "Server public URL must be an absolute origin like https://receipts.example.com"
+		}
+	}
+
 	if msg := validateRefreshTokenValidForHours(command.RefreshTokenValidForHours); len(msg) > 0 {
 		errorMap["refreshTokenValidForHours"] = msg
 	}
@@ -142,7 +160,7 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 // empty string when the value is acceptable.
 //
 // A nil pointer means the key was omitted, which leaves the stored value alone
-// (see ApplyOmittedLifetimes) and is always valid. An explicit 0 means "unset":
+// (see ApplyOmittedValues) and is always valid. An explicit 0 means "unset":
 // the read side falls back to the built-in default. Shared by the app and MCP
 // settings so the two cannot drift.
 func validateRefreshTokenValidForHours(hours *int) string {
@@ -194,17 +212,17 @@ func (command *UpsertSystemSettingsCommand) ToSystemSettings(id uint) (models.Sy
 	return systemSettings, nil
 }
 
-// OmittedLifetimeColumns names the refresh-token lifetime fields the request did
-// not send, so the repository can leave those columns out of the UPDATE entirely.
+// OmittedColumns names the pointer-typed fields the request did not send, so the
+// repository can leave those columns out of the UPDATE entirely.
 //
 // Skipping the column is what makes a concurrent update safe. Copying the stored
-// value onto the row instead (see ApplyOmittedLifetimes) would still write it,
-// so two requests that each set one lifetime and omit the other would clobber
-// each other with the values they read before the write. A column that is never
+// value onto the row instead (see ApplyOmittedValues) would still write it, so
+// two requests that each set one field and omit the other would clobber each
+// other with the values they read before the write. A column that is never
 // written cannot be clobbered, and unlike a row lock this works identically on
 // SQLite, MySQL and Postgres.
-func (command *UpsertSystemSettingsCommand) OmittedLifetimeColumns() []string {
-	columns := make([]string, 0, 2)
+func (command *UpsertSystemSettingsCommand) OmittedColumns() []string {
+	columns := make([]string, 0, 3)
 
 	if command.RefreshTokenValidForHours == nil {
 		columns = append(columns, "RefreshTokenValidForHours")
@@ -214,22 +232,30 @@ func (command *UpsertSystemSettingsCommand) OmittedLifetimeColumns() []string {
 		columns = append(columns, "McpRefreshTokenValidForHours")
 	}
 
+	if command.ServerPublicUrl == nil {
+		columns = append(columns, "ServerPublicUrl")
+	}
+
 	return columns
 }
 
-// ApplyOmittedLifetimes carries the stored refresh-token lifetimes onto the
-// settings a PUT is about to write for any key the request omitted.
+// ApplyOmittedValues carries the stored value of every omitted pointer field onto
+// the settings a PUT is about to write.
 //
 // ToSystemSettings round-trips the command through JSON, so a nil pointer lands
-// as 0 on the model. The columns themselves are excluded from the UPDATE by
-// OmittedLifetimeColumns, so this exists purely so the object echoed back in the
-// response carries the stored value rather than a misleading 0.
-func (command *UpsertSystemSettingsCommand) ApplyOmittedLifetimes(existing models.SystemSettings, updated *models.SystemSettings) {
+// as the zero value on the model. The columns themselves are excluded from the
+// UPDATE by OmittedColumns, so this exists purely so the object echoed back in
+// the response carries the stored value rather than a misleading zero.
+func (command *UpsertSystemSettingsCommand) ApplyOmittedValues(existing models.SystemSettings, updated *models.SystemSettings) {
 	if command.RefreshTokenValidForHours == nil {
 		updated.RefreshTokenValidForHours = existing.RefreshTokenValidForHours
 	}
 
 	if command.McpRefreshTokenValidForHours == nil {
 		updated.McpRefreshTokenValidForHours = existing.McpRefreshTokenValidForHours
+	}
+
+	if command.ServerPublicUrl == nil {
+		updated.ServerPublicUrl = existing.ServerPublicUrl
 	}
 }

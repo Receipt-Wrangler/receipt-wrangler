@@ -1,4 +1,4 @@
-package oauth
+package utils
 
 import (
 	"crypto/sha256"
@@ -6,11 +6,16 @@ import (
 	"encoding/base64"
 )
 
-// verifyPkceS256 reports whether codeVerifier matches the stored S256
+// VerifyPkceS256 reports whether codeVerifier matches the stored S256
 // codeChallenge per RFC 7636: BASE64URL-WITHOUT-PADDING(SHA256(verifier)).
 // Only the S256 method is supported; "plain" is intentionally rejected by
 // callers before reaching here. The comparison is constant time.
-func verifyPkceS256(codeVerifier string, codeChallenge string) bool {
+//
+// Shared by the OAuth 2.1 authorization server (internal/oauth, verifying a
+// client's verifier at the token endpoint) and the OIDC relying party
+// (internal/oidc, verifying the mobile app's verifier at the exchange
+// endpoint). It lives here so the two cannot drift.
+func VerifyPkceS256(codeVerifier string, codeChallenge string) bool {
 	if len(codeVerifier) == 0 || len(codeChallenge) == 0 {
 		return false
 	}

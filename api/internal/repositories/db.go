@@ -165,6 +165,10 @@ func MakeMigrations() error {
 		&models.DataMigration{},
 		&models.OAuthClient{},
 		&models.OAuthAuthorizationCode{},
+		&models.OidcProvider{},
+		&models.OidcIdentity{},
+		&models.OidcAuthSession{},
+		&models.OidcExchangeCode{},
 	)
 
 	return err
