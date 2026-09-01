@@ -70,6 +70,7 @@ func BuildMux() *asynq.ServeMux {
 	mux.HandleFunc(EmailProcess, HandleEmailProcessTask)
 	mux.HandleFunc(EmailProcessImageCleanUp, HandleEmailProcessImageCleanUpTask)
 	mux.HandleFunc(RefreshTokenCleanUp, HandleRefreshTokenCleanupTask)
+	mux.HandleFunc(OidcSessionCleanUp, HandleOidcCleanupTask)
 
 	return mux
 }

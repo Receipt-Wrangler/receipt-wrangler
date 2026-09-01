@@ -23,5 +23,12 @@ func VerifyPkceS256(codeVerifier string, codeChallenge string) bool {
 	sum := sha256.Sum256([]byte(codeVerifier))
 	computed := base64.RawURLEncoding.EncodeToString(sum[:])
 
-	return subtle.ConstantTimeCompare([]byte(computed), []byte(codeChallenge)) == 1
+	return SecureCompare(computed, codeChallenge)
+}
+
+// SecureCompare reports whether two strings are equal in constant time. Use it
+// for any secret comparison -- a byte-by-byte == leaks how much of a guess was
+// right through its timing.
+func SecureCompare(a string, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }

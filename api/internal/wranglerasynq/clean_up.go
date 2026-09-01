@@ -17,6 +17,12 @@ func StartSystemCleanUpTasks() error {
 	inspector.DeleteAllScheduledTasks(string(cleanUpQueue))
 	refreshTokenTask := asynq.NewTask(RefreshTokenCleanUp, nil)
 	_, err = RegisterTask("@every 24h", refreshTokenTask, cleanUpQueue, 0)
+	if err != nil {
+		return err
+	}
+
+	oidcSessionTask := asynq.NewTask(OidcSessionCleanUp, nil)
+	_, err = RegisterTask("@every 24h", oidcSessionTask, cleanUpQueue, 0)
 
 	return err
 }

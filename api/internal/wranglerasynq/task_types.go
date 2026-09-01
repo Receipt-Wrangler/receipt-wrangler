@@ -6,4 +6,5 @@ const (
 	EmailProcess             = "email:process"
 	EmailProcessImageCleanUp = "email:process_image_cleanup"
 	RefreshTokenCleanUp      = "system_clean_up:refresh_token"
+	OidcSessionCleanUp       = "system_clean_up:oidc"
 )
