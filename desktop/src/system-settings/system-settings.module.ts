@@ -24,10 +24,14 @@ import { SystemSettingsFormComponent } from "./system-settings-form/system-setti
 import { SystemSettingsRoutingModule } from "./system-settings-routing.module";
 import { SystemSettingsComponent } from "./system-settings/system-settings.component";
 import { SystemTaskTableComponent } from "./system-task-table/system-task-table.component";
+import { OidcProviderFormComponent } from "./oidc-provider-form/oidc-provider-form.component";
+import { OidcProviderTableComponent } from "./oidc-provider-table/oidc-provider-table.component";
 
 
 @NgModule({
   declarations: [SystemEmailTableComponent,
+    OidcProviderFormComponent,
+    OidcProviderTableComponent,
     SystemSettingsComponent,
     SystemEmailFormComponent,
     SystemSettingsFormComponent,

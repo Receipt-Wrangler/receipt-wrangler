@@ -100,6 +100,7 @@ describe("SystemSettingsFormComponent", () => {
       ],
       mcpEnabled: null,
       mcpPublicUrl: null,
+      serverPublicUrl: null,
       showLoginQr: null,
       mobileServerUrl: null,
       // With no stored value, splitHours falls back to the 24h default and
@@ -132,6 +133,7 @@ describe("SystemSettingsFormComponent", () => {
       }],
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      serverPublicUrl: "https://receipts.example.com",
       showLoginQr: true,
       mobileServerUrl: "https://receipts.example.com/api",
       refreshTokenValidForHours: 720,
@@ -159,6 +161,7 @@ describe("SystemSettingsFormComponent", () => {
       }],
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      serverPublicUrl: "https://receipts.example.com",
       showLoginQr: true,
       mobileServerUrl: "https://receipts.example.com/api",
       // 720 hours divides evenly into days, so it renders as 30 Days; 6 does
@@ -385,6 +388,7 @@ describe("SystemSettingsFormComponent", () => {
       taskConcurrency: "12",
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      serverPublicUrl: "https://receipts.example.com",
       showLoginQr: true,
       mobileServerUrl: "https://receipts.example.com/api",
       refreshTokenValidForValue: "14",
@@ -425,6 +429,7 @@ describe("SystemSettingsFormComponent", () => {
       ],
       mcpEnabled: true,
       mcpPublicUrl: "https://receipts.example.com",
+      serverPublicUrl: "https://receipts.example.com",
       showLoginQr: true,
       mobileServerUrl: "https://receipts.example.com/api",
       // The value/unit pairs are folded into hours and the presentation-only
