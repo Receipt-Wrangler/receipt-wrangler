@@ -40,6 +40,8 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
   @override
   final String? mcpPublicUrl;
   @override
+  final String? serverPublicUrl;
+  @override
   final bool? showLoginQr;
   @override
   final String? mobileServerUrl;
@@ -69,6 +71,7 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
       this.taskQueueConfigurations,
       this.mcpEnabled,
       this.mcpPublicUrl,
+      this.serverPublicUrl,
       this.showLoginQr,
       this.mobileServerUrl,
       this.refreshTokenValidForHours,
@@ -104,6 +107,7 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
         taskQueueConfigurations == other.taskQueueConfigurations &&
         mcpEnabled == other.mcpEnabled &&
         mcpPublicUrl == other.mcpPublicUrl &&
+        serverPublicUrl == other.serverPublicUrl &&
         showLoginQr == other.showLoginQr &&
         mobileServerUrl == other.mobileServerUrl &&
         refreshTokenValidForHours == other.refreshTokenValidForHours &&
@@ -129,6 +133,7 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
     _$hash = $jc(_$hash, taskQueueConfigurations.hashCode);
     _$hash = $jc(_$hash, mcpEnabled.hashCode);
     _$hash = $jc(_$hash, mcpPublicUrl.hashCode);
+    _$hash = $jc(_$hash, serverPublicUrl.hashCode);
     _$hash = $jc(_$hash, showLoginQr.hashCode);
     _$hash = $jc(_$hash, mobileServerUrl.hashCode);
     _$hash = $jc(_$hash, refreshTokenValidForHours.hashCode);
@@ -157,6 +162,7 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
           ..add('taskQueueConfigurations', taskQueueConfigurations)
           ..add('mcpEnabled', mcpEnabled)
           ..add('mcpPublicUrl', mcpPublicUrl)
+          ..add('serverPublicUrl', serverPublicUrl)
           ..add('showLoginQr', showLoginQr)
           ..add('mobileServerUrl', mobileServerUrl)
           ..add('refreshTokenValidForHours', refreshTokenValidForHours)
@@ -256,6 +262,11 @@ class UpsertSystemSettingsCommandBuilder
   String? get mcpPublicUrl => _$this._mcpPublicUrl;
   set mcpPublicUrl(String? mcpPublicUrl) => _$this._mcpPublicUrl = mcpPublicUrl;
 
+  String? _serverPublicUrl;
+  String? get serverPublicUrl => _$this._serverPublicUrl;
+  set serverPublicUrl(String? serverPublicUrl) =>
+      _$this._serverPublicUrl = serverPublicUrl;
+
   bool? _showLoginQr;
   bool? get showLoginQr => _$this._showLoginQr;
   set showLoginQr(bool? showLoginQr) => _$this._showLoginQr = showLoginQr;
@@ -299,6 +310,7 @@ class UpsertSystemSettingsCommandBuilder
       _taskQueueConfigurations = $v.taskQueueConfigurations?.toBuilder();
       _mcpEnabled = $v.mcpEnabled;
       _mcpPublicUrl = $v.mcpPublicUrl;
+      _serverPublicUrl = $v.serverPublicUrl;
       _showLoginQr = $v.showLoginQr;
       _mobileServerUrl = $v.mobileServerUrl;
       _refreshTokenValidForHours = $v.refreshTokenValidForHours;
@@ -358,6 +370,7 @@ class UpsertSystemSettingsCommandBuilder
             taskQueueConfigurations: _taskQueueConfigurations?.build(),
             mcpEnabled: mcpEnabled,
             mcpPublicUrl: mcpPublicUrl,
+            serverPublicUrl: serverPublicUrl,
             showLoginQr: showLoginQr,
             mobileServerUrl: mobileServerUrl,
             refreshTokenValidForHours: refreshTokenValidForHours,

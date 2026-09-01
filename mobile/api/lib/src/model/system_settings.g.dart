@@ -18,6 +18,8 @@ class _$SystemSettings extends SystemSettings {
   @override
   final bool? showLoginQr;
   @override
+  final String? serverPublicUrl;
+  @override
   final bool? currencyHideDecimalPlaces;
   @override
   final String? mcpPublicUrl;
@@ -67,6 +69,7 @@ class _$SystemSettings extends SystemSettings {
       this.pdfDpi,
       this.currencyDisplay,
       this.showLoginQr,
+      this.serverPublicUrl,
       this.currencyHideDecimalPlaces,
       this.mcpPublicUrl,
       this.currencyDecimalSeparator,
@@ -104,6 +107,7 @@ class _$SystemSettings extends SystemSettings {
         pdfDpi == other.pdfDpi &&
         currencyDisplay == other.currencyDisplay &&
         showLoginQr == other.showLoginQr &&
+        serverPublicUrl == other.serverPublicUrl &&
         currencyHideDecimalPlaces == other.currencyHideDecimalPlaces &&
         mcpPublicUrl == other.mcpPublicUrl &&
         currencyDecimalSeparator == other.currencyDecimalSeparator &&
@@ -135,6 +139,7 @@ class _$SystemSettings extends SystemSettings {
     _$hash = $jc(_$hash, pdfDpi.hashCode);
     _$hash = $jc(_$hash, currencyDisplay.hashCode);
     _$hash = $jc(_$hash, showLoginQr.hashCode);
+    _$hash = $jc(_$hash, serverPublicUrl.hashCode);
     _$hash = $jc(_$hash, currencyHideDecimalPlaces.hashCode);
     _$hash = $jc(_$hash, mcpPublicUrl.hashCode);
     _$hash = $jc(_$hash, currencyDecimalSeparator.hashCode);
@@ -167,6 +172,7 @@ class _$SystemSettings extends SystemSettings {
           ..add('pdfDpi', pdfDpi)
           ..add('currencyDisplay', currencyDisplay)
           ..add('showLoginQr', showLoginQr)
+          ..add('serverPublicUrl', serverPublicUrl)
           ..add('currencyHideDecimalPlaces', currencyHideDecimalPlaces)
           ..add('mcpPublicUrl', mcpPublicUrl)
           ..add('currencyDecimalSeparator', currencyDecimalSeparator)
@@ -222,6 +228,11 @@ class SystemSettingsBuilder
   bool? get showLoginQr => _$this._showLoginQr;
   set showLoginQr(covariant bool? showLoginQr) =>
       _$this._showLoginQr = showLoginQr;
+
+  String? _serverPublicUrl;
+  String? get serverPublicUrl => _$this._serverPublicUrl;
+  set serverPublicUrl(covariant String? serverPublicUrl) =>
+      _$this._serverPublicUrl = serverPublicUrl;
 
   bool? _currencyHideDecimalPlaces;
   bool? get currencyHideDecimalPlaces => _$this._currencyHideDecimalPlaces;
@@ -340,6 +351,7 @@ class SystemSettingsBuilder
       _pdfDpi = $v.pdfDpi;
       _currencyDisplay = $v.currencyDisplay;
       _showLoginQr = $v.showLoginQr;
+      _serverPublicUrl = $v.serverPublicUrl;
       _currencyHideDecimalPlaces = $v.currencyHideDecimalPlaces;
       _mcpPublicUrl = $v.mcpPublicUrl;
       _currencyDecimalSeparator = $v.currencyDecimalSeparator;
@@ -389,6 +401,7 @@ class SystemSettingsBuilder
             pdfDpi: pdfDpi,
             currencyDisplay: currencyDisplay,
             showLoginQr: showLoginQr,
+            serverPublicUrl: serverPublicUrl,
             currencyHideDecimalPlaces: currencyHideDecimalPlaces,
             mcpPublicUrl: mcpPublicUrl,
             currencyDecimalSeparator: currencyDecimalSeparator,
