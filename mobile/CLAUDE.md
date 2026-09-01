@@ -494,6 +494,50 @@ mounts it, so a raw `shellContext` is **null** and tapping Categories/Tags would
 by `test/widgets/quick_scan_form_test.dart` (tap-opens-picker, shellContext null) and on-device by
 `quick_scan_submit_test.dart`.
 
+### Seeding the receipt group
+
+The Group field is a default, not a lock. The add form seeds it from **the group being browsed**, and
+failing that from **the user's only group**; Quick Scan seeds each picked image from the user's
+`quickScanDefaultGroupId` and, failing that, from their only group. See the root `CLAUDE.md` →
+"Seeding the Group Field" for the cross-client contract.
+
+- **`GroupModel.soleGroupId`** is built off `groupsWithoutAllGroup`, and
+  `buildGroupDropDownMenuItems` (`lib/utils/forms.dart`) now sources that same getter rather than
+  re-filtering `groups` inline. That is not cosmetic: it is what guarantees the seed is always one of
+  the dropdown's items, and `DropdownButton` asserts on an `initialValue` that is not.
+- **`_resolveInitialGroupId()`** (`lib/receipts/widgets/receipt_form.dart`) is the single rule, pure
+  and stable across rebuilds, called from both `buildGroupField()` (for `initialValue`, `0` → `null`)
+  and the `initState` post-frame callback. It **must not** be called from `initState` itself —
+  `getFormStateFromContext` and `getGroupId` both do `GoRouterState.of(context)`, an inherited-widget
+  lookup that is illegal there. That is also why the post-frame callback is now registered
+  **unconditionally**: the resolution can produce a group the receipt does not carry.
+- **Seeding the dropdown is not enough.** Paid-by's item list, the category/tag `Visibility` gates and
+  the add-share "+" all read the `groupId` **State** field, so the callback mirrors the resolved id
+  into it with `setState` — after `_applyGroupDefaultCustomFields`, which writes to `ReceiptModel`
+  and must not fire `notifyListeners()` from inside a `setState` callback. Cost: the group-derived
+  parts render one frame late.
+- **The route group comes from `extra`.** `openManualReceipt` (`lib/shared/functions/receipt_entry.dart`)
+  already put the id there; the form simply discarded it before. The synthetic "All" group is rejected
+  explicitly, mirroring desktop's `initForm`. `getGroupId` now pattern-matches `extra` instead of
+  hard-casting it, since it is reached from a build method on every frame.
+- **`_getInitialQuickScanValues`** (`lib/shared/functions/quick_scan.dart`) tests
+  `quickScanDefaultGroupId > 0` rather than null-coalescing — the generated model **defaults it to
+  `0`**, so "unset" never arrives as null (see "Regenerating API Client Models").
+- **`selectDropdown` had to be hardened** (`integration_test/helpers/form_actions.dart`): its
+  `pumpUntilFound(find.text(option))` wait assumed the option text only appears once the menu is
+  open, which stops holding when the dropdown already *shows* that value -- the wait then returns on
+  the first poll and `.last` can resolve the closed-state child. It now drains the open animation
+  afterwards. (Waiting for the match count to *grow* instead looks tighter but is wrong: the same
+  display name can already be on screen in another dropdown, and `receipt_add_share_test` deadlocks
+  on it.)
+- **Tests.** `test/models/group_model_test.dart` (the rule), `test/widgets/receipt_form_group_prefill_test.dart`
+  (seeding *and* the State-field mirror — asserted through the category field, the add-share button
+  and paid-by's items, since the form value alone would pass without it),
+  `test/shared/functions/quick_scan_initial_values_test.dart` (preference-beats-sole-group). **E2E:**
+  `integration_test/receipt_single_group_default_test.dart` — one case per rule, each on an account
+  chosen so only that rule can explain the seed (`provisionPermUser()` with no role → one group;
+  with `roleName` → two).
+
 ### Group default custom fields
 
 A group can declare custom fields that are pre-added to its receipts

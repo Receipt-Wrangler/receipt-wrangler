@@ -102,8 +102,16 @@ List<QuickScanImage> buildQuickScanImages(
   late final userPreferenceModel =
       Provider.of<UserPreferencesModel>(context, listen: false);
   final userPreferences = userPreferenceModel.userPreferences;
+  // Unset reads as 0, not null -- the generated model defaults it (see
+  // mobile/CLAUDE.md -> "Regenerating API Client Models").
+  final preferredGroupId = userPreferences.quickScanDefaultGroupId ?? 0;
   return (
-    groupId: userPreferences.quickScanDefaultGroupId,
+    // The user's own quick-scan default wins. Without one, a member of exactly
+    // one group has no choice to make, so seed it rather than handing them a
+    // picker with a single option.
+    groupId: preferredGroupId > 0
+        ? preferredGroupId
+        : Provider.of<GroupModel>(context, listen: false).soleGroupId,
     paidByUserId: userPreferences.quickScanDefaultPaidById,
     status: userPreferences.quickScanDefaultStatus,
   );
