@@ -56,5 +56,11 @@ type OidcProvider struct {
 
 	// Enabled hides the provider's login button without discarding its
 	// configuration. A disabled provider 404s on every OIDC route.
-	Enabled bool `gorm:"not null;default:true" json:"enabled"`
+	//
+	// Deliberately NO `default:true` tag: GORM skips zero-value fields on Create
+	// when the column has a default, so a provider created with enabled=false
+	// would silently come back enabled. Both create and update always write this
+	// column explicitly, and defaulting an omitted value to false is the safe
+	// direction anyway -- a provider nobody explicitly enabled should not be live.
+	Enabled bool `gorm:"not null" json:"enabled"`
 }

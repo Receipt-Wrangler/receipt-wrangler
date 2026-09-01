@@ -160,7 +160,7 @@ func Callback(w http.ResponseWriter, r *http.Request) {
 	// 1. The identity provider itself refused. Nothing is consumed; the pending
 	// session simply expires. Never echo the upstream text.
 	if len(r.URL.Query().Get("error")) > 0 {
-		clearBindingCookie(w)
+		clearBindingCookie(w, r)
 		redirectWithError(w, r, models.OidcClientDesktop, errProviderError)
 		return
 	}
@@ -169,7 +169,7 @@ func Callback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 
 	if len(state) == 0 || len(code) == 0 {
-		clearBindingCookie(w)
+		clearBindingCookie(w, r)
 		redirectWithError(w, r, models.OidcClientDesktop, errInvalidRequest)
 		return
 	}
@@ -178,7 +178,7 @@ func Callback(w http.ResponseWriter, r *http.Request) {
 	// therefore cannot even reach the identity provider, let alone mint a second
 	// session. Unknown, expired and already-used states are indistinguishable.
 	session, claimed, err := consumeAuthSession(state)
-	clearBindingCookie(w)
+	clearBindingCookie(w, r)
 
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to consume OIDC auth session: "+err.Error())
@@ -443,7 +443,17 @@ func buildBindingCookie(value string) *http.Cookie {
 	}
 }
 
-func clearBindingCookie(w http.ResponseWriter) {
+// clearBindingCookie expires the browser binding once it has served its purpose.
+//
+// It is a no-op when the request did not carry one, so the mobile leg -- which
+// never sets a binding cookie, because an external user agent may not carry it --
+// emits no Set-Cookie header at all. A native client should get a redirect and
+// nothing else.
+func clearBindingCookie(w http.ResponseWriter, r *http.Request) {
+	if _, err := r.Cookie(bindingCookieName); err != nil {
+		return
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     bindingCookieName,
 		Value:    "",
