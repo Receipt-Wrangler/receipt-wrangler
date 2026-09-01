@@ -482,6 +482,43 @@ non-editable and saved options expose no delete while an appended one does, the 
 control and its direct `PUT /api/customField/:id` 403s, and a type change 400s even for the holder).
 `e2e/legacy-user-visibility.spec.ts` pins that Legacy User sees neither edit nor delete.
 
+### Seeding the receipt group
+
+The Group field is a default, not a lock: when there is only one group to pick, both the receipt form
+and the Quick Scan dialog pre-select it. See the root `CLAUDE.md` → "Seeding the Group Field" for the
+cross-client contract.
+
+- **`GroupState.soleGroupId`** (`src/store/group.state.ts`) is the shared rule, declared as
+  `@Selector([GroupState.groupsWithoutAll])` so it counts exactly the set `app-group-autocomplete`
+  offers. That selector-array form is new to this repo (everything else uses bare `@Selector()` or
+  `createSelector`) but is correct here: with a non-empty dependency list NGXS does **not** prepend
+  the container state, so the function receives the groups directly.
+- **`receipt-form.component.ts` `initForm()`** falls back to it only when the resolved
+  `selectedGroupId` is falsy — the "All" group branch (`""`) and the no-selection branch
+  (`Number("") === 0`). Keeping the original value otherwise preserves the existing `groupId: 0` seed
+  for multi-group users. No `syncSingleDisplay()` is needed: the seed is written while the parent
+  builds the form, which is *before* the child autocomplete's `ngOnInit` seeds its display from the
+  control (unlike Magic Fill, which patches after init).
+- **`setReceiptPermissions()` is deliberately not changed.** In add mode it gates on
+  `GroupState.selectedGroupId`, which can now differ from the seeded form group. That is fine: the
+  "All" group is a real row with a real Legacy Owner membership, so its permissions are present in
+  AppData. Re-pointing the gate at the form control would regress the multi-group case —
+  `Number.parseInt("")` is `NaN`, `groupPermissions[NaN]` is empty, and the add form would render
+  read-only.
+- **`quick-scan-dialog.component.ts` `fileLoaded()`** puts it *after* the user's
+  `quickScanDefaultGroupId`. `configureImages()` already runs at the end of `fileLoaded`, so the
+  seeded group's show/require config lands on that image with no interaction.
+- **The e2e helpers had to learn the field can already be filled.** A single-select `app-autocomlete`
+  binds `[readonly]="readonly || singleOptionSelected()"`, and Material's `_canOpen()` refuses to open
+  a readonly input — so an unconditional `click()` + pick simply times out. `selectFirstOption`
+  (`e2e/receipts.spec.ts`) now skips a filled field, the empty-form validation case clears it first via
+  `clearAutocomplete` (`data-testid="autocomplete-clear"`), and `quick-scan-dialog.spec.ts` routes its
+  pick through the shared `selectImageGroup`. This matters on a **fresh** database, where
+  `api/dev/seed-e2e-users.sh` leaves `e2e-admin`/`e2e-user` with exactly one group until another spec
+  creates one.
+- **E2e:** `e2e/single-group-default.spec.ts` provisions its own Legacy User (a new account owns only
+  "My Receipts" + "All") and asserts both the receipt form and the Quick Scan dialog arrive pre-filled.
+
 ### Per-group default custom fields
 
 A group can declare custom fields that are pre-added to its receipts, configured in a **Default

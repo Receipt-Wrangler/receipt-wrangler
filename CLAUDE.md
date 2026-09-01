@@ -269,6 +269,41 @@ A group can declare custom fields that are **always pre-added** to its receipts,
   `desktop/e2e/group-default-custom-fields.spec.ts` and
   `mobile/integration_test/receipt_default_custom_fields_test.dart`.
 
+### Seeding the Group Field
+
+Both clients pre-select the receipt's group instead of handing the user a picker they have no real
+choice in. **Client-only** — no backend, swagger or generated-client involvement.
+
+- **The rule is "the picker has exactly one option", not "the user has one group".** Every user also
+  carries the synthetic **"All" group** (`Group.isAllGroup`), which the API even sorts *first*, so a
+  single-group user has two entries in state and lands on "All" by default. The count must therefore
+  come from the same filtered set the picker offers: `GroupState.soleGroupId` (desktop, built off
+  `groupsWithoutAll`) and `GroupModel.soleGroupId` (mobile, off `groupsWithoutAllGroup` — which
+  `buildGroupDropDownMenuItems` also sources, so the seed can never be an id the dropdown lacks and
+  trip `DropdownButton`'s "exactly one item with value" assert).
+- **Precedence.** Manual form: the receipt's own group → the group being browsed (never "All") →
+  sole group → blank. Quick Scan: `userPreferences.quickScanDefaultGroupId` → sole group → blank.
+  The user's own quick-scan default always wins.
+- **A seeded group is a picked group.** It applies that group's default custom fields on the add form
+  and, in Quick Scan, its show/require field config — exactly as a manual pick does.
+- **Mobile has to mirror the seed into `_ReceiptForm.groupId` too**, not just the dropdown: paid-by,
+  the category/tag pickers and the add-share button all read that State field and stay dead at `0`.
+  It happens in a post-frame callback because the resolution reads the route
+  (`getFormStateFromContext` / `getGroupId`), which is illegal in `initState`.
+- **The user-preferences "Quick Scan Default Group" control is deliberately left blank** — blank is
+  the encoded "no default", and pre-filling it would silently persist a group the user never chose.
+- **E2e per client**, because both unit suites inject a group list into a mocked store and so prove
+  nothing about the wire: `desktop/e2e/single-group-default.spec.ts` and
+  `mobile/integration_test/receipt_single_group_default_test.dart`. Both **provision their own
+  account** — a freshly created user owns exactly "My Receipts" plus "All" — since the shared e2e
+  accounts accumulate groups as other specs run.
+- **E2e helpers must work with the field already filled.** A desktop single-select autocomplete goes
+  `readonly` once it holds a value, so clicking it never opens the panel; mobile's dropdown opens
+  either way, but "wait for the option text to appear" stops meaning "the menu is up". Both suites'
+  shared pickers were hardened for this (`selectFirstOption`/`clearAutocomplete` in
+  `desktop/e2e/receipts.spec.ts`, `selectDropdown` in
+  `mobile/integration_test/helpers/form_actions.dart`).
+
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
 - **Desktop**: NGXS store with actions/selectors, persistent storage for auth/preferences

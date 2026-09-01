@@ -49,6 +49,18 @@ export class GroupState {
     return state.groups.filter((g) => !g.isAllGroup);
   }
 
+  /**
+   * The user's only real group, when they belong to exactly one -- a picker with
+   * a single option is not a choice, so the receipt form and quick scan seed it
+   * rather than making the user pick it. Undefined when they have several (or
+   * none): built off `groupsWithoutAll` so the auto-selected set and the set the
+   * pickers offer cannot drift apart.
+   */
+  @Selector([GroupState.groupsWithoutAll])
+  static soleGroupId(groups: Group[]): number | undefined {
+    return groups.length === 1 ? groups[0].id : undefined;
+  }
+
   @Selector()
   static groupsWithoutSelectedGroup(state: GroupStateInterface): Group[] {
     return state.groups.filter(

@@ -426,6 +426,16 @@ export class ReceiptFormComponent implements OnInit {
     } else {
       selectedGroupId = Number(selectedGroupId);
     }
+
+    // Nothing resolved (no selection yet, or the "All" group, which is not a
+    // receipt target): a member of exactly one group has no choice to make, so
+    // seed it rather than handing them a picker with a single option. Left as-is
+    // when they belong to several, which keeps the blank/0 seed.
+    if (!selectedGroupId) {
+      selectedGroupId =
+        this.store.selectSnapshot(GroupState.soleGroupId) ?? selectedGroupId;
+    }
+
     this.form = this.formBuilder.group({
       name: [this.originalReceipt?.name ?? "", Validators.required],
       amount: [

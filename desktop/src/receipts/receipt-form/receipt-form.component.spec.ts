@@ -1047,4 +1047,62 @@ describe("ReceiptFormComponent", () => {
       });
     });
   });
+  describe("group seeding on the add form", () => {
+    let store: Store;
+
+    const group = (id: number, isAllGroup = false): any => ({
+      id,
+      name: `Group ${id}`,
+      isAllGroup,
+      groupMembers: [],
+    });
+
+    const openAddForm = (selectedGroupId: string): void => {
+      store.dispatch(new SetSelectedGroupId(selectedGroupId));
+      routeDataSubject.next({ mode: FormMode.add, customFields: [] });
+    };
+
+    beforeEach(() => {
+      store = TestBed.inject(Store);
+    });
+
+    it("seeds the user's only group when the All group is the active one", () => {
+      // The All group sorts first server-side, so it is what a fresh
+      // single-group user lands on - and it is never a receipt target.
+      store.dispatch(new SetGroups([group(1, true), group(7)]));
+
+      openAddForm("1");
+
+      expect(component.form.value.groupId).toEqual(7);
+    });
+
+    it("leaves the group blank when the user belongs to more than one", () => {
+      store.dispatch(new SetGroups([group(1, true), group(7), group(8)]));
+
+      openAddForm("1");
+
+      expect(component.form.value.groupId).toEqual("");
+    });
+
+    it("keeps the actively selected group over the sole-group fallback", () => {
+      store.dispatch(new SetGroups([group(1, true), group(7)]));
+
+      openAddForm("7");
+
+      expect(component.form.value.groupId).toEqual(7);
+    });
+
+    it("keeps an existing receipt's own group in edit mode", () => {
+      store.dispatch(new SetGroups([group(1, true), group(7)]));
+      store.dispatch(new SetSelectedGroupId("1"));
+
+      routeDataSubject.next({
+        mode: FormMode.edit,
+        customFields: [],
+        receipt: { id: 1, name: "R", amount: "1.00", groupId: 9 } as any,
+      });
+
+      expect(component.form.value.groupId).toEqual(9);
+    });
+  });
 });
