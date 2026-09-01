@@ -386,12 +386,20 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   private setReceiptPermissions(): void {
-    // In add mode there is no saved receipt yet, so gate against the selected
-    // group (the same group the route guard checked + the form's groupId seed);
-    // otherwise gate against the receipt's own group.
+    // In add mode there is no saved receipt yet, so gate against the add target -
+    // the group the receipt would be created in, which is what initForm seeds and
+    // what the route guard checked; otherwise gate against the receipt's own group.
+    //
+    // The selectedGroupId tail is load-bearing, and is the one case where the gate
+    // and the seed legitimately differ: a multi-group user browsing the "All"
+    // group has no add target, so the form is seeded blank (they must pick) while
+    // the gate stays on the All group, which carries real permissions, exactly as
+    // before. Gating on that blank seed instead would resolve NaN, and
+    // hasGroupPermission would deny - rendering the whole add form read-only.
     const groupId =
       this.mode === FormMode.add
-        ? Number.parseInt(this.store.selectSnapshot(GroupState.selectedGroupId))
+        ? (this.store.selectSnapshot(GroupState.addTargetGroupId) ??
+          Number.parseInt(this.store.selectSnapshot(GroupState.selectedGroupId)))
         : (this.originalReceipt?.groupId ?? 0);
     const editPermission =
       this.mode === FormMode.add
@@ -416,25 +424,17 @@ export class ReceiptFormComponent implements OnInit {
     this.autoAppliedCustomFieldIds.clear();
     this.groupChangeIsInitialEmission = true;
 
-    let selectedGroupId: number | string = this.store.selectSnapshot(
-      GroupState.selectedGroupId
-    );
-    const group = this.store.selectSnapshot(GroupState.getGroupById(selectedGroupId));
-
-    if (group?.isAllGroup) {
-      selectedGroupId = "";
-    } else {
-      selectedGroupId = Number(selectedGroupId);
-    }
-
-    // Nothing resolved (no selection yet, or the "All" group, which is not a
-    // receipt target): a member of exactly one group has no choice to make, so
-    // seed it rather than handing them a picker with a single option. Left as-is
-    // when they belong to several, which keeps the blank/0 seed.
-    if (!selectedGroupId) {
-      selectedGroupId =
-        this.store.selectSnapshot(GroupState.soleGroupId) ?? selectedGroupId;
-    }
+    // The group being browsed, or -- when that is not a receipt target (the "All"
+    // group, nothing selected, or a stale persisted id) -- the user's only group.
+    //
+    // The empty-string fallback is deliberate and must not be "modernised" to 0:
+    // Validators.required calls isEmptyInputValue, which treats 0 as PRESENT
+    // (only null/undefined and zero-length string/array count as empty), so a 0
+    // seed would make a group-less form valid and POST groupId: 0. It is also
+    // the value app-autocomlete filters its option list by, and "0" matches only
+    // groups whose name contains a zero.
+    const addTargetGroupId: number | string =
+      this.store.selectSnapshot(GroupState.addTargetGroupId) ?? "";
 
     this.form = this.formBuilder.group({
       name: [this.originalReceipt?.name ?? "", Validators.required],
@@ -453,7 +453,7 @@ export class ReceiptFormComponent implements OnInit {
         Validators.required,
       ],
       groupId: [
-        this.originalReceipt?.groupId ?? selectedGroupId,
+        this.originalReceipt?.groupId ?? addTargetGroupId,
         Validators.required,
       ],
       status: this.originalReceipt?.status ?? ReceiptStatus.Open,

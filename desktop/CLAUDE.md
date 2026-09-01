@@ -493,18 +493,33 @@ cross-client contract.
   offers. That selector-array form is new to this repo (everything else uses bare `@Selector()` or
   `createSelector`) but is correct here: with a non-empty dependency list NGXS does **not** prepend
   the container state, so the function receives the groups directly.
-- **`receipt-form.component.ts` `initForm()`** falls back to it only when the resolved
-  `selectedGroupId` is falsy — the "All" group branch (`""`) and the no-selection branch
-  (`Number("") === 0`). Keeping the original value otherwise preserves the existing `groupId: 0` seed
-  for multi-group users. No `syncSingleDisplay()` is needed: the seed is written while the parent
-  builds the form, which is *before* the child autocomplete's `ngOnInit` seeds its display from the
-  control (unlike Magic Fill, which patches after init).
-- **`setReceiptPermissions()` is deliberately not changed.** In add mode it gates on
-  `GroupState.selectedGroupId`, which can now differ from the seeded form group. That is fine: the
-  "All" group is a real row with a real Legacy Owner membership, so its permissions are present in
-  AppData. Re-pointing the gate at the form control would regress the multi-group case —
-  `Number.parseInt("")` is `NaN`, `groupPermissions[NaN]` is empty, and the add form would render
-  read-only.
+- **`GroupState.addTargetGroupId`** is the group a *new* receipt would land in: the selected group,
+  or — when that is the "All" group, unset, or **no longer resolvable** — `soleGroupId`. Because it
+  resolves off `groupsWithoutAll`, all three of those are one lookup miss rather than three checks.
+  `selectedGroupId` is persisted to localStorage and `setAppData` only overwrites a *falsy* one
+  (`app-data.utill.ts`), so it genuinely outlives a group the user has left — that stale case is why
+  the resolution is a lookup rather than a `Number()` coercion.
+- **`receipt-form.component.ts` `initForm()`** seeds `addTargetGroupId ?? ""`. No
+  `syncSingleDisplay()` is needed: the seed is written while the parent builds the form, which is
+  *before* the child autocomplete's `ngOnInit` seeds its display from the control (unlike Magic Fill,
+  which patches after init).
+  - **The blank sentinel must stay `""` — never `0`.** `Validators.required` calls Angular's
+    `isEmptyInputValue`, which counts only `null`/`undefined` and zero-length string/array as empty,
+    so a `0` seed leaves a group-less form **valid** and POSTs `groupId: 0`. `0` is also what
+    `app-autocomlete` filters its options by (`_filter` does `value.toString()`), so the dropdown
+    would silently show only groups whose name contains a zero, while `!!0` still suppresses the
+    clear button the e2e helpers rely on. Pinned by an explicit `form.get("groupId").valid === false`
+    assertion in the spec.
+- **`setReceiptPermissions()` and the `/receipts/add` route guard both gate on
+  `addTargetGroupId ?? Number.parseInt(selectedGroupId)`** — the same group the form seeds. Without
+  this a sole-group user whose *All*-group membership lacks `group.receipts.create` is bounced off
+  `/receipts/add` even though they can create in their real group, which is where login lands them.
+  The `??` tail is load-bearing: a multi-group user on the All dashboard has no add target and must
+  keep gating on the All group, because `Number.parseInt("")` is `NaN` and `groupPermissions[NaN]` is
+  empty — gating on the seed alone would render the add form read-only. The guard opts in per route
+  via `data: { useAddTargetGroupId: true }` (a third mode beside `useRouteGroupId`), so a future
+  route that wants "the group being browsed" keeps that by default; `/receipts/add` is the only
+  consumer of the plain selected-group branch today.
 - **`quick-scan-dialog.component.ts` `fileLoaded()`** puts it *after* the user's
   `quickScanDefaultGroupId`. `configureImages()` already runs at the end of `fileLoaded`, so the
   seeded group's show/require config lands on that image with no interaction.

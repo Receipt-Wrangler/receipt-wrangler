@@ -32,6 +32,7 @@ test.describe('Single-group users get the Group field pre-filled', () => {
 
   let username: string;
   let soleGroupId: number;
+  let allGroupId: number;
 
   test.beforeAll(async ({ browser }) => {
     username = uniqueName('single-group-user');
@@ -67,6 +68,7 @@ test.describe('Single-group users get the Group field pre-filled', () => {
     const real = groups.filter((g) => !g.isAllGroup);
     expect(real, 'a freshly created user has exactly one real group').toHaveLength(1);
     soleGroupId = real[0].id;
+    allGroupId = groups.find((g) => g.isAllGroup)!.id;
 
     await userContext.close();
   });
@@ -96,13 +98,21 @@ test.describe('Single-group users get the Group field pre-filled', () => {
       'My Receipts',
     );
 
-    await page.getByLabel('Name').fill(uniqueName('single-group-receipt'));
+    const name = uniqueName('single-group-receipt');
+    await page.getByLabel('Name').fill(name);
     await page.getByLabel('Amount').fill('12.34');
     await page.getByLabel('Paid By').click();
     await page.getByRole('option').first().click();
 
     await page.getByRole('button', { name: 'Save', exact: true }).first().click();
     await expect(page).toHaveURL(/\/receipts\/\d+\/view/);
+
+    // The seed is a real selection, not just a label: the receipt is listed
+    // under the group it was seeded with.
+    await page.goto(`/receipts/group/${soleGroupId}`);
+    await expect(
+      page.getByRole('row').filter({ hasText: name }).first(),
+    ).toBeVisible();
   });
 
   test('the Quick Scan dialog seeds each image with the only group', async ({ page }) => {
@@ -110,7 +120,11 @@ test.describe('Single-group users get the Group field pre-filled', () => {
     // provisioned user's, so this exercises the real AppData group list.
     await injectQuickScanAppData(page, {});
 
-    const dialog = await openQuickScanDialog(page, soleGroupId);
+    // Deliberately opened from the "All" group's receipts list, not the sole
+    // group's: the browsed group and the expected group must differ, or the
+    // assertion below would also pass for an implementation that simply used
+    // whichever group the user happened to be looking at.
+    const dialog = await openQuickScanDialog(page, allGroupId);
     await uploadQuickScanImages(dialog, 1);
 
     await expect(dialog.getByRole('combobox', { name: 'Group' })).toHaveValue(

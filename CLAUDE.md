@@ -281,9 +281,16 @@ choice in. **Client-only** — no backend, swagger or generated-client involveme
   `groupsWithoutAll`) and `GroupModel.soleGroupId` (mobile, off `groupsWithoutAllGroup` — which
   `buildGroupDropDownMenuItems` also sources, so the seed can never be an id the dropdown lacks and
   trip `DropdownButton`'s "exactly one item with value" assert).
-- **Precedence.** Manual form: the receipt's own group → the group being browsed (never "All") →
-  sole group → blank. Quick Scan: `userPreferences.quickScanDefaultGroupId` → sole group → blank.
-  The user's own quick-scan default always wins.
+- **Precedence.** Manual form: the receipt's own group → the group being browsed (never "All", and
+  still resolvable) → sole group → blank. Quick Scan: `userPreferences.quickScanDefaultGroupId` →
+  sole group → blank. The user's own quick-scan default always wins.
+- **On desktop the permission gate follows the seed.** `setReceiptPermissions()` and the
+  `/receipts/add` route guard resolve the same `GroupState.addTargetGroupId`, so a sole-group user is
+  not turned away because the group they happen to be browsing is the synthetic "All" one. Both fall
+  back to the selected group when there is no single add target, which keeps multi-group users
+  exactly as they were.
+- **Desktop's blank seed is `""`, never `0`.** `Validators.required` treats `0` as present, so a `0`
+  sentinel would let a group-less receipt submit. See `desktop/CLAUDE.md`.
 - **A seeded group is a picked group.** It applies that group's default custom fields on the add form
   and, in Quick Scan, its show/require field config — exactly as a manual pick does.
 - **Mobile has to mirror the seed into `_ReceiptForm.groupId` too**, not just the dropdown: paid-by,
