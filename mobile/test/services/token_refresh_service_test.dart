@@ -533,6 +533,42 @@ void main() {
         verify(() => mockUserApi.getAppData()).called(1);
       });
 
+      // Quick Scan calls reloadAppData() before opening the scanner and needs a
+      // guarantee, not a best effort -- if the debounce silently swallowed it,
+      // a config change made seconds earlier would still not reach the form.
+      test('reloadAppData bypasses the debounce', () async {
+        when(() => mockAuthModel.getJwt()).thenAnswer((_) async => validJwt);
+        when(() => mockAuthModel.getRefreshToken())
+            .thenAnswer((_) async => validJwt);
+        when(() => mockGroupModel.groups).thenReturn([MockGroup()]);
+        when(() => mockUserApi.getAppData()).thenAnswer((_) async => Response(
+              data: buildMockAppData(),
+              requestOptions: RequestOptions(path: '/user/appData'),
+              statusCode: 200,
+            ));
+
+        // The debounced path would skip this second load; reloadAppData must not.
+        await service.refreshTokens();
+        await service.reloadAppData();
+
+        verify(() => mockUserApi.getAppData()).called(2);
+      });
+
+      test('reloadAppData swallows a failed fetch', () async {
+        when(() => mockGroupModel.groups).thenReturn([MockGroup()]);
+        when(() => mockUserApi.getAppData()).thenThrow(DioException(
+          requestOptions: RequestOptions(path: '/user/appData'),
+          response: Response(
+            statusCode: 500,
+            requestOptions: RequestOptions(path: '/user/appData'),
+          ),
+        ));
+
+        // It sits in front of the scanner, so a transient failure must fall
+        // through to the data already loaded rather than block the scan.
+        await expectLater(service.reloadAppData(), completes);
+      });
+
       test('debounces a second refresh that follows immediately', () async {
         when(() => mockAuthModel.getJwt()).thenAnswer((_) async => validJwt);
         when(() => mockAuthModel.getRefreshToken())

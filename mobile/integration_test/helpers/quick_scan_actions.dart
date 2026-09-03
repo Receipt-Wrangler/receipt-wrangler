@@ -7,6 +7,8 @@ import 'package:receipt_wrangler_mobile/constants/receipt_entry.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 
+import 'api.dart';
+import 'permission_fixtures.dart';
 import 'pump.dart';
 import 'receipt_test_helpers.dart';
 
@@ -66,10 +68,23 @@ Finder quickScanDropdown(String name) =>
 Finder quickScanCommentField() => find.byWidgetPredicate(
     (w) => w is FormBuilderTextField && w.name == 'comment');
 
-/// Injects [configure] onto the admin's first non-all group and returns the
-/// configured group (its `name` selects it in the form's group dropdown). The
-/// config is a live-`GroupModel` Provider mutation -- deterministic and
-/// independent of whether the local API persists the quick-scan fields.
+/// Applies [configure] to the admin's first non-all group and returns the
+/// configured group (its `name` selects it in the form's group dropdown).
+///
+/// **Persists through the API**, then mirrors the result into the live
+/// `GroupModel`. It used to only do the latter, which no longer works: starting
+/// a Quick Scan re-fetches AppData before the scanner opens
+/// (`TokenRefreshService.reloadAppData`, called from `startScanEntry`), so a
+/// purely client-side mutation is overwritten by the server's copy the moment
+/// the sheet is opened. Persisting is also what production does -- the client
+/// learns the config from AppData and the backend validates a submit against the
+/// same rows -- so these specs now prove the round trip rather than the form's
+/// reaction to an injected value.
+///
+/// The local mirror is kept so the sheet is still correct if the refresh fails
+/// (it is swallowed by design) and so the config is in place before the first
+/// refresh lands. `setGroupQuickScanConfig` restores the group's original
+/// settings on teardown.
 Future<api.Group> configureFirstGroup(
   WidgetTester tester,
   void Function(api.GroupBuilder) configure,
@@ -78,6 +93,38 @@ Future<api.Group> configureFirstGroup(
   final groupModel = Provider.of<GroupModel>(ctx, listen: false);
   final target = groupModel.groups.firstWhere((g) => !g.isAllGroup);
   final configured = target.rebuild(configure);
+  final settings = configured.groupReceiptSettings;
+
+  // Every key the command carries is sent, read back off the rebuilt group, so
+  // the fields [configure] did not touch keep the values they already had rather
+  // than being reset to false by the command's defaults.
+  await setGroupQuickScanConfig(
+    groupId: target.id,
+    jwt: await apiLogin(),
+    overrides: {
+      'hideComments': settings.hideComments ?? false,
+      'quickScanPaidByEnabled': settings.quickScanPaidByEnabled ?? false,
+      'quickScanPaidByRequired': settings.quickScanPaidByRequired ?? false,
+      'quickScanStatusEnabled': settings.quickScanStatusEnabled ?? false,
+      'quickScanStatusRequired': settings.quickScanStatusRequired ?? false,
+      'quickScanCategoriesEnabled': settings.quickScanCategoriesEnabled ?? false,
+      'quickScanCategoriesRequired':
+          settings.quickScanCategoriesRequired ?? false,
+      'quickScanTagsEnabled': settings.quickScanTagsEnabled ?? false,
+      'quickScanTagsRequired': settings.quickScanTagsRequired ?? false,
+      'quickScanCommentEnabled': settings.quickScanCommentEnabled ?? false,
+      'quickScanCommentRequired': settings.quickScanCommentRequired ?? false,
+      // The backend rejects a config where paid-by or status can be skipped
+      // without a default to backfill it -- a receipt always has both
+      // (UpdateGroupReceiptSettingsCommand.Validate). Most specs here hide or
+      // relax one of the two, so send defaults unconditionally: UPLOADER
+      // resolves at scan time and needs no user id, and OPEN is a valid status.
+      // Harmless when the field is shown+required, since then it is unused.
+      'quickScanDefaultPaidByType': 'UPLOADER',
+      'quickScanDefaultStatus': 'OPEN',
+    },
+  );
+
   groupModel.setGroups(groupModel.groups
       .map((g) => g.id == target.id ? configured : g)
       .toList());

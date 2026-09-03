@@ -28,7 +28,7 @@ class TokenRefreshService {
   Completer<bool>? _refreshCompleter;
 
   /// When AppData was last republished into the models. See
-  /// [_loadAppDataIfNeeded].
+  /// [_loadAppData].
   DateTime? _appDataLoadedAt;
 
   late AuthModel _authModel;
@@ -129,7 +129,31 @@ class TokenRefreshService {
   /// (which would trigger token purge and logout).
   Future<void> _tryLoadAppData() async {
     try {
-      await _loadAppDataIfNeeded();
+      await _loadAppData(bypassDebounce: false);
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  /// Re-fetches AppData now, ignoring the debounce, for a caller that needs a
+  /// guarantee rather than a best effort -- starting a Quick Scan, where the
+  /// group's quick-scan field config decides which fields the form renders.
+  ///
+  /// Deliberately a separate method rather than a flag on [refreshTokens]:
+  /// concurrent callers of that piggyback on `_refreshCompleter` and return
+  /// *before* `_doRefresh` is entered, so a flag would be silently dropped for
+  /// the piggybacking caller -- exactly the caller that most needs the reload.
+  ///
+  /// Never throws. The caller is on the path to a user action (the scanner is
+  /// about to open), so a transient failure must fall through to whatever data
+  /// the app already has rather than block the action.
+  Future<void> reloadAppData() async {
+    if (!_initialized) {
+      return;
+    }
+
+    try {
+      await _loadAppData(bypassDebounce: true);
     } catch (e) {
       print(e);
     }
@@ -154,12 +178,14 @@ class TokenRefreshService {
   /// about how the group was configured.
   ///
   /// The empty-groups case still forces a load regardless of the debounce: that
-  /// is the first load, and nothing can render without it.
-  Future<void> _loadAppDataIfNeeded() async {
+  /// is the first load, and nothing can render without it. [bypassDebounce]
+  /// skips the window outright -- see [reloadAppData].
+  Future<void> _loadAppData({required bool bypassDebounce}) async {
     final loadedAt = _appDataLoadedAt;
     final isFirstLoad = _groupModel.groups.isEmpty;
 
-    if (!isFirstLoad &&
+    if (!bypassDebounce &&
+        !isFirstLoad &&
         loadedAt != null &&
         DateTime.now().difference(loadedAt) < _appDataRefreshDebounce) {
       return;

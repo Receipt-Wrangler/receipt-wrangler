@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
+import 'package:receipt_wrangler_mobile/shared/functions/receipt_entry.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/category_select_field.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/tag_select_field.dart';
 
@@ -92,6 +93,14 @@ void main() {
     // rebuilt with config A; group 2 is a clone with a fresh id + name and the
     // inverse config B. Injected via the live GroupModel (deterministic, no
     // reliance on the API persisting the new fields).
+    // This spec fabricates a second group that does not exist on the server, so
+    // it cannot persist its fixture the way the others do -- and starting a scan
+    // now re-fetches AppData, which would wipe both the synthetic group and the
+    // trimmed list below. Skip that refresh: what is under test here is the form
+    // re-reading config when the dropdown changes, not the round trip.
+    debugSkipQuickScanAppDataRefresh = true;
+    addTearDown(() => debugSkipQuickScanAppDataRefresh = false);
+
     final ctx = tester.element(find.byType(Scaffold).first);
     final groupModel = Provider.of<GroupModel>(ctx, listen: false);
     final real = groupModel.groups.firstWhere((g) => !g.isAllGroup);
