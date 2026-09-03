@@ -82,6 +82,78 @@ Uses `flutter_form_builder` for complex forms with validation. Receipt forms sup
 - Centralized client configuration in `OpenApiClient` singleton
 - Secure token storage using `flutter_secure_storage`
 
+### AppData is re-fetched during a session, not just at login
+
+`storeAppData` (`lib/utils/auth.dart`) is the **only** writer of `GroupModel`, `PermissionsModel`,
+`UserPreferencesModel` and the category/tag catalogs, and outside the login response the only path
+that reaches it is `TokenRefreshService._loadAppData`. That used to be guarded by
+`if (_groupModel.groups.isEmpty)` — false for the whole of a logged-in session — so the 15-minute
+refresh timer (`main.dart`) and the on-resume refresh were both **no-ops**. A group or permission
+change made elsewhere could not reach a running app at all; you had to log out and back in. (On
+Android, backgrounding does not re-run `main()`, so even "close and reopen" did not help.) Desktop
+re-fetches AppData unconditionally on every bootstrap (`desktop/src/services/app-init.service.ts`),
+so the two clients disagreed about how a group was configured.
+
+It now loads every time, with a short **30-second debounce** (`_appDataRefreshDebounce`) that exists
+only to collapse a burst — app resume and the periodic timer can fire together and both call through
+here. It is deliberately not a staleness budget: a longer window would reinstate the bug. The
+empty-groups case bypasses the debounce, since that is the first load and nothing renders without it.
+Pinned by `test/services/token_refresh_service_test.dart` ("reloads app data even when groups already
+exist" / "debounces a second refresh that follows immediately"), whose `buildMockAppData()` helper
+stubs every field `storeAppData` touches — a mock missing one throws mid-store instead of failing the
+assertion under test.
+
+**Starting a Quick Scan forces a reload, ahead of the scanner.** `startScanEntry` and
+`startGalleryEntry` (`lib/shared/functions/receipt_entry.dart`) both `await
+TokenRefreshService().reloadAppData()` before anything else, so the group's quick-scan field config,
+the caller's permissions and the AI feature flag are all current for that tap.
+
+- **It must bypass the debounce**, hence a dedicated public `reloadAppData()` rather than a flag on
+  `refreshTokens`: concurrent callers of that piggyback on `_refreshCompleter` and return *before*
+  `_doRefresh` is entered, so a flag would be silently dropped for the piggybacking caller — the one
+  that most needs the reload. `_loadAppData({required bool bypassDebounce})` carries the split.
+- **It runs before the scanner, not before the sheet.** By the time `showQuickScanBottomSheet` runs
+  the images have already been captured *and* seeded from `userPreferences.quickScanDefaultGroupId` /
+  `GroupModel.soleGroupId` (`buildQuickScanImages`), and `QuickScanForm` reads both providers with
+  `listen: false`, so data landing after the sheet is open never reaches it. Refreshing first also
+  makes the `resolveReceiptEntryAvailability` gate itself fresh. As a bonus,
+  `showQuickScanBottomSheet` stays synchronous.
+- **`openQuickScanFromGallery` deliberately does not refresh on its own behalf** — `fallBackToGallery`
+  reaches it from inside `startScanEntry`, which already has, so the camera-denied path would
+  double-fetch. The gallery *menu item* goes through `startGalleryEntry` instead, because it is the
+  one initiation that bypasses `startScanEntry`.
+- **`reloadAppData()` never throws.** The scanner is about to open, so a transient failure falls
+  through to the data already loaded rather than blocking the scan — Quick Scan stays usable offline.
+  The nav tap is fire-and-forget (`BottomNav.onDestinationSelected` is `void Function(int)`), so a
+  thrown error would be unobserved anyway.
+- **Both load paths are serialized** through `_enqueueAppDataLoad`. A load is a fetch *and* a
+  `storeAppData`, and the scheduled path (`refreshTokens` → `_tryLoadAppData`) and the forced one
+  (`reloadAppData`) are independent — unserialized they overlap and the last response wins, so an
+  older scheduled payload could overwrite the groups and permissions a Quick Scan just fetched. That
+  is the very staleness this path exists to prevent, and `storeAppData` also writes the token pair
+  when the payload carries one. It is deliberately **its own queue, not `_refreshCompleter`**: that
+  completer makes concurrent callers share one result, which would defeat a forced reload by handing
+  it an older fetch's outcome. One consequence: a second *queued* normal load is debounced away,
+  where before both would have fetched (neither had stamped `_appDataLoadedAt` yet) — which is what
+  the debounce is for. Another: the scan path may wait out an in-flight timer load before starting
+  its own, bounded by one request.
+
+**This changed what a quick-scan e2e has to do.** A refresh at scan time overwrites any client-side
+`GroupModel` mutation with the server's copy, so `configureFirstGroup`
+(`integration_test/helpers/quick_scan_actions.dart`) now **persists through the API** and then mirrors
+the result locally. It sends `quickScanDefaultPaidByType: 'UPLOADER'` and `quickScanDefaultStatus:
+'OPEN'` unconditionally, because the backend rejects a config where paid-by or status can be skipped
+without a default to backfill it (`UpdateGroupReceiptSettingsCommand.Validate`) and most of those
+specs relax one of the two. The one exception is the group-switch case, which fabricates a second
+group that does not exist on the server and so sets `debugSkipQuickScanAppDataRefresh`
+(`lib/shared/functions/receipt_entry.dart`, the `debugCameraAccessOverride` pattern) — use that seam
+only for a spec driving an injected `GroupModel`, never to dodge persisting real config.
+
+**`integration_test/quick_scan_app_data_refresh_test.dart` is the spec that proves the round trip**:
+it persists the comment field OFF, logs in, flips it ON server-side, and opens Quick Scan without
+restarting the app. Every other quick-scan spec arranges its config *before* login, so none of them
+can tell a client that re-fetches from one that read the config once at login.
+
 ### Permission-based UI gating
 
 The mobile app gates UI on the caller's **effective permissions**, mirroring the desktop client
@@ -500,6 +572,56 @@ arguments: the list opened with two `int?`s and only grows, so naming each value
 callback (`lib/receipts/widgets/quick_scan.dart`) from transposing them. Note the comment is
 deliberately **not** cleared when the group changes (unlike paid-by/categories/tags, it isn't
 group-scoped data, and the submit re-resolves visibility per group so a hidden one is never sent).
+
+**Each slide's `QuickScanForm` is keyed by the image, not by its position.** `_QuickScanForm` seeds
+its `groupId` State field once in `initState` and reads both `GroupModel` and `PermissionsModel` with
+`listen: false`, so nothing re-derives it later. Deleting a page (`_getDeleteIcon` in
+`lib/shared/functions/quick_scan.dart`) shifts every later image down an index — without a key Flutter
+matches by position and hands the surviving form the **deleted** page's State, leaving `groupId`
+disagreeing with the group its own dropdown displays, and the field set resolved against the wrong
+group. The `FormBuilder` subtree does reset (its `key` is a per-image `GlobalKey`), so the mismatch is
+invisible. Hence `key: ObjectKey(image)` on the form in `lib/receipts/widgets/quick_scan.dart`.
+Desktop cannot have this bug: its `showComment(i)` re-reads `groupIds.at(i).value` on every
+change-detection pass rather than caching a per-index copy.
+
+**The sheet's layout is what makes a configured field usable — one vertical scrollable per
+slide.** The Quick Scan sheet opens through `showFullscreenBottomSheet` with **`bodyFillsSheet:
+true`** (`lib/utils/bottom_sheet.dart`), which does two things `QuickScan` depends on: it does **not**
+wrap the body in a `SingleChildScrollView`, and it pins the submit button as the scaffold's
+**bottom bar** rather than its `bottomSheet`. Both matter:
+
+- The wrapper would make the body's height **unbounded**, and the horizontal `InfiniteCarousel` needs
+  a bounded height. That is why `QuickScan.build()` used to hard-code
+  `SizedBox(height: MediaQuery.of(context).size.height)` — the **screen** height, which is larger than
+  the sheet's body by the app bar, drag handle and safe area. The slide overflowed the body, and
+  because each slide's own `SingleChildScrollView` then believed it had a full-screen viewport it had
+  nothing to scroll, so the overflow was **clipped and unreachable**. It is now `SizedBox.expand`,
+  sized by the bounded constraints the scaffold body supplies.
+- A `Scaffold.bottomSheet` **floats over** the body; a bottom bar reserves its space. Floating buried
+  the form's last field under the submit button and the "enter details manually" link, which no amount
+  of scrolling could clear (`submitButtonSpacing`'s fixed 70px is not the height of that Column).
+
+Together these shipped a Quick Scan whose **configured comment field could never be seen** — the
+comment is last in the form column and the image preview alone claims half the screen height
+(`getImagePreviewHeight`). Note the preview is an `InteractiveViewer`, so it claims pans over itself:
+a drag started on the image will never scroll the form.
+
+**Testing this needs geometry, not finders.** Three things all quietly pass on a broken sheet:
+`expect(..., findsOneWidget)` is true for a widget clipped outside its viewport; `Finder.hitTestable`
+reports **0 under `IntegrationTestWidgetsFlutterBinding` on desktop even for plainly visible
+widgets**, so it cannot be used to assert visibility here; and `tester.ensureVisible` walks *every*
+ancestor scrollable, dragging a field into view even when the user could not (which is exactly how
+this shipped — `quick_scan_submit_test.dart` reaches its comment that way). `binding.setSurfaceSize`
+is additionally a **no-op on the Linux desktop target**, so a "phone-sized" spec is not what it looks
+like; the runner's window is 1280x720 and that is already short enough to expose the bug.
+`expectQuickScanFieldOnScreen` (`integration_test/helpers/quick_scan_actions.dart`) is the assertion
+to use: it scrolls the field's **own** scroll view by the least amount that would bring the field
+fully into the viewport, clamped to what that view can scroll, then checks the field's rect lies
+inside both the window and that viewport. One rule covers the column — a mid-column field
+(Categories, Tags) scrolls just far enough and is never pushed off the *top*, while the last field
+needs more than `maxScrollExtent`, so the clamp leaves it as far down as a user could get it and the
+window check still fails if it is unreachable there. Covered by the two
+"actually on screen" cases in `quick_scan_config_response_test.dart`.
 
 **Category/Tag picker needs a fallback context in Quick Scan.** `CategorySelectField` /
 `TagSelectField` open their multi-select via `showMultiselectBottomSheet(...)`, which calls
@@ -1137,6 +1259,7 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 
 - `integration_test/smoke_login_test.dart` — canonical smoke test.
 - `integration_test/quick_scan_entry_test.dart` — the scan slot's tap (captures → seeded sheet) and hold (menu contents), against real roles.
+- `integration_test/quick_scan_app_data_refresh_test.dart` — a group's comment field switched on **after** login reaches the running app when Quick Scan is next started. The only spec that proves the pre-scan AppData reload; every other quick-scan spec arranges its config before login, so none can distinguish a client that re-fetches from one that read the config once at login. Persists via the API and never touches `GroupModel`.
 - `integration_test/quick_scan_entry_gated_test.dart` — the tap falling through to the manual form, with the right banner for each of the two blocked reasons. Exercises **both** feature-flag fixtures: the permission case enables the flag (to isolate the permission from it), the ai-disabled case **pins it off** with `disableAiPoweredReceiptsForTest()` rather than assuming — which also removes its dependency on the preceding test's teardown having succeeded, since they share the one global.
 - `integration_test/receipt_entry_hidden_test.dart` — a Legacy Viewer gets no scan slot and no overflow at all. Flag-independent: the slot is hidden when the caller holds *neither* entry permission, whatever `aiPoweredReceipts` says.
 - `integration_test/receipt_entry_menu_reopen_test.dart` — the long-press regression guard (`onLongPressUp`, not `onLongPress`): three open/dismiss cycles then a plain tap, proving the slot isn't left dead. **Pins `aiPoweredReceipts` off** — it logs in as the admin (who holds `group.receipts.quick-scan`) and installs no document-scanner mock, so the closing tap only reaches the manual form while Quick Scan is unavailable.
