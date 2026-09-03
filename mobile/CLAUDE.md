@@ -472,10 +472,28 @@ backend enforces the two permissions **separately** (`handlers.QuickScan` → `g
   field and hides the submit button, so once the success snackbar fades the sheet would otherwise sit
   there greyed out with nothing saying why. Extraction is an async backend job, so the wording
   promises a result rather than showing one.
-- **The sheet shows a page counter** (`quick-scan-page-indicator`) when a scan carries more than one
-  page. A scan can carry up to 100, and the carousel gives no other hint that the pages after the
-  first exist — without it a multi-page scan reads as a single-page one and the forms behind it go
-  unfilled.
+- **The sheet pages a multi-page scan with arrows as well as the swipe.** Under the image sits a nav
+  row (`lib/receipts/widgets/quick_scan.dart`): a counter (`quick-scan-page-indicator`, `"2 of 3"`)
+  flanked by `quick-scan-previous-page` / `quick-scan-next-page`, which call the carousel
+  controller's `previousItem()` / `nextItem()`. The whole row is absent below two pages. A scan can
+  carry up to 100 pages and the carousel gives no other hint that the ones after the first exist —
+  without this a multi-page scan reads as a single-page one and the forms behind it go unfilled, and
+  the counter alone left that to a line of text ("swipe for the next", now dropped) which is easy to
+  skip past.
+  - **An arrow at the end of the scan is dropped, not disabled**, so every arrow shown leads
+    somewhere. It is replaced by a `SizedBox.square(dimension: kMinInteractiveDimension)` — the
+    `IconButton` default constraint — so the counter stays put instead of sliding as the arrows come
+    and go.
+  - **The row reads the `itemBuilder`'s `realIndex`, not a tracked selection.** The carousel builds
+    only the item on screen, so the page's own index *is* the visible one; deriving from it is what
+    lets the delete icon (which does `images.removeAt(controller.selectedItem)`) shrink the scan
+    without leaving a stale index behind an arrow that points off the end. That is why `QuickScan` is
+    a `StatelessWidget` with no `onIndexChanged`.
+  - Arrows stay live after submit, unlike the upload/delete icons: paging a queued scan is read-only
+    browsing, and the swipe allows it either way.
+  - Covered by `test/widgets/quick_scan_sheet_test.dart` ("the arrows only ever point at a page that
+    exists"). There is **no e2e** for it: `installDocumentScannerMock()` returns a single fixed PNG,
+    so no integration spec can reach a second page.
 - **The sheet re-checks its own gate** and resolves `canCreateManual` **at the caller's context**.
   Its `bottomSheetWidget` is built inside the modal route, which is outside the GoRouter subtree, so
   `GoRouterState.of` throws there — resolve before opening and pass the result down.
@@ -706,6 +724,93 @@ Three things that spec encodes, all of which cost a debugging cycle:
   shared admin. The group dropdown is a Material menu whose scrollable does not build off-screen items
   into the element tree, so the admin's accumulated groups can push the target below the viewport where
   `find.text` can't reach it (the same problem `keepOnlyGroup` works around for Quick Scan).
+
+### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
+
+`CategorySelectField` and `TagSelectField` render no UI of their own: both are thin
+wrappers that hand an `onTap` to **`lib/shared/widgets/multi-select-field.dart`**, which is
+also used directly for the "Users" field in the quick-actions split sheet. So the field's
+hit target is defined in exactly one place, for the receipt form, the Quick Scan sheet, the
+per-item rows and the split sheet at once.
+
+- **The `GestureDetector` must wrap the `InputDecorator`, with
+  `behavior: HitTestBehavior.opaque`.** It originally sat *inside* the decorator around the
+  inner `Wrap`, which made the field tappable only on its text: the label, the outline
+  border and the content padding were outside the detector; `Wrap` shrink-wraps under
+  `InputDecorator`'s loose width constraints, so the empty state's target was the width of
+  the `"No <items> selected"` glyph run; and the default `deferToChild` behavior dropped
+  even the gaps between chips, because `RenderWrap` and the childless `SizedBox` spacers
+  both hit-test `false`. Adjacent `FormBuilderDropdown` fields are tappable edge to edge, so
+  the difference was very visible.
+- **View mode installs no tap surface at all.** When `onTap` is null (the wrappers pass null
+  in `WranglerFormState.view`) the bare `InputDecorator` is returned rather than an opaque
+  detector that would swallow pointers for a no-op.
+- **`ChoiceChip.onSelected` is kept even though it is now redundant** — the chip wins the
+  gesture arena and calls the same handler the outer detector would. It stays because
+  `onSelected: null` renders a `ChoiceChip` in its *disabled* style.
+- **No explicit min-height is set.** The app's global `InputDecorationTheme` uses
+  `OutlineInputBorder` (`lib/main.dart`), whose default non-dense content padding already
+  puts the decorator past the 48dp target even in the empty state.
+- **Demo:** `tool/tap-target-demo.gif` shows the before/after hit regions under real clicks; it is
+  regenerated by `tool/record_tap_target_demo.sh` (see "Recording a demo GIF" below).
+- **Tests:** `test/widgets/multi_select_field_test.dart` covers the widget end to end —
+  edge/label/gutter/chip-gap taps (the regression guards; they assert the detector's rect
+  equals the decorator's), chip and placeholder taps, rendering, form registration and
+  `didChange`, the `required` validator, and the inert view mode. The e2e specs still tap the
+  `"No <items> selected"` placeholder as their locator, which keeps working.
+
+### Recording a demo GIF (headless Linux desktop)
+
+There is no emulator in the Claude Code sandbox and the Go API is expensive to bring up there
+(ImageMagick 7 from source — see the root `CLAUDE.md`), so a demo of a **widget-level** change is
+recorded by building a small harness against the **Linux desktop** target and driving real mouse
+clicks at it on a headless X server. Worked example, all committed and re-runnable:
+
+```bash
+cd mobile
+flutter build linux --release --target=tool/tap_target_demo.dart
+./tool/record_tap_target_demo.sh            # -> tool/tap-target-demo.gif
+```
+
+`tool/tap_target_demo.dart` is the harness (mounts the real widget beside a verbatim copy of the
+pre-fix tree and publishes each field's on-screen rect as JSON after first paint);
+`tool/record_tap_target_demo.sh` runs Xvfb + the binary + `ffmpeg -f x11grab` and converts to GIF;
+`tool/tap_target_click_plan.py` drives `xdotool`. Copy the trio for a new demo. ~20s at 10fps,
+960px wide, lands around 100KB — a flat UI GIF compresses very well, but it needs the two-pass
+`palettegen`/`paletteuse` filter or it bands badly.
+
+Prerequisites beyond the Flutter SDK setup above (on Ubuntu 24.04):
+
+```bash
+apt-get install -y --no-install-recommends \
+  ffmpeg xdotool xvfb libgtk-3-dev lld llvm libsecret-1-dev pkg-config libcurl4-openssl-dev
+flutter config --enable-linux-desktop
+```
+
+Five things that each cost a cycle:
+
+- **`libcurl4-openssl-dev` is required**, and the CMake error does not say so: `sentry_flutter`
+  vendors sentry-native, whose `find_package(CURL)` fails with *"CURL: Required feature AsynchDNS is
+  not found"* when only the runtime curl is installed.
+- **A failed configure poisons the install prefix.** CMake caches `CMAKE_INSTALL_PREFIX=/usr/local`
+  on the first (failed) configure, after which Flutter's
+  `if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)` redirect in `linux/CMakeLists.txt` no longer
+  fires — the build reports `✓ Built build/linux/x64/release/bundle` while actually installing to
+  `/usr/local`, and `cmake --install --prefix` won't override it. `rm -rf build/linux` and rebuild.
+- **The harness must publish its own coordinates.** It writes each field's rect (in physical pixels,
+  multiplied by `devicePixelRatio`) to `$TAP_DEMO_RECTS` in a post-frame callback. That file
+  appearing is also the "app is up and painted" signal the recorder waits on — far more reliable
+  than a fixed sleep, and it means the click plan never hardcodes a layout.
+- **Don't mount the app's real bottom sheet in a bare harness.** `showMultiselectBottomSheet` →
+  `showFullscreenBottomSheet` renders its `TopAppBar` / `BottomSubmitButton` as untextured grey
+  blocks outside the app's full theme and provider tree, *and* it covers the whole 1280x720 window,
+  hiding whatever is being compared. Demonstrate the outcome in-panel instead.
+- **`pkill -f receipt_wrangler_mobile` kills the shell running it** — the pattern matches that
+  shell's own command line, which shows up as a bare exit 144. Use `killall receipt_wrangler_mobile`.
+
+`ffmpeg -f x11grab` draws the real X cursor (`-draw_mouse 1`, the default), so the pointer is
+visible without faking one; crop to the content (`crop=1280:412:0:0`) rather than shipping 300px of
+empty window.
 
 ### `integration_test` is a regular dependency on purpose (Android Studio signed-bundle builds)
 
