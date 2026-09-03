@@ -63,7 +63,8 @@ Future<void> expectQuickScanFieldOnScreen(
 
   if (delta != 0.0) {
     position.jumpTo((position.pixels + delta)
-        .clamp(position.minScrollExtent, position.maxScrollExtent));
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble());
     await tester.pump(const Duration(milliseconds: 200));
   }
 
