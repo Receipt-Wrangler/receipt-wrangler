@@ -22,15 +22,46 @@ MP4=$(mktemp /tmp/tap_demo_XXXX.mp4)
 }
 
 cleanup() {
-  kill "${APP_PID:-}" "${FFMPEG_PID:-}" "${XVFB_PID:-}" 2>/dev/null || true
+  for pid in "${FFMPEG_PID:-}" "${APP_PID:-}" "${XVFB_PID:-}"; do
+    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && kill "$pid" 2>/dev/null
+  done
   rm -f "$MP4"
+  return 0
 }
 trap cleanup EXIT
 
 export DISPLAY="$DISPLAY_NUM"
+
+# Refuse a display that is already served. Starting Xvfb on it fails, and every
+# later step -- the demo, xdotool, ffmpeg -- would silently attach to that other
+# session instead and record whatever it is showing. Checking after the fact
+# cannot catch this: the readiness probe below would be answered by the very
+# server we are trying to avoid.
+if xdotool getdisplaygeometry >/dev/null 2>&1; then
+  echo "$DISPLAY_NUM is already served by another X server." >&2
+  echo "Free it (killall Xvfb) or point TAP_DEMO_DISPLAY at another display." >&2
+  exit 1
+fi
+
 Xvfb "$DISPLAY_NUM" -screen 0 1280x720x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
 XVFB_PID=$!
-sleep 2
+
+# Xvfb exits immediately when another X server already owns the display -- a
+# stale server left by an aborted run is the usual cause. Without this check the
+# script would sail on and record whatever that other session is showing.
+xvfb_ready=false
+for _ in $(seq 20); do
+  if ! kill -0 "$XVFB_PID" 2>/dev/null; then
+    echo "Xvfb exited -- is $DISPLAY_NUM already in use? /tmp/xvfb.log says:" >&2
+    tail -3 /tmp/xvfb.log >&2
+    echo "Free that display, or point TAP_DEMO_DISPLAY at another one." >&2
+    exit 1
+  fi
+  # Waits for the server to actually answer, which a fixed sleep does not.
+  xdotool getdisplaygeometry >/dev/null 2>&1 && { xvfb_ready=true; break; }
+  sleep 0.25
+done
+"$xvfb_ready" || { echo "Xvfb never came up on $DISPLAY_NUM" >&2; exit 1; }
 
 rm -f "$RECTS"
 TAP_DEMO_RECTS="$RECTS" "$BIN" >/tmp/tap_demo_app.log 2>&1 &
