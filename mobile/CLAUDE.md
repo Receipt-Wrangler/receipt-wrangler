@@ -86,7 +86,7 @@ Uses `flutter_form_builder` for complex forms with validation. Receipt forms sup
 
 `storeAppData` (`lib/utils/auth.dart`) is the **only** writer of `GroupModel`, `PermissionsModel`,
 `UserPreferencesModel` and the category/tag catalogs, and outside the login response the only path
-that reaches it is `TokenRefreshService._loadAppDataIfNeeded`. That used to be guarded by
+that reaches it is `TokenRefreshService._loadAppData`. That used to be guarded by
 `if (_groupModel.groups.isEmpty)` — false for the whole of a logged-in session — so the 15-minute
 refresh timer (`main.dart`) and the on-resume refresh were both **no-ops**. A group or permission
 change made elsewhere could not reach a running app at all; you had to log out and back in. (On
@@ -126,6 +126,17 @@ the caller's permissions and the AI feature flag are all current for that tap.
   through to the data already loaded rather than blocking the scan — Quick Scan stays usable offline.
   The nav tap is fire-and-forget (`BottomNav.onDestinationSelected` is `void Function(int)`), so a
   thrown error would be unobserved anyway.
+- **Both load paths are serialized** through `_enqueueAppDataLoad`. A load is a fetch *and* a
+  `storeAppData`, and the scheduled path (`refreshTokens` → `_tryLoadAppData`) and the forced one
+  (`reloadAppData`) are independent — unserialized they overlap and the last response wins, so an
+  older scheduled payload could overwrite the groups and permissions a Quick Scan just fetched. That
+  is the very staleness this path exists to prevent, and `storeAppData` also writes the token pair
+  when the payload carries one. It is deliberately **its own queue, not `_refreshCompleter`**: that
+  completer makes concurrent callers share one result, which would defeat a forced reload by handing
+  it an older fetch's outcome. One consequence: a second *queued* normal load is debounced away,
+  where before both would have fetched (neither had stamped `_appDataLoadedAt` yet) — which is what
+  the debounce is for. Another: the scan path may wait out an in-flight timer load before starting
+  its own, bounded by one request.
 
 **This changed what a quick-scan e2e has to do.** A refresh at scan time overwrites any client-side
 `GroupModel` mutation with the server's copy, so `configureFirstGroup`
@@ -604,8 +615,12 @@ this shipped — `quick_scan_submit_test.dart` reaches its comment that way). `b
 is additionally a **no-op on the Linux desktop target**, so a "phone-sized" spec is not what it looks
 like; the runner's window is 1280x720 and that is already short enough to expose the bug.
 `expectQuickScanFieldOnScreen` (`integration_test/helpers/quick_scan_actions.dart`) is the assertion
-to use: it jumps the field's own scroll view to `maxScrollExtent` — the furthest a user could get —
-then checks the field's rect lies inside both the window and that viewport. Covered by the two
+to use: it scrolls the field's **own** scroll view by the least amount that would bring the field
+fully into the viewport, clamped to what that view can scroll, then checks the field's rect lies
+inside both the window and that viewport. One rule covers the column — a mid-column field
+(Categories, Tags) scrolls just far enough and is never pushed off the *top*, while the last field
+needs more than `maxScrollExtent`, so the clamp leaves it as far down as a user could get it and the
+window check still fails if it is unreachable there. Covered by the two
 "actually on screen" cases in `quick_scan_config_response_test.dart`.
 
 **Category/Tag picker needs a fallback context in Quick Scan.** `CategorySelectField` /

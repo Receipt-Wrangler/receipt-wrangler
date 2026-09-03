@@ -554,6 +554,47 @@ void main() {
         verify(() => mockUserApi.getAppData()).called(2);
       });
 
+      // A load is a fetch AND a storeAppData. The scheduled path and the forced
+      // path are independent, so unserialized they overlap and whichever
+      // response lands last wins -- an older scheduled payload could overwrite
+      // the config a Quick Scan just fetched, which is the staleness this whole
+      // path exists to prevent.
+      test('serializes a forced reload against an in-flight scheduled load',
+          () async {
+        when(() => mockAuthModel.getJwt()).thenAnswer((_) async => validJwt);
+        when(() => mockAuthModel.getRefreshToken())
+            .thenAnswer((_) async => validJwt);
+        when(() => mockGroupModel.groups).thenReturn([MockGroup()]);
+
+        var inFlight = 0;
+        var peakInFlight = 0;
+        when(() => mockUserApi.getAppData()).thenAnswer((_) async {
+          inFlight++;
+          peakInFlight = inFlight > peakInFlight ? inFlight : peakInFlight;
+          // Long enough that an unserialized second load would start inside it.
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          inFlight--;
+          return Response(
+            data: buildMockAppData(),
+            requestOptions: RequestOptions(path: '/user/appData'),
+            statusCode: 200,
+          );
+        });
+
+        // refreshTokens awaits the token checks before it ever reaches the
+        // load, so give it long enough to actually be mid-fetch -- otherwise the
+        // forced reload wins the race trivially and nothing is serialized.
+        final scheduled = service.refreshTokens();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        final forced = service.reloadAppData();
+        await Future.wait([scheduled, forced]);
+
+        expect(peakInFlight, 1, reason: 'the two loads never overlapped');
+        // Still two distinct fetches -- serializing must not collapse the forced
+        // reload into the scheduled one the way _refreshCompleter would.
+        verify(() => mockUserApi.getAppData()).called(2);
+      });
+
       test('reloadAppData swallows a failed fetch', () async {
         when(() => mockGroupModel.groups).thenReturn([MockGroup()]);
         when(() => mockUserApi.getAppData()).thenThrow(DioException(

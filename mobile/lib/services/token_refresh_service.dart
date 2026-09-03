@@ -31,6 +31,9 @@ class TokenRefreshService {
   /// [_loadAppData].
   DateTime? _appDataLoadedAt;
 
+  /// Serializes AppData loads. See [_enqueueAppDataLoad].
+  Future<void> _appDataQueue = Future<void>.value();
+
   late AuthModel _authModel;
   late GroupModel _groupModel;
   late UserModel _userModel;
@@ -47,6 +50,7 @@ class TokenRefreshService {
     _refreshCompleter = null;
     _initialized = false;
     _appDataLoadedAt = null;
+    _appDataQueue = Future<void>.value();
   }
 
   void initialize({
@@ -129,7 +133,7 @@ class TokenRefreshService {
   /// (which would trigger token purge and logout).
   Future<void> _tryLoadAppData() async {
     try {
-      await _loadAppData(bypassDebounce: false);
+      await _enqueueAppDataLoad(bypassDebounce: false);
     } catch (e) {
       print(e);
     }
@@ -153,10 +157,34 @@ class TokenRefreshService {
     }
 
     try {
-      await _loadAppData(bypassDebounce: true);
+      await _enqueueAppDataLoad(bypassDebounce: true);
     } catch (e) {
       print(e);
     }
+  }
+
+  /// Runs AppData loads one at a time.
+  ///
+  /// A load is a fetch *and* a `storeAppData`, and the two paths into it are
+  /// independent: the scheduled one via [refreshTokens] -> [_tryLoadAppData],
+  /// and the forced one via [reloadAppData]. Unserialized they can overlap, and
+  /// then whichever response lands last wins -- so an older scheduled payload
+  /// could overwrite the groups and permissions a Quick Scan just fetched, which
+  /// is exactly the staleness this whole path exists to prevent. `storeAppData`
+  /// also writes the token pair when the payload carries one, and interleaving
+  /// that is what `_refreshCompleter` was introduced to avoid.
+  ///
+  /// Deliberately its own queue rather than `_refreshCompleter`: that completer
+  /// makes concurrent callers *share one result*, which would defeat a forced
+  /// reload by handing it an older fetch's outcome. Queuing serializes without
+  /// collapsing two distinct requests into one.
+  Future<void> _enqueueAppDataLoad({required bool bypassDebounce}) {
+    final next =
+        _appDataQueue.then((_) => _loadAppData(bypassDebounce: bypassDebounce));
+    // Keep the chain alive: one failed load must not poison every later one. The
+    // error still reaches `next`, which both callers already catch.
+    _appDataQueue = next.catchError((_) {});
+    return next;
   }
 
   /// Collapses the bursts, not the refreshes: app resume and the 15-minute timer

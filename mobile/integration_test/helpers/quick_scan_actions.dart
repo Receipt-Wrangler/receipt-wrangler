@@ -14,20 +14,29 @@ import 'receipt_test_helpers.dart';
 
 /// Shared Quick Scan e2e actions, used by the config + submit specs.
 
-/// Asserts [field] is genuinely on screen in the Quick Scan sheet once the slide
-/// is scrolled as far down as it will go.
+/// Asserts [field] is genuinely on screen in the Quick Scan sheet.
 ///
 /// None of the obvious assertions work here:
 ///  * `findsOneWidget` passes for a widget clipped outside its viewport;
 ///  * `Finder.hitTestable` reports 0 under `IntegrationTestWidgetsFlutterBinding`
 ///    on desktop even for plainly visible widgets;
-///  * `tester.ensureVisible` walks *every* ancestor scrollable, so it dragged the
-///    field into view even when the sheet was broken -- which is precisely how
-///    this shipped (`quick_scan_submit_test` reaches its comment that way).
+///  * `tester.ensureVisible` and `Scrollable.ensureVisible` walk *every* ancestor
+///    scrollable, so they drag the field into view even when the sheet is broken
+///    -- precisely how this shipped (`quick_scan_submit_test` reaches its comment
+///    that way).
 ///
-/// So: scroll the field's own scroll view to `maxScrollExtent` -- the furthest a
-/// user could ever get -- and then check geometry. If the field still is not
-/// fully inside the window at that point, nothing the user does will reveal it.
+/// So this scrolls [field]'s **own** scroll view by the least amount that would
+/// bring it fully into the viewport, clamped to what that view can actually
+/// scroll, and then checks geometry. One rule covers the whole column:
+///
+///  * a mid-column field (Categories, Tags) scrolls just far enough and stays
+///    inside the viewport -- jumping to `maxScrollExtent` for those risked
+///    pushing them off the *top*, since Comment sits below them;
+///  * the last field needs more than `maxScrollExtent`, so the clamp leaves it
+///    as far down as a user could ever get it. If it is still not fully inside
+///    the window there, nothing the user does will reveal it -- which is the
+///    original bug.
+///
 /// The viewport check additionally catches a field left buried under the pinned
 /// submit button.
 ///
@@ -43,13 +52,25 @@ Future<void> expectQuickScanFieldOnScreen(
   expect(field, findsOneWidget, reason: '$label is in the tree');
 
   final scrollable = Scrollable.of(tester.element(field));
-  scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
-  await tester.pump(const Duration(milliseconds: 200));
+  final position = scrollable.position;
+  final viewportFinder = find.byWidget(scrollable.widget);
+
+  final startRect = tester.getRect(field);
+  final startViewport = tester.getRect(viewportFinder);
+  final below = startRect.bottom - startViewport.bottom;
+  final above = startViewport.top - startRect.top;
+  final delta = below > 0 ? below : (above > 0 ? -above : 0.0);
+
+  if (delta != 0.0) {
+    position.jumpTo((position.pixels + delta)
+        .clamp(position.minScrollExtent, position.maxScrollExtent));
+    await tester.pump(const Duration(milliseconds: 200));
+  }
 
   final fieldRect = tester.getRect(field);
   final window =
       Offset.zero & tester.view.physicalSize / tester.view.devicePixelRatio;
-  final viewport = tester.getRect(find.byWidget(scrollable.widget));
+  final viewport = tester.getRect(viewportFinder);
 
   expect(window.contains(fieldRect.topLeft), isTrue,
       reason: '$label starts inside the window ($fieldRect vs $window)');
@@ -57,6 +78,9 @@ Future<void> expectQuickScanFieldOnScreen(
       reason: '$label ends inside the window ($fieldRect vs $window)');
   expect(fieldRect.bottom <= viewport.bottom, isTrue,
       reason: '$label is not buried under the pinned submit button '
+          '($fieldRect vs viewport $viewport)');
+  expect(fieldRect.top >= viewport.top, isTrue,
+      reason: '$label is not scrolled off the top of the sheet '
           '($fieldRect vs viewport $viewport)');
 }
 
