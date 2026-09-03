@@ -600,6 +600,38 @@ Three things that spec encodes, all of which cost a debugging cycle:
   into the element tree, so the admin's accumulated groups can push the target below the viewport where
   `find.text` can't reach it (the same problem `keepOnlyGroup` works around for Quick Scan).
 
+### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
+
+`CategorySelectField` and `TagSelectField` render no UI of their own: both are thin
+wrappers that hand an `onTap` to **`lib/shared/widgets/multi-select-field.dart`**, which is
+also used directly for the "Users" field in the quick-actions split sheet. So the field's
+hit target is defined in exactly one place, for the receipt form, the Quick Scan sheet, the
+per-item rows and the split sheet at once.
+
+- **The `GestureDetector` must wrap the `InputDecorator`, with
+  `behavior: HitTestBehavior.opaque`.** It originally sat *inside* the decorator around the
+  inner `Wrap`, which made the field tappable only on its text: the label, the outline
+  border and the content padding were outside the detector; `Wrap` shrink-wraps under
+  `InputDecorator`'s loose width constraints, so the empty state's target was the width of
+  the `"No <items> selected"` glyph run; and the default `deferToChild` behavior dropped
+  even the gaps between chips, because `RenderWrap` and the childless `SizedBox` spacers
+  both hit-test `false`. Adjacent `FormBuilderDropdown` fields are tappable edge to edge, so
+  the difference was very visible.
+- **View mode installs no tap surface at all.** When `onTap` is null (the wrappers pass null
+  in `WranglerFormState.view`) the bare `InputDecorator` is returned rather than an opaque
+  detector that would swallow pointers for a no-op.
+- **`ChoiceChip.onSelected` is kept even though it is now redundant** — the chip wins the
+  gesture arena and calls the same handler the outer detector would. It stays because
+  `onSelected: null` renders a `ChoiceChip` in its *disabled* style.
+- **No explicit min-height is set.** The app's global `InputDecorationTheme` uses
+  `OutlineInputBorder` (`lib/main.dart`), whose default non-dense content padding already
+  puts the decorator past the 48dp target even in the empty state.
+- **Tests:** `test/widgets/multi_select_field_test.dart` covers the widget end to end —
+  edge/label/gutter/chip-gap taps (the regression guards; they assert the detector's rect
+  equals the decorator's), chip and placeholder taps, rendering, form registration and
+  `didChange`, the `required` validator, and the inert view mode. The e2e specs still tap the
+  `"No <items> selected"` placeholder as their locator, which keeps working.
+
 ### `integration_test` is a regular dependency on purpose (Android Studio signed-bundle builds)
 
 `integration_test` is listed under **`dependencies`**, not `dev_dependencies`, in `pubspec.yaml`.
