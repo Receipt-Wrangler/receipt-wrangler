@@ -411,10 +411,28 @@ backend enforces the two permissions **separately** (`handlers.QuickScan` → `g
   field and hides the submit button, so once the success snackbar fades the sheet would otherwise sit
   there greyed out with nothing saying why. Extraction is an async backend job, so the wording
   promises a result rather than showing one.
-- **The sheet shows a page counter** (`quick-scan-page-indicator`) when a scan carries more than one
-  page. A scan can carry up to 100, and the carousel gives no other hint that the pages after the
-  first exist — without it a multi-page scan reads as a single-page one and the forms behind it go
-  unfilled.
+- **The sheet pages a multi-page scan with arrows as well as the swipe.** Under the image sits a nav
+  row (`lib/receipts/widgets/quick_scan.dart`): a counter (`quick-scan-page-indicator`, `"2 of 3"`)
+  flanked by `quick-scan-previous-page` / `quick-scan-next-page`, which call the carousel
+  controller's `previousItem()` / `nextItem()`. The whole row is absent below two pages. A scan can
+  carry up to 100 pages and the carousel gives no other hint that the ones after the first exist —
+  without this a multi-page scan reads as a single-page one and the forms behind it go unfilled, and
+  the counter alone left that to a line of text ("swipe for the next", now dropped) which is easy to
+  skip past.
+  - **An arrow at the end of the scan is dropped, not disabled**, so every arrow shown leads
+    somewhere. It is replaced by a `SizedBox.square(dimension: kMinInteractiveDimension)` — the
+    `IconButton` default constraint — so the counter stays put instead of sliding as the arrows come
+    and go.
+  - **The row reads the `itemBuilder`'s `realIndex`, not a tracked selection.** The carousel builds
+    only the item on screen, so the page's own index *is* the visible one; deriving from it is what
+    lets the delete icon (which does `images.removeAt(controller.selectedItem)`) shrink the scan
+    without leaving a stale index behind an arrow that points off the end. That is why `QuickScan` is
+    a `StatelessWidget` with no `onIndexChanged`.
+  - Arrows stay live after submit, unlike the upload/delete icons: paging a queued scan is read-only
+    browsing, and the swipe allows it either way.
+  - Covered by `test/widgets/quick_scan_sheet_test.dart` ("the arrows only ever point at a page that
+    exists"). There is **no e2e** for it: `installDocumentScannerMock()` returns a single fixed PNG,
+    so no integration spec can reach a second page.
 - **The sheet re-checks its own gate** and resolves `canCreateManual` **at the caller's context**.
   Its `bottomSheetWidget` is built inside the modal route, which is outside the GoRouter subtree, so
   `GoRouterState.of` throws there — resolve before opening and pass the result down.
