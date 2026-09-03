@@ -634,6 +634,47 @@ mounts it, so a raw `shellContext` is **null** and tapping Categories/Tags would
 by `test/widgets/quick_scan_form_test.dart` (tap-opens-picker, shellContext null) and on-device by
 `quick_scan_submit_test.dart`.
 
+### Receipt status presentation
+
+`receiptStatusLabel` / `receiptStatusColor` (`lib/utils/receipts.dart`) are the **single owner** of
+receipt-status presentation; `ReceiptListItem.getStatusText` / `getStatusColor` are thin delegates,
+and `buildReceiptStatusDropDownMenuItems` (`lib/utils/forms.dart`) carries the same labels for the
+form dropdown — the two label lists must stay in sync.
+
+Every status is a **pale tint**, because `ListItemTrailingStatus` paints its label in the default
+dark `onBackground` and `ListItemColorBlock` sits beside dark text. The tints match the desktop chip
+(`desktop/CLAUDE.md` → "Receipt status colors"):
+
+| Status | Tint |
+|---|---|
+| `NEEDS_ATTENTION` | `warningAmber` `#FFE0B2` |
+| `DECLINED` | `errorRed` `#F2BFBF` — the red NEEDS_ATTENTION gave up |
+| `OPEN` | `#FFFACD` |
+| `RESOLVED` | `successGreen` |
+| `DRAFT` (and the fallback) | `neutralStatusGrey` |
+
+**`errorRed` / `successGreen` are shared with the activity list**
+(`group_activity_list_item.dart`), where red still means a failed system task — so DECLINED reusing
+`errorRed` keeps both meanings intact, and changing either constant moves both surfaces.
+
+**Neither function throws on an unrecognized status.** Both used to end in
+`throw Exception("Unknown status: …")`, which was already reachable via `ReceiptStatus.empty` (the
+search screen builds a `Receipt` from a `SearchResult` whose `receiptStatus` is nullable) and would
+take the whole receipt list down for any status the API adds after a build ships. The label falls
+back to `titleCaseStatusName` (SNAKE_CASE → Title Case, matching desktop's `formatStatus`) and the
+tint to the neutral grey. This does **not** rescue an already-released binary — the generated
+`ReceiptStatus` `EnumClass` throws in `_$valueOf` long before either function is reached (see
+"Permission-based UI gating" → the closed-enum note) — it only bounds the damage from here on.
+
+`titleCaseStatusName` is split out because a `ReceiptStatus` the generated enum does not declare
+**cannot be constructed from a test** (the constructor is private to the openapi package), so the
+fallback rule is otherwise unpinnable. Tests:
+`test/utils/receipt_status_presentation_test.dart` (both maps, exhaustive over
+`ReceiptStatus.values`, plus the fallback rule); the mapping is deliberately **not** asserted through
+`ReceiptListItem`, whose trailing pill is a fixed 100px wide — "Needs Attention" reports a render
+overflow that has nothing to do with the mapping. **E2E:**
+`integration_test/receipt_status_lifecycle_test.dart` drives every status through the real API.
+
 ### Seeding the receipt group
 
 The Group field is a default, not a lock. The add form seeds it from **the group being browsed**, and

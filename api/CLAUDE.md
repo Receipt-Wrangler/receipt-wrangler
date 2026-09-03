@@ -1233,6 +1233,45 @@ See `mobile/CLAUDE.md` → "App Links / Universal Links — server-URL pre-fill 
 `commands/upsert_system_settings_command_test.go` (validation), `services/system_settings_test.go`
 (`BuildLoginQrUrl` compose/encoding + `GetFeatureConfig` mapping).
 
+## Receipt statuses
+
+`models.ReceiptStatus` (`internal/models/receipt_status.go`) is a plain Go `string` type — there is
+no DB enum or CHECK constraint anywhere, so **adding a value needs no migration**, only these four
+edits, which nothing forces to agree with each other:
+
+1. the `const` block,
+2. the `Value()` guard chain (a missing value makes every write fail as a generic 500),
+3. `ReceiptStatuses()` — the single membership list, which drives the only two server-side
+   validations of a caller-supplied status: `handlers/receipts.go` `BulkReceiptStatusUpdate` and
+   `commands/update_group_receipt_settings_command.go` `isValidReceiptStatus`,
+4. the `ReceiptStatus` enum in `swagger.yml` — then regenerate **both** clients, `mobile/api/`
+   included, in the same change (see "API Client Generation").
+
+`models/receipt_status_test.go` → `TestReceiptStatuses` asserts the exact list **and order**, so it
+fails by design on any addition. Update it rather than weakening it.
+
+**`AfterReceiptUpdated` (`repositories/receipts.go`) is the only transition logic** — there is no
+state machine, any status may follow any other, and all three write paths reach it (`UpdateReceipt`,
+`CreateReceipt`, and the bulk handler). Two statuses are **terminal** and cascade the receipt's items
+to `ITEM_RESOLVED`:
+
+- **`RESOLVED`** also stamps `resolved_date`.
+- **`DECLINED`** deliberately does **not** — a decline is not a resolution, and `resolved_date` is a
+  reporting dimension (`receiptsource.KeyResolvedDate` plus its derived day/month/year fields) and a
+  sortable/filterable column. It falls into the existing `Status != RESOLVED` branch, which clears
+  `resolved_date`.
+
+The cascade is what removes a terminal receipt from settlement: `handlers/users.go`
+`GetAmountOwedForUser` filters on **`ITEM_OPEN`**, i.e. the *item* status, never the receipt's. A new
+status that should not count as owed therefore has to be added to that cascade, not just the enum.
+`OPEN` and `NEEDS_ATTENTION` have no cascade and leave items alone.
+
+**Two validation gaps to know about** (both pre-existing): `UpsertReceiptCommand.Validate` and
+`UpdateGroupSettingsCommand.Validate` check a status is **non-empty**, never that it is a member — an
+arbitrary string reaches the DB layer and is caught only by `Value()`, surfacing as a 500. And
+`ReceiptStatus.Scan` never returns an error, so `QuickScanCommand.LoadDataFromRequest` cannot reject
+a bogus status either.
+
 ## Quick Scan Field Configuration
 
 Group admins configure the quick-scan workflow per group on `GroupReceiptSettings` (gated by the

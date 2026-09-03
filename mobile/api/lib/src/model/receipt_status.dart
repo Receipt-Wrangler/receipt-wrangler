@@ -24,6 +24,9 @@ class ReceiptStatus extends EnumClass {
   @BuiltValueEnumConst(wireName: r'DRAFT')
   static const ReceiptStatus DRAFT = _$DRAFT;
   /// Status of a receipt
+  @BuiltValueEnumConst(wireName: r'DECLINED')
+  static const ReceiptStatus DECLINED = _$DECLINED;
+  /// Status of a receipt
   @BuiltValueEnumConst(wireName: r'')
   static const ReceiptStatus empty = _$empty;
 

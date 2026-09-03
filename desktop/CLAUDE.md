@@ -439,6 +439,35 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     `e2e/group-delete-any.spec.ts`.
 
 
+### Receipt status colors
+
+Everything visual for a receipt status is the ~20 lines of
+`src/shared-ui/status-chip/status-chip.component.scss` plus the `[ngClass]` map in its template. The
+options themselves need no code: `RECEIPT_STATUS_OPTIONS` (`src/constants/receipt-status-options.ts`)
+derives from `Object.keys(ReceiptStatus)` and `formatStatus` (`src/utils/status.utils.ts`)
+snake→title-cases the label, so **a status added to `swagger.yml` reaches the receipt form, the
+filters, bulk status update and both "default status" settings on regeneration alone** — only a color
+has to be authored.
+
+The convention is a **pale tint carrying the default (dark) `mat-chip` text**:
+
+| Status | Background |
+|---|---|
+| `NEEDS_ATTENTION` | `variables.$warning-amber` (`#ffe0b2`) |
+| `DECLINED` | `map.get(variables.$warn-palette, 100)` (`#f2bfbf`) — the red NEEDS_ATTENTION gave up |
+| `OPEN` | `#fffacd` |
+| `RESOLVED` | `lightgreen` |
+| `DRAFT` | *(no rule — the default chip surface)* |
+
+**Do not set an explicit `color` on these rules.** `.needs-attention` and `.open` used to declare
+`color: white`, i.e. white on `#f2bfbf` / `#fffacd` — about 1.6:1 and 1.2:1, an effectively invisible
+label. The tints are chosen to be legible under the dark default.
+
+The chip is also driven by an unrelated `customStatusColor` input (`"red" | "green" | "gray" |
+"yellow"`) for **system-task** status in the activity list; `'red'` maps to `.declined`, so red still
+means failure there. (`'gray'` maps to no class — a pre-existing dead value.)
+`status-chip.component.spec.ts` pins the whole status → class map, including that repoint.
+
 ### Custom fields
 
 The Manage Custom Fields page (`src/custom-fields/`) is a paged `app-table` plus a single
