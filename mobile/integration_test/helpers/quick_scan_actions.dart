@@ -12,6 +12,52 @@ import 'receipt_test_helpers.dart';
 
 /// Shared Quick Scan e2e actions, used by the config + submit specs.
 
+/// Asserts [field] is genuinely on screen in the Quick Scan sheet once the slide
+/// is scrolled as far down as it will go.
+///
+/// None of the obvious assertions work here:
+///  * `findsOneWidget` passes for a widget clipped outside its viewport;
+///  * `Finder.hitTestable` reports 0 under `IntegrationTestWidgetsFlutterBinding`
+///    on desktop even for plainly visible widgets;
+///  * `tester.ensureVisible` walks *every* ancestor scrollable, so it dragged the
+///    field into view even when the sheet was broken -- which is precisely how
+///    this shipped (`quick_scan_submit_test` reaches its comment that way).
+///
+/// So: scroll the field's own scroll view to `maxScrollExtent` -- the furthest a
+/// user could ever get -- and then check geometry. If the field still is not
+/// fully inside the window at that point, nothing the user does will reveal it.
+/// The viewport check additionally catches a field left buried under the pinned
+/// submit button.
+///
+/// No surface size is forced: this runs at the target's natural viewport
+/// (1280x720 for the Linux desktop runner, a real handset for Android/iOS).
+/// `setSurfaceSize` is a no-op on the desktop target, so pinning a "phone" size
+/// here would only be misleading.
+Future<void> expectQuickScanFieldOnScreen(
+  WidgetTester tester,
+  Finder field, {
+  required String label,
+}) async {
+  expect(field, findsOneWidget, reason: '$label is in the tree');
+
+  final scrollable = Scrollable.of(tester.element(field));
+  scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+  await tester.pump(const Duration(milliseconds: 200));
+
+  final fieldRect = tester.getRect(field);
+  final window =
+      Offset.zero & tester.view.physicalSize / tester.view.devicePixelRatio;
+  final viewport = tester.getRect(find.byWidget(scrollable.widget));
+
+  expect(window.contains(fieldRect.topLeft), isTrue,
+      reason: '$label starts inside the window ($fieldRect vs $window)');
+  expect(window.contains(fieldRect.bottomRight), isTrue,
+      reason: '$label ends inside the window ($fieldRect vs $window)');
+  expect(fieldRect.bottom <= viewport.bottom, isTrue,
+      reason: '$label is not buried under the pinned submit button '
+          '($fieldRect vs viewport $viewport)');
+}
+
 /// Finds a `FormBuilderDropdown` in the Quick Scan form by its `name`.
 Finder quickScanDropdown(String name) =>
     find.byWidgetPredicate((w) => w is FormBuilderDropdown && w.name == name);

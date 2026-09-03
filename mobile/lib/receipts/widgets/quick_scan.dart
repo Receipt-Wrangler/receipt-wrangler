@@ -80,6 +80,13 @@ class _QuickScan extends State<QuickScan> {
               Padding(
                 padding: getImageDataPadding(),
                 child: QuickScanForm(
+                  // Keyed by the image, not by position. Deleting a page shifts
+                  // every later image down an index, and without a key Flutter
+                  // would match by position and hand the surviving form the old
+                  // page's State -- whose `groupId` (seeded once in initState)
+                  // would then disagree with the group the dropdown shows, so the
+                  // form would resolve its field set against the wrong group.
+                  key: ObjectKey(widget.imageSubject.value[realIndex]),
                   formKey: widget.imageSubject.value[realIndex].formKey,
                   image: widget.imageSubject.value[realIndex],
                   index: realIndex,
@@ -124,11 +131,18 @@ class _QuickScan extends State<QuickScan> {
                 }
 
                 if (imageSnapshot.hasData && imageSnapshot.data!.isNotEmpty) {
-                  return SizedBox(
-                    height: MediaQuery.of(context).size.height,
-                    width: MediaQuery.of(context).size.width,
-                    child: _buildCarousel(isCompleted),
-                  );
+                  // Fill the sheet's body, not the screen. The carousel is
+                  // horizontal, so it needs a bounded height from somewhere --
+                  // but the sheet's body is shorter than the screen by the app
+                  // bar, drag handle and safe area. Sizing to the screen
+                  // overflowed the body, and because each slide's own
+                  // SingleChildScrollView then believed it had a full-screen
+                  // viewport it never scrolled, so the overflow was clipped and
+                  // unreachable: a configured comment field (last in the form)
+                  // simply could not be seen. Bounded constraints reach us
+                  // because the sheet no longer wraps the body in a scroll view
+                  // (`bodyFillsSheet: true` in showQuickScanBottomSheet).
+                  return SizedBox.expand(child: _buildCarousel(isCompleted));
                 }
 
                 return const SizedBox.shrink();

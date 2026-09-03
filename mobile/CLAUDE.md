@@ -82,6 +82,27 @@ Uses `flutter_form_builder` for complex forms with validation. Receipt forms sup
 - Centralized client configuration in `OpenApiClient` singleton
 - Secure token storage using `flutter_secure_storage`
 
+### AppData is re-fetched during a session, not just at login
+
+`storeAppData` (`lib/utils/auth.dart`) is the **only** writer of `GroupModel`, `PermissionsModel`,
+`UserPreferencesModel` and the category/tag catalogs, and outside the login response the only path
+that reaches it is `TokenRefreshService._loadAppDataIfNeeded`. That used to be guarded by
+`if (_groupModel.groups.isEmpty)` — false for the whole of a logged-in session — so the 15-minute
+refresh timer (`main.dart`) and the on-resume refresh were both **no-ops**. A group or permission
+change made elsewhere could not reach a running app at all; you had to log out and back in. (On
+Android, backgrounding does not re-run `main()`, so even "close and reopen" did not help.) Desktop
+re-fetches AppData unconditionally on every bootstrap (`desktop/src/services/app-init.service.ts`),
+so the two clients disagreed about how a group was configured.
+
+It now loads every time, with a short **30-second debounce** (`_appDataRefreshDebounce`) that exists
+only to collapse a burst — app resume and the periodic timer can fire together and both call through
+here. It is deliberately not a staleness budget: a longer window would reinstate the bug. The
+empty-groups case bypasses the debounce, since that is the first load and nothing renders without it.
+Pinned by `test/services/token_refresh_service_test.dart` ("reloads app data even when groups already
+exist" / "debounces a second refresh that follows immediately"), whose `buildMockAppData()` helper
+stubs every field `storeAppData` touches — a mock missing one throws mid-store instead of failing the
+assertion under test.
+
 ### Permission-based UI gating
 
 The mobile app gates UI on the caller's **effective permissions**, mirroring the desktop client
@@ -482,6 +503,52 @@ arguments: the list opened with two `int?`s and only grows, so naming each value
 callback (`lib/receipts/widgets/quick_scan.dart`) from transposing them. Note the comment is
 deliberately **not** cleared when the group changes (unlike paid-by/categories/tags, it isn't
 group-scoped data, and the submit re-resolves visibility per group so a hidden one is never sent).
+
+**Each slide's `QuickScanForm` is keyed by the image, not by its position.** `_QuickScanForm` seeds
+its `groupId` State field once in `initState` and reads both `GroupModel` and `PermissionsModel` with
+`listen: false`, so nothing re-derives it later. Deleting a page (`_getDeleteIcon` in
+`lib/shared/functions/quick_scan.dart`) shifts every later image down an index — without a key Flutter
+matches by position and hands the surviving form the **deleted** page's State, leaving `groupId`
+disagreeing with the group its own dropdown displays, and the field set resolved against the wrong
+group. The `FormBuilder` subtree does reset (its `key` is a per-image `GlobalKey`), so the mismatch is
+invisible. Hence `key: ObjectKey(image)` on the form in `lib/receipts/widgets/quick_scan.dart`.
+Desktop cannot have this bug: its `showComment(i)` re-reads `groupIds.at(i).value` on every
+change-detection pass rather than caching a per-index copy.
+
+**The sheet's layout is what makes a configured field usable — one vertical scrollable per
+slide.** The Quick Scan sheet opens through `showFullscreenBottomSheet` with **`bodyFillsSheet:
+true`** (`lib/utils/bottom_sheet.dart`), which does two things `QuickScan` depends on: it does **not**
+wrap the body in a `SingleChildScrollView`, and it pins the submit button as the scaffold's
+**bottom bar** rather than its `bottomSheet`. Both matter:
+
+- The wrapper would make the body's height **unbounded**, and the horizontal `InfiniteCarousel` needs
+  a bounded height. That is why `QuickScan.build()` used to hard-code
+  `SizedBox(height: MediaQuery.of(context).size.height)` — the **screen** height, which is larger than
+  the sheet's body by the app bar, drag handle and safe area. The slide overflowed the body, and
+  because each slide's own `SingleChildScrollView` then believed it had a full-screen viewport it had
+  nothing to scroll, so the overflow was **clipped and unreachable**. It is now `SizedBox.expand`,
+  sized by the bounded constraints the scaffold body supplies.
+- A `Scaffold.bottomSheet` **floats over** the body; a bottom bar reserves its space. Floating buried
+  the form's last field under the submit button and the "enter details manually" link, which no amount
+  of scrolling could clear (`submitButtonSpacing`'s fixed 70px is not the height of that Column).
+
+Together these shipped a Quick Scan whose **configured comment field could never be seen** — the
+comment is last in the form column and the image preview alone claims half the screen height
+(`getImagePreviewHeight`). Note the preview is an `InteractiveViewer`, so it claims pans over itself:
+a drag started on the image will never scroll the form.
+
+**Testing this needs geometry, not finders.** Three things all quietly pass on a broken sheet:
+`expect(..., findsOneWidget)` is true for a widget clipped outside its viewport; `Finder.hitTestable`
+reports **0 under `IntegrationTestWidgetsFlutterBinding` on desktop even for plainly visible
+widgets**, so it cannot be used to assert visibility here; and `tester.ensureVisible` walks *every*
+ancestor scrollable, dragging a field into view even when the user could not (which is exactly how
+this shipped — `quick_scan_submit_test.dart` reaches its comment that way). `binding.setSurfaceSize`
+is additionally a **no-op on the Linux desktop target**, so a "phone-sized" spec is not what it looks
+like; the runner's window is 1280x720 and that is already short enough to expose the bug.
+`expectQuickScanFieldOnScreen` (`integration_test/helpers/quick_scan_actions.dart`) is the assertion
+to use: it jumps the field's own scroll view to `maxScrollExtent` — the furthest a user could get —
+then checks the field's rect lies inside both the window and that viewport. Covered by the two
+"actually on screen" cases in `quick_scan_config_response_test.dart`.
 
 **Category/Tag picker needs a fallback context in Quick Scan.** `CategorySelectField` /
 `TagSelectField` open their multi-select via `showMultiselectBottomSheet(...)`, which calls

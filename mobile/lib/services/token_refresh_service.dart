@@ -27,6 +27,10 @@ class TokenRefreshService {
 
   Completer<bool>? _refreshCompleter;
 
+  /// When AppData was last republished into the models. See
+  /// [_loadAppDataIfNeeded].
+  DateTime? _appDataLoadedAt;
+
   late AuthModel _authModel;
   late GroupModel _groupModel;
   late UserModel _userModel;
@@ -42,6 +46,7 @@ class TokenRefreshService {
   void resetForTesting() {
     _refreshCompleter = null;
     _initialized = false;
+    _appDataLoadedAt = null;
   }
 
   void initialize({
@@ -130,21 +135,48 @@ class TokenRefreshService {
     }
   }
 
+  /// Collapses the bursts, not the refreshes: app resume and the 15-minute timer
+  /// both land here and can fire together, and re-requesting AppData twice in a
+  /// row buys nothing. Deliberately short -- a longer window would turn back into
+  /// a staleness budget, which is the thing being fixed.
+  static const _appDataRefreshDebounce = Duration(seconds: 30);
+
+  /// Re-fetches AppData and republishes it into the models.
+  ///
+  /// [storeAppData] is the only writer of `GroupModel`, `PermissionsModel`,
+  /// `UserPreferencesModel` and the category/tag catalogs, and outside login this
+  /// is the only path that reaches it. It used to run only when
+  /// `_groupModel.groups.isEmpty` -- which is false for the whole of a logged-in
+  /// session, so the 15-minute refresh timer and the on-resume refresh were both
+  /// no-ops. A group setting changed elsewhere (a quick-scan field switched on,
+  /// say) could then never reach a running app: you had to log out and back in.
+  /// Desktop re-fetches AppData on every bootstrap, so the two clients disagreed
+  /// about how the group was configured.
+  ///
+  /// The empty-groups case still forces a load regardless of the debounce: that
+  /// is the first load, and nothing can render without it.
   Future<void> _loadAppDataIfNeeded() async {
-    if (_groupModel.groups.isEmpty) {
-      var appDataResponse =
-          await OpenApiClient.client.getUserApi().getAppData();
-      await storeAppData(
-        _authModel,
-        _groupModel,
-        _userModel,
-        _userPreferencesModel,
-        _categoryModel,
-        _tagModel,
-        _systemSettingsModel,
-        _permissionsModel,
-        appDataResponse.data as AppData,
-      );
+    final loadedAt = _appDataLoadedAt;
+    final isFirstLoad = _groupModel.groups.isEmpty;
+
+    if (!isFirstLoad &&
+        loadedAt != null &&
+        DateTime.now().difference(loadedAt) < _appDataRefreshDebounce) {
+      return;
     }
+
+    var appDataResponse = await OpenApiClient.client.getUserApi().getAppData();
+    await storeAppData(
+      _authModel,
+      _groupModel,
+      _userModel,
+      _userPreferencesModel,
+      _categoryModel,
+      _tagModel,
+      _systemSettingsModel,
+      _permissionsModel,
+      appDataResponse.data as AppData,
+    );
+    _appDataLoadedAt = DateTime.now();
   }
 }
