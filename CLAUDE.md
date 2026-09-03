@@ -130,7 +130,7 @@ change**.
 
 `dart analyze` substitutes for `flutter analyze` here (it reports the same errors) and stays scoped to
 `mobile/api` — judge a regen by the **error** count, which must be **0**. The warnings are
-pre-existing generator noise: ~73 in `mobile/api` of 108 across `mobile/`, the split recorded in
+pre-existing generator noise: ~73 in `mobile/api` of 107 across `mobile/`, the split recorded in
 `.github/workflows/ci.yml` where the analyzer is deliberately not gated. Keep those two numbers in
 sync with that comment.
 
