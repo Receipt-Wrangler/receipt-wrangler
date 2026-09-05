@@ -29,7 +29,7 @@ ReceiptStatus _$valueOf(String name) {
     case 'empty':
       return _$empty;
     default:
-      throw ArgumentError(name);
+      return _$empty;
   }
 }
 
