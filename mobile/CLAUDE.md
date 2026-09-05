@@ -444,6 +444,32 @@ the swagger, so `Claims` carries only identity claims and the field is gone from
 Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
 is otherwise forbidden — these are the documented exception.)
 
+**A third hand-patch, which does NOT surface as a compile error — `ReceiptStatus` enum tolerance.**
+`model/receipt_status.dart` annotates the `empty` member `@BuiltValueEnumConst(wireName: r'',
+fallback: true)`. `build_runner` turns that into `default: return _$empty;` in `_$valueOf`, replacing
+the generated `default: throw ArgumentError(name)`. Without it, one unrecognized wire value fails the
+**entire** enclosing payload — the whole paged receipts response, and **login** when the value rides
+on `AppData` through a group's `emailDefaultReceiptStatus` or either `quickScanDefaultStatus`. That is
+the same closed-enum mechanism behind the two `Permission` login outages (see "Permission-based UI
+gating"); `ReceiptStatus` cannot take that feature's fix of becoming a plain wire string, because it
+is a genuine closed domain backing the status dropdowns.
+
+The openapi-generator never emits `fallback`, so **a regen silently drops it** — and unlike the two
+patches above nothing fails to compile, so the only thing that catches the regression is
+`test/models/receipt_status_ingest_test.dart`. Run `flutter test` after a regen, not just
+`flutter analyze`.
+
+Two consequences worth knowing. An unknown status deserializes to `empty`, which
+`receiptStatusLabel` / `receiptStatusColor` render as a blank neutral chip rather than crashing —
+degraded, not broken. And on the **write** path `empty` serializes back to `""`, which
+`UpsertReceiptCommand.Validate` rejects with a 400 "Status is required": an old build editing a
+receipt whose status it cannot represent gets a visible error instead of silently downgrading it.
+That is the intended failure — loud, and no data loss.
+
+The sibling closed enums (`ItemStatus`, `GroupStatus`, `SystemTaskStatus`, `Permission` as a
+catalog) are **still intolerant**. Adding a value to any of them is a breaking change for released
+builds until they get the same treatment.
+
 ### Receipt entry (Scan / Add)
 
 The bottom-nav slot that used to open an "Add" menu is a **direct action**. A **tap** scans; a
@@ -663,6 +689,52 @@ mounts it, so a raw `shellContext` is **null** and tapping Categories/Tags would
 `Navigator.of(null)`. (`receipt_form.dart` uses the same helper for its quick-actions sheet.) Guarded
 by `test/widgets/quick_scan_form_test.dart` (tap-opens-picker, shellContext null) and on-device by
 `quick_scan_submit_test.dart`.
+
+### Receipt status presentation
+
+`receiptStatusLabel` / `receiptStatusColor` (`lib/utils/receipts.dart`) are the **single owner** of
+receipt-status presentation; `ReceiptListItem.getStatusText` / `getStatusColor` are thin delegates,
+and `buildReceiptStatusDropDownMenuItems` (`lib/utils/forms.dart`) carries the same labels for the
+form dropdown — the two label lists must stay in sync.
+
+Every status is a **pale tint**, because `ListItemTrailingStatus` paints its label in the default
+dark `onBackground` and `ListItemColorBlock` sits beside dark text. The tints match the desktop chip
+(`desktop/CLAUDE.md` → "Receipt status colors"):
+
+| Status | Tint |
+|---|---|
+| `NEEDS_ATTENTION` | `warningAmber` `#FFE0B2` |
+| `DECLINED` | `errorRed` `#F2BFBF` — the red NEEDS_ATTENTION gave up |
+| `OPEN` | `#FFFACD` |
+| `RESOLVED` | `successGreen` |
+| `DRAFT` (and the fallback) | `neutralStatusGrey` |
+
+**`errorRed` / `successGreen` are shared with the activity list**
+(`group_activity_list_item.dart`), where red still means a failed system task — so DECLINED reusing
+`errorRed` keeps both meanings intact, and changing either constant moves both surfaces.
+
+**Neither function throws on an unrecognized status.** Both used to end in
+`throw Exception("Unknown status: …")`, which was already reachable via `ReceiptStatus.empty` (the
+search screen builds a `Receipt` from a `SearchResult` whose `receiptStatus` is nullable) and would
+take the whole receipt list down for any status the API adds after a build ships. The label falls
+back to `titleCaseStatusName` (SNAKE_CASE → Title Case, matching desktop's `formatStatus`) and the
+tint to the neutral grey.
+
+These two are the **presentation** half of the tolerance; they are only reachable because the
+**deserialization** half exists — `ReceiptStatus.empty` is annotated `fallback: true` so the
+generated `_$valueOf` returns it instead of throwing (see "Regenerating API Client Models" → the
+third hand-patch). Without that the payload fails at the serializer and neither function is ever
+called. Neither half rescues a binary released *before* both landed; together they mean a build from
+here on degrades to a blank neutral chip rather than losing the whole receipts list.
+
+`titleCaseStatusName` is split out because a `ReceiptStatus` the generated enum does not declare
+**cannot be constructed from a test** (the constructor is private to the openapi package), so the
+fallback rule is otherwise unpinnable. Tests:
+`test/utils/receipt_status_presentation_test.dart` (both maps, exhaustive over
+`ReceiptStatus.values`, plus the fallback rule); the mapping is deliberately **not** asserted through
+`ReceiptListItem`, whose trailing pill is a fixed 100px wide — "Needs Attention" reports a render
+overflow that has nothing to do with the mapping. **E2E:**
+`integration_test/receipt_status_lifecycle_test.dart` drives every status through the real API.
 
 ### Seeding the receipt group
 
