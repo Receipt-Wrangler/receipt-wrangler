@@ -154,6 +154,31 @@ it persists the comment field OFF, logs in, flips it ON server-side, and opens Q
 restarting the app. Every other quick-scan spec arranges its config *before* login, so none of them
 can tell a client that re-fetches from one that read the config once at login.
 
+### `TopAppBar`'s loading bar is always mounted — never null
+
+`TopAppBar` passes its `LinearProgressIndicator` as `AppBar.bottom`, and it must stay **non-null even
+when idle** (zero-height `PreferredSize`), however tempting the conditional looks. `AppBar` re-parents
+its whole toolbar into a `Column` *only* when `bottom != null`
+(`flutter/lib/src/material/app_bar.dart`), so a null ↔ non-null swap changes that slot's widget from a
+`ClipRect` to a `Column`, fails `Widget.canUpdate`, and **unmounts `leading`, `title` and every
+`actions` child**. Anything in `actions` that captured its own `BuildContext` and uses it after an
+`await` then fails its `mounted` guard and silently gives up.
+
+That shipped: the receipts-screen overflow menu's **Quick Scan** and **Upload from Gallery** items did
+nothing, because `_refreshBeforeQuickScan` — the very thing they await — is what raises this bar. Only
+"Add Manual Receipt" worked, being synchronous, and the bottom-nav long-press was immune because its
+context comes from the nav rather than the app bar. The avatar menu in the same bar survives because it
+navigates from `this.context` (the `_TopAppBar` **State** context, *above* the `AppBar`) — keep it that
+way.
+
+The idle **child** is still swapped to `SizedBox.shrink()`: a permanently mounted
+`LinearProgressIndicator` animates forever and `pumpAndSettle` would never return (its default timeout
+is **ten minutes**, so that regression hangs CI rather than failing it). Height goes to zero instead of
+the widget going away. Don't "fix" the 4px toolbar squeeze while the bar shows by making
+`TopAppBar.preferredSize` dynamic — `Scaffold` pins 56 either way, and a dynamic size would relayout
+every screen's body on every network call. Pinned by
+`test/widgets/top_app_bar_loading_indicator_test.dart`.
+
 ### Permission-based UI gating
 
 The mobile app gates UI on the caller's **effective permissions**, mirroring the desktop client
@@ -476,7 +501,12 @@ backend enforces the two permissions **separately** (`handlers.QuickScan` → `g
 - **The overflow menu is the receipts screen's only.** `GroupAppBar` is shared with the dashboards
   route, so it gates on `GoRouterState.of(context).fullPath`. It is the accessible equivalent of the
   long-press, and carries the same items from `buildReceiptEntryMenuItems`. It is **not** on
-  `GroupSelectAppBar`.
+  `GroupSelectAppBar`. Its items run from the `PopupMenuButton`'s **own in-app-bar context**, and
+  `_refreshBeforeQuickScan` raises the loading bar in that same app bar — which is why that bar must
+  never toggle `AppBar.bottom` between null and non-null (see "`TopAppBar`'s loading bar is always
+  mounted"). It is also why `quick_scan_entry_test.dart` **taps** the overflow's Quick Scan rather than
+  only asserting its label: a widget test cannot reproduce this, since `TokenRefreshService` is
+  uninitialized there and `reloadAppData()` returns within a microtask, so the bar never gets a frame.
 - **Gallery upload is gated on quick-scan, not create** — that flow feeds the Quick Scan sheet, so
   offering it to a create-only user would produce a sheet they cannot submit.
 - **A submitted sheet confirms itself** (`quick-scan-queued-confirmation`). Submitting disables every
@@ -1299,7 +1329,7 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 #### Reference files
 
 - `integration_test/smoke_login_test.dart` — canonical smoke test.
-- `integration_test/quick_scan_entry_test.dart` — the scan slot's tap (captures → seeded sheet) and hold (menu contents), against real roles.
+- `integration_test/quick_scan_entry_test.dart` — the scan slot's tap (captures → seeded sheet) and hold (menu contents), against real roles, plus the receipts-screen overflow: one case asserting its labels and one **tapping** its Quick Scan through to the sheet (the app-bar teardown regression — see "`TopAppBar`'s loading bar is always mounted").
 - `integration_test/quick_scan_app_data_refresh_test.dart` — a group's comment field switched on **after** login reaches the running app when Quick Scan is next started. The only spec that proves the pre-scan AppData reload; every other quick-scan spec arranges its config before login, so none can distinguish a client that re-fetches from one that read the config once at login. Persists via the API and never touches `GroupModel`.
 - `integration_test/quick_scan_entry_gated_test.dart` — the tap falling through to the manual form, with the right banner for each of the two blocked reasons. Exercises **both** feature-flag fixtures: the permission case enables the flag (to isolate the permission from it), the ai-disabled case **pins it off** with `disableAiPoweredReceiptsForTest()` rather than assuming — which also removes its dependency on the preceding test's teardown having succeeded, since they share the one global.
 - `integration_test/receipt_entry_hidden_test.dart` — a Legacy Viewer gets no scan slot and no overflow at all. Flag-independent: the slot is hidden when the caller holds *neither* entry permission, whatever `aiPoweredReceipts` says.
