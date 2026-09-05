@@ -140,7 +140,16 @@ void main() {
     final overflow = find.byKey(const ValueKey('receipt-entry-overflow-menu'));
     await pumpUntilFound(tester, overflow.hitTestable());
     await tester.tap(overflow.hitTestable());
+
+    // The menu's items mount on the popup's first frame while it is still
+    // growing, so a tap computed then lands short and misses. Wait for
+    // hittability, then drain the animation -- the same shape as
+    // `openManualReceiptForm`.
     await pumpUntilFound(tester, find.text(quickScanLabel).hitTestable());
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
     // Nothing else on the receipts screen carries this string, so the match is
     // the menu item. (Once the sheet opens it becomes the sheet's own title.)
     expect(find.text(quickScanLabel), findsOneWidget);
