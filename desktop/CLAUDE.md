@@ -62,6 +62,27 @@ await page.getByRole('button', { name: 'Login' }).click();
 await page.waitForURL(/\/dashboard\/group\/\d+/);
 ```
 
+**Running the whole `npm run e2e` suite in the sandbox — bridge the build numbers with symlinks.**
+The `executablePath` trick above only helps ad-hoc scripts; `playwright.config.ts` has no
+`launchOptions` hook, so the suite resolves the 1217 paths and fails. Point them at the 1194 build
+instead (outside the repo, so nothing is committed):
+```bash
+# full chromium: 1194's layout already matches what 1217 expects
+ln -sfn /opt/pw-browsers/chromium-1194 /opt/pw-browsers/chromium-1217
+
+# headless shell: the directory AND the binary are named differently, so build the shape by hand
+mkdir -p /opt/pw-browsers/chromium_headless_shell-1217
+ln -sfn /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux \
+        /opt/pw-browsers/chromium_headless_shell-1217/chrome-headless-shell-linux64
+ln -sfn headless_shell \
+        /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/chrome-headless-shell
+touch /opt/pw-browsers/chromium_headless_shell-1217/{INSTALLATION_COMPLETE,DEPENDENCIES_VALIDATED}
+```
+`devices['Desktop Chrome']` runs headless, so it is the **headless shell** path that actually fails
+first — symlinking only `chromium-1217` is not enough. Then export the four `E2E_*` credential vars
+and run `npx playwright test`; leaving `E2E_BASE_URL` at `http://localhost:4200` keeps the config's
+`webServer` block active, which reuses an `ng serve` you already have running.
+
 ## Code Architecture
 
 ### Application Structure
@@ -924,8 +945,9 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
 ### Running locally
 
 1. **One-time:** install browsers — `npm run e2e:install`. (In the Claude Code web sandbox the browser
-   is pre-installed and `e2e:install` is blocked — use the `executablePath: '/opt/pw-browsers/chromium'`
-   workaround from "Running in the Claude Code Web/Cloud Sandbox" above instead.)
+   is pre-installed and `e2e:install` is blocked — apply the `chromium-1217` /
+   `chromium_headless_shell-1217` symlinks from "Running in the Claude Code Web/Cloud Sandbox" above
+   instead.)
 2. **One-time:** sign up the two e2e accounts against your local DB. The **first** signup is auto-promoted to admin, so order matters. With the API running, go to `http://localhost:4200/auth/sign-up` and create:
    - Admin first: username `e2e-admin`, password `e2e-admin-password`
    - Then user: username `e2e-user`, password `e2e-user-password`
