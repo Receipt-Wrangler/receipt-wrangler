@@ -36,6 +36,12 @@ Each component has its own CLAUDE.md with detailed component-specific guidance. 
 
 ## Docker Deployment
 
+**All Docker build config lives in `docker/` — nothing else.** Those two Dockerfiles are what CI
+builds images from (`.github/workflows/ci.yml` and `release.yml` both pass `file: ./docker/Dockerfile`
+with `context: .`). Per-component `api/Dockerfile` and `desktop/Dockerfile` used to exist and were
+removed as dead config; do not add them back. Because the build context is the repo root, a
+`.dockerignore` is only ever consulted at the repo root too.
+
 ### Production Build (Monolith)
 The `docker/Dockerfile` builds a single container with both API and web interface:
 - Stage 1: Build Angular desktop app
