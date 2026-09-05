@@ -114,9 +114,19 @@ class _TopAppBar extends State<TopAppBar> {
             api.Permission.appPeriodReportsPeriodReadAll,
           ]);
 
+          // These items are TextButtons rather than the plain Text every other
+          // menu in the app uses, and a TextButton takes its foreground from
+          // `colorScheme.primary` -- so they rendered in the brand blue while
+          // every other menu rendered in ordinary text colour. Pin them to the
+          // colour a bare PopupMenuItem would have used.
+          final itemStyle = TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+          );
+
           return [
             PopupMenuItem(
               child: TextButton(
+                style: itemStyle,
                 onPressed: () {
                   Navigator.pop(context);
                   this.context.push('/profile');
@@ -127,6 +137,7 @@ class _TopAppBar extends State<TopAppBar> {
             if (canViewReports)
               PopupMenuItem(
                 child: TextButton(
+                  style: itemStyle,
                   onPressed: () {
                     Navigator.pop(context);
                     this.context.push('/reports');
@@ -136,6 +147,7 @@ class _TopAppBar extends State<TopAppBar> {
               ),
             PopupMenuItem(
               child: TextButton(
+                style: itemStyle,
                 onPressed: () => _logout(),
                 child: const Text('Logout'),
               ),
