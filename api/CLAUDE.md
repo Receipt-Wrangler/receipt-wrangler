@@ -71,14 +71,20 @@ pulls in `MagickCore/image-private.h`, which pulls in `MagickCore/quantum-privat
 `make install` installs only the public set. Every cgo compile of `gopkg.in/gographics/imagick.v3`
 then dies with `fatal error: MagickCore/image-private.h: No such file or directory`. Backfill the
 whole set from the source tree:
+
 ```bash
+IM_SRC=$PWD                 # Step 4 left us in the ImageMagick source tree
 INC=/usr/local/include/ImageMagick-7
 for d in MagickCore MagickWand; do
   for f in "$IM_SRC/$d"/*.h; do
     b=$(basename "$f"); [ -f "$INC/$d/$b" ] || cp "$f" "$INC/$d/$b"
   done
 done
+
+cd /home/user/receipt-wrangler/api
+go build ./...
 ```
+
 Do **not** pipe that loop into `head` — the SIGPIPE kills it partway and you get a second, different
 missing-header error. Verify with `go build ./...` (not `go build ... | tail`, whose exit status is
 `tail`'s and so hides the failure).
@@ -152,7 +158,7 @@ pre-installed binary works.
 - `./generate-client.sh mobile <output-dir>` - Generate Dart Dio client
 
 ### Go Toolchain
-- Requires **Go 1.26+** — `api/go.mod` declares `go 1.26.8`, which `golang.org/x/crypto v0.56.0`
+- Requires **Go 1.26.8+** — `api/go.mod` declares `go 1.26.8`, which `golang.org/x/crypto v0.56.0`
   forces (it declares `go 1.26.0`). The MCP `github.com/modelcontextprotocol/go-sdk` sets a lower,
   1.25 minimum.
   Docker images and CI containers use `golang:1.26-trixie`, which currently resolves to the same

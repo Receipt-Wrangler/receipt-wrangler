@@ -64,22 +64,31 @@ await page.waitForURL(/\/dashboard\/group\/\d+/);
 
 **Running the whole `npm run e2e` suite in the sandbox — bridge the build numbers with symlinks.**
 The `executablePath` trick above only helps ad-hoc scripts; `playwright.config.ts` has no
-`launchOptions` hook, so the suite resolves the 1217 paths and fails. Point them at the 1194 build
-instead (outside the repo, so nothing is committed):
+`launchOptions` hook, so the suite resolves the 1217 paths and fails. Bridge them to the installed
+build with symlinks (outside the repo, so nothing is committed). Alongside the `chromium` convenience
+symlink, the image ships two **versioned directories** — `chromium-1194/` and
+`chromium_headless_shell-1194/` — and those are what you point at; confirm the number first, since it
+moves with the sandbox image:
+
 ```bash
-# full chromium: 1194's layout already matches what 1217 expects
-ln -sfn /opt/pw-browsers/chromium-1194 /opt/pw-browsers/chromium-1217
+ls -d /opt/pw-browsers/chromium*   # chromium, chromium-1194, chromium_headless_shell-1194
+SRC=1194                           # installed build, from the listing above
+WANT=1217                          # build @playwright/test 1.59.1 resolves
+
+# full chromium: the installed layout already matches what $WANT expects
+ln -sfn /opt/pw-browsers/chromium-$SRC /opt/pw-browsers/chromium-$WANT
 
 # headless shell: the directory AND the binary are named differently, so build the shape by hand
-mkdir -p /opt/pw-browsers/chromium_headless_shell-1217
-ln -sfn /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux \
-        /opt/pw-browsers/chromium_headless_shell-1217/chrome-headless-shell-linux64
+mkdir -p /opt/pw-browsers/chromium_headless_shell-$WANT
+ln -sfn /opt/pw-browsers/chromium_headless_shell-$SRC/chrome-linux \
+        /opt/pw-browsers/chromium_headless_shell-$WANT/chrome-headless-shell-linux64
 ln -sfn headless_shell \
-        /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/chrome-headless-shell
-touch /opt/pw-browsers/chromium_headless_shell-1217/{INSTALLATION_COMPLETE,DEPENDENCIES_VALIDATED}
+        /opt/pw-browsers/chromium_headless_shell-$SRC/chrome-linux/chrome-headless-shell
+touch /opt/pw-browsers/chromium_headless_shell-$WANT/{INSTALLATION_COMPLETE,DEPENDENCIES_VALIDATED}
 ```
+
 `devices['Desktop Chrome']` runs headless, so it is the **headless shell** path that actually fails
-first — symlinking only `chromium-1217` is not enough. Then export the four `E2E_*` credential vars
+first — symlinking only `chromium-$WANT` is not enough. Then export the four `E2E_*` credential vars
 and run `npx playwright test`; leaving `E2E_BASE_URL` at `http://localhost:4200` keeps the config's
 `webServer` block active, which reuses an `ng serve` you already have running.
 
