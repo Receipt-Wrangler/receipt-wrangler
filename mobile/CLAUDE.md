@@ -300,6 +300,17 @@ permission model exactly.
   `PrivacyInfo.xcprivacy` (auto-processed under Flutter's dynamic framework linking). The app still has
   no app-level `PrivacyInfo.xcprivacy` — a pre-existing gap (`shared_preferences`/UserDefaults already
   qualifies), out of scope here.
+- **Serialization contract (paged receipts + custom fields):** the receipts list
+  (`getReceiptsForGroup` = `POST /receipt/group/{groupId}`, used by `group_receipts_list.dart` and
+  `dashboard_widgets/filtered_receipts.dart`, both casting `anyOf.values[0] as api.Receipt`) now
+  carries `customFields` populated. The API preloads each value **together with its `CustomField` and
+  that field's options** precisely because of the rule below: `models.CustomFieldValue.CustomField` is
+  a non-pointer Go struct with no `omitempty`, so loading the values alone would emit
+  `"customField":{"type":""}`, the generated `CustomFieldType` enum would throw on the empty string,
+  and the `AnyOfSerializer` would swallow it — blanking **every row** of the receipts list on
+  already-released builds. The Go side has a guard test asserting the response never contains
+  `"type":""`; keep the preload set intact in any future change to that handler. See
+  `api/CLAUDE.md` → "Custom fields on the receipts list".
 - **Serialization contract (`aggFunc` omitempty):** the mobile list unwraps each `PagedDataDataInner`
   by **type** (`item.anyOf.values.values.whereType<ReportTemplate>()`, `report_list.dart`), so a
   `ReportTemplate` that fails to deserialize silently collapses to a blank row (the `one_of`

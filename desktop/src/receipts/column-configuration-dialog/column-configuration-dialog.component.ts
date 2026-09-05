@@ -2,6 +2,8 @@ import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { DEFAULT_RECEIPT_TABLE_COLUMNS, ReceiptTableColumnConfig } from '../../interfaces';
+import { CustomField } from '../../open-api';
+import { columnDisplayName, mergeCustomFieldColumns } from '../../utils';
 
 interface ColumnConfigItem extends ReceiptTableColumnConfig {
   displayName: string;
@@ -16,36 +18,41 @@ interface ColumnConfigItem extends ReceiptTableColumnConfig {
 export class ColumnConfigurationDialogComponent implements OnInit {
   public columns: ColumnConfigItem[] = [];
 
-  private readonly columnDisplayNames: { [key: string]: string } = {
-    'created_at': 'Added At',
-    'date': 'Receipt Date',
-    'name': 'Name',
-    'paid_by_user_id': 'Paid By',
-    'amount': 'Amount',
-    'categories': 'Categories',
-    'tags': 'Tags',
-    'status': 'Status',
-    'resolved_date': 'Resolved Date'
-  };
-
   constructor(
     private dialogRef: MatDialogRef<ColumnConfigurationDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: { currentColumns?: ReceiptTableColumnConfig[] }
+    @Inject(MAT_DIALOG_DATA) public data: {
+      currentColumns?: ReceiptTableColumnConfig[];
+      customFields?: CustomField[];
+    }
   ) {}
 
   ngOnInit(): void {
     this.initializeColumns();
   }
 
+  private get customFields(): CustomField[] {
+    return this.data.customFields ?? [];
+  }
+
   private initializeColumns(): void {
-    const currentColumns = this.data.currentColumns || DEFAULT_RECEIPT_TABLE_COLUMNS;
-    
-    this.columns = [...currentColumns]
-      .sort((a, b) => a.order - b.order)
-      .map(col => ({
+    this.setColumns(this.data.currentColumns ?? DEFAULT_RECEIPT_TABLE_COLUMNS);
+  }
+
+  /**
+   * Reconciles against the custom field catalog before display, so a field
+   * deleted since the configuration was persisted disappears from the list and a
+   * newly created one shows up (unchecked) without the user resetting anything.
+   *
+   * `mergeCustomFieldColumns` copies, which matters: the caller hands us the NGXS
+   * snapshot, and that is deep-frozen in dev mode.
+   */
+  private setColumns(columns: ReceiptTableColumnConfig[]): void {
+    this.columns = mergeCustomFieldColumns(columns, this.customFields).map(
+      (col) => ({
         ...col,
-        displayName: this.columnDisplayNames[col.matColumnDef] || col.matColumnDef
-      }));
+        displayName: columnDisplayName(col.matColumnDef, this.customFields),
+      })
+    );
   }
 
   public toggleColumnVisibility(column: ColumnConfigItem): void {
@@ -54,17 +61,19 @@ export class ColumnConfigurationDialogComponent implements OnInit {
 
   public drop(event: CdkDragDrop<ColumnConfigItem[]>): void {
     moveItemInArray(this.columns, event.previousIndex, event.currentIndex);
-    
+
     this.columns.forEach((column, index) => {
       column.order = index;
     });
   }
 
+  /**
+   * Restores the built-in defaults. Custom fields stay listed — they are only
+   * ever hidden by default, so dropping them here would just make them
+   * reappear on the next open.
+   */
   public resetToDefaults(): void {
-    this.columns = DEFAULT_RECEIPT_TABLE_COLUMNS.map(col => ({
-      ...col,
-      displayName: this.columnDisplayNames[col.matColumnDef] || col.matColumnDef
-    }));
+    this.setColumns(DEFAULT_RECEIPT_TABLE_COLUMNS);
   }
 
   public saveConfiguration(): void {

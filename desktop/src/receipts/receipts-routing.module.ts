@@ -15,6 +15,11 @@ const routes: Routes = [
     path: "group/:groupId",
     component: ReceiptsTableComponent,
     canActivate: [GroupGuard],
+    resolve: {
+      // Powers the per-custom-field columns. Resolves to [] without
+      // app.custom-fields.read, which is what gates the feature.
+      customFields: customFieldResolverFn,
+    },
     data: {
       groupGuardBasePath: `/receipts/group`,
     },

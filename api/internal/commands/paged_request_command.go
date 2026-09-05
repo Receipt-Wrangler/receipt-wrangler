@@ -21,6 +21,13 @@ func GetValidSortDirections() []any {
 	return []any{ASCENDING, DESCENDING, DEFAULT}
 }
 
+// IsValidSortDirection reports whether sortDirection is one a query may be
+// ordered by. Callers that build an ORDER BY clause must check this before
+// putting the direction into SQL - it is concatenated, not bound.
+func IsValidSortDirection(sortDirection SortDirection) bool {
+	return utils.Contains(GetValidSortDirections(), sortDirection)
+}
+
 func (sortDirection *SortDirection) Scan(value string) error {
 	*sortDirection = SortDirection(value)
 	return nil

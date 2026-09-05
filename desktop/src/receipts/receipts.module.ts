@@ -33,6 +33,7 @@ import { FilteredStatefulMenuComponent } from "../standalone/components/filtered
 import { TagAutocompleteComponent } from "../tag-autocomplete/tag-autocomplete.component";
 import { BulkStatusUpdateComponent } from "./bulk-resolve-dialog/bulk-status-update-dialog.component";
 import { ColumnConfigurationDialogComponent } from "./column-configuration-dialog/column-configuration-dialog.component";
+import { CustomFieldCellComponent } from "./custom-field-cell/custom-field-cell.component";
 import { CustomFieldComponent } from "./custom-field/custom-field.component";
 import { ItemAddFormComponent } from "./item-add-form/item-add-form.component";
 import { ItemListComponent } from "./item-list/item-list.component";
@@ -52,6 +53,7 @@ import { UserTotalWithPercentagePipe } from "./user-total-with-percentage.pipe";
   declarations: [
     BulkStatusUpdateComponent,
     ColumnConfigurationDialogComponent,
+    CustomFieldCellComponent,
     ItemAddFormComponent,
     ItemListComponent,
     ShareListComponent,

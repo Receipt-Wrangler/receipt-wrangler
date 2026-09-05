@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/reporting/receiptsource"
 	"receipt-wrangler/api/internal/utils"
 	"time"
 
@@ -575,10 +576,19 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 
 	// Set order by
 	if len(pagedRequest.OrderBy) == 0 {
-		pagedRequest.OrderBy = "created_at"
+		pagedRequest.OrderBy = constants.DEFAULT_RECEIPT_ORDER_BY
 	}
 
-	if repository.isTrustedValue(pagedRequest) {
+	if !commands.IsValidSortDirection(pagedRequest.SortDirection) {
+		return nil, 0, errors.New("untrusted value " + pagedRequest.OrderBy + " " + string(pagedRequest.SortDirection))
+	}
+
+	if customFieldId, isCustomField := receiptsource.ParseCustomFieldKey(pagedRequest.OrderBy); isCustomField {
+		query, err = repository.orderByCustomField(query, customFieldId, pagedRequest.SortDirection)
+		if err != nil {
+			return nil, 0, err
+		}
+	} else if repository.isTrustedValue(pagedRequest) {
 		orderBy := pagedRequest.OrderBy
 		query = query.Order(orderBy + " " + string(pagedRequest.SortDirection))
 	} else {
@@ -854,6 +864,101 @@ func (repository ReceiptRepository) buildFilterQuery(runningQuery *gorm.DB, valu
 	}
 
 	return runningQuery
+}
+
+// customFieldSortExpressions returns, for a custom field's type, the expression a
+// value row is sorted by and the column that must be non-null for the row to
+// count. They differ only for CURRENCY.
+//
+// CurrencyValue is a *decimal.Decimal with no gorm type tag, and gorm types an
+// untagged driver.Valuer by what Value() returns - a string for decimal - so
+// currency_value is a text column and a bare sort on it is lexicographic
+// ("100" < "20"). CAST(x AS DECIMAL(20,6)) fixes that and is portable: MySQL and
+// Postgres take DECIMAL(p,s) directly, and SQLite gives that type name NUMERIC
+// affinity. Retyping the column would remove the cast, but that is a migration
+// over existing data and belongs in its own change (see api/CLAUDE.md).
+func customFieldSortExpressions(customFieldType models.CustomFieldType) (sortExpression string, notNullColumn string, ok bool) {
+	// Every column is table-qualified: a SELECT joins custom_field_options, which
+	// carries a custom_field_id of its own.
+	switch customFieldType {
+	case models.TEXT:
+		return "custom_field_values.string_value", "custom_field_values.string_value", true
+	case models.DATE:
+		return "custom_field_values.date_value", "custom_field_values.date_value", true
+	case models.BOOLEAN:
+		return "custom_field_values.boolean_value", "custom_field_values.boolean_value", true
+	case models.CURRENCY:
+		return "CAST(custom_field_values.currency_value AS DECIMAL(20,6))", "custom_field_values.currency_value", true
+	case models.SELECT:
+		// A select stores an option id; readers see the option's text.
+		return "custom_field_options.value", "custom_field_values.select_value", true
+	}
+
+	return "", "", false
+}
+
+// orderByCustomField orders query by a receipt's value for one custom field.
+//
+// The value is read with a correlated subquery rather than a join: nothing stops
+// a receipt holding several values for one field (custom_field_values carries no
+// unique index on receipt_id + custom_field_id), and a join would multiply the
+// receipt rows, corrupting both the total count and pagination.
+//
+// Which of several values wins matches the reporting engine
+// (receiptsource.addCustomFields): the lowest id among the values that actually
+// resolve, so an empty low-id row cannot hide a real one. That is what the
+// IS NOT NULL clause is for, and why a SELECT joins its options rather than
+// left-joining them - an option id that no longer resolves is skipped, not
+// preferred.
+//
+// A field that no longer exists sorts by the default column instead of erroring:
+// clients persist their sort, and a deleted custom field must not make every
+// subsequent list load fail.
+func (repository ReceiptRepository) orderByCustomField(
+	query *gorm.DB,
+	customFieldId uint,
+	sortDirection commands.SortDirection,
+) (*gorm.DB, error) {
+	customFieldRepository := NewCustomFieldRepository(nil)
+	customFields, err := customFieldRepository.GetCustomFieldsByIds([]uint{customFieldId})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(customFields) == 0 {
+		return query.Order(constants.DEFAULT_RECEIPT_ORDER_BY + " " + string(sortDirection)), nil
+	}
+
+	sortExpression, notNullColumn, ok := customFieldSortExpressions(customFields[0].Type)
+	if !ok {
+		return query.Order(constants.DEFAULT_RECEIPT_ORDER_BY + " " + string(sortDirection)), nil
+	}
+
+	valueQuery := repository.GetDB().
+		Model(&models.CustomFieldValue{}).
+		Select(sortExpression).
+		Where("custom_field_values.receipt_id = receipts.id").
+		Where("custom_field_values.custom_field_id = ?", customFieldId).
+		Where(notNullColumn + " IS NOT NULL").
+		Order("custom_field_values.id").
+		Limit(1)
+
+	if customFields[0].Type == models.SELECT {
+		valueQuery = valueQuery.Joins(
+			"JOIN custom_field_options ON custom_field_options.id = custom_field_values.select_value",
+		)
+	}
+
+	// The direction and the tiebreaker have to live in this one expression.
+	// clause.OrderBy builds its Expression *instead of* its Columns and Desc, and
+	// a second Order() call would silently replace this clause rather than append
+	// to it. The tiebreaker is not cosmetic: a boolean or select field has a
+	// handful of distinct values, and without a unique last term LIMIT/OFFSET
+	// paging repeats and skips rows between pages.
+	return query.Order(clause.OrderBy{Expression: clause.Expr{
+		SQL:  "(?) " + string(sortDirection) + ", receipts.id DESC",
+		Vars: []any{valueQuery},
+	}}), nil
 }
 
 func (repository ReceiptRepository) isTrustedValue(pagedRequest commands.ReceiptPagedRequestCommand) bool {

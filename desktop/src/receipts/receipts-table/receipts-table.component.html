@@ -152,6 +152,13 @@
   {{ element.resolvedDate | date : "medium" }}
 </ng-template>
 
+<ng-template #customFieldCell let-element="element" let-column="column">
+  <app-custom-field-cell
+    [receipt]="element"
+    [customField]="column.customField"
+  ></app-custom-field-cell>
+</ng-template>
+
 <ng-template #actionsCell let-element="element" let-index="index">
   <div class="d-flex w-100">
     <app-edit-button

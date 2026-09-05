@@ -1,4 +1,5 @@
 import { Injectable } from "@angular/core";
+import { SortDirection } from "@angular/material/sort";
 import { Action, Selector, State, StateContext } from "@ngxs/store";
 import { ReceiptTableInterface } from "../interfaces";
 import { DEFAULT_RECEIPT_TABLE_COLUMNS, ReceiptTableColumnConfig } from "../interfaces/receipt-table-column-config.interface";
@@ -48,14 +49,21 @@ export const defaultReceiptFilter = {
   },
 } as ReceiptPagedRequestFilter;
 
+/**
+ * The ordering the table falls back to: the state default, and what a sort on a
+ * column that no longer exists is reset to.
+ */
+export const DEFAULT_RECEIPT_ORDER_BY = "created_at";
+export const DEFAULT_RECEIPT_SORT_DIRECTION: SortDirection = "desc";
+
 // TODO: look into fixing date equals
 @State<ReceiptTableInterface>({
   name: "receiptTable",
   defaults: {
     page: 1,
     pageSize: 50,
-    orderBy: "created_at",
-    sortDirection: "desc",
+    orderBy: DEFAULT_RECEIPT_ORDER_BY,
+    sortDirection: DEFAULT_RECEIPT_SORT_DIRECTION,
     filter: defaultReceiptFilter,
     columnConfig: DEFAULT_RECEIPT_TABLE_COLUMNS,
   },

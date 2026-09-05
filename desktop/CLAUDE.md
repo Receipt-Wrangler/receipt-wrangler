@@ -482,6 +482,58 @@ non-editable and saved options expose no delete while an appended one does, the 
 control and its direct `PUT /api/customField/:id` 403s, and a type change 400s even for the holder).
 `e2e/legacy-user-visibility.spec.ts` pins that Legacy User sees neither edit nor delete.
 
+### Custom fields as receipts-table columns
+
+The **Configure Columns** dialog (`src/receipts/column-configuration-dialog/`) lists every custom
+field after the nine built-in columns, and each one can be turned into a sortable table column.
+
+- **`custom_<id>` is the column's `matColumnDef` *and* the `orderBy` sent to the API** — the same key
+  the reporting engine uses (`receiptsource.CustomFieldKey`). `src/utils/receipt-table-columns.ts`
+  owns that convention (`customFieldColumnDef` / `parseCustomFieldColumnDef`) plus
+  `RECEIPT_COLUMN_DISPLAY_NAMES`, which the dialog label and the table header now **share** instead of
+  each hard-coding its own literal.
+- **Hidden by default.** A newly created custom field is appended to the list unchecked, so it never
+  silently widens everyone's table.
+- **`mergeCustomFieldColumns` reconciles the persisted configuration with the live catalog**, and both
+  the dialog and the table run it. The configuration lives in **localStorage** (`receiptTable` is in
+  `ngxsStorageKeys`) and is shared by every account on the browser, so it outlives the catalog it was
+  written against: a column for a deleted custom field is dropped, a new field is appended hidden, and
+  the persisted order — including a custom field dragged above a built-in — is otherwise preserved.
+  `resetToDefaults()` restores the built-in defaults but keeps the custom fields listed, since they
+  would only reappear on the next open anyway.
+- **`reconcileColumnConfig()` runs in `ngOnInit`, before the first fetch**, and also resets a
+  persisted `orderBy` that no longer resolves. That ordering is load-bearing: the sort is persisted
+  too, so without it the *first* request asks the API to order by a column that no longer exists.
+  (The backend falls back rather than erroring, but the table would then disagree with its own
+  headers.)
+- **`displayColumns` is derived from the columns that actually resolved**, not from the stored
+  configuration. `mat-table` throws on a displayed id it has no definition for, and with custom fields
+  a stale id is ordinary rather than hypothetical.
+- **The permission gate is the resolver.** `customFieldResolverFn` is wired onto the
+  `receipts/group/:groupId` route and already returns `[]` without `app.custom-fields.read`, so such a
+  user simply has no custom field columns. No new permission code.
+- **The shared `app-table` hands the whole column to a cell template**
+  (`{ element, index, column }`), which is what lets one `#customFieldCell` template serve every
+  custom field: `receipts-table` carries the `CustomField` on the column object and the template reads
+  it back.
+- **`app-custom-field-cell`** (`src/receipts/custom-field-cell/`) is the read-only counterpart of
+  `app-custom-field` — the same `ngSwitch` on `CustomFieldType`, without a FormGroup (the table renders
+  plain API records). **CURRENCY goes through `customCurrency`**, exactly as the built-in Amount column
+  does; SELECT renders the option's text, BOOLEAN renders Yes/No.
+  - Where a receipt carries several values for one field, the **lowest id that is actually set** wins —
+    the same rule the API sorts by and the reporting engine reads by, so the cell can never disagree
+    with the sort order or a report.
+  - **Do not name a `@let` after the signal it reads.** `@let value = value()` shadows the component
+    member inside its own initializer and fails with "undefined is not a function".
+- The receipts list response now always carries custom field values **with their definitions**; see
+  `api/CLAUDE.md` → "Custom fields on the receipts list" for why the definitions are not optional.
+- **E2E:** `e2e/custom-field-columns.spec.ts` (serial, admin storageState, own seeded group) — the
+  fields listed after Resolved Date and unchecked, a CURRENCY cell formatted by the configured currency
+  display, numeric sorting on it (amounts chosen so a text sort is visibly wrong), a SELECT sorting by
+  option text rather than option id, and the column healing away when its field is deleted. Money is
+  asserted with a **separator-tolerant** regex because the currency configuration is a global System
+  Setting on the shared CI backend that this spec must not mutate.
+
 ### Seeding the receipt group
 
 The Group field is a default, not a lock: when there is only one group to pick, both the receipt form

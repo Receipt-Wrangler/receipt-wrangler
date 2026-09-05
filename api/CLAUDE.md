@@ -1468,6 +1468,79 @@ this screen. `UpdateGroupReceiptSettingsCommand.Validate` therefore checks nothi
   `handlers/group_default_custom_fields_test.go` (400 unknown id writes nothing, 403 without the
   permission, a save omitting both keys leaves the stored config untouched, `[]` on the wire).
 
+## Custom fields on the receipts list (columns & sorting)
+
+The desktop receipts table can show a column per custom field and sort on it. Two things on this side
+make that work; both have a sharp edge.
+
+### The list response always carries custom field values *with their definitions*
+
+`GetPagedReceiptsForGroup` (`handlers/receipts.go`) preloads
+`constants.CUSTOM_FIELD_ASSOCIATIONS` — the value, its `CustomField`, and that field's `Options` —
+unconditionally, not only under `fullReceipts`. `FULL_RECEIPT_ASSOCIATIONS` is composed from the same
+constant so the two lists cannot drift.
+
+**Loading the values without their definitions breaks the mobile app.**
+`models.CustomFieldValue.CustomField` is a non-pointer struct with no `omitempty`, so it serializes
+even when unloaded — as `{"id":0,"name":"","type":""}`. Mobile calls this exact endpoint
+(`getReceiptsForGroup`) and deserializes each row into a typed `Receipt`; its generated
+`CustomFieldType` is a closed enum with no empty member, and the `one_of` `AnyOfSerializer` swallows
+the failure rather than reporting it, so every row of the receipts list silently collapses. Same
+failure mode as the `aggFunc` omitempty fix — see `mobile/CLAUDE.md` → "Serialization contract".
+`TestPagedReceiptCustomFieldsAlwaysCarryTheirDefinition` asserts the response never contains
+`"type":""`.
+
+This is not a new disclosure: the single-receipt endpoints already returned these values to any
+holder of `group.receipts.read`, and `MaskReceiptsForMemberVisibility` already masks their created-by.
+
+### Sorting by `custom_<id>`
+
+`orderBy` accepts the reporting engine's own key shape, parsed by
+`receiptsource.ParseCustomFieldKey` (digits only — `custom_1_month` and `custom_abc` are rejected, and
+a malformed value still errors out, which is the guard keeping `orderBy` out of the SQL it is
+concatenated into). One key vocabulary for reports and the table.
+
+- **A correlated subquery, never a join.** `custom_field_values` has no unique index on
+  `(receipt_id, custom_field_id)`, so a join multiplies receipt rows and corrupts both the total count
+  and pagination. `orderByCustomField` builds the subquery as an ordinary `*gorm.DB` and passes it as
+  a bind var — gorm expands a `*gorm.DB` var into its own built SQL (`gorm/statement.go`), so this
+  stays in the query builder.
+- **Which duplicate wins matches reporting**: lowest id among the values that actually resolve. Hence
+  the `IS NOT NULL` clause, and hence a SELECT **inner**-joins `custom_field_options` — an
+  unresolvable option id is skipped, not preferred. Drop either and the table sorts a receipt as "no
+  value" while a report shows one for it.
+- **`currency_value` is a TEXT column, so CURRENCY sorts through a cast.**
+  `CustomFieldValue.CurrencyValue` is a `*decimal.Decimal` with **no `gorm:"type:"` tag**, unlike
+  `Receipt.Amount` (`gorm:"type:decimal(10,2)"`). gorm types an untagged `driver.Valuer` by what
+  `Value()` returns, and `decimal.Decimal.Value()` returns a string — so a bare sort is lexicographic
+  (`"100" < "20"`). `CAST(... AS DECIMAL(20,6))` is ANSI and needs no dialect branching: MySQL and
+  Postgres take `DECIMAL(p,s)` directly, SQLite gives that type name NUMERIC affinity. **Retyping the
+  column is the better fix** and would remove the cast entirely (gorm's Postgres migrator does emit
+  the required `USING ?::?`), but it is a migration over existing data and belongs in its own change.
+  The same trap applies to any future untagged decimal field.
+- **The direction and the `receipts.id` tiebreaker live inside the one `clause.Expr`.**
+  `clause.OrderBy` builds its `Expression` *instead of* its `Columns` and `Desc`, and a second
+  `Order()` call replaces the clause rather than appending to it — silently. The tiebreaker is not
+  cosmetic: a BOOLEAN or SELECT field has a handful of distinct values, and without a unique last term
+  `LIMIT`/`OFFSET` paging repeats and skips rows.
+- **A deleted custom field falls back to `created_at` rather than erroring.** Clients persist their
+  sort, and `handlers/receipts.go` maps every repository error to a 500, so erroring would make the
+  list fail to load at all for anyone holding a stale sort.
+- **NULL ordering is engine-dependent** and deliberately not normalised: SQLite and MySQL sort NULL
+  first, Postgres last, so receipts with no value land at opposite ends. `NULLS LAST` is not portable
+  (MySQL 8 and MariaDB reject it), and normalising it would mean evaluating the subquery twice. This
+  matches the existing nullable built-in column, `resolved_date`.
+- **Perf note:** `custom_field_values` declares no index on `receipt_id` / `custom_field_id`, so the
+  subquery scans that table per candidate row on SQLite and Postgres (MySQL gets one from the FK).
+  Fine at typical sizes; a composite index is the obvious follow-up.
+- `POST /api/export/{groupId}` deserializes the same `ReceiptPagedRequestCommand` and calls the same
+  repository method, so it inherits both behaviours.
+- **Tests**: `repositories/receipt_custom_field_sort_test.go` — one per type (CURRENCY with values
+  that sort differently as text than as numbers), value-less receipts still listed with a matching
+  count, the duplicate/lowest-non-null rule, stable paging across equal values, the unknown-id
+  fallback, the malformed-key rejection, and the `"type":""` guard. The suite is **SQLite only**, so
+  the cross-engine NULL ordering is not covered there.
+
 ## Reporting Engine (`internal/reporting`)
 
 A **pure** report engine: `(ReportSpec + FieldCatalog + []Row + MetaInput) → ReportModel`. It
