@@ -267,6 +267,23 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   place Save/Cancel buttons in the page header.
 - **Form fields:** `app-input`, `app-textarea`, `app-select`, `app-checkbox`, grouped with
   `app-form-section`; bind via the `formGet` pipe.
+- **Field hints:** `app-input` and `app-textarea` bind
+  `[subscriptSizing]="hint ? 'dynamic' : 'fixed'"`, and that conditional is load-bearing both ways.
+  Material's default `fixed` reserves a **single line** for the subscript and positions the hint
+  wrapper **absolutely**, so a hint that wraps to two or more lines escapes its box and paints over
+  whatever follows the field — which is exactly what a long hint in a narrow column does (the MCP
+  section's "Connector sign-in lasts" hint used to cover the Connector URL block). A field with
+  **no** hint keeps `fixed` so its error row stays reserved and it does not jump when a `mat-error`
+  appears. Note `app-select` has **no** `hint` input at all — passing `hint="…"` to it silently
+  renders nothing.
+  - **A hint is in-flow content once the subscript is dynamic**, so it also feeds the field's
+    intrinsic width. Inside a `d-flex`, `flex-grow-1` alone leaves `flex-basis: auto`, so a hinted
+    column swallows the row and squeezes its neighbour. Base both columns at 0 instead — see
+    `.duration-row` in `system-settings-form.component.scss`, which keeps the Session and MCP
+    value + unit rows even and aligned with each other.
+- **Margins on a shared control's host need `d-block`.** `app-checkbox` / `app-input` have no
+  `:host { display: block }` and their SCSS is empty, so a bare `class="mb-3"` on the host is an
+  **inline** element's vertical margin and does nothing. Pair it (`class="d-block mb-3"`).
 - **Password fields:** `app-input` owns both password affordances as opt-in suffix icon buttons —
   `[showVisibilityEye]="true"` (the eye, `data-testid="password-visibility-toggle"`) and
   `[showGeneratePassword]="true"` (`data-testid="password-generate"`). Switching either flag on
