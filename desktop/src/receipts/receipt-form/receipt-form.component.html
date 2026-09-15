@@ -24,8 +24,12 @@
           [indent]="false"
         ></app-audit-detail-section>
       </ng-container>
-      <div class="row">
-        <app-form-section class="col" headerText="Details" [indent]="false">
+      <div class="receipt-panes" #receiptPanes>
+        <app-form-section
+          class="receipt-panes__form"
+          headerText="Details"
+          [indent]="false"
+        >
           <div
             class="d-flex flex-column justify-content-center align-items-center"
           >
@@ -111,8 +115,15 @@
           </div>
         </app-form-section>
         @if (!selectedGroup()?.groupReceiptSettings?.hideImages) {
+          <app-pane-splitter
+            data-testid="receipt-image-resize"
+            label="Resize image pane"
+            [container]="receiptPanes"
+            [defaultRatio]="defaultImagePaneRatio"
+            [(ratio)]="imagePaneRatio"
+          ></app-pane-splitter>
           <app-form-section
-            class="col h-100"
+            class="receipt-panes__image"
             headerText="Images"
             [headerButtonsTemplate]="imagesSectionHeaderButtons"
             [indent]="false"
@@ -130,9 +141,6 @@
                 (images().length > 0 || filesToUpload().length > 0) &&
                 showImages
               "
-                [ngClass]="{
-              'col-3': !showLargeImagePreview
-              }"
               >
                 <ng-container *ngIf="imagesLoading()">
                   <div class="d-flex justify-content-center align-items-center">
@@ -378,14 +386,6 @@
       [tooltip]="showImages ? 'Hide Images' : 'Show Images'"
       [disabled]="(showProgressBar() ?? false)"
       (clicked)="toggleShowImages()"
-    ></app-button>
-    <app-button
-      matButtonType="iconButton"
-      color="accent"
-      [icon]="showLargeImagePreview ? 'unfold_less' : 'unfold_more'"
-      [tooltip]="showLargeImagePreview ? 'Collapse Image' : 'Expand Image'"
-      [disabled]="(showProgressBar() ?? false)"
-      (clicked)="toggleImagePreviewSize()"
     ></app-button>
     <app-button
       matButtonType="iconButton"

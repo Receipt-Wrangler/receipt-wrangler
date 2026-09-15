@@ -45,6 +45,13 @@ import { ShareListComponent } from "../share-list/share-list.component";
 import { UploadImageComponent } from "../upload-image/upload-image.component";
 import { buildItemForm } from "../utils/form.utils";
 
+/**
+ * How wide the image pane starts, as a percentage of the form/image row, for a
+ * user whose "large image previews" preference is off and on respectively.
+ */
+const IMAGE_PANE_RATIO = 40;
+const LARGE_IMAGE_PANE_RATIO = 65;
+
 @UntilDestroy()
 @Component({
   selector: "app-receipt-form",
@@ -161,7 +168,21 @@ export class ReceiptFormComponent implements OnInit {
 
   public receiptStatusOptions = RECEIPT_STATUS_OPTIONS;
 
-  public showLargeImagePreview: boolean = false;
+  /**
+   * How wide the image pane starts for this user. Doubles as the width a
+   * double-click on the splitter returns to.
+   */
+  public readonly defaultImagePaneRatio = this.userPreferences()?.showLargeImagePreviews
+    ? LARGE_IMAGE_PANE_RATIO
+    : IMAGE_PANE_RATIO;
+
+  /**
+   * Live width of the image pane, driven by the splitter. Seeded once here and
+   * deliberately NOT in the `activatedRoute.data` subscription below, which
+   * re-fires on every queue step — seeding there would throw away a width the
+   * user had just dragged every time they moved to the next receipt.
+   */
+  public readonly imagePaneRatio = signal(this.defaultImagePaneRatio);
 
   public queueIds: string[] = [];
 
@@ -246,7 +267,6 @@ export class ReceiptFormComponent implements OnInit {
         this.setReceiptPermissions();
         this.getImageFiles();
         this.setHeaderText();
-        this.setShowLargeImagePreview();
         this.setQueueData();
         document.scrollingElement?.scrollTo(0, 0);
       });
@@ -342,10 +362,6 @@ export class ReceiptFormComponent implements OnInit {
         this.updateAmountFromItems();
       }
     });
-  }
-
-  private setShowLargeImagePreview(): void {
-    this.showLargeImagePreview = this.store.selectSnapshot(AuthState.userPreferences)?.showLargeImagePreviews ?? false;
   }
 
   private setHeaderText(): void {
@@ -1083,10 +1099,6 @@ export class ReceiptFormComponent implements OnInit {
 
   public zoomImageOut(): void {
     this.carouselComponent().zoomOut();
-  }
-
-  public toggleImagePreviewSize(): void {
-    this.showLargeImagePreview = !this.showLargeImagePreview;
   }
 
   public expandImage(): void {
