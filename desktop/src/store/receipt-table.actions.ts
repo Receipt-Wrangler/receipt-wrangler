@@ -1,4 +1,5 @@
-import { ReceiptPagedRequestFilter } from "../open-api";
+import { ReceiptDateFilterFieldKey } from "../constants/receipt-filter-fields.constant";
+import { FilterOperation, ReceiptPagedRequestFilter } from "../open-api";
 import { ReceiptTableInterface } from "../interfaces";
 import { ReceiptTableColumnConfig } from "../interfaces/receipt-table-column-config.interface";
 
@@ -24,6 +25,23 @@ export class SetReceiptFilter {
   static readonly type = "[ReceiptTable] Set Filter";
 
   constructor(public data: ReceiptPagedRequestFilter) {}
+}
+
+export class SetReceiptFilterField {
+  static readonly type = "[ReceiptTable] Set Filter Field";
+
+  constructor(
+    public field: keyof ReceiptPagedRequestFilter,
+    /** `null` clears the field back to its default empty shape. */
+    public entry: { operation: FilterOperation | null; value: unknown } | null,
+  ) {}
+}
+
+export class SetQuickDateField {
+  static readonly type = "[ReceiptTable] Set Quick Date Field";
+
+  /** Which date field the quick date control writes to from now on. */
+  constructor(public field: ReceiptDateFilterFieldKey) {}
 }
 
 export class ResetReceiptFilter {

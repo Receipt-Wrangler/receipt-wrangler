@@ -1,3 +1,4 @@
+import { CurrencyPipe, DatePipe } from "@angular/common";
 import { AfterViewInit, Component, computed, OnInit, signal, TemplateRef, ViewEncapsulation, viewChild } from "@angular/core";
 import { MatDialog } from "@angular/material/dialog";
 import { PageEvent } from "@angular/material/paginator";
@@ -6,25 +7,27 @@ import { MatTableDataSource } from "@angular/material/table";
 import { ActivatedRoute, Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
-import { map, take, tap } from "rxjs";
+import { catchError, EMPTY, map, Subject, switchMap, take, tap } from "rxjs";
 import { fadeInOut } from "src/animations";
 import { ReceiptFilterService } from "src/services/receipt-filter.service";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
-import { ResetReceiptFilter, SetColumnConfig, SetPage, SetPageSize, SetReceiptFilterData, } from "src/store/receipt-table.actions";
+import { ResetReceiptFilter, SetColumnConfig, SetPage, SetPageSize, SetQuickDateField, SetReceiptFilterData, SetReceiptFilterField, } from "src/store/receipt-table.actions";
 import { DEFAULT_RECEIPT_ORDER_BY, DEFAULT_RECEIPT_SORT_DIRECTION, ReceiptTableState, } from "src/store/receipt-table.state";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
-import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS } from "../../constants";
+import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS, RECEIPT_DATE_FILTER_FIELDS, ReceiptDateFilterFieldKey } from "../../constants";
 import { ReceiptTableColumnConfig } from "../../interfaces";
 import {
   BulkStatusUpdateCommand,
   Category,
   CustomField,
+  FilterOperation,
   Group,
   GroupsService,
   PagedDataDataInner,
   Permission,
   Receipt,
+  ReceiptPagedRequestFilter,
   ReceiptService,
   ReceiptStatus,
   Tag,
@@ -32,13 +35,18 @@ import {
 import { SnackbarService } from "../../services";
 import { ReceiptExportService } from "../../services/receipt-export.service";
 import { ReceiptFilterComponent } from "../../shared-ui/receipt-filter/receipt-filter.component";
-import { AuthState, GroupState } from "../../store";
+import { AuthState, GroupState, UserState } from "../../store";
+import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import {
   applyFormCommand,
   customFieldColumnDef,
   mergeCustomFieldColumns,
 } from "../../utils/index";
+import { FilterMonth, monthFilterEntry, monthFromFilterEntry } from "../../utils/receipt-date-filter";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
+import { buildReceiptFilterChips, ReceiptFilterChip } from "../../utils/receipt-filter-chips";
+import { isFilterEntryActive } from "../../utils/receipt-filter-entry";
+import { openQuickScanDialog } from "../quick-scan-dialog/open-quick-scan-dialog";
 import { BulkStatusUpdateComponent } from "../bulk-resolve-dialog/bulk-status-update-dialog.component";
 import { ColumnConfigurationDialogComponent } from "../column-configuration-dialog/column-configuration-dialog.component";
 
@@ -59,6 +67,10 @@ interface ReceiptTableColumn extends TableColumn {
   animations: [fadeInOut],
   encapsulation: ViewEncapsulation.None,
   host: DEFAULT_HOST_CLASS,
+  // The chip labels are built in TS rather than the template, so the formatting
+  // pipes are injected. CustomCurrencyPipe is declared in PipesModule and needs
+  // CurrencyPipe, neither of which is providedIn: "root".
+  providers: [CurrencyPipe, CustomCurrencyPipe, DatePipe],
   standalone: false
 })
 export class ReceiptsTableComponent implements OnInit, AfterViewInit {
@@ -72,7 +84,11 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     private router: Router,
     private snackbarService: SnackbarService,
     private store: Store,
-  ) {}
+    private customCurrencyPipe: CustomCurrencyPipe,
+    private datePipe: DatePipe,
+  ) {
+    this.listenForRefreshRequests();
+  }
 
   readonly createdAtCell = viewChild.required<TemplateRef<any>>("createdAtCell");
 
@@ -108,6 +124,69 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);
 
+  private readonly refreshRequested = new Subject<void>();
+
+  private groups = this.store.selectSignal(GroupState.groups);
+
+  private users = this.store.selectSignal(UserState.users);
+
+  private receiptFilter = computed(
+    () => this.filter()?.filter as ReceiptPagedRequestFilter | undefined
+  );
+
+  /** The date field the quick date control writes to. */
+  public quickDateField = this.store.selectSignal(ReceiptTableState.quickDateField);
+
+  public readonly dateFilterFields = RECEIPT_DATE_FILTER_FIELDS;
+
+  public quickDateFieldLabel = computed(
+    () =>
+      RECEIPT_DATE_FILTER_FIELDS.find((field) => field.key === this.quickDateField())?.label ??
+      "Receipt Date"
+  );
+
+  /** The entry the quick date control currently owns. */
+  private quickDateEntry = computed(() => this.receiptFilter()?.[this.quickDateField()]);
+
+  /**
+   * The month the quick date control is showing, or null when its field is
+   * unset or holds something a month cannot express.
+   */
+  public stepperMonth = computed(() => monthFromFilterEntry(this.quickDateEntry()));
+
+  public stepperLabel = computed(() => {
+    const month = this.stepperMonth();
+    if (month) {
+      return this.datePipe.transform(new Date(month.year, month.month, 1), "LLLL y") ?? "";
+    }
+
+    // A filter the stepper cannot describe still has to be visible as a
+    // filter — the chip below spells out what it actually is.
+    return isFilterEntryActive(this.quickDateEntry()) ? "Custom" : "All time";
+  });
+
+  public filterChips = computed<ReceiptFilterChip[]>(() => {
+    const categories = this.categories();
+    const tags = this.tags();
+    const groups = this.groups();
+    const users = this.users();
+
+    return buildReceiptFilterChips(
+      this.receiptFilter(),
+      {
+        categories,
+        tags,
+        // Not groupsWithoutAll: a group filter set on the All Groups view is
+        // persisted, so it can outlive the view that offers the control and
+        // still has to name itself here.
+        groups,
+        users,
+        formatDate: (value) => this.datePipe.transform(value as string) ?? "",
+        formatCurrency: (value) => this.customCurrencyPipe.transform(value as number),
+      }
+    );
+  });
+
   private numFiltersAppliedRaw = this.store.selectSignal(ReceiptTableState.numFiltersApplied);
 
   public numFiltersApplied = computed(() => {
@@ -115,11 +194,11 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     return num > 0 ? num : undefined;
   });
 
-  public customFields: CustomField[] = [];
+  public customFields = signal<CustomField[]>([]);
 
-  public categories: Category[] = [];
+  public categories = signal<Category[]>([]);
 
-  public tags: Tag[] = [];
+  public tags = signal<Tag[]>([]);
 
   public groupId: string = "0";
 
@@ -161,17 +240,22 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     // Filter options come from the selected group's AppData catalog (filtered to
     // the user's grants), so a restricted user can't filter by a hidden one.
     const numericGroupId = Number(this.groupId);
-    this.categories = Number.isNaN(numericGroupId)
-      ? []
-      : this.store.selectSnapshot(AuthState.groupCategories(numericGroupId));
-    this.tags = Number.isNaN(numericGroupId)
-      ? []
-      : this.store.selectSnapshot(AuthState.groupTags(numericGroupId));
+    this.categories.set(
+      Number.isNaN(numericGroupId)
+        ? []
+        : this.store.selectSnapshot(AuthState.groupCategories(numericGroupId))
+    );
+    this.tags.set(
+      Number.isNaN(numericGroupId)
+        ? []
+        : this.store.selectSnapshot(AuthState.groupTags(numericGroupId))
+    );
 
     // Resolved per route, and empty for a user without app.custom-fields.read -
     // which is the permission gate: no catalog, no custom field columns.
-    this.customFields =
-      this.activatedRoute.snapshot.data["customFields"] ?? [];
+    this.customFields.set(
+      this.activatedRoute.snapshot.data["customFields"] ?? []
+    );
     this.reconcileColumnConfig();
 
     this.getInitialData();
@@ -192,7 +276,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     const persisted = this.store.selectSnapshot(
       ReceiptTableState.columnConfig
     );
-    const reconciled = mergeCustomFieldColumns(persisted, this.customFields);
+    const reconciled = mergeCustomFieldColumns(persisted, this.customFields());
 
     const changed =
       reconciled.length !== persisted.length ||
@@ -347,7 +431,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     // One column per custom field, after the built-in ones. They share a single
     // cell template, which reads the definition off the column it is rendering.
     allColumns.push(
-      ...this.customFields.map((customField) => ({
+      ...this.customFields().map((customField) => ({
         columnHeader: customField.name,
         matColumnDef: customFieldColumnDef(customField.id),
         template: this.customFieldCell(),
@@ -423,8 +507,8 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
       maxWidth: "100%",
     });
 
-    dialogRef.componentInstance.categories = this.categories;
-    dialogRef.componentInstance.tags = this.tags;
+    dialogRef.componentInstance.categories = this.categories();
+    dialogRef.componentInstance.tags = this.tags();
     dialogRef.componentInstance.parentForm = buildReceiptFilterForm(filter, this);
     dialogRef.componentInstance.headerText = "Filter Receipts";
     // The group filter is only meaningful on the "All groups" view; a
@@ -450,6 +534,56 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
       .subscribe();
   }
 
+  public monthSelected(month: FilterMonth): void {
+    // The quick control IS its field's filter, so it overwrites whatever was there.
+    this.applyFilterField(this.quickDateField(), monthFilterEntry(month) as any);
+  }
+
+  public allTimeSelected(): void {
+    this.applyFilterField(this.quickDateField(), null);
+  }
+
+  /**
+   * Re-points the quick date control at another date field. Deliberately
+   * non-destructive: it changes no condition — only which one the stepper
+   * describes — so whatever the previous field held stays applied and keeps its
+   * chip. Nothing to refetch.
+   */
+  public quickDateFieldSelected(field: ReceiptDateFilterFieldKey): void {
+    this.store.dispatch(new SetQuickDateField(field));
+  }
+
+  public filterChipCleared(field: keyof ReceiptPagedRequestFilter): void {
+    this.applyFilterField(field, null);
+  }
+
+  /**
+   * The one write path for a single-field filter change, so the page reset and
+   * the refetch can never be forgotten — narrowing a filter while on page 7
+   * would otherwise land on an empty page.
+   */
+  private applyFilterField(
+    field: keyof ReceiptPagedRequestFilter,
+    entry: { operation: FilterOperation | null; value: unknown } | null
+  ): void {
+    this.store.dispatch(new SetReceiptFilterField(field, entry));
+    this.store.dispatch(new SetPage(1));
+    this.getFilteredReceipts();
+  }
+
+  public quickScanClicked(): void {
+    openQuickScanDialog(this.matDialog)
+      .pipe(
+        take(1),
+        tap(() => this.getFilteredReceipts())
+      )
+      .subscribe();
+  }
+
+  public exportAllReceipts(): void {
+    this.receiptExportService.exportReceiptsFromFilter(this.groupId, this.filter());
+  }
+
   public resetFilterButtonClicked(): void {
     this.store.dispatch(new ResetReceiptFilter());
     this.getFilteredReceipts();
@@ -462,7 +596,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
       ...DEFAULT_DIALOG_CONFIG,
       data: {
         currentColumns: currentColumnConfig,
-        customFields: this.customFields,
+        customFields: this.customFields(),
       }
     });
 
@@ -481,10 +615,28 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   }
 
   public getFilteredReceipts(): void {
-    this.receiptFilterService
-      .getPagedReceiptsForGroups(this.groupId.toString())
+    this.refreshRequested.next();
+  }
+
+  /**
+   * Every refresh goes through one switchMap, so a newer request supersedes
+   * whatever is in flight (and aborts its XHR) instead of racing it. Without
+   * this the last *response* wins rather than the last *request* — and the
+   * quick date arrows put those one click apart, so a slow earlier page could
+   * repaint the table with a month the user has already stepped past.
+   */
+  private listenForRefreshRequests(): void {
+    this.refreshRequested
       .pipe(
-        take(1),
+        untilDestroyed(this),
+        switchMap(() =>
+          this.receiptFilterService.getPagedReceiptsForGroups(this.groupId.toString()).pipe(
+            // Keeps the outer subscription alive. An error surfacing through
+            // switchMap would complete it and silently kill every later
+            // refresh; the HTTP interceptor already reports the failure.
+            catchError(() => EMPTY)
+          )
+        ),
         tap((pagedData) => {
           this.dataSource.set(new MatTableDataSource(pagedData.data));
           this.totalCount.set(pagedData.totalCount);

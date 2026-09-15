@@ -94,6 +94,10 @@ List<DropdownMenuItem> buildReceiptStatusDropDownMenuItems() {
       value: ReceiptStatus.DRAFT,
       child: Text("Draft"),
     ),
+    DropdownMenuItem(
+      value: ReceiptStatus.DECLINED,
+      child: Text("Declined"),
+    ),
   ];
 }
 

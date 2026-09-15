@@ -3394,6 +3394,7 @@ components:
         - "NEEDS_ATTENTION"
         - "RESOLVED"
         - "DRAFT"
+        - "DECLINED"
         - ""
     QuickScanDefaultPaidByType:
       description: How the default paid-by is resolved for optional quick-scan paid-by
