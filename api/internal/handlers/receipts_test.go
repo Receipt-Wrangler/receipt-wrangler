@@ -219,6 +219,87 @@ func TestShouldGetPagedReceiptsWithoutFullReceipts(t *testing.T) {
 	// Clean up - no need to explicitly delete as tearDownReceiptsTest() handles it
 }
 
+// The handler chooses the preload set, and for a non-full listing that choice is
+// constants.CUSTOM_FIELD_ASSOCIATIONS - the values AND their definitions.
+//
+// This is asserted here, at the handler, rather than only in the repository suite:
+// that test hands the association list to the repository itself, so it stays green
+// if this handler ever drops back to loading nothing. The failure that would cause
+// is invisible in Go. models.CustomFieldValue.CustomField is a non-pointer struct
+// with no omitempty, so an unloaded definition serializes as "type":"", and the
+// mobile client's generated CustomFieldType is a closed enum with no empty member
+// whose AnyOfSerializer swallows the error - collapsing every row of the receipts
+// list on already-released builds.
+//
+// The assertion is on the raw response bytes because "type":"" only exists at the
+// JSON boundary.
+func TestPagedReceiptsCarryCustomFieldDefinitionsWithoutFullReceipts(t *testing.T) {
+	defer tearDownReceiptsTest()
+	setupReceiptsTest()
+
+	db := repositories.GetDB()
+
+	customField := models.CustomField{Name: "Cost Centre", Type: models.TEXT}
+	db.Create(&customField)
+
+	receipt := models.Receipt{
+		Name:         "Test Receipt",
+		Amount:       decimal.NewFromFloat(10.00),
+		Date:         time.Now(),
+		PaidByUserID: 1,
+		GroupId:      1,
+		Status:       models.OPEN,
+	}
+	db.Create(&receipt)
+
+	stringValue := "CC-1"
+	db.Create(&models.CustomFieldValue{
+		ReceiptId:     receipt.ID,
+		CustomFieldId: customField.ID,
+		StringValue:   &stringValue,
+	})
+
+	requestBody := commands.ReceiptPagedRequestCommand{
+		PagedRequestCommand: commands.PagedRequestCommand{Page: 1, PageSize: 10},
+		FullReceipts:        false,
+	}
+
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/receipt/group/1", strings.NewReader(string(body)))
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("groupId", "1")
+	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}}))
+
+	grantAllGroupPerms(t, 1, 1)
+
+	GetPagedReceiptsForGroup(w, r)
+
+	if w.Result().StatusCode != 200 {
+		utils.PrintTestError(t, w.Result().StatusCode, 200)
+		return
+	}
+
+	responseBody := w.Body.String()
+
+	if strings.Contains(responseBody, `"type":""`) {
+		utils.PrintTestError(t, responseBody, `no empty "type" in the response`)
+	}
+	if !strings.Contains(responseBody, customField.Name) {
+		utils.PrintTestError(t, responseBody, "the custom field definition's name")
+	}
+	if !strings.Contains(responseBody, stringValue) {
+		utils.PrintTestError(t, responseBody, "the custom field value")
+	}
+}
+
 // receiptGetRequest builds a GET request to target carrying JWT claims for userId.
 func receiptGetRequest(userId uint, target string) (*httptest.ResponseRecorder, *http.Request) {
 	w := httptest.NewRecorder()

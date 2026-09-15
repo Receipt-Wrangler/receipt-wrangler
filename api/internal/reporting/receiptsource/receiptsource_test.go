@@ -69,6 +69,68 @@ func TestCustomFieldKey(t *testing.T) {
 	}
 }
 
+// ParseCustomFieldKey is reached with a client-supplied orderBy (the receipts
+// table persists its sort), so its strictness is the contract the caller relies
+// on to keep arbitrary text out of the column it builds an ORDER BY from.
+func TestParseCustomFieldKey(t *testing.T) {
+	tests := []struct {
+		key    string
+		wantID uint
+		wantOk bool
+	}{
+		{"custom_1", 1, true},
+		{"custom_0", 0, true},
+		{"custom_42", 42, true},
+
+		// The widest id a uint holds on every platform this builds for. One past
+		// it is rejected rather than truncated - parsing "custom_4294967297" at 64
+		// bits and narrowing to uint would name field 1 on a 32-bit build.
+		{"custom_4294967295", 4294967295, true},
+		{"custom_4294967296", 0, false},
+		{"custom_4294967297", 0, false},
+		{"custom_18446744073709551616", 0, false},
+
+		// Digits alone. A derived period key belongs to the reporting engine and is
+		// not a sortable column; the rest are hand-crafted.
+		{"custom_1_month", 0, false},
+		{"custom_abc", 0, false},
+		{"custom_", 0, false},
+		{"custom_+1", 0, false},
+		{"custom_-1", 0, false},
+		{"custom_ 1", 0, false},
+		{"custom_1; DROP TABLE receipts", 0, false},
+		{"date", 0, false},
+		{"", 0, false},
+	}
+
+	for _, test := range tests {
+		gotID, gotOk := ParseCustomFieldKey(test.key)
+		if gotID != test.wantID || gotOk != test.wantOk {
+			t.Errorf(
+				"ParseCustomFieldKey(%q) = (%d, %t), want (%d, %t)",
+				test.key, gotID, gotOk, test.wantID, test.wantOk,
+			)
+		}
+	}
+}
+
+// The two halves must agree: every key the builder emits has to parse back to
+// the id it was built from, or a saved sort silently stops resolving.
+func TestParseCustomFieldKeyRoundTripsCustomFieldKey(t *testing.T) {
+	for _, id := range []uint{0, 1, 7, 42, 4294967295} {
+		key := string(CustomFieldKey(id))
+
+		gotID, ok := ParseCustomFieldKey(key)
+		if !ok {
+			t.Errorf("ParseCustomFieldKey(%q) rejected a key CustomFieldKey(%d) built", key, id)
+			continue
+		}
+		if gotID != id {
+			t.Errorf("ParseCustomFieldKey(%q) = %d, want %d", key, gotID, id)
+		}
+	}
+}
+
 // A currency custom field is a measure, so a tax field is summable without any
 // special case. Everything else cuts the data.
 func TestSource_CatalogTypesCustomFields(t *testing.T) {

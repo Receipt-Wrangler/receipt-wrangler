@@ -296,8 +296,14 @@ test.describe('Receipt summary', () => {
     await status.click();
     await status.fill('OPEN');
     await page.getByRole('option', { name: 'Open', exact: true }).click();
-    // The open overlay would intercept the submit click.
-    await page.keyboard.press('Escape');
+    // The panel stays open over Save and has to be dismissed, but NOT with Escape:
+    // MatAutocomplete only consumes that while its panel is open, so on the runs where
+    // the panel has already closed the same keypress reaches MatDialog and closes the
+    // whole dialog (receipt-quick-date-filter.spec.ts asserts exactly that), detaching
+    // the submit button mid-click. Tab blurs the input, which closes the panel if it is
+    // open and is harmless if it is not.
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('option', { name: 'Open', exact: true })).toBeHidden();
 
     await dialog.getByTestId('dialog-submit-button').click();
     await expect(dialog).toBeHidden();

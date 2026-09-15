@@ -144,16 +144,14 @@
       someone who uses Receipt Wrangler regularly is never signed out. Lower it for a tighter
       security posture, raise it so people stay signed in longer. Maximum 720 hours (30 days).
     </p>
-    <div class="d-flex gap-3">
+    <div class="d-flex gap-3 mb-3 duration-row">
       <app-input
-        class="flex-grow-1"
         label="Stay signed in for"
         type="number"
         [inputFormControl]="form | formGet:'refreshTokenValidForValue'"
         [readonly]="formConfig.mode | inputReadonly"
       ></app-input>
       <app-select
-        class="flex-grow-1"
         label="Unit"
         optionValueKey="value"
         optionDisplayKey="displayValue"
@@ -171,19 +169,20 @@
       server live, no restart required.
     </p>
     <app-checkbox
+      class="d-block mb-3"
       label="Enable MCP Server"
       [inputFormControl]="form | formGet:'mcpEnabled'"
       [readonly]="formConfig.mode | inputReadonly"
     ></app-checkbox>
     <app-input
+      class="d-block mb-3"
       label="Public URL"
       hint="Externally reachable origin (scheme + host, no path), e.g. https://receipts.example.com. Used to build the OAuth and connector URLs. Changing it invalidates existing connector tokens."
       [readonly]="formConfig.mode | inputReadonly"
       [inputFormControl]="form | formGet:'mcpPublicUrl'"
     ></app-input>
-    <div class="d-flex gap-3">
+    <div class="d-flex gap-3 mb-3 duration-row">
       <app-input
-        class="flex-grow-1"
         label="Connector sign-in lasts"
         type="number"
         hint="How long a connected client stays authorized before it has to sign in again. Kept separate from the app session above so a long user-facing window does not extend third-party access. Maximum 720 hours (30 days)."
@@ -191,7 +190,6 @@
         [readonly]="formConfig.mode | inputReadonly"
       ></app-input>
       <app-select
-        class="flex-grow-1"
         label="Unit"
         optionValueKey="value"
         optionDisplayKey="displayValue"
@@ -200,7 +198,7 @@
       ></app-select>
     </div>
     @if ((form | formGet:'mcpEnabled').value && (form | formGet:'mcpPublicUrl').value) {
-      <div class="d-flex flex-column mb-2">
+      <div class="d-flex flex-column mb-3">
         <strong>Connector URL</strong>
         <span>{{ (form | formGet:'mcpPublicUrl').value }}/mcp</span>
       </div>
@@ -215,6 +213,7 @@
       QR code.
     </p>
     <app-checkbox
+      class="d-block mb-3"
       label="Show login QR code"
       [inputFormControl]="form | formGet:'showLoginQr'"
       [readonly]="formConfig.mode | inputReadonly"

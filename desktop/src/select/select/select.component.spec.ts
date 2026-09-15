@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { BadgeComponent } from '../../shared-ui/badge/badge.component';
 import { OptionDisplayPipe } from '../pipes/option-display.pipe';
 import { ReadonlyValuePipe } from '../pipes/readonly-value.pipe';
 import { SelectComponent } from './select.component';
@@ -19,7 +20,7 @@ describe('SelectComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [SelectComponent, OptionDisplayPipe, ReadonlyValuePipe],
-      imports: [MatSelectModule, ReactiveFormsModule, NoopAnimationsModule],
+      imports: [MatSelectModule, ReactiveFormsModule, NoopAnimationsModule, BadgeComponent],
       providers: [provideZonelessChangeDetection()],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();
@@ -89,19 +90,41 @@ describe('SelectComponent', () => {
     configure('badge', 'custom_7');
     await fixture.whenStable();
 
-    const badges = fixture.nativeElement.querySelectorAll('.select__badge');
+    const badges = fixture.nativeElement.querySelectorAll('app-badge');
     expect(badges.length).toBe(1);
     expect(badges[0].textContent.trim()).toBe('Custom');
     expect(fixture.nativeElement.textContent).toContain('HST');
   });
 
+  // optionBadgeTone is a pass-through to app-badge's own tone input, so nothing
+  // else would catch it being dropped from either binding - the badge would simply
+  // stay the default purple while the select was configured otherwise.
+  it('draws the badge in the configured tone', async () => {
+    configure('badge', 'custom_7');
+    fixture.componentRef.setInput('optionBadgeTone', 'slate');
+    await fixture.whenStable();
+
+    const badge = fixture.nativeElement.querySelector('app-badge .rw-badge');
+    expect(badge.classList).toContain('rw-badge--slate');
+    expect(badge.classList).not.toContain('rw-badge--purple');
+  });
+
+  it('draws the badge purple by default', async () => {
+    configure('badge', 'custom_7');
+    await fixture.whenStable();
+
+    expect(
+      fixture.nativeElement.querySelector('app-badge .rw-badge').classList
+    ).toContain('rw-badge--purple');
+  });
+
   it('draws no badge for an unbadged selection, or when badges are off', async () => {
     configure('badge', 'category');
     await fixture.whenStable();
-    expect(fixture.nativeElement.querySelectorAll('.select__badge').length).toBe(0);
+    expect(fixture.nativeElement.querySelectorAll('app-badge').length).toBe(0);
 
     configure('', 'custom_7');
     await fixture.whenStable();
-    expect(fixture.nativeElement.querySelectorAll('.select__badge').length).toBe(0);
+    expect(fixture.nativeElement.querySelectorAll('app-badge').length).toBe(0);
   });
 });

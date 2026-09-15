@@ -14,6 +14,7 @@ package receiptsource
 import (
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"receipt-wrangler/api/internal/models"
@@ -60,6 +61,39 @@ const customFieldKeyPrefix = "custom_"
 // CustomFieldKey returns the field key a custom field is referenced by.
 func CustomFieldKey(customFieldID uint) reporting.FieldKey {
 	return reporting.FieldKey(customFieldKeyPrefix + strconv.FormatUint(uint64(customFieldID), 10))
+}
+
+// ParseCustomFieldKey returns the custom field id a key refers to, and whether
+// the key is a custom field key at all. It is the inverse of CustomFieldKey, and
+// deliberately strict: only "custom_" followed by digits alone qualifies, so a
+// derived period key ("custom_7_month") and anything hand-crafted are rejected.
+//
+// The receipts table sorts by these same keys, which is why this lives beside
+// the key builder rather than being re-derived wherever a key is read.
+func ParseCustomFieldKey(key string) (uint, bool) {
+	digits, found := strings.CutPrefix(key, customFieldKeyPrefix)
+	if !found || len(digits) == 0 {
+		return 0, false
+	}
+
+	// ParseUint would accept a leading "+", which CustomFieldKey never emits.
+	for _, character := range digits {
+		if character < '0' || character > '9' {
+			return 0, false
+		}
+	}
+
+	// 32 bits, not 64: the result is a models.CustomField id, which is a uint -
+	// and a uint is 32 bits on a 32-bit build, where parsing to 64 would truncate
+	// and name a DIFFERENT field ("custom_4294967297" would resolve to field 1).
+	// No id reaches 2^32, so the cap only rejects keys that cannot name a real
+	// field, which the caller already treats like any other malformed key.
+	customFieldID, err := strconv.ParseUint(digits, 10, 32)
+	if err != nil {
+		return 0, false
+	}
+
+	return uint(customFieldID), true
 }
 
 // CustomFieldPeriodKeys returns the day/month/year keys derived from a date

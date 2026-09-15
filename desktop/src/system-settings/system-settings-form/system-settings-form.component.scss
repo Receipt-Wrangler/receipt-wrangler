@@ -1,3 +1,12 @@
 .scroll-snap {
   scroll-margin-top: 75px;
 }
+
+// The two-column value + unit rows (Session, MCP Server). Sizing the columns
+// from their content lets the hinted one swallow the row, because a hint is
+// in-flow content once the field sizes its subscript dynamically. Basing both
+// at 0 keeps the halves even and the two rows aligned with each other.
+.duration-row > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
