@@ -17,6 +17,7 @@ describe("ColumnConfigurationDialogComponent", () => {
   let mockDialogData: {
     currentColumns?: ReceiptTableColumnConfig[];
     customFields?: CustomField[];
+    customFieldsAvailable?: boolean;
   };
 
   const customField = (id: number, name: string): CustomField =>
@@ -181,7 +182,40 @@ describe("ColumnConfigurationDialogComponent", () => {
       ]);
     });
 
-    it("drops a custom field column whose field no longer exists", () => {
+it("keeps custom field columns when the catalog is unavailable, and saves them back", () => {
+      // The resolver hands an empty catalog to a user without app.custom-fields.read,
+      // so "no fields" here means "may not look". Saving writes this list straight
+      // back to the browser-wide configuration, which is why the dialog has to know.
+      mockDialogData.currentColumns = [
+        ...allBuiltInColumns(),
+        { matColumnDef: "custom_7", visible: true, order: 9 },
+      ];
+      mockDialogData.customFields = [];
+      mockDialogData.customFieldsAvailable = false;
+
+      component.ngOnInit();
+      component.saveConfiguration();
+
+      expect(component.columns.map((col) => col.matColumnDef)).toContain("custom_7");
+
+      const saved = mockDialogRef.close.mock.calls[0][0] as ReceiptTableColumnConfig[];
+      expect(saved.map((col) => col.matColumnDef)).toContain("custom_7");
+    });
+
+    it("still drops an unresolvable custom field when the catalog IS available", () => {
+      mockDialogData.currentColumns = [
+        ...allBuiltInColumns(),
+        { matColumnDef: "custom_7", visible: true, order: 9 },
+      ];
+      mockDialogData.customFields = [];
+      mockDialogData.customFieldsAvailable = true;
+
+      component.ngOnInit();
+
+      expect(component.columns.map((col) => col.matColumnDef)).not.toContain("custom_7");
+    });
+
+        it("drops a custom field column whose field no longer exists", () => {
       mockDialogData.currentColumns = [
         ...allBuiltInColumns(),
         { matColumnDef: "custom_99", visible: true, order: 9 }

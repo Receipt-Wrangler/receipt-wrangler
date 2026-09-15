@@ -35,6 +35,7 @@ import {
 import { SnackbarService } from "../../services";
 import { ReceiptExportService } from "../../services/receipt-export.service";
 import { ReceiptFilterComponent } from "../../shared-ui/receipt-filter/receipt-filter.component";
+import { canReadCustomFieldCatalog } from "../../resolvers/custom-field.resolver";
 import { AuthState, GroupState, UserState } from "../../store";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import {
@@ -196,6 +197,9 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   public customFields = signal<CustomField[]>([]);
 
+  /** Whether `customFields` is the real catalog rather than a permission stub. */
+  public customFieldsAvailable = signal<boolean>(true);
+
   public categories = signal<Category[]>([]);
 
   public tags = signal<Tag[]>([]);
@@ -256,6 +260,10 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     this.customFields.set(
       this.activatedRoute.snapshot.data["customFields"] ?? []
     );
+
+    // ...but that empty list means "not permitted to look", not "none exist", and
+    // the two must not be confused when reconciling - see reconcileColumnConfig.
+    this.customFieldsAvailable.set(canReadCustomFieldCatalog(this.store));
     this.reconcileColumnConfig();
 
     this.getInitialData();
@@ -276,7 +284,11 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     const persisted = this.store.selectSnapshot(
       ReceiptTableState.columnConfig
     );
-    const reconciled = mergeCustomFieldColumns(persisted, this.customFields());
+    const reconciled = mergeCustomFieldColumns(
+      persisted,
+      this.customFields(),
+      this.customFieldsAvailable()
+    );
 
     const changed =
       reconciled.length !== persisted.length ||
@@ -597,6 +609,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
       data: {
         currentColumns: currentColumnConfig,
         customFields: this.customFields(),
+        customFieldsAvailable: this.customFieldsAvailable(),
       }
     });
 

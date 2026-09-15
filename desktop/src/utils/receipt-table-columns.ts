@@ -77,10 +77,24 @@ export function columnDisplayName(
  *
  * Order is otherwise preserved exactly as persisted, including a custom field
  * the user dragged above a built-in column.
+ *
+ * `catalogAvailable` says whether `customFields` is authoritative. It is not when
+ * the caller lacks `app.custom-fields.read`, where the resolver yields an empty
+ * catalog that means "you may not look", not "there are none" — and dropping
+ * against it would delete every custom field column the configuration holds. The
+ * `receiptTable` slice is persisted per browser and NOT namespaced per account
+ * (see `ngxsStorageKeys`), so that discards an administrator's saved layout the
+ * moment a colleague without the permission opens the page on the same machine.
+ * When it is false the persisted `custom_*` entries are kept untouched; built-ins
+ * are still healed and order re-derived, which need no catalog.
+ *
+ * Deliberately required rather than defaulted, so a new call site has to decide
+ * which kind of empty it is holding.
  */
 export function mergeCustomFieldColumns(
   persisted: ReceiptTableColumnConfig[],
-  customFields: CustomField[]
+  customFields: CustomField[],
+  catalogAvailable: boolean
 ): ReceiptTableColumnConfig[] {
   const knownCustomFieldIds = new Set(customFields.map((field) => field.id));
   const builtInColumnDefs = DEFAULT_RECEIPT_TABLE_COLUMNS.map(
@@ -91,9 +105,11 @@ export function mergeCustomFieldColumns(
     .sort((a, b) => a.order - b.order)
     .filter((column) => {
       const customFieldId = parseCustomFieldColumnDef(column.matColumnDef);
-      return customFieldId === undefined
-        ? builtInColumnDefs.includes(column.matColumnDef)
-        : knownCustomFieldIds.has(customFieldId);
+      if (customFieldId === undefined) {
+        return builtInColumnDefs.includes(column.matColumnDef);
+      }
+
+      return catalogAvailable ? knownCustomFieldIds.has(customFieldId) : true;
     });
 
   const present = new Set(kept.map((column) => column.matColumnDef));

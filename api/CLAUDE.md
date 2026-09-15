@@ -1556,6 +1556,14 @@ failure mode as the `aggFunc` omitempty fix — see `mobile/CLAUDE.md` → "Seri
 `TestPagedReceiptCustomFieldsAlwaysCarryTheirDefinition` asserts the response never contains
 `"type":""`.
 
+**That guard is duplicated at the handler on purpose.** The repository test hands the association
+list to the repository itself, so it stays green if `GetPagedReceiptsForGroup` ever stops choosing
+`CUSTOM_FIELD_ASSOCIATIONS` — the one line that actually decides. `handlers/receipts_test.go` →
+`TestPagedReceiptsCarryCustomFieldDefinitionsWithoutFullReceipts` drives the handler with
+`fullReceipts: false` and asserts on the **raw response bytes**, which is where `"type":""` exists at
+all. Verified to fail both ways the line can regress: preloading nothing, and preloading the values
+without their definitions.
+
 This is not a new disclosure: the single-receipt endpoints already returned these values to any
 holder of `group.receipts.read`, and `MaskReceiptsForMemberVisibility` already masks their created-by.
 
@@ -1607,19 +1615,30 @@ its `orderBy` and direction both being allow-listed against literals by `isTrust
   `LIMIT`/`OFFSET` paging repeats and skips rows.
 - **A deleted custom field falls back to `created_at` rather than erroring.** Clients persist their
   sort, and `handlers/receipts.go` maps every repository error to a 500, so erroring would make the
-  list fail to load at all for anyone holding a stale sort.
+  list fail to load at all for anyone holding a stale sort. Both fallbacks (the unknown field and the
+  unsortable type) go through `defaultReceiptOrder`, which **carries the same `receipts.id`
+  tiebreaker** as the custom-field path — `created_at` is not unique, and receipts created in one
+  batch share a timestamp, so without it `LIMIT`/`OFFSET` paging repeats and skips rows. That helper
+  can chain the tiebreaker onto `BaseRepository.Sort` because both clauses are **column**-based and
+  gorm appends them; the expression form above cannot, which is why it builds one `clause.Expr`.
 - **NULL ordering is engine-dependent** and deliberately not normalised: SQLite and MySQL sort NULL
   first, Postgres last, so receipts with no value land at opposite ends. `NULLS LAST` is not portable
   (MySQL 8 and MariaDB reject it), and normalising it would mean evaluating the subquery twice. This
   matches the existing nullable built-in column, `resolved_date`.
-- **Perf note:** `custom_field_values` declares no index on `receipt_id` / `custom_field_id`, so the
-  subquery scans that table per candidate row on SQLite and Postgres (MySQL gets one from the FK).
-  Fine at typical sizes; a composite index is the obvious follow-up.
+- **The subquery is served by a composite index.** `CustomFieldValue` declares
+  `idx_custom_field_value_lookup` over `(receipt_id, custom_field_id)` — without it the subquery is a
+  full scan of `custom_field_values` **per candidate receipt** on SQLite and Postgres (MySQL gets one
+  from the FK). It is two columns, not three: the `ORDER BY id LIMIT 1` would nominally like `id`
+  trailing, but `ID` lives on the embedded `BaseModel` and cannot be tagged without overriding the
+  field, and the two-column seek already narrows to roughly one row. Declared **only** as a model tag —
+  there is no hand-written schema per engine, so AutoMigrate creates it everywhere.
 - `POST /api/export/{groupId}` deserializes the same `ReceiptPagedRequestCommand` and calls the same
   repository method, so it inherits both behaviours.
 - **Tests**: `repositories/receipt_custom_field_sort_test.go` — one per type (CURRENCY with values
   that sort differently as text than as numbers), value-less receipts still listed with a matching
-  count, the duplicate/lowest-non-null rule, stable paging across equal values, both fallbacks
+  count, the duplicate/lowest-non-null rule, stable paging across equal values, the fallback
+  tiebreaker (asserted on the generated SQL — a tie is broken by whatever order the engine happens to
+  return, so paging real rows would pass either way), the index existing after migration, both fallbacks
   (unknown id, and an unsortable type — an empty one, the only unknown `CustomFieldType.Value()` lets
   through) asserted in **both** directions so a dropped direction cannot pass, the malformed-key
   rejection, and the `"type":""` guard. `receiptsource_test.go` → `TestParseCustomFieldKey` covers the

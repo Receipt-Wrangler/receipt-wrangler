@@ -196,6 +196,52 @@ describe("ReceiptsTableComponent", () => {
       ).not.toContain("custom_99");
     });
 
+    // A user without app.custom-fields.read resolves an EMPTY catalog, which is not
+    // the same as "no custom fields exist". The configuration is persisted per
+    // browser and shared across accounts, so dropping against it would destroy an
+    // administrator's saved layout the moment a colleague opens the page here.
+    it("keeps a persisted custom field column when the catalog is unavailable", () => {
+      component.customFields.set([]);
+      component.customFieldsAvailable.set(false);
+      store.dispatch(
+        new SetColumnConfig([
+          ...DEFAULT_RECEIPT_TABLE_COLUMNS,
+          { matColumnDef: "custom_99", visible: true, order: 9 },
+        ])
+      );
+
+      (component as any).reconcileColumnConfig();
+
+      expect(
+        store
+          .selectSnapshot(ReceiptTableState.columnConfig)
+          .map((col) => col.matColumnDef)
+      ).toContain("custom_99");
+    });
+
+    // Follows from the column surviving: the sort is reset off the reconciled
+    // columns, so preserving one without the other would still discard the sort.
+    it("keeps a sort on a custom field when the catalog is unavailable", () => {
+      component.customFields.set([]);
+      component.customFieldsAvailable.set(false);
+      store.dispatch(
+        new SetColumnConfig([
+          ...DEFAULT_RECEIPT_TABLE_COLUMNS,
+          { matColumnDef: "custom_99", visible: true, order: 9 },
+        ])
+      );
+      const filterData = store.selectSnapshot(ReceiptTableState.filterData);
+      store.dispatch(
+        new SetReceiptFilterData({ ...filterData, orderBy: "custom_99", sortDirection: "asc" })
+      );
+
+      (component as any).reconcileColumnConfig();
+
+      expect(store.selectSnapshot(ReceiptTableState.filterData).orderBy).toEqual(
+        "custom_99"
+      );
+    });
+
     // The sort is persisted per browser and shared across accounts, so the table
     // can start up asking the API to order by a column that no longer exists -
     // which the API rejects outright, failing the very first load.

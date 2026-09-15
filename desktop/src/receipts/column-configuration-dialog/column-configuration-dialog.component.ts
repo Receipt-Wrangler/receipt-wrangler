@@ -27,6 +27,9 @@ export class ColumnConfigurationDialogComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: {
       currentColumns?: ReceiptTableColumnConfig[];
       customFields?: CustomField[];
+      // Whether customFields is authoritative. Absent is treated as available, so
+      // a caller that knows nothing about the catalog behaves as before.
+      customFieldsAvailable?: boolean;
     }
   ) {}
 
@@ -36,6 +39,10 @@ export class ColumnConfigurationDialogComponent implements OnInit {
 
   private get customFields(): CustomField[] {
     return this.data.customFields ?? [];
+  }
+
+  private get customFieldsAvailable(): boolean {
+    return this.data.customFieldsAvailable ?? true;
   }
 
   private initializeColumns(): void {
@@ -49,9 +56,18 @@ export class ColumnConfigurationDialogComponent implements OnInit {
    *
    * `mergeCustomFieldColumns` copies, which matters: the caller hands us the NGXS
    * snapshot, and that is deep-frozen in dev mode.
+   *
+   * Saving writes this list straight back to the persisted configuration, so the
+   * catalog-availability flag has to reach here too: without it, opening and
+   * saving the dialog would drop the custom field columns that reconciliation
+   * just took care to preserve.
    */
   private setColumns(columns: ReceiptTableColumnConfig[]): void {
-    this.columns = mergeCustomFieldColumns(columns, this.customFields).map(
+    this.columns = mergeCustomFieldColumns(
+      columns,
+      this.customFields,
+      this.customFieldsAvailable
+    ).map(
       (col) => ({
         ...col,
         displayName: columnDisplayName(col.matColumnDef, this.customFields),

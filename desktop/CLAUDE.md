@@ -691,6 +691,22 @@ field after the nine built-in columns, and each one can be turned into a sortabl
 - **The permission gate is the resolver.** `customFieldResolverFn` is wired onto the
   `receipts/group/:groupId` route and already returns `[]` without `app.custom-fields.read`, so such a
   user simply has no custom field columns. No new permission code.
+- **An empty catalog means "may not look", NOT "none exist" — and the difference is destructive.**
+  Because the configuration is persisted per browser and **not namespaced per account**, treating the
+  permission stub as an authoritative empty catalog deletes every `custom_*` entry the configuration
+  holds: an administrator's saved layout is gone the moment a colleague without the permission opens
+  the page on the same machine. So `mergeCustomFieldColumns` takes a **required** third argument,
+  `catalogAvailable`, and keeps the persisted custom columns untouched when it is false (built-ins are
+  still healed and order re-derived, neither of which needs a catalog). Both persistence paths pass it
+  — `reconcileColumnConfig` **and** the dialog, via `customFieldsAvailable` on its data, since saving
+  writes the list straight back and would otherwise undo what reconciliation preserved. The flag comes
+  from `canReadCustomFieldCatalog(store)`, exported from the resolver so the resolver's own `of([])`
+  branch and its consumers read **one** predicate and cannot drift.
+  - Nothing renders badly as a result: `setColumns` builds `allColumns` from the catalog and then
+    drops any configured column with no definition, so a preserved-but-unnameable column is simply
+    absent from the table rather than showing a raw `custom_5` header. The sort is preserved for the
+    same reason — it is reset off the reconciled columns, so keeping the column without the sort would
+    still discard half the state.
 - **The shared `app-table` hands the whole column to a cell template**
   (`{ element, index, column }`), which is what lets one `#customFieldCell` template serve every
   custom field: `receipts-table` carries the `CustomField` on the column object and the template reads

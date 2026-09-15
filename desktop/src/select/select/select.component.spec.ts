@@ -96,6 +96,28 @@ describe('SelectComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('HST');
   });
 
+  // optionBadgeTone is a pass-through to app-badge's own tone input, so nothing
+  // else would catch it being dropped from either binding - the badge would simply
+  // stay the default purple while the select was configured otherwise.
+  it('draws the badge in the configured tone', async () => {
+    configure('badge', 'custom_7');
+    fixture.componentRef.setInput('optionBadgeTone', 'slate');
+    await fixture.whenStable();
+
+    const badge = fixture.nativeElement.querySelector('app-badge .rw-badge');
+    expect(badge.classList).toContain('rw-badge--slate');
+    expect(badge.classList).not.toContain('rw-badge--purple');
+  });
+
+  it('draws the badge purple by default', async () => {
+    configure('badge', 'custom_7');
+    await fixture.whenStable();
+
+    expect(
+      fixture.nativeElement.querySelector('app-badge .rw-badge').classList
+    ).toContain('rw-badge--purple');
+  });
+
   it('draws no badge for an unbadged selection, or when badges are off', async () => {
     configure('badge', 'category');
     await fixture.whenStable();

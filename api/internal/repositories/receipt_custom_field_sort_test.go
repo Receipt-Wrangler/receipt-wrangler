@@ -12,6 +12,7 @@ import (
 	"receipt-wrangler/api/internal/utils"
 
 	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
 )
 
 // Sorting the receipts table by a custom field. The value lives in another table,
@@ -400,6 +401,63 @@ func TestShouldFallBackToDefaultOrderForUnsortableCustomFieldType(t *testing.T) 
 		sortedNames(t, sortByCustomField(untyped.ID, commands.ASCENDING)),
 		[]string{"oldest", "newest"},
 	)
+}
+
+// normalizeSQL strips the identifier quoting each engine applies, so an assertion
+// can name a column the way the code does rather than the way SQLite renders it.
+func normalizeSQL(sql string) string {
+	return strings.NewReplacer("`", "", `"`, "", "[", "", "]", "").Replace(sql)
+}
+
+// The fallback needs the same receipts.id tiebreaker as the custom-field path:
+// created_at is not unique - receipts created in one batch share a timestamp - and
+// without a unique last term LIMIT/OFFSET paging repeats and skips rows.
+//
+// Asserted on the generated SQL rather than by paging real rows, because a tie is
+// resolved by whatever order the engine happens to return; SQLite would likely
+// hand back rowid order and pass either way, proving nothing.
+func TestFallbackOrderCarriesTheReceiptIdTiebreaker(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	repository := NewReceiptRepository(nil)
+
+	for _, sortDirection := range []commands.SortDirection{
+		commands.ASCENDING, commands.DESCENDING, commands.DEFAULT,
+	} {
+		sql := normalizeSQL(GetDB().ToSQL(func(tx *gorm.DB) *gorm.DB {
+			query, err := repository.orderByCustomField(
+				tx.Model(&models.Receipt{}), 999999, sortDirection,
+			)
+			if err != nil {
+				utils.PrintTestError(t, err, nil)
+				return tx
+			}
+
+			var receipts []models.Receipt
+			return query.Find(&receipts)
+		}))
+
+		if !strings.Contains(sql, "receipts.id DESC") {
+			utils.PrintTestError(t, sql, "an ORDER BY carrying receipts.id DESC")
+		}
+		if !strings.Contains(sql, constants.DEFAULT_RECEIPT_ORDER_BY) {
+			utils.PrintTestError(t, sql, "an ORDER BY carrying "+constants.DEFAULT_RECEIPT_ORDER_BY)
+		}
+	}
+}
+
+// The correlated subquery runs per candidate receipt, so without this index it is
+// a full scan of custom_field_values each time. AutoMigrate creates it from the
+// model tag, which is the only place it is declared - there is no hand-written
+// schema per engine.
+func TestCustomFieldValueLookupIndexExists(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	if !GetDB().Migrator().HasIndex(&models.CustomFieldValue{}, "idx_custom_field_value_lookup") {
+		utils.PrintTestError(t, "index missing", "idx_custom_field_value_lookup created by AutoMigrate")
+	}
 }
 
 // A malformed orderBy is still rejected outright - that is the guard keeping the

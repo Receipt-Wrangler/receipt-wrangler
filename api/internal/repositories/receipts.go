@@ -900,6 +900,26 @@ func customFieldSortExpressions(customFieldType models.CustomFieldType) (sortExp
 	return "", "", false
 }
 
+// defaultReceiptOrder is the ordering a custom-field sort falls back to when the
+// field cannot be sorted on at all.
+//
+// It carries the same receipts.id tiebreaker as the custom-field path, and for
+// the same reason: created_at is not unique - receipts imported or created in one
+// batch share a timestamp - and without a unique last term LIMIT/OFFSET paging
+// repeats and skips rows between pages. BaseRepository.Sort supplies the column
+// and direction; both clauses are column-based, so gorm appends the tiebreaker
+// rather than replacing the clause (unlike the expression form below).
+func (repository ReceiptRepository) defaultReceiptOrder(
+	query *gorm.DB,
+	sortDirection commands.SortDirection,
+) *gorm.DB {
+	return repository.Sort(query, constants.DEFAULT_RECEIPT_ORDER_BY, sortDirection).
+		Order(clause.OrderByColumn{
+			Column: clause.Column{Table: "receipts", Name: "id"},
+			Desc:   true,
+		})
+}
+
 // orderByCustomField orders query by a receipt's value for one custom field.
 //
 // The value is read with a correlated subquery rather than a join: nothing stops
@@ -929,12 +949,12 @@ func (repository ReceiptRepository) orderByCustomField(
 	}
 
 	if len(customFields) == 0 {
-		return repository.Sort(query, constants.DEFAULT_RECEIPT_ORDER_BY, sortDirection), nil
+		return repository.defaultReceiptOrder(query, sortDirection), nil
 	}
 
 	sortExpression, notNullColumn, ok := customFieldSortExpressions(customFields[0].Type)
 	if !ok {
-		return repository.Sort(query, constants.DEFAULT_RECEIPT_ORDER_BY, sortDirection), nil
+		return repository.defaultReceiptOrder(query, sortDirection), nil
 	}
 
 	valueQuery := repository.GetDB().
