@@ -11,7 +11,7 @@ import { catchError, EMPTY, map, Subject, switchMap, take, tap } from "rxjs";
 import { fadeInOut } from "src/animations";
 import { ReceiptFilterService } from "src/services/receipt-filter.service";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
-import { ResetReceiptFilter, SetColumnConfig, SetPage, SetPageSize, SetQuickDateField, SetReceiptFilterData, SetReceiptFilterField, } from "src/store/receipt-table.actions";
+import { ResetReceiptFilter, SetColumnConfig, SetPage, SetPageSize, SetQuickDateField, SetReceiptFilterData, SetReceiptFilterField, SetSummaryConfigGroupId, } from "src/store/receipt-table.actions";
 import { ReceiptTableState } from "src/store/receipt-table.state";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
@@ -29,6 +29,7 @@ import {
   ReceiptPagedRequestFilter,
   ReceiptService,
   ReceiptStatus,
+  ReceiptSummary,
   Tag,
 } from "../../open-api";
 import { SnackbarService } from "../../services";
@@ -41,6 +42,7 @@ import { FilterMonth, monthFilterEntry, monthFromFilterEntry } from "../../utils
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { buildReceiptFilterChips, ReceiptFilterChip } from "../../utils/receipt-filter-chips";
 import { isFilterEntryActive } from "../../utils/receipt-filter-entry";
+import { resolveSummaryConfigGroup, summaryConfigGroups } from "../../utils/receipt-summary";
 import { openQuickScanDialog } from "../quick-scan-dialog/open-quick-scan-dialog";
 import { BulkStatusUpdateComponent } from "../bulk-resolve-dialog/bulk-status-update-dialog.component";
 import { ColumnConfigurationDialogComponent } from "../column-configuration-dialog/column-configuration-dialog.component";
@@ -74,6 +76,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     private datePipe: DatePipe,
   ) {
     this.listenForRefreshRequests();
+    this.listenForSummaryRequests();
   }
 
   readonly createdAtCell = viewChild.required<TemplateRef<any>>("createdAtCell");
@@ -110,7 +113,55 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   private readonly refreshRequested = new Subject<void>();
 
+  /**
+   * The summary rides its own stream rather than the table's, for two reasons: a
+   * forkJoin would make the table wait on the slower unpaged aggregate on the
+   * app's hottest screen, and the totals do not change when only the page or the
+   * sort does — see getFilteredReceiptsPage().
+   *
+   * It mirrors refreshRequested exactly otherwise, switchMap and inner catchError
+   * included, so a newer request supersedes an in-flight one and an error cannot
+   * kill later refreshes.
+   */
+  private readonly summaryRequested = new Subject<void>();
+
+  public readonly summary = signal<ReceiptSummary | undefined>(undefined);
+
   private groups = this.store.selectSignal(GroupState.groups);
+
+  private persistedSummaryConfigGroupId = this.store.selectSignal(
+    ReceiptTableState.summaryConfigGroupId
+  );
+
+  /**
+   * The groups whose summary configuration the viewer may choose between — only
+   * ever more than one on the synthetic "All" group, which spans several groups
+   * and has no configuration of its own.
+   */
+  public readonly summaryConfigGroupOptions = computed(() => {
+    const group = this.groups().find((candidate) => candidate.id === Number(this.groupId));
+    if (!group?.isAllGroup) {
+      return [];
+    }
+
+    return summaryConfigGroups(this.groups());
+  });
+
+  /**
+   * Whose configuration is actually in use. On a real group it is that group; on
+   * "All" it is the viewer's persisted pick, falling back to the first enabled
+   * group when that pick is stale (the group turned its summary off, the user
+   * left it, or the state predates the key).
+   */
+  public readonly summaryConfigGroupId = computed(() => {
+    const options = this.summaryConfigGroupOptions();
+    if (options.length === 0) {
+      const group = this.groups().find((candidate) => candidate.id === Number(this.groupId));
+      return group?.isAllGroup ? undefined : group?.id;
+    }
+
+    return resolveSummaryConfigGroup(options, this.persistedSummaryConfigGroupId())?.id;
+  });
 
   private users = this.store.selectSignal(UserState.users);
 
@@ -233,6 +284,9 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         : this.store.selectSnapshot(AuthState.groupTags(numericGroupId))
     );
     this.getInitialData();
+    // getInitialData stays on its own one-shot subscription because it owns the single
+    // setColumns() call; the summary has no such constraint and just rides its stream.
+    this.summaryRequested.next();
   }
 
   private setGroup(): void {
@@ -408,7 +462,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         })
       );
 
-      this.getFilteredReceipts();
+      this.getFilteredReceiptsPage();
     }
     this.firstSort = false;
   }
@@ -525,7 +579,25 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
       .subscribe();
   }
 
+  /**
+   * The filter changed, or receipts were mutated: refresh the page AND the totals.
+   *
+   * This keeps its name and every existing caller, so the safe behaviour is the
+   * default — a new call site that forgets the distinction over-refreshes rather
+   * than leaving stale figures on screen.
+   */
   public getFilteredReceipts(): void {
+    this.refreshRequested.next();
+    this.summaryRequested.next();
+  }
+
+  /**
+   * The page or the sort changed. Deliberately does NOT refresh the totals:
+   * neither changes which receipts the filter matches, so the figures are already
+   * right, and the summary aggregates the whole result set unpaged — refetching it
+   * on every page click would be the most expensive no-op in the app.
+   */
+  private getFilteredReceiptsPage(): void {
     this.refreshRequested.next();
   }
 
@@ -556,6 +628,45 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
       .subscribe();
   }
 
+  /**
+   * Mirrors listenForRefreshRequests. The guard sits inside the switchMap rather
+   * than at the call sites so a group with no summary configured costs no request
+   * at all — which is what keeps this free for every install that has not opted in.
+   */
+  private listenForSummaryRequests(): void {
+    this.summaryRequested
+      .pipe(
+        untilDestroyed(this),
+        switchMap(() => {
+          const configGroupId = this.summaryConfigGroupId();
+          if (!configGroupId) {
+            this.summary.set(undefined);
+            return EMPTY;
+          }
+
+          return this.receiptFilterService
+            .getReceiptSummaryForGroup(this.groupId.toString(), configGroupId)
+            .pipe(
+              // Same reasoning as the table's: an error through switchMap would
+              // complete the outer subscription and kill every later refresh. The
+              // last good figures stay on screen and the interceptor reports it.
+              catchError(() => EMPTY)
+            );
+        }),
+        tap((summary) => this.summary.set(summary))
+      )
+      .subscribe();
+  }
+
+  /**
+   * Only the breakdown's shape changes, so the table is untouched — this must not
+   * go through getFilteredReceipts().
+   */
+  public summaryConfigGroupSelected(groupId: number): void {
+    this.store.dispatch(new SetSummaryConfigGroupId(groupId));
+    this.summaryRequested.next();
+  }
+
   public deleteReceipt(row: Receipt): void {
     const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
 
@@ -576,6 +687,9 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
                   this.dataSource.update(ds => new MatTableDataSource(ds.data.filter(
                     (r) => r.id !== row.id
                   )));
+                  // The table row is patched out in place rather than refetched, so the
+                  // totals have to be told separately or they keep counting the receipt.
+                  this.summaryRequested.next();
                   this.snackbarService.success("Receipt successfully deleted");
                 })
               )
@@ -603,7 +717,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     this.store.dispatch(new SetPage(newPage));
     this.store.dispatch(new SetPageSize(pageEvent.pageSize));
 
-    this.getFilteredReceipts();
+    this.getFilteredReceiptsPage();
   }
 
   public showStatusUpdateDialog(): void {
@@ -652,6 +766,10 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
                       }
                     });
                     this.dataSource.set(new MatTableDataSource(newReceipts));
+                    // Same in-place patch, and this one moves receipts between the
+                    // summary's status rows — the case that looks like it needs no
+                    // refresh and needs it most.
+                    this.summaryRequested.next();
                   })
                 )
                 .subscribe();

@@ -1253,6 +1253,8 @@ so they can never disagree.
   in-place edit would have corrupted the default for the rest of the session.
   `ReceiptsTableComponent.applyFilterField()` is the only caller — it dispatches the action, then
   `SetPage(1)`, then refetches, so narrowing a filter from page 7 can never land on an empty page.
+- **`sort()` no longer refreshes the receipt summary** — it calls `getFilteredReceiptsPage()`. See
+  "Receipt summary" below; sorting changes the order of the result set, not its membership.
 - **Refreshes go through one `switchMap`** (`listenForRefreshRequests()`, wired in the constructor;
   `getFilteredReceipts()` just pushes onto its `Subject`). Each refresh used to be its own
   subscription, so the last *response* won rather than the last *request* — and the quick date
@@ -1325,6 +1327,66 @@ why this feature needed no API change. Picking a month **overwrites** whatever t
   Pre-existing; the chip just surfaces it for the first time.
 - **Arrow steps from "All time"/"Custom" seed the current month** and then apply the delta, so `‹`
   and `›` never do the same thing.
+
+### Receipt summary (the totals under the table)
+
+A block of totals below `.table-container`, covering the **whole current filter result set** rather
+than the visible page — so it cannot be computed client-side from `PagedData.data`. Configuration is
+per-group (Group Receipt Settings) and applies to everyone; see `api/CLAUDE.md` → "Receipt Summary"
+for the wire contract.
+
+- **`app-receipt-totals` (`src/receipts/receipt-totals/`), deliberately not named `*summary*`.**
+  `app-summary-card` already renders on this very page as "Selected Receipt summary" — the
+  who-owes-whom settlement card — and two components called summary on one screen is a trap.
+  Standalone, imported directly in `ReceiptsModule` (the `MonthStepperComponent` precedent), and
+  purely presentational: it fetches nothing and knows nothing about the filter.
+- **A SECOND `Subject` + `switchMap`, not a `forkJoin` with the table.** A `forkJoin` would make the
+  table repaint wait on the slower unpaged aggregate on the app's hottest screen; two independent
+  `switchMap`s each preserve last-request-wins within themselves, and the transient disagreement
+  (table on month N, totals on N-1 for a few hundred ms) is bounded and self-correcting. It mirrors
+  `listenForRefreshRequests` exactly, inner `catchError(() => EMPTY)` included — an error through
+  `switchMap` would complete the outer subscription and silently kill every later refresh.
+- **`getFilteredReceipts()` refreshes both; `getFilteredReceiptsPage()` refreshes only the table.**
+  Paging and sorting change neither the filter nor the figures, so refetching an unpaged aggregate
+  for them would be the most expensive no-op in the app. The split is arranged so the **safe**
+  behaviour is the default: `getFilteredReceipts` keeps its name and all five existing callers, and
+  only `sort()` and `updatePageData()` were moved to the page-only variant. A new call site that
+  forgets the distinction over-refreshes rather than going stale.
+- **Two mutation paths must push `summaryRequested` explicitly**, because they patch the datasource
+  in place instead of refetching: `deleteReceipt` (the count changes) and the bulk status update
+  (**the status buckets move** — the one that looks like it needs nothing and needs it most).
+  `duplicateReceipt` navigates away, so it needs nothing.
+- **The "no configured group" guard lives inside the `switchMap`**, before the HTTP call, so an
+  install that has not opted in issues no request at all.
+- **The All-group chip row.** `Group.groupReceiptSettings` is required on the generated `Group` and
+  AppData hydrates every group's projections, so the client already knows which groups have a summary
+  configured — no extra fetch. The chips pick whose *configuration* applies while the *data* still
+  spans every group. Changing one dispatches `SetSummaryConfigGroupId` and pushes
+  `summaryRequested` only — **not** `getFilteredReceipts()`, since the table is unchanged.
+- **The fallback cannot live in a state selector.** Unlike `quickDateField`, resolving it needs the
+  user's groups and which have the summary enabled, which the `receiptTable` slice does not know.
+  `resolveSummaryConfigGroup` / `summaryConfigGroups` (`src/utils/receipt-summary.ts`) own it, and
+  handle all three stale cases on one branch: the persisted group turned its summary off, the user
+  left it, or the state was hydrated from localStorage before the key existed (`undefined`). The
+  selector returns the raw persisted value with no default, on purpose.
+- **Settings form: five `app-checkbox`es, not a multi-select.** `app-select` has no `multiple` input
+  and `app-status-select` wraps it as single-select; adding multi-select to a control used app-wide
+  is a real regression surface for five fixed options, and the Quick Scan section directly above
+  already reads as a checkbox grid. The controls are a nested `FormGroup` bound through
+  `form | formGet: 'receiptSummaryStatuses.' + option.value` (`FormGetPipe` delegates to
+  `form.get`, which takes dot paths). Each carries a `data-testid` because the labels collide with
+  Quick Scan's.
+- **Only the currency-field picker is permission-gated.** It sits inside the existing
+  `canManageDefaultCustomFields` branch and `submit()` spreads its key conditionally, so an admin
+  without `app.custom-fields.read` omits it and cannot wipe a selection they cannot see. The toggle
+  and the statuses are ungated — gating them would lock that admin out of the feature.
+- **`mat-chip-listbox` selection comes from each option's `[selected]`, not a `[value]` on the
+  listbox.** The listbox input only takes effect through a form binding, so a `[value]` there
+  renders nothing as selected; the spec asserts the selected class for exactly that reason. The
+  clickable element is the inner `button[matchipaction]` — `mat-chip-option`'s own host is
+  `role="presentation"`, so clicking it in a test does nothing.
+- A configured status matching no receipt still renders, as a **muted zero row**, so the block keeps
+  its shape as the filter narrows and a legitimate zero does not read as a bug.
 
 ### The overflow menu
 

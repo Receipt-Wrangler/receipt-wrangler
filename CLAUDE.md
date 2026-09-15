@@ -288,6 +288,35 @@ A group can declare custom fields that are **always pre-added** to its receipts,
   `desktop/e2e/group-default-custom-fields.spec.ts` and
   `mobile/integration_test/receipt_default_custom_fields_test.dart`.
 
+### Receipt Summary
+
+A block of totals under the receipts table, covering the **whole current filter result set** rather
+than the visible page: a receipt count and amount total overall, then the same figures per
+configured status, plus a column per configured CURRENCY custom field. **Backend + desktop only** —
+the swagger change regenerates both clients, but mobile has no filter UI, so a summary there would
+only ever describe the whole group.
+
+- **Configuration is per-group and applies to everyone**, on Group Receipt Settings: a master
+  toggle, which statuses break out, and which currency fields are totalled. Stored in two new join
+  tables (deliberately not a discriminator on the existing defaults join — see `api/CLAUDE.md`).
+- **The server owns the configuration, not the client.** `ReceiptSummaryCommand` carries the filter
+  and an optional `configurationGroupId`, never the field or status list, so a client cannot add a
+  column or opt out of one.
+- **`POST /api/receipt/group/{groupId}/summary` is gated on `group.receipts.read`** — the same
+  permission as the table it sits under, and deliberately not `app.custom-fields.read`: that gates
+  the catalog, and any receipt reader already sees these field names.
+- **Aggregated in Go with `shopspring/decimal`, never a SQL `SUM`.** SQLite has no decimal type, so
+  `SUM` over a `decimal(10,2)` returns a float there and an exact decimal on Postgres/MySQL — the
+  same endpoint would report different cents on the three supported engines.
+- **A configured status that matches nothing still renders, as a zero row**, so the block keeps its
+  shape as the filter narrows. A receipt whose status is *not* configured still counts toward the
+  overall row, or the total would disagree with the table's own count.
+- **The desktop does not re-request on paging or sorting** — neither changes which receipts the
+  filter matches. That, plus skipping the request entirely for a group that has not opted in, is
+  what keeps an unpaged aggregate affordable on the app's hottest screen.
+- **The synthetic "All" group picks a configuration via chips**, since it spans several groups and
+  has none of its own; the data still spans every group. See `desktop/CLAUDE.md` → "Receipt summary".
+
 ### Seeding the Group Field
 
 Both clients pre-select the receipt's group instead of handing the user a picker they have no real

@@ -298,11 +298,11 @@ func (repository GroupRepository) GetGroupById(id string,
 		}
 	}
 
-	// DefaultCustomFieldIds is `gorm:"-"`, so nothing preloads it. Hydrate it explicitly at this
+	// The settings projections are `gorm:"-"`, so nothing preloads them. Hydrate explicitly at this
 	// serialization boundary. Keyed on GroupId rather than the settings row id precisely because
 	// the settings row above is created and DISCARDED, leaving its ID at 0 on the very call that
-	// created it (a freshly created row has no defaults, so an empty [] is the right answer there).
-	err = groupReceiptSettingsRepository.LoadDefaultCustomFieldIds(
+	// created it (a freshly created row has nothing configured, so empty [] is the right answer).
+	err = groupReceiptSettingsRepository.LoadSettingsProjections(
 		[]*models.GroupReceiptSettings{&group.GroupReceiptSettings},
 	)
 	if err != nil {

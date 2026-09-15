@@ -229,6 +229,18 @@
   ></app-table>
 </div>
 
+<!--
+  Totals for the whole current filter, not just this page. Rendered below the table (the paginator
+  lives inside app-table) so it reads as a footer to the list. It renders nothing at all unless the
+  group has the summary configured.
+-->
+<app-receipt-totals
+  [summary]="summary()"
+  [configGroups]="summaryConfigGroupOptions()"
+  [selectedConfigGroupId]="summaryConfigGroupId()"
+  (configGroupSelected)="summaryConfigGroupSelected($event)"
+></app-receipt-totals>
+
 <ng-template #createdAtCell let-element="element"
 >{{ element.createdAt | date }}
 </ng-template>

@@ -37,6 +37,9 @@ part 'update_group_receipt_settings_command.g.dart';
 /// * [quickScanCommentRequired] - Require the comment field in quick scan
 /// * [defaultCustomFieldIds] - Custom field ids to pre-add to every receipt created for this group. OMIT the key to leave the configured set unchanged (clients that hide this section, e.g. for a user without app.custom-fields.read, must omit it); send an empty array to clear it. Requires app.custom-fields.read - a caller without it gets a 403.
 /// * [applyDefaultCustomFieldsOnIngest] - Also attach the group's default custom fields to receipts the SERVER creates (quick scan, email integration). OMIT the key to leave the stored value unchanged.
+/// * [receiptSummaryEnabled] - Show the block of totals under this group's receipts table. OMIT the key to leave the stored value unchanged - a client that does not render this section must omit it rather than send false, or it switches the summary off for the whole group.
+/// * [receiptSummaryCustomFieldIds] - CURRENCY custom field ids to total in the receipt summary. OMIT the key to leave the configured set unchanged (clients that hide this control, e.g. for a user without app.custom-fields.read, must omit it); send an empty array to clear it. Requires app.custom-fields.read - a caller without it gets a 403. Every id must be an existing CURRENCY custom field - anything else is a 400, because only a currency value can be summed.
+/// * [receiptSummaryStatuses] - Receipt statuses to break out as their own row in the receipt summary. OMIT the key to leave the configured set unchanged; send an empty array to clear it. Unlike the custom field ids this needs NO extra permission - gating it would lock an admin without app.custom-fields.read out of the feature entirely. An unrecognized status is a 400.
 @BuiltValue()
 abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupReceiptSettingsCommand, UpdateGroupReceiptSettingsCommandBuilder> {
   /// Hide receipt images
@@ -130,6 +133,18 @@ abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupRec
   /// Also attach the group's default custom fields to receipts the SERVER creates (quick scan, email integration). OMIT the key to leave the stored value unchanged.
   @BuiltValueField(wireName: r'applyDefaultCustomFieldsOnIngest')
   bool? get applyDefaultCustomFieldsOnIngest;
+
+  /// Show the block of totals under this group's receipts table. OMIT the key to leave the stored value unchanged - a client that does not render this section must omit it rather than send false, or it switches the summary off for the whole group.
+  @BuiltValueField(wireName: r'receiptSummaryEnabled')
+  bool? get receiptSummaryEnabled;
+
+  /// CURRENCY custom field ids to total in the receipt summary. OMIT the key to leave the configured set unchanged (clients that hide this control, e.g. for a user without app.custom-fields.read, must omit it); send an empty array to clear it. Requires app.custom-fields.read - a caller without it gets a 403. Every id must be an existing CURRENCY custom field - anything else is a 400, because only a currency value can be summed.
+  @BuiltValueField(wireName: r'receiptSummaryCustomFieldIds')
+  BuiltList<int>? get receiptSummaryCustomFieldIds;
+
+  /// Receipt statuses to break out as their own row in the receipt summary. OMIT the key to leave the configured set unchanged; send an empty array to clear it. Unlike the custom field ids this needs NO extra permission - gating it would lock an admin without app.custom-fields.read out of the feature entirely. An unrecognized status is a 400.
+  @BuiltValueField(wireName: r'receiptSummaryStatuses')
+  BuiltList<ReceiptStatus>? get receiptSummaryStatuses;
 
   UpdateGroupReceiptSettingsCommand._();
 
@@ -315,6 +330,27 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
         specifiedType: const FullType(bool),
       );
     }
+    if (object.receiptSummaryEnabled != null) {
+      yield r'receiptSummaryEnabled';
+      yield serializers.serialize(
+        object.receiptSummaryEnabled,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.receiptSummaryCustomFieldIds != null) {
+      yield r'receiptSummaryCustomFieldIds';
+      yield serializers.serialize(
+        object.receiptSummaryCustomFieldIds,
+        specifiedType: const FullType(BuiltList, [FullType(int)]),
+      );
+    }
+    if (object.receiptSummaryStatuses != null) {
+      yield r'receiptSummaryStatuses';
+      yield serializers.serialize(
+        object.receiptSummaryStatuses,
+        specifiedType: const FullType(BuiltList, [FullType(ReceiptStatus)]),
+      );
+    }
   }
 
   @override
@@ -498,6 +534,27 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
             specifiedType: const FullType(bool),
           ) as bool;
           result.applyDefaultCustomFieldsOnIngest = valueDes;
+          break;
+        case r'receiptSummaryEnabled':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.receiptSummaryEnabled = valueDes;
+          break;
+        case r'receiptSummaryCustomFieldIds':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(int)]),
+          ) as BuiltList<int>;
+          result.receiptSummaryCustomFieldIds.replace(valueDes);
+          break;
+        case r'receiptSummaryStatuses':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(ReceiptStatus)]),
+          ) as BuiltList<ReceiptStatus>;
+          result.receiptSummaryStatuses.replace(valueDes);
           break;
         default:
           unhandled.add(key);

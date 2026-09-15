@@ -388,10 +388,11 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 		return appData, err
 	}
 
-	// Attach each group's configured default custom field ids. Also `gorm:"-"`, also one batched
-	// query. Must run for EVERY group so an empty set serializes as [] rather than null — the Dart
-	// client has no null guard and a null would fail this whole payload on released builds.
-	if err := repositories.NewGroupReceiptSettingsRepository(nil).LoadDefaultCustomFieldIdsForGroups(groups); err != nil {
+	// Attach each group's receipt-settings projections — default custom field ids plus the receipt
+	// summary configuration. Also `gorm:"-"`, also batched. Must run for EVERY group so an empty set
+	// serializes as [] rather than null — the Dart client has no null guard and a null would fail
+	// this whole payload on released builds.
+	if err := repositories.NewGroupReceiptSettingsRepository(nil).LoadSettingsProjectionsForGroups(groups); err != nil {
 		return appData, err
 	}
 
