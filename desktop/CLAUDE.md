@@ -162,7 +162,7 @@ Keep `npm audit` at **0 vulnerabilities**. Two conventions exist specifically to
 do not undo them without re-checking `npm audit`:
 - **`overrides` block in `package.json`** forces patched versions of build-time/dev-only transitive
   deps that the Angular toolchain otherwise pins inside vulnerable ranges (`@babel/core`, `esbuild`,
-  `http-proxy-middleware`, `undici`, `uuid`). When `npm audit` flags a new transitive advisory that
+  `http-proxy-middleware`, `qs`, `undici`, `uuid`). When `npm audit` flags a new transitive advisory that
   the toolchain hasn't bumped yet, add/raise the floor here rather than waiting on an upstream release.
 - **Exact pins (no caret):** `ngx-bootstrap` (`21.0.1`) and `@playwright/test` (`1.59.1`) are pinned
   because their next minor introduced an incompatibility (ngx-bootstrap dropped `CarouselModule.forRoot()`

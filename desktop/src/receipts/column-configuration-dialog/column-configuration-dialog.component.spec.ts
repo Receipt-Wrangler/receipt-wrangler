@@ -23,6 +23,16 @@ describe("ColumnConfigurationDialogComponent", () => {
   const customField = (id: number, name: string): CustomField =>
     ({ id, name, type: CustomFieldType.Text } as CustomField);
 
+  /**
+   * The rendered row for the custom_7 column, or undefined when it is not listed.
+   * The list renders straight off component.columns, so this is what the user
+   * actually sees rather than what the component holds.
+   */
+  const customFieldRow = (): HTMLElement | undefined =>
+    Array.from(
+      fixture.nativeElement.querySelectorAll(".column-item") as ArrayLike<HTMLElement>
+    ).find((row) => row.textContent?.includes("custom_7"));
+
   /** The configuration a real session persists: every built-in column, in order. */
   const allBuiltInColumns = (): ReceiptTableColumnConfig[] =>
     DEFAULT_RECEIPT_TABLE_COLUMNS.map((column) => ({ ...column }));
@@ -182,7 +192,7 @@ describe("ColumnConfigurationDialogComponent", () => {
       ]);
     });
 
-it("keeps custom field columns when the catalog is unavailable, and saves them back", () => {
+    it("keeps custom field columns when the catalog is unavailable, and saves them back", () => {
       // The resolver hands an empty catalog to a user without app.custom-fields.read,
       // so "no fields" here means "may not look". Saving writes this list straight
       // back to the browser-wide configuration, which is why the dialog has to know.
@@ -194,9 +204,17 @@ it("keeps custom field columns when the catalog is unavailable, and saves them b
       mockDialogData.customFieldsAvailable = false;
 
       component.ngOnInit();
+      fixture.detectChanges();
       component.saveConfiguration();
 
       expect(component.columns.map((col) => col.matColumnDef)).toContain("custom_7");
+
+      // It is listed, and listing it is what makes it survivable: saving writes
+      // this.columns straight back, so a row hidden from the dialog would be
+      // dropped by the very next save. With no catalog there is no name to
+      // resolve, so columnDisplayName falls back to the raw column def - the
+      // honest label for a field this user may not read.
+      expect(customFieldRow()?.textContent).toContain("custom_7");
 
       const saved = mockDialogRef.close.mock.calls[0][0] as ReceiptTableColumnConfig[];
       expect(saved.map((col) => col.matColumnDef)).toContain("custom_7");
@@ -211,11 +229,13 @@ it("keeps custom field columns when the catalog is unavailable, and saves them b
       mockDialogData.customFieldsAvailable = true;
 
       component.ngOnInit();
+      fixture.detectChanges();
 
       expect(component.columns.map((col) => col.matColumnDef)).not.toContain("custom_7");
+      expect(customFieldRow()).toBeUndefined();
     });
 
-        it("drops a custom field column whose field no longer exists", () => {
+    it("drops a custom field column whose field no longer exists", () => {
       mockDialogData.currentColumns = [
         ...allBuiltInColumns(),
         { matColumnDef: "custom_99", visible: true, order: 9 }
