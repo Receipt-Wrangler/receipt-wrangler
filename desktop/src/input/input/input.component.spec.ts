@@ -3,10 +3,11 @@ import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormControl, ReactiveFormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
-import { MatFormFieldModule } from "@angular/material/form-field";
+import { MatFormField, MatFormFieldModule } from "@angular/material/form-field";
 import { MatIconModule } from "@angular/material/icon";
 import { MatInputModule } from "@angular/material/input";
 import { MatTooltipModule } from "@angular/material/tooltip";
+import { By } from "@angular/platform-browser";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { NgxsModule } from "@ngxs/store";
 import { NgxMaskDirective, provideNgxMask } from "ngx-mask";
@@ -57,6 +58,27 @@ describe("InputComponent", () => {
 
   it("should create", () => {
     expect(component).toBeTruthy();
+  });
+
+  describe("subscript sizing", () => {
+    function subscriptSizing(): string {
+      return fixture.debugElement.query(By.directive(MatFormField))
+        .componentInstance.subscriptSizing;
+    }
+
+    it("stays fixed without a hint, so the field does not jump when an error appears", () => {
+      expect(subscriptSizing()).toEqual("fixed");
+    });
+
+    it("goes dynamic with a hint, so a wrapping hint cannot overlap the next field", async () => {
+      fixture.componentRef.setInput(
+        "hint",
+        "A hint long enough to wrap onto more than one line in a narrow column."
+      );
+      await fixture.whenStable();
+
+      expect(subscriptSizing()).toEqual("dynamic");
+    });
   });
 
   describe("generate password button", () => {
