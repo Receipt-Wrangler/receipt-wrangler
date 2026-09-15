@@ -688,13 +688,29 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
       .subscribe();
   }
 
-  public duplicateReceipt(id: string): void {
-    this.receiptService
-      .duplicateReceipt(Number.parseInt(id))
+  public duplicateReceipt(row: Receipt): void {
+    const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
+
+    dialogRef.componentInstance.headerText = "Duplicate Receipt";
+    dialogRef.componentInstance.dialogContent = `Are you sure you would like to duplicate the receipt ${row.name}?`;
+
+    dialogRef
+      .afterClosed()
       .pipe(
-        tap((r: Receipt) => {
-          this.snackbarService.success("Receipt successfully duplicated");
-          this.router.navigateByUrl(`/receipts/${r.id}/view`);
+        take(1),
+        tap((confirmed) => {
+          if (confirmed) {
+            this.receiptService
+              .duplicateReceipt(row.id)
+              .pipe(
+                take(1),
+                tap((r: Receipt) => {
+                  this.snackbarService.success("Receipt successfully duplicated");
+                  this.router.navigateByUrl(`/receipts/${r.id}/view`);
+                })
+              )
+              .subscribe();
+          }
         })
       )
       .subscribe();
