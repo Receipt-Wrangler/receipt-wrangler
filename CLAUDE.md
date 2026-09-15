@@ -316,6 +316,11 @@ only ever describe the whole group.
   what keeps an unpaged aggregate affordable on the app's hottest screen.
 - **The synthetic "All" group picks a configuration via chips**, since it spans several groups and
   has none of its own; the data still spans every group. See `desktop/CLAUDE.md` → "Receipt summary".
+- **E2E on the desktop only** (`desktop/e2e/receipt-summary.spec.ts`), because the Jest specs inject
+  group settings into a mocked store and so prove nothing about the wire — the same reason the
+  default-custom-fields feature above has one. It covers the settings round-trip through the real
+  resolver, the figures off a real decimal fold, a filter recomputing every row, and the All-group
+  chip pick surviving a reload. There is deliberately no mobile counterpart: no filter UI there.
 
 ### Seeding the Group Field
 

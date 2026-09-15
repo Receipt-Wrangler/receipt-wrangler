@@ -1356,8 +1356,12 @@ for the wire contract.
   in place instead of refetching: `deleteReceipt` (the count changes) and the bulk status update
   (**the status buckets move** — the one that looks like it needs nothing and needs it most).
   `duplicateReceipt` navigates away, so it needs nothing.
-- **The "no configured group" guard lives inside the `switchMap`**, before the HTTP call, so an
-  install that has not opted in issues no request at all.
+- **The "no configured group" guard lives inside the `switchMap`**, before the HTTP call — but it
+  only fires on the **All** group when no member group has a summary enabled. A **real** group whose
+  summary is off still issues the request and renders nothing off the 200's `enabled: false`. That is
+  deliberate: gating on the client's cached `groupReceiptSettings` would render a stale block when an
+  admin has just changed the configuration. The cheapness that survives is the server's — the off
+  state costs one settings read and no receipt query at all (`api/CLAUDE.md` → "Receipt Summary").
 - **The All-group chip row.** `Group.groupReceiptSettings` is required on the generated `Group` and
   AppData hydrates every group's projections, so the client already knows which groups have a summary
   configured — no extra fetch. The chips pick whose *configuration* applies while the *data* still
@@ -1387,6 +1391,19 @@ for the wire contract.
   `role="presentation"`, so clicking it in a test does nothing.
 - A configured status matching no receipt still renders, as a **muted zero row**, so the block keeps
   its shape as the filter narrows and a legitimate zero does not read as a bug.
+- **E2E: `e2e/receipt-summary.spec.ts`** (serial, admin `storageState`). The Jest specs inject group
+  settings into a mocked store, so they prove nothing about the wire; this covers the settings form
+  round-tripping through a real `GET /group/{id}`, the figures off a real decimal fold, a filter
+  recomputing every row, and the All-group chip pick surviving a reload. Two locator traps it
+  documents so the next author does not rediscover them: a chip's clickable, state-carrying element
+  is the **inner `role="option"` button** (`mat-chip-option`'s host is `role="presentation"`), and
+  the filter dialog's Status row is an `app-autocomlete` whose open panel covers the footer — press
+  **Escape** after picking or the submit click is intercepted and the test hangs to timeout.
+- **The chip row must never be asserted by count or position.** It lists every group the admin
+  belongs to whose summary is enabled, and the suite runs `fullyParallel` against a shared backend,
+  so a group leaked by a crashed earlier run would break an exact-count assertion — and, sorting
+  earlier, would even win the alphabetical auto-select. Assert chips **by testid** and drive the
+  switch by clicking; the auto-select rule is pinned deterministically in the Jest specs instead.
 
 ### The overflow menu
 
