@@ -12,7 +12,7 @@ import { fadeInOut } from "src/animations";
 import { ReceiptFilterService } from "src/services/receipt-filter.service";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { ResetReceiptFilter, SetColumnConfig, SetPage, SetPageSize, SetQuickDateField, SetReceiptFilterData, SetReceiptFilterField, } from "src/store/receipt-table.actions";
-import { ReceiptTableState } from "src/store/receipt-table.state";
+import { DEFAULT_RECEIPT_ORDER_BY, DEFAULT_RECEIPT_SORT_DIRECTION, ReceiptTableState, } from "src/store/receipt-table.state";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS, RECEIPT_DATE_FILTER_FIELDS, ReceiptDateFilterFieldKey } from "../../constants";
@@ -20,6 +20,7 @@ import { ReceiptTableColumnConfig } from "../../interfaces";
 import {
   BulkStatusUpdateCommand,
   Category,
+  CustomField,
   FilterOperation,
   Group,
   GroupsService,
@@ -34,9 +35,14 @@ import {
 import { SnackbarService } from "../../services";
 import { ReceiptExportService } from "../../services/receipt-export.service";
 import { ReceiptFilterComponent } from "../../shared-ui/receipt-filter/receipt-filter.component";
+import { canReadCustomFieldCatalog } from "../../resolvers/custom-field.resolver";
 import { AuthState, GroupState, UserState } from "../../store";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
-import { applyFormCommand } from "../../utils/index";
+import {
+  applyFormCommand,
+  customFieldColumnDef,
+  mergeCustomFieldColumns,
+} from "../../utils/index";
 import { FilterMonth, monthFilterEntry, monthFromFilterEntry } from "../../utils/receipt-date-filter";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { buildReceiptFilterChips, ReceiptFilterChip } from "../../utils/receipt-filter-chips";
@@ -44,6 +50,15 @@ import { isFilterEntryActive } from "../../utils/receipt-filter-entry";
 import { openQuickScanDialog } from "../quick-scan-dialog/open-quick-scan-dialog";
 import { BulkStatusUpdateComponent } from "../bulk-resolve-dialog/bulk-status-update-dialog.component";
 import { ColumnConfigurationDialogComponent } from "../column-configuration-dialog/column-configuration-dialog.component";
+
+/**
+ * A receipts-table column, carrying the custom field definition when the column
+ * is one. The shared table hands the whole column to a cell template, which is
+ * how a single template can render every custom field.
+ */
+interface ReceiptTableColumn extends TableColumn {
+  customField?: CustomField;
+}
 
 @UntilDestroy()
 @Component({
@@ -93,6 +108,8 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   readonly statusCell = viewChild.required<TemplateRef<any>>("statusCell");
 
   readonly resolvedDateCell = viewChild.required<TemplateRef<any>>("resolvedDateCell");
+
+  readonly customFieldCell = viewChild.required<TemplateRef<any>>("customFieldCell");
 
   readonly actionsCell = viewChild.required<TemplateRef<any>>("actionsCell");
 
@@ -178,6 +195,11 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     return num > 0 ? num : undefined;
   });
 
+  public customFields = signal<CustomField[]>([]);
+
+  /** Whether `customFields` is the real catalog rather than a permission stub. */
+  public customFieldsAvailable = signal<boolean>(true);
+
   public categories = signal<Category[]>([]);
 
   public tags = signal<Tag[]>([]);
@@ -232,7 +254,69 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         ? []
         : this.store.selectSnapshot(AuthState.groupTags(numericGroupId))
     );
+
+    // Resolved per route, and empty for a user without app.custom-fields.read -
+    // which is the permission gate: no catalog, no custom field columns.
+    this.customFields.set(
+      this.activatedRoute.snapshot.data["customFields"] ?? []
+    );
+
+    // ...but that empty list means "not permitted to look", not "none exist", and
+    // the two must not be confused when reconciling - see reconcileColumnConfig.
+    this.customFieldsAvailable.set(canReadCustomFieldCatalog(this.store));
+    this.reconcileColumnConfig();
+
     this.getInitialData();
+  }
+
+  /**
+   * Brings the persisted column configuration back in line with the custom
+   * fields that exist now, before anything reads it.
+   *
+   * Both halves matter on the *first* load. The configuration and the sort are
+   * persisted to localStorage and are shared by every account using the browser,
+   * so the table can start up holding a column for a deleted custom field, or one
+   * only an administrator can see. A stale column would make mat-table render an
+   * id it has no definition for; a stale sort would make the very first request
+   * ask the API to order by a column that no longer exists.
+   */
+  private reconcileColumnConfig(): void {
+    const persisted = this.store.selectSnapshot(
+      ReceiptTableState.columnConfig
+    );
+    const reconciled = mergeCustomFieldColumns(
+      persisted,
+      this.customFields(),
+      this.customFieldsAvailable()
+    );
+
+    const changed =
+      reconciled.length !== persisted.length ||
+      reconciled.some(
+        (column, index) =>
+          column.matColumnDef !== persisted[index].matColumnDef ||
+          column.visible !== persisted[index].visible ||
+          column.order !== persisted[index].order
+      );
+
+    if (changed) {
+      this.store.dispatch(new SetColumnConfig(reconciled));
+    }
+
+    const filterData = this.store.selectSnapshot(ReceiptTableState.filterData);
+    const isKnownColumn = reconciled.some(
+      (column) => column.matColumnDef === filterData.orderBy
+    );
+
+    if (!isKnownColumn) {
+      this.store.dispatch(
+        new SetReceiptFilterData({
+          ...filterData,
+          orderBy: DEFAULT_RECEIPT_ORDER_BY,
+          sortDirection: DEFAULT_RECEIPT_SORT_DIRECTION,
+        })
+      );
+    }
   }
 
   private setGroup(): void {
@@ -354,7 +438,19 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         template: this.resolvedDateCell(),
         sortable: true,
       },
-    ] as TableColumn[];
+    ] as ReceiptTableColumn[];
+
+    // One column per custom field, after the built-in ones. They share a single
+    // cell template, which reads the definition off the column it is rendering.
+    allColumns.push(
+      ...this.customFields().map((customField) => ({
+        columnHeader: customField.name,
+        matColumnDef: customFieldColumnDef(customField.id),
+        template: this.customFieldCell(),
+        sortable: true,
+        customField,
+      }))
+    );
 
     // Filter and order columns based on configuration
     const visibleColumnConfigs = currentColumnConfig
@@ -363,9 +459,7 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
     const columns = visibleColumnConfigs
       .map(config => allColumns.find(col => col.matColumnDef === config.matColumnDef))
-      .filter(col => col !== undefined) as TableColumn[];
-
-    const displayColumns = ["select", ...visibleColumnConfigs.map(config => config.matColumnDef)];
+      .filter(col => col !== undefined) as ReceiptTableColumn[];
 
     if (this.canEdit) {
       columns.push({
@@ -374,8 +468,12 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         template: this.actionsCell(),
         sortable: false,
       });
-      displayColumns.push("actions");
     }
+
+    // Derived from the columns that actually resolved, never from the stored
+    // configuration: mat-table throws on a displayed id it has no definition for,
+    // and a configuration naming a since-deleted custom field is ordinary.
+    const displayColumns = ["select", ...columns.map(col => col.matColumnDef)];
 
     const filter = this.store.selectSnapshot(ReceiptTableState.filterData);
     const orderByIndex = columns.findIndex(
@@ -508,7 +606,11 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
     const dialogRef = this.matDialog.open(ColumnConfigurationDialogComponent, {
       ...DEFAULT_DIALOG_CONFIG,
-      data: { currentColumns: currentColumnConfig }
+      data: {
+        currentColumns: currentColumnConfig,
+        customFields: this.customFields(),
+        customFieldsAvailable: this.customFieldsAvailable(),
+      }
     });
 
     dialogRef

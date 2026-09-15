@@ -1,0 +1,21 @@
+@let customFieldValue = value();
+
+@if (customFieldValue) {
+  <ng-container [ngSwitch]="customField()?.type">
+    <ng-container *ngSwitchCase="CustomFieldType.Currency">
+      {{ currencyValue() | customCurrency }}
+    </ng-container>
+    <ng-container *ngSwitchCase="CustomFieldType.Date">
+      {{ customFieldValue.dateValue | date }}
+    </ng-container>
+    <ng-container *ngSwitchCase="CustomFieldType.Text">
+      {{ customFieldValue.stringValue }}
+    </ng-container>
+    <ng-container *ngSwitchCase="CustomFieldType.Select">
+      {{ selectedOptionValue() }}
+    </ng-container>
+    <ng-container *ngSwitchCase="CustomFieldType.Boolean">
+      {{ customFieldValue.booleanValue ? "Yes" : "No" }}
+    </ng-container>
+  </ng-container>
+}

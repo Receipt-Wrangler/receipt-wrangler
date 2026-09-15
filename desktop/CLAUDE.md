@@ -162,7 +162,7 @@ Keep `npm audit` at **0 vulnerabilities**. Two conventions exist specifically to
 do not undo them without re-checking `npm audit`:
 - **`overrides` block in `package.json`** forces patched versions of build-time/dev-only transitive
   deps that the Angular toolchain otherwise pins inside vulnerable ranges (`@babel/core`, `esbuild`,
-  `http-proxy-middleware`, `undici`, `uuid`). When `npm audit` flags a new transitive advisory that
+  `http-proxy-middleware`, `qs`, `undici`, `uuid`). When `npm audit` flags a new transitive advisory that
   the toolchain hasn't bumped yet, add/raise the floor here rather than waiting on an upstream release.
 - **Exact pins (no caret):** `ngx-bootstrap` (`21.0.1`) and `@playwright/test` (`1.59.1`) are pinned
   because their next minor introduced an incompatibility (ngx-bootstrap dropped `CarouselModule.forRoot()`
@@ -281,6 +281,9 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   generate handler is synchronous by design: `type` is a plain `@Input`, so under zoneless CD only
   the click event's CD pass renders the reveal (the clipboard write is a detached side effect).
 - **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`.
+- **Badges:** the shared standalone **`app-badge`** (`src/shared-ui/badge/`) — `<app-badge [text]="..."
+  [tone]="...">`, a 9.5px uppercase micro-badge for marking an item in a list. Do NOT hand-roll one;
+  see **The shared badge** below for the tones and the two traps.
 - **Simple filters:** the segmented `app-filter-bar` (`src/shared-ui/filter-bar/`) — pass `FilterTab[]`
   (`{ value, label, icon?, count? }`) and two-way bind the selected `value`.
 - **Breadcrumbs:** `app-breadcrumb` with `BreadcrumbItem[]`.
@@ -297,6 +300,50 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   control a `<resource>-add` `data-testid` and a `tooltip`. Do NOT hand-roll a raw `app-button` for a
   list-page add action, and do NOT use a bespoke page-title header.
 If a design appears to require a new pattern, confirm with the user before diverging.
+
+### The shared badge (`app-badge`)
+
+`src/shared-ui/badge/` — a small uppercase badge (`text` + `tone` signal inputs) used to mark an item
+in a list. It replaced two hand-rolled copies with identical geometry and **different colours**, which
+is exactly the drift a shared component prevents: `app-select`'s option badge was slate, the report
+panel's custom badge purple. Both are now purple, so **"Custom" looks the same everywhere** — the
+report builder's dropdowns and picked rows, and the receipts table's Configure Columns dialog.
+
+`CUSTOM_FIELD_BADGE` ("Custom") is exported from the component file, so the string has one home.
+
+Three things about it are load-bearing:
+
+- **The class is `.rw-badge`, NOT `.badge`.** Bootstrap is a global stylesheet here
+  (`angular.json` builds `bootstrap-scss/bootstrap.scss`) and defines an unscoped `.badge` with its
+  own `line-height`, `text-align`, `white-space` and a **white** `color`. A component rule only
+  overrides what it *declares*, so everything else leaks — measured as a ~44% height change — and
+  Bootstrap's badge is genuinely used elsewhere (`dashboard/pie-chart`), so it can't just be dropped.
+  `rw-` matches the existing `.rw-chip` / `.rw-card` convention. **Any new shared component must check
+  for a Bootstrap collision on its class names.**
+- **Tones are opaque, and that is the point.** Both originals used a translucent fill, and both
+  carried a comment that at 9.5px/700 the text is "small text" under WCAG and needs 4.5:1 against its
+  *composited* background. A translucent fill makes contrast depend on whatever the badge is dropped
+  onto, which a shared component cannot know — so each tone is the pre-composited opaque colour.
+  `purple` 6.43:1, `slate` 6.22:1, `blue` 5.90:1, `green` 5.88:1. **`blue`/`green` are darker than the
+  report panel's original kind badges**, which never got the contrast pass the custom badge did (they
+  measured 2.61:1 and 3.03:1); the row's `.kind-*` **icon chip** keeps its lighter translucent fill,
+  so chip and badge in the same row are deliberately not the same shade.
+- **`flex: none` lives on `:host`, not the inner span** — the host is the flex item, so on the span it
+  silently does nothing. The badge carries **no margin**: the two flex call sites space it with `gap`,
+  and only `app-select` (where it follows inline text) adds `margin-left`, in its own stylesheet.
+
+Wiring: registered in `SharedUiModule`'s `imports` + `exports` (the `LoginQrComponent` pattern), which
+covers `ReceiptsModule` and `ReportsModule`. **`SelectModule` imports the component directly** —
+`SharedUiModule` imports `SelectModule`, so reaching it the other way would be a circular import.
+
+Two call-site rules the e2e suites depend on:
+- **Keep the badge inside the `mat-option`'s text content.** `e2e/report-custom-fields.spec.ts`
+  matches option accessible names with `^${name} Custom$`, and `e2e/helpers/reports.ts`
+  (`addGroupingLevel`) documents the same coupling.
+- **Keep it OUT of a `mat-checkbox`'s label.** In the Configure Columns dialog it is a sibling of the
+  checkbox, so the checkbox's accessible name stays the bare field name — otherwise every locator that
+  picks a column by its field name stops resolving. (`.column-checkbox { flex: 1 }` then pushes the
+  badge to the right of the row, which is why it reads as a tidy right-hand column there.)
 
 ### Roles & Permissions (Manage Roles)
 
@@ -613,6 +660,80 @@ holder renames a field through the dialog and it persists with the type untouche
 non-editable and saved options expose no delete while an appended one does, the non-holder sees no
 control and its direct `PUT /api/customField/:id` 403s, and a type change 400s even for the holder).
 `e2e/legacy-user-visibility.spec.ts` pins that Legacy User sees neither edit nor delete.
+
+### Custom fields as receipts-table columns
+
+The **Configure Columns** dialog (`src/receipts/column-configuration-dialog/`) lists every custom
+field after the nine built-in columns, and each one can be turned into a sortable table column.
+
+- **`custom_<id>` is the column's `matColumnDef` *and* the `orderBy` sent to the API** — the same key
+  the reporting engine uses (`receiptsource.CustomFieldKey`). `src/utils/receipt-table-columns.ts`
+  owns that convention (`customFieldColumnDef` / `parseCustomFieldColumnDef`) plus
+  `RECEIPT_COLUMN_DISPLAY_NAMES`, which the dialog label and the table header now **share** instead of
+  each hard-coding its own literal.
+- **Hidden by default.** A newly created custom field is appended to the list unchecked, so it never
+  silently widens everyone's table.
+- **`mergeCustomFieldColumns` reconciles the persisted configuration with the live catalog**, and both
+  the dialog and the table run it. The configuration lives in **localStorage** (`receiptTable` is in
+  `ngxsStorageKeys`) and is shared by every account on the browser, so it outlives the catalog it was
+  written against: a column for a deleted custom field is dropped, a new field is appended hidden, and
+  the persisted order — including a custom field dragged above a built-in — is otherwise preserved.
+  `resetToDefaults()` restores the built-in defaults but keeps the custom fields listed, since they
+  would only reappear on the next open anyway.
+- **`reconcileColumnConfig()` runs in `ngOnInit`, before the first fetch**, and also resets a
+  persisted `orderBy` that no longer resolves. That ordering is load-bearing: the sort is persisted
+  too, so without it the *first* request asks the API to order by a column that no longer exists.
+  (The backend falls back rather than erroring, but the table would then disagree with its own
+  headers.)
+- **`displayColumns` is derived from the columns that actually resolved**, not from the stored
+  configuration. `mat-table` throws on a displayed id it has no definition for, and with custom fields
+  a stale id is ordinary rather than hypothetical.
+- **The permission gate is the resolver.** `customFieldResolverFn` is wired onto the
+  `receipts/group/:groupId` route and already returns `[]` without `app.custom-fields.read`, so such a
+  user simply has no custom field columns. No new permission code.
+- **An empty catalog means "may not look", NOT "none exist" — and the difference is destructive.**
+  Because the configuration is persisted per browser and **not namespaced per account**, treating the
+  permission stub as an authoritative empty catalog deletes every `custom_*` entry the configuration
+  holds: an administrator's saved layout is gone the moment a colleague without the permission opens
+  the page on the same machine. So `mergeCustomFieldColumns` takes a **required** third argument,
+  `catalogAvailable`, and keeps the persisted custom columns untouched when it is false (built-ins are
+  still healed and order re-derived, neither of which needs a catalog). Both persistence paths pass it
+  — `reconcileColumnConfig` **and** the dialog, via `customFieldsAvailable` on its data, since saving
+  writes the list straight back and would otherwise undo what reconciliation preserved. The flag comes
+  from `canReadCustomFieldCatalog(store)`, exported from the resolver so the resolver's own `of([])`
+  branch and its consumers read **one** predicate and cannot drift.
+  - Nothing renders badly as a result: `setColumns` builds `allColumns` from the catalog and then
+    drops any configured column with no definition, so a preserved-but-unnameable column is simply
+    absent from the table rather than showing a raw `custom_5` header. The sort is preserved for the
+    same reason — it is reset off the reconciled columns, so keeping the column without the sort would
+    still discard half the state.
+- **The shared `app-table` hands the whole column to a cell template**
+  (`{ element, index, column }`), which is what lets one `#customFieldCell` template serve every
+  custom field: `receipts-table` carries the `CustomField` on the column object and the template reads
+  it back.
+- **`app-custom-field-cell`** (`src/receipts/custom-field-cell/`) is the read-only counterpart of
+  `app-custom-field` — the same `ngSwitch` on `CustomFieldType`, without a FormGroup (the table renders
+  plain API records). **CURRENCY goes through `customCurrency`**, exactly as the built-in Amount column
+  does; SELECT renders the option's text, BOOLEAN renders Yes/No.
+  - Where a receipt carries several values for one field, the **lowest id that is actually set** wins —
+    the same rule the API sorts by and the reporting engine reads by, so the cell can never disagree
+    with the sort order or a report.
+  - **Do not name a `@let` after the signal it reads.** `@let value = value()` shadows the component
+    member inside its own initializer and fails with "undefined is not a function".
+- **Each custom field row carries the shared `app-badge`** reading "Custom"
+  (`data-testid="column-config-custom"`), so a field named "Vendor" is not mistaken for a built-in
+  column. `ColumnConfigItem.isCustom` comes from the existing `parseCustomFieldColumnDef` helper, and
+  is stripped in `saveConfiguration()` — the saved object is persisted to localStorage and read back
+  as the column config, so a derived key must not ride along. See "The shared badge" above for why it
+  sits outside the checkbox label.
+- The receipts list response now always carries custom field values **with their definitions**; see
+  `api/CLAUDE.md` → "Custom fields on the receipts list" for why the definitions are not optional.
+- **E2E:** `e2e/custom-field-columns.spec.ts` (serial, admin storageState, own seeded group) — the
+  fields listed after Resolved Date and unchecked, a CURRENCY cell formatted by the configured currency
+  display, numeric sorting on it (amounts chosen so a text sort is visibly wrong), a SELECT sorting by
+  option text rather than option id, and the column healing away when its field is deleted. Money is
+  asserted with a **separator-tolerant** regex because the currency configuration is a global System
+  Setting on the shared CI backend that this spec must not mutate.
 
 ### Seeding the receipt group
 
@@ -1535,7 +1656,10 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   and the shared **`app-select` gained an optional `optionBadgeKey`** input that draws it beside the
   option text. Because `MatOption.viewValue` is the option's `textContent`, a badged option would read
   "HSTCustom" in the closed select — so a badged select also renders its own `<mat-select-trigger>`.
-  Both are opt-in and default off, so every other `app-select` call site is unchanged. The already-picked
+  Both are opt-in and default off, so every other `app-select` call site is unchanged. The badge itself
+  is the shared **`app-badge`** (see "The shared badge" above), as are the picked rows' custom and kind
+  badges; `app-select` also takes an `optionBadgeTone` (defaulting to the custom-field purple) so a
+  select badging something other than a custom field can say so. The already-picked
   grouping levels and column rows carry the same badge (`isCustom` on `groupByLevels()` / `columnRows()`,
   resolved through the catalog rather than by matching the key's shape, so a user without
   `app.custom-fields.read` sees no badge instead of one on a field the builder cannot name).
