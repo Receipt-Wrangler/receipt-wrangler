@@ -1566,6 +1566,22 @@ holder of `group.receipts.read`, and `MaskReceiptsForMemberVisibility` already m
 a malformed value still errors out, which is the guard keeping `orderBy` out of the SQL it is
 concatenated into). One key vocabulary for reports and the table.
 
+**The parse is 32-bit on purpose.** The id it yields is a `models.CustomField` id, i.e. a `uint` —
+which is 32 bits on a 32-bit build, where parsing at 64 bits and narrowing would not merely overflow
+but name a *different* field (`custom_4294967297` would resolve to field `1`). No id reaches 2^32, so
+capping only rejects keys that cannot name a real field, and the caller then treats them like any
+other malformed key. Flagged by CodeQL as an incorrect integer conversion.
+
+**The sort DIRECTION is never concatenated on a custom-field path.** Both fallback branches hand it to
+`BaseRepository.Sort`, which renders `ASC`/`DESC` from a `Desc bool` on `clause.OrderByColumn` — the
+same convention the other twelve repositories use — and the main ordering path picks its keyword from
+literals, because `clause.OrderBy{Expression}` leaves `Columns`/`Desc` unavailable (see below).
+`GetPagedReceiptsByGroupId` does validate the direction up front with `commands.IsValidSortDirection`,
+but that check sits ~350 lines upstream, so the safety is deliberately restated at the point the SQL is
+built rather than inherited from one call path. CodeQL flags the concatenated form as a query built
+from user-controlled sources; the remaining concatenation at the built-in-column branch is left alone,
+its `orderBy` and direction both being allow-listed against literals by `isTrustedValue`.
+
 - **A correlated subquery, never a join.** `custom_field_values` has no unique index on
   `(receipt_id, custom_field_id)`, so a join multiplies receipt rows and corrupts both the total count
   and pagination. `orderByCustomField` builds the subquery as an ordinary `*gorm.DB` and passes it as
@@ -1603,8 +1619,11 @@ concatenated into). One key vocabulary for reports and the table.
   repository method, so it inherits both behaviours.
 - **Tests**: `repositories/receipt_custom_field_sort_test.go` — one per type (CURRENCY with values
   that sort differently as text than as numbers), value-less receipts still listed with a matching
-  count, the duplicate/lowest-non-null rule, stable paging across equal values, the unknown-id
-  fallback, the malformed-key rejection, and the `"type":""` guard. The suite is **SQLite only**, so
+  count, the duplicate/lowest-non-null rule, stable paging across equal values, both fallbacks
+  (unknown id, and an unsortable type — an empty one, the only unknown `CustomFieldType.Value()` lets
+  through) asserted in **both** directions so a dropped direction cannot pass, the malformed-key
+  rejection, and the `"type":""` guard. `receiptsource_test.go` → `TestParseCustomFieldKey` covers the
+  parser directly, including the 2^32 boundary and the round trip against `CustomFieldKey`. The suite is **SQLite only**, so
   the cross-engine NULL ordering is not covered there.
 
 ## Reporting Engine (`internal/reporting`)

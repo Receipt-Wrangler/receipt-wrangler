@@ -51,6 +51,16 @@ func createSortableReceipt(name string) models.Receipt {
 	return receipt
 }
 
+// createReceiptAt stamps created_at explicitly, because the fallback below orders
+// by that column and receipts seeded back-to-back can otherwise share a timestamp,
+// which would let a broken sort direction still look correct.
+func createReceiptAt(name string, createdAt time.Time) models.Receipt {
+	receipt := createSortableReceipt(name)
+	GetDB().Model(&receipt).Update("created_at", createdAt)
+
+	return receipt
+}
+
 func sortByCustomField(customFieldId uint, sortDirection commands.SortDirection) commands.ReceiptPagedRequestCommand {
 	return commands.ReceiptPagedRequestCommand{
 		PagedRequestCommand: commands.PagedRequestCommand{
@@ -338,27 +348,64 @@ func TestShouldPageStablyThroughEqualCustomFieldValues(t *testing.T) {
 
 // A client persists its sort, so a custom field deleted afterwards must not make
 // every subsequent list load fail. It falls back to the default ordering.
+// A custom field that no longer exists falls back to the default column instead
+// of erroring, because clients persist their sort and a deleted field must not
+// make every subsequent list load fail.
+//
+// The direction has to survive the fallback, which is what both orders below
+// pin: it is handed to BaseRepository.Sort, which renders ASC/DESC from a bool
+// rather than concatenating the caller's string into the query.
 func TestShouldFallBackToDefaultOrderForUnknownCustomField(t *testing.T) {
 	defer teardownReceiptTest()
 	setupReceiptTest()
-	createTestReceipts()
 
-	repository := NewReceiptRepository(nil)
-	receipts, count, err := repository.GetPagedReceiptsByGroupId(
-		1, "1", sortByCustomField(999999, commands.DESCENDING), nil, nil,
+	base := time.Date(2024, 3, 1, 12, 0, 0, 0, time.UTC)
+	createReceiptAt("oldest", base)
+	createReceiptAt("middle", base.Add(time.Hour))
+	createReceiptAt("newest", base.Add(2*time.Hour))
+
+	assertOrder(
+		t,
+		sortedNames(t, sortByCustomField(999999, commands.DESCENDING)),
+		[]string{"newest", "middle", "oldest"},
 	)
-	if err != nil {
-		utils.PrintTestError(t, err, nil)
-		return
-	}
+	assertOrder(
+		t,
+		sortedNames(t, sortByCustomField(999999, commands.ASCENDING)),
+		[]string{"oldest", "middle", "newest"},
+	)
+}
 
-	if count != 2 || len(receipts) != 2 {
-		utils.PrintTestError(t, count, 2)
-	}
+// The other fallback: a field that exists but whose type has no sort expression.
+// An empty type is the only such value that can be persisted - CustomFieldType's
+// Value() guard rejects every other unknown string, but lets the empty one through.
+func TestShouldFallBackToDefaultOrderForUnsortableCustomFieldType(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	untyped := models.CustomField{Name: "Untyped"}
+	GetDB().Create(&untyped)
+
+	base := time.Date(2024, 3, 1, 12, 0, 0, 0, time.UTC)
+	createReceiptAt("oldest", base)
+	createReceiptAt("newest", base.Add(time.Hour))
+
+	assertOrder(
+		t,
+		sortedNames(t, sortByCustomField(untyped.ID, commands.DESCENDING)),
+		[]string{"newest", "oldest"},
+	)
+	assertOrder(
+		t,
+		sortedNames(t, sortByCustomField(untyped.ID, commands.ASCENDING)),
+		[]string{"oldest", "newest"},
+	)
 }
 
 // A malformed orderBy is still rejected outright - that is the guard keeping the
-// sort column out of the SQL it is concatenated into.
+// sort column out of the SQL it is concatenated into. (The sort *direction* is no
+// longer concatenated on any custom-field path; it goes through the bool that
+// BaseRepository.Sort and the ORDER BY expression both build their keyword from.)
 func TestShouldRejectMalformedCustomFieldOrderBy(t *testing.T) {
 	defer teardownReceiptTest()
 	setupReceiptTest()
@@ -366,7 +413,17 @@ func TestShouldRejectMalformedCustomFieldOrderBy(t *testing.T) {
 
 	repository := NewReceiptRepository(nil)
 
-	for _, orderBy := range []string{"custom_abc", "custom_", "custom_1; DROP TABLE receipts", "custom_1_month"} {
+	malformed := []string{
+		"custom_abc",
+		"custom_",
+		"custom_1; DROP TABLE receipts",
+		"custom_1_month",
+		// Wider than a uint holds on a 32-bit build, where parsing it at 64 bits
+		// and narrowing would name field 1 rather than no field at all.
+		"custom_4294967296",
+	}
+
+	for _, orderBy := range malformed {
 		pagedRequest := commands.ReceiptPagedRequestCommand{
 			PagedRequestCommand: commands.PagedRequestCommand{
 				Page: 1, PageSize: 50, OrderBy: orderBy, SortDirection: commands.ASCENDING,

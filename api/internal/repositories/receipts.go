@@ -929,12 +929,12 @@ func (repository ReceiptRepository) orderByCustomField(
 	}
 
 	if len(customFields) == 0 {
-		return query.Order(constants.DEFAULT_RECEIPT_ORDER_BY + " " + string(sortDirection)), nil
+		return repository.Sort(query, constants.DEFAULT_RECEIPT_ORDER_BY, sortDirection), nil
 	}
 
 	sortExpression, notNullColumn, ok := customFieldSortExpressions(customFields[0].Type)
 	if !ok {
-		return query.Order(constants.DEFAULT_RECEIPT_ORDER_BY + " " + string(sortDirection)), nil
+		return repository.Sort(query, constants.DEFAULT_RECEIPT_ORDER_BY, sortDirection), nil
 	}
 
 	valueQuery := repository.GetDB().
@@ -958,8 +958,18 @@ func (repository ReceiptRepository) orderByCustomField(
 	// to it. The tiebreaker is not cosmetic: a boolean or select field has a
 	// handful of distinct values, and without a unique last term LIMIT/OFFSET
 	// paging repeats and skips rows between pages.
+	//
+	// Because Columns and Desc are unavailable here, this is the one ordering path
+	// that cannot delegate to BaseRepository.Sort. The keyword is therefore chosen
+	// from literals rather than built from sortDirection, so the caller's string
+	// never reaches the SQL even if a future call site skips IsValidSortDirection.
+	direction := "ASC"
+	if sortDirection == commands.DESCENDING {
+		direction = "DESC"
+	}
+
 	return query.Order(clause.OrderBy{Expression: clause.Expr{
-		SQL:  "(?) " + string(sortDirection) + ", receipts.id DESC",
+		SQL:  "(?) " + direction + ", receipts.id DESC",
 		Vars: []any{valueQuery},
 	}}), nil
 }

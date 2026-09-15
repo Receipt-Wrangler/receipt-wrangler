@@ -83,7 +83,12 @@ func ParseCustomFieldKey(key string) (uint, bool) {
 		}
 	}
 
-	customFieldID, err := strconv.ParseUint(digits, 10, 64)
+	// 32 bits, not 64: the result is a models.CustomField id, which is a uint -
+	// and a uint is 32 bits on a 32-bit build, where parsing to 64 would truncate
+	// and name a DIFFERENT field ("custom_4294967297" would resolve to field 1).
+	// No id reaches 2^32, so the cap only rejects keys that cannot name a real
+	// field, which the caller already treats like any other malformed key.
+	customFieldID, err := strconv.ParseUint(digits, 10, 32)
 	if err != nil {
 		return 0, false
 	}
