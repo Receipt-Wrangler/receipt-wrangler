@@ -838,6 +838,10 @@ wrap the body in a `SingleChildScrollView`, and it pins the submit button as the
 - A `Scaffold.bottomSheet` **floats over** the body; a bottom bar reserves its space. Floating buried
   the form's last field under the submit button and the "enter details manually" link, which no amount
   of scrolling could clear (`submitButtonSpacing`'s fixed 70px is not the height of that Column).
+- The bar slot is the one `Scaffold` does **not** lift over the keyboard, so that trade cost the
+  submit button at exactly the moment the user reached for it — the form's last field is the
+  multi-line comment, so the keyboard is up by then. Fixed in `ScreenWrapper`; see "A pinned bottom
+  bar is not keyboard-safe" above.
 
 Together these shipped a Quick Scan whose **configured comment field could never be seen** — the
 comment is last in the form column and the image preview alone claims half the screen height
@@ -871,6 +875,73 @@ mounts it, so a raw `shellContext` is **null** and tapping Categories/Tags would
 `Navigator.of(null)`. (`receipt_form.dart` uses the same helper for its quick-actions sheet.) Guarded
 by `test/widgets/quick_scan_form_test.dart` (tap-opens-picker, shellContext null) and on-device by
 `quick_scan_submit_test.dart`.
+
+### A pinned bottom bar is not keyboard-safe — `Scaffold` only lifts `bottomSheet`
+
+`Scaffold` treats its two bottom slots differently, and the difference is invisible until a
+software keyboard opens:
+
+| slot | placed at | keyboard-safe? |
+|---|---|---|
+| `bottomSheet` | `contentBottom - height`, where `contentBottom = height - max(minInsets.bottom, bottomWidgetsHeight)` (`scaffold.dart:1088`, `:1154`) | **yes** — `minInsets.bottom` *is* `viewInsets.bottom` |
+| `bottomNavigationBar` | `max(0, height - bottomWidgetsHeight)` — no inset term at all (`scaffold.dart:1054`) | **no** — pinned to the physical bottom |
+
+So `showFullscreenBottomSheet`'s `bodyFillsSheet: true`, which moves the caller's button into the
+bar slot precisely *because* a bar reserves its space rather than floating over the form's last
+field, silently traded one bug for another: the Quick Scan submit button sat **under** the keyboard
+raised by the comment field directly above it.
+
+`ScreenWrapper._liftAboveKeyboard` closes it by padding the bar slot by
+`MediaQuery.viewInsetsOf(context).bottom`. Four things about that are load-bearing:
+
+- **The value is not computed.** `MediaQueryData.viewInsets`' own doc: *"When a mobile device's
+  keyboard is visible `viewInsets.bottom` corresponds to the top of the keyboard."* The platform
+  reports it (Android `WindowInsets` IME, iOS `UIKeyboardWillChangeFrame`) in logical pixels and
+  updates it **every frame** while the keyboard slides, so the bar follows exactly — split,
+  floating and hardware keyboards included. Never substitute a measured or hardcoded height.
+- **The read must happen inside the bar slot,** which is why a `Builder` wraps it. Widgets are
+  inflated where they are *mounted*, not where they are constructed, so the `Builder`'s context
+  lands in the slot's own `MediaQuery`. `Scaffold._addIfNonNull` (`scaffold.dart:2917-2925`) passes
+  `removeBottomInset: true` for the **body** slot (`:3036`) and not for this one (`:3166`), so a
+  read from inside the body yields **0** and the padding silently does nothing.
+- **It cannot double-count against the `SafeArea`** wrapping the scaffold. `SafeArea` consumes
+  `MediaQuery.paddingOf` (`safe_area.dart:115`), and `padding` is `viewPadding - viewInsets` floored
+  at 0 — so `padding.bottom` is 0 for exactly as long as the keyboard is up. The two are
+  complementary, never additive.
+- **Plain `Padding`, never `AnimatedPadding`.** The scaffold body resizes un-animated off the same
+  value, so a second interpolation here would make the bar trail the body's edge for the whole
+  slide, opening and closing a gap.
+
+**The `bottomSheet` slot is deliberately left alone** — padding it too would double-count. That is
+what keeps the receipt form (`receipt_form_screen.dart:133`), the quick-actions split sheet
+(`receipt_form.dart:720`) and the comment screen (`receipt_comment_screen.dart:60`) unchanged; all
+three were already safe, and the receipt form in particular is a common wrong guess.
+
+**`/search` restacks, on purpose.** It is the one screen that fills *both* slots
+(`main.dart:234`/`:238`): the nav bar in `bottomNavigationBar`, `WranglerSearchBar` in `bottomSheet`.
+Lifting the bar grows `bottomWidgetsHeight`, which lowers `contentBottom`, which moves the search
+field **above the nav bar** instead of directly onto the keyboard. Before: `[body][search][keyboard]`
+with the nav hidden. After: `[body][search][nav][keyboard]`. This was chosen over scoping the fix to
+the two sheets, so that no future bottom bar has to rediscover the problem.
+
+**Testing it needs geometry, and a control.** `findsOneWidget` is true for a button parked
+off-screen under the keyboard, so only a rect distinguishes the fix from the bug. The recipe:
+
+- `tester.view.viewInsets = FakeViewPadding(bottom: n)` — the same engine field the OS keyboard
+  sets, so `Scaffold` **and** `EditableText` (which reads `View.of`, not `MediaQuery`) both react.
+- `FakeViewPadding` is in **physical** pixels. Set `devicePixelRatio = 1.0` (as
+  `filter_multiselect_test.dart` does) and they are the logical pixels the rects come back in.
+- `addTearDown(tester.view.reset)` — `postTest` does **not** reset view values, so a leaked inset
+  follows every later case in the file.
+- Always assert a **keyboard-down control** too. Without it the guard also passes on a sheet that
+  was never full height — a button at y=400 is "above the keyboard" for the wrong reason.
+
+Covered by `test/widgets/screen_wrapper_keyboard_test.dart` (the slot contract, including the
+both-slots `/search` shape and the bar returning on dismiss), plus one real-surface case in each of
+`test/widgets/quick_scan_sheet_test.dart` and `test/widgets/filter_multiselect_test.dart`. Every
+keyboard case fails pre-fix reading the full screen height instead of the keyboard top; verify that
+when changing them. **Demo:** `tool/quick-scan-keyboard.gif`, `tool/multi-select-keyboard.gif` and
+`tool/search-nav-keyboard.gif` — see "Recording a demo GIF" below.
 
 ### Receipt status presentation
 
@@ -1093,8 +1164,14 @@ per-item rows and the split sheet at once.
     moves it to `bottomNavigationBar`, which reserves the space instead.
   Both fixes land for Categories, Tags **and** the quick-actions Users picker at once — they share the
   one helper. `Expanded` is safe there because `FilterMultiSelect` has exactly one call site.
+  - `bodyFillsSheet` moved the confirm button into the one slot `Scaffold` does not lift above the
+    keyboard — and this sheet pins a `FormBuilderTextField` (the Filter bar) right above it, so
+    keyboard-up is its **normal** state, not an edge case. `ScreenWrapper` lifts it; see "A pinned
+    bottom bar is not keyboard-safe" above, and the keyboard case in
+    `test/widgets/filter_multiselect_test.dart`.
 - **Demo:** `tool/tap-target-demo.gif` shows the before/after hit regions under real clicks; it is
   regenerated by `tool/record_tap_target_demo.sh` (see "Recording a demo GIF" below).
+  `tool/multi-select-keyboard.gif` shows the confirm button against an open keyboard.
 - **Tests for the sheet's layout:** `test/widgets/filter_multiselect_test.dart` (phone-sized surface,
   90 options: a drag on the chips moves the **grid's own** `ScrollPosition`, the last chip ends up
   inside the window and clear of the confirm button, the filter bar does not move) and
@@ -1109,7 +1186,16 @@ per-item rows and the split sheet at once.
   `didChange`, the `required` validator, and the inert view mode. The e2e specs still tap the
   `"No <items> selected"` placeholder as their locator, which keeps working.
 
-### Recording a demo GIF (headless Linux desktop)
+### Recording a demo GIF
+
+Two routes, and the choice is forced by what the demo has to show:
+
+| route | use when | needs |
+|---|---|---|
+| **desktop capture** (below) | the demo needs real pointer input — hit targets, drags, hovers | ffmpeg, xdotool, Xvfb, a Linux desktop build |
+| **widget-test capture** (further below) | the demo needs a platform state the Linux desktop target cannot produce — an open **software keyboard**, a device pixel ratio, a notch | nothing beyond `flutter test` |
+
+#### Route 1 — desktop capture (headless Linux)
 
 There is no emulator in the Claude Code sandbox and the Go API is expensive to bring up there
 (ImageMagick 7 from source — see the root `CLAUDE.md`), so a demo of a **widget-level** change is
@@ -1151,10 +1237,13 @@ Five things that each cost a cycle:
   multiplied by `devicePixelRatio`) to `$TAP_DEMO_RECTS` in a post-frame callback. That file
   appearing is also the "app is up and painted" signal the recorder waits on — far more reliable
   than a fixed sleep, and it means the click plan never hardcodes a layout.
-- **Don't mount the app's real bottom sheet in a bare harness.** `showMultiselectBottomSheet` →
-  `showFullscreenBottomSheet` renders its `TopAppBar` / `BottomSubmitButton` as untextured grey
-  blocks outside the app's full theme and provider tree, *and* it covers the whole 1280x720 window,
-  hiding whatever is being compared. Demonstrate the outcome in-panel instead.
+- **Don't mount the app's real bottom sheet in a bare harness** — *on this route*.
+  `showMultiselectBottomSheet` → `showFullscreenBottomSheet` renders its `TopAppBar` /
+  `BottomSubmitButton` as untextured grey blocks outside the app's full theme and provider tree,
+  *and* it covers the whole 1280x720 window, hiding whatever is being compared. Demonstrate the
+  outcome in-panel instead. Both halves are artefacts of a bare `runApp` harness and **do not apply
+  to route 2**, where the test owns the surface: real fonts via `FontLoader`, the real provider
+  tree, and one panel captured per pump so nothing can cover the comparison.
 - **`pkill -f receipt_wrangler_mobile` kills the shell running it** — the pattern matches that
   shell's own command line, which shows up as a bare exit 144. Use `killall receipt_wrangler_mobile`.
 
@@ -1175,9 +1264,53 @@ Recording the **full app** (rather than a harness) against a live API adds three
   what makes a before/after pair cheap: rebuild and the app comes back already logged in.
 - **Scroll with the wheel (`xdotool click 5`), not a mouse drag.** Flutter's desktop `ScrollBehavior`
   excludes `PointerDeviceKind.mouse` from its drag devices, so a click-and-drag scrolls nothing even
-  on a perfectly good list. To show a **touch**-specific failure, drive it in a widget test instead
-  and capture `RenderRepaintBoundary.toImage` per frame (load the real font with `FontLoader`, or
-  every glyph renders as a box).
+  on a perfectly good list. To show a **touch**-specific failure, drive it in a widget test instead —
+  route 2 below is the worked example.
+
+#### Route 2 — widget-test frame capture
+
+`tool/keyboard_demo/` is the worked example, recording the keyboard-inset fix:
+
+```bash
+cd mobile && ./tool/record_keyboard_demo.sh     # -> tool/*-keyboard.gif
+```
+
+Route 1 **cannot** record that fix at all: there is no software keyboard on Linux desktop, so
+`viewInsets.bottom` is permanently 0 and the bug is unreproducible on that target. This route also
+needs no ffmpeg, ImageMagick, xdotool or Android SDK, none of which the Claude Code sandbox has —
+frames are captured inside a widget test and encoded to GIF in pure Dart.
+
+- **`capture.dart`** ramps the inset, grabs frames and encodes; **`fake_keyboard.dart`** draws the
+  keys; **`keyboard_demo_test.dart`** holds one demo per surface. Copy the trio for a new demo.
+- **It lives in `tool/`, not `test/`, and that is what keeps it out of CI.** `flutter test` with no
+  arguments scans **only** `test/`, while an explicit path is used verbatim. CI runs a bare
+  `flutter test`, so a demo under `test/` would re-encode and rewrite committed binaries on every
+  push. Keep the `_test.dart` suffix (name-based filters) and the `tool/` directory (discovery).
+- **Before/after is the same real screen recorded twice**, differing only by the
+  `debugDisableKeyboardLift` seam, then stitched side by side at encode time. That beats
+  hand-copying the pre-fix tree (as `_LegacyMultiSelectField` did on route 1): the copy cannot
+  drift, and if the fix regresses both panels simply become identical.
+- **Everything with real asynchrony must be inside `tester.runAsync`** — `toImage`, `toByteData`,
+  `File.readAsBytes`, `FontLoader.load`. `testWidgets` runs in fake-async, which never services the
+  engine's futures, so a bare `await boundary.toImage()` **hangs until the test times out** rather
+  than failing. `runAsync` also *swallows* errors and returns null, surfacing them via
+  `takeException` — so null-check and `fail()`, or a real failure shows up as a confusing null.
+- **`flutter test` always passes `--use-test-fonts`,** whose stub font draws every glyph as a filled
+  box. Load Raleway from `fonts/` on disk, register it as `Roboto` too (Material's default
+  `Typography` asks for that, and most text takes the theme default), and load `MaterialIcons` or
+  the app bar's icons are boxes.
+- **Set a `Timeout`** — `package:test`'s 30s default is wall-clock and unaffected by the fake clock,
+  and pure-Dart quantize + LZW over a few dozen frames takes minutes.
+- **Encoder settings are not the defaults.** `GifEncoder`'s default neural quantizer is a per-frame
+  neural net (slow) and dithering destroys the pixel runs LZW needs; flat UI art wants
+  `QuantizerType.octree`, `numColors: 64`, `DitherKernel.none`. Note `addFrame` encodes the
+  *previous* image and `finish()` flushes the last, and `duration` is in **1/100 s**, not ms.
+  There is no inter-frame diffing, so a held frame costs as much as a moving one — **buy hold time
+  with long per-frame durations, not duplicate frames**.
+- **Keep the captured subtree opaque.** `rawRgba` is premultiplied and the encoder switches on GIF
+  transparency the moment it finds a zero-alpha palette entry, which makes the whole clip flicker.
+- **`EditableText.debugDeterministicCursor = true`** or the caret blink makes frames differ run to
+  run (and never call `pumpAndSettle` after focusing a field — the blink schedules frames forever).
 
 ### `integration_test` is a regular dependency on purpose (Android Studio signed-bundle builds)
 

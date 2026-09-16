@@ -96,6 +96,34 @@ void main() {
         (widget) => widget is TextField && widget.decoration?.labelText == 'Filter',
       );
 
+  testWidgets('the confirm button stays clear of an open keyboard',
+      (tester) async {
+    // The Filter field is a real text input sitting above a confirm button that
+    // `bodyFillsSheet: true` pins as the scaffold's bottom BAR -- the one slot
+    // Flutter does not lift above the keyboard. So tapping Filter used to hide
+    // "Select" entirely, with the chips still covering the sheet. Lands for
+    // Categories, Tags and the quick-actions Users picker at once, since all
+    // three share this helper.
+    //
+    // Geometry, not finders, for the same reason as the scroll cases above.
+    const screenHeight = 844.0;
+    const keyboard = 300.0;
+
+    await pumpSheet(tester);
+
+    final confirm = find.byType(BottomSubmitButton);
+    expect(tester.getRect(confirm).bottom, screenHeight,
+        reason: 'the control: no keyboard, so the button is on the bottom');
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: keyboard);
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(confirm).bottom,
+        lessThanOrEqualTo(screenHeight - keyboard),
+        reason: 'pre-fix the button is pinned at $screenHeight, behind the '
+            'keyboard the Filter field just raised');
+  });
+
   testWidgets('the option list scrolls when dragged on the chips',
       (tester) async {
     await pumpSheet(tester);
