@@ -943,6 +943,8 @@ end of any column sitting under a floating `BottomSubmitButton` — today
   `pumpReceiptForm(..., pinnedSubmitButton: true)` or the real sheet — a bare `Scaffold` has no
   floating button to be buried under. Both fail with the spacer removed; verify that when changing
   them.
+- **Demo:** `tool/receipt-form-clearance.png` — the same form at max scroll with and without the
+  spacer, with a marker at the button's top edge. Regenerate with `./tool/record_clearance_shot.sh`.
 
 **`/search` restacks, on purpose.** It is the one screen that fills *both* slots
 (`main.dart:234`/`:238`): the nav bar in `bottomNavigationBar`, `WranglerSearchBar` in `bottomSheet`.
@@ -1296,10 +1298,12 @@ Recording the **full app** (rather than a harness) against a live API adds three
 
 #### Route 2 — widget-test frame capture
 
-`tool/keyboard_demo/` is the worked example, recording the keyboard-inset fix:
+`tool/demo_capture/` holds the machinery and two demos — an animated GIF pair for the
+keyboard-inset fix, and a single before/after still for the floating-button clearance fix:
 
 ```bash
-cd mobile && ./tool/record_keyboard_demo.sh     # -> tool/*-keyboard.gif
+cd mobile && ./tool/record_keyboard_demo.sh      # -> tool/*-keyboard.gif
+cd mobile && ./tool/record_clearance_shot.sh     # -> tool/receipt-form-clearance.png
 ```
 
 Route 1 **cannot** record that fix at all: there is no software keyboard on Linux desktop, so
@@ -1307,8 +1311,20 @@ Route 1 **cannot** record that fix at all: there is no software keyboard on Linu
 needs no ffmpeg, ImageMagick, xdotool or Android SDK, none of which the Claude Code sandbox has —
 frames are captured inside a widget test and encoded to GIF in pure Dart.
 
-- **`capture.dart`** ramps the inset, grabs frames and encodes; **`fake_keyboard.dart`** draws the
-  keys; **`keyboard_demo_test.dart`** holds one demo per surface. Copy the trio for a new demo.
+- **`capture.dart`** is the shared machinery — `loadDemoFonts`, `buildDemoSurface` (caption strip +
+  phone-sized viewport), `grabFrame`, `stitchPanels` and the two writers. `fake_keyboard.dart` draws
+  the keys and collapses to nothing at a zero inset, so a still that does not want a keyboard simply
+  leaves `viewInsets` alone. `keyboard_demo_test.dart` / `clearance_shot_test.dart` are the demos.
+- **A still does not always have a seam to flip.** The keyboard demo toggles
+  `debugDisableKeyboardLift`, but there is no production flag for `submitButtonSpacing` and adding
+  one for a screenshot is not worth it — so `record_clearance_shot.sh` captures one panel, strips the
+  spacer from the source, captures the other, and restores under a `trap`. The trap is load-bearing:
+  without it a crash between runs leaves the working tree patched. Verify `git diff lib/` is empty
+  after running it.
+- **Turn off the debug banner** (`showDebugBanner: false` on the pump helpers). `MaterialApp` draws
+  its red ribbon across the top-right of every captured panel otherwise, and at panel scale it reads
+  as a render-overflow stripe rather than a banner — which sends you hunting a layout bug that is not
+  there.
 - **It lives in `tool/`, not `test/`, and that is what keeps it out of CI.** `flutter test` with no
   arguments scans **only** `test/`, while an explicit path is used verbatim. CI runs a bare
   `flutter test`, so a demo under `test/` would re-encode and rewrite committed binaries on every

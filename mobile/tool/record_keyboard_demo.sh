@@ -14,6 +14,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-flutter test tool/keyboard_demo/keyboard_demo_test.dart
+flutter test tool/demo_capture/keyboard_demo_test.dart
 
 ls -la tool/*-keyboard.gif

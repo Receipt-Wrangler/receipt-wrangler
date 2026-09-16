@@ -180,7 +180,7 @@ Widget buildDemoSurface({
 /// capture hangs until the test times out rather than failing. `runAsync` also
 /// **swallows** any error and returns null, surfacing it through
 /// `takeException`, hence the explicit `fail`.
-Future<img.Image> _grabFrame(WidgetTester tester) async {
+Future<img.Image> grabFrame(WidgetTester tester) async {
   final frame = await tester.runAsync(() async {
     final boundary = _boundaryKey.currentContext!.findRenderObject()!
         as RenderRepaintBoundary;
@@ -212,9 +212,45 @@ Future<List<img.Image>> recordInsetRamp(WidgetTester tester) async {
   for (final step in demoInsetRamp()) {
     tester.view.viewInsets = FakeViewPadding(bottom: step.inset);
     await tester.pump(const Duration(milliseconds: 40));
-    frames.add(await _grabFrame(tester));
+    frames.add(await grabFrame(tester));
   }
   return frames;
+}
+
+/// Lays two equally-sized panels side by side on an opaque canvas.
+///
+/// Opaque on purpose: `rawRgba` is premultiplied and `GifEncoder` turns on GIF
+/// transparency the moment it finds a zero-alpha palette entry, which makes the
+/// whole clip flicker.
+img.Image stitchPanels(img.Image left, img.Image right) {
+  final canvas = img.Image(
+    width: left.width + _panelGap + right.width,
+    height: left.height,
+    numChannels: 3,
+  );
+  img.fill(canvas, color: img.ColorRgb8(255, 255, 255));
+  img.compositeImage(canvas, left, dstX: 0, dstY: 0);
+  img.compositeImage(canvas, right, dstX: left.width + _panelGap, dstY: 0);
+  return canvas;
+}
+
+/// Writes a single before/after still.
+///
+/// Synchronous for the same reason [writeSideBySideGif] is: `testWidgets` runs
+/// in fake-async, where `File.writeAsBytes` never completes and the test simply
+/// hangs until it times out.
+void writeSideBySidePng({
+  required img.Image before,
+  required img.Image after,
+  required String path,
+}) {
+  final bytes = img.encodePng(stitchPanels(before, after));
+  final file = File(path);
+  file.parent.createSync(recursive: true);
+  file.writeAsBytesSync(bytes);
+
+  // ignore: avoid_print
+  print('wrote $path — ${(bytes.length / 1024).toStringAsFixed(0)} KB');
 }
 
 /// Stitches the two recordings into one looping GIF, before on the left.
@@ -246,16 +282,7 @@ void writeSideBySideGif({
 
   final steps = demoInsetRamp();
   for (var i = 0; i < before.length; i++) {
-    final left = before[i];
-    final right = after[i];
-    final canvas = img.Image(
-      width: left.width + _panelGap + right.width,
-      height: left.height,
-      numChannels: 3,
-    );
-    img.fill(canvas, color: img.ColorRgb8(255, 255, 255));
-    img.compositeImage(canvas, left, dstX: 0, dstY: 0);
-    img.compositeImage(canvas, right, dstX: left.width + _panelGap, dstY: 0);
+    final canvas = stitchPanels(before[i], after[i]);
     // Durations are in 1/100 s, not ms. Note addFrame encodes the PREVIOUS
     // image and finish() flushes the last, so N calls plus finish yield N
     // frames.

@@ -225,6 +225,14 @@ Future<ReceiptFormHarness> pumpReceiptForm(
   /// underneath the button. Defaults off, leaving every existing case's tree
   /// unchanged.
   bool pinnedSubmitButton = false,
+  /// Wraps the whole pumped tree. Only the `tool/demo_capture/` screenshot
+  /// harness uses it, to put the form inside a capture surface — this helper
+  /// owns the `pumpWidget` call, so a caller cannot nest the result itself.
+  Widget Function(Widget)? wrap,
+  /// Off only for the screenshot harness, where the debug ribbon is just noise
+  /// across a captured panel. Defaults to the framework's own behaviour so no
+  /// existing test changes.
+  bool showDebugBanner = true,
 }) async {
   registerCustomCurrencyForTests();
 
@@ -261,8 +269,7 @@ Future<ReceiptFormHarness> pumpReceiptForm(
     ],
   );
 
-  await tester.pumpWidget(
-    MultiProvider(
+  final tree = MultiProvider(
       providers: [
         ChangeNotifierProvider<ReceiptModel>.value(value: model),
         ChangeNotifierProvider<GroupModel>.value(value: groupModel),
@@ -280,9 +287,13 @@ Future<ReceiptFormHarness> pumpReceiptForm(
         ChangeNotifierProvider<AuthModel>(create: (_) => AuthModel()),
         ChangeNotifierProvider<LoadingModel>(create: (_) => LoadingModel()),
       ],
-      child: MaterialApp.router(routerConfig: router),
-    ),
-  );
+      child: MaterialApp.router(
+        routerConfig: router,
+        debugShowCheckedModeBanner: showDebugBanner,
+      ),
+    );
+
+  await tester.pumpWidget(wrap == null ? tree : wrap(tree));
   await tester.pumpAndSettle();
 
   return ReceiptFormHarness(
