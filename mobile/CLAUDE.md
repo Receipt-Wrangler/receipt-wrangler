@@ -917,6 +917,33 @@ what keeps the receipt form (`receipt_form_screen.dart:133`), the quick-actions 
 (`receipt_form.dart:720`) and the comment screen (`receipt_comment_screen.dart:60`) unchanged; all
 three were already safe, and the receipt form in particular is a common wrong guess.
 
+**The trade runs both ways, and the other direction is its own bug.** `bottomSheet` is lifted
+over the keyboard but **floats over** the body; `bottomNavigationBar` reserves its space but had to
+be lifted by hand. So a screen using the floating slot has to reserve the button's height *itself*,
+or its tail is unreachable: `SingleChildScrollView` at `maxScrollExtent` only brings content flush
+with the viewport's bottom edge, and the button covers the last 50px at **every** scroll offset.
+`submitButtonSpacing` (`constants/spacing.dart`, 70px) is what reserves it, and it belongs at the
+end of any column sitting under a floating `BottomSubmitButton` — today
+`receipt_form.dart`, `quick_actions.dart` and `quick_scan_form.dart`.
+
+- **A `kDebugMode` widget hid this for as long as it existed.** The receipt form's column used to end
+  with a debug-only "Check form value" `ElevatedButton`. It contributed ~48px in debug and collapsed
+  to `SizedBox.shrink()` in release, so the debug tree cleared the button (by 18px) while shipped
+  builds buried the last ~30px of the "Shared With" field — invisible to `flutter test` and every
+  `integration_test/` spec. It was also drawn *entirely underneath* the submit button, so it could
+  not be tapped. It was deleted rather than kept: the whole point is that debug and release lay out
+  the same, which is what makes the bug testable at all. **Do not reintroduce a debug-only widget at
+  the bottom of a scrollable form.**
+- **Testing it needs a viewport short enough to overflow.** Below the overflow threshold
+  `maxScrollExtent` is 0 and nothing can be buried, so the assertion passes on the broken tree for
+  the wrong reason — the same vacuity trap as the keyboard-down control above. The quick-actions
+  sheet's default content is under 200px, hence the deliberately tiny surface in its test.
+- Covered by `test/widgets/receipt_form_submit_button_clearance_test.dart` and
+  `test/widgets/quick_actions_submit_button_clearance_test.dart`, both of which drive
+  `pumpReceiptForm(..., pinnedSubmitButton: true)` or the real sheet — a bare `Scaffold` has no
+  floating button to be buried under. Both fail with the spacer removed; verify that when changing
+  them.
+
 **`/search` restacks, on purpose.** It is the one screen that fills *both* slots
 (`main.dart:234`/`:238`): the nav bar in `bottomNavigationBar`, `WranglerSearchBar` in `bottomSheet`.
 Lifting the bar grows `bottomWidgetsHeight`, which lowers `contentBottom`, which moves the search

@@ -18,6 +18,8 @@ import 'package:receipt_wrangler_mobile/models/system_settings_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_form.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/screen_wrapper.dart';
 import 'package:receipt_wrangler_mobile/utils/receipts.dart';
 
 import 'widget_test_helpers.dart';
@@ -216,6 +218,13 @@ Future<ReceiptFormHarness> pumpReceiptForm(
   List<api.CustomField> customFields = const [],
   List<api.UserView> users = const [],
   WranglerFormState formState = WranglerFormState.add,
+  /// Mirrors `ReceiptFormScreen`'s real structure — a [ScreenWrapper] whose
+  /// `bottomSheetWidget` is the submit button — rather than the bare `Scaffold`
+  /// every other case uses. `Scaffold.bottomSheet` *floats over* the body, so
+  /// this is the only shape in which the form's tail can be caught sitting
+  /// underneath the button. Defaults off, leaving every existing case's tree
+  /// unchanged.
+  bool pinnedSubmitButton = false,
 }) async {
   registerCustomCurrencyForTests();
 
@@ -240,9 +249,14 @@ Future<ReceiptFormHarness> pumpReceiptForm(
       ])
         GoRoute(
           path: path,
-          builder: (_, __) => const Scaffold(
-            body: SingleChildScrollView(child: ReceiptForm()),
-          ),
+          builder: (_, __) => pinnedSubmitButton
+              ? ScreenWrapper(
+                  bottomSheetWidget: BottomSubmitButton(onPressed: () {}),
+                  child: const SingleChildScrollView(child: ReceiptForm()),
+                )
+              : const Scaffold(
+                  body: SingleChildScrollView(child: ReceiptForm()),
+                ),
         ),
     ],
   );
