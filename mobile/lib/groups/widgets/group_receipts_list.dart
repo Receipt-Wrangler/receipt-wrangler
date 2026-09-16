@@ -19,6 +19,53 @@ class GroupReceiptsList extends StatefulWidget {
 class _GroupReceiptsList extends State<GroupReceiptsList> {
   VoidCallback? _refreshCallback;
 
+  late final ReceiptListModel _receiptListModel =
+      Provider.of<ReceiptListModel>(context, listen: false);
+
+  /// The group these receipts belong to, tracked so a filter authored for one
+  /// group does not follow the user into the next.
+  String? _groupId;
+
+  @override
+  void initState() {
+    super.initState();
+    // The sort setters deliberately pass notify: false and refresh the list
+    // themselves, so a notification from this model means the applied filter
+    // changed -- which is the one state change the list cannot see for itself.
+    _receiptListModel.addListener(_refreshForFilterChange);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // getGroupId reads GoRouterState, an inherited widget, so this fires on a
+    // group change and cannot be done from initState.
+    final groupId = getGroupId(context);
+    if (_groupId != null && _groupId != groupId) {
+      // A filter holds the previous group's category, tag and user ids, which
+      // match nothing here -- and would leave the badge counting conditions the
+      // user cannot see. Clearing everything is the predictable rule: switching
+      // groups shows that group's receipts.
+      //
+      // Silently: this runs during a build, where notifying would rebuild the
+      // badge mid-frame. The refresh below is the visible half.
+      _receiptListModel.clearFilter(false);
+      _refreshCallback?.call();
+    }
+    _groupId = groupId;
+  }
+
+  @override
+  void dispose() {
+    _receiptListModel.removeListener(_refreshForFilterChange);
+    super.dispose();
+  }
+
+  void _refreshForFilterChange() {
+    _refreshCallback?.call();
+  }
+
   Widget buildSortFilterBar() {
     return Row(
       children: [
@@ -99,7 +146,9 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
           onRefreshCallbackSet: (callback) {
             _refreshCallback = callback;
           },
-          noItemsFoundText: "No receipts found",
+          noItemsFoundText: _receiptListModel.hasActiveFilter
+              ? "No receipts match this filter"
+              : "No receipts found",
           listItemBuilder: (context, receipt, index) {
             return ReceiptListItem(
                 receipt: receipt.anyOf.values[0] as api.Receipt);
