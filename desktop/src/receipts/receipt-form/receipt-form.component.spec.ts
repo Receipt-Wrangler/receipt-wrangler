@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule, Validators } from "@angular/forms";
-import { MatDialogModule } from "@angular/material/dialog";
+import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
@@ -11,8 +11,9 @@ import { Store } from "@ngxs/store";
 import { BehaviorSubject, of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
 import { PipesModule } from "src/pipes/pipes.module";
+import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
-import { ApiModule, CustomFieldType, Permission, ReceiptImageService, ReceiptStatus } from "../../open-api";
+import { ApiModule, CustomFieldType, Permission, ReceiptImageService, ReceiptService, ReceiptStatus } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { QueueMode } from "../../services/receipt-queue.service";
 import { StatefulMenuItem } from "../../standalone/components/filtered-stateful-menu/stateful-menu-item";
@@ -1203,6 +1204,57 @@ describe("ReceiptFormComponent", () => {
       });
 
       expect(component.form.value.groupId).toEqual(9);
+    });
+  });
+  // The receipt page's Duplicate creates a real record, so it confirms first.
+  describe("duplicate confirmation", () => {
+    let receiptService: ReceiptService;
+
+    const stubDialog = (confirmed: boolean | undefined) =>
+      jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue({
+        componentInstance: {},
+        afterClosed: () => of(confirmed),
+      } as any);
+
+    beforeEach(() => {
+      component.originalReceipt = { id: 4, name: "Lunch" } as any;
+      receiptService = TestBed.inject(ReceiptService);
+      jest
+        .spyOn(receiptService, "duplicateReceipt")
+        .mockReturnValue(of({ id: 9 }) as any);
+      // The success path renders a template-driven snackbar; the template is
+      // only available once the view is laid out, so stub the service call.
+      jest
+        .spyOn(TestBed.inject(SnackbarService), "successFromTemplate")
+        .mockReturnValue({ dismiss: jest.fn() } as any);
+    });
+
+    it("duplicates the receipt once confirmed", () => {
+      const open = stubDialog(true);
+
+      component.duplicateReceipt();
+
+      expect(open).toHaveBeenCalledWith(ConfirmationDialogComponent);
+      expect(receiptService.duplicateReceipt).toHaveBeenCalledWith(4);
+      expect(component.duplicatedReceiptId()).toEqual("9");
+    });
+
+    it("does nothing when the dialog is cancelled", () => {
+      stubDialog(false);
+
+      component.duplicateReceipt();
+
+      expect(receiptService.duplicateReceipt).not.toHaveBeenCalled();
+      expect(component.duplicatedReceiptId()).toEqual("");
+    });
+
+    // A backdrop click / ESC closes with undefined rather than false.
+    it("does nothing when the dialog is dismissed", () => {
+      stubDialog(undefined);
+
+      component.duplicateReceipt();
+
+      expect(receiptService.duplicateReceipt).not.toHaveBeenCalled();
     });
   });
 });

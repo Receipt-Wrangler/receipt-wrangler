@@ -13,6 +13,7 @@ import { CarouselComponent } from "src/carousel/carousel/carousel.component";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS } from "src/constants";
 import { RECEIPT_STATUS_OPTIONS } from "src/constants/receipt-status-options";
 import { FormMode } from "src/enums/form-mode.enum";
+import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { LayoutState } from "src/store/layout.state";
 import { HideProgressBar, ShowProgressBar } from "src/store/layout.state.actions";
 import { UserAutocompleteComponent } from "src/user-autocomplete/user-autocomplete/user-autocomplete.component";
@@ -1028,16 +1029,31 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public duplicateReceipt(): void {
-    this.receiptService
-      .duplicateReceipt(this.originalReceipt?.id as number)
+    const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
+
+    dialogRef.componentInstance.headerText = "Duplicate Receipt";
+    dialogRef.componentInstance.dialogContent = `Are you sure you would like to duplicate the receipt ${this.originalReceipt?.name}?`;
+
+    dialogRef
+      .afterClosed()
       .pipe(
         take(1),
-        tap((r: Receipt) => {
-          this.duplicatedReceiptId.set(r.id.toString());
-          this.duplicatedSnackbarRef = this.snackbarService.successFromTemplate(
-            this.successDuplicateSnackbar(),
-            { duration: 8000 }
-          );
+        tap((confirmed) => {
+          if (confirmed) {
+            this.receiptService
+              .duplicateReceipt(this.originalReceipt?.id as number)
+              .pipe(
+                take(1),
+                tap((r: Receipt) => {
+                  this.duplicatedReceiptId.set(r.id.toString());
+                  this.duplicatedSnackbarRef = this.snackbarService.successFromTemplate(
+                    this.successDuplicateSnackbar(),
+                    { duration: 8000 }
+                  );
+                })
+              )
+              .subscribe();
+          }
         })
       )
       .subscribe();

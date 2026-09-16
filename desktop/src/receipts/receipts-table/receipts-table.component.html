@@ -287,7 +287,7 @@
       icon="file_copy"
       tooltip="Duplicate"
       color="accent"
-      (clicked)="duplicateReceipt(element.id)"
+      (clicked)="duplicateReceipt(element)"
     ></app-button>
     <app-button
       *hasGroupPermission="{ groupId: element.groupId, permission: Permission.GroupReceiptsDelete }"
