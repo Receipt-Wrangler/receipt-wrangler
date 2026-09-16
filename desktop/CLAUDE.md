@@ -298,6 +298,14 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   generate handler is synchronous by design: `type` is a plain `@Input`, so under zoneless CD only
   the click event's CD pass renders the reveal (the clipboard write is a detached side effect).
 - **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`.
+- **Confirming an action:** the shared **`ConfirmationDialogComponent`**
+  (`src/shared-ui/confirmation-dialog/`). Open it with `matDialog.open(ConfirmationDialogComponent)`,
+  set `componentInstance.headerText` / `componentInstance.dialogContent` (two plain `@Input()`s — it
+  does **not** take `MAT_DIALOG_DATA`), then act on a truthy `afterClosed()`. Check truthiness, not
+  `=== true`: a backdrop click or ESC closes with `undefined`. Every action that writes a record the
+  user can't trivially undo gates on it — deletes, and the receipt **Duplicate** in both the
+  receipts-table row action and the receipt view header (each creates a real receipt, and the table's
+  then navigates away, so a mis-click is easy to miss).
 - **Badges:** the shared standalone **`app-badge`** (`src/shared-ui/badge/`) — `<app-badge [text]="..."
   [tone]="...">`, a 9.5px uppercase micro-badge for marking an item in a list. Do NOT hand-roll one;
   see **The shared badge** below for the tones and the two traps.

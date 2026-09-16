@@ -3,19 +3,20 @@ import { CUSTOM_ELEMENTS_SCHEMA, provideZonelessChangeDetection } from "@angular
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatChipsModule } from "@angular/material/chips";
-import { MatDialogModule } from "@angular/material/dialog";
+import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatMenuModule } from "@angular/material/menu";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTooltipModule } from "@angular/material/tooltip";
-import { ActivatedRoute, provideRouter } from "@angular/router";
+import { ActivatedRoute, provideRouter, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, Subject, throwError } from "rxjs";
 import { PipesModule } from "src/pipes/pipes.module";
 import { DEFAULT_RECEIPT_TABLE_COLUMNS } from "src/interfaces";
 import { SetColumnConfig, SetReceiptFilterData } from "src/store/receipt-table.actions";
 import { ReceiptTableState } from "src/store/receipt-table.state";
+import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { MonthStepperComponent } from "../../shared-ui/month-stepper/month-stepper.component";
-import { ApiModule, CustomField, CustomFieldType, FilterOperation, Group, Permission, Receipt, ReceiptStatus, ReceiptSummary } from "../../open-api";
+import { ApiModule, CustomField, CustomFieldType, FilterOperation, Group, Permission, Receipt, ReceiptService, ReceiptStatus, ReceiptSummary } from "../../open-api";
 import { ReceiptFilterService } from "../../services/receipt-filter.service";
 import { AuthState, GroupState, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
@@ -495,6 +496,57 @@ describe("ReceiptsTableComponent", () => {
       expect(component.filterChips().map((chip) => chip.key)).toEqual(["name"]);
       expect(store.selectSnapshot(ReceiptTableState.page)).toEqual(1);
       expect(refetch).toHaveBeenCalled();
+    });
+  });
+  // Duplicating a receipt creates a real record and navigates away from the
+  // list, so a mis-click is easy to miss — the row action confirms first.
+  describe("duplicate confirmation", () => {
+    const row = { id: 4, name: "Lunch" } as Receipt;
+
+    let receiptService: ReceiptService;
+    let router: Router;
+
+    const stubDialog = (confirmed: boolean | undefined) =>
+      jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue({
+        componentInstance: {},
+        afterClosed: () => of(confirmed),
+      } as any);
+
+    beforeEach(() => {
+      receiptService = TestBed.inject(ReceiptService);
+      router = TestBed.inject(Router);
+      jest
+        .spyOn(receiptService, "duplicateReceipt")
+        .mockReturnValue(of({ id: 9 } as Receipt) as any);
+      jest.spyOn(router, "navigateByUrl").mockResolvedValue(true);
+    });
+
+    it("duplicates and navigates to the copy once confirmed", () => {
+      const open = stubDialog(true);
+
+      component.duplicateReceipt(row);
+
+      expect(open).toHaveBeenCalledWith(ConfirmationDialogComponent);
+      expect(receiptService.duplicateReceipt).toHaveBeenCalledWith(4);
+      expect(router.navigateByUrl).toHaveBeenCalledWith("/receipts/9/view");
+    });
+
+    it("does nothing when the dialog is cancelled", () => {
+      stubDialog(false);
+
+      component.duplicateReceipt(row);
+
+      expect(receiptService.duplicateReceipt).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    // A backdrop click / ESC closes with undefined rather than false.
+    it("does nothing when the dialog is dismissed", () => {
+      stubDialog(undefined);
+
+      component.duplicateReceipt(row);
+
+      expect(receiptService.duplicateReceipt).not.toHaveBeenCalled();
     });
   });
 });
