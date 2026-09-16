@@ -164,6 +164,17 @@ describe("PaneSplitterComponent", () => {
     expect(host.ratio()).toEqual(60);
   });
 
+  // The handle stretches the full height of the panes, so it is usually taller
+  // than the viewport - a plain focus() would jump the page trying to scroll it
+  // into view on every click.
+  it("takes focus without scrolling the page", async () => {
+    const focus = jest.spyOn(splitter, "focus");
+
+    await drag(500, 400);
+
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
   it("ignores a non-primary button", async () => {
     splitter.dispatchEvent(pointerEvent("pointerdown", 500, 1, 2));
     splitter.dispatchEvent(pointerEvent("pointermove", 400));

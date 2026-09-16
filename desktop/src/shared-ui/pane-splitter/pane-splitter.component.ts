@@ -130,7 +130,10 @@ export class PaneSplitterComponent {
     const element = this.host.nativeElement;
     // preventDefault above suppresses the focus a click would normally give the
     // handle, and losing it would mean the arrow keys only work after a Tab.
-    element.focus();
+    // preventScroll is not optional: the handle stretches the full height of the
+    // panes, so it is usually taller than the viewport and a plain focus() jumps
+    // the page trying to scroll it into view.
+    element.focus({ preventScroll: true });
     element.setPointerCapture(event.pointerId);
     element.addEventListener("pointermove", this.onPointerMove);
     element.addEventListener("pointerup", this.onPointerUp);
