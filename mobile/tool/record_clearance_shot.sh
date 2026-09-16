@@ -17,6 +17,10 @@ cd "$(dirname "$0")/.."
 FORM="lib/receipts/widgets/receipt_form.dart"
 OUT="${1:-tool/receipt-form-clearance.png}"
 WORK="$(mktemp -d)"
+# Registered before the backup cp, not after: under `set -e` a failed cp exits
+# immediately, and a trap installed below it would never run -- leaking $WORK.
+# Replaced by the full cleanup once $BACKUP actually exists.
+trap 'rm -rf "$WORK"' EXIT
 BACKUP="$WORK/receipt_form.dart.orig"
 
 cp "$FORM" "$BACKUP"
