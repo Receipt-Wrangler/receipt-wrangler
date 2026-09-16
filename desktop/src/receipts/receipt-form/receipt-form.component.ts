@@ -1,7 +1,7 @@
 import { Component, EmbeddedViewRef, HostListener, Injector, OnInit, Signal, TemplateRef, runInInjectionContext, signal, viewChild } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
-import { MatDialog } from "@angular/material/dialog";
+import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { MatExpansionPanel } from "@angular/material/expansion";
 import { MatSnackBarRef } from "@angular/material/snack-bar";
 import { ActivatedRoute, Router } from "@angular/router";
@@ -160,6 +160,8 @@ export class ReceiptFormComponent implements OnInit {
   public formHeaderText!: Signal<string | undefined>;
 
   public receiptStatusOptions = RECEIPT_STATUS_OPTIONS;
+
+  private expandedImageDialog?: MatDialogRef<unknown>;
 
   /** 0 when the carousel is not rendered, i.e. while images are hidden. */
   public get currentImageIndex(): number {
@@ -1084,10 +1086,21 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public expandImage(): void {
-    this.matDialog.open(this.expandedImageTemplate(), {
+    // No maxHeight on purpose: leaving it undefined is what puts the CDK on its
+    // flush-vertical path, giving the pane the full viewport height the canvas
+    // stage then fills. Setting one silently re-centres the dialog.
+    this.expandedImageDialog = this.matDialog.open(this.expandedImageTemplate(), {
       width: "75%",
       height: "100%",
+      // The close button is the only tabbable control, so the default
+      // "first-tabbable" focus opens the viewer with a focus ring drawn around
+      // it, which reads as a selected button over the image.
+      autoFocus: "dialog",
     });
+  }
+
+  public closeExpandedImage(): void {
+    this.expandedImageDialog?.close();
   }
 
   // TODO: Add functionality to dashboard

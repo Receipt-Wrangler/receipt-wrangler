@@ -49,3 +49,24 @@ app-form-section.rw-images-pane {
     height: 50vh;
   }
 }
+
+// The fullscreen dialog. Its template is declared in this component, so the
+// embedded view carries this component's encapsulation attribute even while it
+// renders inside the MatDialog overlay - the same fact that makes ungated rules
+// dangerous here is what lets these ones work with no ::ng-deep and no global.
+//
+// MatDialog inserts a TemplateRef's nodes straight into .mat-mdc-dialog-surface,
+// which is viewport-tall and padding-free (its padding lives on
+// .mat-mdc-dialog-content, which this dialog does not use), so 100% resolves.
+.rw-image-dialog {
+  position: relative;
+  height: 100%;
+}
+
+.rw-image-dialog__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  // Above the stage, and above ngx-bootstrap's carousel controls (z-index: 1).
+  z-index: 2;
+}

@@ -1717,6 +1717,31 @@ canvas collapses to its 2px border.
 `height: 100% !important` makes a hidden file input swallow the whole column and leaves the stage
 with nothing but its own 2px border.
 
+**The fullscreen dialog runs the same canvas.** `#expandedImageTemplate` now passes
+`class="rw-carousel--fill"`, `[directManipulation]="true"` and `stageHeight="100%"` exactly as the
+inline carousel does, plus a floating close button — it previously had **no way out but Esc and the
+backdrop**. The height chain needs no special handling: MatDialog renders a `TemplateRef` as a
+`TemplatePortal` whose nodes go **straight into `.mat-mdc-dialog-surface`** with no wrapper, and that
+surface is viewport-tall and padding-free (dialog padding lives on `.mat-mdc-dialog-content`, which
+this dialog does not use). Two things there are load-bearing:
+- **Do not wrap it in `app-dialog`.** That costs ~110px before the stage starts — an
+  always-rendered `<h2>` (~39px even when `headerText` is empty), a `.p-4` wrapper and
+  `mat-dialog-content`'s `padding: 20px 24px` — **and caps the body at `max-height: 65vh`**. A
+  `height: 100%` stage inside it collapses.
+- **Do not add a `maxHeight` to the dialog config.** Leaving it undefined is what puts the CDK on its
+  flush-vertical path (`shouldBeFlushVertically` requires no maxHeight), giving the pane the full
+  viewport height. Setting one silently re-centres the dialog and shortens it.
+`autoFocus: "dialog"` because the close button is the only tabbable control, so the default
+first-tabbable focus opens the viewer with a focus ring drawn over the image.
+
+**ngx-bootstrap's carousel controls must stay small over a canvas.** Bootstrap sizes prev/next as
+`top: 0; bottom: 0; width: 15%` at `z-index: 1`, as siblings of `.carousel-inner` — so on a
+full-height stage they become two full-height columns sitting *above* the canvas in hit-testing.
+Navigation still works, but pan, wheel zoom and double-click all die in those strips, and both the
+left and right corner handles live exactly there, undoing the inset that keeps them grabbable at a
+stage edge. `.rw-carousel--fill` shrinks them to 2.75rem circles centred vertically and clear of
+every corner. This bites on **any receipt with 2+ images**, inline as well as fullscreen.
+
 **Gating every rule on a class is not optional.** `#expandedImageTemplate` is declared in
 `receipt-form`, so its embedded view carries that component's encapsulation attribute even while it
 renders inside the MatDialog overlay: an ungated `app-carousel { height: 100% }` would reach into the

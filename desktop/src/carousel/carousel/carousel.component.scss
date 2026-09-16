@@ -38,4 +38,31 @@
     display: block;
     height: 100%;
   }
+
+  // ngx-bootstrap's prev/next are `top: 0; bottom: 0; width: 15%` at z-index 1,
+  // and they sit ABOVE the stage in hit-testing. Over a full-height canvas that
+  // makes two full-height columns where pan, wheel zoom and double-click all die
+  // - and where both the left and right corner handles live, which is exactly
+  // what insetting those handles was meant to prevent. Shrink them to buttons
+  // centred vertically, clear of every corner. Overrides this file's own
+  // `.carousel-control-prev { top: 10% !important }` above.
+  .carousel-control-prev,
+  .carousel-control-next {
+    top: 50% !important;
+    bottom: auto;
+    width: 2.75rem;
+    height: 2.75rem;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.45);
+    opacity: 1;
+  }
+
+  .carousel-control-prev {
+    left: 0.75rem;
+  }
+
+  .carousel-control-next {
+    right: 0.75rem;
+  }
 }

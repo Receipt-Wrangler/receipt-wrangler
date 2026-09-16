@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule, Validators } from "@angular/forms";
-import { MatDialogModule } from "@angular/material/dialog";
+import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
@@ -1228,17 +1228,33 @@ describe("ReceiptFormComponent", () => {
       expect(inline.getAttribute("stageHeight")).toEqual("100%");
     });
 
-    it("does not let the fullscreen dialog fill, so its image is left alone", () => {
+    // The dialog renders its template into the overlay container, outside the
+    // fixture host - which is how it is told apart from the inline one.
+    const openDialogCarousel = (): HTMLElement | undefined => {
       component.expandImage();
       fixture.detectChanges();
 
-      const dialogCarousel = carousels().find(
-        (element) => !fixture.nativeElement.contains(element),
-      );
+      return carousels().find((element) => !fixture.nativeElement.contains(element));
+    };
+
+    it("gives the fullscreen dialog the same filling canvas", () => {
+      const dialogCarousel = openDialogCarousel();
 
       expect(dialogCarousel).toBeTruthy();
-      expect(dialogCarousel!.classList).not.toContain("rw-carousel--fill");
-      expect(dialogCarousel!.getAttribute("stageHeight")).toBeNull();
+      expect(dialogCarousel!.classList).toContain("rw-carousel--fill");
+      expect(dialogCarousel!.getAttribute("stageHeight")).toEqual("100%");
+    });
+
+    // Without this the dialog offers no way out but Esc and the backdrop.
+    it("closes the fullscreen dialog from its close button", async () => {
+      const dialog = TestBed.inject(MatDialog);
+      openDialogCarousel();
+      expect(dialog.openDialogs.length).toEqual(1);
+
+      component.closeExpandedImage();
+      await fixture.whenStable();
+
+      expect(dialog.openDialogs.length).toEqual(0);
     });
   });
 });

@@ -436,11 +436,24 @@
 </ng-template>
 
 <ng-template #expandedImageTemplate>
-  <app-carousel
-    [images]="images()"
-    [imagePreviews]="filesToUpload()"
-    [mode]="mode"
-    [hideButtonControls]="true"
-    [initialIndex]="currentImageIndex"
-  ></app-carousel>
+  <div class="rw-image-dialog">
+    <app-button
+      class="rw-image-dialog__close"
+      data-testid="receipt-image-fullscreen-close"
+      matButtonType="iconButton"
+      icon="close"
+      tooltip="Close"
+      (clicked)="closeExpandedImage()"
+    ></app-button>
+    <app-carousel
+      class="rw-carousel--fill"
+      [images]="images()"
+      [imagePreviews]="filesToUpload()"
+      [mode]="mode"
+      [hideButtonControls]="true"
+      [directManipulation]="true"
+      stageHeight="100%"
+      [initialIndex]="currentImageIndex"
+    ></app-carousel>
+  </div>
 </ng-template>
