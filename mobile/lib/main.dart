@@ -44,6 +44,7 @@ import 'package:receipt_wrangler_mobile/shared/widgets/screen_wrapper.dart';
 import 'package:receipt_wrangler_mobile/utils/url.dart';
 
 import 'package:receipt_wrangler_mobile/profile/screens/user_profile_screen.dart';
+import 'package:receipt_wrangler_mobile/theme/app_theme.dart';
 
 import 'constants/search.dart';
 import 'models/context_model.dart';
@@ -440,36 +441,7 @@ class _ReceiptWrangler extends State<ReceiptWrangler>
       color: Colors.white,
       debugShowCheckedModeBanner: false,
       title: 'Receipt Wrangler',
-      theme: ThemeData(
-        fontFamily: "Raleway",
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-        ),
-        chipTheme: ChipThemeData(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(50),
-          ),
-        ),
-        bottomSheetTheme: const BottomSheetThemeData(
-          backgroundColor: Colors.white,
-          modalBackgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-        ),
-        colorScheme: const ColorScheme(
-          primary: Color(0xFF27B1FF),
-          secondary: Color(0xFF8EA1AC),
-          surface: Color(0xFFFFFFFF),
-          background: Color(0xFFFFFFFF),
-          error: Color(0xFFd63333),
-          onPrimary: Color(0xFFFFFFFF),
-          onSecondary: Color(0xFF000000),
-          onSurface: Color(0xFF000000),
-          onBackground: Color(0xFF000000),
-          onError: Color(0xFFFFFFFF),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
+      theme: buildAppTheme(),
       routerConfig: _router,
       // Hosts an invisible repaint pump (see [nudgeFrames]) so the app can
       // force frames after returning from an inactive state and recover from

@@ -18,6 +18,7 @@ void main() {
   const resetKey = ValueKey("receipt-filter-reset");
   const addKey = ValueKey("receipt-filter-add");
   const emptyKey = ValueKey("receipt-filter-empty");
+  const countKey = ValueKey("receipt-filter-count");
 
   const nameCondition = ReceiptFilterCondition(
       operation: api.FilterOperation.CONTAINS, value: "Costco");
@@ -87,6 +88,34 @@ void main() {
           .toList();
 
       expect(cards.map((card) => card.field.key).toList(), ["name", "amount"]);
+    });
+  });
+
+  group("the condition count header", () {
+    testWidgets("is absent with nothing to count, where the empty state speaks",
+        (tester) async {
+      await pumpScreen(tester);
+
+      expect(find.byKey(countKey), findsNothing);
+      expect(find.byKey(emptyKey), findsOneWidget);
+    });
+
+    testWidgets("is singular for one condition", (tester) async {
+      await pumpScreen(tester, applied: {"name": nameCondition});
+
+      expect(find.text("1 CONDITION"), findsOneWidget);
+      expect(find.byKey(emptyKey), findsNothing);
+    });
+
+    testWidgets("counts the draft, not the applied filter", (tester) async {
+      await pumpScreen(tester,
+          applied: {"name": nameCondition, "amount": amountCondition});
+      expect(find.text("2 CONDITIONS"), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey("receipt-filter-remove-name")));
+      await tester.pump();
+
+      expect(find.text("1 CONDITION"), findsOneWidget);
     });
   });
 

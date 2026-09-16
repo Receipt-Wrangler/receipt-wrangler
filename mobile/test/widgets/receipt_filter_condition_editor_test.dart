@@ -43,7 +43,7 @@ void main() {
   }
 
   bool saveEnabled(WidgetTester tester) =>
-      tester.widget<MaterialButton>(find.byKey(saveKey)).onPressed != null;
+      tester.widget<FilledButton>(find.byKey(saveKey)).onPressed != null;
 
   Finder operationChip(api.FilterOperation operation) =>
       find.byKey(ValueKey("receipt-filter-operation-${operation.name}"));

@@ -179,6 +179,57 @@ the widget going away. Don't "fix" the 4px toolbar squeeze while the bar shows b
 every screen's body on every network call. Pinned by
 `test/widgets/top_app_bar_loading_indicator_test.dart`.
 
+### Theme & color roles — every neutral role is spelled out on purpose
+
+The app's `ThemeData` lives in **`lib/theme/app_theme.dart`** (`buildAppTheme()`), extracted from
+`main.dart` so it can be asserted on and so a harness can render a screen exactly as the app does.
+
+**`ColorScheme` silently falls back for any role it is not given, and in this scheme every fallback
+lands on pure black or pure white.** The getters are, verbatim from
+`flutter/lib/src/material/color_scheme.dart`:
+
+| role | falls back to | what that gave us |
+|---|---|---|
+| `outline`, `outlineVariant` | `onBackground` | **pure black** borders on every input, chip, divider and outlined button |
+| `onSurfaceVariant` | `onSurface` | **black** hints, field labels, list subtitles and nav icons — no text hierarchy at all |
+| every `surfaceContainer*` | `surface` | **white** — no tone to layer a raised card against |
+| `secondaryContainer` | `secondary` | `#8EA1AC`, so an unstyled selected chip read as *disabled* |
+
+So the scheme now names all of them, from the slate scale in `lib/constants/colors.dart`. **Do not
+drop them** — nothing fails to compile and no widget test fails; the app just goes back to looking
+like a wireframe. `test/theme/app_theme_test.dart` is the only guard, and it asserts each role is
+both the expected value *and* not equal to its fallback.
+
+Three consequences worth knowing:
+
+- **`accentBlueDark` (`#0086D4`) is the accent for text and icons on white.** The theme's `primary`
+  (`#27B1FF`) is **2.2:1** against white and fails WCAG for anything but a large solid fill, so it
+  must never be used as a foreground colour. `primary` fills; `accentBlueDark` (and
+  `onPrimaryContainer`, which is the same value) writes.
+- **A chip's selected label colour has to ride on `chipTheme.labelStyle` as a `WidgetStateColor`.**
+  `RawChip` resolves `labelStyle.color` through `WidgetStateProperty.resolveAs` and, under Material
+  3, **never consults `secondaryLabelStyle`** — that is a Material 2 field. Left to the M3 defaults
+  the selected label is `onSecondaryContainer`, i.e. dark slate on the `#27B1FF` fill, which is the
+  contrast bug the category / tag / status pickers shipped with. Note `labelStyle` **replaces** the
+  defaults rather than merging, so the font family and size are restated there.
+  Because the theme now owns this, `multi-select-field.dart` and `group_dashboard.dart` no longer
+  set `selectedColor` themselves.
+- **`appBarTheme` pins `iconTheme` and `actionsIconTheme` together.** M3 takes `leading` from
+  `onSurface` and `actions` from `onSurfaceVariant`, so once `onSurfaceVariant` stopped being black
+  a bar carrying both rendered two different greys.
+
+**`BottomSubmitButton` is the app-wide bottom action bar** — the receipt form, Quick Scan, the
+multi-select picker and the receipt filter all mount it. It is a white bar with a hairline top
+border holding an inset 48px stadium `FilledButton`. Its total height is exported as
+`bottomSubmitBarHeight`, and `submitButtonSpacing` (`lib/constants/spacing.dart`) is **derived from
+it**: where the bar floats as a `Scaffold.bottomSheet` rather than a bottom bar, the scrollable
+above has to reserve at least that much or its last field sits underneath and cannot be scrolled
+clear. Keep the two tied together rather than restating a number.
+
+A known rough edge left alone: Material's `Card` still renders its elevation-1 black shadow as a
+hard ring. It has exactly one call site in the app (`receipt_form.dart`'s add-shares card), so it
+was out of scope here; the filter's condition cards are hand-built containers instead.
+
 ### Permission-based UI gating
 
 The mobile app gates UI on the caller's **effective permissions**, mirroring the desktop client
@@ -1124,9 +1175,12 @@ picker at all.
 
 - `receiptStatusField` is deliberately **not** reused: it is single-select and hard-required, while
   the filter's `status` is `CONTAINS` over a list.
-- The operation chips take `selectedColor: Theme.of(context).primaryColor` + `showCheckmark: false`,
-  matching `MultiSelectField`'s chips. M3's default resolves to the secondary slate, which reads as
-  disabled beside them.
+- The operation chips take the **tinted** selected treatment (`primaryContainer` fill,
+  `onPrimaryContainer` label, a `#BBE6FF` border) via a local `ChipTheme`, deliberately *not* the
+  app-wide filled accent chip. That one means "a value you picked" -- the categories and statuses in
+  the field below it are drawn that way -- while these pick a *mode*, and the two rows share one
+  sheet. The local override has to restate `labelStyle` for the same Material 3 reason the theme
+  does (see "Theme & color roles").
 
 **Two things the group context forces** (`lib/utils/receipt_filter_options.dart`):
 
@@ -1137,6 +1191,27 @@ picker at all.
   entry like any other group -- the wrappers work with the route's group id. **Paid-by is the
   exception**: the All group's roster is just the caller, so `filterPaidByOptions` unions the real
   groups' rosters there.
+
+**Styling follows the design project's mobile panel** (`Quick Date Filtering.dc.html`, panel 4b),
+minus its button gradient. The screen is a slate-50 canvas carrying white condition cards (radius
+14, a 6%-black hairline, a 5%-black 1px shadow) under an uppercase condition count; the operation is
+a filled `surfaceContainer` pill rather than an outlined chip; "Add filter" is a dashed 52px
+placeholder, painted by a private `CustomPainter` because Flutter has no dashed border. Most of the
+rest came from filling in the theme's color roles rather than from anything here -- see "Theme &
+color roles".
+
+- **The condition card carries no field icon.** The icons belong to the add sheet, where they help
+  pick a field; repeating them on the card only competes with the label.
+- **It is a hand-built container, not a `Card`.** Material's `Card` is the elevated one, whose
+  tinted surface and shadow are far heavier than this near-flat row. Its fill has to be on the
+  `BoxDecoration`, not only on the `Material` under it: a `BoxDecoration` paints its `boxShadow` as
+  a silhouette of the whole shape, so without a colour there the shadow shows through the card's
+  interior and greys it out.
+- **The remove X sits inside the card's own `InkWell`**, so it has to win the gesture arena against
+  it. `receipt_filter_condition_card_test.dart` pins that removing a condition does not also reopen
+  the editor for the field just dropped.
+- **The count header is rendered only when there is something to count.** The design shows it *and*
+  the empty state at zero, which says the same thing twice.
 
 **The filter screen is a pushed route, not a bottom sheet.** It keeps the modal stack at the depth
 the app already ships (editor sheet -> picker sheet, the same as Quick Scan -> category picker), and
@@ -1155,7 +1230,7 @@ names a real wire field -- `setReceiptFilterField` dispatches on a string, so a 
 to compile), `test/utils/receipt_filter_test.dart` (a case per field type x operation, asserted
 through the real serializer), `test/utils/receipt_filter_options_test.dart`,
 `test/models/receipt_list_model_test.dart`, and widget tests for the button, the screen, the add
-sheet, the editor and the list wiring. **No e2e yet** -- deliberately deferred.
+sheet, the editor, the condition card and the list wiring. **No e2e yet** -- deliberately deferred.
 
 ### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:receipt_wrangler_mobile/constants/colors.dart';
 import 'package:receipt_wrangler_mobile/constants/receipt_filter_fields.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/models/receipt-list-model.dart';
@@ -115,6 +116,9 @@ class _ReceiptFilterScreen extends State<ReceiptFilterScreen> {
     final activeFields = _activeFields;
 
     return ScreenWrapper(
+      // A slate canvas is what makes the white condition cards read as raised
+      // rather than as outlined boxes on the same sheet of paper.
+      backgroundColor: slate50,
       appBarWidget: AppBar(
         automaticallyImplyLeading: false,
         leading: IconButton(
@@ -138,6 +142,7 @@ class _ReceiptFilterScreen extends State<ReceiptFilterScreen> {
         buttonText: "Apply Filter",
         onPressed: _apply,
       ),
+      bodyPadding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
       // ScreenWrapper hands its child straight to the body with no scrolling of
       // its own, and ten conditions overflow a phone.
       child: SingleChildScrollView(
@@ -149,9 +154,25 @@ class _ReceiptFilterScreen extends State<ReceiptFilterScreen> {
                 key: ValueKey("receipt-filter-empty"),
                 padding: EdgeInsets.symmetric(vertical: 36, horizontal: 16),
                 child: Text("No conditions yet — everything is showing.",
-                    textAlign: TextAlign.center),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: slate500)),
               )
-            else
+            else ...[
+              Padding(
+                key: const ValueKey("receipt-filter-count"),
+                padding: const EdgeInsets.fromLTRB(4, 2, 4, 10),
+                child: Text(
+                  activeFields.length == 1
+                      ? "1 CONDITION"
+                      : "${activeFields.length} CONDITIONS",
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.72,
+                    color: slate500,
+                  ),
+                ),
+              ),
               ...activeFields.map((field) => ReceiptFilterConditionCard(
                     key: ValueKey("receipt-filter-card-${field.key}"),
                     field: field,
@@ -159,19 +180,115 @@ class _ReceiptFilterScreen extends State<ReceiptFilterScreen> {
                     onTap: () => _editCondition(field),
                     onRemove: () => _removeCondition(field),
                   )),
-            const SizedBox(height: 4),
-          OutlinedButton.icon(
-            key: const ValueKey("receipt-filter-add"),
-            onPressed: _addCondition,
-            icon: const Icon(Icons.add),
-            label: const Text("Add filter"),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              ),
+            ],
+            const SizedBox(height: 2),
+            _AddFilterButton(
+              key: const ValueKey("receipt-filter-add"),
+              onPressed: _addCondition,
             ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
+}
+
+/// The design's dashed "+ Add filter" placeholder.
+///
+/// Flutter has no dashed border, so the outline is painted: a rounded rect
+/// walked with a [PathMetric] and stroked in alternating on/off runs.
+class _AddFilterButton extends StatelessWidget {
+  const _AddFilterButton({super.key, required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(14),
+          child: CustomPaint(
+            painter: const _DashedBorderPainter(
+              color: slate400,
+              radius: 14,
+              strokeWidth: 1.5,
+              dash: 6,
+              gap: 4,
+            ),
+            child: const Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add, size: 20, color: accentBlueDark),
+                  SizedBox(width: 8),
+                  Text(
+                    "Add filter",
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: accentBlueDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({
+    required this.color,
+    required this.radius,
+    required this.strokeWidth,
+    required this.dash,
+    required this.gap,
+  });
+
+  final Color color;
+  final double radius;
+  final double strokeWidth;
+  final double dash;
+  final double gap;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final inset = strokeWidth / 2;
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(inset, inset, size.width - strokeWidth,
+            size.height - strokeWidth),
+        Radius.circular(radius),
+      ));
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final end = (distance + dash).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, end), paint);
+        distance = end + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.radius != radius ||
+      oldDelegate.strokeWidth != strokeWidth ||
+      oldDelegate.dash != dash ||
+      oldDelegate.gap != gap;
 }

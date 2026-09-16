@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
+import 'package:receipt_wrangler_mobile/constants/colors.dart';
 import 'package:receipt_wrangler_mobile/constants/receipt_filter_fields.dart';
 import 'package:receipt_wrangler_mobile/constants/spacing.dart';
 import 'package:receipt_wrangler_mobile/enums/form_state.dart';
@@ -13,6 +14,7 @@ import 'package:receipt_wrangler_mobile/shared/widgets/amount_field.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/category_select_field.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/multi-select-field.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/tag_select_field.dart';
+import 'package:receipt_wrangler_mobile/theme/app_theme.dart';
 import 'package:receipt_wrangler_mobile/utils/bottom_sheet.dart';
 import 'package:receipt_wrangler_mobile/utils/date.dart';
 import 'package:receipt_wrangler_mobile/utils/receipt_filter.dart';
@@ -233,26 +235,50 @@ class ReceiptFilterConditionEditorState
       return const [];
     }
 
+    final colorScheme = Theme.of(context).colorScheme;
+
     return [
-      Text("Operation", style: Theme.of(context).textTheme.labelLarge),
+      const _SectionLabel("Operation"),
       const SizedBox(height: 8),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: _operations
-            .map((operation) => ChoiceChip(
-                  key: ValueKey("receipt-filter-operation-${operation.name}"),
-                  label: Text(filterOperationLabels[operation] ?? operation.name),
-                  selected: _operation == operation,
-                  // The same selected treatment the shared MultiSelectField
-                  // gives its chips, so the two chip rows on this sheet do not
-                  // read as different kinds of control. M3's default resolves
-                  // to the secondary slate, which looks disabled next to them.
-                  selectedColor: Theme.of(context).primaryColor,
-                  showCheckmark: false,
-                  onSelected: (_) => _pickOperation(operation),
-                ))
-            .toList(),
+      // Deliberately NOT the app's filled accent chip. That treatment means
+      // "a value you picked" -- the categories and statuses in the field below
+      // are drawn that way. These pick a *mode*, so they take the tinted
+      // treatment instead and the two rows stay tellable apart on one sheet.
+      ChipTheme(
+        data: ChipTheme.of(context).copyWith(
+          selectedColor: colorScheme.primaryContainer,
+          // Material 3 resolves the label colour out of `labelStyle` rather
+          // than `secondaryLabelStyle`, so the selected state has to be
+          // restated here or the chip inherits the theme's white-on-primary
+          // and vanishes into the tint.
+          labelStyle: ChipTheme.of(context).labelStyle?.copyWith(
+                color: WidgetStateColor.resolveWith((states) =>
+                    states.contains(WidgetState.selected)
+                        ? colorScheme.onPrimaryContainer
+                        : slate700),
+              ),
+          shape: StadiumBorder(
+            side: BorderSide(color: colorScheme.outline),
+          ),
+        ),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: _operations
+              .map((operation) => ChoiceChip(
+                    key: ValueKey("receipt-filter-operation-${operation.name}"),
+                    label:
+                        Text(filterOperationLabels[operation] ?? operation.name),
+                    labelStyle: const TextStyle(fontSize: 13),
+                    selected: _operation == operation,
+                    showCheckmark: false,
+                    side: _operation == operation
+                        ? const BorderSide(color: selectedChipBorder)
+                        : null,
+                    onSelected: (_) => _pickOperation(operation),
+                  ))
+              .toList(),
+        ),
       ),
       textFieldSpacing,
     ];
@@ -520,29 +546,51 @@ class ReceiptFilterConditionEditorState
   }
 
   Widget _buildActions() {
-    return Row(
-      children: [
-        if (_isEditing) ...[
-          OutlinedButton(
-            key: const ValueKey("receipt-filter-condition-remove"),
-            onPressed: _remove,
-            child: const Text("Remove"),
-          ),
-          const SizedBox(width: 10),
-        ],
-        Expanded(
-          child: SizedBox(
-            height: 48,
-            child: MaterialButton(
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
+          if (_isEditing) ...[
+            OutlinedButton(
+              key: const ValueKey("receipt-filter-condition-remove"),
+              onPressed: _remove,
+              // Destructive, so it reads as destructive. It was the theme's
+              // primary blue, which is the colour of the safe action beside it.
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(104, 48),
+                shape: const StadiumBorder(),
+                foregroundColor: colorScheme.error,
+              ),
+              child: const Text("Remove"),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Expanded(
+            child: FilledButton(
               key: const ValueKey("receipt-filter-condition-save"),
               onPressed: _isValid ? _save : null,
-              color: Theme.of(context).primaryColor,
-              child: const Text("Save condition",
-                  style: TextStyle(color: Colors.white)),
+              // Matches BottomSubmitButton, which is the same commitment one
+              // level up.
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                shape: const StadiumBorder(),
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+                disabledBackgroundColor: colorScheme.outline,
+                disabledForegroundColor: colorScheme.onPrimary,
+                textStyle: const TextStyle(
+                  fontFamily: appFontFamily,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              child: const Text("Save condition"),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -595,6 +643,26 @@ class _TapField extends StatelessWidget {
           suffixIcon: const Icon(Icons.calendar_today),
         ),
         child: Text(text),
+      ),
+    );
+  }
+}
+
+/// The design's uppercase micro-label above a section of the editor.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.66,
+        color: slate500,
       ),
     );
   }
