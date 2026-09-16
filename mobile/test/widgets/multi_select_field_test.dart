@@ -10,6 +10,12 @@ class _Thing {
   const _Thing(this.name);
 
   final String name;
+
+  // Without this a list mismatch prints "Instance of '_Thing'" per element,
+  // which cannot show WHICH order came back -- the very thing the
+  // remove-by-index case distinguishes.
+  @override
+  String toString() => name;
 }
 
 void main() {
@@ -273,19 +279,23 @@ void main() {
 
     testWidgets('removal is by index, so duplicates drop one at a time',
         (tester) async {
-      // Identical const instances: removing by value would drop both.
+      // Two chips are the same const instance, and it is taking the LAST of
+      // them that separates index removal from either value-based one: a
+      // first-match `remove(thing)` drops index 0 and leaves [beta, alpha],
+      // and a `removeWhere` drops both. A duplicate pair alone cannot tell
+      // index removal from `remove`, since both yield [alpha].
       List<_Thing>? remaining;
       await pumpField(
         tester,
-        initialValue: const [alpha, alpha],
+        initialValue: const [alpha, beta, alpha],
         onTap: () {},
         onRemove: (value) => remaining = value,
       );
 
-      await tester.tap(removeButton('Alpha').first);
+      await tester.tap(removeButton('Alpha').last);
       await tester.pump();
 
-      expect(remaining, const [alpha]);
+      expect(remaining, const [alpha, beta]);
     });
 
     testWidgets('removing the last chip reports an empty list, not null',
