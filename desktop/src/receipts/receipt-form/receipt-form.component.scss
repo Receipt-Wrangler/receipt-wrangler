@@ -38,3 +38,14 @@ app-form-section.rw-images-pane {
   flex: 1 1 auto;
   min-height: 0;
 }
+
+// Below Bootstrap's md the two panes stack into one column (col-12 col-md in the
+// template), so there is no Details pane beside the stage to take its height
+// from - the chain above would leave it at zero. Give it an explicit height
+// instead; the carousel chain resolves its 100% against this.
+@media (max-width: 767.98px) {
+  .rw-images-pane__stage {
+    flex: 0 0 auto;
+    height: 50vh;
+  }
+}

@@ -1704,6 +1704,14 @@ its `ResizeObserver` already re-clamps when the stage resizes, which is what mak
 height safe, and the Details pane's height genuinely does change live (category/tag chips wrap as you
 type).
 
+**Below Bootstrap's `md` the panes stack into one column.** Both sections are `col-12 col-md`, so
+the stacking itself is plain Bootstrap rather than a custom media query — without it `.col` holds a
+50/50 split all the way down, which goes lopsided around 600px as the form's minimum width wins and
+only wraps at phone sizes. Once stacked there is no Details pane beside the stage to take height
+from, so `.rw-images-pane__stage` gets an explicit **50vh** under `@media (max-width: 767.98px)`;
+the carousel chain resolves its `100%` against that. Leave that media query out and the stacked
+canvas collapses to its 2px border.
+
 **`app-upload-image` must not carry `h-100` in that column.** The class was inert while its host was
 `display: inline`, but a flex container blockifies its children — at which point
 `height: 100% !important` makes a hidden file input swallow the whole column and leaves the stage

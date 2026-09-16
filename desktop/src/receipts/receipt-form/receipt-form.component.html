@@ -25,7 +25,11 @@
         ></app-audit-detail-section>
       </ng-container>
       <div class="row">
-        <app-form-section class="col" headerText="Details" [indent]="false">
+        <app-form-section
+          class="col-12 col-md"
+          headerText="Details"
+          [indent]="false"
+        >
           <div
             class="d-flex flex-column justify-content-center align-items-center"
           >
@@ -112,7 +116,7 @@
         </app-form-section>
         @if (!selectedGroup()?.groupReceiptSettings?.hideImages) {
           <app-form-section
-            class="col rw-images-pane"
+            class="col-12 col-md rw-images-pane"
             headerText="Images"
             [headerButtonsTemplate]="imagesSectionHeaderButtons"
             [indent]="false"
