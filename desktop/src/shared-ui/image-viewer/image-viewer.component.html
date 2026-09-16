@@ -1,12 +1,19 @@
 @if (imageBase64 || imageFile()) {
-  <div
-    [ngStyle]="{ transform: 'scale(' + scale() + ')' }"
-  >
-    <img
-      cdkDrag
-      class="viewer-image"
-      alt="image"
-      [src]="imageBase64 || imageFileUrl()"
+  @if (directManipulation() && (imageBase64 || imageFileUrl())) {
+    <app-image-canvas
+      [src]="(imageBase64 || imageFileUrl()) ?? ''"
+      [stageHeight]="stageHeight()"
+    ></app-image-canvas>
+  } @else {
+    <div
+      [ngStyle]="{ transform: 'scale(' + scale() + ')' }"
     >
-  </div>
+      <img
+        cdkDrag
+        class="viewer-image"
+        alt="image"
+        [src]="imageBase64 || imageFileUrl()"
+      >
+    </div>
+  }
 }

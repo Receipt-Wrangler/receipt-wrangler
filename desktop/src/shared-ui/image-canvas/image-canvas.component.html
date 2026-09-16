@@ -1,0 +1,19 @@
+@if (src()) {
+  <img
+    #image
+    class="rw-image-canvas__image"
+    draggable="false"
+    [src]="src()"
+    [alt]="alt()"
+    (load)="onImageLoad()"
+  />
+  <div #frame class="rw-image-canvas__frame">
+    @for (corner of corners; track corner) {
+      <span
+        class="rw-image-canvas__handle"
+        [attr.data-corner]="corner"
+        (pointerdown)="onResizeStart($event, corner)"
+      ></span>
+    }
+  </div>
+}

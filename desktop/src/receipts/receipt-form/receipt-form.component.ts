@@ -45,6 +45,18 @@ import { ShareListComponent } from "../share-list/share-list.component";
 import { UploadImageComponent } from "../upload-image/upload-image.component";
 import { buildItemForm } from "../utils/form.utils";
 
+/**
+ * Height of the image canvas stage, for the compact and expanded states of the
+ * Images section's collapse/expand toggle.
+ *
+ * The expanded height is capped well under the viewport because the form's save
+ * bar is fixed to the bottom of it: at 60vh the stage's lower edge sits beneath
+ * that bar, which swallows the pointer and leaves the two bottom resize handles
+ * impossible to grab. 50vh clears it down to roughly a 768px-tall viewport.
+ */
+const COMPACT_STAGE_HEIGHT = "30vh";
+const EXPANDED_STAGE_HEIGHT = "50vh";
+
 @UntilDestroy()
 @Component({
   selector: "app-receipt-form",
@@ -73,7 +85,7 @@ export class ReceiptFormComponent implements OnInit {
 
   public readonly expandedImageTemplate = viewChild.required<TemplateRef<any>>("expandedImageTemplate");
 
-  public readonly carouselComponent = viewChild.required(CarouselComponent);
+  public readonly carouselComponent = viewChild(CarouselComponent);
 
   public groups = this.store.selectSignal(GroupState.groupsWithoutAll);
 
@@ -162,6 +174,16 @@ export class ReceiptFormComponent implements OnInit {
   public receiptStatusOptions = RECEIPT_STATUS_OPTIONS;
 
   public showLargeImagePreview: boolean = false;
+
+  /** Drives the canvas stage; the collapse/expand toggle switches between the two. */
+  public get imageStageHeight(): string {
+    return this.showLargeImagePreview ? EXPANDED_STAGE_HEIGHT : COMPACT_STAGE_HEIGHT;
+  }
+
+  /** 0 when the carousel is not rendered, i.e. while images are hidden. */
+  public get currentImageIndex(): number {
+    return this.carouselComponent()?.currentlyShownImageIndex ?? 0;
+  }
 
   public queueIds: string[] = [];
 
@@ -627,7 +649,7 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public removeImage(): void {
-    const index = this.carouselComponent().currentlyShownImageIndex;
+    const index = this.currentImageIndex;
 
     if (this.mode === FormMode.add) {
       const newImages = Array.from(this.filesToUpload());
@@ -650,7 +672,7 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public magicFill(): void {
-    const index = this.carouselComponent().currentlyShownImageIndex;
+    const index = this.currentImageIndex;
 
     let file: Blob | undefined;
     let receiptImageId;
@@ -1078,11 +1100,11 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public zoomImageIn(): void {
-    this.carouselComponent().zoomIn();
+    this.carouselComponent()?.zoomIn();
   }
 
   public zoomImageOut(): void {
-    this.carouselComponent().zoomOut();
+    this.carouselComponent()?.zoomOut();
   }
 
   public toggleImagePreviewSize(): void {
@@ -1098,7 +1120,7 @@ export class ReceiptFormComponent implements OnInit {
 
   // TODO: Add functionality to dashboard
   public downloadImage(): void {
-    const currentImage = this.images()[this.carouselComponent().currentlyShownImageIndex];
+    const currentImage = this.images()[this.currentImageIndex];
     this.receiptImageService.downloadReceiptImageById(currentImage.id)
       .pipe(
         take(1),

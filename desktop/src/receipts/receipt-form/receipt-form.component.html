@@ -130,9 +130,6 @@
                 (images().length > 0 || filesToUpload().length > 0) &&
                 showImages
               "
-                [ngClass]="{
-              'col-3': !showLargeImagePreview
-              }"
               >
                 <ng-container *ngIf="imagesLoading()">
                   <div class="d-flex justify-content-center align-items-center">
@@ -144,6 +141,8 @@
                   [imagePreviews]="filesToUpload()"
                   [mode]="mode"
                   [hideButtonControls]="true"
+                  [directManipulation]="true"
+                  [stageHeight]="imageStageHeight"
                   [disabled]="
                   mode !== formMode.edit || (showProgressBar() ?? false)
                 "
@@ -444,6 +443,6 @@
     [imagePreviews]="filesToUpload()"
     [mode]="mode"
     [hideButtonControls]="true"
-    [initialIndex]="carouselComponent().currentlyShownImageIndex"
+    [initialIndex]="currentImageIndex"
   ></app-carousel>
 </ng-template>

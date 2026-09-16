@@ -1638,6 +1638,60 @@ Two cross-component seams support this (each with its own focused spec):
   value whose `customFieldId` isn't in the loaded catalog pool is skipped, and adding one flips its
   manage-fields menu entry to selected via an immutable array replace (zoneless CD).
 
+## Receipt image canvas
+
+The receipt form's inline image is an interactive canvas: four corner handles to pull, drag to pan,
+wheel to zoom, double-click to fit. It replaced a viewer whose only controls were two zoom buttons
+and a free `cdkDrag` on the `<img>`.
+
+**A first attempt resized the form/image *panes* with a draggable splitter. That was reverted** — it
+moved the page layout, when the thing worth manipulating is the image. Don't reintroduce it.
+
+- **`app-image-canvas`** (`src/shared-ui/image-canvas/`, standalone, registered in `SharedUiModule`'s
+  `imports` + `exports`) is generic and presentational: it takes a resolved `src` and a `stageHeight`
+  and owns the whole interaction. The stage is a **fixed viewport** — the image is clipped by it and
+  panned around — so growing the image can never move the surrounding page.
+- **Scale and pan are one transform on one element.** The old viewer put `scale()` on a wrapper div
+  and let `cdkDrag` translate the `<img>` inside it, so drag distance desynchronised from the cursor
+  by a factor of the scale. One matrix is what makes direct manipulation tractable.
+- **Nothing in the template reads the viewport.** It is a plain field, not a signal: the image and the
+  handle frame are both positioned imperatively, so a 120Hz drag runs **no change detection at all**
+  over the receipt form's large, non-`OnPush` template. `pointermove` is likewise a native listener
+  rather than a host binding, which would schedule CD per event.
+- **Handles sit fully INSIDE the image box, not centred on its corners.** The stage clips with
+  `overflow: hidden` and clipped pixels are not hit-testable, so a centred handle loses half its
+  target the moment the image meets a stage edge — which at the fit scale is always true of two of
+  the four. Each also grabs from an invisible 24px box (`::before`, `inset: -6px`).
+- **An axis narrower than the stage is centred**, so a letterboxed image cannot drift into a corner.
+  This is why a corner drag only holds its anchor in the axis that *overflows*; the other grows
+  symmetrically. The canvas spec pins both halves of that rule.
+- Wheel zoom is anchored at the cursor and moves a meaningful amount. The viewer this replaced
+  multiplied `deltaY` by `-0.000001`, so one notch changed the scale by 0.0001 — wheel zoom did
+  nothing at all.
+
+**Wiring, and how fullscreen stays untouched.** `app-carousel` gained `directManipulation` +
+`stageHeight`, passed to `app-image-viewer`, which renders the canvas when the flag is on and its
+original markup when off — the `hideButtonControls` precedent. The receipt form passes the flag on
+the **inline** carousel and deliberately not on `#expandedImageTemplate`, so the fullscreen dialog
+keeps the default and is byte-identical. `ImageViewerComponent.onWheel` also stops re-emitting to the
+carousel in canvas mode, or the wheel would drive the carousel's shared scale as well.
+
+**Zoom buttons are per-image now.** The header Zoom In/Out delegate through the carousel to the
+*active slide's* viewer (`viewChildren(ImageViewerComponent)` indexed by `currentlyShownImageIndex`)
+rather than mutating one `scale` shared by every slide, which is what a canvas implies.
+
+**Stage height is the repurposed collapse/expand toggle.** `showLargeImagePreview` selects
+`COMPACT_STAGE_HEIGHT` (30vh) or `EXPANDED_STAGE_HEIGHT` (**50vh**), still seeded per navigation from
+the `showLargeImagePreviews` preference. **50vh is a hard constraint, not taste**: the form's save bar
+is fixed to the bottom of the viewport, and at 60vh the stage's lower edge sits beneath it, so the bar
+swallows the pointer and the two bottom handles cannot be grabbed at all. It clears down to roughly a
+768px-tall viewport.
+
+`carouselComponent` is also no longer `viewChild.required`: the Zoom/Download/Fullscreen header
+buttons render whenever there are images, but the carousel itself is behind `*ngIf="… && showImages"`,
+so hiding images and clicking one of them used to throw.
+
+
 ## Reports (Report Builder)
 
 The **Report Builder** (`src/reports/`) is a two-pane screen for building and downloading receipt

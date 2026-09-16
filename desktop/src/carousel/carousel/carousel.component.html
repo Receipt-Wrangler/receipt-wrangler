@@ -17,6 +17,8 @@
       [imageBase64]="preview?.encodedImage"
       [imageFile]="$any(preview.file)"
       [scale]="scale"
+      [directManipulation]="directManipulation()"
+      [stageHeight]="stageHeight()"
       (wheel)="onScroll($event)"
     ></app-image-viewer>
   </slide>
@@ -33,6 +35,8 @@
       *ngIf="image?.encodedImage"
       [imageBase64]="image.encodedImage"
       [scale]="scale"
+      [directManipulation]="directManipulation()"
+      [stageHeight]="stageHeight()"
       (wheel)="onScroll($event)"
     ></app-image-viewer>
   </slide>
