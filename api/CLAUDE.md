@@ -1268,9 +1268,12 @@ edits, which nothing forces to agree with each other:
 
 1. the `const` block,
 2. the `Value()` guard chain (a missing value makes every write fail as a generic 500),
-3. `ReceiptStatuses()` — the single membership list, which drives the only two server-side
-   validations of a caller-supplied status: `handlers/receipts.go` `BulkReceiptStatusUpdate` and
-   `commands/update_group_receipt_settings_command.go` `isValidReceiptStatus`,
+3. `ReceiptStatuses()` — the single membership list, which drives the server-side validations of a
+   caller-supplied status: `handlers/receipts.go` `BulkReceiptStatusUpdate`,
+   `commands/update_group_receipt_settings_command.go` `isValidReceiptStatus` (which covers both the
+   quick-scan default and the receipt summary's breakdown set), and
+   `repositories/group_receipt_settings.go` `canonicalStatusOrder`, which orders a group's configured
+   summary statuses by this list rather than alphabetically,
 4. the `ReceiptStatus` enum in `swagger.yml` — then regenerate **both** clients, `mobile/api/`
    included, in the same change (see "API Client Generation").
 
@@ -1533,6 +1536,124 @@ this screen. `UpdateGroupReceiptSettingsCommand.Validate` therefore checks nothi
   (`TestQuickScan_{Applies,Skips}GroupDefaultCustomFields*`), and
   `handlers/group_default_custom_fields_test.go` (400 unknown id writes nothing, 403 without the
   permission, a save omitting both keys leaves the stored config untouched, `[]` on the wire).
+
+## Receipt Summary
+
+A block of totals under the receipts table, aggregated over the **whole current filter result set**
+rather than the visible page: a receipt count and amount total overall, then the same figures for
+each status the group has configured. Configuration lives on `GroupReceiptSettings` and applies to
+every member — it is not a per-user preference.
+
+**Three new settings, two new join tables.** `ReceiptSummaryEnabled` is a plain column (off by
+default, so existing installs are unchanged). `ReceiptSummaryCustomFieldIds` and
+`ReceiptSummaryStatuses` are `gorm:"-"` projections over
+`GroupReceiptSettingsSummaryCustomField` and `GroupReceiptSettingsSummaryStatus`, both keyed on
+**GroupId** for the same reason `GroupReceiptSettingsCustomField` is (a lazily created settings row
+still has `ID == 0` on the call that created it).
+
+- **Not a `purpose` discriminator on the existing defaults join.** That table's PK is
+  `{GroupId, CustomFieldId}`, so a discriminator has to join the key — a PK change `AutoMigrate`
+  does not perform on a deployed install, and `replaceGroupDefaultCustomFields` deletes
+  `WHERE group_id = ?` unscoped, so saving the defaults would silently wipe the summary selection.
+  `TestUpdateGroupReceiptSettingsKeepsDefaultAndSummaryFieldSetsSeparate` is the regression guard.
+- **Not a delimited or JSON column for the statuses.** The house pattern for "a parent owns a set of
+  enum-ish strings" is row-per-value (`GroupRolePermission`), and a per-row column keeps
+  `ReceiptStatus.Value()`'s `driver.Valuer` rejection at the DB boundary for free.
+- **`size:32` on the status column is load-bearing.** A Go string maps to an unbounded TEXT, and
+  MySQL/MariaDB reject that in a key — without it the table creates fine on SQLite and fails
+  AutoMigrate on MySQL.
+
+**`LoadDefaultCustomFieldIds` is now `LoadSettingsProjections`** (and `…ForGroups`), and loads **all
+three** projections. The rename was deliberate: it makes the compiler find every call site, and
+loading them together means no caller can hydrate one and miss another — which would emit a `null`
+where swagger promises an array, the failure that only shows up on an already-released mobile build.
+The `[]`-never-`null` rule covers all three.
+
+**The command's three fields are pointers**, `nil` == leave unchanged, each for its own reason:
+the custom field ids because the desktop omits that key for an admin without `app.custom-fields.read`;
+the statuses because a plain slice cannot tell "omitted" from the legitimate "clear every status";
+and the bool because a plain one unmarshals as `false` for any client that does not send the key and
+would silently switch a configured summary off.
+
+**The permission gate is deliberately asymmetric.** The CURRENCY field selection joins the existing
+`app.custom-fields.read` 403 because it names catalog entries. `receiptSummaryEnabled` and
+`receiptSummaryStatuses` stay **outside** it — neither reads the catalog, and gating them would lock
+an admin without that permission out of the feature entirely. That is the difference from
+`applyDefaultCustomFieldsOnIngest`, which *is* gated because it decides what the (to such a caller
+invisible) default set does. Validation: unknown id → 400, **non-CURRENCY id → 400** (only
+`CurrencyValue` is summed, so a TEXT field would total `0.00` forever and read as data rather than
+misconfiguration), invalid status → 400 via the existing `isValidReceiptStatus`.
+
+### `POST /api/receipt/group/{groupId}/summary`
+
+Gated on **`group.receipts.read`** — the same permission as the table it sits under. Not a new
+permission (the endpoint returns only aggregates of rows the caller can already page through, so a
+separate gate would just produce a table whose own totals 403), not `group.widgets.read` (this is not
+a dashboard widget), and **no `app.custom-fields.read` gate**: that permission covers the catalog
+endpoints and `enforceReceiptCustomFieldSelection`, which explicitly lets a non-holder read the
+values of fields already on a receipt, and `FULL_RECEIPT_ASSOCIATIONS` already ships those names to
+any receipt reader.
+
+`ReceiptSummaryCommand` carries the filter and an optional `ConfigurationGroupId`, **not** the field
+or status list — the configuration is the group's and applies to everyone, so a client must not be
+able to add a column or opt out. `ConfigurationGroupId` exists for the synthetic "All" group, which
+spans several groups and has no meaningful settings of its own.
+
+**Borrowing a configuration is the All group's privilege alone.** A real group must use its own, or a
+member could render group A's receipts under group B's statuses and currency fields — overriding what
+A's admin configured, and switching on a summary A has turned off, which is exactly the invariant
+above. `resolveConfigurationGroupId` therefore tests `IsAllGroup(uintGroupId)` first
+(`ErrConfigurationGroupNotAllGroup` → **400**, a malformed request rather than an access failure), and
+only then authorizes the named group with `HasGroupPermissions`
+(`ErrConfigurationGroupForbidden` → **403**), or it becomes a way to enumerate another group's
+configured field names. **That order matters**: rejecting on the request's shape first means the
+response cannot depend on whether the caller can read the named group, so the endpoint can never be
+used to probe for another group's existence — pinned by
+`TestReceiptSummary_ConfigurationGroupRejectedBeforeAccessCheck`, which asserts an unreadable group and
+a nonexistent one come back identically. The desktop is unaffected: it sends the viewed group's own id
+for a real group, so only the All group ever sends a differing one.
+
+`services/receipt_summary.go` follows `pie_chart.go`: `IntersectReceiptFilterWithGrants`, then
+`GetPagedReceiptsByGroupId` unpaged, then a Go fold. That one repository call is what supplies the
+filter builder, the All-group `group_id IN (...)` fan-out **and** paid-by visibility — so the totals
+cannot drift from the rows above them. `MaskReceiptsForMemberVisibility` and
+`SubstituteRestrictedCategoriesTags` are not called: the first only masks user references, the second
+only matters for category/tag bucketing.
+
+**Go `decimal` fold, not SQL `SUM`.** There is no `SUM` anywhere in this API. `amount` is
+`decimal(10,2)`, but SQLite has no decimal type, so `SUM(amount)` returns an IEEE double there and an
+exact decimal on Postgres/MySQL — the same endpoint would report different cents on the three
+supported engines, on exactly the money this feature exists to report
+(`TestReceiptSummary_DecimalPrecision`). A SUM query would also have to re-derive the access controls
+above, where the failure mode is a totals row that counts receipts the viewer may not see.
+
+**Rules that are easy to get backwards:**
+
+- Every **configured** status is seeded before the walk, so one matching no receipt still renders as
+  a zero row — that is what keeps the block's shape steady as the filter narrows.
+- A receipt whose status is **not** configured still counts toward the overall row. It is in the
+  filter result, so excluding it would make the total disagree with the table's own count.
+- Where a receipt holds **several** values for one custom field, **lowest id wins**, mirroring
+  `reporting/receiptsource.addCustomFields`. `custom_field_values` has no unique index on
+  `(receipt_id, custom_field_id)` and the association loads without an `ORDER BY`, so preferring
+  whichever came back first would let two identical requests return different numbers. A row with no
+  `CurrencyValue` never wins, so an empty low-id row cannot hide a real one.
+- Columns are built from the configured id order, never by ranging the map — a summary whose columns
+  reshuffle between requests is unreadable.
+- `enabled: false` comes back at a normal **200** with zeroed rows, and returns **before any receipt
+  query**. That is both the cost floor for every install that has not opted in and the reason a
+  client with stale group settings renders nothing rather than an error.
+
+**Money crosses the wire as a string** (`decimal.Decimal` marshals quoted), matching `Receipt.amount`
+and `CustomFieldValue.currencyValue`. `PieChartDataPoint`'s `float64` is the outlier, forced on it by
+the charting library.
+
+**Cost.** This loads the filtered set unpaged — the same bargain `PieChartService` and
+`ReportDataService` already make, but the receipts table is a hotter screen than the dashboard. It is
+bounded on four sides: a group that has not enabled the summary never reaches a query, the desktop
+does not re-request on paging or sorting, the desktop skips the request entirely when no configured
+group resolves, and `CustomFields` is preloaded only when a field is configured. If it ever needs
+more, the next step is a `SUM` fast path behind the same service signature — not caching.
 
 ## Custom fields on the receipts list (columns & sorting)
 

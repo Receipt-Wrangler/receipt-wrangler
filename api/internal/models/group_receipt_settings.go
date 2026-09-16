@@ -44,6 +44,25 @@ type GroupReceiptSettings struct {
 	// and a null would fail the whole AppData payload on already-released Android builds.
 	ApplyDefaultCustomFieldsOnIngest bool   `gorm:"not null;default:false" json:"applyDefaultCustomFieldsOnIngest"`
 	DefaultCustomFieldIds            []uint `gorm:"-" json:"defaultCustomFieldIds"`
+
+	// Receipt summary. A block of totals rendered under the receipts table, aggregated over the
+	// WHOLE current filter result set rather than the visible page: a receipt count and amount total
+	// overall, then the same figures per configured status. ReceiptSummaryEnabled is the master
+	// switch and is off by default, so existing installs are unchanged until an admin opts in.
+	//
+	// Both sets are transient (`gorm:"-"`), stored in GroupReceiptSettingsSummaryCustomField and
+	// GroupReceiptSettingsSummaryStatus rows, and carry the same rules as DefaultCustomFieldIds
+	// above: loaded explicitly by the repository at the serialization boundaries, and always
+	// serialized as `[]` when empty rather than `null`.
+	//
+	// ReceiptSummaryCustomFieldIds holds CURRENCY custom fields only — those are the only ones with
+	// a value that can be summed. The handler rejects any other type.
+	//
+	// ReceiptSummaryStatuses is the set of statuses to break out. A configured status that matches
+	// no receipt still renders as a zero row, so the block keeps its shape as the filter narrows.
+	ReceiptSummaryEnabled        bool            `gorm:"not null;default:false" json:"receiptSummaryEnabled"`
+	ReceiptSummaryCustomFieldIds []uint          `gorm:"-" json:"receiptSummaryCustomFieldIds"`
+	ReceiptSummaryStatuses       []ReceiptStatus `gorm:"-" json:"receiptSummaryStatuses"`
 }
 
 // IsQuickScanCommentShown reports whether the quick-scan comment field should be shown. HideComments

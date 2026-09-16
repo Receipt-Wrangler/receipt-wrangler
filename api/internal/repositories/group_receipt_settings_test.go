@@ -386,9 +386,9 @@ func TestUpdateGroupReceiptSettingsDoesNotBlankCustomFieldName(t *testing.T) {
 	}
 }
 
-// TestLoadDefaultCustomFieldIdsBatchesAcrossGroups proves the loader keys on GroupId and keeps each
+// TestLoadSettingsProjectionsBatchesAcrossGroups proves the loader keys on GroupId and keeps each
 // group's set separate - GetGroupById can hand back a lazily created settings row whose ID is 0.
-func TestLoadDefaultCustomFieldIdsBatchesAcrossGroups(t *testing.T) {
+func TestLoadSettingsProjectionsBatchesAcrossGroups(t *testing.T) {
 	defer TruncateTestDb()
 	CreateTestGroup()
 	CreateTestGroup()
@@ -411,7 +411,7 @@ func TestLoadDefaultCustomFieldIdsBatchesAcrossGroups(t *testing.T) {
 	// Group 2 keeps its empty set, and the ids are read back with a settings row whose ID is zero.
 	settingsOne := models.GroupReceiptSettings{GroupId: 1}
 	settingsTwo := models.GroupReceiptSettings{GroupId: 2}
-	err := repository.LoadDefaultCustomFieldIds([]*models.GroupReceiptSettings{&settingsOne, &settingsTwo})
+	err := repository.LoadSettingsProjections([]*models.GroupReceiptSettings{&settingsOne, &settingsTwo})
 	if err != nil {
 		utils.PrintTestError(t, err, "no error")
 		return
@@ -450,5 +450,310 @@ func TestGetGroupByIdHydratesDefaultCustomFieldIds(t *testing.T) {
 
 	if !slices.Equal(group.GroupReceiptSettings.DefaultCustomFieldIds, []uint{fieldA}) {
 		utils.PrintTestError(t, group.GroupReceiptSettings.DefaultCustomFieldIds, []uint{fieldA})
+	}
+}
+
+// seedCurrencyCustomField is the CURRENCY counterpart of seedDefaultCustomField. The summary
+// only totals currency fields, so its tests need a field of that type.
+func seedCurrencyCustomField(t *testing.T, name string) uint {
+	t.Helper()
+	customField := models.CustomField{Name: name, Type: models.CURRENCY}
+	if err := GetDB().Create(&customField).Error; err != nil {
+		t.Fatalf("seed currency custom field: %v", err)
+	}
+	return customField.ID
+}
+
+func TestUpdateGroupReceiptSettingsRoundTripsReceiptSummaryConfig(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	if _, err := repository.CreateGroupReceiptSettings(1); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	fieldA := seedCurrencyCustomField(t, "HST")
+	fieldB := seedCurrencyCustomField(t, "Subtotal")
+
+	enabled := true
+	command := baseSettingsCommand()
+	command.ReceiptSummaryEnabled = &enabled
+	command.ReceiptSummaryCustomFieldIds = &[]uint{fieldA, fieldB}
+	command.ReceiptSummaryStatuses = &[]models.ReceiptStatus{models.RESOLVED, models.OPEN}
+
+	updated, err := repository.UpdateGroupReceiptSettings("1", command)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// The PUT response must carry what was just written - the desktop writes it straight into
+	// its group state.
+	if !updated.ReceiptSummaryEnabled {
+		utils.PrintTestError(t, updated.ReceiptSummaryEnabled, true)
+	}
+	if !slices.Equal(sortedUints(updated.ReceiptSummaryCustomFieldIds), []uint{fieldA, fieldB}) {
+		utils.PrintTestError(t, updated.ReceiptSummaryCustomFieldIds, []uint{fieldA, fieldB})
+	}
+
+	// Statuses come back in models.ReceiptStatuses() order, NOT the order submitted and not
+	// alphabetical: the rendered breakdown reads as a workflow.
+	expectedStatuses := []models.ReceiptStatus{models.OPEN, models.RESOLVED}
+	if !slices.Equal(updated.ReceiptSummaryStatuses, expectedStatuses) {
+		utils.PrintTestError(t, updated.ReceiptSummaryStatuses, expectedStatuses)
+	}
+
+	reloaded, err := repository.GetGroupReceiptSettingsByGroupId(1)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	// ReceiptSummaryEnabled is the one field here that is a plain column, so it is the one that
+	// silently never persists if it is missing from UpdateGroupReceiptSettings' assignment block
+	// (the write is Select("*"), which zeroes anything unassigned).
+	if !reloaded.ReceiptSummaryEnabled {
+		utils.PrintTestError(t, reloaded.ReceiptSummaryEnabled, true)
+	}
+	if !slices.Equal(sortedUints(reloaded.ReceiptSummaryCustomFieldIds), []uint{fieldA, fieldB}) {
+		utils.PrintTestError(t, reloaded.ReceiptSummaryCustomFieldIds, []uint{fieldA, fieldB})
+	}
+	if !slices.Equal(reloaded.ReceiptSummaryStatuses, expectedStatuses) {
+		utils.PrintTestError(t, reloaded.ReceiptSummaryStatuses, expectedStatuses)
+	}
+}
+
+func TestUpdateGroupReceiptSettingsLeavesReceiptSummaryConfigUnchangedWhenNil(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	if _, err := repository.CreateGroupReceiptSettings(1); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	fieldA := seedCurrencyCustomField(t, "HST")
+	enabled := true
+
+	seed := baseSettingsCommand()
+	seed.ReceiptSummaryEnabled = &enabled
+	seed.ReceiptSummaryCustomFieldIds = &[]uint{fieldA}
+	seed.ReceiptSummaryStatuses = &[]models.ReceiptStatus{models.OPEN}
+	if _, err := repository.UpdateGroupReceiptSettings("1", seed); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// A save that touches none of the three summary keys - what the desktop sends for an admin
+	// without app.custom-fields.read, and what any other client sends. All three must survive.
+	updated, err := repository.UpdateGroupReceiptSettings("1", baseSettingsCommand())
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if !updated.ReceiptSummaryEnabled {
+		utils.PrintTestError(t, updated.ReceiptSummaryEnabled, "still enabled")
+	}
+	if !slices.Equal(updated.ReceiptSummaryCustomFieldIds, []uint{fieldA}) {
+		utils.PrintTestError(t, updated.ReceiptSummaryCustomFieldIds, []uint{fieldA})
+	}
+	if !slices.Equal(updated.ReceiptSummaryStatuses, []models.ReceiptStatus{models.OPEN}) {
+		utils.PrintTestError(t, updated.ReceiptSummaryStatuses, []models.ReceiptStatus{models.OPEN})
+	}
+}
+
+func TestUpdateGroupReceiptSettingsClearsReceiptSummarySetsWithEmptySlices(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	if _, err := repository.CreateGroupReceiptSettings(1); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	fieldA := seedCurrencyCustomField(t, "HST")
+	enabled := true
+
+	seed := baseSettingsCommand()
+	seed.ReceiptSummaryEnabled = &enabled
+	seed.ReceiptSummaryCustomFieldIds = &[]uint{fieldA}
+	seed.ReceiptSummaryStatuses = &[]models.ReceiptStatus{models.OPEN}
+	if _, err := repository.UpdateGroupReceiptSettings("1", seed); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// An explicit empty array clears; that is the difference from omitting the key entirely.
+	clear := baseSettingsCommand()
+	clear.ReceiptSummaryCustomFieldIds = &[]uint{}
+	clear.ReceiptSummaryStatuses = &[]models.ReceiptStatus{}
+
+	updated, err := repository.UpdateGroupReceiptSettings("1", clear)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if len(updated.ReceiptSummaryCustomFieldIds) != 0 {
+		utils.PrintTestError(t, updated.ReceiptSummaryCustomFieldIds, "empty")
+	}
+	if len(updated.ReceiptSummaryStatuses) != 0 {
+		utils.PrintTestError(t, updated.ReceiptSummaryStatuses, "empty")
+	}
+	// Clearing the sets must not touch the master toggle.
+	if !updated.ReceiptSummaryEnabled {
+		utils.PrintTestError(t, updated.ReceiptSummaryEnabled, "still enabled")
+	}
+}
+
+func TestUpdateGroupReceiptSettingsDedupesReceiptSummarySelections(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	if _, err := repository.CreateGroupReceiptSettings(1); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	fieldA := seedCurrencyCustomField(t, "HST")
+
+	// Both join tables use a composite primary key, so a repeated value would be a constraint
+	// violation rather than a no-op if the replace helpers did not dedupe first.
+	command := baseSettingsCommand()
+	command.ReceiptSummaryCustomFieldIds = &[]uint{fieldA, fieldA}
+	command.ReceiptSummaryStatuses = &[]models.ReceiptStatus{models.OPEN, models.OPEN}
+
+	updated, err := repository.UpdateGroupReceiptSettings("1", command)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if !slices.Equal(updated.ReceiptSummaryCustomFieldIds, []uint{fieldA}) {
+		utils.PrintTestError(t, updated.ReceiptSummaryCustomFieldIds, []uint{fieldA})
+	}
+	if !slices.Equal(updated.ReceiptSummaryStatuses, []models.ReceiptStatus{models.OPEN}) {
+		utils.PrintTestError(t, updated.ReceiptSummaryStatuses, []models.ReceiptStatus{models.OPEN})
+	}
+}
+
+// TestUpdateGroupReceiptSettingsKeepsDefaultAndSummaryFieldSetsSeparate is the regression guard for
+// storing the two selections in separate tables. Were they one table with a purpose column, the
+// replace helpers' unscoped `DELETE WHERE group_id = ?` would make saving either one wipe the other.
+func TestUpdateGroupReceiptSettingsKeepsDefaultAndSummaryFieldSetsSeparate(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	if _, err := repository.CreateGroupReceiptSettings(1); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	defaultField := seedDefaultCustomField(t, "Notes")
+	summaryField := seedCurrencyCustomField(t, "HST")
+
+	seed := baseSettingsCommand()
+	seed.DefaultCustomFieldIds = &[]uint{defaultField}
+	seed.ReceiptSummaryCustomFieldIds = &[]uint{summaryField}
+	if _, err := repository.UpdateGroupReceiptSettings("1", seed); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// Re-save the defaults alone; the summary selection must be untouched.
+	defaultsOnly := baseSettingsCommand()
+	defaultsOnly.DefaultCustomFieldIds = &[]uint{defaultField}
+	updated, err := repository.UpdateGroupReceiptSettings("1", defaultsOnly)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if !slices.Equal(updated.ReceiptSummaryCustomFieldIds, []uint{summaryField}) {
+		utils.PrintTestError(t, updated.ReceiptSummaryCustomFieldIds, []uint{summaryField})
+	}
+
+	// And the other way round.
+	summaryOnly := baseSettingsCommand()
+	summaryOnly.ReceiptSummaryCustomFieldIds = &[]uint{summaryField}
+	updated, err = repository.UpdateGroupReceiptSettings("1", summaryOnly)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if !slices.Equal(updated.DefaultCustomFieldIds, []uint{defaultField}) {
+		utils.PrintTestError(t, updated.DefaultCustomFieldIds, []uint{defaultField})
+	}
+}
+
+// TestUpdateGroupReceiptSettingsDoesNotBlankSummaryCustomFieldName is the Omit("CustomField") guard.
+// Without it GORM upserts a zero-valued CustomField through the join's association and blanks a
+// `not null` catalog name - across the whole install, not just this group.
+func TestUpdateGroupReceiptSettingsDoesNotBlankSummaryCustomFieldName(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	if _, err := repository.CreateGroupReceiptSettings(1); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	fieldId := seedCurrencyCustomField(t, "HST")
+
+	command := baseSettingsCommand()
+	command.ReceiptSummaryCustomFieldIds = &[]uint{fieldId}
+	if _, err := repository.UpdateGroupReceiptSettings("1", command); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	var customField models.CustomField
+	if err := GetDB().First(&customField, fieldId).Error; err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if customField.Name != "HST" {
+		utils.PrintTestError(t, customField.Name, "HST")
+	}
+	if customField.Type != models.CURRENCY {
+		utils.PrintTestError(t, customField.Type, models.CURRENCY)
+	}
+}
+
+// TestSettingsProjectionsSerializeAsEmptyArrays pins the [] vs null rule for all three projections.
+// A null would fail the WHOLE AppData payload on an already-released Android build, which is how
+// two production login outages happened.
+func TestSettingsProjectionsSerializeAsEmptyArrays(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	created, err := repository.CreateGroupReceiptSettings(1)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	reloaded, err := repository.GetGroupReceiptSettingsByGroupId(1)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// Both the create return value and a fresh read: the create path normalizes directly rather
+	// than going through the loader, so they are two separate opportunities to emit null.
+	for _, settings := range []models.GroupReceiptSettings{created, reloaded} {
+		bytes, err := json.Marshal(settings)
+		if err != nil {
+			utils.PrintTestError(t, err, "no error")
+			return
+		}
+
+		serialized := string(bytes)
+		for _, key := range []string{"defaultCustomFieldIds", "receiptSummaryCustomFieldIds", "receiptSummaryStatuses"} {
+			if !strings.Contains(serialized, `"`+key+`":[]`) {
+				utils.PrintTestError(t, serialized, `"`+key+`":[]`)
+			}
+		}
 	}
 }

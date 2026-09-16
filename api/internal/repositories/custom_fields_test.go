@@ -987,3 +987,68 @@ func TestShouldGetCustomFieldsByIds(t *testing.T) {
 		}
 	}
 }
+
+// TestDeleteCustomFieldPrunesReceiptSummarySelections is the summary counterpart of the default-set
+// cascade above. The join carries no delete-side foreign key (deletion is cascaded explicitly), so
+// a missed cascade leaves a row referencing a field that no longer exists - which the summary would
+// then render as a column with no name, forever.
+func TestDeleteCustomFieldPrunesReceiptSummarySelections(t *testing.T) {
+	defer TruncateTestDb()
+	setupCustomFieldRepositoryTest()
+	CreateTestGroup()
+	CreateTestGroup()
+
+	settingsRepository := NewGroupReceiptSettingsRepository(nil)
+	for _, groupId := range []uint{1, 2} {
+		if _, err := settingsRepository.CreateGroupReceiptSettings(groupId); err != nil {
+			utils.PrintTestError(t, err, "no error")
+		}
+	}
+
+	shared := seedCurrencyCustomField(t, "Shared Currency Field")
+	groupTwoOnly := seedCurrencyCustomField(t, "Group Two Currency Field")
+
+	commandOne := baseSettingsCommand()
+	commandOne.ReceiptSummaryCustomFieldIds = &[]uint{shared}
+	if _, err := settingsRepository.UpdateGroupReceiptSettings("1", commandOne); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	commandTwo := baseSettingsCommand()
+	commandTwo.ReceiptSummaryCustomFieldIds = &[]uint{shared, groupTwoOnly}
+	if _, err := settingsRepository.UpdateGroupReceiptSettings("2", commandTwo); err != nil {
+		utils.PrintTestError(t, err, "no error")
+	}
+
+	if err := NewCustomFieldRepository(nil).DeleteCustomField(shared); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	settingsOne, err := settingsRepository.GetGroupReceiptSettingsByGroupId(1)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(settingsOne.ReceiptSummaryCustomFieldIds) != 0 {
+		utils.PrintTestError(t, settingsOne.ReceiptSummaryCustomFieldIds, "empty set")
+	}
+
+	// The other group keeps its unrelated field.
+	settingsTwo, err := settingsRepository.GetGroupReceiptSettingsByGroupId(2)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if len(settingsTwo.ReceiptSummaryCustomFieldIds) != 1 ||
+		settingsTwo.ReceiptSummaryCustomFieldIds[0] != groupTwoOnly {
+		utils.PrintTestError(t, settingsTwo.ReceiptSummaryCustomFieldIds, []uint{groupTwoOnly})
+	}
+
+	var remaining int64
+	GetDB().Model(&models.GroupReceiptSettingsSummaryCustomField{}).
+		Where("custom_field_id = ?", shared).Count(&remaining)
+	if remaining != 0 {
+		utils.PrintTestError(t, remaining, 0)
+	}
+}

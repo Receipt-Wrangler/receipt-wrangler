@@ -55,3 +55,10 @@ export class SetColumnConfig {
 
   constructor(public columnConfig: ReceiptTableColumnConfig[]) {}
 }
+
+export class SetSummaryConfigGroupId {
+  static readonly type = "[ReceiptTable] Set Summary Config Group Id";
+
+  /** Whose summary configuration to apply on the "All" group. */
+  constructor(public groupId: number) {}
+}

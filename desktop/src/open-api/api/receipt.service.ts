@@ -31,6 +31,10 @@ import { ReceiptPagedRequestCommand } from '../model/receiptPagedRequestCommand'
 // @ts-ignore
 import { ReceiptStatus } from '../model/receiptStatus';
 // @ts-ignore
+import { ReceiptSummary } from '../model/receiptSummary';
+// @ts-ignore
+import { ReceiptSummaryCommand } from '../model/receiptSummaryCommand';
+// @ts-ignore
 import { UpsertReceiptCommand } from '../model/upsertReceiptCommand';
 
 // @ts-ignore
@@ -517,6 +521,98 @@ export class ReceiptService {
         return this.httpClient.request<Receipt>('get', `${this.configuration.basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
+                responseType: <any>responseType_,
+                withCredentials: this.configuration.withCredentials,
+                headers: localVarHeaders,
+                observe: observe,
+                transferCache: localVarTransferCache,
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Gets the receipt summary for a group
+     * Returns the block of totals rendered under the receipts table: a receipt count and amount total over the WHOLE filtered result set (not the current page), then the same figures per configured status. Which statuses break out and which currency custom fields are totalled come from the group\&#39;s receipt settings, not from the request. Gated on group.receipts.read, the same permission as the receipts it aggregates. [SYSTEM USER]
+     * @param groupId Summarize the receipts that belong to groupId
+     * @param receiptSummaryCommand 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     */
+    public getReceiptSummaryForGroup(groupId: number, receiptSummaryCommand: ReceiptSummaryCommand, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<ReceiptSummary>;
+    public getReceiptSummaryForGroup(groupId: number, receiptSummaryCommand: ReceiptSummaryCommand, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<ReceiptSummary>>;
+    public getReceiptSummaryForGroup(groupId: number, receiptSummaryCommand: ReceiptSummaryCommand, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<ReceiptSummary>>;
+    public getReceiptSummaryForGroup(groupId: number, receiptSummaryCommand: ReceiptSummaryCommand, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (groupId === null || groupId === undefined) {
+            throw new Error('Required parameter groupId was null or undefined when calling getReceiptSummaryForGroup.');
+        }
+        if (receiptSummaryCommand === null || receiptSummaryCommand === undefined) {
+            throw new Error('Required parameter receiptSummaryCommand was null or undefined when calling getReceiptSummaryForGroup.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        let localVarCredential: string | undefined;
+        // authentication (apiKeyAuth) required
+        localVarCredential = this.configuration.lookupCredential('apiKeyAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', localVarCredential);
+        }
+
+        // authentication (bearerAuth) required
+        localVarCredential = this.configuration.lookupCredential('bearerAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', 'Bearer ' + localVarCredential);
+        }
+
+        let localVarHttpHeaderAcceptSelected: string | undefined = options && options.httpHeaderAccept;
+        if (localVarHttpHeaderAcceptSelected === undefined) {
+            // to determine the Accept header
+            const httpHeaderAccepts: string[] = [
+                'application/json'
+            ];
+            localVarHttpHeaderAcceptSelected = this.configuration.selectHeaderAccept(httpHeaderAccepts);
+        }
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        let localVarHttpContext: HttpContext | undefined = options && options.context;
+        if (localVarHttpContext === undefined) {
+            localVarHttpContext = new HttpContext();
+        }
+
+        let localVarTransferCache: boolean | undefined = options && options.transferCache;
+        if (localVarTransferCache === undefined) {
+            localVarTransferCache = true;
+        }
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/receipt/group/${this.configuration.encodeParam({name: "groupId", value: groupId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: undefined})}/summary`;
+        return this.httpClient.request<ReceiptSummary>('post', `${this.configuration.basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: receiptSummaryCommand,
                 responseType: <any>responseType_,
                 withCredentials: this.configuration.withCredentials,
                 headers: localVarHeaders,
