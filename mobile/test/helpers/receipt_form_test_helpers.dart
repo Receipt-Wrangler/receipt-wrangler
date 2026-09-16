@@ -216,6 +216,10 @@ Future<ReceiptFormHarness> pumpReceiptForm(
   List<api.CustomField> customFields = const [],
   List<api.UserView> users = const [],
   WranglerFormState formState = WranglerFormState.add,
+  /// Mount under a real theme. Null keeps the bare `MaterialApp.router` every
+  /// existing caller gets; pass `buildAppTheme()` when the test is about how the
+  /// form is drawn rather than how it behaves.
+  ThemeData? theme,
 }) async {
   registerCustomCurrencyForTests();
 
@@ -266,7 +270,7 @@ Future<ReceiptFormHarness> pumpReceiptForm(
         ChangeNotifierProvider<AuthModel>(create: (_) => AuthModel()),
         ChangeNotifierProvider<LoadingModel>(create: (_) => LoadingModel()),
       ],
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(routerConfig: router, theme: theme),
     ),
   );
   await tester.pumpAndSettle();

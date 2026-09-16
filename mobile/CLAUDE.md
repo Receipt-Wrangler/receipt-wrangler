@@ -202,10 +202,11 @@ both the expected value *and* not equal to its fallback.
 
 Three consequences worth knowing:
 
-- **`accentBlueDark` (`#0086D4`) is the accent for text and icons on white.** The theme's `primary`
-  (`#27B1FF`) is **2.2:1** against white and fails WCAG for anything but a large solid fill, so it
-  must never be used as a foreground colour. `primary` fills; `accentBlueDark` (and
-  `onPrimaryContainer`, which is the same value) writes.
+- **`accentBlueDark` (`#0086D4`) is the accent for text on the accent *tints*, not a general
+  "accent on white".** Accent icons and button labels on white are the theme's `primary` -- that is
+  what `receipt_form.dart:374`/`:676` already do and what M3 gives every text and outlined button,
+  so it is the convention already in place. `accentBlueDark` exists because `primary` over
+  `primaryContainer` / `accentContainer` is barely 2:1.
 - **A chip's selected label colour has to ride on `chipTheme.labelStyle` as a `WidgetStateColor`.**
   `RawChip` resolves `labelStyle.color` through `WidgetStateProperty.resolveAs` and, under Material
   3, **never consults `secondaryLabelStyle`** — that is a Material 2 field. Left to the M3 defaults
@@ -217,6 +218,19 @@ Three consequences worth knowing:
 - **`appBarTheme` pins `iconTheme` and `actionsIconTheme` together.** M3 takes `leading` from
   `onSurface` and `actions` from `onSurfaceVariant`, so once `onSurfaceVariant` stopped being black
   a bar carrying both rendered two different greys.
+- **`navigationBarTheme` states the bottom nav's selected treatment rather than riding a role.**
+  `NavigationBar.indicatorColor` defaults to `secondaryContainer`, which *used* to fall through to
+  the `#8EA1AC` secondary -- an accidentally serviceable solid pill. Naming that role `slate100`
+  (correct for its other consumers) turned the selected destination into a near-white pill on a
+  near-white bar, i.e. invisible, on every main screen. The bar now takes `accentContainer`
+  (`#CCECFF`) with `accentBlueDark` icon and label, which is the design's own nav. **This is the
+  shape of mistake to expect when filling in a role**: the fix is right for the role and wrong for
+  one component that was quietly depending on the old fallback. `app_theme_test.dart` guards it.
+
+**Two tints, not one.** `primaryContainer` is `#EAF7FF` and `accentContainer` is `#CCECFF`, both
+from the design, and they are not interchangeable: `accentBlueDark` clears AA on the lighter one at
+chip-label size but only clears the large-text / UI threshold on the stronger one, while the lighter
+one behind a 24px nav icon is too faint to read as selected at all.
 
 **`BottomSubmitButton` is the app-wide bottom action bar** — the receipt form, Quick Scan, the
 multi-select picker and the receipt filter all mount it. It is a white bar with a hairline top

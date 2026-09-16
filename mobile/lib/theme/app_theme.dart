@@ -80,6 +80,32 @@ ThemeData buildAppTheme() {
                 : slate700),
       ),
     ),
+    // NavigationBar takes its indicator from `secondaryContainer`, which used
+    // to fall through to the `#8EA1AC` secondary -- a solid slate-blue pill.
+    // Naming that role slate-100 turned the selected destination into a
+    // near-white pill on a near-white bar, i.e. invisible, so the bar states its
+    // own selected treatment rather than riding a role it does not want. Values
+    // are the design's own nav.
+    navigationBarTheme: NavigationBarThemeData(
+      indicatorColor: accentContainer,
+      iconTheme: WidgetStateProperty.resolveWith(
+        (states) => IconThemeData(
+          color: states.contains(WidgetState.selected)
+              ? accentBlueDark
+              : slate700,
+        ),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontFamily: appFontFamily,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: states.contains(WidgetState.selected)
+              ? accentBlueDark
+              : slate700,
+        ),
+      ),
+    ),
     // Both halves of a toolbar's icons, together. M3 takes `leading` from
     // `onSurface` (black here) and `actions` from `onSurfaceVariant` (slate),
     // so an app bar with both renders two different greys.

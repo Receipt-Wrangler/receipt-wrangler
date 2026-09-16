@@ -205,6 +205,11 @@ class _AddFilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The app's normal blue, not the darker accent: `receipt_form.dart` colours
+    // its add icons `primaryColor` and M3 gives every text / outlined button
+    // label `colorScheme.primary`, so this is the convention already in place.
+    final accent = Theme.of(context).colorScheme.primary;
+
     return SizedBox(
       height: 52,
       child: Material(
@@ -220,18 +225,18 @@ class _AddFilterButton extends StatelessWidget {
               dash: 6,
               gap: 4,
             ),
-            child: const Center(
+            child: Center(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.add, size: 20, color: accentBlueDark),
-                  SizedBox(width: 8),
+                  Icon(Icons.add, size: 20, color: accent),
+                  const SizedBox(width: 8),
                   Text(
                     "Add filter",
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: accentBlueDark,
+                      color: accent,
                     ),
                   ),
                 ],

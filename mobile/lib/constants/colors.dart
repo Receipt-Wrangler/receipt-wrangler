@@ -62,11 +62,21 @@ const slate700 = Color(0xFF334155);
 /// The design's `rgba(39,177,255,.08)`, flattened against white.
 const accentTint = Color(0xFFEAF7FF);
 
-/// The accent for text and icons **on white**.
+/// A filled accent container -- the bottom nav's selected pill.
 ///
-/// The theme's `primary` (`#27B1FF`) is 2.2:1 against white and fails WCAG for
-/// anything but a large solid fill, so it must never be used as a foreground
-/// color. This darker step is the design's own `#0086D4` and clears AA.
+/// Distinct from [accentTint], and both are needed. This one is strong enough
+/// that a 24px icon on it reads as selected across the room; the lighter tint is
+/// not, which is exactly the bug it was introduced to fix. Conversely
+/// [accentBlueDark] clears AA on [accentTint] at chip-label size but only clears
+/// the large-text / UI threshold on this one.
+const accentContainer = Color(0xFFCCECFF);
+
+/// Foreground for [accentTint] and [accentContainer].
+///
+/// **Not** a general "accent on white". Accent icons and button labels on white
+/// are the theme's `primary` -- that is what `receipt_form.dart` already does
+/// and what Material 3 gives every text and outlined button. This darker step
+/// exists because `primary` over the accent tints is barely 2:1.
 const accentBlueDark = Color(0xFF0086D4);
 
 /// Border for a chip in the tinted "selected mode" treatment (the filter

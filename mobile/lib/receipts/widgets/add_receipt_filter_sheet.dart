@@ -64,9 +64,8 @@ class AddReceiptFilterList extends StatelessWidget {
       children: fields
           .map((field) => ListTile(
                 key: ValueKey("add-receipt-filter-${field.key}"),
-                // accentBlueDark, not the theme's primary: at 22px on white
-                // the primary is 2.2:1 and the glyph washes out.
-                leading: Icon(field.icon, color: accentBlueDark),
+                leading: Icon(field.icon,
+                    color: Theme.of(context).colorScheme.primary),
                 title: Text(field.label),
                 subtitle: Text(field.hint),
                 trailing: const Icon(Icons.add, size: 20, color: slate400),

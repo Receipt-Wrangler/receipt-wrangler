@@ -92,6 +92,29 @@ void main() {
     });
   });
 
+  test("the bottom nav's selected pill does not ride secondaryContainer", () {
+    // The regression this guards: NavigationBar takes its indicator from
+    // `secondaryContainer`. Before that role was named it fell through to the
+    // #8EA1AC secondary -- a solid pill. Naming it slate-100 (correct for its
+    // other consumers) made the selected destination a near-white pill on a
+    // near-white bar, on every main screen. Nothing else notices.
+    final nav = theme.navigationBarTheme;
+
+    expect(nav.indicatorColor, accentContainer);
+    expect(nav.indicatorColor, isNot(scheme.secondaryContainer));
+    expect(nav.indicatorColor, isNot(scheme.surface));
+
+    Color iconColorFor(Set<WidgetState> states) =>
+        nav.iconTheme!.resolve(states)!.color!;
+    Color labelColorFor(Set<WidgetState> states) =>
+        nav.labelTextStyle!.resolve(states)!.color!;
+
+    expect(iconColorFor({WidgetState.selected}), accentBlueDark);
+    expect(labelColorFor({WidgetState.selected}), accentBlueDark);
+    expect(iconColorFor(const <WidgetState>{}), slate700);
+    expect(labelColorFor(const <WidgetState>{}), slate700);
+  });
+
   test("an app bar's leading and action icons are the same grey", () {
     // M3 takes leading from onSurface and actions from onSurfaceVariant, so a
     // bar carrying both renders two different colours unless both are pinned.
