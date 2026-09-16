@@ -1071,9 +1071,35 @@ per-item rows and the split sheet at once.
 - **View mode installs no tap surface at all.** When `onTap` is null (the wrappers pass null
   in `WranglerFormState.view`) the bare `InputDecorator` is returned rather than an opaque
   detector that would swallow pointers for a no-op.
-- **`ChoiceChip.onSelected` is kept even though it is now redundant** — the chip wins the
+- **`onSelected` is kept even though it is now redundant** — the chip wins the
   gesture arena and calls the same handler the outer detector would. It stays because
-  `onSelected: null` renders a `ChoiceChip` in its *disabled* style.
+  `onSelected: null` renders the chip in its *disabled* style.
+- **Each chip carries a remove X, so the chips are `InputChip`s, not `ChoiceChip`s.**
+  `ChoiceChip` does not implement `DeletableChipAttributes` and so has no `onDeleted`;
+  `InputChip` implements both it and `SelectableChipAttributes`, so every property the
+  chip already set carries over and, under the app's M3 theme, the selected-state
+  background, label color and border side are the same — the X is the only visual delta.
+  `deleteIcon` **is** set explicitly (`Icon(Icons.cancel, size: 18)`): InputChip's M3
+  default is `Icons.clear`, a bare X, where desktop's `matChipRemove` button renders
+  `<mat-icon>cancel</mat-icon>`, the filled circle. `Wrap` gained `runSpacing: 5` because
+  the wider chips reach a second run sooner and the runs would otherwise touch.
+- **Removal goes out through `onRemove`, never through `field.didChange`.** The owning
+  forms are the source of truth: each answers the picker's result with
+  `setState(() => ...setValue(list))`, and Quick Scan additionally fires `onValueChange()`
+  to mirror the form into its `QuickScanImage` (`quick_scan_form.dart`). A remove that
+  mutated the `FormBuilderField` internally would leave that image holding the removed
+  category and submit its id anyway. Routing it through the same callback the sheet result
+  takes means every call site inherits its existing propagation — `CategorySelectField` /
+  `TagSelectField` just forward to their `onCategoriesChanged` / `onTagsChanged`, so no
+  call site of theirs changed. The new list is computed by **index**
+  (`List.from(field.value)..removeAt(index)`), because the items carry no equality and a
+  list can hold two equal entries; desktop's `removeOption(index)` does the same.
+- **`onRemove == null` is what hides the X**, and it is what the wrappers pass in
+  `WranglerFormState.view` alongside the null `onTap` — mirroring desktop gating its
+  `matChipRemove` button on `*ngIf="!readonly"`. Note `setValue` does **not** call
+  `setState` (only `didChange` does), so it is the owner's rebuild that re-runs the
+  field's builder against the new value; a test harness has to mirror that, which is why
+  `multi_select_field_test.dart` wraps the field in a `StatefulBuilder`.
 - **No explicit min-height is set.** The app's global `InputDecorationTheme` uses
   `OutlineInputBorder` (`lib/main.dart`), whose default non-dense content padding already
   puts the decorator past the 48dp target even in the empty state.
@@ -1106,8 +1132,15 @@ per-item rows and the split sheet at once.
 - **Tests:** `test/widgets/multi_select_field_test.dart` covers the widget end to end —
   edge/label/gutter/chip-gap taps (the regression guards; they assert the detector's rect
   equals the decorator's), chip and placeholder taps, rendering, form registration and
-  `didChange`, the `required` validator, and the inert view mode. The e2e specs still tap the
-  `"No <items> selected"` placeholder as their locator, which keeps working.
+  `didChange`, the `required` validator, the inert view mode, and the remove button (present
+  only with `onRemove`, reports the remaining values in order, drops one of two duplicates,
+  reports `[]` rather than null for the last chip, and — the one most likely to regress
+  silently — does **not** also fire `onTap`, since the button's `InkWell` has to win the
+  gesture arena against the field's opaque ancestor detector).
+  `test/widgets/quick_scan_form_test.dart` pins the propagation contract above: removing a
+  chip reaches the `QuickScanImage` through `onValueChange`. The e2e specs still tap the
+  `"No <items> selected"` placeholder as their locator, and the ones that drive chips drive
+  the **sheet's** `ChoiceChip` toggles (`FilterMultiSelect`, unchanged), so both keep working.
 
 ### Recording a demo GIF (headless Linux desktop)
 
