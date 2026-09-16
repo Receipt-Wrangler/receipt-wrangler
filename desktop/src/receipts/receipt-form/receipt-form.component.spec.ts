@@ -16,7 +16,7 @@ import { ApiModule, CustomFieldType, Permission, ReceiptImageService, ReceiptSta
 import { SnackbarService } from "../../services";
 import { QueueMode } from "../../services/receipt-queue.service";
 import { StatefulMenuItem } from "../../standalone/components/filtered-stateful-menu/stateful-menu-item";
-import { SetPermissions, SetUserPreferences } from "../../store/auth.state.actions";
+import { SetPermissions } from "../../store/auth.state.actions";
 import { SetGroups, SetSelectedGroupId } from "../../store/group.state.actions";
 import { StoreModule } from "../../store/store.module";
 import { ReceiptFormComponent } from "./receipt-form.component";
@@ -1203,43 +1203,6 @@ describe("ReceiptFormComponent", () => {
       });
 
       expect(component.form.value.groupId).toEqual(9);
-    });
-  });
-
-  describe("image pane width", () => {
-    const createWithPreference = (showLargeImagePreviews: boolean): ReceiptFormComponent => {
-      TestBed.inject(Store).dispatch(
-        new SetUserPreferences({ showLargeImagePreviews } as any),
-      );
-
-      return TestBed.createComponent(ReceiptFormComponent).componentInstance;
-    };
-
-    it("starts the image pane at the standard width", () => {
-      expect(component.defaultImagePaneRatio).toEqual(40);
-      expect(component.imagePaneRatio()).toEqual(40);
-    });
-
-    it("starts it wider for a user who prefers large image previews", () => {
-      const created = createWithPreference(true);
-
-      expect(created.defaultImagePaneRatio).toEqual(65);
-      expect(created.imagePaneRatio()).toEqual(65);
-    });
-
-    it("still starts at the standard width when the preference is off", () => {
-      expect(createWithPreference(false).imagePaneRatio()).toEqual(40);
-    });
-
-    // The seed is a field initializer rather than part of the activatedRoute.data
-    // subscription, which re-fires on every queue step - seeding there would throw
-    // away a width the user had just dragged each time they moved to the next receipt.
-    it("keeps a dragged width across a route data emission", () => {
-      component.imagePaneRatio.set(72);
-
-      routeDataSubject.next({ mode: FormMode.edit, customFields: [] });
-
-      expect(component.imagePaneRatio()).toEqual(72);
     });
   });
 });
