@@ -65,6 +65,14 @@ func GetReceiptSummaryForGroup(w http.ResponseWriter, r *http.Request) {
 				)
 				return 0, nil
 			}
+			if errors.Is(err, services.ErrConfigurationGroupNotAllGroup) {
+				utils.WriteCustomErrorResponse(
+					w,
+					"A configuration group may only be specified for the all group",
+					http.StatusBadRequest,
+				)
+				return 0, nil
+			}
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

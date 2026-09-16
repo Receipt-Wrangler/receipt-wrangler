@@ -6,13 +6,21 @@
         breakdown has to come from one group's configuration. This picks which.
       -->
       <div class="receipt-totals__config">
-        <span class="receipt-totals__config-label">Summary configuration:</span>
+        <span id="receipt-totals-config-label" class="receipt-totals__config-label">
+          Summary configuration:
+        </span>
         <!--
           Selection is driven by each option's [selected], not by a [value] on the listbox: the
           listbox input only takes effect through a form binding, so a [value] here would silently
           render nothing as selected (the spec asserts the selected class for exactly that reason).
+
+          aria-labelledby, because the label above is only visually adjacent — nothing associates the
+          two, so a screen reader would otherwise announce this as an unnamed listbox.
         -->
-        <mat-chip-listbox (change)="configGroupSelected.emit($event.value)">
+        <mat-chip-listbox
+          aria-labelledby="receipt-totals-config-label"
+          (change)="configGroupSelected.emit($event.value)"
+        >
           @for (group of configGroups(); track group.id) {
             <mat-chip-option
               [value]="group.id"

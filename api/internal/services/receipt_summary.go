@@ -19,6 +19,12 @@ import (
 // a bare error so a genuine failure is never mistaken for a denial.
 var ErrConfigurationGroupForbidden = errors.New("no access to the requested configuration group")
 
+// ErrConfigurationGroupNotAllGroup is returned when the caller names a configuration
+// group other than the real group being viewed. Only the synthetic All group may borrow
+// another group's configuration — it has none of its own. The handler maps this to a
+// 400: it is a malformed request, not an access failure.
+var ErrConfigurationGroupNotAllGroup = errors.New("a configuration group may only be named for the all group")
+
 // ReceiptSummaryService aggregates a group's filtered receipts into the block of
 // totals under the receipts table. It follows PieChartService: fetch the filtered set
 // unpaged through the repository that already enforces the access controls, then fold
@@ -97,9 +103,19 @@ func (service ReceiptSummaryService) GetReceiptSummary(
 	return service.fold(receipts, settings.ReceiptSummaryStatuses, fieldIds, fieldNames, configurationGroupId), nil
 }
 
-// resolveConfigurationGroupId picks the group whose settings shape the breakdown, and
-// authorizes it when it is not the group being viewed. Without that check a member
-// could name any group id and read back its configured custom field names.
+// resolveConfigurationGroupId picks the group whose settings shape the breakdown.
+//
+// Borrowing another group's configuration is a privilege of the synthetic All group
+// alone, which spans several groups and has no settings row of its own. A real group
+// must use its own: otherwise a member could render group A's receipts under group B's
+// statuses and currency fields, overriding what A's admin configured — and opting into
+// a summary A has switched off. That would undo the invariant the feature is built on,
+// that the server owns the configuration and the client cannot add a column or drop one.
+//
+// The All-group test comes BEFORE the permission check on purpose. Rejecting on the
+// shape of the request first means the answer cannot depend on whether the caller can
+// read the named group, so this endpoint can never be used to probe for another group's
+// existence.
 func (service ReceiptSummaryService) resolveConfigurationGroupId(
 	userId uint,
 	uintGroupId uint,
@@ -108,6 +124,14 @@ func (service ReceiptSummaryService) resolveConfigurationGroupId(
 ) (uint, error) {
 	if command.ConfigurationGroupId == nil || *command.ConfigurationGroupId == uintGroupId {
 		return uintGroupId, nil
+	}
+
+	isAllGroup, err := repositories.NewGroupRepository(service.TX).IsAllGroup(uintGroupId)
+	if err != nil {
+		return 0, err
+	}
+	if !isAllGroup {
+		return 0, ErrConfigurationGroupNotAllGroup
 	}
 
 	configurationGroupId := *command.ConfigurationGroupId

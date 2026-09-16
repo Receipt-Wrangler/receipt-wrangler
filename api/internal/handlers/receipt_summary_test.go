@@ -189,19 +189,66 @@ func TestGetReceiptSummaryExcludesHiddenPayersReceipts(t *testing.T) {
 	}
 }
 
+// seedAllGroupWithMember creates the synthetic All group with the user as a member, which is the only
+// group a configuration override is accepted for.
+func seedAllGroupWithMember(t *testing.T, userId uint) uint {
+	t.Helper()
+
+	db := repositories.GetDB()
+	allGroup := models.Group{Name: "all", IsAllGroup: true}
+	if err := db.Create(&allGroup).Error; err != nil {
+		t.Fatalf("create all group: %v", err)
+	}
+	member := models.GroupMember{GroupID: allGroup.ID, UserID: userId}
+	if err := db.Model(models.GroupMember{}).Create(&member).Error; err != nil {
+		t.Fatalf("add all group member: %v", err)
+	}
+
+	return allGroup.ID
+}
+
 // TestGetReceiptSummaryForbidsUnreadableConfigurationGroup: the All-group chip row lets the client
 // name which group's configuration to apply, so that id must be authorized or it becomes a way to
-// enumerate another group's configured custom field names.
+// enumerate another group's configured custom field names. Driven through the All group, the only
+// group an override is accepted for at all.
 func TestGetReceiptSummaryForbidsUnreadableConfigurationGroup(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	repositories.CreateTestGroupWithUsers()
-	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+
+	allGroupId := seedAllGroupWithMember(t, 1)
+	grantGroupPerms(t, 1, allGroupId, permissions.GroupReceiptsRead)
 
 	// Group 2 exists; user 1 is not a member and holds nothing on it.
 	enableSummaryForGroup(t, 2, []models.ReceiptStatus{models.OPEN})
 
-	w := callGetReceiptSummary(t, 1, 1, `{"configurationGroupId":2,"filter":{}}`)
+	w := callGetReceiptSummary(t, 1, allGroupId, `{"configurationGroupId":2,"filter":{}}`)
 	if w.Result().StatusCode != http.StatusForbidden {
 		utils.PrintTestError(t, w.Result().StatusCode, http.StatusForbidden)
+	}
+}
+
+// TestGetReceiptSummaryRejectsConfigurationGroupForRealGroup: a real group must use its own
+// configuration. Borrowing another group's would let a member render this group's receipts under
+// statuses and currency fields its admin never chose — and switch on a summary the admin turned off.
+// A 400, not a 403: the request is malformed, and user 1 can read both groups here.
+func TestGetReceiptSummaryRejectsConfigurationGroupForRealGroup(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+
+	// Make group 2 genuinely readable, so the rejection cannot be mistaken for an access failure.
+	db := repositories.GetDB()
+	member := models.GroupMember{GroupID: 2, UserID: 1}
+	if err := db.Model(models.GroupMember{}).Create(&member).Error; err != nil {
+		t.Fatalf("add group 2 member: %v", err)
+	}
+	grantGroupPerms(t, 1, 2, permissions.GroupReceiptsRead)
+
+	enableSummaryForGroup(t, 1, []models.ReceiptStatus{models.OPEN})
+	enableSummaryForGroup(t, 2, []models.ReceiptStatus{models.RESOLVED})
+
+	w := callGetReceiptSummary(t, 1, 1, `{"configurationGroupId":2,"filter":{}}`)
+	if w.Result().StatusCode != http.StatusBadRequest {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusBadRequest)
 	}
 }

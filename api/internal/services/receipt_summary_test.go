@@ -391,19 +391,91 @@ func TestReceiptSummary_DecimalPrecision(t *testing.T) {
 	}
 }
 
+// seedSummaryAllGroup creates the synthetic All group (the only group allowed to borrow another
+// group's configuration) with user 1 as a member. It lives here rather than in
+// CreateTestGroupWithUsers so no other suite's group counts shift.
+func seedSummaryAllGroup(t *testing.T) uint {
+	t.Helper()
+
+	db := repositories.GetDB()
+	allGroup := models.Group{Name: "all", IsAllGroup: true}
+	if err := db.Create(&allGroup).Error; err != nil {
+		t.Fatalf("create all group: %v", err)
+	}
+	member := models.GroupMember{GroupID: allGroup.ID, UserID: 1}
+	if err := db.Model(models.GroupMember{}).Create(&member).Error; err != nil {
+		t.Fatalf("add all group member: %v", err)
+	}
+
+	return allGroup.ID
+}
+
 // TestReceiptSummary_ConfigurationGroupForbidden: without this check a member could name any group
-// id and read back its configured custom field names.
+// id and read back its configured custom field names. Viewed through the All group, because that is
+// now the only group a configuration override is accepted for at all.
 func TestReceiptSummary_ConfigurationGroupForbidden(t *testing.T) {
 	defer tearDownReceiptSummaryTest()
 	setupReceiptSummaryTest()
+
+	allGroupId := seedSummaryAllGroup(t)
 
 	// Group 2 exists but user 1 is not a member of it (CreateTestGroupWithUsers puts user 4 there).
 	configureSummary(t, 2, true, []models.ReceiptStatus{models.OPEN}, nil)
 
 	command := summaryCommand(t, `{"configurationGroupId":2,"filter":{}}`)
 
-	_, err := NewReceiptSummaryService(nil).GetReceiptSummary(1, "1", command)
+	_, err := NewReceiptSummaryService(nil).GetReceiptSummary(1, utils.UintToString(allGroupId), command)
 	if err != ErrConfigurationGroupForbidden {
 		utils.PrintTestError(t, err, ErrConfigurationGroupForbidden)
+	}
+}
+
+// TestReceiptSummary_ConfigurationGroupRejectedForRealGroup: a real group must use its own
+// configuration. Otherwise a member could render group 1's receipts under group 2's statuses and
+// currency fields — overriding what group 1's admin chose, and opting into a summary group 1 has
+// switched off. Only the All group, which has no settings row of its own, may borrow one.
+func TestReceiptSummary_ConfigurationGroupRejectedForRealGroup(t *testing.T) {
+	defer tearDownReceiptSummaryTest()
+	setupReceiptSummaryTest()
+
+	// User 1 is made a member of group 2 on purpose, so the borrowed configuration is one they may
+	// genuinely read. That is what makes this a test of the request's SHAPE rather than of access:
+	// the call would sail through the permission check and still has to be refused.
+	db := repositories.GetDB()
+	member := models.GroupMember{GroupID: 2, UserID: 1}
+	if err := db.Model(models.GroupMember{}).Create(&member).Error; err != nil {
+		t.Fatalf("add group 2 member: %v", err)
+	}
+
+	configureSummary(t, 1, true, []models.ReceiptStatus{models.OPEN}, nil)
+	configureSummary(t, 2, true, []models.ReceiptStatus{models.RESOLVED}, nil)
+
+	command := summaryCommand(t, `{"configurationGroupId":2,"filter":{}}`)
+
+	_, err := NewReceiptSummaryService(nil).GetReceiptSummary(1, "1", command)
+	if err != ErrConfigurationGroupNotAllGroup {
+		utils.PrintTestError(t, err, ErrConfigurationGroupNotAllGroup)
+	}
+}
+
+// TestReceiptSummary_ConfigurationGroupRejectedBeforeAccessCheck pins the ORDER of the two guards.
+// Naming a group the caller cannot read, from a real group, must still report the not-all-group
+// rejection: if the access check ran first, the response would differ depending on whether the
+// named group is readable, which turns this endpoint into a probe for other groups' existence.
+func TestReceiptSummary_ConfigurationGroupRejectedBeforeAccessCheck(t *testing.T) {
+	defer tearDownReceiptSummaryTest()
+	setupReceiptSummaryTest()
+
+	configureSummary(t, 1, true, []models.ReceiptStatus{models.OPEN}, nil)
+
+	// Group 2 is one user 1 is NOT a member of, and 9999 does not exist at all. Both must come back
+	// as the same rejection, so neither can be distinguished from a readable group.
+	for _, configurationGroupId := range []string{"2", "9999"} {
+		command := summaryCommand(t, `{"configurationGroupId":`+configurationGroupId+`,"filter":{}}`)
+
+		_, err := NewReceiptSummaryService(nil).GetReceiptSummary(1, "1", command)
+		if err != ErrConfigurationGroupNotAllGroup {
+			utils.PrintTestError(t, err, ErrConfigurationGroupNotAllGroup)
+		}
 	}
 }

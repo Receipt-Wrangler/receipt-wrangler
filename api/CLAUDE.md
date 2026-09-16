@@ -1597,9 +1597,21 @@ any receipt reader.
 `ReceiptSummaryCommand` carries the filter and an optional `ConfigurationGroupId`, **not** the field
 or status list — the configuration is the group's and applies to everyone, so a client must not be
 able to add a column or opt out. `ConfigurationGroupId` exists for the synthetic "All" group, which
-spans several groups and has no meaningful settings of its own; the service authorizes it with
-`HasGroupPermissions` before reading, or it becomes a way to enumerate another group's configured
-field names (`ErrConfigurationGroupForbidden` → 403).
+spans several groups and has no meaningful settings of its own.
+
+**Borrowing a configuration is the All group's privilege alone.** A real group must use its own, or a
+member could render group A's receipts under group B's statuses and currency fields — overriding what
+A's admin configured, and switching on a summary A has turned off, which is exactly the invariant
+above. `resolveConfigurationGroupId` therefore tests `IsAllGroup(uintGroupId)` first
+(`ErrConfigurationGroupNotAllGroup` → **400**, a malformed request rather than an access failure), and
+only then authorizes the named group with `HasGroupPermissions`
+(`ErrConfigurationGroupForbidden` → **403**), or it becomes a way to enumerate another group's
+configured field names. **That order matters**: rejecting on the request's shape first means the
+response cannot depend on whether the caller can read the named group, so the endpoint can never be
+used to probe for another group's existence — pinned by
+`TestReceiptSummary_ConfigurationGroupRejectedBeforeAccessCheck`, which asserts an unreadable group and
+a nonexistent one come back identically. The desktop is unaffected: it sends the viewed group's own id
+for a real group, so only the All group ever sends a differing one.
 
 `services/receipt_summary.go` follows `pie_chart.go`: `IntersectReceiptFilterWithGrants`, then
 `GetPagedReceiptsByGroupId` unpaged, then a Go fold. That one repository call is what supplies the

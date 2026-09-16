@@ -301,7 +301,9 @@ only ever describe the whole group.
   tables (deliberately not a discriminator on the existing defaults join — see `api/CLAUDE.md`).
 - **The server owns the configuration, not the client.** `ReceiptSummaryCommand` carries the filter
   and an optional `configurationGroupId`, never the field or status list, so a client cannot add a
-  column or opt out of one.
+  column or opt out of one. That `configurationGroupId` is accepted **only for the synthetic All
+  group**, which has no configuration of its own — a real group naming another group's is a 400,
+  or the override would be a way around the very invariant this bullet states.
 - **`POST /api/receipt/group/{groupId}/summary` is gated on `group.receipts.read`** — the same
   permission as the table it sits under, and deliberately not `app.custom-fields.read`: that gates
   the catalog, and any receipt reader already sees these field names.
