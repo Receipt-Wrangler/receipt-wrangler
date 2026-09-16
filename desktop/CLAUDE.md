@@ -1680,12 +1680,46 @@ carousel in canvas mode, or the wheel would drive the carousel's shared scale as
 *active slide's* viewer (`viewChildren(ImageViewerComponent)` indexed by `currentlyShownImageIndex`)
 rather than mutating one `scale` shared by every slide, which is what a canvas implies.
 
-**Stage height is the repurposed collapse/expand toggle.** `showLargeImagePreview` selects
-`COMPACT_STAGE_HEIGHT` (30vh) or `EXPANDED_STAGE_HEIGHT` (**50vh**), still seeded per navigation from
-the `showLargeImagePreviews` preference. **50vh is a hard constraint, not taste**: the form's save bar
-is fixed to the bottom of the viewport, and at 60vh the stage's lower edge sits beneath it, so the bar
-swallows the pointer and the two bottom handles cannot be grabbed at all. It clears down to roughly a
-768px-tall viewport.
+**The stage is exactly as tall as the Details pane beside it**, so the two columns move together
+like a two-column grid rather than a short image box floating next to a tall form. Bootstrap's
+`.row` is already `display: flex` with the initial `align-items: stretch`, so the Images column is
+*already* the right height — the work is entirely in making its contents fill it, because every link
+between the column and the canvas is `height: auto` and three hosts (`app-carousel`, ngx-bootstrap's
+`<carousel>`, `app-image-viewer`) are `display: inline`.
+
+The height is handed down in two places, both **gated on a class**:
+- `carousel.component.scss` is global (`ViewEncapsulation.None`), which makes it the right home for
+  the ngx-bootstrap links. `.rw-carousel--fill` carries `display: block; height: 100%` down through
+  `carousel`, `.carousel.slide`, `.carousel-inner`, `.carousel-item.active`, `.item` and
+  `app-image-viewer`. Use `.carousel-item.active`, not `slide`, so the inactive slides ngx-bootstrap
+  takes out of flow stay out of it, and keep them `block` — `flex` fights Bootstrap's `float: left`.
+- `receipt-form.component.scss` covers its own template under `.rw-images-pane`: a flex column so the
+  always-present section header takes its own height and the content takes the rest. One `::ng-deep`
+  is unavoidable — `app-form-section` wraps projected content in a **classless** div of its own,
+  reachable only as `.form-section-header + div`.
+
+`stageHeight` is bound to `[style.height]`, an inline style, so the receipt form simply passes
+`stageHeight="100%"`; no rule on the canvas and no `!important`. The canvas needs no change at all —
+its `ResizeObserver` already re-clamps when the stage resizes, which is what makes a layout-derived
+height safe, and the Details pane's height genuinely does change live (category/tag chips wrap as you
+type).
+
+**`app-upload-image` must not carry `h-100` in that column.** The class was inert while its host was
+`display: inline`, but a flex container blockifies its children — at which point
+`height: 100% !important` makes a hidden file input swallow the whole column and leaves the stage
+with nothing but its own 2px border.
+
+**Gating every rule on a class is not optional.** `#expandedImageTemplate` is declared in
+`receipt-form`, so its embedded view carries that component's encapsulation attribute even while it
+renders inside the MatDialog overlay: an ungated `app-carousel { height: 100% }` would reach into the
+fullscreen dialog and stretch its `img.viewer-image` (`width/height: 100%`), distorting it.
+`receipt-form.component.spec.ts` pins that the inline carousel has the fill class and
+`stageHeight="100%"` while the dialog's has neither.
+
+**The collapse/expand toggle is gone**, along with the `showLargeImagePreviews` checkbox in User
+Preferences that seeded it — the canvas replaced what the toggle was for, and with it removed nothing
+anywhere read that preference (mobile has only the generated model; the backend just stores it). The
+API field remains.
 
 `carouselComponent` is also no longer `viewChild.required`: the Zoom/Download/Fullscreen header
 buttons render whenever there are images, but the carousel itself is behind `*ngIf="… && showImages"`,

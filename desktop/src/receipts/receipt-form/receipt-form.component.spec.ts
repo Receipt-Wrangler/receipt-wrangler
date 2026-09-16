@@ -1205,4 +1205,40 @@ describe("ReceiptFormComponent", () => {
       expect(component.form.value.groupId).toEqual(9);
     });
   });
+
+  // The image stage fills its column via a class-gated height chain. The
+  // fullscreen #expandedImageTemplate is declared in this component, so it
+  // carries the same encapsulation attribute - it must NOT pick the class up, or
+  // the dialog's plain image gets stretched too. Nothing else pins this.
+  describe("image stage sizing", () => {
+    const carousels = (): HTMLElement[] =>
+      Array.from(document.querySelectorAll("app-carousel"));
+
+    beforeEach(async () => {
+      component.images.set([{ id: 1 } as any]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+    });
+
+    it("has the inline carousel fill its column", () => {
+      const inline = fixture.nativeElement.querySelector("app-carousel") as HTMLElement;
+
+      expect(inline).toBeTruthy();
+      expect(inline.classList).toContain("rw-carousel--fill");
+      expect(inline.getAttribute("stageHeight")).toEqual("100%");
+    });
+
+    it("does not let the fullscreen dialog fill, so its image is left alone", () => {
+      component.expandImage();
+      fixture.detectChanges();
+
+      const dialogCarousel = carousels().find(
+        (element) => !fixture.nativeElement.contains(element),
+      );
+
+      expect(dialogCarousel).toBeTruthy();
+      expect(dialogCarousel!.classList).not.toContain("rw-carousel--fill");
+      expect(dialogCarousel!.getAttribute("stageHeight")).toBeNull();
+    });
+  });
 });

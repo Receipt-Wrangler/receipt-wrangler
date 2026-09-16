@@ -112,19 +112,20 @@
         </app-form-section>
         @if (!selectedGroup()?.groupReceiptSettings?.hideImages) {
           <app-form-section
-            class="col h-100"
+            class="col rw-images-pane"
             headerText="Images"
             [headerButtonsTemplate]="imagesSectionHeaderButtons"
             [indent]="false"
           >
-            <div class="w-100 h-100">
+            <div class="w-100 h-100 rw-images-pane__content">
               <app-upload-image
-                class="w-100 h-100"
+                class="w-100"
                 [receiptId]="originalReceipt?.id?.toString()"
                 (fileLoaded)="imageFileLoaded($event)"
               >
               </app-upload-image>
               <div
+                class="rw-images-pane__stage"
                 *ngIf="
                 images() &&
                 (images().length > 0 || filesToUpload().length > 0) &&
@@ -137,12 +138,13 @@
                   </div>
                 </ng-container>
                 <app-carousel
+                  class="rw-carousel--fill"
                   [images]="images()"
                   [imagePreviews]="filesToUpload()"
                   [mode]="mode"
                   [hideButtonControls]="true"
                   [directManipulation]="true"
-                  [stageHeight]="imageStageHeight"
+                  stageHeight="100%"
                   [disabled]="
                   mode !== formMode.edit || (showProgressBar() ?? false)
                 "
@@ -377,14 +379,6 @@
       [tooltip]="showImages ? 'Hide Images' : 'Show Images'"
       [disabled]="(showProgressBar() ?? false)"
       (clicked)="toggleShowImages()"
-    ></app-button>
-    <app-button
-      matButtonType="iconButton"
-      color="accent"
-      [icon]="showLargeImagePreview ? 'unfold_less' : 'unfold_more'"
-      [tooltip]="showLargeImagePreview ? 'Collapse Image' : 'Expand Image'"
-      [disabled]="(showProgressBar() ?? false)"
-      (clicked)="toggleImagePreviewSize()"
     ></app-button>
     <app-button
       matButtonType="iconButton"

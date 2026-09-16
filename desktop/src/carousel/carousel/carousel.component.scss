@@ -13,3 +13,29 @@
 .image-container {
   max-height: 25vh;
 }
+
+// Opt-in: lets the image stage fill the column it sits in instead of using a
+// fixed height. Every link between this host and app-image-canvas is either
+// display:inline (this host, ngx-bootstrap's <carousel>, app-image-viewer) or
+// height:auto, so a definite height has to be handed down explicitly.
+//
+// This file is global (ViewEncapsulation.None), which is exactly why the rules
+// are gated on a class: the receipt form's fullscreen dialog renders this same
+// component WITHOUT the class and so keeps the sizing it has always had.
+.rw-carousel--fill {
+  display: block;
+  height: 100%;
+
+  // .carousel-item.active rather than `slide`, so the inactive slides - which
+  // ngx-bootstrap takes out of flow with position:absolute - stay out of it.
+  // These must stay `block`: `flex` would fight Bootstrap's float: left.
+  carousel,
+  .carousel.slide,
+  .carousel-inner,
+  .carousel-item.active,
+  .item,
+  app-image-viewer {
+    display: block;
+    height: 100%;
+  }
+}

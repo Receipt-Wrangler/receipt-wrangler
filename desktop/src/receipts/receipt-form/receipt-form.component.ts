@@ -45,18 +45,6 @@ import { ShareListComponent } from "../share-list/share-list.component";
 import { UploadImageComponent } from "../upload-image/upload-image.component";
 import { buildItemForm } from "../utils/form.utils";
 
-/**
- * Height of the image canvas stage, for the compact and expanded states of the
- * Images section's collapse/expand toggle.
- *
- * The expanded height is capped well under the viewport because the form's save
- * bar is fixed to the bottom of it: at 60vh the stage's lower edge sits beneath
- * that bar, which swallows the pointer and leaves the two bottom resize handles
- * impossible to grab. 50vh clears it down to roughly a 768px-tall viewport.
- */
-const COMPACT_STAGE_HEIGHT = "30vh";
-const EXPANDED_STAGE_HEIGHT = "50vh";
-
 @UntilDestroy()
 @Component({
   selector: "app-receipt-form",
@@ -173,13 +161,6 @@ export class ReceiptFormComponent implements OnInit {
 
   public receiptStatusOptions = RECEIPT_STATUS_OPTIONS;
 
-  public showLargeImagePreview: boolean = false;
-
-  /** Drives the canvas stage; the collapse/expand toggle switches between the two. */
-  public get imageStageHeight(): string {
-    return this.showLargeImagePreview ? EXPANDED_STAGE_HEIGHT : COMPACT_STAGE_HEIGHT;
-  }
-
   /** 0 when the carousel is not rendered, i.e. while images are hidden. */
   public get currentImageIndex(): number {
     return this.carouselComponent()?.currentlyShownImageIndex ?? 0;
@@ -268,7 +249,6 @@ export class ReceiptFormComponent implements OnInit {
         this.setReceiptPermissions();
         this.getImageFiles();
         this.setHeaderText();
-        this.setShowLargeImagePreview();
         this.setQueueData();
         document.scrollingElement?.scrollTo(0, 0);
       });
@@ -364,10 +344,6 @@ export class ReceiptFormComponent implements OnInit {
         this.updateAmountFromItems();
       }
     });
-  }
-
-  private setShowLargeImagePreview(): void {
-    this.showLargeImagePreview = this.store.selectSnapshot(AuthState.userPreferences)?.showLargeImagePreviews ?? false;
   }
 
   private setHeaderText(): void {
@@ -1105,10 +1081,6 @@ export class ReceiptFormComponent implements OnInit {
 
   public zoomImageOut(): void {
     this.carouselComponent()?.zoomOut();
-  }
-
-  public toggleImagePreviewSize(): void {
-    this.showLargeImagePreview = !this.showLargeImagePreview;
   }
 
   public expandImage(): void {
