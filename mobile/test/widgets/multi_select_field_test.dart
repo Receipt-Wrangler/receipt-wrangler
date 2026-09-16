@@ -19,6 +19,12 @@ void main() {
   const alpha = _Thing('Alpha');
   const beta = _Thing('Beta');
 
+  /// Rebuilds the field's owner. The real consumers answer a value change with
+  /// `setState(() => ...setValue(list))`: FormBuilder's `setValue` does not
+  /// call `setState` itself (only `didChange` does), so it is the owner's
+  /// rebuild that re-runs the field's builder against the new value.
+  late StateSetter rebuildOwner;
+
   /// Mounts a [MultiSelectField] inside a FormBuilder, mirroring how the
   /// receipt / quick-scan forms host it. The surrounding SizedBox pins the
   /// field's width so offset-based taps are computed against a stable rect.
@@ -26,6 +32,7 @@ void main() {
     WidgetTester tester, {
     List<_Thing>? initialValue,
     VoidCallback? onTap,
+    void Function(List<_Thing>)? onRemove,
     bool? required,
   }) async {
     final formKey = GlobalKey<FormBuilderState>();
@@ -45,15 +52,21 @@ void main() {
               width: 400,
               child: FormBuilder(
                 key: formKey,
-                child: MultiSelectField<_Thing>(
-                  key: fieldKey,
-                  name: fieldName,
-                  label: 'Categories',
-                  itemName: 'Categories',
-                  itemDisplayName: (thing) => thing.name,
-                  initialValue: initialValue,
-                  onTap: onTap,
-                  required: required,
+                child: StatefulBuilder(
+                  builder: (context, setState) {
+                    rebuildOwner = setState;
+                    return MultiSelectField<_Thing>(
+                      key: fieldKey,
+                      name: fieldName,
+                      label: 'Categories',
+                      itemName: 'Categories',
+                      itemDisplayName: (thing) => thing.name,
+                      initialValue: initialValue,
+                      onTap: onTap,
+                      onRemove: onRemove,
+                      required: required,
+                    );
+                  },
                 ),
               ),
             ),
@@ -76,6 +89,13 @@ void main() {
           of: find.byKey(fieldKey),
           matching: find.byType(InputDecorator),
         ),
+      );
+
+  /// The X on a named chip. Icons.cancel is the chip's default delete icon,
+  /// and the glyph desktop's matChipRemove button uses.
+  Finder removeButton(String label) => find.descendant(
+        of: find.widgetWithText(InputChip, label),
+        matching: find.byIcon(Icons.cancel),
       );
 
   group('tap target', () {
@@ -153,8 +173,8 @@ void main() {
         onTap: () => taps++,
       );
 
-      final first = tester.getRect(find.widgetWithText(ChoiceChip, 'Alpha'));
-      final second = tester.getRect(find.widgetWithText(ChoiceChip, 'Beta'));
+      final first = tester.getRect(find.widgetWithText(InputChip, 'Alpha'));
+      final second = tester.getRect(find.widgetWithText(InputChip, 'Beta'));
       // The chips are separated by a childless SizedBox spacer, which the old
       // deferToChild detector could not hit-test.
       expect(second.left, greaterThan(first.right));
@@ -187,10 +207,125 @@ void main() {
         onTap: () => taps++,
       );
 
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Alpha'));
+      await tester.tap(find.widgetWithText(InputChip, 'Alpha'));
       await tester.pumpAndSettle();
 
       expect(taps, 1);
+    });
+  });
+
+  group('remove button', () {
+    testWidgets('every chip carries one when onRemove is given',
+        (tester) async {
+      await pumpField(
+        tester,
+        initialValue: const [alpha, beta],
+        onTap: () {},
+        onRemove: (_) {},
+      );
+
+      expect(find.byIcon(Icons.cancel), findsNWidgets(2));
+    });
+
+    testWidgets('there is none without onRemove', (tester) async {
+      await pumpField(
+        tester,
+        initialValue: const [alpha, beta],
+        onTap: () {},
+      );
+
+      expect(find.byIcon(Icons.cancel), findsNothing);
+    });
+
+    testWidgets('tapping one reports the remaining values in order',
+        (tester) async {
+      List<_Thing>? remaining;
+      await pumpField(
+        tester,
+        initialValue: const [alpha, beta],
+        onTap: () {},
+        onRemove: (value) => remaining = value,
+      );
+
+      await tester.tap(removeButton('Alpha'));
+      await tester.pump();
+
+      expect(remaining, const [beta]);
+    });
+
+    testWidgets('tapping one does not also open the picker', (tester) async {
+      // The remove button is an InkWell nested inside the field's opaque
+      // GestureDetector; the inner recognizer has to win the gesture arena, or
+      // removing a chip would open the sheet on top of it.
+      var taps = 0;
+      await pumpField(
+        tester,
+        initialValue: const [alpha, beta],
+        onTap: () => taps++,
+        onRemove: (_) {},
+      );
+
+      await tester.tap(removeButton('Beta'));
+      await tester.pump();
+
+      expect(taps, 0);
+    });
+
+    testWidgets('removal is by index, so duplicates drop one at a time',
+        (tester) async {
+      // Identical const instances: removing by value would drop both.
+      List<_Thing>? remaining;
+      await pumpField(
+        tester,
+        initialValue: const [alpha, alpha],
+        onTap: () {},
+        onRemove: (value) => remaining = value,
+      );
+
+      await tester.tap(removeButton('Alpha').first);
+      await tester.pump();
+
+      expect(remaining, const [alpha]);
+    });
+
+    testWidgets('removing the last chip reports an empty list, not null',
+        (tester) async {
+      List<_Thing>? remaining;
+      await pumpField(
+        tester,
+        initialValue: const [alpha],
+        onTap: () {},
+        onRemove: (value) => remaining = value,
+      );
+
+      await tester.tap(removeButton('Alpha'));
+      await tester.pump();
+
+      expect(remaining, isEmpty);
+    });
+
+    testWidgets('the chip goes away once the owner writes the value back',
+        (tester) async {
+      // Mirrors the real consumers (receipt form / quick scan / split sheet),
+      // which all answer the callback with setValue. The field renders from
+      // its own value, so a consumer that dropped the callback would leave the
+      // chip on screen.
+      late GlobalKey<FormBuilderState> formKey;
+      formKey = await pumpField(
+        tester,
+        initialValue: const [alpha, beta],
+        onTap: () {},
+        onRemove: (remaining) => rebuildOwner(
+          () => formKey.currentState!.fields[fieldName]!.setValue(remaining),
+        ),
+      );
+
+      await tester.tap(removeButton('Alpha'));
+      await tester.pump();
+
+      expect(find.byType(InputChip), findsOneWidget);
+      expect(find.widgetWithText(InputChip, 'Beta'), findsOneWidget);
+      expect(formKey.currentState!.fields[fieldName]!.value, const [beta]);
     });
   });
 
@@ -206,18 +341,18 @@ void main() {
       await pumpField(tester, onTap: () {});
 
       expect(find.text('No Categories selected'), findsOneWidget);
-      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.byType(InputChip), findsNothing);
     });
 
     testWidgets('renders one chip per value, labelled and in order',
         (tester) async {
       await pumpField(tester, initialValue: const [alpha, beta], onTap: () {});
 
-      expect(find.byType(ChoiceChip), findsNWidgets(2));
+      expect(find.byType(InputChip), findsNWidgets(2));
       expect(find.text('No Categories selected'), findsNothing);
 
       final labels = tester
-          .widgetList<ChoiceChip>(find.byType(ChoiceChip))
+          .widgetList<InputChip>(find.byType(InputChip))
           .map((chip) => (chip.label as Text).data)
           .toList();
       expect(labels, ['Alpha', 'Beta']);
@@ -228,7 +363,7 @@ void main() {
       await pumpField(tester, initialValue: const [], onTap: () {});
 
       expect(find.text('No Categories selected'), findsOneWidget);
-      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.byType(InputChip), findsNothing);
     });
   });
 
@@ -249,7 +384,7 @@ void main() {
           .didChange(const <_Thing>[alpha, beta]);
       await tester.pump();
 
-      expect(find.byType(ChoiceChip), findsNWidgets(2));
+      expect(find.byType(InputChip), findsNWidgets(2));
       expect(
         formKey.currentState!.fields[fieldName]!.value,
         const [alpha, beta],
@@ -267,7 +402,7 @@ void main() {
       formKey.currentState!.fields[fieldName]!.didChange(null);
       await tester.pump();
       expect(find.text('No Categories selected'), findsOneWidget);
-      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.byType(InputChip), findsNothing);
     });
   });
 
@@ -321,7 +456,15 @@ void main() {
       await pumpField(tester, initialValue: const [alpha, beta]);
 
       expect(find.text('Categories'), findsOneWidget);
-      expect(find.byType(ChoiceChip), findsNWidgets(2));
+      expect(find.byType(InputChip), findsNWidgets(2));
+    });
+
+    testWidgets('renders no remove buttons', (tester) async {
+      // The wrappers pass a null onRemove alongside the null onTap, matching
+      // desktop hiding matChipRemove when readonly.
+      await pumpField(tester, initialValue: const [alpha, beta]);
+
+      expect(find.byIcon(Icons.cancel), findsNothing);
     });
   });
 }

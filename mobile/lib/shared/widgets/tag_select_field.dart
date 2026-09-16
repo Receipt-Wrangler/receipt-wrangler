@@ -49,26 +49,33 @@ class _TagSelectField extends State<TagSelectField> {
         tagModel.tagsForGroup(widget.groupId),
         widget.initialTags,
         (tag) => tag.name).then((value) {
+      // A dismissed sheet returns null, which means "no change" -- an empty
+      // list is the legitimate "everything removed" value.
       if (value != null) {
         var tags = List<api.Tag>.from(value.map((item) => item as api.Tag));
 
-        if (widget.onTagsChanged != null) {
-          widget.onTagsChanged!(tags);
-        }
+        handleTagsChanged(tags);
       }
     });
   }
 
+  void handleTagsChanged(List<api.Tag> tags) {
+    if (widget.onTagsChanged != null) {
+      widget.onTagsChanged!(tags);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isView = widget.formState == WranglerFormState.view;
+
     return MultiSelectField<api.Tag>(
         name: widget.fieldName,
         label: widget.label,
         initialValue: widget.initialTags,
         itemDisplayName: (tag) => tag.name ?? "",
         itemName: "Tags",
-        onTap: widget.formState == WranglerFormState.view
-            ? null
-            : showTagMultiSelect);
+        onTap: isView ? null : showTagMultiSelect,
+        onRemove: isView ? null : handleTagsChanged);
   }
 }

@@ -146,7 +146,14 @@ class _ReceiptQuickActions extends State<ReceiptQuickActions> {
         initialValue: [],
         itemDisplayName: (user) => user.displayName ?? "",
         itemName: "Users",
-        onTap: showUserMultiSelect);
+        onTap: showUserMultiSelect,
+        onRemove: setUsers);
+  }
+
+  void setUsers(List<api.UserView> users) {
+    setState(() {
+      formKey.currentState!.fields["users"]!.setValue(users);
+    });
   }
 
   void showUserMultiSelect() {
@@ -168,9 +175,7 @@ class _ReceiptQuickActions extends State<ReceiptQuickActions> {
         var users =
             List<api.UserView>.from(value.map((item) => item as api.UserView));
 
-        setState(() {
-          formKey.currentState!.fields["users"]!.setValue(users);
-        });
+        setUsers(users);
       }
     });
   }
