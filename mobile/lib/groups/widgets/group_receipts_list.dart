@@ -63,6 +63,15 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
   }
 
   void _refreshForFilterChange() {
+    if (!mounted) {
+      return;
+    }
+
+    // setState as well as refetch: the empty-state text below reads the applied
+    // filter, and the list is otherwise built with listen: false. Safe to call
+    // here because the only notifying writer is the filter screen's Apply, a
+    // user event -- the group reset writes silently, during a build.
+    setState(() {});
     _refreshCallback?.call();
   }
 

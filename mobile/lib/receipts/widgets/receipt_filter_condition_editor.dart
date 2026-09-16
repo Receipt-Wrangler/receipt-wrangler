@@ -244,6 +244,12 @@ class ReceiptFilterConditionEditorState
                   key: ValueKey("receipt-filter-operation-${operation.name}"),
                   label: Text(filterOperationLabels[operation] ?? operation.name),
                   selected: _operation == operation,
+                  // The same selected treatment the shared MultiSelectField
+                  // gives its chips, so the two chip rows on this sheet do not
+                  // read as different kinds of control. M3's default resolves
+                  // to the secondary slate, which looks disabled next to them.
+                  selectedColor: Theme.of(context).primaryColor,
+                  showCheckmark: false,
                   onSelected: (_) => _pickOperation(operation),
                 ))
             .toList(),
@@ -428,6 +434,7 @@ class ReceiptFilterConditionEditorState
         return _buildMultiSelect<api.UserView>(
           widgetKey: const ValueKey("receipt-filter-paid-by"),
           sheetTitle: "Select ${widget.field.label}",
+          itemName: "People",
           options: filterPaidByOptions(
               Provider.of<UserModel>(context, listen: false),
               groupModel,
@@ -438,6 +445,7 @@ class ReceiptFilterConditionEditorState
         return _buildMultiSelect<api.Group>(
           widgetKey: const ValueKey("receipt-filter-group"),
           sheetTitle: "Select ${widget.field.label}",
+          itemName: "Groups",
           options: filterGroupOptions(groupModel),
         );
 
@@ -445,6 +453,7 @@ class ReceiptFilterConditionEditorState
         return _buildMultiSelect<api.ReceiptStatus>(
           widgetKey: const ValueKey("receipt-filter-status"),
           sheetTitle: "Select ${widget.field.label}",
+          itemName: "Statuses",
           options: filterStatusOptions(),
         );
     }
@@ -457,6 +466,9 @@ class ReceiptFilterConditionEditorState
   Widget _buildMultiSelect<T>({
     required Key widgetKey,
     required String sheetTitle,
+    // The plural the empty state reads as "No <itemName> selected", which the
+    // field label alone does not always give ("No Paid By selected").
+    required String itemName,
     required List<T> options,
   }) {
     final selected = _selection<T>();
@@ -486,7 +498,7 @@ class ReceiptFilterConditionEditorState
       label: widget.field.label,
       initialValue: selected,
       itemDisplayName: (option) => receiptFilterOptionLabel(option),
-      itemName: widget.field.label,
+      itemName: itemName,
       onTap: openPicker,
       onRemove: (remaining) => _applySelection(remaining),
     );

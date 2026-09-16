@@ -17,6 +17,10 @@ Future<String?> showAddReceiptFilterSheet(
     context,
     AddReceiptFilterList(fields: available),
     "Add a filter",
+    // The list scrolls itself, so the sheet must hand it bounded constraints
+    // rather than wrapping it in a SingleChildScrollView -- see
+    // showFullscreenBottomSheet's doc comment.
+    bodyFillsSheet: true,
   );
 
   return result is String ? result : null;
@@ -54,7 +58,8 @@ class AddReceiptFilterList extends StatelessWidget {
       );
     }
 
-    return Column(
+    return ListView(
+      shrinkWrap: false,
       children: fields
           .map((field) => ListTile(
                 key: ValueKey("add-receipt-filter-${field.key}"),

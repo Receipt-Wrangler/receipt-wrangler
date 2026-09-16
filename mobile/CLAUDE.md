@@ -1051,6 +1051,112 @@ Three things that spec encodes, all of which cost a debugging cycle:
   into the element tree, so the admin's accumulated groups can push the target below the viewport where
   `find.text` can't reach it (the same problem `keepOnlyGroup` works around for Quick Scan).
 
+### Receipt filtering
+
+The receipts list can be filtered on all ten fields the API supports -- the same set desktop's
+advanced-filter dialog drives. **Client-only**: `swagger.yml`, the Go API and `mobile/api/` were
+already capable, so nothing there changed.
+
+Entry point is a badged filter action in the receipts app bar (`ReceiptFilterButton`, added to
+`GroupAppBar`'s existing route-gated `actions`). It pushes `ReceiptFilterScreen`, which lists the
+active conditions as cards, offers "Add filter", and commits with **"Apply Filter"**.
+
+- **`lib/constants/receipt_filter_fields.dart` is the single field table** -- key, label, icon,
+  hint and type for the ten fields, plus `filterOperationsByType` and `filterOperationLabels`.
+  The add-list, the cards and the editor all read it, so a card can never disagree with the row
+  that produced it. Mirrors desktop's `RECEIPT_FILTER_FIELDS` +
+  `filter-operations-options.constant.ts`.
+  - Labels match `receiptSortOptions` wherever the two overlap -- `date` is **"Receipt Date"**, not
+    a bare "Date", because the list can also be filtered on `resolvedDate` and `createdAt`.
+  - The operation lists are written out literally rather than derived from `FilterOperation.values`:
+    the Dart enum carries an extra `empty` member desktop's does not, and a derived list would leak
+    it into the chips.
+- **`ReceiptListModel` owns the APPLIED filter; the screen edits a draft.** `ReceiptFilterScreen`
+  copies `model.filter` into local `State`, and only "Apply Filter" writes back via `setFilter`.
+  Backing out (the X, the system back gesture) therefore discards, and the list never refetches
+  mid-authoring.
+- **A notification from `ReceiptListModel` means the filter changed.** `GroupReceiptsList` listens
+  for it and calls its `_refreshCallback` (plus a `setState`, because the empty-state text reads the
+  applied filter). This works because **every sort setter is deliberately called with
+  `notify: false`** and refreshes the list directly -- don't "tidy" those call sites into notifying,
+  or every sort change refetches twice.
+- **The filter is cleared on a group change**, in `didChangeDependencies` (which is where
+  `getGroupId`'s `GoRouterState` read is legal). A filter holds the previous group's category, tag
+  and user ids, which match nothing in the next one and would leave the badge counting conditions
+  the user cannot see. It clears **everything**, not just the id-bearing fields: "switching groups
+  shows that group's receipts" is the predictable rule. It clears **silently** (`notify: false`),
+  because that runs during a build; the explicit `_refreshCallback` is the visible half.
+
+**Encoding (`lib/utils/receipt_filter.dart`) is the highest-risk part, and its rules come from the
+Go side (`api/internal/repositories/receipts.go`).**
+
+- The generated `ReceiptPagedRequestFilter`'s ten properties are **`JsonObject?`**, not a typed
+  `PagedRequestField`, so each condition is written as
+  `JsonObject({"operation": ..., "value": ...})`. `setReceiptFilterField` owns the key-to-slot
+  dispatch and is shared with `dashboardConfigurationToFilter` (`lib/utils/receipts.dart`), which
+  was missing the `group` arm before it was extracted.
+- **An EMPTY field is not an ABSENT one.** `initReceiptFilterValues` coerces a null date value to
+  `""` and a null amount to `0`, and the query builder then runs `date = ''` (matches nothing) or
+  `amount = 0` (matches the wrong rows) -- both silent. `buildReceiptPagedRequestFilter` therefore
+  **skips any condition `isReceiptFilterConditionValid` rejects**. The editor also gates Save, but
+  the encoder's contract has to hold on its own.
+- **Every value is type-asserted with no comma-ok, so a wrong shape is a 500, not an ignored
+  filter.** Amounts go as **numbers** (`AmountField`'s `valueTransformer` yields a *string*, so the
+  editor parses it first); the five list fields always as arrays; `status` as wire strings, not
+  labels; dates as zulu strings via `formatDate(zuluDateFormat, ...)`, the same call the receipt
+  submit uses.
+- **A BETWEEN date range spans start-of-day to end-of-day** (`startOfDay` / `endOfDay` in
+  `lib/utils/date.dart`). These are datetime columns, so a bare `<= 2026-09-18T00:00:00Z` upper
+  bound excludes everything recorded on the last day the user picked.
+- **A zero amount is a real filter and is sent.** Nothing defaults to zero and the API applies
+  `amount = 0`, matching desktop's `isFilterEntryActive`.
+- Conditions hold the **display objects** (`Category`, `Tag`, `Group`, `UserView`, `ReceiptStatus`,
+  `DateTime`, `double`, `String`), not ids -- so a captured option keeps rendering its own name even
+  after the catalog changes, and the card, the chips and the encoder all read one thing.
+
+**Shared components, not new ones.** `AmountField` for every amount (it gained an optional
+`validator`, defaulting to today's required, because a filter amount is only authored when the user
+asks for one); `CategorySelectField` / `TagSelectField` unchanged; `MultiSelectField` +
+`showMultiselectBottomSheet` for Group, Paid By and Status. `FilterMultiSelect` keeps its **single
+call site** inside that helper, so its `Expanded` assumption is untouched. Flutter's own
+`showDatePicker` / `showDateRangePicker` cover dates -- the app had no date widget and no range
+picker at all.
+
+- `receiptStatusField` is deliberately **not** reused: it is single-select and hard-required, while
+  the filter's `status` is `CONTAINS` over a list.
+- The operation chips take `selectedColor: Theme.of(context).primaryColor` + `showCheckmark: false`,
+  matching `MultiSelectField`'s chips. M3's default resolves to the secondary slate, which reads as
+  disabled beside them.
+
+**Two things the group context forces** (`lib/utils/receipt_filter_options.dart`):
+
+- **`Group` is only offered on the synthetic "All" group**, mirroring desktop's `showGroupFilter`.
+  Inside a real group the receipts endpoint already scopes every query to it.
+- **Categories and tags need no special casing.** The All group is a *real row* the user belongs to
+  (`GroupRepository.CreateAllGroup`), so `GetAppData` builds it a `groupCategories` / `groupTags`
+  entry like any other group -- the wrappers work with the route's group id. **Paid-by is the
+  exception**: the All group's roster is just the caller, so `filterPaidByOptions` unions the real
+  groups' rosters there.
+
+**The filter screen is a pushed route, not a bottom sheet.** It keeps the modal stack at the depth
+the app already ships (editor sheet -> picker sheet, the same as Quick Scan -> category picker), and
+a real `Scaffold` puts "Apply Filter" in `bottomNavigationBar`, which reserves its space, rather than
+`Scaffold.bottomSheet`, which floats over the last card.
+
+**A latent paging bug this feature exposed.** `PagedDataList` never reset `_totalCount` on refresh,
+and `getNextPageKey` stops paging once the loaded items reach it. Sorting cannot reach a zero total,
+but filtering to no matches can -- after which `0 >= 0` stayed true and **no page was ever requested
+again**, leaving the list permanently empty even once the filter was cleared. Fixed by nulling
+`_totalCount` in the refresh callback; `test/widgets/paged_data_list_test.dart` was verified to fail
+without it.
+
+**Tests:** `test/constants/receipt_filter_fields_test.dart` (the table, including that every key
+names a real wire field -- `setReceiptFilterField` dispatches on a string, so a typo would not fail
+to compile), `test/utils/receipt_filter_test.dart` (a case per field type x operation, asserted
+through the real serializer), `test/utils/receipt_filter_options_test.dart`,
+`test/models/receipt_list_model_test.dart`, and widget tests for the button, the screen, the add
+sheet, the editor and the list wiring. **No e2e yet** -- deliberately deferred.
+
 ### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
 
 `CategorySelectField` and `TagSelectField` render no UI of their own: both are thin
