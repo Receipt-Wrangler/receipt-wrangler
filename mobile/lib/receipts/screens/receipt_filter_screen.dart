@@ -219,7 +219,7 @@ class _AddFilterButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: CustomPaint(
             painter: const _DashedBorderPainter(
-              color: slate400,
+              color: borderSlate,
               radius: 14,
               strokeWidth: 1.5,
               dash: 6,

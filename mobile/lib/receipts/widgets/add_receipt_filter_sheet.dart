@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:receipt_wrangler_mobile/constants/colors.dart';
 import 'package:receipt_wrangler_mobile/constants/receipt_filter_fields.dart';
 import 'package:receipt_wrangler_mobile/utils/bottom_sheet.dart';
 
@@ -68,7 +67,8 @@ class AddReceiptFilterList extends StatelessWidget {
                     color: Theme.of(context).colorScheme.primary),
                 title: Text(field.label),
                 subtitle: Text(field.hint),
-                trailing: const Icon(Icons.add, size: 20, color: slate400),
+                trailing: Icon(Icons.add,
+                    size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 onTap: () => Navigator.of(context).pop(field.key),
               ))
           .toList(),

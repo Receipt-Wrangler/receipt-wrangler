@@ -227,10 +227,41 @@ Three consequences worth knowing:
   shape of mistake to expect when filling in a role**: the fix is right for the role and wrong for
   one component that was quietly depending on the old fallback. `app_theme_test.dart` guards it.
 
+**Contrast floors, and the one gap left open.** WCAG 2.1 SC 1.4.11 wants **3:1** for the visual
+boundary that identifies a component -- which an outlined field's border *is* -- and SC 1.4.3 wants
+**4.5:1** for normal text. `test/theme/app_theme_test.dart` measures these rather than pinning hex
+values, so the assertions survive a palette tweak and fail only when one actually breaks access.
+The first pass at this palette took `#CBD5E1` straight from the design, which draws its borders at
+1.5-2px; Flutter renders 1px, so the app got the lightness without the weight and every field
+boundary sat at **1.48:1**. Hence `borderSlate` (3.38:1) rather than `slate300`, and `slate400` is
+now decorative-only -- a chevron or a dismiss X carries meaning and belongs at `onSurfaceVariant`.
+
+The **known gap**: `accentBlueDark` is also small *text* in two places -- the nav's selected label
+(3.58:1 on the bar) and the editor's selected operation chip (3.59:1 on its tint). Both clear the
+3:1 non-text floor and fall short of 4.5:1. Closing it means darkening the accent to about
+`#006EB2`, which is a visibly navy brand blue, so it is left open deliberately rather than
+overlooked. The focused floating label was the third such case and is **not** accent-coloured for
+exactly this reason: it keeps `onSurfaceVariant` (4.76:1) and focus rides on the border instead.
+
 **Two tints, not one.** `primaryContainer` is `#EAF7FF` and `accentContainer` is `#CCECFF`, both
 from the design, and they are not interchangeable: `accentBlueDark` clears AA on the lighter one at
 chip-label size but only clears the large-text / UI threshold on the stronger one, while the lighter
 one behind a 24px nav icon is too faint to read as selected at all.
+
+**An outlined field's border cannot be styled the obvious way.** `inputDecorationTheme.border` is a
+`WidgetStateInputBorder`, and that is load-bearing. For a non-filled field
+`InputDecorator._getDefaultBorder` **throws away whatever `borderSide` the theme's border carries**
+and substitutes `_InputDecoratorDefaultsM3`'s, which is built fresh from the context and never
+merged with this theme -- so a width set there is silently ignored, and
+`InputDecorationTheme.outlineBorder` is ignored too (the *filled* branch consults the app theme; the
+outlined one does not). Only the shape survives, which is why the 10px radius works. The single
+escape hatch is an early return when the border **is** a `WidgetStateProperty<InputBorder>`, which
+bypasses the resolution entirely.
+
+The cost of taking that hatch is that this theme now owns **every** state, so all four are written
+out. Dropping the error branch would leave every failed validator in the app without its red border
+and **nothing would fail to compile** -- `app_theme_test.dart` resolves all four states for that
+reason. Focused is `accentBlueDark` at 2px rather than M3's `primary`, which is 2.38:1.
 
 **`BottomSubmitButton` is the app-wide bottom action bar** — the receipt form, Quick Scan, the
 multi-select picker and the receipt filter all mount it. It is a white bar with a hairline top

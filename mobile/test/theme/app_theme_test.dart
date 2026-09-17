@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:receipt_wrangler_mobile/constants/colors.dart';
@@ -14,9 +16,10 @@ void main() {
 
   group("the neutral roles are spelled out, not left to fall back", () {
     test("outline and outlineVariant are slate, not onBackground", () {
-      expect(scheme.outline, slate300);
+      expect(scheme.outline, borderSlate);
       expect(scheme.outlineVariant, slate200);
       expect(scheme.outline, isNot(scheme.onSurface));
+      expect(scheme.outline, isNot(slate300));
       expect(scheme.outlineVariant, isNot(scheme.onSurface));
     });
 
@@ -120,5 +123,138 @@ void main() {
     // bar carrying both renders two different colours unless both are pinned.
     expect(theme.appBarTheme.iconTheme?.color, slate700);
     expect(theme.appBarTheme.actionsIconTheme?.color, slate700);
+  });
+
+  group("non-text contrast clears WCAG 2.1 SC 1.4.11", () {
+    // Measured rather than pinned to hex values, so the assertions keep holding
+    // through a palette tweak and fail only when one actually breaks
+    // accessibility. The borders started at pure black (21:1), went to the
+    // design's #CBD5E1 (1.48:1, a fail) and now sit here.
+    double relativeLuminance(Color c) {
+      double channel(double v) =>
+          v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4) as double;
+      return 0.2126 * channel(c.r) +
+          0.7152 * channel(c.g) +
+          0.0722 * channel(c.b);
+    }
+
+    double contrastRatio(Color a, Color b) {
+      final la = relativeLuminance(a);
+      final lb = relativeLuminance(b);
+      return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05);
+    }
+
+    void expectAtLeast(String what, Color fg, Color bg, double floor) {
+      final measured = contrastRatio(fg, bg);
+      expect(measured, greaterThanOrEqualTo(floor),
+          reason: "$what measures ${measured.toStringAsFixed(2)}:1 against its "
+              "background, under the ${floor}:1 floor");
+    }
+
+    BorderSide sideFor(Set<WidgetState> states) {
+      final border = theme.inputDecorationTheme.border!;
+      return (border as WidgetStateProperty<InputBorder>).resolve(states).borderSide;
+    }
+
+    test("a field's resting border is a visible boundary", () {
+      expectAtLeast("outline", scheme.outline, scheme.surface, 3.0);
+      expectAtLeast("the resting field border",
+          sideFor(const <WidgetState>{}).color, scheme.surface, 3.0);
+    });
+
+    test("the focused border is visible -- primary alone is not", () {
+      final focused = sideFor({WidgetState.focused}).color;
+
+      expectAtLeast("the focused field border", focused, scheme.surface, 3.0);
+      // The specific trap: M3 uses colorScheme.primary here, and this app's
+      // primary is #27B1FF at 2.38:1.
+      expect(focused, isNot(scheme.primary));
+    });
+
+    test("muted text clears the 4.5:1 text floor, not just 3:1", () {
+      expectAtLeast(
+          "onSurfaceVariant", scheme.onSurfaceVariant, scheme.surface, 4.5);
+    });
+
+    test("the accent used as a foreground is readable on its tints", () {
+      // 3:1, the non-text floor. These are the two places accentBlueDark is
+      // also used for small TEXT (the nav's selected label, the editor chip's
+      // label), where the floor is 4.5:1 and they measure ~3.6 -- a known,
+      // deliberate gap, recorded in mobile/CLAUDE.md rather than closed by
+      // darkening the accent further.
+      expectAtLeast("accentBlueDark on primaryContainer", scheme.onPrimaryContainer,
+          scheme.primaryContainer, 3.0);
+      expectAtLeast("the nav's selected icon on its pill", accentBlueDark,
+          accentContainer, 3.0);
+    });
+
+    test("the focused floating label is text, so it clears the text floor", () {
+      final style = (theme.inputDecorationTheme.floatingLabelStyle!
+              as WidgetStateProperty<TextStyle>)
+          .resolve({WidgetState.focused});
+
+      expectAtLeast("the focused floating label", style.color!, scheme.surface, 4.5);
+      // Material's default is colorScheme.primary at 2.38:1.
+      expect(style.color, isNot(scheme.primary));
+    });
+  });
+
+  group("the input border resolves every state", () {
+    // Setting `border` to a WidgetStateInputBorder makes InputDecorator skip
+    // `_getDefaultBorder` entirely, so this theme owns all four states rather
+    // than only the ones it meant to change. A dropped branch is invisible:
+    // nothing fails to compile and no other test looks.
+    BorderSide sideFor(Set<WidgetState> states) {
+      final border = theme.inputDecorationTheme.border!;
+      return (border as WidgetStateProperty<InputBorder>).resolve(states).borderSide;
+    }
+
+    test("enabled is the outline, at the design's 1.5px", () {
+      final side = sideFor(const <WidgetState>{});
+
+      expect(side.color, scheme.outline);
+      expect(side.width, 1.5);
+    });
+
+    test("focused is the darker accent at 2px", () {
+      final side = sideFor({WidgetState.focused});
+
+      expect(side.color, accentBlueDark);
+      expect(side.width, 2);
+    });
+
+    test("error is the error colour, focused or not", () {
+      expect(sideFor({WidgetState.error}).color, scheme.error);
+      expect(sideFor({WidgetState.error, WidgetState.focused}).color, scheme.error);
+      expect(sideFor({WidgetState.error, WidgetState.focused}).width, 2);
+    });
+
+    test("error beats focus, so a bad value never looks merely focused", () {
+      expect(sideFor({WidgetState.error, WidgetState.focused}).color,
+          isNot(accentBlueDark));
+    });
+
+    test("disabled is faint and is neither of the above", () {
+      final side = sideFor({WidgetState.disabled});
+
+      expect(side.color, isNot(scheme.outline));
+      expect(side.color, isNot(scheme.error));
+      expect(side.color.a, lessThan(1.0));
+    });
+
+    test("every state keeps the 10px radius", () {
+      final border = theme.inputDecorationTheme.border!
+          as WidgetStateProperty<InputBorder>;
+
+      for (final states in const [
+        <WidgetState>{},
+        {WidgetState.focused},
+        {WidgetState.error},
+        {WidgetState.disabled},
+      ]) {
+        final resolved = border.resolve(states) as OutlineInputBorder;
+        expect(resolved.borderRadius, BorderRadius.circular(10));
+      }
+    });
   });
 }

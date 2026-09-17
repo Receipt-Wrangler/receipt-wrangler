@@ -33,7 +33,7 @@ ThemeData buildAppTheme() {
     surface: Color(0xFFFFFFFF),
     onSurface: Color(0xFF000000),
     onSurfaceVariant: slate500,
-    outline: slate300,
+    outline: borderSlate,
     outlineVariant: slate200,
     surfaceDim: slate50,
     surfaceBright: Color(0xFFFFFFFF),
@@ -50,9 +50,68 @@ ThemeData buildAppTheme() {
   return ThemeData(
     fontFamily: appFontFamily,
     inputDecorationTheme: InputDecorationTheme(
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
+      // A WidgetStateInputBorder, not a plain OutlineInputBorder, and that is
+      // load-bearing rather than fussy. For a non-filled field
+      // `InputDecorator._getDefaultBorder` THROWS AWAY whatever `borderSide` the
+      // theme's border carries and substitutes `_InputDecoratorDefaultsM3`'s --
+      // which is built fresh from the context and never merged with this theme,
+      // so `InputDecorationTheme.outlineBorder` is ignored too. Only the shape
+      // survives. Its one escape hatch is an early return when the border IS a
+      // `WidgetStateProperty<InputBorder>`, which bypasses the whole resolution.
+      //
+      // The cost of taking that hatch: this theme now owns EVERY state, so all
+      // four are written out. Dropping the error branch would leave every failed
+      // validator in the app without its red border, and nothing would fail to
+      // compile -- hence the state test in `app_theme_test.dart`.
+      // The focused floating label keeps `onSurfaceVariant` (4.76:1) rather than
+      // turning accent. Material's default here is `primary` -- 2.38:1, unusable
+      // -- and even `accentBlueDark` is only 3.92:1, which clears the 3:1 floor
+      // for a non-text boundary but not the 4.5:1 one this *is* text. Focus is
+      // carried by the border instead, which goes 1.5px slate to 2px accent:
+      // unmistakable, and it costs no third blue.
+      floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
+        if (states.contains(WidgetState.focused) &&
+            !states.contains(WidgetState.error)) {
+          return TextStyle(color: colorScheme.onSurfaceVariant);
+        }
+        // Empty merges as a no-op, so error red and the disabled 38% stay
+        // Material's own.
+        return const TextStyle();
+      }),
+      border: WidgetStateInputBorder.resolveWith((states) {
+        final radius = BorderRadius.circular(10);
+
+        if (states.contains(WidgetState.disabled)) {
+          // Matches the M3 default. Disabled controls are exempt from the
+          // contrast rule below, so this stays faint on purpose.
+          return OutlineInputBorder(
+            borderRadius: radius,
+            borderSide:
+                BorderSide(color: colorScheme.onSurface.withValues(alpha: 0.12)),
+          );
+        }
+        if (states.contains(WidgetState.error)) {
+          return OutlineInputBorder(
+            borderRadius: radius,
+            borderSide: BorderSide(
+              color: colorScheme.error,
+              width: states.contains(WidgetState.focused) ? 2 : 1.5,
+            ),
+          );
+        }
+        if (states.contains(WidgetState.focused)) {
+          // `primary` is 2.38:1 on white -- too weak for the one state that has
+          // to be unmistakable. accentBlueDark is 3.92:1.
+          return OutlineInputBorder(
+            borderRadius: radius,
+            borderSide: const BorderSide(color: accentBlueDark, width: 2),
+          );
+        }
+        return OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: colorScheme.outline, width: 1.5),
+        );
+      }),
     ),
     chipTheme: ChipThemeData(
       shape: RoundedRectangleBorder(

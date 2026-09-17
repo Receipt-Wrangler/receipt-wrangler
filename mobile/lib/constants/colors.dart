@@ -46,10 +46,22 @@ const slate100 = Color(0xFFF1F5F9);
 /// Dividers, and the hairline above a bottom action bar.
 const slate200 = Color(0xFFE2E8F0);
 
-/// Input, chip and outlined-button borders.
+/// Disabled fills. Deliberately NOT a border colour -- see [borderSlate].
 const slate300 = Color(0xFFCBD5E1);
 
-/// De-emphasized glyphs: a chevron, a dismiss X, a dashed placeholder border.
+/// Input, chip and outlined-button borders.
+///
+/// The design draws these in slate-300 (`#CBD5E1`), but at 1.5-2px; Flutter
+/// renders 1px, and slate-300 on white is **1.48:1** -- far under the 3:1 WCAG
+/// 2.1 SC 1.4.11 asks for the visual boundary that identifies a component, which
+/// is exactly what an outlined field's border is. This is that role pushed to
+/// **3.38:1**, with margin over the bar rather than the 3.05:1 that just clears
+/// it, because a 1px antialiased hairline reads lighter than its nominal colour.
+/// For scale, Material 3's own baseline `outline` is `#79747E`, 4.55:1.
+const borderSlate = Color(0xFF7E8DA1);
+
+/// Purely decorative greys. A glyph that carries meaning -- a chevron, a dismiss
+/// X -- belongs at `onSurfaceVariant` instead: this is 2.56:1, under SC 1.4.11.
 const slate400 = Color(0xFF94A3B8);
 
 /// Muted text: field labels, hints, list subtitles, section micro-labels.

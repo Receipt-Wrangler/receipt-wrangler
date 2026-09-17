@@ -76,7 +76,7 @@ class ReceiptFilterConditionCard extends StatelessWidget {
                       child: IconButton(
                         key: ValueKey("receipt-filter-remove-${field.key}"),
                         icon: const Icon(Icons.close, size: 18),
-                        color: slate400,
+                        color: theme.colorScheme.onSurfaceVariant,
                         padding: EdgeInsets.zero,
                         visualDensity: VisualDensity.compact,
                         tooltip: "Remove ${field.label} condition",
@@ -114,7 +114,8 @@ class ReceiptFilterConditionCard extends StatelessWidget {
                         style: const TextStyle(fontSize: 14),
                       ),
                     ),
-                    const Icon(Icons.chevron_right, size: 20, color: slate400),
+                    Icon(Icons.chevron_right,
+                        size: 20, color: theme.colorScheme.onSurfaceVariant),
                   ],
                 ),
               ],

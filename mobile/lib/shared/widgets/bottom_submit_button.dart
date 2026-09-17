@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:receipt_wrangler_mobile/constants/colors.dart';
 import 'package:provider/provider.dart';
 import 'package:receipt_wrangler_mobile/models/loading_model.dart';
 import 'package:receipt_wrangler_mobile/theme/app_theme.dart';
@@ -56,7 +57,9 @@ class _BottomSubmitButtonState extends State<BottomSubmitButton> {
                 shape: const StadiumBorder(),
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
-                disabledBackgroundColor: colorScheme.outline,
+                // Pinned rather than `outline`: a disabled fill as dark
+                // as a border reads as enabled. Exempt from SC 1.4.11.
+                disabledBackgroundColor: slate300,
                 disabledForegroundColor: colorScheme.onPrimary,
                 // styleFrom's textStyle REPLACES the theme's labelLarge, so
                 // the font family has to be restated or the label falls back

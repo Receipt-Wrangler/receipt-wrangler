@@ -578,7 +578,9 @@ class ReceiptFilterConditionEditorState
                 shape: const StadiumBorder(),
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
-                disabledBackgroundColor: colorScheme.outline,
+                // Pinned rather than `outline`: a disabled fill as dark
+                // as a border reads as enabled. Exempt from SC 1.4.11.
+                disabledBackgroundColor: slate300,
                 disabledForegroundColor: colorScheme.onPrimary,
                 textStyle: const TextStyle(
                   fontFamily: appFontFamily,
