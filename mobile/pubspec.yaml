@@ -103,6 +103,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   mocktail: ^1.0.4
+  # Pure-Dart GIF encoding for the demo harness in tool/keyboard_demo/.
+  # Already resolved transitively; declared so a pub upgrade cannot drop it.
+  image: ^4.8.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
