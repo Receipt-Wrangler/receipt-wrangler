@@ -150,7 +150,11 @@ export class ImageCanvasComponent implements AfterViewInit, OnDestroy {
   }
 
   protected onWheel(event: WheelEvent): void {
-    if (!this.natural.width) {
+    // A horizontal wheel - a two-finger trackpad swipe - reports deltaY === 0,
+    // which the ternary below would read as "not < 0" and treat as a zoom out.
+    // Returning before preventDefault() also leaves the horizontal scroll alone
+    // rather than swallowing it.
+    if (!this.natural.width || event.deltaY === 0) {
       return;
     }
 

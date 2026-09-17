@@ -231,6 +231,32 @@ describe("ImageCanvasComponent", () => {
     expect((cursorY - before.y) / before.scale).toBeCloseTo((cursorY - after.y) / after.scale, 1);
   });
 
+  // A horizontal wheel (a two-finger trackpad swipe) reports deltaY === 0, which
+  // the zoom ternary would read as "not < 0" and treat as a zoom OUT. The event
+  // must also keep its default, or the page loses the horizontal scroll.
+  it("ignores a horizontal wheel instead of zooming out", async () => {
+    // Zoomed in first: at the fit scale clampScale floors the zoom-out anyway, so
+    // the viewport would not move and the test would pass on the broken code.
+    component.zoomIn();
+    component.zoomIn();
+    await fixture.whenStable();
+
+    const before = viewport();
+    const event = new WheelEvent("wheel", {
+      deltaY: 0,
+      deltaX: 120,
+      clientX: 300,
+      clientY: 200,
+      cancelable: true,
+    });
+
+    host.dispatchEvent(event);
+    await fixture.whenStable();
+
+    expect(viewport()).toEqual(before);
+    expect(event.defaultPrevented).toEqual(false);
+  });
+
   it("returns to the fit on double-click", async () => {
     component.zoomIn();
     component.zoomIn();

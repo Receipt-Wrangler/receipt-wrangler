@@ -1827,11 +1827,11 @@ canvas collapses to its 2px border.
 `height: 100% !important` makes a hidden file input swallow the whole column and leaves the stage
 with nothing but its own 2px border.
 
-**The fullscreen dialog runs the same canvas.** `#expandedImageTemplate` now passes
-`class="rw-carousel--fill"`, `[directManipulation]="true"` and `stageHeight="100%"` exactly as the
-inline carousel does, plus a floating close button — it previously had **no way out but Esc and the
-backdrop**. The height chain needs no special handling: MatDialog renders a `TemplateRef` as a
-`TemplatePortal` whose nodes go **straight into `.mat-mdc-dialog-surface`** with no wrapper, and that
+**The fullscreen dialog runs the same canvas.** `#expandedImageTemplate` passes
+`class="rw-carousel--fill"` and `stageHeight="100%"` exactly as the inline carousel does, plus a
+floating close button — it previously had **no way out but Esc and the backdrop**. The height chain
+needs no special handling: MatDialog renders a `TemplateRef` as a `TemplatePortal` whose nodes go
+**straight into `.mat-mdc-dialog-surface`** with no wrapper, and that
 surface is viewport-tall and padding-free (dialog padding lives on `.mat-mdc-dialog-content`, which
 this dialog does not use). Two things there are load-bearing:
 - **Do not wrap it in `app-dialog`.** That costs ~110px before the stage starts — an
