@@ -13,6 +13,7 @@
         class="rw-image-canvas__handle"
         [attr.data-corner]="corner"
         (pointerdown)="onResizeStart($event, corner)"
+        (dblclick)="$event.stopPropagation()"
       ></span>
     }
   </div>

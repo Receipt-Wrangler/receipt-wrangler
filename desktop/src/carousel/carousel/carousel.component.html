@@ -12,14 +12,16 @@
       }"
     ></ng-template>
 
+    <!--
+      Deliberately unconditional: the header zoom buttons index a viewChildren
+      query by SLIDE index, so gating the viewer here would compact that query
+      and point them at the wrong slide. The viewer renders nothing without a
+      source anyway.
+    -->
     <app-image-viewer
-      *ngIf="preview?.encodedImage || preview?.file"
       [imageBase64]="preview?.encodedImage"
       [imageFile]="$any(preview.file)"
-      [scale]="scale"
-      [directManipulation]="directManipulation()"
       [stageHeight]="stageHeight()"
-      (wheel)="onScroll($event)"
     ></app-image-viewer>
   </slide>
 
@@ -31,13 +33,10 @@
       }"
     ></ng-template>
 
+    <!-- Unconditional for the same reason as the loop above. -->
     <app-image-viewer
-      *ngIf="image?.encodedImage"
       [imageBase64]="image.encodedImage"
-      [scale]="scale"
-      [directManipulation]="directManipulation()"
       [stageHeight]="stageHeight()"
-      (wheel)="onScroll($event)"
     ></app-image-viewer>
   </slide>
 </carousel>

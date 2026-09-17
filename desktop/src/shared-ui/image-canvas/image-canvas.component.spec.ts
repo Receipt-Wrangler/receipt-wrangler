@@ -10,6 +10,9 @@ const NATURAL_HEIGHT = 1600;
 /** Fit is limited by height here: 400 / 1600 = 0.25. */
 const FIT_SCALE = STAGE_HEIGHT / NATURAL_HEIGHT;
 
+/** Mirrors the component's own MAX_SCALE, which it does not export. */
+const MAX_SCALE = 8;
+
 /**
  * jsdom implements neither `PointerEvent` nor pointer capture, so pointer events
  * are faked from `MouseEvent` — which carries every property the component reads
@@ -189,6 +192,16 @@ describe("ImageCanvasComponent", () => {
     expect(viewport().scale).toBeCloseTo(FIT_SCALE);
   });
 
+  it("will not zoom in past the maximum scale", async () => {
+    // Well past the ~25 steps it takes to climb from the fit to the cap.
+    for (let i = 0; i < 40; i += 1) {
+      component.zoomIn();
+    }
+    await fixture.whenStable();
+
+    expect(viewport().scale).toBeCloseTo(MAX_SCALE);
+  });
+
   it("zooms in and back out again", async () => {
     component.zoomIn();
     await fixture.whenStable();
@@ -251,6 +264,22 @@ describe("ImageCanvasComponent", () => {
     await fixture.whenStable();
 
     expect(viewport()).toEqual(after);
+  });
+
+  // preventDefault on pointerdown suppresses the compatibility mouse events but
+  // NOT dblclick, so without an explicit stop a quick double pull of a corner
+  // bubbles to the host and throws away the size just dragged to.
+  it("does not fit when a handle is double-clicked", async () => {
+    // Pull the top-left handle out so the image is bigger than the fit.
+    const start = viewport();
+    await drag(handle("nw"), [start.x, start.y], [start.x - 200, start.y - 200]);
+    const resized = viewport();
+    expect(resized.scale).toBeGreaterThan(FIT_SCALE);
+
+    handle("nw").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    await fixture.whenStable();
+
+    expect(viewport()).toEqual(resized);
   });
 
   // A handle sits over the image, which starts a pan on pointerdown.

@@ -25,6 +25,29 @@ func TestUserPrefernces_LoadDataFromRequest(t *testing.T) {
 	}
 }
 
+// showLargeImagePreviews was removed from this model, but already-released
+// mobile builds still send it. LoadDataFromRequest uses encoding/json's default
+// decoder and the API sets DisallowUnknownFields nowhere, so the unknown key is
+// ignored rather than rejected and the fields that remain still decode. Keep
+// the removed field in this payload - it is the whole point of the test.
+func TestUserPrefernces_LoadDataFromRequestIgnoresRemovedFields(t *testing.T) {
+	body := `{"userId": 5, "showLargeImagePreviews": true, "quickScanDefaultStatus": "OPEN"}`
+	r := httptest.NewRequest("POST", "/", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	var preferences UserPrefernces
+	err := preferences.LoadDataFromRequest(w, r)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if preferences.UserId != 5 {
+		utils.PrintTestError(t, preferences.UserId, uint(5))
+	}
+	if preferences.QuickScanDefaultStatus != OPEN {
+		utils.PrintTestError(t, preferences.QuickScanDefaultStatus, OPEN)
+	}
+}
+
 func TestUserPrefernces_LoadDataFromRequest_MalformedJson(t *testing.T) {
 	r := httptest.NewRequest("POST", "/", strings.NewReader("{"))
 	w := httptest.NewRecorder()

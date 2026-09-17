@@ -1668,17 +1668,34 @@ moved the page layout, when the thing worth manipulating is the image. Don't rei
 - Wheel zoom is anchored at the cursor and moves a meaningful amount. The viewer this replaced
   multiplied `deltaY` by `-0.000001`, so one notch changed the scale by 0.0001 — wheel zoom did
   nothing at all.
+- **A handle stops `dblclick` itself.** The host binds `(dblclick)="fit()"` and the handles are its
+  descendants. `onResizeStart` already calls `preventDefault()` + `stopPropagation()`, but those act
+  on the **PointerEvent** — `dblclick` is a separate event and is not suppressed by either, so
+  quickly pulling a corner twice used to bubble up and throw away the size just dragged to. Hence
+  `(dblclick)="$event.stopPropagation()"` on the handle, pinned by its own spec.
 
-**Wiring, and how fullscreen stays untouched.** `app-carousel` gained `directManipulation` +
-`stageHeight`, passed to `app-image-viewer`, which renders the canvas when the flag is on and its
-original markup when off — the `hideButtonControls` precedent. The receipt form passes the flag on
-the **inline** carousel and deliberately not on `#expandedImageTemplate`, so the fullscreen dialog
-keeps the default and is byte-identical. `ImageViewerComponent.onWheel` also stops re-emitting to the
-carousel in canvas mode, or the wheel would drive the carousel's shared scale as well.
+**Wiring.** `app-carousel` gained `stageHeight`, passed to `app-image-viewer`, which renders
+`app-image-canvas`. **Both** carousels get it — the inline one and the fullscreen dialog's (see "The
+fullscreen dialog runs the same canvas" below); there is no opt-out, and no second rendering path.
+The canvas rolled out behind a `directManipulation` flag while only the inline view used it; once
+fullscreen was ported, both call sites passed `true`, so the flag and the old path it selected were
+deleted rather than left as dead configuration.
 
-**Zoom buttons are per-image now.** The header Zoom In/Out delegate through the carousel to the
-*active slide's* viewer (`viewChildren(ImageViewerComponent)` indexed by `currentlyShownImageIndex`)
-rather than mutating one `scale` shared by every slide, which is what a canvas implies.
+**What went with the old viewer.** Its `@else` branch (a `transform: scale()` wrapper around an
+`img.viewer-image` with an **unbounded `cdkDrag`**, which could fling the image out of view with no
+way back), the carousel's `scale` / `adjustScale()` / `onScroll()` — including the `deltaY *
+-0.000001` wheel bug above — and the `[scale]` / `wheel` plumbing between them. `image-viewer` no
+longer has a stylesheet; `.viewer-image` was its only rule. `DragDropModule` stays: `cdkDrag` is
+still used by the column-configuration dialog and the receipt-form dialog.
+
+**Zoom buttons are per-image.** The header Zoom In/Out delegate through the carousel to the *active
+slide's* viewer rather than mutating one `scale` shared by every slide, which is what a canvas
+implies. That lookup is `viewChildren(ImageViewerComponent)` indexed by `currentlyShownImageIndex`
+— a **slide** index into a **viewer** query, so the two only agree while every slide renders exactly
+one viewer. This is why `carousel.component.html` renders `app-image-viewer` **unconditionally** in
+both loops: the `*ngIf`s that used to gate it were redundant (the viewer already renders nothing
+without a source) and would silently compact the query, pointing the buttons at the wrong slide. Do
+not reintroduce them.
 
 **The stage is exactly as tall as the Details pane beside it**, so the two columns move together
 like a two-column grid rather than a short image box floating next to a tall form. Bootstrap's
@@ -1744,8 +1761,10 @@ every corner. This bites on **any receipt with 2+ images**, inline as well as fu
 
 **Gating every rule on a class is not optional.** `#expandedImageTemplate` is declared in
 `receipt-form`, so its embedded view carries that component's encapsulation attribute even while it
-renders inside the MatDialog overlay: an ungated `app-carousel { height: 100% }` would reach into the
-fullscreen dialog and stretch its `img.viewer-image` (`width/height: 100%`), distorting it.
+renders inside the MatDialog overlay — an ungated `app-carousel { height: 100% }` reaches into the
+dialog too. It cost a distorted `img.viewer-image` back when the dialog rendered the old viewer;
+both carousels now render the canvas, so the immediate symptom is gone, but the reach is not and
+neither is the rule.
 `receipt-form.component.spec.ts` pins that both carousels — the inline one and the dialog's — carry
 the fill class and `stageHeight="100%"`.
 

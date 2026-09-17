@@ -1246,7 +1246,7 @@ describe("ReceiptFormComponent", () => {
     });
 
     // Without this the dialog offers no way out but Esc and the backdrop.
-    it("closes the fullscreen dialog from its close button", async () => {
+    it("closes the fullscreen dialog", async () => {
       const dialog = TestBed.inject(MatDialog);
       openDialogCarousel();
       expect(dialog.openDialogs.length).toEqual(1);
@@ -1255,6 +1255,29 @@ describe("ReceiptFormComponent", () => {
       await fixture.whenStable();
 
       expect(dialog.openDialogs.length).toEqual(0);
+    });
+
+    // The test above drives the method, so on its own it would still pass with
+    // the (clicked) binding - or the whole button - deleted. This covers the
+    // wiring. app-button is an unknown element under CUSTOM_ELEMENTS_SCHEMA, so
+    // it renders no native button and Angular binds (clicked) as a plain DOM
+    // listener on the host; dispatching the event is what the real button's
+    // output does. The handler is mocked out because actually closing here runs
+    // a change-detection pass this block does not stub view children for.
+    it("wires the close button to closeExpandedImage", () => {
+      const close = jest
+        .spyOn(component, "closeExpandedImage")
+        .mockImplementation(() => {});
+      openDialogCarousel();
+
+      const button = document.querySelector(
+        '[data-testid="receipt-image-fullscreen-close"]',
+      );
+
+      expect(button).toBeTruthy();
+      button!.dispatchEvent(new CustomEvent("clicked"));
+
+      expect(close).toHaveBeenCalled();
     });
   });
 });

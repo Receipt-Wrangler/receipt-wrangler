@@ -24,20 +24,11 @@ export class CarouselComponent implements OnChanges {
 
   public readonly hideButtonControls = input<boolean>(false);
 
-  /**
-   * Renders each slide on an interactive canvas instead of a plain scaled image.
-   * Opt-in, following the hideButtonControls precedent, so the fullscreen dialog
-   * — which renders this same component — is left exactly as it was.
-   */
-  public readonly directManipulation = input<boolean>(false);
-
   public readonly stageHeight = input<string>("60vh");
 
   public readonly initialIndex = input<number>(-1);
 
   public readonly removeButtonClicked = output<number>();
-
-  public scale: number = 1;
 
   public currentlyShownImageIndex: number = 0;
 
@@ -54,43 +45,27 @@ export class CarouselComponent implements OnChanges {
   }
 
   public zoomOut() {
-    if (this.directManipulation()) {
-      this.activeViewer()?.zoomOut();
-      return;
-    }
-
-    this.adjustScale(-0.1);
+    this.activeViewer()?.zoomOut();
   }
 
   public zoomIn() {
-    if (this.directManipulation()) {
-      this.activeViewer()?.zoomIn();
-      return;
-    }
-
-    this.adjustScale(0.1);
+    this.activeViewer()?.zoomIn();
   }
 
   /**
-   * On a canvas each image owns its own zoom and pan, so the header buttons act
-   * on the slide being looked at rather than on one scale shared by all of them.
+   * Each image owns its own zoom and pan, so the header buttons act on the slide
+   * being looked at rather than on one scale shared by all of them.
+   *
+   * This indexes a viewChildren query by SLIDE index, so every slide must render
+   * exactly one viewer or the two fall out of step - which is why the template
+   * renders app-image-viewer unconditionally and lets the viewer decide whether
+   * it has anything to show.
    */
   private activeViewer(): ImageViewerComponent | undefined {
     return this.viewers()[this.currentlyShownImageIndex];
   }
 
-  public onScroll(event: WheelEvent): void {
-    event.preventDefault();
-    let value = event.deltaY * -0.000001;
-    this.adjustScale(value);
-  }
-
   public updateCurrentlyShownImage(index: number): void {
     this.currentlyShownImageIndex = index;
-  }
-
-  public adjustScale(amount: number): void {
-    const newScale = this.scale + amount;
-    this.scale = Math.max(newScale, 0.1);
   }
 }
