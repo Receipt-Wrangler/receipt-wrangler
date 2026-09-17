@@ -146,7 +146,14 @@ class _ReceiptQuickActions extends State<ReceiptQuickActions> {
         initialValue: [],
         itemDisplayName: (user) => user.displayName ?? "",
         itemName: "Users",
-        onTap: showUserMultiSelect);
+        onTap: showUserMultiSelect,
+        onRemove: setUsers);
+  }
+
+  void setUsers(List<api.UserView> users) {
+    setState(() {
+      formKey.currentState!.fields["users"]!.setValue(users);
+    });
   }
 
   void showUserMultiSelect() {
@@ -168,9 +175,7 @@ class _ReceiptQuickActions extends State<ReceiptQuickActions> {
         var users =
             List<api.UserView>.from(value.map((item) => item as api.UserView));
 
-        setState(() {
-          formKey.currentState!.fields["users"]!.setValue(users);
-        });
+        setUsers(users);
       }
     });
   }
@@ -445,7 +450,13 @@ class _ReceiptQuickActions extends State<ReceiptQuickActions> {
             buildUserField(),
             ...buildSplitEvenlyTotal(),
             ...buildSplitWithPortionsField(),
-            ...buildPercentageFields()
+            ...buildPercentageFields(),
+            // The "Split" button is `Scaffold.bottomSheet`, which floats over
+            // the body instead of reserving space. Without this the tail of the
+            // column sits under it at every scroll offset -- and in the
+            // portions mode that tail is the "Portions exceed receipt total"
+            // error explaining why Split is refusing to submit.
+            submitButtonSpacing,
           ],
         ));
   }

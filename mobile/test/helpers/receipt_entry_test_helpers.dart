@@ -56,6 +56,10 @@ Widget pumpReceiptEntryApp({
   required bool aiEnabled,
   required PermissionsModel permissions,
   List<api.Group> groups = const [],
+  /// Off only for the demo harness in `tool/keyboard_demo/`, where the ribbon
+  /// is just noise across a recorded screenshot. Defaults to the framework's
+  /// own behaviour so no existing test changes.
+  bool showDebugBanner = true,
 }) {
   return MultiProvider(
     providers: [
@@ -75,7 +79,10 @@ Widget pumpReceiptEntryApp({
       ChangeNotifierProvider<TagModel>(create: (_) => TagModel()),
       ChangeNotifierProvider<ContextModel>(create: (_) => ContextModel()),
     ],
-    child: MaterialApp.router(routerConfig: router),
+    child: MaterialApp.router(
+      routerConfig: router,
+      debugShowCheckedModeBanner: showDebugBanner,
+    ),
   );
 }
 

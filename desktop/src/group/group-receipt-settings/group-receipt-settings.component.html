@@ -78,6 +78,50 @@
   }
 
   <app-form-section
+    headerText="Receipt Summary"
+    subtitle="Show a block of totals under this group's receipts table, covering every receipt the current filter matches rather than just the visible page. Everyone in the group sees it."
+  >
+    <app-checkbox
+      label="Show the receipt summary"
+      data-testid="receipt-summary-enabled"
+      [inputFormControl]="form | formGet: 'receiptSummaryEnabled'"
+    ></app-checkbox>
+
+    <div class="mb-3">
+      <strong>Break down by status</strong>
+      <div class="summary-statuses d-flex flex-wrap gap-4">
+        @for (option of receiptStatusOptions; track option.value) {
+          <!--
+            A status with no matching receipts still renders, as a zero row, so the block keeps its
+            shape as the filter narrows. Labels repeat the Quick Scan section's wording, hence the
+            explicit data-testid on each.
+          -->
+          <app-checkbox
+            [label]="option.displayValue"
+            [attr.data-testid]="'receipt-summary-status-' + option.value"
+            [inputFormControl]="form | formGet: 'receiptSummaryStatuses.' + option.value"
+          ></app-checkbox>
+        }
+      </div>
+    </div>
+
+    @if (canManageDefaultCustomFields) {
+      <app-autocomlete
+        class="w-100"
+        label="Currency Fields to Total"
+        data-testid="receipt-summary-custom-fields"
+        optionFilterKey="name"
+        optionDisplayKey="name"
+        [inputFormControl]="$any(summaryCustomFieldsFormArray)"
+        [options]="summaryCurrencyCustomFields"
+        [multiple]="true"
+        [creatable]="false"
+        [readonly]="formConfig.mode !== FormMode.edit"
+      ></app-autocomlete>
+    }
+  </app-form-section>
+
+  <app-form-section
     headerText="Quick Scan"
     subtitle="Choose which fields appear in quick scan and which are required. Paid by and status always resolve to a value, so set a default for when they are optional."
   >

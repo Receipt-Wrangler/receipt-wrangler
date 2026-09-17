@@ -111,6 +111,7 @@ QuickScanImage _image(
   int? groupId, {
   int? paidByUserId,
   api.ReceiptStatus? status,
+  List<api.Category> categories = const [],
 }) => QuickScanImage(
   multipartFile: MultipartFile.fromBytes(const <int>[]),
   bytes: Uint8List(0),
@@ -118,6 +119,7 @@ QuickScanImage _image(
   groupId: groupId,
   paidByUserId: paidByUserId,
   status: status,
+  categories: categories,
 );
 
 /// Pumps [QuickScanForm] with a real [GroupModel] holding [groups] and a
@@ -138,6 +140,7 @@ Future<GlobalKey<FormBuilderState>> _pumpFormGroups(
   List<api.UserView> users = const [],
   int? imagePaidByUserId,
   api.ReceiptStatus? imageStatus,
+  List<api.Category> imageCategories = const [],
   void Function(QuickScanFormValues values)? onFormChange,
   // The comment field is additionally gated on group.comments.create, so every
   // group the test uses is granted it unless a test opts out.
@@ -147,6 +150,7 @@ Future<GlobalKey<FormBuilderState>> _pumpFormGroups(
     imageGroupId,
     paidByUserId: imagePaidByUserId,
     status: imageStatus,
+    categories: imageCategories,
   );
   final groupModel = GroupModel()..setGroups(groups);
   final userModel = UserModel()..setUsers(users);
@@ -818,5 +822,34 @@ void main() {
 
     expect(_commentField(), findsOneWidget);
     expect(find.text('Kept across groups'), findsOneWidget);
+  });
+
+  testWidgets("removing a category chip reaches the image", (tester) async {
+    // The chip's X routes its new list through the form's own
+    // onCategoriesChanged, which is what fires onValueChange. A remove that
+    // mutated the FormBuilderField directly would leave the QuickScanImage
+    // holding the removed category, and the submit would send its id anyway.
+    QuickScanFormValues? emitted;
+    await _pumpFormGroups(
+      tester,
+      groups: [_group(_settings(categoriesEnabled: true))],
+      imageGroupId: _groupId,
+      imageCategories: [_category()],
+      onFormChange: (values) => emitted = values,
+    );
+
+    expect(find.byType(InputChip), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(CategorySelectField),
+        matching: find.byIcon(Icons.cancel),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(InputChip), findsNothing);
+    expect(emitted, isNotNull);
+    expect(emitted!.categories, isEmpty);
   });
 }

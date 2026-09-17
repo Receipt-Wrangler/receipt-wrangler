@@ -47,6 +47,26 @@ type UpdateGroupReceiptSettingsCommand struct {
 	// app.custom-fields.read (403).
 	DefaultCustomFieldIds            *[]uint `json:"defaultCustomFieldIds"`
 	ApplyDefaultCustomFieldsOnIngest *bool   `json:"applyDefaultCustomFieldsOnIngest"`
+
+	// Receipt summary. All three are pointers with the same `nil` == LEAVE UNCHANGED meaning, for
+	// three separate reasons worth keeping straight:
+	//
+	//   - ReceiptSummaryCustomFieldIds MUST be one: the desktop hides that control from an admin
+	//     without app.custom-fields.read, so its getRawValue() omits the key entirely.
+	//   - ReceiptSummaryStatuses must be one because a non-pointer slice cannot tell "the client
+	//     omitted this" from the legitimate, explicit "clear every status" — both unmarshal to nil.
+	//   - ReceiptSummaryEnabled must be one because a non-pointer bool unmarshals as `false` for any
+	//     caller that does not send the key, and the repository's unconditional assignment would
+	//     then silently switch a configured summary off.
+	//
+	// An explicit empty array clears the corresponding set.
+	//
+	// Validate() checks only the statuses (no DB needed). The handler checks that every submitted
+	// custom field id exists AND is a CURRENCY field (400), and that the caller holds
+	// app.custom-fields.read (403) — but only for the custom field key; see the handler.
+	ReceiptSummaryEnabled        *bool                   `json:"receiptSummaryEnabled"`
+	ReceiptSummaryCustomFieldIds *[]uint                 `json:"receiptSummaryCustomFieldIds"`
+	ReceiptSummaryStatuses       *[]models.ReceiptStatus `json:"receiptSummaryStatuses"`
 }
 
 func (command *UpdateGroupReceiptSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -87,6 +107,20 @@ func (command UpdateGroupReceiptSettingsCommand) Validate() structs.ValidatorErr
 	if !(command.QuickScanStatusEnabled && command.QuickScanStatusRequired) {
 		if !isValidReceiptStatus(command.QuickScanDefaultStatus) {
 			vErr.Errors["quickScanDefaultStatus"] = "A default status is required when status is optional"
+		}
+	}
+
+	// Every summary breakdown status must be a real one. Note "" is rejected: ReceiptStatuses()
+	// does not list it, and an empty status is never a breakdown row — unlike the quick-scan
+	// default above, where ReceiptStatus.Value() tolerates "" for an unset scalar. Checking
+	// membership here rather than leaving it to the DB layer is the point: ReceiptStatus.Value()
+	// would surface a bogus value as a generic 500 (see api/CLAUDE.md -> "Receipt statuses").
+	if command.ReceiptSummaryStatuses != nil {
+		for _, status := range *command.ReceiptSummaryStatuses {
+			if !isValidReceiptStatus(status) {
+				vErr.Errors["receiptSummaryStatuses"] = "One or more selected statuses is not a valid receipt status"
+				break
+			}
 		}
 	}
 

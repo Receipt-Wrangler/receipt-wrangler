@@ -1,5 +1,4 @@
 import 'package:built_collection/built_collection.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_svg/svg.dart';
@@ -878,14 +877,18 @@ class _ReceiptForm extends State<ReceiptForm> {
           textFieldSpacing,
           buildReceiptItemList(),
           textFieldSpacing,
-          kDebugMode
-              ? ElevatedButton(
-                  onPressed: () => {
-                        if (formKey.currentState!.saveAndValidate())
-                          {print(formKey.currentState!.value)}
-                      },
-                  child: Text("Check form value"))
-              : SizedBox.shrink(),
+          // The submit button is `Scaffold.bottomSheet`, which *floats over*
+          // the body rather than reserving space, so this column has to clear
+          // its 50px itself. `SingleChildScrollView` at max scroll only brings
+          // content flush with the viewport bottom, so without this the tail of
+          // the "Shared With" field is unreachable at every scroll offset.
+          //
+          // This replaced a `kDebugMode` "Check form value" button that used to
+          // sit here. That button was itself drawn entirely underneath the
+          // submit button -- unclickable -- and its only real effect was to pad
+          // the debug tree by 48px, which hid this bug from the whole test
+          // suite while release builds still shipped it.
+          submitButtonSpacing,
         ],
           ),
         );

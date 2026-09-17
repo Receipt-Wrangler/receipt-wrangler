@@ -365,13 +365,20 @@ export async function apiCreateReceipt(
      * can match.
      */
     status?: string;
+    /**
+     * Receipt amount as a decimal string. Defaults to '10.00'. Specs that assert
+     * over summed money need distinguishable amounts — a uniform 10.00 makes
+     * every total a multiple of ten, which cannot tell a correct sum from a
+     * miscount.
+     */
+    amount?: string;
     customFields?: ReceiptCustomFieldValue[];
   },
 ): Promise<number> {
   const res = await api.post('/api/receipt', {
     data: {
       name: opts.name,
-      amount: '10.00',
+      amount: opts.amount ?? '10.00',
       date: opts.date ?? '2024-01-01T00:00:00Z',
       groupId: Number(opts.groupId),
       paidByUserId: opts.paidByUserId,
@@ -741,34 +748,37 @@ export async function apiDeleteCustomFieldById(
   await warnOnFailedDelete(api, `/api/customField/${id}`, `custom field ${id}`);
 }
 
-// --- Group default custom fields ---------------------------------------------
+// --- Group receipt settings ---------------------------------------------------
 
 /**
- * Persists [customFieldIds] as [groupId]'s default custom fields, optionally
- * flipping the "apply on ingest" toggle with [applyOnIngest].
+ * Reads [groupId]'s current receipt settings and returns them as a PUT body.
  *
  * `PUT /group/{id}/groupReceiptSettings` is an UPSERT over the whole settings
- * object, so this reads the group's current settings back and echoes them
- * unchanged around the override — sending a partial body would reset every
- * quick-scan flag to false. Only the boolean flags are echoed: the enum
- * defaults (`quickScanDefaultPaidByType` / `...Status`) are omitted because the
- * backend keeps its stored value and rejects an empty enum, which is also why
- * paid-by and status stay shown+required here (making either optional would
- * need a configured default). Mirrors the mobile suite's
- * `setGroupDefaultCustomFields` fixture.
+ * object, so a partial body resets every non-pointer flag to false. This echoes
+ * the boolean flags back unchanged; a caller spreads its own overrides on top.
  *
- * Pass `[]` to clear the group's set.
+ * Only the booleans are echoed: the enum defaults (`quickScanDefaultPaidByType` /
+ * `...Status`) are omitted because the backend keeps its stored value and rejects
+ * an empty enum, which is also why paid-by and status stay shown+required here
+ * (making either optional would need a configured default).
+ *
+ * The POINTER command fields — `defaultCustomFieldIds`, the three
+ * `receiptSummary*` keys — are deliberately absent: omitting a pointer key means
+ * "leave unchanged", so a caller that does not set one cannot clobber it.
+ *
+ * Shared by every settings setter below so the key list exists once. A new
+ * non-pointer flag added to the command has to be added here or it is silently
+ * zeroed by every one of them.
  */
-export async function apiSetGroupDefaultCustomFields(
+async function groupReceiptSettingsEcho(
   api: APIRequestContext,
   groupId: number | string,
-  customFieldIds: number[],
-  applyOnIngest?: boolean,
-): Promise<void> {
+  what: string,
+): Promise<Record<string, unknown>> {
   const groupsRes = await api.get('/api/group/');
   if (!groupsRes.ok()) {
     throw new Error(
-      `set default custom fields: GET /api/group/ failed: HTTP ${groupsRes.status()} ${await groupsRes.text()}`,
+      `${what}: GET /api/group/ failed: HTTP ${groupsRes.status()} ${await groupsRes.text()}`,
     );
   }
   const groups = (await groupsRes.json()) as {
@@ -777,13 +787,11 @@ export async function apiSetGroupDefaultCustomFields(
   }[];
   const group = groups.find((g) => String(g.id) === String(groupId));
   if (!group) {
-    throw new Error(`set default custom fields: group ${groupId} not visible`);
+    throw new Error(`${what}: group ${groupId} not visible`);
   }
 
   const settings = group.groupReceiptSettings ?? {};
-  const command: Record<string, unknown> = {
-    defaultCustomFieldIds: customFieldIds,
-  };
+  const command: Record<string, unknown> = {};
   for (const key of [
     'hideImages', 'hideReceiptCategories', 'hideReceiptTags',
     'hideItemCategories', 'hideItemTags', 'hideComments',
@@ -797,18 +805,75 @@ export async function apiSetGroupDefaultCustomFields(
   ]) {
     command[key] = settings[key] ?? false;
   }
-  if (applyOnIngest !== undefined) {
-    command['applyDefaultCustomFieldsOnIngest'] = applyOnIngest;
-  }
 
+  return command;
+}
+
+async function putGroupReceiptSettings(
+  api: APIRequestContext,
+  groupId: number | string,
+  command: Record<string, unknown>,
+  what: string,
+): Promise<void> {
   const res = await api.put(`/api/group/${groupId}/groupReceiptSettings`, {
     data: command,
   });
   if (!res.ok()) {
-    throw new Error(
-      `set default custom fields failed: HTTP ${res.status()} ${await res.text()}`,
-    );
+    throw new Error(`${what} failed: HTTP ${res.status()} ${await res.text()}`);
   }
+}
+
+/**
+ * Persists [customFieldIds] as [groupId]'s default custom fields, optionally
+ * flipping the "apply on ingest" toggle with [applyOnIngest]. Mirrors the mobile
+ * suite's `setGroupDefaultCustomFields` fixture.
+ *
+ * Pass `[]` to clear the group's set.
+ */
+export async function apiSetGroupDefaultCustomFields(
+  api: APIRequestContext,
+  groupId: number | string,
+  customFieldIds: number[],
+  applyOnIngest?: boolean,
+): Promise<void> {
+  const what = 'set default custom fields';
+  const command = await groupReceiptSettingsEcho(api, groupId, what);
+  command['defaultCustomFieldIds'] = customFieldIds;
+  if (applyOnIngest !== undefined) {
+    command['applyDefaultCustomFieldsOnIngest'] = applyOnIngest;
+  }
+
+  await putGroupReceiptSettings(api, groupId, command, what);
+}
+
+/**
+ * Configures [groupId]'s receipt summary — the block of totals under the receipts
+ * table. Lets a spec seed the configuration without driving the settings form.
+ *
+ * [currencyCustomFieldIds] must reference CURRENCY custom fields; the server 400s
+ * anything else, because only a currency value can be summed. Pass `[]` for either
+ * set to clear it.
+ */
+export async function apiSetGroupSummaryConfig(
+  api: APIRequestContext,
+  groupId: number | string,
+  config: {
+    enabled: boolean;
+    statuses?: string[];
+    currencyCustomFieldIds?: number[];
+  },
+): Promise<void> {
+  const what = 'set receipt summary config';
+  const command = await groupReceiptSettingsEcho(api, groupId, what);
+  command['receiptSummaryEnabled'] = config.enabled;
+  if (config.statuses !== undefined) {
+    command['receiptSummaryStatuses'] = config.statuses;
+  }
+  if (config.currencyCustomFieldIds !== undefined) {
+    command['receiptSummaryCustomFieldIds'] = config.currencyCustomFieldIds;
+  }
+
+  await putGroupReceiptSettings(api, groupId, command, what);
 }
 
 // --- Per-member category/tag grants ------------------------------------------

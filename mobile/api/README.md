@@ -120,6 +120,7 @@ Class | Method | HTTP request | Description
 [*ReceiptApi*](doc/ReceiptApi.md) | [**deleteReceiptById**](doc/ReceiptApi.md#deletereceiptbyid) | **DELETE** /receipt/{receiptId} | Delete receipt
 [*ReceiptApi*](doc/ReceiptApi.md) | [**duplicateReceipt**](doc/ReceiptApi.md#duplicatereceipt) | **POST** /receipt/{receiptId}/duplicate | Duplicate receipt
 [*ReceiptApi*](doc/ReceiptApi.md) | [**getReceiptById**](doc/ReceiptApi.md#getreceiptbyid) | **GET** /receipt/{receiptId} | Get receipt
+[*ReceiptApi*](doc/ReceiptApi.md) | [**getReceiptSummaryForGroup**](doc/ReceiptApi.md#getreceiptsummaryforgroup) | **POST** /receipt/group/{groupId}/summary | Gets the receipt summary for a group
 [*ReceiptApi*](doc/ReceiptApi.md) | [**getReceiptsForGroup**](doc/ReceiptApi.md#getreceiptsforgroup) | **POST** /receipt/group/{groupId} | Gets receipts
 [*ReceiptApi*](doc/ReceiptApi.md) | [**hasAccessToReceipt**](doc/ReceiptApi.md#hasaccesstoreceipt) | **GET** /receipt/hasAccess | Has access to receipt
 [*ReceiptApi*](doc/ReceiptApi.md) | [**quickScanReceipt**](doc/ReceiptApi.md#quickscanreceipt) | **POST** /receipt/quickScan | Quick scan a receipt
@@ -266,6 +267,10 @@ Class | Method | HTTP request | Description
  - [ReceiptPagedRequestFilter](doc/ReceiptPagedRequestFilter.md)
  - [ReceiptProcessingSettings](doc/ReceiptProcessingSettings.md)
  - [ReceiptStatus](doc/ReceiptStatus.md)
+ - [ReceiptSummary](doc/ReceiptSummary.md)
+ - [ReceiptSummaryCommand](doc/ReceiptSummaryCommand.md)
+ - [ReceiptSummaryCustomFieldTotal](doc/ReceiptSummaryCustomFieldTotal.md)
+ - [ReceiptSummaryRow](doc/ReceiptSummaryRow.md)
  - [ReportColumn](doc/ReportColumn.md)
  - [ReportDetail](doc/ReportDetail.md)
  - [ReportDocument](doc/ReportDocument.md)

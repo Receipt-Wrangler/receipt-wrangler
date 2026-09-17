@@ -98,6 +98,18 @@ export interface UpdateGroupReceiptSettingsCommand {
      * Also attach the group\'s default custom fields to receipts the SERVER creates (quick scan, email integration). OMIT the key to leave the stored value unchanged.
      */
     applyDefaultCustomFieldsOnIngest?: boolean;
+    /**
+     * Show the block of totals under this group\'s receipts table. OMIT the key to leave the stored value unchanged - a client that does not render this section must omit it rather than send false, or it switches the summary off for the whole group.
+     */
+    receiptSummaryEnabled?: boolean;
+    /**
+     * CURRENCY custom field ids to total in the receipt summary. OMIT the key to leave the configured set unchanged (clients that hide this control, e.g. for a user without app.custom-fields.read, must omit it); send an empty array to clear it. Requires app.custom-fields.read - a caller without it gets a 403. Every id must be an existing CURRENCY custom field - anything else is a 400, because only a currency value can be summed.
+     */
+    receiptSummaryCustomFieldIds?: Array<number>;
+    /**
+     * Receipt statuses to break out as their own row in the receipt summary. OMIT the key to leave the configured set unchanged; send an empty array to clear it. Unlike the custom field ids this needs NO extra permission - gating it would lock an admin without app.custom-fields.read out of the feature entirely. An unrecognized status is a 400.
+     */
+    receiptSummaryStatuses?: Array<ReceiptStatus>;
 }
 export namespace UpdateGroupReceiptSettingsCommand {
 }

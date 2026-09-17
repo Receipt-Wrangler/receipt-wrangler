@@ -1607,6 +1607,48 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /receipt/group/{groupId}/summary:
+    post:
+      tags:
+        - Receipt
+      summary: Gets the receipt summary for a group
+      description: >-
+        Returns the block of totals rendered under the receipts table: a receipt count
+        and amount total over the WHOLE filtered result set (not the current page),
+        then the same figures per configured status. Which statuses break out and which
+        currency custom fields are totalled come from the group's receipt settings, not
+        from the request. Gated on group.receipts.read, the same permission as the
+        receipts it aggregates. [SYSTEM USER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptSummaryCommand"
+      parameters:
+        - in: path
+          name: groupId
+          schema:
+            type: integer
+          required: true
+          description: Summarize the receipts that belong to groupId
+      operationId: getReceiptSummaryForGroup
+      responses:
+        200:
+          description: >-
+            The summary. Note a group with the summary turned off returns a normal 200
+            with enabled=false and zeroed rows, not an error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptSummary"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /receiptImage/:
     post:
       tags:
@@ -4753,6 +4795,93 @@ components:
       properties:
         associatedGroup:
           $ref: "#/components/schemas/AssociatedGroup"
+    ReceiptSummaryCommand:
+      type: object
+      properties:
+        filter:
+          $ref: "#/components/schemas/ReceiptPagedRequestFilter"
+        configurationGroupId:
+          type: integer
+          format: uint64
+          nullable: true
+          description: >-
+            The group whose receipt settings shape the breakdown. Exists for the
+            synthetic "All" group, which spans every group the caller belongs to and so
+            has no meaningful settings of its own - the client picks which member
+            group's configuration to apply. OMIT it for a real group, where the group
+            in the path is used. The DATA is always the path group's filtered set; this
+            only chooses the shape of the breakdown. A group the caller cannot read is
+            a 403.
+    ReceiptSummaryCustomFieldTotal:
+      type: object
+      required:
+        - customFieldId
+        - name
+        - total
+      properties:
+        customFieldId:
+          type: integer
+          format: uint64
+        name:
+          type: string
+          description: The custom field's name, so the client needs no second lookup
+        total:
+          type: string
+          description: Sum of this field's currency values across the row's receipts
+    ReceiptSummaryRow:
+      type: object
+      required:
+        - status
+        - receiptCount
+        - total
+        - customFieldTotals
+      properties:
+        status:
+          $ref: "#/components/schemas/ReceiptStatus"
+        receiptCount:
+          type: integer
+          format: int64
+          description: >-
+            How many receipts this row covers. On the overall row this matches the
+            table's own total count for the same filter.
+        total:
+          type: string
+          description: Sum of the receipts' amounts
+        customFieldTotals:
+          type: array
+          description: >-
+            One entry per configured currency custom field, in the configured order.
+            Always present; empty when the group totals only the receipt amount.
+          items:
+            $ref: "#/components/schemas/ReceiptSummaryCustomFieldTotal"
+    ReceiptSummary:
+      type: object
+      required:
+        - enabled
+        - configurationGroupId
+        - overall
+        - statuses
+      properties:
+        enabled:
+          type: boolean
+          description: >-
+            Whether the configuration group has the summary turned on. False comes back
+            at a normal 200 with zeroed rows, so a client with stale group settings
+            renders nothing rather than surfacing an error.
+        configurationGroupId:
+          type: integer
+          format: uint64
+          description: The group whose settings produced this breakdown
+        overall:
+          $ref: "#/components/schemas/ReceiptSummaryRow"
+        statuses:
+          type: array
+          description: >-
+            One row per configured status, in ReceiptStatus declaration order. A
+            configured status matching no receipt is still present, with zeroed
+            figures. Always present; empty when no status is configured.
+          items:
+            $ref: "#/components/schemas/ReceiptSummaryRow"
     ReceiptPagedRequestCommand:
       required:
         - page
@@ -5067,6 +5196,31 @@ components:
               description: >-
                 Also attach the group's default custom fields to receipts the SERVER
                 creates (quick scan, email integration). Off by default.
+            receiptSummaryEnabled:
+              type: boolean
+              description: >-
+                Show the block of totals under this group's receipts table. Off by
+                default, so an existing install is unchanged until an admin opts in.
+            receiptSummaryCustomFieldIds:
+              type: array
+              description: >-
+                CURRENCY custom field ids totalled in the receipt summary, in the order
+                their columns are rendered. Always present; an empty array means the
+                group totals only the receipt amount. Read only here - write via
+                UpdateGroupReceiptSettingsCommand.receiptSummaryCustomFieldIds.
+              items:
+                type: integer
+                format: uint64
+            receiptSummaryStatuses:
+              type: array
+              description: >-
+                Receipt statuses broken out as their own row in the receipt summary, in
+                ReceiptStatus declaration order. A configured status matching no receipt
+                still renders, as a zero row. Always present; an empty array means the
+                summary shows only the overall row. Read only here - write via
+                UpdateGroupReceiptSettingsCommand.receiptSummaryStatuses.
+              items:
+                $ref: "#/components/schemas/ReceiptStatus"
     UpdateGroupReceiptSettingsCommand:
       type: object
       properties:
@@ -5149,6 +5303,35 @@ components:
             Also attach the group's default custom fields to receipts the SERVER
             creates (quick scan, email integration). OMIT the key to leave the
             stored value unchanged.
+        receiptSummaryEnabled:
+          type: boolean
+          description: >-
+            Show the block of totals under this group's receipts table. OMIT the key
+            to leave the stored value unchanged - a client that does not render this
+            section must omit it rather than send false, or it switches the summary
+            off for the whole group.
+        receiptSummaryCustomFieldIds:
+          type: array
+          description: >-
+            CURRENCY custom field ids to total in the receipt summary. OMIT the key to
+            leave the configured set unchanged (clients that hide this control, e.g.
+            for a user without app.custom-fields.read, must omit it); send an empty
+            array to clear it. Requires app.custom-fields.read - a caller without it
+            gets a 403. Every id must be an existing CURRENCY custom field - anything
+            else is a 400, because only a currency value can be summed.
+          items:
+            type: integer
+            format: uint64
+        receiptSummaryStatuses:
+          type: array
+          description: >-
+            Receipt statuses to break out as their own row in the receipt summary. OMIT
+            the key to leave the configured set unchanged; send an empty array to clear
+            it. Unlike the custom field ids this needs NO extra permission - gating it
+            would lock an admin without app.custom-fields.read out of the feature
+            entirely. An unrecognized status is a 400.
+          items:
+            $ref: "#/components/schemas/ReceiptStatus"
     GroupSettings:
       type: object
       required:

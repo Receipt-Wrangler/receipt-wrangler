@@ -6,6 +6,7 @@ import 'package:openapi/openapi.dart' as api;
 import 'package:receipt_wrangler_mobile/constants/receipt_entry.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/quick_scan.dart';
 import 'package:receipt_wrangler_mobile/shared/functions/quick_scan.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:rxdart/rxdart.dart';
 
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
@@ -321,6 +322,39 @@ void main() {
         reason: 'the arrows are the swipe, not a separate notion of where the '
             'user is');
     expect(find.text('2 of 3'), findsOneWidget);
+  });
+
+  testWidgets('the submit button stays clear of an open keyboard',
+      (tester) async {
+    // The sheet opens with `bodyFillsSheet: true`, which pins this Column as
+    // the scaffold's bottom BAR rather than its bottomSheet -- so it reserves
+    // its space instead of floating over the form's last field. Flutter lifts
+    // only the bottomSheet slot above the keyboard, so that trade used to bury
+    // the submit button the moment the (last-in-column, multiline) comment
+    // field took focus. ScreenWrapper._liftAboveKeyboard is what closes it.
+    //
+    // Geometry, not finders: the button is still `findsOneWidget` while parked
+    // underneath the keyboard. Pre-fix its bottom edge reads 844.
+    const screenHeight = 844.0;
+    const keyboard = 300.0;
+
+    tester.view.physicalSize = const Size(390, screenHeight);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await pumpSheet(tester, aiEnabled: true, permissions: [quickScan, create]);
+
+    final submit = find.byType(BottomSubmitButton);
+    expect(tester.getRect(submit).bottom, screenHeight,
+        reason: 'the control: no keyboard, so the button is on the bottom');
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: keyboard);
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(submit).bottom,
+        lessThanOrEqualTo(screenHeight - keyboard),
+        reason: 'the whole bottom slot -- queued confirmation, manual-entry '
+            'link and submit button -- rides above the keyboard');
   });
 
   testWidgets('the manual link closes the sheet and opens the form',
