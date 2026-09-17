@@ -16,6 +16,8 @@ void main() {
 
   group("the neutral roles are spelled out, not left to fall back", () {
     test("outline and outlineVariant are slate, not onBackground", () {
+      // outlineVariant is $accent-palette 200; outline is the one deliberate
+      // half-step off the palette (see borderSlate's doc comment).
       expect(scheme.outline, borderSlate);
       expect(scheme.outlineVariant, slate200);
       expect(scheme.outline, isNot(scheme.onSurface));
@@ -46,6 +48,8 @@ void main() {
     });
 
     test("primaryContainer carries the accent tint and its readable text", () {
+      // accentTint is the design's 8% wash; onPrimaryContainer is
+      // $primary-palette 700, the web theme's own "darker" stop.
       expect(scheme.primaryContainer, accentTint);
       expect(scheme.onPrimaryContainer, accentBlueDark);
       expect(scheme.primaryContainer, isNot(scheme.primary));
@@ -54,6 +58,8 @@ void main() {
 
   group("the roles the app already had are unchanged", () {
     test("primary, error and the surface pair", () {
+      // Brand palette stops, from desktop/src/variables.scss: primary 500,
+      // accent 500 (the old secondary), warn 500.
       expect(scheme.primary, const Color(0xFF27B1FF));
       expect(scheme.onPrimary, const Color(0xFFFFFFFF));
       expect(scheme.secondary, const Color(0xFF8EA1AC));
@@ -103,6 +109,8 @@ void main() {
     // near-white bar, on every main screen. Nothing else notices.
     final nav = theme.navigationBarTheme;
 
+    // accentContainer is $primary-palette 50 -- the same stop desktop pairs
+    // with accentBlueDark in roles/role-presets.ts.
     expect(nav.indicatorColor, accentContainer);
     expect(nav.indicatorColor, isNot(scheme.secondaryContainer));
     expect(nav.indicatorColor, isNot(scheme.surface));
@@ -179,9 +187,10 @@ void main() {
     test("the accent used as a foreground is readable on its tints", () {
       // 3:1, the non-text floor. These are the two places accentBlueDark is
       // also used for small TEXT (the nav's selected label, the editor chip's
-      // label), where the floor is 4.5:1 and they measure ~3.6 -- a known,
-      // deliberate gap, recorded in mobile/CLAUDE.md rather than closed by
-      // darkening the accent further.
+      // label), where the floor is 4.5:1 and they measure ~3.6. Closeable
+      // on-palette by moving the accent from $primary-palette 700 to 800
+      // (#0072b4, which clears every floor); left at 700 deliberately because
+      // 800 reads navy. Recorded in mobile/CLAUDE.md.
       expectAtLeast("accentBlueDark on primaryContainer", scheme.onPrimaryContainer,
           scheme.primaryContainer, 3.0);
       expectAtLeast("the nav's selected icon on its pill", accentBlueDark,

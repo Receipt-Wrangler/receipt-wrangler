@@ -238,10 +238,39 @@ now decorative-only -- a chevron or a dismiss X carries meaning and belongs at `
 
 The **known gap**: `accentBlueDark` is also small *text* in two places -- the nav's selected label
 (3.58:1 on the bar) and the editor's selected operation chip (3.59:1 on its tint). Both clear the
-3:1 non-text floor and fall short of 4.5:1. Closing it means darkening the accent to about
-`#006EB2`, which is a visibly navy brand blue, so it is left open deliberately rather than
-overlooked. The focused floating label was the third such case and is **not** accent-coloured for
-exactly this reason: it keeps `onSurfaceVariant` (4.76:1) and focus rides on the border instead.
+3:1 non-text floor and fall short of 4.5:1. **It is closeable on-palette**: moving the accent from
+`$primary-palette` 700 to **800 `#0072b4`** clears every floor (5.16 / 4.18 / 4.71 / 4.73). Staying
+at 700 is a deliberate appearance call -- 800 reads noticeably navy -- not a limitation, and it is
+the call to revisit if the gap ever matters. The focused floating label was a third such case and is
+**not** accent-coloured for this reason: it keeps `onSurfaceVariant` (4.76:1) and focus rides on the
+border instead.
+
+**The palette is shared with desktop, and almost all of it is already canonical.** The source of
+truth is the Angular Material M2 maps in `desktop/src/variables.scss`, which the web theme is
+actually built from (`mat.m2-define-palette`, `desktop/src/styles.scss`). `lib/constants/colors.dart`
+names the stop for each constant; the mapping is:
+
+| mobile | brand palette |
+|---|---|
+| `primary` `#27B1FF` | `$primary-palette` **500** -- the brand blue, and the logo's own fill |
+| `accentBlueDark` `#0086D4` | `$primary-palette` **700**, which `mat.m2-define-palette` makes the web theme's "darker" variant |
+| `accentContainer` `#CCECFF` | `$primary-palette` **50** |
+| `selectedChipBorder` `#BBE6FF` | `$primary-palette` **100** |
+| `slate50` … `slate700` | `$accent-palette` **50 … 700**, exactly |
+| `error` `#D63333` | `$warn-palette` **500** |
+| `accentTint` `#EAF7FF` | *not a stop* -- the design's 8% wash on white |
+| `borderSlate` `#7E8DA1` | *not a stop* -- a half-step, see below |
+
+So **`#0086D4` is a brand colour, not an off-brand darkening** -- desktop uses that same stop for
+the same job (accent text and icons on light) in about sixteen places, including
+`roles/role-presets.ts`, which pairs `PRIMARY_TINT = "#ccecff"` with `PRIMARY_COLOR = "#0086d4"`:
+the mobile nav pill's exact pairing. This has already been queried once; the answer is here so it
+does not have to be re-derived.
+
+**Source a new value from those maps before inventing one.** `borderSlate` is the one grey that
+isn't a stop, and only because `$accent-palette` jumps 400 `#94A3B8` (2.56:1, under the border floor)
+straight to 500 `#64748B` (4.76:1, as heavy as the label text) with nothing between. Nothing
+mechanically ties `colors.dart` to the SCSS, so the two clients stay in step by hand.
 
 **Two tints, not one.** `primaryContainer` is `#EAF7FF` and `accentContainer` is `#CCECFF`, both
 from the design, and they are not interchangeable: `accentBlueDark` clears AA on the lighter one at
