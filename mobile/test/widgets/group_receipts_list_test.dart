@@ -85,8 +85,12 @@ void main() {
   Future<ReceiptFilterHarness> pumpList(
     WidgetTester tester, {
     required GoRouter router,
+    /// Pass one to seed an applied filter *before* the list mounts -- the only
+    /// way to reach the "mounted straight into another group" case, which is
+    /// how every real group switch arrives (see the group-change tests below).
+    ReceiptFilterHarness? harness,
   }) async {
-    final harness = buildReceiptFilterHarness();
+    harness ??= buildReceiptFilterHarness();
 
     await tester.pumpWidget(MultiProvider(
       providers: [
@@ -137,7 +141,7 @@ void main() {
         router: routerFor("/groups/${ReceiptFilterHarness.householdId}/receipts"));
     requests.clear();
 
-    harness.receiptListModel.setFilter({"name": nameCondition}, true);
+    harness.receiptListModel.setFilter({"name": nameCondition}, true, groupId: "${ReceiptFilterHarness.householdId}");
     await tester.pumpAndSettle();
 
     expect(requests, hasLength(1),
@@ -152,7 +156,7 @@ void main() {
         router: routerFor("/groups/${ReceiptFilterHarness.householdId}/receipts"));
     requests.clear();
 
-    harness.receiptListModel.setFilter({"name": nameCondition}, false);
+    harness.receiptListModel.setFilter({"name": nameCondition}, false, groupId: "${ReceiptFilterHarness.householdId}");
     await tester.pumpAndSettle();
 
     expect(requests, isEmpty);
@@ -180,7 +184,7 @@ void main() {
         routerFor("/groups/${ReceiptFilterHarness.householdId}/receipts");
     final harness = await pumpList(tester, router: router);
 
-    harness.receiptListModel.setFilter({"name": nameCondition}, true);
+    harness.receiptListModel.setFilter({"name": nameCondition}, true, groupId: "${ReceiptFilterHarness.householdId}");
     await tester.pumpAndSettle();
     requests.clear();
 
@@ -194,6 +198,48 @@ void main() {
     expect(filterOf(requests.last), isEmpty);
   });
 
+  testWidgets(
+      "a list mounted into another group clears the filter before it fetches",
+      (tester) async {
+    // The case the shipped guard missed. The app offers no lateral group
+    // switch -- every real one goes out through /groups and back in, which
+    // destroys this widget's State. So the list arrives in the new group with
+    // no memory of the old one, and a widget-local "last group I saw" is null
+    // exactly when the clear is needed. The filter's own scope is what makes
+    // this reachable.
+    final harness = buildReceiptFilterHarness();
+    harness.receiptListModel.setFilter({"name": nameCondition}, false,
+        groupId: "${ReceiptFilterHarness.householdId}");
+
+    await pumpList(tester,
+        harness: harness,
+        router: routerFor("/groups/${ReceiptFilterHarness.officeId}/receipts"));
+
+    expect(harness.receiptListModel.hasActiveFilter, isFalse);
+    expect(requests, hasLength(1),
+        reason: "the clear must land before the first fetch, not cause a "
+            "second one");
+    expect(filterOf(requests.single), isEmpty);
+  });
+
+  testWidgets("a list remounted into the SAME group keeps the filter",
+      (tester) async {
+    // The mirror image, and why the scope cannot simply be "clear on mount":
+    // a round trip to a receipt tears this list down and rebuilds it too.
+    final harness = buildReceiptFilterHarness();
+    harness.receiptListModel.setFilter({"name": nameCondition}, false,
+        groupId: "${ReceiptFilterHarness.householdId}");
+
+    await pumpList(tester,
+        harness: harness,
+        router:
+            routerFor("/groups/${ReceiptFilterHarness.householdId}/receipts"));
+
+    expect(harness.receiptListModel.hasActiveFilter, isTrue);
+    expect(filterOf(requests.single),
+        {"name": {"operation": "CONTAINS", "value": "Costco"}});
+  });
+
   testWidgets("the empty state names the filter when one is applied",
       (tester) async {
     final harness = await pumpList(tester,
@@ -201,7 +247,7 @@ void main() {
 
     expect(find.text("No receipts found"), findsOneWidget);
 
-    harness.receiptListModel.setFilter({"name": nameCondition}, true);
+    harness.receiptListModel.setFilter({"name": nameCondition}, true, groupId: "${ReceiptFilterHarness.householdId}");
     await tester.pumpAndSettle();
 
     expect(find.text("No receipts match this filter"), findsOneWidget);

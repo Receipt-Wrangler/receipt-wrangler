@@ -83,7 +83,7 @@ void main() {
     final harness = await pumpButton(tester);
 
     harness.receiptListModel
-        .setFilter({"name": nameCondition, "amount": amountCondition}, true);
+        .setFilter({"name": nameCondition, "amount": amountCondition}, true, groupId: "${ReceiptFilterHarness.householdId}");
     await tester.pump();
 
     expect(badgeOf(tester).isLabelVisible, isTrue);
@@ -93,7 +93,7 @@ void main() {
   testWidgets("follows the applied filter down as well as up", (tester) async {
     final harness = await pumpButton(tester);
 
-    harness.receiptListModel.setFilter({"name": nameCondition}, true);
+    harness.receiptListModel.setFilter({"name": nameCondition}, true, groupId: "${ReceiptFilterHarness.householdId}");
     await tester.pump();
     expect(find.text("1"), findsOneWidget);
 

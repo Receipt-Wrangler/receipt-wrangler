@@ -107,7 +107,7 @@ class _ReceiptFilterScreen extends State<ReceiptFilterScreen> {
   }
 
   void _apply() {
-    _receiptListModel.setFilter(_draft, true);
+    _receiptListModel.setFilter(_draft, true, groupId: widget.groupId);
     Navigator.of(context).pop();
   }
 

@@ -287,13 +287,31 @@ Future<void> deleteGroup(int groupId, {required String jwt}) async {
   }
 }
 
+/// A reference to an existing category or tag, for [createReceipt].
+///
+/// Both fields are carried because `POST /receipt/` takes an
+/// `UpsertCategoryCommand` / `UpsertTagCommand`, whose validator requires a
+/// non-empty `name` even when an `id` identifies an existing row.
+typedef LabelRef = ({int id, String name});
+
 /// Creates a receipt in [groupId] paid by [paidByUserId]. Returns its id.
+///
+/// [date] and [status] default to the values this helper used to hardcode, and
+/// [categories] / [tags] are omitted from the body entirely when empty, so the
+/// request every pre-existing caller sends is unchanged. They are parameters
+/// because the filter specs need receipts that differ along the axes being
+/// filtered on -- a fixed date and a fixed status cannot exercise a date range
+/// or a status filter.
 Future<int> createReceipt({
   required int groupId,
   required int paidByUserId,
   required String jwt,
   required String name,
   String amount = '12.34',
+  String date = '2026-06-11T00:00:00Z',
+  String status = 'OPEN',
+  List<LabelRef> categories = const [],
+  List<LabelRef> tags = const [],
 }) async {
   final res = await http
       .post(
@@ -302,10 +320,16 @@ Future<int> createReceipt({
         body: jsonEncode({
           'name': name,
           'amount': amount,
-          'date': '2026-06-11T00:00:00Z',
+          'date': date,
           'groupId': groupId,
           'paidByUserId': paidByUserId,
-          'status': 'OPEN',
+          'status': status,
+          if (categories.isNotEmpty)
+            'categories': [
+              for (final c in categories) {'id': c.id, 'name': c.name}
+            ],
+          if (tags.isNotEmpty)
+            'tags': [for (final t in tags) {'id': t.id, 'name': t.name}],
         }),
       )
       .timeout(const Duration(seconds: 10));
@@ -920,5 +944,51 @@ Future<PaidByFixture> provisionPaidByOwnMember() async {
     ownReceiptName: ownReceiptName,
     hiddenReceiptId: hiddenReceiptId,
     hiddenReceiptName: hiddenReceiptName,
+  );
+}
+
+/// A [PermFixture] plus a **second** fixture group the same user belongs to,
+/// with the same group role.
+///
+/// [provisionPermUser] creates exactly one group, and the filter's
+/// group-change behaviour needs two *real* ones the user can switch between on
+/// `/groups`. Neither of the groups a single-group user already has will do: the
+/// synthetic "All" group is a different code path (`isAllGroupId`), and the
+/// personal "My Receipts" group's id is not something a fixture hands back.
+class TwoGroupFixture {
+  TwoGroupFixture({
+    required this.fixture,
+    required this.secondGroupId,
+    required this.secondGroupName,
+  });
+
+  final PermFixture fixture;
+  final int secondGroupId;
+  final String secondGroupName;
+}
+
+/// Provisions a user belonging to two fixture groups with the same role.
+Future<TwoGroupFixture> provisionPermUserWithTwoGroups({
+  String roleName = 'Legacy Editor',
+}) async {
+  final fixture = await provisionPermUser(roleName: roleName);
+
+  final jwt = await apiLogin();
+  final name = 'e2e-perm2-${_unique()}';
+  final groupId = await createGroupWithMember(
+    name: name,
+    memberUserId: fixture.userId,
+    groupRoleId: await groupRoleIdByName(roleName, jwt: jwt),
+    jwt: jwt,
+  );
+  // Registered AFTER provisionPermUser's own teardowns, so LIFO runs it FIRST
+  // -- this group goes before the user that belongs to it, matching the
+  // ordering rule documented on provisionUserWithoutAppPermission.
+  addTearDown(() async => deleteGroup(groupId, jwt: await apiLogin()));
+
+  return TwoGroupFixture(
+    fixture: fixture,
+    secondGroupId: groupId,
+    secondGroupName: name,
   );
 }

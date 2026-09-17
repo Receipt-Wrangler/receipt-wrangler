@@ -1211,6 +1211,20 @@ active conditions as cards, offers "Add filter", and commits with **"Apply Filte
   the user cannot see. It clears **everything**, not just the id-bearing fields: "switching groups
   shows that group's receipts" is the predictable rule. It clears **silently** (`notify: false`),
   because that runs during a build; the explicit `_refreshCallback` is the visible half.
+  - **The scope is read off the filter, not off a group the list remembered** --
+    `ReceiptListModel.filterGroupId`, recorded by `setFilter` (whose `groupId` is a *required* named
+    argument for exactly this reason). The first version tracked "the last group I saw" in the
+    widget, and **that guard never fired**: the app offers no lateral group switch, so every real
+    group change leaves the group shell (the app-bar arrow goes to `/groups`, group cards go to
+    `/groups/<id>/dashboards`, and `GroupBottomNav` only navigates within the current group), which
+    destroys the `State`. The replacement mounted with a null "last group" while the filter sat
+    untouched on the app-level model, so **group A's filter followed the user into group B**. It
+    shipped that way and `integration_test/receipt_filter_lifecycle_test.dart` is what caught it.
+  - **"Clear whenever the list mounts" is not the fix**, which is why the scope has to live on the
+    filter: a round trip to a receipt tears the list down and rebuilds it just as a group change
+    does (`/receipts/:id/view` is a top-level route). Only the filter knows the difference between
+    the two, and both cases are pinned -- in `group_receipts_list_test.dart` for the mount, and
+    end to end in the lifecycle spec.
 
 **Encoding (`lib/utils/receipt_filter.dart`) is the highest-risk part, and its rules come from the
 Go side (`api/internal/repositories/receipts.go`).**
@@ -1304,7 +1318,36 @@ names a real wire field -- `setReceiptFilterField` dispatches on a string, so a 
 to compile), `test/utils/receipt_filter_test.dart` (a case per field type x operation, asserted
 through the real serializer), `test/utils/receipt_filter_options_test.dart`,
 `test/models/receipt_list_model_test.dart`, and widget tests for the button, the screen, the add
-sheet, the editor, the condition card and the list wiring. **No e2e yet** -- deliberately deferred.
+sheet, the editor, the condition card and the list wiring.
+
+**E2e: `integration_test/receipt_filter_test.dart` and `receipt_filter_lifecycle_test.dart`.** The
+unit suite proves the *serialized map* through the real serializer and the widget suite runs against
+a mocked `ReceiptApi`, so neither can reach the thing most likely to break -- that the Go query
+builder accepts the filter and narrows real rows. Five tests drive the wire (name, status via the
+real multiselect sheet, categories from the real per-group catalog, a date range, an amount typed
+into the currency field) and two cover the lifecycle (survives a receipt round trip; cleared on a
+group change). Shared drivers live in `integration_test/helpers/receipt_filter_actions.dart`.
+
+- **The seed set is three receipts in one fixture group**, differing in name, amount, date, status
+  and category so each test gets one match and two non-matches. **R2's `18:30` timestamp is
+  load-bearing**: a `BETWEEN` of 06/11-06/13 encodes to an upper bound of `06-13T23:59:59Z` because
+  the client expands the range to end-of-day, and a receipt stored at *midnight* on the last day
+  would match even a broken `<= 06-13T00:00:00Z` bound -- so the date test would pass against the
+  bug it exists to catch.
+- **The date picker is driven through its text-entry mode**, not the calendar. `firstDate` is 2000
+  and `lastDate` five years out, so the grid is ~370 lazily-built months whose day cells are bare
+  unkeyed `Text('11')` repeating every month. The app registers no `flutter_localizations`
+  delegates, so `DefaultMaterialLocalizations` is in force: the toggle is tooltipped
+  **"Switch to input"**, dates parse as US `mm/dd/yyyy`, and the confirm button is **"OK"** in text
+  mode (it is "Save" in calendar mode). The spec asserts the picked range on the `_TapField` before
+  applying, so a later row failure means the *server* disagreed rather than the picker misfiring.
+- **Wait for a button to be *enabled*, not hittable.** A disabled `FilledButton` still hit-tests, so
+  a tap on "Apply Filter" (gated on `LoadingModel.isLoading`) or "Save condition" (gated on the
+  editor's validity) silently no-ops and fails ten seconds later pointing at the wrong widget.
+- **Never `find.byKey` an amount field.** `AmountField` forwards its `widget.key` onto the
+  `FormBuilderTextField` it builds, so the keyed finder matches two widgets and any tap throws. Use
+  `formField("value")` -- and `CurrencyTextFieldController` reads keystrokes as cents, so type the
+  full `50.00`, not `50`.
 
 ### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
 

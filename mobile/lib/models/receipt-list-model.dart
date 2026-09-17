@@ -27,6 +27,18 @@ class ReceiptListModel extends ChangeNotifier {
   /// model's back and leave the badge count disagreeing with the query.
   Map<String, ReceiptFilterCondition> get filter => Map.unmodifiable(_filter);
 
+  /// The group [_filter] was authored in, or null when nothing is applied.
+  ///
+  /// The filter has to carry its own scope because this model outlives every
+  /// screen that reads it, while `GroupReceiptsList` is rebuilt from scratch on
+  /// almost every navigation -- a receipt round trip destroys and remounts it
+  /// just as a group change does. A freshly-mounted list therefore cannot tell
+  /// those two apart by remembering the group it last saw: it has no memory.
+  /// Asking the filter which group it belongs to distinguishes them.
+  String? _filterGroupId;
+
+  String? get filterGroupId => _filterGroupId;
+
   /// How many conditions are narrowing the list, i.e. the app bar's badge.
   int get activeFilterCount => _filter.length;
 
@@ -68,8 +80,18 @@ class ReceiptListModel extends ChangeNotifier {
   /// setters above are deliberately called with `notify: false` (they refresh
   /// the list directly instead), so a notification from this model means the
   /// filter changed -- don't "tidy" those call sites into notifying.
-  void setFilter(Map<String, ReceiptFilterCondition> filter, bool notify) {
+  ///
+  /// [groupId] is required rather than optional because a filter that does not
+  /// know its group is one that can never be cleaned up: it silently follows the
+  /// user into the next group, where its category, tag and user ids match
+  /// nothing. Making the compiler ask is the point.
+  void setFilter(
+    Map<String, ReceiptFilterCondition> filter,
+    bool notify, {
+    required String groupId,
+  }) {
     _filter = Map.of(filter);
+    _filterGroupId = _filter.isEmpty ? null : groupId;
     if (notify) {
       notifyListeners();
     }
@@ -81,6 +103,7 @@ class ReceiptListModel extends ChangeNotifier {
     }
 
     _filter = {};
+    _filterGroupId = null;
     if (notify) {
       notifyListeners();
     }

@@ -22,10 +22,6 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
   late final ReceiptListModel _receiptListModel =
       Provider.of<ReceiptListModel>(context, listen: false);
 
-  /// The group these receipts belong to, tracked so a filter authored for one
-  /// group does not follow the user into the next.
-  String? _groupId;
-
   @override
   void initState() {
     super.initState();
@@ -39,21 +35,32 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // getGroupId reads GoRouterState, an inherited widget, so this fires on a
-    // group change and cannot be done from initState.
+    // getGroupId reads GoRouterState, an inherited widget, so this cannot be
+    // done from initState.
     final groupId = getGroupId(context);
-    if (_groupId != null && _groupId != groupId) {
+    final filterGroupId = _receiptListModel.filterGroupId;
+    if (filterGroupId != null && filterGroupId != groupId) {
       // A filter holds the previous group's category, tag and user ids, which
       // match nothing here -- and would leave the badge counting conditions the
       // user cannot see. Clearing everything is the predictable rule: switching
       // groups shows that group's receipts.
       //
+      // The scope is read off the FILTER, not off a group this widget
+      // remembered. The app offers no lateral group switch -- the app-bar arrow
+      // goes to /groups, group cards go to /groups/<id>/dashboards -- so every
+      // real group change leaves the group shell and this State is rebuilt with
+      // no memory of where the user came from. A widget-local "last group I
+      // saw" is null on arrival and the clear never fires, which is exactly the
+      // leak that shipped. Asking the filter also keeps the case this must NOT
+      // clear: a round trip to a receipt remounts this list just the same, but
+      // the filter still belongs to the group we are returning to.
+      //
       // Silently: this runs during a build, where notifying would rebuild the
-      // badge mid-frame. The refresh below is the visible half.
+      // badge mid-frame. The refresh below is the visible half -- and is null on
+      // a first mount, where the clear simply lands before the first fetch.
       _receiptListModel.clearFilter(false);
       _refreshCallback?.call();
     }
-    _groupId = groupId;
   }
 
   @override

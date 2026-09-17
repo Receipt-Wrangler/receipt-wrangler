@@ -31,7 +31,7 @@ void main() {
     String groupId = "${ReceiptFilterHarness.householdId}",
   }) async {
     final harness = buildReceiptFilterHarness();
-    harness.receiptListModel.setFilter(applied, false);
+    harness.receiptListModel.setFilter(applied, false, groupId: groupId);
 
     await pumpWithFilterHarness(
         tester, harness, ReceiptFilterScreen(groupId: groupId));
@@ -77,7 +77,7 @@ void main() {
       // was built -- the screen looks the same however the user got there.
       final harness = buildReceiptFilterHarness();
       harness.receiptListModel.setFilter(
-          {"amount": amountCondition, "name": nameCondition}, false);
+          {"amount": amountCondition, "name": nameCondition}, false, groupId: "${ReceiptFilterHarness.householdId}");
 
       await pumpWithFilterHarness(tester, harness,
           const ReceiptFilterScreen(groupId: "${ReceiptFilterHarness.householdId}"));
@@ -146,7 +146,7 @@ void main() {
 
     testWidgets("leaving without applying discards the edits", (tester) async {
       final harness = buildReceiptFilterHarness();
-      harness.receiptListModel.setFilter({"name": nameCondition}, false);
+      harness.receiptListModel.setFilter({"name": nameCondition}, false, groupId: "${ReceiptFilterHarness.householdId}");
 
       await pumpWithFilterHarness(
         tester,

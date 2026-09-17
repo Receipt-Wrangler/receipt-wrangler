@@ -14,6 +14,10 @@ void main() {
 
   setUp(() => model = ReceiptListModel());
 
+  /// The group every filter in this file is authored in. `setFilter` requires
+  /// one so a filter always knows which group it is meaningful for.
+  const groupId = "2";
+
   const nameCondition = ReceiptFilterCondition(
       operation: api.FilterOperation.CONTAINS, value: "Costco");
   const amountCondition = ReceiptFilterCondition(
@@ -40,7 +44,7 @@ void main() {
 
   group("setFilter", () {
     test("stores the conditions and counts them", () {
-      model.setFilter({"name": nameCondition, "amount": amountCondition}, false);
+      model.setFilter({"name": nameCondition, "amount": amountCondition}, false, groupId: groupId);
 
       expect(model.activeFilterCount, 2);
       expect(model.hasActiveFilter, isTrue);
@@ -48,7 +52,7 @@ void main() {
     });
 
     test("the conditions reach the command", () {
-      model.setFilter({"name": nameCondition}, false);
+      model.setFilter({"name": nameCondition}, false, groupId: groupId);
 
       expect(serializedFilterOf(model),
           {"name": {"operation": "CONTAINS", "value": "Costco"}});
@@ -58,7 +62,7 @@ void main() {
       var notifications = 0;
       model.addListener(() => notifications++);
 
-      model.setFilter({"name": nameCondition}, true);
+      model.setFilter({"name": nameCondition}, true, groupId: groupId);
 
       expect(notifications, 1);
     });
@@ -67,14 +71,14 @@ void main() {
       var notifications = 0;
       model.addListener(() => notifications++);
 
-      model.setFilter({"name": nameCondition}, false);
+      model.setFilter({"name": nameCondition}, false, groupId: groupId);
 
       expect(notifications, 0);
     });
 
     test("keeps its own copy of the map it is handed", () {
       final conditions = {"name": nameCondition};
-      model.setFilter(conditions, false);
+      model.setFilter(conditions, false, groupId: groupId);
 
       conditions["amount"] = amountCondition;
 
@@ -82,23 +86,59 @@ void main() {
     });
 
     test("replaces rather than merges", () {
-      model.setFilter({"name": nameCondition}, false);
-      model.setFilter({"amount": amountCondition}, false);
+      model.setFilter({"name": nameCondition}, false, groupId: groupId);
+      model.setFilter({"amount": amountCondition}, false, groupId: groupId);
 
       expect(model.filter.keys, ["amount"]);
     });
   });
 
+  group("the filter remembers the group it was authored in", () {
+    // The receipts list is rebuilt from scratch on almost every navigation, so
+    // it cannot tell a group change from a round trip to a receipt by memory
+    // alone. It asks the filter instead -- which is only possible because the
+    // filter records its own scope here.
+    test("setFilter records the group", () {
+      model.setFilter({"name": nameCondition}, false, groupId: "7");
+
+      expect(model.filterGroupId, "7");
+    });
+
+    test("an empty filter is scoped to no group", () {
+      // Applying an emptied draft is how the screen's Reset commits. It has to
+      // leave no scope behind, or the next group change would clear a filter
+      // that is not there and refetch for nothing.
+      model.setFilter({"name": nameCondition}, false, groupId: "7");
+      model.setFilter({}, false, groupId: "7");
+
+      expect(model.filterGroupId, isNull);
+    });
+
+    test("clearFilter drops the group with the conditions", () {
+      model.setFilter({"name": nameCondition}, false, groupId: "7");
+      model.clearFilter(false);
+
+      expect(model.filterGroupId, isNull);
+    });
+
+    test("re-applying in another group re-scopes it", () {
+      model.setFilter({"name": nameCondition}, false, groupId: "7");
+      model.setFilter({"amount": amountCondition}, false, groupId: "9");
+
+      expect(model.filterGroupId, "9");
+    });
+  });
+
   test("the applied filter cannot be mutated from outside", () {
     // Otherwise the badge count and the query could disagree.
-    model.setFilter({"name": nameCondition}, false);
+    model.setFilter({"name": nameCondition}, false, groupId: groupId);
 
     expect(() => model.filter["amount"] = amountCondition, throwsUnsupportedError);
   });
 
   group("clearFilter", () {
     test("empties the filter and the command", () {
-      model.setFilter({"name": nameCondition}, false);
+      model.setFilter({"name": nameCondition}, false, groupId: groupId);
       model.clearFilter(false);
 
       expect(model.filter, isEmpty);
@@ -107,7 +147,7 @@ void main() {
     });
 
     test("notifies when asked to", () {
-      model.setFilter({"name": nameCondition}, false);
+      model.setFilter({"name": nameCondition}, false, groupId: groupId);
 
       var notifications = 0;
       model.addListener(() => notifications++);
@@ -167,7 +207,7 @@ void main() {
       model.setOrderBy("amount", false);
       model.setSortDirection(api.SortDirection.asc, false);
       model.setPage(4, false);
-      model.setFilter({"name": nameCondition}, false);
+      model.setFilter({"name": nameCondition}, false, groupId: groupId);
 
       final command = model.receiptPagedRequestCommand;
 
@@ -184,7 +224,7 @@ void main() {
       model.setOrderBy("name", false);
       model.setPage(7, false);
 
-      model.setFilter({"name": nameCondition}, false);
+      model.setFilter({"name": nameCondition}, false, groupId: groupId);
 
       expect(model.orderBy, "name");
       expect(model.page, 7);
@@ -193,7 +233,7 @@ void main() {
     test("a fresh filter builder is produced per request", () {
       // A built_value nested builder assigned into a command builder is a live
       // reference, so a cached one would be shared between requests.
-      model.setFilter({"name": nameCondition}, false);
+      model.setFilter({"name": nameCondition}, false, groupId: groupId);
 
       final first = model.receiptPagedRequestCommand;
       final second = model.receiptPagedRequestCommand;
@@ -206,7 +246,7 @@ void main() {
       model.setFilter({
         "date": const ReceiptFilterCondition(
             operation: api.FilterOperation.EQUALS)
-      }, false);
+      }, false, groupId: groupId);
 
       // It still counts toward the badge -- the user authored it -- but an empty
       // date value would become `date = ''` server-side and match nothing.
@@ -220,7 +260,7 @@ void main() {
       "categories": ReceiptFilterCondition(
           operation: api.FilterOperation.CONTAINS,
           value: [buildCategory(3, "Fuel"), buildCategory(8, "Dining")])
-    }, false);
+    }, false, groupId: groupId);
 
     expect(serializedFilterOf(model)["categories"],
         {"operation": "CONTAINS", "value": [3, 8]});
