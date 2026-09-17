@@ -8,7 +8,7 @@ import (
 )
 
 func TestUserPrefernces_LoadDataFromRequest(t *testing.T) {
-	body := `{"userId": 5, "showLargeImagePreviews": true, "quickScanDefaultStatus": "OPEN"}`
+	body := `{"userId": 5, "quickScanDefaultStatus": "OPEN"}`
 	r := httptest.NewRequest("POST", "/", strings.NewReader(body))
 	w := httptest.NewRecorder()
 
@@ -19,9 +19,6 @@ func TestUserPrefernces_LoadDataFromRequest(t *testing.T) {
 	}
 	if preferences.UserId != 5 {
 		utils.PrintTestError(t, preferences.UserId, uint(5))
-	}
-	if !preferences.ShowLargeImagePreviews {
-		utils.PrintTestError(t, preferences.ShowLargeImagePreviews, true)
 	}
 	if preferences.QuickScanDefaultStatus != OPEN {
 		utils.PrintTestError(t, preferences.QuickScanDefaultStatus, OPEN)

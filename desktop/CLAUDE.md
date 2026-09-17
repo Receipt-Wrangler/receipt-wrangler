@@ -1746,13 +1746,19 @@ every corner. This bites on **any receipt with 2+ images**, inline as well as fu
 `receipt-form`, so its embedded view carries that component's encapsulation attribute even while it
 renders inside the MatDialog overlay: an ungated `app-carousel { height: 100% }` would reach into the
 fullscreen dialog and stretch its `img.viewer-image` (`width/height: 100%`), distorting it.
-`receipt-form.component.spec.ts` pins that the inline carousel has the fill class and
-`stageHeight="100%"` while the dialog's has neither.
+`receipt-form.component.spec.ts` pins that both carousels — the inline one and the dialog's — carry
+the fill class and `stageHeight="100%"`.
 
 **The collapse/expand toggle is gone**, along with the `showLargeImagePreviews` checkbox in User
-Preferences that seeded it — the canvas replaced what the toggle was for, and with it removed nothing
-anywhere read that preference (mobile has only the generated model; the backend just stores it). The
-API field remains.
+Preferences that seeded it — the canvas replaced what the toggle was for. **The preference is now
+removed end to end**: the Go model field, the `swagger.yml` property, and both generated clients.
+Only the physical `user_preferences.show_large_image_previews` column survives on already-migrated
+installs — AutoMigrate never drops columns, and the column is nullable with no default, so an orphan
+is inert. Two things made the removal safe for already-released mobile builds, and both are worth
+knowing before removing any other response field: the generated Dart field was `bool?`, so an
+**absent** key never enters the deserializer's `switch` (an explicit `null` would still fail the
+`as bool` cast — dropping the Go field guarantees the key is omitted, not nulled), and the API sets
+no `DisallowUnknownFields`, so an old client still PUTting the field is ignored rather than 400'd.
 
 `carouselComponent` is also no longer `viewChild.required`: the Zoom/Download/Fullscreen header
 buttons render whenever there are images, but the carousel itself is behind `*ngIf="… && showImages"`,
