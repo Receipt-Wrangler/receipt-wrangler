@@ -11,16 +11,6 @@
 
 <ng-template #formTemplate>
   <div class="w-100">
-    <app-form-section headerText="Receipt preferences">
-      <div class="mb-3">
-        <app-checkbox
-          class="mb-2"
-          label="Default to show large image previews?"
-          [inputFormControl]="form | formGet : 'showLargeImagePreviews'"
-          [readonly]="formConfig.mode | inputReadonly"
-        ></app-checkbox>
-      </div>
-    </app-form-section>
     <app-form-section
       *appFeature="'aiPoweredReceipts'"
       headerText="Quick scan defaults"

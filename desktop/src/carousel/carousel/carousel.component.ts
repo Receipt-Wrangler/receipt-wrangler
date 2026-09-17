@@ -1,4 +1,5 @@
-import { Component, OnChanges, SimpleChanges, ViewEncapsulation, input, output } from "@angular/core";
+import { Component, OnChanges, SimpleChanges, ViewEncapsulation, input, output, viewChildren } from "@angular/core";
+import { ImageViewerComponent } from "src/shared-ui/image-viewer/image-viewer.component";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { FormMode } from "src/enums/form-mode.enum";
 import { ReceiptFileUploadCommand } from "../../interfaces";
@@ -23,13 +24,15 @@ export class CarouselComponent implements OnChanges {
 
   public readonly hideButtonControls = input<boolean>(false);
 
+  public readonly stageHeight = input<string>("60vh");
+
   public readonly initialIndex = input<number>(-1);
 
   public readonly removeButtonClicked = output<number>();
 
-  public scale: number = 1;
-
   public currentlyShownImageIndex: number = 0;
+
+  private readonly viewers = viewChildren(ImageViewerComponent);
 
   public ngOnChanges(changes: SimpleChanges): void {
     if (changes["initialIndex"]) {
@@ -42,25 +45,27 @@ export class CarouselComponent implements OnChanges {
   }
 
   public zoomOut() {
-    this.adjustScale(-0.1);
+    this.activeViewer()?.zoomOut();
   }
 
   public zoomIn() {
-    this.adjustScale(0.1);
+    this.activeViewer()?.zoomIn();
   }
 
-  public onScroll(event: WheelEvent): void {
-    event.preventDefault();
-    let value = event.deltaY * -0.000001;
-    this.adjustScale(value);
+  /**
+   * Each image owns its own zoom and pan, so the header buttons act on the slide
+   * being looked at rather than on one scale shared by all of them.
+   *
+   * This indexes a viewChildren query by SLIDE index, so every slide must render
+   * exactly one viewer or the two fall out of step - which is why the template
+   * renders app-image-viewer unconditionally and lets the viewer decide whether
+   * it has anything to show.
+   */
+  private activeViewer(): ImageViewerComponent | undefined {
+    return this.viewers()[this.currentlyShownImageIndex];
   }
 
   public updateCurrentlyShownImage(index: number): void {
     this.currentlyShownImageIndex = index;
-  }
-
-  public adjustScale(amount: number): void {
-    const newScale = this.scale + amount;
-    this.scale = Math.max(newScale, 0.1);
   }
 }

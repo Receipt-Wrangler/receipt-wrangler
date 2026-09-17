@@ -1,0 +1,72 @@
+// The Images pane is the same height as the Details pane beside it, so the two
+// columns move together instead of a short image box floating next to a tall
+// form. Bootstrap's .row is already display:flex with the initial
+// align-items: stretch, so this column is ALREADY the right height - everything
+// below is about making its contents actually fill it.
+//
+// Every rule is gated on .rw-images-pane on purpose. The fullscreen
+// #expandedImageTemplate is declared in this component, so its embedded view
+// carries this component's encapsulation attribute even while it renders inside
+// the MatDialog overlay - an ungated rule matching app-carousel or a descendant
+// would reach into the dialog and stretch its image too.
+app-form-section.rw-images-pane {
+  display: flex;
+  flex-direction: column;
+
+  // app-form-section wraps projected content in a classless div of its own,
+  // which is the one link in the chain nothing else can reach. It is the
+  // sibling right after the section header, which does carry a class.
+  ::ng-deep .form-section-header + div {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
+// Inside that content div: the hidden file input contributes nothing, and the
+// stage wrapper takes the remaining height.
+//
+// app-upload-image must NOT keep an h-100 here. That class was inert while its
+// host was display:inline, but a flex container blockifies its children, at
+// which point `height: 100% !important` makes a hidden file input swallow the
+// whole column and leaves the stage with nothing but its own border.
+.rw-images-pane__content {
+  display: flex;
+  flex-direction: column;
+}
+
+.rw-images-pane__stage {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+// Below Bootstrap's md the two panes stack into one column (col-12 col-md in the
+// template), so there is no Details pane beside the stage to take its height
+// from - the chain above would leave it at zero. Give it an explicit height
+// instead; the carousel chain resolves its 100% against this.
+@media (max-width: 767.98px) {
+  .rw-images-pane__stage {
+    flex: 0 0 auto;
+    height: 50vh;
+  }
+}
+
+// The fullscreen dialog. Its template is declared in this component, so the
+// embedded view carries this component's encapsulation attribute even while it
+// renders inside the MatDialog overlay - the same fact that makes ungated rules
+// dangerous here is what lets these ones work with no ::ng-deep and no global.
+//
+// MatDialog inserts a TemplateRef's nodes straight into .mat-mdc-dialog-surface,
+// which is viewport-tall and padding-free (its padding lives on
+// .mat-mdc-dialog-content, which this dialog does not use), so 100% resolves.
+.rw-image-dialog {
+  position: relative;
+  height: 100%;
+}
+
+.rw-image-dialog__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  // Above the stage, and above ngx-bootstrap's carousel controls (z-index: 1).
+  z-index: 2;
+}

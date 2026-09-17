@@ -1731,6 +1731,152 @@ Two cross-component seams support this (each with its own focused spec):
   value whose `customFieldId` isn't in the loaded catalog pool is skipped, and adding one flips its
   manage-fields menu entry to selected via an immutable array replace (zoneless CD).
 
+## Receipt image canvas
+
+The receipt form's inline image is an interactive canvas: four corner handles to pull, drag to pan,
+wheel to zoom, double-click to fit. It replaced a viewer whose only controls were two zoom buttons
+and a free `cdkDrag` on the `<img>`.
+
+**A first attempt resized the form/image *panes* with a draggable splitter. That was reverted** — it
+moved the page layout, when the thing worth manipulating is the image. Don't reintroduce it.
+
+- **`app-image-canvas`** (`src/shared-ui/image-canvas/`, standalone, registered in `SharedUiModule`'s
+  `imports` + `exports`) is generic and presentational: it takes a resolved `src` and a `stageHeight`
+  and owns the whole interaction. The stage is a **fixed viewport** — the image is clipped by it and
+  panned around — so growing the image can never move the surrounding page.
+- **Scale and pan are one transform on one element.** The old viewer put `scale()` on a wrapper div
+  and let `cdkDrag` translate the `<img>` inside it, so drag distance desynchronised from the cursor
+  by a factor of the scale. One matrix is what makes direct manipulation tractable.
+- **Nothing in the template reads the viewport.** It is a plain field, not a signal: the image and the
+  handle frame are both positioned imperatively, so a 120Hz drag runs **no change detection at all**
+  over the receipt form's large, non-`OnPush` template. `pointermove` is likewise a native listener
+  rather than a host binding, which would schedule CD per event.
+- **Handles sit fully INSIDE the image box, not centred on its corners.** The stage clips with
+  `overflow: hidden` and clipped pixels are not hit-testable, so a centred handle loses half its
+  target the moment the image meets a stage edge — which at the fit scale is always true of two of
+  the four. Each also grabs from an invisible 24px box (`::before`, `inset: -6px`).
+- **An axis narrower than the stage is centred**, so a letterboxed image cannot drift into a corner.
+  This is why a corner drag only holds its anchor in the axis that *overflows*; the other grows
+  symmetrically. The canvas spec pins both halves of that rule.
+- Wheel zoom is anchored at the cursor and moves a meaningful amount. The viewer this replaced
+  multiplied `deltaY` by `-0.000001`, so one notch changed the scale by 0.0001 — wheel zoom did
+  nothing at all.
+- **A handle stops `dblclick` itself.** The host binds `(dblclick)="fit()"` and the handles are its
+  descendants. `onResizeStart` already calls `preventDefault()` + `stopPropagation()`, but those act
+  on the **PointerEvent** — `dblclick` is a separate event and is not suppressed by either, so
+  quickly pulling a corner twice used to bubble up and throw away the size just dragged to. Hence
+  `(dblclick)="$event.stopPropagation()"` on the handle, pinned by its own spec.
+
+**Wiring.** `app-carousel` gained `stageHeight`, passed to `app-image-viewer`, which renders
+`app-image-canvas`. **Both** carousels get it — the inline one and the fullscreen dialog's (see "The
+fullscreen dialog runs the same canvas" below); there is no opt-out, and no second rendering path.
+The canvas rolled out behind a `directManipulation` flag while only the inline view used it; once
+fullscreen was ported, both call sites passed `true`, so the flag and the old path it selected were
+deleted rather than left as dead configuration.
+
+**What went with the old viewer.** Its `@else` branch (a `transform: scale()` wrapper around an
+`img.viewer-image` with an **unbounded `cdkDrag`**, which could fling the image out of view with no
+way back), the carousel's `scale` / `adjustScale()` / `onScroll()` — including the `deltaY *
+-0.000001` wheel bug above — and the `[scale]` / `wheel` plumbing between them. `image-viewer` no
+longer has a stylesheet; `.viewer-image` was its only rule. `DragDropModule` stays: `cdkDrag` is
+still used by the column-configuration dialog and the receipt-form dialog.
+
+**Zoom buttons are per-image.** The header Zoom In/Out delegate through the carousel to the *active
+slide's* viewer rather than mutating one `scale` shared by every slide, which is what a canvas
+implies. That lookup is `viewChildren(ImageViewerComponent)` indexed by `currentlyShownImageIndex`
+— a **slide** index into a **viewer** query, so the two only agree while every slide renders exactly
+one viewer. This is why `carousel.component.html` renders `app-image-viewer` **unconditionally** in
+both loops: the `*ngIf`s that used to gate it were redundant (the viewer already renders nothing
+without a source) and would silently compact the query, pointing the buttons at the wrong slide. Do
+not reintroduce them.
+
+**The stage is exactly as tall as the Details pane beside it**, so the two columns move together
+like a two-column grid rather than a short image box floating next to a tall form. Bootstrap's
+`.row` is already `display: flex` with the initial `align-items: stretch`, so the Images column is
+*already* the right height — the work is entirely in making its contents fill it, because every link
+between the column and the canvas is `height: auto` and three hosts (`app-carousel`, ngx-bootstrap's
+`<carousel>`, `app-image-viewer`) are `display: inline`.
+
+The height is handed down in two places, both **gated on a class**:
+- `carousel.component.scss` is global (`ViewEncapsulation.None`), which makes it the right home for
+  the ngx-bootstrap links. `.rw-carousel--fill` carries `display: block; height: 100%` down through
+  `carousel`, `.carousel.slide`, `.carousel-inner`, `.carousel-item.active`, `.item` and
+  `app-image-viewer`. Use `.carousel-item.active`, not `slide`, so the inactive slides ngx-bootstrap
+  takes out of flow stay out of it, and keep them `block` — `flex` fights Bootstrap's `float: left`.
+- `receipt-form.component.scss` covers its own template under `.rw-images-pane`: a flex column so the
+  always-present section header takes its own height and the content takes the rest. One `::ng-deep`
+  is unavoidable — `app-form-section` wraps projected content in a **classless** div of its own,
+  reachable only as `.form-section-header + div`.
+
+`stageHeight` is bound to `[style.height]`, an inline style, so the receipt form simply passes
+`stageHeight="100%"`; no rule on the canvas and no `!important`. The canvas needs no change at all —
+its `ResizeObserver` already re-clamps when the stage resizes, which is what makes a layout-derived
+height safe, and the Details pane's height genuinely does change live (category/tag chips wrap as you
+type).
+
+**Below Bootstrap's `md` the panes stack into one column.** Both sections are `col-12 col-md`, so
+the stacking itself is plain Bootstrap rather than a custom media query — without it `.col` holds a
+50/50 split all the way down, which goes lopsided around 600px as the form's minimum width wins and
+only wraps at phone sizes. Once stacked there is no Details pane beside the stage to take height
+from, so `.rw-images-pane__stage` gets an explicit **50vh** under `@media (max-width: 767.98px)`;
+the carousel chain resolves its `100%` against that. Leave that media query out and the stacked
+canvas collapses to its 2px border.
+
+**`app-upload-image` must not carry `h-100` in that column.** The class was inert while its host was
+`display: inline`, but a flex container blockifies its children — at which point
+`height: 100% !important` makes a hidden file input swallow the whole column and leaves the stage
+with nothing but its own 2px border.
+
+**The fullscreen dialog runs the same canvas.** `#expandedImageTemplate` passes
+`class="rw-carousel--fill"` and `stageHeight="100%"` exactly as the inline carousel does, plus a
+floating close button — it previously had **no way out but Esc and the backdrop**. The height chain
+needs no special handling: MatDialog renders a `TemplateRef` as a `TemplatePortal` whose nodes go
+**straight into `.mat-mdc-dialog-surface`** with no wrapper, and that
+surface is viewport-tall and padding-free (dialog padding lives on `.mat-mdc-dialog-content`, which
+this dialog does not use). Two things there are load-bearing:
+- **Do not wrap it in `app-dialog`.** That costs ~110px before the stage starts — an
+  always-rendered `<h2>` (~39px even when `headerText` is empty), a `.p-4` wrapper and
+  `mat-dialog-content`'s `padding: 20px 24px` — **and caps the body at `max-height: 65vh`**. A
+  `height: 100%` stage inside it collapses.
+- **Do not add a `maxHeight` to the dialog config.** Leaving it undefined is what puts the CDK on its
+  flush-vertical path (`shouldBeFlushVertically` requires no maxHeight), giving the pane the full
+  viewport height. Setting one silently re-centres the dialog and shortens it.
+`autoFocus: "dialog"` because the close button is the only tabbable control, so the default
+first-tabbable focus opens the viewer with a focus ring drawn over the image.
+
+**ngx-bootstrap's carousel controls must stay small over a canvas.** Bootstrap sizes prev/next as
+`top: 0; bottom: 0; width: 15%` at `z-index: 1`, as siblings of `.carousel-inner` — so on a
+full-height stage they become two full-height columns sitting *above* the canvas in hit-testing.
+Navigation still works, but pan, wheel zoom and double-click all die in those strips, and both the
+left and right corner handles live exactly there, undoing the inset that keeps them grabbable at a
+stage edge. `.rw-carousel--fill` shrinks them to 2.75rem circles centred vertically and clear of
+every corner. This bites on **any receipt with 2+ images**, inline as well as fullscreen.
+
+**Gating every rule on a class is not optional.** `#expandedImageTemplate` is declared in
+`receipt-form`, so its embedded view carries that component's encapsulation attribute even while it
+renders inside the MatDialog overlay — an ungated `app-carousel { height: 100% }` reaches into the
+dialog too. It cost a distorted `img.viewer-image` back when the dialog rendered the old viewer;
+both carousels now render the canvas, so the immediate symptom is gone, but the reach is not and
+neither is the rule.
+`receipt-form.component.spec.ts` pins that both carousels — the inline one and the dialog's — carry
+the fill class and `stageHeight="100%"`.
+
+**The collapse/expand toggle is gone**, along with the `showLargeImagePreviews` checkbox in User
+Preferences that seeded it — the canvas replaced what the toggle was for. **The preference is now
+removed end to end**: the Go model field, the `swagger.yml` property, and both generated clients.
+Only the physical `user_preferences.show_large_image_previews` column survives on already-migrated
+installs — AutoMigrate never drops columns, and the column is nullable with no default, so an orphan
+is inert. Two things made the removal safe for already-released mobile builds, and both are worth
+knowing before removing any other response field: the generated Dart field was `bool?`, so an
+**absent** key never enters the deserializer's `switch` (an explicit `null` would still fail the
+`as bool` cast — dropping the Go field guarantees the key is omitted, not nulled), and the API sets
+no `DisallowUnknownFields`, so an old client still PUTting the field is ignored rather than 400'd.
+
+`carouselComponent` is also no longer `viewChild.required`: the Zoom/Download/Fullscreen header
+buttons render whenever there are images, but the carousel itself is behind `*ngIf="… && showImages"`,
+so hiding images and clicking one of them used to throw.
+
+
 ## Reports (Report Builder)
 
 The **Report Builder** (`src/reports/`) is a two-pane screen for building and downloading receipt

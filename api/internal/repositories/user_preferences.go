@@ -67,7 +67,6 @@ func (repository UserPreferncesRepository) UpdateUserPreferences(userId uint, us
 		return models.UserPrefernces{}, err
 	}
 
-	userPreferencesToUpdate.ShowLargeImagePreviews = userPreferences.ShowLargeImagePreviews
 	userPreferencesToUpdate.QuickScanDefaultGroupId = userPreferences.QuickScanDefaultGroupId
 	userPreferencesToUpdate.QuickScanDefaultPaidById = userPreferences.QuickScanDefaultPaidById
 	userPreferencesToUpdate.QuickScanDefaultStatus = userPreferences.QuickScanDefaultStatus

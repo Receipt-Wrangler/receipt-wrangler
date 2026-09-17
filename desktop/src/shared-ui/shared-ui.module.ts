@@ -67,6 +67,7 @@ import { IconAutocompleteComponent } from './icon-autocomplete/icon-autocomplete
 import { PieChartUiComponent } from './pie-chart/pie-chart.component';
 import { LoginQrComponent } from './login-qr/login-qr.component';
 import { BadgeComponent } from './badge/badge.component';
+import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
 
 @NgModule({
   declarations: [
@@ -141,6 +142,7 @@ import { BadgeComponent } from './badge/badge.component';
     PieChartUiComponent,
     LoginQrComponent,
     BadgeComponent,
+    ImageCanvasComponent,
   ],
   exports: [
     AddButtonComponent,
@@ -186,6 +188,7 @@ import { BadgeComponent } from './badge/badge.component';
     PieChartUiComponent,
     LoginQrComponent,
     BadgeComponent,
+    ImageCanvasComponent,
   ],
   providers: [CurrencyPipe],
 })

@@ -1,0 +1,92 @@
+:host {
+  display: block;
+  position: relative;
+  // The stage is a fixed viewport: the image is clipped by it and panned around,
+  // so growing the image can never move the surrounding page.
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, 0.03);
+  // The stage is a region you manipulate within, so it needs a visible edge -
+  // without one the clipping just looks like the image is cut off.
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  // Without this a touch drag scrolls the page instead of panning the image.
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+:host(.rw-image-canvas--pan) {
+  cursor: grabbing;
+}
+
+.rw-image-canvas__image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  // The transform does all the sizing, from the image's natural dimensions, so
+  // the intrinsic size must not be constrained by a stray global img rule.
+  max-width: none;
+  max-height: none;
+  transform-origin: 0 0;
+}
+
+.rw-image-canvas__frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  // The frame covers the image, so it must never swallow a pan; the handles opt
+  // back in individually.
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.rw-image-canvas__handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+}
+
+// A 12px target is small, and precision is the whole point of a resize handle,
+// so each one grabs from an invisible 24px box around itself.
+.rw-image-canvas__handle::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+// Handles sit fully INSIDE the image box rather than centred on its corners.
+// The stage clips with overflow: hidden, and clipped pixels are not hit-testable
+// — so a centred handle loses half its target the moment the image meets a stage
+// edge, which at the fit scale is always true of two of the four.
+.rw-image-canvas__handle[data-corner="nw"] {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+
+.rw-image-canvas__handle[data-corner="ne"] {
+  left: 100%;
+  top: 0;
+  margin-left: -12px;
+  cursor: nesw-resize;
+}
+
+.rw-image-canvas__handle[data-corner="se"] {
+  left: 100%;
+  top: 100%;
+  margin: -12px 0 0 -12px;
+  cursor: nwse-resize;
+}
+
+.rw-image-canvas__handle[data-corner="sw"] {
+  left: 0;
+  top: 100%;
+  margin-top: -12px;
+  cursor: nesw-resize;
+}

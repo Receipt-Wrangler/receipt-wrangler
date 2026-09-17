@@ -1206,6 +1206,82 @@ describe("ReceiptFormComponent", () => {
       expect(component.form.value.groupId).toEqual(9);
     });
   });
+
+  // The image stage fills its column via a class-gated height chain. The
+  // fullscreen #expandedImageTemplate is declared in this component, so it
+  // carries the same encapsulation attribute - it must NOT pick the class up, or
+  // the dialog's plain image gets stretched too. Nothing else pins this.
+  describe("image stage sizing", () => {
+    const carousels = (): HTMLElement[] =>
+      Array.from(document.querySelectorAll("app-carousel"));
+
+    beforeEach(async () => {
+      component.images.set([{ id: 1 } as any]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+    });
+
+    it("has the inline carousel fill its column", () => {
+      const inline = fixture.nativeElement.querySelector("app-carousel") as HTMLElement;
+
+      expect(inline).toBeTruthy();
+      expect(inline.classList).toContain("rw-carousel--fill");
+      expect(inline.getAttribute("stageHeight")).toEqual("100%");
+    });
+
+    // The dialog renders its template into the overlay container, outside the
+    // fixture host - which is how it is told apart from the inline one.
+    const openDialogCarousel = (): HTMLElement | undefined => {
+      component.expandImage();
+      fixture.detectChanges();
+
+      return carousels().find((element) => !fixture.nativeElement.contains(element));
+    };
+
+    it("gives the fullscreen dialog the same filling canvas", () => {
+      const dialogCarousel = openDialogCarousel();
+
+      expect(dialogCarousel).toBeTruthy();
+      expect(dialogCarousel!.classList).toContain("rw-carousel--fill");
+      expect(dialogCarousel!.getAttribute("stageHeight")).toEqual("100%");
+    });
+
+    // Without this the dialog offers no way out but Esc and the backdrop.
+    it("closes the fullscreen dialog", async () => {
+      const dialog = TestBed.inject(MatDialog);
+      openDialogCarousel();
+      expect(dialog.openDialogs.length).toEqual(1);
+
+      component.closeExpandedImage();
+      await fixture.whenStable();
+
+      expect(dialog.openDialogs.length).toEqual(0);
+    });
+
+    // The test above drives the method, so on its own it would still pass with
+    // the (clicked) binding - or the whole button - deleted. This covers the
+    // wiring. app-button is an unknown element under CUSTOM_ELEMENTS_SCHEMA, so
+    // it renders no native button and Angular binds (clicked) as a plain DOM
+    // listener on the host; dispatching the event is what the real button's
+    // output does. The handler is mocked out because actually closing here runs
+    // a change-detection pass this block does not stub view children for.
+    it("wires the close button to closeExpandedImage", () => {
+      const close = jest
+        .spyOn(component, "closeExpandedImage")
+        .mockImplementation(() => {});
+      openDialogCarousel();
+
+      const button = document.querySelector(
+        '[data-testid="receipt-image-fullscreen-close"]',
+      );
+
+      expect(button).toBeTruthy();
+      button!.dispatchEvent(new CustomEvent("clicked"));
+
+      expect(close).toHaveBeenCalled();
+    });
+  });
+
   // The receipt page's Duplicate creates a real record, so it confirms first.
   describe("duplicate confirmation", () => {
     let receiptService: ReceiptService;
