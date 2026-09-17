@@ -13,6 +13,12 @@ const FIT_SCALE = STAGE_HEIGHT / NATURAL_HEIGHT;
 /** Mirrors the component's own MAX_SCALE, which it does not export. */
 const MAX_SCALE = 8;
 
+/** Likewise MIN_VISIBLE_PX: the sliver that must stay on the stage. */
+const MIN_VISIBLE_PX = 48;
+
+/** The scale leaving the image's shorter side at MIN_VISIBLE_PX: 48 / 1200. */
+const MIN_SCALE = MIN_VISIBLE_PX / Math.min(NATURAL_WIDTH, NATURAL_HEIGHT);
+
 /**
  * jsdom implements neither `PointerEvent` nor pointer capture, so pointer events
  * are faked from `MouseEvent` — which carries every property the component reads
@@ -119,10 +125,11 @@ describe("ImageCanvasComponent", () => {
     expect(frame.style.height).toEqual(`${NATURAL_HEIGHT * FIT_SCALE}px`);
   });
 
-  // Pulling a corner scales about the corner opposite it, so that one stays put -
-  // in the axis the image overflows. The other axis obeys the centring rule below.
+  // Pulling a corner scales about the corner opposite it, which stays put for the
+  // whole gesture - in BOTH axes, including the one narrower than the stage.
   it("scales about the opposite corner when a handle is pulled", async () => {
     const before = viewport();
+    const anchorX = before.x + NATURAL_WIDTH * before.scale;
     const anchorY = before.y + NATURAL_HEIGHT * before.scale;
 
     // Drag the top-left handle up and to the left: the image grows.
@@ -130,22 +137,52 @@ describe("ImageCanvasComponent", () => {
 
     const after = viewport();
     expect(after.scale).toBeGreaterThan(before.scale);
+    expect(after.x + NATURAL_WIDTH * after.scale).toBeCloseTo(anchorX, 0);
     expect(after.y + NATURAL_HEIGHT * after.scale).toBeCloseTo(anchorY, 0);
   });
 
-  // An axis narrower than the stage is centred rather than left wherever a
-  // gesture put it, so a letterboxed image cannot drift into a corner. It is why
-  // the anchor above is asserted on one axis: at the fit scale this image is
-  // 300px wide in a 600px stage, so horizontally it stays centred as it grows,
-  // and only edge-clamps once it is wider than the stage.
-  it("keeps an axis narrower than the stage centred as it grows", async () => {
-    const centred = (scale: number) => (STAGE_WIDTH - NATURAL_WIDTH * scale) / 2;
+  // The headline of a real handle: it shrinks as well as grows. The image opens
+  // at the fit, so a handle that cannot go below it is a handle that only works
+  // in one direction.
+  it("shrinks the image below the fit when a handle is pulled inward", async () => {
+    const before = viewport();
+
+    // The se handle sits at the image's bottom-right; pull it in toward the nw
+    // corner, which is the anchor.
+    await drag(handle("se"), [450, 400], [250, 200]);
+
+    const after = viewport();
+    expect(after.scale).toBeLessThan(FIT_SCALE);
+    expect(NATURAL_WIDTH * after.scale).toBeLessThan(STAGE_WIDTH);
+    expect(NATURAL_HEIGHT * after.scale).toBeLessThan(STAGE_HEIGHT);
+
+    // The nw anchor held in BOTH axes - nothing re-centred it.
+    expect(after.x).toBeCloseTo(before.x);
+    expect(after.y).toBeCloseTo(before.y);
+  });
+
+  // The axis narrower than the stage used to be auto-centred, which threw the
+  // anchor away in exactly the axis a letterboxed receipt has spare room in. At
+  // the fit scale this image is 300px wide in a 600px stage, so this grows it
+  // while it is still narrower than the stage and checks the anchor survives.
+  it("holds the anchor in an axis narrower than the stage", async () => {
+    const before = viewport();
+    const anchorX = before.x + NATURAL_WIDTH * before.scale;
 
     await drag(handle("nw"), [150, 0], [100, -100]);
 
     const after = viewport();
     expect(NATURAL_WIDTH * after.scale).toBeLessThan(STAGE_WIDTH);
-    expect(after.x).toBeCloseTo(centred(after.scale));
+    expect(after.x + NATURAL_WIDTH * after.scale).toBeCloseTo(anchorX, 0);
+  });
+
+  it("will not shrink past the minimum size when a handle is pulled inward", async () => {
+    // Pull the se handle right onto its own anchor, which implies a scale of 0.
+    await drag(handle("se"), [450, 400], [150, 0]);
+
+    const after = viewport();
+    expect(after.scale).toBeCloseTo(MIN_SCALE);
+    expect(NATURAL_WIDTH * after.scale).toBeCloseTo(MIN_VISIBLE_PX);
   });
 
   // A distorted receipt is never wanted, so a corner drag is uniform.
@@ -161,7 +198,7 @@ describe("ImageCanvasComponent", () => {
     expect(ratio).toBeCloseTo(NATURAL_WIDTH / NATURAL_HEIGHT);
   });
 
-  it("pans a zoomed image and keeps its edges against the stage", async () => {
+  it("pans a zoomed image and stops once only a sliver of it is left", async () => {
     component.zoomIn();
     component.zoomIn();
     await fixture.whenStable();
@@ -172,24 +209,36 @@ describe("ImageCanvasComponent", () => {
     const after = viewport();
     expect(after.y).toBeLessThan(before.y);
 
-    // Dragging far past the edge stops with the image edge on the stage edge.
+    // Dragging far past the edge stops with MIN_VISIBLE_PX still on the stage.
     await drag(host, [300, 200], [300, 5000]);
-    expect(viewport().y).toEqual(0);
+    expect(viewport().y).toEqual(STAGE_HEIGHT - MIN_VISIBLE_PX);
   });
 
-  // The image should never be draggable out of view.
-  it("centres an axis that is smaller than the stage instead of letting it drift", async () => {
+  // An image smaller than the stage is an object on it, not something pinned to
+  // its middle: it goes where you put it.
+  it("pans an axis narrower than the stage freely", async () => {
+    const before = viewport();
     await drag(host, [300, 200], [40, 200]);
 
-    expect(viewport().x).toBeCloseTo((STAGE_WIDTH - NATURAL_WIDTH * FIT_SCALE) / 2);
+    expect(viewport().x).toBeCloseTo(before.x - 260);
   });
 
-  it("will not zoom out past the fit", async () => {
-    component.zoomOut();
-    component.zoomOut();
+  it("lets the image be pushed into a corner, leaving a sliver on the stage", async () => {
+    await drag(host, [300, 200], [-5000, -5000]);
+
+    const after = viewport();
+    expect(after.x).toBeCloseTo(MIN_VISIBLE_PX - NATURAL_WIDTH * after.scale);
+    expect(after.y).toBeCloseTo(MIN_VISIBLE_PX - NATURAL_HEIGHT * after.scale);
+  });
+
+  it("will not zoom out past the minimum scale", async () => {
+    // Well past the ~14 steps of 1.15 it takes to fall from the fit to the floor.
+    for (let i = 0; i < 30; i += 1) {
+      component.zoomOut();
+    }
     await fixture.whenStable();
 
-    expect(viewport().scale).toBeCloseTo(FIT_SCALE);
+    expect(viewport().scale).toBeCloseTo(MIN_SCALE);
   });
 
   it("will not zoom in past the maximum scale", async () => {
@@ -235,12 +284,6 @@ describe("ImageCanvasComponent", () => {
   // the zoom ternary would read as "not < 0" and treat as a zoom OUT. The event
   // must also keep its default, or the page loses the horizontal scroll.
   it("ignores a horizontal wheel instead of zooming out", async () => {
-    // Zoomed in first: at the fit scale clampScale floors the zoom-out anyway, so
-    // the viewport would not move and the test would pass on the broken code.
-    component.zoomIn();
-    component.zoomIn();
-    await fixture.whenStable();
-
     const before = viewport();
     const event = new WheelEvent("wheel", {
       deltaY: 0,
@@ -316,7 +359,8 @@ describe("ImageCanvasComponent", () => {
     await fixture.whenStable();
 
     // Resized about the top-left, so the origin is unchanged - a pan would have
-    // moved it.
+    // moved it by the full 40px in each axis.
+    expect(viewport().scale).not.toEqual(before.scale);
     expect(viewport().x).toEqual(before.x);
     expect(viewport().y).toEqual(before.y);
   });
