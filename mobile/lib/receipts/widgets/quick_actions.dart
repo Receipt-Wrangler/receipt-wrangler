@@ -450,7 +450,13 @@ class _ReceiptQuickActions extends State<ReceiptQuickActions> {
             buildUserField(),
             ...buildSplitEvenlyTotal(),
             ...buildSplitWithPortionsField(),
-            ...buildPercentageFields()
+            ...buildPercentageFields(),
+            // The "Split" button is `Scaffold.bottomSheet`, which floats over
+            // the body instead of reserving space. Without this the tail of the
+            // column sits under it at every scroll offset -- and in the
+            // portions mode that tail is the "Portions exceed receipt total"
+            // error explaining why Split is refusing to submit.
+            submitButtonSpacing,
           ],
         ));
   }

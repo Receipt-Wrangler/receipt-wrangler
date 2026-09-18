@@ -13,3 +13,56 @@
 .image-container {
   max-height: 25vh;
 }
+
+// Opt-in: lets the image stage fill the column it sits in instead of using a
+// fixed height. Every link between this host and app-image-canvas is either
+// display:inline (this host, ngx-bootstrap's <carousel>, app-image-viewer) or
+// height:auto, so a definite height has to be handed down explicitly.
+//
+// This file is global (ViewEncapsulation.None), which is exactly why the rules
+// are gated on a class: the receipt form's fullscreen dialog renders this same
+// component WITHOUT the class and so keeps the sizing it has always had.
+.rw-carousel--fill {
+  display: block;
+  height: 100%;
+
+  // .carousel-item.active rather than `slide`, so the inactive slides - which
+  // ngx-bootstrap takes out of flow with position:absolute - stay out of it.
+  // These must stay `block`: `flex` would fight Bootstrap's float: left.
+  carousel,
+  .carousel.slide,
+  .carousel-inner,
+  .carousel-item.active,
+  .item,
+  app-image-viewer {
+    display: block;
+    height: 100%;
+  }
+
+  // ngx-bootstrap's prev/next are `top: 0; bottom: 0; width: 15%` at z-index 1,
+  // and they sit ABOVE the stage in hit-testing. Over a full-height canvas that
+  // makes two full-height columns where pan, wheel zoom and double-click all die
+  // - and where both the left and right corner handles live, which is exactly
+  // what insetting those handles was meant to prevent. Shrink them to buttons
+  // centred vertically, clear of every corner. Overrides this file's own
+  // `.carousel-control-prev { top: 10% !important }` above.
+  .carousel-control-prev,
+  .carousel-control-next {
+    top: 50% !important;
+    bottom: auto;
+    width: 2.75rem;
+    height: 2.75rem;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.45);
+    opacity: 1;
+  }
+
+  .carousel-control-prev {
+    left: 0.75rem;
+  }
+
+  .carousel-control-next {
+    right: 0.75rem;
+  }
+}

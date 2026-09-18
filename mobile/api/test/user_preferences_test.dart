@@ -57,11 +57,5 @@ void main() {
       // TODO
     });
 
-    // Whether to show large image previews
-    // bool showLargeImagePreviews (default value: false)
-    test('to test the property `showLargeImagePreviews`', () async {
-      // TODO
-    });
-
   });
 }

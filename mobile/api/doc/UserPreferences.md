@@ -17,7 +17,6 @@ Name | Type | Description | Notes
 **quickScanDefaultGroupId** | **int** | Group foreign key | [optional] [default to 0]
 **quickScanDefaultPaidById** | **int** | User foreign key | [optional] [default to 0]
 **quickScanDefaultStatus** | [**ReceiptStatus**](ReceiptStatus.md) | Default quick scan status | [optional] [default to 'OPEN']
-**showLargeImagePreviews** | **bool** | Whether to show large image previews | [optional] 
 **userShortcuts** | [**BuiltList&lt;UserShortcut&gt;**](UserShortcut.md) |  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
