@@ -50,10 +50,17 @@ import 'helpers/receipt_filter_actions.dart';
 /// `date EQUALS` is avoided because a datetime column only equals an exact
 /// midnight. Anyone adding either case must seed relative to `DateTime.now()`.
 ///
-/// **Timezone.** `formatDate` converts to local time and then stamps a literal
-/// `Z`, so the seeds and the picked range only agree on a UTC host. This
-/// container and CI are UTC; a non-UTC runner would break this spec -- and
-/// production date filtering with it.
+/// **Timezone: this spec needs a UTC host, but production does not.**
+/// `formatDate` converts to local time and then stamps a literal `Z`, so a date
+/// travels as local wall clock labelled UTC. That is the app's convention on
+/// both sides -- `receipt_bottom_sheet_builder.dart` writes a receipt's date the
+/// same way -- so a filter and the receipts it matches agree on any device.
+/// What does not agree is this spec: it seeds through the API with hardcoded
+/// `Z` strings, bypassing the write path, so on a non-UTC runner the seeds and
+/// the picked range would be offset. The container and CI are UTC. If the
+/// mobile e2e job ever moves to a non-UTC host, seed via the app or shift the
+/// literals -- do not "fix" the encoder to match, which would break the
+/// agreement production relies on.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 

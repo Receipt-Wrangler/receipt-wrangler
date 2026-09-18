@@ -402,6 +402,12 @@ class ReceiptFilterConditionEditorState
       lastDate: _lastSelectableDate,
     );
 
+    // The pickers open on the ROOT navigator while this editor lives in a
+    // bottom sheet on a nested one, so the sheet can be torn down while the
+    // future is still pending -- and _setValue calls setState.
+    if (!mounted) {
+      return;
+    }
     if (picked != null) {
       _setValue(picked);
     }
@@ -421,6 +427,9 @@ class ReceiptFilterConditionEditorState
       lastDate: _lastSelectableDate,
     );
 
+    if (!mounted) {
+      return;
+    }
     if (picked != null) {
       _setValue([picked.start, picked.end]);
     }
@@ -597,7 +606,10 @@ class ReceiptFilterConditionEditorState
   }
 
   String _amountText(dynamic amount) {
-    return amount is double ? amount.toString() : "0";
+    // `num`, not `double`: isReceiptFilterConditionValid accepts any num and
+    // the encoder sends an int as a number, so narrowing to double here would
+    // seed the field at zero and silently rewrite the condition on reopen.
+    return amount is num ? amount.toDouble().toString() : "0";
   }
 
   static String? _noValidation(String? _) => null;

@@ -109,7 +109,7 @@ void main() {
     // differently -- "Receipt Date" in one and "Date" in the other leaves the
     // user guessing which of the three date columns is meant.
     const sharedColumns = {
-      "date": "created_at",
+      "date": "date",
       "name": "name",
       "amount": "amount",
       "paidBy": "paid_by_user_id",
@@ -122,11 +122,17 @@ void main() {
       final sortColumn = sharedColumns[field.key];
       if (sortColumn == null) continue;
 
-      final sortOption = receiptSortOptions
-          .where((option) => option.displayLabel == field.label);
+      // Matching on the COLUMN as well as the label is the point: filtering on
+      // displayLabel alone passes whenever any sort option happens to share the
+      // name, even if this field is paired with the wrong column. It was --
+      // "date" was mapped to created_at here, which this assertion now catches.
+      final sortOption = receiptSortOptions.where((option) =>
+          option.columnName == sortColumn &&
+          option.displayLabel == field.label);
 
       expect(sortOption, isNotEmpty,
-          reason: '"${field.label}" has no sort option with the same label');
+          reason: '"${field.label}" has no sort option on $sortColumn with '
+              'the same label');
     }
   });
 
