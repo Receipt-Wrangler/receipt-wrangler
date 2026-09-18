@@ -185,6 +185,34 @@ describe("ImageCanvasComponent", () => {
     expect(NATURAL_WIDTH * after.scale).toBeCloseTo(MIN_VISIBLE_PX);
   });
 
+  // The anchor and the sliver can conflict, and the sliver wins. With the
+  // opposite corner already off-stage, holding it while the image shrinks would
+  // carry the whole image off the stage, leaving nothing to grab. So the resize
+  // keeps going and lets that invisible anchor drift. Constraining the scale to
+  // preserve the anchor instead freezes the handle exactly where the image is
+  // hardest to recover - the dead handle this canvas exists to avoid.
+  it("keeps the sliver rather than an off-stage anchor when the two conflict", async () => {
+    for (let i = 0; i < 10; i += 1) {
+      component.zoomIn();
+    }
+    await fixture.whenStable();
+
+    // Pan until only the image's top-left corner is on the stage, which is what
+    // puts the se anchor - the one a nw drag holds - far outside it.
+    await drag(host, [300, 200], [9000, 9000]);
+
+    const before = viewport();
+    expect(before.x).toEqual(STAGE_WIDTH - MIN_VISIBLE_PX);
+    expect(before.y).toEqual(STAGE_HEIGHT - MIN_VISIBLE_PX);
+
+    await drag(handle("nw"), [before.x + 6, before.y + 6], [before.x + 300, before.y + 200]);
+
+    const after = viewport();
+    expect(after.scale).toBeLessThan(before.scale);
+    expect(after.x).toEqual(STAGE_WIDTH - MIN_VISIBLE_PX);
+    expect(after.y).toEqual(STAGE_HEIGHT - MIN_VISIBLE_PX);
+  });
+
   // A distorted receipt is never wanted, so a corner drag is uniform.
   it("keeps the aspect ratio locked while resizing", async () => {
     const before = viewport();

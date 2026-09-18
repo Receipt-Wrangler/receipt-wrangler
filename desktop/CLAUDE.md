@@ -1767,6 +1767,12 @@ moved the page layout, when the thing worth manipulating is the image. Don't rei
   could only ever grow the image, which is a zoom button with extra steps. The floor is now
   `minScale()`, the scale leaving the image's shorter side at `MIN_VISIBLE_PX`, below which the four
   12px handles would overlap. `fitScale()` is unchanged and is still what load and double-click use.
+- **The sliver outranks the anchor** on the one state where they conflict. With the opposite corner
+  already off-stage, holding it while the image shrinks would carry the whole image off the stage —
+  so the resize keeps going and lets that invisible anchor drift instead. Constraining the *scale* to
+  preserve the anchor is the tempting alternative and it is wrong: it freezes the handle exactly
+  where the image is hardest to recover, which is the dead handle this section exists to prevent.
+  Pinned by its own spec.
 - Two consequences worth knowing. **`fit()` centres the image itself** — committing `x: 0, y: 0` and
   letting the clamp centre it no longer works. And **a stage resize re-clamps the position only**:
   the bounds are stage-relative so a stage that shrank can strand the image, but the scale is the
