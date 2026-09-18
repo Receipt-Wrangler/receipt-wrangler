@@ -21,6 +21,14 @@ const MAX_SCALE = 8;
 /** Applied per wheel notch and per zoom-button press. */
 const ZOOM_STEP = 1.15;
 
+/**
+ * The smallest square of image that must always be on the stage, in px. It
+ * floors the resize - below this the four 12px handles overlap - and bounds the
+ * pan, so the image can be pushed aside but never off to where nothing can grab
+ * it.
+ */
+const MIN_VISIBLE_PX = 48;
+
 /** Where the image sits on the stage: its top-left in stage px, and its scale. */
 interface Viewport {
   scale: number;
@@ -51,6 +59,12 @@ type Drag =
  * The stage never changes size — the image is clipped by it and you pan around,
  * the way a canvas viewport behaves — so nothing here can move the surrounding
  * page layout.
+ *
+ * The image **floats** on that stage rather than being contained by it: it can
+ * be made smaller than the stage, pushed into a corner, or hung over an edge.
+ * That is what lets a corner drag honour its anchor — a rule that forbade dead
+ * space would slide the image instead of pinning the corner you did not grab.
+ * Double-click puts it back.
  *
  * Scale and pan are a **single transform on a single element**. Keeping them on
  * separate elements (a scaled wrapper around a translated image) makes drag
@@ -128,7 +142,16 @@ export class ImageCanvasComponent implements AfterViewInit, OnDestroy {
 
   /** Sizes the image to the stage and centres it. */
   public fit(): void {
-    this.commit({ scale: this.fitScale(), x: 0, y: 0 });
+    const stage = this.stageSize();
+    const scale = this.fitScale();
+
+    // Centred here rather than by the clamp: this is the one place that means
+    // "centred" as opposed to "wherever you last left it".
+    this.commit({
+      scale,
+      x: (stage.width - this.natural.width * scale) / 2,
+      y: (stage.height - this.natural.height * scale) / 2,
+    });
   }
 
   public zoomIn(): void {
@@ -305,9 +328,10 @@ export class ImageCanvasComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    // clampScale floors at the fit, so a stage that grew pulls an image that was
-    // showing in full back up to filling it — without undoing a deliberate zoom.
-    this.commit({ ...this.view, scale: this.clampScale(this.view.scale) });
+    // The bounds are stage-relative, so a stage that shrank can leave the image
+    // off it. Only the position is re-derived — the scale is the user's, and a
+    // stage that grew leaves a deliberately shrunk image exactly where it is.
+    this.commit({ ...this.view });
   }
 
   private zoomAroundCentre(factor: number): void {
@@ -337,26 +361,40 @@ export class ImageCanvasComponent implements AfterViewInit, OnDestroy {
 
   private clamp(view: Viewport): Viewport {
     const stage = this.stageSize();
+    const scale = this.clampScale(view.scale);
 
     return {
-      scale: view.scale,
-      x: this.clampAxis(view.x, this.natural.width * view.scale, stage.width),
-      y: this.clampAxis(view.y, this.natural.height * view.scale, stage.height),
+      scale,
+      x: this.clampAxis(view.x, this.natural.width * scale, stage.width),
+      y: this.clampAxis(view.y, this.natural.height * scale, stage.height),
     };
   }
 
+  /**
+   * The only positional rule: keep a grabbable sliver of the image on the stage.
+   * Anything stricter — centring a narrow axis, or forbidding dead space at an
+   * edge — overrides the anchor a corner drag just established, which is what
+   * made the handles behave as a second zoom control.
+   */
   private clampAxis(value: number, content: number, stage: number): number {
-    // Smaller than the stage: centre it, so a shrunk image cannot drift into a
-    // corner. Larger: stop either edge coming inside the stage.
-    if (content <= stage) {
-      return (stage - content) / 2;
-    }
+    const keep = Math.min(content, MIN_VISIBLE_PX);
 
-    return Math.min(Math.max(value, stage - content), 0);
+    return Math.min(Math.max(value, keep - content), stage - keep);
   }
 
   private clampScale(scale: number): number {
-    return Math.min(Math.max(scale, this.fitScale()), MAX_SCALE);
+    return Math.min(Math.max(scale, this.minScale()), MAX_SCALE);
+  }
+
+  /**
+   * Small enough to push the image aside; never so small the four handles
+   * overlap. Deliberately NOT the fit scale: the image opens at the fit, so
+   * flooring there left every handle unable to shrink anything.
+   */
+  private minScale(): number {
+    const shorter = Math.min(this.natural.width, this.natural.height);
+
+    return shorter ? Math.min(MIN_VISIBLE_PX / shorter, 1) : 1;
   }
 
   /** The scale at which the whole image is visible; never magnifies past 1:1. */

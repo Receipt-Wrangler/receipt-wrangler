@@ -1755,9 +1755,28 @@ moved the page layout, when the thing worth manipulating is the image. Don't rei
   `overflow: hidden` and clipped pixels are not hit-testable, so a centred handle loses half its
   target the moment the image meets a stage edge — which at the fit scale is always true of two of
   the four. Each also grabs from an invisible 24px box (`::before`, `inset: -6px`).
-- **An axis narrower than the stage is centred**, so a letterboxed image cannot drift into a corner.
-  This is why a corner drag only holds its anchor in the axis that *overflows*; the other grows
-  symmetrically. The canvas spec pins both halves of that rule.
+- **The image floats on the stage; it is not contained by it.** It may be smaller than the stage,
+  sit in a corner, or hang over an edge. The only positional rule is that `MIN_VISIBLE_PX` (48) of it
+  stays on the stage, so nothing can be flicked out of reach. This replaced a "centre any axis
+  narrower than the stage, and never allow dead space at an edge" rule, and **that rule is what made
+  the handles fake**: centring throws away the anchor a corner drag just established, and forbidding
+  dead space slides the image rather than pinning the corner you did *not* grab. Do not reintroduce
+  either — a containment rule and a real resize handle cannot both exist.
+- **The resize floor is a minimum size, not the fit.** `clampScale` used to floor at `fitScale()`,
+  and since the image *opens* at the fit, pulling a handle inward was a guaranteed no-op — handles
+  could only ever grow the image, which is a zoom button with extra steps. The floor is now
+  `minScale()`, the scale leaving the image's shorter side at `MIN_VISIBLE_PX`, below which the four
+  12px handles would overlap. `fitScale()` is unchanged and is still what load and double-click use.
+- **The sliver outranks the anchor** on the one state where they conflict. With the opposite corner
+  already off-stage, holding it while the image shrinks would carry the whole image off the stage —
+  so the resize keeps going and lets that invisible anchor drift instead. Constraining the *scale* to
+  preserve the anchor is the tempting alternative and it is wrong: it freezes the handle exactly
+  where the image is hardest to recover, which is the dead handle this section exists to prevent.
+  Pinned by its own spec.
+- Two consequences worth knowing. **`fit()` centres the image itself** — committing `x: 0, y: 0` and
+  letting the clamp centre it no longer works. And **a stage resize re-clamps the position only**:
+  the bounds are stage-relative so a stage that shrank can strand the image, but the scale is the
+  user's, and a stage that *grows* no longer re-grows an image that was showing in full.
 - Wheel zoom is anchored at the cursor and moves a meaningful amount. The viewer this replaced
   multiplied `deltaY` by `-0.000001`, so one notch changed the scale by 0.0001 — wheel zoom did
   nothing at all.
