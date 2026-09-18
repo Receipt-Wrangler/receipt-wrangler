@@ -179,6 +179,131 @@ the widget going away. Don't "fix" the 4px toolbar squeeze while the bar shows b
 every screen's body on every network call. Pinned by
 `test/widgets/top_app_bar_loading_indicator_test.dart`.
 
+### Theme & color roles — every neutral role is spelled out on purpose
+
+The app's `ThemeData` lives in **`lib/theme/app_theme.dart`** (`buildAppTheme()`), extracted from
+`main.dart` so it can be asserted on and so a harness can render a screen exactly as the app does.
+
+**`ColorScheme` silently falls back for any role it is not given, and in this scheme every fallback
+lands on pure black or pure white.** The getters are, verbatim from
+`flutter/lib/src/material/color_scheme.dart`:
+
+| role | falls back to | what that gave us |
+|---|---|---|
+| `outline`, `outlineVariant` | `onBackground` | **pure black** borders on every input, chip, divider and outlined button |
+| `onSurfaceVariant` | `onSurface` | **black** hints, field labels, list subtitles and nav icons — no text hierarchy at all |
+| every `surfaceContainer*` | `surface` | **white** — no tone to layer a raised card against |
+| `secondaryContainer` | `secondary` | `#8EA1AC`, so an unstyled selected chip read as *disabled* |
+
+So the scheme now names all of them, from the slate scale in `lib/constants/colors.dart`. **Do not
+drop them** — nothing fails to compile and no widget test fails; the app just goes back to looking
+like a wireframe. `test/theme/app_theme_test.dart` is the only guard, and it asserts each role is
+both the expected value *and* not equal to its fallback.
+
+Three consequences worth knowing:
+
+- **`accentBlueDark` (`#0086D4`) is the accent for text on the accent *tints*, not a general
+  "accent on white".** Accent icons and button labels on white are the theme's `primary` -- that is
+  what `receipt_form.dart:374`/`:676` already do and what M3 gives every text and outlined button,
+  so it is the convention already in place. `accentBlueDark` exists because `primary` over
+  `primaryContainer` / `accentContainer` is barely 2:1.
+- **A chip's selected label colour has to ride on `chipTheme.labelStyle` as a `WidgetStateColor`.**
+  `RawChip` resolves `labelStyle.color` through `WidgetStateProperty.resolveAs` and, under Material
+  3, **never consults `secondaryLabelStyle`** — that is a Material 2 field. Left to the M3 defaults
+  the selected label is `onSecondaryContainer`, i.e. dark slate on the `#27B1FF` fill, which is the
+  contrast bug the category / tag / status pickers shipped with. Note `labelStyle` **replaces** the
+  defaults rather than merging, so the font family and size are restated there.
+  Because the theme now owns this, `multi-select-field.dart` and `group_dashboard.dart` no longer
+  set `selectedColor` themselves.
+- **`appBarTheme` pins `iconTheme` and `actionsIconTheme` together.** M3 takes `leading` from
+  `onSurface` and `actions` from `onSurfaceVariant`, so once `onSurfaceVariant` stopped being black
+  a bar carrying both rendered two different greys.
+- **`navigationBarTheme` states the bottom nav's selected treatment rather than riding a role.**
+  `NavigationBar.indicatorColor` defaults to `secondaryContainer`, which *used* to fall through to
+  the `#8EA1AC` secondary -- an accidentally serviceable solid pill. Naming that role `slate100`
+  (correct for its other consumers) turned the selected destination into a near-white pill on a
+  near-white bar, i.e. invisible, on every main screen. The bar now takes `accentContainer`
+  (`#CCECFF`) with `accentBlueDark` icon and label, which is the design's own nav. **This is the
+  shape of mistake to expect when filling in a role**: the fix is right for the role and wrong for
+  one component that was quietly depending on the old fallback. `app_theme_test.dart` guards it.
+
+**Contrast floors, and the one gap left open.** WCAG 2.1 SC 1.4.11 wants **3:1** for the visual
+boundary that identifies a component -- which an outlined field's border *is* -- and SC 1.4.3 wants
+**4.5:1** for normal text. `test/theme/app_theme_test.dart` measures these rather than pinning hex
+values, so the assertions survive a palette tweak and fail only when one actually breaks access.
+The first pass at this palette took `#CBD5E1` straight from the design, which draws its borders at
+1.5-2px; Flutter renders 1px, so the app got the lightness without the weight and every field
+boundary sat at **1.48:1**. Hence `borderSlate` (3.38:1) rather than `slate300`, and `slate400` is
+now decorative-only -- a chevron or a dismiss X carries meaning and belongs at `onSurfaceVariant`.
+
+The **known gap**: `accentBlueDark` is also small *text* in two places -- the nav's selected label
+(3.58:1 on the bar) and the editor's selected operation chip (3.59:1 on its tint). Both clear the
+3:1 non-text floor and fall short of 4.5:1. **It is closeable on-palette**: moving the accent from
+`$primary-palette` 700 to **800 `#0072b4`** clears every floor (5.16 / 4.18 / 4.71 / 4.73). Staying
+at 700 is a deliberate appearance call -- 800 reads noticeably navy -- not a limitation, and it is
+the call to revisit if the gap ever matters. The focused floating label was a third such case and is
+**not** accent-coloured for this reason: it keeps `onSurfaceVariant` (4.76:1) and focus rides on the
+border instead.
+
+**The palette is shared with desktop, and almost all of it is already canonical.** The source of
+truth is the Angular Material M2 maps in `desktop/src/variables.scss`, which the web theme is
+actually built from (`mat.m2-define-palette`, `desktop/src/styles.scss`). `lib/constants/colors.dart`
+names the stop for each constant; the mapping is:
+
+| mobile | brand palette |
+|---|---|
+| `primary` `#27B1FF` | `$primary-palette` **500** -- the brand blue, and the logo's own fill |
+| `accentBlueDark` `#0086D4` | `$primary-palette` **700**, which `mat.m2-define-palette` makes the web theme's "darker" variant |
+| `accentContainer` `#CCECFF` | `$primary-palette` **50** |
+| `selectedChipBorder` `#BBE6FF` | `$primary-palette` **100** |
+| `slate50` … `slate700` | `$accent-palette` **50 … 700**, exactly |
+| `error` `#D63333` | `$warn-palette` **500** |
+| `accentTint` `#EAF7FF` | *not a stop* -- the design's 8% wash on white |
+| `borderSlate` `#7E8DA1` | *not a stop* -- a half-step, see below |
+
+So **`#0086D4` is a brand colour, not an off-brand darkening** -- desktop uses that same stop for
+the same job (accent text and icons on light) in about sixteen places, including
+`roles/role-presets.ts`, which pairs `PRIMARY_TINT = "#ccecff"` with `PRIMARY_COLOR = "#0086d4"`:
+the mobile nav pill's exact pairing. This has already been queried once; the answer is here so it
+does not have to be re-derived.
+
+**Source a new value from those maps before inventing one.** `borderSlate` is the one grey that
+isn't a stop, and only because `$accent-palette` jumps 400 `#94A3B8` (2.56:1, under the border floor)
+straight to 500 `#64748B` (4.76:1, as heavy as the label text) with nothing between. Nothing
+mechanically ties `colors.dart` to the SCSS, so the two clients stay in step by hand.
+
+**Two tints, not one.** `primaryContainer` is `#EAF7FF` and `accentContainer` is `#CCECFF`, both
+from the design, and they are not interchangeable: `accentBlueDark` clears AA on the lighter one at
+chip-label size but only clears the large-text / UI threshold on the stronger one, while the lighter
+one behind a 24px nav icon is too faint to read as selected at all.
+
+**An outlined field's border cannot be styled the obvious way.** `inputDecorationTheme.border` is a
+`WidgetStateInputBorder`, and that is load-bearing. For a non-filled field
+`InputDecorator._getDefaultBorder` **throws away whatever `borderSide` the theme's border carries**
+and substitutes `_InputDecoratorDefaultsM3`'s, which is built fresh from the context and never
+merged with this theme -- so a width set there is silently ignored, and
+`InputDecorationTheme.outlineBorder` is ignored too (the *filled* branch consults the app theme; the
+outlined one does not). Only the shape survives, which is why the 10px radius works. The single
+escape hatch is an early return when the border **is** a `WidgetStateProperty<InputBorder>`, which
+bypasses the resolution entirely.
+
+The cost of taking that hatch is that this theme now owns **every** state, so all four are written
+out. Dropping the error branch would leave every failed validator in the app without its red border
+and **nothing would fail to compile** -- `app_theme_test.dart` resolves all four states for that
+reason. Focused is `accentBlueDark` at 2px rather than M3's `primary`, which is 2.38:1.
+
+**`BottomSubmitButton` is the app-wide bottom action bar** — the receipt form, Quick Scan, the
+multi-select picker and the receipt filter all mount it. It is a white bar with a hairline top
+border holding an inset 48px stadium `FilledButton`. Its total height is exported as
+`bottomSubmitBarHeight`, and `submitButtonSpacing` (`lib/constants/spacing.dart`) is **derived from
+it**: where the bar floats as a `Scaffold.bottomSheet` rather than a bottom bar, the scrollable
+above has to reserve at least that much or its last field sits underneath and cannot be scrolled
+clear. Keep the two tied together rather than restating a number.
+
+A known rough edge left alone: Material's `Card` still renders its elevation-1 black shadow as a
+hard ring. It has exactly one call site in the app (`receipt_form.dart`'s add-shares card), so it
+was out of scope here; the filter's condition cards are hand-built containers instead.
+
 ### Permission-based UI gating
 
 The mobile app gates UI on the caller's **effective permissions**, mirroring the desktop client
@@ -1150,6 +1275,179 @@ Three things that spec encodes, all of which cost a debugging cycle:
   shared admin. The group dropdown is a Material menu whose scrollable does not build off-screen items
   into the element tree, so the admin's accumulated groups can push the target below the viewport where
   `find.text` can't reach it (the same problem `keepOnlyGroup` works around for Quick Scan).
+
+### Receipt filtering
+
+The receipts list can be filtered on all ten fields the API supports -- the same set desktop's
+advanced-filter dialog drives. **Client-only**: `swagger.yml`, the Go API and `mobile/api/` were
+already capable, so nothing there changed.
+
+Entry point is a badged filter action in the receipts app bar (`ReceiptFilterButton`, added to
+`GroupAppBar`'s existing route-gated `actions`). It pushes `ReceiptFilterScreen`, which lists the
+active conditions as cards, offers "Add filter", and commits with **"Apply Filter"**.
+
+- **`lib/constants/receipt_filter_fields.dart` is the single field table** -- key, label, icon,
+  hint and type for the ten fields, plus `filterOperationsByType` and `filterOperationLabels`.
+  The add-list, the cards and the editor all read it, so a card can never disagree with the row
+  that produced it. Mirrors desktop's `RECEIPT_FILTER_FIELDS` +
+  `filter-operations-options.constant.ts`.
+  - Labels match `receiptSortOptions` wherever the two overlap -- `date` is **"Receipt Date"**, not
+    a bare "Date", because the list can also be filtered on `resolvedDate` and `createdAt`.
+  - The operation lists are written out literally rather than derived from `FilterOperation.values`:
+    the Dart enum carries an extra `empty` member desktop's does not, and a derived list would leak
+    it into the chips.
+- **`ReceiptListModel` owns the APPLIED filter; the screen edits a draft.** `ReceiptFilterScreen`
+  copies `model.filter` into local `State`, and only "Apply Filter" writes back via `setFilter`.
+  Backing out (the X, the system back gesture) therefore discards, and the list never refetches
+  mid-authoring.
+- **A notification from `ReceiptListModel` means the filter changed.** `GroupReceiptsList` listens
+  for it and calls its `_refreshCallback` (plus a `setState`, because the empty-state text reads the
+  applied filter). This works because **every sort setter is deliberately called with
+  `notify: false`** and refreshes the list directly -- don't "tidy" those call sites into notifying,
+  or every sort change refetches twice.
+- **The filter is cleared on a group change**, in `didChangeDependencies` (which is where
+  `getGroupId`'s `GoRouterState` read is legal). A filter holds the previous group's category, tag
+  and user ids, which match nothing in the next one and would leave the badge counting conditions
+  the user cannot see. It clears **everything**, not just the id-bearing fields: "switching groups
+  shows that group's receipts" is the predictable rule. It clears **silently** (`notify: false`),
+  because that runs during a build; the explicit `_refreshCallback` is the visible half.
+  - **The scope is read off the filter, not off a group the list remembered** --
+    `ReceiptListModel.filterGroupId`, recorded by `setFilter` (whose `groupId` is a *required* named
+    argument for exactly this reason). The first version tracked "the last group I saw" in the
+    widget, and **that guard never fired**: the app offers no lateral group switch, so every real
+    group change leaves the group shell (the app-bar arrow goes to `/groups`, group cards go to
+    `/groups/<id>/dashboards`, and `GroupBottomNav` only navigates within the current group), which
+    destroys the `State`. The replacement mounted with a null "last group" while the filter sat
+    untouched on the app-level model, so **group A's filter followed the user into group B**. It
+    shipped that way and `integration_test/receipt_filter_lifecycle_test.dart` is what caught it.
+  - **"Clear whenever the list mounts" is not the fix**, which is why the scope has to live on the
+    filter: a round trip to a receipt tears the list down and rebuilds it just as a group change
+    does (`/receipts/:id/view` is a top-level route). Only the filter knows the difference between
+    the two, and both cases are pinned -- in `group_receipts_list_test.dart` for the mount, and
+    end to end in the lifecycle spec.
+
+**Encoding (`lib/utils/receipt_filter.dart`) is the highest-risk part, and its rules come from the
+Go side (`api/internal/repositories/receipts.go`).**
+
+- The generated `ReceiptPagedRequestFilter`'s ten properties are **`JsonObject?`**, not a typed
+  `PagedRequestField`, so each condition is written as
+  `JsonObject({"operation": ..., "value": ...})`. `setReceiptFilterField` owns the key-to-slot
+  dispatch and is shared with `dashboardConfigurationToFilter` (`lib/utils/receipts.dart`), which
+  was missing the `group` arm before it was extracted.
+- **An EMPTY field is not an ABSENT one.** `initReceiptFilterValues` coerces a null date value to
+  `""` and a null amount to `0`, and the query builder then runs `date = ''` (matches nothing) or
+  `amount = 0` (matches the wrong rows) -- both silent. `buildReceiptPagedRequestFilter` therefore
+  **skips any condition `isReceiptFilterConditionValid` rejects**. The editor also gates Save, but
+  the encoder's contract has to hold on its own.
+- **Every value is type-asserted with no comma-ok, so a wrong shape is a 500, not an ignored
+  filter.** Amounts go as **numbers** (`AmountField`'s `valueTransformer` yields a *string*, so the
+  editor parses it first); the five list fields always as arrays; `status` as wire strings, not
+  labels; dates as zulu strings via `formatDate(zuluDateFormat, ...)`, the same call the receipt
+  submit uses.
+- **A BETWEEN date range spans start-of-day to end-of-day** (`startOfDay` / `endOfDay` in
+  `lib/utils/date.dart`). These are datetime columns, so a bare `<= 2026-09-18T00:00:00Z` upper
+  bound excludes everything recorded on the last day the user picked.
+- **A zero amount is a real filter and is sent.** Nothing defaults to zero and the API applies
+  `amount = 0`, matching desktop's `isFilterEntryActive`.
+- Conditions hold the **display objects** (`Category`, `Tag`, `Group`, `UserView`, `ReceiptStatus`,
+  `DateTime`, `double`, `String`), not ids -- so a captured option keeps rendering its own name even
+  after the catalog changes, and the card, the chips and the encoder all read one thing.
+
+**Shared components, not new ones.** `AmountField` for every amount (it gained an optional
+`validator`, defaulting to today's required, because a filter amount is only authored when the user
+asks for one); `CategorySelectField` / `TagSelectField` unchanged; `MultiSelectField` +
+`showMultiselectBottomSheet` for Group, Paid By and Status. `FilterMultiSelect` keeps its **single
+call site** inside that helper, so its `Expanded` assumption is untouched. Flutter's own
+`showDatePicker` / `showDateRangePicker` cover dates -- the app had no date widget and no range
+picker at all.
+
+- `receiptStatusField` is deliberately **not** reused: it is single-select and hard-required, while
+  the filter's `status` is `CONTAINS` over a list.
+- The operation chips take the **tinted** selected treatment (`primaryContainer` fill,
+  `onPrimaryContainer` label, a `#BBE6FF` border) via a local `ChipTheme`, deliberately *not* the
+  app-wide filled accent chip. That one means "a value you picked" -- the categories and statuses in
+  the field below it are drawn that way -- while these pick a *mode*, and the two rows share one
+  sheet. The local override has to restate `labelStyle` for the same Material 3 reason the theme
+  does (see "Theme & color roles").
+
+**Two things the group context forces** (`lib/utils/receipt_filter_options.dart`):
+
+- **`Group` is only offered on the synthetic "All" group**, mirroring desktop's `showGroupFilter`.
+  Inside a real group the receipts endpoint already scopes every query to it.
+- **Categories and tags need no special casing.** The All group is a *real row* the user belongs to
+  (`GroupRepository.CreateAllGroup`), so `GetAppData` builds it a `groupCategories` / `groupTags`
+  entry like any other group -- the wrappers work with the route's group id. **Paid-by is the
+  exception**: the All group's roster is just the caller, so `filterPaidByOptions` unions the real
+  groups' rosters there.
+
+**Styling follows the design project's mobile panel** (`Quick Date Filtering.dc.html`, panel 4b),
+minus its button gradient. The screen is a slate-50 canvas carrying white condition cards (radius
+14, a 6%-black hairline, a 5%-black 1px shadow) under an uppercase condition count; the operation is
+a filled `surfaceContainer` pill rather than an outlined chip; "Add filter" is a dashed 52px
+placeholder, painted by a private `CustomPainter` because Flutter has no dashed border. Most of the
+rest came from filling in the theme's color roles rather than from anything here -- see "Theme &
+color roles".
+
+- **The condition card carries no field icon.** The icons belong to the add sheet, where they help
+  pick a field; repeating them on the card only competes with the label.
+- **It is a hand-built container, not a `Card`.** Material's `Card` is the elevated one, whose
+  tinted surface and shadow are far heavier than this near-flat row. Its fill has to be on the
+  `BoxDecoration`, not only on the `Material` under it: a `BoxDecoration` paints its `boxShadow` as
+  a silhouette of the whole shape, so without a colour there the shadow shows through the card's
+  interior and greys it out.
+- **The remove X sits inside the card's own `InkWell`**, so it has to win the gesture arena against
+  it. `receipt_filter_condition_card_test.dart` pins that removing a condition does not also reopen
+  the editor for the field just dropped.
+- **The count header is rendered only when there is something to count.** The design shows it *and*
+  the empty state at zero, which says the same thing twice.
+
+**The filter screen is a pushed route, not a bottom sheet.** It keeps the modal stack at the depth
+the app already ships (editor sheet -> picker sheet, the same as Quick Scan -> category picker), and
+a real `Scaffold` puts "Apply Filter" in `bottomNavigationBar`, which reserves its space, rather than
+`Scaffold.bottomSheet`, which floats over the last card.
+
+**A latent paging bug this feature exposed.** `PagedDataList` never reset `_totalCount` on refresh,
+and `getNextPageKey` stops paging once the loaded items reach it. Sorting cannot reach a zero total,
+but filtering to no matches can -- after which `0 >= 0` stayed true and **no page was ever requested
+again**, leaving the list permanently empty even once the filter was cleared. Fixed by nulling
+`_totalCount` in the refresh callback; `test/widgets/paged_data_list_test.dart` was verified to fail
+without it.
+
+**Tests:** `test/constants/receipt_filter_fields_test.dart` (the table, including that every key
+names a real wire field -- `setReceiptFilterField` dispatches on a string, so a typo would not fail
+to compile), `test/utils/receipt_filter_test.dart` (a case per field type x operation, asserted
+through the real serializer), `test/utils/receipt_filter_options_test.dart`,
+`test/models/receipt_list_model_test.dart`, and widget tests for the button, the screen, the add
+sheet, the editor, the condition card and the list wiring.
+
+**E2e: `integration_test/receipt_filter_test.dart` and `receipt_filter_lifecycle_test.dart`.** The
+unit suite proves the *serialized map* through the real serializer and the widget suite runs against
+a mocked `ReceiptApi`, so neither can reach the thing most likely to break -- that the Go query
+builder accepts the filter and narrows real rows. Five tests drive the wire (name, status via the
+real multiselect sheet, categories from the real per-group catalog, a date range, an amount typed
+into the currency field) and two cover the lifecycle (survives a receipt round trip; cleared on a
+group change). Shared drivers live in `integration_test/helpers/receipt_filter_actions.dart`.
+
+- **The seed set is three receipts in one fixture group**, differing in name, amount, date, status
+  and category so each test gets one match and two non-matches. **R2's `18:30` timestamp is
+  load-bearing**: a `BETWEEN` of 06/11-06/13 encodes to an upper bound of `06-13T23:59:59Z` because
+  the client expands the range to end-of-day, and a receipt stored at *midnight* on the last day
+  would match even a broken `<= 06-13T00:00:00Z` bound -- so the date test would pass against the
+  bug it exists to catch.
+- **The date picker is driven through its text-entry mode**, not the calendar. `firstDate` is 2000
+  and `lastDate` five years out, so the grid is ~370 lazily-built months whose day cells are bare
+  unkeyed `Text('11')` repeating every month. The app registers no `flutter_localizations`
+  delegates, so `DefaultMaterialLocalizations` is in force: the toggle is tooltipped
+  **"Switch to input"**, dates parse as US `mm/dd/yyyy`, and the confirm button is **"OK"** in text
+  mode (it is "Save" in calendar mode). The spec asserts the picked range on the `_TapField` before
+  applying, so a later row failure means the *server* disagreed rather than the picker misfiring.
+- **Wait for a button to be *enabled*, not hittable.** A disabled `FilledButton` still hit-tests, so
+  a tap on "Apply Filter" (gated on `LoadingModel.isLoading`) or "Save condition" (gated on the
+  editor's validity) silently no-ops and fails ten seconds later pointing at the wrong widget.
+- **Never `find.byKey` an amount field.** `AmountField` forwards its `widget.key` onto the
+  `FormBuilderTextField` it builds, so the keyed finder matches two widgets and any tap throws. Use
+  `formField("value")` -- and `CurrencyTextFieldController` reads keystrokes as cents, so type the
+  full `50.00`, not `50`.
 
 ### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
 

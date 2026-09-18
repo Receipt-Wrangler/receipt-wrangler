@@ -37,13 +37,11 @@ class _GroupDashboard extends State<GroupDashboard> {
     for (int i = 0; i < dashboards.length; i++) {
       var dashboard = dashboards[i];
       var selected = i == effectiveIndex;
-      var theme = Theme.of(context);
 
       widgets.add(ChoiceChip(
         key: Key(dashboard.id.toString()),
         label: Text(dashboards[i].name),
         selected: selected,
-        selectedColor: theme.primaryColor,
         onSelected: (value) => setSelectedDashboardIndex(i),
       ));
       widgets.add(const SizedBox(width: 10));

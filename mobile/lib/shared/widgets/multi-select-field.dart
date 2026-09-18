@@ -84,7 +84,8 @@ class _MultiSelectField<T> extends State<MultiSelectField<T>> {
         Widget buildChip(int index, T thing) {
           return InputChip(
             label: buildChipLabel(thing),
-            selectedColor: Theme.of(context).primaryColor,
+            // The selected fill and its white label come from the theme's
+            // chipTheme, so every chip in the app agrees.
             showCheckmark: false,
             selected: true,
             onSelected: (bool selected) {

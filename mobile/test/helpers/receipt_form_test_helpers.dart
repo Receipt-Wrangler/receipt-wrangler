@@ -218,6 +218,10 @@ Future<ReceiptFormHarness> pumpReceiptForm(
   List<api.CustomField> customFields = const [],
   List<api.UserView> users = const [],
   WranglerFormState formState = WranglerFormState.add,
+  /// Mount under a real theme. Null keeps the bare `MaterialApp.router` every
+  /// existing caller gets; pass `buildAppTheme()` when the test is about how the
+  /// form is drawn rather than how it behaves.
+  ThemeData? theme,
   /// Mirrors `ReceiptFormScreen`'s real structure — a [ScreenWrapper] whose
   /// `bottomSheetWidget` is the submit button — rather than the bare `Scaffold`
   /// every other case uses. `Scaffold.bottomSheet` *floats over* the body, so
@@ -289,6 +293,7 @@ Future<ReceiptFormHarness> pumpReceiptForm(
       ],
       child: MaterialApp.router(
         routerConfig: router,
+        theme: theme,
         debugShowCheckedModeBanner: showDebugBanner,
       ),
     );

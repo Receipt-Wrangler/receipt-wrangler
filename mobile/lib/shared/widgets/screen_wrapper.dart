@@ -61,6 +61,7 @@ class ScreenWrapper extends StatefulWidget {
     this.appBarWidget,
     this.bodyPadding,
     this.bottomSheetWidget,
+    this.backgroundColor,
   });
 
   final Widget child;
@@ -68,6 +69,11 @@ class ScreenWrapper extends StatefulWidget {
   final PreferredSizeWidget? appBarWidget;
   final EdgeInsets? bodyPadding;
   final Widget? bottomSheetWidget;
+
+  /// Overrides the scaffold's own background. Null keeps `Scaffold`'s default,
+  /// so every existing caller is unchanged; a screen passes a value when its
+  /// content is meant to read as raised cards on a canvas.
+  final Color? backgroundColor;
 
   @override
   State<ScreenWrapper> createState() => _ScreenWrapper();
@@ -85,6 +91,7 @@ class _ScreenWrapper extends State<ScreenWrapper> {
       bottom: true,
       top: false,
       child: Scaffold(
+        backgroundColor: widget.backgroundColor,
         appBar: widget.appBarWidget,
         // Not lifted: Scaffold already places its bottomSheet above the
         // keyboard, so padding it here would double-count.

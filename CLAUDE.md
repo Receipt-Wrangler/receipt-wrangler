@@ -293,8 +293,10 @@ A group can declare custom fields that are **always pre-added** to its receipts,
 A block of totals under the receipts table, covering the **whole current filter result set** rather
 than the visible page: a receipt count and amount total overall, then the same figures per
 configured status, plus a column per configured CURRENCY custom field. **Backend + desktop only** —
-the swagger change regenerates both clients, but mobile has no filter UI, so a summary there would
-only ever describe the whole group.
+the swagger change regenerates both clients, but the summary endpoint is called from the desktop
+receipts table alone. Mobile has since gained its own receipt filter (see `mobile/CLAUDE.md` →
+"Receipt filtering"), so the original reason for skipping it — no filter to describe — no longer
+holds; it is simply not built there.
 
 - **Configuration is per-group and applies to everyone**, on Group Receipt Settings: a master
   toggle, which statuses break out, and which currency fields are totalled. Stored in two new join
@@ -323,7 +325,8 @@ only ever describe the whole group.
   group settings into a mocked store and so prove nothing about the wire — the same reason the
   default-custom-fields feature above has one. It covers the settings round-trip through the real
   resolver, the figures off a real decimal fold, a filter recomputing every row, and the All-group
-  chip pick surviving a reload. There is deliberately no mobile counterpart: no filter UI there.
+  chip pick surviving a reload. There is no mobile counterpart because the summary block itself is
+  desktop-only — not, as this once said, because mobile has no filter.
 
 ### Seeding the Group Field
 
