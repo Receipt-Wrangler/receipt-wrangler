@@ -120,11 +120,11 @@ void main() {
       expect(isReceiptSummaryAtTop(api.ReceiptSummaryPosition.BOTTOM), isFalse);
     });
 
-    // The empty member exists only so an already-released build tolerates a value added
-    // later. Degrading to the bottom matches the server default; blanking the block
-    // would not.
-    test('the empty member and null degrade to the bottom', () {
-      expect(isReceiptSummaryAtTop(api.ReceiptSummaryPosition.empty), isFalse);
+    // Null is reachable before the first response lands. Degrading to the bottom matches
+    // the server default; blanking the block would not. An unrecognized wire value never
+    // reaches here as a third case -- the generated enum already resolves it to BOTTOM
+    // (see test/models/receipt_summary_position_ingest_test.dart).
+    test('null degrades to the bottom', () {
       expect(isReceiptSummaryAtTop(null), isFalse);
     });
   });

@@ -3874,14 +3874,13 @@ components:
         - "END"
     ReceiptSummaryPosition:
       description: >-
-        Where a group's receipt summary renders relative to its receipts list. The empty
-        member exists so an already-released client tolerates a value added later rather
-        than failing the whole payload; the server never sends it.
+        Where a group's receipt summary renders relative to its receipts list. A client
+        that meets a value added later must degrade to BOTTOM, which is where the block
+        rendered before the setting existed, rather than failing the whole payload.
       type: string
       enum:
         - "TOP"
         - "BOTTOM"
-        - ""
     QueueName:
       type: string
       enum:
@@ -5366,10 +5365,9 @@ components:
             to leave the stored value unchanged - a client that does not render this
             control must omit it rather than send a zero value, or it moves the block for
             the whole group. Needs no extra permission, for the same reason the statuses
-            do not. Anything but TOP or BOTTOM is a 400 - INCLUDING the empty member,
-            which exists on the enum only so a released client tolerates a value added
-            later; on this write side an explicit empty would reset a configured
-            position, so omitting the key is the only way to leave it alone.
+            do not. Anything but TOP or BOTTOM is a 400, an empty string included: on this
+            write side an explicit empty would reset a configured position, so omitting the
+            key is the only way to leave it alone.
     GroupSettings:
       type: object
       required:

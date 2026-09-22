@@ -834,3 +834,67 @@ func TestUpdateGroupReceiptSettingsLeavesReceiptSummaryPositionUnchangedWhenNil(
 		utils.PrintTestError(t, updated.ReceiptSummaryPosition, "still TOP")
 	}
 }
+
+// A position this build does not recognize — a member a newer release added, seen after a
+// downgrade — must not take down a save that never mentioned the position.
+//
+// Before the omit list, Select("*") wrote every loaded field back, so the unknown value went
+// through ReceiptSummaryPosition.Value(), which errors, and the whole UPDATE failed. Omitting
+// the column when the command leaves it nil both fixes that and stops a concurrent writer's
+// value being clobbered by one read before it landed.
+func TestUpdateGroupReceiptSettingsToleratesAnUnknownStoredPosition(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	if _, err := repository.CreateGroupReceiptSettings(1); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// Raw SQL on purpose: every write path the app has rejects this value, which is exactly
+	// why the only way it reaches the column is a build that knew about it.
+	err := GetDB().Model(&models.GroupReceiptSettings{}).
+		Where("group_id = ?", 1).
+		UpdateColumn("receipt_summary_position", "FLOATING").Error
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	untouched := baseSettingsCommand()
+	untouched.HideImages = true
+	if _, err := repository.UpdateGroupReceiptSettings("1", untouched); err != nil {
+		utils.PrintTestError(t, err, "no error saving an unrelated field")
+		return
+	}
+
+	// Read the raw COLUMN, not GetGroupReceiptSettingsByGroupId: every read path runs
+	// OrDefault(), which resolves anything but TOP to BOTTOM so an unknown value can never
+	// reach a client. That normalization is on the way out; the column keeps what was stored,
+	// so the setting survives the trip back up to the build that understands it.
+	var stored string
+	err = GetDB().Model(&models.GroupReceiptSettings{}).
+		Where("group_id = ?", 1).
+		Pluck("receipt_summary_position", &stored).Error
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if stored != "FLOATING" {
+		utils.PrintTestError(t, stored, "FLOATING")
+	}
+
+	reloaded, err := repository.GetGroupReceiptSettingsByGroupId(1)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if !reloaded.HideImages {
+		utils.PrintTestError(t, reloaded.HideImages, true)
+	}
+	// And the value a client sees is still one it can parse.
+	if reloaded.ReceiptSummaryPosition != models.RECEIPT_SUMMARY_POSITION_BOTTOM {
+		utils.PrintTestError(t, reloaded.ReceiptSummaryPosition, models.RECEIPT_SUMMARY_POSITION_BOTTOM)
+	}
+}

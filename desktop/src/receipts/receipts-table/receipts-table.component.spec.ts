@@ -763,10 +763,15 @@ describe("ReceiptsTableComponent receipt summary", () => {
       expect(component.summaryAtTop()).toBe(false);
     });
 
-    // The empty enum member only exists so an already-released client tolerates a value added
-    // later; the server normalizes it away, and a client that meets one must not vanish the block.
-    it("treats the empty position as the bottom", () => {
-      component.summary.set({ ...summaryResponse, position: "" as ReceiptSummaryPosition });
+    // The enum carries TOP and BOTTOM only, so a value outside it is off-contract by
+    // definition -- an older client meeting a position added later, or a partially migrated
+    // install sending an empty string. Either way the block must fall back to where it always
+    // rendered rather than vanish, which is why summaryPosition() defaults rather than gating.
+    it("treats an off-contract position as the bottom", () => {
+      component.summary.set({
+        ...summaryResponse,
+        position: "" as unknown as ReceiptSummaryPosition,
+      });
 
       expect(component.summaryAtTop()).toBe(false);
     });

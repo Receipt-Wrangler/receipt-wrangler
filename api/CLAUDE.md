@@ -1664,14 +1664,26 @@ is **no migration**.
   is exactly the two documented `Permission` outages. Empty is genuinely reachable (`loadSettings`
   maps a missing settings row to a *zero* `GroupReceiptSettings`), so `OrDefault()` normalizes it
   at both emit points: on the summary response, and in `LoadSettingsProjections` — the one batched
-  hydrator every settings read passes through. The swagger enum still carries an `""` member and
-  the generated Dart enum still gets the `fallback: true` hand-patch, but that is belt and braces
-  for a value added *later*; normalizing server-side is the actual guarantee.
+  hydrator every settings read passes through. **The swagger enum carries TOP and BOTTOM only** —
+  no `""` member, matching the `CurrencySymbolPosition` precedent beside it — and the generated
+  Dart enum's `fallback: true` sits on `BOTTOM`, so a client meeting a value added *later* lands on
+  the same placement `OrDefault()` would have sent. Client and server agree by construction, and an
+  empty position is not expressible on the write side at all.
 - **The command field is a pointer**, like the other three: a non-pointer would unmarshal to `""`
   for any caller that omits the key, and the repository's assignment would blank a configured
   position. It must be assigned inside the `if command.X != nil` block in
   `UpdateGroupReceiptSettings` — the write is `Select("*")`, so a field missing from that block is
   actively zeroed, silently.
+- **A `nil` pointer OMITS the column from the UPDATE** rather than writing back the value read at
+  load time. `UpdateGroupReceiptSettings` builds an `omittedColumns` list from the three nil
+  pointers and passes it to `Select("*").Omit(...)`, mirroring
+  `SystemSettingsRepository.UpdateSystemSettings` (`repositories/system_settings.go`). Writing the
+  loaded value back costs two things: a concurrent admin's change is clobbered by a value read
+  before it landed, and for an **enum** the stored value goes back through `Value()` — so a
+  position this build does not recognize (a newer release's member, seen after a downgrade) fails
+  an otherwise unrelated settings save with a 500. `Omit` also preserves that value for the trip
+  back up, where `OrDefault()` already keeps it off the wire.
+  `TestUpdateGroupReceiptSettingsToleratesAnUnknownStoredPosition` pins it.
 - **It needs no permission of its own.** Like `ReceiptSummaryEnabled` and `ReceiptSummaryStatuses`
   and unlike `ReceiptSummaryCustomFieldIds`, it reads no catalog — gating it on
   `app.custom-fields.read` would leave such an admin able to turn the summary on but not to say

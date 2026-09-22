@@ -475,7 +475,7 @@ describe("GroupReceiptSettingsComponent", () => {
           ...testGroupWithSummary,
           groupReceiptSettings: {
             ...testGroupWithSummary.groupReceiptSettings,
-            receiptSummaryPosition: "" as ReceiptSummaryPosition,
+            receiptSummaryPosition: "" as unknown as ReceiptSummaryPosition,
           },
         } as any,
       });

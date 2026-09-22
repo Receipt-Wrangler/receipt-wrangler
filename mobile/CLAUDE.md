@@ -564,23 +564,35 @@ cd /home/user/receipt-wrangler/mobile/api
 flutter pub run build_runner build --delete-conflicting-outputs
 ```
 
-**Known dart-dio default-value regressions (re-patch after every regen).** The `dart-dio`
-generator emits invalid `_defaults` initializers for some fields, which `build_runner` then can't
-compile (and it deletes the matching `.g.dart` first, so the package stops building). After
-regenerating, restore these hand-fixes (precedent: commits `fad192a0`, `a2ec7479`):
+**Known dart-dio regressions — patched automatically, NOT by hand.**
+`api/patches/apply-dart-dio-patches.sh` holds all four, and `api/generate-client.sh` runs it as the
+last step of a `mobile` regen. Add a patch there, never to the generated file: a patch applied by
+hand survives exactly until the next regen, which is how this list used to be a checklist item
+someone had to remember.
+
+The script has three outcomes per patch, and the third is the point: apply it, skip it if already
+applied (so re-running is safe), or **exit 1** when neither the original nor the patched text is
+present — meaning the generator's output changed shape and the patch must be re-derived. It fails
+the regen rather than quietly handing back an unpatched client.
+
+Two of the four are invalid Dart that `build_runner` can't compile (it deletes the matching
+`.g.dart` first, so the package stops building); precedent commits `fad192a0`, `a2ec7479`:
 
 - `model/user_preferences.dart` — `..quickScanDefaultStatus = 'OPEN'` →
   `..quickScanDefaultStatus = ReceiptStatus.OPEN`.
 - `model/system_settings.dart` — `..currencyDisplay = '$'` → `..currencyDisplay = r'$'` (a bare `$`
   in a non-raw string is invalid Dart).
 
+The other two are the `fallback: true` enum annotations below, which compile fine when absent and
+so are caught only by `flutter test`.
+
 `model/claims.dart` **no longer** needs a `userRole` patch — the role rework dropped `userRole` from
 the swagger, so `Claims` carries only identity claims and the field is gone from the generated model.
 
-Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
-is otherwise forbidden — these are the documented exception.)
+Run `flutter analyze` **and `flutter test`** after a regen. (Hand-editing generated files is
+otherwise forbidden — these four are the documented exception, and they are applied by the script.)
 
-**A third hand-patch, which does NOT surface as a compile error — `ReceiptStatus` enum tolerance.**
+**A patch that does NOT surface as a compile error — `ReceiptStatus` enum tolerance.**
 `model/receipt_status.dart` annotates the `empty` member `@BuiltValueEnumConst(wireName: r'',
 fallback: true)`. `build_runner` turns that into `default: return _$empty;` in `_$valueOf`, replacing
 the generated `default: throw ArgumentError(name)`. Without it, one unrecognized wire value fails the
@@ -590,10 +602,18 @@ the same closed-enum mechanism behind the two `Permission` login outages (see "P
 gating"); `ReceiptStatus` cannot take that feature's fix of becoming a plain wire string, because it
 is a genuine closed domain backing the status dropdowns.
 
-The openapi-generator never emits `fallback`, so **a regen silently drops it** — and unlike the two
-patches above nothing fails to compile, so the only thing that catches the regression is
+A bare regen does not emit `fallback` and unlike the two patches above nothing fails to compile, so
+the only thing that catches the annotation going missing is
 `test/models/receipt_status_ingest_test.dart`. Run `flutter test` after a regen, not just
 `flutter analyze`.
+
+**The generator CAN emit it, and the flag is a trap — do not reach for it.** `enumUnknownDefaultCase`
+(via `--additional-properties`) turns on the stock template's `fallback: true`, but it is **global**,
+so it would also open `Permission` — which this repo keeps deliberately closed, with
+`test/models/app_data_permission_ingest_test.dart` asserting it still throws. It also anchors the
+fallback to a **synthetic** `unknown_default_open_api` member rather than to `empty`, which changes
+the write path (`empty` serializes to `""`, the synthetic member to a literal string the API rejects)
+and breaks every assertion below. The patch script is the narrower instrument, on purpose.
 
 Two consequences worth knowing. An unknown status deserializes to `empty`, which
 `receiptStatusLabel` / `receiptStatusColor` render as a blank neutral chip rather than crashing —
@@ -602,14 +622,22 @@ degraded, not broken. And on the **write** path `empty` serializes back to `""`,
 receipt whose status it cannot represent gets a visible error instead of silently downgrading it.
 That is the intended failure — loud, and no data loss.
 
-**`ReceiptSummaryPosition` carries the same patch, for the same reason.**
-`model/receipt_summary_position.dart`'s `empty` member is annotated
-`@BuiltValueEnumConst(wireName: r'', fallback: true)`, and
-`test/receipt_summary_position_ingest_test.dart` is what catches a regen dropping it. It rides on
+**`ReceiptSummaryPosition` carries the same patch — but on `BOTTOM`, not on an `empty` member.**
+`model/receipt_summary_position.dart` annotates
+`@BuiltValueEnumConst(wireName: r'BOTTOM', fallback: true)`, and
+`test/models/receipt_summary_position_ingest_test.dart` is what catches it going missing. It rides on
 `GroupReceiptSettings`, i.e. on **AppData**, i.e. on **login** — a third position added later would
-brick every released build at the sign-in screen. The server also normalizes `""` away at both emit
-points (see `api/CLAUDE.md`), so this is belt and braces rather than the primary guarantee; keep
-both.
+brick every released build at the sign-in screen.
+
+The **enum carries no `""` member at all**, which is the difference from `ReceiptStatus`. There
+`empty` is a value the app actually uses (the overall summary row carries it, since the generated
+`status` field is non-nullable), so it earns its place. Here nothing read it — it existed only to
+host the fallback, while also making `""` expressible on
+`UpdateGroupReceiptSettingsCommand`, where the server 400s it. Putting the fallback on `BOTTOM`
+instead drops the member, makes the invalid write unrepresentable, and lands an unknown value on a
+**real** placement: the same one `ReceiptSummaryPosition.OrDefault()` would have sent server-side, so
+the two agree by construction. The server still normalizes `""` away at both emit points (see
+`api/CLAUDE.md`); keep both.
 
 The sibling closed enums (`ItemStatus`, `GroupStatus`, `SystemTaskStatus`, `Permission` as a
 catalog) are **still intolerant**. Adding a value to any of them is a breaking change for released
@@ -1606,9 +1634,16 @@ cross-client contract and `api/CLAUDE.md` for the wire one.
 - **Out-of-order responses are dropped** via `_summaryRequestSeq`, the manual equivalent of the
   desktop's `switchMap`: two filter applies in quick succession can land backwards and paint figures
   for a filter the user has moved past.
-- **A failed summary is swallowed**, mirroring the desktop's `catchError`. An unhandled
-  `DioException` from a `setState`-driven fetch takes the whole receipts screen down, and the right
-  degradation for a block of totals is to keep the last good figures.
+- **A failed summary is swallowed but the figures are CLEARED** -- and this is the one place mobile
+  deliberately diverges from desktop. Swallowing is shared: an unhandled `DioException` from a
+  `setState`-driven fetch takes the whole receipts screen down, and a block of totals is not worth
+  interrupting someone browsing receipts over. Desktop's `catchError` then *keeps* the last good
+  figures, because its HTTP interceptor tells the user the refresh failed. **Mobile installs no
+  interceptor** (`lib/client/client.dart` is four lines), so keeping them would render the previous
+  filter's totals beside the new filter's list with nothing to say they are stale. "Covers the whole
+  current filter result set" is the block's entire contract, so showing nothing is the honest
+  degradation and showing wrong numbers is not. The clear sits **behind the same `_summaryRequestSeq`
+  guard as the success path**, or a superseded failure would wipe a newer response's figures.
 - **The cached group settings decide only WHETHER to ask.** Everything rendered -- `enabled`,
   `position`, the rows -- comes off the response, which stays authoritative. A group that never
   opted in therefore costs no request at all. The consequence: an admin who enables the summary
@@ -1632,12 +1667,19 @@ cross-client contract and `api/CLAUDE.md` for the wire one.
 - **The overall row arrives carrying `ReceiptStatus.empty`** -- the generated `status` is
   non-nullable, so there is no "no status" to express -- and `receiptStatusLabel` renders that as
   `""`. `receiptSummaryRowLabel` branches on it, or the row reads as a bare " Receipts".
-- **Anything that is not `TOP` renders at the bottom**, including the `empty` member, so a value
-  added later degrades to the server's own default rather than blanking the block.
+- **Anything that is not `TOP` renders at the bottom**, so a value added later degrades to the
+  server's own default rather than blanking the block. The generated enum agrees: its
+  `fallback: true` sits on `BOTTOM` (see "Regenerating API Client Models"), so an unknown wire value
+  is already `BOTTOM` by the time `isReceiptSummaryAtTop` sees it.
 - **On the All group the pick lives in `ReceiptListModel`**, session-scoped: mobile has no persisted
   slice equivalent to the desktop's NGXS `receiptTable`. Written with `notify: false` and refreshed
   directly, like the sort setters -- a configuration pick changes the breakdown's shape, never the
-  data. It is reset on a **group change by the list**, in the same branch that re-fetches the
+  data. **But the write is still wrapped in `setState`**: silencing the model leaves nothing else to
+  repaint, and `ReceiptSummaryBar` reads `selectedConfigGroupId` off its widget, so without it the
+  tapped chip stays unhighlighted for the whole round trip and forever if the request fails. The two
+  are not in tension -- `notify: false` keeps the write off `_refreshForFilterChange` (so the *list*
+  is untouched), `setState` repaints this State alone. Desktop gets this for free: its NGXS dispatch
+  updates a signal. It is reset on a **group change by the list**, in the same branch that re-fetches the
   summary — not from `clearFilter` (which early-returns on an already-empty filter) and not from
   the filter-clear branch beside it (which is itself gated on there having been a filter at all).
   Either would leave a user who never filtered carrying a pick out of the All group and back.

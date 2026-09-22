@@ -85,7 +85,7 @@ abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSett
 
   @BuiltValueField(wireName: r'receiptSummaryPosition')
   ReceiptSummaryPosition? get receiptSummaryPosition;
-  // enum receiptSummaryPositionEnum {  TOP,  BOTTOM,  ,  };
+  // enum receiptSummaryPositionEnum {  TOP,  BOTTOM,  };
 
   /// Hide receipt item categories
   @BuiltValueField(wireName: r'hideItemCategories')

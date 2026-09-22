@@ -202,26 +202,40 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
       }
       setState(() => _summary = response.data);
     } catch (_) {
-      // Swallowed on purpose, mirroring the desktop's catchError: an unhandled
-      // DioException from a setState-driven fetch takes the whole receipts screen down,
-      // and the right degradation for a block of totals is to keep the last good
-      // figures rather than to interrupt someone browsing receipts.
+      // Swallowed rather than rethrown: an unhandled DioException from a setState-driven
+      // fetch takes the whole receipts screen down, and a block of totals is not worth
+      // interrupting someone browsing receipts over.
       //
-      // The group guard is released so a failure is not recorded as "this group is done".
-      // In practice every navigation off this screen remounts the State anyway, so there
-      // is no demonstrable case where the latch bites -- hence no test for it. It is kept
-      // because a guard that means "already fetched" should not be set by a fetch that
-      // did not happen.
-      if (mounted && seq == _summaryRequestSeq && _summaryGroupId == groupId) {
-        _summaryGroupId = null;
+      // But the figures are CLEARED, not kept -- and this is where mobile deliberately
+      // DIVERGES from the desktop. Desktop's catchError leaves the last good figures on
+      // screen because its HTTP interceptor tells the user the refresh failed; mobile
+      // installs no interceptor, so keeping them would render the PREVIOUS filter's
+      // totals beside the new filter's list with nothing to say they are stale.
+      // "Covers the whole current filter result set" is the block's entire contract, so
+      // showing nothing is the honest degradation and showing wrong numbers is not.
+      //
+      // Guarded exactly like the success path: a response that is no longer the latest
+      // must not clear a newer one's figures. The group latch is released with it, so a
+      // fetch that did not happen is never recorded as "this group is done".
+      if (!mounted || seq != _summaryRequestSeq) {
+        return;
       }
+      setState(() {
+        _summary = null;
+        _summaryGroupId = null;
+      });
     }
   }
 
   /// Changing the configuration changes the breakdown's shape, never the data -- so this
   /// refreshes the summary ONLY, and must not go through _refreshCallback.
   void _onConfigGroupSelected(int groupId) {
-    _receiptListModel.setSummaryConfigGroupId(groupId, false);
+    // setState, not a notifying write. The model write stays silent so it cannot reach
+    // _refreshForFilterChange and refetch the LIST as well -- but something still has to
+    // repaint, because ReceiptSummaryBar reads selectedConfigGroupId off its widget and
+    // nothing else rebuilds this State until the response lands. Without it the tapped
+    // chip stays unhighlighted for the whole round trip, and forever if the request fails.
+    setState(() => _receiptListModel.setSummaryConfigGroupId(groupId, false));
     _fetchSummary(getGroupId(context));
   }
 

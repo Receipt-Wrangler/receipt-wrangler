@@ -112,7 +112,7 @@ export interface UpdateGroupReceiptSettingsCommand {
      */
     receiptSummaryStatuses?: Array<ReceiptStatus>;
     /**
-     * Where the receipt summary renders relative to the receipts list. OMIT the key to leave the stored value unchanged - a client that does not render this control must omit it rather than send a zero value, or it moves the block for the whole group. Needs no extra permission, for the same reason the statuses do not. Anything but TOP or BOTTOM is a 400 - INCLUDING the empty member, which exists on the enum only so a released client tolerates a value added later; on this write side an explicit empty would reset a configured position, so omitting the key is the only way to leave it alone.
+     * Where the receipt summary renders relative to the receipts list. OMIT the key to leave the stored value unchanged - a client that does not render this control must omit it rather than send a zero value, or it moves the block for the whole group. Needs no extra permission, for the same reason the statuses do not. Anything but TOP or BOTTOM is a 400, an empty string included: on this write side an explicit empty would reset a configured position, so omitting the key is the only way to leave it alone.
      */
     receiptSummaryPosition?: ReceiptSummaryPosition;
 }

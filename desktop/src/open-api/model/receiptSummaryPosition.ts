@@ -10,13 +10,12 @@
 
 
 /**
- * Where a group\'s receipt summary renders relative to its receipts list. The empty member exists so an already-released client tolerates a value added later rather than failing the whole payload; the server never sends it.
+ * Where a group\'s receipt summary renders relative to its receipts list. A client that meets a value added later must degrade to BOTTOM, which is where the block rendered before the setting existed, rather than failing the whole payload.
  */
-export type ReceiptSummaryPosition = 'TOP' | 'BOTTOM' | '';
+export type ReceiptSummaryPosition = 'TOP' | 'BOTTOM';
 
 export const ReceiptSummaryPosition = {
     Top: 'TOP' as ReceiptSummaryPosition,
-    Bottom: 'BOTTOM' as ReceiptSummaryPosition,
-    Empty: '' as ReceiptSummaryPosition
+    Bottom: 'BOTTOM' as ReceiptSummaryPosition
 };
 

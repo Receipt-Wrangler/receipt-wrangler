@@ -9,7 +9,6 @@ part of 'receipt_summary_position.dart';
 const ReceiptSummaryPosition _$TOP = const ReceiptSummaryPosition._('TOP');
 const ReceiptSummaryPosition _$BOTTOM =
     const ReceiptSummaryPosition._('BOTTOM');
-const ReceiptSummaryPosition _$empty = const ReceiptSummaryPosition._('empty');
 
 ReceiptSummaryPosition _$valueOf(String name) {
   switch (name) {
@@ -17,10 +16,8 @@ ReceiptSummaryPosition _$valueOf(String name) {
       return _$TOP;
     case 'BOTTOM':
       return _$BOTTOM;
-    case 'empty':
-      return _$empty;
     default:
-      return _$empty;
+      return _$BOTTOM;
   }
 }
 
@@ -28,14 +25,12 @@ final BuiltSet<ReceiptSummaryPosition> _$values =
     BuiltSet<ReceiptSummaryPosition>(const <ReceiptSummaryPosition>[
   _$TOP,
   _$BOTTOM,
-  _$empty,
 ]);
 
 class _$ReceiptSummaryPositionMeta {
   const _$ReceiptSummaryPositionMeta();
   ReceiptSummaryPosition get TOP => _$TOP;
   ReceiptSummaryPosition get BOTTOM => _$BOTTOM;
-  ReceiptSummaryPosition get empty => _$empty;
   ReceiptSummaryPosition valueOf(String name) => _$valueOf(name);
   BuiltSet<ReceiptSummaryPosition> get values => _$values;
 }
@@ -54,12 +49,10 @@ class _$ReceiptSummaryPositionSerializer
   static const Map<String, Object> _toWire = const <String, Object>{
     'TOP': 'TOP',
     'BOTTOM': 'BOTTOM',
-    'empty': '',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'TOP': 'TOP',
     'BOTTOM': 'BOTTOM',
-    '': 'empty',
   };
 
   @override

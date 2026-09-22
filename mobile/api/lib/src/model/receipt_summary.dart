@@ -31,7 +31,7 @@ abstract class ReceiptSummary implements Built<ReceiptSummary, ReceiptSummaryBui
 
   @BuiltValueField(wireName: r'position')
   ReceiptSummaryPosition get position;
-  // enum positionEnum {  TOP,  BOTTOM,  ,  };
+  // enum positionEnum {  TOP,  BOTTOM,  };
 
   @BuiltValueField(wireName: r'overall')
   ReceiptSummaryRow get overall;

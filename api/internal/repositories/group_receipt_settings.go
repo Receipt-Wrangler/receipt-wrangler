@@ -273,17 +273,32 @@ func (repository GroupReceiptSettingsRepository) UpdateGroupReceiptSettings(
 		// Pointer fields: nil means the client omitted the key, so leave the stored value alone.
 		// The write below is Select("*"), so anything NOT assigned here is actively overwritten
 		// with its zero value — a new setting missing from this block fails silently.
+		//
+		// An omitted key drops its column from the UPDATE rather than writing the value read
+		// at load time, mirroring SystemSettingsRepository.UpdateSystemSettings. Writing it
+		// back costs two things: a concurrent update that DID set the field is clobbered by a
+		// value read before it landed, and for an enum the stored value goes back through
+		// Value() -- so a position this build does not recognize (a newer release's member,
+		// seen after a downgrade) fails an otherwise unrelated save.
+		omittedColumns := []string{}
+
 		if command.ApplyDefaultCustomFieldsOnIngest != nil {
 			groupReceiptSettings.ApplyDefaultCustomFieldsOnIngest = *command.ApplyDefaultCustomFieldsOnIngest
+		} else {
+			omittedColumns = append(omittedColumns, "ApplyDefaultCustomFieldsOnIngest")
 		}
 		if command.ReceiptSummaryEnabled != nil {
 			groupReceiptSettings.ReceiptSummaryEnabled = *command.ReceiptSummaryEnabled
+		} else {
+			omittedColumns = append(omittedColumns, "ReceiptSummaryEnabled")
 		}
 		if command.ReceiptSummaryPosition != nil {
 			groupReceiptSettings.ReceiptSummaryPosition = *command.ReceiptSummaryPosition
+		} else {
+			omittedColumns = append(omittedColumns, "ReceiptSummaryPosition")
 		}
 
-		err = tx.Select("*").Model(*&groupReceiptSettings).Updates(groupReceiptSettings).Error
+		err = tx.Select("*").Omit(omittedColumns...).Model(*&groupReceiptSettings).Updates(groupReceiptSettings).Error
 		if err != nil {
 			return err
 		}

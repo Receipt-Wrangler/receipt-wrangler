@@ -108,8 +108,12 @@ java -jar /tmp/openapi-generator-cli-7.10.0.jar generate -i swagger.yml -g types
 cd ../mobile/api && flutter pub get && dart run build_runner build
 ```
 
-After a mobile regen, re-apply the two documented dart-dio patches (`mobile/CLAUDE.md` → "Known
-dart-dio default-value regressions") and run `flutter analyze`.
+`generate-client.sh` re-applies the four documented dart-dio patches itself, as the last step of a
+`mobile` regen (`api/patches/apply-dart-dio-patches.sh`); it **fails the regen** rather than
+returning an unpatched client if one no longer applies. Invoking the jar directly, as above, skips
+that step — run the patch script by hand afterwards. Either way run `flutter analyze` **and
+`flutter test`**: two of the four compile fine when missing (see `mobile/CLAUDE.md` → "Known
+dart-dio regressions").
 
 **Mobile regen without Flutter (e.g. the Claude Code web sandbox):** `mobile/api/pubspec.yaml` has
 **no Flutter dependency**, so the standalone **Dart SDK** is enough to finish the regen — Flutter is
@@ -327,7 +331,9 @@ It shipped backend + desktop first, while mobile had no filter to describe; mobi
   client's cached `groupReceiptSettings` is stale the moment an admin changes the configuration, and
   placement is configuration — so both clients render where the current 200 says, exactly as they
   already do for `enabled`. The server normalizes an empty position to `BOTTOM` at every emit point,
-  because an empty enum fails a closed Dart `EnumClass` and with it the whole payload.
+  because an empty enum fails a closed Dart `EnumClass` and with it the whole payload; the enum
+  itself carries `TOP` and `BOTTOM` only, and the generated Dart client's unknown-value fallback
+  lands on `BOTTOM`, so client and server agree on the degradation by construction.
 - **Placement means different mechanics per client.** Desktop *moves* one `ng-template` between two
   anchors, and top means above the who-owes-whom settlement card as well as above the table. Mobile
   pins the block above or below its list — free, because `PagedDataList` is an `Expanded` — which is
