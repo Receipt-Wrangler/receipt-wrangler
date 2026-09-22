@@ -114,6 +114,7 @@ export 'package:openapi/src/model/receipt_status.dart';
 export 'package:openapi/src/model/receipt_summary.dart';
 export 'package:openapi/src/model/receipt_summary_command.dart';
 export 'package:openapi/src/model/receipt_summary_custom_field_total.dart';
+export 'package:openapi/src/model/receipt_summary_position.dart';
 export 'package:openapi/src/model/receipt_summary_row.dart';
 export 'package:openapi/src/model/report_column.dart';
 export 'package:openapi/src/model/report_detail.dart';

@@ -597,6 +597,21 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     `TokenRefreshService` keeps its own logout-on-refresh-failure path for a truly dead session.
     Background `GET` 403s propagate silently for callers to handle (e.g. the `getRoles` +
     `catchError` reads above).
+  - **One toast per error, and the server's `errorMsg` always wins.** `MatSnackBar.open()`
+    dismisses whatever is already showing, so two `snackbarService.error(...)` calls in one tick
+    means only the *last* is readable. The server-supplied `errorMsg` is the user-friendly message;
+    Angular's generic `HttpErrorResponse.message` ("Http failure response for ...: 500 Internal
+    Server Error") is a **fallback only** for a 5xx that carries no message at all, so an
+    infra-level failure (nginx 502, gateway timeout) is not silent. The two branches must stay
+    mutually exclusive — **do not restore them as two independent `if`s.** They were, and the
+    second one only stayed harmless because its regex was broken: `new RegExp("5d{2}")` matches the
+    literal `5dd`, never `"500"`. Repairing it to `5\d{2}` (commit `4bb640c`, 2026-03-23) activated
+    the override, and since nearly every Go handler writes 5xx through `WriteCustomErrorResponse`
+    with an `errorMsg`, the useful message was being replaced app-wide — most visibly on a failed
+    login, where "Invalid credentials." lasted a few milliseconds. `queueMode` suppresses **both**
+    branches, like the 403 one. Pinned by three cases in `http-interceptor.spec.ts`
+    (5xx-with-`errorMsg`, 5xx-without, and 5xx-in-queue-mode) and by
+    `e2e/auth.spec.ts` → "a wrong password reports it and leaves the form filled in".
   - **Category/tag catalogs:** AppData also carries `groupCategories` / `groupTags` (keyed by group
     id, filtered to the user's grants), stored via `SetGroupCatalog` and read with the
     `AuthState.groupCategories(groupId)` / `groupTags(groupId)` selectors. The **receipt form** and
@@ -1206,6 +1221,12 @@ Angular no longer uses zone.js. Change detection is triggered ONLY by:
 
 **Key implications:**
 - Plain property mutations (`this.foo = 'bar'`) in async callbacks (subscribe, setTimeout, Promise.then) will NOT trigger change detection. Always use signals for state that affects templates.
+  - **`finalize()` is an async callback too, and a success path can mask the bug.** The login form
+    kept `isLoading` as a plain field reset in `finalize()` for ~5 months after the zoneless
+    migration (`d3b4246`, which never touched that file): on success `router.navigate()` happened to
+    trigger CD so the reset repainted, while on **failure** nothing did and the spinner stuck
+    forever. State only written on a failure path is the easiest kind to miss — check that a
+    converted signal is exercised by a test on the *error* branch, not just the happy one.
 - `ChangeDetectorRef.detectChanges()` still works but is rarely needed — prefer signals.
 - `setTimeout` still works for delays but won't auto-trigger CD. The callback must write to a signal if the template needs updating.
 - All `@HostListener` handlers automatically trigger CD (same as template events).
@@ -1623,6 +1644,28 @@ for the wire contract.
   the filter" asserts that), detaching the submit button mid-click. Tab blurs the input, which closes
   the panel when it is open and is harmless when it is not. Escape is fine on the **settings page**
   version of the same picker — there is no dialog behind it there to swallow the keypress.
+- **Placement is a per-group setting, and the block MOVES rather than being cloned.**
+  `receipts-table.component.html` holds one `<ng-template #receiptTotals>` with one set of
+  bindings, rendered through `*ngTemplateOutlet` at one of two anchors: `TOP` puts it immediately
+  after `</app-table-header>` — **above `app-summary-card`**, because that card annotates a row
+  *selection* and is transient while these totals describe the whole filter — and `BOTTOM` leaves
+  it under `.table-container` where it has always been. Two elements behind separate `@if`s would
+  drift and would each need handling in the e2e suite.
+  - **`summaryPosition()` reads `summary()?.position`, never `GroupState`.** Same reason the
+    `enabled` gate does: the cached `groupReceiptSettings` is stale the moment an admin changes the
+    configuration. Nothing flickers on first load, because the component renders nothing until the
+    response arrives.
+  - **The component owns its own vertical rhythm** via a `position` input and a
+    `.receipt-totals--top` modifier that moves the `$spacing-md` to the bottom edge. The receipts
+    page adds no margin of its own.
+  - **The settings control is an `app-select` outside the `canManageDefaultCustomFields` branch**,
+    with the toggle and the status checkboxes — it reads no catalog, and gating it would lock an
+    admin without `app.custom-fields.read` out of deciding where their own summary goes.
+  - **Placement is asserted as DOCUMENT ORDER, and only in e2e.** The block renders at both
+    positions, so "is it visible" passes whichever anchor is wrong. The Jest spec asserts the
+    derivation only: `receipts-table.component.spec.ts` never renders the template — every case
+    there drives the component class, and `app-table` resolves to a custom element under
+    `CUSTOM_ELEMENTS_SCHEMA`, so the `viewChild.required` in `ngAfterViewInit` cannot resolve.
 - **The chip row must never be asserted by count or position.** It lists every group the admin
   belongs to whose summary is enabled, and the suite runs `fullyParallel` against a shared backend,
   so a group leaked by a crashed earlier run would break an exact-count assertion — and, sorting

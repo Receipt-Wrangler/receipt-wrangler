@@ -44,9 +44,21 @@ npx @openapitools/openapi-generator-cli generate \
     -o "$output_dir"
 
 # Check if command executed successfully
-if [ $? -eq 0 ]; then
-    echo "API code successfully generated in: $output_dir"
-else
+if [ $? -ne 0 ]; then
     echo "Error: API code generation failed"
     exit 1
 fi
+
+# The dart-dio generator emits four things the app cannot use as generated - two that do not
+# compile and two `fallback: true` annotations that keep an unrecognized enum value from
+# failing the whole payload. Re-applying them here makes them part of generation instead of a
+# step someone has to remember; the script fails loudly if one no longer applies.
+if [ "$platform" = "mobile" ]; then
+    script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    if ! "$script_dir/patches/apply-dart-dio-patches.sh" "$output_dir"; then
+        echo "Error: dart-dio patches could not be applied"
+        exit 1
+    fi
+fi
+
+echo "API code successfully generated in: $output_dir"

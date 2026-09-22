@@ -98,7 +98,7 @@ void main() {
     Future<void> Function(WidgetTester)? open,
   }) async {
     addTearDown(tester.view.reset);
-    await tester.runAsync(loadDemoFonts);
+    await loadDemoFontsOrFail(tester);
 
     final before =
         await recordPanel(tester, legacy: true, buildApp: buildApp, open: open);

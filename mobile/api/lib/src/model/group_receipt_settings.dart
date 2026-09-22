@@ -6,6 +6,7 @@
 import 'package:openapi/src/model/base_model.dart';
 import 'package:openapi/src/model/receipt_status.dart';
 import 'package:built_collection/built_collection.dart';
+import 'package:openapi/src/model/receipt_summary_position.dart';
 import 'package:openapi/src/model/quick_scan_default_paid_by_type.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -47,6 +48,7 @@ part 'group_receipt_settings.g.dart';
 /// * [receiptSummaryEnabled] - Show the block of totals under this group's receipts table. Off by default, so an existing install is unchanged until an admin opts in.
 /// * [receiptSummaryCustomFieldIds] - CURRENCY custom field ids totalled in the receipt summary, in the order their columns are rendered. Always present; an empty array means the group totals only the receipt amount. Read only here - write via UpdateGroupReceiptSettingsCommand.receiptSummaryCustomFieldIds.
 /// * [receiptSummaryStatuses] - Receipt statuses broken out as their own row in the receipt summary, in ReceiptStatus declaration order. A configured status matching no receipt still renders, as a zero row. Always present; an empty array means the summary shows only the overall row. Read only here - write via UpdateGroupReceiptSettingsCommand.receiptSummaryStatuses.
+/// * [receiptSummaryPosition] 
 @BuiltValue()
 abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSettings, GroupReceiptSettingsBuilder> {
   @BuiltValueField(wireName: r'quickScanDefaultPaidByType')
@@ -80,6 +82,10 @@ abstract class GroupReceiptSettings implements BaseModel, Built<GroupReceiptSett
   /// Require the status field in quick scan
   @BuiltValueField(wireName: r'quickScanStatusRequired')
   bool? get quickScanStatusRequired;
+
+  @BuiltValueField(wireName: r'receiptSummaryPosition')
+  ReceiptSummaryPosition? get receiptSummaryPosition;
+  // enum receiptSummaryPositionEnum {  TOP,  BOTTOM,  };
 
   /// Hide receipt item categories
   @BuiltValueField(wireName: r'hideItemCategories')
@@ -240,6 +246,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
       yield serializers.serialize(
         object.quickScanStatusRequired,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.receiptSummaryPosition != null) {
+      yield r'receiptSummaryPosition';
+      yield serializers.serialize(
+        object.receiptSummaryPosition,
+        specifiedType: const FullType(ReceiptSummaryPosition),
       );
     }
     if (object.hideItemCategories != null) {
@@ -486,6 +499,13 @@ class _$GroupReceiptSettingsSerializer implements PrimitiveSerializer<GroupRecei
             specifiedType: const FullType(bool),
           ) as bool;
           result.quickScanStatusRequired = valueDes;
+          break;
+        case r'receiptSummaryPosition':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(ReceiptSummaryPosition),
+          ) as ReceiptSummaryPosition;
+          result.receiptSummaryPosition = valueDes;
           break;
         case r'hideItemCategories':
           final valueDes = serializers.deserialize(

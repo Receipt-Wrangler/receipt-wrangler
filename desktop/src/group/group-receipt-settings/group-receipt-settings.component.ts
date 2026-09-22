@@ -15,6 +15,7 @@ import {
   Permission,
   QuickScanDefaultPaidByType,
   ReceiptStatus,
+  ReceiptSummaryPosition,
 } from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
 import { AuthState, UpdateGroup } from "../../store/index";
@@ -42,6 +43,13 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
   public readonly paidByTypeOptions = [
     { value: QuickScanDefaultPaidByType.Uploader, display: "Uploader" },
     { value: QuickScanDefaultPaidByType.User, display: "Specific user" },
+  ];
+
+  // The empty enum member is deliberately not offered: it exists only so an already-released
+  // client tolerates a value added later, and the server normalizes it away on every read.
+  public readonly summaryPositionOptions = [
+    { value: ReceiptSummaryPosition.Top, display: "Above the table" },
+    { value: ReceiptSummaryPosition.Bottom, display: "Below the table" },
   ];
 
   // Derived from RECEIPT_STATUS_OPTIONS (itself derived from the generated ReceiptStatus enum), so a
@@ -137,6 +145,12 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
       quickScanCommentEnabled: [receiptSettings.quickScanCommentEnabled ?? false],
       quickScanCommentRequired: [receiptSettings.quickScanCommentRequired ?? false],
       receiptSummaryEnabled: [receiptSettings.receiptSummaryEnabled ?? false],
+      // Ungated, so it always rides the command -- see the template comment. The ?? is for a
+      // group whose settings predate the column; the server normalizes "" to BOTTOM too, but
+      // the select needs a real value or it renders blank.
+      receiptSummaryPosition: [
+        receiptSettings.receiptSummaryPosition || ReceiptSummaryPosition.Bottom,
+      ],
       // One boolean control per status rather than a multi-select: app-select has no `multiple`
       // input, and adding one to a control used app-wide is out of proportion for five fixed
       // options. The Quick Scan section above already reads as a checkbox grid.

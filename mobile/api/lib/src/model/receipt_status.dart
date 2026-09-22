@@ -27,12 +27,10 @@ class ReceiptStatus extends EnumClass {
   @BuiltValueEnumConst(wireName: r'DECLINED')
   static const ReceiptStatus DECLINED = _$DECLINED;
   /// Status of a receipt
-  // HAND-PATCH (re-apply after every regen -- see mobile/CLAUDE.md "Known
-  // dart-dio default-value regressions"): `fallback: true` makes the generated
-  // `_$valueOf` return this member for an unrecognized wire value instead of
-  // throwing ArgumentError, which would fail the ENTIRE enclosing payload --
-  // the whole receipts list, or login when the value rides on AppData. The
-  // openapi-generator does not emit it.
+  // Applied by api/patches/apply-dart-dio-patches.sh -- do not hand-edit, and do not
+  // drop it as generator noise. Without `fallback: true` the generated _$valueOf throws
+  // on an unrecognized wire value, failing the WHOLE enclosing payload rather than the
+  // one field. See mobile/CLAUDE.md for the two outages that came of it.
   @BuiltValueEnumConst(wireName: r'', fallback: true)
   static const ReceiptStatus empty = _$empty;
 
