@@ -441,6 +441,44 @@ func TestGetTempDirectoryPath_UsesBasePath(t *testing.T) {
 	}
 }
 
+// A temp path read back out of an asynq payload is attacker-adjacent, so it goes
+// through this before anything opens or serves it. temp/ is exempt from the
+// data-dir helpers, which resolve against data/ and would reject every path
+// here -- so it is the only containment check that path ever gets.
+func TestAssertWithinTempDirectory(t *testing.T) {
+	t.Setenv("BASE_PATH", testBasePath())
+
+	repository := NewFileRepository(nil)
+	tempDirectory := repository.GetTempDirectoryPath()
+
+	allowed := []string{
+		filepath.Join(tempDirectory, "receipt.jpg"),
+		filepath.Join(tempDirectory, "nested", "receipt.jpg"),
+		// Escapes and comes back: lexically contained, so allowed.
+		filepath.Join(tempDirectory, "nested", "..", "receipt.jpg"),
+	}
+	for _, path := range allowed {
+		if err := repository.AssertWithinTempDirectory(path); err != nil {
+			t.Errorf("expected %q to be allowed, got: %v", path, err)
+		}
+	}
+
+	refused := []string{
+		filepath.Join(tempDirectory, ".."),
+		filepath.Join(tempDirectory, "..", "secrets.env"),
+		filepath.Join(tempDirectory, "..", "..", "etc", "passwd"),
+		"/etc/passwd",
+		// A sibling whose name merely starts with the temp directory's, which a
+		// naive string-prefix check would wave through.
+		tempDirectory + "-elsewhere/receipt.jpg",
+	}
+	for _, path := range refused {
+		if err := repository.AssertWithinTempDirectory(path); err == nil {
+			t.Errorf("expected %q to be refused", path)
+		}
+	}
+}
+
 func TestBuildTempFilePath_FormatAndExtension(t *testing.T) {
 	t.Setenv("BASE_PATH", testBasePath())
 

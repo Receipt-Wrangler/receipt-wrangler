@@ -249,6 +249,25 @@ would reject a non-`data/` path). The deliberate raw reads are the AI image read
 be a `temp/` file or a data file depending on the PDF branch — and the data-file case is now guaranteed
 contained at construction because `BuildFilePath` asserts containment on the full path.
 
+**Exception to the exception: a `temp/` path that came back out of an asynq payload.** The exemption
+above is for paths the *server builds*. A path read out of a task payload is JSON in Redis and is
+attacker-adjacent, so it must go through **`FileRepository.AssertWithinTempDirectory`** before anything
+opens or serves it (the activity source-file endpoints are the current callers). The data-scoped
+helpers cannot be used — they resolve against `data/` and would reject every temp path — so both
+checks now delegate to the shared **`utils.AssertWithinDir(baseDir, path)`**, with the base as a
+parameter because the roots genuinely differ: `data/` hangs off `os.Getwd()`, `temp/` off
+`config.GetBasePath()`, which `BASE_PATH` can override. Prefer a scoped wrapper over naming a base
+yourself, so a new trust boundary is always deliberate. The check is purely lexical (`filepath.Rel`,
+no `EvalSymlinks`), matching how every path here is constructed.
+
+**`utils.ReadFile` returns `(nil, nil)` on ANY read error** — it swallows it. Never use it where a
+missing file must be an error: the caller sees empty bytes and a nil error and carries on. That cost
+a real bug in `wranglerasynq/email_process_handler.go`, where a deleted attachment sailed past the
+read (`hasAttachmentImage` is derived from the payload *string*, not the file) and, if processing then
+succeeded, persisted a **zero-byte receipt image carrying the real name and size**. That call site and
+the source-file endpoints use `os.ReadFile`; `utils.ReadDataFile` is the propagating equivalent for
+data paths.
+
 ## Testing Patterns
 
 Each package typically has:
@@ -1228,6 +1247,196 @@ whatever lifetime it is handed), `handlers/system_settings_handler_test.go` (the
 explicit-value endpoint round trips), `repositories/system_settings_test.go` (the omitted-column SQL
 shape and the concurrent-update guard), and `desktop/e2e/session-lifetime.spec.ts` (the only
 end-to-end proof that the setting reaches the `Set-Cookie` header).
+
+## Temporary file retention & cleanup
+
+`temp/` holds the files the ingest pipelines work from. Everything that writes
+there: the **quick-scan upload** (`handlers/receipts.go`, one per file in a
+multi-file scan), the **email attachment and its `image-` OCR copy**
+(`wranglerasynq/email.go`), the **email body image**, short-lived scratch from
+`MagicFillFromImage` / `ReadImageWithEasyOcr` / `ConvertPdfToJpg` (each with a
+`defer os.Remove`), and the **`DebugOcr` dumps** from `services/ocr.go`
+`writeDebuggingFiles`, which are never removed by the code that writes them.
+
+**`HandleTempFileCleanUpTask` (`wranglerasynq/temp_file_cleanup_handler.go`) is
+the only thing that reclaims them.** It runs `@every 1h` on
+`models.SystemCleanUpQueue`, registered from **`StartSystemCleanUpTasks`**, and
+that placement is load-bearing: it used to live in `StartEmailPolling`, which
+`main.go` calls only when `EmailPollingInterval > 0 && ReceiptProcessingSettingsId != nil`,
+so an install that never configured email polling ran **no temp cleanup at all** —
+including for quick-scan uploads, which have nothing to do with email.
+`StartEmailPolling` also re-runs on every polling-interval change while
+`scheduler.Register` adds an entry without removing the previous one, so the sweep
+used to accumulate duplicate crons.
+
+### The classification, and its precedence
+
+Ordered — the order is the behaviour, not a formatting choice:
+
+| # | Case | Action |
+|---|---|---|
+| 1 | any referencing task is still actionable (pending/active/scheduled/retry/aggregating) | keep |
+| 2 | else any referencing task is `Archived` | keep until older than retention |
+| 3 | else every referencing task is `Completed` | remove now |
+| 4 | unreferenced | keep until aged, **and only when the reference map is complete** |
+
+**Rule 2 must be tested before rule 3.** One email attachment fans out to a
+sibling task per `groupSettingsId`, so a file can be referenced by both a
+succeeded task and a permanently failed one; releasing it because something
+succeeded is precisely the bug this sweeper replaces.
+
+**`Archived` can never mean deletable** — it is the state that makes an activity
+rerunnable (`SetActivityFlags`), and the previous cleanup released on it.
+
+Age comes from **file mtime**, not task timestamps: uniform across queues, still
+correct once the task ages out of Redis, and it doubles as the grace window for
+the race where a file is written just before its task becomes visible.
+
+### Two invariants that keep the orphan branch safe
+
+The failure mode inverted with the rewrite. Previously a task the scan missed
+meant "we fail to delete" (harmless); now it means the file looks unreferenced
+and is deleted once aged. So:
+
+1. **Every inspector listing pages.** Asynq defaults to **30 per page**
+   (`defaultPageSize` in its `inspector.go`), and the old `getTaskInfo` passed no
+   `ListOption` at all. `listAllTasks` loops with `asynq.PageSize`/`asynq.Page`
+   until a short page.
+2. **Any gap stands the orphan branch down for that run.** A listing error other
+   than `ErrQueueNotFound` aborts the whole sweep with zero deletions; a payload
+   that will not unmarshal drops a `referencesComplete` flag that suppresses
+   **only** rule 4. Rules 1-3 rest on a state actually observed, so they stay live.
+   (The old `buildAttachmentMap` returned the error, which would have aborted every
+   future sweep after one malformed payload.)
+
+### `ListCompletedTasks` is always empty
+
+There is **no `asynq.Retention(...)` anywhere in the repo** — `task_enqueue.go`
+passes only `MaxRetry` and `Queue` — so asynq drops a successfully-processed task
+from Redis immediately and it never enters the completed set. Two consequences:
+
+- The old cleanup was **inverted end to end**: rule 3 could never fire, so the
+  only files it ever deleted were the archived ones it had to keep.
+- Successful uploads now land in the **orphan** branch and wait out the full
+  retention window rather than being cleared within the hour. That is a real
+  disk-footprint change and the reason the window is configurable.
+
+**Do not "fix" that by deleting on success inside `HandleEmailProcessTask`**: one
+`TempFilePath` fans out to N sibling tasks and the first to succeed would break
+the rest. Quick scan is 1:1 and already deletes on success
+(`services/receipts.go`). Adding `asynq.Retention` to the two ingest queues would
+make rule 3 live, but it is a Redis-memory change deserving its own testing.
+
+### `TempFileRetentionHours`
+
+A System Setting, default **720** (30 days), bounds **24-8760** (1 year), `0`
+means unset. It follows the `RefreshTokenValidForHours` machinery exactly — see
+"Session lifetime" above for the `*int` command field, `OmittedLifetimeColumns`
+and why an omitted key is *dropped from the UPDATE* rather than copied. Despite
+their names, both helpers now cover every pointer-backed duration field.
+
+`tempFileRetention()` is the read-side clamp, the same shape as
+`repositories.pdfRasterizationDpi`: **the clamp, not the validator, is the real
+safety net**, because it also covers a value that predates the bounds or a
+settings row that cannot be read at all.
+
+### Upgrade path
+
+`EmailReceiptImageCleanupQueue` stays declared in `models/queue_names.go` —
+persisted `TaskQueueConfigurations` reference it, `QueueName.Value()` whitelists
+it, and `UpsertSystemSettingsCommand.Validate` requires a configuration for every
+name. The retired `EmailProcessImageCleanUp` **task type** also stays declared and
+stays routed in `BuildMux`: the type is a string in Redis, so tasks the old cron
+already enqueued outlive the deploy and would otherwise fail as unregistered.
+`DeleteAllScheduledTasks` alone is insufficient — it only touches the *scheduled*
+set, so `retireEmailReceiptImageCleanupQueue` drains **pending** too.
+
+### Testing
+
+The sweeper is deliberately three seams so the rules stay Redis-free:
+`listTempFileReferences` (Redis, injectable listers), `classifyTempFile` (**pure**
+— no Redis, no filesystem) and `sweepTempDirectory` (`t.TempDir()` + `os.Chtimes`).
+`wranglerasynq/main_test.go` starts no Redis and must not have to. Keep it that
+way — the precedence table above is only cheap to cover exhaustively because the
+classifier is pure.
+
+## Activity source files (preview / download)
+
+A failed quick scan or email upload keeps its image (above), so the user can get
+it back and enter the receipt by hand. Two endpoints on the system task router,
+both gated on **`group.activities.read`** for the group resolved from the task's
+asynq payload:
+
+- `GET /systemTask/{id}/sourceFile` — JSON `{ name, encodedImage }`.
+- `GET /systemTask/{id}/sourceFile/download` — the original bytes.
+
+**Preview prefers `ImageForOcrPath` when the payload has one; download always
+serves `TempFilePath`.** `GetBytesFromImageBytes` on a multi-page PDF runs
+`ConvertPdfToJpg` at the configured `PdfDpi` and concatenates every page into one
+tall JPEG — seconds of CPU inside a request. For email that conversion already
+exists on disk. Download is the *original*, under its original name, because that
+is the file the user recognises.
+
+**The path comes out of a Redis payload**, so it goes through
+`FileRepository.AssertWithinTempDirectory` before anything opens it — see the
+amended Filesystem section below.
+
+**Never `utils.ReadFile` here.** It returns `(nil, nil)` on any read error, which
+would serve an empty image as a success.
+
+`Content-Disposition` is **sanitized and quoted** (`utils.SanitizeFileName`): an
+email attachment's name comes from a MIME header. `DownloadReceiptImage`'s
+unquoted form is a latent bug — copy the rest of that handler's shape
+(`ResponseType: ""` so `http.ServeFile` owns Content-Type, header before serving,
+`return 0, nil` once streaming begins), not that line.
+
+### The two flags, and why they differ
+
+- **`hasSourceFile`** — the task type expects an upload **and** it exists. True in
+  **any** task state.
+- **`canBeRestarted`** — the task is **`Archived`** and every file a rerun reads
+  exists.
+
+`canBeRestarted` stays pinned to `Archived` because `Inspector.RunTask` refuses a
+task in any other state. Only the *lookup* became state-agnostic, not the rule.
+`hasSourceFile` is deliberately **not** gated on it: asynq backs its retries off
+exponentially, so a task takes minutes to archive and the user should not watch an
+activity sit at FAILED with no way to retrieve their image.
+
+**Email needs both files for a rerun** — `HandleEmailProcessTask` reads
+`TempFilePath` for the `FileData` it persists and hands `ImageForOcrPath` to the
+OCR/vision pipeline — while `hasSourceFile` keys on `TempFilePath` alone. A
+**body-only email has neither and stays rerunnable**, which is why "expects a
+file" is tracked apart from "has a file".
+
+### Hydration traps
+
+- **`AssociatedSystemTaskId == nil` is NOT a valid "top level" test.**
+  `email_process_handler.go` chains every `EMAIL_UPLOAD` task under its
+  `EMAIL_READ` parent, so that rule reads false for exactly the rows this feature
+  exists for. `SetSystemTaskHasSourceFile` hydrates the rows the page returned and
+  never recurses into `ChildSystemTasks`.
+- **`GetPagedActivities` must `Omit` every computed field.** GORM infers the
+  SELECT list from the `structs.Activity` destination, so it is
+  `.Omit("can_be_restarted", "has_source_file")`. `asynq_task_id` is a real column
+  and needs none — it is selected so the flags resolve without a per-row query.
+- **Both hydrators live in `wranglerasynq`, not `repositories`** —
+  `wranglerasynq` imports `repositories`, so a loader there needing
+  `GetAsynqInspector` is an import cycle. The precedent to cite is
+  `models.ReportTemplate.AllowedActions` (a `gorm:"-"` field the list handler
+  fills per row), not `LoadSettingsProjections` (pure-DB, lives in the repo).
+- **The system-task flag is resolved per caller.** That table is app-scoped
+  (`app.system-tasks.read`) and lists groups the caller may not belong to, so the
+  handler passes a `canReadGroup` predicate; without it the table would offer
+  buttons that 403.
+- **Nothing here fails a request.** A task that aged out of Redis, an unreadable
+  payload or a failed stat leaves both flags false; the first *other* lookup error
+  logs once and stops, rather than paying a dial timeout per remaining row.
+
+**A known duplication, accepted:** `CreateSystemTasksFromMetadata` creates up to
+two rows of the same type sharing one `AsynqTaskId` when a fallback processing
+setting ran, so such a failure already shows two Rerun buttons and now shows two
+button pairs. Deduping would change rerun's existing behaviour.
 
 ## Login QR & mobile deep link
 

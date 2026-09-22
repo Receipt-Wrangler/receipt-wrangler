@@ -73,8 +73,31 @@ func TestUpdateSystemSettingsOmitsUnsentLifetimeColumns(t *testing.T) {
 		expectSkipped []string
 	}{
 		"both omitted": {
-			command:       buildSettingsCommand(),
+			command: buildSettingsCommand(),
+			expectSkipped: []string{
+				"`refresh_token_valid_for_hours`",
+				"`mcp_refresh_token_valid_for_hours`",
+				"`temp_file_retention_hours`",
+			},
+		},
+		"retention sent, lifetimes omitted": {
+			command: func() commands.UpsertSystemSettingsCommand {
+				cmd := buildSettingsCommand()
+				cmd.TempFileRetentionHours = intPtr(1080)
+				return cmd
+			}(),
+			expectWritten: []string{"`temp_file_retention_hours`"},
 			expectSkipped: []string{"`refresh_token_valid_for_hours`", "`mcp_refresh_token_valid_for_hours`"},
+		},
+		"lifetimes sent, retention omitted": {
+			command: func() commands.UpsertSystemSettingsCommand {
+				cmd := buildSettingsCommand()
+				cmd.RefreshTokenValidForHours = intPtr(720)
+				cmd.McpRefreshTokenValidForHours = intPtr(6)
+				return cmd
+			}(),
+			expectWritten: []string{"`refresh_token_valid_for_hours`", "`mcp_refresh_token_valid_for_hours`"},
+			expectSkipped: []string{"`temp_file_retention_hours`"},
 		},
 		"app sent, mcp omitted": {
 			command: func() commands.UpsertSystemSettingsCommand {

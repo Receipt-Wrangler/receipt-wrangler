@@ -259,6 +259,7 @@ func TestUpdateSystemSettingsPreservesOmittedRefreshTokenLifetimes(t *testing.T)
 		Updates(map[string]interface{}{
 			"refresh_token_valid_for_hours":     720,
 			"mcp_refresh_token_valid_for_hours": 6,
+			"temp_file_retention_hours":         1080,
 		}).Error
 	if err != nil {
 		t.Fatalf("failed to seed configured lifetimes: %v", err)
@@ -310,6 +311,12 @@ func TestUpdateSystemSettingsPreservesOmittedRefreshTokenLifetimes(t *testing.T)
 
 	if updated.McpRefreshTokenValidForHours != 6 {
 		utils.PrintTestError(t, updated.McpRefreshTokenValidForHours, 6)
+	}
+
+	// Same hazard, same fix: the retention window is a pointer on the command and
+	// is dropped from the UPDATE when the key is absent.
+	if updated.TempFileRetentionHours != 1080 {
+		utils.PrintTestError(t, updated.TempFileRetentionHours, 1080)
 	}
 }
 

@@ -78,6 +78,14 @@ When the API swagger.yml changes, regenerate clients:
 
 **IMPORTANT**: Never manually edit generated client code in `desktop/src/open-api/` or `mobile/api/`. Changes will be overwritten.
 
+**Drift runs the other way too — the spec can fall behind the server.** `swagger.yml`'s `QueueName`
+enum listed four of the Go side's five names (`system_clean_up` was missing) while
+`UpsertSystemSettingsCommand.Validate` had always required a configuration for all five; the System
+Settings form only worked because it builds its FormArray from the server's settings rather than from
+the enum. Fixed when that queue took on the temp-file sweep. When you add a value to a Go enum the API
+serializes, add it to `swagger.yml` in the same change — and note this direction is the *safe* one to
+fix, since a client learning a value the server already sends can only stop failing on it.
+
 **Regenerate `mobile/api/` in the SAME change as any `swagger.yml` edit** — not "later". It is easy
 to update the backend and desktop and forget mobile, because nothing fails: the Go tests pass, the
 desktop compiles, and the drift is invisible until a released Android build hits the new payload.
@@ -369,6 +377,38 @@ choice in. **Client-only** — no backend, swagger or generated-client involveme
   shared pickers were hardened for this (`selectFirstOption`/`clearAutocomplete` in
   `desktop/e2e/receipts.spec.ts`, `selectDropdown` in
   `mobile/integration_test/helpers/form_actions.dart`).
+
+### Failed Uploads Keep Their Image
+
+A quick scan or email upload that fails keeps the file it was working from, and the user can preview
+or download it to enter the receipt by hand. **Backend + desktop**; the swagger change regenerates
+both clients, but mobile gets no new UI.
+
+- **The old cleanup was inverted.** It released a temp file once every referencing task was
+  `Completed` **or** `Archived` — and `Archived` is exactly what makes an activity rerunnable. No
+  queue sets `asynq.Retention`, so a successful task leaves Redis immediately and never reaches the
+  completed set, meaning the only files it ever deleted were the ones it had to keep. It also scanned
+  only the email queue, and was registered inside `StartEmailPolling`, so an install without email
+  polling ran no temp cleanup at all. See `api/CLAUDE.md` → "Temporary file retention & cleanup" for
+  the replacement's precedence table and the two invariants that keep its orphan branch safe.
+- **How long a file is kept is a System Setting** (`tempFileRetentionHours`, default 720 = 30 days,
+  bounds 24-8760), following the same pointer-and-omitted-column machinery as the refresh-token
+  lifetimes — an omitted key leaves the stored value alone.
+- **`canBeRestarted` now also requires the files a rerun reads**, so it stops advertising reruns that
+  cannot work. A body-only email reads none and stays rerunnable, which is why "expects a file" is
+  tracked separately from "has a file". **Mobile inherits this for free** —
+  `group_activity_list_item.dart` already gates its rerun slidable on the flag, so the regen is the
+  whole mobile change.
+- **`hasSourceFile` is deliberately NOT gated on `Archived`**, unlike `canBeRestarted`: asynq's retry
+  backoff means minutes pass before a task archives, and the user should not watch an activity sit at
+  FAILED with no way to get their image.
+- **Each client's gate keys on the activity's own group**, never the surface's. The desktop widget had
+  this wrong and hid every control on the "All" dashboard; mobile had fixed it years earlier. See
+  `desktop/CLAUDE.md` → "Activity source file".
+- **E2E on the desktop only** (`desktop/e2e/failed-activity-source-file.spec.ts`), because it is the
+  only test that can prove the image survived in `temp/` through a real failure. It forces the failure
+  by pointing the global AI provider at an unreachable host, so it works against the shared demo
+  backend too — which makes it a global-state-mutating, serial spec.
 
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
