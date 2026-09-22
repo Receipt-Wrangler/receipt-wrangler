@@ -17,6 +17,7 @@ import 'package:receipt_wrangler_mobile/models/receipt-list-model.dart';
 import 'package:receipt_wrangler_mobile/models/system_settings_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
+import 'package:receipt_wrangler_mobile/utils/receipt_date_filter.dart';
 import 'package:receipt_wrangler_mobile/utils/receipt_filter.dart';
 
 import '../helpers/receipt_filter_widget_helpers.dart';
@@ -251,5 +252,201 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text("No receipts match this filter"), findsOneWidget);
+  });
+
+  group("the quick date control", () {
+    const householdId = "${ReceiptFilterHarness.householdId}";
+    final thisMonth = monthOfDate(DateTime.now());
+
+    /// The `{operation, value}` the request carried for [key].
+    Map<String, dynamic>? fieldOf(
+            api.ReceiptPagedRequestCommand command, String key) =>
+        filterOf(command)[key] == null
+            ? null
+            : Map<String, dynamic>.from(filterOf(command)[key] as Map);
+
+    testWidgets("starts on All time, pointed at Receipt Date",
+        (tester) async {
+      final harness = await pumpList(tester,
+          router: routerFor("/groups/$householdId/receipts"));
+
+      expect(find.text("All time"), findsOneWidget);
+      expect(find.text("On Receipt Date"), findsOneWidget);
+      expect(harness.receiptListModel.quickDateField, "date");
+    });
+
+    testWidgets("stepping back writes a whole month and refetches once",
+        (tester) async {
+      final harness = await pumpList(tester,
+          router: routerFor("/groups/$householdId/receipts"));
+      requests.clear();
+
+      await tester.tap(find.byKey(const ValueKey("receipt-month-prev")));
+      await tester.pumpAndSettle();
+
+      final lastMonth = shiftMonth(thisMonth, -1);
+      expect(requests, hasLength(1),
+          reason: "one tap must mean one refetch");
+      expect(fieldOf(requests.single, "date")?["operation"], "BETWEEN");
+      expect(
+          harness.receiptListModel.filter["date"]?.value,
+          monthFilterCondition(lastMonth).value);
+      expect(find.text(filterMonthLabel(lastMonth)), findsOneWidget);
+    });
+
+    testWidgets("the arrows step in opposite directions from All time",
+        (tester) async {
+      // Both seed from today, so without the delta they would land on the same
+      // month and one arrow would look broken.
+      final harness = await pumpList(tester,
+          router: routerFor("/groups/$householdId/receipts"));
+
+      await tester.tap(find.byKey(const ValueKey("receipt-month-prev")));
+      await tester.pumpAndSettle();
+      final back = harness.receiptListModel.filter["date"]!.value;
+
+      harness.receiptListModel.clearFilter(true);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey("receipt-month-next")));
+      await tester.pumpAndSettle();
+
+      expect(harness.receiptListModel.filter["date"]!.value, isNot(back));
+    });
+
+    testWidgets("stepping a month replaces the condition rather than adding",
+        (tester) async {
+      final harness = await pumpList(tester,
+          router: routerFor("/groups/$householdId/receipts"));
+      harness.receiptListModel.setFilter({
+        "date": ReceiptFilterCondition(
+            operation: api.FilterOperation.GREATER_THAN,
+            value: DateTime(2020, 1, 1)),
+      }, true, groupId: householdId);
+      await tester.pumpAndSettle();
+      requests.clear();
+
+      await tester.tap(find.byKey(const ValueKey("receipt-month-next")));
+      await tester.pumpAndSettle();
+
+      expect(harness.receiptListModel.filter.keys, ["date"]);
+      expect(fieldOf(requests.single, "date")?["operation"], "BETWEEN");
+    });
+
+    testWidgets("clearing returns to all time", (tester) async {
+      final harness = await pumpList(tester,
+          router: routerFor("/groups/$householdId/receipts"));
+      await tester.tap(find.byKey(const ValueKey("receipt-month-prev")));
+      await tester.pumpAndSettle();
+      requests.clear();
+
+      await tester.tap(find.byKey(const ValueKey("receipt-month-clear")));
+      await tester.pumpAndSettle();
+
+      expect(harness.receiptListModel.filter, isEmpty);
+      expect(filterOf(requests.single), isEmpty);
+      expect(find.text("All time"), findsOneWidget);
+    });
+
+    testWidgets("a range it cannot describe reads as Custom, and is clearable",
+        (tester) async {
+      final harness = await pumpList(tester,
+          router: routerFor("/groups/$householdId/receipts"));
+
+      harness.receiptListModel.setFilter({
+        "date": ReceiptFilterCondition(
+            operation: api.FilterOperation.BETWEEN,
+            value: [DateTime(2026, 9, 3), DateTime(2026, 9, 20)]),
+      }, true, groupId: householdId);
+      await tester.pumpAndSettle();
+
+      expect(find.text("Custom"), findsOneWidget);
+      expect(find.byKey(const ValueKey("receipt-month-clear")), findsOneWidget);
+    });
+
+    testWidgets("switching the date field refetches nothing and keeps the "
+        "condition", (tester) async {
+      // The single most important case: re-pointing the stepper changes no
+      // condition, so the result set has not moved and must not be re-requested.
+      final harness = await pumpList(tester,
+          router: routerFor("/groups/$householdId/receipts"));
+      await tester.tap(find.byKey(const ValueKey("receipt-month-prev")));
+      await tester.pumpAndSettle();
+      final applied = harness.receiptListModel.filter["date"];
+      requests.clear();
+
+      await tester.tap(find.byKey(const ValueKey("receipt-quick-date-field")));
+      await tester.pumpAndSettle();
+      await tester.tap(find
+          .byKey(const ValueKey("receipt-quick-date-field-resolvedDate")));
+      await tester.pumpAndSettle();
+
+      expect(requests, isEmpty,
+          reason: "re-pointing the stepper changes no condition");
+      expect(harness.receiptListModel.filter["date"], applied,
+          reason: "the abandoned condition stays applied");
+      expect(harness.receiptListModel.quickDateField, "resolvedDate");
+      // The stepper now describes an empty field, so it reads All time again
+      // while the Receipt Date condition is still narrowing the list.
+      expect(find.text("All time"), findsOneWidget);
+      expect(find.text("On Resolved Date"), findsOneWidget);
+    });
+
+    testWidgets("stepping after a switch writes the newly chosen field",
+        (tester) async {
+      final harness = await pumpList(tester,
+          router: routerFor("/groups/$householdId/receipts"));
+
+      await tester.tap(find.byKey(const ValueKey("receipt-quick-date-field")));
+      await tester.pumpAndSettle();
+      await tester
+          .tap(find.byKey(const ValueKey("receipt-quick-date-field-createdAt")));
+      await tester.pumpAndSettle();
+      requests.clear();
+
+      await tester.tap(find.byKey(const ValueKey("receipt-month-prev")));
+      await tester.pumpAndSettle();
+
+      expect(fieldOf(requests.single, "createdAt")?["operation"], "BETWEEN");
+      expect(fieldOf(requests.single, "date"), isNull);
+      expect(harness.receiptListModel.filter.keys, ["createdAt"]);
+    });
+
+    testWidgets("stays distinguishable from a sort chip naming the same column",
+        (tester) async {
+      // receiptSortOptions names these three columns identically, so an
+      // unprefixed chip would sit beside a sort chip reading exactly the same
+      // thing while meaning something else entirely.
+      await pumpList(tester,
+          router: routerFor("/groups/$householdId/receipts"));
+
+      await tester.tap(find.text("Added At"));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("Sort by Receipt Date"));
+      await tester.pumpAndSettle();
+
+      expect(find.text("Receipt Date"), findsOneWidget,
+          reason: "only the sort chip may read the bare column name");
+      expect(find.text("On Receipt Date"), findsOneWidget);
+    });
+
+    testWidgets("a group change resets the field as well as the filter",
+        (tester) async {
+      // A filter cleared on arrival must not leave the stepper pointed at a
+      // field the user chose in the group they just left.
+      final harness = buildReceiptFilterHarness();
+      harness.receiptListModel.setQuickDateField("resolvedDate", false);
+      harness.receiptListModel.setFilter({
+        "resolvedDate": monthFilterCondition(thisMonth),
+      }, false, groupId: "${ReceiptFilterHarness.officeId}");
+
+      await pumpList(tester,
+          harness: harness,
+          router: routerFor("/groups/$householdId/receipts"));
+
+      expect(harness.receiptListModel.filter, isEmpty);
+      expect(harness.receiptListModel.quickDateField, "date");
+      expect(find.text("On Receipt Date"), findsOneWidget);
+    });
   });
 }

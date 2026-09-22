@@ -140,6 +140,32 @@ void main() {
     expect(receiptFilterFieldByKey("paidBy")?.label, "Paid By");
     expect(receiptFilterFieldByKey("nonsense"), isNull);
   });
+
+  group("the quick date control's fields", () {
+    test("offers exactly the three date fields, in the table's order", () {
+      expect(receiptDateFilterFields.map((field) => field.key).toList(),
+          ["date", "resolvedDate", "createdAt"]);
+    });
+
+    test("names them as the rest of the filter UI does", () {
+      // The picker, the condition card and the "Add filter" sheet all read this
+      // one table, so a field cannot be called one thing in the picker and
+      // another in the condition it produces.
+      expect(receiptDateFilterFields.map((field) => field.label).toList(),
+          ["Receipt Date", "Resolved Date", "Added At"]);
+    });
+
+    test("every one of them is a real filter field", () {
+      for (final field in receiptDateFilterFields) {
+        expect(receiptFilterFieldByKey(field.key), same(field));
+      }
+    });
+
+    test("the default field is one it offers", () {
+      expect(receiptDateFilterFields.map((field) => field.key),
+          contains(defaultQuickDateFieldKey));
+    });
+  });
 }
 
 /// A minimal valid condition for [field], so the round-trip case above exercises

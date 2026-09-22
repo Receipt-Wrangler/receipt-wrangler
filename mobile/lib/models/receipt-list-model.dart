@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:openapi/openapi.dart';
+import 'package:receipt_wrangler_mobile/constants/receipt_filter_fields.dart';
 import 'package:receipt_wrangler_mobile/constants/receipts.dart';
 import 'package:receipt_wrangler_mobile/utils/receipt_filter.dart';
 
@@ -38,6 +39,21 @@ class ReceiptListModel extends ChangeNotifier {
   String? _filterGroupId;
 
   String? get filterGroupId => _filterGroupId;
+
+  /// The date field the quick date control (the month stepper) reads and
+  /// writes -- one of [receiptDateFilterFields].
+  ///
+  /// It lives here rather than in `GroupReceiptsList`'s State because that
+  /// widget is torn down and rebuilt on almost every navigation, including a
+  /// round trip to a receipt. A widget-local field would silently snap back to
+  /// "Receipt Date" while the month it wrote still sat on `resolvedDate`,
+  /// leaving the stepper describing a condition it does not own.
+  String _quickDateField = defaultQuickDateFieldKey;
+
+  String get quickDateField => _quickDateField;
+
+  /// The condition the quick date control currently owns, if any.
+  ReceiptFilterCondition? get quickDateCondition => _filter[_quickDateField];
 
   /// How many conditions are narrowing the list, i.e. the app bar's badge.
   int get activeFilterCount => _filter.length;
@@ -97,13 +113,62 @@ class ReceiptListModel extends ChangeNotifier {
     }
   }
 
+  /// Replaces, or with a null [condition] removes, a single field's condition.
+  ///
+  /// The quick date control's write path, and the analogue of desktop's
+  /// `SetReceiptFilterField`. It notifies, so the list refetches once -- unlike
+  /// the filter screen, which authors a whole draft and commits it through
+  /// [setFilter], the stepper applies on the tap.
+  ///
+  /// [groupId] is required for the same reason it is on [setFilter]: a filter
+  /// that does not know its group can never be cleaned up.
+  void setFilterField(
+    String key,
+    ReceiptFilterCondition? condition, {
+    required String groupId,
+  }) {
+    final next = Map.of(_filter);
+    if (condition == null) {
+      next.remove(key);
+    } else {
+      next[key] = condition;
+    }
+
+    setFilter(next, true, groupId: groupId);
+  }
+
+  /// Re-points the quick date control at another date field.
+  ///
+  /// Deliberately non-destructive: it changes no condition, only which one the
+  /// stepper describes, so a Receipt Date filter authored on the filter screen
+  /// survives a move to Resolved Date and stays applied. Callers therefore pass
+  /// `notify: false` -- a notification here means "the filter changed" and
+  /// would refetch a result set that has not moved.
+  void setQuickDateField(String key, bool notify) {
+    if (_quickDateField == key) {
+      return;
+    }
+
+    _quickDateField = key;
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  /// Drops every condition and re-points the quick date control at its default
+  /// field, mirroring desktop's `ResetReceiptFilter`.
+  ///
+  /// The guard covers the field as well as the map: a filter cleared on a group
+  /// change would otherwise leave the stepper pointed at `resolvedDate` in a
+  /// group the user has only just arrived in.
   void clearFilter(bool notify) {
-    if (_filter.isEmpty) {
+    if (_filter.isEmpty && _quickDateField == defaultQuickDateFieldKey) {
       return;
     }
 
     _filter = {};
     _filterGroupId = null;
+    _quickDateField = defaultQuickDateFieldKey;
     if (notify) {
       notifyListeners();
     }

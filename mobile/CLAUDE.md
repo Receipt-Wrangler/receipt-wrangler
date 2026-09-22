@@ -1449,6 +1449,93 @@ group change). Shared drivers live in `integration_test/helpers/receipt_filter_a
   `formField("value")` -- and `CurrencyTextFieldController` reads keystrokes as cents, so type the
   full `50.00`, not `50`.
 
+### Quick date filter (month stepper + date field picker)
+
+Above the receipts list, a month stepper and a chip naming the date field it writes to -- the mobile
+half of the design project's panel **4b**, and a port of desktop's `app-month-stepper` +
+`receipts-quick-date-field` (`desktop/CLAUDE.md` -> "The month stepper targets one date field").
+**Client-only**, like the filter screen below it: a month is `BETWEEN [first day, last day]`, which
+the API and the encoder already handle.
+
+```
+◄   📅 September 2026   ✕   ►
+[📅 On Receipt Date] [Added At] [Descending]
+```
+
+- **`lib/utils/receipt_date_filter.dart` owns the month <-> condition translation** --
+  `monthFilterCondition`, `monthFromCondition`, `shiftMonth`, `monthOfDate`, `filterMonthLabel`.
+  It hands the encoder plain month boundaries (`DateTime(y, m, 1)` / `DateTime(y, m + 1, 0)`) rather
+  than day-bounded instants, because `buildReceiptPagedRequestFilter` already applies
+  `startOfDay`/`endOfDay` to a `BETWEEN` pair -- duplicating that here would give the rule two homes.
+  Day `0` of the next month and month `13` both normalize in Dart, so **February and December need no
+  special case**.
+- **`FilterMonth.month` is 1-based**, unlike desktop's zero-based `FilterMonth` (which is built on
+  JavaScript's `Date`). `DateTime.month` is 1-based, so a faithful port of the off-by-one would fight
+  every constructor.
+- **`monthFromCondition` takes `DateTime`s only**, where desktop's `monthFromFilterEntry` also accepts
+  ISO strings. Desktop persists its filter to localStorage and NGXS serializes through JSON;
+  `ReceiptListModel` is in-memory, so the string branch would be dead code. It still matches on
+  **calendar fields**, which is what lets it name a month the advanced filter's `showDateRangePicker`
+  authored (both bounds at local midnight).
+- **`ReceiptListModel` owns which field the control points at** (`quickDateField`,
+  `setQuickDateField`, `quickDateCondition`), not `GroupReceiptsList`. That widget is torn down and
+  rebuilt on almost every navigation, including a round trip to a receipt -- a widget-local field
+  would snap back to `date` while the month it wrote still sat on `resolvedDate`, leaving the stepper
+  describing a condition it does not own. Same reasoning as `filterGroupId`.
+- **`setFilterField(key, condition, groupId:)`** is the single-field write path (the analogue of
+  desktop's `SetReceiptFilterField`). It **notifies**, so the list refetches once through
+  `_refreshForFilterChange`; the filter screen keeps committing whole drafts through `setFilter`.
+- **Switching the date field must NOT refetch**, which is why the chip calls
+  `setQuickDateField(key, false)` and repaints with a bare `setState`. It changes no condition, only
+  which one the stepper describes, so the result set has not moved -- and a notification from this
+  model means "the filter changed". The abandoned condition stays applied and stays on the filter
+  screen. `group_receipts_list_test.dart` asserts **zero** requests for it; verified to fail with the
+  flag flipped to `true`.
+- **`clearFilter` resets the field too**, and its early return was widened to cover it
+  (`_filter.isEmpty && _quickDateField == defaultQuickDateFieldKey`). Without that widening a group
+  change clears the conditions but leaves the stepper pointed at a field chosen in the group just
+  left -- the same shape as the filter leak `receipt_filter_lifecycle_test.dart` exists for.
+- **The label reads "September 2026" / "Custom" / "All time"**, and the stepper never hides. A
+  condition it cannot describe (a partial range, a `GREATER_THAN`, `WITHIN_CURRENT_MONTH`) still has
+  to read as a filter. **The clear ✕ follows the *condition*, not the month** -- "Custom" carries no
+  month but is exactly the state a user most needs a way out of.
+- **The arrows seed from today when no month is showing**, then apply the delta, so `◄` and `►` never
+  do the same thing. Stepping off "Custom" overwrites that condition with a whole month.
+- **The field chip is labelled "On Receipt Date", not "Receipt Date".** `receiptSortOptions` names
+  the same three columns identically, so an unprefixed chip sits beside a sort chip reading exactly
+  the same words while meaning something else. Desktop needs no prefix because its picker abuts the
+  stepper and reads "September 2026 ... on Receipt Date" in one line; the two stacked rows here
+  cannot. Pinned by a test that sorts by Receipt Date and asserts both chips.
+- **`buildSortFilterBar()` is horizontally scrollable** now that it carries a third chip -- a bare
+  `Row` overflows a narrow phone rather than truncating.
+- **The month sheet is `isScrollControlled`.** A default `showModalBottomSheet` caps itself at 9/16 of
+  the screen, which the year pager plus the grid plus the shortcuts exceeds on a short phone -- and a
+  bottom sheet **overflows rather than scrolling**. It is also a plain compact sheet rather than
+  `showFullscreenBottomSheet`, which mounts a `TopAppBar` over a full-height body for children that
+  scroll themselves. Opened through `ContextModel.resolveSheetContext`, like every other sheet.
+- **Paging the year selects nothing and leaves the sheet open** -- it is a view concern. Bounds are
+  1970 through five years out, matching desktop's `MIN_YEAR` / `MAX_YEAR_OFFSET`.
+- **`receiptDateFilterFields`** is derived from `receiptFilterFields` by `type`, so the picker, the
+  condition card and the "Add filter" sheet cannot name a field differently. Desktop narrows on the
+  *key* because TypeScript needs the runtime check to justify its narrower type; Dart does not, and
+  filtering on the type means a new date field reaches the picker with no second edit.
+
+**Tests:** `test/utils/receipt_date_filter_test.dart` (boundaries incl. leap February and the
+December roll, the null cases, and the whole thing through the **real** encoder -- that last is what
+proves a month reaches the server as `…-01T00:00:00Z` -> `…-<last>T23:59:59Z`),
+`test/widgets/receipt_month_stepper_test.dart`, `test/widgets/receipt_month_picker_sheet_test.dart`,
+plus new cases in `receipt_filter_fields_test.dart`, `receipt_list_model_test.dart` and
+`group_receipts_list_test.dart`.
+
+**E2e: `integration_test/receipt_quick_date_filter_test.dart`.** It **seeds relative to
+`DateTime.now()`**, which `receipt_filter_test.dart` explicitly requires of any month-relative case --
+that suite is pinned to June 2026 and would drift out of the stepper's reach. Two receipts: one dated
+the 15th of last month with status **RESOLVED**, one dated the 15th of this month. The RESOLVED one
+is what makes the field picker testable at all: the API stamps `resolved_date` with `time.Now()` on
+create, so its two date columns fall in different months, and filtering "this month" returns the
+*other* row on `resolvedDate` than on `date`. Nothing but a real column change on the wire produces
+that.
+
 ### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
 
 `CategorySelectField` and `TagSelectField` render no UI of their own: both are thin
