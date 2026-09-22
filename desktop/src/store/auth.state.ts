@@ -21,6 +21,17 @@ export class AuthState {
     return state.userPreferences;
   }
 
+  /**
+   * Whether a multi-select chip field should close its option list after each
+   * selection. The default - and so the behavior of every install that has not
+   * opted in - is to leave it open. Kept as its own selector so that default
+   * lives in one place rather than at each reader.
+   */
+  @Selector()
+  static closeChipSelectOnSelect(state: AuthStateInterface): boolean {
+    return state.userPreferences?.closeChipSelectOnSelect ?? false;
+  }
+
   @Selector()
   static icons(state: AuthStateInterface): Icon[] {
     return state.icons ?? [];

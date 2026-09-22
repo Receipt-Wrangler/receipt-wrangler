@@ -5095,6 +5095,12 @@ components:
               $ref: "#/components/schemas/ReceiptStatus"
               description: Default quick scan status
               default: "OPEN"
+            closeChipSelectOnSelect:
+              type: boolean
+              description:
+                Whether multi-select chip fields close their option list after
+                each selection
+              default: false
             userShortcuts:
               type: array
               items:

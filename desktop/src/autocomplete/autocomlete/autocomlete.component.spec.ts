@@ -2,9 +2,11 @@ import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, } from "@angular/forms";
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent, } from "@angular/material/autocomplete";
-import { NgxsModule } from "@ngxs/store";
+import { NgxsModule, Store } from "@ngxs/store";
 import { BaseInputComponent } from "../../base-input";
+import { AuthState } from "../../store/auth.state";
 import { AutocomleteComponent } from "./autocomlete.component";
+import { OptionDisplayPipe } from "./option-display.pipe";
 
 describe("AutocomleteComponent", () => {
   let component: AutocomleteComponent;
@@ -13,9 +15,12 @@ describe("AutocomleteComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [AutocomleteComponent, BaseInputComponent],
+      // OptionDisplayPipe renders the chips. Only the panel-behavior cases
+      // below reach it - they are the only ones that let change detection
+      // run over the multiple-mode branch of the template.
+      declarations: [AutocomleteComponent, BaseInputComponent, OptionDisplayPipe],
       imports: [
-        NgxsModule.forRoot([]),
+        NgxsModule.forRoot([AuthState]),
         MatAutocompleteModule,
         ReactiveFormsModule,
       ],
@@ -243,5 +248,71 @@ describe("AutocomleteComponent", () => {
       "value 1",
       "new value",
     ]);
+  });
+
+  // The panel handling runs in a setTimeout, so these are the only cases that
+  // flush it - every other optionSelected case stops at the FormArray push.
+  //
+  // Both required viewChildren are stubbed rather than rendered: #inputMultiple
+  // sits behind *ngIf="multiple" and the real MatAutocompleteTrigger drives a
+  // CDK overlay, neither of which this branch is about.
+  describe("panel behavior after selecting in multiple mode", () => {
+    function selectAnOption(): {
+      openPanel: jest.Mock;
+      closePanel: jest.Mock;
+      blur: jest.Mock;
+    } {
+      const openPanel = jest.fn();
+      const closePanel = jest.fn();
+      const blur = jest.fn();
+
+      component.multiple = true;
+      component.inputFormControl = new FormArray([]) as any;
+      (component as any).matAutocompleteTrigger = () => ({ openPanel, closePanel });
+      (component as any).inputMultiple = () => ({ nativeElement: { blur } });
+
+      // jest.useFakeTimers() is describe-scoped and none of the other
+      // optionSelected cases flush, so the queue is carrying their timers -
+      // bound to components TestBed has since destroyed. Drop them, or
+      // runAllTimers() fires those instead and throws NG0205.
+      jest.clearAllTimers();
+
+      component.optionSelected({
+        option: { id: "selected-option", value: "value 1" },
+      } as MatAutocompleteSelectedEvent);
+      jest.runAllTimers();
+
+      return { openPanel, closePanel, blur };
+    }
+
+    it("should re-open the panel when the preference is off", () => {
+      const { openPanel, closePanel, blur } = selectAnOption();
+
+      expect(openPanel).toHaveBeenCalled();
+      expect(closePanel).not.toHaveBeenCalled();
+      expect(blur).not.toHaveBeenCalled();
+      expect(component.filterFormControl.value).toEqual("");
+    });
+
+    it("should close the panel and blur the field when the preference is on", () => {
+      const store = TestBed.inject(Store);
+      store.reset({
+        ...store.snapshot(),
+        auth: {
+          ...store.snapshot().auth,
+          userPreferences: { closeChipSelectOnSelect: true },
+        },
+      });
+
+      const { openPanel, closePanel, blur } = selectAnOption();
+
+      // Material closes the panel on selection by itself, so the blur is what
+      // actually distinguishes this path - without it the trigger re-opens on
+      // the focus the input still holds.
+      expect(closePanel).toHaveBeenCalled();
+      expect(blur).toHaveBeenCalled();
+      expect(openPanel).not.toHaveBeenCalled();
+      expect(component.filterFormControl.value).toEqual("");
+    });
   });
 });
