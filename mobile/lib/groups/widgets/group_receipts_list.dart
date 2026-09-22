@@ -19,6 +19,69 @@ class GroupReceiptsList extends StatefulWidget {
 class _GroupReceiptsList extends State<GroupReceiptsList> {
   VoidCallback? _refreshCallback;
 
+  late final ReceiptListModel _receiptListModel =
+      Provider.of<ReceiptListModel>(context, listen: false);
+
+  @override
+  void initState() {
+    super.initState();
+    // The sort setters deliberately pass notify: false and refresh the list
+    // themselves, so a notification from this model means the applied filter
+    // changed -- which is the one state change the list cannot see for itself.
+    _receiptListModel.addListener(_refreshForFilterChange);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // getGroupId reads GoRouterState, an inherited widget, so this cannot be
+    // done from initState.
+    final groupId = getGroupId(context);
+    final filterGroupId = _receiptListModel.filterGroupId;
+    if (filterGroupId != null && filterGroupId != groupId) {
+      // A filter holds the previous group's category, tag and user ids, which
+      // match nothing here -- and would leave the badge counting conditions the
+      // user cannot see. Clearing everything is the predictable rule: switching
+      // groups shows that group's receipts.
+      //
+      // The scope is read off the FILTER, not off a group this widget
+      // remembered. The app offers no lateral group switch -- the app-bar arrow
+      // goes to /groups, group cards go to /groups/<id>/dashboards -- so every
+      // real group change leaves the group shell and this State is rebuilt with
+      // no memory of where the user came from. A widget-local "last group I
+      // saw" is null on arrival and the clear never fires, which is exactly the
+      // leak that shipped. Asking the filter also keeps the case this must NOT
+      // clear: a round trip to a receipt remounts this list just the same, but
+      // the filter still belongs to the group we are returning to.
+      //
+      // Silently: this runs during a build, where notifying would rebuild the
+      // badge mid-frame. The refresh below is the visible half -- and is null on
+      // a first mount, where the clear simply lands before the first fetch.
+      _receiptListModel.clearFilter(false);
+      _refreshCallback?.call();
+    }
+  }
+
+  @override
+  void dispose() {
+    _receiptListModel.removeListener(_refreshForFilterChange);
+    super.dispose();
+  }
+
+  void _refreshForFilterChange() {
+    if (!mounted) {
+      return;
+    }
+
+    // setState as well as refetch: the empty-state text below reads the applied
+    // filter, and the list is otherwise built with listen: false. Safe to call
+    // here because the only notifying writer is the filter screen's Apply, a
+    // user event -- the group reset writes silently, during a build.
+    setState(() {});
+    _refreshCallback?.call();
+  }
+
   Widget buildSortFilterBar() {
     return Row(
       children: [
@@ -99,7 +162,9 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
           onRefreshCallbackSet: (callback) {
             _refreshCallback = callback;
           },
-          noItemsFoundText: "No receipts found",
+          noItemsFoundText: _receiptListModel.hasActiveFilter
+              ? "No receipts match this filter"
+              : "No receipts found",
           listItemBuilder: (context, receipt, index) {
             return ReceiptListItem(
                 receipt: receipt.anyOf.values[0] as api.Receipt);

@@ -40,7 +40,12 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 			pagedData := structs.PagedData{}
 			token := structs.GetClaims(r)
 
-			var associations []string
+			// The receipts table can show a column per custom field, so the list
+			// always carries the values (and their definitions - see
+			// constants.CUSTOM_FIELD_ASSOCIATIONS for why the definitions are
+			// not optional). FULL_RECEIPT_ASSOCIATIONS already contains them;
+			// gorm's Preloads is a map, so the overlap is not a second query.
+			associations := constants.CUSTOM_FIELD_ASSOCIATIONS
 			if pagedRequest.FullReceipts {
 				associations = constants.FULL_RECEIPT_ASSOCIATIONS
 			}

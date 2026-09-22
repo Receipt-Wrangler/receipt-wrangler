@@ -253,12 +253,25 @@ A group can declare custom fields that are **always pre-added** to its receipts,
   `applyDefaultCustomFieldsOnIngest`, which attaches the set to receipts the **server** creates
   (quick scan, email). Deleting a custom field removes it from every group's set. See
   `api/CLAUDE.md` → "Group Default Custom Fields".
-- **Both clients apply the set on the receipt form**, on create and whenever the group changes, with
-  the same "smart swap" rule: an auto-added field that is still **empty** is dropped when you switch
-  away, anything you typed into or added by hand is kept, and the new group's missing defaults are
-  added. A field the user adds or removes by hand stops being auto-managed. See
-  `desktop/CLAUDE.md` → "Per-group default custom fields" and `mobile/CLAUDE.md` → "Group default
-  custom fields".
+- **Both clients apply the set on the receipt form**, on load in **every** mode — create, edit and
+  read-only view — and whenever the group changes, with the same "smart swap" rule: an auto-added
+  field that is still **empty** is dropped when you switch away, anything you typed into or added by
+  hand is kept, and the new group's missing defaults are added. A field the user adds or removes by
+  hand stops being auto-managed. See `desktop/CLAUDE.md` → "Per-group default custom fields" and
+  `mobile/CLAUDE.md` → "Group default custom fields".
+  - **Applying on load is what makes a default read as a built-in field.** A receipt saved before the
+    group was configured shows the field too: blank and read-only in view, editable in edit. Two
+    consequences worth knowing. **Saving an edited receipt persists the defaults as empty attached
+    values** — an empty value is meaningful, it records that the field belongs on the receipt, and
+    both clients already submit one per attached field because the backend replaces the whole
+    association on update. And **a default applied on load stays auto-managed**, so changing the
+    group on that form drops it again while it is still empty.
+  - **Each client tracks that "the form added this, the user didn't" differently**, because their
+    form lifecycles differ. Desktop re-derives it every `initForm()`, which rebuilds the custom-field
+    `FormArray` from the saved receipt, so an unsaved manual edit never survives a navigation.
+    Mobile's `ReceiptModel` *does* outlive its screen, so the provenance set lives on the model
+    (`ReceiptModel.autoAppliedCustomFieldIds`) — see `mobile/CLAUDE.md`. Inferring it from the saved
+    receipt instead reclaims a field the user removed and re-added by hand, and then drops it.
 - **Both clients gate on `app.custom-fields.read`.** The server's
   `enforceReceiptCustomFieldSelection` **403s** any save that changes the set of attached custom
   field ids for a caller without it, so auto-adding fields for such a user would make their receipts
@@ -274,6 +287,46 @@ A group can declare custom fields that are **always pre-added** to its receipts,
   inject group settings into a mocked store and so prove nothing about the wire:
   `desktop/e2e/group-default-custom-fields.spec.ts` and
   `mobile/integration_test/receipt_default_custom_fields_test.dart`.
+
+### Receipt Summary
+
+A block of totals under the receipts table, covering the **whole current filter result set** rather
+than the visible page: a receipt count and amount total overall, then the same figures per
+configured status, plus a column per configured CURRENCY custom field. **Backend + desktop only** —
+the swagger change regenerates both clients, but the summary endpoint is called from the desktop
+receipts table alone. Mobile has since gained its own receipt filter (see `mobile/CLAUDE.md` →
+"Receipt filtering"), so the original reason for skipping it — no filter to describe — no longer
+holds; it is simply not built there.
+
+- **Configuration is per-group and applies to everyone**, on Group Receipt Settings: a master
+  toggle, which statuses break out, and which currency fields are totalled. Stored in two new join
+  tables (deliberately not a discriminator on the existing defaults join — see `api/CLAUDE.md`).
+- **The server owns the configuration, not the client.** `ReceiptSummaryCommand` carries the filter
+  and an optional `configurationGroupId`, never the field or status list, so a client cannot add a
+  column or opt out of one. A real group may omit `configurationGroupId` or send **its own** id —
+  which is what the desktop does — but naming a **different** group's is a 400. Borrowing another
+  group's configuration is the synthetic All group's privilege alone, since it has none of its own;
+  allowing it anywhere else would be a way around the very invariant this bullet states.
+- **`POST /api/receipt/group/{groupId}/summary` is gated on `group.receipts.read`** — the same
+  permission as the table it sits under, and deliberately not `app.custom-fields.read`: that gates
+  the catalog, and any receipt reader already sees these field names.
+- **Aggregated in Go with `shopspring/decimal`, never a SQL `SUM`.** SQLite has no decimal type, so
+  `SUM` over a `decimal(10,2)` returns a float there and an exact decimal on Postgres/MySQL — the
+  same endpoint would report different cents on the three supported engines.
+- **A configured status that matches nothing still renders, as a zero row**, so the block keeps its
+  shape as the filter narrows. A receipt whose status is *not* configured still counts toward the
+  overall row, or the total would disagree with the table's own count.
+- **The desktop does not re-request on paging or sorting** — neither changes which receipts the
+  filter matches. That, plus skipping the request entirely for a group that has not opted in, is
+  what keeps an unpaged aggregate affordable on the app's hottest screen.
+- **The synthetic "All" group picks a configuration via chips**, since it spans several groups and
+  has none of its own; the data still spans every group. See `desktop/CLAUDE.md` → "Receipt summary".
+- **E2E on the desktop only** (`desktop/e2e/receipt-summary.spec.ts`), because the Jest specs inject
+  group settings into a mocked store and so prove nothing about the wire — the same reason the
+  default-custom-fields feature above has one. It covers the settings round-trip through the real
+  resolver, the figures off a real decimal fold, a filter recomputing every row, and the All-group
+  chip pick surviving a reload. There is no mobile counterpart because the summary block itself is
+  desktop-only — not, as this once said, because mobile has no filter.
 
 ### Seeding the Group Field
 

@@ -12,6 +12,7 @@ import 'package:receipt_wrangler_mobile/models/context_model.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/models/loading_model.dart';
 import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
+import 'package:receipt_wrangler_mobile/models/receipt-list-model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_preferences_model.dart';
@@ -56,6 +57,10 @@ Widget pumpReceiptEntryApp({
   required bool aiEnabled,
   required PermissionsModel permissions,
   List<api.Group> groups = const [],
+  /// Off only for the demo harness in `tool/keyboard_demo/`, where the ribbon
+  /// is just noise across a recorded screenshot. Defaults to the framework's
+  /// own behaviour so no existing test changes.
+  bool showDebugBanner = true,
 }) {
   return MultiProvider(
     providers: [
@@ -66,6 +71,10 @@ Widget pumpReceiptEntryApp({
       // and bottom nav sit in the same trees these tests build.
       ChangeNotifierProvider<LoadingModel>(create: (_) => LoadingModel()),
       ChangeNotifierProvider<UserModel>(create: (_) => UserModel()),
+      // The receipts app bar also carries the filter button, which reads the
+      // applied filter for its badge count.
+      ChangeNotifierProvider<ReceiptListModel>(
+          create: (_) => ReceiptListModel()),
       // Same rationale, for the trees that reach the Quick Scan carousel: each
       // page mounts a QuickScanForm, which reads preferences directly and
       // sources its pickers from the category/tag catalogs.
@@ -75,7 +84,10 @@ Widget pumpReceiptEntryApp({
       ChangeNotifierProvider<TagModel>(create: (_) => TagModel()),
       ChangeNotifierProvider<ContextModel>(create: (_) => ContextModel()),
     ],
-    child: MaterialApp.router(routerConfig: router),
+    child: MaterialApp.router(
+      routerConfig: router,
+      debugShowCheckedModeBanner: showDebugBanner,
+    ),
   );
 }
 

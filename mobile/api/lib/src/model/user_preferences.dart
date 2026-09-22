@@ -24,7 +24,6 @@ part 'user_preferences.g.dart';
 /// * [quickScanDefaultGroupId] - Group foreign key
 /// * [quickScanDefaultPaidById] - User foreign key
 /// * [quickScanDefaultStatus] - Default quick scan status
-/// * [showLargeImagePreviews] - Whether to show large image previews
 /// * [userShortcuts] 
 @BuiltValue()
 abstract class UserPreferences implements BaseModel, Built<UserPreferences, UserPreferencesBuilder> {
@@ -35,10 +34,6 @@ abstract class UserPreferences implements BaseModel, Built<UserPreferences, User
 
   @BuiltValueField(wireName: r'userShortcuts')
   BuiltList<UserShortcut>? get userShortcuts;
-
-  /// Whether to show large image previews
-  @BuiltValueField(wireName: r'showLargeImagePreviews')
-  bool? get showLargeImagePreviews;
 
   /// User foreign key
   @BuiltValueField(wireName: r'userId')
@@ -105,13 +100,6 @@ class _$UserPreferencesSerializer implements PrimitiveSerializer<UserPreferences
       yield serializers.serialize(
         object.userShortcuts,
         specifiedType: const FullType(BuiltList, [FullType(UserShortcut)]),
-      );
-    }
-    if (object.showLargeImagePreviews != null) {
-      yield r'showLargeImagePreviews';
-      yield serializers.serialize(
-        object.showLargeImagePreviews,
-        specifiedType: const FullType(bool),
       );
     }
     yield r'id';
@@ -202,13 +190,6 @@ class _$UserPreferencesSerializer implements PrimitiveSerializer<UserPreferences
             specifiedType: const FullType(BuiltList, [FullType(UserShortcut)]),
           ) as BuiltList<UserShortcut>;
           result.userShortcuts.replace(valueDes);
-          break;
-        case r'showLargeImagePreviews':
-          final valueDes = serializers.deserialize(
-            value,
-            specifiedType: const FullType(bool),
-          ) as bool;
-          result.showLargeImagePreviews = valueDes;
           break;
         case r'id':
           final valueDes = serializers.deserialize(

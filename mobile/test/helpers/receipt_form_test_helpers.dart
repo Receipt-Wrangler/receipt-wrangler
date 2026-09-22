@@ -18,6 +18,8 @@ import 'package:receipt_wrangler_mobile/models/system_settings_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_form.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/screen_wrapper.dart';
 import 'package:receipt_wrangler_mobile/utils/receipts.dart';
 
 import 'widget_test_helpers.dart';
@@ -200,22 +202,51 @@ String _locationFor(WranglerFormState formState, int receiptId) {
 ///
 /// The form derives its mode from the route (`getFormStateFromContext`), so a
 /// real [GoRouter] is mounted at the location matching [formState].
+///
+/// Pass [receiptModel] to pump against a model an earlier call returned: the
+/// second pump replaces the tree, so `ReceiptForm` gets a fresh `State`
+/// while the working copy and its auto-applied provenance carry over. That is
+/// what a view -> edit navigation does in the app -- the app bar menu's Edit
+/// entry is a plain `go`, and `ReceiptFormScreen` re-hydrates only for a
+/// different receipt id -- so a remount is reproduced rather than simulated.
+/// [receipt] is ignored when a model is supplied; the model already holds one.
 Future<ReceiptFormHarness> pumpReceiptForm(
   WidgetTester tester, {
   required List<api.Group> groups,
   api.Receipt? receipt,
+  ReceiptModel? receiptModel,
   List<api.CustomField> customFields = const [],
   List<api.UserView> users = const [],
   WranglerFormState formState = WranglerFormState.add,
+  /// Mount under a real theme. Null keeps the bare `MaterialApp.router` every
+  /// existing caller gets; pass `buildAppTheme()` when the test is about how the
+  /// form is drawn rather than how it behaves.
+  ThemeData? theme,
+  /// Mirrors `ReceiptFormScreen`'s real structure — a [ScreenWrapper] whose
+  /// `bottomSheetWidget` is the submit button — rather than the bare `Scaffold`
+  /// every other case uses. `Scaffold.bottomSheet` *floats over* the body, so
+  /// this is the only shape in which the form's tail can be caught sitting
+  /// underneath the button. Defaults off, leaving every existing case's tree
+  /// unchanged.
+  bool pinnedSubmitButton = false,
+  /// Wraps the whole pumped tree. Only the `tool/demo_capture/` screenshot
+  /// harness uses it, to put the form inside a capture surface — this helper
+  /// owns the `pumpWidget` call, so a caller cannot nest the result itself.
+  Widget Function(Widget)? wrap,
+  /// Off only for the screenshot harness, where the debug ribbon is just noise
+  /// across a captured panel. Defaults to the framework's own behaviour so no
+  /// existing test changes.
+  bool showDebugBanner = true,
 }) async {
   registerCustomCurrencyForTests();
 
-  final seededReceipt = receipt ?? getDefaultReceipt();
+  final seededReceipt = receiptModel?.receipt ?? receipt ?? getDefaultReceipt();
 
   // Seed the receipt before the first pump: `ReceiptForm` captures the model's
   // form key once (`late final`), and `setReceipt` regenerates that key
   // whenever the receipt identity changes.
-  final receiptModel = ReceiptModel()..setReceipt(seededReceipt, false);
+  final model =
+      receiptModel ?? (ReceiptModel()..setReceipt(seededReceipt, false));
   final groupModel = GroupModel()..setGroups(groups);
   final userModel = UserModel()..setUsers(users);
   final customFieldModel = CustomFieldModel()..setCustomFields(customFields);
@@ -230,17 +261,21 @@ Future<ReceiptFormHarness> pumpReceiptForm(
       ])
         GoRoute(
           path: path,
-          builder: (_, __) => const Scaffold(
-            body: SingleChildScrollView(child: ReceiptForm()),
-          ),
+          builder: (_, __) => pinnedSubmitButton
+              ? ScreenWrapper(
+                  bottomSheetWidget: BottomSubmitButton(onPressed: () {}),
+                  child: const SingleChildScrollView(child: ReceiptForm()),
+                )
+              : const Scaffold(
+                  body: SingleChildScrollView(child: ReceiptForm()),
+                ),
         ),
     ],
   );
 
-  await tester.pumpWidget(
-    MultiProvider(
+  final tree = MultiProvider(
       providers: [
-        ChangeNotifierProvider<ReceiptModel>.value(value: receiptModel),
+        ChangeNotifierProvider<ReceiptModel>.value(value: model),
         ChangeNotifierProvider<GroupModel>.value(value: groupModel),
         ChangeNotifierProvider<UserModel>.value(value: userModel),
         ChangeNotifierProvider<CustomFieldModel>.value(value: customFieldModel),
@@ -256,13 +291,18 @@ Future<ReceiptFormHarness> pumpReceiptForm(
         ChangeNotifierProvider<AuthModel>(create: (_) => AuthModel()),
         ChangeNotifierProvider<LoadingModel>(create: (_) => LoadingModel()),
       ],
-      child: MaterialApp.router(routerConfig: router),
-    ),
-  );
+      child: MaterialApp.router(
+        routerConfig: router,
+        theme: theme,
+        debugShowCheckedModeBanner: showDebugBanner,
+      ),
+    );
+
+  await tester.pumpWidget(wrap == null ? tree : wrap(tree));
   await tester.pumpAndSettle();
 
   return ReceiptFormHarness(
-    receiptModel: receiptModel,
+    receiptModel: model,
     groupModel: groupModel,
     userModel: userModel,
     customFieldModel: customFieldModel,

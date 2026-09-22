@@ -36,6 +36,7 @@ Future<GlobalKey<FormBuilderState>> pumpAmountField(
   required Key amountFieldKey,
   String initialAmount = '0.00',
   WranglerFormState formState = WranglerFormState.add,
+  String? Function(String?)? validator,
 }) async {
   final formKey = GlobalKey<FormBuilderState>();
 
@@ -52,6 +53,7 @@ Future<GlobalKey<FormBuilderState>> pumpAmountField(
               fieldName: 'amount',
               initialAmount: initialAmount,
               formState: formState,
+              validator: validator,
             ),
           ),
         ),

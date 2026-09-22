@@ -1324,9 +1324,12 @@ edits, which nothing forces to agree with each other:
 
 1. the `const` block,
 2. the `Value()` guard chain (a missing value makes every write fail as a generic 500),
-3. `ReceiptStatuses()` — the single membership list, which drives the only two server-side
-   validations of a caller-supplied status: `handlers/receipts.go` `BulkReceiptStatusUpdate` and
-   `commands/update_group_receipt_settings_command.go` `isValidReceiptStatus`,
+3. `ReceiptStatuses()` — the single membership list, which drives the server-side validations of a
+   caller-supplied status: `handlers/receipts.go` `BulkReceiptStatusUpdate`,
+   `commands/update_group_receipt_settings_command.go` `isValidReceiptStatus` (which covers both the
+   quick-scan default and the receipt summary's breakdown set), and
+   `repositories/group_receipt_settings.go` `canonicalStatusOrder`, which orders a group's configured
+   summary statuses by this list rather than alphabetically,
 4. the `ReceiptStatus` enum in `swagger.yml` — then regenerate **both** clients, `mobile/api/`
    included, in the same change (see "API Client Generation").
 
@@ -1376,7 +1379,7 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
 - **Comment (`QuickScanCommentEnabled` / `QuickScanCommentRequired`)** captures a receipt comment at
   scan time. Two things gate it beyond its own toggle, both resolved in **one** place per runtime so
   they can't drift — `GroupReceiptSettings.IsQuickScanCommentShown()` / `IsQuickScanCommentRequired()`
-  on the server, `resolveQuickScanFieldConfig` on mobile, `showComment(i)` on desktop:
+  on the server, and `resolveQuickScanFieldConfig` on both clients:
   - **`HideComments`** (the group-wide "hide comments" setting) overrides the toggle. It is derived,
     never written: the stored toggles are untouched, so turning `HideComments` off restores them. The
     desktop config UI greys the two checkboxes out for the same reason — which is why its `submit()`
@@ -1589,6 +1592,235 @@ this screen. `UpdateGroupReceiptSettingsCommand.Validate` therefore checks nothi
   (`TestQuickScan_{Applies,Skips}GroupDefaultCustomFields*`), and
   `handlers/group_default_custom_fields_test.go` (400 unknown id writes nothing, 403 without the
   permission, a save omitting both keys leaves the stored config untouched, `[]` on the wire).
+
+## Receipt Summary
+
+A block of totals under the receipts table, aggregated over the **whole current filter result set**
+rather than the visible page: a receipt count and amount total overall, then the same figures for
+each status the group has configured. Configuration lives on `GroupReceiptSettings` and applies to
+every member — it is not a per-user preference.
+
+**Three new settings, two new join tables.** `ReceiptSummaryEnabled` is a plain column (off by
+default, so existing installs are unchanged). `ReceiptSummaryCustomFieldIds` and
+`ReceiptSummaryStatuses` are `gorm:"-"` projections over
+`GroupReceiptSettingsSummaryCustomField` and `GroupReceiptSettingsSummaryStatus`, both keyed on
+**GroupId** for the same reason `GroupReceiptSettingsCustomField` is (a lazily created settings row
+still has `ID == 0` on the call that created it).
+
+- **Not a `purpose` discriminator on the existing defaults join.** That table's PK is
+  `{GroupId, CustomFieldId}`, so a discriminator has to join the key — a PK change `AutoMigrate`
+  does not perform on a deployed install, and `replaceGroupDefaultCustomFields` deletes
+  `WHERE group_id = ?` unscoped, so saving the defaults would silently wipe the summary selection.
+  `TestUpdateGroupReceiptSettingsKeepsDefaultAndSummaryFieldSetsSeparate` is the regression guard.
+- **Not a delimited or JSON column for the statuses.** The house pattern for "a parent owns a set of
+  enum-ish strings" is row-per-value (`GroupRolePermission`), and a per-row column keeps
+  `ReceiptStatus.Value()`'s `driver.Valuer` rejection at the DB boundary for free.
+- **`size:32` on the status column is load-bearing.** A Go string maps to an unbounded TEXT, and
+  MySQL/MariaDB reject that in a key — without it the table creates fine on SQLite and fails
+  AutoMigrate on MySQL.
+
+**`LoadDefaultCustomFieldIds` is now `LoadSettingsProjections`** (and `…ForGroups`), and loads **all
+three** projections. The rename was deliberate: it makes the compiler find every call site, and
+loading them together means no caller can hydrate one and miss another — which would emit a `null`
+where swagger promises an array, the failure that only shows up on an already-released mobile build.
+The `[]`-never-`null` rule covers all three.
+
+**The command's three fields are pointers**, `nil` == leave unchanged, each for its own reason:
+the custom field ids because the desktop omits that key for an admin without `app.custom-fields.read`;
+the statuses because a plain slice cannot tell "omitted" from the legitimate "clear every status";
+and the bool because a plain one unmarshals as `false` for any client that does not send the key and
+would silently switch a configured summary off.
+
+**The permission gate is deliberately asymmetric.** The CURRENCY field selection joins the existing
+`app.custom-fields.read` 403 because it names catalog entries. `receiptSummaryEnabled` and
+`receiptSummaryStatuses` stay **outside** it — neither reads the catalog, and gating them would lock
+an admin without that permission out of the feature entirely. That is the difference from
+`applyDefaultCustomFieldsOnIngest`, which *is* gated because it decides what the (to such a caller
+invisible) default set does. Validation: unknown id → 400, **non-CURRENCY id → 400** (only
+`CurrencyValue` is summed, so a TEXT field would total `0.00` forever and read as data rather than
+misconfiguration), invalid status → 400 via the existing `isValidReceiptStatus`.
+
+### `POST /api/receipt/group/{groupId}/summary`
+
+Gated on **`group.receipts.read`** — the same permission as the table it sits under. Not a new
+permission (the endpoint returns only aggregates of rows the caller can already page through, so a
+separate gate would just produce a table whose own totals 403), not `group.widgets.read` (this is not
+a dashboard widget), and **no `app.custom-fields.read` gate**: that permission covers the catalog
+endpoints and `enforceReceiptCustomFieldSelection`, which explicitly lets a non-holder read the
+values of fields already on a receipt, and `FULL_RECEIPT_ASSOCIATIONS` already ships those names to
+any receipt reader.
+
+`ReceiptSummaryCommand` carries the filter and an optional `ConfigurationGroupId`, **not** the field
+or status list — the configuration is the group's and applies to everyone, so a client must not be
+able to add a column or opt out. `ConfigurationGroupId` exists for the synthetic "All" group, which
+spans several groups and has no meaningful settings of its own.
+
+**Borrowing a configuration is the All group's privilege alone.** A real group must use its own, or a
+member could render group A's receipts under group B's statuses and currency fields — overriding what
+A's admin configured, and switching on a summary A has turned off, which is exactly the invariant
+above. `resolveConfigurationGroupId` therefore tests `IsAllGroup(uintGroupId)` first
+(`ErrConfigurationGroupNotAllGroup` → **400**, a malformed request rather than an access failure), and
+only then authorizes the named group with `HasGroupPermissions`
+(`ErrConfigurationGroupForbidden` → **403**), or it becomes a way to enumerate another group's
+configured field names. **That order matters**: rejecting on the request's shape first means the
+response cannot depend on whether the caller can read the named group, so the endpoint can never be
+used to probe for another group's existence — pinned by
+`TestReceiptSummary_ConfigurationGroupRejectedBeforeAccessCheck`, which asserts an unreadable group and
+a nonexistent one come back identically. The desktop is unaffected: it sends the viewed group's own id
+for a real group, so only the All group ever sends a differing one.
+
+`services/receipt_summary.go` follows `pie_chart.go`: `IntersectReceiptFilterWithGrants`, then
+`GetPagedReceiptsByGroupId` unpaged, then a Go fold. That one repository call is what supplies the
+filter builder, the All-group `group_id IN (...)` fan-out **and** paid-by visibility — so the totals
+cannot drift from the rows above them. `MaskReceiptsForMemberVisibility` and
+`SubstituteRestrictedCategoriesTags` are not called: the first only masks user references, the second
+only matters for category/tag bucketing.
+
+**Go `decimal` fold, not SQL `SUM`.** There is no `SUM` anywhere in this API. `amount` is
+`decimal(10,2)`, but SQLite has no decimal type, so `SUM(amount)` returns an IEEE double there and an
+exact decimal on Postgres/MySQL — the same endpoint would report different cents on the three
+supported engines, on exactly the money this feature exists to report
+(`TestReceiptSummary_DecimalPrecision`). A SUM query would also have to re-derive the access controls
+above, where the failure mode is a totals row that counts receipts the viewer may not see.
+
+**Rules that are easy to get backwards:**
+
+- Every **configured** status is seeded before the walk, so one matching no receipt still renders as
+  a zero row — that is what keeps the block's shape steady as the filter narrows.
+- A receipt whose status is **not** configured still counts toward the overall row. It is in the
+  filter result, so excluding it would make the total disagree with the table's own count.
+- Where a receipt holds **several** values for one custom field, **lowest id wins**, mirroring
+  `reporting/receiptsource.addCustomFields`. `custom_field_values` has no unique index on
+  `(receipt_id, custom_field_id)` and the association loads without an `ORDER BY`, so preferring
+  whichever came back first would let two identical requests return different numbers. A row with no
+  `CurrencyValue` never wins, so an empty low-id row cannot hide a real one.
+- Columns are built from the configured id order, never by ranging the map — a summary whose columns
+  reshuffle between requests is unreadable.
+- `enabled: false` comes back at a normal **200** with zeroed rows, and returns **before any receipt
+  query**. That is both the cost floor for every install that has not opted in and the reason a
+  client with stale group settings renders nothing rather than an error.
+
+**Money crosses the wire as a string** (`decimal.Decimal` marshals quoted), matching `Receipt.amount`
+and `CustomFieldValue.currencyValue`. `PieChartDataPoint`'s `float64` is the outlier, forced on it by
+the charting library.
+
+**Cost.** This loads the filtered set unpaged — the same bargain `PieChartService` and
+`ReportDataService` already make, but the receipts table is a hotter screen than the dashboard. It is
+bounded on four sides: a group that has not enabled the summary never reaches a query, the desktop
+does not re-request on paging or sorting, the desktop skips the request entirely when no configured
+group resolves, and `CustomFields` is preloaded only when a field is configured. If it ever needs
+more, the next step is a `SUM` fast path behind the same service signature — not caching.
+
+## Custom fields on the receipts list (columns & sorting)
+
+The desktop receipts table can show a column per custom field and sort on it. Two things on this side
+make that work; both have a sharp edge.
+
+### The list response always carries custom field values *with their definitions*
+
+`GetPagedReceiptsForGroup` (`handlers/receipts.go`) preloads
+`constants.CUSTOM_FIELD_ASSOCIATIONS` — the value, its `CustomField`, and that field's `Options` —
+unconditionally, not only under `fullReceipts`. `FULL_RECEIPT_ASSOCIATIONS` is composed from the same
+constant so the two lists cannot drift.
+
+**Loading the values without their definitions breaks the mobile app.**
+`models.CustomFieldValue.CustomField` is a non-pointer struct with no `omitempty`, so it serializes
+even when unloaded — as `{"id":0,"name":"","type":""}`. Mobile calls this exact endpoint
+(`getReceiptsForGroup`) and deserializes each row into a typed `Receipt`; its generated
+`CustomFieldType` is a closed enum with no empty member, and the `one_of` `AnyOfSerializer` swallows
+the failure rather than reporting it, so every row of the receipts list silently collapses. Same
+failure mode as the `aggFunc` omitempty fix — see `mobile/CLAUDE.md` → "Serialization contract".
+`TestPagedReceiptCustomFieldsAlwaysCarryTheirDefinition` asserts the response never contains
+`"type":""`.
+
+**That guard is duplicated at the handler on purpose.** The repository test hands the association
+list to the repository itself, so it stays green if `GetPagedReceiptsForGroup` ever stops choosing
+`CUSTOM_FIELD_ASSOCIATIONS` — the one line that actually decides. `handlers/receipts_test.go` →
+`TestPagedReceiptsCarryCustomFieldDefinitionsWithoutFullReceipts` drives the handler with
+`fullReceipts: false` and asserts on the **raw response bytes**, which is where `"type":""` exists at
+all. Verified to fail both ways the line can regress: preloading nothing, and preloading the values
+without their definitions.
+
+This is not a new disclosure: the single-receipt endpoints already returned these values to any
+holder of `group.receipts.read`, and `MaskReceiptsForMemberVisibility` already masks their created-by.
+
+### Sorting by `custom_<id>`
+
+`orderBy` accepts the reporting engine's own key shape, parsed by
+`receiptsource.ParseCustomFieldKey` (digits only — `custom_1_month` and `custom_abc` are rejected, and
+a malformed value still errors out, which is the guard keeping `orderBy` out of the SQL it is
+concatenated into). One key vocabulary for reports and the table.
+
+**The parse is 32-bit on purpose.** The id it yields is a `models.CustomField` id, i.e. a `uint` —
+which is 32 bits on a 32-bit build, where parsing at 64 bits and narrowing would not merely overflow
+but name a *different* field (`custom_4294967297` would resolve to field `1`). No id reaches 2^32, so
+capping only rejects keys that cannot name a real field, and the caller then treats them like any
+other malformed key. Flagged by CodeQL as an incorrect integer conversion.
+
+**The sort DIRECTION is never concatenated on a custom-field path.** Both fallback branches hand it to
+`BaseRepository.Sort`, which renders `ASC`/`DESC` from a `Desc bool` on `clause.OrderByColumn` — the
+same convention the other twelve repositories use — and the main ordering path picks its keyword from
+literals, because `clause.OrderBy{Expression}` leaves `Columns`/`Desc` unavailable (see below).
+`GetPagedReceiptsByGroupId` does validate the direction up front with `commands.IsValidSortDirection`,
+but that check sits ~350 lines upstream, so the safety is deliberately restated at the point the SQL is
+built rather than inherited from one call path. CodeQL flags the concatenated form as a query built
+from user-controlled sources; the remaining concatenation at the built-in-column branch is left alone,
+its `orderBy` and direction both being allow-listed against literals by `isTrustedValue`.
+
+- **A correlated subquery, never a join.** `custom_field_values` has no unique index on
+  `(receipt_id, custom_field_id)`, so a join multiplies receipt rows and corrupts both the total count
+  and pagination. `orderByCustomField` builds the subquery as an ordinary `*gorm.DB` and passes it as
+  a bind var — gorm expands a `*gorm.DB` var into its own built SQL (`gorm/statement.go`), so this
+  stays in the query builder.
+- **Which duplicate wins matches reporting**: lowest id among the values that actually resolve. Hence
+  the `IS NOT NULL` clause, and hence a SELECT **inner**-joins `custom_field_options` — an
+  unresolvable option id is skipped, not preferred. Drop either and the table sorts a receipt as "no
+  value" while a report shows one for it.
+- **`currency_value` is a TEXT column, so CURRENCY sorts through a cast.**
+  `CustomFieldValue.CurrencyValue` is a `*decimal.Decimal` with **no `gorm:"type:"` tag**, unlike
+  `Receipt.Amount` (`gorm:"type:decimal(10,2)"`). gorm types an untagged `driver.Valuer` by what
+  `Value()` returns, and `decimal.Decimal.Value()` returns a string — so a bare sort is lexicographic
+  (`"100" < "20"`). `CAST(... AS DECIMAL(20,6))` is ANSI and needs no dialect branching: MySQL and
+  Postgres take `DECIMAL(p,s)` directly, SQLite gives that type name NUMERIC affinity. **Retyping the
+  column is the better fix** and would remove the cast entirely (gorm's Postgres migrator does emit
+  the required `USING ?::?`), but it is a migration over existing data and belongs in its own change.
+  The same trap applies to any future untagged decimal field.
+- **The direction and the `receipts.id` tiebreaker live inside the one `clause.Expr`.**
+  `clause.OrderBy` builds its `Expression` *instead of* its `Columns` and `Desc`, and a second
+  `Order()` call replaces the clause rather than appending to it — silently. The tiebreaker is not
+  cosmetic: a BOOLEAN or SELECT field has a handful of distinct values, and without a unique last term
+  `LIMIT`/`OFFSET` paging repeats and skips rows.
+- **A deleted custom field falls back to `created_at` rather than erroring.** Clients persist their
+  sort, and `handlers/receipts.go` maps every repository error to a 500, so erroring would make the
+  list fail to load at all for anyone holding a stale sort. Both fallbacks (the unknown field and the
+  unsortable type) go through `defaultReceiptOrder`, which **carries the same `receipts.id`
+  tiebreaker** as the custom-field path — `created_at` is not unique, and receipts created in one
+  batch share a timestamp, so without it `LIMIT`/`OFFSET` paging repeats and skips rows. That helper
+  can chain the tiebreaker onto `BaseRepository.Sort` because both clauses are **column**-based and
+  gorm appends them; the expression form above cannot, which is why it builds one `clause.Expr`.
+- **NULL ordering is engine-dependent** and deliberately not normalised: SQLite and MySQL sort NULL
+  first, Postgres last, so receipts with no value land at opposite ends. `NULLS LAST` is not portable
+  (MySQL 8 and MariaDB reject it), and normalising it would mean evaluating the subquery twice. This
+  matches the existing nullable built-in column, `resolved_date`.
+- **The subquery is served by a composite index.** `CustomFieldValue` declares
+  `idx_custom_field_value_lookup` over `(receipt_id, custom_field_id)` — without it the subquery is a
+  full scan of `custom_field_values` **per candidate receipt** on SQLite and Postgres (MySQL gets one
+  from the FK). It is two columns, not three: the `ORDER BY id LIMIT 1` would nominally like `id`
+  trailing, but `ID` lives on the embedded `BaseModel` and cannot be tagged without overriding the
+  field, and the two-column seek already narrows to roughly one row. Declared **only** as a model tag —
+  there is no hand-written schema per engine, so AutoMigrate creates it everywhere.
+- `POST /api/export/{groupId}` deserializes the same `ReceiptPagedRequestCommand` and calls the same
+  repository method, so it inherits both behaviours.
+- **Tests**: `repositories/receipt_custom_field_sort_test.go` — one per type (CURRENCY with values
+  that sort differently as text than as numbers), value-less receipts still listed with a matching
+  count, the duplicate/lowest-non-null rule, stable paging across equal values, the fallback
+  tiebreaker (asserted on the generated SQL — a tie is broken by whatever order the engine happens to
+  return, so paging real rows would pass either way), the index existing after migration, both fallbacks
+  (unknown id, and an unsortable type — an empty one, the only unknown `CustomFieldType.Value()` lets
+  through) asserted in **both** directions so a dropped direction cannot pass, the malformed-key
+  rejection, and the `"type":""` guard. `receiptsource_test.go` → `TestParseCustomFieldKey` covers the
+  parser directly, including the 2^32 boundary and the round trip against `CustomFieldKey`. The suite is **SQLite only**, so
+  the cross-engine NULL ordering is not covered there.
 
 ## Reporting Engine (`internal/reporting`)
 

@@ -6,8 +6,15 @@ import 'package:openapi/openapi.dart' as api;
 import 'package:receipt_wrangler_mobile/constants/receipt_entry.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/quick_scan.dart';
 import 'package:receipt_wrangler_mobile/shared/functions/quick_scan.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:rxdart/rxdart.dart';
 
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
+import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:receipt_wrangler_mobile/enums/upload_method.dart';
+
+import '../helpers/channel_mocks.dart';
 import '../helpers/permission_test_helpers.dart';
 import '../helpers/receipt_entry_test_helpers.dart';
 import '../helpers/receipt_form_test_helpers.dart';
@@ -16,6 +23,34 @@ import '../helpers/receipt_form_test_helpers.dart';
 /// and the overflow menu, so it re-checks its own gates rather than trusting the
 /// caller -- and it offers a way out to manual entry only for users who could
 /// actually save one.
+class _RecordingImagePicker extends ImagePickerPlatform
+    with MockPlatformInterfaceMixin {
+  int pickCalls = 0;
+
+  @override
+  Future<List<XFile>> getMultiImageWithOptions({
+    MultiImagePickerOptions options = const MultiImagePickerOptions(),
+  }) async {
+    pickCalls++;
+    return <XFile>[];
+  }
+}
+
+class _RecordingFileSelector extends FileSelectorPlatform
+    with MockPlatformInterfaceMixin {
+  int openFilesCalls = 0;
+
+  @override
+  Future<List<XFile>> openFiles({
+    List<XTypeGroup>? acceptedTypeGroups,
+    String? initialDirectory,
+    String? confirmButtonText,
+  }) async {
+    openFilesCalls++;
+    return <XFile>[];
+  }
+}
+
 void main() {
   const quickScan = api.Permission.groupPeriodReceiptsPeriodQuickScan;
   const create = api.Permission.groupPeriodReceiptsPeriodCreate;
@@ -99,6 +134,91 @@ void main() {
 
     return controller;
   }
+
+  group('the upload source menu', () {
+    const menuKey = ValueKey('quick-scan-upload-source-menu');
+
+    testWidgets('offers both picker sources behind one icon', (tester) async {
+      await pumpSheet(tester,
+          aiEnabled: true, permissions: [quickScan, create]);
+
+      // Closed, it is one icon -- the sheet's app bar already carries the
+      // scanner and delete beside the title.
+      expect(find.byKey(menuKey), findsOneWidget);
+      expect(find.text(uploadPhotoLabel), findsNothing);
+      expect(find.text(uploadFileLabel), findsNothing);
+
+      await tester.tap(find.byKey(menuKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text(uploadPhotoLabel), findsOneWidget);
+      expect(find.text(uploadFileLabel), findsOneWidget);
+    });
+
+    testWidgets('a denied camera explains itself instead of escaping',
+        (tester) async {
+      // acquireReceiptFiles RETHROWS CunningDocumentScannerException rather than
+      // swallowing it, because the right answer differs per call site. The sheet
+      // has to catch it: uncaught, it escaped an async onPressed with no user
+      // feedback at all, so the scan icon just appeared to do nothing.
+      //
+      // Deliberately the message and not fallBackToPhotos -- that opens a whole
+      // new Quick Scan flow, and this sheet is already open with a photo source
+      // one tap away in its own app bar.
+      final permCalls = installPermissionMocks(status: PermissionStatusWire.denied);
+      addTearDown(clearPermissionMocks);
+
+      await pumpSheet(tester,
+          aiEnabled: true, permissions: [quickScan, create]);
+
+      await tester.tap(find.byIcon(Icons.add_a_photo));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull,
+          reason: 'the permission failure must not escape the callback');
+      // findsWidgets, not findsOneWidget: ScaffoldMessenger renders the snack
+      // bar into every registered Scaffold, and while the sheet is open that is
+      // both the sheet's and the route's underneath. `requests` is the honest
+      // proof it was REPORTED once -- the scanner asks for camera permission
+      // exactly once per invocation.
+      expect(find.text(cameraDeniedFallbackMessage), findsWidgets);
+      expect(permCalls.requests, 1, reason: 'one tap, one attempt');
+    });
+
+    testWidgets('routes each entry to its own picker', (tester) async {
+      final picker = _RecordingImagePicker();
+      final selector = _RecordingFileSelector();
+      ImagePickerPlatform.instance = picker;
+      FileSelectorPlatform.instance = selector;
+
+      await pumpSheet(tester,
+          aiEnabled: true, permissions: [quickScan, create]);
+
+      await tester.tap(find.byKey(menuKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(uploadPhotoLabel));
+      await tester.pumpAndSettle();
+
+      expect(picker.pickCalls, 1);
+      expect(selector.openFilesCalls, 0);
+
+      await tester.tap(find.byKey(menuKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(uploadFileLabel));
+      await tester.pumpAndSettle();
+
+      expect(selector.openFilesCalls, 1,
+          reason: 'the file entry must reach the document picker, which is '
+              'the only source that can produce a PDF');
+      expect(picker.pickCalls, 1);
+    });
+
+    // The submitted state disables this menu the same way it disables the
+    // scanner icon (`enabled: !isCompleted`), but the sheet owns
+    // `isCompletedSubject` internally and only a real submit flips it, so that
+    // branch is not reachable from a widget test. It is covered on-device by
+    // the queued-confirmation e2e.
+  });
 
   testWidgets('opens for a user who holds the quick-scan permission',
       (tester) async {
@@ -202,6 +322,39 @@ void main() {
         reason: 'the arrows are the swipe, not a separate notion of where the '
             'user is');
     expect(find.text('2 of 3'), findsOneWidget);
+  });
+
+  testWidgets('the submit button stays clear of an open keyboard',
+      (tester) async {
+    // The sheet opens with `bodyFillsSheet: true`, which pins this Column as
+    // the scaffold's bottom BAR rather than its bottomSheet -- so it reserves
+    // its space instead of floating over the form's last field. Flutter lifts
+    // only the bottomSheet slot above the keyboard, so that trade used to bury
+    // the submit button the moment the (last-in-column, multiline) comment
+    // field took focus. ScreenWrapper._liftAboveKeyboard is what closes it.
+    //
+    // Geometry, not finders: the button is still `findsOneWidget` while parked
+    // underneath the keyboard. Pre-fix its bottom edge reads 844.
+    const screenHeight = 844.0;
+    const keyboard = 300.0;
+
+    tester.view.physicalSize = const Size(390, screenHeight);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await pumpSheet(tester, aiEnabled: true, permissions: [quickScan, create]);
+
+    final submit = find.byType(BottomSubmitButton);
+    expect(tester.getRect(submit).bottom, screenHeight,
+        reason: 'the control: no keyboard, so the button is on the bottom');
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: keyboard);
+    await tester.pumpAndSettle();
+
+    expect(tester.getRect(submit).bottom,
+        lessThanOrEqualTo(screenHeight - keyboard),
+        reason: 'the whole bottom slot -- queued confirmation, manual-entry '
+            'link and submit button -- rides above the keyboard');
   });
 
   testWidgets('the manual link closes the sheet and opens the form',

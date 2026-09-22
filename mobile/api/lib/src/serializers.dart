@@ -88,6 +88,10 @@ import 'package:openapi/src/model/receipt_paged_request_command.dart';
 import 'package:openapi/src/model/receipt_paged_request_filter.dart';
 import 'package:openapi/src/model/receipt_processing_settings.dart';
 import 'package:openapi/src/model/receipt_status.dart';
+import 'package:openapi/src/model/receipt_summary.dart';
+import 'package:openapi/src/model/receipt_summary_command.dart';
+import 'package:openapi/src/model/receipt_summary_custom_field_total.dart';
+import 'package:openapi/src/model/receipt_summary_row.dart';
 import 'package:openapi/src/model/report_column.dart';
 import 'package:openapi/src/model/report_detail.dart';
 import 'package:openapi/src/model/report_document.dart';
@@ -220,6 +224,10 @@ part 'serializers.g.dart';
   ReceiptPagedRequestFilter,
   ReceiptProcessingSettings,
   ReceiptStatus,
+  ReceiptSummary,
+  ReceiptSummaryCommand,
+  ReceiptSummaryCustomFieldTotal,
+  ReceiptSummaryRow,
   ReportColumn,
   ReportDetail,
   ReportDocument,

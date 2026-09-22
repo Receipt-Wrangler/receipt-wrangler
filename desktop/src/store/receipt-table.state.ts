@@ -1,10 +1,12 @@
 import { Injectable } from "@angular/core";
+import { SortDirection } from "@angular/material/sort";
 import { Action, Selector, State, StateContext } from "@ngxs/store";
+import { DEFAULT_QUICK_DATE_FIELD, ReceiptDateFilterFieldKey } from "../constants/receipt-filter-fields.constant";
 import { ReceiptTableInterface } from "../interfaces";
 import { DEFAULT_RECEIPT_TABLE_COLUMNS, ReceiptTableColumnConfig } from "../interfaces/receipt-table-column-config.interface";
 import { ReceiptPagedRequestFilter } from "../open-api";
 import { isFilterEntryActive } from "../utils/receipt-filter-entry";
-import { ResetReceiptFilter, SetColumnConfig, SetPage, SetPageSize, SetReceiptFilter, SetReceiptFilterData, SetReceiptFilterField } from "./receipt-table.actions";
+import { ResetReceiptFilter, SetColumnConfig, SetPage, SetPageSize, SetQuickDateField, SetReceiptFilter, SetReceiptFilterData, SetReceiptFilterField, SetSummaryConfigGroupId } from "./receipt-table.actions";
 
 /**
  * A pristine filter. This is a factory rather than a shared constant because
@@ -59,15 +61,23 @@ export function buildDefaultReceiptFilter(): ReceiptPagedRequestFilter {
 
 export const defaultReceiptFilter = buildDefaultReceiptFilter();
 
+/**
+ * The ordering the table falls back to: the state default, and what a sort on a
+ * column that no longer exists is reset to.
+ */
+export const DEFAULT_RECEIPT_ORDER_BY = "created_at";
+export const DEFAULT_RECEIPT_SORT_DIRECTION: SortDirection = "desc";
+
 // TODO: look into fixing date equals
 @State<ReceiptTableInterface>({
   name: "receiptTable",
   defaults: {
     page: 1,
     pageSize: 50,
-    orderBy: "created_at",
-    sortDirection: "desc",
+    orderBy: DEFAULT_RECEIPT_ORDER_BY,
+    sortDirection: DEFAULT_RECEIPT_SORT_DIRECTION,
     filter: buildDefaultReceiptFilter(),
+    quickDateField: DEFAULT_QUICK_DATE_FIELD,
     columnConfig: DEFAULT_RECEIPT_TABLE_COLUMNS,
   },
 })
@@ -97,9 +107,33 @@ export class ReceiptTableState {
     return Object.keys(filter).filter((key) => isFilterEntryActive(filter[key])).length;
   }
 
+  /**
+   * The date field the quick date control targets. The fallback lives here
+   * rather than only in the state defaults because `defaults` never runs for a
+   * state hydrated from localStorage — every install that filtered before this
+   * key existed would otherwise read `undefined` and index the filter with it.
+   */
+  @Selector()
+  static quickDateField(state: ReceiptTableInterface): ReceiptDateFilterFieldKey {
+    return state.quickDateField ?? DEFAULT_QUICK_DATE_FIELD;
+  }
+
   @Selector()
   static columnConfig(state: ReceiptTableInterface): ReceiptTableColumnConfig[] {
     return state.columnConfig || DEFAULT_RECEIPT_TABLE_COLUMNS;
+  }
+
+  /**
+   * The persisted summary configuration group, raw. There is deliberately no
+   * fallback here: resolving one needs the user's groups and which of them have
+   * the summary enabled, which this slice does not know. `resolveSummaryConfigGroup`
+   * (`src/utils/receipt-summary.ts`) takes this value and does that, and tolerates
+   * `undefined` — which is what a state hydrated from localStorage before this key
+   * existed reads as.
+   */
+  @Selector()
+  static summaryConfigGroupId(state: ReceiptTableInterface): number | undefined {
+    return state.summaryConfigGroupId;
   }
 
   @Action(SetPage)
@@ -159,10 +193,33 @@ export class ReceiptTableState {
     });
   }
 
+  @Action(SetQuickDateField)
+  setQuickDateField(
+    { patchState }: StateContext<ReceiptTableInterface>,
+    payload: SetQuickDateField
+  ) {
+    patchState({
+      quickDateField: payload.field,
+    });
+  }
+
   @Action(ResetReceiptFilter)
   resetFilter({ patchState }: StateContext<ReceiptTableInterface>) {
+    // The targeted field is part of what the user configured, so a reset puts
+    // the control back where a fresh install starts it.
     patchState({
       filter: buildDefaultReceiptFilter(),
+      quickDateField: DEFAULT_QUICK_DATE_FIELD,
+    });
+  }
+
+  @Action(SetSummaryConfigGroupId)
+  setSummaryConfigGroupId(
+    { patchState }: StateContext<ReceiptTableInterface>,
+    payload: SetSummaryConfigGroupId
+  ) {
+    patchState({
+      summaryConfigGroupId: payload.groupId,
     });
   }
 

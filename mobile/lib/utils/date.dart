@@ -12,3 +12,16 @@ String formatDate(String dateFormat, DateTime date) {
   var formatter = DateFormat(dateFormat);
   return formatter.format(date.toLocal());
 }
+
+/// Midnight at the start of [date]'s day, in its own zone.
+DateTime startOfDay(DateTime date) {
+  return DateTime(date.year, date.month, date.day);
+}
+
+/// The last representable instant of [date]'s day, in its own zone.
+///
+/// The receipt date columns are datetimes, so a range whose upper bound is that
+/// day's midnight excludes everything actually recorded on it.
+DateTime endOfDay(DateTime date) {
+  return DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
+}

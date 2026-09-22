@@ -184,11 +184,16 @@ jobs:
       # script-parser does that killed the previous inline loop with
       # `exit code null` on the first iteration.
       #
-      # 18 specs below: the original 13, plus the five receipt-entry specs
+      # 20 specs below: the original 13, the five receipt-entry specs
       # (quick_scan_entry, quick_scan_entry_gated, quick_scan_camera_denied,
-      # receipt_entry_hidden, receipt_entry_menu_reopen). They run here rather
-      # than on ios-e2e because two of them pin the global aiPoweredReceipts
-      # flag -- see the concurrency comment above.
+      # receipt_entry_hidden, receipt_entry_menu_reopen), and the two
+      # receipt-filter specs. The receipt-entry five run here rather than on
+      # ios-e2e because two of them pin the global aiPoweredReceipts flag --
+      # see the concurrency comment above.
+      #
+      # The two filter specs touch no install-wide setting, so the ios-e2e lock
+      # invariant does not bind them; they are Android-only because ios-e2e is
+      # deliberately a smoke subset, not because they are unsafe there.
       - name: Run Flutter integration tests on Android
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -229,6 +234,8 @@ jobs:
             integration_test/receipt_entry_hidden_test.dart
             integration_test/receipt_entry_menu_reopen_test.dart
             integration_test/login_qr_deep_link_test.dart
+            integration_test/receipt_filter_test.dart
+            integration_test/receipt_filter_lifecycle_test.dart
 
   ios-e2e:
     # macos-14 ships Xcode 15.4 + iOS 17.0/17.2/17.4/17.5/18.1/18.2

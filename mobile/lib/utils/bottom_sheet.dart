@@ -13,7 +13,9 @@ import 'package:receipt_wrangler_mobile/shared/widgets/top_app_bar.dart';
 ///  * [bottomSheetWidget] is pinned as the scaffold's bottom bar rather than as
 ///    its `bottomSheet`. A `Scaffold.bottomSheet` **floats over** the body, so
 ///    the tail of the content sits underneath it and cannot be scrolled clear;
-///    a bottom bar reserves its space, so the body shrinks to fit instead.
+///    a bottom bar reserves its space, so the body shrinks to fit instead. That
+///    slot is not keyboard-safe on its own -- `ScreenWrapper` lifts it, see
+///    `_liftAboveKeyboard` there.
 ///
 /// Both defaults keep the existing behaviour for every other sheet.
 showFullscreenBottomSheet(BuildContext context, Widget child, String label,

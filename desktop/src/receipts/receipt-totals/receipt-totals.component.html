@@ -1,0 +1,70 @@
+@if (show()) {
+  <section class="receipt-totals" data-testid="receipt-totals">
+    @if (showConfigGroupChips()) {
+      <!--
+        On the "All" group the data spans every group the user belongs to, but the shape of the
+        breakdown has to come from one group's configuration. This picks which.
+      -->
+      <div class="receipt-totals__config">
+        <span id="receipt-totals-config-label" class="receipt-totals__config-label">
+          Summary configuration:
+        </span>
+        <!--
+          Selection is driven by each option's [selected], not by a [value] on the listbox: the
+          listbox input only takes effect through a form binding, so a [value] here would silently
+          render nothing as selected (the spec asserts the selected class for exactly that reason).
+
+          aria-labelledby, because the label above is only visually adjacent — nothing associates the
+          two, so a screen reader would otherwise announce this as an unnamed listbox.
+        -->
+        <mat-chip-listbox
+          aria-labelledby="receipt-totals-config-label"
+          (change)="configGroupSelected.emit($event.value)"
+        >
+          @for (group of configGroups(); track group.id) {
+            <mat-chip-option
+              [value]="group.id"
+              [selected]="group.id === selectedConfigGroupId()"
+              [attr.data-testid]="'receipt-totals-config-group-' + group.id"
+            >
+              {{ group.name }}
+            </mat-chip-option>
+          }
+        </mat-chip-listbox>
+      </div>
+    } @else if (soleConfigGroupName()) {
+      <p class="receipt-totals__config-note">
+        Using the summary configuration from {{ soleConfigGroupName() }}.
+      </p>
+    }
+
+    @for (row of rows(); track row.status; let isOverall = $first) {
+      <!--
+        A configured status matching nothing still renders, as a zero row, so the block keeps its
+        shape as the filter narrows. It is muted so it reads as "nothing here" rather than a bug.
+      -->
+      <div
+        class="receipt-totals__row"
+        [class.receipt-totals__row--overall]="isOverall"
+        [class.receipt-totals__row--empty]="row.receiptCount === 0"
+        [attr.data-testid]="'receipt-totals-row-' + (row.status || 'overall')"
+      >
+        <span class="receipt-totals__label">
+          {{ rowLabel(row) }} ({{ receiptCountLabel(row) }}):
+        </span>
+        <span class="receipt-totals__figure">
+          <span class="receipt-totals__figure-name">Total</span>
+          <span class="receipt-totals__figure-value">{{ row.total | customCurrency }}</span>
+        </span>
+        @for (customFieldTotal of row.customFieldTotals; track customFieldTotal.customFieldId) {
+          <span class="receipt-totals__figure">
+            <span class="receipt-totals__figure-name">{{ customFieldTotal.name }}</span>
+            <span class="receipt-totals__figure-value">
+              {{ customFieldTotal.total | customCurrency }}
+            </span>
+          </span>
+        }
+      </div>
+    }
+  </section>
+}

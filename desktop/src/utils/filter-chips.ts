@@ -29,22 +29,20 @@ const BETWEEN_SEPARATOR = " – ";
  * One chip per filter field that actually narrows the result set, labelled
  * `"<Field> <operation> <value>"`.
  *
- * `omitKeys` lets a caller suppress a field it already renders another way —
- * the receipts table passes `["date"]` while the month stepper is displaying
- * that exact month, so the same condition never appears twice.
+ * There is deliberately no suppression hook: a condition with no chip is one
+ * the user can neither see nor clear.
  */
 export function buildFilterChips<TKey extends string>(
   fields: readonly FilterField<TKey>[],
   filter: Record<string, unknown> | undefined | null,
   lookups: FilterChipLookups,
-  omitKeys: readonly string[] = [],
 ): FilterChip<TKey>[] {
   if (!filter) {
     return [];
   }
 
   return fields
-    .filter((field) => !omitKeys.includes(field.key) && isFilterEntryActive(filter[field.key]))
+    .filter((field) => isFilterEntryActive(filter[field.key]))
     .map((field) => ({
       key: field.key,
       label: buildLabel(field, filter[field.key] as ReceiptFilterEntry, lookups),

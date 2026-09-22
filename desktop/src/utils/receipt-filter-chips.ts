@@ -26,11 +26,16 @@ export interface ReceiptFilterChipLookups {
  * One chip per receipt filter field that actually narrows the result set. See
  * `buildFilterChips` for the shared label rules; this wrapper only supplies the
  * receipt-specific id resolution.
+ *
+ * Exceptionless on purpose: the quick date control's own condition is chipped
+ * too. It used to be suppressed while the month stepper named that month, but
+ * the stepper's target field is now selectable, so this row is the only place
+ * that says *which* date column is being filtered — and a condition with no
+ * chip is one the user can neither see nor clear from here.
  */
 export function buildReceiptFilterChips(
   filter: ReceiptPagedRequestFilter | undefined | null,
   lookups: ReceiptFilterChipLookups,
-  omitKeys: readonly string[] = [],
 ): ReceiptFilterChip[] {
   return buildFilterChips(
     RECEIPT_FILTER_FIELDS,
@@ -40,7 +45,6 @@ export function buildReceiptFilterChips(
       formatCurrency: lookups.formatCurrency,
       resolveOptionName: (key, id) => resolveOptionName(key as ReceiptFilterFieldKey, id, lookups),
     },
-    omitKeys,
   );
 }
 

@@ -107,6 +107,10 @@ model/receiptPagedRequestCommand.ts
 model/receiptPagedRequestFilter.ts
 model/receiptProcessingSettings.ts
 model/receiptStatus.ts
+model/receiptSummary.ts
+model/receiptSummaryCommand.ts
+model/receiptSummaryCustomFieldTotal.ts
+model/receiptSummaryRow.ts
 model/reportColumn.ts
 model/reportDetail.ts
 model/reportDocument.ts

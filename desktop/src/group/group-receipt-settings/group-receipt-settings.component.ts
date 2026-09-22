@@ -1,12 +1,21 @@
 import { Component, DestroyRef, OnInit, inject } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { FormArray, FormBuilder, FormControl } from "@angular/forms";
+import { FormArray, FormBuilder, FormControl, FormGroup } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { switchMap, take, tap } from "rxjs";
+import { RECEIPT_STATUS_OPTIONS } from "../../constants/receipt-status-options";
 import { FormMode } from "../../enums/form-mode.enum";
 import { BaseFormComponent, setRequired } from "../../form/index";
-import { CustomField, Group, GroupsService, Permission, QuickScanDefaultPaidByType } from "../../open-api/index";
+import {
+  CustomField,
+  CustomFieldType,
+  Group,
+  GroupsService,
+  Permission,
+  QuickScanDefaultPaidByType,
+  ReceiptStatus,
+} from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
 import { AuthState, UpdateGroup } from "../../store/index";
 
@@ -34,6 +43,16 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
     { value: QuickScanDefaultPaidByType.Uploader, display: "Uploader" },
     { value: QuickScanDefaultPaidByType.User, display: "Specific user" },
   ];
+
+  // Derived from RECEIPT_STATUS_OPTIONS (itself derived from the generated ReceiptStatus enum), so a
+  // status added to swagger reaches this screen on regeneration alone.
+  public readonly receiptStatusOptions = RECEIPT_STATUS_OPTIONS;
+
+  // Only CURRENCY fields can be totalled - the server 400s anything else, because only a currency
+  // value can be summed.
+  public get summaryCurrencyCustomFields(): CustomField[] {
+    return this.customFields.filter((field) => field.type === CustomFieldType.Currency);
+  }
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -67,6 +86,10 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
 
   public get defaultCustomFieldsFormArray(): FormArray {
     return this.form.get("defaultCustomFields") as FormArray;
+  }
+
+  public get summaryCustomFieldsFormArray(): FormArray {
+    return this.form.get("receiptSummaryCustomFields") as FormArray;
   }
 
   public get showStatusDefault(): boolean {
@@ -113,6 +136,11 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
       quickScanTagsRequired: [receiptSettings.quickScanTagsRequired ?? false],
       quickScanCommentEnabled: [receiptSettings.quickScanCommentEnabled ?? false],
       quickScanCommentRequired: [receiptSettings.quickScanCommentRequired ?? false],
+      receiptSummaryEnabled: [receiptSettings.receiptSummaryEnabled ?? false],
+      // One boolean control per status rather than a multi-select: app-select has no `multiple`
+      // input, and adding one to a control used app-wide is out of proportion for five fixed
+      // options. The Quick Scan section above already reads as a checkbox grid.
+      receiptSummaryStatuses: this.buildSummaryStatusesGroup(),
     });
 
     // Added conditionally on purpose: the command treats a missing key as "leave
@@ -124,6 +152,10 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
         "applyDefaultCustomFieldsOnIngest",
         new FormControl(receiptSettings.applyDefaultCustomFieldsOnIngest ?? false)
       );
+      // Same reasoning for the summary's currency field picker - it reads the catalog. The master
+      // toggle and the status checkboxes above are deliberately NOT gated: they need no catalog, and
+      // gating them would lock an admin without the permission out of the feature entirely.
+      this.form.addControl("receiptSummaryCustomFields", this.buildSummaryCustomFieldsArray());
     }
 
     this.applyQuickScanDerivedState();
@@ -146,6 +178,37 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
 
     for (const id of configuredIds) {
       const customField = this.customFields.find((field) => field.id === id);
+      if (customField) {
+        array.push(new FormControl(customField), { emitEvent: false });
+      }
+    }
+
+    return array;
+  }
+
+  // One control per status, checked when the group has it configured. Keyed by the status value so
+  // submit() can map straight back to a ReceiptStatus[].
+  private buildSummaryStatusesGroup(): FormGroup {
+    const configured = this.originalGroup.groupReceiptSettings?.receiptSummaryStatuses ?? [];
+    const controls: Record<string, FormControl> = {};
+
+    for (const option of this.receiptStatusOptions) {
+      controls[option.value] = new FormControl(
+        configured.includes(option.value as ReceiptStatus)
+      );
+    }
+
+    return this.formBuilder.group(controls);
+  }
+
+  // Seeded from the catalog objects themselves, for the same reference-equality reason as
+  // buildDefaultCustomFieldsArray above.
+  private buildSummaryCustomFieldsArray(): FormArray {
+    const configuredIds = this.originalGroup.groupReceiptSettings?.receiptSummaryCustomFieldIds ?? [];
+    const array = new FormArray<FormControl>([]);
+
+    for (const id of configuredIds) {
+      const customField = this.summaryCurrencyCustomFields.find((field) => field.id === id);
       if (customField) {
         array.push(new FormControl(customField), { emitEvent: false });
       }
@@ -205,9 +268,19 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
       // the admin's stored configuration.
       // defaultCustomFields is destructured out rather than spread: it holds whole
       // CustomField objects, and only their ids belong on the command.
-      const { defaultCustomFields, ...value } = this.form.getRawValue();
+      const {
+        defaultCustomFields,
+        receiptSummaryCustomFields,
+        receiptSummaryStatuses,
+        ...value
+      } = this.form.getRawValue();
       const command = {
         ...value,
+        // The checkbox group is a { [status]: boolean } map on the form and a ReceiptStatus[] on
+        // the wire.
+        receiptSummaryStatuses: Object.entries(receiptSummaryStatuses ?? {})
+          .filter(([, checked]) => checked)
+          .map(([status]) => status as ReceiptStatus),
         // An empty user autocomplete yields "" / null; send undefined so the nullable id is omitted
         // rather than sent as a non-numeric value.
         quickScanDefaultPaidById: value.quickScanDefaultPaidById
@@ -216,6 +289,9 @@ export class GroupReceiptSettingsComponent extends BaseFormComponent implements 
         ...(this.canManageDefaultCustomFields
           ? {
             defaultCustomFieldIds: ((defaultCustomFields ?? []) as CustomField[]).map(
+              (field) => field.id
+            ),
+            receiptSummaryCustomFieldIds: ((receiptSummaryCustomFields ?? []) as CustomField[]).map(
               (field) => field.id
             ),
           }

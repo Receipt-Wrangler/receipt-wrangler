@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.3.0+25
+version: 2.4.0+26
 
 environment:
   sdk: ">=3.7.0 <4.0.0"
@@ -73,6 +73,16 @@ dependencies:
   path_provider: ^2.1.6
   share_plus: ^13.2.1
   sentry_flutter: ^8.14.2
+  # The photo-library source. file_selector opens a *document* picker
+  # (ACTION_OPEN_DOCUMENT / the Files app), and the camera roll is not a Files
+  # provider -- so on iOS it cannot reach photos at all. image_picker opens the
+  # Android Photo Picker and PHPickerViewController instead. Neither needs a
+  # runtime permission, which is why no READ_MEDIA_IMAGES declaration comes with
+  # this. file_selector stays, for the Files/PDF source.
+  image_picker: ^1.2.0
+  # Direct dependency only so main() can reference the ImagePickerAndroid type
+  # to set `useAndroidPhotoPicker`; the plugin itself arrives transitively.
+  image_picker_android: ^0.8.13
   # Kept as a regular dependency (not a dev_dependency) on purpose.
   # Flutter 3.27+ strips dev_dependency plugins from release builds, but the
   # generated GeneratedPluginRegistrant.java still references IntegrationTestPlugin
@@ -93,6 +103,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   mocktail: ^1.0.4
+  # Pure-Dart GIF encoding for the demo harness in tool/keyboard_demo/.
+  # Already resolved transitively; declared so a pub upgrade cannot drop it.
+  image: ^4.8.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

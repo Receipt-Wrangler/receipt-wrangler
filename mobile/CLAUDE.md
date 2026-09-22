@@ -64,7 +64,7 @@ and defer the `go` until the menu finishes dismissing (see
 
 ### Key Features
 - **Receipt Management**: Create, edit, view receipts with items and images
-- **Image Handling**: Camera/gallery upload with scanning capabilities
+- **Image Handling**: three sources — the document scanner (camera), the OS photo library and the OS file browser — plus scanning capabilities
 - **Group Management**: Multi-user groups with role-based access
 - **Search**: Full-text search across receipts
 - **Offline Support**: Secure token storage with refresh token flow
@@ -104,7 +104,7 @@ stubs every field `storeAppData` touches — a mock missing one throws mid-store
 assertion under test.
 
 **Starting a Quick Scan forces a reload, ahead of the scanner.** `startScanEntry` and
-`startGalleryEntry` (`lib/shared/functions/receipt_entry.dart`) both `await
+`startPickerEntry` (`lib/shared/functions/receipt_entry.dart`) both `await
 TokenRefreshService().reloadAppData()` before anything else, so the group's quick-scan field config,
 the caller's permissions and the AI feature flag are all current for that tap.
 
@@ -120,8 +120,8 @@ the caller's permissions and the AI feature flag are all current for that tap.
   `showQuickScanBottomSheet` stays synchronous.
 - **`openQuickScanFromGallery` deliberately does not refresh on its own behalf** — `fallBackToGallery`
   reaches it from inside `startScanEntry`, which already has, so the camera-denied path would
-  double-fetch. The gallery *menu item* goes through `startGalleryEntry` instead, because it is the
-  one initiation that bypasses `startScanEntry`.
+  double-fetch. The two picker *menu items* go through `startPickerEntry(context, method)` instead,
+  because they are the initiations that bypass `startScanEntry`.
 - **`reloadAppData()` never throws.** The scanner is about to open, so a transient failure falls
   through to the data already loaded rather than blocking the scan — Quick Scan stays usable offline.
   The nav tap is fire-and-forget (`BottomNav.onDestinationSelected` is `void Function(int)`), so a
@@ -164,7 +164,7 @@ its whole toolbar into a `Column` *only* when `bottom != null`
 `actions` child**. Anything in `actions` that captured its own `BuildContext` and uses it after an
 `await` then fails its `mounted` guard and silently gives up.
 
-That shipped: the receipts-screen overflow menu's **Quick Scan** and **Upload from Gallery** items did
+That shipped: the receipts-screen overflow menu's **Quick Scan** and picker items did
 nothing, because `_refreshBeforeQuickScan` — the very thing they await — is what raises this bar. Only
 "Add Manual Receipt" worked, being synchronous, and the bottom-nav long-press was immune because its
 context comes from the nav rather than the app bar. The avatar menu in the same bar survives because it
@@ -178,6 +178,131 @@ the widget going away. Don't "fix" the 4px toolbar squeeze while the bar shows b
 `TopAppBar.preferredSize` dynamic — `Scaffold` pins 56 either way, and a dynamic size would relayout
 every screen's body on every network call. Pinned by
 `test/widgets/top_app_bar_loading_indicator_test.dart`.
+
+### Theme & color roles — every neutral role is spelled out on purpose
+
+The app's `ThemeData` lives in **`lib/theme/app_theme.dart`** (`buildAppTheme()`), extracted from
+`main.dart` so it can be asserted on and so a harness can render a screen exactly as the app does.
+
+**`ColorScheme` silently falls back for any role it is not given, and in this scheme every fallback
+lands on pure black or pure white.** The getters are, verbatim from
+`flutter/lib/src/material/color_scheme.dart`:
+
+| role | falls back to | what that gave us |
+|---|---|---|
+| `outline`, `outlineVariant` | `onBackground` | **pure black** borders on every input, chip, divider and outlined button |
+| `onSurfaceVariant` | `onSurface` | **black** hints, field labels, list subtitles and nav icons — no text hierarchy at all |
+| every `surfaceContainer*` | `surface` | **white** — no tone to layer a raised card against |
+| `secondaryContainer` | `secondary` | `#8EA1AC`, so an unstyled selected chip read as *disabled* |
+
+So the scheme now names all of them, from the slate scale in `lib/constants/colors.dart`. **Do not
+drop them** — nothing fails to compile and no widget test fails; the app just goes back to looking
+like a wireframe. `test/theme/app_theme_test.dart` is the only guard, and it asserts each role is
+both the expected value *and* not equal to its fallback.
+
+Three consequences worth knowing:
+
+- **`accentBlueDark` (`#0086D4`) is the accent for text on the accent *tints*, not a general
+  "accent on white".** Accent icons and button labels on white are the theme's `primary` -- that is
+  what `receipt_form.dart:374`/`:676` already do and what M3 gives every text and outlined button,
+  so it is the convention already in place. `accentBlueDark` exists because `primary` over
+  `primaryContainer` / `accentContainer` is barely 2:1.
+- **A chip's selected label colour has to ride on `chipTheme.labelStyle` as a `WidgetStateColor`.**
+  `RawChip` resolves `labelStyle.color` through `WidgetStateProperty.resolveAs` and, under Material
+  3, **never consults `secondaryLabelStyle`** — that is a Material 2 field. Left to the M3 defaults
+  the selected label is `onSecondaryContainer`, i.e. dark slate on the `#27B1FF` fill, which is the
+  contrast bug the category / tag / status pickers shipped with. Note `labelStyle` **replaces** the
+  defaults rather than merging, so the font family and size are restated there.
+  Because the theme now owns this, `multi-select-field.dart` and `group_dashboard.dart` no longer
+  set `selectedColor` themselves.
+- **`appBarTheme` pins `iconTheme` and `actionsIconTheme` together.** M3 takes `leading` from
+  `onSurface` and `actions` from `onSurfaceVariant`, so once `onSurfaceVariant` stopped being black
+  a bar carrying both rendered two different greys.
+- **`navigationBarTheme` states the bottom nav's selected treatment rather than riding a role.**
+  `NavigationBar.indicatorColor` defaults to `secondaryContainer`, which *used* to fall through to
+  the `#8EA1AC` secondary -- an accidentally serviceable solid pill. Naming that role `slate100`
+  (correct for its other consumers) turned the selected destination into a near-white pill on a
+  near-white bar, i.e. invisible, on every main screen. The bar now takes `accentContainer`
+  (`#CCECFF`) with `accentBlueDark` icon and label, which is the design's own nav. **This is the
+  shape of mistake to expect when filling in a role**: the fix is right for the role and wrong for
+  one component that was quietly depending on the old fallback. `app_theme_test.dart` guards it.
+
+**Contrast floors, and the one gap left open.** WCAG 2.1 SC 1.4.11 wants **3:1** for the visual
+boundary that identifies a component -- which an outlined field's border *is* -- and SC 1.4.3 wants
+**4.5:1** for normal text. `test/theme/app_theme_test.dart` measures these rather than pinning hex
+values, so the assertions survive a palette tweak and fail only when one actually breaks access.
+The first pass at this palette took `#CBD5E1` straight from the design, which draws its borders at
+1.5-2px; Flutter renders 1px, so the app got the lightness without the weight and every field
+boundary sat at **1.48:1**. Hence `borderSlate` (3.38:1) rather than `slate300`, and `slate400` is
+now decorative-only -- a chevron or a dismiss X carries meaning and belongs at `onSurfaceVariant`.
+
+The **known gap**: `accentBlueDark` is also small *text* in two places -- the nav's selected label
+(3.58:1 on the bar) and the editor's selected operation chip (3.59:1 on its tint). Both clear the
+3:1 non-text floor and fall short of 4.5:1. **It is closeable on-palette**: moving the accent from
+`$primary-palette` 700 to **800 `#0072b4`** clears every floor (5.16 / 4.18 / 4.71 / 4.73). Staying
+at 700 is a deliberate appearance call -- 800 reads noticeably navy -- not a limitation, and it is
+the call to revisit if the gap ever matters. The focused floating label was a third such case and is
+**not** accent-coloured for this reason: it keeps `onSurfaceVariant` (4.76:1) and focus rides on the
+border instead.
+
+**The palette is shared with desktop, and almost all of it is already canonical.** The source of
+truth is the Angular Material M2 maps in `desktop/src/variables.scss`, which the web theme is
+actually built from (`mat.m2-define-palette`, `desktop/src/styles.scss`). `lib/constants/colors.dart`
+names the stop for each constant; the mapping is:
+
+| mobile | brand palette |
+|---|---|
+| `primary` `#27B1FF` | `$primary-palette` **500** -- the brand blue, and the logo's own fill |
+| `accentBlueDark` `#0086D4` | `$primary-palette` **700**, which `mat.m2-define-palette` makes the web theme's "darker" variant |
+| `accentContainer` `#CCECFF` | `$primary-palette` **50** |
+| `selectedChipBorder` `#BBE6FF` | `$primary-palette` **100** |
+| `slate50` … `slate700` | `$accent-palette` **50 … 700**, exactly |
+| `error` `#D63333` | `$warn-palette` **500** |
+| `accentTint` `#EAF7FF` | *not a stop* -- the design's 8% wash on white |
+| `borderSlate` `#7E8DA1` | *not a stop* -- a half-step, see below |
+
+So **`#0086D4` is a brand colour, not an off-brand darkening** -- desktop uses that same stop for
+the same job (accent text and icons on light) in about sixteen places, including
+`roles/role-presets.ts`, which pairs `PRIMARY_TINT = "#ccecff"` with `PRIMARY_COLOR = "#0086d4"`:
+the mobile nav pill's exact pairing. This has already been queried once; the answer is here so it
+does not have to be re-derived.
+
+**Source a new value from those maps before inventing one.** `borderSlate` is the one grey that
+isn't a stop, and only because `$accent-palette` jumps 400 `#94A3B8` (2.56:1, under the border floor)
+straight to 500 `#64748B` (4.76:1, as heavy as the label text) with nothing between. Nothing
+mechanically ties `colors.dart` to the SCSS, so the two clients stay in step by hand.
+
+**Two tints, not one.** `primaryContainer` is `#EAF7FF` and `accentContainer` is `#CCECFF`, both
+from the design, and they are not interchangeable: `accentBlueDark` clears AA on the lighter one at
+chip-label size but only clears the large-text / UI threshold on the stronger one, while the lighter
+one behind a 24px nav icon is too faint to read as selected at all.
+
+**An outlined field's border cannot be styled the obvious way.** `inputDecorationTheme.border` is a
+`WidgetStateInputBorder`, and that is load-bearing. For a non-filled field
+`InputDecorator._getDefaultBorder` **throws away whatever `borderSide` the theme's border carries**
+and substitutes `_InputDecoratorDefaultsM3`'s, which is built fresh from the context and never
+merged with this theme -- so a width set there is silently ignored, and
+`InputDecorationTheme.outlineBorder` is ignored too (the *filled* branch consults the app theme; the
+outlined one does not). Only the shape survives, which is why the 10px radius works. The single
+escape hatch is an early return when the border **is** a `WidgetStateProperty<InputBorder>`, which
+bypasses the resolution entirely.
+
+The cost of taking that hatch is that this theme now owns **every** state, so all four are written
+out. Dropping the error branch would leave every failed validator in the app without its red border
+and **nothing would fail to compile** -- `app_theme_test.dart` resolves all four states for that
+reason. Focused is `accentBlueDark` at 2px rather than M3's `primary`, which is 2.38:1.
+
+**`BottomSubmitButton` is the app-wide bottom action bar** — the receipt form, Quick Scan, the
+multi-select picker and the receipt filter all mount it. It is a white bar with a hairline top
+border holding an inset 48px stadium `FilledButton`. Its total height is exported as
+`bottomSubmitBarHeight`, and `submitButtonSpacing` (`lib/constants/spacing.dart`) is **derived from
+it**: where the bar floats as a `Scaffold.bottomSheet` rather than a bottom bar, the scrollable
+above has to reserve at least that much or its last field sits underneath and cannot be scrolled
+clear. Keep the two tied together rather than restating a number.
+
+A known rough edge left alone: Material's `Card` still renders its elevation-1 black shadow as a
+hard ring. It has exactly one call site in the app (`receipt_form.dart`'s add-shares card), so it
+was out of scope here; the filter's condition cards are hand-built containers instead.
 
 ### Permission-based UI gating
 
@@ -325,6 +450,17 @@ permission model exactly.
   `PrivacyInfo.xcprivacy` (auto-processed under Flutter's dynamic framework linking). The app still has
   no app-level `PrivacyInfo.xcprivacy` — a pre-existing gap (`shared_preferences`/UserDefaults already
   qualifies), out of scope here.
+- **Serialization contract (paged receipts + custom fields):** the receipts list
+  (`getReceiptsForGroup` = `POST /receipt/group/{groupId}`, used by `group_receipts_list.dart` and
+  `dashboard_widgets/filtered_receipts.dart`, both casting `anyOf.values[0] as api.Receipt`) now
+  carries `customFields` populated. The API preloads each value **together with its `CustomField` and
+  that field's options** precisely because of the rule below: `models.CustomFieldValue.CustomField` is
+  a non-pointer Go struct with no `omitempty`, so loading the values alone would emit
+  `"customField":{"type":""}`, the generated `CustomFieldType` enum would throw on the empty string,
+  and the `AnyOfSerializer` would swallow it — blanking **every row** of the receipts list on
+  already-released builds. The Go side has a guard test asserting the response never contains
+  `"type":""`; keep the preload set intact in any future change to that handler. See
+  `api/CLAUDE.md` → "Custom fields on the receipts list".
 - **Serialization contract (`aggFunc` omitempty):** the mobile list unwraps each `PagedDataDataInner`
   by **type** (`item.anyOf.values.values.whereType<ReportTemplate>()`, `report_list.dart`), so a
   `ReportTemplate` that fails to deserialize silently collapses to a blank row (the `one_of`
@@ -533,8 +669,8 @@ backend enforces the two permissions **separately** (`handlers.QuickScan` → `g
   mounted"). It is also why `quick_scan_entry_test.dart` **taps** the overflow's Quick Scan rather than
   only asserting its label: a widget test cannot reproduce this, since `TokenRefreshService` is
   uninitialized there and `reloadAppData()` returns within a microtask, so the bar never gets a frame.
-- **Gallery upload is gated on quick-scan, not create** — that flow feeds the Quick Scan sheet, so
-  offering it to a create-only user would produce a sheet they cannot submit.
+- **Both picker entries are gated on quick-scan, not create** — they feed the Quick Scan sheet, so
+  offering them to a create-only user would produce a sheet they cannot submit.
 - **A submitted sheet confirms itself** (`quick-scan-queued-confirmation`). Submitting disables every
   field and hides the submit button, so once the success snackbar fades the sheet would otherwise sit
   there greyed out with nothing saying why. Extraction is an async backend job, so the wording
@@ -565,6 +701,129 @@ backend enforces the two permissions **separately** (`handlers.QuickScan` → `g
   Its `bottomSheetWidget` is built inside the modal route, which is outside the GoRouter subtree, so
   `GoRouterState.of` throws there — resolve before opening and pass the result down.
 
+### Picking receipt files
+
+Three sources feed a receipt image, selected by `UploadMethod { camera, photos, files }` and
+dispatched by the single `acquireReceiptFiles(context, method)`
+(`lib/shared/functions/receipt_upload.dart`). Every entry point routes through it — the Quick Scan
+sheet's two app-bar actions, the scan slot's long-press menu, the receipts overflow menu and the
+receipt-image app bar — so which picker a source opens, how a failure is reported, and whether the
+result is guarded before it touches the tree are decided once.
+
+**Why the photo library is its own source.** `file_selector` opens a *document* picker on both
+platforms — `ACTION_OPEN_DOCUMENT` (SAF) on Android, `UIDocumentPickerViewController` on iOS. On
+Android photos are at least reachable through the file browser; **on iOS the Files app is not a view
+onto the photo library and the camera roll is unreachable from it entirely**, so the button that used
+to say "Upload from Gallery" could not open the gallery. `image_picker` opens the Android Photo
+Picker / `PHPickerViewController` instead. Both are kept: the photo pickers are media-only by design,
+and **only the file source can produce a PDF**, which the backend converts server-side
+(`FileRepository.GetBytesFromImageBytes`) and quick scan OCRs end to end.
+
+**Layering.** `lib/utils/media_picker.dart` is the raw half (`pickPhotos` / `pickDocuments`, no
+Provider, no `BuildContext`, no snackbars); `lib/shared/functions/receipt_upload.dart` is the policy
+half. That mirrors the existing `lib/utils/` vs `lib/shared/functions/` split. Top-level functions,
+not a class — the operation is stateless, and the test seam already exists one layer down
+(`FileSelectorPlatform.instance` / `ImagePickerPlatform.instance` are both settable), so a
+class-level seam would be redundant *and* would stub out the bytes→`MultipartFile` conversion.
+
+**No runtime permission is required and none must be added.** The Android Photo Picker and PHPicker
+both work without one — that is their whole point, and Play Console requires a restricted-permission
+declaration to justify `READ_MEDIA_IMAGES` when the system picker would do. Do **not** route these
+through `ensureCameraAccess` or `Gal.requestAccess`: the latter is for *saving* to the library
+(`saveReceiptImageToGallery`), which is what `WRITE_EXTERNAL_STORAGE` and
+`NSPhotoLibraryAddUsageDescription` are for. `NSPhotoLibraryUsageDescription` already existed and
+needed no change.
+
+**No `imageQuality` / `maxWidth` / `maxHeight` on `pickMultiImage`.** Those make `image_picker`
+re-encode on device, and the backend already normalises HEIC before OCR — re-encoding here would only
+cost fidelity on the images we most need read accurately.
+
+**One `XTypeGroup`, no platform switch.** `receiptFileTypeGroup` carries `mimeTypes`,
+`uniformTypeIdentifiers` and `extensions` at once and each `file_selector` implementation reads the
+field it understands. `extensions` is not decorative: `file_selector_windows` throws `ArgumentError`
+without it and `file_selector_linux` (the e2e host) needs it because GTK's `image/*` wildcard
+handling is unreliable. Deleting the old `Platform.operatingSystem` switch is what un-skipped three
+Linux e2e specs.
+
+**`useAndroidPhotoPicker` is set in `main()`**, after `WidgetsFlutterBinding.ensureInitialized()` and
+before `runApp`. It is plugin *configuration* — no permission request, no channel round trip — so it
+is exempt from the launch-time-work ban documented in `_ReceiptWrangler.initState` (GitHub #617);
+the comment there says so, so it does not get "cleaned up" into that block later. Needed on API
+33–35; a no-op on 36+, and below 33 the Play Services `ModuleDependencies` service in
+`AndroidManifest.xml` pulls in the backported picker (without it those devices simply fall back to
+`ACTION_OPEN_DOCUMENT`, i.e. the old behaviour). The branch itself lives in
+`configureAndroidPhotoPicker([ImagePickerPlatform?])`, split out of `main()` **only** so it is
+reachable from a test — the parameter defaults to the live instance, so the production call site is
+unchanged, and it must stay in `main()` rather than moving into `initState`.
+`test/main_photo_picker_test.dart` pins both branches (Android gets the opt-in, any other
+implementation is untouched and does not throw). **e2e pumps `buildApp()`, not `main()`, so the
+plugin *registration* is still uncovered** — verify that on a physical Android device.
+
+**Undecodable bytes render a placeholder, not a broken-image glyph.**
+`UnrenderableFilePlaceholder` / `unrenderableFileErrorBuilder`
+(`lib/shared/widgets/unrenderable_file_placeholder.dart`) back the `errorBuilder` on every
+`Image.memory` that shows picked or server bytes. A PDF picked from the file source *uploads and OCRs
+fine* but cannot be decoded for preview; without this the user sees Flutter's grey broken-image glyph
+and concludes the upload failed. It also replaces `Image.asset("assets/images/placeholder.png")` in
+`receipt_image_carousel.dart`, which threw — there is no such asset. `ImageViewer.image` is typed
+`Widget` rather than `Image` for this reason.
+
+**`QuickScanImage` no longer redeclares `multipartFile` / `bytes`.** It used to, shadowing the
+superclass fields. Both copies held the same object so it worked, but Dart fields are not virtual: a
+getter on `UploadMultipartFileData` (such as the `filename` the placeholder uses) reads the *base*
+field while subclass code reads the shadow. Do not reintroduce them.
+
+**Known gap — `ImagePicker.retrieveLostData()` is not implemented.** On low-memory Android the
+activity can be destroyed while the photo picker is foregrounded; the selection is then only
+recoverable via `retrieveLostData()` on resume. Today it is silently lost and the user re-picks.
+Deferred deliberately: recovering it means deciding *where* the file lands (the Quick Scan sheet is
+gone by then), and the failure is rare and non-destructive.
+
+### The receipt-image app bar had an unreachable twin
+
+`ReceiptAppBarActionBuilder.buildAppBarMenu` used to branch on
+`state.fullPath.contains("images") / ("comments")` and serve two further menus. **No such route
+exists** — the full set is `/`, `/login`, `/groups`, `/groups/:groupId/{dashboards,receipts}`,
+`/receipts/add`, `/receipts/:receiptId/{view,edit}`, `/profile`, `/reports`, `/search` — and
+`ReceiptImageScreen` is pushed as a plain `MaterialPageRoute` from `receipt_form.dart`, so the path
+never changes when it opens. Both branches were dead, and the images one was a stale copy of
+`ReceiptImageAppBar` that navigated to `/receipts/:id/images/edit`, a URL the router does not define.
+They were **deleted** (306 lines → 58), not merged; `ReceiptImageAppBar` is the live implementation
+and now takes its upload plumbing from `receipt_upload.dart`. Do not recreate the copy.
+
+Four latent bugs in that plumbing were fixed while it moved: no try/catch around the picker (now via
+`acquireReceiptFiles`), no `context.mounted` guards after awaits, `showApiErrorSnackbar(context, e as
+DioException)` throwing a `TypeError` *from inside the catch block* for any non-Dio error (the helper
+now takes `Object` and reports non-Dio errors to Sentry, which fixes every call site at once), and a
+multi-image upload that assigned a success message and then `return`ed before showing it. The loading
+spinner is now raised and lowered in exactly one place, so a cancelled pick can no longer clear a
+spinner another request raised.
+
+**`acquireReceiptFiles` swallows every picker failure EXCEPT
+`CunningDocumentScannerException`, which it rethrows** — that one means camera permission is
+missing, and the right answer differs per call site, so turning it into a snackbar centrally would
+delete the distinction. Every caller therefore has to handle it, and there are three:
+`openQuickScanFromCamera` (`receipt_entry.dart`) answers it with `fallBackToPhotos`, because it is
+*starting* a flow and can redirect the whole thing; `_addPickedImages` (`quick_scan.dart`) and
+`addImagesToReceipt` (`receipt_upload.dart`) answer it with the `cameraDeniedFallbackMessage`
+snackbar and nothing else, because both already sit inside a surface that offers a photo source one
+tap away — opening a second Quick Scan flow over the top would be wrong. The latter two went
+uncaught at first, so a denied camera threw out of an async `onTap` and the scan icon simply
+appeared to do nothing. Pinned by `test/widgets/quick_scan_sheet_test.dart` ("a denied camera
+explains itself instead of escaping"), which asserts on the **permission-request count** rather than
+the snackbar count — `ScaffoldMessenger` renders one snackbar into *every* registered `Scaffold`, and
+while the sheet is open that is both the sheet's and the route's underneath, so `findsOneWidget`
+would fail for a reason that has nothing to do with the code under test.
+
+**`uploadImagesToReceipt` publishes partial results.** Each image is its own API call, so a failure
+on the third leaves the first two already persisted server-side. `uploaded` is declared **outside**
+the `try` and emitted once in `finally` (guarded by `isNotEmpty`), so every exit carries it —
+success, error, and the early return taken when the context is gone. Scoping it inside the `try`
+instead meant a mid-batch failure discarded images the server had already stored: the user saw only
+an error, and repeating the action uploaded them a second time, leaving the receipt with duplicates.
+Guarded by `test/shared/functions/receipt_upload_publish_test.dart`, which also pins that a
+first-image failure publishes nothing and that a successful batch emits exactly once.
+
 #### Camera permission
 
 `ensureCameraAccess()` (`lib/utils/permissions.dart`) maps the OS state to
@@ -575,17 +834,20 @@ denied state resolves instantly with no dialog, which reads to the user as the t
 and shares a single in-flight future for the same
 `ERROR_ALREADY_REQUESTING_PERMISSIONS` reason `requestPermissions()` does.
 
-Denied falls back to the gallery with a notice; permanently denied adds an **Open Settings**
-snackbar action (`openAppSettings`). **Keep the request lazy** — a launch-time request was removed
+Denied falls back to the **photo library** with a notice (`fallBackToPhotos`); permanently denied
+adds an **Open Settings** snackbar action (`openAppSettings`). Photos rather than a source menu
+because this is an automatic continuation, not a choice — the user just tried to *photograph* a
+receipt. Someone whose receipt is a PDF in Files can still reach it from the menu. **Keep the request lazy** — a launch-time request was removed
 deliberately for the iOS 26.x render-pause freeze (GitHub #617).
 
 `debugCameraAccessOverride` is the test seam (the plugins are statics with no injectable seam),
 mirroring the settable `OpenApiClient.client` and `QrScannerScreen`'s `debugForce*` flags.
 
-Three latent bugs on this path were fixed alongside: `scanImagesMultiPart` dereferenced a null with
-`!` (the scanner returns null on cancel, now an ordinary flow), `getPictures` re-requests camera
-permission itself and **throws** when it is missing (now caught → gallery fallback), and
-`getGalleryImages` throws off android/ios and is newly reachable (now caught → message).
+Two latent bugs on this path were fixed alongside: `scanImagesMultiPart` dereferenced a null with
+`!` (the scanner returns null on cancel, now an ordinary flow), and `getPictures` re-requests camera
+permission itself and **throws** when it is missing (now caught → photo-library fallback). A third —
+`getGalleryImages` throwing off android/ios — is gone with the picker rework below, which deleted the
+`Platform.operatingSystem` switch entirely.
 
 ### Quick Scan field configuration
 
@@ -604,14 +866,59 @@ backend **backfills** a default for a hidden/optional paid-by or status, `_submi
 those and per-file comma-joined `categoryIds` / `tagIds` plus a per-file `comments` string, building
 **one aligned array entry per image** (never skipping, so `files` and the parallel arrays stay 1:1). It
 requires a field only when that group's config marks it shown+required, mirroring the backend's
-`resolveQuickScanFields`. Null settings (no group selected yet) fall back to the backend defaults:
-paid-by/status shown, categories/tags/comment hidden.
+`resolveQuickScanFields`.
+
+**Until a group is picked, ONLY the Group dropdown renders.** There is no configuration to honour
+yet, and the old behaviour — falling back to the backend's column defaults, paid-by/status shown
+and required — was a guess that flipped the field set the moment the user chose a group whose
+config hides them. Common, not exotic: the group is seeded only from
+`userPreferences.quickScanDefaultGroupId` or `soleGroupId`, so any user in ≥2 groups without a
+default starts blank.
 
 The show/require derivation for all five fields lives in **one** pure helper —
-`resolveQuickScanFieldConfig(GroupReceiptSettings?, {required bool canCreateComments})` →
-`QuickScanFieldConfig` (`lib/shared/functions/quick_scan_field_config.dart`) — reused by both the
-form's `build()` and `_submitQuickScan`, so the two can't drift from each other or from
-`resolveQuickScanFields`. Covered by `test/shared/functions/quick_scan_field_config_test.dart`.
+`resolveQuickScanFieldConfig(GroupReceiptSettings?, {required bool hasGroup, required bool
+canCreateComments})` → `QuickScanFieldConfig` (`lib/shared/functions/quick_scan_field_config.dart`)
+— reused by both the form's `build()` and `_submitQuickScan`, so the two can't drift from each
+other or from `resolveQuickScanFields`. `hasGroup: false` returns `noGroupQuickScanFieldConfig`
+(all ten flags false). Covered by `test/shared/functions/quick_scan_field_config_test.dart`.
+
+- **`hasGroup` is keyed off "a group id is chosen", deliberately NOT `settings == null`.**
+  `getGroupReceiptSettings` returns null for *two* states — no group, and a group whose settings
+  aren't in `GroupModel` (a stale `quickScanDefaultGroupId`, which
+  `quick_scan_initial_values_test.dart` pins as reachable). Only the first collapses to Group-only;
+  a selected-but-unresolvable group keeps the backend defaults, so this change moves exactly one
+  behaviour. Desktop's resolver takes the same flag for the same reason.
+- **Hiding a field must not destroy its value, so `onValueChange` MERGES rather than overwrites.**
+  A hidden field is never built (`Visibility` defaults to `maintainState: false`), so it never
+  registers with `FormBuilder` and its key is absent from `formKey.currentState.value`. `FormBuilder`
+  runs with the default `clearValueOnUnregister: false`, so a key that *has* been registered
+  survives the field being hidden later — **an absent key therefore means "never shown", not
+  "cleared"**, and the image's own value is the right answer. Reporting `null` for an absent key
+  made the carousel consumer (`quick_scan.dart`, which writes every record member onto the
+  `QuickScanImage` unconditionally) erase the user's `quickScanDefault*` prefill on the very first
+  group selection — for exactly the users who have to pick a group. A field that *is* mounted always
+  reports its own value, so the explicit clears in the group dropdown's `onChanged` still apply.
+- **The group dropdown's `onChanged` re-reports in a post-frame callback.** The new group's fields
+  mount on the *next* frame, each seeding from the image — and a prefilled paid-by who is **not a
+  member** of the group just picked seeds the dropdown **blank** (`valueExists` in
+  `_buildUserDropDown`). Without the second report the image would keep that invisible id and
+  `_submitQuickScan` would send a user the caller never chose. Safe to re-enter: `onValueChange`
+  does not `setState`.
+- Both regression paths are pinned by `test/widgets/quick_scan_form_test.dart` ("keeps the paid-by
+  and status prefills through the first group selection" / "drops a prefilled paid-by who is not a
+  member of the group just picked"). That harness's `onFormChangeCallback` **mirrors the real
+  consumer** — with an inert `(_) {}` callback the image is never mutated and both tests pass with
+  the bug present.
+- **A value the user SELECTED never survives a group that hides its field — only an untouched
+  prefill does.** The distinction is easy to get backwards, and was raised in review as a suspected
+  bug. It holds for two reasons that are worth keeping together: the dropdown's `onChanged` clears
+  paid-by/categories/tags *before* its own `setState`, so the clear lands while the **old** group's
+  fields are still mounted and registered; and the merge above only falls back to the image for a key
+  that is **absent**, which — with `clearValueOnUnregister: false` — means "never shown", not
+  "hidden later". A field shown under group A and hidden under B keeps its (cleared) key, so a later
+  group C that shows it again gets a blank field, while a prefill that was never rendered is still
+  offered. Pinned by the A→B→C pair "a selected paid-by does not come back after a group that hides
+  it" / "a prefilled paid-by DOES survive a group that hides it".
 
 **The comment field is gated on `group.comments.create` as well as the group config.** The permission
 is a **required named argument** to the resolver (not read from a provider) so the helper stays pure
@@ -656,6 +963,10 @@ wrap the body in a `SingleChildScrollView`, and it pins the submit button as the
 - A `Scaffold.bottomSheet` **floats over** the body; a bottom bar reserves its space. Floating buried
   the form's last field under the submit button and the "enter details manually" link, which no amount
   of scrolling could clear (`submitButtonSpacing`'s fixed 70px is not the height of that Column).
+- The bar slot is the one `Scaffold` does **not** lift over the keyboard, so that trade cost the
+  submit button at exactly the moment the user reached for it — the form's last field is the
+  multi-line comment, so the keyboard is up by then. Fixed in `ScreenWrapper`; see "A pinned bottom
+  bar is not keyboard-safe" above.
 
 Together these shipped a Quick Scan whose **configured comment field could never be seen** — the
 comment is last in the form column and the image preview alone claims half the screen height
@@ -689,6 +1000,102 @@ mounts it, so a raw `shellContext` is **null** and tapping Categories/Tags would
 `Navigator.of(null)`. (`receipt_form.dart` uses the same helper for its quick-actions sheet.) Guarded
 by `test/widgets/quick_scan_form_test.dart` (tap-opens-picker, shellContext null) and on-device by
 `quick_scan_submit_test.dart`.
+
+### A pinned bottom bar is not keyboard-safe — `Scaffold` only lifts `bottomSheet`
+
+`Scaffold` treats its two bottom slots differently, and the difference is invisible until a
+software keyboard opens:
+
+| slot | placed at | keyboard-safe? |
+|---|---|---|
+| `bottomSheet` | `contentBottom - height`, where `contentBottom = height - max(minInsets.bottom, bottomWidgetsHeight)` (`scaffold.dart:1088`, `:1154`) | **yes** — `minInsets.bottom` *is* `viewInsets.bottom` |
+| `bottomNavigationBar` | `max(0, height - bottomWidgetsHeight)` — no inset term at all (`scaffold.dart:1054`) | **no** — pinned to the physical bottom |
+
+So `showFullscreenBottomSheet`'s `bodyFillsSheet: true`, which moves the caller's button into the
+bar slot precisely *because* a bar reserves its space rather than floating over the form's last
+field, silently traded one bug for another: the Quick Scan submit button sat **under** the keyboard
+raised by the comment field directly above it.
+
+`ScreenWrapper._liftAboveKeyboard` closes it by padding the bar slot by
+`MediaQuery.viewInsetsOf(context).bottom`. Four things about that are load-bearing:
+
+- **The value is not computed.** `MediaQueryData.viewInsets`' own doc: *"When a mobile device's
+  keyboard is visible `viewInsets.bottom` corresponds to the top of the keyboard."* The platform
+  reports it (Android `WindowInsets` IME, iOS `UIKeyboardWillChangeFrame`) in logical pixels and
+  updates it **every frame** while the keyboard slides, so the bar follows exactly — split,
+  floating and hardware keyboards included. Never substitute a measured or hardcoded height.
+- **The read must happen inside the bar slot,** which is why a `Builder` wraps it. Widgets are
+  inflated where they are *mounted*, not where they are constructed, so the `Builder`'s context
+  lands in the slot's own `MediaQuery`. `Scaffold._addIfNonNull` (`scaffold.dart:2917-2925`) passes
+  `removeBottomInset: true` for the **body** slot (`:3036`) and not for this one (`:3166`), so a
+  read from inside the body yields **0** and the padding silently does nothing.
+- **It cannot double-count against the `SafeArea`** wrapping the scaffold. `SafeArea` consumes
+  `MediaQuery.paddingOf` (`safe_area.dart:115`), and `padding` is `viewPadding - viewInsets` floored
+  at 0 — so `padding.bottom` is 0 for exactly as long as the keyboard is up. The two are
+  complementary, never additive.
+- **Plain `Padding`, never `AnimatedPadding`.** The scaffold body resizes un-animated off the same
+  value, so a second interpolation here would make the bar trail the body's edge for the whole
+  slide, opening and closing a gap.
+
+**The `bottomSheet` slot is deliberately left alone** — padding it too would double-count. That is
+what keeps the receipt form (`receipt_form_screen.dart:133`), the quick-actions split sheet
+(`receipt_form.dart:720`) and the comment screen (`receipt_comment_screen.dart:60`) unchanged; all
+three were already safe, and the receipt form in particular is a common wrong guess.
+
+**The trade runs both ways, and the other direction is its own bug.** `bottomSheet` is lifted
+over the keyboard but **floats over** the body; `bottomNavigationBar` reserves its space but had to
+be lifted by hand. So a screen using the floating slot has to reserve the button's height *itself*,
+or its tail is unreachable: `SingleChildScrollView` at `maxScrollExtent` only brings content flush
+with the viewport's bottom edge, and the button covers the last 50px at **every** scroll offset.
+`submitButtonSpacing` (`constants/spacing.dart`, 70px) is what reserves it, and it belongs at the
+end of any column sitting under a floating `BottomSubmitButton` — today
+`receipt_form.dart`, `quick_actions.dart` and `quick_scan_form.dart`.
+
+- **A `kDebugMode` widget hid this for as long as it existed.** The receipt form's column used to end
+  with a debug-only "Check form value" `ElevatedButton`. It contributed ~48px in debug and collapsed
+  to `SizedBox.shrink()` in release, so the debug tree cleared the button (by 18px) while shipped
+  builds buried the last ~30px of the "Shared With" field — invisible to `flutter test` and every
+  `integration_test/` spec. It was also drawn *entirely underneath* the submit button, so it could
+  not be tapped. It was deleted rather than kept: the whole point is that debug and release lay out
+  the same, which is what makes the bug testable at all. **Do not reintroduce a debug-only widget at
+  the bottom of a scrollable form.**
+- **Testing it needs a viewport short enough to overflow.** Below the overflow threshold
+  `maxScrollExtent` is 0 and nothing can be buried, so the assertion passes on the broken tree for
+  the wrong reason — the same vacuity trap as the keyboard-down control above. The quick-actions
+  sheet's default content is under 200px, hence the deliberately tiny surface in its test.
+- Covered by `test/widgets/receipt_form_submit_button_clearance_test.dart` and
+  `test/widgets/quick_actions_submit_button_clearance_test.dart`, both of which drive
+  `pumpReceiptForm(..., pinnedSubmitButton: true)` or the real sheet — a bare `Scaffold` has no
+  floating button to be buried under. Both fail with the spacer removed; verify that when changing
+  them.
+- **Demo:** `tool/receipt-form-clearance.png` — the same form at max scroll with and without the
+  spacer, with a marker at the button's top edge. Regenerate with `./tool/record_clearance_shot.sh`.
+
+**`/search` restacks, on purpose.** It is the one screen that fills *both* slots
+(`main.dart:234`/`:238`): the nav bar in `bottomNavigationBar`, `WranglerSearchBar` in `bottomSheet`.
+Lifting the bar grows `bottomWidgetsHeight`, which lowers `contentBottom`, which moves the search
+field **above the nav bar** instead of directly onto the keyboard. Before: `[body][search][keyboard]`
+with the nav hidden. After: `[body][search][nav][keyboard]`. This was chosen over scoping the fix to
+the two sheets, so that no future bottom bar has to rediscover the problem.
+
+**Testing it needs geometry, and a control.** `findsOneWidget` is true for a button parked
+off-screen under the keyboard, so only a rect distinguishes the fix from the bug. The recipe:
+
+- `tester.view.viewInsets = FakeViewPadding(bottom: n)` — the same engine field the OS keyboard
+  sets, so `Scaffold` **and** `EditableText` (which reads `View.of`, not `MediaQuery`) both react.
+- `FakeViewPadding` is in **physical** pixels. Set `devicePixelRatio = 1.0` (as
+  `filter_multiselect_test.dart` does) and they are the logical pixels the rects come back in.
+- `addTearDown(tester.view.reset)` — `postTest` does **not** reset view values, so a leaked inset
+  follows every later case in the file.
+- Always assert a **keyboard-down control** too. Without it the guard also passes on a sheet that
+  was never full height — a button at y=400 is "above the keyboard" for the wrong reason.
+
+Covered by `test/widgets/screen_wrapper_keyboard_test.dart` (the slot contract, including the
+both-slots `/search` shape and the bar returning on dismiss), plus one real-surface case in each of
+`test/widgets/quick_scan_sheet_test.dart` and `test/widgets/filter_multiselect_test.dart`. Every
+keyboard case fails pre-fix reading the full screen height instead of the keyboard top; verify that
+when changing them. **Demo:** `tool/quick-scan-keyboard.gif`, `tool/multi-select-keyboard.gif` and
+`tool/search-nav-keyboard.gif` — see "Recording a demo GIF" below.
 
 ### Receipt status presentation
 
@@ -785,7 +1192,7 @@ failing that from **the user's only group**; Quick Scan seeds each picked image 
 A group can declare custom fields that are pre-added to its receipts
 (`GroupReceiptSettings.defaultCustomFieldIds`, configured on desktop's Group Receipt Settings — see
 the root `CLAUDE.md` → "Group Default Custom Fields" for the cross-component contract). The receipt
-form (`lib/receipts/widgets/receipt_form.dart`) applies the selected group's set on **create** and on
+form (`lib/receipts/widgets/receipt_form.dart`) applies the selected group's set on **load** and on
 every **active group change**, because each group is effectively its own receipt template.
 
 - **The swap is conservative.** `_applyGroupDefaultCustomFields(newGroupId)` only takes back a field
@@ -793,10 +1200,31 @@ every **active group change**, because each group is effectively its own receipt
   user typed into is kept and handed over to them (dropped from the auto set); so is anything they
   added by hand. Adding or removing a field by hand (`_addCustomField` / `_removeCustomField`) removes
   its id from the auto set, so the swap never fights a decision the user made.
-- **It runs on an active change, never on load in edit/view.** `initState` seeds only when
-  `formState == add` and the form already knows its group; the dropdown's `onChanged` runs it **before**
-  its `setState`, because it writes to `ReceiptModel` and `notifyListeners()` must not fire from inside
-  a setState callback. View mode returns early.
+- **It runs on load in EVERY form state, and on every active group change.** A group's defaults are
+  meant to read as its built-in receipt fields, so a receipt saved before the group was configured
+  picks them up too — read-only in view (`CustomFieldWidget` gets `onRemove: null` and there is no
+  Add button), and persisted as empty attached values once an edit is saved. `initState`'s post-frame
+  callback runs `_applyGroupDefaultCustomFields` whenever `_resolveInitialGroupId` yields a group;
+  the dropdown's `onChanged` runs it **before** its `setState`, because it writes to `ReceiptModel`
+  and `notifyListeners()` must not fire from inside a setState callback.
+- **Provenance lives on `ReceiptModel`, not the form's `State`.**
+  `ReceiptModel.autoAppliedCustomFieldIds` is the set the form adds to when it attaches a default and
+  removes from when the user touches one. It has to outlive the screen: the app bar menu's Edit entry
+  is a plain `go` (`receipt_app_bar_action_builder.dart`) and `receipt_form_screen.dart` re-hydrates
+  only for a *different* receipt id, so **view → edit remounts the form against the same
+  `modifiedReceipt`** with a fresh `State`. Two sequences end with the same empty field attached and
+  absent from the saved receipt, and only the set tells them apart: one the *form* added in the view
+  mount (still the swap's, dropped on a later group change) and one the *user* removed and re-added
+  by hand (theirs, kept). An earlier attempt inferred this on load from "every default the saved
+  receipt does not carry", which reclaimed the second case and silently dropped it — see
+  [receipt-wrangler#689](https://github.com/Receipt-Wrangler/receipt-wrangler/pull/689).
+  - The set is cleared wherever the working copy is replaced — `setReceipt` (which also covers the
+    post-save re-hydration, by which point the fields really are the receipt's own data) and
+    `resetModel` (the back arrow, and the `/receipts/add` route redirect in `main.dart`) — so
+    provenance and `modifiedReceipt` can never disagree. It deliberately does **not** notify:
+    nothing renders from it.
+  - The removal pass is inert on a *first* load, since the set is empty until something attaches a
+    default.
 - **One model write per swap.** `_customFieldValuesWith(add:, remove:)` is pure and every caller hands
   the whole result to a single `_setCustomFieldValues`, so a multi-field swap rebuilds the form once
   instead of once per field, with its fields half-mounted in between.
@@ -818,13 +1246,19 @@ every **active group change**, because each group is effectively its own receipt
   because the backend REPLACES the whole association on update.
 
 **Tests.** `test/widgets/receipt_form_default_custom_fields_test.dart` covers the rules exhaustively
-against injected models (13 cases: seeding, each keep/drop rule, A→B→A leaving no residue, an unchecked
-BOOLEAN counting as empty, a missing/empty catalog, view mode, edit-mode-on-change-only). **E2E:**
+against injected models (18 cases: seeding, each keep/drop rule, A→B→A leaving no residue, an unchecked
+BOOLEAN counting as empty, a missing/empty catalog, the load-time apply in view and edit, no duplicate
+for a default the receipt already carries, and the two remount cases the provenance set exists for —
+the view → edit carry-over staying swappable, and a hand-re-added default staying the user's). Those
+last two pass `pumpReceiptForm`'s `receiptModel:` seam a model an earlier pump returned, so the
+second pump is a **real remount** (fresh `State`, same working copy and provenance) rather than a
+simulated one. **E2E:**
 `integration_test/receipt_default_custom_fields_test.dart` — three specs proving the ids survive the
 wire (persisted, hydrated onto `GroupModel` via AppData at login, applied by the real form, accepted on
 save): the full swap matrix ending in an API read-back of the saved values, the stale-value guard (type
-into a default → remove it by hand → switch away and back → it returns **blank**), and view-never /
-edit-only-on-change. Every step also asserts no UI error survived it.
+into a default → remove it by hand → switch away and back → it returns **blank**), and a receipt seeded
+server-side with no custom fields showing its group's defaults in view and edit and still swapping on a
+group change. Every step also asserts no UI error survived it.
 
 Three things that spec encodes, all of which cost a debugging cycle:
 - **Do not install a `FlutterError.onError` collector to catch UI errors.** It takes the handler away
@@ -841,6 +1275,179 @@ Three things that spec encodes, all of which cost a debugging cycle:
   shared admin. The group dropdown is a Material menu whose scrollable does not build off-screen items
   into the element tree, so the admin's accumulated groups can push the target below the viewport where
   `find.text` can't reach it (the same problem `keepOnlyGroup` works around for Quick Scan).
+
+### Receipt filtering
+
+The receipts list can be filtered on all ten fields the API supports -- the same set desktop's
+advanced-filter dialog drives. **Client-only**: `swagger.yml`, the Go API and `mobile/api/` were
+already capable, so nothing there changed.
+
+Entry point is a badged filter action in the receipts app bar (`ReceiptFilterButton`, added to
+`GroupAppBar`'s existing route-gated `actions`). It pushes `ReceiptFilterScreen`, which lists the
+active conditions as cards, offers "Add filter", and commits with **"Apply Filter"**.
+
+- **`lib/constants/receipt_filter_fields.dart` is the single field table** -- key, label, icon,
+  hint and type for the ten fields, plus `filterOperationsByType` and `filterOperationLabels`.
+  The add-list, the cards and the editor all read it, so a card can never disagree with the row
+  that produced it. Mirrors desktop's `RECEIPT_FILTER_FIELDS` +
+  `filter-operations-options.constant.ts`.
+  - Labels match `receiptSortOptions` wherever the two overlap -- `date` is **"Receipt Date"**, not
+    a bare "Date", because the list can also be filtered on `resolvedDate` and `createdAt`.
+  - The operation lists are written out literally rather than derived from `FilterOperation.values`:
+    the Dart enum carries an extra `empty` member desktop's does not, and a derived list would leak
+    it into the chips.
+- **`ReceiptListModel` owns the APPLIED filter; the screen edits a draft.** `ReceiptFilterScreen`
+  copies `model.filter` into local `State`, and only "Apply Filter" writes back via `setFilter`.
+  Backing out (the X, the system back gesture) therefore discards, and the list never refetches
+  mid-authoring.
+- **A notification from `ReceiptListModel` means the filter changed.** `GroupReceiptsList` listens
+  for it and calls its `_refreshCallback` (plus a `setState`, because the empty-state text reads the
+  applied filter). This works because **every sort setter is deliberately called with
+  `notify: false`** and refreshes the list directly -- don't "tidy" those call sites into notifying,
+  or every sort change refetches twice.
+- **The filter is cleared on a group change**, in `didChangeDependencies` (which is where
+  `getGroupId`'s `GoRouterState` read is legal). A filter holds the previous group's category, tag
+  and user ids, which match nothing in the next one and would leave the badge counting conditions
+  the user cannot see. It clears **everything**, not just the id-bearing fields: "switching groups
+  shows that group's receipts" is the predictable rule. It clears **silently** (`notify: false`),
+  because that runs during a build; the explicit `_refreshCallback` is the visible half.
+  - **The scope is read off the filter, not off a group the list remembered** --
+    `ReceiptListModel.filterGroupId`, recorded by `setFilter` (whose `groupId` is a *required* named
+    argument for exactly this reason). The first version tracked "the last group I saw" in the
+    widget, and **that guard never fired**: the app offers no lateral group switch, so every real
+    group change leaves the group shell (the app-bar arrow goes to `/groups`, group cards go to
+    `/groups/<id>/dashboards`, and `GroupBottomNav` only navigates within the current group), which
+    destroys the `State`. The replacement mounted with a null "last group" while the filter sat
+    untouched on the app-level model, so **group A's filter followed the user into group B**. It
+    shipped that way and `integration_test/receipt_filter_lifecycle_test.dart` is what caught it.
+  - **"Clear whenever the list mounts" is not the fix**, which is why the scope has to live on the
+    filter: a round trip to a receipt tears the list down and rebuilds it just as a group change
+    does (`/receipts/:id/view` is a top-level route). Only the filter knows the difference between
+    the two, and both cases are pinned -- in `group_receipts_list_test.dart` for the mount, and
+    end to end in the lifecycle spec.
+
+**Encoding (`lib/utils/receipt_filter.dart`) is the highest-risk part, and its rules come from the
+Go side (`api/internal/repositories/receipts.go`).**
+
+- The generated `ReceiptPagedRequestFilter`'s ten properties are **`JsonObject?`**, not a typed
+  `PagedRequestField`, so each condition is written as
+  `JsonObject({"operation": ..., "value": ...})`. `setReceiptFilterField` owns the key-to-slot
+  dispatch and is shared with `dashboardConfigurationToFilter` (`lib/utils/receipts.dart`), which
+  was missing the `group` arm before it was extracted.
+- **An EMPTY field is not an ABSENT one.** `initReceiptFilterValues` coerces a null date value to
+  `""` and a null amount to `0`, and the query builder then runs `date = ''` (matches nothing) or
+  `amount = 0` (matches the wrong rows) -- both silent. `buildReceiptPagedRequestFilter` therefore
+  **skips any condition `isReceiptFilterConditionValid` rejects**. The editor also gates Save, but
+  the encoder's contract has to hold on its own.
+- **Every value is type-asserted with no comma-ok, so a wrong shape is a 500, not an ignored
+  filter.** Amounts go as **numbers** (`AmountField`'s `valueTransformer` yields a *string*, so the
+  editor parses it first); the five list fields always as arrays; `status` as wire strings, not
+  labels; dates as zulu strings via `formatDate(zuluDateFormat, ...)`, the same call the receipt
+  submit uses.
+- **A BETWEEN date range spans start-of-day to end-of-day** (`startOfDay` / `endOfDay` in
+  `lib/utils/date.dart`). These are datetime columns, so a bare `<= 2026-09-18T00:00:00Z` upper
+  bound excludes everything recorded on the last day the user picked.
+- **A zero amount is a real filter and is sent.** Nothing defaults to zero and the API applies
+  `amount = 0`, matching desktop's `isFilterEntryActive`.
+- Conditions hold the **display objects** (`Category`, `Tag`, `Group`, `UserView`, `ReceiptStatus`,
+  `DateTime`, `double`, `String`), not ids -- so a captured option keeps rendering its own name even
+  after the catalog changes, and the card, the chips and the encoder all read one thing.
+
+**Shared components, not new ones.** `AmountField` for every amount (it gained an optional
+`validator`, defaulting to today's required, because a filter amount is only authored when the user
+asks for one); `CategorySelectField` / `TagSelectField` unchanged; `MultiSelectField` +
+`showMultiselectBottomSheet` for Group, Paid By and Status. `FilterMultiSelect` keeps its **single
+call site** inside that helper, so its `Expanded` assumption is untouched. Flutter's own
+`showDatePicker` / `showDateRangePicker` cover dates -- the app had no date widget and no range
+picker at all.
+
+- `receiptStatusField` is deliberately **not** reused: it is single-select and hard-required, while
+  the filter's `status` is `CONTAINS` over a list.
+- The operation chips take the **tinted** selected treatment (`primaryContainer` fill,
+  `onPrimaryContainer` label, a `#BBE6FF` border) via a local `ChipTheme`, deliberately *not* the
+  app-wide filled accent chip. That one means "a value you picked" -- the categories and statuses in
+  the field below it are drawn that way -- while these pick a *mode*, and the two rows share one
+  sheet. The local override has to restate `labelStyle` for the same Material 3 reason the theme
+  does (see "Theme & color roles").
+
+**Two things the group context forces** (`lib/utils/receipt_filter_options.dart`):
+
+- **`Group` is only offered on the synthetic "All" group**, mirroring desktop's `showGroupFilter`.
+  Inside a real group the receipts endpoint already scopes every query to it.
+- **Categories and tags need no special casing.** The All group is a *real row* the user belongs to
+  (`GroupRepository.CreateAllGroup`), so `GetAppData` builds it a `groupCategories` / `groupTags`
+  entry like any other group -- the wrappers work with the route's group id. **Paid-by is the
+  exception**: the All group's roster is just the caller, so `filterPaidByOptions` unions the real
+  groups' rosters there.
+
+**Styling follows the design project's mobile panel** (`Quick Date Filtering.dc.html`, panel 4b),
+minus its button gradient. The screen is a slate-50 canvas carrying white condition cards (radius
+14, a 6%-black hairline, a 5%-black 1px shadow) under an uppercase condition count; the operation is
+a filled `surfaceContainer` pill rather than an outlined chip; "Add filter" is a dashed 52px
+placeholder, painted by a private `CustomPainter` because Flutter has no dashed border. Most of the
+rest came from filling in the theme's color roles rather than from anything here -- see "Theme &
+color roles".
+
+- **The condition card carries no field icon.** The icons belong to the add sheet, where they help
+  pick a field; repeating them on the card only competes with the label.
+- **It is a hand-built container, not a `Card`.** Material's `Card` is the elevated one, whose
+  tinted surface and shadow are far heavier than this near-flat row. Its fill has to be on the
+  `BoxDecoration`, not only on the `Material` under it: a `BoxDecoration` paints its `boxShadow` as
+  a silhouette of the whole shape, so without a colour there the shadow shows through the card's
+  interior and greys it out.
+- **The remove X sits inside the card's own `InkWell`**, so it has to win the gesture arena against
+  it. `receipt_filter_condition_card_test.dart` pins that removing a condition does not also reopen
+  the editor for the field just dropped.
+- **The count header is rendered only when there is something to count.** The design shows it *and*
+  the empty state at zero, which says the same thing twice.
+
+**The filter screen is a pushed route, not a bottom sheet.** It keeps the modal stack at the depth
+the app already ships (editor sheet -> picker sheet, the same as Quick Scan -> category picker), and
+a real `Scaffold` puts "Apply Filter" in `bottomNavigationBar`, which reserves its space, rather than
+`Scaffold.bottomSheet`, which floats over the last card.
+
+**A latent paging bug this feature exposed.** `PagedDataList` never reset `_totalCount` on refresh,
+and `getNextPageKey` stops paging once the loaded items reach it. Sorting cannot reach a zero total,
+but filtering to no matches can -- after which `0 >= 0` stayed true and **no page was ever requested
+again**, leaving the list permanently empty even once the filter was cleared. Fixed by nulling
+`_totalCount` in the refresh callback; `test/widgets/paged_data_list_test.dart` was verified to fail
+without it.
+
+**Tests:** `test/constants/receipt_filter_fields_test.dart` (the table, including that every key
+names a real wire field -- `setReceiptFilterField` dispatches on a string, so a typo would not fail
+to compile), `test/utils/receipt_filter_test.dart` (a case per field type x operation, asserted
+through the real serializer), `test/utils/receipt_filter_options_test.dart`,
+`test/models/receipt_list_model_test.dart`, and widget tests for the button, the screen, the add
+sheet, the editor, the condition card and the list wiring.
+
+**E2e: `integration_test/receipt_filter_test.dart` and `receipt_filter_lifecycle_test.dart`.** The
+unit suite proves the *serialized map* through the real serializer and the widget suite runs against
+a mocked `ReceiptApi`, so neither can reach the thing most likely to break -- that the Go query
+builder accepts the filter and narrows real rows. Five tests drive the wire (name, status via the
+real multiselect sheet, categories from the real per-group catalog, a date range, an amount typed
+into the currency field) and two cover the lifecycle (survives a receipt round trip; cleared on a
+group change). Shared drivers live in `integration_test/helpers/receipt_filter_actions.dart`.
+
+- **The seed set is three receipts in one fixture group**, differing in name, amount, date, status
+  and category so each test gets one match and two non-matches. **R2's `18:30` timestamp is
+  load-bearing**: a `BETWEEN` of 06/11-06/13 encodes to an upper bound of `06-13T23:59:59Z` because
+  the client expands the range to end-of-day, and a receipt stored at *midnight* on the last day
+  would match even a broken `<= 06-13T00:00:00Z` bound -- so the date test would pass against the
+  bug it exists to catch.
+- **The date picker is driven through its text-entry mode**, not the calendar. `firstDate` is 2000
+  and `lastDate` five years out, so the grid is ~370 lazily-built months whose day cells are bare
+  unkeyed `Text('11')` repeating every month. The app registers no `flutter_localizations`
+  delegates, so `DefaultMaterialLocalizations` is in force: the toggle is tooltipped
+  **"Switch to input"**, dates parse as US `mm/dd/yyyy`, and the confirm button is **"OK"** in text
+  mode (it is "Save" in calendar mode). The spec asserts the picked range on the `_TapField` before
+  applying, so a later row failure means the *server* disagreed rather than the picker misfiring.
+- **Wait for a button to be *enabled*, not hittable.** A disabled `FilledButton` still hit-tests, so
+  a tap on "Apply Filter" (gated on `LoadingModel.isLoading`) or "Save condition" (gated on the
+  editor's validity) silently no-ops and fails ten seconds later pointing at the wrong widget.
+- **Never `find.byKey` an amount field.** `AmountField` forwards its `widget.key` onto the
+  `FormBuilderTextField` it builds, so the keyed finder matches two widgets and any tap throws. Use
+  `formField("value")` -- and `CurrencyTextFieldController` reads keystrokes as cents, so type the
+  full `50.00`, not `50`.
 
 ### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
 
@@ -862,9 +1469,35 @@ per-item rows and the split sheet at once.
 - **View mode installs no tap surface at all.** When `onTap` is null (the wrappers pass null
   in `WranglerFormState.view`) the bare `InputDecorator` is returned rather than an opaque
   detector that would swallow pointers for a no-op.
-- **`ChoiceChip.onSelected` is kept even though it is now redundant** — the chip wins the
+- **`onSelected` is kept even though it is now redundant** — the chip wins the
   gesture arena and calls the same handler the outer detector would. It stays because
-  `onSelected: null` renders a `ChoiceChip` in its *disabled* style.
+  `onSelected: null` renders the chip in its *disabled* style.
+- **Each chip carries a remove X, so the chips are `InputChip`s, not `ChoiceChip`s.**
+  `ChoiceChip` does not implement `DeletableChipAttributes` and so has no `onDeleted`;
+  `InputChip` implements both it and `SelectableChipAttributes`, so every property the
+  chip already set carries over and, under the app's M3 theme, the selected-state
+  background, label color and border side are the same — the X is the only visual delta.
+  `deleteIcon` **is** set explicitly (`Icon(Icons.cancel, size: 18)`): InputChip's M3
+  default is `Icons.clear`, a bare X, where desktop's `matChipRemove` button renders
+  `<mat-icon>cancel</mat-icon>`, the filled circle. `Wrap` gained `runSpacing: 5` because
+  the wider chips reach a second run sooner and the runs would otherwise touch.
+- **Removal goes out through `onRemove`, never through `field.didChange`.** The owning
+  forms are the source of truth: each answers the picker's result with
+  `setState(() => ...setValue(list))`, and Quick Scan additionally fires `onValueChange()`
+  to mirror the form into its `QuickScanImage` (`quick_scan_form.dart`). A remove that
+  mutated the `FormBuilderField` internally would leave that image holding the removed
+  category and submit its id anyway. Routing it through the same callback the sheet result
+  takes means every call site inherits its existing propagation — `CategorySelectField` /
+  `TagSelectField` just forward to their `onCategoriesChanged` / `onTagsChanged`, so no
+  call site of theirs changed. The new list is computed by **index**
+  (`List.from(field.value)..removeAt(index)`), because the items carry no equality and a
+  list can hold two equal entries; desktop's `removeOption(index)` does the same.
+- **`onRemove == null` is what hides the X**, and it is what the wrappers pass in
+  `WranglerFormState.view` alongside the null `onTap` — mirroring desktop gating its
+  `matChipRemove` button on `*ngIf="!readonly"`. Note `setValue` does **not** call
+  `setState` (only `didChange` does), so it is the owner's rebuild that re-runs the
+  field's builder against the new value; a test harness has to mirror that, which is why
+  `multi_select_field_test.dart` wraps the field in a `StatefulBuilder`.
 - **No explicit min-height is set.** The app's global `InputDecorationTheme` uses
   `OutlineInputBorder` (`lib/main.dart`), whose default non-dense content padding already
   puts the decorator past the 48dp target even in the empty state.
@@ -884,8 +1517,14 @@ per-item rows and the split sheet at once.
     moves it to `bottomNavigationBar`, which reserves the space instead.
   Both fixes land for Categories, Tags **and** the quick-actions Users picker at once — they share the
   one helper. `Expanded` is safe there because `FilterMultiSelect` has exactly one call site.
+  - `bodyFillsSheet` moved the confirm button into the one slot `Scaffold` does not lift above the
+    keyboard — and this sheet pins a `FormBuilderTextField` (the Filter bar) right above it, so
+    keyboard-up is its **normal** state, not an edge case. `ScreenWrapper` lifts it; see "A pinned
+    bottom bar is not keyboard-safe" above, and the keyboard case in
+    `test/widgets/filter_multiselect_test.dart`.
 - **Demo:** `tool/tap-target-demo.gif` shows the before/after hit regions under real clicks; it is
   regenerated by `tool/record_tap_target_demo.sh` (see "Recording a demo GIF" below).
+  `tool/multi-select-keyboard.gif` shows the confirm button against an open keyboard.
 - **Tests for the sheet's layout:** `test/widgets/filter_multiselect_test.dart` (phone-sized surface,
   90 options: a drag on the chips moves the **grid's own** `ScrollPosition`, the last chip ends up
   inside the window and clear of the confirm button, the filter bar does not move) and
@@ -897,10 +1536,26 @@ per-item rows and the split sheet at once.
 - **Tests:** `test/widgets/multi_select_field_test.dart` covers the widget end to end —
   edge/label/gutter/chip-gap taps (the regression guards; they assert the detector's rect
   equals the decorator's), chip and placeholder taps, rendering, form registration and
-  `didChange`, the `required` validator, and the inert view mode. The e2e specs still tap the
-  `"No <items> selected"` placeholder as their locator, which keeps working.
+  `didChange`, the `required` validator, the inert view mode, and the remove button (present
+  only with `onRemove`, reports the remaining values in order, drops one of two duplicates,
+  reports `[]` rather than null for the last chip, and — the one most likely to regress
+  silently — does **not** also fire `onTap`, since the button's `InkWell` has to win the
+  gesture arena against the field's opaque ancestor detector).
+  `test/widgets/quick_scan_form_test.dart` pins the propagation contract above: removing a
+  chip reaches the `QuickScanImage` through `onValueChange`. The e2e specs still tap the
+  `"No <items> selected"` placeholder as their locator, and the ones that drive chips drive
+  the **sheet's** `ChoiceChip` toggles (`FilterMultiSelect`, unchanged), so both keep working.
 
-### Recording a demo GIF (headless Linux desktop)
+### Recording a demo GIF
+
+Two routes, and the choice is forced by what the demo has to show:
+
+| route | use when | needs |
+|---|---|---|
+| **desktop capture** (below) | the demo needs real pointer input — hit targets, drags, hovers | ffmpeg, xdotool, Xvfb, a Linux desktop build |
+| **widget-test capture** (further below) | the demo needs a platform state the Linux desktop target cannot produce — an open **software keyboard**, a device pixel ratio, a notch | nothing beyond `flutter test` |
+
+#### Route 1 — desktop capture (headless Linux)
 
 There is no emulator in the Claude Code sandbox and the Go API is expensive to bring up there
 (ImageMagick 7 from source — see the root `CLAUDE.md`), so a demo of a **widget-level** change is
@@ -942,10 +1597,13 @@ Five things that each cost a cycle:
   multiplied by `devicePixelRatio`) to `$TAP_DEMO_RECTS` in a post-frame callback. That file
   appearing is also the "app is up and painted" signal the recorder waits on — far more reliable
   than a fixed sleep, and it means the click plan never hardcodes a layout.
-- **Don't mount the app's real bottom sheet in a bare harness.** `showMultiselectBottomSheet` →
-  `showFullscreenBottomSheet` renders its `TopAppBar` / `BottomSubmitButton` as untextured grey
-  blocks outside the app's full theme and provider tree, *and* it covers the whole 1280x720 window,
-  hiding whatever is being compared. Demonstrate the outcome in-panel instead.
+- **Don't mount the app's real bottom sheet in a bare harness** — *on this route*.
+  `showMultiselectBottomSheet` → `showFullscreenBottomSheet` renders its `TopAppBar` /
+  `BottomSubmitButton` as untextured grey blocks outside the app's full theme and provider tree,
+  *and* it covers the whole 1280x720 window, hiding whatever is being compared. Demonstrate the
+  outcome in-panel instead. Both halves are artefacts of a bare `runApp` harness and **do not apply
+  to route 2**, where the test owns the surface: real fonts via `FontLoader`, the real provider
+  tree, and one panel captured per pump so nothing can cover the comparison.
 - **`pkill -f receipt_wrangler_mobile` kills the shell running it** — the pattern matches that
   shell's own command line, which shows up as a bare exit 144. Use `killall receipt_wrangler_mobile`.
 
@@ -966,9 +1624,67 @@ Recording the **full app** (rather than a harness) against a live API adds three
   what makes a before/after pair cheap: rebuild and the app comes back already logged in.
 - **Scroll with the wheel (`xdotool click 5`), not a mouse drag.** Flutter's desktop `ScrollBehavior`
   excludes `PointerDeviceKind.mouse` from its drag devices, so a click-and-drag scrolls nothing even
-  on a perfectly good list. To show a **touch**-specific failure, drive it in a widget test instead
-  and capture `RenderRepaintBoundary.toImage` per frame (load the real font with `FontLoader`, or
-  every glyph renders as a box).
+  on a perfectly good list. To show a **touch**-specific failure, drive it in a widget test instead —
+  route 2 below is the worked example.
+
+#### Route 2 — widget-test frame capture
+
+`tool/demo_capture/` holds the machinery and two demos — an animated GIF pair for the
+keyboard-inset fix, and a single before/after still for the floating-button clearance fix:
+
+```bash
+cd mobile && ./tool/record_keyboard_demo.sh      # -> tool/*-keyboard.gif
+cd mobile && ./tool/record_clearance_shot.sh     # -> tool/receipt-form-clearance.png
+```
+
+Route 1 **cannot** record that fix at all: there is no software keyboard on Linux desktop, so
+`viewInsets.bottom` is permanently 0 and the bug is unreproducible on that target. This route also
+needs no ffmpeg, ImageMagick, xdotool or Android SDK, none of which the Claude Code sandbox has —
+frames are captured inside a widget test and encoded to GIF in pure Dart.
+
+- **`capture.dart`** is the shared machinery — `loadDemoFonts`, `buildDemoSurface` (caption strip +
+  phone-sized viewport), `grabFrame`, `stitchPanels` and the two writers. `fake_keyboard.dart` draws
+  the keys and collapses to nothing at a zero inset, so a still that does not want a keyboard simply
+  leaves `viewInsets` alone. `keyboard_demo_test.dart` / `clearance_shot_test.dart` are the demos.
+- **A still does not always have a seam to flip.** The keyboard demo toggles
+  `debugDisableKeyboardLift`, but there is no production flag for `submitButtonSpacing` and adding
+  one for a screenshot is not worth it — so `record_clearance_shot.sh` captures one panel, strips the
+  spacer from the source, captures the other, and restores under a `trap`. The trap is load-bearing:
+  without it a crash between runs leaves the working tree patched. Verify `git diff lib/` is empty
+  after running it.
+- **Turn off the debug banner** (`showDebugBanner: false` on the pump helpers). `MaterialApp` draws
+  its red ribbon across the top-right of every captured panel otherwise, and at panel scale it reads
+  as a render-overflow stripe rather than a banner — which sends you hunting a layout bug that is not
+  there.
+- **It lives in `tool/`, not `test/`, and that is what keeps it out of CI.** `flutter test` with no
+  arguments scans **only** `test/`, while an explicit path is used verbatim. CI runs a bare
+  `flutter test`, so a demo under `test/` would re-encode and rewrite committed binaries on every
+  push. Keep the `_test.dart` suffix (name-based filters) and the `tool/` directory (discovery).
+- **Before/after is the same real screen recorded twice**, differing only by the
+  `debugDisableKeyboardLift` seam, then stitched side by side at encode time. That beats
+  hand-copying the pre-fix tree (as `_LegacyMultiSelectField` did on route 1): the copy cannot
+  drift, and if the fix regresses both panels simply become identical.
+- **Everything with real asynchrony must be inside `tester.runAsync`** — `toImage`, `toByteData`,
+  `File.readAsBytes`, `FontLoader.load`. `testWidgets` runs in fake-async, which never services the
+  engine's futures, so a bare `await boundary.toImage()` **hangs until the test times out** rather
+  than failing. `runAsync` also *swallows* errors and returns null, surfacing them via
+  `takeException` — so null-check and `fail()`, or a real failure shows up as a confusing null.
+- **`flutter test` always passes `--use-test-fonts`,** whose stub font draws every glyph as a filled
+  box. Load Raleway from `fonts/` on disk, register it as `Roboto` too (Material's default
+  `Typography` asks for that, and most text takes the theme default), and load `MaterialIcons` or
+  the app bar's icons are boxes.
+- **Set a `Timeout`** — `package:test`'s 30s default is wall-clock and unaffected by the fake clock,
+  and pure-Dart quantize + LZW over a few dozen frames takes minutes.
+- **Encoder settings are not the defaults.** `GifEncoder`'s default neural quantizer is a per-frame
+  neural net (slow) and dithering destroys the pixel runs LZW needs; flat UI art wants
+  `QuantizerType.octree`, `numColors: 64`, `DitherKernel.none`. Note `addFrame` encodes the
+  *previous* image and `finish()` flushes the last, and `duration` is in **1/100 s**, not ms.
+  There is no inter-frame diffing, so a held frame costs as much as a moving one — **buy hold time
+  with long per-frame durations, not duplicate frames**.
+- **Keep the captured subtree opaque.** `rawRgba` is premultiplied and the encoder switches on GIF
+  transparency the moment it finds a zero-alpha palette entry, which makes the whole clip flicker.
+- **`EditableText.debugDeterministicCursor = true`** or the caret blink makes frames differ run to
+  run (and never call `pumpAndSettle` after focusing a field — the blink schedules frames forever).
 
 ### `integration_test` is a regular dependency on purpose (Android Studio signed-bundle builds)
 
@@ -1370,10 +2086,10 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - **Destination markers must be unique to the destination.** `find.text('Name')` matches on BOTH `/view` and
   `/edit` receipt forms, so it cannot prove an Edit navigation happened — use `find.byType(BottomSubmitButton)`
   (only mounted on edit/add paths) instead.
-- **Quick Scan image input on Linux:** `getGalleryImages` (`lib/utils/scan.dart`) throws `"Unsupported platform"` on desktop via a `Platform.operatingSystem` switch **before** it reaches `file_selector`, so the file-selector mock can't help and `quick_scan_test.dart` (the gallery happy-path) is `skip: Platform.isLinux`. To reach the Quick Scan form headlessly, go through the **document scanner** — tap the scan slot with `installDocumentScannerMock()` installed (`openQuickScanImageForm` in `helpers/quick_scan_actions.dart`), which works on **all** targets (Linux/iOS/Android).
+- **Quick Scan image input on Linux:** the old `"Unsupported platform"` throw is **gone** — `getGalleryImages` and its `Platform.operatingSystem` switch were deleted (see "Picking receipt files"), so `installFileSelectorMock()` now reaches the file source on desktop and `quick_scan_test.dart` / `receipt_add_gallery_test.dart` / `receipt_add_partial_image_test.dart` run un-skipped — all three verified green on the Linux runner. `receipt_add_gallery_test.dart` needed the `hitTestable()` + frame-drain hardening before its popup-menu tap (tap-flake pattern 2 above); it had never run on Linux, so it had never needed it. **Assert the file source, not the photo one:** `image_picker_linux` is implemented on top of `file_selector_linux`, so on Linux the file-selector mock intercepts *both* and no Linux e2e can tell the two apart. The **document scanner** (`installDocumentScannerMock()`, `openQuickScanImageForm` in `helpers/quick_scan_actions.dart`) is still the way in when a spec wants a source that is neither picker.
 - **Reaching the receipt entry points:** a **tap** on the scan slot is a direct action, so manual entry is reached by **holding** it — `openManualReceiptForm(tester)` (`helpers/receipt_test_helpers.dart`) is the shared path, and it works on every screen and in every flag state (the receipts-screen overflow menu does not). Use `scanNavSlot()` rather than `find.text('Add')` when you only need to *reach* the slot: its label is "Scan" or "Add" depending on the caller's gates.
 - **Driving camera permission states:** set `debugCameraAccessOverride` (`lib/utils/permissions.dart`) rather than swapping the permission channel mock — login bootstrap also touches permission_handler, and the override pins only the branch under test. See `quick_scan_camera_denied_test.dart`. The suite uses the first-party `integration_test` package, which **cannot** drive native OS permission dialogs; that would need Patrol.
-- **Shared channel mocks live in `test/helpers/channel_mocks.dart`,** not here: the widget suite is the gating one and must not import from `integration_test/`. `helpers/platform_mocks.dart` re-exports them. `installPermissionMocks(status:, requestStatus:)` is the parameterised variant (`PermissionStatusWire` names the wire ints); `installCameraGalleryPermissionMocks()` is the always-granted one the scanner path needs.
+- **Shared channel mocks live in `test/helpers/channel_mocks.dart`,** not here: the widget suite is the gating one and must not import from `integration_test/`. `helpers/platform_mocks.dart` re-exports them, along with `test/helpers/image_picker_mock.dart` (`installImagePickerMock` / `installFailingImagePickerMock`) which lives there for the same reason. `installPermissionMocks(status:, requestStatus:)` is the parameterised variant (`PermissionStatusWire` names the wire ints); `installCameraGalleryPermissionMocks()` is the always-granted one the scanner path needs.
 - **Document-scanner mock must grant camera permission on every platform:** `CunningDocumentScanner.getPictures` requests `Permission.camera` **itself** (Dart-side, via `permission_handler`) before invoking its native channel, so `installDocumentScannerMock()` also calls `installCameraGalleryPermissionMocks()` (extracted from `installLinuxDesktopMocks`) on **all** platforms — not just Linux. Without it, iOS/Android hit the real permission_handler: the fire-and-forget `requestPermissions()` in `main.dart` leaves an app-init camera request **pending** (its native dialog is never dismissed in a headless test), and `getPictures`' own camera request then collides with it → `PlatformException(ERROR_ALREADY_REQUESTING_PERMISSIONS)`. Granting up front makes both requests resolve instantly with no dialog. Only this scan path needs the mobile grant; every other spec hits permission_handler natively (one fire-and-forget request, never a second) and stays green. `flutter_secure_storage` stays **real** on iOS/Android (only Linux mocks it).
 - **Linux build linker/ar:** the desktop build resolves its toolchain from the installed clang's dir (e.g. `/usr/lib/llvm-19/bin`). With only `clang` installed you get `Failed to find any of [ld.lld, ld]` then `[llvm-ar, ar]` — install `lld` **and** the matching `llvm` package (see the Flutter SDK Setup apt line above) so `ld.lld` / `llvm-ar` land in that dir.
 - **Headless display:** Flutter Linux desktop apps render through GTK and exit immediately without a display. `run-e2e.sh` auto-wraps in `xvfb-run` when `$DISPLAY` is unset. If you see "The log reader stopped unexpectedly, or never started," your display setup isn't working — check `xvfb-run --help` or set `DISPLAY` to a real X server.
@@ -1437,7 +2153,8 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - `integration_test/quick_scan_prefill_test.dart` — Quick Scan per-image **prefill** from user preferences vs group config. Each added image seeds group/paid-by/status from `userPreferences.quickScanDefault*` (`_getInitialQuickScanValues`, delivered via AppData). Persists a group that **hides** paid-by (real prefs→AppData→form path via `setUserQuickScanPrefs` + `setGroupQuickScanConfig`, both restored) and asserts a **preset paid-by falls off** (field absent) while a **preset status is kept** (shown), then that submit **queues** (the hidden paid-by is backfilled from the group's `UPLOADER` default). Hiding paid-by/status in a persisted config **requires a group default** (`quickScanDefaultPaidByType: 'UPLOADER'` needs no id; `quickScanDefaultStatus` for status) — the backend rejects hiding/optional without one.
 - `test/widgets/quick_scan_form_test.dart` — fast widget-level coverage of the same form logic: per-config visibility, paid-by/status required-vs-optional validators, null + non-null default configs, the group-switch behaviors (fields re-render per the new group's config; paid-by/categories/tags values clear on switch; a required validator is re-evaluated after switching), the picker tap-opens-with-null-shellContext crash guards, the **comment** cases (optional vs required validator, hidden by default / by `hideComments` / without `group.comments.create`, and surviving a group change), and **prefill vs config** (a prefilled paid-by/status shows when the group shows the field, and **falls off** — field absent — when the group hides it). Categories/tags "required" is **not** a field validator (enforced at submit in `quick_scan.dart`), so it's asserted in the integration spec, not here.
 - `integration_test/helpers/document_scanner_mock.dart` — `installDocumentScannerMock()`: stubs the `cunning_document_scanner` channel's `getPictures` to return a fixed on-disk PNG **and** grants camera/gallery permission via `installCameraGalleryPermissionMocks()` on every platform (see the "Document-scanner mock" caveat above). This is the **only** way to add an image to the Quick Scan sheet on Linux desktop.
-- `integration_test/helpers/platform_mocks.dart` — `installLinuxDesktopMocks()` (Linux-only: permission_handler + gal + flutter_secure_storage) and the extracted `installCameraGalleryPermissionMocks()` (camera + gallery grant, shared with the document-scanner mock on all platforms).
+- `integration_test/helpers/platform_mocks.dart` — `installLinuxDesktopMocks()` (Linux-only: permission_handler + gal + flutter_secure_storage) and the extracted `installCameraGalleryPermissionMocks()` (camera + gallery grant, shared with the document-scanner mock on all platforms). Also re-exports the photo-picker fakes.
+- `test/helpers/image_picker_mock.dart` — `installImagePickerMock()` swaps `ImagePickerPlatform.instance` for a fake returning a real on-disk file (same empty-filename rationale as the file-selector mock); `installFailingImagePickerMock()` is the throwing variant the failure-message specs use. **Widget tests must pass `bytes:` explicitly** (`quickScanTestPngBytes`) — `rootBundle` is not serviced there — **and must wrap the pick in `tester.runAsync`**, since `testWidgets` runs in fake-async where the mock's temp-file I/O never completes and the test hangs rather than failing. `integration_test/helpers/file_selector_mock.dart` gained a matching `installFailingFileSelectorMock()`.
 - `integration_test/helpers/receipt_test_helpers.dart` — `addManualReceiptViaUI` (group-selectable), URL/id extraction, receipt cleanup.
 - `integration_test/helpers/nav.dart` — group-entry and group-receipt navigation helpers.
 - `test_driver/integration_test.dart` — `integrationDriver()` entrypoint that `flutter drive` uses.

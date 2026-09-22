@@ -44,7 +44,7 @@
       <ng-container *ngIf="column.template">
         <ng-template
           [ngTemplateOutlet]="column.template"
-          [ngTemplateOutletContext]="{ element: element, index: indexFor(element) }"
+          [ngTemplateOutletContext]="{ element: element, index: indexFor(element), column: column }"
         ></ng-template>
       </ng-container>
     </td>

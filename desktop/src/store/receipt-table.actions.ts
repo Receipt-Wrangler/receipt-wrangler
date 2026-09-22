@@ -1,3 +1,4 @@
+import { ReceiptDateFilterFieldKey } from "../constants/receipt-filter-fields.constant";
 import { FilterOperation, ReceiptPagedRequestFilter } from "../open-api";
 import { ReceiptTableInterface } from "../interfaces";
 import { ReceiptTableColumnConfig } from "../interfaces/receipt-table-column-config.interface";
@@ -36,6 +37,13 @@ export class SetReceiptFilterField {
   ) {}
 }
 
+export class SetQuickDateField {
+  static readonly type = "[ReceiptTable] Set Quick Date Field";
+
+  /** Which date field the quick date control writes to from now on. */
+  constructor(public field: ReceiptDateFilterFieldKey) {}
+}
+
 export class ResetReceiptFilter {
   static readonly type = "[ReceiptTable] Reset Filter";
 
@@ -46,4 +54,11 @@ export class SetColumnConfig {
   static readonly type = "[ReceiptTable] Set Column Config";
 
   constructor(public columnConfig: ReceiptTableColumnConfig[]) {}
+}
+
+export class SetSummaryConfigGroupId {
+  static readonly type = "[ReceiptTable] Set Summary Config Group Id";
+
+  /** Whose summary configuration to apply on the "All" group. */
+  constructor(public groupId: number) {}
 }

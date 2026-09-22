@@ -2,8 +2,9 @@ import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormControl, ReactiveFormsModule } from "@angular/forms";
 import { MatAutocompleteModule } from "@angular/material/autocomplete";
-import { MatFormFieldModule } from "@angular/material/form-field";
+import { MatFormField, MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
+import { By } from "@angular/platform-browser";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { TextareaComponent } from "./textarea.component";
 
@@ -31,6 +32,27 @@ describe("TextareaComponent", () => {
 
   it("should create", () => {
     expect(component).toBeTruthy();
+  });
+
+  describe("subscript sizing", () => {
+    function subscriptSizing(): string {
+      return fixture.debugElement.query(By.directive(MatFormField))
+        .componentInstance.subscriptSizing;
+    }
+
+    it("stays fixed without a hint", () => {
+      expect(subscriptSizing()).toEqual("fixed");
+    });
+
+    it("goes dynamic with a hint, so a wrapping hint cannot overlap what follows", () => {
+      fixture.componentRef.setInput(
+        "hint",
+        "A hint long enough to wrap onto more than one line."
+      );
+      fixture.detectChanges();
+
+      expect(subscriptSizing()).toEqual("dynamic");
+    });
   });
 
   it("should set selection end to where word was inserted", () => {
