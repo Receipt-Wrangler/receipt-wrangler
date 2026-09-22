@@ -28,7 +28,14 @@ class ReceiptListModel extends ChangeNotifier {
   /// model's back and leave the badge count disagreeing with the query.
   Map<String, ReceiptFilterCondition> get filter => Map.unmodifiable(_filter);
 
-  /// The group [_filter] was authored in, or null when nothing is applied.
+  /// The group this model's quick-filter **state** belongs to, or null when it
+  /// holds none.
+  ///
+  /// That state is the conditions *and* the quick date field: both are authored
+  /// against one group, and both have to be dropped on the way into another.
+  /// Scoping only the conditions left the field un-scoped, so changing it
+  /// without applying a condition kept `_filterGroupId` null, `didChangeDependencies`
+  /// skipped its reset, and the field followed the user into the next group.
   ///
   /// The filter has to carry its own scope because this model outlives every
   /// screen that reads it, while `GroupReceiptsList` is rebuilt from scratch on
@@ -54,6 +61,14 @@ class ReceiptListModel extends ChangeNotifier {
 
   /// The condition the quick date control currently owns, if any.
   ReceiptFilterCondition? get quickDateCondition => _filter[_quickDateField];
+
+  /// Whether anything here belongs to one group, and so has to be dropped when
+  /// the user arrives in another: conditions, a non-default date field, or both.
+  ///
+  /// Recomputed on every write rather than tracked, so a field toggled away
+  /// from the default and back leaves nothing group-scoped behind.
+  bool get _hasGroupScopedState =>
+      _filter.isNotEmpty || _quickDateField != defaultQuickDateFieldKey;
 
   /// How many conditions are narrowing the list, i.e. the app bar's badge.
   int get activeFilterCount => _filter.length;
@@ -107,7 +122,7 @@ class ReceiptListModel extends ChangeNotifier {
     required String groupId,
   }) {
     _filter = Map.of(filter);
-    _filterGroupId = _filter.isEmpty ? null : groupId;
+    _filterGroupId = _hasGroupScopedState ? groupId : null;
     if (notify) {
       notifyListeners();
     }
@@ -144,12 +159,20 @@ class ReceiptListModel extends ChangeNotifier {
   /// survives a move to Resolved Date and stays applied. Callers therefore pass
   /// `notify: false` -- a notification here means "the filter changed" and
   /// would refetch a result set that has not moved.
-  void setQuickDateField(String key, bool notify) {
+  ///
+  /// [groupId] is required for the same reason it is on [setFilter], and the
+  /// compiler asking is the point: the chosen field is authored against one
+  /// group and has to be dropped on the way into another. It is recorded even
+  /// with no conditions applied, which is the case that made the field outlive
+  /// its group -- and dropped again when the field returns to its default,
+  /// since nothing group-scoped is left at that point.
+  void setQuickDateField(String key, bool notify, {required String groupId}) {
     if (_quickDateField == key) {
       return;
     }
 
     _quickDateField = key;
+    _filterGroupId = _hasGroupScopedState ? groupId : null;
     if (notify) {
       notifyListeners();
     }
@@ -158,9 +181,9 @@ class ReceiptListModel extends ChangeNotifier {
   /// Drops every condition and re-points the quick date control at its default
   /// field, mirroring desktop's `ResetReceiptFilter`.
   ///
-  /// The guard covers the field as well as the map: a filter cleared on a group
-  /// change would otherwise leave the stepper pointed at `resolvedDate` in a
-  /// group the user has only just arrived in.
+  /// The guard covers the field as well as the map, and [_hasGroupScopedState]
+  /// is what gets this *called* for a field-only change: together they stop the
+  /// stepper arriving in a new group still pointed at `resolvedDate`.
   void clearFilter(bool notify) {
     if (_filter.isEmpty && _quickDateField == defaultQuickDateFieldKey) {
       return;

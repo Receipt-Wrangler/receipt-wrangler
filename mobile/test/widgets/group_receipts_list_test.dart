@@ -430,12 +430,34 @@ void main() {
       expect(find.text("On Receipt Date"), findsOneWidget);
     });
 
+    testWidgets("a group change resets a field chosen with no condition applied",
+        (tester) async {
+      // The field is group-scoped even on its own. Before it was, choosing a
+      // field without applying a condition recorded no scope at all, so
+      // didChangeDependencies had nothing to compare and skipped its reset --
+      // and the next month action wrote to a field picked in the group the
+      // user had already left.
+      final harness = buildReceiptFilterHarness();
+      harness.receiptListModel.setQuickDateField("resolvedDate", false,
+          groupId: "${ReceiptFilterHarness.officeId}");
+      expect(harness.receiptListModel.filter, isEmpty,
+          reason: "the point of this case is that no condition is applied");
+
+      await pumpList(tester,
+          harness: harness,
+          router: routerFor("/groups/$householdId/receipts"));
+
+      expect(harness.receiptListModel.quickDateField, "date");
+      expect(find.text("On Receipt Date"), findsOneWidget);
+    });
+
     testWidgets("a group change resets the field as well as the filter",
         (tester) async {
       // A filter cleared on arrival must not leave the stepper pointed at a
       // field the user chose in the group they just left.
       final harness = buildReceiptFilterHarness();
-      harness.receiptListModel.setQuickDateField("resolvedDate", false);
+      harness.receiptListModel.setQuickDateField("resolvedDate", false,
+          groupId: "${ReceiptFilterHarness.officeId}");
       harness.receiptListModel.setFilter({
         "resolvedDate": monthFilterCondition(thisMonth),
       }, false, groupId: "${ReceiptFilterHarness.officeId}");

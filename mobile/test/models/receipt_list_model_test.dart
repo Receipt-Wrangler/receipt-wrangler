@@ -326,7 +326,7 @@ void main() {
         "resolvedDate": monthCondition,
       }, false, groupId: groupId);
 
-      model.setQuickDateField("resolvedDate", false);
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
 
       expect(model.quickDateCondition, monthCondition);
     });
@@ -336,7 +336,7 @@ void main() {
       // describes, not the filter itself.
       model.setFilter({"date": monthCondition}, false, groupId: groupId);
 
-      model.setQuickDateField("createdAt", false);
+      model.setQuickDateField("createdAt", false, groupId: groupId);
 
       expect(model.filter.keys, ["date"]);
       expect(model.quickDateCondition, isNull);
@@ -348,17 +348,17 @@ void main() {
       var notifications = 0;
       model.addListener(() => notifications++);
 
-      model.setQuickDateField("resolvedDate", false);
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
       expect(notifications, 0);
 
-      model.setQuickDateField("createdAt", true);
+      model.setQuickDateField("createdAt", true, groupId: groupId);
       expect(notifications, 1);
     });
 
     test("is reset by clearFilter, alongside the conditions", () {
       model.setFilter({"resolvedDate": monthCondition}, false,
           groupId: groupId);
-      model.setQuickDateField("resolvedDate", false);
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
 
       model.clearFilter(false);
 
@@ -366,10 +366,39 @@ void main() {
       expect(model.quickDateField, defaultQuickDateFieldKey);
     });
 
+    test("records its group, so a field-only change is still scoped", () {
+      // The case that made the field outlive its group: with no conditions
+      // applied nothing recorded a scope, so the receipts list had nothing to
+      // compare against on navigation and never reset the field.
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
+
+      expect(model.filterGroupId, groupId);
+    });
+
+    test("drops the scope again when the field returns to its default", () {
+      // Nothing group-specific is left at that point, so a toggle away and
+      // back must not leave the next group looking like a group change.
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
+
+      model.setQuickDateField(defaultQuickDateFieldKey, false,
+          groupId: groupId);
+
+      expect(model.filterGroupId, isNull);
+    });
+
+    test("keeps the scope while conditions remain", () {
+      model.setFilter({"date": monthCondition}, false, groupId: groupId);
+
+      model.setQuickDateField(defaultQuickDateFieldKey, false,
+          groupId: groupId);
+
+      expect(model.filterGroupId, groupId);
+    });
+
     test("is reset even when no condition was ever applied", () {
       // The early return has to cover the field too, or a group change leaves
       // the stepper pointed at a field chosen in the group just left.
-      model.setQuickDateField("createdAt", false);
+      model.setQuickDateField("createdAt", false, groupId: groupId);
 
       model.clearFilter(false);
 

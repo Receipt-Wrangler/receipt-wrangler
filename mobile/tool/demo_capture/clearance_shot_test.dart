@@ -41,7 +41,7 @@ void main() {
         (Platform.environment['CLEARANCE_SHOT_LABEL'] ?? 'BEFORE') == 'BEFORE';
 
     addTearDown(tester.view.reset);
-    await tester.runAsync(loadDemoFonts);
+    await loadDemoFontsOrFail(tester);
 
     tester.view.physicalSize = const Size(demoPhoneWidth, demoPanelHeight);
     tester.view.devicePixelRatio = 1.0;

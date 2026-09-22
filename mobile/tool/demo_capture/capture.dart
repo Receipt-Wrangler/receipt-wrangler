@@ -173,6 +173,29 @@ Widget buildDemoSurface({
   );
 }
 
+/// Loads the demo fonts, failing the test if they do not load.
+///
+/// Call this rather than `tester.runAsync(loadDemoFonts)`. `loadDemoFonts`
+/// returns `Future<void>`, and `runAsync` returns null **both** when the
+/// callback throws and when it simply has nothing to return -- so a bare call
+/// cannot tell the two apart and silently carries on. What follows is a whole
+/// recording in `--use-test-fonts`' stub font, where every glyph is a filled
+/// box: the demo passes and writes a GIF nobody can read.
+///
+/// Returning a sentinel from inside [WidgetTester.runAsync] is what makes the
+/// failure detectable, and the shape matches [grabFrame] below, which has the
+/// same problem for the same reason.
+Future<void> loadDemoFontsOrFail(WidgetTester tester) async {
+  final loaded = await tester.runAsync(() async {
+    await loadDemoFonts();
+    return true;
+  });
+
+  if (loaded != true) {
+    fail('demo fonts failed to load: ${tester.takeException()}');
+  }
+}
+
 /// Grabs the current frame off the repaint boundary.
 ///
 /// `toImage` is asynchronous and `testWidgets` runs in fake-async, where the

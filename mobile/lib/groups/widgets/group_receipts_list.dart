@@ -210,7 +210,8 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
         );
       }).toList(),
       onSelected: (value) {
-        _receiptListModel.setQuickDateField(value, false);
+        _receiptListModel.setQuickDateField(value, false,
+            groupId: getGroupId(context));
         setState(() {});
       },
     );

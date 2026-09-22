@@ -1491,10 +1491,19 @@ the API and the encoder already handle.
   model means "the filter changed". The abandoned condition stays applied and stays on the filter
   screen. `group_receipts_list_test.dart` asserts **zero** requests for it; verified to fail with the
   flag flipped to `true`.
-- **`clearFilter` resets the field too**, and its early return was widened to cover it
-  (`_filter.isEmpty && _quickDateField == defaultQuickDateFieldKey`). Without that widening a group
-  change clears the conditions but leaves the stepper pointed at a field chosen in the group just
-  left -- the same shape as the filter leak `receipt_filter_lifecycle_test.dart` exists for.
+- **The chosen field is group-scoped exactly as the conditions are**, and it takes *both* halves to
+  hold. `clearFilter`'s early return was widened to cover the field
+  (`_filter.isEmpty && _quickDateField == defaultQuickDateFieldKey`), **and** `setQuickDateField`
+  takes a **required `groupId`** and records it -- because `_filterGroupId` is what
+  `didChangeDependencies` compares, and it is the only thing that gets `clearFilter` *called*.
+  Widening the guard alone shipped a half-rule: with a condition applied the field reset, and with
+  none applied `_filterGroupId` stayed null, the reset never ran, and the field followed the user
+  into the next group (caught in review on #702). `_filterGroupId` is therefore recomputed on every
+  write from one predicate, `_hasGroupScopedState` (`_filter.isNotEmpty || field != default`), so a
+  field toggled away from the default and back leaves nothing scoped behind. Same shape as the
+  filter leak `receipt_filter_lifecycle_test.dart` exists for, and
+  `group_receipts_list_test.dart` pins the field-only navigation case separately from the
+  with-a-condition one.
 - **The label reads "September 2026" / "Custom" / "All time"**, and the stepper never hides. A
   condition it cannot describe (a partial range, a `GREATER_THAN`, `WITHIN_CURRENT_MONTH`) still has
   to read as a filter. **The clear ✕ follows the *condition*, not the month** -- "Custom" carries no
@@ -1777,11 +1786,16 @@ frames are captured inside a widget test and encoded to GIF in pure Dart.
   **Turning dithering on instead is not the fix**, and it is worth not rediscovering: Floyd-Steinberg
   at 256 colors dithered the screen's large *white* areas into visible noise and took the file from
   176KB to 445KB. The existing "no dither" guidance holds; raise the palette, not the dither.
-- **`loadDemoFonts` must be called as `tester.runAsync(loadDemoFonts)`.** It reads fonts off disk and
-  awaits `FontLoader.load`, so a bare `await loadDemoFonts()` in fake-async hangs until the 10-minute
-  test timeout rather than failing -- and the timeout names the test, not the call, so it reads as a
-  mysterious stall. Both existing demos already do it; it is listed here because the failure mode
-  gives no hint.
+- **Call `loadDemoFontsOrFail(tester)`, never `loadDemoFonts` directly.** Two failure modes sit on
+  this one line and neither announces itself. A bare `await loadDemoFonts()` reads fonts off disk and
+  awaits `FontLoader.load` in fake-async, so it **hangs** until the 10-minute test timeout rather
+  than failing -- and the timeout names the test, not the call, so it reads as a mysterious stall.
+  Wrapping it in `tester.runAsync` fixes that but introduces the opposite problem: `runAsync` returns
+  null **both** when the callback throws and when it has nothing to return, and `loadDemoFonts`
+  returns `Future<void>` -- so a genuine font-load failure is swallowed and the demo cheerfully
+  records a whole clip in `--use-test-fonts`' stub font, where every glyph is a filled box. It
+  passes, and writes a GIF nobody can read. `loadDemoFontsOrFail` returns a sentinel from inside
+  `runAsync` and fails on anything else, the same shape `grabFrame` uses; all three demos call it.
 - **`flutter test` always passes `--use-test-fonts`,** whose stub font draws every glyph as a filled
   box. Load Raleway from `fonts/` on disk, register it as `Roboto` too (Material's default
   `Typography` asks for that, and most text takes the theme default), and load `MaterialIcons` or

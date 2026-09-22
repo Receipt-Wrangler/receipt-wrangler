@@ -86,7 +86,7 @@ void main() {
   tearDown(() => OpenApiClient.client = _MockOpenapi());
 
   testWidgets("records the quick date filter demo", (tester) async {
-    await tester.runAsync(loadDemoFonts);
+    await loadDemoFontsOrFail(tester);
     tester.view.physicalSize = surface;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
