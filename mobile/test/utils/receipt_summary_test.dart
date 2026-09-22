@@ -22,6 +22,21 @@ void main() {
       expect(summaryConfigGroups(model).map((g) => g.name), ['Alpha', 'Zulu']);
     });
 
+    // Case-INsensitively, to match the desktop twin's localeCompare. Dart's compareTo is
+    // UTF-16 ordinal, so this list comes back in the opposite order without the fix --
+    // and because the fallback is "the first enabled group", the two clients would default
+    // the All group to different configurations for the same user.
+    test('sorts case-insensitively, like the desktop twin', () {
+      final model = modelWith([
+        buildGroup(id: 2, name: 'Bravo team', receiptSummaryEnabled: true),
+        buildGroup(id: 3, name: 'apple budget', receiptSummaryEnabled: true),
+      ]);
+
+      expect(summaryConfigGroups(model).map((g) => g.name),
+          ['apple budget', 'Bravo team']);
+      expect(resolveSummaryConfigGroup(summaryConfigGroups(model), null)?.id, 3);
+    });
+
     test('excludes a group whose summary is off', () {
       final model = modelWith([
         buildGroup(id: 2, name: 'On', receiptSummaryEnabled: true),

@@ -1477,17 +1477,18 @@ cross-client contract and `api/CLAUDE.md` for the wire one.
   anything else in `GroupReceiptsList`'s `Column` takes its natural height and never scrolls with
   the list. No slivers, no `Scaffold` slot -- and the bottom position is reachable under infinite
   scroll, which a trailing sliver would not be.
-- **FOUR fixed slots, each always a `SizedBox`.** Not `if (atTop) bar` — and this bit *cost a
-  cycle*. `Element.updateChildren` walks the old and new child lists inward from both ends while
-  `Widget.canUpdate` holds, and in the middle it cannot match it reuses only **keyed** children. A
-  slot whose type flips (bar <-> nothing) halts that walk at both ends, leaving the unkeyed
-  `PagedDataList` in the middle -- so it is rebuilt from scratch, **discarding its State along with
-  the paging controller, every loaded page and `_totalCount`, and silently refetching page 1**.
-  Wrapping each slot in a `SizedBox(child: ...)` keeps the type stable and the walk matches the
-  whole list. (A `GlobalKey` on `PagedDataList` also works; this is the lighter tool.) Pinned by
-  *"flipping the position does not reset the paged list"*, which asserts **State identity** -- a
-  request count does not catch it, because the reconstructed State refetches immediately and that
-  looks exactly like the filter's own refetch.
+- **`PagedDataList` carries a `GlobalKey`, and it is load-bearing** — this bit *cost a cycle*.
+  The bar renders in one of two slots either side of the list, so the list's position among its
+  siblings changes with the group's configured position. `Element.updateChildren` walks the old and
+  new child lists inward from both ends while `Widget.canUpdate` holds, and in the middle it cannot
+  match it reuses only **keyed** children — so unkeyed, `PagedDataList` is rebuilt from scratch,
+  **discarding its State along with the paging controller, every loaded page and `_totalCount`, and
+  silently refetching page 1**. Padding the `Column` with always-present placeholder slots also
+  works, but the key travels with the widget it protects, so adding any other conditional child to
+  this `Column` later cannot reintroduce the bug. Pinned by *"flipping the position does not reset
+  the paged list"*, which asserts **State identity** — a request count does not catch it, because
+  the reconstructed State refetches immediately and that looks exactly like the filter's own
+  refetch.
 - **The list owns the request; `ReceiptListModel` owns only the All-group pick.** The model has no
   Dio and no route access, and -- decisively -- its notify contract says a notification means *the
   filter changed*, so a model that fetched and notified on arrival would ping-pong with
@@ -1513,7 +1514,10 @@ cross-client contract and `api/CLAUDE.md` for the wire one.
 - **The cached group settings decide only WHETHER to ask.** Everything rendered -- `enabled`,
   `position`, the rows -- comes off the response, which stays authoritative. A group that never
   opted in therefore costs no request at all. The consequence: an admin who enables the summary
-  while the app is running sees nothing until the next AppData refresh. Desktop behaves identically.
+  while the app is running changes nothing on a screen already open. The list reads `GroupModel`
+  with `listen: false` **deliberately** — a listener would re-fetch an unpaged aggregate on every
+  15-minute AppData refresh for nothing — so the block appears on the next navigation into the
+  group, not merely on the next refresh. Desktop behaves the same way.
 - **ONE horizontal scroll view for the whole figure grid, with the labels frozen outside it.** A
   `SingleChildScrollView` per row lets the rows desync under a drag and parks a value under the
   wrong heading; *"every row scrolls together"* fails against that tree. Nothing can swallow the
@@ -1535,8 +1539,10 @@ cross-client contract and `api/CLAUDE.md` for the wire one.
 - **On the All group the pick lives in `ReceiptListModel`**, session-scoped: mobile has no persisted
   slice equivalent to the desktop's NGXS `receiptTable`. Written with `notify: false` and refreshed
   directly, like the sort setters -- a configuration pick changes the breakdown's shape, never the
-  data. It is reset on a **group change by the list**, not from `clearFilter`, which early-returns on
-  an already-empty filter and so would skip exactly the navigation that invalidates it.
+  data. It is reset on a **group change by the list**, in the same branch that re-fetches the
+  summary — not from `clearFilter` (which early-returns on an already-empty filter) and not from
+  the filter-clear branch beside it (which is itself gated on there having been a filter at all).
+  Either would leave a user who never filtered carrying a pick out of the All group and back.
 - **E2E: `integration_test/receipt_summary_test.dart`.** The widget suite injects a mocked
   `ReceiptApi` and a hand-seeded `GroupModel`, so it proves nothing about the wire; this covers the
   encoded filter reaching the summary endpoint and narrowing every row, and `position` surviving

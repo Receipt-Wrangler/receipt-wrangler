@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:built_collection/built_collection.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -408,6 +410,39 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byType(PagedDataList), findsOneWidget);
       expect(find.byKey(const ValueKey('receipt-summary')), findsNothing);
+    });
+
+    /// The skip branch bumps the sequence too, so a decision NOT to ask still supersedes
+    /// whatever is in flight. Without that, leaving a summary-enabled group for one
+    /// without a summary lets the old group's response land after the block was cleared
+    /// and repaint its figures over the new group's list.
+    testWidgets('a pending response cannot repaint after a skip supersedes it',
+        (tester) async {
+      final gate = Completer<Response<api.ReceiptSummary>>();
+      when(() => mockReceiptApi.getReceiptSummaryForGroup(
+            groupId: any(named: "groupId"),
+            receiptSummaryCommand: any(named: "receiptSummaryCommand"),
+          )).thenAnswer((_) => gate.future);
+
+      final router = routerFor(householdRoute());
+      await pumpList(tester,
+          router: router,
+          // Office has no summary, so arriving there is the "skip" decision.
+          harness: harnessWithSummary(officeEnabled: false));
+
+      router.go("/groups/${ReceiptFilterHarness.officeId}/receipts");
+      await tester.pumpAndSettle();
+
+      // Household's request only now comes back.
+      gate.complete(Response(
+        requestOptions: RequestOptions(path: "/"),
+        data: buildReceiptSummary(
+            overall: buildSummaryRow(receiptCount: 3, total: '30.00')),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('receipt-summary')), findsNothing,
+          reason: "the superseded response must not paint another group's figures");
     });
 
     group('placement', () {

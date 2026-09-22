@@ -14,7 +14,16 @@ List<api.Group> summaryConfigGroups(GroupModel groupModel) {
   final enabled = groupModel.groupsWithoutAllGroup
       .where((group) => group.groupReceiptSettings.receiptSummaryEnabled == true)
       .toList();
-  enabled.sort((a, b) => a.name.compareTo(b.name));
+  // Case-insensitive, to match the desktop twin's localeCompare. Dart's compareTo is
+  // UTF-16 ORDINAL, so "Bravo team" sorts before "apple budget" ('B' 66 < 'a' 97) while
+  // localeCompare puts them the other way round -- and since the fallback is "the first
+  // enabled group", the two clients would default the All group to DIFFERENT
+  // configurations, showing the same user different columns on phone and on desktop.
+  // The tie-break keeps the order stable when two names differ only in case.
+  enabled.sort((a, b) {
+    final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    return byName != 0 ? byName : a.name.compareTo(b.name);
+  });
   return enabled;
 }
 

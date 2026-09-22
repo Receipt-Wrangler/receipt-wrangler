@@ -136,7 +136,7 @@ change**.
 
 `dart analyze` substitutes for `flutter analyze` here (it reports the same errors) and stays scoped to
 `mobile/api` — judge a regen by the **error** count, which must be **0**. The warnings are
-pre-existing generator noise: ~73 in `mobile/api` of 107 across `mobile/`, the split recorded in
+pre-existing generator noise: 73 in `mobile/api` of 106 across `mobile/`, the split recorded in
 `.github/workflows/ci.yml` where the analyzer is deliberately not gated. Keep those two numbers in
 sync with that comment.
 
@@ -315,12 +315,11 @@ It shipped backend + desktop first, while mobile had no filter to describe; mobi
 - **A configured status that matches nothing still renders, as a zero row**, so the block keeps its
   shape as the filter narrows. A receipt whose status is *not* configured still counts toward the
   overall row, or the total would disagree with the table's own count.
-- **The desktop does not re-request on paging or sorting** — neither changes which receipts the
-  filter matches. That, plus skipping the request entirely for a group that has not opted in, is
-  what keeps an unpaged aggregate affordable on the app's hottest screen.
-- **Neither client re-requests on paging or sorting**, for the same reason, and mobile's split is
-  structural rather than conventional: its sort setters already bypass the notification the summary
-  listens to. See `mobile/CLAUDE.md` → "Receipt summary".
+- **Neither client re-requests on paging or sorting** — neither changes which receipts the filter
+  matches. That, plus skipping the request entirely for a group that has not opted in, is what keeps
+  an unpaged aggregate affordable on the app's hottest screen. Mobile's split is structural rather
+  than conventional: its sort setters already bypass the notification the summary listens to. See
+  `mobile/CLAUDE.md` → "Receipt summary".
 - **The synthetic "All" group picks a configuration via chips**, since it spans several groups and
   has none of its own; the data still spans every group. Desktop persists that pick to localStorage;
   mobile keeps it in `ReceiptListModel` for the session, having no persisted slice of its own.

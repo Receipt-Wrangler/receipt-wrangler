@@ -264,3 +264,39 @@ func TestUpdateGroupReceiptSettingsAllowsSummaryPositionWithoutCustomFieldPermis
 		utils.PrintTestError(t, settings.ReceiptSummaryPosition, models.RECEIPT_SUMMARY_POSITION_TOP)
 	}
 }
+
+// An explicit empty position is a 400, not "leave unchanged". The empty member exists on the enum
+// only so a released client tolerates a value added later; on the write side the pointer is
+// non-nil, so the repository would assign "" and silently reset a configured position with a 200.
+func TestUpdateGroupReceiptSettingsRejectsEmptySummaryPosition(t *testing.T) {
+	defer tearDownGroupTests()
+
+	groupId := seedDefaultCustomFieldGroup(t, 1, true)
+
+	// Configure TOP first, so the assertion is that it SURVIVES rather than that nothing happened.
+	w := callUpdateGroupReceiptSettings(t, 1, groupId,
+		`{`+baseSettingsBody+`,"receiptSummaryPosition":"TOP"}`)
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+		return
+	}
+
+	w = callUpdateGroupReceiptSettings(t, 1, groupId,
+		`{`+baseSettingsBody+`,"receiptSummaryPosition":""}`)
+	if w.Result().StatusCode != http.StatusBadRequest {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusBadRequest)
+		return
+	}
+	if _, ok := settingsValidationErrors(t, w.Body.Bytes())["receiptSummaryPosition"]; !ok {
+		utils.PrintTestError(t, w.Body.String(), "a receiptSummaryPosition error")
+	}
+
+	settings, err := repositories.NewGroupReceiptSettingsRepository(nil).GetGroupReceiptSettingsByGroupId(groupId)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if settings.ReceiptSummaryPosition != models.RECEIPT_SUMMARY_POSITION_TOP {
+		utils.PrintTestError(t, settings.ReceiptSummaryPosition, "still TOP")
+	}
+}

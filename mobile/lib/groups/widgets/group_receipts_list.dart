@@ -41,6 +41,23 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
   /// user has already moved past.
   int _summaryRequestSeq = 0;
 
+  /// Keeps the paged list's State across a reparent.
+  ///
+  /// The summary bar renders in one of two slots either side of this list, so the list's
+  /// position among its siblings changes when the group's configured position does.
+  /// Element.updateChildren walks the old and new child lists inward from both ends while
+  /// Widget.canUpdate holds and reuses only KEYED children in the middle it cannot match
+  /// -- so without a key PagedDataList is rebuilt from scratch, discarding its paging
+  /// controller, every loaded page and _totalCount, and silently refetching page 1.
+  ///
+  /// A key rather than padding the Column with always-present placeholder slots: the key
+  /// travels with the widget it protects, so adding any other conditional child here
+  /// later cannot reintroduce the bug. Pinned by "flipping the position does not reset
+  /// the paged list", which asserts State identity -- a request count does not catch it,
+  /// because the reconstructed State refetches immediately and that looks exactly like
+  /// the filter's own refetch.
+  final GlobalKey _pagedListKey = GlobalKey();
+
   late final ReceiptListModel _receiptListModel =
       Provider.of<ReceiptListModel>(context, listen: false);
 
@@ -81,16 +98,17 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
       // badge mid-frame. The refresh below is the visible half -- and is null on
       // a first mount, where the clear simply lands before the first fetch.
       _receiptListModel.clearFilter(false);
-      // The All-group configuration pick belongs to the group being browsed. Reset here
-      // rather than inside clearFilter, which early-returns on an already-empty filter
-      // and so would skip exactly the navigation that invalidates the pick.
-      _receiptListModel.setSummaryConfigGroupId(null, false);
       _refreshCallback?.call();
     }
 
     // Guarded on the group, not run unconditionally: this method fires for any inherited
     // widget change, and the summary is an UNPAGED aggregate.
     if (_summaryGroupId != groupId) {
+      // The All-group configuration pick belongs to the group being browsed, so it goes
+      // with the group -- NOT inside the filter branch above, which is gated on there
+      // having been a filter at all. A user who never filtered would otherwise carry a
+      // pick from the All group into and back out of a real one.
+      _receiptListModel.setSummaryConfigGroupId(null, false);
       _summaryGroupId = groupId;
       _fetchSummary(groupId);
     }
@@ -149,6 +167,12 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
   }
 
   Future<void> _fetchSummary(String groupId) async {
+    // Bumped BEFORE the skip branch, not only before a request: a decision not to ask
+    // still supersedes whatever is in flight. Without it, leaving a summary-enabled group
+    // for one without a summary lets the old group's response land after the block was
+    // cleared and repaint its figures over the new group's list.
+    final seq = ++_summaryRequestSeq;
+
     final request = _resolveSummaryRequest(groupId);
     if (!request.shouldRequest) {
       if (mounted && _summary != null) {
@@ -157,7 +181,6 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
       return;
     }
 
-    final seq = ++_summaryRequestSeq;
     try {
       final response =
           await OpenApiClient.client.getReceiptApi().getReceiptSummaryForGroup(
@@ -176,6 +199,15 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
       // DioException from a setState-driven fetch takes the whole receipts screen down,
       // and the right degradation for a block of totals is to keep the last good
       // figures rather than to interrupt someone browsing receipts.
+      //
+      // The group guard is released so a failure is not recorded as "this group is done".
+      // In practice every navigation off this screen remounts the State anyway, so there
+      // is no demonstrable case where the latch bites -- hence no test for it. It is kept
+      // because a guard that means "already fetched" should not be set by a fetch that
+      // did not happen.
+      if (mounted && seq == _summaryRequestSeq && _summaryGroupId == groupId) {
+        _summaryGroupId = null;
+      }
     }
   }
 
@@ -277,7 +309,11 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
       summary: summary,
       atTop: isReceiptSummaryAtTop(summary.position),
       configGroups: configGroups,
-      selectedConfigGroupId: summary.configurationGroupId,
+      // The pick, not the last response's configurationGroupId: otherwise a tap leaves the
+      // previous chip highlighted for the whole round trip, and stays there forever if the
+      // request fails -- with the model and the UI silently disagreeing.
+      selectedConfigGroupId:
+          _receiptListModel.summaryConfigGroupId ?? summary.configurationGroupId,
       onConfigGroupSelected: _onConfigGroupSelected,
     );
   }
@@ -290,23 +326,13 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
     return Column(
       children: [
         buildSortFilterBar(),
-        // TWO FIXED SLOTS, each ALWAYS a SizedBox -- never one bar moved between them,
-        // and never an `if` that shortens the list.
-        //
-        // Element.updateChildren walks the old and new child lists inward from both ends
-        // while Widget.canUpdate holds, and reuses only KEYED children in the middle it
-        // cannot match. A slot whose type flips (bar <-> SizedBox) halts that walk at
-        // index 1 and at the last index, leaving PagedDataList unkeyed in the middle --
-        // so it is rebuilt from scratch, discarding its State along with the paging
-        // controller, every loaded page and _totalCount, and silently refetching page 1.
-        // Keeping the slot TYPE stable lets the walk match the whole list. (A GlobalKey
-        // on PagedDataList would also work; this is the lighter tool.)
-        //
         // Both slots are PINNED for free: PagedDataList returns an Expanded, so it takes
         // the remaining height and the bar never scrolls with the list. That is what
-        // makes the bottom position reachable at all under infinite scroll.
-        SizedBox(child: atTop ? bar : null),
+        // makes the bottom position reachable at all under infinite scroll -- and it is
+        // why _pagedListKey exists; see its doc comment.
+        if (atTop) bar,
         PagedDataList(
+          key: _pagedListKey,
           onRefreshCallbackSet: (callback) {
             _refreshCallback = callback;
           },
@@ -328,7 +354,7 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
                 );
           },
         ),
-        SizedBox(child: (bar != null && !atTop) ? bar : null),
+        if (bar != null && !atTop) bar,
       ],
     );
   }

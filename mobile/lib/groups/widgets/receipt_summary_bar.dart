@@ -148,6 +148,10 @@ class _ReceiptSummaryBarState extends State<ReceiptSummaryBar> {
   }
 
   Widget _buildLabelColumn(ThemeData theme) {
+    // Hoisted: _rows SYNTHESISES a list on every read, so reading it in a loop condition
+    // and again per field allocates one list per access.
+    final rows = _rows;
+
     return SizedBox(
       width: _labelColumnWidth,
       child: Column(
@@ -155,22 +159,22 @@ class _ReceiptSummaryBarState extends State<ReceiptSummaryBar> {
         children: [
           // Aligns the labels with the figure rows, past the column headings.
           const SizedBox(height: _headerHeight),
-          for (var i = 0; i < _rows.length; i++)
+          for (var i = 0; i < rows.length; i++)
             SizedBox(
               key: ValueKey(
-                  'receipt-summary-row-${summaryRowKey(_rows[i], isOverall: i == 0)}'),
+                  'receipt-summary-row-${summaryRowKey(rows[i], isOverall: i == 0)}'),
               height: _rowHeight,
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '${receiptSummaryRowLabel(_rows[i], receiptStatusLabel, isOverall: i == 0)}'
-                  '\n(${receiptSummaryCountLabel(_rows[i])})',
+                  '${receiptSummaryRowLabel(rows[i], receiptStatusLabel, isOverall: i == 0)}'
+                  '\n(${receiptSummaryCountLabel(rows[i])})',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: _rowStyle(
                     theme,
                     isOverall: i == 0,
-                    isEmpty: _rows[i].receiptCount == 0,
+                    isEmpty: rows[i].receiptCount == 0,
                   ),
                 ),
               ),
@@ -182,6 +186,7 @@ class _ReceiptSummaryBarState extends State<ReceiptSummaryBar> {
 
   Widget _buildFigureGrid(ThemeData theme) {
     final names = _columnNames;
+    final rows = _rows;
 
     return Scrollbar(
       controller: _figuresController,
@@ -213,11 +218,11 @@ class _ReceiptSummaryBarState extends State<ReceiptSummaryBar> {
                 ],
               ),
             ),
-            for (var i = 0; i < _rows.length; i++)
+            for (var i = 0; i < rows.length; i++)
               SizedBox(
                 height: _rowHeight,
                 child: Row(
-                  children: _buildFigureCells(theme, _rows[i], isOverall: i == 0),
+                  children: _buildFigureCells(theme, rows[i], isOverall: i == 0),
                 ),
               ),
           ],

@@ -133,8 +133,16 @@ func (command UpdateGroupReceiptSettingsCommand) Validate() structs.ValidatorErr
 	// The position goes through its own Valuer rather than a membership walk, the
 	// pie_chart_data_command.go style: two values make a list overkill, and routing it here turns
 	// what the DB layer would surface as a generic 500 into a field-level 400.
+	//
+	// The EMPTY check is separate and load-bearing. Value() tolerates "" (every enum here does, for
+	// unset scalars), and "" is a real member of the swagger enum -- it has to be, so the generated
+	// Dart enum has a member to carry `fallback: true`. But on the WRITE side an explicit "" is not
+	// "leave unchanged": the pointer being non-nil makes the repository assign it, silently
+	// resetting a configured position to the default with a 200. Omitting the key is the only way
+	// to leave it alone, so an explicit empty is a 400.
 	if command.ReceiptSummaryPosition != nil {
-		if _, err := command.ReceiptSummaryPosition.Value(); err != nil {
+		_, err := command.ReceiptSummaryPosition.Value()
+		if err != nil || len(*command.ReceiptSummaryPosition) == 0 {
 			vErr.Errors["receiptSummaryPosition"] = "Invalid receipt summary position. Must be TOP or BOTTOM"
 		}
 	}

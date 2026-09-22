@@ -547,8 +547,11 @@ func TestReceiptSummary_DefaultsToBottom(t *testing.T) {
 func setSummaryPosition(t *testing.T, groupId uint, position models.ReceiptSummaryPosition) {
 	t.Helper()
 
-	// Only the position key: every other field is a pointer left nil, which the repository reads
-	// as "leave unchanged" — so this cannot disturb what configureSummary just wrote.
+	// The three SUMMARY keys are pointers left nil, which the repository reads as "leave unchanged",
+	// so this cannot disturb the enabled flag or the status set configureSummary just wrote. The
+	// non-pointer hide*/quick-scan fields ARE overwritten -- the repository assigns them
+	// unconditionally and writes with Select("*") -- which is why the quick-scan defaults below are
+	// repeated verbatim from configureSummary rather than omitted.
 	command := commands.UpdateGroupReceiptSettingsCommand{
 		QuickScanPaidByEnabled:     true,
 		QuickScanPaidByRequired:    true,
