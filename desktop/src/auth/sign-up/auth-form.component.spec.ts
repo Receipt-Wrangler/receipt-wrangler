@@ -1,4 +1,7 @@
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
@@ -67,6 +70,50 @@ describe('AuthForm', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  // Regression guard: isLoading used to be a plain field reset inside finalize().
+  // Under zoneless change detection nothing repaints on the failure path (the
+  // success path only repainted because router.navigate() triggers CD), so the
+  // loading GIF stayed up forever and the user never got their form back.
+  it('clears the spinner and restores the populated form when login fails', async () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    component.form.setValue({
+      username: 'wrangler',
+      password: 'wrong-password',
+    });
+
+    component.submit();
+    await fixture.whenStable();
+
+    // The spinner is up while the request is in flight.
+    expect(component.isLoading()).toBe(true);
+    expect(
+      fixture.nativeElement.querySelector('.loading-container')
+    ).toBeTruthy();
+
+    httpTesting
+      .expectOne('/api/login/')
+      .flush(
+        { errorMsg: 'Invalid credentials.' },
+        { status: 500, statusText: 'Internal Server Error' }
+      );
+
+    await fixture.whenStable();
+
+    expect(component.isLoading()).toBe(false);
+    expect(fixture.nativeElement.querySelector('.loading-container')).toBeNull();
+
+    // The form is back in the DOM, still rendering what the user typed.
+    const inputs: HTMLInputElement[] = Array.from(
+      fixture.nativeElement.querySelectorAll('app-input input')
+    );
+    expect(inputs.map((input) => input.value)).toEqual([
+      'wrangler',
+      'wrong-password',
+    ]);
+
+    httpTesting.verify();
   });
 
   // The QR itself is unit-tested in shared-ui/login-qr; these two only pin that
