@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"math"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"testing"
@@ -566,5 +567,116 @@ func TestGetPagedSystemTasksCombinesTypeWithASystemRanByDisjunction(t *testing.T
 
 	if count != 2 {
 		t.Errorf("expected only the 2 QUICK_SCAN tasks, got %d", count)
+	}
+}
+
+// The wire format is a bare calendar day precisely so the server cannot resolve
+// it into the adjacent one. Before this, a UTC-4 browser's local midnight on the
+// 22nd arrived as 2026-09-22T04:00:00Z and became the 21st under a US Pacific
+// API.
+func TestStartOfDayValueReadsACalendarDayWithoutZoneDrift(t *testing.T) {
+	zones := []string{"UTC", "America/Los_Angeles", "Australia/Sydney"}
+
+	for _, zoneName := range zones {
+		t.Run(zoneName, func(t *testing.T) {
+			zone, err := time.LoadLocation(zoneName)
+			if err != nil {
+				t.Skipf("zone %s unavailable: %v", zoneName, err)
+			}
+
+			original := time.Local
+			time.Local = zone
+			defer func() { time.Local = original }()
+
+			day, ok := startOfDayValue("2026-09-22")
+			if !ok {
+				t.Fatal("expected the calendar day to parse")
+			}
+
+			if day.Format(time.DateOnly) != "2026-09-22" {
+				t.Errorf("expected 2026-09-22, got %s", day.Format(time.DateOnly))
+			}
+
+			if hour, minute := day.Hour(), day.Minute(); hour != 0 || minute != 0 {
+				t.Errorf("expected local midnight, got %02d:%02d", hour, minute)
+			}
+		})
+	}
+}
+
+func TestToInt64RejectsValuesThatCannotBeAnId(t *testing.T) {
+	rejected := map[string]interface{}{
+		// The headline case: a plain conversion truncates to user 4.
+		"fractional":     float64(4.9),
+		"negative frac":  float64(-4.9),
+		"NaN":            math.NaN(),
+		"positive inf":   math.Inf(1),
+		"negative inf":   math.Inf(-1),
+		"above int64":    float64(1 << 63),
+		"far above":      1e300,
+		"fractional f32": float32(4.5),
+		"not a number":   "4",
+	}
+
+	for name, value := range rejected {
+		t.Run(name, func(t *testing.T) {
+			if id, ok := toInt64(value); ok {
+				t.Errorf("expected %v to be rejected, got %d", value, id)
+			}
+		})
+	}
+
+	accepted := map[string]struct {
+		value    interface{}
+		expected int64
+	}{
+		"whole float": {float64(4), 4},
+		"negative":    {float64(-1), -1},
+		"zero":        {float64(0), 0},
+		"float32":     {float32(7), 7},
+		"int":         {int(9), 9},
+		"int64":       {int64(11), 11},
+		"uint":        {uint(13), 13},
+		"min int64":   {float64(math.MinInt64), math.MinInt64},
+	}
+
+	for name, test := range accepted {
+		t.Run(name, func(t *testing.T) {
+			id, ok := toInt64(test.value)
+			if !ok || id != test.expected {
+				t.Errorf("expected %d, got %d (ok=%v)", test.expected, id, ok)
+			}
+		})
+	}
+}
+
+// A fractional id must not silently become a different user's tasks: it is
+// dropped, exactly as a non-numeric one is.
+func TestGetPagedSystemTasksDropsAFractionalRanByIdRatherThanTruncating(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+	now := time.Now()
+
+	fourth := models.User{Username: "task-filter-frac-4", Password: "x"}
+	db.Create(&fourth)
+	fourthId := fourth.ID
+
+	seedSystemTask(db, models.QUICK_SCAN, &fourthId, now, nil)
+	seedSystemTask(db, models.QUICK_SCAN, nil, now, nil)
+
+	repository := NewSystemTaskRepository(nil)
+	_, count, err := repository.GetPagedSystemTasks(systemTaskFilterCommand(commands.SystemTaskPagedRequestFilter{
+		RanBy: commands.PagedRequestField{
+			Operation: commands.CONTAINS,
+			// Truncating this would select the seeded user's tasks.
+			Value: []interface{}{float64(fourthId) + 0.9},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("expected the filter to add no predicate (2 rows), got %d", count)
 	}
 }

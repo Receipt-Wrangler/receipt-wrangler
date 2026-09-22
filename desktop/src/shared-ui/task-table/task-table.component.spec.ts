@@ -57,6 +57,26 @@ describe("TaskTableComponent", () => {
     request.flush({ data: [], totalCount: 0 });
   });
 
+  // A local-midnight Date would serialize as an instant, which the server
+  // resolves to a day in its own zone -- so the request must carry the calendar
+  // day the user picked. See toSystemTaskWireFilter.
+  it("sends the date fields as local calendar days", () => {
+    fixture.componentRef.setInput("filterProvider", () => ({
+      startedAt: { operation: FilterOperation.Equals, value: new Date(2026, 8, 22, 0, 0, 0, 0) },
+      endedAt: {
+        operation: FilterOperation.Between,
+        value: [new Date(2026, 8, 10, 0, 0, 0, 0), new Date(2026, 8, 12, 0, 0, 0, 0)],
+      },
+    }) as unknown as SystemTaskPagedRequestFilter);
+
+    component.getTableData();
+
+    const request = httpTesting.expectOne("/api/systemTask/getPagedSystemTasks");
+    expect((request.request.body.filter.startedAt as any).value).toBe("2026-09-22");
+    expect((request.request.body.filter.endedAt as any).value).toEqual(["2026-09-10", "2026-09-12"]);
+    request.flush({ data: [], totalCount: 0 });
+  });
+
   // The page dispatches a filter change and refreshes in the same synchronous
   // turn, before change detection can push a new input value in. Reading the
   // filter at request time is what makes a cleared chip actually clear.

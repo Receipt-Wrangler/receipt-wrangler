@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"gorm.io/gorm"
@@ -186,9 +187,15 @@ func (repository SystemTaskRepository) applyTimestampDayFilter(query *gorm.DB, f
 }
 
 // startOfDayValue parses a filter value into the midnight that begins its
-// calendar day in the server's location. Values ride the wire as the ISO
-// strings Date.toJSON() produces; a time.Time is accepted so Go callers and
-// tests can pass one directly.
+// calendar day in the server's location.
+//
+// The wire format is a bare calendar day, yyyy-MM-dd: the desktop normalizes
+// the datepicker's local-midnight Date to one before sending
+// (toSystemTaskWireFilter). An instant would be ambiguous — resolving it here
+// picks the day in the *server's* zone, so a client far enough east or west
+// selects the adjacent one. Full RFC 3339 instants are still accepted, for any
+// caller that sends one; a time.Time is accepted so Go callers and tests can
+// pass one directly.
 func startOfDayValue(value interface{}) (time.Time, bool) {
 	var parsed time.Time
 
@@ -200,11 +207,12 @@ func startOfDayValue(value interface{}) (time.Time, bool) {
 			return time.Time{}, false
 		}
 
+		// A bare calendar day is already midnight-local, and carries no zone to
+		// misread.
 		var err error
-		parsed, err = time.Parse(time.RFC3339, typed)
+		parsed, err = time.ParseInLocation(time.DateOnly, typed, time.Local)
 		if err != nil {
-			// A bare calendar day (yyyy-MM-dd) is already midnight-local.
-			parsed, err = time.ParseInLocation(time.DateOnly, typed, time.Local)
+			parsed, err = time.Parse(time.RFC3339, typed)
 			if err != nil {
 				return time.Time{}, false
 			}
@@ -222,9 +230,9 @@ func startOfDayValue(value interface{}) (time.Time, bool) {
 func toInt64(value interface{}) (int64, bool) {
 	switch typed := value.(type) {
 	case float64:
-		return int64(typed), true
+		return floatToInt64(typed)
 	case float32:
-		return int64(typed), true
+		return floatToInt64(float64(typed))
 	case int:
 		return int64(typed), true
 	case int64:
@@ -236,6 +244,31 @@ func toInt64(value interface{}) (int64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// floatToInt64 accepts only a finite, whole value inside the int64 range.
+//
+// JSON has a single number type, so a fractional id reaches us as a float64: a
+// plain conversion would truncate `4.9` to user 4 and filter on somebody else.
+// Out-of-range and non-finite values are rejected too — converting either to an
+// integer is undefined behaviour in Go. A rejected id is dropped by the caller,
+// exactly as a non-numeric one already is.
+func floatToInt64(value float64) (int64, bool) {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, false
+	}
+
+	if value != math.Trunc(value) {
+		return 0, false
+	}
+
+	// math.MaxInt64 is not exactly representable as a float64 (it rounds up to
+	// 2^63), so the upper bound is the power of two itself, exclusive.
+	if value < float64(math.MinInt64) || value >= float64(1<<63) {
+		return 0, false
+	}
+
+	return int64(value), true
 }
 
 // ActivityVisibilityResolver reports, for a group, the ran-by user ids the caller may

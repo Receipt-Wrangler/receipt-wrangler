@@ -8,6 +8,7 @@ import { catchError, EMPTY, Subject, switchMap, tap } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants/dialog.constant";
 import { AssociatedEntityType, GetSystemTaskCommand, SystemTask, SystemTaskPagedRequestFilter, SystemTaskService, SystemTaskType } from "../../open-api";
 import { BaseTableService } from "../../services/base-table.service";
+import { toSystemTaskWireFilter } from "../../utils/system-task-filter";
 import { TABLE_SERVICE_INJECTION_TOKEN } from "../../services/injection-tokens/table-service";
 import { TableColumn } from "../../table/table-column.interface";
 import { DescriptionViewerDialogComponent, DescriptionViewerDialogData } from "../description-viewer-dialog/description-viewer-dialog.component";
@@ -118,7 +119,8 @@ export class TaskTableComponent implements OnInit, AfterViewInit {
             sortDirection: pagedCommand.sortDirection,
             associatedEntityId: this.associatedEntityId(),
             associatedEntityType: this.associatedEntityType(),
-            filter: this.filterProvider()?.()
+            // Normalized here rather than in the store: see toSystemTaskWireFilter.
+            filter: toSystemTaskWireFilter(this.filterProvider()?.())
           };
 
           return this.systemTaskService.getPagedSystemTasks(getSystemTaskCommand)

@@ -1629,9 +1629,12 @@ dialog. `SystemTaskTableState.filter` is the single slice all three read and wri
 
 - **The filter belongs to the page, not to `app-task-table`.** That shared table is rendered by three
   hosts (this page, `system-email-form`, `receipt-processing-settings-form`), each with its own table
-  service, so the filter rides in as one optional input (`[filter]`) rather than widening
-  `BaseTableService`. The two embedded hosts leave it unbound, the key is omitted from the request,
-  and the API's zero-value filter adds no predicates.
+  service, so the filter rides in as one optional input (`[filterProvider]`) rather than widening
+  `BaseTableService`. It is a **function**, not the filter value: the page dispatches the filter
+  change and calls `getTableData()` in the same synchronous turn, before change detection pushes a
+  new input value in, so a value input would send the previous filter and a cleared chip would stay
+  applied. The two embedded hosts leave it unbound, the key is omitted from the request, and the
+  API's zero-value filter adds no predicates.
 - **`TaskTableComponent` refreshes through one `switchMap`** (`listenForRefreshRequests()`, wired in
   the constructor; `getTableData()` just pushes onto its `Subject`), with `catchError(() => EMPTY)`
   on the *inner* observable so an error cannot complete the outer subscription and kill every later
@@ -1659,9 +1662,19 @@ dialog. `SystemTaskTableState.filter` is the single slice all three read and wri
 - **Every filter write outside the dialog goes through `applyFilterChange()`**, which dispatches the
   action, then `SetPage(1)`, then refetches — narrowing from page 7 can never land on an empty page.
   The dialog's `afterClosed()` does the same.
-- **Date fields are timestamps, and the server widens them to whole days.** The client sends the
-  datepicker's value unchanged; `EQUALS` means that calendar day, `BETWEEN` runs to the end of the
-  last day. See `api/CLAUDE.md` → "System task filtering" for why, and for the timezone caveat.
+- **Date fields are timestamps, and the server widens them to whole days.** `EQUALS` means that
+  calendar day, `BETWEEN` runs to the end of the last day. See `api/CLAUDE.md` → "System task
+  filtering" for the query side.
+- **The date fields go on the wire as `YYYY-MM-DD`, normalized by `toSystemTaskWireFilter`**
+  (`src/utils/system-task-filter.ts`) where `TaskTableComponent` assembles the request. The
+  datepicker writes a local-midnight `Date`, which serializes as an *instant*; the server resolves
+  that instant to a day in **its** zone, so a UTC-4 browser picking Sep 22 selects Sep 21 against an
+  API in America/Los_Angeles. A calendar day carries no zone to misread.
+  - **Normalize at the request, never in the store.** NGXS persists the filter and hands it back to
+    the datepicker when the dialog reopens, and Material's `NativeDateAdapter.deserialize` matches a
+    bare `YYYY-MM-DD` against its ISO-8601 regex and parses it with `new Date()` — UTC midnight,
+    which renders as the *previous* day west of Greenwich. Storing the normalized form just moves
+    the off-by-one into the picker.
 
 **E2E:** `e2e/system-task-filter.spec.ts` (serial, admin storageState). It seeds a deterministic row
 by creating and deleting an API key (`apiRecordApiKeyDeletedSystemTask` — system tasks are only ever

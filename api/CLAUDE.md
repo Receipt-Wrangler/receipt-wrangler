@@ -1291,9 +1291,13 @@ so the desktop renders both dialogs from one row component.
   `GREATER_THAN d` ⇒ `>= startOfDay(d)+24h`, `LESS_THAN d` ⇒ `< startOfDay(d)`, `BETWEEN [a,b]` ⇒
   `[startOfDay(a), startOfDay(b)+24h)`; `WITHIN_CURRENT_MONTH` delegates to `BuildFilterQuery`, which
   already does the right thing.
-  - **"Day" resolves in the server's location** (`time.Local`), the same zone
-    `WITHIN_CURRENT_MONTH` already uses — a client in a different zone can shift the boundary by a
-    day, exactly as it can for receipts.
+  - **The wire format is a bare calendar day, `yyyy-MM-dd`.** "Day" resolves in the server's
+    location (`time.Local`, the same zone `WITHIN_CURRENT_MONTH` already uses), so an *instant*
+    would be ambiguous: resolving it here picks the day in the server's zone, and a UTC-4 browser
+    picking Sep 22 lands on Sep 21 against an API in America/Los_Angeles. The desktop normalizes to
+    a calendar day before sending (`toSystemTaskWireFilter`); `startOfDayValue` parses that first
+    and still accepts a full RFC 3339 instant for any other caller. The receipt filter, which sends
+    instants, retains the original hazard.
   - **`ended_at` is nullable, so any filter on it excludes tasks that are still running.** That is
     the correct reading of "ended before X"; it is not special-cased.
 - **The three child-only types stay excluded.** `filteredSystemTaskTypes` (`RECEIPT_UPLOADED`,
