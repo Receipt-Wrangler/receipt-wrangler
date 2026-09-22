@@ -18,6 +18,19 @@ const (
 	MaxRefreshTokenValidForHours = 720 // 30 days
 )
 
+// Bounds and default for the temp-file retention window, here for the same
+// reason as the refresh-token bounds above: the validator below and the
+// read-side clamp in wranglerasynq must not drift.
+//
+// The floor is a day because the window doubles as the grace period a user has
+// to rerun or download a failed upload — anything shorter reintroduces the bug
+// this setting exists to fix. The ceiling is a year.
+const (
+	MinTempFileRetentionHours     = 24
+	MaxTempFileRetentionHours     = 8760 // 365 days
+	DefaultTempFileRetentionHours = 720  // 30 days
+)
+
 type UpsertSystemSettingsCommand struct {
 	EnableLocalSignUp                   bool                                  `json:"enableLocalSignUp"`
 	DebugOcr                            bool                                  `json:"debugOcr"`
@@ -39,11 +52,12 @@ type UpsertSystemSettingsCommand struct {
 	MobileServerUrl                     string                                `json:"mobileServerUrl"`
 	// Pointers so an omitted key is distinguishable from an explicit 0. The
 	// repository writes every column (Select("*")), so a plain int would persist
-	// as 0 and silently reset a configured lifetime to the default whenever a
+	// as 0 and silently reset a configured value to the default whenever a
 	// client PUTs a body without these keys. Same reasoning as the pointer
 	// fields on UpdateGroupReceiptSettingsCommand.
 	RefreshTokenValidForHours    *int `json:"refreshTokenValidForHours"`
 	McpRefreshTokenValidForHours *int `json:"mcpRefreshTokenValidForHours"`
+	TempFileRetentionHours       *int `json:"tempFileRetentionHours"`
 }
 
 func (command *UpsertSystemSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -135,7 +149,29 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 		errorMap["mcpRefreshTokenValidForHours"] = msg
 	}
 
+	if msg := validateTempFileRetentionHours(command.TempFileRetentionHours); len(msg) > 0 {
+		errorMap["tempFileRetentionHours"] = msg
+	}
+
 	return vErr
+}
+
+// validateTempFileRetentionHours bounds the temp-file retention window, returning
+// an empty string when the value is acceptable.
+//
+// Same two-flavoured "no value" as the refresh-token lifetimes: a nil pointer
+// means the key was omitted and leaves the stored value alone, while an explicit
+// 0 means "unset" and lets the read-side clamp fall back to the built-in default.
+func validateTempFileRetentionHours(hours *int) string {
+	if hours == nil || *hours == 0 {
+		return ""
+	}
+
+	if *hours < MinTempFileRetentionHours || *hours > MaxTempFileRetentionHours {
+		return "Temporary file retention must be between 24 and 8760 hours (1 year)"
+	}
+
+	return ""
 }
 
 // validateRefreshTokenValidForHours bounds a refresh-token lifetime, returning an
@@ -194,17 +230,18 @@ func (command *UpsertSystemSettingsCommand) ToSystemSettings(id uint) (models.Sy
 	return systemSettings, nil
 }
 
-// OmittedLifetimeColumns names the refresh-token lifetime fields the request did
+// OmittedLifetimeColumns names the pointer-backed duration fields the request did
 // not send, so the repository can leave those columns out of the UPDATE entirely.
+// Despite the name it covers every such field, not only the token lifetimes.
 //
 // Skipping the column is what makes a concurrent update safe. Copying the stored
 // value onto the row instead (see ApplyOmittedLifetimes) would still write it,
-// so two requests that each set one lifetime and omit the other would clobber
+// so two requests that each set one field and omit the other would clobber
 // each other with the values they read before the write. A column that is never
 // written cannot be clobbered, and unlike a row lock this works identically on
 // SQLite, MySQL and Postgres.
 func (command *UpsertSystemSettingsCommand) OmittedLifetimeColumns() []string {
-	columns := make([]string, 0, 2)
+	columns := make([]string, 0, 3)
 
 	if command.RefreshTokenValidForHours == nil {
 		columns = append(columns, "RefreshTokenValidForHours")
@@ -214,11 +251,17 @@ func (command *UpsertSystemSettingsCommand) OmittedLifetimeColumns() []string {
 		columns = append(columns, "McpRefreshTokenValidForHours")
 	}
 
+	if command.TempFileRetentionHours == nil {
+		columns = append(columns, "TempFileRetentionHours")
+	}
+
 	return columns
 }
 
-// ApplyOmittedLifetimes carries the stored refresh-token lifetimes onto the
-// settings a PUT is about to write for any key the request omitted.
+// ApplyOmittedLifetimes carries the stored values of the pointer-backed duration
+// fields onto the settings a PUT is about to write, for any key the request
+// omitted. Despite the name it covers every such field, not only the token
+// lifetimes.
 //
 // ToSystemSettings round-trips the command through JSON, so a nil pointer lands
 // as 0 on the model. The columns themselves are excluded from the UPDATE by
@@ -231,5 +274,9 @@ func (command *UpsertSystemSettingsCommand) ApplyOmittedLifetimes(existing model
 
 	if command.McpRefreshTokenValidForHours == nil {
 		updated.McpRefreshTokenValidForHours = existing.McpRefreshTokenValidForHours
+	}
+
+	if command.TempFileRetentionHours == nil {
+		updated.TempFileRetentionHours = existing.TempFileRetentionHours
 	}
 }

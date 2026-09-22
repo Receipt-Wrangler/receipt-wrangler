@@ -78,6 +78,10 @@ export interface UpsertSystemSettingsCommand {
      * How long an MCP/OAuth connector refresh token stays valid, in hours. Accepted values are 1-720 (30 days), or 0 meaning unset, which falls back to the default of 24. Omit the key entirely to leave the currently configured value unchanged.
      */
     mcpRefreshTokenValidForHours?: number;
+    /**
+     * How long a temp file is kept once nothing can still act on it, in hours. Accepted values are 24-8760 (1 year), or 0 meaning unset, which falls back to the default of 720 (30 days). Omit the key entirely to leave the currently configured value unchanged.
+     */
+    tempFileRetentionHours?: number;
 }
 export namespace UpsertSystemSettingsCommand {
 }

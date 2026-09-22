@@ -110,6 +110,7 @@ import 'package:openapi/src/model/subject_line_regex.dart';
 import 'package:openapi/src/model/system_email.dart';
 import 'package:openapi/src/model/system_settings.dart';
 import 'package:openapi/src/model/system_task.dart';
+import 'package:openapi/src/model/system_task_source_file_view.dart';
 import 'package:openapi/src/model/system_task_status.dart';
 import 'package:openapi/src/model/system_task_type.dart';
 import 'package:openapi/src/model/tag.dart';
@@ -245,6 +246,7 @@ part 'serializers.g.dart';
   SystemEmail,
   SystemSettings,
   SystemTask,
+  SystemTaskSourceFileView,
   SystemTaskStatus,
   SystemTaskType,
   Tag,

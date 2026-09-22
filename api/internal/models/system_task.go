@@ -23,6 +23,12 @@ type SystemTask struct {
 	ChildSystemTasks       []*SystemTask        `gorm:"foreignKey:AssociatedSystemTaskId" json:"childSystemTasks"`
 	AsynqTaskId            string               `json:"asynqTaskId"`
 	ApiKeyId               *string              `json:"apiKeyId"`
+	// HasSourceFile reports whether the upload behind this task is still on disk,
+	// so a client can offer to preview or download it. It is transient and filled
+	// per request by the list handler — it depends on Redis and on the caller's
+	// permissions, neither of which is a column. Same shape as
+	// ReportTemplate.AllowedActions.
+	HasSourceFile bool `gorm:"-" json:"hasSourceFile"`
 }
 
 type SystemTaskStatus string

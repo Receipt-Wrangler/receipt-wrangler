@@ -86,7 +86,7 @@ describe("SystemSettingsFormComponent", () => {
       // Session and MCP Server. `.duration-row > *` in the component's SCSS is
       // what bases each column at 0; without the class they fall back to
       // flex-basis: auto and the hinted column swallows the row.
-      expect(rows.length).toEqual(2);
+      expect(rows.length).toEqual(3);
       rows.forEach((row) => expect(row.classList).toContain("d-flex"));
     });
 
@@ -134,6 +134,10 @@ describe("SystemSettingsFormComponent", () => {
       refreshTokenValidForUnit: "DAYS",
       mcpRefreshTokenValidForValue: 1,
       mcpRefreshTokenValidForUnit: "DAYS",
+      // Unset on the wire, so it renders its own 720h default rather than
+      // splitHours' generic 24h fallback.
+      tempFileRetentionValue: 30,
+      tempFileRetentionUnit: "DAYS",
     });
   });
 
@@ -193,6 +197,8 @@ describe("SystemSettingsFormComponent", () => {
       refreshTokenValidForUnit: "DAYS",
       mcpRefreshTokenValidForValue: 6,
       mcpRefreshTokenValidForUnit: "HOURS",
+      tempFileRetentionValue: 30,
+      tempFileRetentionUnit: "DAYS",
     });
   });
 
@@ -333,6 +339,61 @@ describe("SystemSettingsFormComponent", () => {
     expect(value.valid).toBe(false);
   });
 
+  it("caps temp file retention at 8760 hours or 365 days depending on the unit", () => {
+    component.ngOnInit();
+
+    const value = component.form.get("tempFileRetentionValue")!;
+    const unit = component.form.get("tempFileRetentionUnit")!;
+
+    unit.setValue("HOURS");
+    value.setValue(8760);
+    expect(value.valid).toBe(true);
+
+    value.setValue(8761);
+    expect(value.valid).toBe(false);
+
+    unit.setValue("DAYS");
+    value.setValue(365);
+    expect(value.valid).toBe(true);
+
+    value.setValue(366);
+    expect(value.valid).toBe(false);
+  });
+
+  // The server floors this at 24 hours. Without a client-side floor the entry
+  // passes validation and comes back as a bare 400 with nothing on the field.
+  it("enforces the 24 hour retention floor in whichever unit is selected", () => {
+    component.ngOnInit();
+
+    const value = component.form.get("tempFileRetentionValue")!;
+    const unit = component.form.get("tempFileRetentionUnit")!;
+
+    unit.setValue("HOURS");
+    value.setValue(23);
+    expect(value.valid).toBe(false);
+    expect(value.errors?.["duration"]).toBe("Must be at least 24.");
+
+    value.setValue(24);
+    expect(value.valid).toBe(true);
+
+    unit.setValue("DAYS");
+    value.setValue(1);
+    expect(value.valid).toBe(true);
+  });
+
+  it("bounds the retention and the session lifetime independently", () => {
+    component.ngOnInit();
+
+    component.form.get("tempFileRetentionUnit")!.setValue("HOURS");
+    component.form.get("tempFileRetentionValue")!.setValue(5000);
+    expect(component.form.get("tempFileRetentionValue")!.valid).toBe(true);
+
+    // The session lifetime keeps its own, much lower cap.
+    component.form.get("refreshTokenValidForUnit")!.setValue("HOURS");
+    component.form.get("refreshTokenValidForValue")!.setValue(5000);
+    expect(component.form.get("refreshTokenValidForValue")!.valid).toBe(false);
+  });
+
   it("requires a positive whole-number session lifetime", () => {
     component.ngOnInit();
 
@@ -457,6 +518,7 @@ describe("SystemSettingsFormComponent", () => {
       // controls are stripped — toEqual would fail if any of them leaked.
       refreshTokenValidForHours: 336,
       mcpRefreshTokenValidForHours: 12,
+      tempFileRetentionHours: 720,
     });
 
     expect(snackbarServiceSpy).toHaveBeenCalled();

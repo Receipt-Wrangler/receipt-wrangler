@@ -68,7 +68,11 @@ func BuildMux() *asynq.ServeMux {
 	mux.HandleFunc(QuickScan, HandleQuickScanTask)
 	mux.HandleFunc(EmailPoll, HandleEmailPollTask)
 	mux.HandleFunc(EmailProcess, HandleEmailProcessTask)
-	mux.HandleFunc(EmailProcessImageCleanUp, HandleEmailProcessImageCleanUpTask)
+	mux.HandleFunc(TempFileCleanUp, HandleTempFileCleanUpTask)
+	// Retired task type, still routed so tasks enqueued by the previous cron
+	// survive the upgrade rather than failing as unregistered. The sweep is
+	// idempotent, so running it under either name is harmless.
+	mux.HandleFunc(EmailProcessImageCleanUp, HandleTempFileCleanUpTask)
 	mux.HandleFunc(RefreshTokenCleanUp, HandleRefreshTokenCleanupTask)
 
 	return mux

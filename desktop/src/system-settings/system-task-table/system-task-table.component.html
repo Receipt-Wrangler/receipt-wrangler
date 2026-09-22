@@ -10,7 +10,10 @@
     (clicked)="refresh()"
   ></app-button>
 </app-table-header>
-<app-task-table [expandedRowTemplate]="expandedRowTemplate"></app-task-table>
+<app-task-table
+  [expandedRowTemplate]="expandedRowTemplate"
+  [showSourceFileActions]="true"
+></app-task-table>
 
 <ng-template
   #expandedRowTemplate

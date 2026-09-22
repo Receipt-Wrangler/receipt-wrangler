@@ -43,12 +43,41 @@
   <div class="aligned-content ms-2">
     {{ item.startedAt | duration }}
   </div>
+  <!--
+    Every gate below keys on item.groupId, NOT the widget's groupId(). On the
+    "All" dashboard the latter is the synthetic All group, which never appears in
+    the permission map, so the controls silently vanish for activities the user is
+    perfectly entitled to act on. Mobile fixed this long ago; see
+    group_activity_list_item.dart.
+  -->
+  @if (item.hasSourceFile) {
+    <app-button
+      *hasGroupPermission="{ groupId: item.groupId ?? 0, permission: Permission.GroupActivitiesRead }"
+      class="aligned-content"
+      matButtonType="iconButton"
+      icon="visibility"
+      tooltip="Preview source file"
+      data-testid="activity-source-file-preview"
+      (clicked)="onPreviewButtonClick(item.id)"
+    ></app-button>
+    <app-button
+      *hasGroupPermission="{ groupId: item.groupId ?? 0, permission: Permission.GroupActivitiesRead }"
+      class="aligned-content"
+      matButtonType="iconButton"
+      icon="download"
+      tooltip="Download source file"
+      data-testid="activity-source-file-download"
+      (clicked)="onDownloadButtonClick(item.id)"
+    ></app-button>
+  }
   @if (item.canBeRestarted && !ranActivities()[item.id]) {
     <app-button
-      *hasGroupPermission="{ groupId: groupId() ?? 0, permission: Permission.GroupActivitiesRerun }"
+      *hasGroupPermission="{ groupId: item.groupId ?? 0, permission: Permission.GroupActivitiesRerun }"
       class="aligned-content"
       matButtonType="iconButton"
       icon="refresh"
+      tooltip="Rerun activity"
+      data-testid="activity-rerun"
       (clicked)="onRefreshButtonClick(item.id)"
     ></app-button>
   }
