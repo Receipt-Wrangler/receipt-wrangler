@@ -116,4 +116,48 @@ describe("httpInterceptor", () => {
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith("Something broke");
   });
+
+  // Regression guard for the failed-login double toast. The backend returns a bad
+  // password as a 500 carrying errorMsg, and MatSnackBar shows one bar at a time,
+  // so a second toast here silently replaces "Invalid credentials." with Angular's
+  // generic "Http failure response ... 500" text.
+  it("prefers the server errorMsg over the generic message on a 5xx", () => {
+    httpClient.post("/api/login/", {}).subscribe({ error: () => {} });
+
+    httpTestingController
+      .expectOne("/api/login/")
+      .flush(
+        { errorMsg: "Invalid credentials." },
+        { status: 500, statusText: "Internal Server Error" }
+      );
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith("Invalid credentials.");
+  });
+
+  it("falls back to the generic message when a 5xx carries no errorMsg", () => {
+    httpClient.get("/test").subscribe({ error: () => {} });
+
+    httpTestingController
+      .expectOne("/test")
+      .flush(null, { status: 502, statusText: "Bad Gateway" });
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][0]).toContain("502");
+  });
+
+  it("stays silent on a 5xx while in queue mode", () => {
+    activatedRouteStub.snapshot.queryParams = { queueMode: "true" };
+
+    httpClient.post("/test", {}).subscribe({ error: () => {} });
+
+    httpTestingController
+      .expectOne("/test")
+      .flush(
+        { errorMsg: "Something broke" },
+        { status: 500, statusText: "Internal Server Error" }
+      );
+
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
 });

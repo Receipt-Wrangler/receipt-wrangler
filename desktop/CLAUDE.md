@@ -557,6 +557,21 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     `TokenRefreshService` keeps its own logout-on-refresh-failure path for a truly dead session.
     Background `GET` 403s propagate silently for callers to handle (e.g. the `getRoles` +
     `catchError` reads above).
+  - **One toast per error, and the server's `errorMsg` always wins.** `MatSnackBar.open()`
+    dismisses whatever is already showing, so two `snackbarService.error(...)` calls in one tick
+    means only the *last* is readable. The server-supplied `errorMsg` is the user-friendly message;
+    Angular's generic `HttpErrorResponse.message` ("Http failure response for ...: 500 Internal
+    Server Error") is a **fallback only** for a 5xx that carries no message at all, so an
+    infra-level failure (nginx 502, gateway timeout) is not silent. The two branches must stay
+    mutually exclusive — **do not restore them as two independent `if`s.** They were, and the
+    second one only stayed harmless because its regex was broken: `new RegExp("5d{2}")` matches the
+    literal `5dd`, never `"500"`. Repairing it to `5\d{2}` (commit `4bb640c`, 2026-03-23) activated
+    the override, and since nearly every Go handler writes 5xx through `WriteCustomErrorResponse`
+    with an `errorMsg`, the useful message was being replaced app-wide — most visibly on a failed
+    login, where "Invalid credentials." lasted a few milliseconds. `queueMode` suppresses **both**
+    branches, like the 403 one. Pinned by three cases in `http-interceptor.spec.ts`
+    (5xx-with-`errorMsg`, 5xx-without, and 5xx-in-queue-mode) and by
+    `e2e/auth.spec.ts` → "a wrong password reports it and leaves the form filled in".
   - **Category/tag catalogs:** AppData also carries `groupCategories` / `groupTags` (keyed by group
     id, filtered to the user's grants), stored via `SetGroupCatalog` and read with the
     `AuthState.groupCategories(groupId)` / `groupTags(groupId)` selectors. The **receipt form** and
@@ -1166,6 +1181,12 @@ Angular no longer uses zone.js. Change detection is triggered ONLY by:
 
 **Key implications:**
 - Plain property mutations (`this.foo = 'bar'`) in async callbacks (subscribe, setTimeout, Promise.then) will NOT trigger change detection. Always use signals for state that affects templates.
+  - **`finalize()` is an async callback too, and a success path can mask the bug.** The login form
+    kept `isLoading` as a plain field reset in `finalize()` for ~5 months after the zoneless
+    migration (`d3b4246`, which never touched that file): on success `router.navigate()` happened to
+    trigger CD so the reset repainted, while on **failure** nothing did and the spinner stuck
+    forever. State only written on a failure path is the easiest kind to miss — check that a
+    converted signal is exercised by a test on the *error* branch, not just the happy one.
 - `ChangeDetectorRef.detectChanges()` still works but is rarely needed — prefer signals.
 - `setTimeout` still works for delays but won't auto-trigger CD. The callback must write to a signal if the template needs updating.
 - All `@HostListener` handlers automatically trigger CD (same as template events).
