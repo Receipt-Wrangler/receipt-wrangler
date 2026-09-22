@@ -1604,8 +1604,9 @@ rather than the visible page: a receipt count and amount total overall, then the
 each status the group has configured. Configuration lives on `GroupReceiptSettings` and applies to
 every member — it is not a per-user preference.
 
-**Three new settings, two new join tables.** `ReceiptSummaryEnabled` is a plain column (off by
-default, so existing installs are unchanged). `ReceiptSummaryCustomFieldIds` and
+**Four settings, two join tables.** `ReceiptSummaryEnabled` is a plain column (off by
+default, so existing installs are unchanged) and so is `ReceiptSummaryPosition` (see below).
+`ReceiptSummaryCustomFieldIds` and
 `ReceiptSummaryStatuses` are `gorm:"-"` projections over
 `GroupReceiptSettingsSummaryCustomField` and `GroupReceiptSettingsSummaryStatus`, both keyed on
 **GroupId** for the same reason `GroupReceiptSettingsCustomField` is (a lazily created settings row
@@ -1643,6 +1644,54 @@ an admin without that permission out of the feature entirely. That is the differ
 invisible) default set does. Validation: unknown id → 400, **non-CURRENCY id → 400** (only
 `CurrencyValue` is summed, so a TEXT field would total `0.00` forever and read as data rather than
 misconfiguration), invalid status → 400 via the existing `isValidReceiptStatus`.
+
+### Where the block renders — `ReceiptSummaryPosition`
+
+`TOP` or `BOTTOM`, per group, defaulting to **BOTTOM** — where the summary rendered before the
+setting existed, so an install that never touches it is unchanged. Modelled on
+`CurrencySymbolPosition` (`models/receipt_summary_position.go`): a Go string type with `Scan` /
+`Value`, no DB enum and no CHECK constraint, and a plain column carrying `gorm:"default:BOTTOM"` —
+`AutoMigrate` adds it and backfills existing rows with the default on all three engines, so there
+is **no migration**.
+
+- **It rides on the summary RESPONSE, not just on the settings.** `ReceiptSummary.Position` is
+  what both clients render from. The same argument as `Enabled`: a client's cached
+  `groupReceiptSettings` is stale the moment an admin changes the configuration, and placement is
+  configuration. Reading it from the response is what stops the block rendering in the old place
+  until the next AppData refresh.
+- **The server never emits `""`.** A closed Dart `EnumClass` throws on an unrecognized wire value
+  and fails the WHOLE payload — `GroupReceiptSettings` rides on AppData, i.e. on **login**, which
+  is exactly the two documented `Permission` outages. Empty is genuinely reachable (`loadSettings`
+  maps a missing settings row to a *zero* `GroupReceiptSettings`), so `OrDefault()` normalizes it
+  at both emit points: on the summary response, and in `LoadSettingsProjections` — the one batched
+  hydrator every settings read passes through. **The swagger enum carries TOP and BOTTOM only** —
+  no `""` member, matching the `CurrencySymbolPosition` precedent beside it — and the generated
+  Dart enum's `fallback: true` sits on `BOTTOM`, so a client meeting a value added *later* lands on
+  the same placement `OrDefault()` would have sent. Client and server agree by construction, and an
+  empty position is not expressible on the write side at all.
+- **The command field is a pointer**, like the other three: a non-pointer would unmarshal to `""`
+  for any caller that omits the key, and the repository's assignment would blank a configured
+  position. It must be assigned inside the `if command.X != nil` block in
+  `UpdateGroupReceiptSettings` — the write is `Select("*")`, so a field missing from that block is
+  actively zeroed, silently.
+- **A `nil` pointer OMITS the column from the UPDATE** rather than writing back the value read at
+  load time. `UpdateGroupReceiptSettings` builds an `omittedColumns` list from the three nil
+  pointers and passes it to `Select("*").Omit(...)`, mirroring
+  `SystemSettingsRepository.UpdateSystemSettings` (`repositories/system_settings.go`). Writing the
+  loaded value back costs two things: a concurrent admin's change is clobbered by a value read
+  before it landed, and for an **enum** the stored value goes back through `Value()` — so a
+  position this build does not recognize (a newer release's member, seen after a downgrade) fails
+  an otherwise unrelated settings save with a 500. `Omit` also preserves that value for the trip
+  back up, where `OrDefault()` already keeps it off the wire.
+  `TestUpdateGroupReceiptSettingsToleratesAnUnknownStoredPosition` pins it.
+- **It needs no permission of its own.** Like `ReceiptSummaryEnabled` and `ReceiptSummaryStatuses`
+  and unlike `ReceiptSummaryCustomFieldIds`, it reads no catalog — gating it on
+  `app.custom-fields.read` would leave such an admin able to turn the summary on but not to say
+  where it goes. `TestUpdateGroupReceiptSettingsAllowsSummaryPositionWithoutCustomFieldPermission`
+  pins that.
+- **Validated in the command, not at the DB boundary.** `Validate()` routes it through its own
+  `Value()` (the `pie_chart_data_command.go` style), which turns what the DB layer would surface as
+  a generic 500 into a field-level 400.
 
 ### `POST /api/receipt/group/{groupId}/summary`
 

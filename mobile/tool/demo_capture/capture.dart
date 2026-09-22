@@ -336,30 +336,44 @@ void writeGif({
 /// `File.writeAsBytes` never completes — the test simply hangs until it times
 /// out. Encoding is CPU-bound anyway, so sync I/O sidesteps the whole problem
 /// without a `runAsync` wrapper.
+/// [durationsCentis] gives one hold time per frame, in 1/100 s. It defaults to the
+/// keyboard ramp's own timings, which is what the two keyboard demos want; any demo
+/// with a different frame count MUST pass its own, or this indexes past the end of a
+/// 13-step ramp (or silently applies keyboard timings to a scroll).
 void writeSideBySideGif({
   required List<img.Image> before,
   required List<img.Image> after,
   required String path,
+  List<int>? durationsCentis,
+  int numColors = 128,
 }) {
-  assert(before.length == after.length, 'panels must ramp in lockstep');
+  assert(before.length == after.length, 'panels must have the same frame count');
 
   final encoder = img.GifEncoder(
     repeat: 0,
     // The defaults are wrong for this: the neural quantizer is a per-frame
     // neural net (slow), and dithering destroys the long runs of identical
     // pixels that LZW needs. Flat UI art quantizes cleanly without either.
-    numColors: 128,
+    //
+    // [numColors] is raised by a demo whose screen carries a GRADIENT -- at 128
+    // the octree banding across ListItemTrailingStatus's status chips reads as
+    // hard black stripes, i.e. as a rendering bug rather than as compression.
+    // Raise the palette rather than switching the dither on, which would cost
+    // far more bytes by breaking LZW's runs everywhere else.
+    numColors: numColors,
     quantizerType: img.QuantizerType.octree,
     dither: img.DitherKernel.none,
   );
 
-  final steps = demoInsetRamp();
+  final steps =
+      durationsCentis ?? demoInsetRamp().map((step) => step.centis).toList();
+  assert(steps.length == before.length, 'one duration per frame');
   for (var i = 0; i < before.length; i++) {
     final canvas = stitchPanels(before[i], after[i]);
     // Durations are in 1/100 s, not ms. Note addFrame encodes the PREVIOUS
     // image and finish() flushes the last, so N calls plus finish yield N
     // frames.
-    encoder.addFrame(canvas, duration: steps[i].centis);
+    encoder.addFrame(canvas, duration: steps[i]);
   }
 
   final bytes = encoder.finish()!;

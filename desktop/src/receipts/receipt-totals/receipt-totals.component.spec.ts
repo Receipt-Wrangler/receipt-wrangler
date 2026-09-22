@@ -3,7 +3,7 @@ import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { NgxsModule } from "@ngxs/store";
-import { Group, ReceiptStatus, ReceiptSummary } from "../../open-api";
+import { Group, ReceiptStatus, ReceiptSummary, ReceiptSummaryPosition } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { ReceiptTotalsComponent } from "./receipt-totals.component";
@@ -12,6 +12,7 @@ function buildSummary(overrides: Partial<ReceiptSummary> = {}): ReceiptSummary {
   return {
     enabled: true,
     configurationGroupId: 1,
+    position: ReceiptSummaryPosition.Bottom,
     overall: {
       status: "" as ReceiptStatus,
       receiptCount: 3,
@@ -195,5 +196,57 @@ describe("ReceiptTotalsComponent", () => {
 
       expect(picked).toEqual([2]);
     });
+  });
+});
+
+// The component owns its own vertical rhythm at both anchors: rendered above the table the gap
+// belongs on the bottom edge, or the block hugs the header it follows and floats away from the
+// table it describes. The receipts page must not reach in with a margin of its own.
+describe("ReceiptTotalsComponent position", () => {
+  let fixture: ComponentFixture<ReceiptTotalsComponent>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [
+        ReceiptTotalsComponent,
+        NoopAnimationsModule,
+        PipesModule,
+        NgxsModule.forRoot([SystemSettingsState]),
+      ],
+      providers: [provideZonelessChangeDetection(), CurrencyPipe],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ReceiptTotalsComponent);
+  });
+
+  function section(): HTMLElement {
+    return fixture.nativeElement.querySelector("[data-testid='receipt-totals']");
+  }
+
+  it("carries the top modifier only when positioned at the top", async () => {
+    fixture.componentRef.setInput("summary", buildSummary());
+    fixture.componentRef.setInput("position", ReceiptSummaryPosition.Top);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(section().classList).toContain("receipt-totals--top");
+  });
+
+  it("omits the top modifier at the bottom", async () => {
+    fixture.componentRef.setInput("summary", buildSummary());
+    fixture.componentRef.setInput("position", ReceiptSummaryPosition.Bottom);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(section().classList).not.toContain("receipt-totals--top");
+  });
+
+  // Unbound is the historical placement, so an older caller that never sets the input is unchanged.
+  it("defaults to the bottom", async () => {
+    fixture.componentRef.setInput("summary", buildSummary());
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(section().classList).not.toContain("receipt-totals--top");
   });
 });

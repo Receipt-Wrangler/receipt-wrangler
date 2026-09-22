@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:built_collection/built_collection.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -17,10 +19,13 @@ import 'package:receipt_wrangler_mobile/models/receipt-list-model.dart';
 import 'package:receipt_wrangler_mobile/models/system_settings_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/paged_data_list.dart';
 import 'package:receipt_wrangler_mobile/utils/receipt_date_filter.dart';
 import 'package:receipt_wrangler_mobile/utils/receipt_filter.dart';
 
 import '../helpers/receipt_filter_widget_helpers.dart';
+import '../helpers/receipt_form_test_helpers.dart';
+import '../helpers/receipt_summary_test_helpers.dart';
 import '../helpers/widget_test_helpers.dart';
 
 class _MockOpenapi extends Mock implements api.Openapi {}
@@ -38,6 +43,7 @@ void main() {
           ..page = 1
           ..pageSize = 10)
         .build());
+    registerFallbackValue(api.ReceiptSummaryCommandBuilder().build());
   });
 
   const nameCondition = ReceiptFilterCondition(
@@ -46,6 +52,16 @@ void main() {
   late _MockOpenapi mockClient;
   late _MockReceiptApi mockReceiptApi;
   late List<api.ReceiptPagedRequestCommand> requests;
+  late List<({int groupId, api.ReceiptSummaryCommand command})> summaryRequests;
+  late api.ReceiptSummary summaryResponse;
+
+  /// Makes the NEXT summary request fail, for the degradation cases.
+  late bool summaryShouldFail;
+
+  /// Holds a summary request open so a test can assert what is on screen WHILE it is in
+  /// flight. pumpAndSettle would never return with one of these outstanding, so every test
+  /// that sets it must complete it before it ends.
+  Completer<void>? summaryGate;
 
   setUp(() {
     // Deliberately no save-and-restore of the real client: reading
@@ -55,6 +71,42 @@ void main() {
     mockClient = _MockOpenapi();
     mockReceiptApi = _MockReceiptApi();
     requests = [];
+    summaryRequests = [];
+    summaryResponse = buildReceiptSummary(
+      overall: buildSummaryRow(receiptCount: 3, total: '30.00'),
+    );
+    summaryShouldFail = false;
+    summaryGate = null;
+
+    when(() => mockReceiptApi.getReceiptSummaryForGroup(
+          groupId: any(named: "groupId"),
+          receiptSummaryCommand: any(named: "receiptSummaryCommand"),
+        )).thenAnswer((invocation) async {
+      summaryRequests.add((
+        groupId: invocation.namedArguments[#groupId] as int,
+        command: invocation.namedArguments[#receiptSummaryCommand]
+            as api.ReceiptSummaryCommand,
+      ));
+
+      // Both are captured at REQUEST time, not after the gate: a test that holds one
+      // request open and lets a second overtake it flips these in between, and a gated
+      // request must still behave the way it was dispatched.
+      final gate = summaryGate;
+      final shouldFail = summaryShouldFail;
+
+      if (gate != null) {
+        await gate.future;
+      }
+
+      if (shouldFail) {
+        throw DioException(requestOptions: RequestOptions(path: "/"));
+      }
+
+      return Response(
+        requestOptions: RequestOptions(path: "/"),
+        data: summaryResponse,
+      );
+    });
 
     when(() => mockClient.getReceiptApi()).thenReturn(mockReceiptApi);
     when(() => mockReceiptApi.getReceiptsForGroup(
@@ -113,6 +165,33 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
+    return harness;
+  }
+
+  /// A harness whose Household group has opted into the summary. The default harness
+  /// leaves it off, which is what makes "no request when not opted in" the baseline that
+  /// every other test in this file already asserts by never stubbing the endpoint.
+  ReceiptFilterHarness harnessWithSummary({
+    bool householdEnabled = true,
+    bool officeEnabled = false,
+    bool allGroupEnabled = false,
+  }) {
+    final harness = buildReceiptFilterHarness();
+    harness.groupModel.setGroups([
+      buildGroup(
+          id: ReceiptFilterHarness.allGroupId,
+          name: "All",
+          isAllGroup: true,
+          receiptSummaryEnabled: allGroupEnabled),
+      buildGroup(
+          id: ReceiptFilterHarness.householdId,
+          name: "Household",
+          receiptSummaryEnabled: householdEnabled),
+      buildGroup(
+          id: ReceiptFilterHarness.officeId,
+          name: "Office",
+          receiptSummaryEnabled: officeEnabled),
+    ]);
     return harness;
   }
 
@@ -252,6 +331,347 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text("No receipts match this filter"), findsOneWidget);
+  });
+
+  /// The summary rides the same refresh contract as the desktop's, and the point of it
+  /// is what it does NOT do: sorting and paging change neither the filter nor the
+  /// figures, so an unpaged aggregate must not be refetched for either.
+  group('the receipt summary', () {
+    String householdRoute() =>
+        "/groups/${ReceiptFilterHarness.householdId}/receipts";
+
+    testWidgets('is fetched once on mount, with an empty filter', (tester) async {
+      await pumpList(tester,
+          router: routerFor(householdRoute()), harness: harnessWithSummary());
+
+      expect(summaryRequests, hasLength(1));
+      expect(summaryRequests.single.groupId, ReceiptFilterHarness.householdId);
+      // A real group configures itself, so the key is OMITTED -- naming another group
+      // is a 400 and naming its own is merely redundant.
+      expect(summaryRequests.single.command.configurationGroupId, isNull);
+      expect(find.byKey(const ValueKey('receipt-summary')), findsOneWidget);
+    });
+
+    testWidgets('is not fetched for a group that never opted in', (tester) async {
+      await pumpList(tester,
+          router: routerFor(householdRoute()),
+          harness: harnessWithSummary(householdEnabled: false));
+
+      expect(summaryRequests, isEmpty);
+      expect(find.byKey(const ValueKey('receipt-summary')), findsNothing);
+    });
+
+    testWidgets('applying a filter refetches it, once, with the conditions',
+        (tester) async {
+      final harness = await pumpList(tester,
+          router: routerFor(householdRoute()), harness: harnessWithSummary());
+      summaryRequests.clear();
+
+      harness.receiptListModel.setFilter({"name": nameCondition}, true,
+          groupId: "${ReceiptFilterHarness.householdId}");
+      await tester.pumpAndSettle();
+
+      expect(summaryRequests, hasLength(1));
+      final filter = Map<String, dynamic>.from(api.standardSerializers.serializeWith(
+          api.ReceiptPagedRequestFilter.serializer,
+          summaryRequests.single.command.filter!) as Map);
+      expect(filter, {
+        "name": {"operation": "CONTAINS", "value": "Costco"}
+      });
+    });
+
+    // The single most valuable case here. The sort setters pass notify: false and call
+    // the list's own refresh callback, so the summary must not be on that path at all.
+    testWidgets('a sort change refetches the list but NOT the summary', (tester) async {
+      await pumpList(tester,
+          router: routerFor(householdRoute()), harness: harnessWithSummary());
+      requests.clear();
+      summaryRequests.clear();
+
+      await tester.tap(find.text("Added At"));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("Sort by Amount"));
+      await tester.pumpAndSettle();
+
+      expect(requests, hasLength(1), reason: "the list still refetches");
+      expect(summaryRequests, isEmpty,
+          reason: "sorting changes the order of the result set, not its membership");
+    });
+
+    testWidgets('a group change refetches it for the new group', (tester) async {
+      final router = routerFor(householdRoute());
+      await pumpList(tester,
+          router: router,
+          harness: harnessWithSummary(officeEnabled: true));
+      summaryRequests.clear();
+
+      router.go("/groups/${ReceiptFilterHarness.officeId}/receipts");
+      await tester.pumpAndSettle();
+
+      expect(summaryRequests, hasLength(1));
+      expect(summaryRequests.single.groupId, ReceiptFilterHarness.officeId);
+    });
+
+    // Mobile deliberately diverges from the desktop here: desktop keeps the last good
+    // figures because its HTTP interceptor reports the failure, and mobile has no
+    // interceptor at all -- so keeping them would show the PREVIOUS filter's totals beside
+    // the new filter's list with nothing to say they are stale.
+    testWidgets('a failed refresh clears the figures rather than showing the old filter\'s',
+        (tester) async {
+      final harness = await pumpList(tester,
+          router: routerFor(householdRoute()), harness: harnessWithSummary());
+      expect(find.byKey(const ValueKey('receipt-summary')), findsOneWidget);
+
+      summaryShouldFail = true;
+      harness.receiptListModel.setFilter({"name": nameCondition}, true,
+          groupId: "${ReceiptFilterHarness.householdId}");
+      await tester.pumpAndSettle();
+
+      expect(summaryRequests, hasLength(2), reason: "the filter change did ask");
+      expect(find.byKey(const ValueKey('receipt-summary')), findsNothing,
+          reason: "showing nothing beats showing the previous filter's totals");
+    });
+
+    // A failure must not clear figures a NEWER request has already painted -- the same
+    // staleness guard the success path uses, which is why the clear sits behind it rather
+    // than in front. Mirrors 'a pending response cannot repaint after a skip supersedes
+    // it' below, with the superseded request failing instead of succeeding.
+    testWidgets('a stale failure leaves a newer response\'s figures alone', (tester) async {
+      final gate = Completer<Response<api.ReceiptSummary>>();
+      var call = 0;
+      when(() => mockReceiptApi.getReceiptSummaryForGroup(
+            groupId: any(named: "groupId"),
+            receiptSummaryCommand: any(named: "receiptSummaryCommand"),
+          )).thenAnswer((_) {
+        call += 1;
+        // Household's request hangs and will fail; Office's answers straight away.
+        return call == 1
+            ? gate.future
+            : Future.value(Response(
+                requestOptions: RequestOptions(path: "/"),
+                data: buildReceiptSummary(
+                    overall: buildSummaryRow(receiptCount: 3, total: '30.00')),
+              ));
+      });
+
+      final router = routerFor(householdRoute());
+      await pumpList(tester,
+          router: router, harness: harnessWithSummary(officeEnabled: true));
+
+      router.go("/groups/${ReceiptFilterHarness.officeId}/receipts");
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('receipt-summary')), findsOneWidget,
+          reason: "Office's figures are on screen");
+
+      // Household's request only now fails.
+      gate.completeError(DioException(requestOptions: RequestOptions(path: "/")));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('receipt-summary')), findsOneWidget,
+          reason: "the superseded failure must not clear the newer figures");
+    });
+
+    testWidgets('renders nothing for an enabled: false response', (tester) async {
+      summaryResponse = buildReceiptSummary(enabled: false);
+      await pumpList(tester,
+          router: routerFor(householdRoute()), harness: harnessWithSummary());
+
+      // The request still goes out -- gating on the client's cached settings would render
+      // a stale block when an admin has just changed the configuration.
+      expect(summaryRequests, hasLength(1));
+      expect(find.byKey(const ValueKey('receipt-summary')), findsNothing);
+    });
+
+    testWidgets('a failed summary leaves the list working', (tester) async {
+      when(() => mockReceiptApi.getReceiptSummaryForGroup(
+            groupId: any(named: "groupId"),
+            receiptSummaryCommand: any(named: "receiptSummaryCommand"),
+          )).thenThrow(DioException(requestOptions: RequestOptions(path: "/")));
+
+      await pumpList(tester,
+          router: routerFor(householdRoute()), harness: harnessWithSummary());
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(PagedDataList), findsOneWidget);
+      expect(find.byKey(const ValueKey('receipt-summary')), findsNothing);
+    });
+
+    /// The skip branch bumps the sequence too, so a decision NOT to ask still supersedes
+    /// whatever is in flight. Without that, leaving a summary-enabled group for one
+    /// without a summary lets the old group's response land after the block was cleared
+    /// and repaint its figures over the new group's list.
+    testWidgets('a pending response cannot repaint after a skip supersedes it',
+        (tester) async {
+      final gate = Completer<Response<api.ReceiptSummary>>();
+      when(() => mockReceiptApi.getReceiptSummaryForGroup(
+            groupId: any(named: "groupId"),
+            receiptSummaryCommand: any(named: "receiptSummaryCommand"),
+          )).thenAnswer((_) => gate.future);
+
+      final router = routerFor(householdRoute());
+      await pumpList(tester,
+          router: router,
+          // Office has no summary, so arriving there is the "skip" decision.
+          harness: harnessWithSummary(officeEnabled: false));
+
+      router.go("/groups/${ReceiptFilterHarness.officeId}/receipts");
+      await tester.pumpAndSettle();
+
+      // Household's request only now comes back.
+      gate.complete(Response(
+        requestOptions: RequestOptions(path: "/"),
+        data: buildReceiptSummary(
+            overall: buildSummaryRow(receiptCount: 3, total: '30.00')),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('receipt-summary')), findsNothing,
+          reason: "the superseded response must not paint another group's figures");
+    });
+
+    group('placement', () {
+      Future<ReceiptFilterHarness> pumpAt(
+          WidgetTester tester, api.ReceiptSummaryPosition position) async {
+        summaryResponse = buildReceiptSummary(
+          position: position,
+          overall: buildSummaryRow(receiptCount: 3, total: '30.00'),
+        );
+        return pumpList(tester,
+            router: routerFor(householdRoute()), harness: harnessWithSummary());
+      }
+
+      // Geometry, not a slot key: it tests the thing rather than a label for it.
+      testWidgets('BOTTOM puts the bar under the list', (tester) async {
+        await pumpAt(tester, api.ReceiptSummaryPosition.BOTTOM);
+
+        expect(
+          tester.getTopLeft(find.byKey(const ValueKey('receipt-summary'))).dy,
+          greaterThan(tester.getTopLeft(find.byType(PagedDataList)).dy),
+        );
+      });
+
+      testWidgets('TOP puts the bar above the list', (tester) async {
+        await pumpAt(tester, api.ReceiptSummaryPosition.TOP);
+
+        expect(
+          tester.getTopLeft(find.byKey(const ValueKey('receipt-summary'))).dy,
+          lessThan(tester.getTopLeft(find.byType(PagedDataList)).dy),
+        );
+      });
+
+      /// The four-slot Column guard. Column matches children by index and runtime type,
+      /// so moving one bar between slots would shift PagedDataList's index, fail
+      /// Widget.canUpdate and silently discard its State -- losing every loaded page and
+      /// refetching page 1. This fails against that implementation.
+      testWidgets('flipping the position does not reset the paged list',
+          (tester) async {
+        final harness = await pumpAt(tester, api.ReceiptSummaryPosition.TOP);
+        final listRequestsBefore = requests.length;
+        final pagedStateBefore = tester.state(find.byType(PagedDataList));
+
+        summaryResponse = buildReceiptSummary(
+          position: api.ReceiptSummaryPosition.BOTTOM,
+          overall: buildSummaryRow(receiptCount: 3, total: '30.00'),
+        );
+        // A filter apply is the cheapest way to drive a fresh summary response through
+        // the real path; it refetches the list exactly once, which is accounted for.
+        harness.receiptListModel.setFilter({"name": nameCondition}, true,
+            groupId: "${ReceiptFilterHarness.householdId}");
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.getTopLeft(find.byKey(const ValueKey('receipt-summary'))).dy,
+          greaterThan(tester.getTopLeft(find.byType(PagedDataList)).dy),
+          reason: 'the bar moved to the other slot',
+        );
+        // State IDENTITY, not a request count: a discarded State is reconstructed
+        // immediately and its refetch is easy to mistake for the filter's own.
+        expect(identical(tester.state(find.byType(PagedDataList)), pagedStateBefore),
+            isTrue,
+            reason: 'PagedDataList kept its index, so it kept its State -- and with it '
+                'the paging controller, every loaded page and _totalCount');
+        expect(requests.length, listRequestsBefore + 1,
+            reason: 'the filter refetch, and nothing else');
+      });
+    });
+
+    group('on the All group', () {
+      String allRoute() => "/groups/${ReceiptFilterHarness.allGroupId}/receipts";
+
+      testWidgets('borrows the first enabled group\'s configuration', (tester) async {
+        await pumpList(tester,
+            router: routerFor(allRoute()),
+            harness: harnessWithSummary(officeEnabled: true));
+
+        expect(summaryRequests, hasLength(1));
+        expect(summaryRequests.single.groupId, ReceiptFilterHarness.allGroupId);
+        // Household sorts before Office.
+        expect(summaryRequests.single.command.configurationGroupId,
+            ReceiptFilterHarness.householdId);
+      });
+
+      testWidgets('asks for nothing when no member group has one', (tester) async {
+        await pumpList(tester,
+            router: routerFor(allRoute()),
+            harness: harnessWithSummary(householdEnabled: false));
+
+        expect(summaryRequests, isEmpty);
+      });
+
+      testWidgets('a chip pick refetches the summary only', (tester) async {
+        await pumpList(tester,
+            router: routerFor(allRoute()),
+            harness: harnessWithSummary(officeEnabled: true));
+        requests.clear();
+        summaryRequests.clear();
+
+        await tester.tap(
+            find.byKey(const ValueKey('receipt-summary-config-group-'
+                '${ReceiptFilterHarness.officeId}')));
+        await tester.pumpAndSettle();
+
+        expect(summaryRequests, hasLength(1));
+        expect(summaryRequests.single.command.configurationGroupId,
+            ReceiptFilterHarness.officeId);
+        expect(requests, isEmpty,
+            reason: 'a configuration pick changes the breakdown shape, not the data');
+      });
+
+      // The pick is written with notify: false so it cannot reach _refreshForFilterChange
+      // and refetch the list -- which leaves setState as the only thing that can repaint
+      // the chips. ReceiptSummaryBar reads selectedConfigGroupId off its widget, so
+      // without it the tapped chip stays unhighlighted for the whole round trip, and
+      // forever if the request fails.
+      testWidgets('the tapped chip highlights before the response lands', (tester) async {
+        await pumpList(tester,
+            router: routerFor(allRoute()),
+            harness: harnessWithSummary(officeEnabled: true));
+
+        // Hold the pick's request open so the only thing that can have repainted the
+        // chips is the tap itself.
+        final gate = Completer<void>();
+        summaryGate = gate;
+
+        await tester.tap(
+            find.byKey(const ValueKey('receipt-summary-config-group-'
+                '${ReceiptFilterHarness.officeId}')));
+        await tester.pump();
+
+        final tapped = tester.widget<ChoiceChip>(
+            find.byKey(const ValueKey('receipt-summary-config-group-'
+                '${ReceiptFilterHarness.officeId}')));
+        final previous = tester.widget<ChoiceChip>(
+            find.byKey(const ValueKey('receipt-summary-config-group-'
+                '${ReceiptFilterHarness.householdId}')));
+
+        expect(tapped.selected, isTrue,
+            reason: 'the pick must show immediately, not when the response lands');
+        expect(previous.selected, isFalse);
+
+        gate.complete();
+        await tester.pumpAndSettle();
+      });
+    });
   });
 
   group("the quick date control", () {

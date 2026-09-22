@@ -75,6 +75,7 @@ export * from './receiptStatus';
 export * from './receiptSummary';
 export * from './receiptSummaryCommand';
 export * from './receiptSummaryCustomFieldTotal';
+export * from './receiptSummaryPosition';
 export * from './receiptSummaryRow';
 export * from './reportColumn';
 export * from './reportDetail';

@@ -5,13 +5,17 @@ import 'package:receipt_wrangler_mobile/constants/receipt_filter_fields.dart';
 import 'package:receipt_wrangler_mobile/constants/receipts.dart';
 import 'package:receipt_wrangler_mobile/groups/widgets/receipt_list_item.dart';
 import 'package:receipt_wrangler_mobile/models/receipt-list-model.dart';
+import 'package:receipt_wrangler_mobile/models/group_model.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_month_picker_sheet.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_month_stepper.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/paged_data_list.dart';
 import 'package:receipt_wrangler_mobile/utils/group.dart';
 import 'package:receipt_wrangler_mobile/utils/receipt_date_filter.dart';
+import 'package:receipt_wrangler_mobile/utils/receipt_filter_options.dart';
+import 'package:receipt_wrangler_mobile/utils/receipt_summary.dart';
 
 import '../../client/client.dart';
+import 'receipt_summary_bar.dart';
 
 class GroupReceiptsList extends StatefulWidget {
   const GroupReceiptsList({super.key});
@@ -20,8 +24,43 @@ class GroupReceiptsList extends StatefulWidget {
   State<GroupReceiptsList> createState() => _GroupReceiptsList();
 }
 
+/// What [_GroupReceiptsList._resolveSummaryRequest] decided: whether to ask at all, and
+/// if so whose configuration to ask for. A bare `int?` cannot express this, because
+/// `configurationGroupId: null` is MEANINGFUL on the wire -- it means "use the path
+/// group" -- and would be read as "skip" at the call site.
+typedef _SummaryRequest = ({bool shouldRequest, int? configurationGroupId});
+
 class _GroupReceiptsList extends State<GroupReceiptsList> {
   VoidCallback? _refreshCallback;
+
+  api.ReceiptSummary? _summary;
+
+  /// The group [_summary] belongs to. didChangeDependencies fires for ANY inherited
+  /// widget change and getGroupId makes GoRouterState one, so without this guard an
+  /// unpaged aggregate -- the expensive request -- fires on incidental rebuilds.
+  String? _summaryGroupId;
+
+  /// Last-request-wins, the manual equivalent of the desktop's switchMap. Two filter
+  /// applies in quick succession can land backwards and paint figures for a filter the
+  /// user has already moved past.
+  int _summaryRequestSeq = 0;
+
+  /// Keeps the paged list's State across a reparent.
+  ///
+  /// The summary bar renders in one of two slots either side of this list, so the list's
+  /// position among its siblings changes when the group's configured position does.
+  /// Element.updateChildren walks the old and new child lists inward from both ends while
+  /// Widget.canUpdate holds and reuses only KEYED children in the middle it cannot match
+  /// -- so without a key PagedDataList is rebuilt from scratch, discarding its paging
+  /// controller, every loaded page and _totalCount, and silently refetching page 1.
+  ///
+  /// A key rather than padding the Column with always-present placeholder slots: the key
+  /// travels with the widget it protects, so adding any other conditional child here
+  /// later cannot reintroduce the bug. Pinned by "flipping the position does not reset
+  /// the paged list", which asserts State identity -- a request count does not catch it,
+  /// because the reconstructed State refetches immediately and that looks exactly like
+  /// the filter's own refetch.
+  final GlobalKey _pagedListKey = GlobalKey();
 
   late final ReceiptListModel _receiptListModel =
       Provider.of<ReceiptListModel>(context, listen: false);
@@ -65,6 +104,18 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
       _receiptListModel.clearFilter(false);
       _refreshCallback?.call();
     }
+
+    // Guarded on the group, not run unconditionally: this method fires for any inherited
+    // widget change, and the summary is an UNPAGED aggregate.
+    if (_summaryGroupId != groupId) {
+      // The All-group configuration pick belongs to the group being browsed, so it goes
+      // with the group -- NOT inside the filter branch above, which is gated on there
+      // having been a filter at all. A user who never filtered would otherwise carry a
+      // pick from the All group into and back out of a real one.
+      _receiptListModel.setSummaryConfigGroupId(null, false);
+      _summaryGroupId = groupId;
+      _fetchSummary(groupId);
+    }
   }
 
   @override
@@ -80,10 +131,112 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
 
     // setState as well as refetch: the empty-state text below reads the applied
     // filter, and the list is otherwise built with listen: false. Safe to call
-    // here because the only notifying writer is the filter screen's Apply, a
-    // user event -- the group reset writes silently, during a build.
+    // here because every notifying writer is a user EVENT -- the filter screen's
+    // Apply and the month stepper's tap (setFilterField) -- while the group reset
+    // and the date-field re-point write silently.
     setState(() {});
     _refreshCallback?.call();
+    // The filter changed, so the figures did too. Stepping the month reaches here and
+    // must, since it narrows the result set. What does NOT is the sort setters and the
+    // date-field re-point, which call _refreshCallback directly (or nothing at all) with
+    // notify: false -- and that is what makes "only a real filter change refetches the
+    // summary" true by construction rather than by a rule someone has to remember.
+    // Paging never reaches here either.
+    _fetchSummary(getGroupId(context));
+  }
+
+  /// Which configuration the summary should be asked for, or that it should not be
+  /// asked at all.
+  ///
+  /// The cached group settings decide only WHETHER to send the request -- the one thing
+  /// that has to be decided before there is a response. Everything the block renders
+  /// (enabled, position, the rows) is read off the response, which stays authoritative.
+  /// A group that never opted in therefore costs nothing, exactly as on desktop.
+  _SummaryRequest _resolveSummaryRequest(String groupId) {
+    final groupModel = Provider.of<GroupModel>(context, listen: false);
+
+    if (!isAllGroupId(groupModel, groupId)) {
+      // A real group configures itself, so the command OMITS configurationGroupId --
+      // naming a different group is a 400, and naming its own is merely redundant.
+      final settings =
+          groupModel.getGroupReceiptSettings(int.tryParse(groupId) ?? 0);
+      return (
+        shouldRequest: settings?.receiptSummaryEnabled == true,
+        configurationGroupId: null,
+      );
+    }
+
+    // The All group has no configuration of its own, so it borrows one.
+    final enabled = summaryConfigGroups(groupModel);
+    final resolved =
+        resolveSummaryConfigGroup(enabled, _receiptListModel.summaryConfigGroupId);
+    return (shouldRequest: resolved != null, configurationGroupId: resolved?.id);
+  }
+
+  Future<void> _fetchSummary(String groupId) async {
+    // Bumped BEFORE the skip branch, not only before a request: a decision not to ask
+    // still supersedes whatever is in flight. Without it, leaving a summary-enabled group
+    // for one without a summary lets the old group's response land after the block was
+    // cleared and repaint its figures over the new group's list.
+    final seq = ++_summaryRequestSeq;
+
+    final request = _resolveSummaryRequest(groupId);
+    if (!request.shouldRequest) {
+      if (mounted && _summary != null) {
+        setState(() => _summary = null);
+      }
+      return;
+    }
+
+    try {
+      final response =
+          await OpenApiClient.client.getReceiptApi().getReceiptSummaryForGroup(
+                groupId: int.parse(groupId),
+                receiptSummaryCommand: _receiptListModel.receiptSummaryCommand(
+                  configurationGroupId: request.configurationGroupId,
+                ),
+              );
+      // A response that is no longer the latest is dropped rather than painted.
+      if (!mounted || seq != _summaryRequestSeq) {
+        return;
+      }
+      setState(() => _summary = response.data);
+    } catch (_) {
+      // Swallowed rather than rethrown: an unhandled DioException from a setState-driven
+      // fetch takes the whole receipts screen down, and a block of totals is not worth
+      // interrupting someone browsing receipts over.
+      //
+      // But the figures are CLEARED, not kept -- and this is where mobile deliberately
+      // DIVERGES from the desktop. Desktop's catchError leaves the last good figures on
+      // screen because its HTTP interceptor tells the user the refresh failed; mobile
+      // installs no interceptor, so keeping them would render the PREVIOUS filter's
+      // totals beside the new filter's list with nothing to say they are stale.
+      // "Covers the whole current filter result set" is the block's entire contract, so
+      // showing nothing is the honest degradation and showing wrong numbers is not.
+      //
+      // Guarded exactly like the success path: a response that is no longer the latest
+      // must not clear a newer one's figures. The group latch is released with it, so a
+      // fetch that did not happen is never recorded as "this group is done".
+      if (!mounted || seq != _summaryRequestSeq) {
+        return;
+      }
+      setState(() {
+        _summary = null;
+        _summaryGroupId = null;
+      });
+    }
+  }
+
+  /// Changing the configuration changes the breakdown's shape, never the data -- so this
+  /// refreshes the summary ONLY, and must not go through _refreshCallback.
+  void _onConfigGroupSelected(int groupId) {
+    // setState, not a notifying write. The model write stays silent so it cannot reach
+    // _refreshForFilterChange and refetch the LIST as well -- but something still has to
+    // repaint, because ReceiptSummaryBar reads selectedConfigGroupId off its widget and
+    // nothing else rebuilds this State until the response lands. Without it the tapped
+    // chip stays unhighlighted for the whole round trip, and forever if the request fails.
+    setState(() => _receiptListModel.setSummaryConfigGroupId(groupId, false));
+    _fetchSummary(getGroupId(context));
   }
 
   /// The quick date control: a month stepper over the date field the chip row
@@ -276,13 +429,51 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
     return option.displayLabel;
   }
 
+  /// Null unless the server says the configuration group has the summary turned on.
+  /// `enabled: false` arrives as a normal 200 with zeroed rows, so a client with stale
+  /// group settings renders nothing rather than surfacing an error.
+  Widget? _buildSummaryBar() {
+    final summary = _summary;
+    if (summary == null || !summary.enabled) {
+      return null;
+    }
+
+    final groupId = getGroupId(context);
+    final groupModel = Provider.of<GroupModel>(context, listen: false);
+    // Chips only where there is a choice to make: the All group, which borrows a
+    // configuration. A real group configures itself.
+    final configGroups =
+        isAllGroupId(groupModel, groupId) ? summaryConfigGroups(groupModel) : <api.Group>[];
+
+    return ReceiptSummaryBar(
+      summary: summary,
+      atTop: isReceiptSummaryAtTop(summary.position),
+      configGroups: configGroups,
+      // The pick, not the last response's configurationGroupId: otherwise a tap leaves the
+      // previous chip highlighted for the whole round trip, and stays there forever if the
+      // request fails -- with the model and the UI silently disagreeing.
+      selectedConfigGroupId:
+          _receiptListModel.summaryConfigGroupId ?? summary.configurationGroupId,
+      onConfigGroupSelected: _onConfigGroupSelected,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bar = _buildSummaryBar();
+    final atTop = bar != null && isReceiptSummaryAtTop(_summary?.position);
+
     return Column(
       children: [
         buildMonthStepper(),
         buildSortFilterBar(),
+        // Both slots are PINNED for free: PagedDataList returns an Expanded, so it takes
+        // the remaining height and the bar never scrolls with the list. That is what
+        // makes the bottom position reachable at all under infinite scroll -- and it is
+        // why _pagedListKey exists; see its doc comment.
+        if (atTop) bar,
         PagedDataList(
+          key: _pagedListKey,
           onRefreshCallbackSet: (callback) {
             _refreshCallback = callback;
           },
@@ -304,6 +495,7 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
                 );
           },
         ),
+        if (bar != null && !atTop) bar,
       ],
     );
   }

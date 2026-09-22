@@ -1604,6 +1604,28 @@ for the wire contract.
   the filter" asserts that), detaching the submit button mid-click. Tab blurs the input, which closes
   the panel when it is open and is harmless when it is not. Escape is fine on the **settings page**
   version of the same picker — there is no dialog behind it there to swallow the keypress.
+- **Placement is a per-group setting, and the block MOVES rather than being cloned.**
+  `receipts-table.component.html` holds one `<ng-template #receiptTotals>` with one set of
+  bindings, rendered through `*ngTemplateOutlet` at one of two anchors: `TOP` puts it immediately
+  after `</app-table-header>` — **above `app-summary-card`**, because that card annotates a row
+  *selection* and is transient while these totals describe the whole filter — and `BOTTOM` leaves
+  it under `.table-container` where it has always been. Two elements behind separate `@if`s would
+  drift and would each need handling in the e2e suite.
+  - **`summaryPosition()` reads `summary()?.position`, never `GroupState`.** Same reason the
+    `enabled` gate does: the cached `groupReceiptSettings` is stale the moment an admin changes the
+    configuration. Nothing flickers on first load, because the component renders nothing until the
+    response arrives.
+  - **The component owns its own vertical rhythm** via a `position` input and a
+    `.receipt-totals--top` modifier that moves the `$spacing-md` to the bottom edge. The receipts
+    page adds no margin of its own.
+  - **The settings control is an `app-select` outside the `canManageDefaultCustomFields` branch**,
+    with the toggle and the status checkboxes — it reads no catalog, and gating it would lock an
+    admin without `app.custom-fields.read` out of deciding where their own summary goes.
+  - **Placement is asserted as DOCUMENT ORDER, and only in e2e.** The block renders at both
+    positions, so "is it visible" passes whichever anchor is wrong. The Jest spec asserts the
+    derivation only: `receipts-table.component.spec.ts` never renders the template — every case
+    there drives the component class, and `app-table` resolves to a custom element under
+    `CUSTOM_ELEMENTS_SCHEMA`, so the `viewChild.required` in `ngAfterViewInit` cannot resolve.
 - **The chip row must never be asserted by count or position.** It lists every group the admin
   belongs to whose summary is enabled, and the suite runs `fullyParallel` against a shared backend,
   so a group leaked by a crashed earlier run would break an exact-count assertion — and, sorting

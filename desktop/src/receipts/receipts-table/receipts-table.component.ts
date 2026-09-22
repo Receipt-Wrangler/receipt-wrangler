@@ -31,6 +31,7 @@ import {
   ReceiptService,
   ReceiptStatus,
   ReceiptSummary,
+  ReceiptSummaryPosition,
   Tag,
 } from "../../open-api";
 import { SnackbarService } from "../../services";
@@ -163,6 +164,22 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
     return summaryConfigGroups(this.groups());
   });
+
+  /**
+   * Where the block renders. Read off the RESPONSE, never off the cached
+   * GroupState.groupReceiptSettings: placement is configuration, and the cache is stale
+   * the moment an admin changes it — the same reason `enabled` rides on the response.
+   *
+   * Nothing flickers before the first response: app-receipt-totals renders nothing until
+   * summary().enabled, so there is no pre-response position to get wrong.
+   */
+  public readonly summaryPosition = computed(
+    () => this.summary()?.position ?? ReceiptSummaryPosition.Bottom
+  );
+
+  public readonly summaryAtTop = computed(
+    () => this.summaryPosition() === ReceiptSummaryPosition.Top
+  );
 
   /**
    * Whose configuration is actually in use. On a real group it is that group; on

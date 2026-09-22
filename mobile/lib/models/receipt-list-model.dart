@@ -84,6 +84,50 @@ class ReceiptListModel extends ChangeNotifier {
             ..filter = buildReceiptPagedRequestFilter(_filter))
           .build();
 
+  /// The same applied filter, shaped for the summary endpoint.
+  ///
+  /// A method rather than a getter because the synthetic All group has to name a
+  /// configuration group. Deliberately carries NO page and NO sort: the summary
+  /// aggregates the whole filtered set, which is exactly why paging and sorting must
+  /// not refetch it.
+  ///
+  /// Built here rather than in the list widget so the table and the totals can never
+  /// disagree about what is filtered -- and so nobody hands ONE
+  /// `buildReceiptPagedRequestFilter` result to both commands, which share a mutable
+  /// nested builder.
+  ReceiptSummaryCommand receiptSummaryCommand({int? configurationGroupId}) =>
+      (ReceiptSummaryCommandBuilder()
+            ..filter = buildReceiptPagedRequestFilter(_filter)
+            ..configurationGroupId = configurationGroupId)
+          .build();
+
+  int? _summaryConfigGroupId;
+
+  int? get summaryConfigGroupId => _summaryConfigGroupId;
+
+  /// Which member group's configuration shapes the All group's summary breakdown.
+  ///
+  /// Lives here, not in the list's State, for the reason [_filterGroupId] does: this
+  /// model outlives every screen that reads it, while `GroupReceiptsList` is destroyed
+  /// and remounted on every receipt round trip -- a widget-local pick would silently
+  /// reset itself. Session-scoped only: mobile has no persisted slice equivalent to the
+  /// desktop's NGXS `receiptTable`, so unlike there the pick does not survive a restart.
+  ///
+  /// [notify] exists for symmetry with the setters above; every call site passes false,
+  /// for the same reason they do. Picking a configuration changes the breakdown's SHAPE,
+  /// never the data, so notifying would make the list refetch for nothing.
+  ///
+  /// Reset on a GROUP change, by the list, not from [clearFilter]: that early-returns on
+  /// an already-empty filter, so the pick would survive exactly the navigation that
+  /// invalidates it -- and it is also what a user pressing "Reset" in the filter screen
+  /// calls, where silently changing which group's configuration applies is a surprise.
+  void setSummaryConfigGroupId(int? groupId, bool notify) {
+    _summaryConfigGroupId = groupId;
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
   void setOrderBy(String orderBy, bool notify) {
     _orderBy = orderBy;
     if (notify) {

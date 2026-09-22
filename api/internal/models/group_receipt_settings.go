@@ -60,9 +60,17 @@ type GroupReceiptSettings struct {
 	//
 	// ReceiptSummaryStatuses is the set of statuses to break out. A configured status that matches
 	// no receipt still renders as a zero row, so the block keeps its shape as the filter narrows.
-	ReceiptSummaryEnabled        bool            `gorm:"not null;default:false" json:"receiptSummaryEnabled"`
-	ReceiptSummaryCustomFieldIds []uint          `gorm:"-" json:"receiptSummaryCustomFieldIds"`
-	ReceiptSummaryStatuses       []ReceiptStatus `gorm:"-" json:"receiptSummaryStatuses"`
+	//
+	// ReceiptSummaryPosition is where the block renders relative to the receipts list. A real
+	// column with a DB default rather than a `gorm:"-"` projection, because it is a scalar and
+	// AutoMigrate backfills existing rows with the default on all three engines. BOTTOM is where
+	// the summary rendered before the setting existed, so an install that never touches it is
+	// unchanged. Read it through OrDefault(): a settings row that predates the column reads "",
+	// and an empty enum on the wire fails a closed Dart EnumClass -- and with it the whole payload.
+	ReceiptSummaryEnabled        bool                   `gorm:"not null;default:false" json:"receiptSummaryEnabled"`
+	ReceiptSummaryPosition       ReceiptSummaryPosition `gorm:"default:BOTTOM" json:"receiptSummaryPosition"`
+	ReceiptSummaryCustomFieldIds []uint                 `gorm:"-" json:"receiptSummaryCustomFieldIds"`
+	ReceiptSummaryStatuses       []ReceiptStatus        `gorm:"-" json:"receiptSummaryStatuses"`
 }
 
 // IsQuickScanCommentShown reports whether the quick-scan comment field should be shown. HideComments

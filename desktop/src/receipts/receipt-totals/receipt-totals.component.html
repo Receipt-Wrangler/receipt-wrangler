@@ -1,5 +1,9 @@
 @if (show()) {
-  <section class="receipt-totals" data-testid="receipt-totals">
+  <section
+    class="receipt-totals"
+    [class.receipt-totals--top]="isTop()"
+    data-testid="receipt-totals"
+  >
     @if (showConfigGroupChips()) {
       <!--
         On the "All" group the data spans every group the user belongs to, but the shape of the

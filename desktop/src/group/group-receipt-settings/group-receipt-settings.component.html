@@ -87,6 +87,21 @@
       [inputFormControl]="form | formGet: 'receiptSummaryEnabled'"
     ></app-checkbox>
 
+    <!--
+      Outside the canManageDefaultCustomFields branch below, with the toggle and the statuses:
+      it reads no catalog, and gating it would leave an admin without app.custom-fields.read
+      able to turn the summary on but not to say where it goes.
+    -->
+    <app-select
+      class="w-100"
+      label="Summary position"
+      data-testid="receipt-summary-position"
+      optionValueKey="value"
+      optionDisplayKey="display"
+      [options]="summaryPositionOptions"
+      [inputFormControl]="form | formGet: 'receiptSummaryPosition'"
+    ></app-select>
+
     <div class="mb-3">
       <strong>Break down by status</strong>
       <div class="summary-statuses d-flex flex-wrap gap-4">

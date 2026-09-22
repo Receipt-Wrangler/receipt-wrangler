@@ -861,6 +861,7 @@ export async function apiSetGroupSummaryConfig(
     enabled: boolean;
     statuses?: string[];
     currencyCustomFieldIds?: number[];
+    position?: 'TOP' | 'BOTTOM';
   },
 ): Promise<void> {
   const what = 'set receipt summary config';
@@ -871,6 +872,9 @@ export async function apiSetGroupSummaryConfig(
   }
   if (config.currencyCustomFieldIds !== undefined) {
     command['receiptSummaryCustomFieldIds'] = config.currencyCustomFieldIds;
+  }
+  if (config.position !== undefined) {
+    command['receiptSummaryPosition'] = config.position;
   }
 
   await putGroupReceiptSettings(api, groupId, command, what);
