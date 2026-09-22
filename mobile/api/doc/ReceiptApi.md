@@ -14,6 +14,7 @@ Method | HTTP request | Description
 [**deleteReceiptById**](ReceiptApi.md#deletereceiptbyid) | **DELETE** /receipt/{receiptId} | Delete receipt
 [**duplicateReceipt**](ReceiptApi.md#duplicatereceipt) | **POST** /receipt/{receiptId}/duplicate | Duplicate receipt
 [**getReceiptById**](ReceiptApi.md#getreceiptbyid) | **GET** /receipt/{receiptId} | Get receipt
+[**getReceiptSummaryForGroup**](ReceiptApi.md#getreceiptsummaryforgroup) | **POST** /receipt/group/{groupId}/summary | Gets the receipt summary for a group
 [**getReceiptsForGroup**](ReceiptApi.md#getreceiptsforgroup) | **POST** /receipt/group/{groupId} | Gets receipts
 [**hasAccessToReceipt**](ReceiptApi.md#hasaccesstoreceipt) | **GET** /receipt/hasAccess | Has access to receipt
 [**quickScanReceipt**](ReceiptApi.md#quickscanreceipt) | **POST** /receipt/quickScan | Quick scan a receipt
@@ -249,6 +250,55 @@ Name | Type | Description  | Notes
 ### HTTP request headers
 
  - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getReceiptSummaryForGroup**
+> ReceiptSummary getReceiptSummaryForGroup(groupId, receiptSummaryCommand)
+
+Gets the receipt summary for a group
+
+Returns the block of totals rendered under the receipts table: a receipt count and amount total over the WHOLE filtered result set (not the current page), then the same figures per configured status. Which statuses break out and which currency custom fields are totalled come from the group's receipt settings, not from the request. Gated on group.receipts.read, the same permission as the receipts it aggregates. [SYSTEM USER]
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getReceiptApi();
+final int groupId = 56; // int | Summarize the receipts that belong to groupId
+final ReceiptSummaryCommand receiptSummaryCommand = ; // ReceiptSummaryCommand | 
+
+try {
+    final response = api.getReceiptSummaryForGroup(groupId, receiptSummaryCommand);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling ReceiptApi->getReceiptSummaryForGroup: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **groupId** | **int**| Summarize the receipts that belong to groupId | 
+ **receiptSummaryCommand** | [**ReceiptSummaryCommand**](ReceiptSummaryCommand.md)|  | 
+
+### Return type
+
+[**ReceiptSummary**](ReceiptSummary.md)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
  - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

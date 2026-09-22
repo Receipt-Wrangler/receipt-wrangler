@@ -1,0 +1,73 @@
+@use "../../variables.scss" as variables;
+
+:host {
+  display: block;
+}
+
+.receipt-totals {
+  margin-top: variables.$spacing-md;
+}
+
+.receipt-totals__config {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: variables.$spacing-sm;
+  margin-bottom: variables.$spacing-sm;
+}
+
+.receipt-totals__config-label,
+.receipt-totals__config-note {
+  opacity: 0.7;
+  font-size: 0.875rem;
+}
+
+.receipt-totals__config-note {
+  margin: 0 0 variables.$spacing-sm;
+}
+
+.receipt-totals__row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  // Wide enough to separate figures on one line, so the row still reads as a row when it wraps
+  // on a narrow viewport.
+  gap: variables.$spacing-sm variables.$spacing-lg;
+  padding: variables.$spacing-sm 0;
+
+  & + .receipt-totals__row {
+    border-top: 1px solid rgba(128, 128, 128, 0.2);
+  }
+}
+
+// The overall row is the headline figure; the status rows are its breakdown.
+.receipt-totals__row--overall {
+  font-weight: 600;
+}
+
+// A configured status that matched nothing still renders, so that the block keeps its shape as the
+// filter narrows. Muting it is what stops a legitimate zero reading as a bug.
+.receipt-totals__row--empty {
+  opacity: 0.55;
+}
+
+.receipt-totals__label {
+  // Keeps the figures aligned across rows at comfortable widths; it collapses rather than
+  // overflowing when the viewport is narrow.
+  min-width: 14rem;
+  flex: 0 1 auto;
+}
+
+.receipt-totals__figure {
+  display: inline-flex;
+  align-items: baseline;
+  gap: variables.$spacing-sm;
+}
+
+.receipt-totals__figure-name {
+  opacity: 0.7;
+}
+
+.receipt-totals__figure-value {
+  font-variant-numeric: tabular-nums;
+}

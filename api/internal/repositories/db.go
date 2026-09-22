@@ -160,6 +160,8 @@ func MakeMigrations() error {
 		&models.GroupRoleReportTemplateGrant{},
 		&models.GroupReceiptSettings{},
 		&models.GroupReceiptSettingsCustomField{},
+		&models.GroupReceiptSettingsSummaryCustomField{},
+		&models.GroupReceiptSettingsSummaryStatus{},
 		&models.Pepper{},
 		&models.ApiKey{},
 		&models.DataMigration{},

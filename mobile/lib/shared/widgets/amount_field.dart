@@ -19,6 +19,7 @@ class AmountField extends StatefulWidget {
     required this.initialAmount,
     required this.formState,
     this.suffixIcon,
+    this.validator,
   });
 
   final String label;
@@ -30,6 +31,14 @@ class AmountField extends StatefulWidget {
   final WranglerFormState formState;
 
   final Widget? suffixIcon;
+
+  /// Overrides the default "amount is required" validation.
+  ///
+  /// The receipt form and quick scan both need an amount, so required stays the
+  /// default and every existing call site is unchanged. The receipt filter is
+  /// the exception -- an amount condition is only authored when the user asks
+  /// for one, so it passes a no-op validator rather than blocking its sheet.
+  final String? Function(String?)? validator;
 
   @override
   State<AmountField> createState() => _AmountField();
@@ -88,9 +97,10 @@ class _AmountField extends State<AmountField> {
         suffixIcon: widget.suffixIcon,
       ),
       keyboardType: const TextInputType.numberWithOptions(signed: true, decimal: true),
-      validator: FormBuilderValidators.compose([
-        FormBuilderValidators.required(),
-      ]),
+      validator: widget.validator ??
+          FormBuilderValidators.compose([
+            FormBuilderValidators.required(),
+          ]),
       readOnly: isFieldReadOnly(widget.formState),
       controller: controller,
       valueTransformer: (value) {

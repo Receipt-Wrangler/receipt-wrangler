@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule, Validators } from "@angular/forms";
-import { MatDialogModule } from "@angular/material/dialog";
+import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
@@ -11,8 +11,9 @@ import { Store } from "@ngxs/store";
 import { BehaviorSubject, of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
 import { PipesModule } from "src/pipes/pipes.module";
+import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { SharedUiModule } from "src/shared-ui/shared-ui.module";
-import { ApiModule, CustomFieldType, Permission, ReceiptImageService, ReceiptStatus } from "../../open-api";
+import { ApiModule, CustomFieldType, Permission, ReceiptImageService, ReceiptService, ReceiptStatus } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { QueueMode } from "../../services/receipt-queue.service";
 import { StatefulMenuItem } from "../../standalone/components/filtered-stateful-menu/stateful-menu-item";
@@ -1203,6 +1204,133 @@ describe("ReceiptFormComponent", () => {
       });
 
       expect(component.form.value.groupId).toEqual(9);
+    });
+  });
+
+  // The image stage fills its column via a class-gated height chain. The
+  // fullscreen #expandedImageTemplate is declared in this component, so it
+  // carries the same encapsulation attribute - it must NOT pick the class up, or
+  // the dialog's plain image gets stretched too. Nothing else pins this.
+  describe("image stage sizing", () => {
+    const carousels = (): HTMLElement[] =>
+      Array.from(document.querySelectorAll("app-carousel"));
+
+    beforeEach(async () => {
+      component.images.set([{ id: 1 } as any]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+    });
+
+    it("has the inline carousel fill its column", () => {
+      const inline = fixture.nativeElement.querySelector("app-carousel") as HTMLElement;
+
+      expect(inline).toBeTruthy();
+      expect(inline.classList).toContain("rw-carousel--fill");
+      expect(inline.getAttribute("stageHeight")).toEqual("100%");
+    });
+
+    // The dialog renders its template into the overlay container, outside the
+    // fixture host - which is how it is told apart from the inline one.
+    const openDialogCarousel = (): HTMLElement | undefined => {
+      component.expandImage();
+      fixture.detectChanges();
+
+      return carousels().find((element) => !fixture.nativeElement.contains(element));
+    };
+
+    it("gives the fullscreen dialog the same filling canvas", () => {
+      const dialogCarousel = openDialogCarousel();
+
+      expect(dialogCarousel).toBeTruthy();
+      expect(dialogCarousel!.classList).toContain("rw-carousel--fill");
+      expect(dialogCarousel!.getAttribute("stageHeight")).toEqual("100%");
+    });
+
+    // Without this the dialog offers no way out but Esc and the backdrop.
+    it("closes the fullscreen dialog", async () => {
+      const dialog = TestBed.inject(MatDialog);
+      openDialogCarousel();
+      expect(dialog.openDialogs.length).toEqual(1);
+
+      component.closeExpandedImage();
+      await fixture.whenStable();
+
+      expect(dialog.openDialogs.length).toEqual(0);
+    });
+
+    // The test above drives the method, so on its own it would still pass with
+    // the (clicked) binding - or the whole button - deleted. This covers the
+    // wiring. app-button is an unknown element under CUSTOM_ELEMENTS_SCHEMA, so
+    // it renders no native button and Angular binds (clicked) as a plain DOM
+    // listener on the host; dispatching the event is what the real button's
+    // output does. The handler is mocked out because actually closing here runs
+    // a change-detection pass this block does not stub view children for.
+    it("wires the close button to closeExpandedImage", () => {
+      const close = jest
+        .spyOn(component, "closeExpandedImage")
+        .mockImplementation(() => {});
+      openDialogCarousel();
+
+      const button = document.querySelector(
+        '[data-testid="receipt-image-fullscreen-close"]',
+      );
+
+      expect(button).toBeTruthy();
+      button!.dispatchEvent(new CustomEvent("clicked"));
+
+      expect(close).toHaveBeenCalled();
+    });
+  });
+
+  // The receipt page's Duplicate creates a real record, so it confirms first.
+  describe("duplicate confirmation", () => {
+    let receiptService: ReceiptService;
+
+    const stubDialog = (confirmed: boolean | undefined) =>
+      jest.spyOn(TestBed.inject(MatDialog), "open").mockReturnValue({
+        componentInstance: {},
+        afterClosed: () => of(confirmed),
+      } as any);
+
+    beforeEach(() => {
+      component.originalReceipt = { id: 4, name: "Lunch" } as any;
+      receiptService = TestBed.inject(ReceiptService);
+      jest
+        .spyOn(receiptService, "duplicateReceipt")
+        .mockReturnValue(of({ id: 9 }) as any);
+      // The success path renders a template-driven snackbar; the template is
+      // only available once the view is laid out, so stub the service call.
+      jest
+        .spyOn(TestBed.inject(SnackbarService), "successFromTemplate")
+        .mockReturnValue({ dismiss: jest.fn() } as any);
+    });
+
+    it("duplicates the receipt once confirmed", () => {
+      const open = stubDialog(true);
+
+      component.duplicateReceipt();
+
+      expect(open).toHaveBeenCalledWith(ConfirmationDialogComponent);
+      expect(receiptService.duplicateReceipt).toHaveBeenCalledWith(4);
+      expect(component.duplicatedReceiptId()).toEqual("9");
+    });
+
+    it("does nothing when the dialog is cancelled", () => {
+      stubDialog(false);
+
+      component.duplicateReceipt();
+
+      expect(receiptService.duplicateReceipt).not.toHaveBeenCalled();
+      expect(component.duplicatedReceiptId()).toEqual("");
+    });
+
+    // A backdrop click / ESC closes with undefined rather than false.
+    it("does nothing when the dialog is dismissed", () => {
+      stubDialog(undefined);
+
+      component.duplicateReceipt();
+
+      expect(receiptService.duplicateReceipt).not.toHaveBeenCalled();
     });
   });
 });

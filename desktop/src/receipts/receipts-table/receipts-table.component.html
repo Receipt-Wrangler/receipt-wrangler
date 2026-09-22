@@ -229,6 +229,18 @@
   ></app-table>
 </div>
 
+<!--
+  Totals for the whole current filter, not just this page. Rendered below the table (the paginator
+  lives inside app-table) so it reads as a footer to the list. It renders nothing at all unless the
+  group has the summary configured.
+-->
+<app-receipt-totals
+  [summary]="summary()"
+  [configGroups]="summaryConfigGroupOptions()"
+  [selectedConfigGroupId]="summaryConfigGroupId()"
+  (configGroupSelected)="summaryConfigGroupSelected($event)"
+></app-receipt-totals>
+
 <ng-template #createdAtCell let-element="element"
 >{{ element.createdAt | date }}
 </ng-template>
@@ -267,6 +279,13 @@
   {{ element.resolvedDate | date : "medium" }}
 </ng-template>
 
+<ng-template #customFieldCell let-element="element" let-column="column">
+  <app-custom-field-cell
+    [receipt]="element"
+    [customField]="column.customField"
+  ></app-custom-field-cell>
+</ng-template>
+
 <ng-template #actionsCell let-element="element" let-index="index">
   <div class="d-flex w-100">
     <app-edit-button
@@ -280,7 +299,7 @@
       icon="file_copy"
       tooltip="Duplicate"
       color="accent"
-      (clicked)="duplicateReceipt(element.id)"
+      (clicked)="duplicateReceipt(element)"
     ></app-button>
     <app-button
       *hasGroupPermission="{ groupId: element.groupId, permission: Permission.GroupReceiptsDelete }"

@@ -50,6 +50,7 @@ import { ImageViewerComponent } from "./image-viewer/image-viewer.component";
 import { PrettyJsonComponent } from "./pretty-json/pretty-json.component";
 import { QueueStartMenuComponent } from "./queue-start-menu/queue-start-menu.component";
 import { QuickScanButtonComponent } from "./quick-scan-button/quick-scan-button.component";
+import { FilterFieldComponent } from "./filter-field/filter-field.component";
 import { OperationsPipe } from "./receipt-filter/operations.pipe";
 import { ReceiptFilterComponent } from "./receipt-filter/receipt-filter.component";
 import { StatusChipComponent } from "./status-chip/status-chip.component";
@@ -66,6 +67,8 @@ import { EditableListComponent } from './editable-list/editable-list.component';
 import { IconAutocompleteComponent } from './icon-autocomplete/icon-autocomplete.component';
 import { PieChartUiComponent } from './pie-chart/pie-chart.component';
 import { LoginQrComponent } from './login-qr/login-qr.component';
+import { BadgeComponent } from './badge/badge.component';
+import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
 
 @NgModule({
   declarations: [
@@ -90,6 +93,7 @@ import { LoginQrComponent } from './login-qr/login-qr.component';
     FormSectionComponent,
     GroupAutocompleteComponent,
     HelpIconComponent,
+    FilterFieldComponent,
     OperationsPipe,
     ReceiptFilterComponent,
     StatusChipComponent,
@@ -139,6 +143,8 @@ import { LoginQrComponent } from './login-qr/login-qr.component';
     UserAutocompleteModule,
     PieChartUiComponent,
     LoginQrComponent,
+    BadgeComponent,
+    ImageCanvasComponent,
   ],
   exports: [
     AddButtonComponent,
@@ -161,6 +167,7 @@ import { LoginQrComponent } from './login-qr/login-qr.component';
     FormSectionComponent,
     GroupAutocompleteComponent,
     HelpIconComponent,
+    FilterFieldComponent,
     OperationsPipe,
     QuickScanButtonComponent,
     ReceiptFilterComponent,
@@ -183,6 +190,8 @@ import { LoginQrComponent } from './login-qr/login-qr.component';
     IconAutocompleteComponent,
     PieChartUiComponent,
     LoginQrComponent,
+    BadgeComponent,
+    ImageCanvasComponent,
   ],
   providers: [CurrencyPipe],
 })

@@ -162,7 +162,7 @@ Keep `npm audit` at **0 vulnerabilities**. Two conventions exist specifically to
 do not undo them without re-checking `npm audit`:
 - **`overrides` block in `package.json`** forces patched versions of build-time/dev-only transitive
   deps that the Angular toolchain otherwise pins inside vulnerable ranges (`@babel/core`, `esbuild`,
-  `http-proxy-middleware`, `undici`, `uuid`). When `npm audit` flags a new transitive advisory that
+  `http-proxy-middleware`, `qs`, `undici`, `uuid`). When `npm audit` flags a new transitive advisory that
   the toolchain hasn't bumped yet, add/raise the floor here rather than waiting on an upstream release.
 - **Exact pins (no caret):** `ngx-bootstrap` (`21.0.1`) and `@playwright/test` (`1.59.1`) are pinned
   because their next minor introduced an incompatibility (ngx-bootstrap dropped `CarouselModule.forRoot()`
@@ -267,6 +267,23 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   place Save/Cancel buttons in the page header.
 - **Form fields:** `app-input`, `app-textarea`, `app-select`, `app-checkbox`, grouped with
   `app-form-section`; bind via the `formGet` pipe.
+- **Field hints:** `app-input` and `app-textarea` bind
+  `[subscriptSizing]="hint ? 'dynamic' : 'fixed'"`, and that conditional is load-bearing both ways.
+  Material's default `fixed` reserves a **single line** for the subscript and positions the hint
+  wrapper **absolutely**, so a hint that wraps to two or more lines escapes its box and paints over
+  whatever follows the field — which is exactly what a long hint in a narrow column does (the MCP
+  section's "Connector sign-in lasts" hint used to cover the Connector URL block). A field with
+  **no** hint keeps `fixed` so its error row stays reserved and it does not jump when a `mat-error`
+  appears. Note `app-select` has **no** `hint` input at all — passing `hint="…"` to it silently
+  renders nothing.
+  - **A hint is in-flow content once the subscript is dynamic**, so it also feeds the field's
+    intrinsic width. Inside a `d-flex`, `flex-grow-1` alone leaves `flex-basis: auto`, so a hinted
+    column swallows the row and squeezes its neighbour. Base both columns at 0 instead — see
+    `.duration-row` in `system-settings-form.component.scss`, which keeps the Session and MCP
+    value + unit rows even and aligned with each other.
+- **Margins on a shared control's host need `d-block`.** `app-checkbox` / `app-input` have no
+  `:host { display: block }` and their SCSS is empty, so a bare `class="mb-3"` on the host is an
+  **inline** element's vertical margin and does nothing. Pair it (`class="d-block mb-3"`).
 - **Password fields:** `app-input` owns both password affordances as opt-in suffix icon buttons —
   `[showVisibilityEye]="true"` (the eye, `data-testid="password-visibility-toggle"`) and
   `[showGeneratePassword]="true"` (`data-testid="password-generate"`). Switching either flag on
@@ -281,6 +298,17 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   generate handler is synchronous by design: `type` is a plain `@Input`, so under zoneless CD only
   the click event's CD pass renders the reveal (the clipboard write is a detached side effect).
 - **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`.
+- **Confirming an action:** the shared **`ConfirmationDialogComponent`**
+  (`src/shared-ui/confirmation-dialog/`). Open it with `matDialog.open(ConfirmationDialogComponent)`,
+  set `componentInstance.headerText` / `componentInstance.dialogContent` (two plain `@Input()`s — it
+  does **not** take `MAT_DIALOG_DATA`), then act on a truthy `afterClosed()`. Check truthiness, not
+  `=== true`: a backdrop click or ESC closes with `undefined`. Every action that writes a record the
+  user can't trivially undo gates on it — deletes, and the receipt **Duplicate** in both the
+  receipts-table row action and the receipt view header (each creates a real receipt, and the table's
+  then navigates away, so a mis-click is easy to miss).
+- **Badges:** the shared standalone **`app-badge`** (`src/shared-ui/badge/`) — `<app-badge [text]="..."
+  [tone]="...">`, a 9.5px uppercase micro-badge for marking an item in a list. Do NOT hand-roll one;
+  see **The shared badge** below for the tones and the two traps.
 - **Simple filters:** the segmented `app-filter-bar` (`src/shared-ui/filter-bar/`) — pass `FilterTab[]`
   (`{ value, label, icon?, count? }`) and two-way bind the selected `value`.
 - **Breadcrumbs:** `app-breadcrumb` with `BreadcrumbItem[]`.
@@ -297,6 +325,50 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   control a `<resource>-add` `data-testid` and a `tooltip`. Do NOT hand-roll a raw `app-button` for a
   list-page add action, and do NOT use a bespoke page-title header.
 If a design appears to require a new pattern, confirm with the user before diverging.
+
+### The shared badge (`app-badge`)
+
+`src/shared-ui/badge/` — a small uppercase badge (`text` + `tone` signal inputs) used to mark an item
+in a list. It replaced two hand-rolled copies with identical geometry and **different colours**, which
+is exactly the drift a shared component prevents: `app-select`'s option badge was slate, the report
+panel's custom badge purple. Both are now purple, so **"Custom" looks the same everywhere** — the
+report builder's dropdowns and picked rows, and the receipts table's Configure Columns dialog.
+
+`CUSTOM_FIELD_BADGE` ("Custom") is exported from the component file, so the string has one home.
+
+Three things about it are load-bearing:
+
+- **The class is `.rw-badge`, NOT `.badge`.** Bootstrap is a global stylesheet here
+  (`angular.json` builds `bootstrap-scss/bootstrap.scss`) and defines an unscoped `.badge` with its
+  own `line-height`, `text-align`, `white-space` and a **white** `color`. A component rule only
+  overrides what it *declares*, so everything else leaks — measured as a ~44% height change — and
+  Bootstrap's badge is genuinely used elsewhere (`dashboard/pie-chart`), so it can't just be dropped.
+  `rw-` matches the existing `.rw-chip` / `.rw-card` convention. **Any new shared component must check
+  for a Bootstrap collision on its class names.**
+- **Tones are opaque, and that is the point.** Both originals used a translucent fill, and both
+  carried a comment that at 9.5px/700 the text is "small text" under WCAG and needs 4.5:1 against its
+  *composited* background. A translucent fill makes contrast depend on whatever the badge is dropped
+  onto, which a shared component cannot know — so each tone is the pre-composited opaque colour.
+  `purple` 6.43:1, `slate` 6.22:1, `blue` 5.90:1, `green` 5.88:1. **`blue`/`green` are darker than the
+  report panel's original kind badges**, which never got the contrast pass the custom badge did (they
+  measured 2.61:1 and 3.03:1); the row's `.kind-*` **icon chip** keeps its lighter translucent fill,
+  so chip and badge in the same row are deliberately not the same shade.
+- **`flex: none` lives on `:host`, not the inner span** — the host is the flex item, so on the span it
+  silently does nothing. The badge carries **no margin**: the two flex call sites space it with `gap`,
+  and only `app-select` (where it follows inline text) adds `margin-left`, in its own stylesheet.
+
+Wiring: registered in `SharedUiModule`'s `imports` + `exports` (the `LoginQrComponent` pattern), which
+covers `ReceiptsModule` and `ReportsModule`. **`SelectModule` imports the component directly** —
+`SharedUiModule` imports `SelectModule`, so reaching it the other way would be a circular import.
+
+Two call-site rules the e2e suites depend on:
+- **Keep the badge inside the `mat-option`'s text content.** `e2e/report-custom-fields.spec.ts`
+  matches option accessible names with `^${name} Custom$`, and `e2e/helpers/reports.ts`
+  (`addGroupingLevel`) documents the same coupling.
+- **Keep it OUT of a `mat-checkbox`'s label.** In the Configure Columns dialog it is a sibling of the
+  checkbox, so the checkbox's accessible name stays the bare field name — otherwise every locator that
+  picks a column by its field name stops resolving. (`.column-checkbox { flex: 1 }` then pushes the
+  badge to the right of the row, which is why it reads as a tidy right-hand column there.)
 
 ### Roles & Permissions (Manage Roles)
 
@@ -613,6 +685,80 @@ holder renames a field through the dialog and it persists with the type untouche
 non-editable and saved options expose no delete while an appended one does, the non-holder sees no
 control and its direct `PUT /api/customField/:id` 403s, and a type change 400s even for the holder).
 `e2e/legacy-user-visibility.spec.ts` pins that Legacy User sees neither edit nor delete.
+
+### Custom fields as receipts-table columns
+
+The **Configure Columns** dialog (`src/receipts/column-configuration-dialog/`) lists every custom
+field after the nine built-in columns, and each one can be turned into a sortable table column.
+
+- **`custom_<id>` is the column's `matColumnDef` *and* the `orderBy` sent to the API** — the same key
+  the reporting engine uses (`receiptsource.CustomFieldKey`). `src/utils/receipt-table-columns.ts`
+  owns that convention (`customFieldColumnDef` / `parseCustomFieldColumnDef`) plus
+  `RECEIPT_COLUMN_DISPLAY_NAMES`, which the dialog label and the table header now **share** instead of
+  each hard-coding its own literal.
+- **Hidden by default.** A newly created custom field is appended to the list unchecked, so it never
+  silently widens everyone's table.
+- **`mergeCustomFieldColumns` reconciles the persisted configuration with the live catalog**, and both
+  the dialog and the table run it. The configuration lives in **localStorage** (`receiptTable` is in
+  `ngxsStorageKeys`) and is shared by every account on the browser, so it outlives the catalog it was
+  written against: a column for a deleted custom field is dropped, a new field is appended hidden, and
+  the persisted order — including a custom field dragged above a built-in — is otherwise preserved.
+  `resetToDefaults()` restores the built-in defaults but keeps the custom fields listed, since they
+  would only reappear on the next open anyway.
+- **`reconcileColumnConfig()` runs in `ngOnInit`, before the first fetch**, and also resets a
+  persisted `orderBy` that no longer resolves. That ordering is load-bearing: the sort is persisted
+  too, so without it the *first* request asks the API to order by a column that no longer exists.
+  (The backend falls back rather than erroring, but the table would then disagree with its own
+  headers.)
+- **`displayColumns` is derived from the columns that actually resolved**, not from the stored
+  configuration. `mat-table` throws on a displayed id it has no definition for, and with custom fields
+  a stale id is ordinary rather than hypothetical.
+- **The permission gate is the resolver.** `customFieldResolverFn` is wired onto the
+  `receipts/group/:groupId` route and already returns `[]` without `app.custom-fields.read`, so such a
+  user simply has no custom field columns. No new permission code.
+- **An empty catalog means "may not look", NOT "none exist" — and the difference is destructive.**
+  Because the configuration is persisted per browser and **not namespaced per account**, treating the
+  permission stub as an authoritative empty catalog deletes every `custom_*` entry the configuration
+  holds: an administrator's saved layout is gone the moment a colleague without the permission opens
+  the page on the same machine. So `mergeCustomFieldColumns` takes a **required** third argument,
+  `catalogAvailable`, and keeps the persisted custom columns untouched when it is false (built-ins are
+  still healed and order re-derived, neither of which needs a catalog). Both persistence paths pass it
+  — `reconcileColumnConfig` **and** the dialog, via `customFieldsAvailable` on its data, since saving
+  writes the list straight back and would otherwise undo what reconciliation preserved. The flag comes
+  from `canReadCustomFieldCatalog(store)`, exported from the resolver so the resolver's own `of([])`
+  branch and its consumers read **one** predicate and cannot drift.
+  - Nothing renders badly as a result: `setColumns` builds `allColumns` from the catalog and then
+    drops any configured column with no definition, so a preserved-but-unnameable column is simply
+    absent from the table rather than showing a raw `custom_5` header. The sort is preserved for the
+    same reason — it is reset off the reconciled columns, so keeping the column without the sort would
+    still discard half the state.
+- **The shared `app-table` hands the whole column to a cell template**
+  (`{ element, index, column }`), which is what lets one `#customFieldCell` template serve every
+  custom field: `receipts-table` carries the `CustomField` on the column object and the template reads
+  it back.
+- **`app-custom-field-cell`** (`src/receipts/custom-field-cell/`) is the read-only counterpart of
+  `app-custom-field` — the same `ngSwitch` on `CustomFieldType`, without a FormGroup (the table renders
+  plain API records). **CURRENCY goes through `customCurrency`**, exactly as the built-in Amount column
+  does; SELECT renders the option's text, BOOLEAN renders Yes/No.
+  - Where a receipt carries several values for one field, the **lowest id that is actually set** wins —
+    the same rule the API sorts by and the reporting engine reads by, so the cell can never disagree
+    with the sort order or a report.
+  - **Do not name a `@let` after the signal it reads.** `@let value = value()` shadows the component
+    member inside its own initializer and fails with "undefined is not a function".
+- **Each custom field row carries the shared `app-badge`** reading "Custom"
+  (`data-testid="column-config-custom"`), so a field named "Vendor" is not mistaken for a built-in
+  column. `ColumnConfigItem.isCustom` comes from the existing `parseCustomFieldColumnDef` helper, and
+  is stripped in `saveConfiguration()` — the saved object is persisted to localStorage and read back
+  as the column config, so a derived key must not ride along. See "The shared badge" above for why it
+  sits outside the checkbox label.
+- The receipts list response now always carries custom field values **with their definitions**; see
+  `api/CLAUDE.md` → "Custom fields on the receipts list" for why the definitions are not optional.
+- **E2E:** `e2e/custom-field-columns.spec.ts` (serial, admin storageState, own seeded group) — the
+  fields listed after Resolved Date and unchecked, a CURRENCY cell formatted by the configured currency
+  display, numeric sorting on it (amounts chosen so a text sort is visibly wrong), a SELECT sorting by
+  option text rather than option id, and the column healing away when its field is deleted. Money is
+  asserted with a **separator-tolerant** regex because the currency configuration is a global System
+  Setting on the shared CI backend that this spec must not mutate.
 
 ### Seeding the receipt group
 
@@ -1289,6 +1435,39 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   spec rather than an extension of `group-viewer-visibility.spec.ts`, whose serial block has a known
   pre-existing failure — a Legacy User can't load `/groups` — that would skip any test appended to it.)
 
+## Filter dialogs (the shared pieces)
+
+Two tables have a `{ operation, value }` filter dialog — receipts and system tasks — and they are
+**one implementation with two field lists**, not two dialogs. Anything new of this shape reuses these
+four pieces rather than copying a row template:
+
+- **`app-filter-field`** (`src/shared-ui/filter-field/`, declared *and exported* by `SharedUiModule`)
+  renders one row: the value editor for the field's `type` beside its Operation `app-select`,
+  switching shape with the selected operation (a two-slot range for `BETWEEN`, a **disabled** implied
+  range for `WITHIN_CURRENT_MONTH`, a single editor otherwise). It is deliberately presentational and
+  form-agnostic — it reaches into the caller's `parentForm` by `basePath + fieldName`, exactly as the
+  receipt filter's local `#filterField` template did before it was extracted.
+- **`src/utils/filter-form.ts`** holds the form machinery: `buildFieldFormGroup` (a `FormArray` value
+  for list/users fields, because the multi-select autocompletes `push()` onto the control),
+  `listenForBetweenOperation` (swaps the value control between a scalar and a two-slot range as the
+  operation flips) and `setupAutoOperationSelection` (picks the first operation for a field's type as
+  soon as it gains a value, and clears it when the value empties). Every entry point takes a
+  `thisContext` for `untilDestroyed`, so **the calling component must carry `@UntilDestroy()`**.
+  `buildReceiptFilterForm` and `buildSystemTaskFilterForm` are thin field lists over these.
+- **`src/utils/filter-chips.ts`** builds the chip labels (`"<Field> <operation> <value>"`,
+  `WITHIN_CURRENT_MONTH` stopping at the operation, `BETWEEN` joined with `" – "`). It is pure: the
+  caller injects `formatDate` / `formatCurrency` / `resolveOptionName`. `receipt-filter-chips.ts` and
+  `system-task-filter-chips.ts` are wrappers supplying only their own id resolution. There is
+  deliberately **no suppression hook**: every active condition gets a chip, because one without a
+  chip is one the user can neither see nor clear (see "Every active condition is chipped" below).
+- **`FilterField<TKey>` / `FilterFieldType`** (`src/constants/filter-fields.constant.ts`) is the one
+  field-metadata type; `ReceiptFilterField` and `SystemTaskFilterField` are aliases of it.
+  `isFilterEntryActive` (`src/utils/receipt-filter-entry.ts`) is likewise shared verbatim, which is
+  what keeps every Filter badge and its chip row in agreement.
+
+**A chip row needs `MatChipsModule` in the consuming module** — `SharedUiModule` imports it but does
+not export it. `MatIconModule` too, for the `cancel` icon inside `matChipRemove`.
+
 ## Receipts table filtering
 
 The receipts table (`src/receipts/receipts-table/`) offers three ways into **one** filter —
@@ -1300,14 +1479,13 @@ so they can never disagree.
   (`src/constants/receipt-filter-fields.constant.ts`) defines each field's key, label and operation
   type, and `OperationsPipe` reads the extracted `FILTER_OPERATION_DISPLAY_VALUES`, so the operation
   wording is genuinely single-sourced. **The field labels are not.** The dialog reads only
-  `{ key, type }` from the constant (`setupAutoOperationSelection()`) and **authors its own label in
-  its template** — each row is an `ngTemplateOutlet` with a literal
-  `{ label: 'Receipt Date', fieldName: 'date', type: 'date' }` context. So the constant's `label`
-  reaches the chips and the quick-date picker only, and **renaming a field means editing both
-  `receipt-filter-fields.constant.ts` and `receipt-filter.component.html`** or the dialog row will
-  disagree with the chip it produces. (Collapsing those ten outlets into a loop is not the one-liner
-  it looks like: four rows carry an extra `options:` context key and the Group row sits in its own
-  conditional wrapper.)
+  `{ key, type }` from the constant (the shared `setupAutoOperationSelection()`) and **authors its own
+  label per row** — each row is an `<app-filter-field label="Receipt Date" fieldName="date"
+  type="date">`. So the constant's `label` reaches the chips and the quick-date picker only, and
+  **renaming a field means editing both `receipt-filter-fields.constant.ts` and
+  `receipt-filter.component.html`** or the dialog row will disagree with the chip it produces.
+  (Driving those ten rows from the constant with an `@for` is not the one-liner it looks like: four
+  carry an extra `[options]` binding and the Group row sits in its own conditional.)
 - **A field's label matches its table column.** `date` is **"Receipt Date"**, not "Date" — the
   column header is `Receipt Date` and the table also shows `Resolved Date` and `Added At`, so a bare
   "Date" left the user guessing which of the three a filter or chip meant.
@@ -1324,6 +1502,8 @@ so they can never disagree.
   in-place edit would have corrupted the default for the rest of the session.
   `ReceiptsTableComponent.applyFilterField()` is the only caller — it dispatches the action, then
   `SetPage(1)`, then refetches, so narrowing a filter from page 7 can never land on an empty page.
+- **`sort()` no longer refreshes the receipt summary** — it calls `getFilteredReceiptsPage()`. See
+  "Receipt summary" below; sorting changes the order of the result set, not its membership.
 - **Refreshes go through one `switchMap`** (`listenForRefreshRequests()`, wired in the constructor;
   `getFilteredReceipts()` just pushes onto its `Subject`). Each refresh used to be its own
   subscription, so the last *response* won rather than the last *request* — and the quick date
@@ -1397,6 +1577,89 @@ why this feature needed no API change. Picking a month **overwrites** whatever t
 - **Arrow steps from "All time"/"Custom" seed the current month** and then apply the delta, so `‹`
   and `›` never do the same thing.
 
+### Receipt summary (the totals under the table)
+
+A block of totals below `.table-container`, covering the **whole current filter result set** rather
+than the visible page — so it cannot be computed client-side from `PagedData.data`. Configuration is
+per-group (Group Receipt Settings) and applies to everyone; see `api/CLAUDE.md` → "Receipt Summary"
+for the wire contract.
+
+- **`app-receipt-totals` (`src/receipts/receipt-totals/`), deliberately not named `*summary*`.**
+  `app-summary-card` already renders on this very page as "Selected Receipt summary" — the
+  who-owes-whom settlement card — and two components called summary on one screen is a trap.
+  Standalone, imported directly in `ReceiptsModule` (the `MonthStepperComponent` precedent), and
+  purely presentational: it fetches nothing and knows nothing about the filter.
+- **A SECOND `Subject` + `switchMap`, not a `forkJoin` with the table.** A `forkJoin` would make the
+  table repaint wait on the slower unpaged aggregate on the app's hottest screen; two independent
+  `switchMap`s each preserve last-request-wins within themselves, and the transient disagreement
+  (table on month N, totals on N-1 for a few hundred ms) is bounded and self-correcting. It mirrors
+  `listenForRefreshRequests` exactly, inner `catchError(() => EMPTY)` included — an error through
+  `switchMap` would complete the outer subscription and silently kill every later refresh.
+- **`getFilteredReceipts()` refreshes both; `getFilteredReceiptsPage()` refreshes only the table.**
+  Paging and sorting change neither the filter nor the figures, so refetching an unpaged aggregate
+  for them would be the most expensive no-op in the app. The split is arranged so the **safe**
+  behaviour is the default: `getFilteredReceipts` keeps its name and all five existing callers, and
+  only `sort()` and `updatePageData()` were moved to the page-only variant. A new call site that
+  forgets the distinction over-refreshes rather than going stale.
+- **Two mutation paths must push `summaryRequested` explicitly**, because they patch the datasource
+  in place instead of refetching: `deleteReceipt` (the count changes) and the bulk status update
+  (**the status buckets move** — the one that looks like it needs nothing and needs it most).
+  `duplicateReceipt` navigates away, so it needs nothing.
+- **The "no configured group" guard lives inside the `switchMap`**, before the HTTP call — but it
+  only fires on the **All** group when no member group has a summary enabled. A **real** group whose
+  summary is off still issues the request and renders nothing off the 200's `enabled: false`. That is
+  deliberate: gating on the client's cached `groupReceiptSettings` would render a stale block when an
+  admin has just changed the configuration. The cheapness that survives is the server's — the off
+  state costs one settings read and no receipt query at all (`api/CLAUDE.md` → "Receipt Summary").
+- **The All-group chip row.** `Group.groupReceiptSettings` is required on the generated `Group` and
+  AppData hydrates every group's projections, so the client already knows which groups have a summary
+  configured — no extra fetch. The chips pick whose *configuration* applies while the *data* still
+  spans every group. Changing one dispatches `SetSummaryConfigGroupId` and pushes
+  `summaryRequested` only — **not** `getFilteredReceipts()`, since the table is unchanged.
+- **The fallback cannot live in a state selector.** Unlike `quickDateField`, resolving it needs the
+  user's groups and which have the summary enabled, which the `receiptTable` slice does not know.
+  `resolveSummaryConfigGroup` / `summaryConfigGroups` (`src/utils/receipt-summary.ts`) own it, and
+  handle all three stale cases on one branch: the persisted group turned its summary off, the user
+  left it, or the state was hydrated from localStorage before the key existed (`undefined`). The
+  selector returns the raw persisted value with no default, on purpose.
+- **Settings form: five `app-checkbox`es, not a multi-select.** `app-select` has no `multiple` input
+  and `app-status-select` wraps it as single-select; adding multi-select to a control used app-wide
+  is a real regression surface for five fixed options, and the Quick Scan section directly above
+  already reads as a checkbox grid. The controls are a nested `FormGroup` bound through
+  `form | formGet: 'receiptSummaryStatuses.' + option.value` (`FormGetPipe` delegates to
+  `form.get`, which takes dot paths). Each carries a `data-testid` because the labels collide with
+  Quick Scan's.
+- **Only the currency-field picker is permission-gated.** It sits inside the existing
+  `canManageDefaultCustomFields` branch and `submit()` spreads its key conditionally, so an admin
+  without `app.custom-fields.read` omits it and cannot wipe a selection they cannot see. The toggle
+  and the statuses are ungated — gating them would lock that admin out of the feature.
+- **`mat-chip-listbox` selection comes from each option's `[selected]`, not a `[value]` on the
+  listbox.** The listbox input only takes effect through a form binding, so a `[value]` there
+  renders nothing as selected; the spec asserts the selected class for exactly that reason. The
+  clickable element is the inner `button[matchipaction]` — `mat-chip-option`'s own host is
+  `role="presentation"`, so clicking it in a test does nothing.
+- A configured status matching no receipt still renders, as a **muted zero row**, so the block keeps
+  its shape as the filter narrows and a legitimate zero does not read as a bug.
+- **E2E: `e2e/receipt-summary.spec.ts`** (serial, admin `storageState`). The Jest specs inject group
+  settings into a mocked store, so they prove nothing about the wire; this covers the settings form
+  round-tripping through a real `GET /group/{id}`, the figures off a real decimal fold, a filter
+  recomputing every row, and the All-group chip pick surviving a reload. Two locator traps it
+  documents so the next author does not rediscover them: a chip's clickable, state-carrying element
+  is the **inner `role="option"` button** (`mat-chip-option`'s host is `role="presentation"`), and
+  the filter dialog's Status row is an `app-autocomlete` whose panel stays open over the footer after
+  a pick, so it has to be dismissed or the submit click is intercepted and the test hangs to timeout.
+  Dismiss it with **Tab, never Escape**: MatAutocomplete consumes Escape only *while its panel is
+  open*, so on the runs where the panel has already closed the same keypress reaches MatDialog and
+  closes the whole dialog (`receipt-quick-date-filter.spec.ts` → "closes on Escape without changing
+  the filter" asserts that), detaching the submit button mid-click. Tab blurs the input, which closes
+  the panel when it is open and is harmless when it is not. Escape is fine on the **settings page**
+  version of the same picker — there is no dialog behind it there to swallow the keypress.
+- **The chip row must never be asserted by count or position.** It lists every group the admin
+  belongs to whose summary is enabled, and the suite runs `fullyParallel` against a shared backend,
+  so a group leaked by a crashed earlier run would break an exact-count assertion — and, sorting
+  earlier, would even win the alphabetical auto-select. Assert chips **by testid** and drive the
+  switch by clicking; the auto-select rule is pinned deterministically in the Jest specs instead.
+
 ### The overflow menu
 
 Quick Scan, Export all receipts, Configure Columns, Poll email(s) and the selection actions live in a
@@ -1427,6 +1690,69 @@ imports it but does not export it. It makes no exceptions: see "Every active con
 above. An id the caller cannot resolve (a category outside their grants,
 a group they have left) renders as the raw id rather than dropping the chip, so a filter that is
 actively removing rows is never invisible.
+
+## System tasks table filtering
+
+The System Tasks page (`src/system-settings/system-task-table/`) filters on **Type**, **Ran By**,
+**Started At** and **Ended At** through the shared pieces above: a badge-counted Filter button and a
+Reset button in the `app-table-header`, a chip row below it, and `app-system-task-filter` as the
+dialog. `SystemTaskTableState.filter` is the single slice all three read and write.
+
+- **The filter belongs to the page, not to `app-task-table`.** That shared table is rendered by three
+  hosts (this page, `system-email-form`, `receipt-processing-settings-form`), each with its own table
+  service, so the filter rides in as one optional input (`[filterProvider]`) rather than widening
+  `BaseTableService`. It is a **function**, not the filter value: the page dispatches the filter
+  change and calls `getTableData()` in the same synchronous turn, before change detection pushes a
+  new input value in, so a value input would send the previous filter and a cleared chip would stay
+  applied. The two embedded hosts leave it unbound, the key is omitted from the request, and the
+  API's zero-value filter adds no predicates.
+- **`TaskTableComponent` refreshes through one `switchMap`** (`listenForRefreshRequests()`, wired in
+  the constructor; `getTableData()` just pushes onto its `Subject`), with `catchError(() => EMPTY)`
+  on the *inner* observable so an error cannot complete the outer subscription and kill every later
+  refresh. Clearing two chips in quick succession is the same last-response-wins race the receipts
+  month stepper hit.
+- **"Ran By" is a `list` field, not `users`.** `app-user-autocomplete` cannot prepend the pinned
+  **"System"** option (`SYSTEM_RAN_BY_OPTION_ID = -1`) that matches the rows with no `ranByUserId` —
+  most of the table. Same reason the report builder's paid-by picker is a plain `app-autocomlete`.
+  Both types offer the same `CONTAINS`-only operation, so the row is identical either way. The API
+  turns the sentinel into an `IS NULL` disjunct (see `api/CLAUDE.md` → "System task filtering").
+- **The Type picker omits three types.** `SYSTEM_TASK_TYPE_OPTIONS`
+  (`src/constants/system-task-type-options.ts`) drops `RECEIPT_UPLOADED`, `CHAT_COMPLETION` and
+  `OCR_PROCESSING`: `GetPagedSystemTasks` never returns them as top-level rows (they are children,
+  shown in an expanded row), so offering them would be a picker that can only ever return zero rows.
+  Keep `CHILD_ONLY_SYSTEM_TASK_TYPES` in sync with `filteredSystemTaskTypes` in the Go repository —
+  `TestGetPagedSystemTasksExcludesChildTaskTypes` pins that side.
+- **The persisted slice predates the filter, so every read must tolerate its absence.**
+  `systemTaskTable` was already in both storage-key lists, so an existing session rehydrates with no
+  `filter` key at all. `SystemTaskTableState.filter` / `.numFiltersApplied` and the
+  `SetSystemTaskFilterField` handler all fall back to `buildDefaultSystemTaskFilter()`; without that
+  the page throws for anyone who has ever loaded it before. Covered by a spec case.
+- **`buildDefaultSystemTaskFilter()` is a factory, not a shared constant** — the value is written
+  straight into state, so handing out one object would let a later in-place edit corrupt the default
+  for the rest of the session. Same reasoning as `buildDefaultReceiptFilter`.
+- **Every filter write outside the dialog goes through `applyFilterChange()`**, which dispatches the
+  action, then `SetPage(1)`, then refetches — narrowing from page 7 can never land on an empty page.
+  The dialog's `afterClosed()` does the same.
+- **Date fields are timestamps, and the server widens them to whole days.** `EQUALS` means that
+  calendar day, `BETWEEN` runs to the end of the last day. See `api/CLAUDE.md` → "System task
+  filtering" for the query side.
+- **The date fields go on the wire as `YYYY-MM-DD`, normalized by `toSystemTaskWireFilter`**
+  (`src/utils/system-task-filter.ts`) where `TaskTableComponent` assembles the request. The
+  datepicker writes a local-midnight `Date`, which serializes as an *instant*; the server resolves
+  that instant to a day in **its** zone, so a UTC-4 browser picking Sep 22 selects Sep 21 against an
+  API in America/Los_Angeles. A calendar day carries no zone to misread.
+  - **Normalize at the request, never in the store.** NGXS persists the filter and hands it back to
+    the datepicker when the dialog reopens, and Material's `NativeDateAdapter.deserialize` matches a
+    bare `YYYY-MM-DD` against its ISO-8601 regex and parses it with `new Date()` — UTC midnight,
+    which renders as the *previous* day west of Greenwich. Storing the normalized form just moves
+    the off-by-one into the picker.
+
+**E2E:** `e2e/system-task-filter.spec.ts` (serial, admin storageState). It seeds a deterministic row
+by creating and deleting an API key (`apiRecordApiKeyDeletedSystemTask` — system tasks are only ever
+written as a side effect of real work, so there is no endpoint that creates one), then asserts what
+the Jest specs cannot: the server narrows (`totalCount` included, which is what proves the predicates
+land before the count), the "System" sentinel matches unattributed rows, a Started At of the task's
+own day matches while the previous day does not, and the filter survives a reload.
 
 ## Quick Scan Configuration
 
@@ -1571,6 +1897,171 @@ Two cross-component seams support this (each with its own focused spec):
   value whose `customFieldId` isn't in the loaded catalog pool is skipped, and adding one flips its
   manage-fields menu entry to selected via an immutable array replace (zoneless CD).
 
+## Receipt image canvas
+
+The receipt form's inline image is an interactive canvas: four corner handles to pull, drag to pan,
+wheel to zoom, double-click to fit. It replaced a viewer whose only controls were two zoom buttons
+and a free `cdkDrag` on the `<img>`.
+
+**A first attempt resized the form/image *panes* with a draggable splitter. That was reverted** — it
+moved the page layout, when the thing worth manipulating is the image. Don't reintroduce it.
+
+- **`app-image-canvas`** (`src/shared-ui/image-canvas/`, standalone, registered in `SharedUiModule`'s
+  `imports` + `exports`) is generic and presentational: it takes a resolved `src` and a `stageHeight`
+  and owns the whole interaction. The stage is a **fixed viewport** — the image is clipped by it and
+  panned around — so growing the image can never move the surrounding page.
+- **Scale and pan are one transform on one element.** The old viewer put `scale()` on a wrapper div
+  and let `cdkDrag` translate the `<img>` inside it, so drag distance desynchronised from the cursor
+  by a factor of the scale. One matrix is what makes direct manipulation tractable.
+- **Nothing in the template reads the viewport.** It is a plain field, not a signal: the image and the
+  handle frame are both positioned imperatively, so a 120Hz drag runs **no change detection at all**
+  over the receipt form's large, non-`OnPush` template. `pointermove` is likewise a native listener
+  rather than a host binding, which would schedule CD per event.
+- **Handles sit fully INSIDE the image box, not centred on its corners.** The stage clips with
+  `overflow: hidden` and clipped pixels are not hit-testable, so a centred handle loses half its
+  target the moment the image meets a stage edge — which at the fit scale is always true of two of
+  the four. Each also grabs from an invisible 24px box (`::before`, `inset: -6px`).
+- **The image floats on the stage; it is not contained by it.** It may be smaller than the stage,
+  sit in a corner, or hang over an edge. The only positional rule is that `MIN_VISIBLE_PX` (48) of it
+  stays on the stage, so nothing can be flicked out of reach. This replaced a "centre any axis
+  narrower than the stage, and never allow dead space at an edge" rule, and **that rule is what made
+  the handles fake**: centring throws away the anchor a corner drag just established, and forbidding
+  dead space slides the image rather than pinning the corner you did *not* grab. Do not reintroduce
+  either — a containment rule and a real resize handle cannot both exist.
+- **The resize floor is a minimum size, not the fit.** `clampScale` used to floor at `fitScale()`,
+  and since the image *opens* at the fit, pulling a handle inward was a guaranteed no-op — handles
+  could only ever grow the image, which is a zoom button with extra steps. The floor is now
+  `minScale()`, the scale leaving the image's shorter side at `MIN_VISIBLE_PX`, below which the four
+  12px handles would overlap. `fitScale()` is unchanged and is still what load and double-click use.
+- **The sliver outranks the anchor** on the one state where they conflict. With the opposite corner
+  already off-stage, holding it while the image shrinks would carry the whole image off the stage —
+  so the resize keeps going and lets that invisible anchor drift instead. Constraining the *scale* to
+  preserve the anchor is the tempting alternative and it is wrong: it freezes the handle exactly
+  where the image is hardest to recover, which is the dead handle this section exists to prevent.
+  Pinned by its own spec.
+- Two consequences worth knowing. **`fit()` centres the image itself** — committing `x: 0, y: 0` and
+  letting the clamp centre it no longer works. And **a stage resize re-clamps the position only**:
+  the bounds are stage-relative so a stage that shrank can strand the image, but the scale is the
+  user's, and a stage that *grows* no longer re-grows an image that was showing in full.
+- Wheel zoom is anchored at the cursor and moves a meaningful amount. The viewer this replaced
+  multiplied `deltaY` by `-0.000001`, so one notch changed the scale by 0.0001 — wheel zoom did
+  nothing at all.
+- **A handle stops `dblclick` itself.** The host binds `(dblclick)="fit()"` and the handles are its
+  descendants. `onResizeStart` already calls `preventDefault()` + `stopPropagation()`, but those act
+  on the **PointerEvent** — `dblclick` is a separate event and is not suppressed by either, so
+  quickly pulling a corner twice used to bubble up and throw away the size just dragged to. Hence
+  `(dblclick)="$event.stopPropagation()"` on the handle, pinned by its own spec.
+
+**Wiring.** `app-carousel` gained `stageHeight`, passed to `app-image-viewer`, which renders
+`app-image-canvas`. **Both** carousels get it — the inline one and the fullscreen dialog's (see "The
+fullscreen dialog runs the same canvas" below); there is no opt-out, and no second rendering path.
+The canvas rolled out behind a `directManipulation` flag while only the inline view used it; once
+fullscreen was ported, both call sites passed `true`, so the flag and the old path it selected were
+deleted rather than left as dead configuration.
+
+**What went with the old viewer.** Its `@else` branch (a `transform: scale()` wrapper around an
+`img.viewer-image` with an **unbounded `cdkDrag`**, which could fling the image out of view with no
+way back), the carousel's `scale` / `adjustScale()` / `onScroll()` — including the `deltaY *
+-0.000001` wheel bug above — and the `[scale]` / `wheel` plumbing between them. `image-viewer` no
+longer has a stylesheet; `.viewer-image` was its only rule. `DragDropModule` stays: `cdkDrag` is
+still used by the column-configuration dialog and the receipt-form dialog.
+
+**Zoom buttons are per-image.** The header Zoom In/Out delegate through the carousel to the *active
+slide's* viewer rather than mutating one `scale` shared by every slide, which is what a canvas
+implies. That lookup is `viewChildren(ImageViewerComponent)` indexed by `currentlyShownImageIndex`
+— a **slide** index into a **viewer** query, so the two only agree while every slide renders exactly
+one viewer. This is why `carousel.component.html` renders `app-image-viewer` **unconditionally** in
+both loops: the `*ngIf`s that used to gate it were redundant (the viewer already renders nothing
+without a source) and would silently compact the query, pointing the buttons at the wrong slide. Do
+not reintroduce them.
+
+**The stage is exactly as tall as the Details pane beside it**, so the two columns move together
+like a two-column grid rather than a short image box floating next to a tall form. Bootstrap's
+`.row` is already `display: flex` with the initial `align-items: stretch`, so the Images column is
+*already* the right height — the work is entirely in making its contents fill it, because every link
+between the column and the canvas is `height: auto` and three hosts (`app-carousel`, ngx-bootstrap's
+`<carousel>`, `app-image-viewer`) are `display: inline`.
+
+The height is handed down in two places, both **gated on a class**:
+- `carousel.component.scss` is global (`ViewEncapsulation.None`), which makes it the right home for
+  the ngx-bootstrap links. `.rw-carousel--fill` carries `display: block; height: 100%` down through
+  `carousel`, `.carousel.slide`, `.carousel-inner`, `.carousel-item.active`, `.item` and
+  `app-image-viewer`. Use `.carousel-item.active`, not `slide`, so the inactive slides ngx-bootstrap
+  takes out of flow stay out of it, and keep them `block` — `flex` fights Bootstrap's `float: left`.
+- `receipt-form.component.scss` covers its own template under `.rw-images-pane`: a flex column so the
+  always-present section header takes its own height and the content takes the rest. One `::ng-deep`
+  is unavoidable — `app-form-section` wraps projected content in a **classless** div of its own,
+  reachable only as `.form-section-header + div`.
+
+`stageHeight` is bound to `[style.height]`, an inline style, so the receipt form simply passes
+`stageHeight="100%"`; no rule on the canvas and no `!important`. The canvas needs no change at all —
+its `ResizeObserver` already re-clamps when the stage resizes, which is what makes a layout-derived
+height safe, and the Details pane's height genuinely does change live (category/tag chips wrap as you
+type).
+
+**Below Bootstrap's `md` the panes stack into one column.** Both sections are `col-12 col-md`, so
+the stacking itself is plain Bootstrap rather than a custom media query — without it `.col` holds a
+50/50 split all the way down, which goes lopsided around 600px as the form's minimum width wins and
+only wraps at phone sizes. Once stacked there is no Details pane beside the stage to take height
+from, so `.rw-images-pane__stage` gets an explicit **50vh** under `@media (max-width: 767.98px)`;
+the carousel chain resolves its `100%` against that. Leave that media query out and the stacked
+canvas collapses to its 2px border.
+
+**`app-upload-image` must not carry `h-100` in that column.** The class was inert while its host was
+`display: inline`, but a flex container blockifies its children — at which point
+`height: 100% !important` makes a hidden file input swallow the whole column and leaves the stage
+with nothing but its own 2px border.
+
+**The fullscreen dialog runs the same canvas.** `#expandedImageTemplate` passes
+`class="rw-carousel--fill"` and `stageHeight="100%"` exactly as the inline carousel does, plus a
+floating close button — it previously had **no way out but Esc and the backdrop**. The height chain
+needs no special handling: MatDialog renders a `TemplateRef` as a `TemplatePortal` whose nodes go
+**straight into `.mat-mdc-dialog-surface`** with no wrapper, and that
+surface is viewport-tall and padding-free (dialog padding lives on `.mat-mdc-dialog-content`, which
+this dialog does not use). Two things there are load-bearing:
+- **Do not wrap it in `app-dialog`.** That costs ~110px before the stage starts — an
+  always-rendered `<h2>` (~39px even when `headerText` is empty), a `.p-4` wrapper and
+  `mat-dialog-content`'s `padding: 20px 24px` — **and caps the body at `max-height: 65vh`**. A
+  `height: 100%` stage inside it collapses.
+- **Do not add a `maxHeight` to the dialog config.** Leaving it undefined is what puts the CDK on its
+  flush-vertical path (`shouldBeFlushVertically` requires no maxHeight), giving the pane the full
+  viewport height. Setting one silently re-centres the dialog and shortens it.
+`autoFocus: "dialog"` because the close button is the only tabbable control, so the default
+first-tabbable focus opens the viewer with a focus ring drawn over the image.
+
+**ngx-bootstrap's carousel controls must stay small over a canvas.** Bootstrap sizes prev/next as
+`top: 0; bottom: 0; width: 15%` at `z-index: 1`, as siblings of `.carousel-inner` — so on a
+full-height stage they become two full-height columns sitting *above* the canvas in hit-testing.
+Navigation still works, but pan, wheel zoom and double-click all die in those strips, and both the
+left and right corner handles live exactly there, undoing the inset that keeps them grabbable at a
+stage edge. `.rw-carousel--fill` shrinks them to 2.75rem circles centred vertically and clear of
+every corner. This bites on **any receipt with 2+ images**, inline as well as fullscreen.
+
+**Gating every rule on a class is not optional.** `#expandedImageTemplate` is declared in
+`receipt-form`, so its embedded view carries that component's encapsulation attribute even while it
+renders inside the MatDialog overlay — an ungated `app-carousel { height: 100% }` reaches into the
+dialog too. It cost a distorted `img.viewer-image` back when the dialog rendered the old viewer;
+both carousels now render the canvas, so the immediate symptom is gone, but the reach is not and
+neither is the rule.
+`receipt-form.component.spec.ts` pins that both carousels — the inline one and the dialog's — carry
+the fill class and `stageHeight="100%"`.
+
+**The collapse/expand toggle is gone**, along with the `showLargeImagePreviews` checkbox in User
+Preferences that seeded it — the canvas replaced what the toggle was for. **The preference is now
+removed end to end**: the Go model field, the `swagger.yml` property, and both generated clients.
+Only the physical `user_preferences.show_large_image_previews` column survives on already-migrated
+installs — AutoMigrate never drops columns, and the column is nullable with no default, so an orphan
+is inert. Two things made the removal safe for already-released mobile builds, and both are worth
+knowing before removing any other response field: the generated Dart field was `bool?`, so an
+**absent** key never enters the deserializer's `switch` (an explicit `null` would still fail the
+`as bool` cast — dropping the Go field guarantees the key is omitted, not nulled), and the API sets
+no `DisallowUnknownFields`, so an old client still PUTting the field is ignored rather than 400'd.
+
+`carouselComponent` is also no longer `viewChild.required`: the Zoom/Download/Fullscreen header
+buttons render whenever there are images, but the carousel itself is behind `*ngIf="… && showImages"`,
+so hiding images and clicking one of them used to throw.
+
+
 ## Reports (Report Builder)
 
 The **Report Builder** (`src/reports/`) is a two-pane screen for building and downloading receipt
@@ -1606,7 +2097,10 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   and the shared **`app-select` gained an optional `optionBadgeKey`** input that draws it beside the
   option text. Because `MatOption.viewValue` is the option's `textContent`, a badged option would read
   "HSTCustom" in the closed select — so a badged select also renders its own `<mat-select-trigger>`.
-  Both are opt-in and default off, so every other `app-select` call site is unchanged. The already-picked
+  Both are opt-in and default off, so every other `app-select` call site is unchanged. The badge itself
+  is the shared **`app-badge`** (see "The shared badge" above), as are the picked rows' custom and kind
+  badges; `app-select` also takes an `optionBadgeTone` (defaulting to the custom-field purple) so a
+  select badging something other than a custom field can say so. The already-picked
   grouping levels and column rows carry the same badge (`isCustom` on `groupByLevels()` / `columnRows()`,
   resolved through the catalog rather than by matching the key's shape, so a user without
   `app.custom-fields.read` sees no badge instead of one on a field the builder cannot name).

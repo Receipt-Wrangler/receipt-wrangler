@@ -85,6 +85,10 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ReceiptPagedRequestFilter.serializer)
       ..add(ReceiptProcessingSettings.serializer)
       ..add(ReceiptStatus.serializer)
+      ..add(ReceiptSummary.serializer)
+      ..add(ReceiptSummaryCommand.serializer)
+      ..add(ReceiptSummaryCustomFieldTotal.serializer)
+      ..add(ReceiptSummaryRow.serializer)
       ..add(ReportColumn.serializer)
       ..add(ReportColumnAggFuncEnum.serializer)
       ..add(ReportColumnKindEnum.serializer)
@@ -108,6 +112,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(SystemEmail.serializer)
       ..add(SystemSettings.serializer)
       ..add(SystemTask.serializer)
+      ..add(SystemTaskPagedRequestFilter.serializer)
       ..add(SystemTaskStatus.serializer)
       ..add(SystemTaskType.serializer)
       ..add(Tag.serializer)
@@ -256,6 +261,22 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(PieChartDataPoint)]),
           () => ListBuilder<PieChartDataPoint>())
       ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(ReceiptStatus)]),
+          () => ListBuilder<ReceiptStatus>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList,
+              const [const FullType(ReceiptSummaryCustomFieldTotal)]),
+          () => ListBuilder<ReceiptSummaryCustomFieldTotal>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(ReceiptSummaryRow)]),
+          () => ListBuilder<ReceiptSummaryRow>())
+      ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(String)]),
           () => ListBuilder<String>())
       ..addBuilderFactory(
@@ -391,6 +412,9 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(int)]),
           () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(ReceiptStatus)]),
+          () => ListBuilder<ReceiptStatus>())
       ..addBuilderFactory(
           const FullType(BuiltMap, const [
             const FullType(String),

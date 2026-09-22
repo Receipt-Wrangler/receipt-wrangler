@@ -150,3 +150,52 @@ func TestUpdateGroupReceiptSettingsCommand_Validate_InvalidInputs(t *testing.T) 
 		})
 	}
 }
+
+// validSettingsCommand satisfies the quick-scan rules so a test can isolate the summary validation.
+func validSettingsCommand() UpdateGroupReceiptSettingsCommand {
+	return UpdateGroupReceiptSettingsCommand{
+		QuickScanPaidByEnabled:  true,
+		QuickScanPaidByRequired: true,
+		QuickScanStatusEnabled:  true,
+		QuickScanStatusRequired: true,
+	}
+}
+
+func TestValidateReceiptSummaryStatuses(t *testing.T) {
+	tests := map[string]struct {
+		statuses  *[]models.ReceiptStatus
+		expectErr bool
+	}{
+		// nil means the client omitted the key; there is nothing to validate.
+		"omitted":          {statuses: nil, expectErr: false},
+		"explicitly empty": {statuses: &[]models.ReceiptStatus{}, expectErr: false},
+		"all valid": {
+			statuses:  &[]models.ReceiptStatus{models.OPEN, models.RESOLVED, models.DECLINED},
+			expectErr: false,
+		},
+		"one bogus": {
+			statuses:  &[]models.ReceiptStatus{models.OPEN, models.ReceiptStatus("NOT_A_STATUS")},
+			expectErr: true,
+		},
+		// "" is a valid scalar for the quick-scan default (ReceiptStatus.Value tolerates it) but is
+		// never a breakdown row, so the summary rejects it.
+		"empty string": {
+			statuses:  &[]models.ReceiptStatus{models.ReceiptStatus("")},
+			expectErr: true,
+		},
+	}
+
+	for testName, test := range tests {
+		t.Run(testName, func(t *testing.T) {
+			command := validSettingsCommand()
+			command.ReceiptSummaryStatuses = test.statuses
+
+			vErr := command.Validate()
+			_, hasErr := vErr.Errors["receiptSummaryStatuses"]
+
+			if hasErr != test.expectErr {
+				utils.PrintTestError(t, vErr.Errors, test.expectErr)
+			}
+		})
+	}
+}

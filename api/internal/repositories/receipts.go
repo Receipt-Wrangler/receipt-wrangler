@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/reporting/receiptsource"
 	"receipt-wrangler/api/internal/utils"
 	"time"
 
@@ -578,10 +579,19 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 
 	// Set order by
 	if len(pagedRequest.OrderBy) == 0 {
-		pagedRequest.OrderBy = "created_at"
+		pagedRequest.OrderBy = constants.DEFAULT_RECEIPT_ORDER_BY
 	}
 
-	if repository.isTrustedValue(pagedRequest) {
+	if !commands.IsValidSortDirection(pagedRequest.SortDirection) {
+		return nil, 0, errors.New("untrusted value " + pagedRequest.OrderBy + " " + string(pagedRequest.SortDirection))
+	}
+
+	if customFieldId, isCustomField := receiptsource.ParseCustomFieldKey(pagedRequest.OrderBy); isCustomField {
+		query, err = repository.orderByCustomField(query, customFieldId, pagedRequest.SortDirection)
+		if err != nil {
+			return nil, 0, err
+		}
+	} else if repository.isTrustedValue(pagedRequest) {
 		orderBy := pagedRequest.OrderBy
 		query = query.Order(orderBy + " " + string(pagedRequest.SortDirection))
 	} else {
@@ -697,7 +707,7 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 	if pagedRequest.Filter.Name.Value != nil {
 		name := pagedRequest.Filter.Name.Value.(string)
 		if len(name) > 0 {
-			query = repository.buildFilterQuery(query, name, pagedRequest.Filter.Name.Operation, "name", false)
+			query = repository.BuildFilterQuery(query, name, pagedRequest.Filter.Name.Operation, "name", false)
 		}
 	}
 
@@ -711,14 +721,14 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 			date = pagedRequest.Filter.Date.Value.(string)
 		}
 
-		query = repository.buildFilterQuery(query, date, pagedRequest.Filter.Date.Operation, "date", isBetweenOperation)
+		query = repository.BuildFilterQuery(query, date, pagedRequest.Filter.Date.Operation, "date", isBetweenOperation)
 	}
 
 	// Paid By
 	if pagedRequest.Filter.PaidBy.Value != nil {
 		paidBy := pagedRequest.Filter.PaidBy.Value.([]interface{})
 		if len(paidBy) > 0 {
-			query = repository.buildFilterQuery(query, paidBy, pagedRequest.Filter.PaidBy.Operation, "paid_by_user_id", true)
+			query = repository.BuildFilterQuery(query, paidBy, pagedRequest.Filter.PaidBy.Operation, "paid_by_user_id", true)
 		}
 	}
 
@@ -751,7 +761,7 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 		} else {
 			amount = pagedRequest.Filter.Amount.Value.(float64)
 		}
-		query = repository.buildFilterQuery(
+		query = repository.BuildFilterQuery(
 			query,
 			amount,
 			pagedRequest.Filter.Amount.Operation,
@@ -763,7 +773,7 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 	if pagedRequest.Filter.Status.Value != nil {
 		status := pagedRequest.Filter.Status.Value.([]interface{})
 		if len(status) > 0 {
-			query = repository.buildFilterQuery(query, status, pagedRequest.Filter.Status.Operation, "status", true)
+			query = repository.BuildFilterQuery(query, status, pagedRequest.Filter.Status.Operation, "status", true)
 		}
 	}
 
@@ -771,7 +781,7 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 	if pagedRequest.Filter.Group.Value != nil {
 		groups := pagedRequest.Filter.Group.Value.([]interface{})
 		if len(groups) > 0 {
-			query = repository.buildFilterQuery(query, groups, pagedRequest.Filter.Group.Operation, "group_id", true)
+			query = repository.BuildFilterQuery(query, groups, pagedRequest.Filter.Group.Operation, "group_id", true)
 		}
 	}
 
@@ -785,7 +795,7 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 			resolvedDate = pagedRequest.Filter.ResolvedDate.Value.(string)
 		}
 
-		query = repository.buildFilterQuery(
+		query = repository.BuildFilterQuery(
 			query,
 			resolvedDate,
 			pagedRequest.Filter.ResolvedDate.Operation,
@@ -804,7 +814,7 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 			addedAt = pagedRequest.Filter.CreatedAt.Value.(string)
 		}
 
-		query = repository.buildFilterQuery(
+		query = repository.BuildFilterQuery(
 			query,
 			addedAt,
 			pagedRequest.Filter.CreatedAt.Operation,
@@ -816,47 +826,129 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 	return query, nil
 }
 
-func (repository ReceiptRepository) buildFilterQuery(runningQuery *gorm.DB, value interface{}, operation commands.FilterOperation, fieldName string, isArray bool) *gorm.DB {
-	if operation == commands.EQUALS && !isArray {
-		return runningQuery.Where(fmt.Sprintf("%v = ?", fieldName), value)
+// customFieldSortExpressions returns, for a custom field's type, the expression a
+// value row is sorted by and the column that must be non-null for the row to
+// count. They differ only for CURRENCY.
+//
+// CurrencyValue is a *decimal.Decimal with no gorm type tag, and gorm types an
+// untagged driver.Valuer by what Value() returns - a string for decimal - so
+// currency_value is a text column and a bare sort on it is lexicographic
+// ("100" < "20"). CAST(x AS DECIMAL(20,6)) fixes that and is portable: MySQL and
+// Postgres take DECIMAL(p,s) directly, and SQLite gives that type name NUMERIC
+// affinity. Retyping the column would remove the cast, but that is a migration
+// over existing data and belongs in its own change (see api/CLAUDE.md).
+func customFieldSortExpressions(customFieldType models.CustomFieldType) (sortExpression string, notNullColumn string, ok bool) {
+	// Every column is table-qualified: a SELECT joins custom_field_options, which
+	// carries a custom_field_id of its own.
+	switch customFieldType {
+	case models.TEXT:
+		return "custom_field_values.string_value", "custom_field_values.string_value", true
+	case models.DATE:
+		return "custom_field_values.date_value", "custom_field_values.date_value", true
+	case models.BOOLEAN:
+		return "custom_field_values.boolean_value", "custom_field_values.boolean_value", true
+	case models.CURRENCY:
+		return "CAST(custom_field_values.currency_value AS DECIMAL(20,6))", "custom_field_values.currency_value", true
+	case models.SELECT:
+		// A select stores an option id; readers see the option's text.
+		return "custom_field_options.value", "custom_field_values.select_value", true
 	}
 
-	if operation == commands.CONTAINS && !isArray {
-		searchValue := value.(string)
-		searchValue = "%" + searchValue + "%"
-		return runningQuery.Where(fmt.Sprintf("%v LIKE ?", fieldName), searchValue)
+	return "", "", false
+}
+
+// defaultReceiptOrder is the ordering a custom-field sort falls back to when the
+// field cannot be sorted on at all.
+//
+// It carries the same receipts.id tiebreaker as the custom-field path, and for
+// the same reason: created_at is not unique - receipts imported or created in one
+// batch share a timestamp - and without a unique last term LIMIT/OFFSET paging
+// repeats and skips rows between pages. BaseRepository.Sort supplies the column
+// and direction; both clauses are column-based, so gorm appends the tiebreaker
+// rather than replacing the clause (unlike the expression form below).
+func (repository ReceiptRepository) defaultReceiptOrder(
+	query *gorm.DB,
+	sortDirection commands.SortDirection,
+) *gorm.DB {
+	return repository.Sort(query, constants.DEFAULT_RECEIPT_ORDER_BY, sortDirection).
+		Order(clause.OrderByColumn{
+			Column: clause.Column{Table: "receipts", Name: "id"},
+			Desc:   true,
+		})
+}
+
+// orderByCustomField orders query by a receipt's value for one custom field.
+//
+// The value is read with a correlated subquery rather than a join: nothing stops
+// a receipt holding several values for one field (custom_field_values carries no
+// unique index on receipt_id + custom_field_id), and a join would multiply the
+// receipt rows, corrupting both the total count and pagination.
+//
+// Which of several values wins matches the reporting engine
+// (receiptsource.addCustomFields): the lowest id among the values that actually
+// resolve, so an empty low-id row cannot hide a real one. That is what the
+// IS NOT NULL clause is for, and why a SELECT joins its options rather than
+// left-joining them - an option id that no longer resolves is skipped, not
+// preferred.
+//
+// A field that no longer exists sorts by the default column instead of erroring:
+// clients persist their sort, and a deleted custom field must not make every
+// subsequent list load fail.
+func (repository ReceiptRepository) orderByCustomField(
+	query *gorm.DB,
+	customFieldId uint,
+	sortDirection commands.SortDirection,
+) (*gorm.DB, error) {
+	customFieldRepository := NewCustomFieldRepository(nil)
+	customFields, err := customFieldRepository.GetCustomFieldsByIds([]uint{customFieldId})
+	if err != nil {
+		return nil, err
 	}
 
-	if operation == commands.CONTAINS && isArray {
-		return runningQuery.Where(fmt.Sprintf("%v IN ?", fieldName), value)
+	if len(customFields) == 0 {
+		return repository.defaultReceiptOrder(query, sortDirection), nil
 	}
 
-	if operation == commands.GREATER_THAN && !isArray {
-		return runningQuery.Where(fmt.Sprintf("%v > ?", fieldName), value)
+	sortExpression, notNullColumn, ok := customFieldSortExpressions(customFields[0].Type)
+	if !ok {
+		return repository.defaultReceiptOrder(query, sortDirection), nil
 	}
 
-	if operation == commands.LESS_THAN && !isArray {
-		return runningQuery.Where(fmt.Sprintf("%v < ?", fieldName), value)
+	valueQuery := repository.GetDB().
+		Model(&models.CustomFieldValue{}).
+		Select(sortExpression).
+		Where("custom_field_values.receipt_id = receipts.id").
+		Where("custom_field_values.custom_field_id = ?", customFieldId).
+		Where(notNullColumn + " IS NOT NULL").
+		Order("custom_field_values.id").
+		Limit(1)
+
+	if customFields[0].Type == models.SELECT {
+		valueQuery = valueQuery.Joins(
+			"JOIN custom_field_options ON custom_field_options.id = custom_field_values.select_value",
+		)
 	}
 
-	if operation == commands.BETWEEN {
-		arrayValue := value.([]interface{})
-		if len(arrayValue) != 2 {
-			return runningQuery
-		}
-
-		return runningQuery.Where(fmt.Sprintf("%v >= ? AND %v <= ?", fieldName, fieldName), arrayValue[0], arrayValue[1])
+	// The direction and the tiebreaker have to live in this one expression.
+	// clause.OrderBy builds its Expression *instead of* its Columns and Desc, and
+	// a second Order() call would silently replace this clause rather than append
+	// to it. The tiebreaker is not cosmetic: a boolean or select field has a
+	// handful of distinct values, and without a unique last term LIMIT/OFFSET
+	// paging repeats and skips rows between pages.
+	//
+	// Because Columns and Desc are unavailable here, this is the one ordering path
+	// that cannot delegate to BaseRepository.Sort. The keyword is therefore chosen
+	// from literals rather than built from sortDirection, so the caller's string
+	// never reaches the SQL even if a future call site skips IsValidSortDirection.
+	direction := "ASC"
+	if sortDirection == commands.DESCENDING {
+		direction = "DESC"
 	}
 
-	if operation == commands.WITHIN_CURRENT_MONTH {
-		now := time.Now()
-		beginningOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		endOfToday := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, now.Location())
-
-		return runningQuery.Where(fmt.Sprintf("%v >= ? AND %v <= ?", fieldName, fieldName), beginningOfMonth, endOfToday)
-	}
-
-	return runningQuery
+	return query.Order(clause.OrderBy{Expression: clause.Expr{
+		SQL:  "(?) " + direction + ", receipts.id DESC",
+		Vars: []any{valueQuery},
+	}}), nil
 }
 
 func (repository ReceiptRepository) isTrustedValue(pagedRequest commands.ReceiptPagedRequestCommand) bool {

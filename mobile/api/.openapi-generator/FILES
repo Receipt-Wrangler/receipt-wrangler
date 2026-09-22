@@ -97,6 +97,10 @@ doc/ReceiptPagedRequestFilter.md
 doc/ReceiptProcessingSettings.md
 doc/ReceiptProcessingSettingsApi.md
 doc/ReceiptStatus.md
+doc/ReceiptSummary.md
+doc/ReceiptSummaryCommand.md
+doc/ReceiptSummaryCustomFieldTotal.md
+doc/ReceiptSummaryRow.md
 doc/ReportApi.md
 doc/ReportColumn.md
 doc/ReportDetail.md
@@ -121,6 +125,7 @@ doc/SystemSettings.md
 doc/SystemSettingsApi.md
 doc/SystemTask.md
 doc/SystemTaskApi.md
+doc/SystemTaskPagedRequestFilter.md
 doc/SystemTaskStatus.md
 doc/SystemTaskType.md
 doc/Tag.md
@@ -277,6 +282,10 @@ lib/src/model/receipt_paged_request_command.dart
 lib/src/model/receipt_paged_request_filter.dart
 lib/src/model/receipt_processing_settings.dart
 lib/src/model/receipt_status.dart
+lib/src/model/receipt_summary.dart
+lib/src/model/receipt_summary_command.dart
+lib/src/model/receipt_summary_custom_field_total.dart
+lib/src/model/receipt_summary_row.dart
 lib/src/model/report_column.dart
 lib/src/model/report_detail.dart
 lib/src/model/report_document.dart
@@ -295,6 +304,7 @@ lib/src/model/subject_line_regex.dart
 lib/src/model/system_email.dart
 lib/src/model/system_settings.dart
 lib/src/model/system_task.dart
+lib/src/model/system_task_paged_request_filter.dart
 lib/src/model/system_task_status.dart
 lib/src/model/system_task_type.dart
 lib/src/model/tag.dart

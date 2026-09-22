@@ -1,17 +1,12 @@
-import { FILTER_OPERATION_DISPLAY_VALUES } from "../constants/filter-operations-options.constant";
 import {
   RECEIPT_FILTER_FIELDS,
-  ReceiptFilterField,
   ReceiptFilterFieldKey,
 } from "../constants/receipt-filter-fields.constant";
 import { RECEIPT_STATUS_OPTIONS } from "../constants/receipt-status-options";
-import { Category, FilterOperation, Group, ReceiptPagedRequestFilter, Tag, User } from "../open-api";
-import { isFilterEntryActive, ReceiptFilterEntry } from "./receipt-filter-entry";
+import { Category, Group, ReceiptPagedRequestFilter, Tag, User } from "../open-api";
+import { buildFilterChips, FilterChip } from "./filter-chips";
 
-export interface ReceiptFilterChip {
-  key: ReceiptFilterFieldKey;
-  label: string;
-}
+export type ReceiptFilterChip = FilterChip<ReceiptFilterFieldKey>;
 
 /**
  * Everything needed to turn stored ids into names. Passed in rather than looked
@@ -27,11 +22,10 @@ export interface ReceiptFilterChipLookups {
   formatCurrency: (value: unknown) => string;
 }
 
-const BETWEEN_SEPARATOR = " – ";
-
 /**
- * One chip per filter field that actually narrows the result set, labelled
- * `"<Field> <operation> <value>"`.
+ * One chip per receipt filter field that actually narrows the result set. See
+ * `buildFilterChips` for the shared label rules; this wrapper only supplies the
+ * receipt-specific id resolution.
  *
  * Exceptionless on purpose: the quick date control's own condition is chipped
  * too. It used to be suppressed while the month stepper named that month, but
@@ -43,58 +37,15 @@ export function buildReceiptFilterChips(
   filter: ReceiptPagedRequestFilter | undefined | null,
   lookups: ReceiptFilterChipLookups,
 ): ReceiptFilterChip[] {
-  if (!filter) {
-    return [];
-  }
-
-  return RECEIPT_FILTER_FIELDS.filter((field) =>
-    isFilterEntryActive((filter as Record<string, unknown>)[field.key]),
-  ).map((field) => ({
-    key: field.key,
-    label: buildLabel(field, (filter as Record<string, unknown>)[field.key] as ReceiptFilterEntry, lookups),
-  }));
-}
-
-function buildLabel(
-  field: ReceiptFilterField,
-  entry: ReceiptFilterEntry,
-  lookups: ReceiptFilterChipLookups,
-): string {
-  const operation = entry?.operation?.toString() ?? "";
-  const operationLabel = (FILTER_OPERATION_DISPLAY_VALUES[operation] ?? "").toLowerCase();
-
-  // WITHIN_CURRENT_MONTH carries no value, so the label stops at the operation.
-  const valueLabel =
-    operation === FilterOperation.WithinCurrentMonth
-      ? ""
-      : buildValueLabel(field, entry, operation, lookups);
-
-  return [field.label, operationLabel, valueLabel].filter((part) => !!part).join(" ");
-}
-
-function buildValueLabel(
-  field: ReceiptFilterField,
-  entry: ReceiptFilterEntry,
-  operation: string,
-  lookups: ReceiptFilterChipLookups,
-): string {
-  const value = entry?.value;
-
-  if (field.type === "date" || field.type === "number") {
-    const format = field.type === "date" ? lookups.formatDate : lookups.formatCurrency;
-
-    if (operation === FilterOperation.Between && Array.isArray(value)) {
-      return [format(value[0]), format(value[1])].join(BETWEEN_SEPARATOR);
-    }
-
-    return format(value);
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((id) => resolveOptionName(field.key, id, lookups)).join(", ");
-  }
-
-  return value?.toString() ?? "";
+  return buildFilterChips(
+    RECEIPT_FILTER_FIELDS,
+    filter as Record<string, unknown> | undefined | null,
+    {
+      formatDate: lookups.formatDate,
+      formatCurrency: lookups.formatCurrency,
+      resolveOptionName: (key, id) => resolveOptionName(key as ReceiptFilterFieldKey, id, lookups),
+    },
+  );
 }
 
 /**

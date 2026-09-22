@@ -92,6 +92,10 @@ import 'package:openapi/src/model/receipt_paged_request_command.dart';
 import 'package:openapi/src/model/receipt_paged_request_filter.dart';
 import 'package:openapi/src/model/receipt_processing_settings.dart';
 import 'package:openapi/src/model/receipt_status.dart';
+import 'package:openapi/src/model/receipt_summary.dart';
+import 'package:openapi/src/model/receipt_summary_command.dart';
+import 'package:openapi/src/model/receipt_summary_custom_field_total.dart';
+import 'package:openapi/src/model/receipt_summary_row.dart';
 import 'package:openapi/src/model/report_column.dart';
 import 'package:openapi/src/model/report_detail.dart';
 import 'package:openapi/src/model/report_document.dart';
@@ -110,6 +114,7 @@ import 'package:openapi/src/model/subject_line_regex.dart';
 import 'package:openapi/src/model/system_email.dart';
 import 'package:openapi/src/model/system_settings.dart';
 import 'package:openapi/src/model/system_task.dart';
+import 'package:openapi/src/model/system_task_paged_request_filter.dart';
 import 'package:openapi/src/model/system_task_status.dart';
 import 'package:openapi/src/model/system_task_type.dart';
 import 'package:openapi/src/model/tag.dart';
@@ -228,6 +233,10 @@ part 'serializers.g.dart';
   ReceiptPagedRequestFilter,
   ReceiptProcessingSettings,
   ReceiptStatus,
+  ReceiptSummary,
+  ReceiptSummaryCommand,
+  ReceiptSummaryCustomFieldTotal,
+  ReceiptSummaryRow,
   ReportColumn,
   ReportDetail,
   ReportDocument,
@@ -246,6 +255,7 @@ part 'serializers.g.dart';
   SystemEmail,
   SystemSettings,
   SystemTask,
+  SystemTaskPagedRequestFilter,
   SystemTaskStatus,
   SystemTaskType,
   Tag,

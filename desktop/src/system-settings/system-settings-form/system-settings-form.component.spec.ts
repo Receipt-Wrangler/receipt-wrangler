@@ -76,6 +76,32 @@ describe("SystemSettingsFormComponent", () => {
     expect(component).toBeTruthy();
   });
 
+  describe("layout contracts", () => {
+    // Both classes below are load-bearing and silently droppable: nothing fails
+    // to compile without them, the page just goes back to overlapping itself.
+    it("marks both duration rows so the flex-basis rule can reach them", () => {
+      const rows: NodeListOf<HTMLElement> =
+        fixture.nativeElement.querySelectorAll(".duration-row");
+
+      // Session and MCP Server. `.duration-row > *` in the component's SCSS is
+      // what bases each column at 0; without the class they fall back to
+      // flex-basis: auto and the hinted column swallows the row.
+      expect(rows.length).toEqual(2);
+      rows.forEach((row) => expect(row.classList).toContain("d-flex"));
+    });
+
+    it("pairs every host margin with d-block", () => {
+      const hosts: NodeListOf<HTMLElement> =
+        fixture.nativeElement.querySelectorAll("app-checkbox.mb-3, app-input.mb-3");
+
+      // app-checkbox and app-input have no :host { display: block }, so a bare
+      // mb-3 on the host is an inline element's vertical margin — it does
+      // nothing at all until d-block comes with it.
+      expect(hosts.length).toBeGreaterThan(0);
+      hosts.forEach((host) => expect(host.classList).toContain("d-block"));
+    });
+  });
+
   it("init form with no data", () => {
     component.ngOnInit();
 

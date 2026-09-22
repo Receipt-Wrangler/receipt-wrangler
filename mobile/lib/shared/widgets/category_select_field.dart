@@ -49,27 +49,34 @@ class _CategorySelectField extends State<CategorySelectField> {
         categoryModel.categoriesForGroup(widget.groupId),
         widget.initialCategories,
         (category) => category.name).then((value) {
+      // A dismissed sheet returns null, which means "no change" -- an empty
+      // list is the legitimate "everything removed" value.
       if (value != null) {
         var categories =
             List<api.Category>.from(value.map((item) => item as api.Category));
 
-        if (widget.onCategoriesChanged != null) {
-          widget.onCategoriesChanged!(categories);
-        }
+        handleCategoriesChanged(categories);
       }
     });
   }
 
+  void handleCategoriesChanged(List<api.Category> categories) {
+    if (widget.onCategoriesChanged != null) {
+      widget.onCategoriesChanged!(categories);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isView = widget.formState == WranglerFormState.view;
+
     return MultiSelectField<api.Category>(
         name: widget.fieldName,
         label: widget.label,
         initialValue: widget.initialCategories,
         itemDisplayName: (category) => category.name ?? "",
         itemName: "Categories",
-        onTap: widget.formState == WranglerFormState.view
-            ? null
-            : showCategoryMultiSelect);
+        onTap: isView ? null : showCategoryMultiSelect,
+        onRemove: isView ? null : handleCategoriesChanged);
   }
 }

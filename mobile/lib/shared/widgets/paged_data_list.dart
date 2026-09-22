@@ -54,6 +54,13 @@ class _PagedDataListState extends State<PagedDataList> {
 
     // Provide refresh callback to parent widget
     widget.onRefreshCallbackSet?.call(() {
+      // A refresh re-derives the total from the first page, so the old one must
+      // not outlive it. getNextPageKey stops paging once the loaded items reach
+      // _totalCount -- and after a refresh clears the items, a stale total of 0
+      // still satisfies `0 >= 0`, so NO page is ever requested again and the
+      // list stays permanently empty. Sorting cannot reach a zero total, which
+      // is why this only surfaced once the list could be filtered.
+      _totalCount = null;
       _pagingController.refresh();
     });
   }

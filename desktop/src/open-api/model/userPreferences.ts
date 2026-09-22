@@ -39,10 +39,6 @@ export interface UserPreferences {
      * Default quick scan status
      */
     quickScanDefaultStatus?: ReceiptStatus;
-    /**
-     * Whether to show large image previews
-     */
-    showLargeImagePreviews?: boolean;
     userShortcuts?: Array<UserShortcut>;
 }
 export namespace UserPreferences {

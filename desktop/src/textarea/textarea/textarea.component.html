@@ -1,4 +1,8 @@
-<mat-form-field class="w-100">
+<!-- See app-input: a wrapping hint overflows Material's fixed subscript. -->
+<mat-form-field
+  class="w-100"
+  [subscriptSizing]="hint ? 'dynamic' : 'fixed'"
+>
   <mat-label>{{ label }}</mat-label>
   <textarea
     #nativeTextarea

@@ -123,6 +123,11 @@ func TestDeleteGroupRemovesDefaultCustomFields(t *testing.T) {
 		t.Fatalf("seed custom field: %v", err)
 	}
 
+	summaryField := models.CustomField{Name: "Deleted Group Summary Field", Type: models.CURRENCY}
+	if err := db.Create(&summaryField).Error; err != nil {
+		t.Fatalf("seed summary custom field: %v", err)
+	}
+
 	command := commands.UpdateGroupReceiptSettingsCommand{
 		QuickScanPaidByEnabled:     true,
 		QuickScanPaidByRequired:    true,
@@ -131,6 +136,9 @@ func TestDeleteGroupRemovesDefaultCustomFields(t *testing.T) {
 		QuickScanDefaultPaidByType: models.QUICK_SCAN_PAID_BY_UPLOADER,
 		QuickScanDefaultStatus:     models.OPEN,
 		DefaultCustomFieldIds:      &[]uint{customField.ID},
+		// Configure the summary too, or the cascade assertions below pass vacuously.
+		ReceiptSummaryCustomFieldIds: &[]uint{summaryField.ID},
+		ReceiptSummaryStatuses:       &[]models.ReceiptStatus{models.OPEN},
 	}
 	if _, err := settingsRepository.UpdateGroupReceiptSettings(utils.UintToString(group.ID), command); err != nil {
 		t.Fatalf("UpdateGroupReceiptSettings: %v", err)
@@ -149,12 +157,35 @@ func TestDeleteGroupRemovesDefaultCustomFields(t *testing.T) {
 	if remaining != 0 {
 		t.Errorf("deleting the group left %d default custom field rows behind", remaining)
 	}
+
+	// The receipt summary's two join tables are cascaded the same way and for the same reason: the
+	// settings delete uses Select(clause.Associations), which cannot reach a `gorm:"-"` join.
+	err = db.Model(&models.GroupReceiptSettingsSummaryCustomField{}).
+		Where("group_id = ?", group.ID).Count(&remaining).Error
+	if err != nil {
+		t.Fatalf("count summary custom fields: %v", err)
+	}
+	if remaining != 0 {
+		t.Errorf("deleting the group left %d summary custom field rows behind", remaining)
+	}
+
+	err = db.Model(&models.GroupReceiptSettingsSummaryStatus{}).
+		Where("group_id = ?", group.ID).Count(&remaining).Error
+	if err != nil {
+		t.Fatalf("count summary statuses: %v", err)
+	}
+	if remaining != 0 {
+		t.Errorf("deleting the group left %d summary status rows behind", remaining)
+	}
 }
 
-// TestGetAppDataHydratesGroupDefaultCustomFields covers the AppData serialization boundary: the ids
-// are `gorm:"-"`, so nothing preloads them, and an empty set must arrive as [] rather than null (the
-// generated Dart deserializer has no null guard and a null fails the WHOLE payload).
-func TestGetAppDataHydratesGroupDefaultCustomFields(t *testing.T) {
+// TestGetAppDataHydratesGroupReceiptSettingsProjections covers the AppData serialization boundary for
+// ALL THREE of GroupReceiptSettings' transient slices - the default custom field ids and the two
+// receipt summary sets. They are `gorm:"-"`, so nothing preloads them, and an empty set must arrive
+// as [] rather than null (the generated Dart deserializer has no null guard and a null fails the
+// WHOLE payload). This is also what proves LoadSettingsProjections hydrates every projection rather
+// than just the one a caller happened to think about.
+func TestGetAppDataHydratesGroupReceiptSettingsProjections(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	db := repositories.GetDB()
 
@@ -170,6 +201,11 @@ func TestGetAppDataHydratesGroupDefaultCustomFields(t *testing.T) {
 	customField := models.CustomField{Name: "Cost Centre", Type: models.TEXT}
 	if err := db.Create(&customField).Error; err != nil {
 		t.Fatalf("seed custom field: %v", err)
+	}
+
+	summaryField := models.CustomField{Name: "Cost Centre Tax", Type: models.CURRENCY}
+	if err := db.Create(&summaryField).Error; err != nil {
+		t.Fatalf("seed summary custom field: %v", err)
 	}
 
 	// CreateUser seeds a personal group and an "All" group; configure the first non-all one.
@@ -196,6 +232,9 @@ func TestGetAppDataHydratesGroupDefaultCustomFields(t *testing.T) {
 		QuickScanDefaultPaidByType: models.QUICK_SCAN_PAID_BY_UPLOADER,
 		QuickScanDefaultStatus:     models.OPEN,
 		DefaultCustomFieldIds:      &[]uint{customField.ID},
+		// Configure the summary too, or the cascade assertions below pass vacuously.
+		ReceiptSummaryCustomFieldIds: &[]uint{summaryField.ID},
+		ReceiptSummaryStatuses:       &[]models.ReceiptStatus{models.OPEN},
 	}
 	settingsRepository := repositories.NewGroupReceiptSettingsRepository(nil)
 	if _, err := settingsRepository.UpdateGroupReceiptSettings(utils.UintToString(targetGroupId), command); err != nil {
@@ -209,17 +248,30 @@ func TestGetAppDataHydratesGroupDefaultCustomFields(t *testing.T) {
 
 	sawConfiguredGroup := false
 	for _, group := range appData.Groups {
-		ids := group.GroupReceiptSettings.DefaultCustomFieldIds
-		if ids == nil {
-			utils.PrintTestError(t, group.Name+": nil", "[] rather than nil")
+		settings := group.GroupReceiptSettings
+
+		// Every group, configured or not, must carry [] rather than nil on all three.
+		if settings.DefaultCustomFieldIds == nil ||
+			settings.ReceiptSummaryCustomFieldIds == nil ||
+			settings.ReceiptSummaryStatuses == nil {
+			utils.PrintTestError(t, group.Name+": a nil projection", "[] rather than nil")
 			continue
 		}
+
 		if group.ID != targetGroupId {
 			continue
 		}
 		sawConfiguredGroup = true
-		if len(ids) != 1 || ids[0] != customField.ID {
-			utils.PrintTestError(t, ids, []uint{customField.ID})
+
+		if len(settings.DefaultCustomFieldIds) != 1 || settings.DefaultCustomFieldIds[0] != customField.ID {
+			utils.PrintTestError(t, settings.DefaultCustomFieldIds, []uint{customField.ID})
+		}
+		if len(settings.ReceiptSummaryCustomFieldIds) != 1 ||
+			settings.ReceiptSummaryCustomFieldIds[0] != summaryField.ID {
+			utils.PrintTestError(t, settings.ReceiptSummaryCustomFieldIds, []uint{summaryField.ID})
+		}
+		if len(settings.ReceiptSummaryStatuses) != 1 || settings.ReceiptSummaryStatuses[0] != models.OPEN {
+			utils.PrintTestError(t, settings.ReceiptSummaryStatuses, []models.ReceiptStatus{models.OPEN})
 		}
 	}
 	if !sawConfiguredGroup {

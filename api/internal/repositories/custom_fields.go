@@ -196,9 +196,15 @@ func (repository CustomFieldRepository) DeleteCustomField(id uint) error {
 			return err
 		}
 
-		// Drop the field from EVERY group's default set. Explicit rather than relying on
-		// the FK cascade, matching the other cascades in this transaction.
+		// Drop the field from EVERY group's default set and from every group's receipt
+		// summary columns. Explicit rather than relying on the FK cascade, matching the
+		// other cascades in this transaction.
 		err = tx.Delete(&models.GroupReceiptSettingsCustomField{}, "custom_field_id = ?", id).Error
+		if err != nil {
+			return err
+		}
+
+		err = tx.Delete(&models.GroupReceiptSettingsSummaryCustomField{}, "custom_field_id = ?", id).Error
 		if err != nil {
 			return err
 		}

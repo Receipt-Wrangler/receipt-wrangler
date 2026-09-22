@@ -1,7 +1,7 @@
 import { Component, EmbeddedViewRef, HostListener, Injector, OnInit, Signal, TemplateRef, runInInjectionContext, signal, viewChild } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
-import { MatDialog } from "@angular/material/dialog";
+import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { MatExpansionPanel } from "@angular/material/expansion";
 import { MatSnackBarRef } from "@angular/material/snack-bar";
 import { ActivatedRoute, Router } from "@angular/router";
@@ -13,6 +13,7 @@ import { CarouselComponent } from "src/carousel/carousel/carousel.component";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS } from "src/constants";
 import { RECEIPT_STATUS_OPTIONS } from "src/constants/receipt-status-options";
 import { FormMode } from "src/enums/form-mode.enum";
+import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { LayoutState } from "src/store/layout.state";
 import { HideProgressBar, ShowProgressBar } from "src/store/layout.state.actions";
 import { UserAutocompleteComponent } from "src/user-autocomplete/user-autocomplete/user-autocomplete.component";
@@ -73,7 +74,7 @@ export class ReceiptFormComponent implements OnInit {
 
   public readonly expandedImageTemplate = viewChild.required<TemplateRef<any>>("expandedImageTemplate");
 
-  public readonly carouselComponent = viewChild.required(CarouselComponent);
+  public readonly carouselComponent = viewChild(CarouselComponent);
 
   public groups = this.store.selectSignal(GroupState.groupsWithoutAll);
 
@@ -161,7 +162,12 @@ export class ReceiptFormComponent implements OnInit {
 
   public receiptStatusOptions = RECEIPT_STATUS_OPTIONS;
 
-  public showLargeImagePreview: boolean = false;
+  private expandedImageDialog?: MatDialogRef<unknown>;
+
+  /** 0 when the carousel is not rendered, i.e. while images are hidden. */
+  public get currentImageIndex(): number {
+    return this.carouselComponent()?.currentlyShownImageIndex ?? 0;
+  }
 
   public queueIds: string[] = [];
 
@@ -246,7 +252,6 @@ export class ReceiptFormComponent implements OnInit {
         this.setReceiptPermissions();
         this.getImageFiles();
         this.setHeaderText();
-        this.setShowLargeImagePreview();
         this.setQueueData();
         document.scrollingElement?.scrollTo(0, 0);
       });
@@ -342,10 +347,6 @@ export class ReceiptFormComponent implements OnInit {
         this.updateAmountFromItems();
       }
     });
-  }
-
-  private setShowLargeImagePreview(): void {
-    this.showLargeImagePreview = this.store.selectSnapshot(AuthState.userPreferences)?.showLargeImagePreviews ?? false;
   }
 
   private setHeaderText(): void {
@@ -627,7 +628,7 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public removeImage(): void {
-    const index = this.carouselComponent().currentlyShownImageIndex;
+    const index = this.currentImageIndex;
 
     if (this.mode === FormMode.add) {
       const newImages = Array.from(this.filesToUpload());
@@ -650,7 +651,7 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public magicFill(): void {
-    const index = this.carouselComponent().currentlyShownImageIndex;
+    const index = this.currentImageIndex;
 
     let file: Blob | undefined;
     let receiptImageId;
@@ -1028,16 +1029,31 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public duplicateReceipt(): void {
-    this.receiptService
-      .duplicateReceipt(this.originalReceipt?.id as number)
+    const dialogRef = this.matDialog.open(ConfirmationDialogComponent);
+
+    dialogRef.componentInstance.headerText = "Duplicate Receipt";
+    dialogRef.componentInstance.dialogContent = `Are you sure you would like to duplicate the receipt ${this.originalReceipt?.name}?`;
+
+    dialogRef
+      .afterClosed()
       .pipe(
         take(1),
-        tap((r: Receipt) => {
-          this.duplicatedReceiptId.set(r.id.toString());
-          this.duplicatedSnackbarRef = this.snackbarService.successFromTemplate(
-            this.successDuplicateSnackbar(),
-            { duration: 8000 }
-          );
+        tap((confirmed) => {
+          if (confirmed) {
+            this.receiptService
+              .duplicateReceipt(this.originalReceipt?.id as number)
+              .pipe(
+                take(1),
+                tap((r: Receipt) => {
+                  this.duplicatedReceiptId.set(r.id.toString());
+                  this.duplicatedSnackbarRef = this.snackbarService.successFromTemplate(
+                    this.successDuplicateSnackbar(),
+                    { duration: 8000 }
+                  );
+                })
+              )
+              .subscribe();
+          }
         })
       )
       .subscribe();
@@ -1078,27 +1094,34 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   public zoomImageIn(): void {
-    this.carouselComponent().zoomIn();
+    this.carouselComponent()?.zoomIn();
   }
 
   public zoomImageOut(): void {
-    this.carouselComponent().zoomOut();
-  }
-
-  public toggleImagePreviewSize(): void {
-    this.showLargeImagePreview = !this.showLargeImagePreview;
+    this.carouselComponent()?.zoomOut();
   }
 
   public expandImage(): void {
-    this.matDialog.open(this.expandedImageTemplate(), {
+    // No maxHeight on purpose: leaving it undefined is what puts the CDK on its
+    // flush-vertical path, giving the pane the full viewport height the canvas
+    // stage then fills. Setting one silently re-centres the dialog.
+    this.expandedImageDialog = this.matDialog.open(this.expandedImageTemplate(), {
       width: "75%",
       height: "100%",
+      // The close button is the only tabbable control, so the default
+      // "first-tabbable" focus opens the viewer with a focus ring drawn around
+      // it, which reads as a selected button over the image.
+      autoFocus: "dialog",
     });
+  }
+
+  public closeExpandedImage(): void {
+    this.expandedImageDialog?.close();
   }
 
   // TODO: Add functionality to dashboard
   public downloadImage(): void {
-    const currentImage = this.images()[this.carouselComponent().currentlyShownImageIndex];
+    const currentImage = this.images()[this.currentImageIndex];
     this.receiptImageService.downloadReceiptImageById(currentImage.id)
       .pipe(
         take(1),
