@@ -1727,12 +1727,14 @@ Recording the **full app** (rather than a harness) against a live API adds three
 
 #### Route 2 — widget-test frame capture
 
-`tool/demo_capture/` holds the machinery and two demos — an animated GIF pair for the
-keyboard-inset fix, and a single before/after still for the floating-button clearance fix:
+`tool/demo_capture/` holds the machinery and three demos — an animated GIF pair for the
+keyboard-inset fix, a single before/after still for the floating-button clearance fix, and the
+receipt-summary placement pair:
 
 ```bash
-cd mobile && ./tool/record_keyboard_demo.sh      # -> tool/*-keyboard.gif
-cd mobile && ./tool/record_clearance_shot.sh     # -> tool/receipt-form-clearance.png
+cd mobile && ./tool/record_keyboard_demo.sh          # -> tool/*-keyboard.gif
+cd mobile && ./tool/record_clearance_shot.sh         # -> tool/receipt-form-clearance.png
+cd mobile && ./tool/record_summary_position_demo.sh  # -> tool/receipt-summary-position.gif
 ```
 
 Route 1 **cannot** record that fix at all: there is no software keyboard on Linux desktop, so
@@ -1754,6 +1756,30 @@ frames are captured inside a widget test and encoded to GIF in pure Dart.
   its red ribbon across the top-right of every captured panel otherwise, and at panel scale it reads
   as a render-overflow stripe rather than a banner — which sends you hunting a layout bug that is not
   there.
+- **The summary demo needed NO production seam at all**, and that is a property of the feature
+  rather than luck: the position arrives as *data on the summary response*, so the two panels are
+  the identical real tree fed two responses differing in one field. Better than a debug flag —
+  nothing to leave switched on, no source patched and restored under a `trap` (verify `git diff
+  lib/` is empty after a run; it should never have been non-empty), and if placement regresses the
+  two panels simply become identical. It mocks only `OpenApiClient.client`; the theme, the
+  `ScreenWrapper` with the receipts route's zeroed body padding, the providers and
+  `GroupReceiptsList` are all the shipping tree.
+- **Two things in `capture.dart` are parameterised for it, and both bite silently.**
+  `writeSideBySideGif` hard-coded `demoInsetRamp()` for its per-frame durations, so any demo with a
+  different frame count either `RangeError`s or gets keyboard timings applied to something that is
+  not a keyboard — pass `durationsCentis`. And `numColors` was fixed at 128, which is right for flat
+  UI art and wrong for a screen with a **gradient**: at 128 the octree banding across
+  `ListItemTrailingStatus`'s status chips renders as hard black stripes that read as a rendering
+  bug. Raise the palette (192 here) rather than switching the dither on, which breaks LZW's runs
+  everywhere else and costs far more bytes.
+- **Drive a scroll with an explicit gesture and fixed pumps, never `drag` + `pumpAndSettle`.**
+  Ballistic physics give a frame count that is not reproducible run to run, and `pumpAndSettle` is
+  independently unsafe here: `PagedDataList`'s first-load spinner animates, and `TopAppBar`'s
+  progress bar is permanently mounted with a **ten-minute** settle timeout — that regression hangs
+  CI rather than failing it.
+- **Seed `UserModel` for any demo showing the receipts list.** `ReceiptListItem` resolves each row's
+  payer with a `firstWhere` that has no `orElse`, so an unseeded model throws "Bad state: No
+  element" once per row and the frames come out full of error widgets.
 - **It lives in `tool/`, not `test/`, and that is what keeps it out of CI.** `flutter test` with no
   arguments scans **only** `test/`, while an explicit path is used verbatim. CI runs a bare
   `flutter test`, so a demo under `test/` would re-encode and rewrite committed binaries on every
