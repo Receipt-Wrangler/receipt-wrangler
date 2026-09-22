@@ -59,6 +59,10 @@ export interface PagedDataDataInner {
      * Receipt date
      */
     date: string;
+    /**
+     * Text of the receipt\'s earliest comment the caller may see. Only populated by the paged receipt list (POST /receipt/group/{groupId}); absent when there is no such comment.
+     */
+    firstComment?: string;
     groupId: number;
     id: number;
     /**

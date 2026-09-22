@@ -126,7 +126,7 @@ describe("ReceiptsTableComponent", () => {
       for (const cell of [
         "createdAtCell", "dateCell", "nameCell", "paidByCell", "amountCell",
         "categoryCell", "tagCell", "statusCell", "resolvedDateCell",
-        "customFieldCell", "actionsCell",
+        "firstCommentCell", "customFieldCell", "actionsCell",
       ]) {
         Object.defineProperty(component, cell, { value: () => ({}) });
       }
@@ -152,6 +152,34 @@ describe("ReceiptsTableComponent", () => {
         .find((col) => col.matColumnDef === "custom_7");
       expect(column?.columnHeader).toEqual("Vendor");
       expect(column?.sortable).toEqual(true);
+    });
+
+    it("offers a sortable Comment column, hidden until it is switched on", () => {
+      component.customFields.set([]);
+      store.dispatch(new SetColumnConfig(DEFAULT_RECEIPT_TABLE_COLUMNS));
+
+      (component as any).setColumns();
+
+      expect(component.displayedColumns()).not.toContain("first_comment");
+
+      store.dispatch(
+        new SetColumnConfig(
+          DEFAULT_RECEIPT_TABLE_COLUMNS.map((column) =>
+            column.matColumnDef === "first_comment" ? { ...column, visible: true } : column
+          )
+        )
+      );
+
+      (component as any).setColumns();
+
+      // Its matColumnDef is also the orderBy the API sorts on, so both must be
+      // exactly first_comment.
+      const column = component
+        .columns()
+        .find((col) => col.matColumnDef === "first_comment");
+      expect(column?.columnHeader).toEqual("Comment");
+      expect(column?.sortable).toEqual(true);
+      expect(component.displayedColumns()).toContain("first_comment");
     });
 
     // mat-table throws on a displayed id it has no definition for, and a config

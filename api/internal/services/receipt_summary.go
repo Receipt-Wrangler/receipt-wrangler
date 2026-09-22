@@ -246,6 +246,7 @@ func (service ReceiptSummaryService) fetchReceipts(
 		pagedRequest,
 		associations,
 		permissionService.PaidByListResolver(userId),
+		nil,
 	)
 	if err != nil {
 		return nil, err

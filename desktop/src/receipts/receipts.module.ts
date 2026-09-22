@@ -9,6 +9,7 @@ import { MatExpansionModule } from "@angular/material/expansion";
 import { MatIconModule } from "@angular/material/icon";
 import { MatChipsModule } from "@angular/material/chips";
 import { MatMenuModule } from "@angular/material/menu";
+import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
 import { MatTableModule } from "@angular/material/table";
 import { CarouselModule } from "ngx-bootstrap/carousel";
@@ -90,6 +91,7 @@ import { UserTotalWithPercentagePipe } from "./user-total-with-percentage.pipe";
     MatMenuModule,
     MatProgressSpinnerModule,
     MatTableModule,
+    MatTooltipModule,
     PipesModule,
     RadioGroupModule,
     ReactiveFormsModule,

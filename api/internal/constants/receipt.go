@@ -4,6 +4,10 @@ package constants
 // request names no sortable column of its own.
 const DEFAULT_RECEIPT_ORDER_BY = "created_at"
 
+// FIRST_COMMENT_ORDER_BY sorts a receipt list by each receipt's first comment. It
+// is also the desktop receipts table's column key, so the two must agree.
+const FIRST_COMMENT_ORDER_BY = "first_comment"
+
 // CUSTOM_FIELD_ASSOCIATIONS loads a receipt's custom field values together with
 // the definition (and options) each value is read against.
 //

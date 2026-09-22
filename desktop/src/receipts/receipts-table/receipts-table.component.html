@@ -296,6 +296,16 @@
   {{ element.resolvedDate | date : "medium" }}
 </ng-template>
 
+<ng-template #firstCommentCell let-element="element">
+  <span
+    class="receipt-first-comment"
+    data-testid="receipt-first-comment"
+    [matTooltip]="element.firstComment"
+  >
+    {{ element.firstComment }}
+  </span>
+</ng-template>
+
 <ng-template #customFieldCell let-element="element" let-column="column">
   <app-custom-field-cell
     [receipt]="element"

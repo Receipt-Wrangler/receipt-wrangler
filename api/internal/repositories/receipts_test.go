@@ -332,7 +332,7 @@ func TestShouldGetPagedReceiptsByGroupId(t *testing.T) {
 		},
 	}
 
-	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil, nil)
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil, nil, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -369,7 +369,7 @@ func TestGetPagedReceiptsAppliesPaidByVisibilitySingleGroup(t *testing.T) {
 	restrictedToUser1 := func(groupId uint) ([]uint, bool, error) {
 		return []uint{1}, false, nil
 	}
-	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, restrictedToUser1)
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, restrictedToUser1, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -385,7 +385,7 @@ func TestGetPagedReceiptsAppliesPaidByVisibilitySingleGroup(t *testing.T) {
 	unrestricted := func(groupId uint) ([]uint, bool, error) {
 		return nil, true, nil
 	}
-	_, count, err = repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, unrestricted)
+	_, count, err = repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, unrestricted, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -398,7 +398,7 @@ func TestGetPagedReceiptsAppliesPaidByVisibilitySingleGroup(t *testing.T) {
 	seeNothing := func(groupId uint) ([]uint, bool, error) {
 		return []uint{}, false, nil
 	}
-	receipts, count, err = repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, seeNothing)
+	receipts, count, err = repository.GetPagedReceiptsByGroupId(1, "1", pagedRequestAllReceipts(), nil, seeNothing, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -453,7 +453,7 @@ func TestGetPagedReceiptsAppliesPaidByVisibilityAllGroup(t *testing.T) {
 	}
 
 	repository := NewReceiptRepository(nil)
-	receipts, count, err := repository.GetPagedReceiptsByGroupId(member.ID, utils.UintToString(allGroup.ID), pagedRequestAllReceipts(), nil, resolver)
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(member.ID, utils.UintToString(allGroup.ID), pagedRequestAllReceipts(), nil, resolver, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
@@ -651,7 +651,7 @@ func TestGetPagedReceiptsAppliesGroupFilter(t *testing.T) {
 
 	// All-groups view filtered to group1: only group1's receipts return.
 	receipts, count, err := repository.GetPagedReceiptsByGroupId(
-		member.ID, utils.UintToString(allGroup.ID), groupFilterRequest(group1.ID), nil, nil,
+		member.ID, utils.UintToString(allGroup.ID), groupFilterRequest(group1.ID), nil, nil, nil,
 	)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
@@ -675,7 +675,7 @@ func TestGetPagedReceiptsAppliesGroupFilter(t *testing.T) {
 	// mandatory member-group scope excludes it, so nothing leaks even though the
 	// group has a receipt.
 	_, count, err = repository.GetPagedReceiptsByGroupId(
-		member.ID, utils.UintToString(allGroup.ID), groupFilterRequest(otherGroup.ID), nil, nil,
+		member.ID, utils.UintToString(allGroup.ID), groupFilterRequest(otherGroup.ID), nil, nil, nil,
 	)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
@@ -689,7 +689,7 @@ func TestGetPagedReceiptsAppliesGroupFilter(t *testing.T) {
 	// the group filter intersect to nothing, so a user cannot surface another
 	// group's receipts through the filter.
 	_, count, err = repository.GetPagedReceiptsByGroupId(
-		member.ID, utils.UintToString(group1.ID), groupFilterRequest(group2.ID), nil, nil,
+		member.ID, utils.UintToString(group1.ID), groupFilterRequest(group2.ID), nil, nil, nil,
 	)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)

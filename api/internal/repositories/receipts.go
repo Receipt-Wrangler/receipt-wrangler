@@ -528,12 +528,20 @@ func (repository ReceiptRepository) GetReceiptById(receiptId string) (models.Rec
 // callers).
 type PaidByAllowedResolver func(groupId uint) (allowedUserIds []uint, unrestricted bool, err error)
 
+// CommentAuthorVisibilityResolver returns the comment authors a user may see in a
+// group under member isolation, or unrestricted == true (see every author). It is
+// what keeps a sort by first comment from ordering receipts by a comment the
+// caller is never shown. Pass nil to GetPagedReceiptsByGroupId to skip it
+// (internal/system callers), exactly like a nil PaidByAllowedResolver.
+type CommentAuthorVisibilityResolver func(groupId uint) (visibleUserIds []uint, unrestricted bool, err error)
+
 func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 	userId uint,
 	groupId string,
 	pagedRequest commands.ReceiptPagedRequestCommand,
 	associations []string,
 	paidByResolver PaidByAllowedResolver,
+	commentAuthorResolver CommentAuthorVisibilityResolver,
 ) ([]models.Receipt, int64, error) {
 	var receipts []models.Receipt
 	var count int64
@@ -588,6 +596,15 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 
 	if customFieldId, isCustomField := receiptsource.ParseCustomFieldKey(pagedRequest.OrderBy); isCustomField {
 		query, err = repository.orderByCustomField(query, customFieldId, pagedRequest.SortDirection)
+		if err != nil {
+			return nil, 0, err
+		}
+	} else if pagedRequest.OrderBy == constants.FIRST_COMMENT_ORDER_BY {
+		groupIds := []uint{uintGroupId}
+		if isAllGroup {
+			groupIds = memberGroupIds
+		}
+		query, err = repository.orderByFirstComment(query, groupIds, commentAuthorResolver, pagedRequest.SortDirection)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -929,17 +946,107 @@ func (repository ReceiptRepository) orderByCustomField(
 		)
 	}
 
-	// The direction and the tiebreaker have to live in this one expression.
-	// clause.OrderBy builds its Expression *instead of* its Columns and Desc, and
-	// a second Order() call would silently replace this clause rather than append
-	// to it. The tiebreaker is not cosmetic: a boolean or select field has a
-	// handful of distinct values, and without a unique last term LIMIT/OFFSET
-	// paging repeats and skips rows between pages.
-	//
-	// Because Columns and Desc are unavailable here, this is the one ordering path
-	// that cannot delegate to BaseRepository.Sort. The keyword is therefore chosen
-	// from literals rather than built from sortDirection, so the caller's string
-	// never reaches the SQL even if a future call site skips IsValidSortDirection.
+	return repository.orderBySubquery(query, valueQuery, sortDirection), nil
+}
+
+// orderByFirstComment orders query by the text of each receipt's first comment
+// (firstCommentOrder), read with a correlated subquery for the same reason
+// orderByCustomField uses one: a receipt has many comments, and a join would
+// multiply its rows and corrupt the count and pagination.
+//
+// Only a comment the caller may see is a candidate. Member isolation drops a
+// comment by an author the caller cannot see from every response, so sorting on
+// it would order the table by text that is never shown - and would leak it, one
+// comparison at a time. groupIds is the set of groups the query spans (one, or
+// the caller's member groups for the All group), so each receipt is judged by its
+// own group's visibility.
+func (repository ReceiptRepository) orderByFirstComment(
+	query *gorm.DB,
+	groupIds []uint,
+	resolver CommentAuthorVisibilityResolver,
+	sortDirection commands.SortDirection,
+) (*gorm.DB, error) {
+	commentQuery := repository.GetDB().
+		Model(&models.Comment{}).
+		Select("comments.comment").
+		Where("comments.receipt_id = receipts.id").
+		Order(firstCommentOrder).
+		Limit(1)
+
+	visibility, err := repository.commentAuthorVisibility(groupIds, resolver)
+	if err != nil {
+		return nil, err
+	}
+	if visibility != nil {
+		commentQuery = commentQuery.Where(visibility)
+	}
+
+	return repository.orderBySubquery(query, commentQuery, sortDirection), nil
+}
+
+// commentAuthorVisibility builds the predicate restricting a first-comment
+// subquery to authors the caller may see, as a per-group disjunction on the outer
+// receipt's group mirroring SystemTaskRepository.applyActivityVisibilityDisjunction:
+// an unrestricted group contributes `receipts.group_id = G`, a restricted one
+// `receipts.group_id = G AND (comments.user_id IS NULL OR comments.user_id IN (visible))`.
+// A comment with no author names no one, so it stays visible - as it does in
+// PermissionService's filterComments. Returns nil, adding no predicate at all, when
+// there is no resolver or no group restricts the caller, which is every
+// non-isolated install.
+func (repository ReceiptRepository) commentAuthorVisibility(
+	groupIds []uint,
+	resolver CommentAuthorVisibilityResolver,
+) (*gorm.DB, error) {
+	if resolver == nil {
+		return nil, nil
+	}
+
+	disjunction := repository.GetDB().Session(&gorm.Session{NewDB: true})
+	restricted := false
+	for _, groupId := range groupIds {
+		visibleIds, unrestricted, err := resolver(groupId)
+		if err != nil {
+			return nil, err
+		}
+		if unrestricted {
+			disjunction = disjunction.Or("receipts.group_id = ?", groupId)
+			continue
+		}
+
+		restricted = true
+		groupCondition := repository.GetDB().Session(&gorm.Session{NewDB: true}).
+			Where("receipts.group_id = ?", groupId).
+			// User ids start at 1, so paidByInValues' IN (0) guard applies unchanged.
+			Where("(comments.user_id IS NULL OR comments.user_id IN ?)", paidByInValues(visibleIds))
+		disjunction = disjunction.Or(groupCondition)
+	}
+
+	if !restricted {
+		return nil, nil
+	}
+	return disjunction, nil
+}
+
+// orderBySubquery orders query by the value valueQuery - a correlated subquery
+// against the outer receipts row - yields for each receipt.
+//
+// The direction and the tiebreaker have to live in this one expression.
+// clause.OrderBy builds its Expression *instead of* its Columns and Desc, and
+// a second Order() call would silently replace this clause rather than append
+// to it. The tiebreaker is not cosmetic: a boolean or select field has a
+// handful of distinct values, many receipts have no comment at all, and
+// without a unique last term LIMIT/OFFSET paging repeats and skips rows between
+// pages.
+//
+// Because Columns and Desc are unavailable here, this is the one ordering path
+// that cannot delegate to BaseRepository.Sort. The keyword is therefore chosen
+// from literals rather than built from sortDirection, so the caller's string
+// never reaches the SQL even if a future call site skips IsValidSortDirection.
+func (repository ReceiptRepository) orderBySubquery(
+	query *gorm.DB,
+	valueQuery *gorm.DB,
+	sortDirection commands.SortDirection,
+) *gorm.DB {
 	direction := "ASC"
 	if sortDirection == commands.DESCENDING {
 		direction = "DESC"
@@ -948,7 +1055,7 @@ func (repository ReceiptRepository) orderByCustomField(
 	return query.Order(clause.OrderBy{Expression: clause.Expr{
 		SQL:  "(?) " + direction + ", receipts.id DESC",
 		Vars: []any{valueQuery},
-	}}), nil
+	}})
 }
 
 func (repository ReceiptRepository) isTrustedValue(pagedRequest commands.ReceiptPagedRequestCommand) bool {

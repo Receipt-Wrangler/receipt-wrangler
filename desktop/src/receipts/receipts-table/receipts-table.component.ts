@@ -44,6 +44,7 @@ import {
   applyFormCommand,
   customFieldColumnDef,
   mergeCustomFieldColumns,
+  RECEIPT_COLUMN_DISPLAY_NAMES,
 } from "../../utils/index";
 import { FilterMonth, monthFilterEntry, monthFromFilterEntry } from "../../utils/receipt-date-filter";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
@@ -112,6 +113,8 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   readonly statusCell = viewChild.required<TemplateRef<any>>("statusCell");
 
   readonly resolvedDateCell = viewChild.required<TemplateRef<any>>("resolvedDateCell");
+
+  readonly firstCommentCell = viewChild.required<TemplateRef<any>>("firstCommentCell");
 
   readonly customFieldCell = viewChild.required<TemplateRef<any>>("customFieldCell");
 
@@ -507,6 +510,14 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         columnHeader: "Resolved Date",
         matColumnDef: "resolved_date",
         template: this.resolvedDateCell(),
+        sortable: true,
+      },
+      {
+        // The receipt's first comment, which the API both returns
+        // (firstComment) and sorts on under this same key.
+        columnHeader: RECEIPT_COLUMN_DISPLAY_NAMES["first_comment"],
+        matColumnDef: "first_comment",
+        template: this.firstCommentCell(),
         sortable: true,
       },
     ] as ReceiptTableColumn[];
