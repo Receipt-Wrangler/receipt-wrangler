@@ -16,7 +16,7 @@ import { SetColumnConfig, SetReceiptFilterData } from "src/store/receipt-table.a
 import { ReceiptTableState } from "src/store/receipt-table.state";
 import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { MonthStepperComponent } from "../../shared-ui/month-stepper/month-stepper.component";
-import { ApiModule, CustomField, CustomFieldType, FilterOperation, Group, Permission, Receipt, ReceiptService, ReceiptStatus, ReceiptSummary } from "../../open-api";
+import { ApiModule, CustomField, CustomFieldType, FilterOperation, Group, Permission, Receipt, ReceiptService, ReceiptStatus, ReceiptSummary, ReceiptSummaryPosition } from "../../open-api";
 import { ReceiptFilterService } from "../../services/receipt-filter.service";
 import { AuthState, GroupState, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
@@ -575,6 +575,7 @@ describe("ReceiptsTableComponent receipt summary", () => {
   const summaryResponse: ReceiptSummary = {
     enabled: true,
     configurationGroupId: 1,
+    position: ReceiptSummaryPosition.Bottom,
     overall: {
       status: "" as ReceiptStatus,
       receiptCount: 2,
@@ -726,6 +727,48 @@ describe("ReceiptsTableComponent receipt summary", () => {
       component.summaryConfigGroupSelected(2);
 
       expect(summaryCalls).toEqual([{ groupId: "99", configurationGroupId: 2 }]);
+    });
+  });
+
+  /**
+   * Placement is derived from the RESPONSE, never from the cached GroupState settings: the cache
+   * is stale the moment an admin changes the configuration, which is the same reason `enabled`
+   * rides on the response.
+   *
+   * This asserts the derivation only. The template's two anchors are proved as DOCUMENT ORDER in
+   * e2e/receipt-summary.spec.ts, because this spec never renders the template — every test here
+   * drives the component class, and app-table resolves to a custom element under
+   * CUSTOM_ELEMENTS_SCHEMA, so the viewChild.required in ngAfterViewInit cannot resolve.
+   */
+  describe("placement", () => {
+    it("reads the position off the summary response", () => {
+      component.summary.set({ ...summaryResponse, position: ReceiptSummaryPosition.Top });
+
+      expect(component.summaryPosition()).toBe(ReceiptSummaryPosition.Top);
+      expect(component.summaryAtTop()).toBe(true);
+    });
+
+    it("stays at the bottom for a BOTTOM response", () => {
+      component.summary.set({ ...summaryResponse, position: ReceiptSummaryPosition.Bottom });
+
+      expect(component.summaryAtTop()).toBe(false);
+    });
+
+    // Before the first response there is nothing to render anyway, but the default must be the
+    // historical placement so a group that never configured it is unchanged.
+    it("defaults to the bottom with no summary yet", () => {
+      component.summary.set(undefined);
+
+      expect(component.summaryPosition()).toBe(ReceiptSummaryPosition.Bottom);
+      expect(component.summaryAtTop()).toBe(false);
+    });
+
+    // The empty enum member only exists so an already-released client tolerates a value added
+    // later; the server normalizes it away, and a client that meets one must not vanish the block.
+    it("treats the empty position as the bottom", () => {
+      component.summary.set({ ...summaryResponse, position: "" as ReceiptSummaryPosition });
+
+      expect(component.summaryAtTop()).toBe(false);
     });
   });
 

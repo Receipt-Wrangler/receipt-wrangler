@@ -8,6 +8,13 @@
   margin-top: variables.$spacing-md;
 }
 
+// Rendered above the table, the gap belongs on the other edge -- otherwise the block hugs
+// the header it follows and floats away from the table it describes.
+.receipt-totals--top {
+  margin-top: 0;
+  margin-bottom: variables.$spacing-md;
+}
+
 .receipt-totals__config {
   display: flex;
   align-items: center;

@@ -479,3 +479,88 @@ func TestReceiptSummary_ConfigurationGroupRejectedBeforeAccessCheck(t *testing.T
 		}
 	}
 }
+
+// The position rides on the response rather than being read from the client's cached group
+// settings, exactly as Enabled does, so a client renders where the server currently says
+// rather than where it last remembered.
+func TestReceiptSummary_CarriesConfiguredPosition(t *testing.T) {
+	defer tearDownReceiptSummaryTest()
+	setupReceiptSummaryTest()
+
+	configureSummary(t, 1, true, []models.ReceiptStatus{models.OPEN}, nil)
+	setSummaryPosition(t, 1, models.RECEIPT_SUMMARY_POSITION_TOP)
+	seedSummaryReceipt(t, 1, models.OPEN, "10.00", nil)
+
+	summary, err := NewReceiptSummaryService(nil).GetReceiptSummary(1, "1", emptySummaryCommand(t))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if summary.Position != models.RECEIPT_SUMMARY_POSITION_TOP {
+		utils.PrintTestError(t, summary.Position, models.RECEIPT_SUMMARY_POSITION_TOP)
+	}
+}
+
+// A group whose settings row has never been written reads as a ZERO GroupReceiptSettings, whose
+// position is "". An empty enum on the wire throws in a closed Dart EnumClass and fails the WHOLE
+// payload, so the off state must still name a real position.
+func TestReceiptSummary_MissingSettingsRowNormalizesPosition(t *testing.T) {
+	defer tearDownReceiptSummaryTest()
+	setupReceiptSummaryTest()
+
+	seedSummaryReceipt(t, 1, models.OPEN, "10.00", nil)
+
+	summary, err := NewReceiptSummaryService(nil).GetReceiptSummary(1, "1", emptySummaryCommand(t))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if summary.Enabled {
+		utils.PrintTestError(t, summary.Enabled, false)
+	}
+	if summary.Position != models.RECEIPT_SUMMARY_POSITION_BOTTOM {
+		utils.PrintTestError(t, summary.Position, models.RECEIPT_SUMMARY_POSITION_BOTTOM)
+	}
+}
+
+// A configured group that never touched the setting keeps rendering where it always did.
+func TestReceiptSummary_DefaultsToBottom(t *testing.T) {
+	defer tearDownReceiptSummaryTest()
+	setupReceiptSummaryTest()
+
+	configureSummary(t, 1, true, []models.ReceiptStatus{models.OPEN}, nil)
+	seedSummaryReceipt(t, 1, models.OPEN, "10.00", nil)
+
+	summary, err := NewReceiptSummaryService(nil).GetReceiptSummary(1, "1", emptySummaryCommand(t))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if summary.Position != models.RECEIPT_SUMMARY_POSITION_BOTTOM {
+		utils.PrintTestError(t, summary.Position, models.RECEIPT_SUMMARY_POSITION_BOTTOM)
+	}
+}
+
+func setSummaryPosition(t *testing.T, groupId uint, position models.ReceiptSummaryPosition) {
+	t.Helper()
+
+	// Only the position key: every other field is a pointer left nil, which the repository reads
+	// as "leave unchanged" — so this cannot disturb what configureSummary just wrote.
+	command := commands.UpdateGroupReceiptSettingsCommand{
+		QuickScanPaidByEnabled:     true,
+		QuickScanPaidByRequired:    true,
+		QuickScanStatusEnabled:     true,
+		QuickScanStatusRequired:    true,
+		QuickScanDefaultPaidByType: models.QUICK_SCAN_PAID_BY_UPLOADER,
+		QuickScanDefaultStatus:     models.OPEN,
+		ReceiptSummaryPosition:     &position,
+	}
+
+	repository := repositories.NewGroupReceiptSettingsRepository(nil)
+	if _, err := repository.UpdateGroupReceiptSettings(utils.UintToString(groupId), command); err != nil {
+		t.Fatalf("set summary position: %v", err)
+	}
+}

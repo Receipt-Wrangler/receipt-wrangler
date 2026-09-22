@@ -602,6 +602,15 @@ degraded, not broken. And on the **write** path `empty` serializes back to `""`,
 receipt whose status it cannot represent gets a visible error instead of silently downgrading it.
 That is the intended failure — loud, and no data loss.
 
+**`ReceiptSummaryPosition` carries the same patch, for the same reason.**
+`model/receipt_summary_position.dart`'s `empty` member is annotated
+`@BuiltValueEnumConst(wireName: r'', fallback: true)`, and
+`test/receipt_summary_position_ingest_test.dart` is what catches a regen dropping it. It rides on
+`GroupReceiptSettings`, i.e. on **AppData**, i.e. on **login** — a third position added later would
+brick every released build at the sign-in screen. The server also normalizes `""` away at both emit
+points (see `api/CLAUDE.md`), so this is belt and braces rather than the primary guarantee; keep
+both.
+
 The sibling closed enums (`ItemStatus`, `GroupStatus`, `SystemTaskStatus`, `Permission` as a
 catalog) are **still intolerant**. Adding a value to any of them is a breaking change for released
 builds until they get the same treatment.
@@ -1448,6 +1457,95 @@ group change). Shared drivers live in `integration_test/helpers/receipt_filter_a
   `FormBuilderTextField` it builds, so the keyed finder matches two widgets and any tap throws. Use
   `formField("value")` -- and `CurrencyTextFieldController` reads keystrokes as cents, so type the
   full `50.00`, not `50`.
+
+### Receipt summary
+
+A block of totals **pinned** above or below the receipts list, covering the whole current filter
+result set rather than the visible page. `swagger.yml`, the Go API and `mobile/api/` already carried
+`getReceiptSummaryForGroup` and all four models -- the original reason for skipping mobile (no
+filter to describe) died with the receipt filter above -- so the only backend work was the new
+per-group `receiptSummaryPosition`. See the root `CLAUDE.md` -> "Receipt Summary" for the
+cross-client contract and `api/CLAUDE.md` for the wire one.
+
+- **`ReceiptSummaryBar` (`lib/groups/widgets/receipt_summary_bar.dart`) is presentational**, the
+  twin of the desktop's `app-receipt-totals`: it fetches nothing and knows nothing about the
+  filter. Named *Bar* rather than *Summary* because `api.ReceiptSummary` is the model it takes and
+  `dashboard_widgets/group_summary.dart` already owns the word -- the same collision desktop dodged
+  by not calling its component `*summary*`. Pure helpers (labelling, the config-group fallback) live
+  in `lib/utils/receipt_summary.dart`, ported from `desktop/src/utils/receipt-summary.ts`.
+- **Both positions are pinned, and that comes for free.** `PagedDataList` returns an `Expanded`, so
+  anything else in `GroupReceiptsList`'s `Column` takes its natural height and never scrolls with
+  the list. No slivers, no `Scaffold` slot -- and the bottom position is reachable under infinite
+  scroll, which a trailing sliver would not be.
+- **FOUR fixed slots, each always a `SizedBox`.** Not `if (atTop) bar` — and this bit *cost a
+  cycle*. `Element.updateChildren` walks the old and new child lists inward from both ends while
+  `Widget.canUpdate` holds, and in the middle it cannot match it reuses only **keyed** children. A
+  slot whose type flips (bar <-> nothing) halts that walk at both ends, leaving the unkeyed
+  `PagedDataList` in the middle -- so it is rebuilt from scratch, **discarding its State along with
+  the paging controller, every loaded page and `_totalCount`, and silently refetching page 1**.
+  Wrapping each slot in a `SizedBox(child: ...)` keeps the type stable and the walk matches the
+  whole list. (A `GlobalKey` on `PagedDataList` also works; this is the lighter tool.) Pinned by
+  *"flipping the position does not reset the paged list"*, which asserts **State identity** -- a
+  request count does not catch it, because the reconstructed State refetches immediately and that
+  looks exactly like the filter's own refetch.
+- **The list owns the request; `ReceiptListModel` owns only the All-group pick.** The model has no
+  Dio and no route access, and -- decisively -- its notify contract says a notification means *the
+  filter changed*, so a model that fetched and notified on arrival would ping-pong with
+  `_refreshForFilterChange`. Putting `_fetchSummary` beside the `_refreshCallback` call sites is
+  what makes the refresh contract true **by construction**:
+
+  | event | refetches the summary? |
+  |---|---|
+  | filter applied (the one notifying writer) | yes |
+  | first mount / group change | yes, guarded on `_summaryGroupId` |
+  | sort change (`notify: false`, calls `_refreshCallback` directly) | **no** -- order, not membership |
+  | infinite-scroll page load | **no** -- the figures already cover every page |
+
+- **`didChangeDependencies` must be guarded on the group id.** It fires for *any* inherited widget
+  change and `getGroupId` makes `GoRouterState` a dependency, so an unguarded fetch there is a
+  request storm on the app's most expensive request.
+- **Out-of-order responses are dropped** via `_summaryRequestSeq`, the manual equivalent of the
+  desktop's `switchMap`: two filter applies in quick succession can land backwards and paint figures
+  for a filter the user has moved past.
+- **A failed summary is swallowed**, mirroring the desktop's `catchError`. An unhandled
+  `DioException` from a `setState`-driven fetch takes the whole receipts screen down, and the right
+  degradation for a block of totals is to keep the last good figures.
+- **The cached group settings decide only WHETHER to ask.** Everything rendered -- `enabled`,
+  `position`, the rows -- comes off the response, which stays authoritative. A group that never
+  opted in therefore costs no request at all. The consequence: an admin who enables the summary
+  while the app is running sees nothing until the next AppData refresh. Desktop behaves identically.
+- **ONE horizontal scroll view for the whole figure grid, with the labels frozen outside it.** A
+  `SingleChildScrollView` per row lets the rows desync under a drag and parks a value under the
+  wrong heading; *"every row scrolls together"* fails against that tree. Nothing can swallow the
+  list's vertical scroll, because the bar is a **sibling** of `PagedDataList`, not a child.
+- **The bar supplies its own horizontal 16.** The receipts route zeroes `ScreenWrapper`'s body
+  padding so rows sit edge to edge, and the bar's background has to reach the edges too or it reads
+  as a list row rather than a pinned bar. Its height is capped at 35% of the viewport with an inner
+  vertical scroll: five broken-out statuses on a short phone would otherwise starve the `Expanded`
+  list and overflow the `Column`.
+- **`_money` wraps `formatCurrency`**, which parses the wire string with `double.parse` and
+  **throws**. From inside this bar that takes down the receipts screen, not just the block.
+- **A zero row is muted with a COLOUR** (`onSurfaceVariant`), not an `Opacity` widget: the
+  frozen-label split would need two of them and two layers to keep in step.
+- **The overall row arrives carrying `ReceiptStatus.empty`** -- the generated `status` is
+  non-nullable, so there is no "no status" to express -- and `receiptStatusLabel` renders that as
+  `""`. `receiptSummaryRowLabel` branches on it, or the row reads as a bare " Receipts".
+- **Anything that is not `TOP` renders at the bottom**, including the `empty` member, so a value
+  added later degrades to the server's own default rather than blanking the block.
+- **On the All group the pick lives in `ReceiptListModel`**, session-scoped: mobile has no persisted
+  slice equivalent to the desktop's NGXS `receiptTable`. Written with `notify: false` and refreshed
+  directly, like the sort setters -- a configuration pick changes the breakdown's shape, never the
+  data. It is reset on a **group change by the list**, not from `clearFilter`, which early-returns on
+  an already-empty filter and so would skip exactly the navigation that invalidates it.
+- **E2E: `integration_test/receipt_summary_test.dart`.** The widget suite injects a mocked
+  `ReceiptApi` and a hand-seeded `GroupModel`, so it proves nothing about the wire; this covers the
+  encoded filter reaching the summary endpoint and narrowing every row, and `position` surviving
+  model -> command -> DB -> response -> render. `setGroupSummaryConfig` in
+  `integration_test/helpers/permission_fixtures.dart` restores **all four** summary keys explicitly
+  on teardown: they are pointers on the Go command, so replaying `_settingsToCommand` omits them and
+  an omitted key means *leave unchanged* -- a spec turning the summary on for a shared group would
+  otherwise leave it on for every later run. Do **not** add them to that helper's `?? false` loop;
+  `receiptSummaryPosition: false` fails the enum decode.
 
 ### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
 

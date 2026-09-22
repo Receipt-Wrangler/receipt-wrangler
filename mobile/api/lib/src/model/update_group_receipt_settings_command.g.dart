@@ -60,6 +60,8 @@ class _$UpdateGroupReceiptSettingsCommand
   final BuiltList<int>? receiptSummaryCustomFieldIds;
   @override
   final BuiltList<ReceiptStatus>? receiptSummaryStatuses;
+  @override
+  final ReceiptSummaryPosition? receiptSummaryPosition;
 
   factory _$UpdateGroupReceiptSettingsCommand(
           [void Function(UpdateGroupReceiptSettingsCommandBuilder)? updates]) =>
@@ -91,7 +93,8 @@ class _$UpdateGroupReceiptSettingsCommand
       this.applyDefaultCustomFieldsOnIngest,
       this.receiptSummaryEnabled,
       this.receiptSummaryCustomFieldIds,
-      this.receiptSummaryStatuses})
+      this.receiptSummaryStatuses,
+      this.receiptSummaryPosition})
       : super._();
   @override
   UpdateGroupReceiptSettingsCommand rebuild(
@@ -132,7 +135,8 @@ class _$UpdateGroupReceiptSettingsCommand
             other.applyDefaultCustomFieldsOnIngest &&
         receiptSummaryEnabled == other.receiptSummaryEnabled &&
         receiptSummaryCustomFieldIds == other.receiptSummaryCustomFieldIds &&
-        receiptSummaryStatuses == other.receiptSummaryStatuses;
+        receiptSummaryStatuses == other.receiptSummaryStatuses &&
+        receiptSummaryPosition == other.receiptSummaryPosition;
   }
 
   @override
@@ -164,6 +168,7 @@ class _$UpdateGroupReceiptSettingsCommand
     _$hash = $jc(_$hash, receiptSummaryEnabled.hashCode);
     _$hash = $jc(_$hash, receiptSummaryCustomFieldIds.hashCode);
     _$hash = $jc(_$hash, receiptSummaryStatuses.hashCode);
+    _$hash = $jc(_$hash, receiptSummaryPosition.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -197,7 +202,8 @@ class _$UpdateGroupReceiptSettingsCommand
               applyDefaultCustomFieldsOnIngest)
           ..add('receiptSummaryEnabled', receiptSummaryEnabled)
           ..add('receiptSummaryCustomFieldIds', receiptSummaryCustomFieldIds)
-          ..add('receiptSummaryStatuses', receiptSummaryStatuses))
+          ..add('receiptSummaryStatuses', receiptSummaryStatuses)
+          ..add('receiptSummaryPosition', receiptSummaryPosition))
         .toString();
   }
 }
@@ -345,6 +351,12 @@ class UpdateGroupReceiptSettingsCommandBuilder
           ListBuilder<ReceiptStatus>? receiptSummaryStatuses) =>
       _$this._receiptSummaryStatuses = receiptSummaryStatuses;
 
+  ReceiptSummaryPosition? _receiptSummaryPosition;
+  ReceiptSummaryPosition? get receiptSummaryPosition =>
+      _$this._receiptSummaryPosition;
+  set receiptSummaryPosition(ReceiptSummaryPosition? receiptSummaryPosition) =>
+      _$this._receiptSummaryPosition = receiptSummaryPosition;
+
   UpdateGroupReceiptSettingsCommandBuilder() {
     UpdateGroupReceiptSettingsCommand._defaults(this);
   }
@@ -379,6 +391,7 @@ class UpdateGroupReceiptSettingsCommandBuilder
       _receiptSummaryCustomFieldIds =
           $v.receiptSummaryCustomFieldIds?.toBuilder();
       _receiptSummaryStatuses = $v.receiptSummaryStatuses?.toBuilder();
+      _receiptSummaryPosition = $v.receiptSummaryPosition;
       _$v = null;
     }
     return this;
@@ -430,6 +443,7 @@ class UpdateGroupReceiptSettingsCommandBuilder
             receiptSummaryCustomFieldIds:
                 _receiptSummaryCustomFieldIds?.build(),
             receiptSummaryStatuses: _receiptSummaryStatuses?.build(),
+            receiptSummaryPosition: receiptSummaryPosition,
           );
     } catch (_) {
       late String _$failedField;

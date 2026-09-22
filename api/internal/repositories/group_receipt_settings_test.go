@@ -757,3 +757,80 @@ func TestSettingsProjectionsSerializeAsEmptyArrays(t *testing.T) {
 		}
 	}
 }
+
+// TestUpdateGroupReceiptSettingsRoundTripsReceiptSummaryPosition covers the scalar half of the
+// summary configuration. It is a real column rather than a join projection, so the risk it carries
+// is the opposite one: the write is Select("*"), which zeroes anything the assignment block forgets.
+func TestUpdateGroupReceiptSettingsRoundTripsReceiptSummaryPosition(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	created, err := repository.CreateGroupReceiptSettings(1)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	// A group that has never touched the setting renders where it always did.
+	if created.ReceiptSummaryPosition != models.RECEIPT_SUMMARY_POSITION_BOTTOM {
+		utils.PrintTestError(t, created.ReceiptSummaryPosition, models.RECEIPT_SUMMARY_POSITION_BOTTOM)
+	}
+
+	top := models.RECEIPT_SUMMARY_POSITION_TOP
+	command := baseSettingsCommand()
+	command.ReceiptSummaryPosition = &top
+
+	updated, err := repository.UpdateGroupReceiptSettings("1", command)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if updated.ReceiptSummaryPosition != models.RECEIPT_SUMMARY_POSITION_TOP {
+		utils.PrintTestError(t, updated.ReceiptSummaryPosition, models.RECEIPT_SUMMARY_POSITION_TOP)
+	}
+
+	// Read it back out of the database, not off the returned struct: the PUT response is hydrated
+	// in memory, so only a fresh read proves the column was actually written.
+	reloaded, err := repository.GetGroupReceiptSettingsByGroupId(1)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if reloaded.ReceiptSummaryPosition != models.RECEIPT_SUMMARY_POSITION_TOP {
+		utils.PrintTestError(t, reloaded.ReceiptSummaryPosition, models.RECEIPT_SUMMARY_POSITION_TOP)
+	}
+}
+
+// A nil pointer means the client omitted the key. The position must then survive a save that
+// changes something else entirely — the bug shape the pointer fields exist to prevent.
+func TestUpdateGroupReceiptSettingsLeavesReceiptSummaryPositionUnchangedWhenNil(t *testing.T) {
+	defer TruncateTestDb()
+	CreateTestGroup()
+	repository := setupGroupReceiptSettingsRepository()
+
+	if _, err := repository.CreateGroupReceiptSettings(1); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	top := models.RECEIPT_SUMMARY_POSITION_TOP
+	seed := baseSettingsCommand()
+	seed.ReceiptSummaryPosition = &top
+	if _, err := repository.UpdateGroupReceiptSettings("1", seed); err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	untouched := baseSettingsCommand()
+	untouched.HideImages = true
+	updated, err := repository.UpdateGroupReceiptSettings("1", untouched)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+
+	if updated.ReceiptSummaryPosition != models.RECEIPT_SUMMARY_POSITION_TOP {
+		utils.PrintTestError(t, updated.ReceiptSummaryPosition, "still TOP")
+	}
+}

@@ -91,6 +91,7 @@ import 'package:openapi/src/model/receipt_status.dart';
 import 'package:openapi/src/model/receipt_summary.dart';
 import 'package:openapi/src/model/receipt_summary_command.dart';
 import 'package:openapi/src/model/receipt_summary_custom_field_total.dart';
+import 'package:openapi/src/model/receipt_summary_position.dart';
 import 'package:openapi/src/model/receipt_summary_row.dart';
 import 'package:openapi/src/model/report_column.dart';
 import 'package:openapi/src/model/report_detail.dart';
@@ -226,6 +227,7 @@ part 'serializers.g.dart';
   ReceiptSummary,
   ReceiptSummaryCommand,
   ReceiptSummaryCustomFieldTotal,
+  ReceiptSummaryPosition,
   ReceiptSummaryRow,
   ReportColumn,
   ReportDetail,

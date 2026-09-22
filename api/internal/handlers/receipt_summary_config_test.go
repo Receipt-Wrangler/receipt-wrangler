@@ -201,3 +201,66 @@ func TestUpdateGroupReceiptSettingsOmittingSummaryKeysLeavesConfigIntact(t *test
 		utils.PrintTestError(t, settings.ReceiptSummaryCustomFieldIds, "still one field")
 	}
 }
+
+func TestUpdateGroupReceiptSettingsRoundTripsSummaryPosition(t *testing.T) {
+	defer tearDownGroupTests()
+
+	groupId := seedDefaultCustomFieldGroup(t, 1, true)
+
+	w := callUpdateGroupReceiptSettings(t, 1, groupId,
+		`{`+baseSettingsBody+`,"receiptSummaryEnabled":true,"receiptSummaryPosition":"TOP"}`)
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+		return
+	}
+
+	settings, err := repositories.NewGroupReceiptSettingsRepository(nil).GetGroupReceiptSettingsByGroupId(groupId)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if settings.ReceiptSummaryPosition != models.RECEIPT_SUMMARY_POSITION_TOP {
+		utils.PrintTestError(t, settings.ReceiptSummaryPosition, models.RECEIPT_SUMMARY_POSITION_TOP)
+	}
+}
+
+// An unknown position is a field-level 400 rather than the generic 500 the DB boundary would give.
+func TestUpdateGroupReceiptSettingsRejectsInvalidSummaryPosition(t *testing.T) {
+	defer tearDownGroupTests()
+
+	groupId := seedDefaultCustomFieldGroup(t, 1, true)
+
+	w := callUpdateGroupReceiptSettings(t, 1, groupId,
+		`{`+baseSettingsBody+`,"receiptSummaryPosition":"SIDEWAYS"}`)
+	if w.Result().StatusCode != http.StatusBadRequest {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusBadRequest)
+		return
+	}
+	if _, ok := settingsValidationErrors(t, w.Body.Bytes())["receiptSummaryPosition"]; !ok {
+		utils.PrintTestError(t, w.Body.String(), "a receiptSummaryPosition error")
+	}
+}
+
+// The position joins the toggle and the statuses OUTSIDE the app.custom-fields.read gate. Gating it
+// would leave such an admin able to turn the summary on but not to say where it goes.
+func TestUpdateGroupReceiptSettingsAllowsSummaryPositionWithoutCustomFieldPermission(t *testing.T) {
+	defer tearDownGroupTests()
+
+	groupId := seedDefaultCustomFieldGroup(t, 1, false)
+
+	w := callUpdateGroupReceiptSettings(t, 1, groupId,
+		`{`+baseSettingsBody+`,"receiptSummaryPosition":"TOP"}`)
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+		return
+	}
+
+	settings, err := repositories.NewGroupReceiptSettingsRepository(nil).GetGroupReceiptSettingsByGroupId(groupId)
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if settings.ReceiptSummaryPosition != models.RECEIPT_SUMMARY_POSITION_TOP {
+		utils.PrintTestError(t, settings.ReceiptSummaryPosition, models.RECEIPT_SUMMARY_POSITION_TOP)
+	}
+}

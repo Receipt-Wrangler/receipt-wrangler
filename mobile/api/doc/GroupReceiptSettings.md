@@ -40,6 +40,7 @@ Name | Type | Description | Notes
 **receiptSummaryEnabled** | **bool** | Show the block of totals under this group's receipts table. Off by default, so an existing install is unchanged until an admin opts in. | [optional] 
 **receiptSummaryCustomFieldIds** | **BuiltList&lt;int&gt;** | CURRENCY custom field ids totalled in the receipt summary, in the order their columns are rendered. Always present; an empty array means the group totals only the receipt amount. Read only here - write via UpdateGroupReceiptSettingsCommand.receiptSummaryCustomFieldIds. | [optional] 
 **receiptSummaryStatuses** | [**BuiltList&lt;ReceiptStatus&gt;**](ReceiptStatus.md) | Receipt statuses broken out as their own row in the receipt summary, in ReceiptStatus declaration order. A configured status matching no receipt still renders, as a zero row. Always present; an empty array means the summary shows only the overall row. Read only here - write via UpdateGroupReceiptSettingsCommand.receiptSummaryStatuses. | [optional] 
+**receiptSummaryPosition** | [**ReceiptSummaryPosition**](ReceiptSummaryPosition.md) |  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

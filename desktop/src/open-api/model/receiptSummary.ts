@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { ReceiptSummaryRow } from './receiptSummaryRow';
+import { ReceiptSummaryPosition } from './receiptSummaryPosition';
 
 
 export interface ReceiptSummary { 
@@ -19,10 +20,14 @@ export interface ReceiptSummary {
      * The group whose settings produced this breakdown
      */
     configurationGroupId: number;
+    position: ReceiptSummaryPosition;
     overall: ReceiptSummaryRow;
     /**
      * One row per configured status, in ReceiptStatus declaration order. A configured status matching no receipt is still present, with zeroed figures. Always present; empty when no status is configured.
      */
     statuses: Array<ReceiptSummaryRow>;
 }
+export namespace ReceiptSummary {
+}
+
 

@@ -406,6 +406,83 @@ test.describe('Receipt summary', () => {
     await expect(statusRow(page, 'OPEN')).toHaveCount(0);
   });
 
+  /**
+   * Placement is the one thing no Jest spec can prove. The component spec asserts the derivation
+   * against a mocked response and the totals spec asserts the modifier class, but neither renders
+   * the receipts page, so neither can see WHERE the block lands. This walks the whole path:
+   * settings form -> PUT -> DB -> summary response -> the two template anchors.
+   *
+   * Asserted as DOCUMENT ORDER, never presence: the block renders at both positions, so
+   * "is it visible" passes whichever anchor is wrong.
+   */
+  test('moves the block above the table when the position is set to top', async ({ page }) => {
+    await page.goto(`/groups/${primary.id}/receipt-settings/edit`);
+
+    // It sits outside the currency-field picker's permission branch, with the toggle and the
+    // statuses, so it is reachable by any admin who can reach the section at all.
+    // The combobox role, not the testid host: while the panel is open the listbox shares the
+    // field's aria label, and the host element is not what MatSelect opens on.
+    await page.getByRole('combobox', { name: 'Summary position' }).click();
+    await page.getByRole('option', { name: 'Above the table', exact: true }).click();
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.waitForURL(/\/receipt-settings\/view/);
+
+    await gotoGroupTable(page, primary.id);
+    await expect(totals(page)).toBeVisible();
+
+    // The totals must now precede the table in the DOM. evaluateAll over BOTH elements at once,
+    // rather than comparing bounding boxes: a box comparison would pass for a block that merely
+    // renders higher on a wrapped layout.
+    const totalsPrecedesTable = await page.evaluate(() => {
+      const block = document.querySelector('[data-testid="receipt-totals"]');
+      const table = document.querySelector('.table-container');
+      if (!block || !table) {
+        return null;
+      }
+      return (block.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    });
+    expect(totalsPrecedesTable).toBe(true);
+
+    // Exactly one block, whichever anchor rendered it -- the template holds one set of bindings
+    // behind an ngTemplateOutlet, not two elements behind separate conditions.
+    await expect(totals(page)).toHaveCount(1);
+
+    // And it is above the settlement card too, which is the placement the feature was asked for.
+    // The card renders only for a row selection, so select one first.
+    await page.locator('.table-container mat-checkbox').nth(1).click();
+    await expect(page.locator('app-summary-card')).toBeVisible();
+
+    const totalsPrecedesCard = await page.evaluate(() => {
+      const block = document.querySelector('[data-testid="receipt-totals"]');
+      const card = document.querySelector('app-summary-card');
+      if (!block || !card) {
+        return null;
+      }
+      return (block.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    });
+    expect(totalsPrecedesCard).toBe(true);
+  });
+
+  // The other anchor, and the default: an install that never touches the setting is unchanged.
+  test('keeps the block below the table when the position is set to bottom', async ({ page }) => {
+    await withAdminApi(async (api) => {
+      await apiSetGroupSummaryConfig(api, primary.id, { enabled: true, position: 'BOTTOM' });
+    });
+
+    await gotoGroupTable(page, primary.id);
+    await expect(totals(page)).toBeVisible();
+
+    const tablePrecedesTotals = await page.evaluate(() => {
+      const block = document.querySelector('[data-testid="receipt-totals"]');
+      const table = document.querySelector('.table-container');
+      if (!block || !table) {
+        return null;
+      }
+      return (table.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    });
+    expect(tablePrecedesTotals).toBe(true);
+  });
+
   // The summary rides its own refresh stream precisely so paging and sorting do not re-request an
   // unpaged aggregate. The Jest spec proves the split against a mocked service; only this proves it
   // on the wire.

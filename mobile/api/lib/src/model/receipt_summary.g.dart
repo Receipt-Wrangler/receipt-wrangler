@@ -12,6 +12,8 @@ class _$ReceiptSummary extends ReceiptSummary {
   @override
   final int configurationGroupId;
   @override
+  final ReceiptSummaryPosition position;
+  @override
   final ReceiptSummaryRow overall;
   @override
   final BuiltList<ReceiptSummaryRow> statuses;
@@ -22,6 +24,7 @@ class _$ReceiptSummary extends ReceiptSummary {
   _$ReceiptSummary._(
       {required this.enabled,
       required this.configurationGroupId,
+      required this.position,
       required this.overall,
       required this.statuses})
       : super._();
@@ -38,6 +41,7 @@ class _$ReceiptSummary extends ReceiptSummary {
     return other is ReceiptSummary &&
         enabled == other.enabled &&
         configurationGroupId == other.configurationGroupId &&
+        position == other.position &&
         overall == other.overall &&
         statuses == other.statuses;
   }
@@ -47,6 +51,7 @@ class _$ReceiptSummary extends ReceiptSummary {
     var _$hash = 0;
     _$hash = $jc(_$hash, enabled.hashCode);
     _$hash = $jc(_$hash, configurationGroupId.hashCode);
+    _$hash = $jc(_$hash, position.hashCode);
     _$hash = $jc(_$hash, overall.hashCode);
     _$hash = $jc(_$hash, statuses.hashCode);
     _$hash = $jf(_$hash);
@@ -58,6 +63,7 @@ class _$ReceiptSummary extends ReceiptSummary {
     return (newBuiltValueToStringHelper(r'ReceiptSummary')
           ..add('enabled', enabled)
           ..add('configurationGroupId', configurationGroupId)
+          ..add('position', position)
           ..add('overall', overall)
           ..add('statuses', statuses))
         .toString();
@@ -76,6 +82,10 @@ class ReceiptSummaryBuilder
   int? get configurationGroupId => _$this._configurationGroupId;
   set configurationGroupId(int? configurationGroupId) =>
       _$this._configurationGroupId = configurationGroupId;
+
+  ReceiptSummaryPosition? _position;
+  ReceiptSummaryPosition? get position => _$this._position;
+  set position(ReceiptSummaryPosition? position) => _$this._position = position;
 
   ReceiptSummaryRowBuilder? _overall;
   ReceiptSummaryRowBuilder get overall =>
@@ -97,6 +107,7 @@ class ReceiptSummaryBuilder
     if ($v != null) {
       _enabled = $v.enabled;
       _configurationGroupId = $v.configurationGroupId;
+      _position = $v.position;
       _overall = $v.overall.toBuilder();
       _statuses = $v.statuses.toBuilder();
       _$v = null;
@@ -128,6 +139,8 @@ class ReceiptSummaryBuilder
                 configurationGroupId,
                 r'ReceiptSummary',
                 'configurationGroupId'),
+            position: BuiltValueNullFieldError.checkNotNull(
+                position, r'ReceiptSummary', 'position'),
             overall: overall.build(),
             statuses: statuses.build(),
           );

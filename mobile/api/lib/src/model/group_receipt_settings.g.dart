@@ -24,6 +24,8 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
   @override
   final bool? quickScanStatusRequired;
   @override
+  final ReceiptSummaryPosition? receiptSummaryPosition;
+  @override
   final bool? hideItemCategories;
   @override
   final bool? quickScanCommentRequired;
@@ -85,6 +87,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
       this.quickScanDefaultStatus,
       this.quickScanCategoriesRequired,
       this.quickScanStatusRequired,
+      this.receiptSummaryPosition,
       this.hideItemCategories,
       this.quickScanCommentRequired,
       this.hideItemTags,
@@ -132,6 +135,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
         quickScanDefaultStatus == other.quickScanDefaultStatus &&
         quickScanCategoriesRequired == other.quickScanCategoriesRequired &&
         quickScanStatusRequired == other.quickScanStatusRequired &&
+        receiptSummaryPosition == other.receiptSummaryPosition &&
         hideItemCategories == other.hideItemCategories &&
         quickScanCommentRequired == other.quickScanCommentRequired &&
         hideItemTags == other.hideItemTags &&
@@ -169,6 +173,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
     _$hash = $jc(_$hash, quickScanDefaultStatus.hashCode);
     _$hash = $jc(_$hash, quickScanCategoriesRequired.hashCode);
     _$hash = $jc(_$hash, quickScanStatusRequired.hashCode);
+    _$hash = $jc(_$hash, receiptSummaryPosition.hashCode);
     _$hash = $jc(_$hash, hideItemCategories.hashCode);
     _$hash = $jc(_$hash, quickScanCommentRequired.hashCode);
     _$hash = $jc(_$hash, hideItemTags.hashCode);
@@ -209,6 +214,7 @@ class _$GroupReceiptSettings extends GroupReceiptSettings {
           ..add('quickScanDefaultStatus', quickScanDefaultStatus)
           ..add('quickScanCategoriesRequired', quickScanCategoriesRequired)
           ..add('quickScanStatusRequired', quickScanStatusRequired)
+          ..add('receiptSummaryPosition', receiptSummaryPosition)
           ..add('hideItemCategories', hideItemCategories)
           ..add('quickScanCommentRequired', quickScanCommentRequired)
           ..add('hideItemTags', hideItemTags)
@@ -289,6 +295,13 @@ class GroupReceiptSettingsBuilder
   bool? get quickScanStatusRequired => _$this._quickScanStatusRequired;
   set quickScanStatusRequired(covariant bool? quickScanStatusRequired) =>
       _$this._quickScanStatusRequired = quickScanStatusRequired;
+
+  ReceiptSummaryPosition? _receiptSummaryPosition;
+  ReceiptSummaryPosition? get receiptSummaryPosition =>
+      _$this._receiptSummaryPosition;
+  set receiptSummaryPosition(
+          covariant ReceiptSummaryPosition? receiptSummaryPosition) =>
+      _$this._receiptSummaryPosition = receiptSummaryPosition;
 
   bool? _hideItemCategories;
   bool? get hideItemCategories => _$this._hideItemCategories;
@@ -424,6 +437,7 @@ class GroupReceiptSettingsBuilder
       _quickScanDefaultStatus = $v.quickScanDefaultStatus;
       _quickScanCategoriesRequired = $v.quickScanCategoriesRequired;
       _quickScanStatusRequired = $v.quickScanStatusRequired;
+      _receiptSummaryPosition = $v.receiptSummaryPosition;
       _hideItemCategories = $v.hideItemCategories;
       _quickScanCommentRequired = $v.quickScanCommentRequired;
       _hideItemTags = $v.hideItemTags;
@@ -481,6 +495,7 @@ class GroupReceiptSettingsBuilder
             quickScanDefaultStatus: quickScanDefaultStatus,
             quickScanCategoriesRequired: quickScanCategoriesRequired,
             quickScanStatusRequired: quickScanStatusRequired,
+            receiptSummaryPosition: receiptSummaryPosition,
             hideItemCategories: hideItemCategories,
             quickScanCommentRequired: quickScanCommentRequired,
             hideItemTags: hideItemTags,

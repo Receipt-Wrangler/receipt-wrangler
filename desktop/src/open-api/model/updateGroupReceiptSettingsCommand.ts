@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { ReceiptStatus } from './receiptStatus';
+import { ReceiptSummaryPosition } from './receiptSummaryPosition';
 import { QuickScanDefaultPaidByType } from './quickScanDefaultPaidByType';
 
 
@@ -110,6 +111,10 @@ export interface UpdateGroupReceiptSettingsCommand {
      * Receipt statuses to break out as their own row in the receipt summary. OMIT the key to leave the configured set unchanged; send an empty array to clear it. Unlike the custom field ids this needs NO extra permission - gating it would lock an admin without app.custom-fields.read out of the feature entirely. An unrecognized status is a 400.
      */
     receiptSummaryStatuses?: Array<ReceiptStatus>;
+    /**
+     * Where the receipt summary renders relative to the receipts list. OMIT the key to leave the stored value unchanged - a client that does not render this control must omit it rather than send a zero value, or it moves the block for the whole group. Needs no extra permission, for the same reason the statuses do not. Anything but TOP or BOTTOM is a 400.
+     */
+    receiptSummaryPosition?: ReceiptSummaryPosition;
 }
 export namespace UpdateGroupReceiptSettingsCommand {
 }

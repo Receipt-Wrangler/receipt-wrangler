@@ -270,6 +270,7 @@ Class | Method | HTTP request | Description
  - [ReceiptSummary](doc/ReceiptSummary.md)
  - [ReceiptSummaryCommand](doc/ReceiptSummaryCommand.md)
  - [ReceiptSummaryCustomFieldTotal](doc/ReceiptSummaryCustomFieldTotal.md)
+ - [ReceiptSummaryPosition](doc/ReceiptSummaryPosition.md)
  - [ReceiptSummaryRow](doc/ReceiptSummaryRow.md)
  - [ReportColumn](doc/ReportColumn.md)
  - [ReportDetail](doc/ReportDetail.md)

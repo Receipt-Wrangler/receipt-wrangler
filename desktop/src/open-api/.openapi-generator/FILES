@@ -110,6 +110,7 @@ model/receiptStatus.ts
 model/receiptSummary.ts
 model/receiptSummaryCommand.ts
 model/receiptSummaryCustomFieldTotal.ts
+model/receiptSummaryPosition.ts
 model/receiptSummaryRow.ts
 model/reportColumn.ts
 model/reportDetail.ts

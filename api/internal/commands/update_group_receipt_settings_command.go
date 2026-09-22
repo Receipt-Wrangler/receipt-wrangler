@@ -64,9 +64,15 @@ type UpdateGroupReceiptSettingsCommand struct {
 	// Validate() checks only the statuses (no DB needed). The handler checks that every submitted
 	// custom field id exists AND is a CURRENCY field (400), and that the caller holds
 	// app.custom-fields.read (403) — but only for the custom field key; see the handler.
-	ReceiptSummaryEnabled        *bool                   `json:"receiptSummaryEnabled"`
-	ReceiptSummaryCustomFieldIds *[]uint                 `json:"receiptSummaryCustomFieldIds"`
-	ReceiptSummaryStatuses       *[]models.ReceiptStatus `json:"receiptSummaryStatuses"`
+	//
+	// ReceiptSummaryPosition is a pointer for the ReceiptSummaryEnabled reason, in its enum form: a
+	// non-pointer would unmarshal to "" for a caller that omits the key, and the repository's
+	// assignment would then blank a configured position. It needs no permission of its own — see
+	// the handler's gate, which covers the custom field key alone.
+	ReceiptSummaryEnabled        *bool                          `json:"receiptSummaryEnabled"`
+	ReceiptSummaryPosition       *models.ReceiptSummaryPosition `json:"receiptSummaryPosition"`
+	ReceiptSummaryCustomFieldIds *[]uint                        `json:"receiptSummaryCustomFieldIds"`
+	ReceiptSummaryStatuses       *[]models.ReceiptStatus        `json:"receiptSummaryStatuses"`
 }
 
 func (command *UpdateGroupReceiptSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -121,6 +127,15 @@ func (command UpdateGroupReceiptSettingsCommand) Validate() structs.ValidatorErr
 				vErr.Errors["receiptSummaryStatuses"] = "One or more selected statuses is not a valid receipt status"
 				break
 			}
+		}
+	}
+
+	// The position goes through its own Valuer rather than a membership walk, the
+	// pie_chart_data_command.go style: two values make a list overkill, and routing it here turns
+	// what the DB layer would surface as a generic 500 into a field-level 400.
+	if command.ReceiptSummaryPosition != nil {
+		if _, err := command.ReceiptSummaryPosition.Value(); err != nil {
+			vErr.Errors["receiptSummaryPosition"] = "Invalid receipt summary position. Must be TOP or BOTTOM"
 		}
 	}
 

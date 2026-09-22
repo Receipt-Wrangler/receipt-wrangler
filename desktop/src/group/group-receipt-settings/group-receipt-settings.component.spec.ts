@@ -8,7 +8,13 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
-import { CustomFieldType, GroupsService, Permission, QuickScanDefaultPaidByType } from "../../open-api";
+import {
+  CustomFieldType,
+  GroupsService,
+  Permission,
+  QuickScanDefaultPaidByType,
+  ReceiptSummaryPosition,
+} from "../../open-api";
 import { PipesModule } from "../../pipes/index";
 import { SnackbarService } from "../../services";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
@@ -161,6 +167,7 @@ describe("GroupReceiptSettingsComponent", () => {
       // The summary controls exist for every caller - unlike the currency field picker, they need
       // no catalog permission. The status group is one control per status, all unchecked here.
       receiptSummaryEnabled: false,
+      receiptSummaryPosition: ReceiptSummaryPosition.Bottom,
       receiptSummaryStatuses: {
         OPEN: false,
         NEEDS_ATTENTION: false,
@@ -187,15 +194,16 @@ describe("GroupReceiptSettingsComponent", () => {
     component.submit();
 
     // The empty paid-by id is coerced to undefined so the nullable id is omitted from the request.
-    // The summary keys ride along: statuses as a flat array (nothing checked here), and
-    // receiptSummaryCustomFieldIds deliberately ABSENT, because this caller lacks
-    // app.custom-fields.read and an omitted key means "leave unchanged".
+    // The summary keys ride along: statuses as a flat array (nothing checked here), the position
+    // as its own value, and receiptSummaryCustomFieldIds deliberately ABSENT, because this caller
+    // lacks app.custom-fields.read and an omitted key means "leave unchanged".
     expect(groupsService.updateGroupReceiptSettings).toHaveBeenCalledWith(
       testGroup.id,
       {
         ...testGroup.groupReceiptSettings,
         quickScanDefaultPaidById: undefined,
         receiptSummaryEnabled: false,
+        receiptSummaryPosition: ReceiptSummaryPosition.Bottom,
         receiptSummaryStatuses: [],
       }
     );
@@ -433,6 +441,48 @@ describe("GroupReceiptSettingsComponent", () => {
       expect(component.form.get("receiptSummaryStatuses.DRAFT")?.value).toBe(false);
       // ...but the currency picker does not exist for this caller.
       expect(component.form.get("receiptSummaryCustomFields")).toBeNull();
+    });
+
+    // The position joins the toggle and the statuses outside the catalog gate, for the same
+    // reason: an admin who can turn the summary on must be able to say where it goes.
+    it("builds and submits the position without app.custom-fields.read", async () => {
+      TestBed.resetTestingModule();
+      await configureTestBed(FormMode.edit, { group: testGroupWithSummary });
+
+      expect(component.form.get("receiptSummaryPosition")?.value).toBe(
+        ReceiptSummaryPosition.Bottom
+      );
+      component.form.get("receiptSummaryPosition")?.setValue(ReceiptSummaryPosition.Top);
+
+      const groupsService = TestBed.inject(GroupsService);
+      jest.spyOn(groupsService, "updateGroupReceiptSettings")
+        .mockReturnValue(of(testGroupWithSummary.groupReceiptSettings as any));
+      jest.spyOn(TestBed.inject(Store), "dispatch").mockReturnValue(of(undefined));
+
+      component.submit();
+
+      const command = (groupsService.updateGroupReceiptSettings as jest.Mock).mock.calls[0][1];
+      expect(command.receiptSummaryPosition).toBe(ReceiptSummaryPosition.Top);
+    });
+
+    // A group whose settings row predates the column reads "" off the wire. The server normalizes
+    // it too, but the select needs a real value or it renders blank with no way to tell which
+    // position is in force.
+    it("falls back to BOTTOM when the group carries no position", async () => {
+      TestBed.resetTestingModule();
+      await configureTestBed(FormMode.edit, {
+        group: {
+          ...testGroupWithSummary,
+          groupReceiptSettings: {
+            ...testGroupWithSummary.groupReceiptSettings,
+            receiptSummaryPosition: "" as ReceiptSummaryPosition,
+          },
+        } as any,
+      });
+
+      expect(component.form.get("receiptSummaryPosition")?.value).toBe(
+        ReceiptSummaryPosition.Bottom
+      );
     });
 
     it("omits receiptSummaryCustomFieldIds without the permission, so a save cannot wipe it", async () => {

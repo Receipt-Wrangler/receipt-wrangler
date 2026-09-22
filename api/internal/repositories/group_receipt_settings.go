@@ -130,10 +130,17 @@ func (repository GroupReceiptSettingsRepository) LoadSettingsProjections(setting
 	// declares each property as an array, a missing map key yields a nil slice, and the
 	// generated Dart deserializer has no null guard — a null would fail the WHOLE
 	// AppData payload on already-released Android builds.
+	//
+	// The position is normalized for the same class of reason, one field further along: a settings
+	// row written before the column existed reads "", and an empty value against a closed Dart
+	// EnumClass throws and fails the whole payload. This loop is the one chokepoint every
+	// GroupReceiptSettings read passes through — AppData, GetPagedGroups, CreateGroup,
+	// GetGroupById — so normalizing here is what guarantees "" never reaches a client.
 	for _, setting := range settings {
 		setting.DefaultCustomFieldIds = sliceOrEmpty(defaultCustomFieldIds[setting.GroupId])
 		setting.ReceiptSummaryCustomFieldIds = sliceOrEmpty(summaryCustomFieldIds[setting.GroupId])
 		setting.ReceiptSummaryStatuses = sliceOrEmpty(canonicalStatusOrder(summaryStatuses[setting.GroupId]))
+		setting.ReceiptSummaryPosition = setting.ReceiptSummaryPosition.OrDefault()
 	}
 
 	return nil
@@ -186,6 +193,7 @@ func emptySettingsProjections(settings *models.GroupReceiptSettings) {
 	settings.DefaultCustomFieldIds = []uint{}
 	settings.ReceiptSummaryCustomFieldIds = []uint{}
 	settings.ReceiptSummaryStatuses = []models.ReceiptStatus{}
+	settings.ReceiptSummaryPosition = settings.ReceiptSummaryPosition.OrDefault()
 }
 
 // canonicalStatusOrder sorts a group's configured statuses into models.ReceiptStatuses()
@@ -270,6 +278,9 @@ func (repository GroupReceiptSettingsRepository) UpdateGroupReceiptSettings(
 		}
 		if command.ReceiptSummaryEnabled != nil {
 			groupReceiptSettings.ReceiptSummaryEnabled = *command.ReceiptSummaryEnabled
+		}
+		if command.ReceiptSummaryPosition != nil {
+			groupReceiptSettings.ReceiptSummaryPosition = *command.ReceiptSummaryPosition
 		}
 
 		err = tx.Select("*").Model(*&groupReceiptSettings).Updates(groupReceiptSettings).Error

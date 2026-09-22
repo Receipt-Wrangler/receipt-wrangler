@@ -94,6 +94,7 @@ doc/ReceiptStatus.md
 doc/ReceiptSummary.md
 doc/ReceiptSummaryCommand.md
 doc/ReceiptSummaryCustomFieldTotal.md
+doc/ReceiptSummaryPosition.md
 doc/ReceiptSummaryRow.md
 doc/ReportApi.md
 doc/ReportColumn.md
@@ -271,6 +272,7 @@ lib/src/model/receipt_status.dart
 lib/src/model/receipt_summary.dart
 lib/src/model/receipt_summary_command.dart
 lib/src/model/receipt_summary_custom_field_total.dart
+lib/src/model/receipt_summary_position.dart
 lib/src/model/receipt_summary_row.dart
 lib/src/model/report_column.dart
 lib/src/model/report_detail.dart
@@ -327,7 +329,4 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/receipt_summary_command_test.dart
-test/receipt_summary_custom_field_total_test.dart
-test/receipt_summary_row_test.dart
-test/receipt_summary_test.dart
+test/receipt_summary_position_test.dart
