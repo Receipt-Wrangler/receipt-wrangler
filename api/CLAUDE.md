@@ -1362,6 +1362,34 @@ arbitrary string reaches the DB layer and is caught only by `Value()`, surfacing
 `ReceiptStatus.Scan` never returns an error, so `QuickScanCommand.LoadDataFromRequest` cannot reject
 a bogus status either.
 
+## User Preferences
+
+Per-user settings, stored on `models.UserPrefernces` (note the misspelling - it is the repo-wide
+spelling of the type). There is **no service layer and no Upsert command**: `PUT /userPreferences`
+unmarshals the request body straight into the model, and the swagger `UserPreferences` schema is
+both the request and the response, so one schema edit covers both directions. The user id comes from
+the JWT, never the body. Gated by `app.user-preferences.read` / `.update`, both in the Legacy User
+set.
+
+The whole object also rides on **AppData** (`services/auth.go`), which is how the desktop and mobile
+read it without a second request.
+
+**`UpdateUserPreferences` copies the request onto the stored row one field at a time** - a new field
+that is not added to that block silently never persists: no compile error, and nothing else in the
+suite fails. `repositories/user_preferences_test.go` round-trips each boolean specifically to catch
+that; extend it when adding a field. The write itself is `Select("*").Updates(&struct)` inside a
+transaction, so GORM emits the column (including a `false`, which the struct form of `Updates` would
+skip) as soon as the model field exists.
+
+Because the body is unmarshalled with `encoding/json` and nothing sets `DisallowUnknownFields`, a
+**removed** field sent by an already-released mobile build is ignored rather than rejected, and an
+**omitted** field decodes to its zero value - so for a bool, "omitted" and "explicitly false" reach
+the repository identically. Both are pinned in `models/user_preferences_test.go`.
+
+Current fields: the three quick-scan defaults, `userShortcuts`, and `closeChipSelectOnSelect` (a
+desktop-only behavior flag for the multi-select chip pickers - see `desktop/CLAUDE.md` -> "The chip
+picker's close-on-select preference"; mobile carries the generated field but never reads it).
+
 ## Quick Scan Field Configuration
 
 Group admins configure the quick-scan workflow per group on `GroupReceiptSettings` (gated by the

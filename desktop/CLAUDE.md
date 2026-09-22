@@ -326,6 +326,46 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   list-page add action, and do NOT use a bespoke page-title header.
 If a design appears to require a new pattern, confirm with the user before diverging.
 
+### The chip picker's close-on-select preference
+
+`app-autocomlete` in `[multiple]` mode (Categories, Tags, the user/group/icon pickers, the role
+form's permission picker, report filters) deliberately **re-opens** its option panel after every
+pick, so several values can be chosen in a row. `closeChipSelectOnSelect` on `UserPreferences` flips
+that per user; the default is **off**, i.e. the panel stays open exactly as before.
+
+Three things about it are load-bearing:
+
+- **The component reads the preference itself**, from `AuthState.closeChipSelectOnSelect`, rather
+  than taking an `@Input`. It is global by design — the setting says "all of these pickers" — and
+  threading a flag through the twenty-odd call sites would only create a way for one of them to
+  disagree with the rest. The default (`?? false`) lives in the selector, not at the reader.
+- **`closePanel()` alone does not close it.** `MatAutocompleteTrigger` opens on `focus`, and
+  Material returns focus to the input after a selection, so the panel comes straight back.
+  `clearFilterAndClosePanel()` therefore also **blurs** `inputMultiple()`. This is also why the e2e
+  asserts the blur *before* asserting the panel is hidden: Material closes the panel on selection by
+  itself, so "hidden" alone would pass even if the preference were ignored entirely.
+- **Removing a chip is deliberately NOT covered.** `removeOption()` refocuses the input, which opens
+  the panel again regardless of the preference. The setting is about selecting, and a removal that
+  left the field blurred would make removing several chips take an extra click each.
+
+The panel handling runs inside the existing `setTimeout(…, 0)` in `optionSelected()`, so the two
+tests in `autocomlete.component.spec.ts` that call `jest.runAllTimers()` are the only ones that
+exercise it at all — every other `optionSelected` case stops at the `FormArray` push. They stub the
+trigger (`textarea.component.spec.ts` is the precedent), because `CUSTOM_ELEMENTS_SCHEMA` leaves the
+template's real `#auto` trigger unresolvable.
+
+Because the component now injects `Store`, **any spec that instantiates a real `AutocomleteComponent`
+needs `AuthState` registered** — `NgxsModule.forRoot([AuthState])`. That covers the base spec, the
+`category-autocomplete` / `tag-autocomplete` / `grant-picker` specs, and `system-settings-form`
+(which registered only `SystemSettingsState`).
+
+`desktop/e2e/chip-select-close-on-select.spec.ts` is the wire test: the Jest specs drive the
+component against a mocked store, so only the e2e proves the checkbox reaches the picker through
+`PUT /userPreferences` -> the stored column -> AppData -> `AuthState`. It **provisions its own
+account**, because the preference is per-user and global and the suite runs `fullyParallel` —
+flipping it on a shared e2e account would change behavior under every spec running as that account
+at the same time.
+
 ### The shared badge (`app-badge`)
 
 `src/shared-ui/badge/` — a small uppercase badge (`text` + `tone` signal inputs) used to mark an item

@@ -615,6 +615,19 @@ fallback to a **synthetic** `unknown_default_open_api` member rather than to `em
 the write path (`empty` serializes to `""`, the synthetic member to a literal string the API rejects)
 and breaks every assertion below. The patch script is the narrower instrument, on purpose.
 
+**A new field on a response model needs a hand-written guard in `test/models/`, not the generated
+stub.** The generator drops a `*_test.dart` per model in `mobile/api/test/`, but it **does not
+overwrite one that already exists** — so those stubs still describe whatever the model looked like
+the day they were first written, never gain a case when a field is added, and are all `// TODO`
+bodies regardless. They also sit under `mobile/api/`, which is generated output nobody may
+hand-edit. The four real API-boundary guards therefore live beside the app's own tests and are what
+`flutter test` actually runs: `test/models/app_data_permission_ingest_test.dart`,
+`test/models/receipt_status_ingest_test.dart`,
+`test/models/receipt_summary_position_ingest_test.dart`, and
+`test/models/user_preferences_ingest_test.dart` (the `closeChipSelectOnSelect` default and wire
+round trip — a desktop-only flag mobile carries and never reads, which is precisely why nothing in
+the app would notice it disappearing).
+
 Two consequences worth knowing. An unknown status deserializes to `empty`, which
 `receiptStatusLabel` / `receiptStatusColor` render as a blank neutral chip rather than crashing —
 degraded, not broken. And on the **write** path `empty` serializes back to `""`, which

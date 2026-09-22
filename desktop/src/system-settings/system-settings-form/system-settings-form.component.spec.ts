@@ -14,6 +14,7 @@ import { PipesModule } from "../../pipes";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import { SnackbarService } from "../../services";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
+import { AuthState } from "../../store/auth.state";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { TaskQueueFormControlPipe } from "../pipes/task-queue-form-control.pipe";
 
@@ -32,7 +33,7 @@ describe("SystemSettingsFormComponent", () => {
     imports: [AutocompleteModule,
         CheckboxModule,
         InputModule,
-        NgxsModule.forRoot([SystemSettingsState]),
+        NgxsModule.forRoot([SystemSettingsState, AuthState]),
         PipesModule,
         ReactiveFormsModule,
         SharedUiModule,
