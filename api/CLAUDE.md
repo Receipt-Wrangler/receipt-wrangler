@@ -1826,6 +1826,52 @@ its `orderBy` and direction both being allow-listed against literals by `isTrust
   parser directly, including the 2^32 boundary and the round trip against `CustomFieldKey`. The suite is **SQLite only**, so
   the cross-engine NULL ordering is not covered there.
 
+### The first comment (`first_comment`)
+
+The desktop table's **Comment** column shows each receipt's first comment and sorts on it. The paged
+list only preloads `Comments` under `fullReceipts`, so the value rides a separate projection.
+
+- **"First" is `firstCommentOrder`** (`repositories/comments.go`): `created_at`, then `id` — comments
+  written in one insert share a timestamp. The sort and the display both use that one constant, so the
+  column can never sort by one comment while showing another. Replies cannot be created through the
+  API, so the list is flat and no `comment_id` filter is applied.
+- **`Receipt.FirstComment`** is a `*string` with `gorm:"-"` and `omitempty`: the handler fills it
+  after `MaskReceiptsForMemberVisibility`, through `PermissionService.LoadFirstVisibleComments`. That
+  is **one** `GetCommentsForReceiptIds` query per page, plus the per-group visibility the masker already
+  resolves. Every other endpoint leaves it nil, so the key is absent there, not `null`.
+- **`orderBy = first_comment`** (`constants.FIRST_COMMENT_ORDER_BY`) takes its own branch ahead of
+  `isTrustedValue`: `orderByFirstComment` is a correlated subquery, never a join (a receipt has many
+  comments, so a join would multiply rows and corrupt the count). It shares `orderBySubquery` with
+  the custom-field sort, which is where the literal direction keyword and the `receipts.id DESC`
+  tiebreaker live. The tiebreaker matters here too, because most receipts have no comment at all.
+- **No new permission.** Reading a receipt already means reading its comments on every other
+  surface, so the list's `group.receipts.read` gate covers this.
+- **Member isolation applies to both halves.** A comment by an author the caller can't see in that
+  receipt's group is dropped from every response, so it must not be shown **or sorted on**. A sort
+  on hidden text would order the table by comments the caller never sees, and would leak them one
+  comparison at a time. `GetPagedReceiptsByGroupId` therefore takes a sixth argument, a
+  `CommentAuthorVisibilityResolver`. The handler and the CSV export pass
+  `PermissionService.CommentAuthorVisibilityResolver`; the export passes it because it honours the
+  table's sort. Internal callers pass `nil`, the same contract as the paid-by resolver.
+  `commentAuthorVisibility` builds a per-group disjunction on `receipts.group_id`, mirroring
+  `applyActivityVisibilityDisjunction`, so an All-group page judges each receipt by its own group's
+  rules. It adds **no predicate at all** when no group restricts the caller, which covers every
+  non-isolated install. An authorless comment stays visible, as it does in `filterComments`.
+- **`idx_comment_receipt_id`** on `Comment.ReceiptId` serves both the subquery and the loader. It is
+  a model tag only; there was no index on that column before.
+- NULL (no comment) ordering and text collation are engine-dependent. That matches `name`,
+  `resolved_date` and the custom-field sorts, and is deliberately not normalised.
+- **Tests**:
+  - `repositories/receipt_first_comment_sort_test.go`: both directions; the earliest comment beating
+    a later one that sorts lower; the id tiebreak; hidden authors skipped, with an unrestricted
+    contrast; the All-group per-group rule; the SQL shape; no predicate when unrestricted; the index.
+  - `services/first_comment_test.go`: the earliest pick, hidden and authorless authors, and the
+    resolver.
+  - `handlers/receipt_first_comment_test.go`: the key is present or absent on the wire, the sort
+    works through the handler, and an isolated member never receives a peer's text, neither as the
+    value nor through the sort order. That last test was checked to fail when the handler passes a
+    `nil` resolver.
+
 ## Reporting Engine (`internal/reporting`)
 
 A **pure** report engine: `(ReportSpec + FieldCatalog + []Row + MetaInput) → ReportModel`. It

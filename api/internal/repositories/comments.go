@@ -29,6 +29,34 @@ func NewCommentRepository(tx *gorm.DB) CommentRepository {
 	return repository
 }
 
+// firstCommentOrder is what "a receipt's first comment" means: the earliest, with
+// the id breaking the tie between comments written in one insert (they share a
+// created_at). The receipts table both sorts on it (orderByFirstComment) and
+// displays it (GetCommentsForReceiptIds), so the two share this one definition —
+// otherwise the Comment column could sort by one comment while showing another.
+const firstCommentOrder = "comments.created_at ASC, comments.id ASC"
+
+// GetCommentsForReceiptIds returns every comment on the given receipts in a single
+// query, in firstCommentOrder, so a receipt's first comment is the first of its
+// rows the caller is allowed to see.
+func (repository CommentRepository) GetCommentsForReceiptIds(receiptIds []uint) ([]models.Comment, error) {
+	comments := make([]models.Comment, 0)
+	if len(receiptIds) == 0 {
+		return comments, nil
+	}
+
+	err := repository.GetDB().
+		Model(&models.Comment{}).
+		Where("receipt_id IN ?", receiptIds).
+		Order(firstCommentOrder).
+		Find(&comments).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return comments, nil
+}
+
 func (repository CommentRepository) AddComment(command commands.UpsertCommentCommand, authorVisibleTo AuthorVisibilityResolver) (models.Comment, error) {
 	db := repository.GetDB()
 	comment := models.Comment{

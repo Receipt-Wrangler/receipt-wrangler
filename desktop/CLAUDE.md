@@ -689,7 +689,7 @@ control and its direct `PUT /api/customField/:id` 403s, and a type change 400s e
 ### Custom fields as receipts-table columns
 
 The **Configure Columns** dialog (`src/receipts/column-configuration-dialog/`) lists every custom
-field after the nine built-in columns, and each one can be turned into a sortable table column.
+field after the ten built-in columns, and each one can be turned into a sortable table column.
 
 - **`custom_<id>` is the column's `matColumnDef` *and* the `orderBy` sent to the API** — the same key
   the reporting engine uses (`receiptsource.CustomFieldKey`). `src/utils/receipt-table-columns.ts`
@@ -758,7 +758,31 @@ field after the nine built-in columns, and each one can be turned into a sortabl
   display, numeric sorting on it (amounts chosen so a text sort is visibly wrong), a SELECT sorting by
   option text rather than option id, and the column healing away when its field is deleted. Money is
   asserted with a **separator-tolerant** regex because the currency configuration is a global System
-  Setting on the shared CI backend that this spec must not mutate.
+  Setting on the shared CI backend that this spec must not mutate. **Configure Columns** sits inside
+  the `⋮` overflow menu, so its helpers go through `openReceiptsOverflowMenu` first.
+
+### The Comment column (`first_comment`)
+
+The tenth built-in column shows the receipt's **first** comment and sorts on it. It is the last
+built-in in `DEFAULT_RECEIPT_TABLE_COLUMNS`.
+
+- **Hidden by default, with no merge code.** The default entry is `visible: false`, and
+  `mergeCustomFieldColumns` appends a missing built-in with its default's visibility. So a layout
+  saved before this column existed gains it **unchecked**, and upgrading widens nobody's table.
+- **`first_comment` is both the `matColumnDef` and the `orderBy`**, the same convention as
+  `custom_<id>`. `sort()` already sends `sortState.active` verbatim, so sorting needed no client
+  code. The header reads `RECEIPT_COLUMN_DISPLAY_NAMES.first_comment` rather than a new literal.
+- **The value is `Receipt.firstComment`**, which only the paged list returns. The server has already
+  applied member isolation, so a comment the viewer may not see is never in the payload.
+  `hideComments` is deliberately **not** applied here; that group setting stays receipt-form-only.
+  See `api/CLAUDE.md` → "The first comment".
+- The cell (`#firstCommentCell`, `data-testid="receipt-first-comment"`) is one ellipsised line capped
+  at 20rem, so a long comment can't stretch the row. `matTooltip` shows the full text, which is why
+  `ReceiptsModule` now imports `MatTooltipModule`.
+- **E2E:** `e2e/receipt-comment-column.spec.ts` (serial, admin storageState, own seeded group) covers:
+  - the column offered unchecked and unbadged;
+  - the first comment shown, never a later one that sorts lower;
+  - the `first_comment` sort in both directions against the real API.
 
 ### Seeding the receipt group
 

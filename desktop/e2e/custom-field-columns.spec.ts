@@ -10,6 +10,7 @@ import {
   uniqueName,
   withAdminApi,
 } from './helpers/provisioning';
+import { openReceiptsOverflowMenu } from './helpers/receipts-table';
 
 // Creating and deleting custom fields needs app.custom-fields.create/.delete, and
 // the columns themselves are gated on app.custom-fields.read - all Legacy Admin.
@@ -108,10 +109,11 @@ test.describe('Receipts table — custom field columns', () => {
 
   async function gotoTable(page: Page): Promise<void> {
     await page.goto(`/receipts/group/${groupId}`);
-    await expect(page.getByTestId('configure-columns')).toBeVisible();
+    await expect(page.getByTestId('receipts-overflow-menu')).toBeVisible();
   }
 
   async function showColumn(page: Page, label: string): Promise<void> {
+    await openReceiptsOverflowMenu(page);
     await page.getByTestId('configure-columns').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -131,6 +133,7 @@ test.describe('Receipts table — custom field columns', () => {
 
   test('lists every custom field after the built-in columns, unchecked', async ({ page }) => {
     await gotoTable(page);
+    await openReceiptsOverflowMenu(page);
     await page.getByTestId('configure-columns').click();
 
     const dialog = page.getByRole('dialog');
@@ -151,17 +154,18 @@ test.describe('Receipts table — custom field columns', () => {
 
   test('badges the custom fields and nothing else', async ({ page }) => {
     await gotoTable(page);
+    await openReceiptsOverflowMenu(page);
     await page.getByTestId('configure-columns').click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
     // Custom fields are global, so other specs' fields are in this list too -
-    // assert on the rows rather than on a total. Exactly the nine built-ins carry
+    // assert on the rows rather than on a total. Exactly the ten built-ins carry
     // no badge; everything past them is a custom field and is badged.
     const rows = dialog.locator('.column-item');
     const badged = dialog.getByTestId('column-config-custom');
-    expect((await rows.count()) - (await badged.count())).toEqual(9);
+    expect((await rows.count()) - (await badged.count())).toEqual(10);
 
     const tipRow = rows.filter({ hasText: tipName });
     await expect(tipRow.getByTestId('column-config-custom')).toHaveText('Custom');

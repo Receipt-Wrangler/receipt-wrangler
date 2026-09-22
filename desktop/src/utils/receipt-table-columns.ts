@@ -22,6 +22,7 @@ export const RECEIPT_COLUMN_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   tags: "Tags",
   status: "Status",
   resolved_date: "Resolved Date",
+  first_comment: "Comment",
 };
 
 export function customFieldColumnDef(customFieldId: number): string {
