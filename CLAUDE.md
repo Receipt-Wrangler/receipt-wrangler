@@ -382,6 +382,38 @@ choice in. **Client-only** — no backend, swagger or generated-client involveme
   `desktop/e2e/receipts.spec.ts`, `selectDropdown` in
   `mobile/integration_test/helpers/form_actions.dart`).
 
+### Quick Date Filter (month stepper)
+
+A month stepper — `‹ September 2026 ›` — plus a picker naming which date field it writes to, sitting
+above the receipts list on **both clients**. Stepping left or right adds or replaces that field's
+condition in the *same* filter the advanced filter dialog/screen drives, so the two can never
+disagree. **Client-only on both sides**: no backend, `swagger.yml` or generated-client involvement.
+
+- **A month is `BETWEEN [first day, last day]`** — the one operation that can express *any* month,
+  which is why the feature needed no API change. `WITHIN_CURRENT_MONTH` is **not** equivalent: the
+  server pins it to month-start through *today*, so it can only ever mean the current month.
+- **It targets one of three date fields** — `date` / `resolvedDate` / `createdAt` — chosen by the
+  user and held in the same state as the filter. **Switching is non-destructive and refetches
+  nothing**: it changes no condition, only which one the stepper describes, so the abandoned
+  condition stays applied and stays visible (a chip on desktop, a card on the filter screen on
+  mobile).
+- **The label degrades rather than hiding.** `"<Month> <Year>"` for a whole calendar month, `"Custom"`
+  for a condition the stepper cannot describe, `"All time"` for none. The arrows seed from **today's**
+  month when nothing is showing, then apply the delta, so `‹` and `›` never do the same thing.
+- **Each client stores the chosen field where its filter already lives**, and that is the one place
+  they differ meaningfully: desktop persists both to localStorage (so `monthFromFilterEntry` has to
+  accept ISO strings, and the field's default has to be applied on *read*), while mobile's
+  `ReceiptListModel` is in-memory and needs neither. Mobile still keeps the field on the **model**
+  rather than the list widget, because that widget is rebuilt on almost every navigation.
+- **E2e per client**, because both unit suites assert against a mocked API and so prove nothing about
+  the wire: `desktop/e2e/receipt-quick-date-filter.spec.ts` and
+  `mobile/integration_test/receipt_quick_date_filter_test.dart`. The mobile one **seeds relative to
+  `DateTime.now()`** — the shared mobile filter fixture is pinned to June 2026, which a
+  month-relative control drifts away from.
+
+See `desktop/CLAUDE.md` → "The month stepper targets one date field" and `mobile/CLAUDE.md` → "Quick
+date filter" for the per-client details.
+
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
 - **Desktop**: NGXS store with actions/selectors, persistent storage for auth/preferences

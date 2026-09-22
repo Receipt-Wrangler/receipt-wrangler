@@ -1458,6 +1458,104 @@ group change). Shared drivers live in `integration_test/helpers/receipt_filter_a
   `formField("value")` -- and `CurrencyTextFieldController` reads keystrokes as cents, so type the
   full `50.00`, not `50`.
 
+### Quick date filter (month stepper + date field picker)
+
+Above the receipts list, a month stepper and a chip naming the date field it writes to -- the mobile
+half of the design project's panel **4b**, and a port of desktop's `app-month-stepper` +
+`receipts-quick-date-field` (`desktop/CLAUDE.md` -> "The month stepper targets one date field").
+**Client-only**, like the filter screen below it: a month is `BETWEEN [first day, last day]`, which
+the API and the encoder already handle.
+
+```
+◄   📅 September 2026   ✕   ►
+[📅 On Receipt Date] [Added At] [Descending]
+```
+
+- **`lib/utils/receipt_date_filter.dart` owns the month <-> condition translation** --
+  `monthFilterCondition`, `monthFromCondition`, `shiftMonth`, `monthOfDate`, `filterMonthLabel`.
+  It hands the encoder plain month boundaries (`DateTime(y, m, 1)` / `DateTime(y, m + 1, 0)`) rather
+  than day-bounded instants, because `buildReceiptPagedRequestFilter` already applies
+  `startOfDay`/`endOfDay` to a `BETWEEN` pair -- duplicating that here would give the rule two homes.
+  Day `0` of the next month and month `13` both normalize in Dart, so **February and December need no
+  special case**.
+- **`FilterMonth.month` is 1-based**, unlike desktop's zero-based `FilterMonth` (which is built on
+  JavaScript's `Date`). `DateTime.month` is 1-based, so a faithful port of the off-by-one would fight
+  every constructor.
+- **`monthFromCondition` takes `DateTime`s only**, where desktop's `monthFromFilterEntry` also accepts
+  ISO strings. Desktop persists its filter to localStorage and NGXS serializes through JSON;
+  `ReceiptListModel` is in-memory, so the string branch would be dead code. It still matches on
+  **calendar fields**, which is what lets it name a month the advanced filter's `showDateRangePicker`
+  authored (both bounds at local midnight).
+- **`ReceiptListModel` owns which field the control points at** (`quickDateField`,
+  `setQuickDateField`, `quickDateCondition`), not `GroupReceiptsList`. That widget is torn down and
+  rebuilt on almost every navigation, including a round trip to a receipt -- a widget-local field
+  would snap back to `date` while the month it wrote still sat on `resolvedDate`, leaving the stepper
+  describing a condition it does not own. Same reasoning as `filterGroupId`.
+- **`setFilterField(key, condition, groupId:)`** is the single-field write path (the analogue of
+  desktop's `SetReceiptFilterField`). It **notifies**, so the list refetches once through
+  `_refreshForFilterChange`; the filter screen keeps committing whole drafts through `setFilter`.
+- **Switching the date field must NOT refetch**, which is why the chip calls
+  `setQuickDateField(key, false)` and repaints with a bare `setState`. It changes no condition, only
+  which one the stepper describes, so the result set has not moved -- and a notification from this
+  model means "the filter changed". The abandoned condition stays applied and stays on the filter
+  screen. `group_receipts_list_test.dart` asserts **zero** requests for it; verified to fail with the
+  flag flipped to `true`.
+- **The chosen field is group-scoped exactly as the conditions are**, and it takes *both* halves to
+  hold. `clearFilter`'s early return was widened to cover the field
+  (`_filter.isEmpty && _quickDateField == defaultQuickDateFieldKey`), **and** `setQuickDateField`
+  takes a **required `groupId`** and records it -- because `_filterGroupId` is what
+  `didChangeDependencies` compares, and it is the only thing that gets `clearFilter` *called*.
+  Widening the guard alone shipped a half-rule: with a condition applied the field reset, and with
+  none applied `_filterGroupId` stayed null, the reset never ran, and the field followed the user
+  into the next group (caught in review on #702). `_filterGroupId` is therefore recomputed on every
+  write from one predicate, `_hasGroupScopedState` (`_filter.isNotEmpty || field != default`), so a
+  field toggled away from the default and back leaves nothing scoped behind. Same shape as the
+  filter leak `receipt_filter_lifecycle_test.dart` exists for, and
+  `group_receipts_list_test.dart` pins the field-only navigation case separately from the
+  with-a-condition one.
+- **The label reads "September 2026" / "Custom" / "All time"**, and the stepper never hides. A
+  condition it cannot describe (a partial range, a `GREATER_THAN`, `WITHIN_CURRENT_MONTH`) still has
+  to read as a filter. **The clear ✕ follows the *condition*, not the month** -- "Custom" carries no
+  month but is exactly the state a user most needs a way out of.
+- **The arrows seed from today when no month is showing**, then apply the delta, so `◄` and `►` never
+  do the same thing. Stepping off "Custom" overwrites that condition with a whole month.
+- **The field chip is labelled "On Receipt Date", not "Receipt Date".** `receiptSortOptions` names
+  the same three columns identically, so an unprefixed chip sits beside a sort chip reading exactly
+  the same words while meaning something else. Desktop needs no prefix because its picker abuts the
+  stepper and reads "September 2026 ... on Receipt Date" in one line; the two stacked rows here
+  cannot. Pinned by a test that sorts by Receipt Date and asserts both chips.
+- **`buildSortFilterBar()` is horizontally scrollable** now that it carries a third chip -- a bare
+  `Row` overflows a narrow phone rather than truncating.
+- **The month sheet is `isScrollControlled`.** A default `showModalBottomSheet` caps itself at 9/16 of
+  the screen, which the year pager plus the grid plus the shortcuts exceeds on a short phone -- and a
+  bottom sheet **overflows rather than scrolling**. It is also a plain compact sheet rather than
+  `showFullscreenBottomSheet`, which mounts a `TopAppBar` over a full-height body for children that
+  scroll themselves. Opened through `ContextModel.resolveSheetContext`, like every other sheet.
+- **Paging the year selects nothing and leaves the sheet open** -- it is a view concern. Bounds are
+  1970 through five years out, matching desktop's `MIN_YEAR` / `MAX_YEAR_OFFSET`.
+- **`receiptDateFilterFields`** is derived from `receiptFilterFields` by `type`, so the picker, the
+  condition card and the "Add filter" sheet cannot name a field differently. Desktop narrows on the
+  *key* because TypeScript needs the runtime check to justify its narrower type; Dart does not, and
+  filtering on the type means a new date field reaches the picker with no second edit.
+
+**Demo:** `tool/quick-date-filter.gif`, regenerated by `tool/record_quick_date_demo.sh` (see
+"Recording a demo GIF" below -- route 2, single panel).
+
+**Tests:** `test/utils/receipt_date_filter_test.dart` (boundaries incl. leap February and the
+December roll, the null cases, and the whole thing through the **real** encoder -- that last is what
+proves a month reaches the server as `…-01T00:00:00Z` -> `…-<last>T23:59:59Z`),
+`test/widgets/receipt_month_stepper_test.dart`, `test/widgets/receipt_month_picker_sheet_test.dart`,
+plus new cases in `receipt_filter_fields_test.dart`, `receipt_list_model_test.dart` and
+`group_receipts_list_test.dart`.
+
+**E2e: `integration_test/receipt_quick_date_filter_test.dart`.** It **seeds relative to
+`DateTime.now()`**, which `receipt_filter_test.dart` explicitly requires of any month-relative case --
+that suite is pinned to June 2026 and would drift out of the stepper's reach. Two receipts: one dated
+the 15th of last month with status **RESOLVED**, one dated the 15th of this month. The RESOLVED one
+is what makes the field picker testable at all: the API stamps `resolved_date` with `time.Now()` on
+create, so its two date columns fall in different months, and filtering "this month" returns the
+*other* row on `resolvedDate` than on `date`. Nothing but a real column change on the wire produces
+that.
 ### Receipt summary
 
 A block of totals **pinned** above or below the receipts list, covering the whole current filter
@@ -1799,6 +1897,34 @@ frames are captured inside a widget test and encoded to GIF in pure Dart.
   engine's futures, so a bare `await boundary.toImage()` **hangs until the test times out** rather
   than failing. `runAsync` also *swallows* errors and returns null, surfacing them via
   `takeException` — so null-check and `fail()`, or a real failure shows up as a confusing null.
+- **Route 2 can drive a whole API-backed screen, not just a bare form.**
+  `quick_date_demo_test.dart` records the real `GroupReceiptsList` -- real stepper, real sheet, real
+  picker, real theme and provider tree -- with only `getReceiptsForGroup` stubbed, by a fake that
+  **decodes the filter the client actually sent** and returns the seeded rows inside it. So the rows
+  narrowing is evidence rather than choreography: break the encoder and the demo visibly stops
+  filtering. That is also why route 1 was not an option for it -- driving the real control there
+  needs the Go API behind it, which the sandbox cannot bring up (ImageMagick 7 from source).
+- **A demo of a new feature is one panel, not a pair.** The other demos here record the same screen
+  twice across a `debugDisable*` seam because they document *fixes*. A new control has no seam and
+  nothing to compare against, so `writeGif` takes frames that each carry their own hold time (in
+  1/100 s) instead of reading durations off `demoInsetRamp()`.
+- **`numColors: 128` is for flat UI art; a real screen may need 256.** `ListItemTrailingStatus`
+  paints a `LinearGradient` in every receipt row, which a short palette bands into visible vertical
+  stripes with dithering off. 256 (the GIF maximum) clears it, and also cleans up the antialiased
+  white caption text that ghosts at 128 -- visible in the committed keyboard GIFs.
+  **Turning dithering on instead is not the fix**, and it is worth not rediscovering: Floyd-Steinberg
+  at 256 colors dithered the screen's large *white* areas into visible noise and took the file from
+  176KB to 445KB. The existing "no dither" guidance holds; raise the palette, not the dither.
+- **Call `loadDemoFontsOrFail(tester)`, never `loadDemoFonts` directly.** Two failure modes sit on
+  this one line and neither announces itself. A bare `await loadDemoFonts()` reads fonts off disk and
+  awaits `FontLoader.load` in fake-async, so it **hangs** until the 10-minute test timeout rather
+  than failing -- and the timeout names the test, not the call, so it reads as a mysterious stall.
+  Wrapping it in `tester.runAsync` fixes that but introduces the opposite problem: `runAsync` returns
+  null **both** when the callback throws and when it has nothing to return, and `loadDemoFonts`
+  returns `Future<void>` -- so a genuine font-load failure is swallowed and the demo cheerfully
+  records a whole clip in `--use-test-fonts`' stub font, where every glyph is a filled box. It
+  passes, and writes a GIF nobody can read. `loadDemoFontsOrFail` returns a sentinel from inside
+  `runAsync` and fails on anything else, the same shape `grabFrame` uses; all three demos call it.
 - **`flutter test` always passes `--use-test-fonts`,** whose stub font draws every glyph as a filled
   box. Load Raleway from `fonts/` on disk, register it as `Roboto` too (Material's default
   `Typography` asks for that, and most text takes the theme default), and load `MaterialIcons` or

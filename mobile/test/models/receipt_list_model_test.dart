@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openapi/openapi.dart' as api;
+import 'package:receipt_wrangler_mobile/constants/receipt_filter_fields.dart';
 import 'package:receipt_wrangler_mobile/models/receipt-list-model.dart';
+import 'package:receipt_wrangler_mobile/utils/receipt_date_filter.dart';
 import 'package:receipt_wrangler_mobile/utils/receipt_filter.dart';
 
 import '../helpers/receipt_filter_test_helpers.dart';
@@ -22,6 +24,7 @@ void main() {
       operation: api.FilterOperation.CONTAINS, value: "Costco");
   const amountCondition = ReceiptFilterCondition(
       operation: api.FilterOperation.GREATER_THAN, value: 50.0);
+  final monthCondition = monthFilterCondition(const FilterMonth(2026, 9));
 
   Map<String, dynamic> serializedFilterOf(ReceiptListModel model) {
     final command = model.receiptPagedRequestCommand;
@@ -264,5 +267,142 @@ void main() {
 
     expect(serializedFilterOf(model)["categories"],
         {"operation": "CONTAINS", "value": [3, 8]});
+  });
+
+  group("setFilterField", () {
+    test("adds a condition to an empty filter and records the group", () {
+      model.setFilterField("date", monthCondition, groupId: groupId);
+
+      expect(model.filter.keys, ["date"]);
+      expect(model.filterGroupId, groupId);
+    });
+
+    test("replaces one field without disturbing the others", () {
+      model.setFilter({"name": nameCondition}, false, groupId: groupId);
+
+      model.setFilterField("date", monthCondition, groupId: groupId);
+
+      expect(model.filter.keys, containsAll(["name", "date"]));
+      expect(model.filter["name"], nameCondition);
+    });
+
+    test("a null condition removes the field", () {
+      model.setFilter({"name": nameCondition, "date": monthCondition}, false,
+          groupId: groupId);
+
+      model.setFilterField("date", null, groupId: groupId);
+
+      expect(model.filter.keys, ["name"]);
+    });
+
+    test("removing the last condition drops the group scope with it", () {
+      model.setFilterField("date", monthCondition, groupId: groupId);
+
+      model.setFilterField("date", null, groupId: groupId);
+
+      expect(model.filter, isEmpty);
+      expect(model.filterGroupId, isNull);
+    });
+
+    test("notifies, because the result set moved", () {
+      var notifications = 0;
+      model.addListener(() => notifications++);
+
+      model.setFilterField("date", monthCondition, groupId: groupId);
+
+      expect(notifications, 1);
+    });
+  });
+
+  group("the quick date field", () {
+    test("starts on Receipt Date", () {
+      expect(model.quickDateField, defaultQuickDateFieldKey);
+      expect(model.quickDateCondition, isNull);
+    });
+
+    test("reads the condition on whichever field it points at", () {
+      model.setFilter({
+        "date": nameCondition,
+        "resolvedDate": monthCondition,
+      }, false, groupId: groupId);
+
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
+
+      expect(model.quickDateCondition, monthCondition);
+    });
+
+    test("switching it disturbs no condition", () {
+      // Non-destructive by design: it changes which condition the stepper
+      // describes, not the filter itself.
+      model.setFilter({"date": monthCondition}, false, groupId: groupId);
+
+      model.setQuickDateField("createdAt", false, groupId: groupId);
+
+      expect(model.filter.keys, ["date"]);
+      expect(model.quickDateCondition, isNull);
+    });
+
+    test("honours its notify flag", () {
+      // The receipts list treats a notification as "the filter changed", so a
+      // notifying switch would refetch a result set that has not moved.
+      var notifications = 0;
+      model.addListener(() => notifications++);
+
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
+      expect(notifications, 0);
+
+      model.setQuickDateField("createdAt", true, groupId: groupId);
+      expect(notifications, 1);
+    });
+
+    test("is reset by clearFilter, alongside the conditions", () {
+      model.setFilter({"resolvedDate": monthCondition}, false,
+          groupId: groupId);
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
+
+      model.clearFilter(false);
+
+      expect(model.filter, isEmpty);
+      expect(model.quickDateField, defaultQuickDateFieldKey);
+    });
+
+    test("records its group, so a field-only change is still scoped", () {
+      // The case that made the field outlive its group: with no conditions
+      // applied nothing recorded a scope, so the receipts list had nothing to
+      // compare against on navigation and never reset the field.
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
+
+      expect(model.filterGroupId, groupId);
+    });
+
+    test("drops the scope again when the field returns to its default", () {
+      // Nothing group-specific is left at that point, so a toggle away and
+      // back must not leave the next group looking like a group change.
+      model.setQuickDateField("resolvedDate", false, groupId: groupId);
+
+      model.setQuickDateField(defaultQuickDateFieldKey, false,
+          groupId: groupId);
+
+      expect(model.filterGroupId, isNull);
+    });
+
+    test("keeps the scope while conditions remain", () {
+      model.setFilter({"date": monthCondition}, false, groupId: groupId);
+
+      model.setQuickDateField(defaultQuickDateFieldKey, false,
+          groupId: groupId);
+
+      expect(model.filterGroupId, groupId);
+    });
+
+    test("is reset even when no condition was ever applied", () {
+      // The early return has to cover the field too, or a group change leaves
+      // the stepper pointed at a field chosen in the group just left.
+      model.setQuickDateField("createdAt", false, groupId: groupId);
+
+      model.clearFilter(false);
+
+      expect(model.quickDateField, defaultQuickDateFieldKey);
+    });
   });
 }

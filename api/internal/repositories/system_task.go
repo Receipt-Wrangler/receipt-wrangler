@@ -2,12 +2,22 @@ package repositories
 
 import (
 	"errors"
+	"math"
+	"time"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/structs"
 )
+
+// SystemRanByUserId is the sentinel the desktop's "Ran By" picker submits for
+// tasks the system ran itself (system_tasks.ran_by_user_id IS NULL). It is
+// negative so it can never collide with a real user id — the same convention as
+// the role editor's OWN_PAID_RECEIPTS_OPTION_ID and the report builder's
+// REPORT_GENERATOR_PAID_BY_ID.
+const SystemRanByUserId = -1
 
 type SystemTaskRepository struct {
 	BaseRepository
@@ -46,6 +56,10 @@ func (repository SystemTaskRepository) GetPagedSystemTasks(command commands.GetS
 		query = query.Where("associated_entity_type = ?", command.AssociatedEntityType)
 	}
 
+	// Applied before Count so totalCount describes the filtered set, mirroring
+	// the paid-by/visibility predicates in GetPagedActivities below.
+	query = repository.buildSystemTaskFilterQuery(query, command.Filter)
+
 	query.Count(&count)
 
 	query = repository.Sort(query, command.OrderBy, command.SortDirection)
@@ -57,6 +71,204 @@ func (repository SystemTaskRepository) GetPagedSystemTasks(command commands.GetS
 	}
 
 	return results, count, nil
+}
+
+// buildSystemTaskFilterQuery narrows the paged system task query by the
+// caller's filter. Every value arrives as an interface{} off the request body,
+// so each unwrap is a comma-ok assertion: a wrong-typed value is treated as
+// "field not set" rather than panicking the handler.
+func (repository SystemTaskRepository) buildSystemTaskFilterQuery(query *gorm.DB, filter commands.SystemTaskPagedRequestFilter) *gorm.DB {
+	if types, ok := filter.Type.Value.([]interface{}); ok && len(types) > 0 {
+		query = repository.BuildFilterQuery(query, types, filter.Type.Operation, "type", true)
+	}
+
+	query = repository.applyRanByFilter(query, filter.RanBy)
+	query = repository.applyTimestampDayFilter(query, filter.StartedAt, "started_at")
+	query = repository.applyTimestampDayFilter(query, filter.EndedAt, "ended_at")
+
+	return query
+}
+
+// applyRanByFilter cannot go through BuildFilterQuery because ran_by_user_id is
+// nullable and the rows with no user are exactly the ones the table labels
+// "System". The desktop submits SystemRanByUserId for those, so the sentinel is
+// split out of the id list and becomes an IS NULL disjunct.
+func (repository SystemTaskRepository) applyRanByFilter(query *gorm.DB, field commands.PagedRequestField) *gorm.DB {
+	rawIds, ok := field.Value.([]interface{})
+	if !ok || len(rawIds) == 0 || field.Operation != commands.CONTAINS {
+		return query
+	}
+
+	includeSystem := false
+	userIds := make([]int64, 0, len(rawIds))
+
+	for _, rawId := range rawIds {
+		id, ok := toInt64(rawId)
+		if !ok {
+			continue
+		}
+
+		if id == SystemRanByUserId {
+			includeSystem = true
+			continue
+		}
+
+		userIds = append(userIds, id)
+	}
+
+	switch {
+	case includeSystem && len(userIds) > 0:
+		// Parenthesized explicitly, like applyActivityVisibilityDisjunction below:
+		// GORM does wrap an OR condition when AND-ing it onto the query today, but
+		// an unparenthesized disjunction would bind as
+		// `(other AND a IS NULL) OR a IN (...)` and silently drop the other filters
+		// from the second branch.
+		return query.Where("(ran_by_user_id IS NULL OR ran_by_user_id IN ?)", userIds)
+	case includeSystem:
+		return query.Where("ran_by_user_id IS NULL")
+	case len(userIds) > 0:
+		return query.Where("ran_by_user_id IN ?", userIds)
+	default:
+		return query
+	}
+}
+
+// applyTimestampDayFilter compares a timestamp column against whole calendar
+// days. started_at / ended_at carry a time of day, unlike the date-only column
+// the receipt filter compares against, so a raw comparison to the datepicker's
+// midnight would make EQUALS never match and BETWEEN drop everything after
+// midnight on the end day.
+//
+// "Day" resolves in the server's location, the same zone WITHIN_CURRENT_MONTH
+// already uses — a client in a different zone can therefore shift the boundary
+// by a day, exactly as it can for receipts.
+//
+// ended_at is nullable, so any filter on it excludes tasks that are still
+// running. That is the correct reading of "ended before X".
+func (repository SystemTaskRepository) applyTimestampDayFilter(query *gorm.DB, field commands.PagedRequestField, column string) *gorm.DB {
+	if field.Value == nil {
+		return query
+	}
+
+	if field.Operation == commands.WITHIN_CURRENT_MONTH {
+		return repository.BuildFilterQuery(query, field.Value, field.Operation, column, false)
+	}
+
+	if field.Operation == commands.BETWEEN {
+		bounds, ok := field.Value.([]interface{})
+		if !ok || len(bounds) != 2 {
+			return query
+		}
+
+		start, startOk := startOfDayValue(bounds[0])
+		end, endOk := startOfDayValue(bounds[1])
+		if !startOk || !endOk {
+			return query
+		}
+
+		return query.Where(column+" >= ? AND "+column+" < ?", start, end.AddDate(0, 0, 1))
+	}
+
+	day, ok := startOfDayValue(field.Value)
+	if !ok {
+		return query
+	}
+
+	switch field.Operation {
+	case commands.EQUALS:
+		return query.Where(column+" >= ? AND "+column+" < ?", day, day.AddDate(0, 0, 1))
+	case commands.GREATER_THAN:
+		return query.Where(column+" >= ?", day.AddDate(0, 0, 1))
+	case commands.LESS_THAN:
+		return query.Where(column+" < ?", day)
+	default:
+		return query
+	}
+}
+
+// startOfDayValue parses a filter value into the midnight that begins its
+// calendar day in the server's location.
+//
+// The wire format is a bare calendar day, yyyy-MM-dd: the desktop normalizes
+// the datepicker's local-midnight Date to one before sending
+// (toSystemTaskWireFilter). An instant would be ambiguous — resolving it here
+// picks the day in the *server's* zone, so a client far enough east or west
+// selects the adjacent one. Full RFC 3339 instants are still accepted, for any
+// caller that sends one; a time.Time is accepted so Go callers and tests can
+// pass one directly.
+func startOfDayValue(value interface{}) (time.Time, bool) {
+	var parsed time.Time
+
+	switch typed := value.(type) {
+	case time.Time:
+		parsed = typed
+	case string:
+		if len(typed) == 0 {
+			return time.Time{}, false
+		}
+
+		// A bare calendar day is already midnight-local, and carries no zone to
+		// misread.
+		var err error
+		parsed, err = time.ParseInLocation(time.DateOnly, typed, time.Local)
+		if err != nil {
+			parsed, err = time.Parse(time.RFC3339, typed)
+			if err != nil {
+				return time.Time{}, false
+			}
+		}
+	default:
+		return time.Time{}, false
+	}
+
+	local := parsed.In(time.Local)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local), true
+}
+
+// toInt64 normalizes a JSON-decoded number. Ids arrive as float64 through
+// encoding/json, but a Go caller may pass a native integer type.
+func toInt64(value interface{}) (int64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return floatToInt64(typed)
+	case float32:
+		return floatToInt64(float64(typed))
+	case int:
+		return int64(typed), true
+	case int64:
+		return typed, true
+	case uint:
+		return int64(typed), true
+	case uint64:
+		return int64(typed), true
+	default:
+		return 0, false
+	}
+}
+
+// floatToInt64 accepts only a finite, whole value inside the int64 range.
+//
+// JSON has a single number type, so a fractional id reaches us as a float64: a
+// plain conversion would truncate `4.9` to user 4 and filter on somebody else.
+// Out-of-range and non-finite values are rejected too — converting either to an
+// integer is undefined behaviour in Go. A rejected id is dropped by the caller,
+// exactly as a non-numeric one already is.
+func floatToInt64(value float64) (int64, bool) {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, false
+	}
+
+	if value != math.Trunc(value) {
+		return 0, false
+	}
+
+	// math.MaxInt64 is not exactly representable as a float64 (it rounds up to
+	// 2^63), so the upper bound is the power of two itself, exclusive.
+	if value < float64(math.MinInt64) || value >= float64(1<<63) {
+		return 0, false
+	}
+
+	return int64(value), true
 }
 
 // ActivityVisibilityResolver reports, for a group, the ran-by user ids the caller may

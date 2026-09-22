@@ -290,6 +290,7 @@ Class | Method | HTTP request | Description
  - [SystemEmail](doc/SystemEmail.md)
  - [SystemSettings](doc/SystemSettings.md)
  - [SystemTask](doc/SystemTask.md)
+ - [SystemTaskPagedRequestFilter](doc/SystemTaskPagedRequestFilter.md)
  - [SystemTaskStatus](doc/SystemTaskStatus.md)
  - [SystemTaskType](doc/SystemTaskType.md)
  - [Tag](doc/Tag.md)

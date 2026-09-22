@@ -50,6 +50,7 @@ import { ImageViewerComponent } from "./image-viewer/image-viewer.component";
 import { PrettyJsonComponent } from "./pretty-json/pretty-json.component";
 import { QueueStartMenuComponent } from "./queue-start-menu/queue-start-menu.component";
 import { QuickScanButtonComponent } from "./quick-scan-button/quick-scan-button.component";
+import { FilterFieldComponent } from "./filter-field/filter-field.component";
 import { OperationsPipe } from "./receipt-filter/operations.pipe";
 import { ReceiptFilterComponent } from "./receipt-filter/receipt-filter.component";
 import { StatusChipComponent } from "./status-chip/status-chip.component";
@@ -92,6 +93,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     FormSectionComponent,
     GroupAutocompleteComponent,
     HelpIconComponent,
+    FilterFieldComponent,
     OperationsPipe,
     ReceiptFilterComponent,
     StatusChipComponent,
@@ -165,6 +167,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     FormSectionComponent,
     GroupAutocompleteComponent,
     HelpIconComponent,
+    FilterFieldComponent,
     OperationsPipe,
     QuickScanButtonComponent,
     ReceiptFilterComponent,

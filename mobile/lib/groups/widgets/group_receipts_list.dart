@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
+import 'package:receipt_wrangler_mobile/constants/receipt_filter_fields.dart';
 import 'package:receipt_wrangler_mobile/constants/receipts.dart';
 import 'package:receipt_wrangler_mobile/groups/widgets/receipt_list_item.dart';
 import 'package:receipt_wrangler_mobile/models/receipt-list-model.dart';
 import 'package:receipt_wrangler_mobile/models/group_model.dart';
+import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_month_picker_sheet.dart';
+import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_month_stepper.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/paged_data_list.dart';
 import 'package:receipt_wrangler_mobile/utils/group.dart';
+import 'package:receipt_wrangler_mobile/utils/receipt_date_filter.dart';
 import 'package:receipt_wrangler_mobile/utils/receipt_filter_options.dart';
 import 'package:receipt_wrangler_mobile/utils/receipt_summary.dart';
 
@@ -127,14 +131,17 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
 
     // setState as well as refetch: the empty-state text below reads the applied
     // filter, and the list is otherwise built with listen: false. Safe to call
-    // here because the only notifying writer is the filter screen's Apply, a
-    // user event -- the group reset writes silently, during a build.
+    // here because every notifying writer is a user EVENT -- the filter screen's
+    // Apply and the month stepper's tap (setFilterField) -- while the group reset
+    // and the date-field re-point write silently.
     setState(() {});
     _refreshCallback?.call();
-    // The filter changed, so the figures did too. The sort setters do NOT come through
-    // here -- they call _refreshCallback directly with notify: false -- which is what
-    // makes "sorting never refetches the summary" true by construction rather than by a
-    // rule someone has to remember. Paging never reaches here either.
+    // The filter changed, so the figures did too. Stepping the month reaches here and
+    // must, since it narrows the result set. What does NOT is the sort setters and the
+    // date-field re-point, which call _refreshCallback directly (or nothing at all) with
+    // notify: false -- and that is what makes "only a real filter change refetches the
+    // summary" true by construction rather than by a rule someone has to remember.
+    // Paging never reaches here either.
     _fetchSummary(getGroupId(context));
   }
 
@@ -218,15 +225,134 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
     _fetchSummary(getGroupId(context));
   }
 
+  /// The quick date control: a month stepper over the date field the chip row
+  /// below points it at.
+  ///
+  /// Mirrors desktop's `.receipts-quick-date`, which reads left to right as
+  /// "September 2026 ... on Receipt Date"; on a phone the two stack instead, so
+  /// it reads top to bottom.
+  Widget buildMonthStepper() {
+    final month = monthFromCondition(_receiptListModel.quickDateCondition);
+
+    return ReceiptMonthStepper(
+      month: month,
+      label: buildMonthStepperLabel(month),
+      // Not `month != null`: a condition the stepper cannot describe is still
+      // one the user needs a way out of.
+      hasCondition: _receiptListModel.quickDateCondition != null,
+      onMonthSelected: applyMonth,
+      onAllTimeSelected: () => applyMonth(null),
+      onLabelPressed: openMonthPicker,
+    );
+  }
+
+  /// "September 2026" for a whole calendar month, "Custom" for a condition the
+  /// stepper cannot describe, "All time" for no condition at all.
+  ///
+  /// A condition it cannot describe still has to read as a filter -- the
+  /// stepper never hides and never silently drops one.
+  String buildMonthStepperLabel(FilterMonth? month) {
+    if (month != null) {
+      return filterMonthLabel(month);
+    }
+
+    return _receiptListModel.quickDateCondition == null ? "All time" : "Custom";
+  }
+
+  /// Writes [month] onto the field the control is pointed at, or clears it.
+  ///
+  /// The quick control IS its field's filter, so it overwrites whatever was
+  /// there. `setFilterField` notifies, which refetches once through
+  /// [_refreshForFilterChange].
+  void applyMonth(FilterMonth? month) {
+    _receiptListModel.setFilterField(
+      _receiptListModel.quickDateField,
+      month == null ? null : monthFilterCondition(month),
+      groupId: getGroupId(context),
+    );
+  }
+
+  Future<void> openMonthPicker() async {
+    final result = await showReceiptMonthPickerSheet(
+      context,
+      selected: monthFromCondition(_receiptListModel.quickDateCondition),
+    );
+
+    // A dismissal changes nothing. `applyMonth` reads the route for the group
+    // id, so bail if the sheet outlived this widget.
+    if (result == null || !mounted) {
+      return;
+    }
+
+    applyMonth(result.isAllTime ? null : result.month);
+  }
+
+  /// Horizontally scrollable: three chips do not fit a narrow phone, and an
+  /// unscrollable `Row` overflows rather than truncating.
   Widget buildSortFilterBar() {
-    return Row(
-      children: [
-        buildSortChip(),
-        SizedBox(
-          width: 4,
-        ),
-        buildSortDirectionChip()
-      ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          buildQuickDateFieldChip(),
+          SizedBox(
+            width: 4,
+          ),
+          buildSortChip(),
+          SizedBox(
+            width: 4,
+          ),
+          buildSortDirectionChip()
+        ],
+      ),
+    );
+  }
+
+  /// Which date field the stepper reads and writes.
+  ///
+  /// Switching is deliberately non-destructive and refetches nothing: it
+  /// changes no condition, only which one the stepper describes, so a Receipt
+  /// Date filter survives a move to Resolved Date and stays applied. The
+  /// `setState` is only to repaint this bar and the label above it.
+  ///
+  /// The label is prefixed with "On" because [receiptSortOptions] names the
+  /// same three columns identically -- sorting by Receipt Date would otherwise
+  /// put two chips reading "Receipt Date" side by side, meaning different
+  /// things. Desktop needs no prefix: its picker sits against the stepper and
+  /// reads "September 2026 ... on Receipt Date" in one line, which the two rows
+  /// here cannot.
+  Widget buildQuickDateFieldChip() {
+    final selected = _receiptListModel.quickDateField;
+    final label = receiptDateFilterFields
+        .firstWhere((field) => field.key == selected,
+            orElse: () => receiptDateFilterFields.first)
+        .label;
+
+    return PopupMenuButton<String>(
+      key: const ValueKey("receipt-quick-date-field"),
+      tooltip: "Choose which date field to filter on",
+      child: Chip(
+        avatar: Icon(Icons.event, size: 18),
+        label: Text("On $label"),
+      ),
+      itemBuilder: (context) => receiptDateFilterFields.map((field) {
+        return PopupMenuItem(
+          key: ValueKey("receipt-quick-date-field-${field.key}"),
+          value: field.key,
+          child: Row(
+            children: [
+              Icon(field.key == selected ? Icons.check : null, size: 18),
+              SizedBox(width: 8),
+              Text(field.label),
+            ],
+          ),
+        );
+      }).toList(),
+      onSelected: (value) {
+        _receiptListModel.setQuickDateField(value, false,
+            groupId: getGroupId(context));
+        setState(() {});
+      },
     );
   }
 
@@ -325,6 +451,7 @@ class _GroupReceiptsList extends State<GroupReceiptsList> {
 
     return Column(
       children: [
+        buildMonthStepper(),
         buildSortFilterBar(),
         // Both slots are PINNED for free: PagedDataList returns an Expanded, so it takes
         // the remaining height and the bar never scrolls with the list. That is what
