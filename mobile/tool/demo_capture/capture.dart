@@ -253,6 +253,56 @@ void writeSideBySidePng({
   print('wrote $path — ${(bytes.length / 1024).toStringAsFixed(0)} KB');
 }
 
+/// Writes a single-panel looping GIF from frames that each carry their own
+/// hold time, in **1/100 s**.
+///
+/// [writeSideBySideGif] below reads its durations off `demoInsetRamp()`, which
+/// only makes sense for a demo driven by the keyboard inset. A demo driven by
+/// *taps* has no ramp -- each step holds for as long as that step needs to be
+/// read -- so the frames carry their own timing instead. The encoder settings
+/// are the shared part and the reason this lives here rather than in a demo
+/// file: they are not the defaults, and getting them wrong is not obvious until
+/// the GIF is already committed (see `mobile/CLAUDE.md` -> "Recording a demo
+/// GIF").
+///
+/// Synchronous for the same reason the others are: `testWidgets` runs in
+/// fake-async, where `File.writeAsBytes` never completes and the test hangs
+/// until it times out.
+void writeGif({
+  required List<({img.Image frame, int centis})> frames,
+  required String path,
+}) {
+  final encoder = img.GifEncoder(
+    repeat: 0,
+    // 256, the GIF maximum, where the side-by-side writer below uses 128.
+    // That one records flat UI art, which quantizes cleanly; a receipts list
+    // does not -- `ListItemTrailingStatus` paints a LinearGradient in every
+    // row, and with dithering off (which it must be, or LZW loses the long
+    // pixel runs it compresses) a short palette bands that gradient into
+    // visible stripes. It also cleans up antialiased white text on a saturated
+    // caption strip, which ghosts at 128.
+    numColors: 256,
+    quantizerType: img.QuantizerType.octree,
+    dither: img.DitherKernel.none,
+  );
+
+  for (final step in frames) {
+    // addFrame encodes the PREVIOUS image and finish() flushes the last, so N
+    // calls plus finish yield N frames.
+    encoder.addFrame(step.frame, duration: step.centis);
+  }
+
+  final bytes = encoder.finish()!;
+  final file = File(path);
+  file.parent.createSync(recursive: true);
+  file.writeAsBytesSync(bytes);
+
+  // ignore: avoid_print
+  print('wrote $path — ${(bytes.length / 1024).toStringAsFixed(0)} KB, '
+      '${frames.length} frames, '
+      '${frames.first.frame.width}x${frames.first.frame.height}');
+}
+
 /// Stitches the two recordings into one looping GIF, before on the left.
 ///
 /// Side by side rather than sequential for the reason the tap-target demo is:
