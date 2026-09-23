@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/go-chi/chi/v5"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -168,27 +168,13 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 
 func RerunActivity(w http.ResponseWriter, r *http.Request) {
 	errorMsg := "Error rerunning activity"
-	systemTaskRepository := repositories.NewSystemTaskRepository(nil)
-	inspector, err := wranglerasynq.GetAsynqInspector()
-	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
-		return
-	}
-	defer inspector.Close()
 
-	systemTaskId := chi.URLParam(r, "id")
-	systemTaskUintId, err := utils.StringToUint(systemTaskId)
-	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
-		return
-	}
-
-	systemTask, err := systemTaskRepository.GetSystemTaskById(systemTaskUintId)
-	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
+	// The group and the actor come off the task ROW, and everything Redis knows is
+	// deferred into the handler function below. Resolving the group from the asynq
+	// payload first, as this used to, put a Redis round trip — and any error from
+	// it — ahead of the permission gate. See "Authorization order" in api/CLAUDE.md.
+	systemTask, groupId, handled := loadSystemTaskForSourceFile(w, r, errorMsg)
+	if handled {
 		return
 	}
 
@@ -198,42 +184,36 @@ func RerunActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queueName, err := wranglerasynq.SystemTaskToQueueName(systemTask.Type)
-	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
-		return
-	}
-
-	taskInfo, err := inspector.GetTaskInfo(queueName, systemTask.AsynqTaskId)
-	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
-		return
-	}
-
-	var payload wranglerasynq.RerunTaskPayload
-	err = json.Unmarshal(taskInfo.Payload, &payload)
-	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
-		return
-	}
-
-	stringGroupId, err := wranglerasynq.ResolveActivityGroupId(payload)
-	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
-		return
-	}
-
 	handler := structs.Handler{
 		ErrorMessage:     errorMsg,
 		Writer:           w,
 		Request:          r,
-		GroupId:          stringGroupId,
+		GroupId:          groupId,
 		GroupPermissions: []string{permissions.GroupActivitiesRerun},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			// Same member-isolation rule as the source-file routes: holding
+			// group.activities.rerun in an isolated group must not let a plain member
+			// re-run an activity the list hid from them.
+			if denied := enforceActivityActorVisible(w, r, systemTask, errorMsg); denied {
+				return 0, nil
+			}
+
+			queueName, err := wranglerasynq.SystemTaskToQueueName(systemTask.Type)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			inspector, err := wranglerasynq.GetAsynqInspector()
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			defer inspector.Close()
+
+			taskInfo, err := inspector.GetTaskInfo(queueName, systemTask.AsynqTaskId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			// Inspector.RunTask does not refuse a task by state — it pushes back
 			// anything that is not active or pending, a succeeded task included —
 			// so the rule lives here. The email queue retains its completed tasks
@@ -253,8 +233,7 @@ func RerunActivity(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
-			err = inspector.RunTask(queueName, systemTask.AsynqTaskId)
-			if err != nil {
+			if err := inspector.RunTask(queueName, systemTask.AsynqTaskId); err != nil {
 				return http.StatusInternalServerError, err
 			}
 
@@ -294,8 +273,8 @@ func groupSourceFileReader(userId uint) func(groupId uint) bool {
 func GetSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 	errorMsg := "Error getting activity source file"
 
-	sourceFile, systemTaskErr := resolveSourceFileFromRequest(w, r, errorMsg)
-	if systemTaskErr {
+	systemTask, groupId, handled := loadSystemTaskForSourceFile(w, r, errorMsg)
+	if handled {
 		return
 	}
 
@@ -303,10 +282,15 @@ func GetSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 		ErrorMessage:     errorMsg,
 		Writer:           w,
 		Request:          r,
-		GroupId:          sourceFile.GroupId,
+		GroupId:          groupId,
 		GroupPermissions: []string{permissions.GroupActivitiesRead},
 		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			sourceFile, ok := authorizeAndResolveSourceFile(w, r, systemTask, errorMsg)
+			if !ok {
+				return 0, nil
+			}
+
 			fileRepository := repositories.NewFileRepository(nil)
 
 			// Prefer the already-converted OCR copy. Converting the original
@@ -356,8 +340,8 @@ func GetSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 func DownloadSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 	errorMsg := "Error downloading activity source file"
 
-	sourceFile, systemTaskErr := resolveSourceFileFromRequest(w, r, errorMsg)
-	if systemTaskErr {
+	systemTask, groupId, handled := loadSystemTaskForSourceFile(w, r, errorMsg)
+	if handled {
 		return
 	}
 
@@ -365,19 +349,29 @@ func DownloadSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 		ErrorMessage:     errorMsg,
 		Writer:           w,
 		Request:          r,
-		GroupId:          sourceFile.GroupId,
+		GroupId:          groupId,
 		GroupPermissions: []string{permissions.GroupActivitiesRead},
 		// Deliberately unset so http.ServeFile derives the Content-Type itself.
 		ResponseType: "",
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			// Quoted and sanitized: an email attachment's name comes from a MIME
-			// header, so it can carry spaces, commas or separators.
+			sourceFile, ok := authorizeAndResolveSourceFile(w, r, systemTask, errorMsg)
+			if !ok {
+				return 0, nil
+			}
+
+			// Sanitized because an email attachment's name comes from a MIME header,
+			// then formatted by mime.FormatMediaType rather than concatenated: a name
+			// containing a quote would otherwise close the quoted value early and
+			// truncate what the client reads back off the header.
 			fileName := utils.SanitizeFileName(sourceFile.FileName)
 			if len(fileName) == 0 {
 				fileName = filepath.Base(sourceFile.Path)
 			}
 
-			w.Header().Set("Content-Disposition", "attachment; filename=\""+fileName+"\"")
+			w.Header().Set(
+				"Content-Disposition",
+				mime.FormatMediaType("attachment", map[string]string{"filename": fileName}),
+			)
 			http.ServeFile(w, r, sourceFile.Path)
 
 			// Streaming has begun, so returning an error here would write an error
@@ -389,49 +383,127 @@ func DownloadSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
-// resolveSourceFileFromRequest loads the system task named in the URL and locates
-// its upload. It reports true when it has already written a response, in which
-// case the caller must return without building a handler.
+// activityAccessDeniedMessage is deliberately the same for "you are not in this group"
+// and "this activity was run by someone you cannot see", so neither answer distinguishes
+// the other.
+const activityAccessDeniedMessage = "You do not have access to this activity."
+
+// loadSystemTaskForSourceFile loads the system task named in the URL and returns the group
+// the request must be gated on. It reports true when it has already written a response, in
+// which case the caller must return without building a handler.
 //
-// This runs before the structs.Handler is built because the group it gates on is
-// only knowable from the task's asynq payload — the same shape RerunActivity uses.
-func resolveSourceFileFromRequest(
+// It reads the group off the system_tasks ROW rather than the asynq payload. That is what
+// lets every authorization answer come before any file-specific one: resolving the payload
+// means a Redis round trip that can itself fail or report the file gone, and doing that
+// first told an unauthorized caller whether a task existed and still had its upload. The
+// row carries GroupId for both task types (CreateSystemTasksFromMetadata is passed one by
+// the quick scan and email paths alike), and it saves the GroupSettings lookup
+// ResolveActivityGroupId needs for email.
+//
+// A nil GroupId fails closed: there is no group to gate against, so nothing is served.
+func loadSystemTaskForSourceFile(
 	w http.ResponseWriter,
 	r *http.Request,
 	errorMsg string,
-) (wranglerasynq.SystemTaskSourceFile, bool) {
+) (models.SystemTask, string, bool) {
 	systemTaskRepository := repositories.NewSystemTaskRepository(nil)
 
 	systemTaskId, err := utils.StringToUint(chi.URLParam(r, "id"))
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
 		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusBadRequest)
-		return wranglerasynq.SystemTaskSourceFile{}, true
+		return models.SystemTask{}, "", true
 	}
 
 	systemTask, err := systemTaskRepository.GetSystemTaskById(systemTaskId)
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
 		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
-		return wranglerasynq.SystemTaskSourceFile{}, true
+		return models.SystemTask{}, "", true
+	}
+
+	if systemTask.GroupId == nil {
+		utils.WriteCustomErrorResponse(w, activityAccessDeniedMessage, http.StatusForbidden)
+		return models.SystemTask{}, "", true
+	}
+
+	return systemTask, utils.UintToString(*systemTask.GroupId), false
+}
+
+// authorizeAndResolveSourceFile applies the member-isolation rule and then locates the
+// upload, in that order. It reports false when it has already written a response.
+//
+// It runs INSIDE the handler function, so the group permission has already been checked:
+// the remaining question is whether this caller may see the member who ran the activity.
+func authorizeAndResolveSourceFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	systemTask models.SystemTask,
+	errorMsg string,
+) (wranglerasynq.SystemTaskSourceFile, bool) {
+	if denied := enforceActivityActorVisible(w, r, systemTask, errorMsg); denied {
+		return wranglerasynq.SystemTaskSourceFile{}, false
 	}
 
 	sourceFile, err := wranglerasynq.ResolveSystemTaskSourceFile(systemTask)
 	if err != nil {
 		if errors.Is(err, wranglerasynq.ErrSourceFileUnsupportedTask) {
 			utils.WriteCustomErrorResponse(w, "This activity type has no source file.", http.StatusBadRequest)
-			return wranglerasynq.SystemTaskSourceFile{}, true
+			return wranglerasynq.SystemTaskSourceFile{}, false
 		}
 
 		if errors.Is(err, wranglerasynq.ErrSourceFileUnavailable) {
 			utils.WriteCustomErrorResponse(w, "The source file is no longer available.", http.StatusNotFound)
-			return wranglerasynq.SystemTaskSourceFile{}, true
+			return wranglerasynq.SystemTaskSourceFile{}, false
 		}
 
 		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
 		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
-		return wranglerasynq.SystemTaskSourceFile{}, true
+		return wranglerasynq.SystemTaskSourceFile{}, false
 	}
 
-	return sourceFile, false
+	return sourceFile, true
+}
+
+// enforceActivityActorVisible applies to a single task the member-isolation rule
+// GetActivitiesForGroups already enforces in SQL (applyActivityVisibilityDisjunction), so
+// a per-task endpoint cannot hand back what the list deliberately hid. Without it, a plain
+// member of an isolated group holds group.activities.read and could name a hidden
+// co-member's task id to fetch their upload. It reports true when it has written a
+// response.
+//
+// A nil RanByUserId is a system action and stays visible — which is every EMAIL_UPLOAD,
+// since email is polled rather than run by a user. That matches the SQL clause exactly:
+// ran_by_user_id IS NULL OR ran_by_user_id IN <visible>.
+func enforceActivityActorVisible(
+	w http.ResponseWriter,
+	r *http.Request,
+	systemTask models.SystemTask,
+	errorMsg string,
+) bool {
+	if systemTask.RanByUserId == nil {
+		return false
+	}
+
+	if systemTask.GroupId == nil {
+		utils.WriteCustomErrorResponse(w, activityAccessDeniedMessage, http.StatusForbidden)
+		return true
+	}
+
+	token := structs.GetClaims(r)
+	permissionService := services.NewPermissionService(nil)
+
+	visible, err := permissionService.UserVisibleInGroup(token.UserId, *systemTask.RanByUserId, *systemTask.GroupId)
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
+		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
+		return true
+	}
+
+	if !visible {
+		utils.WriteCustomErrorResponse(w, activityAccessDeniedMessage, http.StatusForbidden)
+		return true
+	}
+
+	return false
 }

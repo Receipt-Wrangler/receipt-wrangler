@@ -247,7 +247,7 @@ func resolveActivityFlags(
 		canBeRestarted: rerunnableState(taskInfo.State) && allFilesPresent(files.rerunPaths()),
 		hasSourceFile: offersSourceFile(taskInfo.State) &&
 			files.expectsSourceFile() &&
-			utils.FileExists(files.Primary),
+			sourcePathUsable(files.Primary),
 	}, nil
 }
 
@@ -264,9 +264,25 @@ func RerunSourceFilesPresent(taskType models.SystemTaskType, payload []byte) boo
 	return allFilesPresent(files.rerunPaths())
 }
 
+// sourcePathUsable reports whether a payload path is one this server may serve: inside
+// temp/, and present on disk.
+//
+// The containment half matters because these paths come out of a Redis payload, which the
+// Filesystem section of api/CLAUDE.md classes as attacker-adjacent — and because
+// ResolveSystemTaskSourceFile already applies it. Without the same rule here the flag and
+// the endpoint disagree: the client renders a preview button that can only fail. It also
+// stops a bare FileExists from reporting whether an arbitrary server path exists.
+func sourcePathUsable(path string) bool {
+	if err := repositories.NewFileRepository(nil).AssertWithinTempDirectory(path); err != nil {
+		return false
+	}
+
+	return utils.FileExists(path)
+}
+
 func allFilesPresent(paths []string) bool {
 	for _, path := range paths {
-		if !utils.FileExists(path) {
+		if !sourcePathUsable(path) {
 			return false
 		}
 	}

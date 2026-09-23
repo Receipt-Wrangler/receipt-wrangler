@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 )
 
 func TestResolveActivityFlags(t *testing.T) {
-	directory := t.TempDir()
+	directory := containedTempDir(t)
 	present := writeTempFile(t, directory, "present.jpg", 0)
 	presentOcr := writeTempFile(t, directory, "image-present.jpg", 0)
 	missing := filepath.Join(directory, "gone.jpg")
@@ -226,7 +227,7 @@ func TestMemoizeTaskInfoLookup_LooksEachTaskUpOnce(t *testing.T) {
 }
 
 func TestRerunSourceFilesPresent(t *testing.T) {
-	directory := t.TempDir()
+	directory := containedTempDir(t)
 	present := writeTempFile(t, directory, "present.jpg", 0)
 	missing := filepath.Join(directory, "gone.jpg")
 
@@ -265,7 +266,7 @@ func TestRerunSourceFilesPresent(t *testing.T) {
 // task is chained under its EMAIL_READ parent, so that rule would strip the flag
 // from exactly the rows this feature exists for.
 func TestSetSystemTaskHasSourceFile_HydratesEmailUploadWithAParent(t *testing.T) {
-	directory := t.TempDir()
+	directory := containedTempDir(t)
 	present := writeTempFile(t, directory, "attachment.pdf", 0)
 
 	parentId := uint(42)
@@ -294,7 +295,7 @@ func TestSetSystemTaskHasSourceFile_HydratesEmailUploadWithAParent(t *testing.T)
 // The system-task table is app-scoped, so it lists groups the caller may not
 // belong to. A flag there would advertise a button the endpoints refuse.
 func TestSetSystemTaskHasSourceFile_SkipsGroupsTheCallerCannotRead(t *testing.T) {
-	directory := t.TempDir()
+	directory := containedTempDir(t)
 	present := writeTempFile(t, directory, "scan.jpg", 0)
 
 	readable := uint(1)
@@ -321,7 +322,7 @@ func TestSetSystemTaskHasSourceFile_SkipsGroupsTheCallerCannotRead(t *testing.T)
 }
 
 func TestSetActivityFlags_AppliesBothFlagsPerRow(t *testing.T) {
-	directory := t.TempDir()
+	directory := containedTempDir(t)
 	present := writeTempFile(t, directory, "scan.jpg", 0)
 	missing := filepath.Join(directory, "gone.jpg")
 
@@ -419,5 +420,52 @@ func TestCanRerunTask_RefusesNilAndZeroState(t *testing.T) {
 	}
 	if CanRerunTask(&asynq.TaskInfo{}) {
 		t.Error("CanRerunTask(zero state) = true, want false")
+	}
+}
+
+// containedTempDir points BASE_PATH at a fresh directory and returns its temp/
+// subdirectory, which is the only place sourcePathUsable accepts a path from.
+//
+// A bare t.TempDir() is NOT inside temp/, so every fixture written there would read as
+// missing once the flag path started asserting containment. Rooting the fixtures properly
+// exercises the real check rather than injecting a stub for it.
+func containedTempDir(t *testing.T) string {
+	t.Helper()
+
+	base := t.TempDir()
+	directory := filepath.Join(base, "temp")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatalf("failed to create %s: %v", directory, err)
+	}
+	t.Setenv("BASE_PATH", base)
+
+	return directory
+}
+
+// A payload naming a path outside temp/ must report no source file, matching what
+// ResolveSystemTaskSourceFile does at the endpoint. Otherwise the client renders a preview
+// control whose request can only fail, and the stat doubles as an existence oracle for
+// arbitrary server paths.
+func TestResolveActivityFlags_PathOutsideTempIsNotUsable(t *testing.T) {
+	outside := t.TempDir()
+	escaped := filepath.Join(outside, "escaped.jpg")
+	if err := os.WriteFile(escaped, []byte("contents"), 0o644); err != nil {
+		t.Fatalf("failed to write %s: %v", escaped, err)
+	}
+
+	// BASE_PATH is set to a DIFFERENT root, so temp/ does not contain the file above.
+	containedTempDir(t)
+
+	lookup := lookupReturning(t, asynq.TaskStateArchived, QuickScanTaskPayload{TempPath: escaped})
+
+	flags, err := resolveActivityFlags(lookup, models.QUICK_SCAN, "task-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if flags.hasSourceFile {
+		t.Error("hasSourceFile = true for a path outside temp/, want false")
+	}
+	if flags.canBeRestarted {
+		t.Error("canBeRestarted = true for a path outside temp/, want false")
 	}
 }

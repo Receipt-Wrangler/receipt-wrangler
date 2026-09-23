@@ -889,6 +889,13 @@ open group's own surfaces; the isolated group never leaks presence or settlement
 allowed to leave a cross-group aggregate incomplete (a settlement/report total may omit a hidden group's
 dollars) — the truthful isolation guarantee wins.
 
+**`UserVisibleInGroup(viewerId, targetId, groupId)`** is the single-row form of the
+per-group resolver below, for a gate on one record rather than a batch. It exists
+because that closure was being re-inlined per call site (the comment-notification
+fan-out, and again in its test) while the in-package equivalent,
+`groupVisibilityResolver.isVisible`, is unexported and memoized for batch use. Use
+it for any per-request check; use the resolvers below when filtering a set.
+
 **Two resolvers** (`services/member_visibility.go`):
 - **`GetVisibleUserIdsForUserInGroup(viewerId, groupId)`** → `(set, unrestricted, err)` — the per-group
   resolver used by **every group-scoped surface** and by settlement. `app.users.read` ⇒ unrestricted; a
@@ -1308,8 +1315,15 @@ and is deleted once aged. So:
 
 1. **Every inspector listing pages.** Asynq defaults to **30 per page**
    (`defaultPageSize` in its `inspector.go`), and the old `getTaskInfo` passed no
-   `ListOption` at all. `listAllTasks` loops with `asynq.PageSize`/`asynq.Page`
-   until a short page.
+   `ListOption` at all. `forEachTaskPage` loops with `asynq.PageSize`/`asynq.Page`
+   until a short page, handing each page to a callback and then dropping it —
+   the sweep wants each payload's paths and state, while the payloads are the
+   large part (`EmailProcessTaskPayload` carries the body twice, copied per
+   `groupSettingsId`). Accumulating a whole listing first held the archived email
+   set — 10,000 tasks, kept 90 days — in memory at once inside an hourly job.
+   Building the map incrementally makes the abort path load-bearing: a listing
+   error must discard what it already has, or the unreached files look
+   unreferenced and the orphan branch deletes them once aged.
 2. **Any gap stands the orphan branch down for that run.** A listing error other
    than `ErrQueueNotFound` aborts the whole sweep with zero deletions; a payload
    that will not unmarshal drops a `referencesComplete` flag that suppresses
@@ -1401,8 +1415,7 @@ classifier is pure.
 
 A failed quick scan or email upload keeps its image (above), so the user can get
 it back and enter the receipt by hand. Two endpoints on the system task router,
-both gated on **`group.activities.read`** for the group resolved from the task's
-asynq payload:
+both gated on **`group.activities.read`** for the task row's own `GroupId`:
 
 - `GET /systemTask/{id}/sourceFile` — JSON `{ name, encodedImage }`.
 - `GET /systemTask/{id}/sourceFile/download` — the original bytes.
@@ -1436,17 +1449,31 @@ conversion, exactly as the receipt form does. Download is the *original*, under 
 original name, because that is the file the user recognises.
 
 **The path comes out of a Redis payload**, so it goes through
-`FileRepository.AssertWithinTempDirectory` before anything opens it — see the
-amended Filesystem section below.
+`FileRepository.AssertWithinTempDirectory` before anything opens it — see
+"Filesystem Access & Path-Traversal Safety" **above**. `resolveActivityFlags`
+applies the same rule via `sourcePathUsable`, so the flag and the endpoint cannot
+disagree about a path; without that, a flag resolved from a bare `FileExists`
+would render a preview control whose request can only fail, and the stat would
+double as an existence oracle for arbitrary server paths.
 
 **Never `utils.ReadFile` here.** It returns `(nil, nil)` on any read error, which
 would serve an empty image as a success.
 
-`Content-Disposition` is **sanitized and quoted** (`utils.SanitizeFileName`): an
-email attachment's name comes from a MIME header. `DownloadReceiptImage`'s
-unquoted form is a latent bug — copy the rest of that handler's shape
-(`ResponseType: ""` so `http.ServeFile` owns Content-Type, header before serving,
-`return 0, nil` once streaming begins), not that line.
+`Content-Disposition` is **sanitized and then formatted by `mime.FormatMediaType`**,
+never concatenated. `utils.SanitizeFileName` is `filepath.Base`, so it reduces an
+email attachment's MIME-header name to a basename but leaves a `"` in it — and a
+raw `filename="`+name+`"` then closes the quoted value early, so a client reading
+the header back gets `receipt` out of `receipt"final.pdf` and loses the extension.
+`FormatMediaType` escapes it, and switches to the RFC 5987 `filename*` form for a
+non-ASCII name; the desktop parser reads both (`desktop/src/utils/file.ts`), which
+is why changing one side without the other breaks every accented attachment name.
+
+The other five `Content-Disposition` writers are unchanged and are **not** parsed
+client-side: `DownloadReceiptImage` is unquoted *and* unsanitized (a latent bug),
+and the two report downloads quote without sanitizing. Copy the rest of
+`DownloadReceiptImage`'s shape (`ResponseType: ""` so `http.ServeFile` owns
+Content-Type, header before serving, `return 0, nil` once streaming begins), not
+that line.
 
 ### The two flags, and why they differ
 
@@ -1482,6 +1509,37 @@ function rather than two conditions that can drift.
 OCR/vision pipeline — while `hasSourceFile` keys on `TempFilePath` alone. A
 **body-only email has neither and stays rerunnable**, which is why "expects a
 file" is tracked apart from "has a file".
+
+### Authorization order, and why it is not the payload's job
+
+Both endpoints, and `RerunActivity`, answer **every** authorization question before
+any file-specific one. The sequence is: load the task row → gate on its `GroupId`
+with `group.activities.read` → check actor visibility → only then resolve the file
+and emit 400/404.
+
+That ordering is the fix for two things.
+
+**Member isolation applies per task, not just per list.** `GetActivitiesForGroups`
+filters rows in SQL through `ActivityVisibilityResolver`, so inside an isolated
+group a plain member never *sees* a hidden co-member's activity — but they hold
+`group.activities.read` there, so naming that activity's id directly returned the
+hidden member's upload. `enforceActivityActorVisible` applies
+`applyActivityVisibilityDisjunction`'s rule to one row, through the exported
+`PermissionService.UserVisibleInGroup`. A nil `RanByUserId` is a system action and
+stays visible, exactly as the SQL clause has it — which is **every EMAIL_UPLOAD**,
+since email is polled rather than run by a user.
+
+**Resolving the file first leaked its existence.** The group used to come from the
+asynq payload via `ResolveActivityGroupId`, which meant a Redis round trip — and a
+400/404 written from it — *before* `HandleRequest` ran the gate, so an
+unauthorized caller learned whether a task existed, whether its type had a source
+file, and whether that file was still on disk. `models.SystemTask` carries
+`GroupId` and `RanByUserId` as ordinary columns, populated for both task types, so
+nothing about the gate needs Redis. A nil `GroupId` **fails closed**. The
+authorization denial and the "no such file" answer are now deliberately
+indistinguishable, and the gate is reachable in a handler test without a Redis
+instance — which is how it is covered, since the source-file endpoints otherwise
+cannot be.
 
 ### Hydration traps
 

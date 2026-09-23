@@ -140,25 +140,25 @@ func listTempFileReferences(listers []tempFileTaskLister) (map[string][]asynq.Ta
 
 	for _, queue := range tempFileQueues() {
 		for _, list := range listers {
-			tasks, err := listAllTasks(list, string(queue.name))
+			err := forEachTaskPage(list, string(queue.name), func(tasks []*asynq.TaskInfo) {
+				for _, task := range tasks {
+					paths, err := queue.extract(task.Payload)
+					if err != nil {
+						logging.LogStd(
+							logging.LOG_LEVEL_ERROR,
+							"Could not read temp file references from task ", task.ID, ": ", err.Error(),
+						)
+						referencesComplete = false
+						continue
+					}
+
+					for _, path := range paths {
+						references[path] = append(references[path], task.State)
+					}
+				}
+			})
 			if err != nil {
 				return nil, false, err
-			}
-
-			for _, task := range tasks {
-				paths, err := queue.extract(task.Payload)
-				if err != nil {
-					logging.LogStd(
-						logging.LOG_LEVEL_ERROR,
-						"Could not read temp file references from task ", task.ID, ": ", err.Error(),
-					)
-					referencesComplete = false
-					continue
-				}
-
-				for _, path := range paths {
-					references[path] = append(references[path], task.State)
-				}
 			}
 		}
 	}
@@ -166,28 +166,35 @@ func listTempFileReferences(listers []tempFileTaskLister) (map[string][]asynq.Ta
 	return references, referencesComplete, nil
 }
 
-// listAllTasks pages one listing to exhaustion. A queue that has never been used
-// does not exist in Redis yet, which is not an error worth aborting a sweep over.
-func listAllTasks(list tempFileTaskLister, queue string) ([]*asynq.TaskInfo, error) {
-	allTasks := make([]*asynq.TaskInfo, 0)
-
+// forEachTaskPage pages one listing to exhaustion, handing each page to visit and
+// then letting it go. A queue that has never been used does not exist in Redis
+// yet, which is not an error worth aborting a sweep over.
+//
+// It hands over PAGES rather than returning every task because the caller only
+// wants each payload's paths and state, while the payloads themselves are the
+// large part: EmailProcessTaskPayload carries the email body twice
+// (Metadata.Body + Metadata.BodyHtml) and email.go copies that metadata per
+// groupSettingsId. Accumulating a whole listing first held the archived email set
+// — which asynq caps at 10,000 tasks and keeps for 90 days — in memory at once,
+// inside an hourly background job. Peak is now one page.
+func forEachTaskPage(list tempFileTaskLister, queue string, visit func(tasks []*asynq.TaskInfo)) error {
 	for page := 1; page <= tempFileMaxListPages; page++ {
 		tasks, err := list(queue, asynq.PageSize(tempFileListPageSize), asynq.Page(page))
 		if err != nil {
 			if errors.Is(err, asynq.ErrQueueNotFound) {
-				return allTasks, nil
+				return nil
 			}
-			return nil, err
+			return err
 		}
 
-		allTasks = append(allTasks, tasks...)
+		visit(tasks)
 
 		if len(tasks) < tempFileListPageSize {
-			return allTasks, nil
+			return nil
 		}
 	}
 
-	return allTasks, nil
+	return nil
 }
 
 // classifyTempFile decides the fate of a single file. Pure — no Redis, no

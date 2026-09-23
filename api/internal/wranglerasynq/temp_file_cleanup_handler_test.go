@@ -454,6 +454,45 @@ func TestListTempFileReferences_AbortsOnListingError(t *testing.T) {
 	}
 }
 
+// The page-by-page extraction builds the reference map as it goes, so a failure
+// PART WAY THROUGH must still discard what it had. A partial map is the dangerous
+// shape: the files it did not reach look unreferenced, which is the orphan branch
+// deleting them once aged.
+func TestListTempFileReferences_AbortsOnAnErrorPartWayThroughPaging(t *testing.T) {
+	listingErr := errors.New("redis went away mid-scan")
+
+	firstPage := make([]*asynq.TaskInfo, 0, tempFileListPageSize)
+	for i := 0; i < tempFileListPageSize; i++ {
+		firstPage = append(firstPage, taskInfo(t, fmt.Sprintf("quick-scan-%d", i), asynq.TaskStateArchived, QuickScanTaskPayload{
+			TempPath: fmt.Sprintf("/base/temp/scan-%d.jpg", i),
+		}))
+	}
+
+	calls := 0
+	lister := func(queue string, opts ...asynq.ListOption) ([]*asynq.TaskInfo, error) {
+		calls++
+		if calls == 1 {
+			// A full page, so the loop asks for another.
+			return firstPage, nil
+		}
+		return nil, listingErr
+	}
+
+	references, complete, err := listTempFileReferences([]tempFileTaskLister{lister})
+	if !errors.Is(err, listingErr) {
+		t.Fatalf("expected the listing error to propagate, got: %v", err)
+	}
+	if references != nil {
+		t.Error("expected the partially built reference map to be discarded")
+	}
+	if complete {
+		t.Error("expected the reference map to be marked incomplete")
+	}
+	if calls < 2 {
+		t.Errorf("lister called %d time(s); the first page was full, so a second was expected", calls)
+	}
+}
+
 // One unreadable payload used to abort every future sweep. Now it drops the
 // completeness flag, which stands the orphan branch down without losing the
 // references we could read.
