@@ -1,9 +1,16 @@
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
-import { of } from "rxjs";
-import { RECEIPT_DATE_FILTER_FIELDS } from "src/constants";
-import { FilterOperation, Receipt, ReceiptService, ReportPeriod } from "../../../open-api";
+import { Observable, of, throwError } from "rxjs";
+import {
+  PagedData,
+  Receipt,
+  ReportColumn,
+  ReportDetail,
+  ReportPeriod,
+  ReportRequestCommand,
+  ReportService,
+} from "../../../open-api";
 import { PipesModule } from "../../../pipes";
 import {
   ReportReceiptsDialogComponent,
@@ -15,51 +22,48 @@ const receipts: Receipt[] = [
   { id: 8, name: "Lunch", date: "2026-07-05", amount: "30.00", status: "OPEN", groupId: 1, paidByUserId: 2, categories: [], tags: [] } as Receipt,
 ];
 
-function configure(data: Partial<ReportReceiptsDialogData> = {}): {
+const command: ReportRequestCommand = {
+  name: "Report",
+  groupIds: ["1", "2"],
+  period: { preset: ReportPeriod.PresetEnum.Custom, startDate: "2026-05-01", endDate: "2026-05-31", dateField: "createdAt" },
+  filter: {},
+  detail: { mode: ReportDetail.ModeEnum.Records },
+  columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+  formats: [ReportRequestCommand.FormatsEnum.Pdf],
+};
+
+const MAY_2026: ReportReceiptsDialogData["period"] = {
+  preset: ReportPeriod.PresetEnum.Custom,
+  startDate: new Date(2026, 4, 1),
+  endDate: new Date(2026, 4, 31),
+  dateField: "createdAt",
+};
+
+function configure(
+  data: Partial<ReportReceiptsDialogData> = {},
+  response: Observable<PagedData> = of({ data: receipts, totalCount: 5 } as unknown as PagedData)
+): {
   fixture: ComponentFixture<ReportReceiptsDialogComponent>;
   component: ReportReceiptsDialogComponent;
-  receiptService: { getReceiptsForGroup: jest.Mock };
+  reportService: { getReportReceipts: jest.Mock };
 } {
-  const receiptService = {
-    getReceiptsForGroup: jest.fn(() => of({ data: receipts, totalCount: receipts.length })),
-  };
+  const reportService = { getReportReceipts: jest.fn(() => response) };
   TestBed.configureTestingModule({
     declarations: [ReportReceiptsDialogComponent],
     imports: [PipesModule],
     providers: [
       provideZonelessChangeDetection(),
-      { provide: ReceiptService, useValue: receiptService },
+      { provide: ReportService, useValue: reportService },
       { provide: MatDialogRef, useValue: { close: jest.fn() } },
       {
         provide: MAT_DIALOG_DATA,
-        useValue: {
-          groupIds: ["1"],
-          filter: {},
-          period: { preset: ReportPeriod.PresetEnum.ThisMonth, startDate: null, endDate: null, dateField: "date" },
-          receiptCount: 5,
-          ...data,
-        } as ReportReceiptsDialogData,
+        useValue: { command, period: MAY_2026, receiptCount: 5, ...data } as ReportReceiptsDialogData,
       },
     ],
     schemas: [NO_ERRORS_SCHEMA],
   });
   const fixture = TestBed.createComponent(ReportReceiptsDialogComponent);
-  return { fixture, component: fixture.componentInstance, receiptService };
-}
-
-const MAY_2026 = {
-  preset: ReportPeriod.PresetEnum.Custom,
-  startDate: new Date(2026, 4, 1),
-  endDate: new Date(2026, 4, 31),
-};
-
-const DATE_KEYS = RECEIPT_DATE_FILTER_FIELDS.map((field) => field.key);
-
-// A condition on every date field, so a test can see which one the period replaced.
-function sentinelDateFilter(): Record<string, { operation: FilterOperation; value: string }> {
-  return Object.fromEntries(
-    DATE_KEYS.map((key) => [key, { operation: FilterOperation.Equals, value: `sentinel-${key}` }])
-  );
+  return { fixture, component: fixture.componentInstance, reportService };
 }
 
 describe("ReportReceiptsDialogComponent", () => {
@@ -68,9 +72,17 @@ describe("ReportReceiptsDialogComponent", () => {
   it("loads the covered receipts and starts on the list view", () => {
     const { component } = configure();
     expect(component.receipts().length).toBe(2);
+    expect(component.loading()).toBe(false);
+    expect(component.hasError()).toBe(false);
     expect(component.selected()).toBeNull();
-    // The subtitle count is the report's true total, not the loaded sample.
-    expect(component.count()).toBe(5);
+  });
+
+  // The server resolves the period and filter exactly as the report does, so the
+  // dialog sends the preview's own command, once, and builds no bounds itself.
+  it("asks the server for the receipts the preview's command covers, in one request", () => {
+    const { reportService } = configure();
+    expect(reportService.getReportReceipts).toHaveBeenCalledTimes(1);
+    expect(reportService.getReportReceipts).toHaveBeenCalledWith(command);
   });
 
   it("opens a receipt's breakdown and returns to the list", () => {
@@ -89,53 +101,33 @@ describe("ReportReceiptsDialogComponent", () => {
     openSpy.mockRestore();
   });
 
-  it.each(DATE_KEYS)("narrows the listed receipts on %s, leaving the other date fields alone", (dateField) => {
-    const { receiptService } = configure({
-      filter: sentinelDateFilter(),
-      period: { ...MAY_2026, dateField },
-    });
-
-    const filter = receiptService.getReceiptsForGroup.mock.calls[0][1].filter;
-    for (const key of DATE_KEYS) {
-      if (key === dateField) {
-        expect(filter[key]).toEqual({
-          operation: FilterOperation.Between,
-          value: [new Date(2026, 4, 1), new Date(2026, 4, 31, 23, 59, 59, 999)],
-        });
-      } else {
-        expect(filter[key]).toEqual(sentinelDateFilter()[key]);
-      }
-    }
-  });
-
-  it("narrows on the receipt date when the period names no date field", () => {
-    const { receiptService } = configure({
-      period: { ...MAY_2026 } as ReportReceiptsDialogData["period"],
-    });
-
-    const filter = receiptService.getReceiptsForGroup.mock.calls[0][1].filter;
-    expect(filter.date.operation).toBe(FilterOperation.Between);
-    expect(filter.resolvedDate).toBeUndefined();
-    expect(filter.createdAt).toBeUndefined();
-  });
-
-  // A custom range ends at local midnight; on the timestamped Added At column
-  // that would drop everything added during the range's last day.
-  it("extends the range to the end of its last day", () => {
-    const { receiptService } = configure({ period: { ...MAY_2026, dateField: "createdAt" } });
-
-    const [start, end] = receiptService.getReceiptsForGroup.mock.calls[0][1].filter.createdAt.value;
-    expect(start).toEqual(new Date(2026, 4, 1, 0, 0, 0, 0));
-    expect(end).toEqual(new Date(2026, 4, 31, 23, 59, 59, 999));
-  });
-
   it("names the date field in the subtitle", () => {
-    const { component } = configure({ period: { ...MAY_2026, dateField: "createdAt" } });
+    const { component } = configure();
     expect(component.periodLabel).toBe("2026-05-01 to 2026-05-31 on Added At");
   });
 
-  it("falls back to the loaded count when no true count is provided", () => {
+  it("names the receipt date when the period names no date field", () => {
+    const { component } = configure({
+      period: { ...MAY_2026, dateField: undefined } as unknown as ReportReceiptsDialogData["period"],
+    });
+    expect(component.periodLabel).toBe("2026-05-01 to 2026-05-31 on Receipt Date");
+  });
+
+  it("shows the report's own count when one is provided", () => {
+    const { component } = configure({ receiptCount: 9 });
+    expect(component.count()).toBe(9);
+  });
+
+  // The list is capped server-side, so its length is not the count; its total is.
+  it("falls back to the list's total when no count is provided", () => {
     const { component } = configure({ receiptCount: undefined });
-    expect(component.count()).toBe(2);
+    expect(component.count()).toBe(5);
+  });
+
+  it("flags an error and stops loading when the list cannot be fetched", () => {
+    const { component } = configure({}, throwError(() => new Error("403")));
+    expect(component.hasError()).toBe(true);
+    expect(component.loading()).toBe(false);
+    expect(component.receipts()).toEqual([]);
   });
 });

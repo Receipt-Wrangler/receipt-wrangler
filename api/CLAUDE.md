@@ -2121,13 +2121,40 @@ picker.
 - **Adding a date key** means `ReceiptDateFilterKeys()`, `DateFilterField`, the swagger description,
   and desktop's `RECEIPT_DATE_FILTER_FIELDS`. `TestReceiptDateFilterKeys` pins the list, and
   `TestReceiptDateFilterKeysAreFilterJsonKeys` checks it against the struct by reflection.
+- **The drill-in list is server-side: `POST /api/report/receipts` (`ReportService.Receipts`).** The
+  builder's "N receipts" chip opens a list of what the report covers.
+  - **Why the server builds it.** The list used to build its own period BETWEEN in the browser, and
+    disagreed with the count in three ways:
+    - it used the browser's time zone, not the server clock's;
+    - on SQLite, its ISO `…T…` bounds compared as text against the stored `YYYY-MM-DD HH:MM:SS…`,
+      dropping first-day receipts;
+    - it sent the "report generator" paid-by sentinel (`-1`) as-is, which matches nothing.
+  - **How it stays in step with the report.** Both start from `prepareReportFilter` (the paid-by
+    sentinel plus `applyPeriod`) and fetch through `ReportDataService.fetchReceipts`, so the list and
+    the count are the same query. They differ only in presentation:
+    - `Rows` marks hidden categories/tags `(Restricted)`;
+    - `Receipts` strips them, masks for member visibility, and preloads
+      `CUSTOM_FIELD_ASSOCIATIONS`, like the receipts list.
+  - **Gating, ordering and the cap.** It is gated exactly like `PreviewReport`: `app.reports.read`/
+    `readAll` plus `group.reports.read` in every group. It is **not** `group.receipts.read`, so a
+    report reader sees the receipts their report already covers. It is merged newest-first across
+    groups and capped at `reportReceiptsCap` (200), with `totalCount` the true total.
 - **Tests:**
   - `commands/report_request_command_test.go` and `paged_request_command_test.go`: validation,
     marshalling, and the sync guards above.
-  - `services/report_period_date_field_test.go`: DB-backed, one receipt per field, with inclusive
-    bounds, presets, and the AND with a Date filter.
-  - `handlers/report_period_date_field_test.go`: preview, template CRUD, and the unvalidated
-    render/generate-from-template paths.
+  - `services/report_period_date_field_test.go`: DB-backed.
+    - One receipt per field, with inclusive bounds, presets, and the AND with a Date filter.
+    - For the drill-in:
+      - parity with the report on every field;
+      - a server in America/Los_Angeles at the May 31/June 1 boundary;
+      - the `-1` sentinel;
+      - custom-field definitions;
+      - merge order and the cap.
+  - `handlers/report_period_date_field_test.go`:
+    - preview and template CRUD;
+    - the unvalidated render/generate-from-template paths, with a May case proving the fallback lands
+      on the receipt date and not the resolved one;
+    - `GetReportReceipts`, per field and for its gate.
   - `repositories/report_template_test.go`: the stored blob.
 
 **`POST /api/report/preview`** drives the desktop builder's live preview. It shares GenerateReport's

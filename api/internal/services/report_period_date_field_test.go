@@ -1,11 +1,13 @@
 package services
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/shopspring/decimal"
 
@@ -13,6 +15,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/reporting"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/structs"
 )
 
 // These tests run the report pipeline against real receipts to prove a period
@@ -305,5 +308,244 @@ func TestReportService_Preview_HonorsPeriodDateField(t *testing.T) {
 	}
 	if !strings.Contains(preview.Html, "created-hit") || strings.Contains(preview.Html, "date-hit") {
 		t.Errorf("preview should list only created-hit:\n%s", preview.Html)
+	}
+}
+
+// --- the drill-in list -----------------------------------------------------
+
+// pagedReceiptNames reads the receipt names off the drill-in list, in its order.
+func pagedReceiptNames(t *testing.T, paged structs.PagedData) []string {
+	t.Helper()
+	names := make([]string, 0, len(paged.Data))
+	for _, item := range paged.Data {
+		receipt, ok := item.(models.Receipt)
+		if !ok {
+			t.Fatalf("drill-in item is %T, want models.Receipt", item)
+		}
+		names = append(names, receipt.Name)
+	}
+	return names
+}
+
+// listPeriodReceipts runs the drill-in list for a command and returns its sorted
+// names and total count.
+func listPeriodReceipts(t *testing.T, userId uint, command commands.ReportRequestCommand, now time.Time) ([]string, int64) {
+	t.Helper()
+	paged, err := NewReportService(nil).receipts(userId, command, now)
+	if err != nil {
+		t.Fatalf("receipts: %v", err)
+	}
+	names := pagedReceiptNames(t, paged)
+	sort.Strings(names)
+	return names, paged.TotalCount
+}
+
+// The drill-in lists exactly the receipts the report counts, on every date field.
+// Both go through prepareReportFilter and the same fetch, which is what this pins.
+func TestReportService_Receipts_MatchTheReportOnEachDateField(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	userId, groupIds := seedReportUserInGroups(t, "rpt-drill-fields", "Household")
+	june15 := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
+	january := time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC)
+	seedReceiptOnDateField(t, "date-hit", userId, groupIds[0], commands.ReceiptFilterKeyDate, june15)
+	seedReceiptOnDateField(t, "resolved-hit", userId, groupIds[0], commands.ReceiptFilterKeyResolvedDate, june15)
+	seedReceiptOnDateField(t, "created-hit", userId, groupIds[0], commands.ReceiptFilterKeyCreatedAt, june15)
+	seedPeriodReceipt(t, "none", userId, groupIds[0], january, &january, january)
+
+	for _, dateField := range append([]string{""}, commands.ReceiptDateFilterKeys()...) {
+		t.Run("dateField="+dateField, func(t *testing.T) {
+			command := periodRecordsCommand(groupIds, commands.ReportPeriod{
+				Preset: commands.ReportPeriodCustom, StartDate: "2026-06-01", EndDate: "2026-06-30",
+				DateField: dateField,
+			})
+			reportNames, reportCount := buildPeriodReport(t, userId, command, june15)
+			listNames, listCount := listPeriodReceipts(t, userId, command, june15)
+
+			if len(listNames) != 1 || !reflect.DeepEqual(listNames, reportNames) {
+				t.Errorf("drill-in lists %v, report covers %v; want the same single receipt", listNames, reportNames)
+			}
+			if listCount != int64(reportCount) {
+				t.Errorf("drill-in total = %d, report count = %d", listCount, reportCount)
+			}
+		})
+	}
+}
+
+// The period resolves on the server clock, in its time zone, for the list as for
+// the report. A receipt added at 20:00 on May 31 in Los Angeles is already June 1
+// in UTC: a server in Los Angeles counts it in May, and so does its drill-in,
+// whatever time zone the browser asking for the list is in.
+func TestReportService_Receipts_AgreeWithTheReportAcrossTimeZones(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	losAngeles, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatalf("load location: %v", err)
+	}
+	userId, groupIds := seedReportUserInGroups(t, "rpt-drill-tz", "Household")
+	// Stored in the server's own zone, as a server running there stores it.
+	addedMay31 := time.Date(2026, 5, 31, 20, 0, 0, 0, losAngeles)
+	seedPeriodReceipt(t, "added-may-31", userId, groupIds[0], periodFarDate, nil, addedMay31)
+
+	now := time.Date(2026, 6, 20, 12, 0, 0, 0, losAngeles)
+	tests := []struct {
+		start, end string
+		want       []string
+	}{
+		{"2026-05-01", "2026-05-31", []string{"added-may-31"}},
+		{"2026-06-01", "2026-06-30", []string{}},
+	}
+	for _, test := range tests {
+		t.Run(test.start, func(t *testing.T) {
+			command := periodRecordsCommand(groupIds, commands.ReportPeriod{
+				Preset: commands.ReportPeriodCustom, StartDate: test.start, EndDate: test.end,
+				DateField: commands.ReceiptFilterKeyCreatedAt,
+			})
+			reportNames, _ := buildPeriodReport(t, userId, command, now)
+			listNames, _ := listPeriodReceipts(t, userId, command, now)
+
+			if !reflect.DeepEqual(reportNames, test.want) {
+				t.Errorf("report covers %v, want %v", reportNames, test.want)
+			}
+			if !reflect.DeepEqual(listNames, test.want) {
+				t.Errorf("drill-in lists %v, want %v", listNames, test.want)
+			}
+		})
+	}
+}
+
+// A saved filter's "whoever generates the report" paid-by sentinel resolves to the
+// caller in the list too; sent as-is it would match no receipt at all.
+func TestReportService_Receipts_ResolveTheReportGeneratorPaidBy(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	userId, groupIds := seedReportUserInGroups(t, "rpt-drill-payer", "Household")
+	otherPayer := makeUser(t, "rpt-drill-other-payer")
+	june15 := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	seedPeriodReceipt(t, "mine", userId, groupIds[0], june15, nil, june15)
+	seedPeriodReceipt(t, "theirs", otherPayer, groupIds[0], june15, nil, june15)
+
+	command := periodRecordsCommand(groupIds, commands.ReportPeriod{
+		Preset: commands.ReportPeriodCustom, StartDate: "2026-06-01", EndDate: "2026-06-30",
+	})
+	command.Filter.PaidBy = commands.PagedRequestField{Operation: commands.CONTAINS, Value: []interface{}{float64(-1)}}
+
+	names, count := listPeriodReceipts(t, userId, command, june15)
+	if !reflect.DeepEqual(names, []string{"mine"}) || count != 1 {
+		t.Errorf("drill-in lists %v (total %d), want only the caller's receipt", names, count)
+	}
+}
+
+// Every custom field value carries its definition. Without it the value
+// serializes a zero definition with "type":"", which the mobile client's closed
+// CustomFieldType enum cannot read.
+func TestReportService_Receipts_CarryCustomFieldDefinitions(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	userId, groupIds := seedReportUserInGroups(t, "rpt-drill-custom", "Household")
+	customField := models.CustomField{Name: "HST", Type: models.CURRENCY}
+	if err := repositories.GetDB().Create(&customField).Error; err != nil {
+		t.Fatalf("seed custom field: %v", err)
+	}
+	hst := decimal.RequireFromString("15.60")
+	receipt := models.Receipt{
+		Name:         "with-hst",
+		Amount:       decimal.NewFromInt(100),
+		Date:         time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC),
+		PaidByUserID: userId,
+		GroupId:      groupIds[0],
+		Status:       models.OPEN,
+		CustomFields: []models.CustomFieldValue{{CustomFieldId: customField.ID, CurrencyValue: &hst}},
+	}
+	if err := repositories.GetDB().Create(&receipt).Error; err != nil {
+		t.Fatalf("create receipt: %v", err)
+	}
+
+	command := periodRecordsCommand(groupIds, commands.ReportPeriod{
+		Preset: commands.ReportPeriodCustom, StartDate: "2026-06-01", EndDate: "2026-06-30",
+	})
+	paged, err := NewReportService(nil).receipts(userId, command, time.Now())
+	if err != nil {
+		t.Fatalf("receipts: %v", err)
+	}
+	if len(paged.Data) != 1 {
+		t.Fatalf("drill-in lists %d receipts, want 1", len(paged.Data))
+	}
+	values := paged.Data[0].(models.Receipt).CustomFields
+	if len(values) != 1 || values[0].CustomField.Type != models.CURRENCY {
+		t.Errorf("custom field values = %+v, want one carrying its CURRENCY definition", values)
+	}
+}
+
+// Receipts from several groups come back as one list, newest receipt date first.
+func TestReportService_Receipts_MergeGroupsNewestFirst(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	userId, groupIds := seedReportUserInGroups(t, "rpt-drill-order", "Household", "Roommates")
+	day := func(d int) time.Time { return time.Date(2026, 6, d, 0, 0, 0, 0, time.UTC) }
+	seedPeriodReceipt(t, "household-10", userId, groupIds[0], day(10), nil, day(10))
+	seedPeriodReceipt(t, "roommates-20", userId, groupIds[1], day(20), nil, day(20))
+	seedPeriodReceipt(t, "household-5", userId, groupIds[0], day(5), nil, day(5))
+	seedPeriodReceipt(t, "roommates-15", userId, groupIds[1], day(15), nil, day(15))
+
+	command := periodRecordsCommand(groupIds, commands.ReportPeriod{
+		Preset: commands.ReportPeriodCustom, StartDate: "2026-06-01", EndDate: "2026-06-30",
+	})
+	paged, err := NewReportService(nil).receipts(userId, command, day(30))
+	if err != nil {
+		t.Fatalf("receipts: %v", err)
+	}
+	want := []string{"roommates-20", "roommates-15", "household-10", "household-5"}
+	if got := pagedReceiptNames(t, paged); !reflect.DeepEqual(got, want) {
+		t.Errorf("drill-in order = %v, want %v", got, want)
+	}
+}
+
+// The list is capped, but its total still counts every receipt the report covers,
+// so the drill-in's subtitle agrees with the preview's count chip.
+func TestReportService_Receipts_CapTheListButCountEveryReceipt(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	userId, groupIds := seedReportUserInGroups(t, "rpt-drill-cap", "Household")
+	receipts := make([]models.Receipt, reportReceiptsCap+1)
+	for index := range receipts {
+		receipts[index] = models.Receipt{
+			Name:         fmt.Sprintf("r%03d", index),
+			Amount:       decimal.NewFromInt(1),
+			Date:         time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC),
+			PaidByUserID: userId,
+			GroupId:      groupIds[0],
+			Status:       models.OPEN,
+		}
+	}
+	if err := repositories.GetDB().Create(&receipts).Error; err != nil {
+		t.Fatalf("create receipts: %v", err)
+	}
+
+	command := periodRecordsCommand(groupIds, commands.ReportPeriod{
+		Preset: commands.ReportPeriodCustom, StartDate: "2026-06-01", EndDate: "2026-06-30",
+	})
+	paged, err := NewReportService(nil).receipts(userId, command, time.Now())
+	if err != nil {
+		t.Fatalf("receipts: %v", err)
+	}
+	if len(paged.Data) != reportReceiptsCap {
+		t.Errorf("drill-in lists %d receipts, want the cap of %d", len(paged.Data), reportReceiptsCap)
+	}
+	if paged.TotalCount != int64(reportReceiptsCap+1) {
+		t.Errorf("total = %d, want %d", paged.TotalCount, reportReceiptsCap+1)
 	}
 }

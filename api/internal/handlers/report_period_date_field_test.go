@@ -56,16 +56,19 @@ func periodReportBody(month int, dateField string) string {
 }
 
 // seedPeriodTemplate stores a template over group 1 whose custom period covers
-// August 2026 on dateField (empty for a template saved before the field existed).
-// It goes through the repository, not the handler, so it can also store a value
-// the handler's validation would reject.
-func seedPeriodTemplate(t *testing.T, dateField string) models.ReportTemplate {
+// one calendar month of 2026 on dateField (empty for a template saved before the
+// field existed). It goes through the repository, not the handler, so it can also
+// store a value the handler's validation would reject.
+func seedPeriodTemplate(t *testing.T, dateField string, month int) models.ReportTemplate {
 	t.Helper()
+	lastDay := time.Date(2026, time.Month(month)+1, 0, 0, 0, 0, 0, time.UTC).Day()
 	command := commands.ReportRequestCommand{
 		Name:     "Period Template",
 		GroupIds: []string{"1"},
 		Period: commands.ReportPeriod{
-			Preset: commands.ReportPeriodCustom, StartDate: "2026-08-01", EndDate: "2026-08-31",
+			Preset:    commands.ReportPeriodCustom,
+			StartDate: fmt.Sprintf("2026-%02d-01", month),
+			EndDate:   fmt.Sprintf("2026-%02d-%02d", month, lastDay),
 			DateField: dateField,
 		},
 		Detail:  commands.ReportDetail{Mode: commands.ReportDetailRecords},
@@ -171,7 +174,7 @@ func TestGetReportTemplate_ReturnsPeriodDateField(t *testing.T) {
 			repositories.CreateTestGroupWithUsers()
 			grantAppPerms(t, 1, permissions.AppReportsRead)
 			grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
-			seeded := seedPeriodTemplate(t, test.dateField)
+			seeded := seedPeriodTemplate(t, test.dateField, 8)
 
 			w, r := reportTemplateIdRequest("GET", 1, fmt.Sprint(seeded.ID))
 			GetReportTemplate(w, r)
@@ -199,24 +202,29 @@ func TestGetReportTemplate_ReturnsPeriodDateField(t *testing.T) {
 // The dashboard widget renders a stored configuration without re-validating it.
 // A stored date field is honoured there; a template saved before the field existed
 // stays on the receipt date, and so does a stored value the report cannot run on.
+// The receipt's three dates fall in three different months, so each case can only
+// match through the date it names: May is the receipt date, July the resolved
+// date, August the date it was added.
 func TestRenderReportTemplate_HonorsPeriodDateField(t *testing.T) {
 	tests := []struct {
 		dateField string
+		month     int
 		want      int
 	}{
-		// The receipt was added in August, but its receipt date is in May.
-		{commands.ReceiptFilterKeyCreatedAt, 1},
-		{"", 0},
-		{"paidAt", 0},
+		{commands.ReceiptFilterKeyCreatedAt, 8, 1},
+		{"", 5, 1},
+		{"", 8, 0},
+		{"paidAt", 5, 1},
+		{"paidAt", 8, 0},
 	}
 	for _, test := range tests {
-		t.Run("dateField="+test.dateField, func(t *testing.T) {
+		t.Run(fmt.Sprintf("dateField=%s/month=%d", test.dateField, test.month), func(t *testing.T) {
 			defer tearDownReportTest()
 			repositories.CreateTestGroupWithUsers()
 			grantAppPerms(t, 1, permissions.AppReportsRead)
 			grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 			seedDatedReportReceipt(t, "dated")
-			seeded := seedPeriodTemplate(t, test.dateField)
+			seeded := seedPeriodTemplate(t, test.dateField, test.month)
 
 			w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(seeded.ID))
 			RenderReportTemplate(w, r)
@@ -232,19 +240,21 @@ func TestRenderReportTemplate_HonorsPeriodDateField(t *testing.T) {
 func TestGenerateReportFromTemplate_HonorsPeriodDateField(t *testing.T) {
 	tests := []struct {
 		dateField    string
+		month        int
 		wantIncluded bool
 	}{
-		{commands.ReceiptFilterKeyCreatedAt, true},
-		{"", false},
+		{commands.ReceiptFilterKeyCreatedAt, 8, true},
+		{"", 5, true},
+		{"", 8, false},
 	}
 	for _, test := range tests {
-		t.Run("dateField="+test.dateField, func(t *testing.T) {
+		t.Run(fmt.Sprintf("dateField=%s/month=%d", test.dateField, test.month), func(t *testing.T) {
 			defer tearDownReportTest()
 			repositories.CreateTestGroupWithUsers()
 			grantAppPerms(t, 1, permissions.AppReportsGenerate)
 			grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
 			seedDatedReportReceipt(t, "added-in-august")
-			seeded := seedPeriodTemplate(t, test.dateField)
+			seeded := seedPeriodTemplate(t, test.dateField, test.month)
 
 			w, r := reportTemplateIdRequest("POST", 1, fmt.Sprint(seeded.ID))
 			GenerateReportFromTemplate(w, r)
@@ -255,4 +265,93 @@ func TestGenerateReportFromTemplate_HonorsPeriodDateField(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- the drill-in list -----------------------------------------------------
+
+func decodeReportReceipts(t *testing.T, body []byte) ([]models.Receipt, int64) {
+	t.Helper()
+	var paged struct {
+		Data       []models.Receipt `json:"data"`
+		TotalCount int64            `json:"totalCount"`
+	}
+	if err := json.Unmarshal(body, &paged); err != nil {
+		t.Fatalf("decode report receipts body: %v", err)
+	}
+	return paged.Data, paged.TotalCount
+}
+
+// The drill-in lists the receipts the preview counts, through the same date field.
+func TestGetReportReceipts_ListsTheReceiptsOnTheChosenDateField(t *testing.T) {
+	tests := []struct {
+		dateField string
+		month     int
+		want      int
+	}{
+		{"", 5, 1},
+		{commands.ReceiptFilterKeyDate, 5, 1},
+		{commands.ReceiptFilterKeyDate, 8, 0},
+		{commands.ReceiptFilterKeyResolvedDate, 7, 1},
+		{commands.ReceiptFilterKeyResolvedDate, 5, 0},
+		{commands.ReceiptFilterKeyCreatedAt, 8, 1},
+		{commands.ReceiptFilterKeyCreatedAt, 5, 0},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("dateField=%s/month=%d", test.dateField, test.month), func(t *testing.T) {
+			defer tearDownReportTest()
+			repositories.CreateTestGroupWithUsers()
+			grantAppPerms(t, 1, permissions.AppReportsRead)
+			grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+			seedDatedReportReceipt(t, "dated")
+
+			w, r := generateReportRequest(1, periodReportBody(test.month, test.dateField))
+			GetReportReceipts(w, r)
+
+			assertStatus(t, w, http.StatusOK)
+			receipts, total := decodeReportReceipts(t, w.Body.Bytes())
+			if len(receipts) != test.want || total != int64(test.want) {
+				t.Fatalf("listed %d receipts (total %d), want %d", len(receipts), total, test.want)
+			}
+			if test.want == 1 && receipts[0].Name != "dated" {
+				t.Errorf("listed %q, want the seeded receipt", receipts[0].Name)
+			}
+		})
+	}
+}
+
+// Gated exactly like the preview whose count it lists: the app-level report
+// permission, and report access in every covered group.
+func TestGetReportReceipts_ForbidsWithoutAppReportsPermission(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	GetReportReceipts(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestGetReportReceipts_ForbidsWithoutGroupReportsPermission(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+
+	w, r := generateReportRequest(1, recordsReportBody)
+	GetReportReceipts(w, r)
+
+	assertStatus(t, w, http.StatusForbidden)
+}
+
+func TestGetReportReceipts_RejectsInvalidCommand(t *testing.T) {
+	defer tearDownReportTest()
+	repositories.CreateTestGroupWithUsers()
+	grantAppPerms(t, 1, permissions.AppReportsRead)
+	grantGroupPerms(t, 1, 1, permissions.GroupReportsRead)
+
+	w, r := generateReportRequest(1, periodReportBody(5, "created_at"))
+	GetReportReceipts(w, r)
+
+	assertStatus(t, w, http.StatusBadRequest)
 }

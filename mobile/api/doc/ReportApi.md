@@ -14,6 +14,7 @@ Method | HTTP request | Description
 [**duplicateReportTemplate**](ReportApi.md#duplicatereporttemplate) | **POST** /report/template/{id}/duplicate | Duplicate a report template
 [**generateReport**](ReportApi.md#generatereport) | **POST** /report/generate | Generate a report
 [**generateReportFromTemplate**](ReportApi.md#generatereportfromtemplate) | **POST** /report/template/{id}/generate | Generate a report from a saved template
+[**getReportReceipts**](ReportApi.md#getreportreceipts) | **POST** /report/receipts | List the receipts a report covers
 [**getReportTemplate**](ReportApi.md#getreporttemplate) | **GET** /report/template/{id} | Get a report template
 [**getReportTemplateOptions**](ReportApi.md#getreporttemplateoptions) | **GET** /report/template/options | Get report template options
 [**getReportTemplates**](ReportApi.md#getreporttemplates) | **POST** /report/template/list | Get paged report templates
@@ -253,6 +254,53 @@ Name | Type | Description  | Notes
 
  - **Content-Type**: Not defined
  - **Accept**: application/octet-stream, application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getReportReceipts**
+> PagedData getReportReceipts(reportRequestCommand)
+
+List the receipts a report covers
+
+Lists the receipts the report configuration covers, newest first, for the builder's drill-in. The period and filter resolve exactly as they do for the report, so the list agrees with the preview's receipt count. Capped at 200 receipts; totalCount is every covered receipt. Requires the same permissions as the preview.
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getReportApi();
+final ReportRequestCommand reportRequestCommand = ; // ReportRequestCommand | The report builder configuration
+
+try {
+    final response = api.getReportReceipts(reportRequestCommand);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling ReportApi->getReportReceipts: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **reportRequestCommand** | [**ReportRequestCommand**](ReportRequestCommand.md)| The report builder configuration | 
+
+### Return type
+
+[**PagedData**](PagedData.md)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

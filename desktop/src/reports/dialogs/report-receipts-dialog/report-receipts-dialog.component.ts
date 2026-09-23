@@ -9,15 +9,7 @@ import {
 } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
-import { endOfDay, startOfDay } from "date-fns";
-import { catchError, forkJoin, map, of, take } from "rxjs";
-import {
-  FilterOperation,
-  Receipt,
-  ReceiptPagedRequestCommand,
-  ReceiptPagedRequestFilter,
-  ReceiptService,
-} from "../../../open-api";
+import { Receipt, ReportRequestCommand, ReportService } from "../../../open-api";
 import { ReportBuilderValue } from "../../models/report-command.mapper";
 import {
   formatPeriodRange,
@@ -27,21 +19,21 @@ import {
 } from "../../models/report-period.util";
 
 export interface ReportReceiptsDialogData {
-  groupIds: string[];
-  filter: ReceiptPagedRequestFilter;
+  // The command the preview ran, so the list covers exactly what it counted.
+  command: ReportRequestCommand;
+  // The builder's period, for the subtitle only.
   period: ReportBuilderValue["period"];
   // The report's true covered count (from the preview), shown in the subtitle;
-  // falls back to the loaded list length when absent.
+  // falls back to the list's own total when absent.
   receiptCount?: number;
 }
 
-// Bounds the drill-in fetch per group; the count chip still reports the true total.
-const DRILL_IN_PAGE_SIZE = 200;
-
 /**
- * Lists the receipts a report covers: the report's filter narrowed to the resolved
- * period on the date field it covers, fetched across every scope group and merged.
- * Read-only — it exists so a user can sanity-check what's flowing into the report.
+ * Lists the receipts a report covers. The server resolves the report's filter and
+ * period (on its own clock and time zone) and runs the report's own query, so the
+ * list matches the preview's count; resolving the period here would use the
+ * browser's time zone instead. Read-only — it exists so a user can sanity-check
+ * what's flowing into the report.
  */
 @Component({
   selector: "app-report-receipts-dialog",
@@ -51,21 +43,22 @@ const DRILL_IN_PAGE_SIZE = 200;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReportReceiptsDialogComponent {
-  private readonly receiptService = inject(ReceiptService);
+  private readonly reportService = inject(ReportService);
   private readonly dialogRef = inject(MatDialogRef<ReportReceiptsDialogComponent>);
   private readonly destroyRef = inject(DestroyRef);
 
   public readonly loading = signal<boolean>(true);
   public readonly receipts = signal<Receipt[]>([]);
-  // Set when any group's fetch fails, so the list can warn it may be incomplete.
+  // Set when the list fails to load.
   public readonly hasError = signal<boolean>(false);
   // The receipt being inspected; null shows the list, non-null the breakdown.
   public readonly selected = signal<Receipt | null>(null);
 
   public readonly periodLabel: string;
   private readonly providedCount?: number;
-  // Subtitle count: the report's true total when known, else the loaded count.
-  public readonly count = computed(() => this.providedCount ?? this.receipts().length);
+  private readonly totalCount = signal<number>(0);
+  // Subtitle count: the report's true total when known, else the list's own total.
+  public readonly count = computed(() => this.providedCount ?? this.totalCount());
 
   constructor(@Inject(MAT_DIALOG_DATA) data: ReportReceiptsDialogData) {
     const range = formatPeriodRange(
@@ -74,7 +67,7 @@ export class ReportReceiptsDialogComponent {
     const dateField = reportPeriodDateFieldLabel(toReportPeriodDateField(data.period.dateField));
     this.periodLabel = `${range} on ${dateField}`;
     this.providedCount = data.receiptCount;
-    this.load(data);
+    this.load(data.command);
   }
 
   public viewReceipt(receipt: Receipt): void {
@@ -94,44 +87,20 @@ export class ReportReceiptsDialogComponent {
     this.dialogRef.close();
   }
 
-  private load(data: ReportReceiptsDialogData): void {
-    const range = resolvePeriodRange(data.period.preset, data.period.startDate, data.period.endDate);
-    // Like the report, the period replaces whatever condition its date field held
-    // and leaves the other date fields' conditions alone. The bounds span whole
-    // days as the server's do: a custom range ends at local midnight, which would
-    // drop its last day on the timestamped Added At and Resolved Date columns.
-    const filter: ReceiptPagedRequestFilter = { ...data.filter };
-    filter[toReportPeriodDateField(data.period.dateField)] = {
-      operation: FilterOperation.Between,
-      value: [startOfDay(range.start), endOfDay(range.end)],
-    };
-    const command: ReceiptPagedRequestCommand = {
-      page: 1,
-      pageSize: DRILL_IN_PAGE_SIZE,
-      filter,
-    };
-
-    if (data.groupIds.length === 0) {
-      this.loading.set(false);
-      return;
-    }
-
-    const requests = data.groupIds.map((groupId) =>
-      this.receiptService.getReceiptsForGroup(Number.parseInt(groupId, 10), command).pipe(
-        take(1),
-        map((paged) => (paged.data ?? []) as unknown as Receipt[]),
-        catchError(() => {
-          this.hasError.set(true);
-          return of<Receipt[]>([]);
-        })
-      )
-    );
-
-    forkJoin(requests)
+  private load(command: ReportRequestCommand): void {
+    this.reportService
+      .getReportReceipts(command)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((results) => {
-        this.receipts.set(results.flat());
-        this.loading.set(false);
+      .subscribe({
+        next: (paged) => {
+          this.receipts.set((paged.data ?? []) as unknown as Receipt[]);
+          this.totalCount.set(paged.totalCount ?? 0);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.hasError.set(true);
+          this.loading.set(false);
+        },
       });
   }
 }

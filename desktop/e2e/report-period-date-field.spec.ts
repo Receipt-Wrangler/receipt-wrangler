@@ -161,3 +161,52 @@ test.describe.serial('Report Builder — period date field', () => {
     await expect(dateFieldSelect(page)).toContainText('Resolved Date');
   });
 });
+
+// The drill-in lists what the report covers even when the browser and the server
+// disagree on what day it is. The server resolves the period on its own clock (UTC
+// here, as the Docker images run), and the browser is in Los Angeles: a receipt
+// dated 03:00 UTC on January 1 is in the server's January and in the browser's
+// December 31. A drill-in that resolved the period in the browser would leave it
+// out of the list while the count chip includes it.
+test.describe.serial('Report Builder — drill-in across time zones', () => {
+  test.use({ timezoneId: 'America/Los_Angeles' });
+
+  const groupName = uniqueName('report-period-tz-grp');
+  const receiptName = uniqueName('jan-1-utc');
+  let groupId: number;
+
+  test.beforeAll(async () => {
+    await withAdminApi(async (api) => {
+      const adminId = await apiGetUserId(api, creds('admin').username);
+      groupId = (await apiCreateGroup(api, groupName)).id;
+      await apiCreateReceipt(api, {
+        groupId,
+        paidByUserId: adminId,
+        name: receiptName,
+        date: '2024-01-01T03:00:00Z',
+      });
+    });
+  });
+
+  test.afterAll(async () => {
+    try {
+      await withAdminApi((api) => apiDeleteGroupById(api, String(groupId)));
+    } catch {
+      // Best-effort cleanup — don't mask a test failure with a cleanup error.
+    }
+  });
+
+  test('lists the receipt the report counts at a period boundary', async ({ page }) => {
+    await stubTokenRefresh(page);
+    await gotoReportBuilder(page);
+    await addGroupToScopeByName(page, groupName);
+
+    await setCustomPeriod(page, '01/01/2024', '01/31/2024');
+    await expectReceiptCount(page, 1);
+
+    await page.getByTestId('report-receipt-count').click();
+    const drillIn = page.getByRole('dialog');
+    await expect(drillIn.getByTestId('report-receipt-row')).toHaveCount(1);
+    await expect(drillIn.getByText(receiptName)).toBeVisible();
+  });
+});

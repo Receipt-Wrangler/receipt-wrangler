@@ -17,6 +17,7 @@ import (
 	"receipt-wrangler/api/internal/reporting"
 	"receipt-wrangler/api/internal/reporting/render"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/structs"
 )
 
 // ReportService turns a report-builder request into a downloadable report. It is
@@ -55,6 +56,10 @@ type ReportPreview struct {
 	ReceiptCount   int      `json:"receiptCount"`
 	AllowedActions []string `json:"allowedActions,omitempty"`
 }
+
+// reportReceiptsCap bounds how many receipts the report drill-in lists. It is a
+// sanity check, not the report: TotalCount still reports every covered receipt.
+const reportReceiptsCap = 200
 
 // reportPreviewRowCap bounds how many receipt rows a preview feeds to the engine.
 // A preview is a sample rendered on every builder edit (debounced), so beyond
@@ -219,9 +224,7 @@ func (service ReportService) buildModel(
 	now time.Time,
 	rowLimit int,
 ) (reportBuild, error) {
-	filter := command.Filter
-	resolveReportGeneratorPaidBy(&filter, userId)
-	periodLabel := applyPeriod(&filter, command.Period, now)
+	filter, periodLabel := prepareReportFilter(userId, command, now)
 
 	catalog, rows, err := service.loadRows(userId, command.GroupIds, filter)
 	if err != nil {
@@ -285,6 +288,64 @@ func currencyFormat(settings models.SystemSettings) *reporting.CurrencyFormat {
 		DecimalSeparator:   string(settings.CurrencyDecimalSeparator),
 		HideDecimals:       settings.CurrencyHideDecimalPlaces,
 	}
+}
+
+// prepareReportFilter copies the request's filter and applies what a report adds
+// to it: the "report generator" paid-by sentinel becomes the caller, and the period
+// becomes a BETWEEN on the receipt date it covers. The report and its receipts
+// drill-in both start here, so they cover the same receipts.
+func prepareReportFilter(
+	userId uint,
+	command commands.ReportRequestCommand,
+	now time.Time,
+) (commands.ReceiptPagedRequestFilter, string) {
+	filter := command.Filter
+	resolveReportGeneratorPaidBy(&filter, userId)
+	periodLabel := applyPeriod(&filter, command.Period, now)
+	return filter, periodLabel
+}
+
+// Receipts lists the receipts the report described by command covers, for the
+// Report Builder's drill-in. It resolves the filter and period exactly as the
+// report does, on the server clock, and fetches through the same query, so the
+// list agrees with the report's receipt count on every database; a browser
+// resolving the period itself would land in its own time zone, and on SQLite its
+// ISO bounds would compare as text against the stored timestamps. The same
+// per-group authorization as Preview is the caller's responsibility.
+func (service ReportService) Receipts(userId uint, command commands.ReportRequestCommand) (structs.PagedData, error) {
+	return service.receipts(userId, command, time.Now())
+}
+
+func (service ReportService) receipts(
+	userId uint,
+	command commands.ReportRequestCommand,
+	now time.Time,
+) (structs.PagedData, error) {
+	filter, _ := prepareReportFilter(userId, command, now)
+	dataService := NewReportDataService(service.TX)
+
+	var receipts []models.Receipt
+	for _, groupId := range command.GroupIds {
+		groupReceipts, err := dataService.Receipts(userId, groupId, filter)
+		if err != nil {
+			return structs.PagedData{}, err
+		}
+		receipts = append(receipts, groupReceipts...)
+	}
+	// Each group arrives newest first; keep that order across the groups.
+	slices.SortStableFunc(receipts, func(a, b models.Receipt) int {
+		return b.Date.Compare(a.Date)
+	})
+
+	total := len(receipts)
+	if total > reportReceiptsCap {
+		receipts = receipts[:reportReceiptsCap]
+	}
+	data := make([]any, len(receipts))
+	for index := range receipts {
+		data[index] = receipts[index]
+	}
+	return structs.PagedData{Data: data, TotalCount: int64(total)}, nil
 }
 
 // loadRows gathers the engine rows across every covered group under a single

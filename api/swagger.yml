@@ -234,6 +234,41 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/receipts:
+    post:
+      tags:
+        - Report
+      summary: List the receipts a report covers
+      description:
+        Lists the receipts the report configuration covers, newest first, for
+        the builder's drill-in. The period and filter resolve exactly as they do
+        for the report, so the list agrees with the preview's receipt count.
+        Capped at 200 receipts; totalCount is every covered receipt. Requires the
+        same permissions as the preview.
+      operationId: getReportReceipts
+      requestBody:
+        description: The report builder configuration
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The covered receipts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedData"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /report/template:
     post:
       tags:

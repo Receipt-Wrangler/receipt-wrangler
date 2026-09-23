@@ -142,6 +142,7 @@ Class | Method | HTTP request | Description
 [*ReportApi*](doc/ReportApi.md) | [**duplicateReportTemplate**](doc/ReportApi.md#duplicatereporttemplate) | **POST** /report/template/{id}/duplicate | Duplicate a report template
 [*ReportApi*](doc/ReportApi.md) | [**generateReport**](doc/ReportApi.md#generatereport) | **POST** /report/generate | Generate a report
 [*ReportApi*](doc/ReportApi.md) | [**generateReportFromTemplate**](doc/ReportApi.md#generatereportfromtemplate) | **POST** /report/template/{id}/generate | Generate a report from a saved template
+[*ReportApi*](doc/ReportApi.md) | [**getReportReceipts**](doc/ReportApi.md#getreportreceipts) | **POST** /report/receipts | List the receipts a report covers
 [*ReportApi*](doc/ReportApi.md) | [**getReportTemplate**](doc/ReportApi.md#getreporttemplate) | **GET** /report/template/{id} | Get a report template
 [*ReportApi*](doc/ReportApi.md) | [**getReportTemplateOptions**](doc/ReportApi.md#getreporttemplateoptions) | **GET** /report/template/options | Get report template options
 [*ReportApi*](doc/ReportApi.md) | [**getReportTemplates**](doc/ReportApi.md#getreporttemplates) | **POST** /report/template/list | Get paged report templates
