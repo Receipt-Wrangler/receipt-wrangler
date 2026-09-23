@@ -234,6 +234,41 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/receipts:
+    post:
+      tags:
+        - Report
+      summary: List the receipts a report covers
+      description:
+        Lists the receipts the report configuration covers, newest first, for
+        the builder's drill-in. The period and filter resolve exactly as they do
+        for the report, so the list agrees with the preview's receipt count.
+        Capped at 100 receipts; totalCount is every covered receipt. Requires the
+        same permissions as the preview.
+      operationId: getReportReceipts
+      requestBody:
+        description: The report builder configuration
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The covered receipts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedData"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /report/template:
     post:
       tags:
@@ -6656,6 +6691,14 @@ components:
         endDate:
           type: string
           description: End date (YYYY-MM-DD), read only when preset is custom
+        dateField:
+          type: string
+          description: >-
+            Which receipt date the period covers, as a ReceiptPagedRequestFilter
+            date key: date, resolvedDate or createdAt. Omitted means date. A plain
+            string rather than an enum on purpose: this rides inside
+            ReportTemplate.configuration, and a value added to a closed enum
+            would fail that whole payload on already-released mobile builds.
     ReportDetail:
       type: object
       required:

@@ -3,9 +3,14 @@ package commands
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestReportRequestCommand_LoadDataFromRequest(t *testing.T) {
@@ -140,6 +145,143 @@ func TestReportRequestCommand_Validate_AcceptsCustomPeriod(t *testing.T) {
 	}
 }
 
+// Every receipt date key is a valid period date field on both a preset and a
+// custom period, and so is an empty one (a template saved before the field
+// existed).
+func TestReportRequestCommand_Validate_AcceptsEveryPeriodDateField(t *testing.T) {
+	periods := map[string]ReportPeriod{
+		"preset": {Preset: ReportPeriodThisMonth},
+		"custom": {Preset: ReportPeriodCustom, StartDate: "2026-05-01", EndDate: "2026-05-31"},
+	}
+	for periodName, period := range periods {
+		for _, dateField := range append([]string{""}, ReceiptDateFilterKeys()...) {
+			t.Run(periodName+"/"+dateField, func(t *testing.T) {
+				command := validReportCommand()
+				command.Period = period
+				command.Period.DateField = dateField
+				if errs := command.Validate().Errors; len(errs) > 0 {
+					t.Errorf("expected date field %q to be valid, got %v", dateField, errs)
+				}
+			})
+		}
+	}
+}
+
+// A missing preset still reports the preset, not the date field, so the user is
+// told about the thing actually missing.
+func TestReportRequestCommand_Validate_PresetErrorWinsOverDateField(t *testing.T) {
+	command := validReportCommand()
+	command.Period = ReportPeriod{DateField: "paidAt"}
+	if got := command.Validate().Errors["period"]; got != "A reporting period is required" {
+		t.Errorf("period error = %q, want the missing-preset message", got)
+	}
+}
+
+func TestReportRequestCommand_LoadDataFromRequest_ReadsPeriodDateField(t *testing.T) {
+	for _, dateField := range ReceiptDateFilterKeys() {
+		t.Run(dateField, func(t *testing.T) {
+			body := `{"groupIds": ["1"], "period": {"preset": "this_month", "dateField": "` + dateField + `"}}`
+			request := httptest.NewRequest("POST", "/api/report/generate", strings.NewReader(body))
+
+			command := ReportRequestCommand{}
+			if err := command.LoadDataFromRequest(httptest.NewRecorder(), request); err != nil {
+				t.Fatalf("LoadDataFromRequest: %v", err)
+			}
+			if command.Period.DateField != dateField {
+				t.Errorf("period date field = %q, want %q", command.Period.DateField, dateField)
+			}
+		})
+	}
+}
+
+func TestReportPeriod_DateFilterKey(t *testing.T) {
+	if got := (ReportPeriod{}).DateFilterKey(); got != ReceiptFilterKeyDate {
+		t.Errorf("empty date field = %q, want the receipt date %q", got, ReceiptFilterKeyDate)
+	}
+	for _, dateField := range ReceiptDateFilterKeys() {
+		if got := (ReportPeriod{DateField: dateField}).DateFilterKey(); got != dateField {
+			t.Errorf("date field %q = %q, want it passed through", dateField, got)
+		}
+	}
+}
+
+// TestReportPeriod_MarshalOmitsEmptyDateField guards the omitempty tag: templates
+// are stored with json.Marshal, and an empty `"dateField":""` in that blob is a
+// value no client ever sent, where an absent key already means the receipt date.
+func TestReportPeriod_MarshalOmitsEmptyDateField(t *testing.T) {
+	empty, err := json.Marshal(ReportPeriod{Preset: ReportPeriodThisMonth})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	if strings.Contains(string(empty), "dateField") {
+		t.Errorf("an empty date field should be omitted, got: %s", empty)
+	}
+
+	set, err := json.Marshal(ReportPeriod{Preset: ReportPeriodThisMonth, DateField: ReceiptFilterKeyCreatedAt})
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	if !strings.Contains(string(set), `"dateField":"createdAt"`) {
+		t.Errorf("a set date field should be kept, got: %s", set)
+	}
+}
+
+// TestReportPeriodDateFieldIsAnOpenStringOnTheContract pins the swagger shape of
+// ReportPeriod.dateField. ReportPeriod rides inside ReportTemplate.configuration, a
+// response the mobile client deserializes; were dateField a closed enum, the
+// generated dart-dio EnumClass would throw on any date key added later and fail
+// the whole template payload on every already-released build. So it must stay a
+// plain optional string, and its description must name every accepted key.
+func TestReportPeriodDateFieldIsAnOpenStringOnTheContract(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	data, err := os.ReadFile(filepath.Join(filepath.Dir(thisFile), "..", "..", "swagger.yml"))
+	if err != nil {
+		t.Fatalf("read swagger.yml: %v", err)
+	}
+
+	var doc struct {
+		Components struct {
+			Schemas map[string]struct {
+				Required   []string `yaml:"required"`
+				Properties map[string]struct {
+					Type        string   `yaml:"type"`
+					Enum        []string `yaml:"enum"`
+					Ref         string   `yaml:"$ref"`
+					Description string   `yaml:"description"`
+				} `yaml:"properties"`
+			} `yaml:"schemas"`
+		} `yaml:"components"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("parse swagger.yml: %v", err)
+	}
+
+	period, ok := doc.Components.Schemas["ReportPeriod"]
+	if !ok {
+		t.Fatal("swagger.yml is missing the ReportPeriod schema")
+	}
+	dateField, ok := period.Properties["dateField"]
+	if !ok {
+		t.Fatal("ReportPeriod is missing the dateField property")
+	}
+	if dateField.Type != "string" || len(dateField.Enum) > 0 || dateField.Ref != "" {
+		t.Errorf("dateField must be a plain string, got type=%q enum=%v $ref=%q", dateField.Type, dateField.Enum, dateField.Ref)
+	}
+	for _, required := range period.Required {
+		if required == "dateField" {
+			t.Error("dateField must stay optional; templates saved before it existed omit it")
+		}
+	}
+	for _, key := range ReceiptDateFilterKeys() {
+		if !strings.Contains(dateField.Description, key) {
+			t.Errorf("dateField description does not name the accepted key %q", key)
+		}
+	}
+}
+
 func TestReportRequestCommand_Validate_Rejects(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -154,6 +296,19 @@ func TestReportRequestCommand_Validate_Rejects(t *testing.T) {
 		{"custom without dates", func(c *ReportRequestCommand) { c.Period = ReportPeriod{Preset: ReportPeriodCustom} }, "period"},
 		{"custom end before start", func(c *ReportRequestCommand) {
 			c.Period = ReportPeriod{Preset: ReportPeriodCustom, StartDate: "2026-05-31", EndDate: "2026-05-01"}
+		}, "period"},
+		// The period's date field is a filter JSON key, never a column name, a
+		// differently cased key, or a filter key that isn't a date.
+		{"date field as column name created_at", func(c *ReportRequestCommand) { c.Period.DateField = "created_at" }, "period"},
+		{"date field as column name resolved_date", func(c *ReportRequestCommand) { c.Period.DateField = "resolved_date" }, "period"},
+		{"date field wrong case Date", func(c *ReportRequestCommand) { c.Period.DateField = "Date" }, "period"},
+		{"date field wrong case CreatedAt", func(c *ReportRequestCommand) { c.Period.DateField = "CreatedAt" }, "period"},
+		{"date field with whitespace", func(c *ReportRequestCommand) { c.Period.DateField = " date" }, "period"},
+		{"date field non-date filter key amount", func(c *ReportRequestCommand) { c.Period.DateField = "amount" }, "period"},
+		{"date field non-date filter key name", func(c *ReportRequestCommand) { c.Period.DateField = "name" }, "period"},
+		{"date field unknown", func(c *ReportRequestCommand) { c.Period.DateField = "paidAt" }, "period"},
+		{"date field unknown on a valid custom range", func(c *ReportRequestCommand) {
+			c.Period = ReportPeriod{Preset: ReportPeriodCustom, StartDate: "2026-05-01", EndDate: "2026-05-31", DateField: "paidAt"}
 		}, "period"},
 		{"records with by", func(c *ReportRequestCommand) { c.Detail = ReportDetail{Mode: ReportDetailRecords, By: "category"} }, "detail"},
 		{"aggregate without by", func(c *ReportRequestCommand) { c.Detail = ReportDetail{Mode: ReportDetailAggregate} }, "detail"},

@@ -185,6 +185,46 @@ func PreviewReport(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
+// GetReportReceipts lists the receipts a report covers, for the Report Builder's
+// drill-in. It is gated exactly like PreviewReport, whose receipt count it lists,
+// and resolves the period and filter through the report's own pipeline, so the
+// list cannot disagree with that count.
+func GetReportReceipts(w http.ResponseWriter, r *http.Request) {
+	command, ok := loadReportCommand(w, r)
+	if !ok {
+		return
+	}
+
+	handler := structs.Handler{
+		ErrorMessage:      "Error getting report receipts",
+		Writer:            w,
+		Request:           r,
+		ResponseType:      constants.ApplicationJson,
+		AnyAppPermissions: []string{permissions.AppReportsRead, permissions.AppReportsReadAll},
+		GroupIds:          command.GroupIds,
+		GroupPermissions:  []string{permissions.GroupReportsRead},
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			token := structs.GetClaims(r)
+
+			pagedData, err := services.NewReportService(nil).Receipts(token.UserId, command)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(pagedData)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
 // DeleteReportTemplate removes a saved report template by id. Access is resolved by
 // CanActOnTemplate (delete): a missing id maps to 404, an unauthorized caller to 403.
 // On success the grant cache is flushed, since the deleted template's grant rows

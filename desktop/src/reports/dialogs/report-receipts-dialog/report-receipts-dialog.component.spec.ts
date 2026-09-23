@@ -1,8 +1,18 @@
+import { CurrencyPipe } from "@angular/common";
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
-import { of } from "rxjs";
-import { Receipt, ReceiptService, ReportPeriod } from "../../../open-api";
+import { Store } from "@ngxs/store";
+import { Observable, of, throwError } from "rxjs";
+import {
+  PagedData,
+  Receipt,
+  ReportColumn,
+  ReportDetail,
+  ReportPeriod,
+  ReportRequestCommand,
+  ReportService,
+} from "../../../open-api";
 import { PipesModule } from "../../../pipes";
 import {
   ReportReceiptsDialogComponent,
@@ -14,35 +24,51 @@ const receipts: Receipt[] = [
   { id: 8, name: "Lunch", date: "2026-07-05", amount: "30.00", status: "OPEN", groupId: 1, paidByUserId: 2, categories: [], tags: [] } as Receipt,
 ];
 
-function configure(data: Partial<ReportReceiptsDialogData> = {}): {
+const command: ReportRequestCommand = {
+  name: "Report",
+  groupIds: ["1", "2"],
+  period: { preset: ReportPeriod.PresetEnum.Custom, startDate: "2026-05-01", endDate: "2026-05-31", dateField: "createdAt" },
+  filter: {},
+  detail: { mode: ReportDetail.ModeEnum.Records },
+  columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+  formats: [ReportRequestCommand.FormatsEnum.Pdf],
+};
+
+const MAY_2026: ReportReceiptsDialogData["period"] = {
+  preset: ReportPeriod.PresetEnum.Custom,
+  startDate: new Date(2026, 4, 1),
+  endDate: new Date(2026, 4, 31),
+  dateField: "createdAt",
+};
+
+function configure(
+  data: Partial<ReportReceiptsDialogData> = {},
+  response: Observable<PagedData> = of({ data: receipts, totalCount: 5 } as unknown as PagedData)
+): {
   fixture: ComponentFixture<ReportReceiptsDialogComponent>;
   component: ReportReceiptsDialogComponent;
+  reportService: { getReportReceipts: jest.Mock };
 } {
-  const receiptService = {
-    getReceiptsForGroup: jest.fn(() => of({ data: receipts, totalCount: receipts.length })),
-  };
+  const reportService = { getReportReceipts: jest.fn(() => response) };
   TestBed.configureTestingModule({
     declarations: [ReportReceiptsDialogComponent],
     imports: [PipesModule],
     providers: [
       provideZonelessChangeDetection(),
-      { provide: ReceiptService, useValue: receiptService },
+      { provide: ReportService, useValue: reportService },
       { provide: MatDialogRef, useValue: { close: jest.fn() } },
+      // The row pipes (user, customCurrency) read the store; nothing here asserts on them.
+      { provide: Store, useValue: { selectSnapshot: jest.fn(() => ({})) } },
+      CurrencyPipe,
       {
         provide: MAT_DIALOG_DATA,
-        useValue: {
-          groupIds: ["1"],
-          filter: {},
-          period: { preset: ReportPeriod.PresetEnum.ThisMonth, startDate: null, endDate: null },
-          receiptCount: 5,
-          ...data,
-        } as ReportReceiptsDialogData,
+        useValue: { command, period: MAY_2026, receiptCount: 5, ...data } as ReportReceiptsDialogData,
       },
     ],
     schemas: [NO_ERRORS_SCHEMA],
   });
   const fixture = TestBed.createComponent(ReportReceiptsDialogComponent);
-  return { fixture, component: fixture.componentInstance };
+  return { fixture, component: fixture.componentInstance, reportService };
 }
 
 describe("ReportReceiptsDialogComponent", () => {
@@ -51,9 +77,17 @@ describe("ReportReceiptsDialogComponent", () => {
   it("loads the covered receipts and starts on the list view", () => {
     const { component } = configure();
     expect(component.receipts().length).toBe(2);
+    expect(component.loading()).toBe(false);
+    expect(component.hasError()).toBe(false);
     expect(component.selected()).toBeNull();
-    // The subtitle count is the report's true total, not the loaded sample.
-    expect(component.count()).toBe(5);
+  });
+
+  // The server resolves the period and filter exactly as the report does, so the
+  // dialog sends the preview's own command, once, and builds no bounds itself.
+  it("asks the server for the receipts the preview's command covers, in one request", () => {
+    const { reportService } = configure();
+    expect(reportService.getReportReceipts).toHaveBeenCalledTimes(1);
+    expect(reportService.getReportReceipts).toHaveBeenCalledWith(command);
   });
 
   it("opens a receipt's breakdown and returns to the list", () => {
@@ -72,8 +106,63 @@ describe("ReportReceiptsDialogComponent", () => {
     openSpy.mockRestore();
   });
 
-  it("falls back to the loaded count when no true count is provided", () => {
+  it("names the date field in the subtitle", () => {
+    const { component } = configure();
+    expect(component.periodLabel).toBe("2026-05-01 to 2026-05-31 on Added At");
+  });
+
+  it("names the receipt date when the period names no date field", () => {
+    const { component } = configure({
+      period: { ...MAY_2026, dateField: undefined } as unknown as ReportReceiptsDialogData["period"],
+    });
+    expect(component.periodLabel).toBe("2026-05-01 to 2026-05-31 on Receipt Date");
+  });
+
+  it("shows the report's own count when one is provided", () => {
+    const { component } = configure({ receiptCount: 9 });
+    expect(component.count()).toBe(9);
+  });
+
+  // The list is capped server-side, so its length is not the count; its total is.
+  it("falls back to the list's total when no count is provided", () => {
     const { component } = configure({ receiptCount: undefined });
-    expect(component.count()).toBe(2);
+    expect(component.count()).toBe(5);
+  });
+
+  // The server caps the list, so a report covering more receipts than it returns
+  // must say so rather than pass the list off as complete.
+  it("notes when the list shows only the newest receipts", async () => {
+    const { fixture, component } = configure();
+    await fixture.whenStable();
+
+    expect(component.truncated()).toBe(true);
+    const notice = fixture.nativeElement.querySelector('[data-testid="report-receipt-truncated"]');
+    expect(notice?.textContent).toContain("Showing the newest 2 of 5 receipts.");
+  });
+
+  it("shows no truncation note when the list is complete", async () => {
+    const { fixture, component } = configure(
+      {},
+      of({ data: receipts, totalCount: receipts.length } as unknown as PagedData)
+    );
+    await fixture.whenStable();
+
+    expect(component.truncated()).toBe(false);
+    expect(fixture.nativeElement.querySelector('[data-testid="report-receipt-truncated"]')).toBeNull();
+  });
+
+  it("shows no truncation note when the list failed to load", async () => {
+    const { fixture } = configure({}, throwError(() => new Error("500")));
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('[data-testid="report-receipt-truncated"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="report-receipt-error"]')).not.toBeNull();
+  });
+
+  it("flags an error and stops loading when the list cannot be fetched", () => {
+    const { component } = configure({}, throwError(() => new Error("403")));
+    expect(component.hasError()).toBe(true);
+    expect(component.loading()).toBe(false);
+    expect(component.receipts()).toEqual([]);
   });
 });

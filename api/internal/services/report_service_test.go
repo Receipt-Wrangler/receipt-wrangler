@@ -142,21 +142,65 @@ func TestReportService_ResolvePeriodBounds(t *testing.T) {
 	}
 }
 
-func TestReportService_ApplyPeriodWritesBetweenDateFilter(t *testing.T) {
-	now := time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC)
-	filter := commands.ReceiptPagedRequestFilter{}
+// applyPeriod writes the period's BETWEEN onto exactly the date slot it covers —
+// an empty date field being the receipt date — and leaves every other slot as the
+// caller set it. The label describes the window only, whatever field it covers.
+func TestReportService_ApplyPeriodWritesTheChosenDateSlot(t *testing.T) {
+	now := time.Date(2026, 6, 15, 10, 0, 0, 0, time.UTC)
+	wantStart := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	wantEnd := time.Date(2026, 6, 30, 23, 59, 59, 999999999, time.UTC)
 
-	label := applyPeriod(&filter, commands.ReportPeriod{Preset: commands.ReportPeriodThisMonth}, now)
+	tests := []struct {
+		dateField string
+		wantSlot  string
+	}{
+		{"", commands.ReceiptFilterKeyDate},
+		{commands.ReceiptFilterKeyDate, commands.ReceiptFilterKeyDate},
+		{commands.ReceiptFilterKeyResolvedDate, commands.ReceiptFilterKeyResolvedDate},
+		{commands.ReceiptFilterKeyCreatedAt, commands.ReceiptFilterKeyCreatedAt},
+		// A stored template is run without re-validation, so an unknown field
+		// falls back to the receipt date rather than dropping the period.
+		{"paidAt", commands.ReceiptFilterKeyDate},
+	}
+	for _, test := range tests {
+		t.Run("dateField="+test.dateField, func(t *testing.T) {
+			filter := commands.ReceiptPagedRequestFilter{}
+			sentinel := func(key string) commands.PagedRequestField {
+				return commands.PagedRequestField{Operation: commands.EQUALS, Value: "sentinel-" + key}
+			}
+			for _, key := range commands.ReceiptDateFilterKeys() {
+				*filter.DateFilterField(key) = sentinel(key)
+			}
+			filter.Name = sentinel("name")
 
-	if filter.Date.Operation != commands.BETWEEN {
-		t.Errorf("date operation = %q, want BETWEEN", filter.Date.Operation)
-	}
-	bounds, ok := filter.Date.Value.([]interface{})
-	if !ok || len(bounds) != 2 {
-		t.Fatalf("date value = %v, want a two-element bound slice", filter.Date.Value)
-	}
-	if label != "2026-05-01 to 2026-05-31" {
-		t.Errorf("label = %q", label)
+			label := applyPeriod(&filter, commands.ReportPeriod{Preset: commands.ReportPeriodThisMonth, DateField: test.dateField}, now)
+
+			if label != "2026-06-01 to 2026-06-30" {
+				t.Errorf("label = %q, want the window regardless of the date field", label)
+			}
+			for _, key := range commands.ReceiptDateFilterKeys() {
+				slot := *filter.DateFilterField(key)
+				if key != test.wantSlot {
+					if !reflect.DeepEqual(slot, sentinel(key)) {
+						t.Errorf("%s slot = %+v, want it left untouched", key, slot)
+					}
+					continue
+				}
+				if slot.Operation != commands.BETWEEN {
+					t.Errorf("%s operation = %q, want BETWEEN", key, slot.Operation)
+				}
+				bounds, ok := slot.Value.([]interface{})
+				if !ok || len(bounds) != 2 {
+					t.Fatalf("%s value = %v, want a two-element bound slice", key, slot.Value)
+				}
+				if !bounds[0].(time.Time).Equal(wantStart) || !bounds[1].(time.Time).Equal(wantEnd) {
+					t.Errorf("%s bounds = %v..%v, want %v..%v", key, bounds[0], bounds[1], wantStart, wantEnd)
+				}
+			}
+			if !reflect.DeepEqual(filter.Name, sentinel("name")) {
+				t.Errorf("name slot = %+v, want it left untouched", filter.Name)
+			}
+		})
 	}
 }
 

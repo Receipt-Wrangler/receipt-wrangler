@@ -1590,6 +1590,9 @@ why this feature needed no API change. Picking a month **overwrites** whatever t
   Pre-existing; the chip just surfaces it for the first time.
 - **Arrow steps from "All time"/"Custom" seed the current month** and then apply the delta, so `‹`
   and `›` never do the same thing.
+- **`RECEIPT_DATE_FILTER_FIELDS` has a second consumer: the Report Builder's period "Date field"
+  picker.** That one is server-backed, so a new key there needs the API side too. See "Period date
+  field" under "Reports (Report Builder)".
 
 ### Receipt summary (the totals under the table)
 
@@ -2217,11 +2220,56 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
       currency configuration is a global System Setting on the shared CI backend that this spec must
       not mutate; the seeded value is `1500.50` precisely so the thousands separator and trailing
       zero prove formatting ran.
+- **Period date field.** A **"Date field"** `app-select` sits in Parameters, after "Period covering"
+  and its custom Start/End. It chooses which receipt date the period filters on, bound to
+  `period.dateField`, and the hint reads "Resolves to … on Added At". See `api/CLAUDE.md` →
+  "The period's date field" for the wire contract.
+  - **Its options are `RECEIPT_DATE_FILTER_FIELDS` mapped as-is** (`periodDateFieldOptions`), so they
+    match the receipts table's quick date filter in content and order by construction.
+    `ReportBuilderValue.period.dateField` is typed `ReceiptDateFilterFieldKey`, and the panel spec
+    pins the list.
+  - **A new report defaults to `DEFAULT_QUICK_DATE_FIELD`, and the mapper always sends the field**, so
+    a saved template records which date it covers.
+  - **Rehydrating goes through `toReportPeriodDateField`** (`report-period.util.ts`), which falls back
+    to the **literal** `LEGACY_REPORT_PERIOD_DATE_FIELD` (`"date"`), not the quick filter's default.
+    Templates saved before the picker have no field and always ran on the receipt date; a later
+    change to the table's default must not change what they cover. The swagger field is a plain
+    `string`, so an unrecognized stored value lands on `"date"` too. Re-saving a legacy template writes
+    `dateField: "date"`, so that round trip is intentionally not a fixpoint.
+  - **The drill-in never resolves the period itself.** `report-preview-panel.openReceipts()` hands
+    the dialog the same `toReportRequestCommand` the preview sends. `report-receipts-dialog` makes
+    one `ReportService.getReportReceipts(command)` call (`POST /report/receipts`), and the server
+    runs the report's own filter and period.
+    - It used to build the BETWEEN here, per group, via `getReceiptsForGroup`. That disagreed with
+      the count chip in three ways:
+      - it used the browser's time zone, not the server's;
+      - on SQLite its ISO bounds compared as text and dropped first-day receipts;
+      - the report-generator `-1` paid-by matched nothing.
+    - The subtitle still formats the period client-side (display only) and names the field.
+    - The subtitle's count is the preview's `receiptCount`, falling back to the response's
+      `totalCount`, not the list length: the server caps the list at 100.
+    - When the list is shorter than its `totalCount`, a `report-receipt-truncated` notice reads
+      "Showing the newest N of M receipts", so a partial list is never passed off as the whole report.
+  - **E2E:** `e2e/report-period-date-field.spec.ts` (serial, admin storageState, own group).
+    - Seeds two receipts dated 2024-01-01, one RESOLVED. The server stamps both "resolved" and "added"
+      with now.
+    - Asserts the options and order, and the counts per field across a past window and a window from
+      2025.
+    - The drill-in under Added At lists both receipts, and a saved template reopens on its field.
+    - A second block runs the browser in `timezoneId: 'America/Los_Angeles'` against the UTC backend.
+      A receipt dated 03:00 UTC on January 1 must appear in the January drill-in, matching the chip.
+      This was verified to fail with the old client-side bounds.
+    - The count chip reads `receipt_long<N> receipts` (icon ligature flush against the number), so it
+      is matched with `(?<!\d)N receipts`.
+    - The label contains "field", so a bare `getByLabel('Field')` elsewhere on the builder now
+      resolves two elements. `report-grouping-label.spec.ts` scopes its column-picker lookup to the
+      dialog for that reason.
 - **Live preview** (`report-preview-panel`): the container debounces the form (~450ms, `switchMap`) into
   `POST /report/preview` and renders the engine's returned HTML in a **sandboxed `<iframe srcdoc>`**
   (`sandbox="allow-same-origin"`, scripts disabled; sized to content on load). The response's
-  `receiptCount` drives the chip that opens the receipts drill-in (`report-receipts-dialog`, paged
-  receipts across scope with the filter + resolved period). The drill-in is a read-only list → detail
+  `receiptCount` drives the chip that opens the receipts drill-in (`report-receipts-dialog`, the
+  receipts the report covers, listed server-side by `POST /report/receipts` from the preview's own
+  command; see "Period date field" above). The drill-in is a read-only list → detail
   inspector: a `selected` signal toggles the list (clickable rows) and a per-receipt breakdown card
   (amount/category/paid-by/tags via the shared `customCurrency`/`name`/`user` pipes + `app-status-chip`);
   "Open full receipt" does `window.open(\`/receipts/${id}/view\`, "_blank")` to view it in a new tab.

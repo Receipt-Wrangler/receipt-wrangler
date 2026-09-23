@@ -147,6 +147,42 @@ type ReceiptPagedRequestFilter struct {
 	CreatedAt    PagedRequestField `json:"createdAt"`
 }
 
+// The ReceiptPagedRequestFilter keys that hold a receipt date. A report period
+// names one of these to say which date it covers.
+const (
+	ReceiptFilterKeyDate         = "date"
+	ReceiptFilterKeyResolvedDate = "resolvedDate"
+	ReceiptFilterKeyCreatedAt    = "createdAt"
+)
+
+// ReceiptDateFilterKeys lists the date keys in the order the desktop offers them
+// (RECEIPT_DATE_FILTER_FIELDS in desktop/src/constants/receipt-filter-fields.constant.ts),
+// which the receipts quick date filter and the Report Builder's period picker share.
+// Adding a key there means adding it here and to DateFilterField.
+func ReceiptDateFilterKeys() []string {
+	return []string{ReceiptFilterKeyDate, ReceiptFilterKeyResolvedDate, ReceiptFilterKeyCreatedAt}
+}
+
+// DateFilterField returns the filter slot a receipt date key names, or nil when
+// the key names no date slot.
+func (filter *ReceiptPagedRequestFilter) DateFilterField(key string) *PagedRequestField {
+	switch key {
+	case ReceiptFilterKeyDate:
+		return &filter.Date
+	case ReceiptFilterKeyResolvedDate:
+		return &filter.ResolvedDate
+	case ReceiptFilterKeyCreatedAt:
+		return &filter.CreatedAt
+	default:
+		return nil
+	}
+}
+
+// IsReceiptDateFilterKey reports whether key names a receipt date slot.
+func IsReceiptDateFilterKey(key string) bool {
+	return (&ReceiptPagedRequestFilter{}).DateFilterField(key) != nil
+}
+
 type PagedRequestField struct {
 	Operation FilterOperation `json:"operation"`
 	Value     interface{}     `json:"value"`

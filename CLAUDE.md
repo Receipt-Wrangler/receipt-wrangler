@@ -416,6 +416,13 @@ disagree. **Client-only on both sides**: no backend, `swagger.yml` or generated-
   `mobile/integration_test/receipt_quick_date_filter_test.dart`. The mobile one **seeds relative to
   `DateTime.now()`** — the shared mobile filter fixture is pinned to June 2026, which a
   month-relative control drifts away from.
+- **The same field list drives the Report Builder's "Date field" picker**, next to "Period covering",
+  and that one **is** server-backed: `ReportPeriod.dateField` picks which receipt date the report
+  period filters. Adding a date field to desktop's `RECEIPT_DATE_FILTER_FIELDS` therefore also needs
+  `commands.ReceiptDateFilterKeys()` / `DateFilterField` and the swagger description, or the picker
+  offers a value the API rejects with a 400. `TestReceiptDateFilterKeys` pins the Go side. The wire
+  field is a plain string, not an enum, so mobile never breaks on a new key. See `api/CLAUDE.md` →
+  "The period's date field".
 
 See `desktop/CLAUDE.md` → "The month stepper targets one date field" and `mobile/CLAUDE.md` → "Quick
 date filter" for the per-client details.

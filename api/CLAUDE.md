@@ -2135,6 +2135,81 @@ formulas reference by name with ASCII operators; group-by/detail carry engine fi
 client maps its builder UI onto engine-shaped values before submitting. Report generation is **synchronous**
 (streamed download); an async job + live progress + stored-results download is a possible later slice.
 
+**The period's date field (`ReportPeriod.dateField`).** A period covers one receipt date: `date`,
+`resolvedDate` or `createdAt`. These are the `ReceiptPagedRequestFilter` JSON keys, and the same fields,
+in the same order, as the receipts table's quick date filter, whose list drives the Report Builder's
+picker.
+- **Mapping and validation both live in `commands`.** `ReceiptDateFilterKeys()` pins the list and
+  `(*ReceiptPagedRequestFilter).DateFilterField(key)` returns the matching slot.
+  `validatePeriod` accepts a key only if `DateFilterField` resolves it, so the two cannot disagree. A
+  bad value is a 400 under the `period` key, reported after the preset checks.
+- **`applyPeriod` writes the BETWEEN onto that one slot**, overwriting whatever condition it held.
+  The preamble, `Meta.Params["Period"]` and `{{period}}` are unchanged.
+  - An unknown value falls back to `Date`. `GenerateReportFromTemplate` and the dashboard render path
+    run a stored configuration without re-validating it, so the fallback stays lenient, like
+    `resolvePeriodBounds`' default.
+  - Only the chosen slot is overwritten, so a builder **Date** filter now ANDs with a period on
+    another field. On `date` it is still replaced, as before.
+  - A nil `resolved_date` never matches, so a Resolved Date period excludes every unresolved receipt,
+    DECLINED included.
+- **Empty means `date`** (`ReportPeriod.DateFilterKey()`). That is how templates saved before the field
+  existed keep their meaning: no migration, and `CurrentReportConfigurationVersion` stays 1. The Go
+  field is `json:"dateField,omitempty"`. Templates are stored with `json.Marshal`, and the tag keeps an
+  empty value out of the blob instead of storing `""`.
+- **It is a plain `type: string` in swagger, deliberately not an enum.** `ReportPeriod` rides inside
+  `ReportTemplate.configuration`, a response the mobile client deserializes. A closed dart-dio enum
+  would throw on the first date key added later and fail the whole template payload on every
+  already-released build. `TestReportPeriodDateFieldIsAnOpenStringOnTheContract` parses `swagger.yml`
+  to hold that.
+- **Adding a date key** means `ReceiptDateFilterKeys()`, `DateFilterField`, the swagger description,
+  and desktop's `RECEIPT_DATE_FILTER_FIELDS`. `TestReceiptDateFilterKeys` pins the list, and
+  `TestReceiptDateFilterKeysAreFilterJsonKeys` checks it against the struct by reflection.
+- **The drill-in list is server-side: `POST /api/report/receipts` (`ReportService.Receipts`).** The
+  builder's "N receipts" chip opens a list of what the report covers.
+  - **Why the server builds it.** The list used to build its own period BETWEEN in the browser, and
+    disagreed with the count in three ways:
+    - it used the browser's time zone, not the server clock's;
+    - on SQLite, its ISO `…T…` bounds compared as text against the stored `YYYY-MM-DD HH:MM:SS…`,
+      dropping first-day receipts;
+    - it sent the "report generator" paid-by sentinel (`-1`) as-is, which matches nothing.
+  - **How it stays in step with the report.** Both start from `prepareReportFilter` (the paid-by
+    sentinel plus `applyPeriod`) and fetch through `ReportDataService.fetchReceipts`, so the list and
+    the count are the same query. They differ only in presentation:
+    - `Rows` marks hidden categories/tags `(Restricted)`;
+    - `Receipts` strips them, masks for member visibility, and preloads
+      `CUSTOM_FIELD_ASSOCIATIONS`, like the receipts list.
+  - **Gating.** It is gated exactly like `PreviewReport`: `app.reports.read`/`readAll` plus
+    `group.reports.read` in every group. It is **not** `group.receipts.read`, so a report reader sees
+    the receipts their report already covers.
+  - **Ordering and the cap.** The list is merged newest-first across groups and capped at
+    `reportReceiptsCap`.
+    - **The cap is 100** because it is the repository's page-size ceiling: `BaseRepository.Paginate`
+      clamps any larger page.
+    - **Each group fetches only its newest 100** as one page, which always contains the newest 100
+      overall.
+    - **`totalCount` is the sum of the groups' repository counts.** Those are taken after the grant
+      intersection and the paid-by WHERE, so it is the true total, not the loaded length. The desktop
+      shows a "Showing the newest N of M" notice when the two differ.
+- **Tests:**
+  - `commands/report_request_command_test.go` and `paged_request_command_test.go`: validation,
+    marshalling, and the sync guards above.
+  - `services/report_period_date_field_test.go`: DB-backed.
+    - One receipt per field, with inclusive bounds, presets, and the AND with a Date filter.
+    - For the drill-in:
+      - parity with the report on every field;
+      - a server in America/Los_Angeles at the May 31/June 1 boundary;
+      - the `-1` sentinel;
+      - custom-field definitions;
+      - merge order;
+      - the cap across two groups, which keeps the newest overall and the full total;
+      - a limited fetch whose count still excludes hidden payers.
+  - `handlers/report_period_date_field_test.go`:
+    - preview and template CRUD;
+    - the unvalidated render/generate-from-template paths, with a May case proving the fallback lands
+      on the receipt date and not the resolved one;
+    - `GetReportReceipts`, per field and for its gate.
+  - `repositories/report_template_test.go`: the stored blob.
+
 **`POST /api/report/preview`** drives the desktop builder's live preview. It shares GenerateReport's
 front-loaded parse/validate and the same per-group `group.reports.read` gate (the shared
 `loadReportCommand` handler helper), and `ReportService.Preview` runs the **same** pipeline as `Generate`
