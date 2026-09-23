@@ -3,6 +3,7 @@ package repositories
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/base64"
 	"image"
 	_ "image/jpeg"
 	"io"
@@ -423,6 +424,77 @@ func TestBuildEncodedImageString_ProducesDataUri(t *testing.T) {
 func TestBuildEncodedImageString_ErrorOnInvalidType(t *testing.T) {
 	repository := NewFileRepository(nil)
 	_, err := repository.BuildEncodedImageString([]byte("plain text"))
+	if err == nil {
+		utils.PrintTestError(t, err, "expected error")
+	}
+}
+
+// decodeDataUriPayload returns the bytes a data URI actually carries, so a test
+// can assert what a browser would receive rather than what the URI claims to be.
+func decodeDataUriPayload(t *testing.T, dataUri string) []byte {
+	t.Helper()
+	_, encoded, found := strings.Cut(dataUri, "base64,")
+	if !found {
+		t.Fatalf("not a base64 data uri: %.40s", dataUri)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatalf("data uri payload is not base64: %v", err)
+	}
+	return decoded
+}
+
+// The guard that matters. Checking the data URI's mime prefix alone would pass
+// against the broken behaviour too — GetFileType relabels a PDF as image/jpeg
+// without converting it, so the URI already LOOKS like an image. Only the payload
+// tells the truth about what the browser would try to decode.
+func TestBuildDisplayImageString_PdfRasterizes(t *testing.T) {
+	t.Setenv("BASE_PATH", testBasePath())
+	repository := NewFileRepository(nil)
+	pdf := makePdfFromJpg(t, readTestJpgBytes(t))
+
+	got, err := repository.BuildDisplayImageString(pdf)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if !strings.HasPrefix(got, "data:image/") {
+		utils.PrintTestError(t, got[:25], "data:image/... prefix")
+	}
+
+	payload := decodeDataUriPayload(t, got)
+	if bytes.HasPrefix(payload, []byte("%PDF")) {
+		utils.PrintTestError(t, "%PDF...", "rasterized image bytes, not the original PDF")
+	}
+
+	isImage, err := repository.IsImage(payload)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if !isImage {
+		utils.PrintTestError(t, isImage, true)
+	}
+}
+
+func TestBuildDisplayImageString_JpgPassesThroughUntouched(t *testing.T) {
+	t.Setenv("BASE_PATH", testBasePath())
+	repository := NewFileRepository(nil)
+	jpg := readTestJpgBytes(t)
+
+	got, err := repository.BuildDisplayImageString(jpg)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	// Byte-identical: an image that needs no conversion must not be re-encoded,
+	// which would cost a generation of quality on every preview.
+	if !bytes.Equal(decodeDataUriPayload(t, got), jpg) {
+		utils.PrintTestError(t, "re-encoded bytes", "the original jpg bytes")
+	}
+}
+
+func TestBuildDisplayImageString_ErrorOnInvalidType(t *testing.T) {
+	repository := NewFileRepository(nil)
+	_, err := repository.BuildDisplayImageString([]byte("plain text"))
 	if err == nil {
 		utils.PrintTestError(t, err, "expected error")
 	}

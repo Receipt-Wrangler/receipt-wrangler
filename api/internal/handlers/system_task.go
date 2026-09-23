@@ -315,7 +315,11 @@ func GetSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
-			encodedImage, err := fileRepository.BuildEncodedImageString(fileBytes)
+			// BuildDisplayImageString, never BuildEncodedImageString: a quick scan's
+			// upload is whatever the user picked, and the uploader accepts PDF and
+			// HEIC. Encoding those unconverted yields a data URI the browser cannot
+			// render — silently, since GetFileType labels a PDF image/jpeg anyway.
+			encodedImage, err := fileRepository.BuildDisplayImageString(fileBytes)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

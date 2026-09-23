@@ -260,6 +260,14 @@ parameter because the roots genuinely differ: `data/` hangs off `os.Getwd()`, `t
 yourself, so a new trust boundary is always deliberate. The check is purely lexical (`filepath.Rel`,
 no `EvalSymlinks`), matching how every path here is constructed.
 
+**Reading is per-boundary; encoding for a browser is not.** The split above is
+about *getting* bytes safely, and it is genuinely different per root. Turning those
+bytes into something an `<img>` can render is identical everywhere, so it has one
+home: `FileRepository.BuildDisplayImageString`. Any handler returning an image to a
+client calls it — never `BuildEncodedImageString` directly, which encodes whatever
+it is handed and (via `GetFileType`) will happily label an unconverted PDF
+`image/jpeg`. See "Activity source files" below for the bug that cost.
+
 **`utils.ReadFile` returns `(nil, nil)` on ANY read error** — it swallows it. Never use it where a
 missing file must be an error: the caller sees empty bytes and a nil error and carries on. That cost
 a real bug in `wranglerasynq/email_process_handler.go`, where a deleted attachment sailed past the
@@ -1399,12 +1407,33 @@ asynq payload:
 - `GET /systemTask/{id}/sourceFile` — JSON `{ name, encodedImage }`.
 - `GET /systemTask/{id}/sourceFile/download` — the original bytes.
 
-**Preview prefers `ImageForOcrPath` when the payload has one; download always
-serves `TempFilePath`.** `GetBytesFromImageBytes` on a multi-page PDF runs
+**Preview goes through `FileRepository.BuildDisplayImageString`, like every other
+browser-facing image response.** That helper is the one canonical
+`raw bytes → data URI a browser can render in an <img>` transform: PDFs rasterize,
+HEIC transcodes, everything else passes through. Reading the bytes stays the
+caller's job — `data/` and `temp/` are separate trust boundaries with separate
+containment checks, and `ConvertToJpg` has no file at all — but the *encode* half
+is shared, so no surface can get it half-right.
+
+**This shipped wrong and the failure was silent**, which is worth knowing before
+touching any of it. The preview originally called `BuildEncodedImageString` on the
+raw upload. That looks harmless until you read `GetFileType` (`files.go`), which
+relabels PDF bytes as `image/jpeg` **without converting them** — so a quick-scanned
+PDF previewed as `data:image/jpeg;base64,JVBERi0…`: a well-formed data URI carrying
+`%PDF`, which the browser silently fails to decode into a broken-image icon. No
+error, no suspicious mime, nothing in the logs. Quick scan was the exposed case
+because `taskSourceFiles.Preview` is always empty for `QUICK_SCAN`, so the handler
+always falls back to the raw upload; email escaped it only because
+`ImageForOcrPath` was already converted at enqueue.
+
+**Preview still prefers `ImageForOcrPath` when the payload has one; download always
+serves `TempFilePath`.** That preference is an optimization *within* the canonical
+path, not a divergence: `GetBytesFromImageBytes` on a multi-page PDF runs
 `ConvertPdfToJpg` at the configured `PdfDpi` and concatenates every page into one
-tall JPEG — seconds of CPU inside a request. For email that conversion already
-exists on disk. Download is the *original*, under its original name, because that
-is the file the user recognises.
+tall JPEG — seconds of CPU inside a request — and for email that conversion already
+exists on disk, passing through untouched. Quick scan has no such copy and pays the
+conversion, exactly as the receipt form does. Download is the *original*, under its
+original name, because that is the file the user recognises.
 
 **The path comes out of a Redis payload**, so it goes through
 `FileRepository.AssertWithinTempDirectory` before anything opens it — see the

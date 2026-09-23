@@ -17,6 +17,13 @@ import {
 
 const FIXTURE = 'e2e/fixtures/receipt.png';
 
+// A PDF is the case the preview used to get wrong: the uploader accepts PDF and
+// HEIC, quick scan stores the upload verbatim, and encoding those bytes without
+// converting them yields a data URI no browser can render. It failed silently,
+// because GetFileType labels a PDF `image/jpeg` regardless -- so the assertion
+// below has to check the decoded payload, not the URI's own mime.
+const PDF_FIXTURE = 'e2e/fixtures/receipt.pdf';
+
 // A quick scan has to be made to fail on purpose, and the only lever for that is
 // the AI provider -- which is a GLOBAL system setting. So this suite mutates
 // shared server state, runs serially, and restores what it found. It relies on
@@ -33,9 +40,14 @@ test.describe.serial('Failed activity source file', () => {
   let originalProcessingSettingsId: unknown;
   let activityId: number;
   let adminUserId: number;
+  // The PDF scan gets its OWN group: apiWaitForFailedQuickScan returns the first
+  // failed quick scan it finds for a group, so sharing one would let it hand back
+  // the PNG activity.
+  let pdfGroupId: number;
+  let pdfActivityId: number;
 
   test.beforeAll(async () => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
 
     await withAdminApi(async (api) => {
       const settings = await (await api.get('/api/systemSettings')).json();
@@ -63,6 +75,18 @@ test.describe.serial('Failed activity source file', () => {
 
       const activity = await apiWaitForFailedQuickScan(api, groupId);
       activityId = activity.id;
+
+      const pdfGroup = await apiCreateGroup(api, uniqueName('failed-scan-pdf-group'));
+      pdfGroupId = pdfGroup.id;
+
+      await apiQuickScan(api, pdfGroupId, adminUserId, {
+        name: 'receipt.pdf',
+        mimeType: 'application/pdf',
+        buffer: readFileSync(PDF_FIXTURE),
+      });
+
+      const pdfActivity = await apiWaitForFailedQuickScan(api, pdfGroupId);
+      pdfActivityId = pdfActivity.id;
     });
   });
 
@@ -74,6 +98,9 @@ test.describe.serial('Failed activity source file', () => {
         });
         if (groupId) {
           await apiDeleteGroupById(api, String(groupId));
+        }
+        if (pdfGroupId) {
+          await apiDeleteGroupById(api, String(pdfGroupId));
         }
         if (processingSettingsId) {
           await apiDeleteProcessingSettings(api, processingSettingsId, promptId);
@@ -117,6 +144,38 @@ test.describe.serial('Failed activity source file', () => {
       // Byte-identical to what was uploaded -- the download serves the original,
       // never the converted copy the preview may use.
       expect(Buffer.from(await res.body())).toEqual(readFileSync(FIXTURE));
+    });
+  });
+
+  // The regression guard for the shared BuildDisplayImageString path. There is no
+  // Go test that can cover it: GetSystemTaskSourceFile needs a live Redis to
+  // resolve the task payload, so the handler sits at 0% coverage and this is the
+  // only thing that proves it still converts.
+  test('a PDF upload previews as a real image and downloads as the PDF', async () => {
+    await withAdminApi(async (api) => {
+      const res = await api.get(`/api/systemTask/${pdfActivityId}/sourceFile`);
+      expect(res.ok()).toBe(true);
+
+      const sourceFile = (await res.json()) as {
+        name: string;
+        encodedImage: string;
+      };
+      expect(sourceFile.name).toBe('receipt.pdf');
+
+      // The mime the URI CLAIMS proves nothing -- GetFileType reports image/jpeg
+      // for raw PDF bytes too. Decode it and look at what a browser would get.
+      const [, base64Payload] = sourceFile.encodedImage.split('base64,');
+      expect(base64Payload).toBeTruthy();
+      const decoded = Buffer.from(base64Payload, 'base64');
+      expect(decoded.subarray(0, 4).toString('latin1')).not.toBe('%PDF');
+      expect(decoded.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8])); // JPEG SOI
+
+      // ...while the download still serves the ORIGINAL, not the converted copy.
+      const download = await api.get(
+        `/api/systemTask/${pdfActivityId}/sourceFile/download`,
+      );
+      expect(download.ok()).toBe(true);
+      expect(Buffer.from(await download.body())).toEqual(readFileSync(PDF_FIXTURE));
     });
   });
 
