@@ -2,7 +2,7 @@ import { TestBed } from "@angular/core/testing";
 import { NgxsModule, Store } from "@ngxs/store";
 import { Claims } from "../open-api";
 import { AuthState } from "./auth.state";
-import { Logout, SetAuthState, SetGroupCatalog, SetPermissions } from "./auth.state.actions";
+import { Logout, SetAuthState, SetGroupCatalog, SetPermissions, SetUserPreferences } from "./auth.state.actions";
 
 describe("AuthState", () => {
   let store: Store;
@@ -68,6 +68,26 @@ describe("AuthState", () => {
 
     expect(store.selectSnapshot(AuthState.appPermissions)).toEqual(APP_PERMISSIONS);
     expect(store.selectSnapshot(AuthState.hasAppPermission("app.users.read"))).toBe(true);
+  });
+
+  describe("closeChipSelectOnSelect", () => {
+    it("defaults to false when there are no user preferences", () => {
+      expect(store.selectSnapshot(AuthState.closeChipSelectOnSelect)).toBe(false);
+    });
+
+    it("defaults to false when the preference is absent from stored preferences", () => {
+      store.dispatch(new SetUserPreferences({ quickScanDefaultGroupId: 1 } as any));
+
+      expect(store.selectSnapshot(AuthState.closeChipSelectOnSelect)).toBe(false);
+    });
+
+    it("reflects the stored preference", () => {
+      store.dispatch(
+        new SetUserPreferences({ closeChipSelectOnSelect: true } as any)
+      );
+
+      expect(store.selectSnapshot(AuthState.closeChipSelectOnSelect)).toBe(true);
+    });
   });
 
   describe("selectors", () => {

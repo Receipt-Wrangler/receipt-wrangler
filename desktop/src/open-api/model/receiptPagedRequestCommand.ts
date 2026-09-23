@@ -21,7 +21,7 @@ export interface ReceiptPagedRequestCommand {
      */
     pageSize: number;
     /**
-     * field to order on
+     * field to order on - a receipt column, custom_<id> for a custom field, or first_comment for the receipt\'s first comment
      */
     orderBy?: string;
     sortDirection?: SortDirection;

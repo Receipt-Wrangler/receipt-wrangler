@@ -116,8 +116,12 @@ java -jar /tmp/openapi-generator-cli-7.10.0.jar generate -i swagger.yml -g types
 cd ../mobile/api && flutter pub get && dart run build_runner build
 ```
 
-After a mobile regen, re-apply the two documented dart-dio patches (`mobile/CLAUDE.md` → "Known
-dart-dio default-value regressions") and run `flutter analyze`.
+`generate-client.sh` re-applies the four documented dart-dio patches itself, as the last step of a
+`mobile` regen (`api/patches/apply-dart-dio-patches.sh`); it **fails the regen** rather than
+returning an unpatched client if one no longer applies. Invoking the jar directly, as above, skips
+that step — run the patch script by hand afterwards. Either way run `flutter analyze` **and
+`flutter test`**: two of the four compile fine when missing (see `mobile/CLAUDE.md` → "Known
+dart-dio regressions").
 
 **Mobile regen without Flutter (e.g. the Claude Code web sandbox):** `mobile/api/pubspec.yaml` has
 **no Flutter dependency**, so the standalone **Dart SDK** is enough to finish the regen — Flutter is
@@ -144,7 +148,7 @@ change**.
 
 `dart analyze` substitutes for `flutter analyze` here (it reports the same errors) and stays scoped to
 `mobile/api` — judge a regen by the **error** count, which must be **0**. The warnings are
-pre-existing generator noise: ~73 in `mobile/api` of 107 across `mobile/`, the split recorded in
+pre-existing generator noise: 73 in `mobile/api` of 106 across `mobile/`, the split recorded in
 `.github/workflows/ci.yml` where the analyzer is deliberately not gated. Keep those two numbers in
 sync with that comment.
 
@@ -300,15 +304,14 @@ A group can declare custom fields that are **always pre-added** to its receipts,
 
 A block of totals under the receipts table, covering the **whole current filter result set** rather
 than the visible page: a receipt count and amount total overall, then the same figures per
-configured status, plus a column per configured CURRENCY custom field. **Backend + desktop only** —
-the swagger change regenerates both clients, but the summary endpoint is called from the desktop
-receipts table alone. Mobile has since gained its own receipt filter (see `mobile/CLAUDE.md` →
-"Receipt filtering"), so the original reason for skipping it — no filter to describe — no longer
-holds; it is simply not built there.
+configured status, plus a column per configured CURRENCY custom field. **All three components.**
+It shipped backend + desktop first, while mobile had no filter to describe; mobile gained one (see
+`mobile/CLAUDE.md` → "Receipt filtering") and the block followed.
 
 - **Configuration is per-group and applies to everyone**, on Group Receipt Settings: a master
-  toggle, which statuses break out, and which currency fields are totalled. Stored in two new join
-  tables (deliberately not a discriminator on the existing defaults join — see `api/CLAUDE.md`).
+  toggle, which statuses break out, which currency fields are totalled, and **where the block
+  renders** (top or bottom). Stored in two join tables plus two plain columns (deliberately not a
+  discriminator on the existing defaults join — see `api/CLAUDE.md`).
 - **The server owns the configuration, not the client.** `ReceiptSummaryCommand` carries the filter
   and an optional `configurationGroupId`, never the field or status list, so a client cannot add a
   column or opt out of one. A real group may omit `configurationGroupId` or send **its own** id —
@@ -324,17 +327,32 @@ holds; it is simply not built there.
 - **A configured status that matches nothing still renders, as a zero row**, so the block keeps its
   shape as the filter narrows. A receipt whose status is *not* configured still counts toward the
   overall row, or the total would disagree with the table's own count.
-- **The desktop does not re-request on paging or sorting** — neither changes which receipts the
-  filter matches. That, plus skipping the request entirely for a group that has not opted in, is
-  what keeps an unpaged aggregate affordable on the app's hottest screen.
+- **Neither client re-requests on paging or sorting** — neither changes which receipts the filter
+  matches. That, plus skipping the request entirely for a group that has not opted in, is what keeps
+  an unpaged aggregate affordable on the app's hottest screen. Mobile's split is structural rather
+  than conventional: its sort setters already bypass the notification the summary listens to. See
+  `mobile/CLAUDE.md` → "Receipt summary".
 - **The synthetic "All" group picks a configuration via chips**, since it spans several groups and
-  has none of its own; the data still spans every group. See `desktop/CLAUDE.md` → "Receipt summary".
-- **E2E on the desktop only** (`desktop/e2e/receipt-summary.spec.ts`), because the Jest specs inject
-  group settings into a mocked store and so prove nothing about the wire — the same reason the
-  default-custom-fields feature above has one. It covers the settings round-trip through the real
-  resolver, the figures off a real decimal fold, a filter recomputing every row, and the All-group
-  chip pick surviving a reload. There is no mobile counterpart because the summary block itself is
-  desktop-only — not, as this once said, because mobile has no filter.
+  has none of its own; the data still spans every group. Desktop persists that pick to localStorage;
+  mobile keeps it in `ReceiptListModel` for the session, having no persisted slice of its own.
+- **`receiptSummaryPosition` rides on the summary RESPONSE, not just on the group settings.** A
+  client's cached `groupReceiptSettings` is stale the moment an admin changes the configuration, and
+  placement is configuration — so both clients render where the current 200 says, exactly as they
+  already do for `enabled`. The server normalizes an empty position to `BOTTOM` at every emit point,
+  because an empty enum fails a closed Dart `EnumClass` and with it the whole payload; the enum
+  itself carries `TOP` and `BOTTOM` only, and the generated Dart client's unknown-value fallback
+  lands on `BOTTOM`, so client and server agree on the degradation by construction.
+- **Placement means different mechanics per client.** Desktop *moves* one `ng-template` between two
+  anchors, and top means above the who-owes-whom settlement card as well as above the table. Mobile
+  pins the block above or below its list — free, because `PagedDataList` is an `Expanded` — which is
+  what makes the bottom position reachable at all under infinite scroll. Both slots must hold a
+  **stable widget type**, or `PagedDataList` loses its State and silently refetches page 1.
+- **E2e per client**, because both unit suites inject group settings into a mocked store and so
+  prove nothing about the wire: `desktop/e2e/receipt-summary.spec.ts` and
+  `mobile/integration_test/receipt_summary_test.dart`. Between them they cover the settings
+  round-trip through the real resolver, the figures off a real decimal fold, a filter recomputing
+  every row, the All-group chip pick surviving a reload, and the position surviving
+  model → command → DB → response → render.
 
 ### Seeding the Group Field
 
@@ -418,6 +436,38 @@ both clients, but mobile gets no new UI.
   only test that can prove the image survived in `temp/` through a real failure. It forces the failure
   by pointing the global AI provider at an unreachable host, so it works against the shared demo
   backend too — which makes it a global-state-mutating, serial spec.
+
+### Quick Date Filter (month stepper)
+
+A month stepper — `‹ September 2026 ›` — plus a picker naming which date field it writes to, sitting
+above the receipts list on **both clients**. Stepping left or right adds or replaces that field's
+condition in the *same* filter the advanced filter dialog/screen drives, so the two can never
+disagree. **Client-only on both sides**: no backend, `swagger.yml` or generated-client involvement.
+
+- **A month is `BETWEEN [first day, last day]`** — the one operation that can express *any* month,
+  which is why the feature needed no API change. `WITHIN_CURRENT_MONTH` is **not** equivalent: the
+  server pins it to month-start through *today*, so it can only ever mean the current month.
+- **It targets one of three date fields** — `date` / `resolvedDate` / `createdAt` — chosen by the
+  user and held in the same state as the filter. **Switching is non-destructive and refetches
+  nothing**: it changes no condition, only which one the stepper describes, so the abandoned
+  condition stays applied and stays visible (a chip on desktop, a card on the filter screen on
+  mobile).
+- **The label degrades rather than hiding.** `"<Month> <Year>"` for a whole calendar month, `"Custom"`
+  for a condition the stepper cannot describe, `"All time"` for none. The arrows seed from **today's**
+  month when nothing is showing, then apply the delta, so `‹` and `›` never do the same thing.
+- **Each client stores the chosen field where its filter already lives**, and that is the one place
+  they differ meaningfully: desktop persists both to localStorage (so `monthFromFilterEntry` has to
+  accept ISO strings, and the field's default has to be applied on *read*), while mobile's
+  `ReceiptListModel` is in-memory and needs neither. Mobile still keeps the field on the **model**
+  rather than the list widget, because that widget is rebuilt on almost every navigation.
+- **E2e per client**, because both unit suites assert against a mocked API and so prove nothing about
+  the wire: `desktop/e2e/receipt-quick-date-filter.spec.ts` and
+  `mobile/integration_test/receipt_quick_date_filter_test.dart`. The mobile one **seeds relative to
+  `DateTime.now()`** — the shared mobile filter fixture is pinned to June 2026, which a
+  month-relative control drifts away from.
+
+See `desktop/CLAUDE.md` → "The month stepper targets one date field" and `mobile/CLAUDE.md` → "Quick
+date filter" for the per-client details.
 
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access

@@ -1543,6 +1543,109 @@ See `mobile/CLAUDE.md` → "App Links / Universal Links — server-URL pre-fill 
 `commands/upsert_system_settings_command_test.go` (validation), `services/system_settings_test.go`
 (`BuildLoginQrUrl` compose/encoding + `GetFeatureConfig` mapping).
 
+## System task filtering
+
+`GET`-by-POST `/systemTask/getPagedSystemTasks` accepts a `filter` on
+`GetSystemTaskCommand`: a `SystemTaskPagedRequestFilter` of four `PagedRequestField`s — `type`,
+`ranBy`, `startedAt`, `endedAt` — reusing the receipt filter's `FilterOperation` enum and wire shape,
+so the desktop renders both dialogs from one row component.
+
+- **`BaseRepository.BuildFilterQuery`** is the shared operation→WHERE translator, promoted from
+  `ReceiptRepository.buildFilterQuery` so the receipt filter and the system task filter cannot drift
+  on what an operation means. `fieldName` is interpolated into the clause, so it MUST stay a
+  hardcoded column literal supplied by the caller — never a request value.
+- **Predicates are applied before `Count`** (`buildSystemTaskFilterQuery`, called from
+  `GetPagedSystemTasks`), mirroring `GetPagedActivities`' visibility disjunction, so `totalCount`
+  describes the filtered set rather than the whole table.
+- **Every unwrap is a comma-ok assertion.** Values arrive as `interface{}` off the request body; a
+  wrong-typed value is treated as "field not set". This is deliberately unlike the receipt builder's
+  bare `.(string)` / `.([]interface{})` assertions, which panic on a malformed body — and it is why
+  there is no `initSystemTaskFilterValues` analogue seeding non-nil defaults.
+- **`ranBy` does not go through the shared helper**, because `ran_by_user_id` is nullable and the
+  rows with no user are exactly the ones the table labels "System". The desktop submits
+  `repositories.SystemRanByUserId` (`-1`, negative so it can never collide with a real id — the
+  `OWN_PAID_RECEIPTS_OPTION_ID` convention) for those, and `applyRanByFilter` splits the sentinel out
+  of the id list: sentinel only ⇒ `IS NULL`, ids only ⇒ `IN ?`, both ⇒
+  `IS NULL OR ran_by_user_id IN ?`. Ids decode as `float64` through `encoding/json`, hence `toInt64`.
+- **`started_at` / `ended_at` are compared as whole calendar days** (`applyTimestampDayFilter`).
+  Unlike the date-only column the receipt `date` filter compares against, these carry a time of day,
+  so a raw comparison to the datepicker's midnight would make `EQUALS` never match and `BETWEEN` drop
+  everything after midnight on the end day. `EQUALS d` ⇒ `[startOfDay(d), startOfDay(d)+24h)`,
+  `GREATER_THAN d` ⇒ `>= startOfDay(d)+24h`, `LESS_THAN d` ⇒ `< startOfDay(d)`, `BETWEEN [a,b]` ⇒
+  `[startOfDay(a), startOfDay(b)+24h)`; `WITHIN_CURRENT_MONTH` delegates to `BuildFilterQuery`, which
+  already does the right thing.
+  - **The wire format is a bare calendar day, `yyyy-MM-dd`.** "Day" resolves in the server's
+    location (`time.Local`, the same zone `WITHIN_CURRENT_MONTH` already uses), so an *instant*
+    would be ambiguous: resolving it here picks the day in the server's zone, and a UTC-4 browser
+    picking Sep 22 lands on Sep 21 against an API in America/Los_Angeles. The desktop normalizes to
+    a calendar day before sending (`toSystemTaskWireFilter`); `startOfDayValue` parses that first
+    and still accepts a full RFC 3339 instant for any other caller. The receipt filter, which sends
+    instants, retains the original hazard.
+  - **`ended_at` is nullable, so any filter on it excludes tasks that are still running.** That is
+    the correct reading of "ended before X"; it is not special-cased.
+- **The three child-only types stay excluded.** `filteredSystemTaskTypes` (`RECEIPT_UPLOADED`,
+  `CHAT_COMPLETION`, `OCR_PROCESSING`) is applied before the filter, so a `type` filter narrows
+  within the top-level rows. The desktop's Type picker omits them for the same reason; keep
+  `CHILD_ONLY_SYSTEM_TASK_TYPES` in `desktop/src/constants/system-task-type-options.ts` in sync with
+  the Go list, which `TestGetPagedSystemTasksExcludesChildTaskTypes` pins.
+
+The handler is unchanged: `GetSystemTasks` already passes the whole command through and the
+`app.system-tasks.read` gate still applies. Note this endpoint has **no** member-isolation filtering
+(unlike `GetPagedActivities`) — it is admin-only by that permission.
+
+**Tests:** `repositories/system_task_test.go` — `TestApplyTimestampDayFilterWidensBoundsToWholeDays`
+asserts the **bound values** off a `DryRun` statement rather than row counts, because the test DB is
+SQLite: it stores timestamps as text and compares them lexically, where a raw bound happens to sort
+*after* every row on the same day (`" " < "T"`), so a row count alone cannot tell the widened path
+from the broken one. The behavioural cases (`...FiltersByType`, `...FiltersByRanBy`,
+`...BetweenIncludesTasksLateOnTheEndDay`, `...EqualsMatchesTheWholeDay`,
+`...LessThanOnEndedAtExcludesRunningTasks`, `...IgnoresWrongTypedFilterValues`) all assert
+`totalCount` alongside the rows. Also `commands/get_system_task_command_test.go` (the wire keys, the
+`float64` ids, and an absent `filter` staying zero-valued).
+
+## Receipt update snapshots (`RECEIPT_UPDATED`)
+
+`ReceiptRepository.UpdateReceipt` records a `RECEIPT_UPDATED` system task whose description is
+`{"before": "<receipt JSON>", "after": "<receipt JSON>", "version": 2}`. Each side is
+`Receipt.ToString()`, so the value is **double-encoded**. The desktop parses it itself and renders a
+side-by-side diff (see `desktop/CLAUDE.md` → "Receipt update diff"), so keep the format stable: an old
+row must still parse.
+
+**The format is versioned** by `repositories.ReceiptUpdateDescriptionVersion`. A row with **no
+`version` key is version 1**: its "before" is incomplete (below). **Version 2** rows have a complete
+"before". Bump the constant whenever the snapshot format changes; the repository test pins the
+literal `2`, and the desktop's `COMPLETE_RECEIPT_UPDATE_VERSION` must agree.
+
+**Both sides are loaded with `GetFullyLoadedReceiptById`.** `before` used to be serialized from
+`currentReceipt`, which only preloads `clause.Associations`, one level deep. Loaded that way, the
+snapshot has no item categories, tags or linked items and no custom field definitions, and it lists
+linked items as top-level items (`FilterLinkedItemsFromReceiptItems` never ran). Every update would
+then diff as a change to all of those. `currentReceipt` itself is left alone, because the update
+relies on it (`BeforeUpdateReceipt`, `Model(&currentReceipt)`). The snapshot is one extra read.
+Pinned by `TestUpdateReceiptSystemTaskSnapshotsAreLoadedToTheSameDepth`, which fails with the old
+loader.
+
+**Version 1 rows are rebuilt on read, never rewritten.** `GetSystemTasks` passes each page through
+`SystemTaskService.UpcastReceiptUpdateDescriptions` (`services/receipt_update_history.go`). For every
+successful version 1 row it swaps the incomplete "before" for the **nearest earlier complete copy of
+the same receipt**: the previous `RECEIPT_UPDATED` row's "after", or the `RECEIPT_UPLOADED` copy
+stored when the receipt was created. The form, Quick Scan, email and duplicate all store one. It adds
+`"beforeSource": {type, systemTaskId, recordedAt}` and keeps `version: 1`.
+- **One query per page** fetches the candidates, below the page's highest version 1 id.
+- A receipt is matched on `receipt_id`, or on `associated_entity_type = RECEIPT` plus its id.
+  Quick Scan and email uploads carry only the former; old rows may carry only the latter.
+- A candidate is used only if it parses and its `id` is that receipt's.
+- A row with no usable candidate is left as stored.
+- Why it stays version 1: a change that writes no update row, such as a bulk status change, falls
+  inside a rebuilt comparison, and a version 2 row's own "before" would not have it.
+- Why on read: `resultDescription` is a free-form string, so there is no swagger change or client
+  regeneration. Mobile never reads it. And the stored history is never rewritten.
+- Only the System Tasks listing does this; `getPagedActivities` doesn't display descriptions.
+
+Tests: `services/receipt_update_history_test.go` covers the matching rules, and
+`handlers/system_task_handler_test.go` → `TestGetSystemTasksRebuildsVersionOneReceiptUpdates`
+covers the listing.
+
 ## Receipt statuses
 
 `models.ReceiptStatus` (`internal/models/receipt_status.go`) is a plain Go `string` type — there is
@@ -1584,6 +1687,34 @@ status that should not count as owed therefore has to be added to that cascade, 
 arbitrary string reaches the DB layer and is caught only by `Value()`, surfacing as a 500. And
 `ReceiptStatus.Scan` never returns an error, so `QuickScanCommand.LoadDataFromRequest` cannot reject
 a bogus status either.
+
+## User Preferences
+
+Per-user settings, stored on `models.UserPrefernces` (note the misspelling - it is the repo-wide
+spelling of the type). There is **no service layer and no Upsert command**: `PUT /userPreferences`
+unmarshals the request body straight into the model, and the swagger `UserPreferences` schema is
+both the request and the response, so one schema edit covers both directions. The user id comes from
+the JWT, never the body. Gated by `app.user-preferences.read` / `.update`, both in the Legacy User
+set.
+
+The whole object also rides on **AppData** (`services/auth.go`), which is how the desktop and mobile
+read it without a second request.
+
+**`UpdateUserPreferences` copies the request onto the stored row one field at a time** - a new field
+that is not added to that block silently never persists: no compile error, and nothing else in the
+suite fails. `repositories/user_preferences_test.go` round-trips each boolean specifically to catch
+that; extend it when adding a field. The write itself is `Select("*").Updates(&struct)` inside a
+transaction, so GORM emits the column (including a `false`, which the struct form of `Updates` would
+skip) as soon as the model field exists.
+
+Because the body is unmarshalled with `encoding/json` and nothing sets `DisallowUnknownFields`, a
+**removed** field sent by an already-released mobile build is ignored rather than rejected, and an
+**omitted** field decodes to its zero value - so for a bool, "omitted" and "explicitly false" reach
+the repository identically. Both are pinned in `models/user_preferences_test.go`.
+
+Current fields: the three quick-scan defaults, `userShortcuts`, and `closeChipSelectOnSelect` (a
+desktop-only behavior flag for the multi-select chip pickers - see `desktop/CLAUDE.md` -> "The chip
+picker's close-on-select preference"; mobile carries the generated field but never reads it).
 
 ## Quick Scan Field Configuration
 
@@ -1827,8 +1958,9 @@ rather than the visible page: a receipt count and amount total overall, then the
 each status the group has configured. Configuration lives on `GroupReceiptSettings` and applies to
 every member — it is not a per-user preference.
 
-**Three new settings, two new join tables.** `ReceiptSummaryEnabled` is a plain column (off by
-default, so existing installs are unchanged). `ReceiptSummaryCustomFieldIds` and
+**Four settings, two join tables.** `ReceiptSummaryEnabled` is a plain column (off by
+default, so existing installs are unchanged) and so is `ReceiptSummaryPosition` (see below).
+`ReceiptSummaryCustomFieldIds` and
 `ReceiptSummaryStatuses` are `gorm:"-"` projections over
 `GroupReceiptSettingsSummaryCustomField` and `GroupReceiptSettingsSummaryStatus`, both keyed on
 **GroupId** for the same reason `GroupReceiptSettingsCustomField` is (a lazily created settings row
@@ -1866,6 +1998,54 @@ an admin without that permission out of the feature entirely. That is the differ
 invisible) default set does. Validation: unknown id → 400, **non-CURRENCY id → 400** (only
 `CurrencyValue` is summed, so a TEXT field would total `0.00` forever and read as data rather than
 misconfiguration), invalid status → 400 via the existing `isValidReceiptStatus`.
+
+### Where the block renders — `ReceiptSummaryPosition`
+
+`TOP` or `BOTTOM`, per group, defaulting to **BOTTOM** — where the summary rendered before the
+setting existed, so an install that never touches it is unchanged. Modelled on
+`CurrencySymbolPosition` (`models/receipt_summary_position.go`): a Go string type with `Scan` /
+`Value`, no DB enum and no CHECK constraint, and a plain column carrying `gorm:"default:BOTTOM"` —
+`AutoMigrate` adds it and backfills existing rows with the default on all three engines, so there
+is **no migration**.
+
+- **It rides on the summary RESPONSE, not just on the settings.** `ReceiptSummary.Position` is
+  what both clients render from. The same argument as `Enabled`: a client's cached
+  `groupReceiptSettings` is stale the moment an admin changes the configuration, and placement is
+  configuration. Reading it from the response is what stops the block rendering in the old place
+  until the next AppData refresh.
+- **The server never emits `""`.** A closed Dart `EnumClass` throws on an unrecognized wire value
+  and fails the WHOLE payload — `GroupReceiptSettings` rides on AppData, i.e. on **login**, which
+  is exactly the two documented `Permission` outages. Empty is genuinely reachable (`loadSettings`
+  maps a missing settings row to a *zero* `GroupReceiptSettings`), so `OrDefault()` normalizes it
+  at both emit points: on the summary response, and in `LoadSettingsProjections` — the one batched
+  hydrator every settings read passes through. **The swagger enum carries TOP and BOTTOM only** —
+  no `""` member, matching the `CurrencySymbolPosition` precedent beside it — and the generated
+  Dart enum's `fallback: true` sits on `BOTTOM`, so a client meeting a value added *later* lands on
+  the same placement `OrDefault()` would have sent. Client and server agree by construction, and an
+  empty position is not expressible on the write side at all.
+- **The command field is a pointer**, like the other three: a non-pointer would unmarshal to `""`
+  for any caller that omits the key, and the repository's assignment would blank a configured
+  position. It must be assigned inside the `if command.X != nil` block in
+  `UpdateGroupReceiptSettings` — the write is `Select("*")`, so a field missing from that block is
+  actively zeroed, silently.
+- **A `nil` pointer OMITS the column from the UPDATE** rather than writing back the value read at
+  load time. `UpdateGroupReceiptSettings` builds an `omittedColumns` list from the three nil
+  pointers and passes it to `Select("*").Omit(...)`, mirroring
+  `SystemSettingsRepository.UpdateSystemSettings` (`repositories/system_settings.go`). Writing the
+  loaded value back costs two things: a concurrent admin's change is clobbered by a value read
+  before it landed, and for an **enum** the stored value goes back through `Value()` — so a
+  position this build does not recognize (a newer release's member, seen after a downgrade) fails
+  an otherwise unrelated settings save with a 500. `Omit` also preserves that value for the trip
+  back up, where `OrDefault()` already keeps it off the wire.
+  `TestUpdateGroupReceiptSettingsToleratesAnUnknownStoredPosition` pins it.
+- **It needs no permission of its own.** Like `ReceiptSummaryEnabled` and `ReceiptSummaryStatuses`
+  and unlike `ReceiptSummaryCustomFieldIds`, it reads no catalog — gating it on
+  `app.custom-fields.read` would leave such an admin able to turn the summary on but not to say
+  where it goes. `TestUpdateGroupReceiptSettingsAllowsSummaryPositionWithoutCustomFieldPermission`
+  pins that.
+- **Validated in the command, not at the DB boundary.** `Validate()` routes it through its own
+  `Value()` (the `pie_chart_data_command.go` style), which turns what the DB layer would surface as
+  a generic 500 into a field-level 400.
 
 ### `POST /api/receipt/group/{groupId}/summary`
 
@@ -2048,6 +2228,52 @@ its `orderBy` and direction both being allow-listed against literals by `isTrust
   rejection, and the `"type":""` guard. `receiptsource_test.go` → `TestParseCustomFieldKey` covers the
   parser directly, including the 2^32 boundary and the round trip against `CustomFieldKey`. The suite is **SQLite only**, so
   the cross-engine NULL ordering is not covered there.
+
+### The first comment (`first_comment`)
+
+The desktop table's **Comment** column shows each receipt's first comment and sorts on it. The paged
+list only preloads `Comments` under `fullReceipts`, so the value rides a separate projection.
+
+- **"First" is `firstCommentOrder`** (`repositories/comments.go`): `created_at`, then `id` — comments
+  written in one insert share a timestamp. The sort and the display both use that one constant, so the
+  column can never sort by one comment while showing another. Replies cannot be created through the
+  API, so the list is flat and no `comment_id` filter is applied.
+- **`Receipt.FirstComment`** is a `*string` with `gorm:"-"` and `omitempty`: the handler fills it
+  after `MaskReceiptsForMemberVisibility`, through `PermissionService.LoadFirstVisibleComments`. That
+  is **one** `GetCommentsForReceiptIds` query per page, plus the per-group visibility the masker already
+  resolves. Every other endpoint leaves it nil, so the key is absent there, not `null`.
+- **`orderBy = first_comment`** (`constants.FIRST_COMMENT_ORDER_BY`) takes its own branch ahead of
+  `isTrustedValue`: `orderByFirstComment` is a correlated subquery, never a join (a receipt has many
+  comments, so a join would multiply rows and corrupt the count). It shares `orderBySubquery` with
+  the custom-field sort, which is where the literal direction keyword and the `receipts.id DESC`
+  tiebreaker live. The tiebreaker matters here too, because most receipts have no comment at all.
+- **No new permission.** Reading a receipt already means reading its comments on every other
+  surface, so the list's `group.receipts.read` gate covers this.
+- **Member isolation applies to both halves.** A comment by an author the caller can't see in that
+  receipt's group is dropped from every response, so it must not be shown **or sorted on**. A sort
+  on hidden text would order the table by comments the caller never sees, and would leak them one
+  comparison at a time. `GetPagedReceiptsByGroupId` therefore takes a sixth argument, a
+  `CommentAuthorVisibilityResolver`. The handler and the CSV export pass
+  `PermissionService.CommentAuthorVisibilityResolver`; the export passes it because it honours the
+  table's sort. Internal callers pass `nil`, the same contract as the paid-by resolver.
+  `commentAuthorVisibility` builds a per-group disjunction on `receipts.group_id`, mirroring
+  `applyActivityVisibilityDisjunction`, so an All-group page judges each receipt by its own group's
+  rules. It adds **no predicate at all** when no group restricts the caller, which covers every
+  non-isolated install. An authorless comment stays visible, as it does in `filterComments`.
+- **`idx_comment_receipt_id`** on `Comment.ReceiptId` serves both the subquery and the loader. It is
+  a model tag only; there was no index on that column before.
+- NULL (no comment) ordering and text collation are engine-dependent. That matches `name`,
+  `resolved_date` and the custom-field sorts, and is deliberately not normalised.
+- **Tests**:
+  - `repositories/receipt_first_comment_sort_test.go`: both directions; the earliest comment beating
+    a later one that sorts lower; the id tiebreak; hidden authors skipped, with an unrestricted
+    contrast; the All-group per-group rule; the SQL shape; no predicate when unrestricted; the index.
+  - `services/first_comment_test.go`: the earliest pick, hidden and authorless authors, and the
+    resolver.
+  - `handlers/receipt_first_comment_test.go`: the key is present or absent on the wire, the sort
+    works through the handler, and an isolated member never receives a peer's text, neither as the
+    value nor through the sort order. That last test was checked to fail when the handler passes a
+    `nil` resolver.
 
 ## Reporting Engine (`internal/reporting`)
 

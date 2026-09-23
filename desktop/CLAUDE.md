@@ -326,6 +326,46 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   list-page add action, and do NOT use a bespoke page-title header.
 If a design appears to require a new pattern, confirm with the user before diverging.
 
+### The chip picker's close-on-select preference
+
+`app-autocomlete` in `[multiple]` mode (Categories, Tags, the user/group/icon pickers, the role
+form's permission picker, report filters) deliberately **re-opens** its option panel after every
+pick, so several values can be chosen in a row. `closeChipSelectOnSelect` on `UserPreferences` flips
+that per user; the default is **off**, i.e. the panel stays open exactly as before.
+
+Three things about it are load-bearing:
+
+- **The component reads the preference itself**, from `AuthState.closeChipSelectOnSelect`, rather
+  than taking an `@Input`. It is global by design — the setting says "all of these pickers" — and
+  threading a flag through the twenty-odd call sites would only create a way for one of them to
+  disagree with the rest. The default (`?? false`) lives in the selector, not at the reader.
+- **`closePanel()` alone does not close it.** `MatAutocompleteTrigger` opens on `focus`, and
+  Material returns focus to the input after a selection, so the panel comes straight back.
+  `clearFilterAndClosePanel()` therefore also **blurs** `inputMultiple()`. This is also why the e2e
+  asserts the blur *before* asserting the panel is hidden: Material closes the panel on selection by
+  itself, so "hidden" alone would pass even if the preference were ignored entirely.
+- **Removing a chip is deliberately NOT covered.** `removeOption()` refocuses the input, which opens
+  the panel again regardless of the preference. The setting is about selecting, and a removal that
+  left the field blurred would make removing several chips take an extra click each.
+
+The panel handling runs inside the existing `setTimeout(…, 0)` in `optionSelected()`, so the two
+tests in `autocomlete.component.spec.ts` that call `jest.runAllTimers()` are the only ones that
+exercise it at all — every other `optionSelected` case stops at the `FormArray` push. They stub the
+trigger (`textarea.component.spec.ts` is the precedent), because `CUSTOM_ELEMENTS_SCHEMA` leaves the
+template's real `#auto` trigger unresolvable.
+
+Because the component now injects `Store`, **any spec that instantiates a real `AutocomleteComponent`
+needs `AuthState` registered** — `NgxsModule.forRoot([AuthState])`. That covers the base spec, the
+`category-autocomplete` / `tag-autocomplete` / `grant-picker` specs, and `system-settings-form`
+(which registered only `SystemSettingsState`).
+
+`desktop/e2e/chip-select-close-on-select.spec.ts` is the wire test: the Jest specs drive the
+component against a mocked store, so only the e2e proves the checkbox reaches the picker through
+`PUT /userPreferences` -> the stored column -> AppData -> `AuthState`. It **provisions its own
+account**, because the preference is per-user and global and the suite runs `fullyParallel` —
+flipping it on a shared e2e account would change behavior under every spec running as that account
+at the same time.
+
 ### The shared badge (`app-badge`)
 
 `src/shared-ui/badge/` — a small uppercase badge (`text` + `tone` signal inputs) used to mark an item
@@ -557,6 +597,21 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     `TokenRefreshService` keeps its own logout-on-refresh-failure path for a truly dead session.
     Background `GET` 403s propagate silently for callers to handle (e.g. the `getRoles` +
     `catchError` reads above).
+  - **One toast per error, and the server's `errorMsg` always wins.** `MatSnackBar.open()`
+    dismisses whatever is already showing, so two `snackbarService.error(...)` calls in one tick
+    means only the *last* is readable. The server-supplied `errorMsg` is the user-friendly message;
+    Angular's generic `HttpErrorResponse.message` ("Http failure response for ...: 500 Internal
+    Server Error") is a **fallback only** for a 5xx that carries no message at all, so an
+    infra-level failure (nginx 502, gateway timeout) is not silent. The two branches must stay
+    mutually exclusive — **do not restore them as two independent `if`s.** They were, and the
+    second one only stayed harmless because its regex was broken: `new RegExp("5d{2}")` matches the
+    literal `5dd`, never `"500"`. Repairing it to `5\d{2}` (commit `4bb640c`, 2026-03-23) activated
+    the override, and since nearly every Go handler writes 5xx through `WriteCustomErrorResponse`
+    with an `errorMsg`, the useful message was being replaced app-wide — most visibly on a failed
+    login, where "Invalid credentials." lasted a few milliseconds. `queueMode` suppresses **both**
+    branches, like the 403 one. Pinned by three cases in `http-interceptor.spec.ts`
+    (5xx-with-`errorMsg`, 5xx-without, and 5xx-in-queue-mode) and by
+    `e2e/auth.spec.ts` → "a wrong password reports it and leaves the form filled in".
   - **Category/tag catalogs:** AppData also carries `groupCategories` / `groupTags` (keyed by group
     id, filtered to the user's grants), stored via `SetGroupCatalog` and read with the
     `AuthState.groupCategories(groupId)` / `groupTags(groupId)` selectors. The **receipt form** and
@@ -689,7 +744,7 @@ control and its direct `PUT /api/customField/:id` 403s, and a type change 400s e
 ### Custom fields as receipts-table columns
 
 The **Configure Columns** dialog (`src/receipts/column-configuration-dialog/`) lists every custom
-field after the nine built-in columns, and each one can be turned into a sortable table column.
+field after the ten built-in columns, and each one can be turned into a sortable table column.
 
 - **`custom_<id>` is the column's `matColumnDef` *and* the `orderBy` sent to the API** — the same key
   the reporting engine uses (`receiptsource.CustomFieldKey`). `src/utils/receipt-table-columns.ts`
@@ -758,7 +813,31 @@ field after the nine built-in columns, and each one can be turned into a sortabl
   display, numeric sorting on it (amounts chosen so a text sort is visibly wrong), a SELECT sorting by
   option text rather than option id, and the column healing away when its field is deleted. Money is
   asserted with a **separator-tolerant** regex because the currency configuration is a global System
-  Setting on the shared CI backend that this spec must not mutate.
+  Setting on the shared CI backend that this spec must not mutate. **Configure Columns** sits inside
+  the `⋮` overflow menu, so its helpers go through `openReceiptsOverflowMenu` first.
+
+### The Comment column (`first_comment`)
+
+The tenth built-in column shows the receipt's **first** comment and sorts on it. It is the last
+built-in in `DEFAULT_RECEIPT_TABLE_COLUMNS`.
+
+- **Hidden by default, with no merge code.** The default entry is `visible: false`, and
+  `mergeCustomFieldColumns` appends a missing built-in with its default's visibility. So a layout
+  saved before this column existed gains it **unchecked**, and upgrading widens nobody's table.
+- **`first_comment` is both the `matColumnDef` and the `orderBy`**, the same convention as
+  `custom_<id>`. `sort()` already sends `sortState.active` verbatim, so sorting needed no client
+  code. The header reads `RECEIPT_COLUMN_DISPLAY_NAMES.first_comment` rather than a new literal.
+- **The value is `Receipt.firstComment`**, which only the paged list returns. The server has already
+  applied member isolation, so a comment the viewer may not see is never in the payload.
+  `hideComments` is deliberately **not** applied here; that group setting stays receipt-form-only.
+  See `api/CLAUDE.md` → "The first comment".
+- The cell (`#firstCommentCell`, `data-testid="receipt-first-comment"`) is one ellipsised line capped
+  at 20rem, so a long comment can't stretch the row. `matTooltip` shows the full text, which is why
+  `ReceiptsModule` now imports `MatTooltipModule`.
+- **E2E:** `e2e/receipt-comment-column.spec.ts` (serial, admin storageState, own seeded group) covers:
+  - the column offered unchecked and unbadged;
+  - the first comment shown, never a later one that sorts lower;
+  - the `first_comment` sort in both directions against the real API.
 
 ### Seeding the receipt group
 
@@ -1228,6 +1307,12 @@ Angular no longer uses zone.js. Change detection is triggered ONLY by:
 
 **Key implications:**
 - Plain property mutations (`this.foo = 'bar'`) in async callbacks (subscribe, setTimeout, Promise.then) will NOT trigger change detection. Always use signals for state that affects templates.
+  - **`finalize()` is an async callback too, and a success path can mask the bug.** The login form
+    kept `isLoading` as a plain field reset in `finalize()` for ~5 months after the zoneless
+    migration (`d3b4246`, which never touched that file): on success `router.navigate()` happened to
+    trigger CD so the reset repainted, while on **failure** nothing did and the spinner stuck
+    forever. State only written on a failure path is the easiest kind to miss — check that a
+    converted signal is exercised by a test on the *error* branch, not just the happy one.
 - `ChangeDetectorRef.detectChanges()` still works but is rarely needed — prefer signals.
 - `setTimeout` still works for delays but won't auto-trigger CD. The callback must write to a signal if the template needs updating.
 - All `@HostListener` handlers automatically trigger CD (same as template events).
@@ -1426,6 +1511,39 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   spec rather than an extension of `group-viewer-visibility.spec.ts`, whose serial block has a known
   pre-existing failure — a Legacy User can't load `/groups` — that would skip any test appended to it.)
 
+## Filter dialogs (the shared pieces)
+
+Two tables have a `{ operation, value }` filter dialog — receipts and system tasks — and they are
+**one implementation with two field lists**, not two dialogs. Anything new of this shape reuses these
+four pieces rather than copying a row template:
+
+- **`app-filter-field`** (`src/shared-ui/filter-field/`, declared *and exported* by `SharedUiModule`)
+  renders one row: the value editor for the field's `type` beside its Operation `app-select`,
+  switching shape with the selected operation (a two-slot range for `BETWEEN`, a **disabled** implied
+  range for `WITHIN_CURRENT_MONTH`, a single editor otherwise). It is deliberately presentational and
+  form-agnostic — it reaches into the caller's `parentForm` by `basePath + fieldName`, exactly as the
+  receipt filter's local `#filterField` template did before it was extracted.
+- **`src/utils/filter-form.ts`** holds the form machinery: `buildFieldFormGroup` (a `FormArray` value
+  for list/users fields, because the multi-select autocompletes `push()` onto the control),
+  `listenForBetweenOperation` (swaps the value control between a scalar and a two-slot range as the
+  operation flips) and `setupAutoOperationSelection` (picks the first operation for a field's type as
+  soon as it gains a value, and clears it when the value empties). Every entry point takes a
+  `thisContext` for `untilDestroyed`, so **the calling component must carry `@UntilDestroy()`**.
+  `buildReceiptFilterForm` and `buildSystemTaskFilterForm` are thin field lists over these.
+- **`src/utils/filter-chips.ts`** builds the chip labels (`"<Field> <operation> <value>"`,
+  `WITHIN_CURRENT_MONTH` stopping at the operation, `BETWEEN` joined with `" – "`). It is pure: the
+  caller injects `formatDate` / `formatCurrency` / `resolveOptionName`. `receipt-filter-chips.ts` and
+  `system-task-filter-chips.ts` are wrappers supplying only their own id resolution. There is
+  deliberately **no suppression hook**: every active condition gets a chip, because one without a
+  chip is one the user can neither see nor clear (see "Every active condition is chipped" below).
+- **`FilterField<TKey>` / `FilterFieldType`** (`src/constants/filter-fields.constant.ts`) is the one
+  field-metadata type; `ReceiptFilterField` and `SystemTaskFilterField` are aliases of it.
+  `isFilterEntryActive` (`src/utils/receipt-filter-entry.ts`) is likewise shared verbatim, which is
+  what keeps every Filter badge and its chip row in agreement.
+
+**A chip row needs `MatChipsModule` in the consuming module** — `SharedUiModule` imports it but does
+not export it. `MatIconModule` too, for the `cancel` icon inside `matChipRemove`.
+
 ## Receipts table filtering
 
 The receipts table (`src/receipts/receipts-table/`) offers three ways into **one** filter —
@@ -1437,14 +1555,13 @@ so they can never disagree.
   (`src/constants/receipt-filter-fields.constant.ts`) defines each field's key, label and operation
   type, and `OperationsPipe` reads the extracted `FILTER_OPERATION_DISPLAY_VALUES`, so the operation
   wording is genuinely single-sourced. **The field labels are not.** The dialog reads only
-  `{ key, type }` from the constant (`setupAutoOperationSelection()`) and **authors its own label in
-  its template** — each row is an `ngTemplateOutlet` with a literal
-  `{ label: 'Receipt Date', fieldName: 'date', type: 'date' }` context. So the constant's `label`
-  reaches the chips and the quick-date picker only, and **renaming a field means editing both
-  `receipt-filter-fields.constant.ts` and `receipt-filter.component.html`** or the dialog row will
-  disagree with the chip it produces. (Collapsing those ten outlets into a loop is not the one-liner
-  it looks like: four rows carry an extra `options:` context key and the Group row sits in its own
-  conditional wrapper.)
+  `{ key, type }` from the constant (the shared `setupAutoOperationSelection()`) and **authors its own
+  label per row** — each row is an `<app-filter-field label="Receipt Date" fieldName="date"
+  type="date">`. So the constant's `label` reaches the chips and the quick-date picker only, and
+  **renaming a field means editing both `receipt-filter-fields.constant.ts` and
+  `receipt-filter.component.html`** or the dialog row will disagree with the chip it produces.
+  (Driving those ten rows from the constant with an `@for` is not the one-liner it looks like: four
+  carry an extra `[options]` binding and the Group row sits in its own conditional.)
 - **A field's label matches its table column.** `date` is **"Receipt Date"**, not "Date" — the
   column header is `Receipt Date` and the table also shows `Resolved Date` and `Added At`, so a bare
   "Date" left the user guessing which of the three a filter or chip meant.
@@ -1613,6 +1730,28 @@ for the wire contract.
   the filter" asserts that), detaching the submit button mid-click. Tab blurs the input, which closes
   the panel when it is open and is harmless when it is not. Escape is fine on the **settings page**
   version of the same picker — there is no dialog behind it there to swallow the keypress.
+- **Placement is a per-group setting, and the block MOVES rather than being cloned.**
+  `receipts-table.component.html` holds one `<ng-template #receiptTotals>` with one set of
+  bindings, rendered through `*ngTemplateOutlet` at one of two anchors: `TOP` puts it immediately
+  after `</app-table-header>` — **above `app-summary-card`**, because that card annotates a row
+  *selection* and is transient while these totals describe the whole filter — and `BOTTOM` leaves
+  it under `.table-container` where it has always been. Two elements behind separate `@if`s would
+  drift and would each need handling in the e2e suite.
+  - **`summaryPosition()` reads `summary()?.position`, never `GroupState`.** Same reason the
+    `enabled` gate does: the cached `groupReceiptSettings` is stale the moment an admin changes the
+    configuration. Nothing flickers on first load, because the component renders nothing until the
+    response arrives.
+  - **The component owns its own vertical rhythm** via a `position` input and a
+    `.receipt-totals--top` modifier that moves the `$spacing-md` to the bottom edge. The receipts
+    page adds no margin of its own.
+  - **The settings control is an `app-select` outside the `canManageDefaultCustomFields` branch**,
+    with the toggle and the status checkboxes — it reads no catalog, and gating it would lock an
+    admin without `app.custom-fields.read` out of deciding where their own summary goes.
+  - **Placement is asserted as DOCUMENT ORDER, and only in e2e.** The block renders at both
+    positions, so "is it visible" passes whichever anchor is wrong. The Jest spec asserts the
+    derivation only: `receipts-table.component.spec.ts` never renders the template — every case
+    there drives the component class, and `app-table` resolves to a custom element under
+    `CUSTOM_ELEMENTS_SCHEMA`, so the `viewChild.required` in `ngAfterViewInit` cannot resolve.
 - **The chip row must never be asserted by count or position.** It lists every group the admin
   belongs to whose summary is enabled, and the suite runs `fullyParallel` against a shared backend,
   so a group leaked by a crashed earlier run would break an exact-count assertion — and, sorting
@@ -1649,6 +1788,128 @@ imports it but does not export it. It makes no exceptions: see "Every active con
 above. An id the caller cannot resolve (a category outside their grants,
 a group they have left) renders as the raw id rather than dropping the chip, so a filter that is
 actively removing rows is never invisible.
+
+## System tasks table filtering
+
+The System Tasks page (`src/system-settings/system-task-table/`) filters on **Type**, **Ran By**,
+**Started At** and **Ended At** through the shared pieces above: a badge-counted Filter button and a
+Reset button in the `app-table-header`, a chip row below it, and `app-system-task-filter` as the
+dialog. `SystemTaskTableState.filter` is the single slice all three read and write.
+
+- **The filter belongs to the page, not to `app-task-table`.** That shared table is rendered by three
+  hosts (this page, `system-email-form`, `receipt-processing-settings-form`), each with its own table
+  service, so the filter rides in as one optional input (`[filterProvider]`) rather than widening
+  `BaseTableService`. It is a **function**, not the filter value: the page dispatches the filter
+  change and calls `getTableData()` in the same synchronous turn, before change detection pushes a
+  new input value in, so a value input would send the previous filter and a cleared chip would stay
+  applied. The two embedded hosts leave it unbound, the key is omitted from the request, and the
+  API's zero-value filter adds no predicates.
+- **`TaskTableComponent` refreshes through one `switchMap`** (`listenForRefreshRequests()`, wired in
+  the constructor; `getTableData()` just pushes onto its `Subject`), with `catchError(() => EMPTY)`
+  on the *inner* observable so an error cannot complete the outer subscription and kill every later
+  refresh. Clearing two chips in quick succession is the same last-response-wins race the receipts
+  month stepper hit.
+- **"Ran By" is a `list` field, not `users`.** `app-user-autocomplete` cannot prepend the pinned
+  **"System"** option (`SYSTEM_RAN_BY_OPTION_ID = -1`) that matches the rows with no `ranByUserId` —
+  most of the table. Same reason the report builder's paid-by picker is a plain `app-autocomlete`.
+  Both types offer the same `CONTAINS`-only operation, so the row is identical either way. The API
+  turns the sentinel into an `IS NULL` disjunct (see `api/CLAUDE.md` → "System task filtering").
+- **The Type picker omits three types.** `SYSTEM_TASK_TYPE_OPTIONS`
+  (`src/constants/system-task-type-options.ts`) drops `RECEIPT_UPLOADED`, `CHAT_COMPLETION` and
+  `OCR_PROCESSING`: `GetPagedSystemTasks` never returns them as top-level rows (they are children,
+  shown in an expanded row), so offering them would be a picker that can only ever return zero rows.
+  Keep `CHILD_ONLY_SYSTEM_TASK_TYPES` in sync with `filteredSystemTaskTypes` in the Go repository —
+  `TestGetPagedSystemTasksExcludesChildTaskTypes` pins that side.
+- **The persisted slice predates the filter, so every read must tolerate its absence.**
+  `systemTaskTable` was already in both storage-key lists, so an existing session rehydrates with no
+  `filter` key at all. `SystemTaskTableState.filter` / `.numFiltersApplied` and the
+  `SetSystemTaskFilterField` handler all fall back to `buildDefaultSystemTaskFilter()`; without that
+  the page throws for anyone who has ever loaded it before. Covered by a spec case.
+- **`buildDefaultSystemTaskFilter()` is a factory, not a shared constant** — the value is written
+  straight into state, so handing out one object would let a later in-place edit corrupt the default
+  for the rest of the session. Same reasoning as `buildDefaultReceiptFilter`.
+- **Every filter write outside the dialog goes through `applyFilterChange()`**, which dispatches the
+  action, then `SetPage(1)`, then refetches — narrowing from page 7 can never land on an empty page.
+  The dialog's `afterClosed()` does the same.
+- **Date fields are timestamps, and the server widens them to whole days.** `EQUALS` means that
+  calendar day, `BETWEEN` runs to the end of the last day. See `api/CLAUDE.md` → "System task
+  filtering" for the query side.
+- **The date fields go on the wire as `YYYY-MM-DD`, normalized by `toSystemTaskWireFilter`**
+  (`src/utils/system-task-filter.ts`) where `TaskTableComponent` assembles the request. The
+  datepicker writes a local-midnight `Date`, which serializes as an *instant*; the server resolves
+  that instant to a day in **its** zone, so a UTC-4 browser picking Sep 22 selects Sep 21 against an
+  API in America/Los_Angeles. A calendar day carries no zone to misread.
+  - **Normalize at the request, never in the store.** NGXS persists the filter and hands it back to
+    the datepicker when the dialog reopens, and Material's `NativeDateAdapter.deserialize` matches a
+    bare `YYYY-MM-DD` against its ISO-8601 regex and parses it with `new Date()` — UTC midnight,
+    which renders as the *previous* day west of Greenwich. Storing the normalized form just moves
+    the off-by-one into the picker.
+
+**E2E:** `e2e/system-task-filter.spec.ts` (serial, admin storageState). It seeds a deterministic row
+by creating and deleting an API key (`apiRecordApiKeyDeletedSystemTask` — system tasks are only ever
+written as a side effect of real work, so there is no endpoint that creates one), then asserts what
+the Jest specs cannot: the server narrows (`totalCount` included, which is what proves the predicates
+land before the count), the "System" sentinel matches unattributed rows, a Started At of the task's
+own day matches while the previous day does not, and the filter survives a reload.
+
+## Receipt update diff (System Tasks)
+
+An **Updated Receipt** (`RECEIPT_UPDATED`) row stores the receipt before and after the edit. The
+description cell summarizes it ("Changed: name, amount", or "No changes") and its open button shows
+`app-receipt-update-diff-dialog` (`src/shared-ui/receipt-update-diff-dialog/`): the two receipts as
+pretty-printed JSON, before on the left and after on the right, like a split-view diff.
+
+- **The description is double-encoded, which is why it has its own parser.** The API stores
+  `{"before":"<receipt JSON>","after":"<receipt JSON>"}`, each side a JSON *string*.
+  `PrettyJsonPipe`'s cleanup rewrites every `"` inside a string value to `'`, so the rebuilt text is
+  invalid JSON and the pipe falls back to printing the raw escaped string. That was the "busted"
+  display. `parseReceiptUpdateDescription` (`src/utils/receipt-update-description.ts`) parses each
+  side once more and never throws. A **failed** update stores its plain error text, which returns
+  `undefined`, and that row renders through the old `app-pretty-json` path like every other task.
+  `RECEIPT_UPDATED` is the only double-encoded type, so the pipe is untouched.
+- **`TaskTableComponent.receiptUpdates` parses once per page** (a `computed` over the data source,
+  keyed by task id), not per change-detection pass, since each row holds two whole receipts.
+- **The summary ignores the record-keeping fields at every depth**: the API's `BaseModel`, i.e.
+  `id`, `createdAt`, `updatedAt`, `createdBy` and `createdByString`. An update deletes and recreates
+  the receipt's items (linked items included) and custom field values, so they come back with new ids
+  and timestamps on *every* save, and it bumps `updatedAt` on the receipt, its categories and its tags.
+  Comparing those would list `receiptItems`, `customFields`, `categories` and `tags` on every row
+  whose receipt has any. The **diff itself is deliberately raw**, so those lines still show as changed
+  there.
+- **The diff is hand-written** (`src/utils/line-diff.ts`): it trims the common prefix and suffix, runs
+  Myers' O(ND) diff on the rest, and keeps each round's frontier only for the diagonals it can read,
+  so memory is O(D²). Removed and added lines in one run are paired side by side as `changed` rows,
+  and `inlineChange` marks the part that differs. It avoids a new runtime dependency (and the
+  sandbox lockfile drift above). `line-diff.spec.ts` fuzzes it against a reference LCS, so a
+  regression that stays *valid* but stops being *minimal* still fails.
+- **"All lines" is the default**, and "Changes only" (`collapseUnchanged`, 3 lines of context)
+  replaces longer unchanged runs with a "⋯ N unchanged lines" row. A run of one line is shown rather
+  than replaced by a marker the same size.
+- **The code cell's content is written on one template line.** The column is `white-space: pre-wrap`,
+  so template whitespace inside the `<td>` would render as indentation.
+- **Older rows are versioned, and the dialog says how far to trust "before".** The API writes
+  `version: 2`. A row without the key is version 1, whose own "before" is incomplete (see
+  `api/CLAUDE.md` → "Receipt update snapshots"). The listing rebuilds such a row from an earlier
+  complete copy when one exists, and names it in `beforeSource`. `receiptUpdateBeforeState` turns
+  that into one of three states, and the dialog renders a notice for the last two
+  (`data-testid="receipt-diff-version-notice"`, `data-before-state`):
+  - `complete`: a version 2 row; no notice.
+  - `rebuilt`: an `alert-info` naming the copy, "as saved when it was created" or "by the previous
+    update", and its date. It also warns that bulk status changes can fold in.
+  - `incomplete`: an `alert-warning` that item categories and tags, shares and custom field names
+    can show as changed when they weren't.
+  The notice sits **inside** the scroll box, above the table, so it scrolls away rather than
+  shrinking the diff; the sticky header still pins to the box's top. Nothing else on the desktop
+  branches on the version, because the summary and diff simply read the rebuilt "before".
+
+**E2E:** `e2e/receipt-update-diff.spec.ts` updates a receipt through the real API and asserts the
+row summary, the old/new name on the correct sides, and the "Changes only" collapse. The receipt
+keeps an unchanged item across the update under test, so the summary assertion also proves the
+server-side item recreation is not reported as an edit (it fails if only `updatedAt` is ignored).
+It also asserts the stored row carries `version: 2` and that the dialog shows no notice. The current
+API cannot write a version 1 row, so that path is covered by the Go service tests and the Jest specs. It narrows the
+paged response to its own task with `page.route` + `route.fetch()`, so the row is still the real
+server's output while other specs' tasks stay out of the way.
 
 ## Quick Scan Configuration
 

@@ -94,6 +94,7 @@ doc/ReceiptStatus.md
 doc/ReceiptSummary.md
 doc/ReceiptSummaryCommand.md
 doc/ReceiptSummaryCustomFieldTotal.md
+doc/ReceiptSummaryPosition.md
 doc/ReceiptSummaryRow.md
 doc/ReportApi.md
 doc/ReportColumn.md
@@ -119,6 +120,7 @@ doc/SystemSettings.md
 doc/SystemSettingsApi.md
 doc/SystemTask.md
 doc/SystemTaskApi.md
+doc/SystemTaskPagedRequestFilter.md
 doc/SystemTaskSourceFileView.md
 doc/SystemTaskStatus.md
 doc/SystemTaskType.md
@@ -272,6 +274,7 @@ lib/src/model/receipt_status.dart
 lib/src/model/receipt_summary.dart
 lib/src/model/receipt_summary_command.dart
 lib/src/model/receipt_summary_custom_field_total.dart
+lib/src/model/receipt_summary_position.dart
 lib/src/model/receipt_summary_row.dart
 lib/src/model/report_column.dart
 lib/src/model/report_detail.dart
@@ -291,6 +294,7 @@ lib/src/model/subject_line_regex.dart
 lib/src/model/system_email.dart
 lib/src/model/system_settings.dart
 lib/src/model/system_task.dart
+lib/src/model/system_task_paged_request_filter.dart
 lib/src/model/system_task_source_file_view.dart
 lib/src/model/system_task_status.dart
 lib/src/model/system_task_type.dart
@@ -329,4 +333,3 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/system_task_source_file_view_test.dart

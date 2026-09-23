@@ -10,7 +10,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **page** | **int** | Page number | 
 **pageSize** | **int** | Number of records per page | 
-**orderBy** | **String** | field to order on | [optional] 
+**orderBy** | **String** | field to order on - a receipt column, custom_<id> for a custom field, or first_comment for the receipt's first comment | [optional] 
 **sortDirection** | [**SortDirection**](SortDirection.md) |  | [optional] 
 **filter** | [**ReceiptPagedRequestFilter**](ReceiptPagedRequestFilter.md) |  | [optional] 
 **fullReceipts** | **bool** | Whether to include all receipt associations (receiptItems, comments, customFields, imageFiles, etc.) | [optional] 

@@ -81,7 +81,8 @@ describe("ColumnConfigurationDialogComponent", () => {
         "categories": "Categories",
         "tags": "Tags",
         "status": "Status",
-        "resolved_date": "Resolved Date"
+        "resolved_date": "Resolved Date",
+        "first_comment": "Comment"
       };
 
       expect(RECEIPT_COLUMN_DISPLAY_NAMES).toEqual(expectedMapping);
@@ -187,8 +188,8 @@ describe("ColumnConfigurationDialogComponent", () => {
 
       // Sorted by name, so the ids are deliberately out of order above.
       expect(component.columns.slice(DEFAULT_RECEIPT_TABLE_COLUMNS.length)).toEqual([
-        { matColumnDef: "custom_2", visible: false, order: 9, displayName: "Approver", isCustom: true },
-        { matColumnDef: "custom_7", visible: false, order: 10, displayName: "Vendor", isCustom: true }
+        { matColumnDef: "custom_2", visible: false, order: DEFAULT_RECEIPT_TABLE_COLUMNS.length, displayName: "Approver", isCustom: true },
+        { matColumnDef: "custom_7", visible: false, order: DEFAULT_RECEIPT_TABLE_COLUMNS.length + 1, displayName: "Vendor", isCustom: true }
       ]);
     });
 

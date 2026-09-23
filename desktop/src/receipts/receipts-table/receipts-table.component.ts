@@ -31,6 +31,7 @@ import {
   ReceiptService,
   ReceiptStatus,
   ReceiptSummary,
+  ReceiptSummaryPosition,
   Tag,
 } from "../../open-api";
 import { SnackbarService } from "../../services";
@@ -43,6 +44,7 @@ import {
   applyFormCommand,
   customFieldColumnDef,
   mergeCustomFieldColumns,
+  RECEIPT_COLUMN_DISPLAY_NAMES,
 } from "../../utils/index";
 import { FilterMonth, monthFilterEntry, monthFromFilterEntry } from "../../utils/receipt-date-filter";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
@@ -112,6 +114,8 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   readonly resolvedDateCell = viewChild.required<TemplateRef<any>>("resolvedDateCell");
 
+  readonly firstCommentCell = viewChild.required<TemplateRef<any>>("firstCommentCell");
+
   readonly customFieldCell = viewChild.required<TemplateRef<any>>("customFieldCell");
 
   readonly actionsCell = viewChild.required<TemplateRef<any>>("actionsCell");
@@ -163,6 +167,22 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
     return summaryConfigGroups(this.groups());
   });
+
+  /**
+   * Where the block renders. Read off the RESPONSE, never off the cached
+   * GroupState.groupReceiptSettings: placement is configuration, and the cache is stale
+   * the moment an admin changes it — the same reason `enabled` rides on the response.
+   *
+   * Nothing flickers before the first response: app-receipt-totals renders nothing until
+   * summary().enabled, so there is no pre-response position to get wrong.
+   */
+  public readonly summaryPosition = computed(
+    () => this.summary()?.position ?? ReceiptSummaryPosition.Bottom
+  );
+
+  public readonly summaryAtTop = computed(
+    () => this.summaryPosition() === ReceiptSummaryPosition.Top
+  );
 
   /**
    * Whose configuration is actually in use. On a real group it is that group; on
@@ -490,6 +510,14 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         columnHeader: "Resolved Date",
         matColumnDef: "resolved_date",
         template: this.resolvedDateCell(),
+        sortable: true,
+      },
+      {
+        // The receipt's first comment, which the API both returns
+        // (firstComment) and sorts on under this same key.
+        columnHeader: RECEIPT_COLUMN_DISPLAY_NAMES["first_comment"],
+        matColumnDef: "first_comment",
+        template: this.firstCommentCell(),
         sortable: true,
       },
     ] as ReceiptTableColumn[];

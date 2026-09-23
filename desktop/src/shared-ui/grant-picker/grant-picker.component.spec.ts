@@ -1,7 +1,9 @@
 import { provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormControl } from "@angular/forms";
+import { NgxsModule } from "@ngxs/store";
 import { Category, Tag } from "../../open-api";
+import { AuthState } from "../../store/auth.state";
 import { GrantPickerComponent, GrantSelection } from "./grant-picker.component";
 
 describe("GrantPickerComponent", () => {
@@ -20,7 +22,7 @@ describe("GrantPickerComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GrantPickerComponent],
+      imports: [GrantPickerComponent, NgxsModule.forRoot([AuthState])],
       providers: [provideZonelessChangeDetection()],
     }).compileComponents();
 

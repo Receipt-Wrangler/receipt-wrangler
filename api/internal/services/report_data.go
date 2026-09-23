@@ -90,6 +90,7 @@ func (service ReportDataService) Rows(userId uint, groupId string, filter comman
 		pagedRequest,
 		[]string{"PaidByUser", "Group", "CustomFields"},
 		permissionService.PaidByListResolver(userId),
+		nil,
 	)
 	if err != nil {
 		return reporting.FieldCatalog{}, nil, err

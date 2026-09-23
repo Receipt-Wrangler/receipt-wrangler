@@ -45,7 +45,16 @@ func GetSystemTasks(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
-			// Hydrate before the copy loop below, which takes each task by value.
+			// Both hydration passes below run before the copy loop, which takes
+			// each task by value — a mutation after it would be thrown away.
+
+			// Older "Updated Receipt" rows stored an incomplete "before"; the
+			// response compares them against an earlier complete copy instead.
+			err = services.NewSystemTaskService(nil).UpcastReceiptUpdateDescriptions(systemTasks)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			// This table is app-scoped, so it lists groups the caller may not be a
 			// member of; the flag is resolved per caller so it never advertises a
 			// file the source-file endpoints would refuse to serve them.

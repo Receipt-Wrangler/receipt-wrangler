@@ -47,6 +47,7 @@ part 'paged_data_data_inner.g.dart';
 /// * [createdAt] 
 /// * [createdBy] 
 /// * [date] - Receipt date
+/// * [firstComment] - Text of the receipt's earliest comment the caller may see. Only populated by the paged receipt list (POST /receipt/group/{groupId}); absent when there is no such comment.
 /// * [groupId] 
 /// * [id] 
 /// * [imageFiles] - Files associated to receipt

@@ -87,7 +87,7 @@ func (service ReceiptSummaryService) GetReceiptSummary(
 	// The off state costs one settings read and no receipt query. Every install that
 	// has not opted in pays exactly this.
 	if !settings.ReceiptSummaryEnabled {
-		return emptyReceiptSummary(configurationGroupId), nil
+		return emptyReceiptSummary(configurationGroupId, settings.ReceiptSummaryPosition), nil
 	}
 
 	fieldNames, fieldIds, err := service.resolveSummaryFields(settings)
@@ -100,7 +100,14 @@ func (service ReceiptSummaryService) GetReceiptSummary(
 		return structs.ReceiptSummary{}, err
 	}
 
-	return service.fold(receipts, settings.ReceiptSummaryStatuses, fieldIds, fieldNames, configurationGroupId), nil
+	return service.fold(
+		receipts,
+		settings.ReceiptSummaryStatuses,
+		fieldIds,
+		fieldNames,
+		configurationGroupId,
+		settings.ReceiptSummaryPosition,
+	), nil
 }
 
 // resolveConfigurationGroupId picks the group whose settings shape the breakdown.
@@ -239,6 +246,7 @@ func (service ReceiptSummaryService) fetchReceipts(
 		pagedRequest,
 		associations,
 		permissionService.PaidByListResolver(userId),
+		nil,
 	)
 	if err != nil {
 		return nil, err
@@ -289,6 +297,7 @@ func (service ReceiptSummaryService) fold(
 	fieldIds []uint,
 	fieldNames map[uint]string,
 	configurationGroupId uint,
+	position models.ReceiptSummaryPosition,
 ) structs.ReceiptSummary {
 	overall := newSummaryAccumulator(fieldIds)
 
@@ -314,6 +323,7 @@ func (service ReceiptSummaryService) fold(
 	return structs.ReceiptSummary{
 		Enabled:              true,
 		ConfigurationGroupId: configurationGroupId,
+		Position:             position.OrDefault(),
 		Overall:              overall.toRow("", fieldIds, fieldNames),
 		Statuses:             rows,
 	}
@@ -379,10 +389,17 @@ func (accumulator *summaryAccumulator) toRow(
 
 // emptyReceiptSummary is the off state: a well-formed 200 with nothing in it. Every
 // slice is non-nil so it serializes as [] rather than null.
-func emptyReceiptSummary(configurationGroupId uint) structs.ReceiptSummary {
+func emptyReceiptSummary(
+	configurationGroupId uint,
+	position models.ReceiptSummaryPosition,
+) structs.ReceiptSummary {
 	return structs.ReceiptSummary{
 		Enabled:              false,
 		ConfigurationGroupId: configurationGroupId,
+		// Normalized even in the off state: loadSettings maps a missing row to a ZERO
+		// GroupReceiptSettings, whose position is "", and an empty enum fails a closed
+		// Dart EnumClass — which would turn "this group has no summary" into a parse error.
+		Position: position.OrDefault(),
 		Overall: structs.ReceiptSummaryRow{
 			Total:             decimal.Zero,
 			CustomFieldTotals: []structs.ReceiptSummaryCustomFieldTotal{},

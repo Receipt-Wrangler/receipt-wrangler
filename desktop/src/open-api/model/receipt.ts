@@ -43,6 +43,10 @@ export interface Receipt {
      */
     date: string;
     /**
+     * Text of the receipt\'s earliest comment the caller may see. Only populated by the paged receipt list (POST /receipt/group/{groupId}); absent when there is no such comment.
+     */
+    firstComment?: string;
+    /**
      * Group foreign key
      */
     groupId: number;

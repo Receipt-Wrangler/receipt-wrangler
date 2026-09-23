@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:built_collection/built_collection.dart';
 import 'package:openapi/src/model/receipt_summary_row.dart';
+import 'package:openapi/src/model/receipt_summary_position.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -15,6 +16,7 @@ part 'receipt_summary.g.dart';
 /// Properties:
 /// * [enabled] - Whether the configuration group has the summary turned on. False comes back at a normal 200 with zeroed rows, so a client with stale group settings renders nothing rather than surfacing an error.
 /// * [configurationGroupId] - The group whose settings produced this breakdown
+/// * [position] 
 /// * [overall] 
 /// * [statuses] - One row per configured status, in ReceiptStatus declaration order. A configured status matching no receipt is still present, with zeroed figures. Always present; empty when no status is configured.
 @BuiltValue()
@@ -26,6 +28,10 @@ abstract class ReceiptSummary implements Built<ReceiptSummary, ReceiptSummaryBui
   /// The group whose settings produced this breakdown
   @BuiltValueField(wireName: r'configurationGroupId')
   int get configurationGroupId;
+
+  @BuiltValueField(wireName: r'position')
+  ReceiptSummaryPosition get position;
+  // enum positionEnum {  TOP,  BOTTOM,  };
 
   @BuiltValueField(wireName: r'overall')
   ReceiptSummaryRow get overall;
@@ -66,6 +72,11 @@ class _$ReceiptSummarySerializer implements PrimitiveSerializer<ReceiptSummary> 
     yield serializers.serialize(
       object.configurationGroupId,
       specifiedType: const FullType(int),
+    );
+    yield r'position';
+    yield serializers.serialize(
+      object.position,
+      specifiedType: const FullType(ReceiptSummaryPosition),
     );
     yield r'overall';
     yield serializers.serialize(
@@ -113,6 +124,13 @@ class _$ReceiptSummarySerializer implements PrimitiveSerializer<ReceiptSummary> 
             specifiedType: const FullType(int),
           ) as int;
           result.configurationGroupId = valueDes;
+          break;
+        case r'position':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(ReceiptSummaryPosition),
+          ) as ReceiptSummaryPosition;
+          result.position = valueDes;
           break;
         case r'overall':
           final valueDes = serializers.deserialize(

@@ -8,7 +8,7 @@ import (
 )
 
 func TestUserPrefernces_LoadDataFromRequest(t *testing.T) {
-	body := `{"userId": 5, "quickScanDefaultStatus": "OPEN"}`
+	body := `{"userId": 5, "quickScanDefaultStatus": "OPEN", "closeChipSelectOnSelect": true}`
 	r := httptest.NewRequest("POST", "/", strings.NewReader(body))
 	w := httptest.NewRecorder()
 
@@ -22,6 +22,28 @@ func TestUserPrefernces_LoadDataFromRequest(t *testing.T) {
 	}
 	if preferences.QuickScanDefaultStatus != OPEN {
 		utils.PrintTestError(t, preferences.QuickScanDefaultStatus, OPEN)
+	}
+	if !preferences.CloseChipSelectOnSelect {
+		utils.PrintTestError(t, preferences.CloseChipSelectOnSelect, true)
+	}
+}
+
+// A body that omits closeChipSelectOnSelect decodes it as false, which is the
+// default behavior (the option list stays open). Pinned because the repository
+// writes the field unconditionally, so "omitted" and "explicitly false" are the
+// same request as far as the stored value is concerned.
+func TestUserPrefernces_LoadDataFromRequestDefaultsCloseChipSelectOnSelect(t *testing.T) {
+	body := `{"userId": 5, "quickScanDefaultStatus": "OPEN"}`
+	r := httptest.NewRequest("POST", "/", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	var preferences UserPrefernces
+	err := preferences.LoadDataFromRequest(w, r)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if preferences.CloseChipSelectOnSelect {
+		utils.PrintTestError(t, preferences.CloseChipSelectOnSelect, false)
 	}
 }
 

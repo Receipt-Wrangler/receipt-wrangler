@@ -173,6 +173,29 @@ Widget buildDemoSurface({
   );
 }
 
+/// Loads the demo fonts, failing the test if they do not load.
+///
+/// Call this rather than `tester.runAsync(loadDemoFonts)`. `loadDemoFonts`
+/// returns `Future<void>`, and `runAsync` returns null **both** when the
+/// callback throws and when it simply has nothing to return -- so a bare call
+/// cannot tell the two apart and silently carries on. What follows is a whole
+/// recording in `--use-test-fonts`' stub font, where every glyph is a filled
+/// box: the demo passes and writes a GIF nobody can read.
+///
+/// Returning a sentinel from inside [WidgetTester.runAsync] is what makes the
+/// failure detectable, and the shape matches [grabFrame] below, which has the
+/// same problem for the same reason.
+Future<void> loadDemoFontsOrFail(WidgetTester tester) async {
+  final loaded = await tester.runAsync(() async {
+    await loadDemoFonts();
+    return true;
+  });
+
+  if (loaded != true) {
+    fail('demo fonts failed to load: ${tester.takeException()}');
+  }
+}
+
 /// Grabs the current frame off the repaint boundary.
 ///
 /// `toImage` is asynchronous and `testWidgets` runs in fake-async, where the
@@ -253,6 +276,56 @@ void writeSideBySidePng({
   print('wrote $path — ${(bytes.length / 1024).toStringAsFixed(0)} KB');
 }
 
+/// Writes a single-panel looping GIF from frames that each carry their own
+/// hold time, in **1/100 s**.
+///
+/// [writeSideBySideGif] below reads its durations off `demoInsetRamp()`, which
+/// only makes sense for a demo driven by the keyboard inset. A demo driven by
+/// *taps* has no ramp -- each step holds for as long as that step needs to be
+/// read -- so the frames carry their own timing instead. The encoder settings
+/// are the shared part and the reason this lives here rather than in a demo
+/// file: they are not the defaults, and getting them wrong is not obvious until
+/// the GIF is already committed (see `mobile/CLAUDE.md` -> "Recording a demo
+/// GIF").
+///
+/// Synchronous for the same reason the others are: `testWidgets` runs in
+/// fake-async, where `File.writeAsBytes` never completes and the test hangs
+/// until it times out.
+void writeGif({
+  required List<({img.Image frame, int centis})> frames,
+  required String path,
+}) {
+  final encoder = img.GifEncoder(
+    repeat: 0,
+    // 256, the GIF maximum, where the side-by-side writer below uses 128.
+    // That one records flat UI art, which quantizes cleanly; a receipts list
+    // does not -- `ListItemTrailingStatus` paints a LinearGradient in every
+    // row, and with dithering off (which it must be, or LZW loses the long
+    // pixel runs it compresses) a short palette bands that gradient into
+    // visible stripes. It also cleans up antialiased white text on a saturated
+    // caption strip, which ghosts at 128.
+    numColors: 256,
+    quantizerType: img.QuantizerType.octree,
+    dither: img.DitherKernel.none,
+  );
+
+  for (final step in frames) {
+    // addFrame encodes the PREVIOUS image and finish() flushes the last, so N
+    // calls plus finish yield N frames.
+    encoder.addFrame(step.frame, duration: step.centis);
+  }
+
+  final bytes = encoder.finish()!;
+  final file = File(path);
+  file.parent.createSync(recursive: true);
+  file.writeAsBytesSync(bytes);
+
+  // ignore: avoid_print
+  print('wrote $path — ${(bytes.length / 1024).toStringAsFixed(0)} KB, '
+      '${frames.length} frames, '
+      '${frames.first.frame.width}x${frames.first.frame.height}');
+}
+
 /// Stitches the two recordings into one looping GIF, before on the left.
 ///
 /// Side by side rather than sequential for the reason the tap-target demo is:
@@ -263,30 +336,44 @@ void writeSideBySidePng({
 /// `File.writeAsBytes` never completes — the test simply hangs until it times
 /// out. Encoding is CPU-bound anyway, so sync I/O sidesteps the whole problem
 /// without a `runAsync` wrapper.
+/// [durationsCentis] gives one hold time per frame, in 1/100 s. It defaults to the
+/// keyboard ramp's own timings, which is what the two keyboard demos want; any demo
+/// with a different frame count MUST pass its own, or this indexes past the end of a
+/// 13-step ramp (or silently applies keyboard timings to a scroll).
 void writeSideBySideGif({
   required List<img.Image> before,
   required List<img.Image> after,
   required String path,
+  List<int>? durationsCentis,
+  int numColors = 128,
 }) {
-  assert(before.length == after.length, 'panels must ramp in lockstep');
+  assert(before.length == after.length, 'panels must have the same frame count');
 
   final encoder = img.GifEncoder(
     repeat: 0,
     // The defaults are wrong for this: the neural quantizer is a per-frame
     // neural net (slow), and dithering destroys the long runs of identical
     // pixels that LZW needs. Flat UI art quantizes cleanly without either.
-    numColors: 128,
+    //
+    // [numColors] is raised by a demo whose screen carries a GRADIENT -- at 128
+    // the octree banding across ListItemTrailingStatus's status chips reads as
+    // hard black stripes, i.e. as a rendering bug rather than as compression.
+    // Raise the palette rather than switching the dither on, which would cost
+    // far more bytes by breaking LZW's runs everywhere else.
+    numColors: numColors,
     quantizerType: img.QuantizerType.octree,
     dither: img.DitherKernel.none,
   );
 
-  final steps = demoInsetRamp();
+  final steps =
+      durationsCentis ?? demoInsetRamp().map((step) => step.centis).toList();
+  assert(steps.length == before.length, 'one duration per frame');
   for (var i = 0; i < before.length; i++) {
     final canvas = stitchPanels(before[i], after[i]);
     // Durations are in 1/100 s, not ms. Note addFrame encodes the PREVIOUS
     // image and finish() flushes the last, so N calls plus finish yield N
     // frames.
-    encoder.addFrame(canvas, duration: steps[i].centis);
+    encoder.addFrame(canvas, duration: steps[i]);
   }
 
   final bytes = encoder.finish()!;

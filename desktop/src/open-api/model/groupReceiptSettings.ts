@@ -8,6 +8,7 @@
  * Do not edit the class manually.
  */
 import { ReceiptStatus } from './receiptStatus';
+import { ReceiptSummaryPosition } from './receiptSummaryPosition';
 import { QuickScanDefaultPaidByType } from './quickScanDefaultPaidByType';
 
 
@@ -122,6 +123,7 @@ export interface GroupReceiptSettings {
      * Receipt statuses broken out as their own row in the receipt summary, in ReceiptStatus declaration order. A configured status matching no receipt still renders, as a zero row. Always present; an empty array means the summary shows only the overall row. Read only here - write via UpdateGroupReceiptSettingsCommand.receiptSummaryStatuses.
      */
     receiptSummaryStatuses?: Array<ReceiptStatus>;
+    receiptSummaryPosition?: ReceiptSummaryPosition;
 }
 export namespace GroupReceiptSettings {
 }

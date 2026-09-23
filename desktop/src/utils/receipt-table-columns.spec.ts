@@ -41,6 +41,7 @@ describe("receipt-table-columns", () => {
   describe("columnDisplayName", () => {
     it("names a built-in column and a custom field", () => {
       expect(columnDisplayName("resolved_date", [])).toBe("Resolved Date");
+      expect(columnDisplayName("first_comment", [])).toBe("Comment");
       expect(columnDisplayName("custom_7", [customField(7, "Vendor")])).toBe("Vendor");
     });
 
@@ -76,6 +77,21 @@ describe("receipt-table-columns", () => {
 
       expect(merged[0].matColumnDef).toBe("custom_7");
       expect(merged.map((column) => column.order)).toEqual(merged.map((_, i) => i));
+    });
+
+    // A layout saved before the Comment column existed gains it unchecked: it is
+    // opt-in, so an upgrade must not widen anyone's table.
+    it("appends the Comment column hidden to a layout saved before it existed", () => {
+      const persisted = builtIns()
+        .filter((column) => column.matColumnDef !== "first_comment")
+        .map((column) => ({ ...column, visible: true }));
+
+      const merged = mergeCustomFieldColumns(persisted, [], true);
+
+      const comment = merged.find((column) => column.matColumnDef === "first_comment");
+      expect(comment).toBeDefined();
+      expect(comment?.visible).toBe(false);
+      expect(merged[merged.length - 1].matColumnDef).toBe("first_comment");
     });
 
     it("heals a missing built-in column", () => {

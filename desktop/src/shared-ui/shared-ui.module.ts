@@ -35,6 +35,7 @@ import { ConfirmationDialogComponent } from "./confirmation-dialog/confirmation-
 import { CopyButtonComponent } from "./copy-button/copy-button.component";
 import { DeleteButtonComponent } from "./delete-button/delete-button.component";
 import { DescriptionViewerDialogComponent } from "./description-viewer-dialog/description-viewer-dialog.component";
+import { ReceiptUpdateDiffDialogComponent } from "./receipt-update-diff-dialog/receipt-update-diff-dialog.component";
 import { DialogFooterComponent } from "./dialog-footer/dialog-footer.component";
 import { DialogComponent } from "./dialog/dialog.component";
 import { EditButtonComponent } from "./edit-button/edit-button.component";
@@ -51,6 +52,7 @@ import { SourceFileViewerDialogComponent } from "./source-file-viewer-dialog/sou
 import { PrettyJsonComponent } from "./pretty-json/pretty-json.component";
 import { QueueStartMenuComponent } from "./queue-start-menu/queue-start-menu.component";
 import { QuickScanButtonComponent } from "./quick-scan-button/quick-scan-button.component";
+import { FilterFieldComponent } from "./filter-field/filter-field.component";
 import { OperationsPipe } from "./receipt-filter/operations.pipe";
 import { ReceiptFilterComponent } from "./receipt-filter/receipt-filter.component";
 import { StatusChipComponent } from "./status-chip/status-chip.component";
@@ -82,6 +84,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     CopyButtonComponent,
     DeleteButtonComponent,
     DescriptionViewerDialogComponent,
+    ReceiptUpdateDiffDialogComponent,
     DialogComponent,
     DialogFooterComponent,
     EditButtonComponent,
@@ -93,6 +96,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     FormSectionComponent,
     GroupAutocompleteComponent,
     HelpIconComponent,
+    FilterFieldComponent,
     OperationsPipe,
     ReceiptFilterComponent,
     StatusChipComponent,
@@ -157,6 +161,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     CopyButtonComponent,
     DeleteButtonComponent,
     DescriptionViewerDialogComponent,
+    ReceiptUpdateDiffDialogComponent,
     DialogComponent,
     DialogFooterComponent,
     EditButtonComponent,
@@ -167,6 +172,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     FormSectionComponent,
     GroupAutocompleteComponent,
     HelpIconComponent,
+    FilterFieldComponent,
     OperationsPipe,
     QuickScanButtonComponent,
     ReceiptFilterComponent,

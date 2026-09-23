@@ -15,6 +15,7 @@ type UserPrefernces struct {
 	QuickScanDefaultPaidById *uint          `json:"quickScanDefaultPaidById"`
 	QuickScanDefaultPaidBy   *User          `json:"-"`
 	QuickScanDefaultStatus   ReceiptStatus  `json:"quickScanDefaultStatus"`
+	CloseChipSelectOnSelect  bool           `json:"closeChipSelectOnSelect"`
 	UserShortcuts            []UserShortcut `json:"userShortcuts"`
 }
 

@@ -564,23 +564,35 @@ cd /home/user/receipt-wrangler/mobile/api
 flutter pub run build_runner build --delete-conflicting-outputs
 ```
 
-**Known dart-dio default-value regressions (re-patch after every regen).** The `dart-dio`
-generator emits invalid `_defaults` initializers for some fields, which `build_runner` then can't
-compile (and it deletes the matching `.g.dart` first, so the package stops building). After
-regenerating, restore these hand-fixes (precedent: commits `fad192a0`, `a2ec7479`):
+**Known dart-dio regressions — patched automatically, NOT by hand.**
+`api/patches/apply-dart-dio-patches.sh` holds all four, and `api/generate-client.sh` runs it as the
+last step of a `mobile` regen. Add a patch there, never to the generated file: a patch applied by
+hand survives exactly until the next regen, which is how this list used to be a checklist item
+someone had to remember.
+
+The script has three outcomes per patch, and the third is the point: apply it, skip it if already
+applied (so re-running is safe), or **exit 1** when neither the original nor the patched text is
+present — meaning the generator's output changed shape and the patch must be re-derived. It fails
+the regen rather than quietly handing back an unpatched client.
+
+Two of the four are invalid Dart that `build_runner` can't compile (it deletes the matching
+`.g.dart` first, so the package stops building); precedent commits `fad192a0`, `a2ec7479`:
 
 - `model/user_preferences.dart` — `..quickScanDefaultStatus = 'OPEN'` →
   `..quickScanDefaultStatus = ReceiptStatus.OPEN`.
 - `model/system_settings.dart` — `..currencyDisplay = '$'` → `..currencyDisplay = r'$'` (a bare `$`
   in a non-raw string is invalid Dart).
 
+The other two are the `fallback: true` enum annotations below, which compile fine when absent and
+so are caught only by `flutter test`.
+
 `model/claims.dart` **no longer** needs a `userRole` patch — the role rework dropped `userRole` from
 the swagger, so `Claims` carries only identity claims and the field is gone from the generated model.
 
-Run `flutter analyze` after a regen; these surface as compile errors. (Hand-editing generated files
-is otherwise forbidden — these are the documented exception.)
+Run `flutter analyze` **and `flutter test`** after a regen. (Hand-editing generated files is
+otherwise forbidden — these four are the documented exception, and they are applied by the script.)
 
-**A third hand-patch, which does NOT surface as a compile error — `ReceiptStatus` enum tolerance.**
+**A patch that does NOT surface as a compile error — `ReceiptStatus` enum tolerance.**
 `model/receipt_status.dart` annotates the `empty` member `@BuiltValueEnumConst(wireName: r'',
 fallback: true)`. `build_runner` turns that into `default: return _$empty;` in `_$valueOf`, replacing
 the generated `default: throw ArgumentError(name)`. Without it, one unrecognized wire value fails the
@@ -590,10 +602,31 @@ the same closed-enum mechanism behind the two `Permission` login outages (see "P
 gating"); `ReceiptStatus` cannot take that feature's fix of becoming a plain wire string, because it
 is a genuine closed domain backing the status dropdowns.
 
-The openapi-generator never emits `fallback`, so **a regen silently drops it** — and unlike the two
-patches above nothing fails to compile, so the only thing that catches the regression is
+A bare regen does not emit `fallback` and unlike the two patches above nothing fails to compile, so
+the only thing that catches the annotation going missing is
 `test/models/receipt_status_ingest_test.dart`. Run `flutter test` after a regen, not just
 `flutter analyze`.
+
+**The generator CAN emit it, and the flag is a trap — do not reach for it.** `enumUnknownDefaultCase`
+(via `--additional-properties`) turns on the stock template's `fallback: true`, but it is **global**,
+so it would also open `Permission` — which this repo keeps deliberately closed, with
+`test/models/app_data_permission_ingest_test.dart` asserting it still throws. It also anchors the
+fallback to a **synthetic** `unknown_default_open_api` member rather than to `empty`, which changes
+the write path (`empty` serializes to `""`, the synthetic member to a literal string the API rejects)
+and breaks every assertion below. The patch script is the narrower instrument, on purpose.
+
+**A new field on a response model needs a hand-written guard in `test/models/`, not the generated
+stub.** The generator drops a `*_test.dart` per model in `mobile/api/test/`, but it **does not
+overwrite one that already exists** — so those stubs still describe whatever the model looked like
+the day they were first written, never gain a case when a field is added, and are all `// TODO`
+bodies regardless. They also sit under `mobile/api/`, which is generated output nobody may
+hand-edit. The four real API-boundary guards therefore live beside the app's own tests and are what
+`flutter test` actually runs: `test/models/app_data_permission_ingest_test.dart`,
+`test/models/receipt_status_ingest_test.dart`,
+`test/models/receipt_summary_position_ingest_test.dart`, and
+`test/models/user_preferences_ingest_test.dart` (the `closeChipSelectOnSelect` default and wire
+round trip — a desktop-only flag mobile carries and never reads, which is precisely why nothing in
+the app would notice it disappearing).
 
 Two consequences worth knowing. An unknown status deserializes to `empty`, which
 `receiptStatusLabel` / `receiptStatusColor` render as a blank neutral chip rather than crashing —
@@ -601,6 +634,23 @@ degraded, not broken. And on the **write** path `empty` serializes back to `""`,
 `UpsertReceiptCommand.Validate` rejects with a 400 "Status is required": an old build editing a
 receipt whose status it cannot represent gets a visible error instead of silently downgrading it.
 That is the intended failure — loud, and no data loss.
+
+**`ReceiptSummaryPosition` carries the same patch — but on `BOTTOM`, not on an `empty` member.**
+`model/receipt_summary_position.dart` annotates
+`@BuiltValueEnumConst(wireName: r'BOTTOM', fallback: true)`, and
+`test/models/receipt_summary_position_ingest_test.dart` is what catches it going missing. It rides on
+`GroupReceiptSettings`, i.e. on **AppData**, i.e. on **login** — a third position added later would
+brick every released build at the sign-in screen.
+
+The **enum carries no `""` member at all**, which is the difference from `ReceiptStatus`. There
+`empty` is a value the app actually uses (the overall summary row carries it, since the generated
+`status` field is non-nullable), so it earns its place. Here nothing read it — it existed only to
+host the fallback, while also making `""` expressible on
+`UpdateGroupReceiptSettingsCommand`, where the server 400s it. Putting the fallback on `BOTTOM`
+instead drops the member, makes the invalid write unrepresentable, and lands an unknown value on a
+**real** placement: the same one `ReceiptSummaryPosition.OrDefault()` would have sent server-side, so
+the two agree by construction. The server still normalizes `""` away at both emit points (see
+`api/CLAUDE.md`); keep both.
 
 The sibling closed enums (`ItemStatus`, `GroupStatus`, `SystemTaskStatus`, `Permission` as a
 catalog) are **still intolerant**. Adding a value to any of them is a breaking change for released
@@ -1449,6 +1499,240 @@ group change). Shared drivers live in `integration_test/helpers/receipt_filter_a
   `formField("value")` -- and `CurrencyTextFieldController` reads keystrokes as cents, so type the
   full `50.00`, not `50`.
 
+### Quick date filter (month stepper + date field picker)
+
+Above the receipts list, a month stepper and a chip naming the date field it writes to -- the mobile
+half of the design project's panel **4b**, and a port of desktop's `app-month-stepper` +
+`receipts-quick-date-field` (`desktop/CLAUDE.md` -> "The month stepper targets one date field").
+**Client-only**, like the filter screen below it: a month is `BETWEEN [first day, last day]`, which
+the API and the encoder already handle.
+
+```
+◄   📅 September 2026   ✕   ►
+[📅 On Receipt Date] [Added At] [Descending]
+```
+
+- **`lib/utils/receipt_date_filter.dart` owns the month <-> condition translation** --
+  `monthFilterCondition`, `monthFromCondition`, `shiftMonth`, `monthOfDate`, `filterMonthLabel`.
+  It hands the encoder plain month boundaries (`DateTime(y, m, 1)` / `DateTime(y, m + 1, 0)`) rather
+  than day-bounded instants, because `buildReceiptPagedRequestFilter` already applies
+  `startOfDay`/`endOfDay` to a `BETWEEN` pair -- duplicating that here would give the rule two homes.
+  Day `0` of the next month and month `13` both normalize in Dart, so **February and December need no
+  special case**.
+- **`FilterMonth.month` is 1-based**, unlike desktop's zero-based `FilterMonth` (which is built on
+  JavaScript's `Date`). `DateTime.month` is 1-based, so a faithful port of the off-by-one would fight
+  every constructor.
+- **`monthFromCondition` takes `DateTime`s only**, where desktop's `monthFromFilterEntry` also accepts
+  ISO strings. Desktop persists its filter to localStorage and NGXS serializes through JSON;
+  `ReceiptListModel` is in-memory, so the string branch would be dead code. It still matches on
+  **calendar fields**, which is what lets it name a month the advanced filter's `showDateRangePicker`
+  authored (both bounds at local midnight).
+- **`ReceiptListModel` owns which field the control points at** (`quickDateField`,
+  `setQuickDateField`, `quickDateCondition`), not `GroupReceiptsList`. That widget is torn down and
+  rebuilt on almost every navigation, including a round trip to a receipt -- a widget-local field
+  would snap back to `date` while the month it wrote still sat on `resolvedDate`, leaving the stepper
+  describing a condition it does not own. Same reasoning as `filterGroupId`.
+- **`setFilterField(key, condition, groupId:)`** is the single-field write path (the analogue of
+  desktop's `SetReceiptFilterField`). It **notifies**, so the list refetches once through
+  `_refreshForFilterChange`; the filter screen keeps committing whole drafts through `setFilter`.
+- **Switching the date field must NOT refetch**, which is why the chip calls
+  `setQuickDateField(key, false)` and repaints with a bare `setState`. It changes no condition, only
+  which one the stepper describes, so the result set has not moved -- and a notification from this
+  model means "the filter changed". The abandoned condition stays applied and stays on the filter
+  screen. `group_receipts_list_test.dart` asserts **zero** requests for it; verified to fail with the
+  flag flipped to `true`.
+- **The chosen field is group-scoped exactly as the conditions are**, and it takes *both* halves to
+  hold. `clearFilter`'s early return was widened to cover the field
+  (`_filter.isEmpty && _quickDateField == defaultQuickDateFieldKey`), **and** `setQuickDateField`
+  takes a **required `groupId`** and records it -- because `_filterGroupId` is what
+  `didChangeDependencies` compares, and it is the only thing that gets `clearFilter` *called*.
+  Widening the guard alone shipped a half-rule: with a condition applied the field reset, and with
+  none applied `_filterGroupId` stayed null, the reset never ran, and the field followed the user
+  into the next group (caught in review on #702). `_filterGroupId` is therefore recomputed on every
+  write from one predicate, `_hasGroupScopedState` (`_filter.isNotEmpty || field != default`), so a
+  field toggled away from the default and back leaves nothing scoped behind. Same shape as the
+  filter leak `receipt_filter_lifecycle_test.dart` exists for, and
+  `group_receipts_list_test.dart` pins the field-only navigation case separately from the
+  with-a-condition one.
+- **The label reads "September 2026" / "Custom" / "All time"**, and the stepper never hides. A
+  condition it cannot describe (a partial range, a `GREATER_THAN`, `WITHIN_CURRENT_MONTH`) still has
+  to read as a filter. **The clear ✕ follows the *condition*, not the month** -- "Custom" carries no
+  month but is exactly the state a user most needs a way out of.
+- **The arrows seed from today when no month is showing**, then apply the delta, so `◄` and `►` never
+  do the same thing. Stepping off "Custom" overwrites that condition with a whole month.
+- **The field chip is labelled "On Receipt Date", not "Receipt Date".** `receiptSortOptions` names
+  the same three columns identically, so an unprefixed chip sits beside a sort chip reading exactly
+  the same words while meaning something else. Desktop needs no prefix because its picker abuts the
+  stepper and reads "September 2026 ... on Receipt Date" in one line; the two stacked rows here
+  cannot. Pinned by a test that sorts by Receipt Date and asserts both chips.
+- **`buildSortFilterBar()` is horizontally scrollable** now that it carries a third chip -- a bare
+  `Row` overflows a narrow phone rather than truncating.
+- **The month sheet is `isScrollControlled`.** A default `showModalBottomSheet` caps itself at 9/16 of
+  the screen, which the year pager plus the grid plus the shortcuts exceeds on a short phone -- and a
+  bottom sheet **overflows rather than scrolling**. It is also a plain compact sheet rather than
+  `showFullscreenBottomSheet`, which mounts a `TopAppBar` over a full-height body for children that
+  scroll themselves. Opened through `ContextModel.resolveSheetContext`, like every other sheet.
+- **Paging the year selects nothing and leaves the sheet open** -- it is a view concern. Bounds are
+  1970 through five years out, matching desktop's `MIN_YEAR` / `MAX_YEAR_OFFSET`.
+- **`receiptDateFilterFields`** is derived from `receiptFilterFields` by `type`, so the picker, the
+  condition card and the "Add filter" sheet cannot name a field differently. Desktop narrows on the
+  *key* because TypeScript needs the runtime check to justify its narrower type; Dart does not, and
+  filtering on the type means a new date field reaches the picker with no second edit.
+
+**Demo:** `tool/quick-date-filter.gif`, regenerated by `tool/record_quick_date_demo.sh` (see
+"Recording a demo GIF" below -- route 2, single panel).
+
+**Tests:** `test/utils/receipt_date_filter_test.dart` (boundaries incl. leap February and the
+December roll, the null cases, and the whole thing through the **real** encoder -- that last is what
+proves a month reaches the server as `…-01T00:00:00Z` -> `…-<last>T23:59:59Z`),
+`test/widgets/receipt_month_stepper_test.dart`, `test/widgets/receipt_month_picker_sheet_test.dart`,
+plus new cases in `receipt_filter_fields_test.dart`, `receipt_list_model_test.dart` and
+`group_receipts_list_test.dart`.
+
+**E2e: `integration_test/receipt_quick_date_filter_test.dart`.** It **seeds relative to
+`DateTime.now()`**, which `receipt_filter_test.dart` explicitly requires of any month-relative case --
+that suite is pinned to June 2026 and would drift out of the stepper's reach. Two receipts: one dated
+the 15th of last month with status **RESOLVED**, one dated the 15th of this month. The RESOLVED one
+is what makes the field picker testable at all: the API stamps `resolved_date` with `time.Now()` on
+create, so its two date columns fall in different months, and filtering "this month" returns the
+*other* row on `resolvedDate` than on `date`. Nothing but a real column change on the wire produces
+that.
+### Receipt summary
+
+A block of totals **pinned** above or below the receipts list, covering the whole current filter
+result set rather than the visible page. `swagger.yml`, the Go API and `mobile/api/` already carried
+`getReceiptSummaryForGroup` and all four models -- the original reason for skipping mobile (no
+filter to describe) died with the receipt filter above -- so the only backend work was the new
+per-group `receiptSummaryPosition`. See the root `CLAUDE.md` -> "Receipt Summary" for the
+cross-client contract and `api/CLAUDE.md` for the wire one.
+
+- **`ReceiptSummaryBar` (`lib/groups/widgets/receipt_summary_bar.dart`) is presentational**, the
+  twin of the desktop's `app-receipt-totals`: it fetches nothing and knows nothing about the
+  filter. Named *Bar* rather than *Summary* because `api.ReceiptSummary` is the model it takes and
+  `dashboard_widgets/group_summary.dart` already owns the word -- the same collision desktop dodged
+  by not calling its component `*summary*`. Pure helpers (labelling, the config-group fallback) live
+  in `lib/utils/receipt_summary.dart`, ported from `desktop/src/utils/receipt-summary.ts`.
+- **Both positions are pinned, and that comes for free.** `PagedDataList` returns an `Expanded`, so
+  anything else in `GroupReceiptsList`'s `Column` takes its natural height and never scrolls with
+  the list. No slivers, no `Scaffold` slot -- and the bottom position is reachable under infinite
+  scroll, which a trailing sliver would not be.
+- **`PagedDataList` carries a `GlobalKey`, and it is load-bearing** — this bit *cost a cycle*.
+  The bar renders in one of two slots either side of the list, so the list's position among its
+  siblings changes with the group's configured position. `Element.updateChildren` walks the old and
+  new child lists inward from both ends while `Widget.canUpdate` holds, and in the middle it cannot
+  match it reuses only **keyed** children — so unkeyed, `PagedDataList` is rebuilt from scratch,
+  **discarding its State along with the paging controller, every loaded page and `_totalCount`, and
+  silently refetching page 1**. Padding the `Column` with always-present placeholder slots also
+  works, but the key travels with the widget it protects, so adding any other conditional child to
+  this `Column` later cannot reintroduce the bug. Pinned by *"flipping the position does not reset
+  the paged list"*, which asserts **State identity** — a request count does not catch it, because
+  the reconstructed State refetches immediately and that looks exactly like the filter's own
+  refetch.
+- **The list owns the request; `ReceiptListModel` owns only the All-group pick.** The model has no
+  Dio and no route access, and -- decisively -- its notify contract says a notification means *the
+  filter changed*, so a model that fetched and notified on arrival would ping-pong with
+  `_refreshForFilterChange`. Putting `_fetchSummary` beside the `_refreshCallback` call sites is
+  what makes the refresh contract true **by construction**:
+
+  | event | refetches the summary? |
+  |---|---|
+  | filter applied (the one notifying writer) | yes |
+  | first mount / group change | yes, guarded on `_summaryGroupId` |
+  | sort change (`notify: false`, calls `_refreshCallback` directly) | **no** -- order, not membership |
+  | infinite-scroll page load | **no** -- the figures already cover every page |
+
+- **`didChangeDependencies` must be guarded on the group id.** It fires for *any* inherited widget
+  change and `getGroupId` makes `GoRouterState` a dependency, so an unguarded fetch there is a
+  request storm on the app's most expensive request.
+- **Out-of-order responses are dropped** via `_summaryRequestSeq`, the manual equivalent of the
+  desktop's `switchMap`: two filter applies in quick succession can land backwards and paint figures
+  for a filter the user has moved past.
+- **A failed summary is swallowed but the figures are CLEARED** -- and this is the one place mobile
+  deliberately diverges from desktop. Swallowing is shared: an unhandled `DioException` from a
+  `setState`-driven fetch takes the whole receipts screen down, and a block of totals is not worth
+  interrupting someone browsing receipts over. Desktop's `catchError` then *keeps* the last good
+  figures, because its HTTP interceptor tells the user the refresh failed. **Mobile installs no
+  interceptor** (`lib/client/client.dart` is four lines), so keeping them would render the previous
+  filter's totals beside the new filter's list with nothing to say they are stale. "Covers the whole
+  current filter result set" is the block's entire contract, so showing nothing is the honest
+  degradation and showing wrong numbers is not. The clear sits **behind the same `_summaryRequestSeq`
+  guard as the success path**, or a superseded failure would wipe a newer response's figures.
+- **The cached group settings decide only WHETHER to ask.** Everything rendered -- `enabled`,
+  `position`, the rows -- comes off the response, which stays authoritative. A group that never
+  opted in therefore costs no request at all. The consequence: an admin who enables the summary
+  while the app is running changes nothing on a screen already open. The list reads `GroupModel`
+  with `listen: false` **deliberately** — a listener would re-fetch an unpaged aggregate on every
+  15-minute AppData refresh for nothing — so the block appears on the next navigation into the
+  group, not merely on the next refresh. Desktop behaves the same way.
+- **ROWS WRAP; NOTHING IS A COLUMN -- and this is the one to not undo.** The first version was a
+  frozen 148pt label column beside a horizontally scrolling grid of fixed 116pt figure columns. At
+  390pt that leaves 210pt for figures and two columns want 232, so a group with a **single**
+  currency field already had its second column chopped mid-number, and a long status name
+  ("Needs Attention Receipts") wrapped to two lines and ate its own receipt count through the
+  label's ellipsis. Fixed widths cannot fit an unknown number of configured fields into a phone.
+  So a row is now a label line plus `name value` pairs in a `Wrap` -- the same flex-wrap the
+  desktop's `receipt-totals` uses, and for the same reason. Anything that does not fit moves to the
+  next line instead of disappearing.
+  - **The label line and the figures line are separate, deliberately.** One `Wrap` over the label
+    and every figure lets the first figure ride up whenever a label happens to be short, so "Total"
+    starts at a different x on every row and the block reads as ragged. Two lines cost a little
+    height and buy a left rail every figure starts from.
+  - **Except for a lone `Total`**, which rides the label line pushed right: that is the shape most
+    groups have, and giving it a line of its own wasted half the block's height on one number. It
+    is a `Wrap` with `spaceBetween` rather than an `Expanded`, so at a large text scale it drops to
+    the next line instead of becoming an overflow stripe.
+  - Pinned by *"clips nothing horizontally, however much is configured"*, which asserts every
+    figure's rect is inside the bar's. **Vertical** overflow is deliberately not asserted -- the
+    35% cap scrolls, with a visible thumb, and that is a real affordance; there is no equivalent
+    for a number past the right edge.
+- **A full-bleed band carrying an inset card.** The receipts route zeroes `ScreenWrapper`'s body
+  padding so rows sit edge to edge, and a block inset on all sides reads as a list row rather than
+  as pinned chrome -- so the *band* still reaches the screen edges, tinted `surfaceDim` (the page
+  canvas) with the divider on whichever edge faces the list, and the white rounded card sits 12pt
+  inside it. The card is a hand-built `Container`, matching `ReceiptFilterConditionCard`: the app's
+  `Card` is Material's elevated one, far heavier than this wants (see "Theme & color roles").
+  Height is capped at 35% of the viewport with an inner vertical scroll, or five broken-out
+  statuses on a short phone starve the `Expanded` list and overflow the `Column`.
+- **The status dot is RINGED, and that is not decoration.** `receiptStatusColor` returns a pale
+  *background* tint -- it is built to sit behind dark text, which is how `ListItemTrailingStatus`
+  and `ListItemColorBlock` use it. Painted as a bare dot on white, OPEN (`#FFFACD`) lands near
+  1.1:1 and is invisible; the 1px `outlineVariant` ring is what makes it read at every status while
+  staying quieter than a chip. The overall row takes an empty gutter of the same width, so every
+  label starts on the same x.
+- **`_money` wraps `formatCurrency`**, which parses the wire string with `double.parse` and
+  **throws**. From inside this bar that takes down the receipts screen, not just the block.
+- **A zero row is muted with a COLOUR** (`onSurfaceVariant`), not an `Opacity` widget: the mute has
+  to reach the row's label, its count and every figure, and keeping several `Opacity` layers in
+  step is a drift waiting to happen.
+- **The overall row arrives carrying `ReceiptStatus.empty`** -- the generated `status` is
+  non-nullable, so there is no "no status" to express -- and `receiptStatusLabel` renders that as
+  `""`. `receiptSummaryRowLabel` branches on it, or the row reads as a bare " Receipts".
+- **Anything that is not `TOP` renders at the bottom**, so a value added later degrades to the
+  server's own default rather than blanking the block. The generated enum agrees: its
+  `fallback: true` sits on `BOTTOM` (see "Regenerating API Client Models"), so an unknown wire value
+  is already `BOTTOM` by the time `isReceiptSummaryAtTop` sees it.
+- **On the All group the pick lives in `ReceiptListModel`**, session-scoped: mobile has no persisted
+  slice equivalent to the desktop's NGXS `receiptTable`. Written with `notify: false` and refreshed
+  directly, like the sort setters -- a configuration pick changes the breakdown's shape, never the
+  data. **But the write is still wrapped in `setState`**: silencing the model leaves nothing else to
+  repaint, and `ReceiptSummaryBar` reads `selectedConfigGroupId` off its widget, so without it the
+  tapped chip stays unhighlighted for the whole round trip and forever if the request fails. The two
+  are not in tension -- `notify: false` keeps the write off `_refreshForFilterChange` (so the *list*
+  is untouched), `setState` repaints this State alone. Desktop gets this for free: its NGXS dispatch
+  updates a signal. It is reset on a **group change by the list**, in the same branch that re-fetches the
+  summary — not from `clearFilter` (which early-returns on an already-empty filter) and not from
+  the filter-clear branch beside it (which is itself gated on there having been a filter at all).
+  Either would leave a user who never filtered carrying a pick out of the All group and back.
+- **E2E: `integration_test/receipt_summary_test.dart`.** The widget suite injects a mocked
+  `ReceiptApi` and a hand-seeded `GroupModel`, so it proves nothing about the wire; this covers the
+  encoded filter reaching the summary endpoint and narrowing every row, and `position` surviving
+  model -> command -> DB -> response -> render. `setGroupSummaryConfig` in
+  `integration_test/helpers/permission_fixtures.dart` restores **all four** summary keys explicitly
+  on teardown: they are pointers on the Go command, so replaying `_settingsToCommand` omits them and
+  an omitted key means *leave unchanged* -- a spec turning the summary on for a shared group would
+  otherwise leave it on for every later run. Do **not** add them to that helper's `?? false` loop;
+  `receiptSummaryPosition: false` fails the enum decode.
+
 ### Category / Tag / Users pickers — the tap target lives in `MultiSelectField`
 
 `CategorySelectField` and `TagSelectField` render no UI of their own: both are thin
@@ -1629,13 +1913,24 @@ Recording the **full app** (rather than a harness) against a live API adds three
 
 #### Route 2 — widget-test frame capture
 
-`tool/demo_capture/` holds the machinery and two demos — an animated GIF pair for the
-keyboard-inset fix, and a single before/after still for the floating-button clearance fix:
+`tool/demo_capture/` holds the machinery and four demos — an animated GIF pair for the
+keyboard-inset fix, a single before/after still for the floating-button clearance fix, the
+receipt-summary placement pair, and a reference still of the summary bar itself:
 
 ```bash
-cd mobile && ./tool/record_keyboard_demo.sh      # -> tool/*-keyboard.gif
-cd mobile && ./tool/record_clearance_shot.sh     # -> tool/receipt-form-clearance.png
+cd mobile && ./tool/record_keyboard_demo.sh          # -> tool/*-keyboard.gif
+cd mobile && ./tool/record_clearance_shot.sh         # -> tool/receipt-form-clearance.png
+cd mobile && ./tool/record_summary_position_demo.sh  # -> tool/receipt-summary-position.gif
+cd mobile && ./tool/record_summary_shot.sh           # -> tool/receipt-summary-bar.png
 ```
+
+**Judge a LOOK from the still, not from a frame of the GIF.** `writeSideBySideGif` quantises to an
+octree palette and bands badly on flat UI — the stripes through the status washes in the placement
+GIF are encoding artifacts, not pixels any widget drew — so spacing, weight and colour decisions
+made from it are made against noise. `record_summary_shot.sh` writes a PNG, in the two
+configurations of the summary bar that look least alike: the one most groups have (a couple of
+statuses, no currency fields) and the heavy one (every status broken out, two currency fields) that
+is where a row-layout regression shows up first.
 
 Route 1 **cannot** record that fix at all: there is no software keyboard on Linux desktop, so
 `viewInsets.bottom` is permanently 0 and the bug is unreproducible on that target. This route also
@@ -1645,7 +1940,8 @@ frames are captured inside a widget test and encoded to GIF in pure Dart.
 - **`capture.dart`** is the shared machinery — `loadDemoFonts`, `buildDemoSurface` (caption strip +
   phone-sized viewport), `grabFrame`, `stitchPanels` and the two writers. `fake_keyboard.dart` draws
   the keys and collapses to nothing at a zero inset, so a still that does not want a keyboard simply
-  leaves `viewInsets` alone. `keyboard_demo_test.dart` / `clearance_shot_test.dart` are the demos.
+  leaves `viewInsets` alone. `keyboard_demo_test.dart`, `clearance_shot_test.dart`,
+  `summary_position_demo_test.dart` and `summary_shot_test.dart` are the demos.
 - **A still does not always have a seam to flip.** The keyboard demo toggles
   `debugDisableKeyboardLift`, but there is no production flag for `submitButtonSpacing` and adding
   one for a screenshot is not worth it — so `record_clearance_shot.sh` captures one panel, strips the
@@ -1656,6 +1952,30 @@ frames are captured inside a widget test and encoded to GIF in pure Dart.
   its red ribbon across the top-right of every captured panel otherwise, and at panel scale it reads
   as a render-overflow stripe rather than a banner — which sends you hunting a layout bug that is not
   there.
+- **The summary demo needed NO production seam at all**, and that is a property of the feature
+  rather than luck: the position arrives as *data on the summary response*, so the two panels are
+  the identical real tree fed two responses differing in one field. Better than a debug flag —
+  nothing to leave switched on, no source patched and restored under a `trap` (verify `git diff
+  lib/` is empty after a run; it should never have been non-empty), and if placement regresses the
+  two panels simply become identical. It mocks only `OpenApiClient.client`; the theme, the
+  `ScreenWrapper` with the receipts route's zeroed body padding, the providers and
+  `GroupReceiptsList` are all the shipping tree.
+- **Two things in `capture.dart` are parameterised for it, and both bite silently.**
+  `writeSideBySideGif` hard-coded `demoInsetRamp()` for its per-frame durations, so any demo with a
+  different frame count either `RangeError`s or gets keyboard timings applied to something that is
+  not a keyboard — pass `durationsCentis`. And `numColors` was fixed at 128, which is right for flat
+  UI art and wrong for a screen with a **gradient**: at 128 the octree banding across
+  `ListItemTrailingStatus`'s status chips renders as hard black stripes that read as a rendering
+  bug. Raise the palette (192 here) rather than switching the dither on, which breaks LZW's runs
+  everywhere else and costs far more bytes.
+- **Drive a scroll with an explicit gesture and fixed pumps, never `drag` + `pumpAndSettle`.**
+  Ballistic physics give a frame count that is not reproducible run to run, and `pumpAndSettle` is
+  independently unsafe here: `PagedDataList`'s first-load spinner animates, and `TopAppBar`'s
+  progress bar is permanently mounted with a **ten-minute** settle timeout — that regression hangs
+  CI rather than failing it.
+- **Seed `UserModel` for any demo showing the receipts list.** `ReceiptListItem` resolves each row's
+  payer with a `firstWhere` that has no `orElse`, so an unseeded model throws "Bad state: No
+  element" once per row and the frames come out full of error widgets.
 - **It lives in `tool/`, not `test/`, and that is what keeps it out of CI.** `flutter test` with no
   arguments scans **only** `test/`, while an explicit path is used verbatim. CI runs a bare
   `flutter test`, so a demo under `test/` would re-encode and rewrite committed binaries on every
@@ -1669,6 +1989,34 @@ frames are captured inside a widget test and encoded to GIF in pure Dart.
   engine's futures, so a bare `await boundary.toImage()` **hangs until the test times out** rather
   than failing. `runAsync` also *swallows* errors and returns null, surfacing them via
   `takeException` — so null-check and `fail()`, or a real failure shows up as a confusing null.
+- **Route 2 can drive a whole API-backed screen, not just a bare form.**
+  `quick_date_demo_test.dart` records the real `GroupReceiptsList` -- real stepper, real sheet, real
+  picker, real theme and provider tree -- with only `getReceiptsForGroup` stubbed, by a fake that
+  **decodes the filter the client actually sent** and returns the seeded rows inside it. So the rows
+  narrowing is evidence rather than choreography: break the encoder and the demo visibly stops
+  filtering. That is also why route 1 was not an option for it -- driving the real control there
+  needs the Go API behind it, which the sandbox cannot bring up (ImageMagick 7 from source).
+- **A demo of a new feature is one panel, not a pair.** The other demos here record the same screen
+  twice across a `debugDisable*` seam because they document *fixes*. A new control has no seam and
+  nothing to compare against, so `writeGif` takes frames that each carry their own hold time (in
+  1/100 s) instead of reading durations off `demoInsetRamp()`.
+- **`numColors: 128` is for flat UI art; a real screen may need 256.** `ListItemTrailingStatus`
+  paints a `LinearGradient` in every receipt row, which a short palette bands into visible vertical
+  stripes with dithering off. 256 (the GIF maximum) clears it, and also cleans up the antialiased
+  white caption text that ghosts at 128 -- visible in the committed keyboard GIFs.
+  **Turning dithering on instead is not the fix**, and it is worth not rediscovering: Floyd-Steinberg
+  at 256 colors dithered the screen's large *white* areas into visible noise and took the file from
+  176KB to 445KB. The existing "no dither" guidance holds; raise the palette, not the dither.
+- **Call `loadDemoFontsOrFail(tester)`, never `loadDemoFonts` directly.** Two failure modes sit on
+  this one line and neither announces itself. A bare `await loadDemoFonts()` reads fonts off disk and
+  awaits `FontLoader.load` in fake-async, so it **hangs** until the 10-minute test timeout rather
+  than failing -- and the timeout names the test, not the call, so it reads as a mysterious stall.
+  Wrapping it in `tester.runAsync` fixes that but introduces the opposite problem: `runAsync` returns
+  null **both** when the callback throws and when it has nothing to return, and `loadDemoFonts`
+  returns `Future<void>` -- so a genuine font-load failure is swallowed and the demo cheerfully
+  records a whole clip in `--use-test-fonts`' stub font, where every glyph is a filled box. It
+  passes, and writes a GIF nobody can read. `loadDemoFontsOrFail` returns a sentinel from inside
+  `runAsync` and fails on anything else, the same shape `grabFrame` uses; all three demos call it.
 - **`flutter test` always passes `--use-test-fonts`,** whose stub font draws every glyph as a filled
   box. Load Raleway from `fonts/` on disk, register it as `Roboto` too (Material's default
   `Typography` asks for that, and most text takes the theme default), and load `MaterialIcons` or

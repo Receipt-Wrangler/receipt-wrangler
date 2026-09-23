@@ -861,6 +861,7 @@ export async function apiSetGroupSummaryConfig(
     enabled: boolean;
     statuses?: string[];
     currencyCustomFieldIds?: number[];
+    position?: 'TOP' | 'BOTTOM';
   },
 ): Promise<void> {
   const what = 'set receipt summary config';
@@ -871,6 +872,9 @@ export async function apiSetGroupSummaryConfig(
   }
   if (config.currencyCustomFieldIds !== undefined) {
     command['receiptSummaryCustomFieldIds'] = config.currencyCustomFieldIds;
+  }
+  if (config.position !== undefined) {
+    command['receiptSummaryPosition'] = config.position;
   }
 
   await putGroupReceiptSettings(api, groupId, command, what);
@@ -1089,6 +1093,50 @@ export async function apiQuickScan(
 }
 
 /**
+ * Creates an API key and immediately deletes it, which records exactly one
+ * `API_KEY_DELETED` system task attributed to the caller.
+ *
+ * This is how a system-task spec seeds a deterministic row: system tasks are
+ * only ever written as a side effect of real work, so there is no endpoint that
+ * creates one directly.
+ */
+export async function apiRecordApiKeyDeletedSystemTask(
+  api: APIRequestContext,
+  name: string,
+): Promise<void> {
+  const createRes = await api.post('/api/apiKey/', {
+    data: { name, description: 'e2e system task seed', scope: 'r' },
+  });
+  if (!createRes.ok()) {
+    throw new Error(`create api key failed: HTTP ${createRes.status()}`);
+  }
+
+  const listRes = await api.post('/api/apiKey/paged', {
+    data: {
+      page: 1,
+      pageSize: 100,
+      orderBy: 'created_at',
+      sortDirection: 'desc',
+      filter: { associatedApiKeys: 'MINE' },
+    },
+  });
+  if (!listRes.ok()) {
+    throw new Error(`list api keys failed: HTTP ${listRes.status()}`);
+  }
+
+  const keys = ((await listRes.json()).data ?? []) as { id: string; name: string }[];
+  const key = keys.find((k) => k.name === name);
+  if (!key) {
+    throw new Error(`api key ${name} not found after create`);
+  }
+
+  const deleteRes = await api.delete(`/api/apiKey/${key.id}`);
+  if (!deleteRes.ok()) {
+    throw new Error(`delete api key failed: HTTP ${deleteRes.status()}`);
+  }
+}
+
+/**
  * Polls the activity feed until a QUICK_SCAN row for [groupId] is FAILED and
  * still carries its upload, then returns it.
  */
@@ -1135,4 +1183,30 @@ export async function apiDeleteProcessingSettings(
 ): Promise<void> {
   await api.delete(`/api/receiptProcessingSettings/${settingsId}`);
   await api.delete(`/api/prompt/${promptId}`);
+}
+
+/**
+ * Reads a page of system tasks through the same endpoint the table uses, so a
+ * spec can assert the server actually narrowed rather than only that the UI
+ * rendered. [filter] is a `SystemTaskPagedRequestFilter`.
+ */
+export async function apiPagedSystemTasks(
+  api: APIRequestContext,
+  filter: Record<string, unknown> = {},
+): Promise<{ totalCount: number; data: Record<string, any>[] }> {
+  const res = await api.post('/api/systemTask/getPagedSystemTasks', {
+    data: {
+      page: 1,
+      pageSize: 100,
+      orderBy: 'started_at',
+      sortDirection: 'desc',
+      filter,
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(`paged system tasks failed: HTTP ${res.status()}`);
+  }
+
+  const body = await res.json();
+  return { totalCount: body.totalCount, data: body.data ?? [] };
 }

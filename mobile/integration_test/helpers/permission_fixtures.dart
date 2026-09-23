@@ -564,6 +564,18 @@ Future<List<Map<String, dynamic>>> _adminGroups(String jwt) async {
 /// not a bool, and the command treats an omitted key as "leave unchanged", which
 /// is exactly what every caller that isn't [setGroupDefaultCustomFields] wants.
 /// The `?? false` fallback would otherwise send `false` for it.
+///
+/// The same rule covers all four RECEIPT SUMMARY keys -- `receiptSummaryEnabled`,
+/// `receiptSummaryPosition`, `receiptSummaryCustomFieldIds` and
+/// `receiptSummaryStatuses`. Every one of them is a POINTER on the Go command, so
+/// omitting them leaves the stored value alone; `receiptSummaryEnabled` is a
+/// pointer specifically to stop this bug shape. **Do not add them to the loop**:
+/// `receiptSummaryPosition: false` fails the enum decode outright.
+///
+/// The consequence is that a teardown replaying this map does NOT restore them --
+/// nil means "leave unchanged". [setGroupSummaryConfig] therefore captures the
+/// originals and passes them back EXPLICITLY, the way
+/// [setGroupDefaultCustomFields] does for its ids.
 Map<String, dynamic> _settingsToCommand(
   Map<String, dynamic> s, {
   Map<String, dynamic> overrides = const {},
@@ -659,6 +671,67 @@ Future<void> setGroupDefaultCustomFields({
         j,
         _settingsToCommand(original,
             overrides: {'defaultCustomFieldIds': originalIds}));
+  });
+}
+
+/// Persists [groupId]'s receipt summary configuration, restoring the original on
+/// teardown.
+///
+/// Like the two fixtures above this goes through the real API rather than mutating
+/// `GroupModel`: the client decides whether to REQUEST the summary from the settings it
+/// learned via AppData at login, and the server decides everything it renders, so the
+/// two have to agree as they do in production.
+///
+/// The teardown restores all four keys explicitly. Replaying [_settingsToCommand] alone
+/// would omit them, and an omitted key means "leave unchanged" -- so a spec that turned
+/// the summary on for a shared group would leave it on for every later spec and every
+/// later run.
+Future<void> setGroupSummaryConfig({
+  required int groupId,
+  required String jwt,
+  required bool enabled,
+  String? position,
+  List<String>? statuses,
+  List<int>? customFieldIds,
+}) async {
+  final groups = await _adminGroups(jwt);
+  final original = ((groups.firstWhere((x) => x['id'] == groupId,
+              orElse: () => throw StateError('group $groupId not found'))[
+          'groupReceiptSettings']) as Map)
+      .cast<String, dynamic>();
+
+  // `?? const []` / `?? 'BOTTOM'` are belt and braces: the backend always serializes
+  // arrays rather than null and normalizes an empty position away, so a teardown can
+  // never throw on a group that has nothing configured.
+  final originalEnabled = original['receiptSummaryEnabled'] == true;
+  final originalPosition =
+      (original['receiptSummaryPosition'] as String?) ?? 'BOTTOM';
+  final originalStatuses =
+      ((original['receiptSummaryStatuses'] as List?) ?? const []).cast<String>();
+  final originalFieldIds =
+      ((original['receiptSummaryCustomFieldIds'] as List?) ?? const []).cast<int>();
+
+  await _putGroupReceiptSettings(
+      groupId,
+      jwt,
+      _settingsToCommand(original, overrides: {
+        'receiptSummaryEnabled': enabled,
+        if (position != null) 'receiptSummaryPosition': position,
+        if (statuses != null) 'receiptSummaryStatuses': statuses,
+        if (customFieldIds != null) 'receiptSummaryCustomFieldIds': customFieldIds,
+      }));
+
+  addTearDown(() async {
+    final j = await apiLogin();
+    await _putGroupReceiptSettings(
+        groupId,
+        j,
+        _settingsToCommand(original, overrides: {
+          'receiptSummaryEnabled': originalEnabled,
+          'receiptSummaryPosition': originalPosition,
+          'receiptSummaryStatuses': originalStatuses,
+          'receiptSummaryCustomFieldIds': originalFieldIds,
+        }));
   });
 }
 
