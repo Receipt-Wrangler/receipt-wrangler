@@ -1,4 +1,9 @@
-import { changedTopLevelKeys, parseReceiptUpdateDescription, toJsonLines } from "./receipt-update-description";
+import {
+  changedTopLevelKeys,
+  parseReceiptUpdateDescription,
+  receiptUpdateBeforeState,
+  toJsonLines,
+} from "./receipt-update-description";
 
 // What UpdateReceipt stores: each side is itself a JSON string.
 const storedDescription = (before: object, after: object) =>
@@ -9,13 +14,32 @@ describe("parseReceiptUpdateDescription", () => {
     const before = { id: 1, name: 'Costco "Wholesale"', comments: [{ comment: "a {quoted} note" }] };
     const after = { id: 1, name: "Costco", comments: [] };
 
-    expect(parseReceiptUpdateDescription(storedDescription(before, after))).toEqual({ before, after });
+    expect(parseReceiptUpdateDescription(storedDescription(before, after))).toEqual({ before, after, version: 1 });
   });
 
   it("accepts sides that are already objects", () => {
     const description = JSON.stringify({ before: { id: 1 }, after: { id: 1, name: "x" } });
 
-    expect(parseReceiptUpdateDescription(description)).toEqual({ before: { id: 1 }, after: { id: 1, name: "x" } });
+    expect(parseReceiptUpdateDescription(description))
+      .toEqual({ before: { id: 1 }, after: { id: 1, name: "x" }, version: 1 });
+  });
+
+  // Rows written before the marker existed have no version key.
+  it("reads the version, and treats a description without one as version 1", () => {
+    const pair = { before: "{}", after: "{}" };
+
+    expect(parseReceiptUpdateDescription(JSON.stringify({ ...pair, version: 2 }))?.version).toBe(2);
+    expect(parseReceiptUpdateDescription(JSON.stringify(pair))?.version).toBe(1);
+    expect(parseReceiptUpdateDescription(JSON.stringify({ ...pair, version: "2" }))?.version).toBe(1);
+  });
+
+  it("reads the earlier copy the API rebuilt an older row's before from", () => {
+    const beforeSource = { type: "RECEIPT_UPLOADED", systemTaskId: 4, recordedAt: "2026-09-20T10:00:00Z" };
+
+    expect(parseReceiptUpdateDescription(JSON.stringify({ before: "{}", after: "{}", beforeSource }))?.beforeSource)
+      .toEqual(beforeSource);
+    expect(parseReceiptUpdateDescription(JSON.stringify({ before: "{}", after: "{}", beforeSource: { type: 1 } })))
+      .not.toHaveProperty("beforeSource");
   });
 
   it("returns undefined for a failed update's plain error text", () => {
@@ -100,6 +124,23 @@ describe("changedTopLevelKeys", () => {
 
   it("includes a key present on only one side", () => {
     expect(changedTopLevelKeys({ id: 1 }, { id: 1, resolvedDate: "2026-09-01" })).toEqual(["resolvedDate"]);
+  });
+});
+
+describe("receiptUpdateBeforeState", () => {
+  const snapshots = { before: {}, after: {} };
+  const beforeSource = { type: "RECEIPT_UPDATED" as const, systemTaskId: 4, recordedAt: "2026-09-20T10:00:00Z" };
+
+  it("trusts a version 2 row's own before", () => {
+    expect(receiptUpdateBeforeState({ ...snapshots, version: 2 })).toBe("complete");
+  });
+
+  it("marks a version 1 row the API rebuilt from an earlier copy", () => {
+    expect(receiptUpdateBeforeState({ ...snapshots, version: 1, beforeSource })).toBe("rebuilt");
+  });
+
+  it("marks a version 1 row with no earlier copy as incomplete", () => {
+    expect(receiptUpdateBeforeState({ ...snapshots, version: 1 })).toBe("incomplete");
   });
 });
 

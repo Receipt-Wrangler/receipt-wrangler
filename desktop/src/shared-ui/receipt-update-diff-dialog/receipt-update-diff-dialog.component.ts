@@ -1,7 +1,14 @@
 import { Component, computed, Inject, signal } from "@angular/core";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { buildSplitDiff, collapseUnchanged, DiffLine, InlineSegments, inlineChange, SplitDiffRow } from "../../utils/line-diff";
-import { ReceiptUpdateSnapshots, toJsonLines } from "../../utils/receipt-update-description";
+import { SystemTaskType } from "../../open-api";
+import {
+  ReceiptUpdateBeforeSource,
+  ReceiptUpdateBeforeState,
+  receiptUpdateBeforeState,
+  ReceiptUpdateSnapshots,
+  toJsonLines,
+} from "../../utils/receipt-update-description";
 import { FilterTab } from "../filter-bar/filter-tab.interface";
 
 export interface ReceiptUpdateDiffDialogData {
@@ -48,6 +55,14 @@ export class ReceiptUpdateDiffDialogComponent {
 
   public readonly tabs: FilterTab[];
 
+  /** Whether "before" is the row's own complete copy, a rebuilt one, or incomplete. */
+  public readonly beforeState: ReceiptUpdateBeforeState;
+
+  /** Set for a rebuilt row: the earlier copy "before" now shows. */
+  public readonly beforeSource?: ReceiptUpdateBeforeSource;
+
+  protected readonly SystemTaskType = SystemTaskType;
+
   public readonly view = signal<ReceiptDiffView>("all");
 
   private readonly rows: ReceiptDiffRow[];
@@ -61,6 +76,8 @@ export class ReceiptUpdateDiffDialogComponent {
     @Inject(MAT_DIALOG_DATA) data: ReceiptUpdateDiffDialogData,
   ) {
     const { before, after } = data.snapshots;
+    this.beforeState = receiptUpdateBeforeState(data.snapshots);
+    this.beforeSource = data.snapshots.beforeSource;
     const splitRows = buildSplitDiff(toJsonLines(before), toJsonLines(after));
 
     this.rows = splitRows.map(toReceiptDiffRow);

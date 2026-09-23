@@ -23,6 +23,13 @@ $divider: map.get(variables.$accent-palette, 200);
   overflow: auto;
 }
 
+// Sits above the table inside the scroll box, so it scrolls away while reading
+// rather than eating into the diff's height.
+.receipt-diff__notice {
+  margin-bottom: 0.75rem;
+  font-size: 13px;
+}
+
 .receipt-diff {
   width: 100%;
   table-layout: fixed;

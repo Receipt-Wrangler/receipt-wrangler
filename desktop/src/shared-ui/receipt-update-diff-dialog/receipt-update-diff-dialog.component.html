@@ -4,6 +4,34 @@
   [actionsTemplate]="actions"
 >
   <div class="receipt-diff-scroll">
+    @if (beforeState !== "complete") {
+      <div
+        class="alert receipt-diff__notice"
+        role="note"
+        data-testid="receipt-diff-version-notice"
+        [attr.data-before-state]="beforeState"
+        [class.alert-info]="beforeState === 'rebuilt'"
+        [class.alert-warning]="beforeState === 'incomplete'"
+      >
+        @if (beforeSource) {
+          This change was recorded by an older version, whose own copy of the
+          receipt before the change is incomplete. <strong>Before</strong> shows
+          the receipt as saved
+          {{
+            beforeSource.type === SystemTaskType.ReceiptUploaded
+              ? "when it was created"
+              : "by the previous update"
+          }}
+          ({{ beforeSource.recordedAt | date: "medium" }}) instead. Changes made
+          without editing the receipt, such as bulk status updates, can also
+          show here.
+        } @else {
+          This change was recorded by an older version, and no earlier complete
+          copy of this receipt exists. Item categories and tags, shares and
+          custom field names can show as changed when they weren't.
+        }
+      </div>
+    }
     <table class="receipt-diff">
       <colgroup>
         <col class="receipt-diff__number-col" />

@@ -71,6 +71,18 @@ func (repository ReceiptRepository) BeforeUpdateReceipt(currentReceipt models.Re
 	return nil
 }
 
+// ReceiptUpdateDescriptionVersion marks the format of a RECEIPT_UPDATED
+// system task's description, stored under its "version" key. The desktop reads
+// it to decide how far to trust the "before" snapshot:
+//
+//   - 1 (no "version" key): "before" was loaded one level deep, so it lacks
+//     item categories/tags/linked items and custom field definitions, and it
+//     lists linked items as top-level items.
+//   - 2: "before" is loaded with GetFullyLoadedReceiptById, like "after".
+//
+// Bump it whenever the snapshot format changes.
+const ReceiptUpdateDescriptionVersion = 2
+
 func createFailedUpdateSystemTask(command commands.UpsertSystemTaskCommand, err error) {
 	endedAt := time.Now()
 	command.EndedAt = &endedAt
@@ -228,6 +240,7 @@ func (repository ReceiptRepository) UpdateReceipt(id string, command commands.Up
 	}
 
 	systemTaskResultDescription["after"] = after
+	systemTaskResultDescription["version"] = ReceiptUpdateDescriptionVersion
 	endedAt = time.Now()
 	systemTask.EndedAt = &endedAt
 

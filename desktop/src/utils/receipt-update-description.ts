@@ -1,9 +1,38 @@
+import { SystemTaskType } from "../open-api";
+
 export type ReceiptSnapshot = Record<string, unknown>;
+
+/**
+ * The first description version whose own "before" is complete. The API writes
+ * it as `version`; a description without one is version 1, whose "before" was
+ * loaded one level deep (see api/CLAUDE.md -> "Receipt update snapshots").
+ */
+export const COMPLETE_RECEIPT_UPDATE_VERSION = 2;
+
+/**
+ * Names the earlier complete copy the API put in place of a version 1 row's
+ * own "before": the previous update's "after" (RECEIPT_UPDATED), or the copy
+ * recorded when the receipt was created (RECEIPT_UPLOADED).
+ */
+export interface ReceiptUpdateBeforeSource {
+  type: SystemTaskType;
+  systemTaskId: number;
+  recordedAt: string;
+}
 
 export interface ReceiptUpdateSnapshots {
   before: ReceiptSnapshot;
   after: ReceiptSnapshot;
+  version: number;
+  beforeSource?: ReceiptUpdateBeforeSource;
 }
+
+/**
+ * How far the "before" side can be trusted: `complete` for a current row,
+ * `rebuilt` for an older row the API compared against an earlier complete
+ * copy, `incomplete` for an older row with no such copy.
+ */
+export type ReceiptUpdateBeforeState = "complete" | "rebuilt" | "incomplete";
 
 /**
  * Record-keeping fields (the API's BaseModel) the changed-keys summary ignores
@@ -23,6 +52,10 @@ const SUMMARY_IGNORED_KEYS = new Set(["id", "createdAt", "updatedAt", "createdBy
  * pipe cannot display it. Each side is parsed once more here (an already-parsed
  * object is accepted too).
  *
+ * `version` defaults to 1 when absent. For a version 1 row the API may already
+ * have replaced "before" with an earlier complete copy, which `beforeSource`
+ * then names; see {@link receiptUpdateBeforeState}.
+ *
  * Never throws: a failed update stores its plain error text instead, and that
  * (or anything else that is not a before/after pair) returns `undefined` so the
  * caller can fall back to showing the text as-is.
@@ -38,8 +71,14 @@ export function parseReceiptUpdateDescription(
     const outer = JSON.parse(description);
     const before = parseSnapshot(outer?.before);
     const after = parseSnapshot(outer?.after);
+    if (!before || !after) {
+      return undefined;
+    }
 
-    return before && after ? { before, after } : undefined;
+    const version = typeof outer.version === "number" ? outer.version : 1;
+    const beforeSource = parseBeforeSource(outer.beforeSource);
+
+    return beforeSource ? { before, after, version, beforeSource } : { before, after, version };
   } catch {
     return undefined;
   }
@@ -62,6 +101,14 @@ export function changedTopLevelKeys(before: ReceiptSnapshot, after: ReceiptSnaps
   );
 }
 
+export function receiptUpdateBeforeState(snapshots: ReceiptUpdateSnapshots): ReceiptUpdateBeforeState {
+  if (snapshots.version >= COMPLETE_RECEIPT_UPDATE_VERSION) {
+    return "complete";
+  }
+
+  return snapshots.beforeSource ? "rebuilt" : "incomplete";
+}
+
 /** The snapshot as the lines a diff compares: 2-space pretty-printed JSON. */
 export function toJsonLines(snapshot: ReceiptSnapshot): string[] {
   return JSON.stringify(snapshot, null, 2).split("\n");
@@ -72,5 +119,16 @@ function parseSnapshot(value: unknown): ReceiptSnapshot | undefined {
 
   return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
     ? (parsed as ReceiptSnapshot)
+    : undefined;
+}
+
+function parseBeforeSource(value: unknown): ReceiptUpdateBeforeSource | undefined {
+  const source = value as Partial<ReceiptUpdateBeforeSource> | null | undefined;
+
+  return source &&
+    typeof source.type === "string" &&
+    typeof source.systemTaskId === "number" &&
+    typeof source.recordedAt === "string"
+    ? { type: source.type, systemTaskId: source.systemTaskId, recordedAt: source.recordedAt }
     : undefined;
 }

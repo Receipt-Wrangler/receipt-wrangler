@@ -1744,19 +1744,30 @@ func TestUpdateReceiptSystemTaskSnapshotsAreLoadedToTheSameDepth(t *testing.T) {
 		return
 	}
 
-	var description map[string]string
+	var description struct {
+		Before  string `json:"before"`
+		After   string `json:"after"`
+		Version int    `json:"version"`
+	}
 	err = json.Unmarshal([]byte(systemTask.ResultDescription), &description)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
 
+	// The desktop trusts "before" only from version 2 on; an unversioned row is
+	// read as version 1, whose "before" is incomplete. Pinned to the literal so
+	// a bump has to be a deliberate change here and on the desktop.
+	if description.Version != 2 {
+		utils.PrintTestError(t, description.Version, 2)
+	}
+
 	var before, after models.Receipt
-	if err = json.Unmarshal([]byte(description["before"]), &before); err != nil {
+	if err = json.Unmarshal([]byte(description.Before), &before); err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}
-	if err = json.Unmarshal([]byte(description["after"]), &after); err != nil {
+	if err = json.Unmarshal([]byte(description.After), &after); err != nil {
 		utils.PrintTestError(t, err, nil)
 		return
 	}

@@ -77,11 +77,14 @@ test.describe('Receipt update diff', () => {
       const tasks = await apiPagedSystemTasks(api, {
         type: { operation: 'CONTAINS', value: ['RECEIPT_UPDATED'] },
       });
-      const ownTaskIds = tasks.data
-        .filter((row) => row.associatedEntityId === receiptId)
-        .map((row) => row.id as number);
-      expect(ownTaskIds).toHaveLength(2);
-      taskId = Math.max(...ownTaskIds);
+      const ownTasks = tasks.data.filter((row) => row.associatedEntityId === receiptId);
+      expect(ownTasks).toHaveLength(2);
+      const task = ownTasks.reduce((latest, row) => (row.id > latest.id ? row : latest));
+      taskId = task.id;
+
+      // The current API marks what it writes, so the desktop trusts its own
+      // "before" rather than rebuilding it.
+      expect(JSON.parse(task.resultDescription).version).toBe(2);
     });
   });
 
@@ -125,6 +128,9 @@ test.describe('Receipt update diff', () => {
     await expect(nameRow.locator('[data-side="left"]')).toHaveText(`  "name": "${oldName}",`);
     await expect(nameRow.locator('[data-side="right"]')).toHaveText(`  "name": "${newName}",`);
     await expect(changed.filter({ hasText: '"amount"' })).toHaveCount(1);
+
+    // A current row needs no explanation of where "before" came from.
+    await expect(dialog.getByTestId('receipt-diff-version-notice')).toHaveCount(0);
 
     // Every line shows by default.
     await expect(dialog.locator('[data-kind="equal"]').first()).toBeVisible();

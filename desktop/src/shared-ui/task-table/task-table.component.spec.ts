@@ -142,7 +142,7 @@ describe("TaskTableComponent", () => {
       loadRows([task(1, SystemTaskType.ReceiptUpdated, stored)]);
 
       const row = component.receiptUpdates().get(1);
-      expect(row?.snapshots).toEqual({ before, after });
+      expect(row?.snapshots).toEqual({ before, after, version: 1 });
       expect(row?.changedKeys).toEqual(["name", "amount"]);
     });
 
@@ -159,11 +159,11 @@ describe("TaskTableComponent", () => {
       const dialog = TestBed.inject(MatDialog);
       const open = jest.spyOn(dialog, "open").mockReturnValue(undefined as any);
 
-      component.openReceiptUpdateDialog({ before, after });
+      component.openReceiptUpdateDialog({ before, after, version: 2 });
 
       expect(open).toHaveBeenCalledWith(
         ReceiptUpdateDiffDialogComponent,
-        expect.objectContaining({ data: { snapshots: { before, after } }, width: "90vw" }),
+        expect.objectContaining({ data: { snapshots: { before, after, version: 2 } }, width: "90vw" }),
       );
     });
   });

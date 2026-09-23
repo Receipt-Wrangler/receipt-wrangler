@@ -1825,14 +1825,27 @@ pretty-printed JSON, before on the left and after on the right, like a split-vie
   than replaced by a marker the same size.
 - **The code cell's content is written on one template line.** The column is `white-space: pre-wrap`,
   so template whitespace inside the `<td>` would render as indentation.
-- **Snapshots are loaded to the same depth only since this change** (see `api/CLAUDE.md` → "Receipt
-  update snapshots"). Rows written earlier have a shallow `before`, so their item categories and
-  tags, linked items and custom field definitions show as changed even when they weren't.
+- **Older rows are versioned, and the dialog says how far to trust "before".** The API writes
+  `version: 2`. A row without the key is version 1, whose own "before" is incomplete (see
+  `api/CLAUDE.md` → "Receipt update snapshots"). The listing rebuilds such a row from an earlier
+  complete copy when one exists, and names it in `beforeSource`. `receiptUpdateBeforeState` turns
+  that into one of three states, and the dialog renders a notice for the last two
+  (`data-testid="receipt-diff-version-notice"`, `data-before-state`):
+  - `complete`: a version 2 row; no notice.
+  - `rebuilt`: an `alert-info` naming the copy, "as saved when it was created" or "by the previous
+    update", and its date. It also warns that bulk status changes can fold in.
+  - `incomplete`: an `alert-warning` that item categories and tags, shares and custom field names
+    can show as changed when they weren't.
+  The notice sits **inside** the scroll box, above the table, so it scrolls away rather than
+  shrinking the diff; the sticky header still pins to the box's top. Nothing else on the desktop
+  branches on the version, because the summary and diff simply read the rebuilt "before".
 
 **E2E:** `e2e/receipt-update-diff.spec.ts` updates a receipt through the real API and asserts the
 row summary, the old/new name on the correct sides, and the "Changes only" collapse. The receipt
 keeps an unchanged item across the update under test, so the summary assertion also proves the
-server-side item recreation is not reported as an edit (it fails if only `updatedAt` is ignored). It narrows the
+server-side item recreation is not reported as an edit (it fails if only `updatedAt` is ignored).
+It also asserts the stored row carries `version: 2` and that the dialog shows no notice. The current
+API cannot write a version 1 row, so that path is covered by the Go service tests and the Jest specs. It narrows the
 paged response to its own task with `page.route` + `route.fetch()`, so the row is still the real
 server's output while other specs' tasks stay out of the way.
 

@@ -42,6 +42,13 @@ func GetSystemTasks(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
+			// Older "Updated Receipt" rows stored an incomplete "before"; the
+			// response compares them against an earlier complete copy instead.
+			err = services.NewSystemTaskService(nil).UpcastReceiptUpdateDescriptions(systemTasks)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
 			pagedData := structs.PagedData{}
 			data := make([]any, 0)
 

@@ -61,7 +61,7 @@ describe("ReceiptUpdateDiffDialogComponent", () => {
   const rowsOfKind = (kind: string) => renderedRows().filter((row) => row.dataset["kind"] === kind);
 
   beforeEach(async () => {
-    await create({ before, after });
+    await create({ before, after, version: 2 });
   });
 
   it("shows the old value on the left and the new value on the right of a changed line", () => {
@@ -120,6 +120,53 @@ describe("ReceiptUpdateDiffDialogComponent", () => {
   it("copies the pair as readable JSON rather than the double-encoded description", () => {
     expect(JSON.parse(component.copyText)).toEqual({ before, after });
     expect(component.copyText).not.toContain('\\"');
+  });
+
+  describe("version notice", () => {
+    const notice = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector("[data-testid='receipt-diff-version-notice']");
+
+    const recreate = async (snapshots: ReceiptUpdateSnapshots) => {
+      TestBed.resetTestingModule();
+      await create(snapshots);
+    };
+
+    it("shows none for a version 2 row", () => {
+      expect(notice()).toBeNull();
+    });
+
+    it("says which earlier copy an older row is compared against", async () => {
+      await recreate({
+        before,
+        after,
+        version: 1,
+        beforeSource: { type: "RECEIPT_UPLOADED", systemTaskId: 4, recordedAt: "2026-09-20T10:00:00Z" },
+      });
+
+      expect(notice()?.dataset["beforeState"]).toBe("rebuilt");
+      expect(notice()?.classList).toContain("alert-info");
+      expect(notice()?.textContent).toContain("as saved when it was created");
+      expect(notice()?.textContent).toContain("2026");
+    });
+
+    it("names the previous update when that is the earlier copy", async () => {
+      await recreate({
+        before,
+        after,
+        version: 1,
+        beforeSource: { type: "RECEIPT_UPDATED", systemTaskId: 4, recordedAt: "2026-09-20T10:00:00Z" },
+      });
+
+      expect(notice()?.textContent).toContain("as saved by the previous update");
+    });
+
+    it("warns that an older row with no earlier copy may show changes that did not happen", async () => {
+      await recreate({ before, after, version: 1 });
+
+      expect(notice()?.dataset["beforeState"]).toBe("incomplete");
+      expect(notice()?.classList).toContain("alert-warning");
+      expect(notice()?.textContent).toContain("no earlier complete copy");
+    });
   });
 
   it("closes", () => {
