@@ -2188,7 +2188,9 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
       - the report-generator `-1` paid-by matched nothing.
     - The subtitle still formats the period client-side (display only) and names the field.
     - The subtitle's count is the preview's `receiptCount`, falling back to the response's
-      `totalCount`, not the list length: the list is capped at 200.
+      `totalCount`, not the list length: the server caps the list at 100.
+    - When the list is shorter than its `totalCount`, a `report-receipt-truncated` notice reads
+      "Showing the newest N of M receipts", so a partial list is never passed off as the whole report.
   - **E2E:** `e2e/report-period-date-field.spec.ts` (serial, admin storageState, own group).
     - Seeds two receipts dated 2024-01-01, one RESOLVED. The server stamps both "resolved" and "added"
       with now.

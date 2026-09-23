@@ -2135,10 +2135,18 @@ picker.
     - `Rows` marks hidden categories/tags `(Restricted)`;
     - `Receipts` strips them, masks for member visibility, and preloads
       `CUSTOM_FIELD_ASSOCIATIONS`, like the receipts list.
-  - **Gating, ordering and the cap.** It is gated exactly like `PreviewReport`: `app.reports.read`/
-    `readAll` plus `group.reports.read` in every group. It is **not** `group.receipts.read`, so a
-    report reader sees the receipts their report already covers. It is merged newest-first across
-    groups and capped at `reportReceiptsCap` (200), with `totalCount` the true total.
+  - **Gating.** It is gated exactly like `PreviewReport`: `app.reports.read`/`readAll` plus
+    `group.reports.read` in every group. It is **not** `group.receipts.read`, so a report reader sees
+    the receipts their report already covers.
+  - **Ordering and the cap.** The list is merged newest-first across groups and capped at
+    `reportReceiptsCap`.
+    - **The cap is 100** because it is the repository's page-size ceiling: `BaseRepository.Paginate`
+      clamps any larger page.
+    - **Each group fetches only its newest 100** as one page, which always contains the newest 100
+      overall.
+    - **`totalCount` is the sum of the groups' repository counts.** Those are taken after the grant
+      intersection and the paid-by WHERE, so it is the true total, not the loaded length. The desktop
+      shows a "Showing the newest N of M" notice when the two differ.
 - **Tests:**
   - `commands/report_request_command_test.go` and `paged_request_command_test.go`: validation,
     marshalling, and the sync guards above.
@@ -2149,7 +2157,9 @@ picker.
       - a server in America/Los_Angeles at the May 31/June 1 boundary;
       - the `-1` sentinel;
       - custom-field definitions;
-      - merge order and the cap.
+      - merge order;
+      - the cap across two groups, which keeps the newest overall and the full total;
+      - a limited fetch whose count still excludes hidden payers.
   - `handlers/report_period_date_field_test.go`:
     - preview and template CRUD;
     - the unvalidated render/generate-from-template paths, with a May case proving the fallback lands

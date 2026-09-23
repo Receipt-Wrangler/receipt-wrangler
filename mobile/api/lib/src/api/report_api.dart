@@ -466,7 +466,7 @@ class ReportApi {
   }
 
   /// List the receipts a report covers
-  /// Lists the receipts the report configuration covers, newest first, for the builder&#39;s drill-in. The period and filter resolve exactly as they do for the report, so the list agrees with the preview&#39;s receipt count. Capped at 200 receipts; totalCount is every covered receipt. Requires the same permissions as the preview.
+  /// Lists the receipts the report configuration covers, newest first, for the builder&#39;s drill-in. The period and filter resolve exactly as they do for the report, so the list agrees with the preview&#39;s receipt count. Capped at 100 receipts; totalCount is every covered receipt. Requires the same permissions as the preview.
   ///
   /// Parameters:
   /// * [reportRequestCommand] - The report builder configuration

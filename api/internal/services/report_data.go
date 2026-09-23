@@ -65,7 +65,7 @@ func (service ReportDataService) Rows(userId uint, groupId string, filter comman
 
 	// The extra preloads are what receiptsource reads beyond the always-loaded
 	// Categories/Tags.
-	receipts, err := service.fetchReceipts(userId, groupId, filter, []string{"PaidByUser", "Group", "CustomFields"})
+	receipts, _, err := service.fetchReceipts(userId, groupId, filter, []string{"PaidByUser", "Group", "CustomFields"}, -1)
 	if err != nil {
 		return reporting.FieldCatalog{}, nil, err
 	}
@@ -80,51 +80,64 @@ func (service ReportDataService) Rows(userId uint, groupId string, filter comman
 }
 
 // Receipts fetches the same receipts Rows turns into report rows, for a caller
-// that lists them rather than reporting on them (the Report Builder's drill-in).
-// Sharing fetchReceipts is what keeps the list and the report's count in step.
-// Where the two differ is presentation, and there it follows the receipts list:
-// each custom field value carries its definition, categories/tags the caller may
-// not see are stripped rather than marked (Restricted), and user references are
-// masked for member visibility.
-func (service ReportDataService) Receipts(userId uint, groupId string, filter commands.ReceiptPagedRequestFilter) ([]models.Receipt, error) {
+// that lists them rather than reporting on them (the Report Builder's drill-in):
+// at most limit of them, newest first, plus the count of every receipt that
+// matched. Sharing fetchReceipts is what keeps the list and the report's count in
+// step. Where the two differ is presentation, and there it follows the receipts
+// list: each custom field value carries its definition, categories/tags the caller
+// may not see are stripped rather than marked (Restricted), and user references
+// are masked for member visibility.
+func (service ReportDataService) Receipts(
+	userId uint,
+	groupId string,
+	filter commands.ReceiptPagedRequestFilter,
+	limit int,
+) ([]models.Receipt, int64, error) {
 	permissionService := NewPermissionService(service.TX)
 
-	receipts, err := service.fetchReceipts(userId, groupId, filter, constants.CUSTOM_FIELD_ASSOCIATIONS)
+	receipts, count, err := service.fetchReceipts(userId, groupId, filter, constants.CUSTOM_FIELD_ASSOCIATIONS, limit)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if err := permissionService.FilterReceiptCategoriesTags(userId, receipts); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if err := permissionService.MaskReceiptsForMemberVisibility(userId, receipts); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return receipts, nil
+	return receipts, count, nil
 }
 
-// fetchReceipts loads every receipt in a group matching the filter, newest first,
-// with the two controls that decide which receipts a caller may see at all: the
-// filter is narrowed to the caller's category/tag grants, so a restricted caller
-// cannot probe for hidden ones through it, and paid-by visibility is enforced in
-// the query, so a receipt the caller may not see is never fetched.
+// fetchReceipts loads a group's receipts matching the filter, newest first, with
+// the two controls that decide which receipts a caller may see at all: the filter
+// is narrowed to the caller's category/tag grants, so a restricted caller cannot
+// probe for hidden ones through it, and paid-by visibility is enforced in the
+// query, so a receipt the caller may not see is never fetched. A limit above zero
+// loads only that many; the returned count is every receipt the query matched,
+// taken after both controls, so it holds either way. A limit of -1 loads them all.
 func (service ReportDataService) fetchReceipts(
 	userId uint,
 	groupId string,
 	filter commands.ReceiptPagedRequestFilter,
 	associations []string,
-) ([]models.Receipt, error) {
+	limit int,
+) ([]models.Receipt, int64, error) {
 	receiptRepository := repositories.NewReceiptRepository(service.TX)
 	permissionService := NewPermissionService(service.TX)
 
 	uintGroupId, err := utils.StringToUint(groupId)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
+	page := -1
+	if limit > 0 {
+		page = 1
+	}
 	pagedRequest := commands.ReceiptPagedRequestCommand{
 		PagedRequestCommand: commands.PagedRequestCommand{
-			Page:          -1,
-			PageSize:      -1,
+			Page:          page,
+			PageSize:      limit,
 			OrderBy:       "date",
 			SortDirection: commands.DESCENDING,
 		},
@@ -132,10 +145,10 @@ func (service ReportDataService) fetchReceipts(
 	}
 
 	if err := permissionService.IntersectReceiptFilterWithGrants(userId, uintGroupId, &pagedRequest.Filter); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	receipts, _, err := receiptRepository.GetPagedReceiptsByGroupId(
+	return receiptRepository.GetPagedReceiptsByGroupId(
 		userId,
 		groupId,
 		pagedRequest,
@@ -143,5 +156,4 @@ func (service ReportDataService) fetchReceipts(
 		permissionService.PaidByListResolver(userId),
 		nil,
 	)
-	return receipts, err
 }

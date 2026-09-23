@@ -59,7 +59,9 @@ type ReportPreview struct {
 
 // reportReceiptsCap bounds how many receipts the report drill-in lists. It is a
 // sanity check, not the report: TotalCount still reports every covered receipt.
-const reportReceiptsCap = 200
+// It is the repository's page-size ceiling (BaseRepository.Paginate clamps any
+// larger page to 100), since each group's newest receipts are fetched as one page.
+const reportReceiptsCap = 100
 
 // reportPreviewRowCap bounds how many receipt rows a preview feeds to the engine.
 // A preview is a sample rendered on every builder edit (debounced), so beyond
@@ -324,28 +326,32 @@ func (service ReportService) receipts(
 	filter, _ := prepareReportFilter(userId, command, now)
 	dataService := NewReportDataService(service.TX)
 
+	// Each group loads only its newest reportReceiptsCap receipts, which is enough:
+	// the newest reportReceiptsCap overall are always among them. The total is the
+	// sum of the groups' full counts, not of what was loaded.
 	var receipts []models.Receipt
+	var total int64
 	for _, groupId := range command.GroupIds {
-		groupReceipts, err := dataService.Receipts(userId, groupId, filter)
+		groupReceipts, groupCount, err := dataService.Receipts(userId, groupId, filter, reportReceiptsCap)
 		if err != nil {
 			return structs.PagedData{}, err
 		}
 		receipts = append(receipts, groupReceipts...)
+		total += groupCount
 	}
 	// Each group arrives newest first; keep that order across the groups.
 	slices.SortStableFunc(receipts, func(a, b models.Receipt) int {
 		return b.Date.Compare(a.Date)
 	})
 
-	total := len(receipts)
-	if total > reportReceiptsCap {
+	if len(receipts) > reportReceiptsCap {
 		receipts = receipts[:reportReceiptsCap]
 	}
 	data := make([]any, len(receipts))
 	for index := range receipts {
 		data[index] = receipts[index]
 	}
-	return structs.PagedData{Data: data, TotalCount: int64(total)}, nil
+	return structs.PagedData{Data: data, TotalCount: total}, nil
 }
 
 // loadRows gathers the engine rows across every covered group under a single

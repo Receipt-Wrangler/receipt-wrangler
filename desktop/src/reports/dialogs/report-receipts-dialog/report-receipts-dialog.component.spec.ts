@@ -1,6 +1,8 @@
+import { CurrencyPipe } from "@angular/common";
 import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
+import { Store } from "@ngxs/store";
 import { Observable, of, throwError } from "rxjs";
 import {
   PagedData,
@@ -55,6 +57,9 @@ function configure(
       provideZonelessChangeDetection(),
       { provide: ReportService, useValue: reportService },
       { provide: MatDialogRef, useValue: { close: jest.fn() } },
+      // The row pipes (user, customCurrency) read the store; nothing here asserts on them.
+      { provide: Store, useValue: { selectSnapshot: jest.fn(() => ({})) } },
+      CurrencyPipe,
       {
         provide: MAT_DIALOG_DATA,
         useValue: { command, period: MAY_2026, receiptCount: 5, ...data } as ReportReceiptsDialogData,
@@ -122,6 +127,36 @@ describe("ReportReceiptsDialogComponent", () => {
   it("falls back to the list's total when no count is provided", () => {
     const { component } = configure({ receiptCount: undefined });
     expect(component.count()).toBe(5);
+  });
+
+  // The server caps the list, so a report covering more receipts than it returns
+  // must say so rather than pass the list off as complete.
+  it("notes when the list shows only the newest receipts", async () => {
+    const { fixture, component } = configure();
+    await fixture.whenStable();
+
+    expect(component.truncated()).toBe(true);
+    const notice = fixture.nativeElement.querySelector('[data-testid="report-receipt-truncated"]');
+    expect(notice?.textContent).toContain("Showing the newest 2 of 5 receipts.");
+  });
+
+  it("shows no truncation note when the list is complete", async () => {
+    const { fixture, component } = configure(
+      {},
+      of({ data: receipts, totalCount: receipts.length } as unknown as PagedData)
+    );
+    await fixture.whenStable();
+
+    expect(component.truncated()).toBe(false);
+    expect(fixture.nativeElement.querySelector('[data-testid="report-receipt-truncated"]')).toBeNull();
+  });
+
+  it("shows no truncation note when the list failed to load", async () => {
+    const { fixture } = configure({}, throwError(() => new Error("500")));
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('[data-testid="report-receipt-truncated"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="report-receipt-error"]')).not.toBeNull();
   });
 
   it("flags an error and stops loading when the list cannot be fetched", () => {

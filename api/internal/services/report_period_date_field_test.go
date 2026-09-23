@@ -549,3 +549,96 @@ func TestReportService_Receipts_CapTheListButCountEveryReceipt(t *testing.T) {
 		t.Errorf("total = %d, want %d", paged.TotalCount, reportReceiptsCap+1)
 	}
 }
+
+// With several groups, each loads only its newest receipts, yet the list is still
+// exactly the newest reportReceiptsCap across all of them and the total counts
+// every receipt in every group.
+func TestReportService_Receipts_CapAcrossGroupsKeepsTheNewestAndTheFullTotal(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	userId, groupIds := seedReportUserInGroups(t, "rpt-drill-cap-groups", "Household", "Roommates")
+	type seeded struct {
+		name string
+		date time.Time
+	}
+	var all []seeded
+	seedGroup := func(groupId uint, prefix string, count int, offset int) {
+		receipts := make([]models.Receipt, count)
+		for index := range receipts {
+			// Interleave the two groups' dates, so the newest overall draws from both.
+			date := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC).Add(time.Duration(index*2+offset) * time.Minute)
+			name := fmt.Sprintf("%s-%03d", prefix, index)
+			receipts[index] = models.Receipt{
+				Name:         name,
+				Amount:       decimal.NewFromInt(1),
+				Date:         date,
+				PaidByUserID: userId,
+				GroupId:      groupId,
+				Status:       models.OPEN,
+			}
+			all = append(all, seeded{name, date})
+		}
+		if err := repositories.GetDB().Create(&receipts).Error; err != nil {
+			t.Fatalf("create receipts: %v", err)
+		}
+	}
+	seedGroup(groupIds[0], "household", 150, 0)
+	seedGroup(groupIds[1], "roommates", 120, 1)
+
+	sort.Slice(all, func(i, j int) bool { return all[i].date.After(all[j].date) })
+	want := make([]string, reportReceiptsCap)
+	for index := range want {
+		want[index] = all[index].name
+	}
+
+	command := periodRecordsCommand(groupIds, commands.ReportPeriod{
+		Preset: commands.ReportPeriodCustom, StartDate: "2026-06-01", EndDate: "2026-06-30",
+	})
+	paged, err := NewReportService(nil).receipts(userId, command, time.Now())
+	if err != nil {
+		t.Fatalf("receipts: %v", err)
+	}
+	if paged.TotalCount != 270 {
+		t.Errorf("total = %d, want 270", paged.TotalCount)
+	}
+	if got := pagedReceiptNames(t, paged); !reflect.DeepEqual(got, want) {
+		t.Errorf("drill-in lists %d receipts, want the %d newest across both groups in order", len(got), len(want))
+	}
+}
+
+// A limited fetch loads at most the limit, newest first, while its count is every
+// receipt the caller may see: the count is taken after paid-by visibility, so a
+// hidden payer's receipts are in neither.
+func TestReportDataService_Receipts_LimitsTheFetchButCountsWhatTheCallerMaySee(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	clearGroupRoleGrantCacheAll()
+	clearRolePermissionCacheAll()
+
+	allowedPayer := makeUser(t, "rpt-drill-allowed-payer")
+	hiddenPayer := makeUser(t, "rpt-drill-hidden-payer")
+	userId, groupId, _ := seedMemberWithPaidByRole(t, "rpt-drill-reviewer", []uint{allowedPayer}, false)
+
+	day := func(d int) time.Time { return time.Date(2026, 6, d, 0, 0, 0, 0, time.UTC) }
+	seedPeriodReceipt(t, "visible-1", allowedPayer, groupId, day(1), nil, day(1))
+	seedPeriodReceipt(t, "visible-2", allowedPayer, groupId, day(2), nil, day(2))
+	seedPeriodReceipt(t, "visible-3", allowedPayer, groupId, day(3), nil, day(3))
+	seedPeriodReceipt(t, "hidden-4", hiddenPayer, groupId, day(4), nil, day(4))
+	seedPeriodReceipt(t, "hidden-5", hiddenPayer, groupId, day(5), nil, day(5))
+
+	receipts, count, err := NewReportDataService(nil).Receipts(userId, groupIdString(groupId), commands.ReceiptPagedRequestFilter{}, 2)
+	if err != nil {
+		t.Fatalf("Receipts: %v", err)
+	}
+	names := make([]string, len(receipts))
+	for index, receipt := range receipts {
+		names[index] = receipt.Name
+	}
+	if want := []string{"visible-3", "visible-2"}; !reflect.DeepEqual(names, want) {
+		t.Errorf("fetched %v, want the newest two visible receipts %v", names, want)
+	}
+	if count != 3 {
+		t.Errorf("count = %d, want 3 (every visible receipt, none hidden)", count)
+	}
+}

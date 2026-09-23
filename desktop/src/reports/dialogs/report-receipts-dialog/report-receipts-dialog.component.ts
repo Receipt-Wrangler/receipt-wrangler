@@ -56,9 +56,12 @@ export class ReportReceiptsDialogComponent {
 
   public readonly periodLabel: string;
   private readonly providedCount?: number;
-  private readonly totalCount = signal<number>(0);
+  // Every receipt the list covers; the server caps the list itself.
+  public readonly totalCount = signal<number>(0);
   // Subtitle count: the report's true total when known, else the list's own total.
   public readonly count = computed(() => this.providedCount ?? this.totalCount());
+  // The server returned only the newest receipts, not all of them.
+  public readonly truncated = computed(() => this.receipts().length < this.totalCount());
 
   constructor(@Inject(MAT_DIALOG_DATA) data: ReportReceiptsDialogData) {
     const range = formatPeriodRange(

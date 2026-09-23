@@ -8,6 +8,13 @@
     </div>
   }
 
+  @if (!loading() && !hasError() && truncated()) {
+    <div class="drill__warning" data-testid="report-receipt-truncated">
+      <mat-icon>info</mat-icon>
+      Showing the newest {{ receipts().length }} of {{ totalCount() }} receipts.
+    </div>
+  }
+
   @if (loading()) {
     <div class="drill__state">
       <mat-icon class="drill__spinner">autorenew</mat-icon>
