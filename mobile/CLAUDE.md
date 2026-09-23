@@ -1664,19 +1664,46 @@ cross-client contract and `api/CLAUDE.md` for the wire one.
   with `listen: false` **deliberately** — a listener would re-fetch an unpaged aggregate on every
   15-minute AppData refresh for nothing — so the block appears on the next navigation into the
   group, not merely on the next refresh. Desktop behaves the same way.
-- **ONE horizontal scroll view for the whole figure grid, with the labels frozen outside it.** A
-  `SingleChildScrollView` per row lets the rows desync under a drag and parks a value under the
-  wrong heading; *"every row scrolls together"* fails against that tree. Nothing can swallow the
-  list's vertical scroll, because the bar is a **sibling** of `PagedDataList`, not a child.
-- **The bar supplies its own horizontal 16.** The receipts route zeroes `ScreenWrapper`'s body
-  padding so rows sit edge to edge, and the bar's background has to reach the edges too or it reads
-  as a list row rather than a pinned bar. Its height is capped at 35% of the viewport with an inner
-  vertical scroll: five broken-out statuses on a short phone would otherwise starve the `Expanded`
-  list and overflow the `Column`.
+- **ROWS WRAP; NOTHING IS A COLUMN -- and this is the one to not undo.** The first version was a
+  frozen 148pt label column beside a horizontally scrolling grid of fixed 116pt figure columns. At
+  390pt that leaves 210pt for figures and two columns want 232, so a group with a **single**
+  currency field already had its second column chopped mid-number, and a long status name
+  ("Needs Attention Receipts") wrapped to two lines and ate its own receipt count through the
+  label's ellipsis. Fixed widths cannot fit an unknown number of configured fields into a phone.
+  So a row is now a label line plus `name value` pairs in a `Wrap` -- the same flex-wrap the
+  desktop's `receipt-totals` uses, and for the same reason. Anything that does not fit moves to the
+  next line instead of disappearing.
+  - **The label line and the figures line are separate, deliberately.** One `Wrap` over the label
+    and every figure lets the first figure ride up whenever a label happens to be short, so "Total"
+    starts at a different x on every row and the block reads as ragged. Two lines cost a little
+    height and buy a left rail every figure starts from.
+  - **Except for a lone `Total`**, which rides the label line pushed right: that is the shape most
+    groups have, and giving it a line of its own wasted half the block's height on one number. It
+    is a `Wrap` with `spaceBetween` rather than an `Expanded`, so at a large text scale it drops to
+    the next line instead of becoming an overflow stripe.
+  - Pinned by *"clips nothing horizontally, however much is configured"*, which asserts every
+    figure's rect is inside the bar's. **Vertical** overflow is deliberately not asserted -- the
+    35% cap scrolls, with a visible thumb, and that is a real affordance; there is no equivalent
+    for a number past the right edge.
+- **A full-bleed band carrying an inset card.** The receipts route zeroes `ScreenWrapper`'s body
+  padding so rows sit edge to edge, and a block inset on all sides reads as a list row rather than
+  as pinned chrome -- so the *band* still reaches the screen edges, tinted `surfaceDim` (the page
+  canvas) with the divider on whichever edge faces the list, and the white rounded card sits 12pt
+  inside it. The card is a hand-built `Container`, matching `ReceiptFilterConditionCard`: the app's
+  `Card` is Material's elevated one, far heavier than this wants (see "Theme & color roles").
+  Height is capped at 35% of the viewport with an inner vertical scroll, or five broken-out
+  statuses on a short phone starve the `Expanded` list and overflow the `Column`.
+- **The status dot is RINGED, and that is not decoration.** `receiptStatusColor` returns a pale
+  *background* tint -- it is built to sit behind dark text, which is how `ListItemTrailingStatus`
+  and `ListItemColorBlock` use it. Painted as a bare dot on white, OPEN (`#FFFACD`) lands near
+  1.1:1 and is invisible; the 1px `outlineVariant` ring is what makes it read at every status while
+  staying quieter than a chip. The overall row takes an empty gutter of the same width, so every
+  label starts on the same x.
 - **`_money` wraps `formatCurrency`**, which parses the wire string with `double.parse` and
   **throws**. From inside this bar that takes down the receipts screen, not just the block.
-- **A zero row is muted with a COLOUR** (`onSurfaceVariant`), not an `Opacity` widget: the
-  frozen-label split would need two of them and two layers to keep in step.
+- **A zero row is muted with a COLOUR** (`onSurfaceVariant`), not an `Opacity` widget: the mute has
+  to reach the row's label, its count and every figure, and keeping several `Opacity` layers in
+  step is a drift waiting to happen.
 - **The overall row arrives carrying `ReceiptStatus.empty`** -- the generated `status` is
   non-nullable, so there is no "no status" to express -- and `receiptStatusLabel` renders that as
   `""`. `receiptSummaryRowLabel` branches on it, or the row reads as a bare " Receipts".
@@ -1886,15 +1913,24 @@ Recording the **full app** (rather than a harness) against a live API adds three
 
 #### Route 2 — widget-test frame capture
 
-`tool/demo_capture/` holds the machinery and three demos — an animated GIF pair for the
-keyboard-inset fix, a single before/after still for the floating-button clearance fix, and the
-receipt-summary placement pair:
+`tool/demo_capture/` holds the machinery and four demos — an animated GIF pair for the
+keyboard-inset fix, a single before/after still for the floating-button clearance fix, the
+receipt-summary placement pair, and a reference still of the summary bar itself:
 
 ```bash
 cd mobile && ./tool/record_keyboard_demo.sh          # -> tool/*-keyboard.gif
 cd mobile && ./tool/record_clearance_shot.sh         # -> tool/receipt-form-clearance.png
 cd mobile && ./tool/record_summary_position_demo.sh  # -> tool/receipt-summary-position.gif
+cd mobile && ./tool/record_summary_shot.sh           # -> tool/receipt-summary-bar.png
 ```
+
+**Judge a LOOK from the still, not from a frame of the GIF.** `writeSideBySideGif` quantises to an
+octree palette and bands badly on flat UI — the stripes through the status washes in the placement
+GIF are encoding artifacts, not pixels any widget drew — so spacing, weight and colour decisions
+made from it are made against noise. `record_summary_shot.sh` writes a PNG, in the two
+configurations of the summary bar that look least alike: the one most groups have (a couple of
+statuses, no currency fields) and the heavy one (every status broken out, two currency fields) that
+is where a row-layout regression shows up first.
 
 Route 1 **cannot** record that fix at all: there is no software keyboard on Linux desktop, so
 `viewInsets.bottom` is permanently 0 and the bug is unreproducible on that target. This route also
@@ -1904,7 +1940,8 @@ frames are captured inside a widget test and encoded to GIF in pure Dart.
 - **`capture.dart`** is the shared machinery — `loadDemoFonts`, `buildDemoSurface` (caption strip +
   phone-sized viewport), `grabFrame`, `stitchPanels` and the two writers. `fake_keyboard.dart` draws
   the keys and collapses to nothing at a zero inset, so a still that does not want a keyboard simply
-  leaves `viewInsets` alone. `keyboard_demo_test.dart` / `clearance_shot_test.dart` are the demos.
+  leaves `viewInsets` alone. `keyboard_demo_test.dart`, `clearance_shot_test.dart`,
+  `summary_position_demo_test.dart` and `summary_shot_test.dart` are the demos.
 - **A still does not always have a seam to flip.** The keyboard demo toggles
   `debugDisableKeyboardLift`, but there is no production flag for `submitButtonSpacing` and adding
   one for a screenshot is not worth it — so `record_clearance_shot.sh` captures one panel, strips the

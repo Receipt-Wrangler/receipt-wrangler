@@ -53,9 +53,16 @@ void main() {
   Finder overallRow() => find.byKey(const ValueKey('receipt-summary-row-overall'));
   Finder openRow() => find.byKey(const ValueKey('receipt-summary-row-OPEN'));
 
-  /// The rendered text of a row's label cell, e.g. "All Receipts\n(3 receipts)".
-  String rowText(WidgetTester tester, Finder row) =>
-      tester.widget<Text>(find.descendant(of: row, matching: find.byType(Text))).data!;
+  /// Everything a row renders, joined -- its label, its receipt count and every figure,
+  /// e.g. "All Receipts | 3 receipts | Total | 40.00$".
+  ///
+  /// Joined rather than read off a single Text: a row is a label line plus one
+  /// `name value` pair per configured figure, so there is no one cell that carries the
+  /// row's meaning.
+  String rowText(WidgetTester tester, Finder row) => tester
+      .widgetList<Text>(find.descendant(of: row, matching: find.byType(Text)))
+      .map((text) => text.data ?? '')
+      .join(' | ');
 
   testWidgets('the summary totals the whole filter, and honours its position',
       (tester) async {

@@ -61,12 +61,9 @@ void main() {
   /// a reviewer actually reads. Buy hold time with DURATIONS, never duplicate frames:
   /// GifEncoder writes every frame in full, so a held frame costs a moving one.
   const scrollSteps = 7;
-  const swipeSteps = 4;
   List<int> durations() => const [
         170,
         ...[8, 8, 8, 8, 8, 8, 8],
-        160,
-        ...[8, 8, 8, 8],
         300,
       ];
 
@@ -225,22 +222,10 @@ void main() {
     await gesture.up();
     await tester.pump();
 
-    // A hold: the list has moved, the bar has not.
-    frames.add(await grabFrame(tester));
-
-    // Then swipe the figure grid sideways, so the currency column reads as
-    // scrollable rather than clipped -- and so the demo shows that every row moves
-    // together while the label column stays put.
-    final swipe = await tester.startGesture(
-        tester.getCenter(find.byKey(const ValueKey('receipt-summary-figures-scroll'))));
-    for (var i = 0; i < swipeSteps; i++) {
-      await swipe.moveBy(const Offset(-30, 0));
-      await tester.pump(const Duration(milliseconds: 40));
-      frames.add(await grabFrame(tester));
-    }
-    await swipe.up();
-    await tester.pump();
-
+    // A hold: the list has moved, the bar has not, which is the whole point of the
+    // recording. There used to be a sideways swipe of the figure grid after this, to
+    // show the clipped currency column was scrollable rather than broken; the rows
+    // wrap now, so there is nothing off-screen to reveal.
     frames.add(await grabFrame(tester));
     return frames;
   }
