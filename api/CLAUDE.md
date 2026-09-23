@@ -1309,23 +1309,52 @@ and is deleted once aged. So:
    (The old `buildAttachmentMap` returned the error, which would have aborted every
    future sweep after one malformed payload.)
 
-### `ListCompletedTasks` is always empty
+### Rule 3 is live on the email queue alone
 
-There is **no `asynq.Retention(...)` anywhere in the repo** — `task_enqueue.go`
-passes only `MaxRetry` and `Queue` — so asynq drops a successfully-processed task
-from Redis immediately and it never enters the completed set. Two consequences:
+Asynq drops a successfully-processed task the instant it succeeds unless the
+enqueue sets `asynq.Retention`, in which case the task stays in Redis for that
+long in the **completed** set and the janitor reaps it afterwards. Nothing here
+set it at first, so `ListCompletedTasks` was always empty and rule 3 was dead
+code — which is how the *old* cleanup came to be inverted end to end: its
+`Completed` branch could never fire, so the only files it ever deleted were the
+archived ones it had to keep.
 
-- The old cleanup was **inverted end to end**: rule 3 could never fire, so the
-  only files it ever deleted were the archived ones it had to keep.
-- Successful uploads now land in the **orphan** branch and wait out the full
-  retention window rather than being cleared within the hour. That is a real
-  disk-footprint change and the reason the window is configurable.
+`enqueueOptions` (`task_enqueue.go`) now attaches
+`asynq.Retention(completedTaskRetention)` — **6 hours** — to
+`EmailReceiptProcessingQueue`, so a succeeded email upload's attachment and its
+`image-` OCR copy are released on the next hourly sweep instead of waiting out
+the user-configured window. The duration is a handful of sweep intervals rather
+than a day because `EmailProcessTaskPayload` carries the email body **twice**
+(`Metadata.Body` + `Metadata.BodyHtml`) and `email.go` copies the metadata per
+`groupSettingsId`, so one message consumed by N groups with M attachments retains
+N×M copies of a 50-500 KB body. Overshooting degrades benignly — the files just
+fall back to waiting out the window.
 
-**Do not "fix" that by deleting on success inside `HandleEmailProcessTask`**: one
-`TempFilePath` fans out to N sibling tasks and the first to succeed would break
-the rest. Quick scan is 1:1 and already deletes on success
-(`services/receipts.go`). Adding `asynq.Retention` to the two ingest queues would
-make rule 3 live, but it is a Redis-memory change deserving its own testing.
+**It is deliberately NOT on the other two queues**, and "the ingest queues" is the
+wrong mental model:
+
+- **Quick scan** already deletes its own file on success — `ReceiptService.QuickScan`
+  ends with `os.Remove(params.TempPath)`, reached only after the create-receipt
+  transaction commits, and every failure path returns earlier and keeps the file.
+  It is 1:1 task-to-file, so by the time such a task completes there is nothing on
+  disk for the sweep to classify. Retention there is pure Redis cost.
+- **`EmailPollingQueue`** owns no temp files at all.
+
+**Do not "fix" the email case by deleting on success inside
+`HandleEmailProcessTask`** instead: one `TempFilePath` fans out to N sibling tasks
+and the first to succeed would break the rest. The sweep owns the decision
+precisely because it can see every referencing task at once, and retention is what
+lets it see them.
+
+**No janitor configuration is needed.** `asynq.Server.Start` starts the janitor
+unconditionally and it runs `DeleteExpiredCompletedTasks` per queue every 8s by
+default; `asynq_server.go` sets only `Concurrency` and `Queues`, so it takes that
+default.
+
+**Retention changed two things outside the sweeper**, both now guarded — see
+"Activity source files" below for `rerunnableState` (the rerun endpoint's state
+check, which asynq does *not* enforce for us) and `offersSourceFile` (a succeeded
+task stops advertising its upload).
 
 ### `TempFileRetentionHours`
 
@@ -1397,11 +1426,27 @@ unquoted form is a latent bug — copy the rest of that handler's shape
 - **`canBeRestarted`** — the task is **`Archived`** and every file a rerun reads
   exists.
 
-`canBeRestarted` stays pinned to `Archived` because `Inspector.RunTask` refuses a
-task in any other state. Only the *lookup* became state-agnostic, not the rule.
-`hasSourceFile` is deliberately **not** gated on it: asynq backs its retries off
-exponentially, so a task takes minutes to archive and the user should not watch an
-activity sit at FAILED with no way to retrieve their image.
+`canBeRestarted` stays pinned to `Archived`, and **enforcing that is ours, not
+asynq's.** `Inspector.RunTask` does *not* refuse a task by state: its Lua script
+special-cases only `active` (-1) and `pending` (-2), and every other state —
+**`completed` included** — falls into the branch that `ZREM`s the id from its set
+and `LPUSH`es it back onto pending (`asynq@v0.25.1/internal/rdb/inspect.go`). That
+was harmless only while completed tasks never existed; with the email queue's
+retention, a rerun of a succeeded upload would pass `GetTaskInfo`, pass
+`RerunSourceFilesPresent` (the files are still on disk) and **create a duplicate
+receipt**. So `rerunnableState` (`source_file.go`) is the rule, `CanRerunTask` is
+its exported form, and `RerunActivity` refuses anything else with a **400** —
+matching exactly what `canBeRestarted` advertises.
+
+`hasSourceFile` is deliberately **not** gated on `Archived`: asynq backs its
+retries off exponentially, so a task takes minutes to archive and the user should
+not watch an activity sit at FAILED with no way to retrieve their image. It *is*
+gated on the task not having **succeeded** (`offersSourceFile`), which is a
+different rule: a retained `Completed` email task still has both files on disk
+until the next sweep, and without this the preview/download controls would appear
+on a succeeded activity for up to an hour and then 404. `ResolveSystemTaskSourceFile`
+applies the same predicate — the two read the same task state, so they share one
+function rather than two conditions that can drift.
 
 **Email needs both files for a rerun** — `HandleEmailProcessTask` reads
 `TempFilePath` for the `FileData` it persists and hands `ImageForOcrPath` to the

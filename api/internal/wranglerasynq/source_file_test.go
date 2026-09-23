@@ -81,6 +81,19 @@ func TestResolveActivityFlags(t *testing.T) {
 			expectedHasSourceFile:  true,
 		},
 		{
+			// The email queue retains its completed tasks so the temp sweep can
+			// observe them and release their files (see completedTaskRetention),
+			// which means a succeeded upload is now visible here with both files
+			// still on disk. Neither control belongs on it: the receipt already
+			// carries the image, and a rerun would duplicate it.
+			name:                   "completed email offers neither, though both files survive",
+			taskType:               models.EMAIL_UPLOAD,
+			state:                  asynq.TaskStateCompleted,
+			payload:                EmailProcessTaskPayload{TempFilePath: present, ImageForOcrPath: presentOcr},
+			expectedCanBeRestarted: false,
+			expectedHasSourceFile:  false,
+		},
+		{
 			// A rerun reads the attachment AND the converted copy, so a missing
 			// OCR image breaks it — but the attachment is still the user's file,
 			// so the download stays offered. The two predicates differ on purpose.
@@ -355,5 +368,56 @@ func lookupReturning(t *testing.T, state asynq.TaskState, payload any) taskInfoL
 
 	return func(queue string, id string) (*asynq.TaskInfo, error) {
 		return &asynq.TaskInfo{ID: id, State: state, Payload: payloadBytes}, nil
+	}
+}
+
+// Exhaustive over every asynq state, so a state added upstream is a deliberate
+// decision rather than a silent default.
+//
+// These two predicates are what keeps asynq.Retention on the email queue from
+// changing anything a user sees: RunTask does not refuse a task by state, and a
+// retained completed task still has its files on disk.
+func TestTaskStatePredicates(t *testing.T) {
+	tests := []struct {
+		state                   asynq.TaskState
+		expectedRerunnable      bool
+		expectedOffersSourceFil bool
+	}{
+		{asynq.TaskStateActive, false, true},
+		{asynq.TaskStatePending, false, true},
+		{asynq.TaskStateScheduled, false, true},
+		{asynq.TaskStateRetry, false, true},
+		// The state a failure lands in once asynq exhausts its retries — the one
+		// a rerun is for.
+		{asynq.TaskStateArchived, true, true},
+		// Retained for the temp sweep. It succeeded: its receipt carries the
+		// image, and re-running it would make a second one.
+		{asynq.TaskStateCompleted, false, false},
+		{asynq.TaskStateAggregating, false, true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.state.String(), func(t *testing.T) {
+			if got := rerunnableState(test.state); got != test.expectedRerunnable {
+				t.Errorf("rerunnableState(%v) = %v, want %v", test.state, got, test.expectedRerunnable)
+			}
+			if got := CanRerunTask(&asynq.TaskInfo{State: test.state}); got != test.expectedRerunnable {
+				t.Errorf("CanRerunTask(%v) = %v, want %v", test.state, got, test.expectedRerunnable)
+			}
+			if got := offersSourceFile(test.state); got != test.expectedOffersSourceFil {
+				t.Errorf("offersSourceFile(%v) = %v, want %v", test.state, got, test.expectedOffersSourceFil)
+			}
+		})
+	}
+}
+
+// The zero TaskState is what an unset struct carries; it must not read as
+// rerunnable, and neither must a nil lookup result.
+func TestCanRerunTask_RefusesNilAndZeroState(t *testing.T) {
+	if CanRerunTask(nil) {
+		t.Error("CanRerunTask(nil) = true, want false")
+	}
+	if CanRerunTask(&asynq.TaskInfo{}) {
+		t.Error("CanRerunTask(zero state) = true, want false")
 	}
 }

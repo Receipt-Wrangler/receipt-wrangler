@@ -225,6 +225,16 @@ func RerunActivity(w http.ResponseWriter, r *http.Request) {
 		GroupId:          stringGroupId,
 		GroupPermissions: []string{permissions.GroupActivitiesRerun},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			// Inspector.RunTask does not refuse a task by state — it pushes back
+			// anything that is not active or pending, a succeeded task included —
+			// so the rule lives here. The email queue retains its completed tasks
+			// for the temp sweep, so without this a rerun of one would re-process
+			// an email that already produced a receipt. See CanRerunTask.
+			if !wranglerasynq.CanRerunTask(taskInfo) {
+				utils.WriteCustomErrorResponse(w, "Only a failed activity can be rerun.", http.StatusBadRequest)
+				return 0, nil
+			}
+
 			// Defence in depth: the client hides the control once the source file
 			// is gone, but the endpoint stays callable. A rerun reads its upload
 			// first, so without this it would fail deep in the pipeline instead of

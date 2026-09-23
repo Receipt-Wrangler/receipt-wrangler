@@ -171,13 +171,45 @@ func hydrateSystemTaskSourceFiles(
 	}
 }
 
+// rerunnableState reports whether a task in this state may be handed to
+// Inspector.RunTask.
+//
+// The rule is ours to enforce, not asynq's: RunTask does NOT refuse a task by
+// state. Its Lua script special-cases only active and pending, and every other
+// state — Completed included — is dropped from its set and pushed straight back
+// onto the pending list (asynq/internal/rdb/inspect.go). Archived is the state a
+// failure lands in once asynq has exhausted its retries, so it is the only one a
+// rerun is meant for; re-running a succeeded email task — which now lingers in
+// Redis for completedTaskRetention — would create a duplicate receipt.
+func rerunnableState(state asynq.TaskState) bool {
+	return state == asynq.TaskStateArchived
+}
+
+// CanRerunTask is rerunnableState for callers outside this package, so the
+// RerunActivity endpoint and the CanBeRestarted flag it advertises cannot drift.
+func CanRerunTask(taskInfo *asynq.TaskInfo) bool {
+	return taskInfo != nil && rerunnableState(taskInfo.State)
+}
+
+// offersSourceFile reports whether a task in this state should still hand its
+// upload back.
+//
+// A Completed task succeeded, so its receipt already carries the image and the
+// temp file is only waiting for the next sweep to release it. Without this the
+// email queue's completedTaskRetention would put preview and download controls on
+// succeeded activities for up to an hour, and then 404 them once the sweep ran.
+func offersSourceFile(state asynq.TaskState) bool {
+	return state != asynq.TaskStateCompleted
+}
+
 // resolveActivityFlags computes both flags for one task.
 //
-// CanBeRestarted stays pinned to Archived because Inspector.RunTask refuses a task
-// in any other state — only the lookup became state-agnostic, not the rule.
-// HasSourceFile is deliberately not gated on Archived: asynq backs its retries off
-// exponentially, so a task takes minutes to archive, and the user should not watch
-// an activity sit at FAILED with no way to retrieve their image.
+// CanBeRestarted stays pinned to Archived (see rerunnableState) — only the lookup
+// became state-agnostic, not the rule. HasSourceFile is deliberately not gated on
+// Archived: asynq backs its retries off exponentially, so a task takes minutes to
+// archive, and the user should not watch an activity sit at FAILED with no way to
+// retrieve their image. It is gated on the task not having *succeeded*, which is a
+// different thing entirely (see offersSourceFile).
 func resolveActivityFlags(
 	lookup taskInfoLookup,
 	taskType models.SystemTaskType,
@@ -212,8 +244,10 @@ func resolveActivityFlags(
 	}
 
 	return activityFlags{
-		canBeRestarted: taskInfo.State == asynq.TaskStateArchived && allFilesPresent(files.rerunPaths()),
-		hasSourceFile:  files.expectsSourceFile() && utils.FileExists(files.Primary),
+		canBeRestarted: rerunnableState(taskInfo.State) && allFilesPresent(files.rerunPaths()),
+		hasSourceFile: offersSourceFile(taskInfo.State) &&
+			files.expectsSourceFile() &&
+			utils.FileExists(files.Primary),
 	}, nil
 }
 
@@ -319,6 +353,12 @@ func ResolveSystemTaskSourceFile(systemTask models.SystemTask) (SystemTaskSource
 		}
 
 		return SystemTaskSourceFile{}, err
+	}
+
+	// The same rule the flag reports: a succeeded task's file is on its way out,
+	// not on offer. Both read the task's state, so they share one predicate.
+	if !offersSourceFile(taskInfo.State) {
+		return SystemTaskSourceFile{}, ErrSourceFileUnavailable
 	}
 
 	var payload RerunTaskPayload

@@ -21,10 +21,15 @@ import (
 //
 // It replaces a cleanup that was exactly inverted: it released a file once every
 // referencing task was Completed OR Archived, and Archived is precisely the state
-// that makes an activity rerunnable. Worse, no queue here sets asynq.Retention, so
-// a successfully-processed task is dropped from Redis immediately and never enters
-// the completed set — meaning the old Completed branch could never fire and the
-// only files it ever deleted were the ones it had to keep.
+// that makes an activity rerunnable. Worse, no queue set asynq.Retention at the
+// time, so a successfully-processed task was dropped from Redis immediately and
+// never entered the completed set — meaning the old Completed branch could never
+// fire and the only files it ever deleted were the ones it had to keep.
+//
+// Rule 3 is live now, but on the email queue alone: enqueueOptions attaches
+// asynq.Retention there so a succeeded task survives long enough for this sweep to
+// see it. Quick scan is excluded because it deletes its own file on success and is
+// 1:1 task-to-file, so its completed tasks would name a path that no longer exists.
 //
 // Two invariants keep the orphan branch safe, because the failure mode inverted
 // with it. Previously a task the scan missed meant "we fail to delete" (harmless);

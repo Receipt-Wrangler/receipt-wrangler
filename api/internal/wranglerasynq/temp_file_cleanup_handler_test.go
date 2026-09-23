@@ -87,6 +87,9 @@ func TestClassifyTempFile(t *testing.T) {
 			expected:           tempFileRemove,
 		},
 		{
+			// Live since enqueueOptions put asynq.Retention on the email queue:
+			// a succeeded upload's attachment and OCR copy are released on the
+			// next sweep instead of waiting out the whole window.
 			name:               "all completed releases immediately",
 			states:             []asynq.TaskState{asynq.TaskStateCompleted, asynq.TaskStateCompleted},
 			age:                youngEnough,
@@ -127,8 +130,10 @@ func TestClassifyTempFile(t *testing.T) {
 			expected:           tempFileKeep,
 		},
 		{
-			// No queue sets asynq.Retention, so successful tasks vanish from Redis
-			// and their files arrive here rather than in the completed branch.
+			// Where a successful quick scan's file would land if it had not already
+			// been deleted by the handler, and where an email attachment lands once
+			// its completed task has outlived completedTaskRetention — plus the
+			// DebugOcr dumps, which no task ever references.
 			name:               "unreferenced releases once aged",
 			states:             nil,
 			age:                oldEnough,
