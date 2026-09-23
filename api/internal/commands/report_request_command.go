@@ -95,10 +95,25 @@ type ReportRequestCommand struct {
 
 // ReportPeriod is the reporting window. Preset is one of the ReportPeriod*
 // constants; StartDate/EndDate (YYYY-MM-DD) are only read when Preset is custom.
+//
+// DateField is the receipt date the window covers, as a ReceiptDateFilterKeys
+// key. Empty means the receipt date: templates saved before the field existed
+// carry none, and omitempty keeps an empty one out of the stored template blob,
+// so an absent key stays the only way "receipt date by default" is written.
 type ReportPeriod struct {
 	Preset    string `json:"preset"`
 	StartDate string `json:"startDate"`
 	EndDate   string `json:"endDate"`
+	DateField string `json:"dateField,omitempty"`
+}
+
+// DateFilterKey is the receipt filter key the period covers, defaulting an
+// empty DateField to the receipt date.
+func (period ReportPeriod) DateFilterKey() string {
+	if period.DateField == "" {
+		return ReceiptFilterKeyDate
+	}
+	return period.DateField
 }
 
 // ReportDetail selects the bottom-row mode. By is the dimension an aggregate keys
@@ -188,6 +203,10 @@ func (command *ReportRequestCommand) validatePeriod(errorMap map[string]string) 
 	}
 	if !validReportPresets[command.Period.Preset] {
 		errorMap["period"] = "Invalid reporting period"
+		return
+	}
+	if !IsReceiptDateFilterKey(command.Period.DateFilterKey()) {
+		errorMap["period"] = "Invalid reporting period date field"
 		return
 	}
 	if command.Period.Preset == ReportPeriodCustom {

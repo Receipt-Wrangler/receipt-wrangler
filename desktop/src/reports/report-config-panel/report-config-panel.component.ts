@@ -13,6 +13,7 @@ import { FormArray, FormBuilder, FormControl, FormGroup } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { merge } from "rxjs";
+import { RECEIPT_DATE_FILTER_FIELDS, ReceiptDateFilterFieldKey } from "src/constants";
 import { DEFAULT_DIALOG_CONFIG } from "src/constants/dialog.constant";
 import { GroupState } from "src/store";
 import { BadgeTone, CUSTOM_FIELD_BADGE } from "src/shared-ui/badge/badge.component";
@@ -30,7 +31,11 @@ import {
   buildGroupByGroup,
   readGroupByFields,
 } from "../models/report-form.factory";
-import { formatPeriodRange, resolvePeriodRange } from "../models/report-period.util";
+import {
+  formatPeriodRange,
+  reportPeriodDateFieldLabel,
+  resolvePeriodRange,
+} from "../models/report-period.util";
 import { ReportCatalogService } from "../services/report-catalog.service";
 import {
   AddGroupDialogComponent,
@@ -122,6 +127,11 @@ export class ReportConfigPanelComponent implements OnInit {
   public readonly periodOptions = REPORT_PERIOD_PRESETS.map((preset) => ({
     value: preset.id,
     displayValue: preset.label,
+  }));
+  // The same fields, in the same order, as the receipts table's quick date filter.
+  public readonly periodDateFieldOptions = RECEIPT_DATE_FILTER_FIELDS.map((field) => ({
+    value: field.key,
+    displayValue: field.label,
   }));
   public readonly documentVariables = REPORT_DOCUMENT_VARIABLES;
   public readonly customFieldBadge = CUSTOM_FIELD_BADGE;
@@ -243,6 +253,13 @@ export class ReportConfigPanelComponent implements OnInit {
 
   public get detailMode(): ReportDetail.ModeEnum {
     return this.form().get("detail.mode")!.value;
+  }
+
+  /** The label of the receipt date the period covers, shown in the hint. */
+  public periodDateFieldLabel(): string {
+    return reportPeriodDateFieldLabel(
+      this.form().get("period.dateField")!.value as ReceiptDateFilterFieldKey
+    );
   }
 
   /** The resolved date window shown under the period picker (display only). */

@@ -19,6 +19,10 @@ export interface ReportPeriod {
      * End date (YYYY-MM-DD), read only when preset is custom
      */
     endDate?: string;
+    /**
+     * Which receipt date the period covers, as a ReceiptPagedRequestFilter date key: date, resolvedDate or createdAt. Omitted means date. A plain string rather than an enum on purpose: this rides inside ReportTemplate.configuration, and a value added to a closed enum would fail that whole payload on already-released mobile builds.
+     */
+    dateField?: string;
 }
 export namespace ReportPeriod {
     export type PresetEnum = 'this_month' | 'last_month' | 'mtd' | 'qtd' | 'ytd' | 'custom';

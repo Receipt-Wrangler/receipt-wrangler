@@ -4,6 +4,7 @@ import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { of } from "rxjs";
+import { RECEIPT_DATE_FILTER_FIELDS } from "src/constants";
 import {
   CustomFieldService,
   CustomFieldType,
@@ -35,6 +36,7 @@ function buildForm(formBuilder: FormBuilder): FormGroup {
       preset: formBuilder.control<string>(ReportPeriod.PresetEnum.ThisMonth),
       startDate: formBuilder.control<Date | null>(null),
       endDate: formBuilder.control<Date | null>(null),
+      dateField: formBuilder.control<string>("date"),
     }),
     document: formBuilder.group({ intro: formBuilder.control("") }),
   });
@@ -402,6 +404,26 @@ describe("ReportConfigPanelComponent", () => {
 
     form.get("period.preset")!.setValue(ReportPeriod.PresetEnum.Custom);
     expect(component.periodLabel()).toBe("a custom range");
+  });
+
+  // The picker must offer exactly the receipts table quick date filter's fields,
+  // in its order, so a report and the table never name a date differently.
+  it("offers the quick date filter's date fields, in order, as the period date field", () => {
+    expect(component.periodDateFieldOptions).toEqual(
+      RECEIPT_DATE_FILTER_FIELDS.map((field) => ({ value: field.key, displayValue: field.label }))
+    );
+    expect(component.periodDateFieldOptions.map((option) => option.displayValue)).toEqual([
+      "Receipt Date",
+      "Resolved Date",
+      "Added At",
+    ]);
+  });
+
+  it("periodDateFieldLabel names the date field the period covers", () => {
+    expect(component.periodDateFieldLabel()).toBe("Receipt Date");
+
+    form.get("period.dateField")!.setValue("createdAt");
+    expect(component.periodDateFieldLabel()).toBe("Added At");
   });
 
   it("insertVariable appends tokens to the document intro", () => {

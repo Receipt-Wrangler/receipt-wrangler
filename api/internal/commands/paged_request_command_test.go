@@ -5,9 +5,69 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/utils"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+// TestReceiptDateFilterKeys pins the receipt date keys and their order. The order
+// is the desktop's RECEIPT_DATE_FILTER_FIELDS (desktop/src/constants/
+// receipt-filter-fields.constant.ts), which drives both the receipts quick date
+// filter and the Report Builder's period date picker: a key added there without
+// being added here is a picker option the API rejects with a 400.
+func TestReceiptDateFilterKeys(t *testing.T) {
+	want := []string{"date", "resolvedDate", "createdAt"}
+	if got := ReceiptDateFilterKeys(); !reflect.DeepEqual(got, want) {
+		t.Errorf("ReceiptDateFilterKeys() = %v, want %v", got, want)
+	}
+}
+
+// TestReceiptDateFilterKeysAreFilterJsonKeys keeps the date keys, DateFilterField
+// and the filter struct in step: every date key is the json tag of the filter slot
+// DateFilterField returns for it, and every other filter key names no date slot.
+func TestReceiptDateFilterKeysAreFilterJsonKeys(t *testing.T) {
+	filter := ReceiptPagedRequestFilter{}
+	value := reflect.ValueOf(&filter).Elem()
+	fieldType := reflect.TypeOf(PagedRequestField{})
+
+	slotsByKey := map[string]*PagedRequestField{}
+	for i := 0; i < value.NumField(); i++ {
+		structField := value.Type().Field(i)
+		if structField.Type != fieldType {
+			t.Fatalf("filter field %s is %s, want PagedRequestField", structField.Name, structField.Type)
+		}
+		key := strings.Split(structField.Tag.Get("json"), ",")[0]
+		slotsByKey[key] = value.Field(i).Addr().Interface().(*PagedRequestField)
+	}
+
+	dateKeys := map[string]bool{}
+	for _, key := range ReceiptDateFilterKeys() {
+		dateKeys[key] = true
+		slot, ok := slotsByKey[key]
+		if !ok {
+			t.Errorf("date key %q is not a json key of ReceiptPagedRequestFilter", key)
+			continue
+		}
+		if got := filter.DateFilterField(key); got != slot {
+			t.Errorf("DateFilterField(%q) does not return the %q slot", key, key)
+		}
+		if !IsReceiptDateFilterKey(key) {
+			t.Errorf("IsReceiptDateFilterKey(%q) = false, want true", key)
+		}
+	}
+
+	for key := range slotsByKey {
+		if dateKeys[key] {
+			continue
+		}
+		if got := filter.DateFilterField(key); got != nil {
+			t.Errorf("DateFilterField(%q) returned a slot for a key that is not a receipt date", key)
+		}
+		if IsReceiptDateFilterKey(key) {
+			t.Errorf("IsReceiptDateFilterKey(%q) = true for a key that is not a receipt date", key)
+		}
+	}
+}
 
 // A stored report template's Configuration is json.Marshal of the command, then read
 // back into the desktop builder, which reads the filter's lowercase `value` / `tags`

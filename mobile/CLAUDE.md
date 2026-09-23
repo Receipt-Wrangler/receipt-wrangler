@@ -436,6 +436,15 @@ permission model exactly.
   `configuration`) returns `{ html, receiptCount }`, rendered in a **WebView**
   (`WebViewController.loadHtmlString`, JS disabled — the sample is self-contained, no network). Can
   403 if a covered group lacks `group.reports.read`; handled with a snackbar, no logout.
+  - **`configuration.period.dateField` rides through untouched.** It names which receipt date the
+    period covers (see `api/CLAUDE.md` → "The period's date field"). Mobile never reads it, but
+    preview re-sends it, so it must survive the round trip.
+  - **It is a plain `String?`, on purpose.** A closed enum would fail the whole template on the first
+    date key added after a build ships.
+  - **Builds released before the field existed drop the unknown key when re-sending**, so their
+    *preview* of such a template runs on the receipt date. Generate and the dashboard widget load the
+    configuration server-side, so they are correct on every build.
+  - `test/models/report_period_date_field_ingest_test.dart` guards all of this.
 - **Generate = the template's saved formats** (`report_actions.dart`): `POST
   /report/template/{id}/generate` returns `Response<Uint8List>` (a single file, or a **ZIP** when the
   template has multiple formats). Bytes are written to `getTemporaryDirectory()` and handed to the OS
@@ -620,13 +629,15 @@ stub.** The generator drops a `*_test.dart` per model in `mobile/api/test/`, but
 overwrite one that already exists** — so those stubs still describe whatever the model looked like
 the day they were first written, never gain a case when a field is added, and are all `// TODO`
 bodies regardless. They also sit under `mobile/api/`, which is generated output nobody may
-hand-edit. The four real API-boundary guards therefore live beside the app's own tests and are what
+hand-edit. The five real API-boundary guards therefore live beside the app's own tests and are what
 `flutter test` actually runs: `test/models/app_data_permission_ingest_test.dart`,
 `test/models/receipt_status_ingest_test.dart`,
-`test/models/receipt_summary_position_ingest_test.dart`, and
+`test/models/receipt_summary_position_ingest_test.dart`,
 `test/models/user_preferences_ingest_test.dart` (the `closeChipSelectOnSelect` default and wire
 round trip — a desktop-only flag mobile carries and never reads, which is precisely why nothing in
-the app would notice it disappearing).
+the app would notice it disappearing), and `test/models/report_period_date_field_ingest_test.dart`
+(`ReportPeriod.dateField` stays an open string and survives the preview round trip — an unknown key
+must not fail the template).
 
 Two consequences worth knowing. An unknown status deserializes to `empty`, which
 `receiptStatusLabel` / `receiptStatusColor` render as a blank neutral chip rather than crashing —

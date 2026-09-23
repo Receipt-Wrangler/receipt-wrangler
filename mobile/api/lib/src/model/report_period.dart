@@ -15,6 +15,7 @@ part 'report_period.g.dart';
 /// * [preset] 
 /// * [startDate] - Start date (YYYY-MM-DD), read only when preset is custom
 /// * [endDate] - End date (YYYY-MM-DD), read only when preset is custom
+/// * [dateField] - Which receipt date the period covers, as a ReceiptPagedRequestFilter date key: date, resolvedDate or createdAt. Omitted means date. A plain string rather than an enum on purpose: this rides inside ReportTemplate.configuration, and a value added to a closed enum would fail that whole payload on already-released mobile builds.
 @BuiltValue()
 abstract class ReportPeriod implements Built<ReportPeriod, ReportPeriodBuilder> {
   @BuiltValueField(wireName: r'preset')
@@ -28,6 +29,10 @@ abstract class ReportPeriod implements Built<ReportPeriod, ReportPeriodBuilder> 
   /// End date (YYYY-MM-DD), read only when preset is custom
   @BuiltValueField(wireName: r'endDate')
   String? get endDate;
+
+  /// Which receipt date the period covers, as a ReceiptPagedRequestFilter date key: date, resolvedDate or createdAt. Omitted means date. A plain string rather than an enum on purpose: this rides inside ReportTemplate.configuration, and a value added to a closed enum would fail that whole payload on already-released mobile builds.
+  @BuiltValueField(wireName: r'dateField')
+  String? get dateField;
 
   ReportPeriod._();
 
@@ -68,6 +73,13 @@ class _$ReportPeriodSerializer implements PrimitiveSerializer<ReportPeriod> {
       yield r'endDate';
       yield serializers.serialize(
         object.endDate,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.dateField != null) {
+      yield r'dateField';
+      yield serializers.serialize(
+        object.dateField,
         specifiedType: const FullType(String),
       );
     }
@@ -114,6 +126,13 @@ class _$ReportPeriodSerializer implements PrimitiveSerializer<ReportPeriod> {
             specifiedType: const FullType(String),
           ) as String;
           result.endDate = valueDes;
+          break;
+        case r'dateField':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.dateField = valueDes;
           break;
         default:
           unhandled.add(key);

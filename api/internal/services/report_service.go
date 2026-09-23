@@ -563,16 +563,24 @@ func resolveReportGeneratorPaidBy(filter *commands.ReceiptPagedRequestFilter, us
 }
 
 // applyPeriod resolves the request's period into an inclusive date window, writes
-// it onto the filter's Date field, and returns a human-readable label for the
-// document preamble and the {{period}} variable. Presets are computed from now;
-// custom uses the supplied bounds (already validated by the command).
+// it onto the filter slot of the receipt date the period covers (overwriting any
+// condition already there), and returns a human-readable label for the document
+// preamble and the {{period}} variable. Presets are computed from now; custom uses
+// the supplied bounds (already validated by the command). A date field the filter
+// has no slot for falls back to the receipt date: the stored-template paths run a
+// configuration without re-validating it, so this stays lenient like
+// resolvePeriodBounds' default.
 func applyPeriod(filter *commands.ReceiptPagedRequestFilter, period commands.ReportPeriod, now time.Time) string {
 	start, end := resolvePeriodBounds(period, now)
 
 	dayStart := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, now.Location())
 	dayEnd := time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 999999999, now.Location())
 
-	filter.Date = commands.PagedRequestField{
+	field := filter.DateFilterField(period.DateFilterKey())
+	if field == nil {
+		field = &filter.Date
+	}
+	*field = commands.PagedRequestField{
 		Operation: commands.BETWEEN,
 		Value:     []interface{}{dayStart, dayEnd},
 	}

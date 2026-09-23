@@ -6656,6 +6656,14 @@ components:
         endDate:
           type: string
           description: End date (YYYY-MM-DD), read only when preset is custom
+        dateField:
+          type: string
+          description: >-
+            Which receipt date the period covers, as a ReceiptPagedRequestFilter
+            date key: date, resolvedDate or createdAt. Omitted means date. A plain
+            string rather than an enum on purpose: this rides inside
+            ReportTemplate.configuration, and a value added to a closed enum
+            would fail that whole payload on already-released mobile builds.
     ReportDetail:
       type: object
       required:

@@ -2092,6 +2092,44 @@ formulas reference by name with ASCII operators; group-by/detail carry engine fi
 client maps its builder UI onto engine-shaped values before submitting. Report generation is **synchronous**
 (streamed download); an async job + live progress + stored-results download is a possible later slice.
 
+**The period's date field (`ReportPeriod.dateField`).** A period covers one receipt date: `date`,
+`resolvedDate` or `createdAt`. These are the `ReceiptPagedRequestFilter` JSON keys, and the same fields,
+in the same order, as the receipts table's quick date filter, whose list drives the Report Builder's
+picker.
+- **Mapping and validation both live in `commands`.** `ReceiptDateFilterKeys()` pins the list and
+  `(*ReceiptPagedRequestFilter).DateFilterField(key)` returns the matching slot.
+  `validatePeriod` accepts a key only if `DateFilterField` resolves it, so the two cannot disagree. A
+  bad value is a 400 under the `period` key, reported after the preset checks.
+- **`applyPeriod` writes the BETWEEN onto that one slot**, overwriting whatever condition it held.
+  The preamble, `Meta.Params["Period"]` and `{{period}}` are unchanged.
+  - An unknown value falls back to `Date`. `GenerateReportFromTemplate` and the dashboard render path
+    run a stored configuration without re-validating it, so the fallback stays lenient, like
+    `resolvePeriodBounds`' default.
+  - Only the chosen slot is overwritten, so a builder **Date** filter now ANDs with a period on
+    another field. On `date` it is still replaced, as before.
+  - A nil `resolved_date` never matches, so a Resolved Date period excludes every unresolved receipt,
+    DECLINED included.
+- **Empty means `date`** (`ReportPeriod.DateFilterKey()`). That is how templates saved before the field
+  existed keep their meaning: no migration, and `CurrentReportConfigurationVersion` stays 1. The Go
+  field is `json:"dateField,omitempty"`. Templates are stored with `json.Marshal`, and the tag keeps an
+  empty value out of the blob instead of storing `""`.
+- **It is a plain `type: string` in swagger, deliberately not an enum.** `ReportPeriod` rides inside
+  `ReportTemplate.configuration`, a response the mobile client deserializes. A closed dart-dio enum
+  would throw on the first date key added later and fail the whole template payload on every
+  already-released build. `TestReportPeriodDateFieldIsAnOpenStringOnTheContract` parses `swagger.yml`
+  to hold that.
+- **Adding a date key** means `ReceiptDateFilterKeys()`, `DateFilterField`, the swagger description,
+  and desktop's `RECEIPT_DATE_FILTER_FIELDS`. `TestReceiptDateFilterKeys` pins the list, and
+  `TestReceiptDateFilterKeysAreFilterJsonKeys` checks it against the struct by reflection.
+- **Tests:**
+  - `commands/report_request_command_test.go` and `paged_request_command_test.go`: validation,
+    marshalling, and the sync guards above.
+  - `services/report_period_date_field_test.go`: DB-backed, one receipt per field, with inclusive
+    bounds, presets, and the AND with a Date filter.
+  - `handlers/report_period_date_field_test.go`: preview, template CRUD, and the unvalidated
+    render/generate-from-template paths.
+  - `repositories/report_template_test.go`: the stored blob.
+
 **`POST /api/report/preview`** drives the desktop builder's live preview. It shares GenerateReport's
 front-loaded parse/validate and the same per-group `group.reports.read` gate (the shared
 `loadReportCommand` handler helper), and `ReportService.Preview` runs the **same** pipeline as `Generate`
