@@ -1,0 +1,129 @@
+@use "sass:color";
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+// Tints carry the default dark text. The line tints are the palettes' 50 shade
+// lightened further so a long diff stays readable; the stronger inline mark is
+// the 200 shade, which still gives the dark text well over 4.5:1.
+$removed-line: color.mix(map.get(variables.$warn-palette, 50), white, 45%);
+$removed-mark: map.get(variables.$warn-palette, 200);
+$added-line: map.get(variables.$success-palette, 50);
+$added-mark: map.get(variables.$success-palette, 200);
+$empty-side: map.get(variables.$accent-palette, 100);
+$divider: map.get(variables.$accent-palette, 200);
+
+// The diff scrolls in its own box rather than in mat-dialog-content, for two
+// reasons: a sticky header pins to its scroll container's padding edge, and
+// mat-dialog-content has 20px of padding that rows would show through above the
+// header; and the Close button stays in view below a long diff. 65vh is
+// mat-dialog-content's own cap; 6rem leaves room for its padding and the Close
+// row, so the dialog never scrolls as well.
+.receipt-diff-scroll {
+  max-height: calc(65vh - 6rem);
+  overflow: auto;
+}
+
+.receipt-diff {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.5rem;
+    background: white;
+    border-bottom: 1px solid $divider;
+    font-family: inherit;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  td {
+    vertical-align: top;
+  }
+}
+
+.receipt-diff__number-col {
+  width: 3.5rem;
+}
+
+.receipt-diff__number {
+  padding: 0 0.5rem;
+  color: variables.$basic-gray;
+  text-align: right;
+  user-select: none;
+}
+
+.receipt-diff__code {
+  padding: 0 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.receipt-diff__right-start {
+  border-left: 1px solid $divider;
+}
+
+.receipt-diff__timestamp {
+  margin-left: 0.5rem;
+  color: variables.$basic-gray;
+  font-weight: 400;
+}
+
+.receipt-diff__changed {
+  padding: 0;
+  color: inherit;
+  border-radius: 2px;
+}
+
+.receipt-diff__row--removed td,
+.receipt-diff__row--changed td:nth-child(-n + 2) {
+  background: $removed-line;
+
+  .receipt-diff__changed {
+    background: $removed-mark;
+  }
+}
+
+.receipt-diff__row--added td,
+.receipt-diff__row--changed td:nth-child(n + 3) {
+  background: $added-line;
+
+  .receipt-diff__changed {
+    background: $added-mark;
+  }
+}
+
+// After the tints, so an empty side of an added/removed row stays neutral.
+.receipt-diff td.receipt-diff__empty {
+  background: $empty-side;
+}
+
+.receipt-diff__collapsed td {
+  padding: 0.25rem 0.5rem;
+  background: $empty-side;
+  color: variables.$basic-gray;
+  font-style: italic;
+  text-align: center;
+}
+
+.receipt-diff__stats {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.receipt-diff__stats-added {
+  margin-right: 0.5rem;
+  color: map.get(variables.$success-palette, 800);
+}
+
+.receipt-diff__stats-removed {
+  color: map.get(variables.$warn-palette, 700);
+}

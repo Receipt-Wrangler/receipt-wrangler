@@ -121,7 +121,18 @@ func (repository ReceiptRepository) UpdateReceipt(id string, command commands.Up
 	// NOTE: ID and field used for afterReceiptUpdated
 	updatedReceipt.ID = currentReceipt.ID
 	updatedReceipt.ResolvedDate = currentReceipt.ResolvedDate
-	before, err := currentReceipt.ToString()
+
+	// The "before" snapshot uses the same loader as "after" below, so the two
+	// sides of the system task diff are loaded to the same depth. currentReceipt
+	// only preloads one level (no item categories/tags/linked items, no custom
+	// field definitions, linked items not yet filtered out), which would make
+	// every update look like it changed those.
+	beforeReceipt, err := repository.GetFullyLoadedReceiptById(id)
+	if err != nil {
+		createFailedUpdateSystemTask(systemTask, err)
+		return models.Receipt{}, err
+	}
+	before, err := beforeReceipt.ToString()
 	if err != nil {
 		createFailedUpdateSystemTask(systemTask, err)
 		return models.Receipt{}, err

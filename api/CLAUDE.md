@@ -1320,6 +1320,22 @@ from the broken one. The behavioural cases (`...FiltersByType`, `...FiltersByRan
 `totalCount` alongside the rows. Also `commands/get_system_task_command_test.go` (the wire keys, the
 `float64` ids, and an absent `filter` staying zero-valued).
 
+## Receipt update snapshots (`RECEIPT_UPDATED`)
+
+`ReceiptRepository.UpdateReceipt` records a `RECEIPT_UPDATED` system task whose description is
+`{"before": "<receipt JSON>", "after": "<receipt JSON>"}`. Each side is `Receipt.ToString()`, so the
+value is **double-encoded**. The desktop parses it itself and renders a side-by-side diff (see
+`desktop/CLAUDE.md` → "Receipt update diff"), so keep the format stable: an old row must still parse.
+
+**Both sides are loaded with `GetFullyLoadedReceiptById`.** `before` used to be serialized from
+`currentReceipt`, which only preloads `clause.Associations`, one level deep. Loaded that way, the
+snapshot has no item categories, tags or linked items and no custom field definitions, and it lists
+linked items as top-level items (`FilterLinkedItemsFromReceiptItems` never ran). Every update would
+then diff as a change to all of those. `currentReceipt` itself is left alone, because the update
+relies on it (`BeforeUpdateReceipt`, `Model(&currentReceipt)`). The snapshot is one extra read.
+Pinned by `TestUpdateReceiptSystemTaskSnapshotsAreLoadedToTheSameDepth`, which fails with the old
+loader.
+
 ## Receipt statuses
 
 `models.ReceiptStatus` (`internal/models/receipt_status.go`) is a plain Go `string` type — there is

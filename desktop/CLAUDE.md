@@ -1790,6 +1790,47 @@ the Jest specs cannot: the server narrows (`totalCount` included, which is what 
 land before the count), the "System" sentinel matches unattributed rows, a Started At of the task's
 own day matches while the previous day does not, and the filter survives a reload.
 
+## Receipt update diff (System Tasks)
+
+An **Updated Receipt** (`RECEIPT_UPDATED`) row stores the receipt before and after the edit. The
+description cell summarizes it ("Changed: name, amount", or "No changes") and its open button shows
+`app-receipt-update-diff-dialog` (`src/shared-ui/receipt-update-diff-dialog/`): the two receipts as
+pretty-printed JSON, before on the left and after on the right, like a split-view diff.
+
+- **The description is double-encoded, which is why it has its own parser.** The API stores
+  `{"before":"<receipt JSON>","after":"<receipt JSON>"}`, each side a JSON *string*.
+  `PrettyJsonPipe`'s cleanup rewrites every `"` inside a string value to `'`, so the rebuilt text is
+  invalid JSON and the pipe falls back to printing the raw escaped string. That was the "busted"
+  display. `parseReceiptUpdateDescription` (`src/utils/receipt-update-description.ts`) parses each
+  side once more and never throws. A **failed** update stores its plain error text, which returns
+  `undefined`, and that row renders through the old `app-pretty-json` path like every other task.
+  `RECEIPT_UPDATED` is the only double-encoded type, so the pipe is untouched.
+- **`TaskTableComponent.receiptUpdates` parses once per page** (a `computed` over the data source,
+  keyed by task id), not per change-detection pass, since each row holds two whole receipts.
+- **The summary ignores `updatedAt` at every depth.** The save bumps the receipt's timestamp, and
+  upserting its categories and tags bumps theirs, so counting it would list `categories` and `tags`
+  on every row. The **diff itself is deliberately raw**: those timestamp lines, and item ids (items are
+  recreated on update), still show as changed there.
+- **The diff is hand-written** (`src/utils/line-diff.ts`): it trims the common prefix and suffix, runs
+  Myers' O(ND) diff on the rest, and keeps each round's frontier only for the diagonals it can read,
+  so memory is O(D²). Removed and added lines in one run are paired side by side as `changed` rows,
+  and `inlineChange` marks the part that differs. It avoids a new runtime dependency (and the
+  sandbox lockfile drift above). `line-diff.spec.ts` fuzzes it against a reference LCS, so a
+  regression that stays *valid* but stops being *minimal* still fails.
+- **"All lines" is the default**, and "Changes only" (`collapseUnchanged`, 3 lines of context)
+  replaces longer unchanged runs with a "⋯ N unchanged lines" row. A run of one line is shown rather
+  than replaced by a marker the same size.
+- **The code cell's content is written on one template line.** The column is `white-space: pre-wrap`,
+  so template whitespace inside the `<td>` would render as indentation.
+- **Snapshots are loaded to the same depth only since this change** (see `api/CLAUDE.md` → "Receipt
+  update snapshots"). Rows written earlier have a shallow `before`, so their item categories and
+  tags, linked items and custom field definitions show as changed even when they weren't.
+
+**E2E:** `e2e/receipt-update-diff.spec.ts` updates a receipt through the real API and asserts the
+row summary, the old/new name on the correct sides, and the "Changes only" collapse. It narrows the
+paged response to its own task with `page.route` + `route.fetch()`, so the row is still the real
+server's output while other specs' tasks stay out of the way.
+
 ## Quick Scan Configuration
 
 - **Group receipt settings** (`src/group/group-receipt-settings/`) has a **Quick Scan** section: per
