@@ -20,6 +20,10 @@ import {
 //
 // The table is shared with every other spec's tasks, so the paged response is
 // narrowed to this spec's own task. The row itself is still the real server's.
+//
+// The receipt carries an item on both sides of the update under test. The
+// server deletes and recreates items on every save, so the item comes back with
+// a new id and timestamps; the summary must still list only what was edited.
 
 test.use({ storageState: 'e2e/.auth/admin.json' });
 
@@ -42,24 +46,42 @@ test.describe('Receipt update diff', () => {
         amount: '10.00',
       });
 
-      const res = await api.put(`/api/receipt/${receiptId}`, {
-        data: {
-          name: newName,
-          amount: '12.50',
-          date: '2024-01-01T00:00:00Z',
-          groupId,
-          paidByUserId,
-          status: 'OPEN',
-        },
-      });
-      expect(res.ok()).toBe(true);
+      const update = async (name: string, amount: string) => {
+        const res = await api.put(`/api/receipt/${receiptId}`, {
+          data: {
+            name,
+            amount,
+            date: '2024-01-01T00:00:00Z',
+            groupId,
+            paidByUserId,
+            status: 'OPEN',
+            receiptItems: [
+              {
+                receiptId,
+                name: 'Pizza',
+                amount: '10.00',
+                chargedToUserId: paidByUserId,
+                status: 'OPEN',
+              },
+            ],
+          },
+        });
+        expect(res.ok()).toBe(true);
+      };
+
+      // Adds the item; this spec does not look at that update's row.
+      await update(oldName, '10.00');
+      // The update under test: same item, new name and amount.
+      await update(newName, '12.50');
 
       const tasks = await apiPagedSystemTasks(api, {
         type: { operation: 'CONTAINS', value: ['RECEIPT_UPDATED'] },
       });
-      const task = tasks.data.find((row) => row.associatedEntityId === receiptId);
-      expect(task).toBeDefined();
-      taskId = task!.id;
+      const ownTaskIds = tasks.data
+        .filter((row) => row.associatedEntityId === receiptId)
+        .map((row) => row.id as number);
+      expect(ownTaskIds).toHaveLength(2);
+      taskId = Math.max(...ownTaskIds);
     });
   });
 
@@ -84,7 +106,7 @@ test.describe('Receipt update diff', () => {
     await page.goto('/system-settings/system-tasks');
   };
 
-  test('the row summarizes what changed instead of printing the raw description', async ({ page }) => {
+  test('the row summarizes only what was edited, not the recreated item', async ({ page }) => {
     await gotoOwnTask(page);
 
     await expect(page.getByTestId('receipt-update-summary')).toHaveText('Changed: name, amount');

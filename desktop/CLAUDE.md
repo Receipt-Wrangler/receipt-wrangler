@@ -1807,10 +1807,13 @@ pretty-printed JSON, before on the left and after on the right, like a split-vie
   `RECEIPT_UPDATED` is the only double-encoded type, so the pipe is untouched.
 - **`TaskTableComponent.receiptUpdates` parses once per page** (a `computed` over the data source,
   keyed by task id), not per change-detection pass, since each row holds two whole receipts.
-- **The summary ignores `updatedAt` at every depth.** The save bumps the receipt's timestamp, and
-  upserting its categories and tags bumps theirs, so counting it would list `categories` and `tags`
-  on every row. The **diff itself is deliberately raw**: those timestamp lines, and item ids (items are
-  recreated on update), still show as changed there.
+- **The summary ignores the record-keeping fields at every depth**: the API's `BaseModel`, i.e.
+  `id`, `createdAt`, `updatedAt`, `createdBy` and `createdByString`. An update deletes and recreates
+  the receipt's items (linked items included) and custom field values, so they come back with new ids
+  and timestamps on *every* save, and it bumps `updatedAt` on the receipt, its categories and its tags.
+  Comparing those would list `receiptItems`, `customFields`, `categories` and `tags` on every row
+  whose receipt has any. The **diff itself is deliberately raw**, so those lines still show as changed
+  there.
 - **The diff is hand-written** (`src/utils/line-diff.ts`): it trims the common prefix and suffix, runs
   Myers' O(ND) diff on the rest, and keeps each round's frontier only for the diagonals it can read,
   so memory is O(D²). Removed and added lines in one run are paired side by side as `changed` rows,
@@ -1827,7 +1830,9 @@ pretty-printed JSON, before on the left and after on the right, like a split-vie
   tags, linked items and custom field definitions show as changed even when they weren't.
 
 **E2E:** `e2e/receipt-update-diff.spec.ts` updates a receipt through the real API and asserts the
-row summary, the old/new name on the correct sides, and the "Changes only" collapse. It narrows the
+row summary, the old/new name on the correct sides, and the "Changes only" collapse. The receipt
+keeps an unchanged item across the update under test, so the summary assertion also proves the
+server-side item recreation is not reported as an edit (it fails if only `updatedAt` is ignored). It narrows the
 paged response to its own task with `page.route` + `route.fetch()`, so the row is still the real
 server's output while other specs' tasks stay out of the way.
 

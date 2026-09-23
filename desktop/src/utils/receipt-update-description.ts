@@ -6,11 +6,14 @@ export interface ReceiptUpdateSnapshots {
 }
 
 /**
- * Ignored by the changed-keys summary, at every depth. The save itself bumps
- * the receipt's `updatedAt`, and upserting its categories and tags bumps
- * theirs, so counting it would list `categories` and `tags` on every row.
+ * Record-keeping fields (the API's BaseModel) the changed-keys summary ignores
+ * at every depth. None of them change because the user edited something:
+ * saving a receipt deletes and recreates its items and custom field values, so
+ * those get new ids and timestamps on every save, and it bumps `updatedAt` on
+ * the receipt and on its categories and tags. Counting them would list
+ * `receiptItems`, `customFields`, `categories` and `tags` on every row.
  */
-const SUMMARY_IGNORED_KEY = "updatedAt";
+const SUMMARY_IGNORED_KEYS = new Set(["id", "createdAt", "updatedAt", "createdBy", "createdByString"]);
 
 /**
  * Reads a RECEIPT_UPDATED system task's description.
@@ -44,17 +47,18 @@ export function parseReceiptUpdateDescription(
 
 /**
  * The top-level receipt keys whose values differ between the two snapshots,
- * in the order the receipt serializes them. `updatedAt` changes are ignored.
+ * in the order the receipt serializes them. Record-keeping fields are ignored
+ * (see {@link SUMMARY_IGNORED_KEYS}), so a key is listed only for a real edit.
  */
 export function changedTopLevelKeys(before: ReceiptSnapshot, after: ReceiptSnapshot): string[] {
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
-  const withoutUpdatedAt = (value: unknown) =>
-    JSON.stringify(value, (key, nested) => (key === SUMMARY_IGNORED_KEY ? undefined : nested));
+  const withoutRecordKeeping = (value: unknown) =>
+    JSON.stringify(value, (key, nested) => (SUMMARY_IGNORED_KEYS.has(key) ? undefined : nested));
 
   return [...keys].filter(
     (key) =>
-      key !== SUMMARY_IGNORED_KEY &&
-      withoutUpdatedAt(before[key]) !== withoutUpdatedAt(after[key]),
+      !SUMMARY_IGNORED_KEYS.has(key) &&
+      withoutRecordKeeping(before[key]) !== withoutRecordKeeping(after[key]),
   );
 }
 

@@ -58,6 +58,46 @@ describe("changedTopLevelKeys", () => {
       .toEqual(["categories"]);
   });
 
+  // Saving deletes and recreates items (linked items included) and custom
+  // field values, so each comes back with a new id, timestamps and creator.
+  describe("records the save recreates", () => {
+    const record = { id: 5, createdAt: "t1", updatedAt: "t1", createdBy: null, createdByString: "" };
+    const recreated = { id: 9, createdAt: "t2", updatedAt: "t2", createdBy: 1, createdByString: "Admin" };
+    const pizza = (bookkeeping: object, overrides: object = {}) => ({
+      ...bookkeeping,
+      name: "Pizza",
+      amount: "20",
+      receiptId: 4,
+      categories: [{ ...record, name: "Groceries" }],
+      linkedItems: [{ ...bookkeeping, name: "Pizza share", amount: "10", receiptId: 4 }],
+      ...overrides,
+    });
+    const poNumber = (bookkeeping: object, stringValue: string) => ({
+      ...bookkeeping,
+      receiptId: 4,
+      customFieldId: 1,
+      customField: { ...record, name: "PO Number", type: "TEXT" },
+      stringValue,
+    });
+
+    it("does not list an item or custom field value that was only recreated", () => {
+      const before = { receiptItems: [pizza(record)], customFields: [poNumber(record, "PO-1182")] };
+      const after = { receiptItems: [pizza(recreated)], customFields: [poNumber(recreated, "PO-1182")] };
+
+      expect(changedTopLevelKeys(before, after)).toEqual([]);
+    });
+
+    it("still lists a real edit to one", () => {
+      const before = { receiptItems: [pizza(record)], customFields: [poNumber(record, "PO-1182")] };
+      const after = {
+        receiptItems: [pizza(recreated, { amount: "18" })],
+        customFields: [poNumber(recreated, "PO-1183")],
+      };
+
+      expect(changedTopLevelKeys(before, after)).toEqual(["receiptItems", "customFields"]);
+    });
+  });
+
   it("includes a key present on only one side", () => {
     expect(changedTopLevelKeys({ id: 1 }, { id: 1, resolvedDate: "2026-09-01" })).toEqual(["resolvedDate"]);
   });
