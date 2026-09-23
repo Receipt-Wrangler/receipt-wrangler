@@ -18,8 +18,11 @@ import {
 // that format by hand; this proves the desktop reads what the real server
 // writes, and that the before/after diff puts each side where it belongs.
 //
-// The table is shared with every other spec's tasks, so the paged response is
-// narrowed to this spec's own task. The row itself is still the real server's.
+// The table is shared with every other spec's tasks, so the page's request is
+// narrowed to this spec's receipt (its associated entity) and the response to
+// its own task. Narrowing only the response would race: tasks other specs write
+// in parallel can push this one off page 1. The row itself is still the real
+// server's.
 //
 // The receipt carries an item on both sides of the update under test. The
 // server deletes and recreates items on every save, so the item comes back with
@@ -33,13 +36,14 @@ test.describe('Receipt update diff', () => {
   const oldName = uniqueName('diff-before');
   const newName = uniqueName('diff-after');
   let groupId: number;
+  let receiptId: number;
   let taskId: number;
 
   test.beforeAll(async () => {
     await withAdminApi(async (api) => {
       const paidByUserId = await apiGetUserId(api, creds('admin').username);
       groupId = (await apiCreateGroup(api, uniqueName('diff-group'))).id;
-      const receiptId = await apiCreateReceipt(api, {
+      receiptId = await apiCreateReceipt(api, {
         groupId,
         paidByUserId,
         name: oldName,
@@ -101,7 +105,10 @@ test.describe('Receipt update diff', () => {
   const gotoOwnTask = async (page: Page): Promise<void> => {
     await stubTokenRefresh(page);
     await page.route('**/api/systemTask/getPagedSystemTasks', async (route) => {
-      const response = await route.fetch();
+      const request = route.request().postDataJSON() ?? {};
+      const response = await route.fetch({
+        postData: { ...request, page: 1, associatedEntityType: 'RECEIPT', associatedEntityId: receiptId },
+      });
       const body = await response.json();
       const data = (body.data ?? []).filter((row: { id: number }) => row.id === taskId);
       await route.fulfill({ response, json: { ...body, data, totalCount: data.length } });
