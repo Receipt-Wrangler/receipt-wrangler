@@ -1,0 +1,115 @@
+<app-dialog
+  data-testid="receipt-diff-dialog"
+  [headerText]="headerText"
+  [actionsTemplate]="actions"
+>
+  <div class="receipt-diff-scroll">
+    @if (beforeState !== "complete") {
+      <div
+        class="alert receipt-diff__notice"
+        role="note"
+        data-testid="receipt-diff-version-notice"
+        [attr.data-before-state]="beforeState"
+        [class.alert-info]="beforeState === 'rebuilt'"
+        [class.alert-warning]="beforeState === 'incomplete'"
+      >
+        @if (beforeSource) {
+          This change was recorded by an older version, whose own copy of the
+          receipt before the change is incomplete. <strong>Before</strong> shows
+          the receipt as saved
+          {{
+            beforeSource.type === SystemTaskType.ReceiptUploaded
+              ? "when it was created"
+              : "by the previous update"
+          }}
+          ({{ beforeSource.recordedAt | date: "medium" }}) instead. Changes made
+          without editing the receipt, such as bulk status updates, can also
+          show here.
+        } @else {
+          This change was recorded by an older version, and no earlier complete
+          copy of this receipt exists. Item categories and tags, shares and
+          custom field names can show as changed when they weren't.
+        }
+      </div>
+    }
+    <table class="receipt-diff">
+      <colgroup>
+        <col class="receipt-diff__number-col" />
+        <col />
+        <col class="receipt-diff__number-col" />
+        <col />
+      </colgroup>
+      <thead>
+        <tr>
+          <th colspan="2">
+            Before
+            @if (beforeUpdatedAt) {
+              <span class="receipt-diff__timestamp">{{ beforeUpdatedAt | date: "medium" }}</span>
+            }
+          </th>
+          <th colspan="2" class="receipt-diff__right-start">
+            After
+            @if (afterUpdatedAt) {
+              <span class="receipt-diff__timestamp">{{ afterUpdatedAt | date: "medium" }}</span>
+            }
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of displayRows(); track $index) {
+          @if (row.kind === "collapsed") {
+            <tr class="receipt-diff__collapsed" data-testid="receipt-diff-collapsed">
+              <td colspan="4">⋯ {{ row.count }} unchanged lines</td>
+            </tr>
+          } @else {
+            <tr
+              data-testid="receipt-diff-row"
+              [attr.data-kind]="row.kind"
+              [class]="'receipt-diff__row receipt-diff__row--' + row.kind"
+            >
+              <ng-container
+                *ngTemplateOutlet="cell; context: { $implicit: row.left, side: 'left' }"
+              ></ng-container>
+              <ng-container
+                *ngTemplateOutlet="cell; context: { $implicit: row.right, side: 'right' }"
+              ></ng-container>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+  <div class="d-flex justify-content-end mt-3">
+    <app-button
+      buttonText="Close"
+      matButtonType="basic"
+      (clicked)="close()"
+    ></app-button>
+  </div>
+</app-dialog>
+
+<ng-template #actions>
+  <div class="d-flex align-items-center gap-3">
+    <span class="receipt-diff__stats" data-testid="receipt-diff-stats">
+      <span class="receipt-diff__stats-added">+{{ addedLineCount }}</span>
+      <span class="receipt-diff__stats-removed">−{{ removedLineCount }}</span>
+    </span>
+    <app-filter-bar
+      data-testid="receipt-diff-view"
+      [tabs]="tabs"
+      [value]="view()"
+      (valueChange)="setView($event)"
+    ></app-filter-bar>
+    <app-copy-button
+      [text]="copyText"
+      tooltip="Copy before and after as JSON"
+    ></app-copy-button>
+  </div>
+</ng-template>
+
+<!-- Each cell is written on one line: the code column is white-space: pre-wrap,
+     so template whitespace inside it would render. -->
+<ng-template #cell let-line let-side="side">
+  <td class="receipt-diff__number" [class.receipt-diff__right-start]="side === 'right'" [class.receipt-diff__empty]="!line">{{ line?.lineNumber }}</td>
+  <td class="receipt-diff__code" [attr.data-side]="side" [class.receipt-diff__empty]="!line">@if (line) {<ng-container>{{ line.prefix }}</ng-container>@if (line.changed) {<mark class="receipt-diff__changed">{{ line.changed }}</mark>}<ng-container>{{ line.suffix }}</ng-container>}</td>
+</ng-template>

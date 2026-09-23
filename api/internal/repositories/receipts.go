@@ -71,6 +71,18 @@ func (repository ReceiptRepository) BeforeUpdateReceipt(currentReceipt models.Re
 	return nil
 }
 
+// ReceiptUpdateDescriptionVersion marks the format of a RECEIPT_UPDATED
+// system task's description, stored under its "version" key. The desktop reads
+// it to decide how far to trust the "before" snapshot:
+//
+//   - 1 (no "version" key): "before" was loaded one level deep, so it lacks
+//     item categories/tags/linked items and custom field definitions, and it
+//     lists linked items as top-level items.
+//   - 2: "before" is loaded with GetFullyLoadedReceiptById, like "after".
+//
+// Bump it whenever the snapshot format changes.
+const ReceiptUpdateDescriptionVersion = 2
+
 func createFailedUpdateSystemTask(command commands.UpsertSystemTaskCommand, err error) {
 	endedAt := time.Now()
 	command.EndedAt = &endedAt
@@ -121,7 +133,18 @@ func (repository ReceiptRepository) UpdateReceipt(id string, command commands.Up
 	// NOTE: ID and field used for afterReceiptUpdated
 	updatedReceipt.ID = currentReceipt.ID
 	updatedReceipt.ResolvedDate = currentReceipt.ResolvedDate
-	before, err := currentReceipt.ToString()
+
+	// The "before" snapshot uses the same loader as "after" below, so the two
+	// sides of the system task diff are loaded to the same depth. currentReceipt
+	// only preloads one level (no item categories/tags/linked items, no custom
+	// field definitions, linked items not yet filtered out), which would make
+	// every update look like it changed those.
+	beforeReceipt, err := repository.GetFullyLoadedReceiptById(id)
+	if err != nil {
+		createFailedUpdateSystemTask(systemTask, err)
+		return models.Receipt{}, err
+	}
+	before, err := beforeReceipt.ToString()
 	if err != nil {
 		createFailedUpdateSystemTask(systemTask, err)
 		return models.Receipt{}, err
@@ -217,6 +240,7 @@ func (repository ReceiptRepository) UpdateReceipt(id string, command commands.Up
 	}
 
 	systemTaskResultDescription["after"] = after
+	systemTaskResultDescription["version"] = ReceiptUpdateDescriptionVersion
 	endedAt = time.Now()
 	systemTask.EndedAt = &endedAt
 

@@ -1320,6 +1320,49 @@ from the broken one. The behavioural cases (`...FiltersByType`, `...FiltersByRan
 `totalCount` alongside the rows. Also `commands/get_system_task_command_test.go` (the wire keys, the
 `float64` ids, and an absent `filter` staying zero-valued).
 
+## Receipt update snapshots (`RECEIPT_UPDATED`)
+
+`ReceiptRepository.UpdateReceipt` records a `RECEIPT_UPDATED` system task whose description is
+`{"before": "<receipt JSON>", "after": "<receipt JSON>", "version": 2}`. Each side is
+`Receipt.ToString()`, so the value is **double-encoded**. The desktop parses it itself and renders a
+side-by-side diff (see `desktop/CLAUDE.md` → "Receipt update diff"), so keep the format stable: an old
+row must still parse.
+
+**The format is versioned** by `repositories.ReceiptUpdateDescriptionVersion`. A row with **no
+`version` key is version 1**: its "before" is incomplete (below). **Version 2** rows have a complete
+"before". Bump the constant whenever the snapshot format changes; the repository test pins the
+literal `2`, and the desktop's `COMPLETE_RECEIPT_UPDATE_VERSION` must agree.
+
+**Both sides are loaded with `GetFullyLoadedReceiptById`.** `before` used to be serialized from
+`currentReceipt`, which only preloads `clause.Associations`, one level deep. Loaded that way, the
+snapshot has no item categories, tags or linked items and no custom field definitions, and it lists
+linked items as top-level items (`FilterLinkedItemsFromReceiptItems` never ran). Every update would
+then diff as a change to all of those. `currentReceipt` itself is left alone, because the update
+relies on it (`BeforeUpdateReceipt`, `Model(&currentReceipt)`). The snapshot is one extra read.
+Pinned by `TestUpdateReceiptSystemTaskSnapshotsAreLoadedToTheSameDepth`, which fails with the old
+loader.
+
+**Version 1 rows are rebuilt on read, never rewritten.** `GetSystemTasks` passes each page through
+`SystemTaskService.UpcastReceiptUpdateDescriptions` (`services/receipt_update_history.go`). For every
+successful version 1 row it swaps the incomplete "before" for the **nearest earlier complete copy of
+the same receipt**: the previous `RECEIPT_UPDATED` row's "after", or the `RECEIPT_UPLOADED` copy
+stored when the receipt was created. The form, Quick Scan, email and duplicate all store one. It adds
+`"beforeSource": {type, systemTaskId, recordedAt}` and keeps `version: 1`.
+- **One query per page** fetches the candidates, below the page's highest version 1 id.
+- A receipt is matched on `receipt_id`, or on `associated_entity_type = RECEIPT` plus its id.
+  Quick Scan and email uploads carry only the former; old rows may carry only the latter.
+- A candidate is used only if it parses and its `id` is that receipt's.
+- A row with no usable candidate is left as stored.
+- Why it stays version 1: a change that writes no update row, such as a bulk status change, falls
+  inside a rebuilt comparison, and a version 2 row's own "before" would not have it.
+- Why on read: `resultDescription` is a free-form string, so there is no swagger change or client
+  regeneration. Mobile never reads it. And the stored history is never rewritten.
+- Only the System Tasks listing does this; `getPagedActivities` doesn't display descriptions.
+
+Tests: `services/receipt_update_history_test.go` covers the matching rules, and
+`handlers/system_task_handler_test.go` → `TestGetSystemTasksRebuildsVersionOneReceiptUpdates`
+covers the listing.
+
 ## Receipt statuses
 
 `models.ReceiptStatus` (`internal/models/receipt_status.go`) is a plain Go `string` type — there is

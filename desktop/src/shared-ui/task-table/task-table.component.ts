@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, Inject, OnInit, signal, TemplateRef, input, viewChild } from "@angular/core";
+import { AfterViewInit, Component, computed, Inject, OnInit, signal, TemplateRef, input, viewChild } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
 import { PageEvent } from "@angular/material/paginator";
@@ -8,10 +8,17 @@ import { catchError, EMPTY, Subject, switchMap, tap } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants/dialog.constant";
 import { AssociatedEntityType, GetSystemTaskCommand, SystemTask, SystemTaskPagedRequestFilter, SystemTaskService, SystemTaskType } from "../../open-api";
 import { BaseTableService } from "../../services/base-table.service";
+import { changedTopLevelKeys, parseReceiptUpdateDescription, ReceiptUpdateSnapshots } from "../../utils/receipt-update-description";
 import { toSystemTaskWireFilter } from "../../utils/system-task-filter";
 import { TABLE_SERVICE_INJECTION_TOKEN } from "../../services/injection-tokens/table-service";
 import { TableColumn } from "../../table/table-column.interface";
 import { DescriptionViewerDialogComponent, DescriptionViewerDialogData } from "../description-viewer-dialog/description-viewer-dialog.component";
+import { ReceiptUpdateDiffDialogComponent, ReceiptUpdateDiffDialogData } from "../receipt-update-diff-dialog/receipt-update-diff-dialog.component";
+
+interface ReceiptUpdateRow {
+  snapshots: ReceiptUpdateSnapshots;
+  changedKeys: string[];
+}
 
 @Component({
   selector: "app-task-table",
@@ -62,6 +69,26 @@ export class TaskTableComponent implements OnInit, AfterViewInit {
 
   public totalCount = signal(0);
 
+  /**
+   * RECEIPT_UPDATED rows whose description parses, keyed by task id. Parsed
+   * once per page rather than per change-detection pass, since each one holds
+   * two whole receipts. A row missing from the map (a failed update stores its
+   * plain error text) renders like any other task.
+   */
+  public readonly receiptUpdates = computed(() => {
+    const updates = new Map<number, ReceiptUpdateRow>();
+    for (const task of this.dataSource().data) {
+      if (task.type !== SystemTaskType.ReceiptUpdated) {
+        continue;
+      }
+      const snapshots = parseReceiptUpdateDescription(task.resultDescription);
+      if (snapshots) {
+        updates.set(task.id, { snapshots, changedKeys: changedTopLevelKeys(snapshots.before, snapshots.after) });
+      }
+    }
+    return updates;
+  });
+
   public rowExpandable: (row: SystemTask) => boolean = (systemTask) => (systemTask?.childSystemTasks?.length || 0) > 0;
 
   // Descriptions shorter than this render inline without a "View More"
@@ -85,6 +112,16 @@ export class TaskTableComponent implements OnInit, AfterViewInit {
     };
     this.dialog.open(DescriptionViewerDialogComponent, {
       ...DEFAULT_DIALOG_CONFIG,
+      data,
+    });
+  }
+
+  public openReceiptUpdateDialog(snapshots: ReceiptUpdateSnapshots): void {
+    const data: ReceiptUpdateDiffDialogData = { snapshots };
+    this.dialog.open(ReceiptUpdateDiffDialogComponent, {
+      ...DEFAULT_DIALOG_CONFIG,
+      width: "90vw",
+      maxWidth: "1400px",
       data,
     });
   }

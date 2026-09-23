@@ -1,12 +1,14 @@
 import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { MatDialog } from "@angular/material/dialog";
 import { NgxsModule } from "@ngxs/store";
-import { FilterOperation, SystemTaskPagedRequestFilter } from "../../open-api";
+import { FilterOperation, SystemTask, SystemTaskPagedRequestFilter, SystemTaskStatus, SystemTaskType } from "../../open-api";
 import { TABLE_SERVICE_INJECTION_TOKEN } from "../../services/injection-tokens/table-service";
 import { SystemEmailTaskTableService } from "../../services/system-email-task-table.service";
 import { SystemEmailTaskTableState } from "../../store/system-email-task-table.state";
 
+import { ReceiptUpdateDiffDialogComponent } from "../receipt-update-diff-dialog/receipt-update-diff-dialog.component";
 import { TaskTableComponent } from "./task-table.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -120,5 +122,49 @@ describe("TaskTableComponent", () => {
     requests[1].flush({ data: [], totalCount: 3 });
 
     expect(component.totalCount()).toBe(3);
+  });
+  describe("receipt update rows", () => {
+    const before = { id: 1, updatedAt: "2026-09-22T10:00:00Z", name: "Costco", amount: "42.1" };
+    const after = { id: 1, updatedAt: "2026-09-23T10:00:00Z", name: "Costco Wholesale", amount: "45.6" };
+
+    const task = (id: number, type: SystemTaskType, resultDescription: string): SystemTask =>
+      ({ id, type, status: SystemTaskStatus.Succeeded, resultDescription } as SystemTask);
+
+    const loadRows = (rows: SystemTask[]) => {
+      component.getTableData();
+      httpTesting.expectOne("/api/systemTask/getPagedSystemTasks").flush({ data: rows, totalCount: rows.length });
+    };
+
+    // What UpdateReceipt stores: each side is itself a JSON string.
+    const stored = JSON.stringify({ before: JSON.stringify(before), after: JSON.stringify(after) });
+
+    it("parses a receipt update and lists the keys it changed, ignoring updatedAt", () => {
+      loadRows([task(1, SystemTaskType.ReceiptUpdated, stored)]);
+
+      const row = component.receiptUpdates().get(1);
+      expect(row?.snapshots).toEqual({ before, after, version: 1 });
+      expect(row?.changedKeys).toEqual(["name", "amount"]);
+    });
+
+    it("leaves a failed update and other task types on the plain description path", () => {
+      loadRows([
+        task(1, SystemTaskType.ReceiptUpdated, "record not found"),
+        task(2, SystemTaskType.QuickScan, stored),
+      ]);
+
+      expect(component.receiptUpdates().size).toBe(0);
+    });
+
+    it("opens the diff dialog with the parsed snapshots", () => {
+      const dialog = TestBed.inject(MatDialog);
+      const open = jest.spyOn(dialog, "open").mockReturnValue(undefined as any);
+
+      component.openReceiptUpdateDialog({ before, after, version: 2 });
+
+      expect(open).toHaveBeenCalledWith(
+        ReceiptUpdateDiffDialogComponent,
+        expect.objectContaining({ data: { snapshots: { before, after, version: 2 } }, width: "90vw" }),
+      );
+    });
   });
 });

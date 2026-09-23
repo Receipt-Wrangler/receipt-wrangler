@@ -35,6 +35,7 @@ import { ConfirmationDialogComponent } from "./confirmation-dialog/confirmation-
 import { CopyButtonComponent } from "./copy-button/copy-button.component";
 import { DeleteButtonComponent } from "./delete-button/delete-button.component";
 import { DescriptionViewerDialogComponent } from "./description-viewer-dialog/description-viewer-dialog.component";
+import { ReceiptUpdateDiffDialogComponent } from "./receipt-update-diff-dialog/receipt-update-diff-dialog.component";
 import { DialogFooterComponent } from "./dialog-footer/dialog-footer.component";
 import { DialogComponent } from "./dialog/dialog.component";
 import { EditButtonComponent } from "./edit-button/edit-button.component";
@@ -82,6 +83,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     CopyButtonComponent,
     DeleteButtonComponent,
     DescriptionViewerDialogComponent,
+    ReceiptUpdateDiffDialogComponent,
     DialogComponent,
     DialogFooterComponent,
     EditButtonComponent,
@@ -157,6 +159,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     CopyButtonComponent,
     DeleteButtonComponent,
     DescriptionViewerDialogComponent,
+    ReceiptUpdateDiffDialogComponent,
     DialogComponent,
     DialogFooterComponent,
     EditButtonComponent,
