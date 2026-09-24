@@ -86,6 +86,14 @@ the enum. Fixed when that queue took on the temp-file sweep. When you add a valu
 serializes, add it to `swagger.yml` in the same change — and note this direction is the *safe* one to
 fix, since a client learning a value the server already sends can only stop failing on it.
 
+**The same property cut the other way in the DATABASE.** Sourcing the FormArray from the server's
+settings is what let the form survive a stale enum — and it is exactly what broke on an install whose
+persisted `task_queue_configurations` predated the new queue: the server returned four rows, the form
+submitted four, and `Validate` rejected the whole save with a 400. So a new queue name needs a
+backfill on the *stored* side too, not just the spec. Both halves now live in
+`repositories/system_settings.go`; see `api/CLAUDE.md` → "Temporary file retention & cleanup" →
+"Upgrade path".
+
 **Regenerate `mobile/api/` in the SAME change as any `swagger.yml` edit** — not "later". It is easy
 to update the backend and desktop and forget mobile, because nothing fails: the Go tests pass, the
 desktop compiles, and the drift is invisible until a released Android build hits the new payload.
