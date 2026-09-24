@@ -559,6 +559,31 @@ type PaidByAllowedResolver func(groupId uint) (allowedUserIds []uint, unrestrict
 // (internal/system callers), exactly like a nil PaidByAllowedResolver.
 type CommentAuthorVisibilityResolver func(groupId uint) (visibleUserIds []uint, unrestricted bool, err error)
 
+// GroupReadableResolver reports whether a user may read receipts in a group.
+// It lets the receipt repository gate the synthetic "All group" expansion by the
+// caller's per-group permission without importing the service layer — each caller
+// supplies a closure bound to the permission its direct single-group path
+// requires. Pass nil to GetPagedReceiptsByGroupId to skip the gate
+// (internal/system callers), exactly like a nil PaidByAllowedResolver.
+type GroupReadableResolver func(groupId uint) (bool, error)
+
+// CategoryTagVisibility is one group's resolved category/tag grant sets. An
+// *Unrestricted flag (with a nil/empty set) means "see every id of that resource
+// in this group" and folds in the app-level catalog bypass.
+type CategoryTagVisibility struct {
+	CategoryAllowed      map[uint]struct{}
+	CategoryUnrestricted bool
+	TagAllowed           map[uint]struct{}
+	TagUnrestricted      bool
+}
+
+// CategoryTagVisibilityResolver returns a group's category/tag visibility. It is
+// used to narrow a category/tag FILTER per group in the All-group view, so a
+// filter on an id only matches receipts in groups where that id is visible to the
+// caller. Pass nil to GetPagedReceiptsByGroupId to skip per-group filter narrowing
+// (internal/system callers), exactly like a nil PaidByAllowedResolver.
+type CategoryTagVisibilityResolver func(groupId uint) (CategoryTagVisibility, error)
+
 func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 	userId uint,
 	groupId string,
@@ -566,6 +591,8 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 	associations []string,
 	paidByResolver PaidByAllowedResolver,
 	commentAuthorResolver CommentAuthorVisibilityResolver,
+	readableResolver GroupReadableResolver,
+	categoryTagResolver CategoryTagVisibilityResolver,
 ) ([]models.Receipt, int64, error) {
 	var receipts []models.Receipt
 	var count int64
@@ -580,8 +607,35 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 		return nil, 0, err
 	}
 
+	// The All-group read gate and the per-group category/tag narrowing must move
+	// as a pair: readableResolver drops groups the caller can't read, and
+	// categoryTagResolver scopes the category/tag filter per group. Supplying
+	// only one silently reopens a cross-group leak — a readable resolver without
+	// the category/tag one lets a category/tag filter fall through to
+	// BuildGormFilterQuery's flat, group-unscoped subquery (matching restricted
+	// ids across groups), and the reverse expands the read set to groups the
+	// caller can't read. Fail closed and loud so a half-wired caller trips here
+	// instead of leaking. Single-group reads pass neither (both nil is allowed).
+	if isAllGroup && (readableResolver == nil) != (categoryTagResolver == nil) {
+		return nil, 0, errors.New("all-group read requires both readable and category/tag resolvers")
+	}
+
+	// For the All-group view, apply the per-group category/tag FILTER as a
+	// disjunction below instead of the flat, group-unscoped subquery
+	// BuildGormFilterQuery emits — otherwise a caller could filter by a category
+	// id they can't see in a group and still match that group's receipts. Build
+	// the base filter WITHOUT the category/tag terms in that case (on a copy, so
+	// the caller's command is untouched); the real per-group narrowing is added
+	// after the group scope.
+	perGroupCatTag := isAllGroup && categoryTagResolver != nil
+	filterForBuild := pagedRequest
+	if perGroupCatTag {
+		filterForBuild.Filter.Categories = commands.PagedRequestField{}
+		filterForBuild.Filter.Tags = commands.PagedRequestField{}
+	}
+
 	// Apply filter
-	query, err := repository.BuildGormFilterQuery(pagedRequest)
+	query, err := repository.BuildGormFilterQuery(filterForBuild)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -594,6 +648,25 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 		if err != nil {
 			return nil, 0, err
 		}
+
+		// Gate the All-group expansion by the caller's per-group read permission.
+		// The All group is a real membership where the caller holds an
+		// unrestricted role, so without this a member could read receipts in every
+		// group they belong to — including groups whose role denies receipt read.
+		if readableResolver != nil {
+			readable := make([]uint, 0, len(memberGroupIds))
+			for _, gid := range memberGroupIds {
+				ok, resolveErr := readableResolver(gid)
+				if resolveErr != nil {
+					return nil, 0, resolveErr
+				}
+				if ok {
+					readable = append(readable, gid)
+				}
+			}
+			memberGroupIds = readable
+		}
+
 		query = query.Where("group_id IN ?", memberGroupIds)
 	} else {
 		query = query.Where("group_id = ?", groupId)
@@ -604,6 +677,16 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 	// post-fetch filter would corrupt pagination).
 	if paidByResolver != nil {
 		query, err = repository.applyPaidByVisibility(query, uintGroupId, isAllGroup, memberGroupIds, paidByResolver)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	// Apply the per-group category/tag filter disjunction for the All-group view
+	// (see perGroupCatTag above). AND-ed before the count so pagination/totalCount
+	// stay correct, exactly like the paid-by disjunction.
+	if perGroupCatTag {
+		query, err = repository.applyAllGroupCategoryTagFilter(query, memberGroupIds, pagedRequest.Filter, categoryTagResolver)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -740,6 +823,118 @@ func paidByInValues(allowedUserIds []uint) []uint {
 		return []uint{0}
 	}
 	return allowedUserIds
+}
+
+// applyAllGroupCategoryTagFilter AND-s per-group category/tag filter disjunctions
+// onto query for the all-group view, so a filter on a category/tag id matches
+// receipts only in the groups where that id is visible to the caller. It is a
+// no-op when no CONTAINS category/tag filter is supplied (the plain group scope
+// then stands). Mirrors ApplyPaidByDisjunction and is AND-ed before the count so
+// totalCount/pagination stay correct.
+func (repository ReceiptRepository) applyAllGroupCategoryTagFilter(
+	query *gorm.DB,
+	memberGroupIds []uint,
+	filter commands.ReceiptPagedRequestFilter,
+	resolver CategoryTagVisibilityResolver,
+) (*gorm.DB, error) {
+	categoryIds := containsFilterIds(filter.Categories)
+	tagIds := containsFilterIds(filter.Tags)
+	if len(categoryIds) == 0 && len(tagIds) == 0 {
+		return query, nil
+	}
+	if len(memberGroupIds) == 0 {
+		return query.Where("1 = 0"), nil
+	}
+
+	// Resolve each group's visibility at most once (shared across category + tag).
+	vis := make(map[uint]CategoryTagVisibility, len(memberGroupIds))
+	for _, gid := range memberGroupIds {
+		v, err := resolver(gid)
+		if err != nil {
+			return nil, err
+		}
+		vis[gid] = v
+	}
+
+	if len(categoryIds) > 0 {
+		query = query.Where(repository.resourceFilterDisjunction(
+			memberGroupIds, categoryIds, "receipt_categories", "category_id", vis,
+			func(v CategoryTagVisibility) (map[uint]struct{}, bool) {
+				return v.CategoryAllowed, v.CategoryUnrestricted
+			}))
+	}
+	if len(tagIds) > 0 {
+		query = query.Where(repository.resourceFilterDisjunction(
+			memberGroupIds, tagIds, "receipt_tags", "tag_id", vis,
+			func(v CategoryTagVisibility) (map[uint]struct{}, bool) {
+				return v.TagAllowed, v.TagUnrestricted
+			}))
+	}
+	return query, nil
+}
+
+// resourceFilterDisjunction builds an OR-of-branches, one per member group: a
+// receipt in group G matches only via the requested ids that are visible to the
+// caller in G. A group where none of the requested ids are visible contributes
+// `group_id = G AND 1 = 0` (no rows) — this is what closes the "filter probe" on
+// a restricted category/tag.
+func (repository ReceiptRepository) resourceFilterDisjunction(
+	memberGroupIds []uint,
+	requestedIds []uint,
+	joinTable string,
+	idColumn string,
+	vis map[uint]CategoryTagVisibility,
+	pick func(CategoryTagVisibility) (map[uint]struct{}, bool),
+) *gorm.DB {
+	disjunction := repository.GetDB().Session(&gorm.Session{NewDB: true})
+	for _, gid := range memberGroupIds {
+		allowed, unrestricted := pick(vis[gid])
+		branch := repository.GetDB().Session(&gorm.Session{NewDB: true}).Where("group_id = ?", gid)
+
+		effective := requestedIds
+		if !unrestricted {
+			effective = intersectIds(requestedIds, allowed)
+		}
+		if len(effective) == 0 {
+			branch = branch.Where("1 = 0")
+		} else {
+			sub := repository.GetDB().Session(&gorm.Session{NewDB: true}).
+				Table(joinTable).Select("receipt_id").
+				Where(idColumn+" IN ?", effective)
+			branch = branch.Where("id IN (?)", sub)
+		}
+		disjunction = disjunction.Or(branch)
+	}
+	return disjunction
+}
+
+// containsFilterIds returns a CONTAINS filter field's ids as uint, or nil when the
+// field is unset or is not a non-empty CONTAINS list.
+func containsFilterIds(field commands.PagedRequestField) []uint {
+	if field.Operation != commands.CONTAINS || field.Value == nil {
+		return nil
+	}
+	values, ok := field.Value.([]interface{})
+	if !ok || len(values) == 0 {
+		return nil
+	}
+	out := make([]uint, 0, len(values))
+	for _, v := range values {
+		if id, ok := utils.FilterValueToUint(v); ok {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func intersectIds(requested []uint, allowed map[uint]struct{}) []uint {
+	out := make([]uint, 0, len(requested))
+	for _, id := range requested {
+		if _, ok := allowed[id]; ok {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.ReceiptPagedRequestCommand) (*gorm.DB, error) {

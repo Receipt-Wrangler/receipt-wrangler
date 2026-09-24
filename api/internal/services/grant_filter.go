@@ -4,6 +4,8 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
+	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/utils"
 )
 
 // This file holds the shared category/tag grant enforcement used by every read
@@ -279,17 +281,10 @@ func intersectFilterFieldWithGrants(field *commands.PagedRequestField, allowed m
 }
 
 // filterValueToUint coerces a JSON-decoded filter id (typically float64) to uint.
+// Delegates to utils.FilterValueToUint so the repository layer (which cannot
+// import services) shares the exact same coercion for the All-group filter.
 func filterValueToUint(value interface{}) (uint, bool) {
-	switch typed := value.(type) {
-	case float64:
-		return uint(typed), true
-	case int:
-		return uint(typed), true
-	case uint:
-		return typed, true
-	default:
-		return 0, false
-	}
+	return utils.FilterValueToUint(value)
 }
 
 // receiptGrantFilter caches a user's bypass flags and per-group allowed sets for
@@ -473,4 +468,45 @@ func substituteTagsBySet(tags []models.Tag, allowed map[uint]struct{}) []models.
 		result = append(result, models.Tag{Name: restrictedCategoryTagName})
 	}
 	return result
+}
+
+// GroupPermissionResolver returns a resolver that reports whether userId holds
+// the given group permission in a group. The receipt repository uses it to gate
+// the synthetic All-group expansion per group without importing the service
+// layer. Callers pass the permission their direct single-group path requires.
+func (service PermissionService) GroupPermissionResolver(userId uint, permission string) repositories.GroupReadableResolver {
+	return func(groupId uint) (bool, error) {
+		return service.HasGroupPermissions(userId, groupId, permission)
+	}
+}
+
+// CategoryTagVisibilityResolver returns a resolver that reports a group's
+// category/tag visibility for userId, so the receipt repository can narrow a
+// category/tag FILTER per group in the All-group view. It reuses the same
+// per-request memo (newReceiptGrantFilter/grantsForGroup) the display-stripping
+// path uses and folds the app-level catalog bypass into Unrestricted, so a
+// category/tag admin resolves as unrestricted everywhere (matching the old
+// global filter). Lazily built so it never errors at construction, like
+// PaidByListResolver.
+func (service PermissionService) CategoryTagVisibilityResolver(userId uint) repositories.CategoryTagVisibilityResolver {
+	var filter *receiptGrantFilter
+	return func(groupId uint) (repositories.CategoryTagVisibility, error) {
+		if filter == nil {
+			built, err := service.newReceiptGrantFilter(userId)
+			if err != nil {
+				return repositories.CategoryTagVisibility{}, err
+			}
+			filter = built
+		}
+		grants, err := filter.grantsForGroup(groupId)
+		if err != nil {
+			return repositories.CategoryTagVisibility{}, err
+		}
+		return repositories.CategoryTagVisibility{
+			CategoryAllowed:      grants.categoryAllowed,
+			CategoryUnrestricted: grants.categoryUnrestricted || filter.bypassCategories,
+			TagAllowed:           grants.tagAllowed,
+			TagUnrestricted:      grants.tagUnrestricted || filter.bypassTags,
+		}, nil
+	}
 }

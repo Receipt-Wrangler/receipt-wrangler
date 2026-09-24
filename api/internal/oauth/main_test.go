@@ -53,3 +53,29 @@ func createTestUserWithPassword(t *testing.T, username string, password string) 
 
 	return user
 }
+
+// createDummyUserWithPassword creates a dummy (placeholder) user whose password
+// is bcrypt-hashed. Storing a real hash — rather than a raw empty string that
+// fails bcrypt on its own — lets a test prove the dummy-user guard is what
+// rejects the login, since password verification would otherwise succeed.
+func createDummyUserWithPassword(t *testing.T, username string, password string) models.User {
+	t.Helper()
+
+	hashed, err := utils.HashPassword(password)
+	if err != nil {
+		t.Fatalf("failed to hash password: %v", err)
+	}
+
+	user := models.User{
+		Username:    username,
+		DisplayName: username,
+		Password:    string(hashed),
+		IsDummyUser: true,
+	}
+
+	if err := repositories.GetDB().Create(&user).Error; err != nil {
+		t.Fatalf("failed to create dummy user: %v", err)
+	}
+
+	return user
+}

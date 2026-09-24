@@ -325,10 +325,53 @@ When working with tests in this codebase, follow these critical requirements:
   Operators running the API as a non-root user can opt back in by setting
   `CHROMIUM_SANDBOX=true`
 - External network resource loads (remote images, CSS, fonts) are
-  **blocked by default** to remove an SSRF / tracking-pixel surface.
-  Inline `data:` URIs and the file:// page itself remain allowed. To
+  **blocked by default** to remove an SSRF / tracking-pixel surface. To
   permit remote loads (useful when receipts depend on remote logos or
-  product imagery), set `CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true`
+  product imagery), set `CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true`. Because an
+  `about:blank` document (see below) never fetches network sub-resources at all,
+  the external mode instead serves the HTML from an **ephemeral loopback HTTP
+  server** (`127.0.0.1:0`, one per render, `defer`-closed right after) and
+  navigates to it, giving the document a real `http` origin so remote images
+  actually load; `chromedp.Navigate` waits for the load event, so slow remote
+  images finish before printing.
+- **External mode is SSRF-guarded: only PUBLIC hosts may load.** The email body is
+  attacker-controlled and the render now has a real `http` origin, so a naive
+  external mode would let `<iframe>`/`<img>` reach internal targets (verified: an
+  internal response was baked into the PDF). Sub-resource requests are therefore
+  intercepted via the CDP **Fetch** domain (`isRequestAllowed` in `html_to_pdf.go`)
+  and each is allowed or failed by its resolved address: the render's own loopback
+  page and inline `data:` URIs are allowed; loopback/private/link-local/multicast/
+  unspecified targets — `127.0.0.1:*`, `169.254.169.254` (cloud metadata), RFC1918,
+  `::1`, `fe80::/10`, `0.0.0.0` — plus the non-public ranges the stdlib `net.IP`
+  predicates miss (`ipIsInternal`'s `extraInternalNets`: `0.0.0.0/8`, CGNAT
+  `100.64.0.0/10` incl. Alibaba metadata `100.100.100.200`, benchmarking
+  `198.18.0.0/15`, reserved+broadcast `240.0.0.0/4`, NAT64 `64:ff9b::/96`) and the
+  `localhost` / `*.localhost` names (which chromium resolves to loopback itself,
+  never asking DNS) — and every non-`http(s)` scheme (incl. `file://`) are
+  refused. A URL blocklist can't express this (it can neither allow our own
+  loopback page while denying other internal hosts, nor catch a hostname that
+  resolves to an internal IP). Residual: **DNS rebinding** — the host is resolved
+  at check time and re-resolved by chromium at fetch time, so operators enabling
+  external mode in a cloud should also restrict egress at the network layer / use
+  IMDSv2. Regressions: `TestHtmlToPdfService_Render_ExternalMode_BlocksInternalSSRF`,
+  `TestHtmlToPdfService_Render_ExternalMode_EmbedsDataImage`, and the hermetic
+  policy unit test `TestIsRequestAllowed`.
+- **`file://` loads are ALWAYS blocked, in BOTH modes.** In the default mode the
+  HTML is injected into an `about:blank` page via `page.SetDocumentContent` rather
+  than being written to a temp file and navigated to as `file://<path>`. The email
+  body is attacker-controlled, so a `file://` document origin let it read local
+  files (other groups' receipt images under `data/`, logs, `/etc/passwd`) into the
+  PDF via `<iframe src="file:///…">`/`<img>` — even with JavaScript disabled.
+  `about:blank` (and the loopback `http` origin used in external mode) has no
+  local-file origin, so those sub-resources are cross-origin-blocked; `file://*`
+  is also on the default mode's network blocklist and denied by the external
+  mode's Fetch policy, as defense in depth (blocked in BOTH modes). Inline `data:`
+  URIs still load
+  (`SetDocumentContent` also sidesteps the data-URL length cap that motivated the
+  old temp-file approach) and decode synchronously, so the default path needs no
+  explicit load wait. Regressions:
+  `TestHtmlToPdfService_Render_BlocksLocalFileRead` and
+  `TestHtmlToPdfService_Render_ExternalMode_BlocksLocalFileRead`.
 - Implementation: `internal/services/html_to_pdf.go` (HtmlToPdfService.Render)
 - The rendered PDF is saved on the receipt as a `FileData` and routed
   through the existing `repositories.ConvertPdfToJpg` pipeline so vision and
@@ -775,6 +818,18 @@ a role never widens an individually-assigned member.
   **receipt-level only** — receipt items have no stable id across an update (they are deleted and
   recreated), so hidden *item-level* categories/tags cannot be matched back and are dropped when a
   restricted user edits a receipt. Closing that needs item identity (a separate change).
+- **Moving a receipt between groups authorizes the DESTINATION.** `UpdateReceipt` runs through
+  `HandleRequest` with `ReceiptId` set, which only verifies `group.receipts.update` on the receipt's
+  **current** group. Both clients let a user change a receipt's group on edit, so when
+  `command.GroupId != currentReceipt.GroupId` the handler additionally requires `group.receipts.create`
+  on the destination group (403 otherwise) and runs the grant / member-visibility **selection** checks
+  against the destination (the group the receipt will live in). Without this a member with update rights
+  in one group could relocate receipts into any group. The **synthetic All group is rejected as a
+  destination** (400) *before* that create-check: a caller's All-group membership carries the default
+  unrestricted role, so its `group.receipts.create` would otherwise satisfy the check and persist the
+  receipt into the cross-group view under a role that sidesteps every real group's grant / visibility
+  controls. Tests: `handlers/receipt_group_move_authz_test.go` (incl.
+  `TestUpdateReceipt_MoveToAllGroupRejected`).
 - **AI prompt:** `ReceiptProcessingService` carries a `UserId` (the user who triggered processing; 0
   for system-initiated, e.g. email polling). When set together with a `Group`,
   `getCategoriesString` / `getTagsString` restrict the candidate categories/tags fed to the model to
@@ -809,6 +864,29 @@ Because paid-by hides the **whole** receipt (not just fields), enforcement diffe
   `totalCount` stays correct — single-group adds `paid_by_user_id IN (allowed)` (empty restricted set
   ⇒ `IN (0)` no-match sentinel); the all-group view builds a per-group **disjunction**
   `(group_id=G AND paid_by_user_id IN s_G) OR (group_id=G2) …` so each group applies its own role.
+- **All-group expansion is gated per group, not by All-group membership.** The synthetic "All" group
+  is a real membership where the caller holds an unrestricted role, so expanding it to every membership
+  without re-checking each group let a member read receipts (and category/tag names) in groups whose
+  role denies it. `GetPagedReceiptsByGroupId` now takes a `GroupReadableResolver`
+  (`PermissionService.GroupPermissionResolver(userId, perm)`, cache-backed) and, for the All view,
+  drops any group where the caller lacks the permission its **direct** single-group path requires
+  (`group.receipts.read` for list/export/summary, `group.reports.read` for reports, `group.widgets.read`
+  for the pie chart) — before the `group_id IN` scope, the paid-by disjunction, and the count. The
+  `GroupReadableResolver` and `CategoryTagVisibilityResolver` must be passed together for the All view
+  (`GetPagedReceiptsByGroupId` fails closed if only one is supplied) — the read gate without the
+  category/tag resolver would let a category/tag filter fall through to the flat, group-unscoped subquery.
+  The same per-group read
+  filter is applied in `SearchReceiptsForUser` (search is gated on `app.receipts.search`, which does
+  not grant per-group read) and in `GetAmountOwedForUser`'s All aggregation. It also carries a
+  `CategoryTagVisibilityResolver`: for the All view the category/tag **filter** is applied as a
+  per-group disjunction (`applyAllGroupCategoryTagFilter`) so a filter on a category id only matches
+  receipts in groups where that id is visible to the caller — closing a probe where the flat,
+  group-unscoped filter subquery matched a restricted category across groups (`IntersectReceiptFilterWithGrants`
+  is a no-op for the All view because the All membership resolves unrestricted). AppData's
+  `groupCategories`/`groupTags` for the All group is likewise the **union** of the caller's per-real-group
+  visible sets, not the whole pool. Tests: `repositories/receipt_all_group_gate_test.go`,
+  `services/auth_test.go` (`TestGetAppData_AllGroupCatalogIsUnionOfRealGroups`), `handlers/users_test.go`
+  (`TestGetAmountOwedForUserAllGroupExcludesUnreadableGroup`).
 - **Single receipt + dependent reads** (`HandleRequest` chokepoint): the `ReceiptId`/`ReceiptIds`
   blocks also select `paid_by_user_id`; `enforcePaidByVisibility` denies **403** when any resolved
   receipt is outside the caller's allowed set. This one place covers `GetReceipt`, image
@@ -1138,6 +1216,13 @@ Claude can read a user's data. It is **off by default** and Go-native (no separa
   - `/oauth/register` (Dynamic Client Registration, RFC 7591), `/oauth/authorize`
     (login form backed by `services.LoginUser`), `/oauth/token` (authorization_code +
     refresh_token grants, PKCE S256)
+    - **`services.LoginUser` itself rejects dummy users and empty passwords**, so the OAuth login form
+      cannot be used to authenticate a passwordless placeholder account. The REST login enforced this
+      via middleware + a post-check, but the OAuth authorize form called `LoginUser` directly and did
+      neither — a dummy user (stored as `bcrypt("")`) could obtain an MCP token with an empty password.
+      Centralizing the guard in `LoginUser` covers every caller. Tests: `services/auth_test.go`
+      (`TestLoginUserRejectsDummyUser`, `TestLoginUserRejectsEmptyPassword`), `oauth/oauth_test.go`
+      (`TestAuthorizeRejectsDummyUserAndEmptyPassword`).
   - `/mcp` — Streamable HTTP MCP endpoint, guarded by bearer-token auth (401 +
     `WWW-Authenticate` advertising the protected-resource metadata)
 - **Auth model**: the OAuth tokens are Receipt Wrangler HS512 JWTs, but **MCP-audience bound**.
@@ -1230,6 +1315,18 @@ A useful corollary: **lowering** the setting takes effect for active sessions at
 15-minute refresh timer against that fixed window — making it configurable would break them and
 widen the blast radius of a leaked token. This is also why `oauth.accessTokenExpiresIn` (the OAuth
 `expires_in`, RFC 6749 — which describes the access token only) still mirrors 20 minutes correctly.
+
+**Access and refresh tokens are NOT interchangeable.** They are otherwise minted with identical
+claims (same key/issuer/audience), so a refresh token would validate — and was previously usable — as
+an API access credential. Each now carries a `structs.Claims.TokenType` (`"access"` / `"refresh"`).
+The access paths reject refresh tokens (`middleware.UnifiedAuthMiddleware` JWT branch via
+`isRefreshToken`, and `mcp.verifyToken`); the refresh paths require a refresh token
+(`middleware.ValidateRefreshToken`, and the OAuth refresh grant guarded by the `refresh_tokens`
+table). `Claims.IsRefreshToken()` also recognizes **legacy** tokens minted before this claim existed:
+they have no `TokenType`, but only refresh tokens were ever given a `jti` (`RegisteredClaims.ID`), so
+a typeless token WITH a jti is treated as refresh. That keeps already-issued legacy access tokens
+working (no forced re-login) while still rejecting legacy refresh tokens immediately. Regression:
+`middleware.TestUnifiedAuthMiddleware_RejectsRefreshTokenAsAccess`.
 
 **Where the value is resolved.** `internal/utils` imports nothing from `internal/`, so it cannot
 read System Settings without an import cycle; `utils.GetRefreshTokenExpiryDate(lifetime)` therefore
@@ -1996,6 +2093,15 @@ this screen. `UpdateGroupReceiptSettingsCommand.Validate` therefore checks nothi
     returns a `Find` that preloads only `GroupMembers`, so its settings object is zero-valued
     **including `GroupId`**; set that first or the loader keys its lookup on group 0 and the empty
     result is right by accident. Both are pinned by response-shape tests (below).
+  - **The `associatedGroup` / `associatedApiKeys` list filters are default-deny.** `GetPagedGroups`
+    only permission-gates the literal `ALL` (via `app.groups.read`) and the repository only scoped the
+    literal `MINE` to the caller — so any *other* value (empty or bogus) fell through both and returned
+    every group in the system (same shape for `GetPagedApiKeys` / `app.api-keys.read-any`). Fixed on
+    two layers: the command `Validate` rejects anything that is not exactly `MINE`/`ALL` (400), and the
+    repository's filter is now `if ALL {…} else {scope to caller}` so an unexpected value fails closed
+    to the caller's own rows. Tests: `commands/paged_group_request_command_test.go`,
+    `commands/paged_api_key_request_command_test.go`,
+    `repositories/api_key_test.go` (`TestGetPagedApiKeys_UnknownFilterFailsClosedToOwnKeys`).
 - **An empty set must serialize as `[]`, never `null`.** `defaultCustomFieldIdsOrEmpty` normalizes it
   inside the loader (mirroring `grantIdsOrEmpty`) so every read path is covered at once. The
   generated Dart deserializer has **no null guard**, so a `null` would fail the **whole** AppData

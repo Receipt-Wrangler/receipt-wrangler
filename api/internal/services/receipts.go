@@ -134,8 +134,26 @@ func (service ReceiptService) SearchReceiptsForUser(userId uint, query string, l
 		return nil, err
 	}
 
+	// app.receipts.search only gates search as a feature; it does not grant read
+	// on any particular group. Narrow to the groups where the caller actually
+	// holds group.receipts.read, so search cannot surface receipts from a group
+	// whose role denies receipt read (the search analogue of the All-group gate).
+	readableGroupIds := make([]uint, 0, len(groupIds))
+	for _, groupId := range groupIds {
+		canRead, err := permissionService.HasGroupPermissions(userId, groupId, permissions.GroupReceiptsRead)
+		if err != nil {
+			return nil, err
+		}
+		if canRead {
+			readableGroupIds = append(readableGroupIds, groupId)
+		}
+	}
+	if len(readableGroupIds) == 0 {
+		return results, nil
+	}
+
 	receiptRepository := repositories.NewReceiptRepository(service.TX)
-	receipts, err := receiptRepository.SearchReceiptsByGroupIds(groupIds, query, limit, permissionService.PaidByListResolver(userId))
+	receipts, err := receiptRepository.SearchReceiptsByGroupIds(readableGroupIds, query, limit, permissionService.PaidByListResolver(userId))
 	if err != nil {
 		return nil, err
 	}

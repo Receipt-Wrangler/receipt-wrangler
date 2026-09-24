@@ -33,10 +33,15 @@ func (repository GroupRepository) GetPagedGroups(command commands.PagedGroupRequ
 		return nil, 0, errors.New("invalid column")
 	}
 
-	// Apply filter and set counts
+	// Apply filter and set counts. Only the explicit ALL filter (already gated on
+	// app.groups.read in the handler) lists every group; ANY other value —
+	// including an unexpected one that slipped past command validation — falls
+	// into the default branch and is scoped to the caller's own groups. This
+	// fail-closed default is what stops a bogus filter value from returning every
+	// group in the system.
 	if command.GroupFilter.AssociatedGroup == commands.ASSOCIATED_GROUP_ALL {
 		query.Count(&count)
-	} else if command.GroupFilter.AssociatedGroup == commands.ASSOCIATED_GROUP_MINE {
+	} else {
 		groupMemberRepository := NewGroupMemberRepository(nil)
 		groupMembers, err := groupMemberRepository.GetGroupMembersByUserId(userId)
 		if err != nil {

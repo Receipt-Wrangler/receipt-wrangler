@@ -790,6 +790,9 @@ func TestGetAmountOwedForUserAllGroupAggregatesAcrossMemberships(t *testing.T) {
 	db := repositories.GetDB()
 	// Make user 1 a member of Group 2 as well so the all-group covers both groups.
 	db.Create(&models.GroupMember{GroupID: 2, UserID: 1})
+	// The all-group view now aggregates only groups the caller may actually read,
+	// so grant receipts.read in group 2 as well (group 1 is granted by the fixture).
+	grantGroupPerms(t, 1, 2, permissions.GroupReceiptsRead)
 
 	// CreateAllGroup makes a new group with IsAllGroup=true and adds user 1 as OWNER member.
 	groupRepository := repositories.NewGroupRepository(nil)
@@ -967,5 +970,45 @@ func TestShouldAllowAdminToGetPagedUsers(t *testing.T) {
 	}
 	if len(pagedData.Data) != 3 {
 		utils.PrintTestError(t, len(pagedData.Data), 3)
+	}
+}
+
+// The all-group amount-owed view must NOT fold in a group the caller cannot read.
+// A member of a group with no receipts.read role there must not have that group's
+// settlement leak through "All". Regression guard for the All-group read gate.
+func TestGetAmountOwedForUserAllGroupExcludesUnreadableGroup(t *testing.T) {
+	defer tearDownUserTest()
+	setupAmountOwedTest(t)
+
+	db := repositories.GetDB()
+	// Member of group 2, but with NO group role (so no receipts.read there).
+	db.Create(&models.GroupMember{GroupID: 2, UserID: 1})
+
+	groupRepository := repositories.NewGroupRepository(nil)
+	allGroup, err := groupRepository.CreateAllGroup(1)
+	if err != nil {
+		t.Fatalf("failed to create all-group: %v", err)
+	}
+	grantGroupPerms(t, 1, allGroup.ID, permissions.GroupReceiptsRead)
+
+	// Group 1 (readable via fixture): caller owes user 2 $10.
+	createReceiptWithItems(t, "G1 receipt", 10, 2, 1, []commands.UpsertItemCommand{
+		chargedItem("g1 item", 10, 1),
+	})
+	// Group 2 (NOT readable): caller would owe user 4 $25 — must be excluded.
+	createReceiptWithItems(t, "G2 receipt", 25, 4, 2, []commands.UpsertItemCommand{
+		chargedItem("g2 item", 25, 1),
+	})
+
+	w, result := callGetAmountOwed(1, strconv.FormatUint(uint64(allGroup.ID), 10), nil)
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+		return
+	}
+
+	assertOwed(t, result, 2, 10)
+	// User 4's group-2 charge must NOT appear (group 2 is not readable).
+	if _, ok := result[4]; ok {
+		utils.PrintTestError(t, "group 2 (unreadable) leaked into all-group settlement", "excluded")
 	}
 }

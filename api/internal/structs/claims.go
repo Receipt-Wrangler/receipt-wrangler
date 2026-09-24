@@ -10,13 +10,45 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Token type values carried on the TokenType claim. They keep an access token
+// and a refresh token — which are otherwise minted with identical claims — from
+// being used interchangeably: access tokens are rejected by the refresh paths and
+// refresh tokens are rejected by the API/MCP access paths.
+const (
+	TokenTypeAccess  = "access"
+	TokenTypeRefresh = "refresh"
+)
+
 type Claims struct {
 	DefaultAvatarColor string             `json:"defaultAvatarColor"`
 	Displayname        string             `json:"displayName"`
 	UserId             uint               `json:"userId"`
 	Username           string             `json:"username"`
 	ApiKeyScope        models.ApiKeyScope `json:"apiKeyScope"`
+	// TokenType is "access" or "refresh" on tokens minted after the token-type
+	// fix. It is empty on legacy tokens issued before it (see IsRefreshToken).
+	TokenType string `json:"tokenType"`
 	jwt.RegisteredClaims
+}
+
+// IsRefreshToken reports whether these claims belong to a refresh token rather
+// than an access token. Tokens minted after the token-type fix carry an explicit
+// TokenType. Legacy tokens carry none; a legacy refresh token is still
+// distinguishable because only refresh tokens were ever given a jti
+// (RegisteredClaims.ID), so a typeless token WITH a jti is a refresh token. This
+// lets the access paths reject refresh tokens immediately — closing the
+// refresh-token-as-access-token hole — while still honoring already-issued legacy
+// access tokens (no type, no jti) until they expire, so no user is forced to log
+// in again on deploy.
+func (claim *Claims) IsRefreshToken() bool {
+	switch claim.TokenType {
+	case TokenTypeRefresh:
+		return true
+	case TokenTypeAccess:
+		return false
+	default:
+		return claim.RegisteredClaims.ID != ""
+	}
 }
 
 func (claim *Claims) Validate(ctx context.Context) error {

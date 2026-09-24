@@ -4,10 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
@@ -17,20 +22,23 @@ import (
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
-	"receipt-wrangler/api/internal/utils"
 )
 
 // blockedExternalUrlPatterns matches all common network schemes so chromium
-// refuses to load remote resources referenced from the rendered HTML.
-// file:// (used for our navigation) and data: URIs (inline base64 content
-// commonly embedded in receipt emails) are intentionally not in this list
-// and remain allowed.
+// refuses to load remote resources referenced from the rendered HTML, plus
+// file:// so attacker-controlled email HTML cannot read local files (e.g.
+// <iframe src="file:///etc/passwd"> or another group's receipt image under
+// data/). The HTML is loaded via Page.setDocumentContent into an about:blank
+// page (see Render), so there is no legitimate file:// load to allow. Inline
+// data: URIs (base64 content commonly embedded in receipt emails) are NOT in
+// this list and remain allowed.
 var blockedExternalUrlPatterns = []string{
 	"http://*",
 	"https://*",
 	"ws://*",
 	"wss://*",
 	"ftp://*",
+	"file://*",
 }
 
 const htmlToPdfTimeout = 30 * time.Second
@@ -49,10 +57,17 @@ func NewHtmlToPdfService(tx *gorm.DB) HtmlToPdfService {
 }
 
 // Render converts the given HTML to a PDF using a fresh headless Chromium
-// process. Network resource loads (remote images, CSS, fonts, etc.) are
-// blocked by default for security; inline data: URIs and the file:// page
-// itself remain allowed. Set CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true to
-// permit remote loads if you need logos or product imagery from URLs.
+// process. Network and file:// resource loads are blocked by default for
+// security; inline data: URIs remain allowed. In the default mode the HTML is
+// injected into an about:blank page via Page.setDocumentContent, so the document
+// has no local-file origin and cannot read files off disk. Set
+// CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true to permit remote loads (logos / product
+// imagery): the HTML is then served from an ephemeral loopback HTTP server and
+// navigated to, giving it a real http origin so remote sub-resources load. In
+// that mode sub-resource requests are intercepted and only PUBLIC hosts are
+// allowed — loopback/private/link-local targets (e.g. 127.0.0.1:*,
+// 169.254.169.254, RFC1918) and file:// are denied, so attacker-controlled email
+// HTML cannot use the render as an SSRF into internal services.
 func (service HtmlToPdfService) Render(html string) ([]byte, commands.UpsertSystemTaskCommand, error) {
 	startTime := time.Now()
 	systemTaskCommand := commands.UpsertSystemTaskCommand{
@@ -93,43 +108,81 @@ func (service HtmlToPdfService) Render(html string) ([]byte, commands.UpsertSyst
 	timeoutCtx, cancelTimeout := context.WithTimeout(browserCtx, htmlToPdfTimeout)
 	defer cancelTimeout()
 
-	// Stage HTML in a temp file rather than a data: URL — chromium has a
-	// hard cap on data-URL length (a few MB depending on version) that
-	// large receipt emails can exceed silently. file:// has no such cap.
-	htmlPath, cleanup, err := writeTempHtml(html)
-	if err != nil {
-		endTime := time.Now()
-		systemTaskCommand.Status = models.SYSTEM_TASK_FAILED
-		systemTaskCommand.EndedAt = &endTime
-		systemTaskCommand.ResultDescription = err.Error()
-		return nil, systemTaskCommand, err
-	}
-	defer cleanup()
-
 	var pdfBuf []byte
-	actions := []chromedp.Action{}
-	// Default behavior is to block external network resources: receipt
-	// emails contain attacker-controllable URLs and we run chromium with
-	// --no-sandbox, so disallowing network requests removes an SSRF /
-	// tracking-pixel surface. Opt back in via CHROMIUM_ALLOW_EXTERNAL_RESOURCES.
-	if !env.GetChromiumAllowExternalResources() {
-		actions = append(actions,
+	printAction := chromedp.ActionFunc(func(ctx context.Context) error {
+		buf, _, err := page.PrintToPDF().WithPrintBackground(true).Do(ctx)
+		if err != nil {
+			return err
+		}
+		pdfBuf = buf
+		return nil
+	})
+
+	var actions []chromedp.Action
+	if env.GetChromiumAllowExternalResources() {
+		// External resources are opt-in (remote logos / product imagery). Serve the
+		// HTML from an ephemeral loopback HTTP server and navigate to it so the
+		// document has a real http origin — an about:blank document filled via
+		// Page.setDocumentContent never fetches http(s) sub-resources at all, so
+		// remote images only load via a navigated origin.
+		//
+		// The email body is attacker-controlled, so allowing arbitrary network loads
+		// is an SSRF vector: <iframe src="http://169.254.169.254/…"> can bake cloud
+		// metadata into the PDF, and http://127.0.0.1:<port> reaches loopback
+		// services. A URL blocklist can't express "allow our own loopback page but
+		// deny every OTHER internal host", nor catch a hostname that resolves to an
+		// internal IP — so requests are intercepted via the Fetch domain and each is
+		// allowed/denied by its resolved address (isRequestAllowed). file:// is
+		// denied there too. chromedp.Navigate waits for the load event, so allowed
+		// remote images finish loading before PrintToPDF.
+		server, addr, serveErr := startLoopbackHtmlServer(html)
+		if serveErr != nil {
+			endTime := time.Now()
+			systemTaskCommand.Status = models.SYSTEM_TASK_FAILED
+			systemTaskCommand.EndedAt = &endTime
+			systemTaskCommand.ResultDescription = serveErr.Error()
+			return nil, systemTaskCommand, serveErr
+		}
+		defer server.Close()
+
+		// Register the interception handler BEFORE Navigate so the main navigation
+		// request is intercepted too. The callback runs on chromedp's event loop and
+		// must not block, so it hands each paused request to a goroutine.
+		chromedp.ListenTarget(browserCtx, func(ev interface{}) {
+			if paused, ok := ev.(*fetch.EventRequestPaused); ok {
+				go resolveInterceptedRequest(browserCtx, paused, addr)
+			}
+		})
+
+		actions = []chromedp.Action{
+			fetch.Enable().WithPatterns([]*fetch.RequestPattern{{URLPattern: "*"}}),
+			chromedp.Navigate("http://" + addr + "/"),
+			printAction,
+		}
+	} else {
+		// Default: block external network resources AND file:// loads. Receipt
+		// emails contain attacker-controllable URLs and we run chromium with
+		// --no-sandbox, so disallowing these removes an SSRF / tracking-pixel
+		// surface. The HTML is injected into an about:blank page instead of a
+		// file:// URL, so it has no local-file origin — <iframe src="file:///...">/
+		// <img> cannot exfiltrate local files into the PDF, and the multi-MB
+		// data-URL truncation cap is avoided. Inline data: URIs remain allowed and
+		// load synchronously, so no explicit load wait is needed before printing.
+		actions = []chromedp.Action{
 			network.Enable(),
 			network.SetBlockedURLs(blockedExternalUrlPatterns),
-		)
+			chromedp.Navigate("about:blank"),
+			chromedp.ActionFunc(func(ctx context.Context) error {
+				frameTree, err := page.GetFrameTree().Do(ctx)
+				if err != nil {
+					return err
+				}
+				return page.SetDocumentContent(frameTree.Frame.ID, html).Do(ctx)
+			}),
+			printAction,
+		}
 	}
-	actions = append(actions,
-		chromedp.Navigate("file://"+htmlPath),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			buf, _, err := page.PrintToPDF().WithPrintBackground(true).Do(ctx)
-			if err != nil {
-				return err
-			}
-			pdfBuf = buf
-			return nil
-		}),
-	)
-	err = chromedp.Run(timeoutCtx, actions...)
+	err := chromedp.Run(timeoutCtx, actions...)
 
 	endTime := time.Now()
 	systemTaskCommand.EndedAt = &endTime
@@ -154,25 +207,148 @@ func (service HtmlToPdfService) Render(html string) ([]byte, commands.UpsertSyst
 	return pdfBuf, systemTaskCommand, nil
 }
 
-// writeTempHtml writes the HTML body to a uniquely-named temp file and
-// returns its absolute path plus a cleanup function. The cleanup is set up
-// before the write so a failed/partial WriteFile still removes any
-// orphaned bytes left on disk; on a clean error the caller may safely
-// ignore the returned cleanup since it has already run.
-func writeTempHtml(html string) (string, func(), error) {
-	randId, err := utils.GetRandomString(8)
+// startLoopbackHtmlServer serves html at "/" on a random loopback port so the
+// renderer can navigate to it with a real http origin (required for remote
+// sub-resources to load; an about:blank document set via Page.setDocumentContent
+// never fetches them). Used only when external resources are enabled. The
+// listener is bound to 127.0.0.1 and the caller closes the returned server as
+// soon as the render finishes; only "/" is served (any other path 404s).
+func startLoopbackHtmlServer(html string) (*http.Server, string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return "", func() {}, err
+		return nil, "", err
 	}
-	htmlPath := filepath.Join(os.TempDir(), "html-to-pdf-"+randId+".html")
-	cleanup := func() {
-		if err := os.Remove(htmlPath); err != nil && !os.IsNotExist(err) {
-			logging.LogStd(logging.LOG_LEVEL_ERROR, "failed to remove html temp file: ", err.Error())
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, html)
+	})
+
+	server := &http.Server{Handler: mux}
+	go func() { _ = server.Serve(listener) }()
+
+	return server, listener.Addr().String(), nil
+}
+
+// resolveInterceptedRequest continues or blocks one Fetch-intercepted request
+// according to the SSRF policy (isRequestAllowed). It runs in its own goroutine
+// so the ListenTarget callback never blocks the CDP event loop. Errors from
+// Continue/Fail are ignored: the browser context may already be cancelled (the
+// render finished or timed out), which is not actionable here.
+func resolveInterceptedRequest(ctx context.Context, paused *fetch.EventRequestPaused, loopbackAddr string) {
+	executor := cdp.WithExecutor(ctx, chromedp.FromContext(ctx).Target)
+
+	var action chromedp.Action
+	if isRequestAllowed(paused.Request.URL, loopbackAddr) {
+		action = fetch.ContinueRequest(paused.RequestID)
+	} else {
+		logging.LogStd(logging.LOG_LEVEL_INFO, "HTML to PDF blocked non-public sub-resource: ", paused.Request.URL)
+		action = fetch.FailRequest(paused.RequestID, network.ErrorReasonBlockedByClient)
+	}
+	_ = action.Do(executor)
+}
+
+// isRequestAllowed decides whether a Fetch-intercepted sub-resource request may
+// proceed in external-resources mode. Inline data: URIs and our own loopback page
+// origin are always allowed; other http(s) requests are allowed only to
+// non-internal hosts (public logos / imagery); every other scheme (file, ws, …)
+// is denied. A parse failure denies (fail closed).
+func isRequestAllowed(rawURL string, loopbackAddr string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	switch u.Scheme {
+	case "data":
+		return true
+	case "http", "https":
+		if u.Host == loopbackAddr {
+			// Our own served page and its same-origin sub-resources.
+			return true
+		}
+		return !hostIsInternal(u.Hostname())
+	default:
+		return false
+	}
+}
+
+// hostIsInternal reports whether a request host points at a loopback, private,
+// link-local (incl. 169.254.169.254 cloud metadata) or unspecified address.
+// Hostnames are resolved and treated as internal if ANY resolved address is, or
+// if resolution fails (fail closed). NOTE: the address is checked at decision
+// time; a host that rebinds to an internal IP between this check and chromium's
+// own resolution could still slip through (documented DNS-rebinding residual).
+func hostIsInternal(host string) bool {
+	// Normalize case and a trailing FQDN dot before matching. Chromium resolves
+	// "localhost" and every "*.localhost" name to loopback itself without asking
+	// DNS, so those must be refused by name — a resolver that returned a public
+	// address for "foo.localhost" would not change where chromium connects.
+	h := strings.TrimSuffix(strings.ToLower(host), ".")
+	if h == "" || h == "localhost" || strings.HasSuffix(h, ".localhost") {
+		return true
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return ipIsInternal(ip)
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil || len(ips) == 0 {
+		return true
+	}
+	for _, ip := range ips {
+		if ipIsInternal(ip) {
+			return true
 		}
 	}
-	if err := utils.WriteFile(htmlPath, []byte(html)); err != nil {
-		cleanup()
-		return "", func() {}, err
+	return false
+}
+
+// extraInternalNets are non-public ranges the stdlib IP predicates below do not
+// cover but chromium can still route to: "this network" (0.0.0.0/8, some of which
+// maps to local services on Linux), CGNAT (100.64.0.0/10 — Alibaba Cloud metadata
+// lives at 100.100.100.200), benchmarking (198.18.0.0/15), reserved + broadcast
+// (240.0.0.0/4, which includes 255.255.255.255) and NAT64 (64:ff9b::/96, which
+// maps onto internal IPv4 on NAT64 networks).
+var extraInternalNets = mustParseCIDRs(
+	"0.0.0.0/8",
+	"100.64.0.0/10",
+	"198.18.0.0/15",
+	"240.0.0.0/4",
+	"64:ff9b::/96",
+)
+
+// mustParseCIDRs parses the given CIDRs at init and panics on a malformed one —
+// they are compile-time constants, so a bad entry is a programmer error.
+func mustParseCIDRs(cidrs ...string) []*net.IPNet {
+	nets := make([]*net.IPNet, 0, len(cidrs))
+	for _, cidr := range cidrs {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic("html_to_pdf: invalid internal CIDR " + cidr + ": " + err.Error())
+		}
+		nets = append(nets, network)
 	}
-	return htmlPath, cleanup, nil
+	return nets
+}
+
+// ipIsInternal reports whether an IP is one the render must never reach: loopback
+// (127/8, ::1), RFC1918 / IPv6 ULA (via IsPrivate), link-local unicast/multicast
+// (169.254/16 incl. cloud metadata, fe80::/10), any multicast, unspecified
+// (0.0.0.0, ::), or one of the extraInternalNets ranges above.
+func ipIsInternal(ip net.IP) bool {
+	for _, network := range extraInternalNets {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() ||
+		ip.IsUnspecified()
 }

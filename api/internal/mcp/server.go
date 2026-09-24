@@ -95,6 +95,14 @@ func verifyToken(ctx context.Context, audience string, token string) (*auth.Toke
 		return nil, fmt.Errorf("%w: unexpected claims type", auth.ErrInvalidToken)
 	}
 
+	// A refresh token validates against the same key/audience as an access token,
+	// so reject it here — an MCP refresh token must not be usable as an MCP access
+	// token (it also has the longest lifetime). Legacy access tokens (no type, no
+	// jti) are still accepted; see structs.Claims.IsRefreshToken.
+	if claims.IsRefreshToken() {
+		return nil, fmt.Errorf("%w: refresh token presented as an access token", auth.ErrInvalidToken)
+	}
+
 	info := &auth.TokenInfo{
 		UserID: utils.UintToString(claims.UserId),
 		Scopes: []string{mcpReadScope},

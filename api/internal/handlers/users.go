@@ -220,8 +220,18 @@ func GetAmountOwedForUser(w http.ResponseWriter, r *http.Request) {
 						return http.StatusInternalServerError, err
 					}
 
+					// Gate the All-group expansion by per-group read permission, so
+					// settlement over "All" only folds in groups the caller may
+					// actually read (the All membership is unrestricted otherwise).
+					permissionService := services.NewPermissionService(nil)
 					for _, userGroupId := range userGroupIds {
-						totalGroupIds = append(totalGroupIds, utils.UintToString(userGroupId))
+						canRead, err := permissionService.HasGroupPermissions(token.UserId, userGroupId, permissions.GroupReceiptsRead)
+						if err != nil {
+							return http.StatusInternalServerError, err
+						}
+						if canRead {
+							totalGroupIds = append(totalGroupIds, utils.UintToString(userGroupId))
+						}
 					}
 				} else {
 					totalGroupIds = append(totalGroupIds, groupId)

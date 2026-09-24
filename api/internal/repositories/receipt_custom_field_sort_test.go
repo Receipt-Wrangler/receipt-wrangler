@@ -78,7 +78,7 @@ func sortByCustomField(customFieldId uint, sortDirection commands.SortDirection)
 func sortedNames(t *testing.T, pagedRequest commands.ReceiptPagedRequestCommand) []string {
 	repository := NewReceiptRepository(nil)
 
-	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil, nil, nil)
+	receipts, count, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil, nil, nil, nil, nil)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
 		return nil
@@ -488,7 +488,7 @@ func TestShouldRejectMalformedCustomFieldOrderBy(t *testing.T) {
 			},
 		}
 
-		_, _, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil, nil, nil)
+		_, _, err := repository.GetPagedReceiptsByGroupId(1, "1", pagedRequest, nil, nil, nil, nil, nil)
 		if err == nil {
 			utils.PrintTestError(t, "no error for orderBy "+orderBy, "untrusted value error")
 		}
@@ -516,7 +516,7 @@ func TestPagedReceiptCustomFieldsAlwaysCarryTheirDefinition(t *testing.T) {
 
 	repository := NewReceiptRepository(nil)
 	receipts, _, err := repository.GetPagedReceiptsByGroupId(
-		1, "1", pagedRequestAllReceipts(), constants.CUSTOM_FIELD_ASSOCIATIONS, nil, nil,
+		1, "1", pagedRequestAllReceipts(), constants.CUSTOM_FIELD_ASSOCIATIONS, nil, nil, nil, nil,
 	)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)

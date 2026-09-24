@@ -59,7 +59,7 @@ func firstCommentNames(
 	repository := NewReceiptRepository(nil)
 
 	receipts, count, err := repository.GetPagedReceiptsByGroupId(
-		userId, utils.UintToString(groupId), sortByFirstComment(sortDirection), nil, nil, resolver,
+		userId, utils.UintToString(groupId), sortByFirstComment(sortDirection), nil, nil, resolver, nil, nil,
 	)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)

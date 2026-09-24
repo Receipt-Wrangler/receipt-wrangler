@@ -5,6 +5,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/reporting"
 	"receipt-wrangler/api/internal/reporting/receiptsource"
 	"receipt-wrangler/api/internal/repositories"
@@ -148,6 +149,11 @@ func (service ReportDataService) fetchReceipts(
 		return nil, 0, err
 	}
 
+	// For the synthetic All group, gate expansion to the groups the caller may
+	// read reports in and scope any category/tag filter per group. Both resolvers
+	// must be passed together (GetPagedReceiptsByGroupId fails closed otherwise).
+	// Shared by Rows and Receipts, so both report paths get the same gate; a
+	// single-group read never consults them.
 	return receiptRepository.GetPagedReceiptsByGroupId(
 		userId,
 		groupId,
@@ -155,5 +161,7 @@ func (service ReportDataService) fetchReceipts(
 		associations,
 		permissionService.PaidByListResolver(userId),
 		nil,
+		permissionService.GroupPermissionResolver(userId, permissions.GroupReportsRead),
+		permissionService.CategoryTagVisibilityResolver(userId),
 	)
 }
