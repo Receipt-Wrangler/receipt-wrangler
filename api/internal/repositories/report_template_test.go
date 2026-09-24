@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"gorm.io/gorm"
@@ -96,6 +97,82 @@ func TestCreateReportTemplate_PersistedRowIsReadable(t *testing.T) {
 	}
 	if stored.Name != "Reloadable" {
 		utils.PrintTestError(t, stored.Name, "Reloadable")
+	}
+}
+
+// A template saved without a period date field stores no dateField key at all:
+// the absent key is what means "receipt date", and an empty string in the blob
+// would be a value no client sent.
+func TestCreateReportTemplate_StoredConfigOmitsEmptyPeriodDateField(t *testing.T) {
+	defer TruncateTestDb()
+
+	template, err := NewReportTemplateRepository(nil).CreateReportTemplate(sampleReportCommand(), 1)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if strings.Contains(string(template.Configuration), "dateField") {
+		utils.PrintTestError(t, string(template.Configuration), "no dateField key")
+	}
+}
+
+func TestCreateReportTemplate_StoredConfigKeepsPeriodDateField(t *testing.T) {
+	defer TruncateTestDb()
+
+	for _, dateField := range commands.ReceiptDateFilterKeys() {
+		t.Run(dateField, func(t *testing.T) {
+			command := sampleReportCommand()
+			command.Period.DateField = dateField
+
+			template, err := NewReportTemplateRepository(nil).CreateReportTemplate(command, 1)
+			if err != nil {
+				utils.PrintTestError(t, err, nil)
+				return
+			}
+
+			var stored commands.ReportRequestCommand
+			if err := json.Unmarshal(template.Configuration, &stored); err != nil {
+				utils.PrintTestError(t, err, nil)
+				return
+			}
+			if stored.Period.DateField != dateField {
+				utils.PrintTestError(t, stored.Period.DateField, dateField)
+			}
+		})
+	}
+}
+
+func TestUpdateReportTemplate_ChangesPeriodDateField(t *testing.T) {
+	defer TruncateTestDb()
+
+	repository := NewReportTemplateRepository(nil)
+	command := sampleReportCommand()
+	command.Period.DateField = commands.ReceiptFilterKeyCreatedAt
+	created, err := repository.CreateReportTemplate(command, 1)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	command.Period.DateField = commands.ReceiptFilterKeyResolvedDate
+	if _, err := repository.UpdateReportTemplate(command, fmt.Sprint(created.ID)); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var fetched models.ReportTemplate
+	if err := GetDB().First(&fetched, created.ID).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	var stored commands.ReportRequestCommand
+	if err := json.Unmarshal(fetched.Configuration, &stored); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	if stored.Period.DateField != commands.ReceiptFilterKeyResolvedDate {
+		utils.PrintTestError(t, stored.Period.DateField, commands.ReceiptFilterKeyResolvedDate)
 	}
 }
 

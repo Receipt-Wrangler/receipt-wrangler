@@ -12,6 +12,7 @@ const QueueName _$emailReceiptProcessing =
     const QueueName._('emailReceiptProcessing');
 const QueueName _$emailReceiptImageCleanup =
     const QueueName._('emailReceiptImageCleanup');
+const QueueName _$systemCleanUp = const QueueName._('systemCleanUp');
 
 QueueName _$valueOf(String name) {
   switch (name) {
@@ -23,6 +24,8 @@ QueueName _$valueOf(String name) {
       return _$emailReceiptProcessing;
     case 'emailReceiptImageCleanup':
       return _$emailReceiptImageCleanup;
+    case 'systemCleanUp':
+      return _$systemCleanUp;
     default:
       throw ArgumentError(name);
   }
@@ -33,6 +36,7 @@ final BuiltSet<QueueName> _$values = BuiltSet<QueueName>(const <QueueName>[
   _$emailPolling,
   _$emailReceiptProcessing,
   _$emailReceiptImageCleanup,
+  _$systemCleanUp,
 ]);
 
 class _$QueueNameMeta {
@@ -41,6 +45,7 @@ class _$QueueNameMeta {
   QueueName get emailPolling => _$emailPolling;
   QueueName get emailReceiptProcessing => _$emailReceiptProcessing;
   QueueName get emailReceiptImageCleanup => _$emailReceiptImageCleanup;
+  QueueName get systemCleanUp => _$systemCleanUp;
   QueueName valueOf(String name) => _$valueOf(name);
   BuiltSet<QueueName> get values => _$values;
 }
@@ -58,12 +63,14 @@ class _$QueueNameSerializer implements PrimitiveSerializer<QueueName> {
     'emailPolling': 'email_polling',
     'emailReceiptProcessing': 'email_receipt_processing',
     'emailReceiptImageCleanup': 'email_receipt_image_cleanup',
+    'systemCleanUp': 'system_clean_up',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'quick_scan': 'quickScan',
     'email_polling': 'emailPolling',
     'email_receipt_processing': 'emailReceiptProcessing',
     'email_receipt_image_cleanup': 'emailReceiptImageCleanup',
+    'system_clean_up': 'systemCleanUp',
   };
 
   @override

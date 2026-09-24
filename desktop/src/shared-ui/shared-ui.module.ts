@@ -48,6 +48,7 @@ import { FormComponent } from "./form/form.component";
 import { GroupAutocompleteComponent } from "./group-autocomplete/group-autocomplete.component";
 import { HelpIconComponent } from "./help-icon/help-icon.component";
 import { ImageViewerComponent } from "./image-viewer/image-viewer.component";
+import { SourceFileViewerDialogComponent } from "./source-file-viewer-dialog/source-file-viewer-dialog.component";
 import { PrettyJsonComponent } from "./pretty-json/pretty-json.component";
 import { QueueStartMenuComponent } from "./queue-start-menu/queue-start-menu.component";
 import { QuickScanButtonComponent } from "./quick-scan-button/quick-scan-button.component";
@@ -113,6 +114,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     AccordionComponent,
     PrettyJsonComponent,
     ImageViewerComponent,
+    SourceFileViewerDialogComponent,
     QueueStartMenuComponent,
     EditableListComponent,
     IconAutocompleteComponent,
@@ -188,6 +190,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     AccordionComponent,
     PrettyJsonComponent,
     ImageViewerComponent,
+    SourceFileViewerDialogComponent,
     QueueStartMenuComponent,
     EditableListComponent,
     IconAutocompleteComponent,

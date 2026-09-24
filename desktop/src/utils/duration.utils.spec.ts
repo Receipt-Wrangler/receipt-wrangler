@@ -1,4 +1,4 @@
-import { DEFAULT_DURATION_HOURS, maxForUnit, splitHours, toHours } from "./duration.utils";
+import { DEFAULT_DURATION_HOURS, maxForUnit, minForUnit, splitHours, toHours } from "./duration.utils";
 
 describe("duration.utils", () => {
   describe("splitHours", () => {
@@ -69,6 +69,23 @@ describe("duration.utils", () => {
     it("expresses the hour cap in the selected unit", () => {
       expect(maxForUnit(720, "HOURS")).toBe(720);
       expect(maxForUnit(720, "DAYS")).toBe(30);
+    });
+  });
+
+  describe("minForUnit", () => {
+    it("expresses the hour floor in the selected unit", () => {
+      expect(minForUnit(24, "HOURS")).toBe(24);
+      expect(minForUnit(24, "DAYS")).toBe(1);
+    });
+
+    // Rounding a floor down is what maxForUnit does, and doing it here would
+    // turn a one-hour minimum into zero days -- admitting a zero-length duration
+    // the server rejects.
+    it("rounds up rather than down, and never yields zero", () => {
+      expect(minForUnit(1, "DAYS")).toBe(1);
+      expect(minForUnit(25, "DAYS")).toBe(2);
+      expect(minForUnit(0, "DAYS")).toBe(1);
+      expect(minForUnit(0, "HOURS")).toBe(1);
     });
   });
 });

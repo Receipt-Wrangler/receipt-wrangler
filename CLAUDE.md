@@ -78,6 +78,22 @@ When the API swagger.yml changes, regenerate clients:
 
 **IMPORTANT**: Never manually edit generated client code in `desktop/src/open-api/` or `mobile/api/`. Changes will be overwritten.
 
+**Drift runs the other way too — the spec can fall behind the server.** `swagger.yml`'s `QueueName`
+enum listed four of the Go side's five names (`system_clean_up` was missing) while
+`UpsertSystemSettingsCommand.Validate` had always required a configuration for all five; the System
+Settings form only worked because it builds its FormArray from the server's settings rather than from
+the enum. Fixed when that queue took on the temp-file sweep. When you add a value to a Go enum the API
+serializes, add it to `swagger.yml` in the same change — and note this direction is the *safe* one to
+fix, since a client learning a value the server already sends can only stop failing on it.
+
+**The same property cut the other way in the DATABASE.** Sourcing the FormArray from the server's
+settings is what let the form survive a stale enum — and it is exactly what broke on an install whose
+persisted `task_queue_configurations` predated the new queue: the server returned four rows, the form
+submitted four, and `Validate` rejected the whole save with a 400. So a new queue name needs a
+backfill on the *stored* side too, not just the spec. Both halves now live in
+`repositories/system_settings.go`; see `api/CLAUDE.md` → "Temporary file retention & cleanup" →
+"Upgrade path".
+
 **Regenerate `mobile/api/` in the SAME change as any `swagger.yml` edit** — not "later". It is easy
 to update the backend and desktop and forget mobile, because nothing fails: the Go tests pass, the
 desktop compiles, and the drift is invisible until a released Android build hits the new payload.
@@ -388,6 +404,47 @@ choice in. **Client-only** — no backend, swagger or generated-client involveme
   `desktop/e2e/receipts.spec.ts`, `selectDropdown` in
   `mobile/integration_test/helpers/form_actions.dart`).
 
+### Failed Uploads Keep Their Image
+
+A quick scan or email upload that fails keeps the file it was working from, and the user can preview
+or download it to enter the receipt by hand. **Backend + desktop**; the swagger change regenerates
+both clients, but mobile gets no new UI.
+
+- **The old cleanup was inverted.** It released a temp file once every referencing task was
+  `Completed` **or** `Archived` — and `Archived` is exactly what makes an activity rerunnable. At the
+  time no queue set `asynq.Retention`, so a successful task left Redis immediately and never reached
+  the completed set, meaning the only files it ever deleted were the ones it had to keep. It also
+  scanned only the email queue, and was registered inside `StartEmailPolling`, so an install without
+  email polling ran no temp cleanup at all. See `api/CLAUDE.md` → "Temporary file retention & cleanup"
+  for the replacement's precedence table and the two invariants that keep its orphan branch safe.
+- **`asynq.Retention` is now set — on the email queue only** (6h, `enqueueOptions` in
+  `wranglerasynq/task_enqueue.go`), so a *succeeded* email upload's attachment and OCR copy are
+  released on the next hourly sweep rather than after the retention window. Quick scan is excluded
+  because it already deletes its own file on success and is 1:1 task-to-file; email cannot, because
+  one attachment fans out to a sibling task per `groupSettingsId`. Two knock-on rules came with it,
+  both because a succeeded task now lingers in Redis: `Inspector.RunTask` does **not** refuse a task
+  by state, so the rerun endpoint enforces `Archived` itself (otherwise a rerun of a succeeded email
+  would duplicate its receipt), and a `Completed` task stops advertising its source file (otherwise
+  preview/download would appear on a succeeded activity and 404 an hour later).
+- **How long a file is kept is a System Setting** (`tempFileRetentionHours`, default 720 = 30 days,
+  bounds 24-8760), following the same pointer-and-omitted-column machinery as the refresh-token
+  lifetimes — an omitted key leaves the stored value alone.
+- **`canBeRestarted` now also requires the files a rerun reads**, so it stops advertising reruns that
+  cannot work. A body-only email reads none and stays rerunnable, which is why "expects a file" is
+  tracked separately from "has a file". **Mobile inherits this for free** —
+  `group_activity_list_item.dart` already gates its rerun slidable on the flag, so the regen is the
+  whole mobile change.
+- **`hasSourceFile` is deliberately NOT gated on `Archived`**, unlike `canBeRestarted`: asynq's retry
+  backoff means minutes pass before a task archives, and the user should not watch an activity sit at
+  FAILED with no way to get their image.
+- **Each client's gate keys on the activity's own group**, never the surface's. The desktop widget had
+  this wrong and hid every control on the "All" dashboard; mobile had fixed it years earlier. See
+  `desktop/CLAUDE.md` → "Activity source file".
+- **E2E on the desktop only** (`desktop/e2e/failed-activity-source-file.spec.ts`), because it is the
+  only test that can prove the image survived in `temp/` through a real failure. It forces the failure
+  by pointing the global AI provider at an unreachable host, so it works against the shared demo
+  backend too — which makes it a global-state-mutating, serial spec.
+
 ### Quick Date Filter (month stepper)
 
 A month stepper — `‹ September 2026 ›` — plus a picker naming which date field it writes to, sitting
@@ -416,6 +473,13 @@ disagree. **Client-only on both sides**: no backend, `swagger.yml` or generated-
   `mobile/integration_test/receipt_quick_date_filter_test.dart`. The mobile one **seeds relative to
   `DateTime.now()`** — the shared mobile filter fixture is pinned to June 2026, which a
   month-relative control drifts away from.
+- **The same field list drives the Report Builder's "Date field" picker**, next to "Period covering",
+  and that one **is** server-backed: `ReportPeriod.dateField` picks which receipt date the report
+  period filters. Adding a date field to desktop's `RECEIPT_DATE_FILTER_FIELDS` therefore also needs
+  `commands.ReceiptDateFilterKeys()` / `DateFilterField` and the swagger description, or the picker
+  offers a value the API rejects with a 400. `TestReceiptDateFilterKeys` pins the Go side. The wire
+  field is a plain string, not an enum, so mobile never breaks on a new key. See `api/CLAUDE.md` →
+  "The period's date field".
 
 See `desktop/CLAUDE.md` → "The month stepper targets one date field" and `mobile/CLAUDE.md` → "Quick
 date filter" for the per-client details.

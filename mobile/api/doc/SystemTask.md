@@ -25,6 +25,7 @@ Name | Type | Description | Notes
 **resultDescription** | **String** |  | [optional] 
 **apiKeyId** | **String** |  | [optional] 
 **childSystemTasks** | [**BuiltList&lt;SystemTask&gt;**](SystemTask.md) |  | [optional] 
+**hasSourceFile** | **bool** | Whether the upload behind this task is still on disk AND the caller may reach it. Resolved per caller, since this listing is app-scoped and spans groups the caller may not belong to. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

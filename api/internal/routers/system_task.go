@@ -14,6 +14,8 @@ func BuildSystemTaskRouter() *chi.Mux {
 	systemTaskRouter.Post("/getPagedSystemTasks", handlers.GetSystemTasks)
 	systemTaskRouter.Post("/getPagedActivities", handlers.GetActivitiesForGroups)
 	systemTaskRouter.Post("/rerunActivity/{id}", handlers.RerunActivity)
+	systemTaskRouter.Get("/{id}/sourceFile", handlers.GetSystemTaskSourceFile)
+	systemTaskRouter.Get("/{id}/sourceFile/download", handlers.DownloadSystemTaskSourceFile)
 
 	return systemTaskRouter
 }

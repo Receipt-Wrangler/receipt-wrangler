@@ -46,6 +46,7 @@ Name | Type | Description | Notes
 **resultDescription** | **String** |  | [optional] 
 **apiKeyId** | **String** |  | [optional] 
 **childSystemTasks** | [**BuiltList&lt;SystemTask&gt;**](SystemTask.md) |  | [optional] 
+**hasSourceFile** | **bool** | Whether the upload behind this activity is still on disk, so it can be previewed or downloaded. False once the temp-file retention window has passed, or for an activity that never had an upload. | [optional] 
 **aiType** | [**AiType**](AiType.md) |  | [optional] 
 **url** | **String** | URL for custom endpoints | [optional] 
 **key** | **String** | Key for endpoints that require authentication | [optional] 

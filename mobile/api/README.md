@@ -142,6 +142,7 @@ Class | Method | HTTP request | Description
 [*ReportApi*](doc/ReportApi.md) | [**duplicateReportTemplate**](doc/ReportApi.md#duplicatereporttemplate) | **POST** /report/template/{id}/duplicate | Duplicate a report template
 [*ReportApi*](doc/ReportApi.md) | [**generateReport**](doc/ReportApi.md#generatereport) | **POST** /report/generate | Generate a report
 [*ReportApi*](doc/ReportApi.md) | [**generateReportFromTemplate**](doc/ReportApi.md#generatereportfromtemplate) | **POST** /report/template/{id}/generate | Generate a report from a saved template
+[*ReportApi*](doc/ReportApi.md) | [**getReportReceipts**](doc/ReportApi.md#getreportreceipts) | **POST** /report/receipts | List the receipts a report covers
 [*ReportApi*](doc/ReportApi.md) | [**getReportTemplate**](doc/ReportApi.md#getreporttemplate) | **GET** /report/template/{id} | Get a report template
 [*ReportApi*](doc/ReportApi.md) | [**getReportTemplateOptions**](doc/ReportApi.md#getreporttemplateoptions) | **GET** /report/template/options | Get report template options
 [*ReportApi*](doc/ReportApi.md) | [**getReportTemplates**](doc/ReportApi.md#getreporttemplates) | **POST** /report/template/list | Get paged report templates
@@ -163,8 +164,10 @@ Class | Method | HTTP request | Description
 [*SystemSettingsApi*](doc/SystemSettingsApi.md) | [**getSystemSettings**](doc/SystemSettingsApi.md#getsystemsettings) | **GET** /systemSettings | Get system settings
 [*SystemSettingsApi*](doc/SystemSettingsApi.md) | [**restartTaskServer**](doc/SystemSettingsApi.md#restarttaskserver) | **POST** /systemSettings/restartTaskServer | Restart task server
 [*SystemSettingsApi*](doc/SystemSettingsApi.md) | [**updateSystemSettings**](doc/SystemSettingsApi.md#updatesystemsettings) | **PUT** /systemSettings | Update system settings
+[*SystemTaskApi*](doc/SystemTaskApi.md) | [**downloadSystemTaskSourceFile**](doc/SystemTaskApi.md#downloadsystemtasksourcefile) | **GET** /systemTask/{id}/sourceFile/download | Download an activity&#39;s source file
 [*SystemTaskApi*](doc/SystemTaskApi.md) | [**getPagedActivities**](doc/SystemTaskApi.md#getpagedactivities) | **POST** /systemTask/getPagedActivities | Gets paged activities
 [*SystemTaskApi*](doc/SystemTaskApi.md) | [**getPagedSystemTasks**](doc/SystemTaskApi.md#getpagedsystemtasks) | **POST** /systemTask/getPagedSystemTasks | Gets paged system tasks
+[*SystemTaskApi*](doc/SystemTaskApi.md) | [**getSystemTaskSourceFile**](doc/SystemTaskApi.md#getsystemtasksourcefile) | **GET** /systemTask/{id}/sourceFile | Get an activity&#39;s source file
 [*SystemTaskApi*](doc/SystemTaskApi.md) | [**rerunActivity**](doc/SystemTaskApi.md#rerunactivity) | **POST** /systemTask/rerunActivity/{id} | Attempts to rerun activity
 [*TagApi*](doc/TagApi.md) | [**createTag**](doc/TagApi.md#createtag) | **POST** /tag/ | Create tag
 [*TagApi*](doc/TagApi.md) | [**deleteTag**](doc/TagApi.md#deletetag) | **DELETE** /tag/{tagId} | Delete tag
@@ -291,6 +294,7 @@ Class | Method | HTTP request | Description
  - [SystemSettings](doc/SystemSettings.md)
  - [SystemTask](doc/SystemTask.md)
  - [SystemTaskPagedRequestFilter](doc/SystemTaskPagedRequestFilter.md)
+ - [SystemTaskSourceFileView](doc/SystemTaskSourceFileView.md)
  - [SystemTaskStatus](doc/SystemTaskStatus.md)
  - [SystemTaskType](doc/SystemTaskType.md)
  - [Tag](doc/Tag.md)

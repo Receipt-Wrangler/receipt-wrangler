@@ -121,6 +121,7 @@ doc/SystemSettingsApi.md
 doc/SystemTask.md
 doc/SystemTaskApi.md
 doc/SystemTaskPagedRequestFilter.md
+doc/SystemTaskSourceFileView.md
 doc/SystemTaskStatus.md
 doc/SystemTaskType.md
 doc/Tag.md
@@ -294,6 +295,7 @@ lib/src/model/system_email.dart
 lib/src/model/system_settings.dart
 lib/src/model/system_task.dart
 lib/src/model/system_task_paged_request_filter.dart
+lib/src/model/system_task_source_file_view.dart
 lib/src/model/system_task_status.dart
 lib/src/model/system_task_type.dart
 lib/src/model/tag.dart

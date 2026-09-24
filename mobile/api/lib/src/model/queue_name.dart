@@ -19,6 +19,8 @@ class QueueName extends EnumClass {
   static const QueueName emailReceiptProcessing = _$emailReceiptProcessing;
   @BuiltValueEnumConst(wireName: r'email_receipt_image_cleanup')
   static const QueueName emailReceiptImageCleanup = _$emailReceiptImageCleanup;
+  @BuiltValueEnumConst(wireName: r'system_clean_up')
+  static const QueueName systemCleanUp = _$systemCleanUp;
 
   static Serializer<QueueName> get serializer => _$queueNameSerializer;
 

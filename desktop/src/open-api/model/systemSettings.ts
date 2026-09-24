@@ -89,6 +89,10 @@ export interface SystemSettings {
      * The same for MCP/OAuth connector refresh tokens, kept separate so a long window chosen for human convenience does not extend third-party client tokens. 1-720 (30 days); 0 means unset and falls back to the default.
      */
     mcpRefreshTokenValidForHours?: number;
+    /**
+     * How long a file in temp/ is kept once nothing can still act on it, i.e. how long a user has to rerun, preview or download the source image of a failed upload. 24-8760 (1 year); 0 means unset and falls back to the default.
+     */
+    tempFileRetentionHours?: number;
 }
 export namespace SystemSettings {
 }

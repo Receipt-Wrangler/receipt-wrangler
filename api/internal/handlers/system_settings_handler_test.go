@@ -259,6 +259,7 @@ func TestUpdateSystemSettingsPreservesOmittedRefreshTokenLifetimes(t *testing.T)
 		Updates(map[string]interface{}{
 			"refresh_token_valid_for_hours":     720,
 			"mcp_refresh_token_valid_for_hours": 6,
+			"temp_file_retention_hours":         1080,
 		}).Error
 	if err != nil {
 		t.Fatalf("failed to seed configured lifetimes: %v", err)
@@ -310,6 +311,12 @@ func TestUpdateSystemSettingsPreservesOmittedRefreshTokenLifetimes(t *testing.T)
 
 	if updated.McpRefreshTokenValidForHours != 6 {
 		utils.PrintTestError(t, updated.McpRefreshTokenValidForHours, 6)
+	}
+
+	// Same hazard, same fix: the retention window is a pointer on the command and
+	// is dropped from the UPDATE when the key is absent.
+	if updated.TempFileRetentionHours != 1080 {
+		utils.PrintTestError(t, updated.TempFileRetentionHours, 1080)
 	}
 }
 
@@ -370,5 +377,97 @@ func TestUpdateSystemSettingsPersistsExplicitRefreshTokenLifetimes(t *testing.T)
 
 	if updated.McpRefreshTokenValidForHours != mcpHours {
 		utils.PrintTestError(t, updated.McpRefreshTokenValidForHours, mcpHours)
+	}
+}
+
+// The end-to-end shape of the upgrade bug: an install whose task_queue_configuration
+// table predates models.SystemCleanUpQueue has four rows, the settings form builds
+// its inputs from whatever the GET returned, and so it submits four --
+// UpsertSystemSettingsCommand.Validate requires one per queue name and rejected the
+// entire body with a 400. tempFileRetentionHours is the setting that made this
+// reachable in practice: changing it is exactly the save that failed.
+func TestUpdateSystemSettingsSucceedsOnAnInstallMissingAQueueConfiguration(t *testing.T) {
+	defer tearDownSystemSettingsTest()
+
+	db := repositories.GetDB()
+	db.Create(&models.SystemSettings{})
+	grantAllAppPerms(t, 1)
+
+	for _, queueName := range models.GetQueueNames() {
+		if queueName == models.SystemCleanUpQueue {
+			continue
+		}
+
+		err := db.Create(&models.TaskQueueConfiguration{
+			Name:             queueName,
+			Priority:         3,
+			SystemSettingsId: 1,
+		}).Error
+		if err != nil {
+			t.Fatalf("failed to seed queue configuration %s: %v", queueName, err)
+		}
+	}
+
+	// Build the queue list the way the settings form does: from the payload the
+	// server just handed the client, never from the client's own enum.
+	served, err := repositories.NewSystemSettingsRepository(nil).GetSystemSettings()
+	if err != nil {
+		t.Fatalf("failed to read system settings: %v", err)
+	}
+
+	queueConfigs := make([]map[string]interface{}, 0)
+	for _, config := range served.TaskQueueConfigurations {
+		queueConfigs = append(queueConfigs, map[string]interface{}{
+			"name":     config.Name,
+			"priority": config.Priority,
+		})
+	}
+
+	body := map[string]interface{}{
+		"currencyDisplay":              "$",
+		"currencySymbolPosition":       models.START,
+		"currencyThousandthsSeparator": models.COMMA,
+		"currencyDecimalSeparator":     models.DOT,
+		"currencyHideDecimalPlaces":    false,
+		"taskConcurrency":              1,
+		"emailPollingInterval":         60,
+		"tempFileRetentionHours":       4320,
+		"taskQueueConfigurations":      queueConfigs,
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal body: %v", err)
+	}
+
+	r := httptest.NewRequest("PUT", "/api", strings.NewReader(string(bodyBytes)))
+	newContext := context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, &validator.ValidatedClaims{CustomClaims: &structs.Claims{UserId: 1}})
+	r = r.WithContext(newContext)
+	w := httptest.NewRecorder()
+
+	UpdateSystemSettings(w, r)
+
+	if w.Result().StatusCode != http.StatusOK {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+	}
+
+	// A 200 that dropped the value would be the worse outcome of the two, so the
+	// setting the save exists to change is asserted alongside the status.
+	updated, err := repositories.NewSystemSettingsRepository(nil).GetSystemSettings()
+	if err != nil {
+		t.Fatalf("failed to read back system settings: %v", err)
+	}
+
+	if updated.TempFileRetentionHours != 4320 {
+		utils.PrintTestError(t, updated.TempFileRetentionHours, 4320)
+	}
+
+	var persistedCount int64
+	if err := db.Model(&models.TaskQueueConfiguration{}).Count(&persistedCount).Error; err != nil {
+		t.Fatalf("failed to count queue configurations: %v", err)
+	}
+
+	// And the row heals, so the next read no longer has to invent it.
+	if persistedCount != int64(len(models.GetQueueNames())) {
+		utils.PrintTestError(t, persistedCount, len(models.GetQueueNames()))
 	}
 }

@@ -46,6 +46,38 @@ describe("TaskTableComponent", () => {
     expect(component).toBeTruthy();
   });
 
+  it("omits the source file column by default, so other hosts are unchanged", () => {
+    fixture.componentRef.setInput("expandedRowTemplate", {} as any);
+    // setColumns() runs in ngAfterViewInit and mutates template-bound state, so
+    // the dev-mode check-no-changes pass would report NG0100.
+    fixture.detectChanges(false);
+
+    // ngOnInit fires the initial fetch; the afterEach httpTesting.verify() added
+    // alongside the filter tests fails on any request left unflushed.
+    httpTesting.expectOne("/api/systemTask/getPagedSystemTasks").flush({ data: [], totalCount: 0 });
+
+    expect(component.displayedColumns).not.toContain("source_file");
+    expect(component.columns.some((column) => column.matColumnDef === "source_file")).toBe(false);
+  });
+
+  it("adds the source file column before expand when the host opts in", () => {
+    fixture.componentRef.setInput("showSourceFileActions", true);
+    fixture.componentRef.setInput("expandedRowTemplate", {} as any);
+    fixture.detectChanges(false);
+
+    // ngOnInit fires the initial fetch; the afterEach httpTesting.verify() added
+    // alongside the filter tests fails on any request left unflushed.
+    httpTesting.expectOne("/api/systemTask/getPagedSystemTasks").flush({ data: [], totalCount: 0 });
+
+    // mat-table throws on a displayed id with no matching column definition, and
+    // "expand" has to stay last.
+    expect(component.columns.some((column) => column.matColumnDef === "source_file")).toBe(true);
+    expect(component.displayedColumns.indexOf("source_file")).toBeGreaterThan(-1);
+    expect(component.displayedColumns.indexOf("source_file"))
+      .toBeLessThan(component.displayedColumns.indexOf("expand"));
+    expect(component.displayedColumns[component.displayedColumns.length - 1]).toBe("expand");
+  });
+
   it("sends the filter the provider reports with the paged request", () => {
     const filter = {
       type: { operation: FilterOperation.Contains, value: ["QUICK_SCAN"] },

@@ -1,8 +1,10 @@
 import { parseISO } from "date-fns";
 import { FormArray, FormBuilder, FormControl, FormGroup } from "@angular/forms";
+import { DEFAULT_QUICK_DATE_FIELD, ReceiptDateFilterFieldKey } from "src/constants";
 import { ReportColumn, ReportDetail, ReportPeriod, ReportRequestCommand } from "../../open-api";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { ReportColumnValue } from "./report-command.mapper";
+import { toReportPeriodDateField } from "./report-period.util";
 
 let columnIdCounter = 0;
 
@@ -26,6 +28,7 @@ export function buildReportForm(formBuilder: FormBuilder, thisContext: any): For
       preset: formBuilder.control<ReportPeriod.PresetEnum>(ReportPeriod.PresetEnum.ThisMonth),
       startDate: formBuilder.control<Date | null>(null),
       endDate: formBuilder.control<Date | null>(null),
+      dateField: formBuilder.control<ReceiptDateFilterFieldKey>(DEFAULT_QUICK_DATE_FIELD),
     }),
     filter: buildReceiptFilterForm({}, thisContext),
     groupBy: formBuilder.array<FormGroup>([]),
@@ -84,6 +87,11 @@ export function buildReportFormFromCommand(
       ),
       endDate: formBuilder.control<Date | null>(
         command.period?.endDate ? parseISO(command.period.endDate) : null
+      ),
+      // A template saved before the picker existed has no date field; it always
+      // covered the receipt date, so it rehydrates to that (and a re-save writes it).
+      dateField: formBuilder.control<ReceiptDateFilterFieldKey>(
+        toReportPeriodDateField(command.period?.dateField)
       ),
     }),
     filter: buildReceiptFilterForm(command.filter ?? {}, thisContext),

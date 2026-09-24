@@ -81,3 +81,24 @@
 </ng-template>
 
 
+
+<ng-template let-element="element" #sourceFileCell>
+  @if (element.hasSourceFile) {
+    <div class="d-flex align-items-center gap-1">
+      <app-button
+        icon="visibility"
+        matButtonType="iconButton"
+        tooltip="Preview source file"
+        data-testid="system-task-source-file-preview"
+        (clicked)="openSourceFileDialog(element)"
+      ></app-button>
+      <app-button
+        icon="download"
+        matButtonType="iconButton"
+        tooltip="Download source file"
+        data-testid="system-task-source-file-download"
+        (clicked)="downloadSourceFile(element)"
+      ></app-button>
+    </div>
+  }
+</ng-template>

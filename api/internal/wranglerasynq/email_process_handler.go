@@ -53,7 +53,12 @@ func HandleEmailProcessTask(context context.Context, task *asynq.Task) error {
 
 	var fileBytes []byte
 	if len(payload.TempFilePath) > 0 {
-		fileBytes, err = utils.ReadFile(payload.TempFilePath)
+		// os.ReadFile, not utils.ReadFile: the latter returns (nil, nil) on any
+		// read error. A missing attachment would then sail past this check as
+		// empty bytes, and because hasAttachmentImage is derived from the payload
+		// string rather than the file, processing would continue and persist a
+		// zero-byte receipt image carrying the real name and size.
+		fileBytes, err = os.ReadFile(payload.TempFilePath)
 		if err != nil {
 			return HandleError(err)
 		}

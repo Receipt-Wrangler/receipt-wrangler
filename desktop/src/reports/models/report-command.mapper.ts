@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { ReceiptDateFilterFieldKey } from "src/constants";
 import {
   ReceiptPagedRequestFilter,
   ReportColumn,
@@ -40,6 +41,9 @@ export interface ReportBuilderValue {
     preset: ReportPeriod.PresetEnum;
     startDate: Date | null;
     endDate: Date | null;
+    // One of the receipts quick date filter's keys, the only values the picker
+    // offers. The contract types it as a plain string (see swagger.yml).
+    dateField: ReceiptDateFilterFieldKey;
   };
   filter: ReceiptPagedRequestFilter;
   groupBy: ReportGroupByValue[];
@@ -85,15 +89,20 @@ function toApiDate(date: Date | null): string {
   return date ? format(date, "yyyy-MM-dd") : "";
 }
 
+/**
+ * The date field is always sent, so a saved template records which date it covers
+ * instead of leaning on the API's receipt-date default.
+ */
 function toPeriod(period: ReportBuilderValue["period"]): ReportPeriod {
   if (period.preset === ReportPeriod.PresetEnum.Custom) {
     return {
       preset: period.preset,
       startDate: toApiDate(period.startDate),
       endDate: toApiDate(period.endDate),
+      dateField: period.dateField,
     };
   }
-  return { preset: period.preset };
+  return { preset: period.preset, dateField: period.dateField };
 }
 
 /** Maps a builder column to an engine column, carrying only the fields its kind uses. */

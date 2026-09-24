@@ -94,11 +94,14 @@ class _$ReportPeriod extends ReportPeriod {
   final String? startDate;
   @override
   final String? endDate;
+  @override
+  final String? dateField;
 
   factory _$ReportPeriod([void Function(ReportPeriodBuilder)? updates]) =>
       (ReportPeriodBuilder()..update(updates))._build();
 
-  _$ReportPeriod._({required this.preset, this.startDate, this.endDate})
+  _$ReportPeriod._(
+      {required this.preset, this.startDate, this.endDate, this.dateField})
       : super._();
   @override
   ReportPeriod rebuild(void Function(ReportPeriodBuilder) updates) =>
@@ -113,7 +116,8 @@ class _$ReportPeriod extends ReportPeriod {
     return other is ReportPeriod &&
         preset == other.preset &&
         startDate == other.startDate &&
-        endDate == other.endDate;
+        endDate == other.endDate &&
+        dateField == other.dateField;
   }
 
   @override
@@ -122,6 +126,7 @@ class _$ReportPeriod extends ReportPeriod {
     _$hash = $jc(_$hash, preset.hashCode);
     _$hash = $jc(_$hash, startDate.hashCode);
     _$hash = $jc(_$hash, endDate.hashCode);
+    _$hash = $jc(_$hash, dateField.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -131,7 +136,8 @@ class _$ReportPeriod extends ReportPeriod {
     return (newBuiltValueToStringHelper(r'ReportPeriod')
           ..add('preset', preset)
           ..add('startDate', startDate)
-          ..add('endDate', endDate))
+          ..add('endDate', endDate)
+          ..add('dateField', dateField))
         .toString();
   }
 }
@@ -152,6 +158,10 @@ class ReportPeriodBuilder
   String? get endDate => _$this._endDate;
   set endDate(String? endDate) => _$this._endDate = endDate;
 
+  String? _dateField;
+  String? get dateField => _$this._dateField;
+  set dateField(String? dateField) => _$this._dateField = dateField;
+
   ReportPeriodBuilder() {
     ReportPeriod._defaults(this);
   }
@@ -162,6 +172,7 @@ class ReportPeriodBuilder
       _preset = $v.preset;
       _startDate = $v.startDate;
       _endDate = $v.endDate;
+      _dateField = $v.dateField;
       _$v = null;
     }
     return this;
@@ -187,6 +198,7 @@ class ReportPeriodBuilder
               preset, r'ReportPeriod', 'preset'),
           startDate: startDate,
           endDate: endDate,
+          dateField: dateField,
         );
     replace(_$result);
     return _$result;

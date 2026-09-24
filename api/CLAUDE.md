@@ -249,6 +249,33 @@ would reject a non-`data/` path). The deliberate raw reads are the AI image read
 be a `temp/` file or a data file depending on the PDF branch — and the data-file case is now guaranteed
 contained at construction because `BuildFilePath` asserts containment on the full path.
 
+**Exception to the exception: a `temp/` path that came back out of an asynq payload.** The exemption
+above is for paths the *server builds*. A path read out of a task payload is JSON in Redis and is
+attacker-adjacent, so it must go through **`FileRepository.AssertWithinTempDirectory`** before anything
+opens or serves it (the activity source-file endpoints are the current callers). The data-scoped
+helpers cannot be used — they resolve against `data/` and would reject every temp path — so both
+checks now delegate to the shared **`utils.AssertWithinDir(baseDir, path)`**, with the base as a
+parameter because the roots genuinely differ: `data/` hangs off `os.Getwd()`, `temp/` off
+`config.GetBasePath()`, which `BASE_PATH` can override. Prefer a scoped wrapper over naming a base
+yourself, so a new trust boundary is always deliberate. The check is purely lexical (`filepath.Rel`,
+no `EvalSymlinks`), matching how every path here is constructed.
+
+**Reading is per-boundary; encoding for a browser is not.** The split above is
+about *getting* bytes safely, and it is genuinely different per root. Turning those
+bytes into something an `<img>` can render is identical everywhere, so it has one
+home: `FileRepository.BuildDisplayImageString`. Any handler returning an image to a
+client calls it — never `BuildEncodedImageString` directly, which encodes whatever
+it is handed and (via `GetFileType`) will happily label an unconverted PDF
+`image/jpeg`. See "Activity source files" below for the bug that cost.
+
+**`utils.ReadFile` returns `(nil, nil)` on ANY read error** — it swallows it. Never use it where a
+missing file must be an error: the caller sees empty bytes and a nil error and carries on. That cost
+a real bug in `wranglerasynq/email_process_handler.go`, where a deleted attachment sailed past the
+read (`hasAttachmentImage` is derived from the payload *string*, not the file) and, if processing then
+succeeded, persisted a **zero-byte receipt image carrying the real name and size**. That call site and
+the source-file endpoints use `os.ReadFile`; `utils.ReadDataFile` is the propagating equivalent for
+data paths.
+
 ## Testing Patterns
 
 Each package typically has:
@@ -931,6 +958,13 @@ open group's own surfaces; the isolated group never leaks presence or settlement
 allowed to leave a cross-group aggregate incomplete (a settlement/report total may omit a hidden group's
 dollars) — the truthful isolation guarantee wins.
 
+**`UserVisibleInGroup(viewerId, targetId, groupId)`** is the single-row form of the
+per-group resolver below, for a gate on one record rather than a batch. It exists
+because that closure was being re-inlined per call site (the comment-notification
+fan-out, and again in its test) while the in-package equivalent,
+`groupVisibilityResolver.isVisible`, is unexported and memoized for batch use. Use
+it for any per-request check; use the resolvers below when filtering a set.
+
 **Two resolvers** (`services/member_visibility.go`):
 - **`GetVisibleUserIdsForUserInGroup(viewerId, groupId)`** → `(set, unrestricted, err)` — the per-group
   resolver used by **every group-scoped surface** and by settlement. `app.users.read` ⇒ unrestricted; a
@@ -1316,6 +1350,364 @@ whatever lifetime it is handed), `handlers/system_settings_handler_test.go` (the
 explicit-value endpoint round trips), `repositories/system_settings_test.go` (the omitted-column SQL
 shape and the concurrent-update guard), and `desktop/e2e/session-lifetime.spec.ts` (the only
 end-to-end proof that the setting reaches the `Set-Cookie` header).
+
+## Temporary file retention & cleanup
+
+`temp/` holds the files the ingest pipelines work from. Everything that writes
+there: the **quick-scan upload** (`handlers/receipts.go`, one per file in a
+multi-file scan), the **email attachment and its `image-` OCR copy**
+(`wranglerasynq/email.go`), the **email body image**, short-lived scratch from
+`MagicFillFromImage` / `ReadImageWithEasyOcr` / `ConvertPdfToJpg` (each with a
+`defer os.Remove`), and the **`DebugOcr` dumps** from `services/ocr.go`
+`writeDebuggingFiles`, which are never removed by the code that writes them.
+
+**`HandleTempFileCleanUpTask` (`wranglerasynq/temp_file_cleanup_handler.go`) is
+the only thing that reclaims them.** It runs `@every 1h` on
+`models.SystemCleanUpQueue`, registered from **`StartSystemCleanUpTasks`**, and
+that placement is load-bearing: it used to live in `StartEmailPolling`, which
+`main.go` calls only when `EmailPollingInterval > 0 && ReceiptProcessingSettingsId != nil`,
+so an install that never configured email polling ran **no temp cleanup at all** —
+including for quick-scan uploads, which have nothing to do with email.
+`StartEmailPolling` also re-runs on every polling-interval change while
+`scheduler.Register` adds an entry without removing the previous one, so the sweep
+used to accumulate duplicate crons.
+
+### The classification, and its precedence
+
+Ordered — the order is the behaviour, not a formatting choice:
+
+| # | Case | Action |
+|---|---|---|
+| 1 | any referencing task is still actionable (pending/active/scheduled/retry/aggregating) | keep |
+| 2 | else any referencing task is `Archived` | keep until older than retention |
+| 3 | else every referencing task is `Completed` | remove now |
+| 4 | unreferenced | keep until aged, **and only when the reference map is complete** |
+
+**Rule 2 must be tested before rule 3.** One email attachment fans out to a
+sibling task per `groupSettingsId`, so a file can be referenced by both a
+succeeded task and a permanently failed one; releasing it because something
+succeeded is precisely the bug this sweeper replaces.
+
+**`Archived` can never mean deletable** — it is the state that makes an activity
+rerunnable (`SetActivityFlags`), and the previous cleanup released on it.
+
+Age comes from **file mtime**, not task timestamps: uniform across queues, still
+correct once the task ages out of Redis, and it doubles as the grace window for
+the race where a file is written just before its task becomes visible.
+
+### Two invariants that keep the orphan branch safe
+
+The failure mode inverted with the rewrite. Previously a task the scan missed
+meant "we fail to delete" (harmless); now it means the file looks unreferenced
+and is deleted once aged. So:
+
+1. **Every inspector listing pages.** Asynq defaults to **30 per page**
+   (`defaultPageSize` in its `inspector.go`), and the old `getTaskInfo` passed no
+   `ListOption` at all. `forEachTaskPage` loops with `asynq.PageSize`/`asynq.Page`
+   until a short page, handing each page to a callback and then dropping it —
+   the sweep wants each payload's paths and state, while the payloads are the
+   large part (`EmailProcessTaskPayload` carries the body twice, copied per
+   `groupSettingsId`). Accumulating a whole listing first held the archived email
+   set — 10,000 tasks, kept 90 days — in memory at once inside an hourly job.
+   Building the map incrementally makes the abort path load-bearing: a listing
+   error must discard what it already has, or the unreached files look
+   unreferenced and the orphan branch deletes them once aged.
+2. **Any gap stands the orphan branch down for that run.** A listing error other
+   than `ErrQueueNotFound` aborts the whole sweep with zero deletions; a payload
+   that will not unmarshal, **or a listing that runs out the `tempFileMaxListPages`
+   cap**, drops a `referencesComplete` flag that suppresses **only** rule 4. Rules
+   1-3 rest on a state actually observed, so they stay live.
+   (The old `buildAttachmentMap` returned the error, which would have aborted every
+   future sweep after one malformed payload.)
+
+   The cap is the easy one to overlook, because it reads like a loop guard rather
+   than a correctness rule: running out of pages is the one case that silently skips
+   **real** tasks, so `forEachTaskPage` reports it (`(scannedAll bool, err error)`)
+   and logs it. Reaching it takes ~100,000 tasks in one (queue, state) and is close
+   to unreachable in practice — asynq caps the archived set at 10,000 — but the
+   failure direction is deletion of a user's file, so it fails the safe way: rule 4
+   simply reclaims nothing that run.
+
+### Rule 3 is live on the email queue alone
+
+Asynq drops a successfully-processed task the instant it succeeds unless the
+enqueue sets `asynq.Retention`, in which case the task stays in Redis for that
+long in the **completed** set and the janitor reaps it afterwards. Nothing here
+set it at first, so `ListCompletedTasks` was always empty and rule 3 was dead
+code — which is how the *old* cleanup came to be inverted end to end: its
+`Completed` branch could never fire, so the only files it ever deleted were the
+archived ones it had to keep.
+
+`enqueueOptions` (`task_enqueue.go`) now attaches
+`asynq.Retention(completedTaskRetention)` — **6 hours** — to
+`EmailReceiptProcessingQueue`, so a succeeded email upload's attachment and its
+`image-` OCR copy are released on the next hourly sweep instead of waiting out
+the user-configured window. The duration is a handful of sweep intervals rather
+than a day because `EmailProcessTaskPayload` carries the email body **twice**
+(`Metadata.Body` + `Metadata.BodyHtml`) and `email.go` copies the metadata per
+`groupSettingsId`, so one message consumed by N groups with M attachments retains
+N×M copies of a 50-500 KB body. Overshooting degrades benignly — the files just
+fall back to waiting out the window.
+
+**It is deliberately NOT on the other two queues**, and "the ingest queues" is the
+wrong mental model:
+
+- **Quick scan** already deletes its own file on success — `ReceiptService.QuickScan`
+  ends with `os.Remove(params.TempPath)`, reached only after the create-receipt
+  transaction commits, and every failure path returns earlier and keeps the file.
+  It is 1:1 task-to-file, so by the time such a task completes there is nothing on
+  disk for the sweep to classify. Retention there is pure Redis cost.
+- **`EmailPollingQueue`** owns no temp files at all.
+
+**Do not "fix" the email case by deleting on success inside
+`HandleEmailProcessTask`** instead: one `TempFilePath` fans out to N sibling tasks
+and the first to succeed would break the rest. The sweep owns the decision
+precisely because it can see every referencing task at once, and retention is what
+lets it see them.
+
+**No janitor configuration is needed.** `asynq.Server.Start` starts the janitor
+unconditionally and it runs `DeleteExpiredCompletedTasks` per queue every 8s by
+default; `asynq_server.go` sets only `Concurrency` and `Queues`, so it takes that
+default.
+
+**Retention changed two things outside the sweeper**, both now guarded — see
+"Activity source files" below for `rerunnableState` (the rerun endpoint's state
+check, which asynq does *not* enforce for us) and `offersSourceFile` (a succeeded
+task stops advertising its upload).
+
+### `TempFileRetentionHours`
+
+A System Setting, default **720** (30 days), bounds **24-8760** (1 year), `0`
+means unset. It follows the `RefreshTokenValidForHours` machinery exactly — see
+"Session lifetime" above for the `*int` command field, `OmittedLifetimeColumns`
+and why an omitted key is *dropped from the UPDATE* rather than copied. Despite
+their names, both helpers now cover every pointer-backed duration field.
+
+`tempFileRetention()` is the read-side clamp, the same shape as
+`repositories.pdfRasterizationDpi`: **the clamp, not the validator, is the real
+safety net**, because it also covers a value that predates the bounds or a
+settings row that cannot be read at all.
+
+### Upgrade path
+
+`EmailReceiptImageCleanupQueue` stays declared in `models/queue_names.go` —
+persisted `TaskQueueConfigurations` reference it, `QueueName.Value()` whitelists
+it, and `UpsertSystemSettingsCommand.Validate` requires a configuration for every
+name. The retired `EmailProcessImageCleanUp` **task type** also stays declared and
+stays routed in `BuildMux`: the type is a string in Redis, so tasks the old cron
+already enqueued outlive the deploy and would otherwise fail as unregistered.
+`DeleteAllScheduledTasks` alone is insufficient — it only touches the *scheduled*
+set, so `retireEmailReceiptImageCleanupQueue` drains **pending** too.
+
+**The symmetric case — a persisted list MISSING a name — is handled in
+`repositories/system_settings.go`, and it used to 400 every settings save.** An
+install that last saved before `SystemCleanUpQueue` existed has four
+`task_queue_configuration` rows. `GetSystemSettings` substituted defaults only when
+the list was **empty**, so it returned four; the desktop form builds its rows from
+that response rather than from the `QueueName` enum, so it submitted four; and
+`UpsertSystemSettingsCommand.Validate` requires one per queue name, so it rejected
+the **whole** body with a 400 — `tempFileRetentionHours` along with everything else.
+`asynq_server.go` falls back to the default priority for a missing configuration, so
+the task server ran fine and nothing surfaced the gap.
+
+`withMissingQueueConfigurations` now fills any absent name from
+`GetDefaultQueueConfigurationMap()` on read (persisted priorities win; ordering
+follows `GetQueueNames()`; a row naming a queue this build does not know is dropped,
+since `QueueName.Value()` would reject it on the way back down), and
+`UpdateSystemSettings`' per-name branch **inserts** a submitted configuration that
+has no row instead of no-op'ing its `UPDATE`. Both halves are needed: without the
+insert the DB never heals and the submitted priority is silently discarded on every
+save. Which names exist is read up front rather than inferred from `RowsAffected`,
+which a no-change `UPDATE` reports as `0` on MySQL. The bug predates this feature —
+adding a setting worth changing is what made it reachable.
+
+### Testing
+
+The sweeper is deliberately three seams so the rules stay Redis-free:
+`listTempFileReferences` (Redis, injectable listers), `classifyTempFile` (**pure**
+— no Redis, no filesystem) and `sweepTempDirectory` (`t.TempDir()` + `os.Chtimes`).
+`wranglerasynq/main_test.go` starts no Redis and must not have to. Keep it that
+way — the precedence table above is only cheap to cover exhaustively because the
+classifier is pure.
+
+## Activity source files (preview / download)
+
+A failed quick scan or email upload keeps its image (above), so the user can get
+it back and enter the receipt by hand. Two endpoints on the system task router,
+both gated on **`group.activities.read`** for the task row's own `GroupId`:
+
+- `GET /systemTask/{id}/sourceFile` — JSON `{ name, encodedImage }`.
+- `GET /systemTask/{id}/sourceFile/download` — the original bytes.
+
+**Preview goes through `FileRepository.BuildDisplayImageString`, like every other
+browser-facing image response.** That helper is the one canonical
+`raw bytes → data URI a browser can render in an <img>` transform: PDFs rasterize,
+HEIC transcodes, everything else passes through. Reading the bytes stays the
+caller's job — `data/` and `temp/` are separate trust boundaries with separate
+containment checks, and `ConvertToJpg` has no file at all — but the *encode* half
+is shared, so no surface can get it half-right.
+
+**This shipped wrong and the failure was silent**, which is worth knowing before
+touching any of it. The preview originally called `BuildEncodedImageString` on the
+raw upload. That looks harmless until you read `GetFileType` (`files.go`), which
+relabels PDF bytes as `image/jpeg` **without converting them** — so a quick-scanned
+PDF previewed as `data:image/jpeg;base64,JVBERi0…`: a well-formed data URI carrying
+`%PDF`, which the browser silently fails to decode into a broken-image icon. No
+error, no suspicious mime, nothing in the logs. Quick scan was the exposed case
+because `taskSourceFiles.Preview` is always empty for `QUICK_SCAN`, so the handler
+always falls back to the raw upload; email escaped it only because
+`ImageForOcrPath` was already converted at enqueue.
+
+**Preview still prefers `ImageForOcrPath` when the payload has one; download always
+serves `TempFilePath`.** That preference is an optimization *within* the canonical
+path, not a divergence: `GetBytesFromImageBytes` on a multi-page PDF runs
+`ConvertPdfToJpg` at the configured `PdfDpi` and concatenates every page into one
+tall JPEG — seconds of CPU inside a request — and for email that conversion already
+exists on disk, passing through untouched. Quick scan has no such copy and pays the
+conversion, exactly as the receipt form does. Download is the *original*, under its
+original name, because that is the file the user recognises.
+
+**The path comes out of a Redis payload**, so it goes through
+`FileRepository.AssertWithinTempDirectory` before anything opens it — see
+"Filesystem Access & Path-Traversal Safety" **above**. `resolveActivityFlags`
+applies the same rule via `sourcePathUsable`, so the flag and the endpoint cannot
+disagree about a path; without that, a flag resolved from a bare `FileExists`
+would render a preview control whose request can only fail, and the stat would
+double as an existence oracle for arbitrary server paths.
+
+**Never `utils.ReadFile` here.** It returns `(nil, nil)` on any read error, which
+would serve an empty image as a success.
+
+`Content-Disposition` is **sanitized and then formatted by `mime.FormatMediaType`**,
+never concatenated. `utils.SanitizeFileName` is `filepath.Base`, so it reduces an
+email attachment's MIME-header name to a basename but leaves a `"` in it — and a
+raw `filename="`+name+`"` then closes the quoted value early, so a client reading
+the header back gets `receipt` out of `receipt"final.pdf` and loses the extension.
+`FormatMediaType` escapes it, and switches to the RFC 5987 `filename*` form for a
+non-ASCII name; the desktop parser reads both (`desktop/src/utils/file.ts`), which
+is why changing one side without the other breaks every accented attachment name.
+
+The other five `Content-Disposition` writers are unchanged and are **not** parsed
+client-side: `DownloadReceiptImage` is unquoted *and* unsanitized (a latent bug),
+and the two report downloads quote without sanitizing. Copy the rest of
+`DownloadReceiptImage`'s shape (`ResponseType: ""` so `http.ServeFile` owns
+Content-Type, header before serving, `return 0, nil` once streaming begins), not
+that line.
+
+### The two flags, and why they differ
+
+- **`hasSourceFile`** — the task type expects an upload **and** it exists. True in
+  **any** task state.
+- **`canBeRestarted`** — the task is **`Archived`** and every file a rerun reads
+  exists.
+
+`canBeRestarted` stays pinned to `Archived`, and **enforcing that is ours, not
+asynq's.** `Inspector.RunTask` does *not* refuse a task by state: its Lua script
+special-cases only `active` (-1) and `pending` (-2), and every other state —
+**`completed` included** — falls into the branch that `ZREM`s the id from its set
+and `LPUSH`es it back onto pending (`asynq@v0.25.1/internal/rdb/inspect.go`). That
+was harmless only while completed tasks never existed; with the email queue's
+retention, a rerun of a succeeded upload would pass `GetTaskInfo`, pass
+`RerunSourceFilesPresent` (the files are still on disk) and **create a duplicate
+receipt**. So `rerunnableState` (`source_file.go`) is the rule, `CanRerunTask` is
+its exported form, and `RerunActivity` refuses anything else with a **400** —
+matching exactly what `canBeRestarted` advertises.
+
+`hasSourceFile` is deliberately **not** gated on `Archived`: asynq backs its
+retries off exponentially, so a task takes minutes to archive and the user should
+not watch an activity sit at FAILED with no way to retrieve their image. It *is*
+gated on the task not having **succeeded** (`offersSourceFile`), which is a
+different rule: a retained `Completed` email task still has both files on disk
+until the next sweep, and without this the preview/download controls would appear
+on a succeeded activity for up to an hour and then 404. `ResolveSystemTaskSourceFile`
+applies the same predicate — the two read the same task state, so they share one
+function rather than two conditions that can drift.
+
+**Email needs both files for a rerun** — `HandleEmailProcessTask` reads
+`TempFilePath` for the `FileData` it persists and hands `ImageForOcrPath` to the
+OCR/vision pipeline — while `hasSourceFile` keys on `TempFilePath` alone. A
+**body-only email has neither and stays rerunnable**, which is why "expects a
+file" is tracked apart from "has a file".
+
+### Authorization order, and why it is not the payload's job
+
+Both endpoints, and `RerunActivity`, answer **every** authorization question before
+any file-specific one. The sequence is: load the task row → gate on its `GroupId`
+with `group.activities.read` → check actor visibility → only then resolve the file
+and emit 400/404.
+
+That ordering is the fix for two things.
+
+**Member isolation applies per task, not just per list.** `GetActivitiesForGroups`
+filters rows in SQL through `ActivityVisibilityResolver`, so inside an isolated
+group a plain member never *sees* a hidden co-member's activity — but they hold
+`group.activities.read` there, so naming that activity's id directly returned the
+hidden member's upload. `enforceActivityActorVisible` applies
+`applyActivityVisibilityDisjunction`'s rule to one row, through the exported
+`PermissionService.UserVisibleInGroup`. A nil `RanByUserId` is a system action and
+stays visible, exactly as the SQL clause has it — which is **every EMAIL_UPLOAD**,
+since email is polled rather than run by a user.
+
+**Resolving the file first leaked its existence.** The group used to come from the
+asynq payload via `ResolveActivityGroupId`, which meant a Redis round trip — and a
+400/404 written from it — *before* `HandleRequest` ran the gate, so an
+unauthorized caller learned whether a task existed, whether its type had a source
+file, and whether that file was still on disk. `models.SystemTask` carries
+`GroupId` and `RanByUserId` as ordinary columns, populated for both task types, so
+nothing about the gate needs Redis. A nil `GroupId` **fails closed**. The
+authorization denial and the "no such file" answer are now deliberately
+indistinguishable, and the gate is reachable in a handler test without a Redis
+instance — which is how it is covered, since the source-file endpoints otherwise
+cannot be.
+
+**Two smaller oracles sit a layer above that one, and both are closed the same way.**
+A task id naming **no row** used to surface `gorm.ErrRecordNotFound` as a **500**
+while a denied one answered 403, so the status distinguished "exists" from "does not
+exist" for arbitrary ids; `loadSystemTaskForSourceFile` now maps that one error — and
+only that one — to the same 403 and the same `activityAccessDeniedMessage`. And
+`RerunActivity`'s "only a quick scan or email upload can be rerun" check ran *before*
+the handler was built, so it answered ahead of the gate and told an unauthorized
+caller the activity's type; it now runs inside `HandlerFunction`, after
+`enforceActivityActorVisible`.
+
+**The body is half the answer, and it is written by three different places.** Closing
+the status oracle with wording of this feature's own just moved it: the group gate is
+`HandleRequest`, which writes `unauthorizedEntityMessage`
+(`handlers/generic_handler.go`), while the row lookup and the actor check write their
+own. So `activityAccessDeniedMessage` **is** `unauthorizedEntityMessage` — not a copy
+of its text, the constant itself, since a divergence is only ever a bug. Any handler
+that denies for a reason of its own has to reuse it. Assert such a fix across **every**
+denial path at once — the unknown id against the hidden actor *and* against the
+non-member — since one pairing passes while another still leaks.
+
+### Hydration traps
+
+- **`AssociatedSystemTaskId == nil` is NOT a valid "top level" test.**
+  `email_process_handler.go` chains every `EMAIL_UPLOAD` task under its
+  `EMAIL_READ` parent, so that rule reads false for exactly the rows this feature
+  exists for. `SetSystemTaskHasSourceFile` hydrates the rows the page returned and
+  never recurses into `ChildSystemTasks`.
+- **`GetPagedActivities` must `Omit` every computed field.** GORM infers the
+  SELECT list from the `structs.Activity` destination, so it is
+  `.Omit("can_be_restarted", "has_source_file")`. `asynq_task_id` is a real column
+  and needs none — it is selected so the flags resolve without a per-row query.
+- **Both hydrators live in `wranglerasynq`, not `repositories`** —
+  `wranglerasynq` imports `repositories`, so a loader there needing
+  `GetAsynqInspector` is an import cycle. The precedent to cite is
+  `models.ReportTemplate.AllowedActions` (a `gorm:"-"` field the list handler
+  fills per row), not `LoadSettingsProjections` (pure-DB, lives in the repo).
+- **The system-task flag is resolved per caller.** That table is app-scoped
+  (`app.system-tasks.read`) and lists groups the caller may not belong to, so the
+  handler passes a `canReadGroup` predicate; without it the table would offer
+  buttons that 403.
+- **Nothing here fails a request.** A task that aged out of Redis, an unreadable
+  payload or a failed stat leaves both flags false; the first *other* lookup error
+  logs once and stops, rather than paying a dial timeout per remaining row.
+
+**A known duplication, accepted:** `CreateSystemTasksFromMetadata` creates up to
+two rows of the same type sharing one `AsynqTaskId` when a fallback processing
+setting ran, so such a failure already shows two Rerun buttons and now shows two
+button pairs. Deduping would change rerun's existing behaviour.
 
 ## Login QR & mobile deep link
 
@@ -2231,6 +2623,81 @@ handler maps to a 400. The request contract mirrors the engine (columns carry a 
 formulas reference by name with ASCII operators; group-by/detail carry engine field keys), so the Angular
 client maps its builder UI onto engine-shaped values before submitting. Report generation is **synchronous**
 (streamed download); an async job + live progress + stored-results download is a possible later slice.
+
+**The period's date field (`ReportPeriod.dateField`).** A period covers one receipt date: `date`,
+`resolvedDate` or `createdAt`. These are the `ReceiptPagedRequestFilter` JSON keys, and the same fields,
+in the same order, as the receipts table's quick date filter, whose list drives the Report Builder's
+picker.
+- **Mapping and validation both live in `commands`.** `ReceiptDateFilterKeys()` pins the list and
+  `(*ReceiptPagedRequestFilter).DateFilterField(key)` returns the matching slot.
+  `validatePeriod` accepts a key only if `DateFilterField` resolves it, so the two cannot disagree. A
+  bad value is a 400 under the `period` key, reported after the preset checks.
+- **`applyPeriod` writes the BETWEEN onto that one slot**, overwriting whatever condition it held.
+  The preamble, `Meta.Params["Period"]` and `{{period}}` are unchanged.
+  - An unknown value falls back to `Date`. `GenerateReportFromTemplate` and the dashboard render path
+    run a stored configuration without re-validating it, so the fallback stays lenient, like
+    `resolvePeriodBounds`' default.
+  - Only the chosen slot is overwritten, so a builder **Date** filter now ANDs with a period on
+    another field. On `date` it is still replaced, as before.
+  - A nil `resolved_date` never matches, so a Resolved Date period excludes every unresolved receipt,
+    DECLINED included.
+- **Empty means `date`** (`ReportPeriod.DateFilterKey()`). That is how templates saved before the field
+  existed keep their meaning: no migration, and `CurrentReportConfigurationVersion` stays 1. The Go
+  field is `json:"dateField,omitempty"`. Templates are stored with `json.Marshal`, and the tag keeps an
+  empty value out of the blob instead of storing `""`.
+- **It is a plain `type: string` in swagger, deliberately not an enum.** `ReportPeriod` rides inside
+  `ReportTemplate.configuration`, a response the mobile client deserializes. A closed dart-dio enum
+  would throw on the first date key added later and fail the whole template payload on every
+  already-released build. `TestReportPeriodDateFieldIsAnOpenStringOnTheContract` parses `swagger.yml`
+  to hold that.
+- **Adding a date key** means `ReceiptDateFilterKeys()`, `DateFilterField`, the swagger description,
+  and desktop's `RECEIPT_DATE_FILTER_FIELDS`. `TestReceiptDateFilterKeys` pins the list, and
+  `TestReceiptDateFilterKeysAreFilterJsonKeys` checks it against the struct by reflection.
+- **The drill-in list is server-side: `POST /api/report/receipts` (`ReportService.Receipts`).** The
+  builder's "N receipts" chip opens a list of what the report covers.
+  - **Why the server builds it.** The list used to build its own period BETWEEN in the browser, and
+    disagreed with the count in three ways:
+    - it used the browser's time zone, not the server clock's;
+    - on SQLite, its ISO `…T…` bounds compared as text against the stored `YYYY-MM-DD HH:MM:SS…`,
+      dropping first-day receipts;
+    - it sent the "report generator" paid-by sentinel (`-1`) as-is, which matches nothing.
+  - **How it stays in step with the report.** Both start from `prepareReportFilter` (the paid-by
+    sentinel plus `applyPeriod`) and fetch through `ReportDataService.fetchReceipts`, so the list and
+    the count are the same query. They differ only in presentation:
+    - `Rows` marks hidden categories/tags `(Restricted)`;
+    - `Receipts` strips them, masks for member visibility, and preloads
+      `CUSTOM_FIELD_ASSOCIATIONS`, like the receipts list.
+  - **Gating.** It is gated exactly like `PreviewReport`: `app.reports.read`/`readAll` plus
+    `group.reports.read` in every group. It is **not** `group.receipts.read`, so a report reader sees
+    the receipts their report already covers.
+  - **Ordering and the cap.** The list is merged newest-first across groups and capped at
+    `reportReceiptsCap`.
+    - **The cap is 100** because it is the repository's page-size ceiling: `BaseRepository.Paginate`
+      clamps any larger page.
+    - **Each group fetches only its newest 100** as one page, which always contains the newest 100
+      overall.
+    - **`totalCount` is the sum of the groups' repository counts.** Those are taken after the grant
+      intersection and the paid-by WHERE, so it is the true total, not the loaded length. The desktop
+      shows a "Showing the newest N of M" notice when the two differ.
+- **Tests:**
+  - `commands/report_request_command_test.go` and `paged_request_command_test.go`: validation,
+    marshalling, and the sync guards above.
+  - `services/report_period_date_field_test.go`: DB-backed.
+    - One receipt per field, with inclusive bounds, presets, and the AND with a Date filter.
+    - For the drill-in:
+      - parity with the report on every field;
+      - a server in America/Los_Angeles at the May 31/June 1 boundary;
+      - the `-1` sentinel;
+      - custom-field definitions;
+      - merge order;
+      - the cap across two groups, which keeps the newest overall and the full total;
+      - a limited fetch whose count still excludes hidden payers.
+  - `handlers/report_period_date_field_test.go`:
+    - preview and template CRUD;
+    - the unvalidated render/generate-from-template paths, with a May case proving the fallback lands
+      on the receipt date and not the resolved one;
+    - `GetReportReceipts`, per field and for its gate.
+  - `repositories/report_template_test.go`: the stored blob.
 
 **`POST /api/report/preview`** drives the desktop builder's live preview. It shares GenerateReport's
 front-loaded parse/validate and the same per-group `group.reports.read` gate (the shared

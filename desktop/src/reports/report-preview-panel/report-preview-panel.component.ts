@@ -7,6 +7,7 @@ import {
   ReportReceiptsDialogComponent,
   ReportReceiptsDialogData,
 } from "../dialogs/report-receipts-dialog/report-receipts-dialog.component";
+import { ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
 
 /**
  * The live preview pane: renders the engine's HTML for the current configuration
@@ -49,10 +50,10 @@ export class ReportPreviewPanelComponent {
     if (this.receiptCount() === 0) {
       return;
     }
-    const value = this.form().getRawValue();
+    const value = this.form().getRawValue() as ReportBuilderValue;
     const data: ReportReceiptsDialogData = {
-      groupIds: value.scope,
-      filter: value.filter,
+      // The same command the preview sends, so the list covers what it counted.
+      command: toReportRequestCommand(value),
       period: value.period,
       receiptCount: this.receiptCount(),
     };

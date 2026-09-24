@@ -18,7 +18,7 @@ part 'upsert_task_queue_configuration.g.dart';
 abstract class UpsertTaskQueueConfiguration implements Built<UpsertTaskQueueConfiguration, UpsertTaskQueueConfigurationBuilder> {
   @BuiltValueField(wireName: r'name')
   QueueName? get name;
-  // enum nameEnum {  quick_scan,  email_polling,  email_receipt_processing,  email_receipt_image_cleanup,  };
+  // enum nameEnum {  quick_scan,  email_polling,  email_receipt_processing,  email_receipt_image_cleanup,  system_clean_up,  };
 
   /// Queue priority
   @BuiltValueField(wireName: r'priority')

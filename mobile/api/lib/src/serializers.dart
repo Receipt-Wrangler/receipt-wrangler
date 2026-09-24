@@ -112,6 +112,7 @@ import 'package:openapi/src/model/system_email.dart';
 import 'package:openapi/src/model/system_settings.dart';
 import 'package:openapi/src/model/system_task.dart';
 import 'package:openapi/src/model/system_task_paged_request_filter.dart';
+import 'package:openapi/src/model/system_task_source_file_view.dart';
 import 'package:openapi/src/model/system_task_status.dart';
 import 'package:openapi/src/model/system_task_type.dart';
 import 'package:openapi/src/model/tag.dart';
@@ -249,6 +250,7 @@ part 'serializers.g.dart';
   SystemSettings,
   SystemTask,
   SystemTaskPagedRequestFilter,
+  SystemTaskSourceFileView,
   SystemTaskStatus,
   SystemTaskType,
   Tag,
