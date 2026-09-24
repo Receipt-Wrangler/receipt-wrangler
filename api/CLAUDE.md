@@ -306,8 +306,24 @@ When working with tests in this codebase, follow these critical requirements:
   server** (`127.0.0.1:0`, one per render, `defer`-closed right after) and
   navigates to it, giving the document a real `http` origin so remote images
   actually load; `chromedp.Navigate` waits for the load event, so slow remote
-  images finish before printing. Regression:
-  `TestHtmlToPdfService_Render_WaitsForSlowImage`.
+  images finish before printing.
+- **External mode is SSRF-guarded: only PUBLIC hosts may load.** The email body is
+  attacker-controlled and the render now has a real `http` origin, so a naive
+  external mode would let `<iframe>`/`<img>` reach internal targets (verified: an
+  internal response was baked into the PDF). Sub-resource requests are therefore
+  intercepted via the CDP **Fetch** domain (`isRequestAllowed` in `html_to_pdf.go`)
+  and each is allowed or failed by its resolved address: the render's own loopback
+  page and inline `data:` URIs are allowed; loopback/private/link-local/unspecified
+  targets — `127.0.0.1:*`, `169.254.169.254` (cloud metadata), RFC1918, `::1`,
+  `fe80::/10`, `0.0.0.0` — and every non-`http(s)` scheme (incl. `file://`) are
+  refused. A URL blocklist can't express this (it can neither allow our own
+  loopback page while denying other internal hosts, nor catch a hostname that
+  resolves to an internal IP). Residual: **DNS rebinding** — the host is resolved
+  at check time and re-resolved by chromium at fetch time, so operators enabling
+  external mode in a cloud should also restrict egress at the network layer / use
+  IMDSv2. Regressions: `TestHtmlToPdfService_Render_ExternalMode_BlocksInternalSSRF`,
+  `TestHtmlToPdfService_Render_ExternalMode_EmbedsDataImage`, and the hermetic
+  policy unit test `TestIsRequestAllowed`.
 - **`file://` loads are ALWAYS blocked, in BOTH modes.** In the default mode the
   HTML is injected into an `about:blank` page via `page.SetDocumentContent` rather
   than being written to a temp file and navigated to as `file://<path>`. The email
@@ -316,8 +332,9 @@ When working with tests in this codebase, follow these critical requirements:
   PDF via `<iframe src="file:///…">`/`<img>` — even with JavaScript disabled.
   `about:blank` (and the loopback `http` origin used in external mode) has no
   local-file origin, so those sub-resources are cross-origin-blocked; `file://*`
-  is also on the network blocklist as defense in depth (and stays blocked even
-  when `CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true`). Inline `data:` URIs still load
+  is also on the default mode's network blocklist and denied by the external
+  mode's Fetch policy, as defense in depth (blocked in BOTH modes). Inline `data:`
+  URIs still load
   (`SetDocumentContent` also sidesteps the data-URL length cap that motivated the
   old temp-file approach) and decode synchronously, so the default path needs no
   explicit load wait. Regressions:

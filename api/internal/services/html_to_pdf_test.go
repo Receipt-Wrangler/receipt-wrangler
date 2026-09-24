@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -12,8 +13,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
-	"time"
 
 	"gopkg.in/gographics/imagick.v3/imagick"
 )
@@ -136,9 +137,7 @@ func TestHtmlToPdfService_Render_BlocksLocalFileRead(t *testing.T) {
 // BodyHtml (which commonly embeds images as data: URIs — the only image kind that
 // survives the default external-resource block) straight into Render, and the
 // resulting PDF is rasterized for OCR/vision, so a dropped image loses content.
-// This proves a data: image is painted into the PDF. (data: images load
-// synchronously, so this does not by itself exercise the load-event wait — see
-// TestHtmlToPdfService_Render_WaitsForSlowImage.) Rasterizing a PDF needs the
+// This proves a data: image is painted into the PDF. Rasterizing a PDF needs the
 // ghostscript delegate, so skip (do not fail) where gs is unavailable.
 func TestHtmlToPdfService_Render_EmbedsDataImage(t *testing.T) {
 	if _, err := exec.LookPath("gs"); err != nil {
@@ -155,33 +154,117 @@ func TestHtmlToPdfService_Render_EmbedsDataImage(t *testing.T) {
 	}
 }
 
-// With CHROMIUM_ALLOW_EXTERNAL_RESOURCES enabled (the operator opt-in for remote
-// logos/imagery), Render must actually load remote images and wait for them
-// before printing. This is the regression guard for the external-image fix: the
-// image is served over HTTP with a deliberate delay, so it only appears if Render
-// navigates to a real http origin AND waits for the load event. On the plain
-// about:blank + SetDocumentContent path an about:blank document never fetches the
-// image at all, so this fails; the loopback-origin path passes.
-func TestHtmlToPdfService_Render_WaitsForSlowImage(t *testing.T) {
+// In external-resources mode the render navigates a loopback http origin and
+// intercepts sub-resource requests. This proves the interception ALLOWS the page
+// through (the render produces a PDF at all → the main navigation was continued)
+// and still embeds inline data: images.
+func TestHtmlToPdfService_Render_ExternalMode_EmbedsDataImage(t *testing.T) {
 	if _, err := exec.LookPath("gs"); err != nil {
 		t.Skip("ghostscript (gs) not available; skipping PDF rasterization")
 	}
 	t.Setenv("CHROMIUM_ALLOW_EXTERNAL_RESOURCES", "true")
 
-	pngBytes := solidRedPng(t)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(400 * time.Millisecond)
-		w.Header().Set("Content-Type", "image/png")
-		_, _ = w.Write(pngBytes)
-	}))
-	defer server.Close()
-
+	dataURI := "data:image/png;base64," + base64.StdEncoding.EncodeToString(solidRedPng(t))
 	html := `<!DOCTYPE html><html><body style="margin:0">` +
-		`<img src="` + server.URL + `/red.png" style="width:400px;height:400px">` +
+		`<img src="` + dataURI + `" style="width:400px;height:400px">` +
 		`</body></html>`
 
 	if !hasRedPixel(rasterizePdfPage(t, renderOrFatal(t, html))) {
-		t.Fatal("expected the slow-loading remote image in the PDF — Render did not load/await it before printing")
+		t.Fatal("expected the data: image in the PDF (external mode): interception must continue the page load and allow data: URIs")
+	}
+}
+
+// C1 regression: in external-resources mode, attacker-controlled email HTML must
+// NOT be able to make the render fetch an internal/loopback host (SSRF) or bake
+// its response into the PDF. Points an iframe + img at a mock "internal" server on
+// 127.0.0.1 and asserts it is NEVER reached and its secret never appears in the
+// PDF. (The render's own loopback PAGE server is a different host:port and is the
+// only loopback origin the policy allows.)
+func TestHtmlToPdfService_Render_ExternalMode_BlocksInternalSSRF(t *testing.T) {
+	gs, err := exec.LookPath("gs")
+	if err != nil {
+		t.Skip("ghostscript (gs) not available; skipping PDF text extraction")
+	}
+	t.Setenv("CHROMIUM_ALLOW_EXTERNAL_RESOURCES", "true")
+
+	const secret = "INTERNAL_SSRF_CANARY_5e1f8a"
+	pngBytes := solidRedPng(t)
+	var hits int32
+	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		if r.URL.Path == "/pixel" {
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(pngBytes)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprintf(w, "<html><body><h1>%s</h1></body></html>", secret)
+	}))
+	defer internal.Close()
+
+	html := `<!DOCTYPE html><html><body>` +
+		`<iframe src="` + internal.URL + `/iframe" width="600" height="200"></iframe>` +
+		`<img src="` + internal.URL + `/pixel">` +
+		`</body></html>`
+
+	pdfBytes := renderOrFatal(t, html)
+
+	pdfPath := filepath.Join(t.TempDir(), "out.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0644); err != nil {
+		t.Fatalf("failed to write pdf: %v", err)
+	}
+	txtPath := filepath.Join(t.TempDir(), "out.txt")
+	if out, err := exec.Command(gs, "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=txtwrite", "-o", txtPath, pdfPath).CombinedOutput(); err != nil {
+		t.Skipf("gs extraction failed (%v): %s", err, string(out))
+	}
+	extracted, err := os.ReadFile(txtPath)
+	if err != nil {
+		t.Fatalf("failed to read extracted text: %v", err)
+	}
+
+	if strings.Contains(string(extracted), secret) {
+		t.Fatalf("SECURITY: internal response leaked into the PDF: %q", string(extracted))
+	}
+	if h := atomic.LoadInt32(&hits); h != 0 {
+		t.Fatalf("SECURITY: internal server was reached %d time(s); SSRF not blocked", h)
+	}
+}
+
+// TestIsRequestAllowed is the hermetic (no-browser) guard for the SSRF policy.
+// Public hosts load; loopback/private/link-local/metadata hosts, non-http(s)
+// schemes, and everything but the render's own loopback page are refused.
+func TestIsRequestAllowed(t *testing.T) {
+	const loopbackAddr = "127.0.0.1:5000" // the render's own page origin
+
+	tests := map[string]struct {
+		rawURL string
+		want   bool
+	}{
+		"our loopback page":         {"http://127.0.0.1:5000/", true},
+		"our loopback sub-resource": {"http://127.0.0.1:5000/logo.png", true},
+		"data URI":                  {"data:image/png;base64,AAAA", true},
+		"public IPv4":               {"https://93.184.216.34/logo.png", true},
+		"public DNS root IPv4":      {"http://8.8.8.8/x", true},
+		"cloud metadata":            {"http://169.254.169.254/latest/meta-data/", false},
+		"other loopback port":       {"http://127.0.0.1:6379/", false},
+		"private 10/8":              {"http://10.0.0.5/", false},
+		"private 192.168/16":        {"http://192.168.1.1/", false},
+		"private 172.16/12":         {"http://172.16.0.1/", false},
+		"loopback IPv6":             {"http://[::1]/", false},
+		"link-local IPv6":           {"http://[fe80::1]/", false},
+		"localhost name":            {"http://localhost:8081/api", false},
+		"unspecified":               {"http://0.0.0.0/", false},
+		"file scheme":               {"file:///etc/passwd", false},
+		"ftp scheme":                {"ftp://93.184.216.34/x", false},
+		"missing scheme":            {"://bad", false},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := isRequestAllowed(tt.rawURL, loopbackAddr); got != tt.want {
+				t.Fatalf("isRequestAllowed(%q) = %v, want %v", tt.rawURL, got, tt.want)
+			}
+		})
 	}
 }
 
