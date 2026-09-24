@@ -168,3 +168,114 @@ func TestSourceFileEndpointsDenyANonMember(t *testing.T) {
 		t.Errorf("status = %d, want 403; body=%s", w.Result().StatusCode, w.Body.String())
 	}
 }
+
+// seedHiddenActivityOfType adds a second activity to the fixture's isolated group,
+// run by the same hidden member, so a type-specific branch can be exercised under
+// the same authorization conditions.
+func seedHiddenActivityOfType(t *testing.T, fixture sourceFileAuthzFixture, taskType models.SystemTaskType) uint {
+	t.Helper()
+
+	existing := models.SystemTask{}
+	if err := repositories.GetDB().First(&existing, fixture.taskId).Error; err != nil {
+		t.Fatalf("fixture task: %v", err)
+	}
+
+	task := models.SystemTask{
+		Type:                 taskType,
+		Status:               models.SYSTEM_TASK_FAILED,
+		AssociatedEntityType: models.NOOP_ENTITY_TYPE,
+		GroupId:              existing.GroupId,
+		RanByUserId:          existing.RanByUserId,
+		AsynqTaskId:          "iso-sf-task-2",
+		StartedAt:            time.Now(),
+	}
+	if err := repositories.GetDB().Create(&task).Error; err != nil {
+		t.Fatalf("task: %v", err)
+	}
+
+	return task.ID
+}
+
+// An id that names no task at all must answer exactly like one the caller may not
+// reach. Asserting the status alone proves nothing — the pairing is the point, and
+// the body has to match too, since it is the other half of what a caller reads.
+//
+// Before this, GetSystemTaskById's gorm.ErrRecordNotFound surfaced as a 500 while a
+// denied task returned 403, so the status code was an existence oracle for arbitrary
+// task ids one layer above the gate that was meant to close it.
+func TestSourceFileEndpointsAnswerAnUnknownTaskIdLikeADeniedOne(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	fixture := seedSourceFileAuthzFixture(t)
+
+	const unknownTaskId = 987654
+
+	for _, endpoint := range []struct {
+		name    string
+		handler func(http.ResponseWriter, *http.Request)
+	}{
+		{"preview", GetSystemTaskSourceFile},
+		{"download", DownloadSystemTaskSourceFile},
+		{"rerun", RerunActivity},
+	} {
+		t.Run(endpoint.name, func(t *testing.T) {
+			deniedWriter, deniedRequest := sourceFileRequest(t, fixture.taskId, fixture.memberA)
+			endpoint.handler(deniedWriter, deniedRequest)
+
+			unknownWriter, unknownRequest := sourceFileRequest(t, unknownTaskId, fixture.memberA)
+			endpoint.handler(unknownWriter, unknownRequest)
+
+			if unknownWriter.Result().StatusCode != deniedWriter.Result().StatusCode {
+				t.Errorf(
+					"unknown id status = %d, denied id status = %d; the two must be indistinguishable",
+					unknownWriter.Result().StatusCode, deniedWriter.Result().StatusCode,
+				)
+			}
+
+			if unknownWriter.Body.String() != deniedWriter.Body.String() {
+				t.Errorf(
+					"unknown id body = %s, denied id body = %s; the two must be indistinguishable",
+					unknownWriter.Body.String(), deniedWriter.Body.String(),
+				)
+			}
+
+			// Pinned explicitly, so a regression that makes BOTH answers a 500
+			// cannot pass the comparison above.
+			if deniedWriter.Result().StatusCode != http.StatusForbidden {
+				t.Errorf("status = %d, want 403; body=%s", deniedWriter.Result().StatusCode, deniedWriter.Body.String())
+			}
+		})
+	}
+}
+
+// RerunActivity's "only a quick scan or email upload can be rerun" check used to run
+// before the handler was built, so it answered ahead of the permission gate and told
+// an unauthorized caller the activity's type. A caller who may not see the activity
+// must get the same 403 as for any other task of theirs.
+func TestRerunActivityHidesTheTaskTypeFromAnUnauthorizedCaller(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	fixture := seedSourceFileAuthzFixture(t)
+	nonRerunnableTaskId := seedHiddenActivityOfType(t, fixture, models.EMAIL_READ)
+
+	w, r := sourceFileRequest(t, nonRerunnableTaskId, fixture.memberA)
+	RerunActivity(w, r)
+
+	if w.Result().StatusCode != http.StatusForbidden {
+		t.Errorf("status = %d, want 403; body=%s", w.Result().StatusCode, w.Body.String())
+	}
+}
+
+// The contrast: a caller who MAY see the activity still gets the 400, so moving the
+// check behind the gate did not quietly drop it. The type check precedes the asynq
+// inspector, so this needs no Redis either.
+func TestRerunActivityStillRejectsANonRerunnableTypeForAnAuthorizedCaller(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	fixture := seedSourceFileAuthzFixture(t)
+	nonRerunnableTaskId := seedHiddenActivityOfType(t, fixture, models.EMAIL_READ)
+
+	w, r := sourceFileRequest(t, nonRerunnableTaskId, fixture.supervisor)
+	RerunActivity(w, r)
+
+	if w.Result().StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400; body=%s", w.Result().StatusCode, w.Body.String())
+	}
+}

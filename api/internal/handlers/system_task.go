@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"github.com/go-chi/chi/v5"
+	"gorm.io/gorm"
 	"mime"
 	"net/http"
 	"os"
@@ -178,12 +179,6 @@ func RerunActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if systemTask.Type != models.QUICK_SCAN && systemTask.Type != models.EMAIL_UPLOAD {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, "Only quick scan and email upload activities can be rerun")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
 	handler := structs.Handler{
 		ErrorMessage:     errorMsg,
 		Writer:           w,
@@ -195,6 +190,15 @@ func RerunActivity(w http.ResponseWriter, r *http.Request) {
 			// group.activities.rerun in an isolated group must not let a plain member
 			// re-run an activity the list hid from them.
 			if denied := enforceActivityActorVisible(w, r, systemTask, errorMsg); denied {
+				return 0, nil
+			}
+
+			// The task type is checked here rather than before the handler is built,
+			// so it stays behind the gate: a caller who may not reach this activity
+			// must not learn from a 400 that it is of a rerunnable type.
+			if systemTask.Type != models.QUICK_SCAN && systemTask.Type != models.EMAIL_UPLOAD {
+				logging.LogStd(logging.LOG_LEVEL_ERROR, "Only quick scan and email upload activities can be rerun")
+				utils.WriteCustomErrorResponse(w, "Only a quick scan or email upload activity can be rerun.", http.StatusBadRequest)
 				return 0, nil
 			}
 
@@ -417,6 +421,15 @@ func loadSystemTaskForSourceFile(
 
 	systemTask, err := systemTaskRepository.GetSystemTaskById(systemTaskId)
 	if err != nil {
+		// A task that does not exist has to answer exactly like one the caller may
+		// not reach, or the status code is an existence oracle for arbitrary task
+		// ids — the very thing the group gate below closes. Only a missing row maps
+		// to the denial; any other failure is still a 500.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.WriteCustomErrorResponse(w, activityAccessDeniedMessage, http.StatusForbidden)
+			return models.SystemTask{}, "", true
+		}
+
 		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
 		utils.WriteCustomErrorResponse(w, errorMsg, http.StatusInternalServerError)
 		return models.SystemTask{}, "", true

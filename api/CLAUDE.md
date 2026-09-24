@@ -1326,10 +1326,19 @@ and is deleted once aged. So:
    unreferenced and the orphan branch deletes them once aged.
 2. **Any gap stands the orphan branch down for that run.** A listing error other
    than `ErrQueueNotFound` aborts the whole sweep with zero deletions; a payload
-   that will not unmarshal drops a `referencesComplete` flag that suppresses
-   **only** rule 4. Rules 1-3 rest on a state actually observed, so they stay live.
+   that will not unmarshal, **or a listing that runs out the `tempFileMaxListPages`
+   cap**, drops a `referencesComplete` flag that suppresses **only** rule 4. Rules
+   1-3 rest on a state actually observed, so they stay live.
    (The old `buildAttachmentMap` returned the error, which would have aborted every
    future sweep after one malformed payload.)
+
+   The cap is the easy one to overlook, because it reads like a loop guard rather
+   than a correctness rule: running out of pages is the one case that silently skips
+   **real** tasks, so `forEachTaskPage` reports it (`(scannedAll bool, err error)`)
+   and logs it. Reaching it takes ~100,000 tasks in one (queue, state) and is close
+   to unreachable in practice — asynq caps the archived set at 10,000 — but the
+   failure direction is deletion of a user's file, so it fails the safe way: rule 4
+   simply reclaims nothing that run.
 
 ### Rule 3 is live on the email queue alone
 
@@ -1401,6 +1410,28 @@ stays routed in `BuildMux`: the type is a string in Redis, so tasks the old cron
 already enqueued outlive the deploy and would otherwise fail as unregistered.
 `DeleteAllScheduledTasks` alone is insufficient — it only touches the *scheduled*
 set, so `retireEmailReceiptImageCleanupQueue` drains **pending** too.
+
+**The symmetric case — a persisted list MISSING a name — is handled in
+`repositories/system_settings.go`, and it used to 400 every settings save.** An
+install that last saved before `SystemCleanUpQueue` existed has four
+`task_queue_configuration` rows. `GetSystemSettings` substituted defaults only when
+the list was **empty**, so it returned four; the desktop form builds its rows from
+that response rather than from the `QueueName` enum, so it submitted four; and
+`UpsertSystemSettingsCommand.Validate` requires one per queue name, so it rejected
+the **whole** body with a 400 — `tempFileRetentionHours` along with everything else.
+`asynq_server.go` falls back to the default priority for a missing configuration, so
+the task server ran fine and nothing surfaced the gap.
+
+`withMissingQueueConfigurations` now fills any absent name from
+`GetDefaultQueueConfigurationMap()` on read (persisted priorities win; ordering
+follows `GetQueueNames()`; a row naming a queue this build does not know is dropped,
+since `QueueName.Value()` would reject it on the way back down), and
+`UpdateSystemSettings`' per-name branch **inserts** a submitted configuration that
+has no row instead of no-op'ing its `UPDATE`. Both halves are needed: without the
+insert the DB never heals and the submitted priority is silently discarded on every
+save. Which names exist is read up front rather than inferred from `RowsAffected`,
+which a no-change `UPDATE` reports as `0` on MySQL. The bug predates this feature —
+adding a setting worth changing is what made it reachable.
 
 ### Testing
 
@@ -1540,6 +1571,17 @@ authorization denial and the "no such file" answer are now deliberately
 indistinguishable, and the gate is reachable in a handler test without a Redis
 instance — which is how it is covered, since the source-file endpoints otherwise
 cannot be.
+
+**Two smaller oracles sit a layer above that one, and both are closed the same way.**
+A task id naming **no row** used to surface `gorm.ErrRecordNotFound` as a **500**
+while a denied one answered 403, so the status distinguished "exists" from "does not
+exist" for arbitrary ids; `loadSystemTaskForSourceFile` now maps that one error — and
+only that one — to the same 403 and the same `activityAccessDeniedMessage`. And
+`RerunActivity`'s "only a quick scan or email upload can be rerun" check ran *before*
+the handler was built, so it answered ahead of the gate and told an unauthorized
+caller the activity's type; it now runs inside `HandlerFunction`, after
+`enforceActivityActorVisible`. Assert such a fix as a **pair** — the unknown id and
+the denied one, status and body — since either answer alone proves nothing.
 
 ### Hydration traps
 

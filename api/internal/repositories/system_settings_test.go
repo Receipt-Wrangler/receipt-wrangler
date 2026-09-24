@@ -200,3 +200,143 @@ func TestUpdateSystemSettingsConcurrentLifetimeUpdatesBothSurvive(t *testing.T) 
 		}
 	}
 }
+
+// seedFourQueueConfigurations reproduces an install that last saved its settings
+// before models.SystemCleanUpQueue existed: it has a row for every other queue and
+// none for that one. Priorities are distinctive so a default silently overwriting a
+// persisted value is visible.
+func seedFourQueueConfigurations(t *testing.T) {
+	t.Helper()
+
+	if err := GetDB().Create(&models.SystemSettings{}).Error; err != nil {
+		t.Fatalf("failed to create system settings: %v", err)
+	}
+
+	priority := 11
+	for _, queueName := range models.GetQueueNames() {
+		if queueName == models.SystemCleanUpQueue {
+			continue
+		}
+
+		err := GetDB().Create(&models.TaskQueueConfiguration{
+			Name:             queueName,
+			Priority:         priority,
+			SystemSettingsId: 1,
+		}).Error
+		if err != nil {
+			t.Fatalf("failed to seed queue configuration %s: %v", queueName, err)
+		}
+
+		priority++
+	}
+}
+
+// An install upgraded across the release that added system_clean_up has four
+// persisted configurations. The read used to substitute defaults only when the list
+// was EMPTY, so it returned four -- the settings form then submitted four and
+// UpsertSystemSettingsCommand.Validate, which requires one per queue name, rejected
+// every save with a 400.
+func TestGetSystemSettingsFillsInAMissingQueueConfiguration(t *testing.T) {
+	defer TruncateTestDb()
+	seedFourQueueConfigurations(t)
+
+	settings, err := NewSystemSettingsRepository(nil).GetSystemSettings()
+	if err != nil {
+		t.Fatalf("failed to read system settings: %v", err)
+	}
+
+	queueNames := models.GetQueueNames()
+	if len(settings.TaskQueueConfigurations) != len(queueNames) {
+		t.Fatalf("got %d queue configurations, expected %d", len(settings.TaskQueueConfigurations), len(queueNames))
+	}
+
+	byName := map[models.QueueName]int{}
+	for _, configuration := range settings.TaskQueueConfigurations {
+		byName[configuration.Name] = configuration.Priority
+	}
+
+	for _, queueName := range queueNames {
+		if _, ok := byName[queueName]; !ok {
+			t.Fatalf("queue configuration for %s is missing", queueName)
+		}
+	}
+
+	// The persisted priorities must survive the merge -- filling the gap must not
+	// reset the queues the admin already configured.
+	expected := 11
+	for _, queueName := range queueNames {
+		if queueName == models.SystemCleanUpQueue {
+			continue
+		}
+
+		if byName[queueName] != expected {
+			t.Errorf("%s priority = %d, expected the persisted %d", queueName, byName[queueName], expected)
+		}
+
+		expected++
+	}
+
+	defaultPriority := models.GetDefaultSystemCleanupQueueConfiguration().Priority
+	if byName[models.SystemCleanUpQueue] != defaultPriority {
+		t.Errorf("%s priority = %d, expected the default %d", models.SystemCleanUpQueue, byName[models.SystemCleanUpQueue], defaultPriority)
+	}
+}
+
+// The read-side fill alone leaves the database broken: the update path only ever
+// UPDATEd by name, so the submitted priority for the missing queue matched no row
+// and was silently discarded on every save, forever.
+func TestUpdateSystemSettingsInsertsAMissingQueueConfiguration(t *testing.T) {
+	defer TruncateTestDb()
+	seedFourQueueConfigurations(t)
+
+	command := buildSettingsCommand()
+	for i := range command.TaskQueueConfigurations {
+		if command.TaskQueueConfigurations[i].Name == models.SystemCleanUpQueue {
+			command.TaskQueueConfigurations[i].Priority = 7
+		}
+	}
+
+	if _, err := NewSystemSettingsRepository(nil).UpdateSystemSettings(command); err != nil {
+		t.Fatalf("failed to update system settings: %v", err)
+	}
+
+	var persisted []models.TaskQueueConfiguration
+	if err := GetDB().Find(&persisted).Error; err != nil {
+		t.Fatalf("failed to read queue configurations: %v", err)
+	}
+
+	queueNames := models.GetQueueNames()
+	if len(persisted) != len(queueNames) {
+		t.Fatalf("got %d persisted queue configurations, expected %d", len(persisted), len(queueNames))
+	}
+
+	byName := map[models.QueueName]models.TaskQueueConfiguration{}
+	for _, configuration := range persisted {
+		byName[configuration.Name] = configuration
+	}
+
+	inserted, ok := byName[models.SystemCleanUpQueue]
+	if !ok {
+		t.Fatalf("no row was inserted for %s", models.SystemCleanUpQueue)
+	}
+
+	if inserted.Priority != 7 {
+		t.Errorf("%s priority = %d, expected the submitted 7", models.SystemCleanUpQueue, inserted.Priority)
+	}
+
+	if inserted.SystemSettingsId != 1 {
+		t.Errorf("%s systemSettingsId = %d, expected 1", models.SystemCleanUpQueue, inserted.SystemSettingsId)
+	}
+
+	// The queues that already had rows still take the submitted priority, so the
+	// insert did not come at the cost of the update it sits beside.
+	for _, queueName := range queueNames {
+		if queueName == models.SystemCleanUpQueue {
+			continue
+		}
+
+		if byName[queueName].Priority != 1 {
+			t.Errorf("%s priority = %d, expected the submitted 1", queueName, byName[queueName].Priority)
+		}
+	}
+}

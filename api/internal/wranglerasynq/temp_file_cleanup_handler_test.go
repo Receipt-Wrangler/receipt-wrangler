@@ -739,3 +739,55 @@ func pageNumberFrom(opts []asynq.ListOption) int {
 
 	return 1
 }
+
+// A lister that never returns a short page runs the loop out at tempFileMaxListPages,
+// leaving every task past the cap unscanned. That is a gap in the reference map
+// exactly as an unreadable payload is, and it must stand the orphan branch down —
+// otherwise rule 4 deletes files it never saw referenced, once they age past the
+// retention window.
+func TestListTempFileReferences_ExhaustedPageCapDropsCompleteness(t *testing.T) {
+	page := make([]*asynq.TaskInfo, 0, tempFileListPageSize)
+	for i := 0; i < tempFileListPageSize; i++ {
+		page = append(page, taskInfo(t, fmt.Sprintf("task-%d", i), asynq.TaskStateArchived, QuickScanTaskPayload{
+			TempPath: fmt.Sprintf("/base/temp/scan-%d.jpg", i),
+		}))
+	}
+
+	calls := 0
+	lister := func(queue string, opts ...asynq.ListOption) ([]*asynq.TaskInfo, error) {
+		if models.QueueName(queue) != models.QuickScanQueue {
+			return nil, nil
+		}
+
+		calls++
+		return page, nil
+	}
+
+	references, complete, err := listTempFileReferences([]tempFileTaskLister{lister})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if complete {
+		t.Error("expected the reference map to be marked incomplete")
+	}
+
+	// The loop is still bounded — the cap is what keeps a misbehaving lister from
+	// spinning forever inside an hourly job.
+	if calls != tempFileMaxListPages {
+		t.Errorf("lister called %d times, expected the cap of %d", calls, tempFileMaxListPages)
+	}
+
+	// Rules 1-3 rest on states actually observed, so what WAS scanned still counts,
+	// matching the malformed-payload behaviour exactly.
+	if len(references) != tempFileListPageSize {
+		t.Fatalf("expected %d referenced paths, got %d", tempFileListPageSize, len(references))
+	}
+
+	// The lister hands back the same page every time, so each path accumulates one
+	// state per call — the states themselves are what matters, not how many.
+	states := references["/base/temp/scan-0.jpg"]
+	if len(states) == 0 || states[0] != asynq.TaskStateArchived {
+		t.Errorf("expected /base/temp/scan-0.jpg to be referenced as archived, got %v", states)
+	}
+}

@@ -36,7 +36,8 @@ import (
 // now it means the file looks unreferenced and is deleted once aged. So:
 //
 //  1. every inspector list call pages (asynq defaults to 30 per page), and
-//  2. any listing or payload error stands the orphan branch down for that run.
+//  2. any gap in the scan stands the orphan branch down for that run — a listing
+//     error, an unreadable payload, or a listing that ran past the page cap.
 //
 // Rules 1-3 below rest on positive evidence — a state we actually observed — so
 // they stay live even when the reference map is known-incomplete.
@@ -45,9 +46,10 @@ const (
 	// default is 30; a queue with more tasks than that would silently truncate.
 	tempFileListPageSize = 100
 
-	// tempFileMaxListPages bounds the paging loop. A well-behaved lister ends it
-	// with a short page; this is only so a misbehaving one cannot spin forever
-	// inside a background job.
+	// tempFileMaxListPages bounds the paging loop so a misbehaving lister cannot
+	// spin forever inside a background job. A well-behaved one ends it with a
+	// short page long before this; reaching the cap means the scan is incomplete,
+	// which forEachTaskPage reports so the orphan branch stands down.
 	tempFileMaxListPages = 1000
 )
 
@@ -128,9 +130,9 @@ func inspectorTaskListers(inspector *asynq.Inspector) []tempFileTaskLister {
 // the states of the tasks referring to it.
 //
 // The second return value reports whether the map is known-complete. It goes
-// false when a payload cannot be read: that task's paths are missing from the map,
-// so treating their files as unreferenced would delete them. Only the orphan
-// branch consults it.
+// false when a payload cannot be read, or when a listing runs past the page cap:
+// either way some task's paths are missing from the map, so treating their files
+// as unreferenced would delete them. Only the orphan branch consults it.
 //
 // A listing error is fatal to the whole sweep rather than partial, so a Redis
 // hiccup can never be mistaken for "nothing references these files".
@@ -140,7 +142,7 @@ func listTempFileReferences(listers []tempFileTaskLister) (map[string][]asynq.Ta
 
 	for _, queue := range tempFileQueues() {
 		for _, list := range listers {
-			err := forEachTaskPage(list, string(queue.name), func(tasks []*asynq.TaskInfo) {
+			scannedAll, err := forEachTaskPage(list, string(queue.name), func(tasks []*asynq.TaskInfo) {
 				for _, task := range tasks {
 					paths, err := queue.extract(task.Payload)
 					if err != nil {
@@ -160,6 +162,8 @@ func listTempFileReferences(listers []tempFileTaskLister) (map[string][]asynq.Ta
 			if err != nil {
 				return nil, false, err
 			}
+
+			referencesComplete = referencesComplete && scannedAll
 		}
 	}
 
@@ -177,24 +181,36 @@ func listTempFileReferences(listers []tempFileTaskLister) (map[string][]asynq.Ta
 // groupSettingsId. Accumulating a whole listing first held the archived email set
 // — which asynq caps at 10,000 tasks and keeps for 90 days — in memory at once,
 // inside an hourly background job. Peak is now one page.
-func forEachTaskPage(list tempFileTaskLister, queue string, visit func(tasks []*asynq.TaskInfo)) error {
+//
+// It reports whether the listing was scanned to exhaustion. Running out of pages
+// is the one case that silently skips real tasks, so it is a gap in the reference
+// map exactly as an unreadable payload is — and a gap stands the orphan branch
+// down for the run rather than letting it delete files it never saw referenced.
+func forEachTaskPage(list tempFileTaskLister, queue string, visit func(tasks []*asynq.TaskInfo)) (bool, error) {
 	for page := 1; page <= tempFileMaxListPages; page++ {
 		tasks, err := list(queue, asynq.PageSize(tempFileListPageSize), asynq.Page(page))
 		if err != nil {
+			// Nothing was left unscanned — the queue simply is not there.
 			if errors.Is(err, asynq.ErrQueueNotFound) {
-				return nil
+				return true, nil
 			}
-			return err
+			return false, err
 		}
 
 		visit(tasks)
 
 		if len(tasks) < tempFileListPageSize {
-			return nil
+			return true, nil
 		}
 	}
 
-	return nil
+	logging.LogStd(
+		logging.LOG_LEVEL_ERROR,
+		"Temp file sweep stopped listing ", queue, " after ", tempFileMaxListPages,
+		" pages; unreferenced files will not be reclaimed this run",
+	)
+
+	return false, nil
 }
 
 // classifyTempFile decides the fate of a single file. Pure — no Redis, no
