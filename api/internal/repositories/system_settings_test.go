@@ -383,4 +383,34 @@ func TestUpdateSystemSettingsReturnsTheTransactionError(t *testing.T) {
 	if persistedCount != 4 {
 		t.Errorf("got %d persisted queue configurations, expected the original 4", persistedCount)
 	}
+
+	// The row count alone would miss the statements this feature actually added:
+	// the per-name loop updates all four existing queues to the submitted priority
+	// BEFORE it reaches the insert that fails, so an un-rolled-back transaction
+	// leaves four rows that all read 1.
+	var persisted []models.TaskQueueConfiguration
+	if err := GetDB().Find(&persisted).Error; err != nil {
+		t.Fatalf("failed to read queue configurations: %v", err)
+	}
+
+	priorities := make(map[models.QueueName]int, len(persisted))
+	for _, configuration := range persisted {
+		priorities[configuration.Name] = configuration.Priority
+	}
+
+	expected := 11
+	for _, queueName := range models.GetQueueNames() {
+		if queueName == models.SystemCleanUpQueue {
+			continue
+		}
+
+		priority, ok := priorities[queueName]
+		if !ok {
+			t.Errorf("queue configuration for %s was not persisted", queueName)
+		} else if priority != expected {
+			t.Errorf("%s priority = %d, expected the seeded %d", queueName, priority, expected)
+		}
+
+		expected++
+	}
 }
