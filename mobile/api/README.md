@@ -263,6 +263,8 @@ Class | Method | HTTP request | Description
  - [OcrEngine](doc/OcrEngine.md)
  - [OidcConnectionView](doc/OidcConnectionView.md)
  - [OidcExchangeCommand](doc/OidcExchangeCommand.md)
+ - [OidcFlowErrorView](doc/OidcFlowErrorView.md)
+ - [OidcLinkStartView](doc/OidcLinkStartView.md)
  - [OidcProviderSummary](doc/OidcProviderSummary.md)
  - [OidcProviderView](doc/OidcProviderView.md)
  - [PagedActivityRequestCommand](doc/PagedActivityRequestCommand.md)

@@ -156,7 +156,7 @@ change**.
 
 `dart analyze` substitutes for `flutter analyze` here (it reports the same errors) and stays scoped to
 `mobile/api` — judge a regen by the **error** count, which must be **0**. The warnings are
-pre-existing generator noise: ~77 in `mobile/api` of 110 across `mobile/`, the split recorded in
+pre-existing generator noise: ~78 in `mobile/api` of 111 across `mobile/`, the split recorded in
 `.github/workflows/ci.yml` where the analyzer is deliberately not gated. Keep those two numbers in
 sync with that comment.
 
@@ -272,10 +272,16 @@ pieces have to agree:
   new permissions up for free (its key set is dynamic over every APP key); Legacy User's list is
   fixed and must stay without them.
 - **Pre-existing password accounts link from the profile page**, not by matching — *Connected
-  accounts* on both `desktop/` and `mobile/` profiles runs the same OIDC flow from an
+  accounts* on both `desktop/` and `mobile/` profiles runs the OIDC flow from an
   authenticated session, so the server is *told* the identity rather than inferring it. That is
   the escape hatch which makes `linkByUsername = false` a safe default, and it is why the feature
-  is usable end-to-end from the phone alone.
+  is usable end-to-end from the phone alone. It is gated on **`app.account.update`**, the same
+  permission as disconnecting one — adding a way to sign in is at least as privileged as removing
+  one. **The two clients start it differently and must**: the desktop navigates and gets a 302,
+  while mobile calls it as an authenticated API request and opens the returned URL itself, because
+  a bearer token cannot ride into the external user agent RFC 8252 requires. Wiring mobile's
+  Connect button to the *login* flow instead — which is how it first shipped — silently provisions a
+  second account rather than linking.
 - **`FeatureConfig.oidcProviders` must serialize as `[]`, never `null`**, and
   `OidcProviderSummary.name` must stay `type: string` and **never become an enum** — the
   generated Dart deserializer has no null guard and closed enums throw on unknown values, the

@@ -331,3 +331,116 @@ func TestDeriveUsernameFallsBackThroughTheClaims(t *testing.T) {
 		})
 	}
 }
+
+// TestLinkByUsernameRequiresAnExactUsernameMatch pins the match as byte-for-byte
+// in Go rather than whatever the column's collation happens to be.
+//
+// GetUserByUsername compares in SQL, and users.username pins no collation, so
+// MySQL and MariaDB -- both supported engines -- default to a case-insensitive
+// one where an identity provider account named "ADMIN" resolves the local
+// "admin". SQLite (this suite) and Postgres compare case-sensitively, so without
+// the Go-side re-assertion this test passes here and the hole exists only in
+// production on MySQL.
+func TestLinkByUsernameRequiresAnExactUsernameMatch(t *testing.T) {
+	defer teardownOidcTest()
+	_, provider := setupOidcTest(t, oidcTestOptions{linkByUsername: true})
+
+	existing := createTestUser(t, "admin")
+
+	// Provisioning is off, so a refused match has nowhere to fall through to and
+	// surfaces as ErrNoAccount -- which is what an unmatched claim should do.
+	_, err := resolveUser(provider, claims("attacker-subject", "ADMIN"))
+	if !errors.Is(err, ErrNoAccount) {
+		t.Fatalf("expected a case-differing username to be refused, got %v", err)
+	}
+
+	_, err = repositories.NewOidcIdentityRepository(nil).GetIdentityBySubject(provider.ID, "attacker-subject")
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("no identity may be linked on a refused match, got %v", err)
+	}
+
+	// The exact claim still links, so the check narrows rather than breaks it.
+	user, err := resolveUser(provider, claims("owner-subject", "admin"))
+	if err != nil {
+		t.Fatalf("expected the exact username to link, got %v", err)
+	}
+
+	if user.ID != existing.ID {
+		t.Errorf("expected to land on %d, got %d", existing.ID, user.ID)
+	}
+}
+
+// TestUsernameMatchesClaim is the decisive comparison, tested directly.
+//
+// It has to be tested directly: this suite runs on SQLite, whose `=` is
+// case-sensitive, so the lookup in linkByUsername never returns a case-differing
+// row here and an assertion driven through resolveUser would pass whether or not
+// the rule exists. The engine that actually needs it, MySQL, is not exercised by
+// the suite at all.
+func TestUsernameMatchesClaim(t *testing.T) {
+	tests := []struct {
+		name   string
+		stored string
+		claim  string
+		want   bool
+	}{
+		{"identical", "admin", "admin", true},
+		{"claim upper-cased -- the MySQL collation hazard", "admin", "ADMIN", false},
+		{"stored upper-cased", "ADMIN", "admin", false},
+		{"mixed case", "Admin", "aDmIn", false},
+		{"leading whitespace", "admin", " admin", false},
+		{"empty against empty", "", "", true},
+		{"unicode case fold is not equality", "\u00e5ngstr\u00f6m", "\u00c5NGSTR\u00d6M", false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := usernameMatchesClaim(test.stored, test.claim); got != test.want {
+				t.Errorf("usernameMatchesClaim(%q, %q) = %v, want %v", test.stored, test.claim, got, test.want)
+			}
+		})
+	}
+}
+
+// TestLinkByUsernameInexactMatchRefusesRatherThanDuplicating covers the end of
+// the road for a case-differing claim when provisioning is ON.
+//
+// The claim does not link (that is the point of the exactness rule), and it does
+// not quietly create a lookalike account either: deriveUsername lower-cases the
+// candidate, so it collides with the existing row and provisioning refuses with
+// ErrAccountExists. The user is told to sign in and connect from their profile,
+// which is the one path that proves who they are.
+func TestLinkByUsernameInexactMatchRefusesRatherThanDuplicating(t *testing.T) {
+	defer teardownOidcTest()
+	_, provider := setupOidcTest(t, oidcTestOptions{linkByUsername: true, allowProvisioning: true})
+
+	existing := createTestUser(t, "dana")
+
+	_, err := resolveUser(provider, claims("dana-upper-subject", "DANA"))
+	if !errors.Is(err, ErrAccountExists) {
+		t.Fatalf("expected ErrAccountExists, got %v", err)
+	}
+
+	_, err = repositories.NewOidcIdentityRepository(nil).GetIdentityBySubject(provider.ID, "dana-upper-subject")
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("no identity may be linked on a refused match, got %v", err)
+	}
+
+	var userCount int64
+	if err := repositories.GetDB().Model(&models.User{}).Count(&userCount).Error; err != nil {
+		t.Fatalf("failed to count users: %v", err)
+	}
+
+	if userCount != 1 {
+		t.Errorf("expected only the original account to exist, got %d users", userCount)
+	}
+
+	var stored models.User
+	if err := repositories.GetDB().Where("id = ?", existing.ID).First(&stored).Error; err != nil {
+		t.Fatalf("failed to reload the existing user: %v", err)
+	}
+
+	if stored.Username != "dana" {
+		t.Errorf("the existing account must be untouched, got username %q", stored.Username)
+	}
+}

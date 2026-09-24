@@ -80,6 +80,57 @@ void main() {
     });
   });
 
+  group('extractLinkedProviderFromCallback', () {
+    test('returns the provider that was connected', () {
+      expect(
+        extractLinkedProviderFromCallback('io.receiptwrangler://oidc?linked=google'),
+        'google',
+      );
+    });
+
+    test('throws with the mapped message when the backend sent an error', () {
+      expect(
+        () => extractLinkedProviderFromCallback(
+          'io.receiptwrangler://oidc?error=already_linked',
+        ),
+        throwsA(
+          isA<OidcSignInException>().having(
+            (e) => e.message,
+            'message',
+            contains('already connected'),
+          ),
+        ),
+      );
+    });
+
+    test('throws when the callback carries neither a provider nor an error', () {
+      expect(
+        () => extractLinkedProviderFromCallback('io.receiptwrangler://oidc'),
+        throwsA(isA<OidcSignInException>()),
+      );
+    });
+
+    // A link mints no session, so a callback carrying a redeemable code is the
+    // login flow's shape and must not be read as a successful link.
+    test('a code alone is not a successful link', () {
+      expect(
+        () => extractLinkedProviderFromCallback(
+          'io.receiptwrangler://oidc?code=an-exchange-code',
+        ),
+        throwsA(isA<OidcSignInException>()),
+      );
+    });
+
+    test('an error wins over a linked parameter', () {
+      expect(
+        () => extractLinkedProviderFromCallback(
+          'io.receiptwrangler://oidc?linked=google&error=no_account',
+        ),
+        throwsA(isA<OidcSignInException>()),
+      );
+    });
+  });
+
   group('oidcErrorMessage', () {
     test('maps every code the backend can send', () {
       for (final code in [

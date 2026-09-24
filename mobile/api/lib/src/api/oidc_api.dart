@@ -14,6 +14,8 @@ import 'package:openapi/src/model/app_data.dart';
 import 'package:openapi/src/model/internal_error_response.dart';
 import 'package:openapi/src/model/oidc_connection_view.dart';
 import 'package:openapi/src/model/oidc_exchange_command.dart';
+import 'package:openapi/src/model/oidc_flow_error_view.dart';
+import 'package:openapi/src/model/oidc_link_start_view.dart';
 
 class OidcApi {
 
@@ -318,10 +320,11 @@ class OidcApi {
   }
 
   /// Connect a provider to the signed-in account
-  /// Starts the same flow as a login, but the session proves who the caller is, so the callback links the identity directly instead of matching or provisioning. Navigate to this URL; do not fetch it.
+  /// Starts the same flow as a login, but the session proves who the caller is, so the callback links the identity directly instead of matching or provisioning. Requires app.account.update, the same permission as disconnecting one.  A browser navigates to this URL and is redirected (302) to the identity provider. A native client passes client&#x3D;mobile and gets the authorization URL as JSON instead, because it authenticates with a bearer token and the external user agent it must use cannot carry one; it then opens that URL itself and waits on its private-use scheme, which the callback returns to with ?linked&#x3D;{name} or ?error&#x3D;{code}.
   ///
   /// Parameters:
   /// * [name] - The provider's slug
+  /// * [client] - Which client is connecting. Mobile receives the authorization URL as JSON rather than a redirect. No codeChallenge is needed here, unlike a mobile login - a link mints no exchange code and no session.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -329,10 +332,11 @@ class OidcApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future]
+  /// Returns a [Future] containing a [Response] with a [OidcLinkStartView] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<void>> oidcLinkStart({ 
+  Future<Response<OidcLinkStartView>> oidcLinkStart({ 
     required String name,
+    String? client = 'desktop',
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -364,15 +368,48 @@ class OidcApi {
       validateStatus: validateStatus,
     );
 
+    final _queryParameters = <String, dynamic>{
+      if (client != null) r'client': encodeQueryParameter(_serializers, client, const FullType(String)),
+    };
+
     final _response = await _dio.request<Object>(
       _path,
       options: _options,
+      queryParameters: _queryParameters,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,
       onReceiveProgress: onReceiveProgress,
     );
 
-    return _response;
+    OidcLinkStartView? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null ? null : _serializers.deserialize(
+        rawResponse,
+        specifiedType: const FullType(OidcLinkStartView),
+      ) as OidcLinkStartView;
+
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<OidcLinkStartView>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
   }
 
   /// Start an OIDC login

@@ -3434,7 +3434,15 @@ paths:
       description:
         Starts the same flow as a login, but the session proves who the caller is, so
         the callback links the identity directly instead of matching or provisioning.
-        Navigate to this URL; do not fetch it.
+        Requires app.account.update, the same permission as disconnecting one.
+
+
+        A browser navigates to this URL and is redirected (302) to the identity
+        provider. A native client passes client=mobile and gets the authorization URL
+        as JSON instead, because it authenticates with a bearer token and the external
+        user agent it must use cannot carry one; it then opens that URL itself and
+        waits on its private-use scheme, which the callback returns to with
+        ?linked={name} or ?error={code}.
       operationId: oidcLinkStart
       parameters:
         - name: name
@@ -3443,9 +3451,34 @@ paths:
           required: true
           schema:
             type: string
+        - name: client
+          in: query
+          description:
+            Which client is connecting. Mobile receives the authorization URL as JSON
+            rather than a redirect. No codeChallenge is needed here, unlike a mobile
+            login - a link mints no exchange code and no session.
+          required: false
+          schema:
+            type: string
+            enum:
+              - desktop
+              - mobile
+            default: desktop
       responses:
+        200:
+          description: The authorization URL, for client=mobile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OidcLinkStartView"
         302:
-          description: Redirect to the identity provider
+          description: Redirect to the identity provider, for a browser
+        400:
+          $ref: "#/components/responses/OidcFlowError"
+        403:
+          $ref: "#/components/responses/OidcFlowError"
+        404:
+          $ref: "#/components/responses/OidcFlowError"
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
@@ -3838,6 +3871,12 @@ components:
       name: Authorization
       description: API Key in format v1.xxx.xxx.xxx
   responses:
+    OidcFlowError:
+      description: The flow could not be started
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OidcFlowErrorView"
     Ok:
       description: Request was successfully processed
     BadRequest:
@@ -5471,6 +5510,29 @@ components:
             slug and display name -- never the issuer, client id, or any secret.
           items:
             $ref: "#/components/schemas/OidcProviderSummary"
+    OidcLinkStartView:
+      type: object
+      description:
+        The authorization URL for a mobile "connect account" flow. Safe to hand to the
+        caller - its state belongs to a session already bound to that caller's user id,
+        so holding it grants nothing the bearer token did not already.
+      properties:
+        authorizationUrl:
+          type: string
+      required:
+        - authorizationUrl
+    OidcFlowErrorView:
+      type: object
+      description:
+        A failure from a flow start that answers with JSON rather than a redirect. The
+        code comes from the same small fixed vocabulary the redirect form puts in its
+        query string, so one client-side table maps both. An identity provider's own
+        error text is never echoed through.
+      properties:
+        errorCode:
+          type: string
+      required:
+        - errorCode
     OidcProviderSummary:
       required:
         - name

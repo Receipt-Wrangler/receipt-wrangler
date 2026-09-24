@@ -91,6 +91,8 @@ model/notification.ts
 model/ocrEngine.ts
 model/oidcConnectionView.ts
 model/oidcExchangeCommand.ts
+model/oidcFlowErrorView.ts
+model/oidcLinkStartView.ts
 model/oidcProviderSummary.ts
 model/oidcProviderView.ts
 model/pagedActivityRequestCommand.ts

@@ -52,3 +52,26 @@ type OidcConnectionView struct {
 	LinkedAt        time.Time  `json:"linkedAt"`
 	LastLoginAt     *time.Time `json:"lastLoginAt"`
 }
+
+// OidcLinkStartView is the response to a MOBILE "connect account" start.
+//
+// The desktop gets a 302 straight to the identity provider, but the mobile app
+// authenticates with a bearer token and the external user agent RFC 8252 demands
+// cannot carry one. So the app starts the flow as an ordinary authenticated API
+// call and opens the URL this carries itself.
+//
+// It is safe to hand to the caller: the URL's state belongs to a session already
+// bound to that caller's user id, so possessing it grants nothing the bearer
+// token did not already.
+type OidcLinkStartView struct {
+	AuthorizationUrl string `json:"authorizationUrl"`
+}
+
+// OidcFlowError reports a failure from a flow start that answers with JSON
+// rather than a redirect. It carries the same small fixed vocabulary of codes
+// the redirect form puts in its query string, so a client maps both with one
+// table -- and, as everywhere else in this package, never an identity
+// provider's own error text.
+type OidcFlowError struct {
+	ErrorCode string `json:"errorCode"`
+}

@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/env"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/structs"
@@ -61,6 +63,7 @@ const (
 	errNoAccount       = "no_account"
 	errAccountExists   = "account_exists"
 	errAlreadyLinked   = "already_linked"
+	errForbidden       = "forbidden"
 	errServerError     = "server_error"
 )
 
@@ -72,34 +75,77 @@ func Login(w http.ResponseWriter, r *http.Request) {
 // LinkStart starts a "connect account" flow for the authenticated caller. It is
 // the same flow as Login, differing only in that the resulting session carries
 // the caller's user id -- so the callback links instead of guessing.
+//
+// Gated on app.account.update, resolved from the database and never from the
+// JWT. Connecting a provider ADDS a way to sign into this account, so it is at
+// least as privileged as disconnecting one -- and DeleteOidcConnection already
+// requires exactly this permission. Without the check an administrator could
+// build a role that cannot remove a sign-in method but can still add one, which
+// is not a coherent thing to be able to configure.
+//
+// The check lives in the handler body rather than on a structs.Handler because
+// this route answers with a redirect, not JSON: HandleRequest's 403 would drop a
+// raw error object into a browser the user navigated here. Same shape as
+// GetPagedApiKeys' app.api-keys.read-any check.
 func LinkStart(w http.ResponseWriter, r *http.Request) {
 	claims := structs.GetClaims(r)
 	userId := claims.UserId
 
+	clientType := resolveClientType(r)
+
+	allowed, err := services.NewPermissionService(nil).HasAppPermissions(userId, permissions.AppAccountUpdate)
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to resolve permissions for an OIDC link: "+err.Error())
+		failFlowStart(w, r, clientType, true, errServerError)
+		return
+	}
+
+	if !allowed {
+		failFlowStart(w, r, clientType, true, errForbidden)
+		return
+	}
+
 	startFlow(w, r, &userId)
+}
+
+// resolveClientType reads which client is driving the flow. Anything that is not
+// an explicit "mobile" is a browser.
+func resolveClientType(r *http.Request) string {
+	if r.URL.Query().Get("client") == models.OidcClientMobile {
+		return models.OidcClientMobile
+	}
+
+	return models.OidcClientDesktop
 }
 
 func startFlow(w http.ResponseWriter, r *http.Request, linkUserId *uint) {
 	name := chi.URLParam(r, "name")
 
+	// Resolved BEFORE the provider lookup so even an unknown-provider failure is
+	// reported in the form this caller can act on.
+	clientType := resolveClientType(r)
+	isLink := linkUserId != nil
+
 	providerRow, err := repositories.NewOidcProviderRepository(nil).GetEnabledOidcProviderByName(name)
 	if err != nil {
-		redirectWithError(w, r, models.OidcClientDesktop, errUnknownProvider)
+		failFlowStart(w, r, clientType, isLink, errUnknownProvider)
 		return
 	}
 
-	clientType := models.OidcClientDesktop
 	mobileChallenge := ""
 
-	if r.URL.Query().Get("client") == models.OidcClientMobile {
-		clientType = models.OidcClientMobile
+	if clientType == models.OidcClientMobile && !isLink {
 		mobileChallenge = strings.TrimSpace(r.URL.Query().Get("codeChallenge"))
 
-		// The mobile leg has no browser cookie to bind to, so the app's own PKCE
-		// challenge is the only thing tying the exchange back to the app that
+		// The mobile LOGIN leg has no browser cookie to bind to, so the app's own
+		// PKCE challenge is the only thing tying the exchange back to the app that
 		// started the flow. Without it the handoff code would be bearer-only.
+		//
+		// A mobile LINK needs none: it mints no exchange code and no session -- the
+		// caller already proved who they are with a bearer token on this very
+		// request, which is what LinkUserId records.
 		if len(mobileChallenge) == 0 {
-			redirectWithError(w, r, clientType, errInvalidRequest)
+			failFlowStart(w, r, clientType, isLink, errInvalidRequest)
 			return
 		}
 	}
@@ -107,14 +153,14 @@ func startFlow(w http.ResponseWriter, r *http.Request, linkUserId *uint) {
 	discovered, err := GetProvider(providerRow)
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "OIDC discovery failed for provider "+providerRow.Name+": "+err.Error())
-		redirectWithError(w, r, clientType, errProviderError)
+		failFlowStart(w, r, clientType, isLink, errProviderError)
 		return
 	}
 
 	config, err := buildOauthConfig(providerRow, discovered, services.BuildOidcRedirectUri(providerRow.Name))
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to build OIDC config for provider "+providerRow.Name+": "+err.Error())
-		redirectWithError(w, r, clientType, errServerError)
+		failFlowStart(w, r, clientType, isLink, errServerError)
 		return
 	}
 
@@ -129,7 +175,7 @@ func startFlow(w http.ResponseWriter, r *http.Request, linkUserId *uint) {
 	})
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to create OIDC auth session: "+err.Error())
-		redirectWithError(w, r, clientType, errServerError)
+		failFlowStart(w, r, clientType, isLink, errServerError)
 		return
 	}
 
@@ -142,6 +188,16 @@ func startFlow(w http.ResponseWriter, r *http.Request, linkUserId *uint) {
 		oidc.Nonce(created.Nonce),
 		oauth2.S256ChallengeOption(verifier),
 	)
+
+	// A mobile link is the one start that answers with JSON instead of a redirect.
+	// The app authenticates with a bearer token, which the external user agent
+	// RFC 8252 requires cannot carry -- so the app calls this as an ordinary API
+	// request and opens the returned URL itself. Every other start is already a
+	// browser navigation and stays a 302.
+	if clientType == models.OidcClientMobile && isLink {
+		writeOidcJson(w, http.StatusOK, structs.OidcLinkStartView{AuthorizationUrl: authUrl})
+		return
+	}
 
 	http.Redirect(w, r, authUrl, http.StatusFound)
 }
@@ -354,11 +410,39 @@ func finishLink(
 ) {
 	err := resolveLink(providerRow, claims, *session.LinkUserId)
 	if err != nil {
-		http.Redirect(w, r, desktopProfilePath+"?tab=user-profile&oidcError="+resolutionErrorCode(err), http.StatusFound)
+		redirectLinkError(w, r, session.ClientType, resolutionErrorCode(err))
 		return
 	}
 
-	http.Redirect(w, r, desktopProfilePath+"?tab=user-profile&oidcLinked="+url.QueryEscape(providerRow.Name), http.StatusFound)
+	redirectLinkSuccess(w, r, session.ClientType, providerRow.Name)
+}
+
+// redirectLinkSuccess returns a completed "connect account" flow to wherever it
+// was started from. The mobile app is waiting on its private-use scheme, so it
+// gets the same redirect a mobile login would -- carrying only the provider's
+// name, since a link mints no session and there is nothing to hand over.
+func redirectLinkSuccess(w http.ResponseWriter, r *http.Request, clientType string, providerName string) {
+	if clientType == models.OidcClientMobile {
+		http.Redirect(w, r, mobileCallbackScheme+"?linked="+url.QueryEscape(providerName), http.StatusFound)
+		return
+	}
+
+	http.Redirect(w, r, desktopProfilePath+"?tab=user-profile&oidcLinked="+url.QueryEscape(providerName), http.StatusFound)
+}
+
+// redirectLinkError reports a failed "connect account" attempt on the profile
+// page the user started from.
+//
+// Deliberately NOT redirectWithError, which lands on the login screen: a link
+// flow's caller is already signed in, so bouncing them to a login form reads as
+// "you have been signed out" rather than "that provider could not be connected".
+func redirectLinkError(w http.ResponseWriter, r *http.Request, clientType string, code string) {
+	if clientType == models.OidcClientMobile {
+		redirectWithError(w, r, clientType, code)
+		return
+	}
+
+	http.Redirect(w, r, desktopProfilePath+"?tab=user-profile&oidcError="+url.QueryEscape(code), http.StatusFound)
 }
 
 // issueSession mints Receipt Wrangler tokens and hands them to the client in the
@@ -411,6 +495,57 @@ func resolutionErrorCode(err error) string {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "OIDC identity resolution failed: "+err.Error())
 		return errServerError
 	}
+}
+
+// failFlowStart reports a failure from the START of a flow, in whatever form the
+// caller can act on. Three cases, because the callers genuinely differ: a mobile
+// link is an API call and gets JSON, a desktop link is a navigation from the
+// profile page and returns there, and a login is a navigation from the login
+// screen and returns there.
+func failFlowStart(w http.ResponseWriter, r *http.Request, clientType string, isLink bool, code string) {
+	if clientType == models.OidcClientMobile && isLink {
+		writeOidcFlowError(w, code)
+		return
+	}
+
+	if isLink {
+		redirectLinkError(w, r, clientType, code)
+		return
+	}
+
+	redirectWithError(w, r, clientType, code)
+}
+
+// writeOidcFlowError writes a flow error code as JSON under a status that
+// describes the failure, for the one start that is an API call.
+func writeOidcFlowError(w http.ResponseWriter, code string) {
+	status := http.StatusInternalServerError
+
+	switch code {
+	case errUnknownProvider:
+		status = http.StatusNotFound
+	case errInvalidRequest:
+		status = http.StatusBadRequest
+	case errForbidden:
+		status = http.StatusForbidden
+	case errProviderError:
+		status = http.StatusBadGateway
+	}
+
+	writeOidcJson(w, status, structs.OidcFlowError{ErrorCode: code})
+}
+
+func writeOidcJson(w http.ResponseWriter, status int, body any) {
+	bytes, err := json.Marshal(body)
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to marshal an OIDC response: "+err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", constants.ApplicationJson)
+	w.WriteHeader(status)
+	w.Write(bytes)
 }
 
 func redirectWithError(w http.ResponseWriter, r *http.Request, clientType string, code string) {

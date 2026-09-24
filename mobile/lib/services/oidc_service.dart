@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:openapi/openapi.dart' as api;
@@ -132,4 +133,92 @@ Future<api.AppData> signInWithOidc({
   }
 
   return appData;
+}
+
+/// Connects [providerName] to the signed-in account and returns its name.
+///
+/// This is NOT a login. The distinction is the whole point: a login flow asks
+/// the server "who is this?", so running one from the profile screen would
+/// provision a brand-new account (or, with linkByUsername on, attach the
+/// identity to whichever account holds that username) rather than connect this
+/// one. The link flow tells the server who the caller is instead, and it is only
+/// able to do that because the START of the flow is an authenticated API call
+/// carrying this app's bearer token.
+///
+/// That is why the URL is fetched rather than navigated to: the external user
+/// agent RFC 8252 requires has no session with the API, so a 302 into it would
+/// arrive unauthenticated. The app opens the returned authorization URL itself
+/// and waits on its private-use scheme, which the callback returns to with
+/// `?linked=` or `?error=`.
+Future<String> linkWithOidc({required String providerName}) async {
+  final String authorizationUrl;
+
+  try {
+    final response = await OpenApiClient.client.getOidcApi().oidcLinkStart(
+          name: providerName,
+          client: 'mobile',
+        );
+
+    final url = response.data?.authorizationUrl;
+    if (url == null || url.isEmpty) {
+      throw OidcSignInException('Could not connect that account. Please try again.');
+    }
+
+    authorizationUrl = url;
+  } on DioException catch (e) {
+    throw OidcSignInException(oidcErrorMessage(_errorCodeFrom(e)));
+  }
+
+  String callbackUrl;
+  try {
+    callbackUrl = await FlutterWebAuth2.authenticate(
+      url: authorizationUrl,
+      callbackUrlScheme: oidcCallbackScheme,
+    );
+  } on PlatformException catch (e) {
+    if (e.code == 'CANCELED' || e.code == 'canceled') {
+      throw OidcSignInCancelled();
+    }
+
+    rethrow;
+  }
+
+  return extractLinkedProviderFromCallback(callbackUrl);
+}
+
+/// Reads the linked provider out of the callback URL, or throws with the
+/// backend's error if it sent one.
+///
+/// A link callback carries `linked`, never a `code` -- it mints no session, so
+/// there is nothing for the app to redeem.
+String extractLinkedProviderFromCallback(String callbackUrl) {
+  final uri = Uri.parse(callbackUrl);
+
+  final error = uri.queryParameters['error'];
+  if (error != null && error.isNotEmpty) {
+    throw OidcSignInException(oidcErrorMessage(error));
+  }
+
+  final linked = uri.queryParameters['linked'];
+  if (linked == null || linked.isEmpty) {
+    throw OidcSignInException('Could not connect that account. Please try again.');
+  }
+
+  return linked;
+}
+
+/// Pulls the server's error code out of a failed link start.
+///
+/// The body is an OidcFlowErrorView carrying one of the same codes the redirect
+/// form puts in its query string, so [oidcErrorMessage] maps both. Anything
+/// unreadable falls back to a code it has no copy for, which yields the generic
+/// message rather than leaking a transport error at the user.
+String _errorCodeFrom(DioException exception) {
+  final data = exception.response?.data;
+
+  if (data is Map && data['errorCode'] is String) {
+    return data['errorCode'] as String;
+  }
+
+  return 'unknown';
 }

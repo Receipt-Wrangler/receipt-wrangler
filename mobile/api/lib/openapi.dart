@@ -95,6 +95,8 @@ export 'package:openapi/src/model/notification.dart';
 export 'package:openapi/src/model/ocr_engine.dart';
 export 'package:openapi/src/model/oidc_connection_view.dart';
 export 'package:openapi/src/model/oidc_exchange_command.dart';
+export 'package:openapi/src/model/oidc_flow_error_view.dart';
+export 'package:openapi/src/model/oidc_link_start_view.dart';
 export 'package:openapi/src/model/oidc_provider_summary.dart';
 export 'package:openapi/src/model/oidc_provider_view.dart';
 export 'package:openapi/src/model/paged_activity_request_command.dart';

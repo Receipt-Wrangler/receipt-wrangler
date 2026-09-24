@@ -54,6 +54,8 @@ export * from './notification';
 export * from './ocrEngine';
 export * from './oidcConnectionView';
 export * from './oidcExchangeCommand';
+export * from './oidcFlowErrorView';
+export * from './oidcLinkStartView';
 export * from './oidcProviderSummary';
 export * from './oidcProviderView';
 export * from './pagedActivityRequestCommand';

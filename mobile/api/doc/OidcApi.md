@@ -194,11 +194,11 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **oidcLinkStart**
-> oidcLinkStart(name)
+> OidcLinkStartView oidcLinkStart(name, client)
 
 Connect a provider to the signed-in account
 
-Starts the same flow as a login, but the session proves who the caller is, so the callback links the identity directly instead of matching or provisioning. Navigate to this URL; do not fetch it.
+Starts the same flow as a login, but the session proves who the caller is, so the callback links the identity directly instead of matching or provisioning. Requires app.account.update, the same permission as disconnecting one.  A browser navigates to this URL and is redirected (302) to the identity provider. A native client passes client=mobile and gets the authorization URL as JSON instead, because it authenticates with a bearer token and the external user agent it must use cannot carry one; it then opens that URL itself and waits on its private-use scheme, which the callback returns to with ?linked={name} or ?error={code}.
 
 ### Example
 ```dart
@@ -210,9 +210,11 @@ import 'package:openapi/api.dart';
 
 final api = Openapi().getOidcApi();
 final String name = name_example; // String | The provider's slug
+final String client = client_example; // String | Which client is connecting. Mobile receives the authorization URL as JSON rather than a redirect. No codeChallenge is needed here, unlike a mobile login - a link mints no exchange code and no session.
 
 try {
-    api.oidcLinkStart(name);
+    final response = api.oidcLinkStart(name, client);
+    print(response);
 } catch on DioException (e) {
     print('Exception when calling OidcApi->oidcLinkStart: $e\n');
 }
@@ -223,10 +225,11 @@ try {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **name** | **String**| The provider's slug | 
+ **client** | **String**| Which client is connecting. Mobile receives the authorization URL as JSON rather than a redirect. No codeChallenge is needed here, unlike a mobile login - a link mints no exchange code and no session. | [optional] [default to 'desktop']
 
 ### Return type
 
-void (empty response body)
+[**OidcLinkStartView**](OidcLinkStartView.md)
 
 ### Authorization
 
@@ -235,7 +238,7 @@ void (empty response body)
 ### HTTP request headers
 
  - **Content-Type**: Not defined
- - **Accept**: Not defined
+ - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

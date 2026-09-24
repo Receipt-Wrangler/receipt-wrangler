@@ -70,6 +70,8 @@ import 'package:openapi/src/model/notification.dart';
 import 'package:openapi/src/model/ocr_engine.dart';
 import 'package:openapi/src/model/oidc_connection_view.dart';
 import 'package:openapi/src/model/oidc_exchange_command.dart';
+import 'package:openapi/src/model/oidc_flow_error_view.dart';
+import 'package:openapi/src/model/oidc_link_start_view.dart';
 import 'package:openapi/src/model/oidc_provider_summary.dart';
 import 'package:openapi/src/model/oidc_provider_view.dart';
 import 'package:openapi/src/model/paged_activity_request_command.dart';
@@ -213,6 +215,8 @@ part 'serializers.g.dart';
   OcrEngine,
   OidcConnectionView,
   OidcExchangeCommand,
+  OidcFlowErrorView,
+  OidcLinkStartView,
   OidcProviderSummary,
   OidcProviderView,
   PagedActivityRequestCommand,

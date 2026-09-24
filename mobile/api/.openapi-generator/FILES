@@ -69,6 +69,8 @@ doc/OcrEngine.md
 doc/OidcApi.md
 doc/OidcConnectionView.md
 doc/OidcExchangeCommand.md
+doc/OidcFlowErrorView.md
+doc/OidcLinkStartView.md
 doc/OidcProviderApi.md
 doc/OidcProviderSummary.md
 doc/OidcProviderView.md
@@ -262,6 +264,8 @@ lib/src/model/notification.dart
 lib/src/model/ocr_engine.dart
 lib/src/model/oidc_connection_view.dart
 lib/src/model/oidc_exchange_command.dart
+lib/src/model/oidc_flow_error_view.dart
+lib/src/model/oidc_link_start_view.dart
 lib/src/model/oidc_provider_summary.dart
 lib/src/model/oidc_provider_view.dart
 lib/src/model/paged_activity_request_command.dart
@@ -347,3 +351,5 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
+test/oidc_flow_error_view_test.dart
+test/oidc_link_start_view_test.dart

@@ -79,9 +79,11 @@ class _ConnectedAccountsState extends State<ConnectedAccounts> {
     }
 
     try {
-      // The same browser flow as a login, but the request carries the session,
-      // so the backend links the identity to this account directly.
-      await signInWithOidc(basePath: basePath, providerName: providerName);
+      // linkWithOidc, NOT signInWithOidc. A login flow asks the server "who is
+      // this?", so from here it would provision a second account rather than
+      // connect this one -- and this button is only ever shown for providers
+      // this account has not connected, which is exactly when that happens.
+      await linkWithOidc(providerName: providerName);
 
       if (!mounted) return;
 

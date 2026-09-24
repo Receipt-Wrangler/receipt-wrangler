@@ -2260,16 +2260,29 @@ the system browser and redeems the one-time code that comes back. See `api/CLAUD
 - **Buttons** render in `lib/auth/login/widgets/auth_form.dart` from
   `authModel.featureConfig.oidcProviders`, already populated — the Connect-to-Server screen fetches
   `/featureConfig` unauthenticated before `/login`, so there is no extra request.
-- **Connected accounts** (`lib/profile/widgets/connected_accounts.dart`): Connect runs the same
-  browser flow against `/oidc/link/{name}` (the generated client attaches the bearer token, and the
-  session is what proves identity — nothing is matched by name). Disconnect is hidden for a
-  provisioned account's **last** connection, matching the server's lockout guard; the server refuses
-  it either way. A failed load yields no section rather than an error, so an older server or a caller
-  without `app.account.read` degrades quietly.
+- **Connected accounts** (`lib/profile/widgets/connected_accounts.dart`): Connect calls
+  **`linkWithOidc`, never `signInWithOidc`** — and the difference is the whole feature. A login flow
+  asks the server *"who is this?"*, so running one from the profile screen provisions a brand-new
+  account (or, with `linkByUsername` on, attaches the identity to whichever account holds that
+  username) instead of connecting this one — and the button is only ever rendered for providers this
+  account has **not** connected, which is exactly the case where that happens. It shipped wired to
+  the login flow and reported "Account connected" while doing it.
+  - **The start is an API call, not a navigation.** `GET /oidc/link/{name}?client=mobile` returns
+    `{authorizationUrl}` as JSON, and the app opens that URL in the external user agent itself. It
+    cannot be a redirect: this app authenticates with a **bearer token** (`auth_interceptor.dart`),
+    which the browser RFC 8252 requires has no way to carry, so a 302 into it arrives
+    unauthenticated. The callback returns to `io.receiptwrangler://oidc?linked={name}`, parsed by
+    `extractLinkedProviderFromCallback` — a **link carries no `code`**, because it mints no session.
+  - **No `codeChallenge` is sent**, unlike a login: there is no exchange code to bind, and the
+    bearer token on the start request already proved who the caller is.
+  - Disconnect is hidden for a provisioned account's **last** connection, matching the server's
+    lockout guard; the server refuses it either way. A failed load yields no section rather than an
+    error, so an older server or a caller without `app.account.read` degrades quietly.
 - **`app_links` is not involved** — `flutter_web_auth_2` captures the callback itself, so the existing
   deep-link handler in `lib/main.dart` and its test seams are untouched.
 - **Tests:** `test/utils/pkce_test.dart` (the cross-language contract),
-  `test/services/oidc_service_test.dart` (URL composition, escaping, callback parsing, error mapping),
+  `test/services/oidc_service_test.dart` (URL composition, escaping, callback parsing for **both** the
+  login and link shapes — including that a bare `code` is not a successful link — and error mapping),
   `test/widgets/auth_form_test.dart` (a button per provider; none when the list is empty **or
   absent**), and `test/models/feature_config_oidc_ingest_test.dart` — which deserializes
   `featureConfig` with `oidcProviders` **absent, empty and populated**. That last one matters because

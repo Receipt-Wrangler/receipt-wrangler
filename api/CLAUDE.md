@@ -1211,6 +1211,17 @@ re-point an existing account. `Subject` is capped at 255 so the composite index 
    claim is stable or unique, and public providers (Twitch notably) let users change their username
    and recycle released names, so an always-on match is an account-takeover path against a local
    `admin`. The safe way to attach an existing account is the authenticated link flow below.
+
+   **The match is re-asserted byte for byte in Go** (`usernameMatchesClaim`), not left to the SQL
+   lookup that found the row. `users.username` pins no collation, so the same claim resolves
+   differently per engine: MySQL and MariaDB default to a case-**insensitive** collation, where an
+   identity provider account named `ADMIN` resolves the local `admin`, while SQLite and Postgres
+   compare case-sensitively and would not. A boundary that holds on one supported engine and not
+   another is not a boundary. An inexact match is treated as a **miss**, so it falls through to
+   provisioning — where `deriveUsername` lower-cases the candidate, collides, and refuses with
+   `ErrAccountExists` rather than quietly creating a lookalike account. It is a named function
+   precisely because the test database is SQLite: inlined, the rule would be unreachable there and
+   would ship with no test that can fail on it.
 2. **provision** a new account, if `AllowProvisioning` is on.
 3. otherwise refuse (`ErrNoAccount` → a `no_account` error redirect).
 
@@ -1282,6 +1293,30 @@ nothing is inferred from a claim. This is what makes `linkByUsername = false` a 
 link navigation authenticates. Unlinking refuses when it is the caller's last identity *and*
 `ProvisionedUser` is true — that account has only the discarded random password.
 
+**It is gated on `app.account.update`**, the same permission as `DeleteOidcConnection`. Connecting a
+provider ADDS a way to sign into an account, so it is at least as privileged as disconnecting one;
+without the check an administrator could build a role that cannot remove a sign-in method but can
+still add one, which is not a coherent thing to be able to configure. The check sits in the handler
+body rather than on a `structs.Handler` because this route answers with a redirect — `HandleRequest`'s
+403 would drop a raw error object into a browser the user navigated here. Same shape as
+`GetPagedApiKeys`' `app.api-keys.read-any` check.
+
+**A mobile link start answers with JSON, not a 302** — `GET /oidc/link/{name}?client=mobile` returns
+`structs.OidcLinkStartView{authorizationUrl}` and the app opens that URL itself. This is not a
+stylistic split: the app authenticates with a **bearer token**, and the external user agent RFC 8252
+requires cannot carry one, so a redirect into that browser arrives unauthenticated and is refused.
+The whole flow-start error vocabulary follows it (`structs.OidcFlowError{errorCode}`, mapped to
+404/400/403/502 by `writeOidcFlowError`), so a failure reaches the app in the same shape as a success
+instead of as an unparseable redirect. `resolveClientType` therefore runs **before** the provider
+lookup — otherwise an unknown-provider failure took the desktop branch and the app got HTML.
+
+**A mobile link needs no `codeChallenge`**, unlike a mobile login. The challenge binds the login's
+one-time exchange code to the app that started the flow; a link mints no exchange code and no session,
+and the caller already proved who they are with a bearer token on the start request. `startFlow`
+therefore requires it only when `linkUserId == nil`. The callback returns to
+`io.receiptwrangler://oidc?linked={name}` (or `?error={code}`) — **never** the desktop profile path,
+which would strand the external browser on a page the app never sees.
+
 The static route segments (`link`, `exchange`, `connections`) come first so chi's resolution stays
 unambiguous, and `commands.ReservedOidcProviderNames` rejects them as slugs from the other direction.
 The provider **name is immutable on update**: it is baked into the redirect URI already registered at
@@ -1334,8 +1369,11 @@ tokens via `golang-jwt`, already a dependency), so go-oidc is exercised rather t
 replayed / expired / cross-provider state, missing and foreign binding cookie, nonce mismatch, absent
 nonce, missing `id_token`, a signature from a key not in the JWKS, a foreign audience, and both happy
 paths. Plus `provision_test.go` (the resolution matrix, `TestSecondLoginUsesSubjectNotUsername`,
-`TestProvisionedPasswordIsUnusable`), `exchange_test.go`, `store_test.go` (atomic consume under 20
-concurrent callers), `provider_cache_test.go`, `claims_test.go`. Elsewhere:
+`TestProvisionedPasswordIsUnusable`, `TestUsernameMatchesClaim` and
+`TestLinkByUsernameRequiresAnExactUsernameMatch`), `link_test.go` (the `app.account.update` gate, the
+mobile JSON start and its denial/unknown-provider shapes, the `codeChallenge` split between login and
+link, and the callback returning to the app's scheme), `exchange_test.go`, `store_test.go` (atomic
+consume under 20 concurrent callers), `provider_cache_test.go`, `claims_test.go`. Elsewhere:
 `handlers/oidc_providers_test.go` (permission gating, the secret never in a response body, the
 boolean-flag regression), `repositories/oidc_providers_test.go` (the unique indexes, cascades, the
 `enabled:false` regression), `services/oidc_feature_config_test.go` (the `[]`-not-`null` guard),

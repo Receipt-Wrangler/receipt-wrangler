@@ -12,6 +12,7 @@ import (
 	"receipt-wrangler/api/internal/env"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/services"
 	"receipt-wrangler/api/internal/utils"
 
 	"github.com/go-chi/chi/v5"
@@ -78,6 +79,10 @@ func createTestProvider(t *testing.T, issuerUrl string, options providerOptions)
 // pointed at a different fake identity provider.
 func teardownOidcTest() {
 	ClearProviderCacheForTests()
+	// Same hazard as the provider cache: the role-permission cache is keyed by
+	// scope + role id, and the truncated test database reuses ids, so one case's
+	// permission set would be served to the next.
+	services.ClearRolePermissionCacheForTests()
 	repositories.TruncateTestDb()
 }
 
@@ -119,3 +124,39 @@ func createTestUser(t *testing.T, username string) models.User {
 }
 
 var _ = env.GetEncryptionKey
+
+// createTestUserWithPermissions creates a user holding an app role that grants
+// exactly the permissions given. CreateTestRoles' shared role carries only
+// app.users.create, so a case that turns on a specific permission needs its own.
+func createTestUserWithPermissions(t *testing.T, username string, granted ...string) models.User {
+	t.Helper()
+
+	user := createTestUser(t, username)
+
+	rolePermissions := make([]models.AppRolePermission, 0, len(granted))
+	for _, permission := range granted {
+		rolePermissions = append(rolePermissions, models.AppRolePermission{Permission: permission})
+	}
+
+	role := models.AppRole{
+		Name:        "role-for-" + username,
+		Description: "test role",
+		Permissions: rolePermissions,
+	}
+
+	if err := repositories.GetDB().Create(&role).Error; err != nil {
+		t.Fatalf("failed to create the app role: %v", err)
+	}
+
+	err := repositories.GetDB().
+		Model(&models.User{}).
+		Where("id = ?", user.ID).
+		Update("app_role_id", role.ID).Error
+	if err != nil {
+		t.Fatalf("failed to assign the app role: %v", err)
+	}
+
+	user.AppRoleID = &role.ID
+
+	return user
+}

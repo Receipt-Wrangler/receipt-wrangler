@@ -114,6 +114,27 @@ func resolveUser(provider models.OidcProvider, claims idTokenClaims) (structs.Us
 	return structs.UserView{}, ErrNoAccount
 }
 
+// usernameMatchesClaim re-asserts, byte for byte in Go, that a row the database
+// handed back really does carry the username the claim asked for.
+//
+// It exists because the lookup that produced that row compared in SQL, and
+// users.username pins no collation -- so the same claim resolves differently per
+// engine. MySQL and MariaDB, both supported here, default to a case-INSENSITIVE
+// collation, where an identity provider account named "ADMIN" resolves the local
+// "admin"; SQLite and Postgres compare case-sensitively and would not. This path
+// is premised on an EXACT, opt-in username match, and a fuzzy one is precisely
+// the account-takeover vector OidcProvider.LinkByUsername's doc comment warns
+// about. A boundary that holds on one supported engine and not another is not a
+// boundary, so the decisive comparison is made here rather than left to the
+// column.
+//
+// Kept as a named function rather than inlined because the test database is
+// SQLite: an inline check would be unreachable there, so the rule would ship
+// with no test that can fail on it.
+func usernameMatchesClaim(storedUsername string, claimedUsername string) bool {
+	return storedUsername == claimedUsername
+}
+
 // linkByUsername attaches an unseen identity to an existing local account whose
 // username matches the preferred_username claim.
 func linkByUsername(provider models.OidcProvider, claims idTokenClaims) (structs.UserView, error) {
@@ -122,6 +143,12 @@ func linkByUsername(provider models.OidcProvider, claims idTokenClaims) (structs
 	user, err := repositories.NewUserRepository(nil).GetUserByUsername(claims.PreferredUsername)
 	if err != nil {
 		return structs.UserView{}, err
+	}
+
+	// Treated as a miss rather than an error, so an inexact match falls through to
+	// provisioning exactly like a lookup that found nothing.
+	if !usernameMatchesClaim(user.Username, claims.PreferredUsername) {
+		return structs.UserView{}, gorm.ErrRecordNotFound
 	}
 
 	// A dummy user is a placeholder that is blocked from logging in anyway;
