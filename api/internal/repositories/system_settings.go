@@ -206,7 +206,10 @@ func (repository SystemSettingsRepository) UpdateSystemSettings(command commands
 	})
 
 	if err != nil {
-		return models.SystemSettings{}, nil
+		// The transaction rolled back, so nothing was saved. Swallowing this
+		// returned a 200 with an empty body and lost the change without a
+		// signal -- and it silently disarmed every caller's error check.
+		return models.SystemSettings{}, err
 	}
 
 	return updatedSettings, nil

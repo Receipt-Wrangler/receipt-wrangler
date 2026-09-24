@@ -1580,8 +1580,17 @@ only that one — to the same 403 and the same `activityAccessDeniedMessage`. An
 `RerunActivity`'s "only a quick scan or email upload can be rerun" check ran *before*
 the handler was built, so it answered ahead of the gate and told an unauthorized
 caller the activity's type; it now runs inside `HandlerFunction`, after
-`enforceActivityActorVisible`. Assert such a fix as a **pair** — the unknown id and
-the denied one, status and body — since either answer alone proves nothing.
+`enforceActivityActorVisible`.
+
+**The body is half the answer, and it is written by three different places.** Closing
+the status oracle with wording of this feature's own just moved it: the group gate is
+`HandleRequest`, which writes `unauthorizedEntityMessage`
+(`handlers/generic_handler.go`), while the row lookup and the actor check write their
+own. So `activityAccessDeniedMessage` **is** `unauthorizedEntityMessage` — not a copy
+of its text, the constant itself, since a divergence is only ever a bug. Any handler
+that denies for a reason of its own has to reuse it. Assert such a fix across **every**
+denial path at once — the unknown id against the hidden actor *and* against the
+non-member — since one pairing passes while another still leaks.
 
 ### Hydration traps
 

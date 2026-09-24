@@ -387,10 +387,15 @@ func DownloadSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
-// activityAccessDeniedMessage is deliberately the same for "you are not in this group"
-// and "this activity was run by someone you cannot see", so neither answer distinguishes
-// the other.
-const activityAccessDeniedMessage = "You do not have access to this activity."
+// activityAccessDeniedMessage is deliberately the same for "no such activity", "you
+// are not in this group" and "this activity was run by someone you cannot see", so no
+// answer distinguishes another.
+//
+// It is HandleRequest's own denial body rather than wording of its own, because the
+// group gate writes that one and these helpers cannot: a caller comparing a denial
+// from here against one from the gate would otherwise learn which check refused, and
+// so whether the task exists at all.
+const activityAccessDeniedMessage = unauthorizedEntityMessage
 
 // loadSystemTaskForSourceFile loads the system task named in the URL and returns the group
 // the request must be gated on. It reports true when it has already written a response, in

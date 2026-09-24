@@ -340,3 +340,47 @@ func TestUpdateSystemSettingsInsertsAMissingQueueConfiguration(t *testing.T) {
 		}
 	}
 }
+
+// A rolled-back transaction has to reach the caller as an error. It used to return
+// (zero settings, nil), so the handler answered 200 with an empty body and the
+// admin's change vanished without a signal -- and, worse, every caller's `err`
+// check was silently disarmed, including the one in the test above.
+//
+// The failure is forced through the insert this feature added: an unknown queue
+// name reaches tx.Create, where models.QueueName.Value() refuses it.
+func TestUpdateSystemSettingsReturnsTheTransactionError(t *testing.T) {
+	defer TruncateTestDb()
+	seedFourQueueConfigurations(t)
+
+	command := buildSettingsCommand()
+	command.TaskConcurrency = 9
+	for i := range command.TaskQueueConfigurations {
+		if command.TaskQueueConfigurations[i].Name == models.SystemCleanUpQueue {
+			command.TaskQueueConfigurations[i].Name = models.QueueName("not_a_real_queue")
+		}
+	}
+
+	_, err := NewSystemSettingsRepository(nil).UpdateSystemSettings(command)
+	if err == nil {
+		t.Fatal("expected the failed transaction to be reported to the caller")
+	}
+
+	// And the rollback really rolled back, so the error is not merely cosmetic.
+	settings, readErr := NewSystemSettingsRepository(nil).GetSystemSettings()
+	if readErr != nil {
+		t.Fatalf("failed to read system settings: %v", readErr)
+	}
+
+	if settings.TaskConcurrency == 9 {
+		t.Error("the scalar update survived a rolled-back transaction")
+	}
+
+	var persistedCount int64
+	if err := GetDB().Model(&models.TaskQueueConfiguration{}).Count(&persistedCount).Error; err != nil {
+		t.Fatalf("failed to count queue configurations: %v", err)
+	}
+
+	if persistedCount != 4 {
+		t.Errorf("got %d persisted queue configurations, expected the original 4", persistedCount)
+	}
+}

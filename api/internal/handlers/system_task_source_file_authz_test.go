@@ -197,12 +197,16 @@ func seedHiddenActivityOfType(t *testing.T, fixture sourceFileAuthzFixture, task
 }
 
 // An id that names no task at all must answer exactly like one the caller may not
-// reach. Asserting the status alone proves nothing — the pairing is the point, and
-// the body has to match too, since it is the other half of what a caller reads.
+// reach — for EVERY reason a caller can be refused. Asserting the status alone
+// proves nothing, and neither does one pairing: the three denials are written by
+// three different places (this file's task lookup, HandleRequest's group gate, and
+// enforceActivityActorVisible), so all three have to agree on the body as well.
 //
 // Before this, GetSystemTaskById's gorm.ErrRecordNotFound surfaced as a 500 while a
 // denied task returned 403, so the status code was an existence oracle for arbitrary
-// task ids one layer above the gate that was meant to close it.
+// task ids one layer above the gate that was meant to close it. Closing it with a
+// message of this feature's own then left the same oracle in the BODY, since the
+// group gate writes its own.
 func TestSourceFileEndpointsAnswerAnUnknownTaskIdLikeADeniedOne(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	fixture := seedSourceFileAuthzFixture(t)
@@ -218,30 +222,47 @@ func TestSourceFileEndpointsAnswerAnUnknownTaskIdLikeADeniedOne(t *testing.T) {
 		{"rerun", RerunActivity},
 	} {
 		t.Run(endpoint.name, func(t *testing.T) {
-			deniedWriter, deniedRequest := sourceFileRequest(t, fixture.taskId, fixture.memberA)
-			endpoint.handler(deniedWriter, deniedRequest)
-
-			unknownWriter, unknownRequest := sourceFileRequest(t, unknownTaskId, fixture.memberA)
-			endpoint.handler(unknownWriter, unknownRequest)
-
-			if unknownWriter.Result().StatusCode != deniedWriter.Result().StatusCode {
-				t.Errorf(
-					"unknown id status = %d, denied id status = %d; the two must be indistinguishable",
-					unknownWriter.Result().StatusCode, deniedWriter.Result().StatusCode,
-				)
+			answer := func(taskId uint, userId uint) (int, string) {
+				w, r := sourceFileRequest(t, taskId, userId)
+				endpoint.handler(w, r)
+				return w.Result().StatusCode, w.Body.String()
 			}
 
-			if unknownWriter.Body.String() != deniedWriter.Body.String() {
-				t.Errorf(
-					"unknown id body = %s, denied id body = %s; the two must be indistinguishable",
-					unknownWriter.Body.String(), deniedWriter.Body.String(),
-				)
-			}
+			unknownStatus, unknownBody := answer(unknownTaskId, fixture.memberA)
 
-			// Pinned explicitly, so a regression that makes BOTH answers a 500
-			// cannot pass the comparison above.
-			if deniedWriter.Result().StatusCode != http.StatusForbidden {
-				t.Errorf("status = %d, want 403; body=%s", deniedWriter.Result().StatusCode, deniedWriter.Body.String())
+			// Refused by enforceActivityActorVisible: a member of the group, but
+			// the activity was run by a peer isolation hides from them.
+			hiddenStatus, hiddenBody := answer(fixture.taskId, fixture.memberA)
+			// Refused by HandleRequest's group gate, which writes its own body.
+			outsiderStatus, outsiderBody := answer(fixture.taskId, fixture.outsider)
+
+			for _, denied := range []struct {
+				name   string
+				status int
+				body   string
+			}{
+				{"a hidden peer's activity", hiddenStatus, hiddenBody},
+				{"an activity in a group they are not in", outsiderStatus, outsiderBody},
+			} {
+				if unknownStatus != denied.status {
+					t.Errorf(
+						"unknown id status = %d, %s status = %d; the two must be indistinguishable",
+						unknownStatus, denied.name, denied.status,
+					)
+				}
+
+				if unknownBody != denied.body {
+					t.Errorf(
+						"unknown id body = %s, %s body = %s; the two must be indistinguishable",
+						unknownBody, denied.name, denied.body,
+					)
+				}
+
+				// Pinned explicitly, so a regression that makes BOTH answers a 500
+				// cannot pass the comparisons above.
+				if denied.status != http.StatusForbidden {
+					t.Errorf("%s status = %d, want 403; body=%s", denied.name, denied.status, denied.body)
+				}
 			}
 		})
 	}
