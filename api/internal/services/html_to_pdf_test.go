@@ -181,10 +181,6 @@ func TestHtmlToPdfService_Render_ExternalMode_EmbedsDataImage(t *testing.T) {
 // PDF. (The render's own loopback PAGE server is a different host:port and is the
 // only loopback origin the policy allows.)
 func TestHtmlToPdfService_Render_ExternalMode_BlocksInternalSSRF(t *testing.T) {
-	gs, err := exec.LookPath("gs")
-	if err != nil {
-		t.Skip("ghostscript (gs) not available; skipping PDF text extraction")
-	}
 	t.Setenv("CHROMIUM_ALLOW_EXTERNAL_RESOURCES", "true")
 
 	const secret = "INTERNAL_SSRF_CANARY_5e1f8a"
@@ -209,6 +205,19 @@ func TestHtmlToPdfService_Render_ExternalMode_BlocksInternalSSRF(t *testing.T) {
 
 	pdfBytes := renderOrFatal(t, html)
 
+	// The hits counter is the most direct evidence that the SSRF was blocked and
+	// needs no ghostscript, so assert it BEFORE the gs-gated extraction below —
+	// otherwise this security check would silently never run on a CI runner that
+	// lacks ghostscript.
+	if h := atomic.LoadInt32(&hits); h != 0 {
+		t.Fatalf("SECURITY: internal server was reached %d time(s); SSRF not blocked", h)
+	}
+
+	gs, err := exec.LookPath("gs")
+	if err != nil {
+		t.Skip("ghostscript (gs) not available; skipping PDF text extraction")
+	}
+
 	pdfPath := filepath.Join(t.TempDir(), "out.pdf")
 	if err := os.WriteFile(pdfPath, pdfBytes, 0644); err != nil {
 		t.Fatalf("failed to write pdf: %v", err)
@@ -224,9 +233,6 @@ func TestHtmlToPdfService_Render_ExternalMode_BlocksInternalSSRF(t *testing.T) {
 
 	if strings.Contains(string(extracted), secret) {
 		t.Fatalf("SECURITY: internal response leaked into the PDF: %q", string(extracted))
-	}
-	if h := atomic.LoadInt32(&hits); h != 0 {
-		t.Fatalf("SECURITY: internal server was reached %d time(s); SSRF not blocked", h)
 	}
 }
 
@@ -253,7 +259,17 @@ func TestIsRequestAllowed(t *testing.T) {
 		"loopback IPv6":             {"http://[::1]/", false},
 		"link-local IPv6":           {"http://[fe80::1]/", false},
 		"localhost name":            {"http://localhost:8081/api", false},
+		"localhost trailing dot":    {"http://localhost./", false},
+		"localhost subdomain":       {"http://foo.localhost/", false},
 		"unspecified":               {"http://0.0.0.0/", false},
+		"zero network 0/8":          {"http://0.1.2.3/", false},
+		"cgnat metadata":            {"http://100.100.100.200/latest/meta-data/", false},
+		"cgnat range":               {"http://100.64.0.1/", false},
+		"benchmarking 198.18/15":    {"http://198.18.0.1/", false},
+		"reserved 240/4":            {"http://240.0.0.1/", false},
+		"broadcast":                 {"http://255.255.255.255/", false},
+		"ipv4 multicast":            {"http://224.0.0.1/", false},
+		"nat64":                     {"http://[64:ff9b::7f00:1]/", false},
 		"file scheme":               {"file:///etc/passwd", false},
 		"ftp scheme":                {"ftp://93.184.216.34/x", false},
 		"missing scheme":            {"://bad", false},

@@ -284,7 +284,12 @@ func isRequestAllowed(rawURL string, loopbackAddr string) bool {
 // time; a host that rebinds to an internal IP between this check and chromium's
 // own resolution could still slip through (documented DNS-rebinding residual).
 func hostIsInternal(host string) bool {
-	if host == "" || strings.EqualFold(host, "localhost") {
+	// Normalize case and a trailing FQDN dot before matching. Chromium resolves
+	// "localhost" and every "*.localhost" name to loopback itself without asking
+	// DNS, so those must be refused by name — a resolver that returned a public
+	// address for "foo.localhost" would not change where chromium connects.
+	h := strings.TrimSuffix(strings.ToLower(host), ".")
+	if h == "" || h == "localhost" || strings.HasSuffix(h, ".localhost") {
 		return true
 	}
 	if ip := net.ParseIP(host); ip != nil {
@@ -302,13 +307,48 @@ func hostIsInternal(host string) bool {
 	return false
 }
 
+// extraInternalNets are non-public ranges the stdlib IP predicates below do not
+// cover but chromium can still route to: "this network" (0.0.0.0/8, some of which
+// maps to local services on Linux), CGNAT (100.64.0.0/10 — Alibaba Cloud metadata
+// lives at 100.100.100.200), benchmarking (198.18.0.0/15), reserved + broadcast
+// (240.0.0.0/4, which includes 255.255.255.255) and NAT64 (64:ff9b::/96, which
+// maps onto internal IPv4 on NAT64 networks).
+var extraInternalNets = mustParseCIDRs(
+	"0.0.0.0/8",
+	"100.64.0.0/10",
+	"198.18.0.0/15",
+	"240.0.0.0/4",
+	"64:ff9b::/96",
+)
+
+// mustParseCIDRs parses the given CIDRs at init and panics on a malformed one —
+// they are compile-time constants, so a bad entry is a programmer error.
+func mustParseCIDRs(cidrs ...string) []*net.IPNet {
+	nets := make([]*net.IPNet, 0, len(cidrs))
+	for _, cidr := range cidrs {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic("html_to_pdf: invalid internal CIDR " + cidr + ": " + err.Error())
+		}
+		nets = append(nets, network)
+	}
+	return nets
+}
+
 // ipIsInternal reports whether an IP is one the render must never reach: loopback
 // (127/8, ::1), RFC1918 / IPv6 ULA (via IsPrivate), link-local unicast/multicast
-// (169.254/16 incl. cloud metadata, fe80::/10) or unspecified (0.0.0.0, ::).
+// (169.254/16 incl. cloud metadata, fe80::/10), any multicast, unspecified
+// (0.0.0.0, ::), or one of the extraInternalNets ranges above.
 func ipIsInternal(ip net.IP) bool {
+	for _, network := range extraInternalNets {
+		if network.Contains(ip) {
+			return true
+		}
+	}
 	return ip.IsLoopback() ||
 		ip.IsPrivate() ||
 		ip.IsLinkLocalUnicast() ||
 		ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() ||
 		ip.IsUnspecified()
 }

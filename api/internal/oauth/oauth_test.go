@@ -474,29 +474,44 @@ func TestTokenRefreshGrant(t *testing.T) {
 func TestAuthorizeRejectsDummyUserAndEmptyPassword(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
-	dummy := models.User{Username: "ghost", DisplayName: "Ghost", IsDummyUser: true}
-	if err := repositories.GetDB().Create(&dummy).Error; err != nil {
-		t.Fatalf("failed to create dummy user: %v", err)
+	// Fixtures store real bcrypt hashes, so password verification would SUCCEED
+	// for the submitted password in each case — making the two LoginUser guards
+	// (dummy-user and empty-password) the ONLY thing that can reject the login. A
+	// raw-empty Password would fail bcrypt on its own, and the test would then
+	// pass even with both guards removed.
+	createDummyUserWithPassword(t, "ghost-empty", "") // stored as bcrypt("") — the real dummy exploit condition
+	createDummyUserWithPassword(t, "ghost-any", "anything")
+	createTestUserWithPassword(t, "real-empty", "") // non-dummy user stored as bcrypt("")
+
+	client, err := createClient("Claude", []string{testRedirectUri})
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
 	}
-	createTestUserWithPassword(t, "realuser", "correct-password")
-	client, _ := createClient("Claude", []string{testRedirectUri})
 
 	cases := []struct {
 		name     string
 		username string
 		password string
 	}{
-		{"dummy user with empty password", "ghost", ""},
-		{"dummy user with any password", "ghost", "anything"},
-		{"real user with empty password", "realuser", ""},
+		// bcrypt("") would verify the empty password if the empty-password guard
+		// were removed; the dummy-user guard also covers this case.
+		{"dummy user with empty password", "ghost-empty", ""},
+		// bcrypt("anything") would verify if the dummy-user guard were removed —
+		// isolates that guard.
+		{"dummy user with any password", "ghost-any", "anything"},
+		// A non-dummy user stored as bcrypt("") — isolates the empty-password guard.
+		{"real user with empty password", "real-empty", ""},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			recorder := postAuthorize(t, client, testRedirectUri, tc.username, tc.password, challengeFor("verifier-123"))
 
-			if recorder.Code == http.StatusFound {
-				t.Fatalf("expected NO redirect/code, got 302 to %s", recorder.Header().Get("Location"))
+			// The client is valid, so credential rejection reaches LoginUser, which
+			// makes Authorize re-render the login form with 401. Requiring 401 (not
+			// merely "not 302") ensures the credentials are what caused the rejection.
+			if recorder.Code != http.StatusUnauthorized {
+				t.Fatalf("expected 401 credential rejection, got %d (Location %q)", recorder.Code, recorder.Header().Get("Location"))
 			}
 			if strings.Contains(recorder.Header().Get("Location"), "code=") {
 				t.Fatalf("an authorization code was issued: %s", recorder.Header().Get("Location"))

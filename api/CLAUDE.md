@@ -340,9 +340,14 @@ When working with tests in this codebase, follow these critical requirements:
   internal response was baked into the PDF). Sub-resource requests are therefore
   intercepted via the CDP **Fetch** domain (`isRequestAllowed` in `html_to_pdf.go`)
   and each is allowed or failed by its resolved address: the render's own loopback
-  page and inline `data:` URIs are allowed; loopback/private/link-local/unspecified
-  targets — `127.0.0.1:*`, `169.254.169.254` (cloud metadata), RFC1918, `::1`,
-  `fe80::/10`, `0.0.0.0` — and every non-`http(s)` scheme (incl. `file://`) are
+  page and inline `data:` URIs are allowed; loopback/private/link-local/multicast/
+  unspecified targets — `127.0.0.1:*`, `169.254.169.254` (cloud metadata), RFC1918,
+  `::1`, `fe80::/10`, `0.0.0.0` — plus the non-public ranges the stdlib `net.IP`
+  predicates miss (`ipIsInternal`'s `extraInternalNets`: `0.0.0.0/8`, CGNAT
+  `100.64.0.0/10` incl. Alibaba metadata `100.100.100.200`, benchmarking
+  `198.18.0.0/15`, reserved+broadcast `240.0.0.0/4`, NAT64 `64:ff9b::/96`) and the
+  `localhost` / `*.localhost` names (which chromium resolves to loopback itself,
+  never asking DNS) — and every non-`http(s)` scheme (incl. `file://`) are
   refused. A URL blocklist can't express this (it can neither allow our own
   loopback page while denying other internal hosts, nor catch a hostname that
   resolves to an internal IP). Residual: **DNS rebinding** — the host is resolved
@@ -819,8 +824,12 @@ a role never widens an individually-assigned member.
   `command.GroupId != currentReceipt.GroupId` the handler additionally requires `group.receipts.create`
   on the destination group (403 otherwise) and runs the grant / member-visibility **selection** checks
   against the destination (the group the receipt will live in). Without this a member with update rights
-  in one group could relocate receipts into any group. Tests:
-  `handlers/receipt_group_move_authz_test.go`.
+  in one group could relocate receipts into any group. The **synthetic All group is rejected as a
+  destination** (400) *before* that create-check: a caller's All-group membership carries the default
+  unrestricted role, so its `group.receipts.create` would otherwise satisfy the check and persist the
+  receipt into the cross-group view under a role that sidesteps every real group's grant / visibility
+  controls. Tests: `handlers/receipt_group_move_authz_test.go` (incl.
+  `TestUpdateReceipt_MoveToAllGroupRejected`).
 - **AI prompt:** `ReceiptProcessingService` carries a `UserId` (the user who triggered processing; 0
   for system-initiated, e.g. email polling). When set together with a `Group`,
   `getCategoriesString` / `getTagsString` restrict the candidate categories/tags fed to the model to

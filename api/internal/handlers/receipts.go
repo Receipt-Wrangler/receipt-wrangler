@@ -456,6 +456,22 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			// in) rather than the source.
 			targetGroupId := currentReceipt.GroupId
 			if command.GroupId != currentReceipt.GroupId {
+				// The synthetic "All" group is a cross-group view, not a real
+				// container. A caller's All-group membership carries the default
+				// (unrestricted) role, so its group.receipts.create would satisfy the
+				// destination check below and the receipt would be persisted into the
+				// All group under a role that sidesteps any real group's grant and
+				// member-visibility controls. Reject it up front. A non-existent
+				// destination falls through to the permission check, which denies it.
+				isAllGroup, err := repositories.NewGroupRepository(nil).IsAllGroup(command.GroupId)
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return http.StatusInternalServerError, err
+				}
+				if isAllGroup {
+					utils.WriteCustomErrorResponse(w, "Receipts cannot be moved into the All group", http.StatusBadRequest)
+					return 0, nil
+				}
+
 				canCreateInDestination, err := permissionService.HasGroupPermissions(token.UserId, command.GroupId, permissions.GroupReceiptsCreate)
 				if err != nil {
 					return http.StatusInternalServerError, err

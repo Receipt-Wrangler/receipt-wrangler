@@ -66,8 +66,11 @@ func TestUpdateReceipt_MoveToUnauthorizedGroupDenied(t *testing.T) {
 
 	fullPerms := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate, permissions.GroupReceiptsCreate}
 	userId, sourceGroup := seedGroupWithRole(t, "move-src", fullPerms)
-	// A destination group the attacker is NOT a member of at all.
+	// The caller IS a member of the destination with read + update, but NOT
+	// create. This isolates the required group.receipts.create check: a weaker
+	// implementation that merely checked destination membership would still pass.
 	_, destGroup := seedGroupWithRole(t, "move-dest", fullPerms)
+	addMemberWithRole(t, userId, destGroup, "move-dest-member", []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate})
 
 	receiptId := seedReceipt(t, sourceGroup, userId, 0)
 
@@ -92,8 +95,10 @@ func TestUpdateReceipt_MoveToAuthorizedGroupAllowed(t *testing.T) {
 	fullPerms := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate, permissions.GroupReceiptsCreate}
 	userId, sourceGroup := seedGroupWithRole(t, "move2-src", fullPerms)
 	_, destGroup := seedGroupWithRole(t, "move2-dest", fullPerms)
-	// Give the same user create rights in the destination group.
-	addMemberWithRole(t, userId, destGroup, "move2-dest-member", fullPerms)
+	// Grant create in the destination WITHOUT update: moving a receipt in
+	// requires group.receipts.create, so this proves create (not update) is what
+	// authorizes the move.
+	addMemberWithRole(t, userId, destGroup, "move2-dest-member", []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsCreate})
 
 	receiptId := seedReceipt(t, sourceGroup, userId, 0)
 
@@ -114,8 +119,10 @@ func TestUpdateReceipt_MoveToAuthorizedGroupAllowed(t *testing.T) {
 func TestUpdateReceipt_SameGroupEditUnaffected(t *testing.T) {
 	defer repositories.TruncateTestDb()
 
-	fullPerms := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate, permissions.GroupReceiptsCreate}
-	userId, groupId := seedGroupWithRole(t, "move3-src", fullPerms)
+	// Update WITHOUT create: a same-group edit must not require create, so this
+	// also guards against an accidental create-check being run on every update.
+	editPerms := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate}
+	userId, groupId := seedGroupWithRole(t, "move3-src", editPerms)
 	receiptId := seedReceipt(t, groupId, userId, 0)
 
 	w, r := updateReceiptRequest(receiptId, userId, moveBody(groupId, userId))
@@ -123,5 +130,39 @@ func TestUpdateReceipt_SameGroupEditUnaffected(t *testing.T) {
 
 	if w.Result().StatusCode != http.StatusOK {
 		utils.PrintTestError(t, w.Result().StatusCode, http.StatusOK)
+	}
+}
+
+// A receipt may never be moved into the synthetic "All" group, even by a caller
+// whose All-group membership grants group.receipts.create — the All group is a
+// cross-group view, not a real container. Without the destination All-group
+// guard, that create permission would satisfy the move check and the receipt
+// would be persisted into the All group under an unrestricted role.
+func TestUpdateReceipt_MoveToAllGroupRejected(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	fullPerms := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate, permissions.GroupReceiptsCreate}
+	userId, sourceGroup := seedGroupWithRole(t, "move-allgrp-src", fullPerms)
+
+	// A real All-group row the caller belongs to with create rights — the exact
+	// condition under which the destination create-check would otherwise pass.
+	allGroup := models.Group{Name: "All", IsAllGroup: true}
+	if err := repositories.GetDB().Create(&allGroup).Error; err != nil {
+		t.Fatalf("seed all group: %v", err)
+	}
+	addMemberWithRole(t, userId, allGroup.ID, "move-allgrp-member", fullPerms)
+
+	receiptId := seedReceipt(t, sourceGroup, userId, 0)
+
+	w, r := updateReceiptRequest(receiptId, userId, moveBody(allGroup.ID, userId))
+	UpdateReceipt(w, r)
+
+	if w.Result().StatusCode != http.StatusBadRequest {
+		utils.PrintTestError(t, w.Result().StatusCode, http.StatusBadRequest)
+	}
+	var reloaded models.Receipt
+	repositories.GetDB().Select("group_id").First(&reloaded, receiptId)
+	if reloaded.GroupId != sourceGroup {
+		utils.PrintTestError(t, reloaded.GroupId, sourceGroup)
 	}
 }
