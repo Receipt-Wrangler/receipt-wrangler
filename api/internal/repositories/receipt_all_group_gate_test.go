@@ -38,10 +38,15 @@ func TestGetPagedReceipts_AllGroup_ReadGateDropsUnreadableGroups(t *testing.T) {
 
 	// The caller can read group1 but NOT group2.
 	readable := func(groupId uint) (bool, error) { return groupId == group1.ID, nil }
+	// The read gate and category/tag resolver must be supplied together; this
+	// test carries no category/tag filter, so the resolver is never invoked.
+	catTagVis := func(uint) (CategoryTagVisibility, error) {
+		return CategoryTagVisibility{CategoryUnrestricted: true, TagUnrestricted: true}, nil
+	}
 
 	repository := NewReceiptRepository(nil)
 	receipts, count, err := repository.GetPagedReceiptsByGroupId(
-		member.ID, utils.UintToString(allGroup.ID), pagedRequestAllReceipts(), nil, nil, nil, readable, nil,
+		member.ID, utils.UintToString(allGroup.ID), pagedRequestAllReceipts(), nil, nil, nil, readable, catTagVis,
 	)
 	if err != nil {
 		utils.PrintTestError(t, err, nil)
@@ -139,5 +144,52 @@ func TestGetPagedReceipts_AllGroup_CategoryFilterIsPerGroup(t *testing.T) {
 	}
 	if count != 2 {
 		utils.PrintTestError(t, count, 2)
+	}
+}
+
+// The All-group read gate and the per-group category/tag resolver must be passed
+// together: supplying only one silently reopens a cross-group leak (a read gate
+// without the category/tag resolver lets a category/tag filter fall through to
+// the flat, group-unscoped subquery; the reverse expands the read set), so
+// GetPagedReceiptsByGroupId fails closed on a mismatch. Passing neither is the
+// single-group shape and stays allowed.
+func TestGetPagedReceipts_AllGroup_RequiresBothResolvers(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+
+	allGroup := models.Group{Name: "pair-all", IsAllGroup: true}
+	db.Create(&allGroup)
+
+	member := models.User{Username: "pair-member", Password: "x"}
+	db.Create(&member)
+
+	repository := NewReceiptRepository(nil)
+	readable := func(uint) (bool, error) { return true, nil }
+	catTagVis := func(uint) (CategoryTagVisibility, error) {
+		return CategoryTagVisibility{CategoryUnrestricted: true, TagUnrestricted: true}, nil
+	}
+
+	call := func(r GroupReadableResolver, c CategoryTagVisibilityResolver) error {
+		_, _, err := repository.GetPagedReceiptsByGroupId(
+			member.ID, utils.UintToString(allGroup.ID), pagedRequestAllReceipts(), nil, nil, nil, r, c,
+		)
+		return err
+	}
+
+	// Read gate without the category/tag resolver -> error (the leak this guards).
+	if err := call(readable, nil); err == nil {
+		utils.PrintTestError(t, nil, "expected error when only the readable resolver is supplied")
+	}
+	// Category/tag resolver without the read gate -> error.
+	if err := call(nil, catTagVis); err == nil {
+		utils.PrintTestError(t, nil, "expected error when only the category/tag resolver is supplied")
+	}
+	// Both supplied -> no guard error.
+	if err := call(readable, catTagVis); err != nil {
+		utils.PrintTestError(t, err, "no error when both resolvers are supplied")
+	}
+	// Neither supplied -> allowed (guard only fires on a mismatch).
+	if err := call(nil, nil); err != nil {
+		utils.PrintTestError(t, err, "no error when neither resolver is supplied")
 	}
 }

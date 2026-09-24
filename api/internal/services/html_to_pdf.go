@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+	"net"
+	"net/http"
 	"time"
 
 	"github.com/chromedp/cdproto/network"
@@ -50,12 +53,15 @@ func NewHtmlToPdfService(tx *gorm.DB) HtmlToPdfService {
 }
 
 // Render converts the given HTML to a PDF using a fresh headless Chromium
-// process. The HTML is injected into an about:blank page via
-// Page.setDocumentContent (NOT navigated to as a file://), so the document has
-// no local-file origin and cannot read files off disk. Network and file://
-// resource loads are blocked by default for security; inline data: URIs remain
-// allowed. Set CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true to permit remote loads if
-// you need logos or product imagery from URLs.
+// process. Network and file:// resource loads are blocked by default for
+// security; inline data: URIs remain allowed. In the default mode the HTML is
+// injected into an about:blank page via Page.setDocumentContent, so the document
+// has no local-file origin and cannot read files off disk. Set
+// CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true to permit remote loads (logos / product
+// imagery): the HTML is then served from an ephemeral loopback HTTP server and
+// navigated to, giving it a real http origin so remote sub-resources load, while
+// file:// stays blocked (an about:blank document never fetches network
+// sub-resources, so remote images only load via this navigated origin).
 func (service HtmlToPdfService) Render(html string) ([]byte, commands.UpsertSystemTaskCommand, error) {
 	startTime := time.Now()
 	systemTaskCommand := commands.UpsertSystemTaskCommand{
@@ -97,48 +103,64 @@ func (service HtmlToPdfService) Render(html string) ([]byte, commands.UpsertSyst
 	defer cancelTimeout()
 
 	var pdfBuf []byte
-	actions := []chromedp.Action{}
-	// Default behavior is to block external network resources AND file:// loads:
-	// receipt emails contain attacker-controllable URLs and we run chromium with
-	// --no-sandbox, so disallowing these removes an SSRF / tracking-pixel surface
-	// and (with the about:blank injection below) a local-file-read surface. Opt
-	// back into network loads via CHROMIUM_ALLOW_EXTERNAL_RESOURCES; file:// stays
-	// blocked regardless since nothing legitimate needs it.
+	printAction := chromedp.ActionFunc(func(ctx context.Context) error {
+		buf, _, err := page.PrintToPDF().WithPrintBackground(true).Do(ctx)
+		if err != nil {
+			return err
+		}
+		pdfBuf = buf
+		return nil
+	})
+
+	var actions []chromedp.Action
 	if env.GetChromiumAllowExternalResources() {
-		actions = append(actions,
+		// External resources are opt-in (remote logos / product imagery). Serve
+		// the HTML from an ephemeral loopback HTTP server and navigate to it so
+		// the document has a real http origin — an about:blank document filled via
+		// Page.setDocumentContent never fetches http(s) sub-resources at all, so
+		// remote images only load via a navigated origin. Only file:// is blocked
+		// (nothing legitimate needs it); it is also cross-origin to the http page,
+		// so this does not reopen the local-file read. chromedp.Navigate waits for
+		// the load event, so remote images finish loading before PrintToPDF.
+		server, addr, serveErr := startLoopbackHtmlServer(html)
+		if serveErr != nil {
+			endTime := time.Now()
+			systemTaskCommand.Status = models.SYSTEM_TASK_FAILED
+			systemTaskCommand.EndedAt = &endTime
+			systemTaskCommand.ResultDescription = serveErr.Error()
+			return nil, systemTaskCommand, serveErr
+		}
+		defer server.Close()
+
+		actions = []chromedp.Action{
 			network.Enable(),
 			network.SetBlockedURLs([]string{"file://*"}),
-		)
+			chromedp.Navigate("http://" + addr + "/"),
+			printAction,
+		}
 	} else {
-		actions = append(actions,
+		// Default: block external network resources AND file:// loads. Receipt
+		// emails contain attacker-controllable URLs and we run chromium with
+		// --no-sandbox, so disallowing these removes an SSRF / tracking-pixel
+		// surface. The HTML is injected into an about:blank page instead of a
+		// file:// URL, so it has no local-file origin — <iframe src="file:///...">/
+		// <img> cannot exfiltrate local files into the PDF, and the multi-MB
+		// data-URL truncation cap is avoided. Inline data: URIs remain allowed and
+		// load synchronously, so no explicit load wait is needed before printing.
+		actions = []chromedp.Action{
 			network.Enable(),
 			network.SetBlockedURLs(blockedExternalUrlPatterns),
-		)
+			chromedp.Navigate("about:blank"),
+			chromedp.ActionFunc(func(ctx context.Context) error {
+				frameTree, err := page.GetFrameTree().Do(ctx)
+				if err != nil {
+					return err
+				}
+				return page.SetDocumentContent(frameTree.Frame.ID, html).Do(ctx)
+			}),
+			printAction,
+		}
 	}
-	actions = append(actions,
-		// Inject the HTML into a blank page instead of navigating to a file://
-		// URL. This avoids both the data-URL length cap (chromium silently
-		// truncates multi-MB data: URLs, which large receipt emails can exceed)
-		// AND a local-file origin — an about:blank document cannot read file://
-		// sub-resources, so <iframe src="file:///...">/<img> can't exfiltrate
-		// local files into the PDF.
-		chromedp.Navigate("about:blank"),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			frameTree, err := page.GetFrameTree().Do(ctx)
-			if err != nil {
-				return err
-			}
-			if err := page.SetDocumentContent(frameTree.Frame.ID, html).Do(ctx); err != nil {
-				return err
-			}
-			buf, _, err := page.PrintToPDF().WithPrintBackground(true).Do(ctx)
-			if err != nil {
-				return err
-			}
-			pdfBuf = buf
-			return nil
-		}),
-	)
 	err := chromedp.Run(timeoutCtx, actions...)
 
 	endTime := time.Now()
@@ -162,4 +184,32 @@ func (service HtmlToPdfService) Render(html string) ([]byte, commands.UpsertSyst
 	systemTaskCommand.ResultDescription = "rendered " + elapsed.String()
 	logging.LogStd(logging.LOG_LEVEL_INFO, "HTML to PDF render took: ", elapsed)
 	return pdfBuf, systemTaskCommand, nil
+}
+
+// startLoopbackHtmlServer serves html at "/" on a random loopback port so the
+// renderer can navigate to it with a real http origin (required for remote
+// sub-resources to load; an about:blank document set via Page.setDocumentContent
+// never fetches them). Used only when external resources are enabled. The
+// listener is bound to 127.0.0.1 and the caller closes the returned server as
+// soon as the render finishes; only "/" is served (any other path 404s).
+func startLoopbackHtmlServer(html string) (*http.Server, string, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, "", err
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, html)
+	})
+
+	server := &http.Server{Handler: mux}
+	go func() { _ = server.Serve(listener) }()
+
+	return server, listener.Addr().String(), nil
 }

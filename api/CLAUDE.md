@@ -300,19 +300,29 @@ When working with tests in this codebase, follow these critical requirements:
 - External network resource loads (remote images, CSS, fonts) are
   **blocked by default** to remove an SSRF / tracking-pixel surface. To
   permit remote loads (useful when receipts depend on remote logos or
-  product imagery), set `CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true`
-- **`file://` loads are ALWAYS blocked**, and the HTML is injected into an
-  `about:blank` page via `page.SetDocumentContent` rather than being written to a
-  temp file and navigated to as `file://<path>`. The email body is
-  attacker-controlled, so a `file://` document origin let it read local files
-  (other groups' receipt images under `data/`, logs, `/etc/passwd`) into the PDF
-  via `<iframe src="file:///…">`/`<img>` — even with JavaScript disabled.
-  `about:blank` has no local-file origin, so those sub-resources are
-  cross-origin-blocked; `file://*` is also on the network blocklist as defense in
-  depth (and stays blocked even when `CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true`).
-  Inline `data:` URIs still load (`SetDocumentContent` also sidesteps the
-  data-URL length cap that motivated the old temp-file approach). Regression:
-  `TestHtmlToPdfService_Render_BlocksLocalFileRead`.
+  product imagery), set `CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true`. Because an
+  `about:blank` document (see below) never fetches network sub-resources at all,
+  the external mode instead serves the HTML from an **ephemeral loopback HTTP
+  server** (`127.0.0.1:0`, one per render, `defer`-closed right after) and
+  navigates to it, giving the document a real `http` origin so remote images
+  actually load; `chromedp.Navigate` waits for the load event, so slow remote
+  images finish before printing. Regression:
+  `TestHtmlToPdfService_Render_WaitsForSlowImage`.
+- **`file://` loads are ALWAYS blocked, in BOTH modes.** In the default mode the
+  HTML is injected into an `about:blank` page via `page.SetDocumentContent` rather
+  than being written to a temp file and navigated to as `file://<path>`. The email
+  body is attacker-controlled, so a `file://` document origin let it read local
+  files (other groups' receipt images under `data/`, logs, `/etc/passwd`) into the
+  PDF via `<iframe src="file:///…">`/`<img>` — even with JavaScript disabled.
+  `about:blank` (and the loopback `http` origin used in external mode) has no
+  local-file origin, so those sub-resources are cross-origin-blocked; `file://*`
+  is also on the network blocklist as defense in depth (and stays blocked even
+  when `CHROMIUM_ALLOW_EXTERNAL_RESOURCES=true`). Inline `data:` URIs still load
+  (`SetDocumentContent` also sidesteps the data-URL length cap that motivated the
+  old temp-file approach) and decode synchronously, so the default path needs no
+  explicit load wait. Regressions:
+  `TestHtmlToPdfService_Render_BlocksLocalFileRead` and
+  `TestHtmlToPdfService_Render_ExternalMode_BlocksLocalFileRead`.
 - Implementation: `internal/services/html_to_pdf.go` (HtmlToPdfService.Render)
 - The rendered PDF is saved on the receipt as a `FileData` and routed
   through the existing `repositories.ConvertPdfToJpg` pipeline so vision and
@@ -807,8 +817,12 @@ Because paid-by hides the **whole** receipt (not just fields), enforcement diffe
   role denies it. `GetPagedReceiptsByGroupId` now takes a `GroupReadableResolver`
   (`PermissionService.GroupPermissionResolver(userId, perm)`, cache-backed) and, for the All view,
   drops any group where the caller lacks the permission its **direct** single-group path requires
-  (`group.receipts.read` for list/export/summary/report; `group.widgets.read` for the pie chart) —
-  before the `group_id IN` scope, the paid-by disjunction, and the count. The same per-group read
+  (`group.receipts.read` for list/export/summary, `group.reports.read` for reports, `group.widgets.read`
+  for the pie chart) — before the `group_id IN` scope, the paid-by disjunction, and the count. The
+  `GroupReadableResolver` and `CategoryTagVisibilityResolver` must be passed together for the All view
+  (`GetPagedReceiptsByGroupId` fails closed if only one is supplied) — the read gate without the
+  category/tag resolver would let a category/tag filter fall through to the flat, group-unscoped subquery.
+  The same per-group read
   filter is applied in `SearchReceiptsForUser` (search is gated on `app.receipts.search`, which does
   not grant per-group read) and in `GetAmountOwedForUser`'s All aggregation. It also carries a
   `CategoryTagVisibilityResolver`: for the All view the category/tag **filter** is applied as a

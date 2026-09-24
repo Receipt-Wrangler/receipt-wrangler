@@ -607,6 +607,19 @@ func (repository ReceiptRepository) GetPagedReceiptsByGroupId(
 		return nil, 0, err
 	}
 
+	// The All-group read gate and the per-group category/tag narrowing must move
+	// as a pair: readableResolver drops groups the caller can't read, and
+	// categoryTagResolver scopes the category/tag filter per group. Supplying
+	// only one silently reopens a cross-group leak — a readable resolver without
+	// the category/tag one lets a category/tag filter fall through to
+	// BuildGormFilterQuery's flat, group-unscoped subquery (matching restricted
+	// ids across groups), and the reverse expands the read set to groups the
+	// caller can't read. Fail closed and loud so a half-wired caller trips here
+	// instead of leaking. Single-group reads pass neither (both nil is allowed).
+	if isAllGroup && (readableResolver == nil) != (categoryTagResolver == nil) {
+		return nil, 0, errors.New("all-group read requires both readable and category/tag resolvers")
+	}
+
 	// For the All-group view, apply the per-group category/tag FILTER as a
 	// disjunction below instead of the flat, group-unscoped subquery
 	// BuildGormFilterQuery emits — otherwise a caller could filter by a category
