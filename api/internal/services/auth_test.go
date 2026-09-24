@@ -809,3 +809,122 @@ func TestGetAppData_NoRolePermissionsEmpty(t *testing.T) {
 		}
 	}
 }
+
+// LoginUser must reject a dummy (passwordless placeholder) account regardless of
+// the submitted password, and must reject an empty password for any account.
+// This is the centralized guard that closes the OAuth/MCP authorize bypass
+// (dummy users could previously authenticate there with an empty password).
+func TestLoginUserRejectsDummyUser(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+
+	userRepository := repositories.NewUserRepository(nil)
+	_, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username:    "ghost",
+		DisplayName: "Ghost",
+		IsDummyUser: true,
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	// Empty password (the exact exploit) must be rejected.
+	if _, _, err := LoginUser(commands.LoginCommand{Username: "ghost", Password: ""}); err == nil {
+		utils.PrintTestError(t, nil, "login error for dummy user with empty password")
+	}
+
+	// A non-empty password against a dummy user must also be rejected (the
+	// account can never authenticate), and must not fall through to bcrypt.
+	if _, _, err := LoginUser(commands.LoginCommand{Username: "ghost", Password: "anything"}); err == nil {
+		utils.PrintTestError(t, nil, "login error for dummy user with any password")
+	}
+}
+
+func TestLoginUserRejectsEmptyPassword(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+
+	userRepository := repositories.NewUserRepository(nil)
+	_, err := userRepository.CreateUser(commands.SignUpCommand{
+		Username:    "realuser",
+		Password:    "Password",
+		DisplayName: "Real User",
+	})
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	if _, _, err := LoginUser(commands.LoginCommand{Username: "realuser", Password: ""}); err == nil {
+		utils.PrintTestError(t, nil, "login error for empty password")
+	}
+
+	// Sanity: the real password still works.
+	if _, _, err := LoginUser(commands.LoginCommand{Username: "realuser", Password: "Password"}); err != nil {
+		utils.PrintTestError(t, err, "successful login with correct password")
+	}
+}
+
+// The synthetic "All" group's catalog in AppData must be the UNION of the
+// caller's per-real-group visible categories — never the full global pool. A
+// category the caller is grant-restricted from in their only real group must not
+// appear under the All-group key. Regression guard for the All-group catalog leak.
+func TestGetAppData_AllGroupCatalogIsUnionOfRealGroups(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	ClearRolePermissionCacheForTests()
+	ClearGroupRoleGrantCacheForTests()
+
+	db := repositories.GetDB()
+	roleRepository := repositories.NewRoleRepository(nil)
+
+	allowedCategory := models.Category{Name: "AllGroup-Allowed"}
+	hiddenCategory := models.Category{Name: "AllGroup-Hidden"}
+	db.Create(&allowedCategory)
+	db.Create(&hiddenCategory)
+
+	// App role without app.categories.read, so no global-pool bypass.
+	appRole, err := roleRepository.CreateAppRole("AllGroup Union User Role", "", []string{permissions.AppCategoriesCreate}, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	user := models.User{Username: "allgroup-union-user", Password: "password", AppRoleID: &appRole.ID}
+	if err := db.Create(&user).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	// Real group where the user is restricted to allowedCategory only.
+	groupRole, err := roleRepository.CreateGroupRole("AllGroup Union Restricted Role", "", []string{permissions.GroupReceiptsRead}, []uint{allowedCategory.ID}, nil, nil, false, false)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	realGroup := models.Group{Name: "allgroup-union-real"}
+	if err := db.Create(&realGroup).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if err := db.Create(&models.GroupMember{GroupID: realGroup.ID, UserID: user.ID, GroupRoleID: &groupRole.ID}).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	// The user's own unrestricted "All" group.
+	allGroup := models.Group{Name: "allgroup-union-all", IsAllGroup: true}
+	if err := db.Create(&allGroup).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+	if err := db.Create(&models.GroupMember{GroupID: allGroup.ID, UserID: user.ID, GroupRoleID: &groupRole.ID}).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	appData, err := GetAppData(user.ID, nil)
+	if err != nil {
+		utils.PrintTestError(t, err, nil)
+	}
+
+	allCatalog := appData.GroupCategories[allGroup.ID]
+	if len(allCatalog) != 1 || allCatalog[0].ID != allowedCategory.ID {
+		utils.PrintTestError(t, allCatalog, []uint{allowedCategory.ID})
+	}
+	for _, category := range allCatalog {
+		if category.ID == hiddenCategory.ID {
+			utils.PrintTestError(t, "hidden category leaked into All-group catalog", "no hidden category")
+		}
+	}
+}

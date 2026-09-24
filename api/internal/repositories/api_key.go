@@ -43,7 +43,12 @@ func (repository ApiKeyRepository) GetPagedApiKeys(command commands.PagedApiKeyR
 		return nil, 0, errors.New("invalid column")
 	}
 
-	if command.ApiKeyFilter.AssociatedApiKeys == commands.ASSOCIATED_API_KEYS_MINE {
+	// Only the explicit ALL filter (already gated on app.api-keys.read-any in the
+	// handler) lists every user's keys; ANY other value — including one that
+	// slipped past command validation — is scoped to the caller's own keys. This
+	// fail-closed default stops a bogus filter value from leaking other users'
+	// keys.
+	if command.ApiKeyFilter.AssociatedApiKeys != commands.ASSOCIATED_API_KEYS_ALL {
 		query = query.Where("user_id = ?", userId)
 	}
 

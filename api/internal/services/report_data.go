@@ -3,6 +3,7 @@ package services
 import (
 	"gorm.io/gorm"
 	"receipt-wrangler/api/internal/commands"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/reporting"
 	"receipt-wrangler/api/internal/reporting/receiptsource"
 	"receipt-wrangler/api/internal/repositories"
@@ -91,6 +92,8 @@ func (service ReportDataService) Rows(userId uint, groupId string, filter comman
 		[]string{"PaidByUser", "Group", "CustomFields"},
 		permissionService.PaidByListResolver(userId),
 		nil,
+		permissionService.GroupPermissionResolver(userId, permissions.GroupReportsRead),
+		permissionService.CategoryTagVisibilityResolver(userId),
 	)
 	if err != nil {
 		return reporting.FieldCatalog{}, nil, err

@@ -31,8 +31,14 @@ func (command *PagedApiKeyRequestCommand) LoadDataFromRequest(w http.ResponseWri
 func (command *PagedApiKeyRequestCommand) Validate(r *http.Request) structs.ValidatorError {
 	vErrs := command.PagedRequestCommand.Validate()
 
-	if command.ApiKeyFilter.AssociatedApiKeys == "" {
-		vErrs.Errors["associatedApiKeys"] = "Associated API keys is required"
+	// Reject anything that is not exactly MINE or ALL. Same fail-open reasoning
+	// as PagedGroupRequestCommand: only ALL is permission-gated in the handler
+	// and only MINE is scoped to the caller in the repository, so any other
+	// value (empty or bogus) would leak every user's API keys. The repository
+	// also defaults unknown values to MINE scoping as defense in depth.
+	if command.ApiKeyFilter.AssociatedApiKeys != ASSOCIATED_API_KEYS_MINE &&
+		command.ApiKeyFilter.AssociatedApiKeys != ASSOCIATED_API_KEYS_ALL {
+		vErrs.Errors["associatedApiKeys"] = "Associated API keys must be MINE or ALL"
 	}
 
 	return vErrs

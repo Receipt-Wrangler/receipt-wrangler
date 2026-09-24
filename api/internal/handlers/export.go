@@ -58,6 +58,8 @@ func ExportAllReceiptsFromGroup(w http.ResponseWriter, r *http.Request) {
 					// The export honours the table's sort, which may be the
 					// Comment column.
 					permissionService.CommentAuthorVisibilityResolver(token.UserId),
+					permissionService.GroupPermissionResolver(token.UserId, permissions.GroupReceiptsRead),
+					permissionService.CategoryTagVisibilityResolver(token.UserId),
 				)
 			if err != nil {
 				return http.StatusInternalServerError, err

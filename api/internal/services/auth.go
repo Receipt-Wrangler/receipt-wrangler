@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -111,9 +112,25 @@ func LoginUser(loginAttempt commands.LoginCommand) (models.User, bool, error) {
 	firstAdminToLogin := false
 	var dbUser models.User
 
+	// Reject empty passwords before any lookup. Dummy/placeholder accounts are
+	// stored as bcrypt("") and would otherwise verify against an empty password,
+	// and no legitimate login uses an empty password. Centralizing this (and the
+	// dummy-user guard below) here means every caller is protected — the REST
+	// login handler AND the OAuth/MCP authorize form — rather than relying on
+	// each caller to re-check. (REST additionally rejects this at the middleware.)
+	if len(loginAttempt.Password) == 0 {
+		return models.User{}, false, errors.New("password is required")
+	}
+
 	err := db.Model(models.User{}).Where("username = ?", loginAttempt.Username).First(&dbUser).Error
 	if err != nil {
 		return models.User{}, false, err
+	}
+
+	// Dummy (passwordless placeholder) users can never authenticate, regardless
+	// of the submitted password.
+	if dbUser.IsDummyUser {
+		return models.User{}, false, errors.New("dummy users cannot log in")
 	}
 
 	err = utils.VerifyPassword(dbUser.Password, loginAttempt.Password)
@@ -207,6 +224,7 @@ func generateTokenPair(userId uint, audience string, refreshLifetime time.Durati
 		Displayname:        user.DisplayName,
 		UserId:             user.ID,
 		Username:           user.Username,
+		TokenType:          structs.TokenTypeAccess,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    jwtIssuer,
 			Audience:  []string{audience},
@@ -231,6 +249,7 @@ func generateTokenPair(userId uint, audience string, refreshLifetime time.Durati
 		Displayname:        user.DisplayName,
 		UserId:             user.ID,
 		Username:           user.Username,
+		TokenType:          structs.TokenTypeRefresh,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    jwtIssuer,
 			Audience:  []string{audience},
@@ -326,12 +345,25 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 	groupPermissions := make(map[uint][]string, len(groups))
 	groupCategories := make(map[uint][]models.Category, len(groups))
 	groupTags := make(map[uint][]models.Tag, len(groups))
+	// The synthetic "All" group is a real membership where the caller holds an
+	// unrestricted role, so resolving its catalog directly would return the whole
+	// global pool and leak category/tag names the caller cannot see in any real
+	// group. Instead its catalog is the UNION of the caller's per-real-group
+	// visible sets, computed after the loop.
+	var allGroupIds []uint
+	unionCategoryIds := map[uint]struct{}{}
+	unionTagIds := map[uint]struct{}{}
 	for _, group := range groups {
 		perms, err := permissionService.GetGroupPermissionsForUser(userId, group.ID)
 		if err != nil {
 			return appData, err
 		}
 		groupPermissions[group.ID] = perms
+
+		if group.IsAllGroup {
+			allGroupIds = append(allGroupIds, group.ID)
+			continue
+		}
 
 		// Per-group category/tag catalog filtered to the caller's grants
 		// (full pool when unrestricted). This is how non-admins receive
@@ -341,12 +373,40 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 			return appData, err
 		}
 		groupCategories[group.ID] = visibleCategories
+		for _, category := range visibleCategories {
+			unionCategoryIds[category.ID] = struct{}{}
+		}
 
 		visibleTags, err := permissionService.GetVisibleTagsForUser(userId, group.ID, tags)
 		if err != nil {
 			return appData, err
 		}
 		groupTags[group.ID] = visibleTags
+		for _, tag := range visibleTags {
+			unionTagIds[tag.ID] = struct{}{}
+		}
+	}
+
+	// Materialize the All-group catalog from the union, preserving the global
+	// ordering of categories/tags (which still hold the full pool here; the flat
+	// lists are truncated for non-admins below).
+	if len(allGroupIds) > 0 {
+		unionCategories := make([]models.Category, 0, len(unionCategoryIds))
+		for _, category := range categories {
+			if _, ok := unionCategoryIds[category.ID]; ok {
+				unionCategories = append(unionCategories, category)
+			}
+		}
+		unionTags := make([]models.Tag, 0, len(unionTagIds))
+		for _, tag := range tags {
+			if _, ok := unionTagIds[tag.ID]; ok {
+				unionTags = append(unionTags, tag)
+			}
+		}
+		for _, allGroupId := range allGroupIds {
+			groupCategories[allGroupId] = unionCategories
+			groupTags[allGroupId] = unionTags
+		}
 	}
 
 	// The flat global category/tag lists are only for callers who may read the

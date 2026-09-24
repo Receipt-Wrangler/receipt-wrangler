@@ -8,11 +8,29 @@ import (
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"strings"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v2"
+	"github.com/auth0/go-jwt-middleware/v2/validator"
 )
+
+// isRefreshToken reports whether the validated JWT claims belong to a refresh
+// token (which must never be accepted as an API access credential). A shape it
+// does not recognize is treated as NOT a refresh token, leaving the normal
+// downstream validation in charge.
+func isRefreshToken(validated interface{}) bool {
+	validatedClaims, ok := validated.(*validator.ValidatedClaims)
+	if !ok {
+		return false
+	}
+	claims, ok := validatedClaims.CustomClaims.(*structs.Claims)
+	if !ok {
+		return false
+	}
+	return claims.IsRefreshToken()
+}
 
 func UnifiedAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +69,17 @@ func UnifiedAuthMiddleware(next http.Handler) http.Handler {
 			claims, err := validateJwt(jwt)
 			if err != nil {
 				logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
+				utils.WriteCustomErrorResponse(w, unauthorized, http.StatusForbidden)
+				return
+			}
+
+			// A refresh token is signed with the same key/issuer/audience as an
+			// access token, so it validates here — but it must NOT be usable as an
+			// API access credential. Reject it explicitly. (Legacy access tokens,
+			// which carry no type and no jti, are still accepted; see
+			// structs.Claims.IsRefreshToken.)
+			if isRefreshToken(claims) {
+				logging.LogStd(logging.LOG_LEVEL_ERROR, "refresh token presented as an access token")
 				utils.WriteCustomErrorResponse(w, unauthorized, http.StatusForbidden)
 				return
 			}

@@ -37,3 +37,21 @@ func StringToInt(v string) (int, error) {
 
 	return result, nil
 }
+
+// FilterValueToUint coerces a JSON-decoded filter id (numbers decode to float64)
+// to uint. Shared by the receipt grant filter (services) and the per-group
+// category/tag filter disjunction (repositories), which cannot import services.
+func FilterValueToUint(value interface{}) (uint, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return uint(typed), true
+	case int:
+		return uint(typed), true
+	case int64:
+		return uint(typed), true
+	case uint:
+		return typed, true
+	default:
+		return 0, false
+	}
+}

@@ -2424,3 +2424,54 @@ func TestUpdateApiKey_MultipleKeys(t *testing.T) {
 		utils.PrintTestError(t, unchangedKey3.Name, "User 2 Key A")
 	}
 }
+
+// A filter value that is neither ALL nor MINE must fail closed to the caller's
+// own keys, never leak other users'. Defense in depth behind command validation
+// (regression guard for the fail-open filter bug).
+func TestGetPagedApiKeys_UnknownFilterFailsClosedToOwnKeys(t *testing.T) {
+	defer TruncateTestDb()
+
+	owner := uint(1)
+	other := uint(2)
+	repository := NewApiKeyRepository(nil)
+
+	for _, k := range []models.ApiKey{
+		{ID: "own-1", UserID: &owner, CreatedBy: &owner, Name: "own-1", Prefix: "key", Hmac: "h1", Version: 1, Scope: "r"},
+		{ID: "other-1", UserID: &other, CreatedBy: &other, Name: "other-1", Prefix: "key", Hmac: "h2", Version: 1, Scope: "r"},
+	} {
+		if _, err := repository.CreateApiKey(k); err != nil {
+			utils.PrintTestError(t, err, "no error")
+			return
+		}
+	}
+
+	buildCommand := func(filter commands.AssociatedApiKeys) commands.PagedApiKeyRequestCommand {
+		command := commands.PagedApiKeyRequestCommand{}
+		command.Page = 1
+		command.PageSize = 100
+		command.OrderBy = "name"
+		command.SortDirection = commands.ASCENDING
+		command.ApiKeyFilter.AssociatedApiKeys = filter
+		return command
+	}
+
+	// A bogus value must behave like MINE, not ALL.
+	results, count, err := repository.GetPagedApiKeys(buildCommand("x"), utils.UintToString(owner))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if count != 1 || len(results) != 1 || results[0].ID != "own-1" {
+		utils.PrintTestError(t, results, "only the caller's own key (own-1)")
+	}
+
+	// ALL still returns everything (permission is enforced at the handler).
+	all, allCount, err := repository.GetPagedApiKeys(buildCommand(commands.ASSOCIATED_API_KEYS_ALL), utils.UintToString(owner))
+	if err != nil {
+		utils.PrintTestError(t, err, "no error")
+		return
+	}
+	if allCount != 2 || len(all) != 2 {
+		utils.PrintTestError(t, all, "both keys for the ALL filter")
+	}
+}

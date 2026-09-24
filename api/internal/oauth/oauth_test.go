@@ -466,3 +466,47 @@ func TestTokenRefreshGrant(t *testing.T) {
 		t.Errorf("expected 400 when reusing a refresh token, got %d", replay.Code)
 	}
 }
+
+// A dummy (passwordless placeholder) user must not be able to obtain an
+// authorization code through the OAuth login form, and an empty password must be
+// rejected — mirroring the REST login. Regression guard for the OAuth/MCP
+// dummy-user + empty-password bypass.
+func TestAuthorizeRejectsDummyUserAndEmptyPassword(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	dummy := models.User{Username: "ghost", DisplayName: "Ghost", IsDummyUser: true}
+	if err := repositories.GetDB().Create(&dummy).Error; err != nil {
+		t.Fatalf("failed to create dummy user: %v", err)
+	}
+	createTestUserWithPassword(t, "realuser", "correct-password")
+	client, _ := createClient("Claude", []string{testRedirectUri})
+
+	cases := []struct {
+		name     string
+		username string
+		password string
+	}{
+		{"dummy user with empty password", "ghost", ""},
+		{"dummy user with any password", "ghost", "anything"},
+		{"real user with empty password", "realuser", ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := postAuthorize(t, client, testRedirectUri, tc.username, tc.password, challengeFor("verifier-123"))
+
+			if recorder.Code == http.StatusFound {
+				t.Fatalf("expected NO redirect/code, got 302 to %s", recorder.Header().Get("Location"))
+			}
+			if strings.Contains(recorder.Header().Get("Location"), "code=") {
+				t.Fatalf("an authorization code was issued: %s", recorder.Header().Get("Location"))
+			}
+
+			var codeCount int64
+			repositories.GetDB().Model(&models.OAuthAuthorizationCode{}).Count(&codeCount)
+			if codeCount != 0 {
+				t.Fatalf("expected no authorization code persisted, found %d", codeCount)
+			}
+		})
+	}
+}

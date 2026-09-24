@@ -71,6 +71,8 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 				associations,
 				permissionService.PaidByListResolver(token.UserId),
 				permissionService.CommentAuthorVisibilityResolver(token.UserId),
+				permissionService.GroupPermissionResolver(token.UserId, permissions.GroupReceiptsRead),
+				permissionService.CategoryTagVisibilityResolver(token.UserId),
 			)
 			if err != nil {
 				return http.StatusInternalServerError, err
@@ -442,7 +444,30 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
-			allowed, denyMessage, err := enforceReceiptGrantSelection(token.UserId, currentReceipt.GroupId, command)
+			// A receipt's group may be changed on update (both clients support
+			// moving a receipt between groups). HandleRequest only verified
+			// group.receipts.update on the receipt's CURRENT group, so a move must
+			// be authorized against the DESTINATION group here — otherwise a member
+			// with update rights in one group could relocate receipts into any
+			// group they cannot write to. Moving a receipt into a group is
+			// effectively creating it there, so it requires group.receipts.create
+			// in the destination; the category/tag/payer selection is then
+			// validated against the destination (the group the receipt will live
+			// in) rather than the source.
+			targetGroupId := currentReceipt.GroupId
+			if command.GroupId != currentReceipt.GroupId {
+				canCreateInDestination, err := permissionService.HasGroupPermissions(token.UserId, command.GroupId, permissions.GroupReceiptsCreate)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				if !canCreateInDestination {
+					utils.WriteCustomErrorResponse(w, "User is unauthorized to move a receipt into the destination group", http.StatusForbidden)
+					return 0, nil
+				}
+				targetGroupId = command.GroupId
+			}
+
+			allowed, denyMessage, err := enforceReceiptGrantSelection(token.UserId, targetGroupId, command)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -453,7 +478,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 
 			// An isolated member may not plant a payer or charged-to user outside
 			// their member-visible set for the group.
-			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, currentReceipt.GroupId, command)
+			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, targetGroupId, command)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

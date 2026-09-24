@@ -247,6 +247,8 @@ func (service ReceiptSummaryService) fetchReceipts(
 		associations,
 		permissionService.PaidByListResolver(userId),
 		nil,
+		permissionService.GroupPermissionResolver(userId, permissions.GroupReceiptsRead),
+		permissionService.CategoryTagVisibilityResolver(userId),
 	)
 	if err != nil {
 		return nil, err

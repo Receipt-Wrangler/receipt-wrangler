@@ -35,6 +35,16 @@ func ValidateRefreshToken(next http.Handler) http.Handler {
 			return
 		}
 
+		// Only a refresh token may be exchanged here. An access token validates
+		// against the same key, so reject it explicitly (defense in depth on top
+		// of the refresh_tokens table lookup in RevokeRefreshToken, which an access
+		// token would also fail).
+		if !isRefreshToken(refreshToken) {
+			utils.WriteCustomErrorResponse(w, errMessage, http.StatusInternalServerError)
+			logging.LogStd(logging.LOG_LEVEL_ERROR, "non-refresh token presented to the token refresh endpoint")
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), "refreshToken", refreshToken)
 		ctx = context.WithValue(ctx, "refreshTokenString", refreshTokenString)
 		next.ServeHTTP(w, r.WithContext(ctx))

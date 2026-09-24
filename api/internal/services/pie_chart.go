@@ -4,6 +4,7 @@ import (
 	"gorm.io/gorm"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
@@ -59,6 +60,8 @@ func (service PieChartService) GetPieChartData(
 		[]string{"Categories", "Tags"},
 		permissionService.PaidByListResolver(userId),
 		nil,
+		permissionService.GroupPermissionResolver(userId, permissions.GroupWidgetsRead),
+		permissionService.CategoryTagVisibilityResolver(userId),
 	)
 	if err != nil {
 		return structs.PieChartData{}, err
