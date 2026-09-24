@@ -1027,7 +1027,7 @@ divider-only-with-`headerText`, turned back off, and the stale-generation guard)
 `feature-config.state.spec.ts`, `auth-form.component.spec.ts` and `about.component.spec.ts` (each
 pinning that its page wires the shared component up), and `system-settings-form.component.spec.ts`.
 
-## Session lifetime settings (Hours/Days selector over an hours-based API)
+## Duration settings (Hours/Days selector over an hours-based API)
 
 The System Settings form exposes two configurable refresh-token lifetimes (see `api/CLAUDE.md` →
 "Session lifetime"): a **Session** `app-form-section` with **"Stay signed in for"**
@@ -1048,12 +1048,33 @@ the 24h default for the `0`/null the API sends when the setting is unset — so 
 `Number(null)` and `Number("")` are both `0`, so an emptied number field would otherwise submit a
 zero-length lifetime.
 
-**The max tracks the selected unit** (720 hours === 30 days). `listenForDurationUnitChanges(value,
-unit)` — one parameterised method called twice — re-applies
-`[Validators.required, durationValueValidator(maxForUnit(...))]` whenever the unit flips, the same
-shape as `urlValidators()` above (`setValidators` replaces the whole list, so `required` must be
-re-supplied each time rather than declared in `initForm`). All four controls are also added to the
-**view-mode disable block**, or they stay editable on the read-only page.
+**The bounds track the selected unit** (720 hours === 30 days).
+`listenForDurationUnitChanges(value, unit, maxHours, minHours = 1)` — one parameterised method called
+once per setting — re-applies
+`[Validators.required, durationValueValidator(maxForUnit(...), minForUnit(...))]` whenever the unit
+flips, the same shape as `urlValidators()` above (`setValidators` replaces the whole list, so
+`required` must be re-supplied each time rather than declared in `initForm`). Every control is also
+added to the **view-mode disable block**, or it stays editable on the read-only page.
+
+**A third consumer: `tempFileRetentionHours`** — a "Temporary Files" section holding **"Keep failed
+uploads for"** (how long a failed upload's image is kept so the user can rerun, preview or download
+it; see `api/CLAUDE.md` → "Temporary file retention & cleanup"). Three things it does differently, all
+of them traps:
+
+- **Its bounds are its own** — 24 to 8760 hours. `MAX_TOKEN_LIFETIME_HOURS` is the *token* cap; reusing
+  it would cap a year-long retention at 30 days. Hence the bounds became parameters of
+  `listenForDurationUnitChanges`, which previously hardcoded that constant *inside* the method (only
+  the control names were parameters), so both existing call sites had to be updated.
+- **Seed it as `splitHours(settings?.tempFileRetentionHours || 720)`.** `splitHours` falls back to
+  `DEFAULT_DURATION_HOURS` (24) for the `0`/null the API sends when unset, which would render this
+  setting as "1 Days" instead of its real 30-day default.
+- **A floor converts with `minForUnit`, never `maxForUnit`.** `maxForUnit` floors, which turns a
+  1-hour minimum into **0 days** and admits a zero-length duration; `minForUnit` rounds up and never
+  yields zero. `durationValueValidator` gained an optional `min` for this, so the 24-hour floor is a
+  field-level message rather than a bare server 400.
+
+The spec's `.duration-row` count assertion is now **3**, and both exact `toEqual` assertions (on
+`form.value` and on the `updateSystemSettings` payload) carry the new control pair.
 
 **E2E:** `e2e/session-lifetime.spec.ts` (serial, admin `storageState`; the setting is **global**, so
 `afterAll` re-reads live settings and restores only the captured field). It is the only test that
@@ -1072,6 +1093,47 @@ cookie expiry lands in the configured window while the `jwt` cookie stays inside
   explanation. This validator emits its message as the error *value*, which takes that component's
   `typeof value === "string"` path and renders verbatim. Reach for the same trick for any new
   validator whose error key is not in that map.
+
+## Activity source file (preview / download)
+
+A failed quick scan or email upload keeps its image, so the user can retrieve it and enter the receipt
+by hand — the endpoints and the retention window are in `api/CLAUDE.md` → "Activity source files".
+
+- **Two places render it.** The dashboard **activity widget**'s `itemMetaTemplate`
+  (`activity-source-file-preview` / `-download`, beside the existing rerun button), and an **opt-in
+  column** on the shared `app-task-table` behind `[showSourceFileActions]="true"` — only the System
+  Settings → System Tasks page passes it, so the component's other host is unchanged. The column id
+  goes into `displayedColumns` **before** the `"expand"` push (`expand` stays last, and `mat-table`
+  throws on a displayed id with no matching `columns` entry).
+- **Both gate on `item.hasSourceFile` and the group permission**, and the server decides the flag —
+  on the app-scoped tasks table it is resolved per caller, so a button never appears where the
+  endpoint would 403.
+- **Gate on `item.groupId`, NOT the widget's `groupId()`.** The activity widget's rerun button had
+  this wrong: on the "All" dashboard `groupId()` is the synthetic aggregate, which never appears in
+  `AuthState.groupPermissions`, so every control silently vanished for activities the user was
+  entitled to act on. Mobile fixed it long ago and documents the reasoning at
+  `group_activity_list_item.dart`; desktop never did. Rerun was fixed in the same change, and
+  `activity.component.spec.ts` pins it by setting the two ids to different values.
+- **`SourceFileViewerDialogComponent`** (`shared-ui/source-file-viewer-dialog/`) wraps
+  `app-image-viewer` in `app-dialog`, opened with `DEFAULT_DIALOG_CONFIG` — shaped on
+  `DescriptionViewerDialogComponent`, and declared **and** exported in `SharedUiModule`.
+- **The download is observed as a `response`, not a body.** The original file name is only on
+  `Content-Disposition` and an activity row does not carry it, so
+  `filenameFromContentDisposition` (`src/utils/file.ts`) reads it back before handing off to the
+  shared `downloadFile`.
+
+**E2E:** `e2e/failed-activity-source-file.spec.ts` (serial, admin storageState). It is the only test
+that proves the image actually survived in `temp/` through a failure and that the asynq payload still
+resolves to it. Making a quick scan fail is the whole trick: the spec points the **global** AI
+provider at an unreachable host rather than assuming the backend has none configured, which is what
+makes it work against the shared demo backend as well as a local database. It therefore mutates
+global state, runs serially, restores what it found, and leans on the `e2e-shared-backend` job-level
+concurrency group. It asserts the preview converts, the download is **byte-identical** to the
+uploaded fixture, a non-member 403s on both endpoints, and the tasks table renders the controls.
+
+`e2e/temp-file-retention.spec.ts` covers the setting's own round trip (days in, hours stored, days
+rendered back) and the 24-hour floor. **Do not try to e2e the sweeper** — the 24-hour minimum
+retention makes it unobservable; its coverage is the Go table tests.
 
 ## Signals & Zoneless Change Detection
 

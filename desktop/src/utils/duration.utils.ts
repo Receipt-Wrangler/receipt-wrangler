@@ -58,3 +58,20 @@ export function toHours(value: number | string | null | undefined, unit: Duratio
 export function maxForUnit(maxHours: number, unit: DurationUnit): number {
   return unit === "DAYS" ? Math.floor(maxHours / HOURS_PER_DAY) : maxHours;
 }
+
+/**
+ * The lower bound expressed in the given unit.
+ *
+ * A minimum rounds **up** where a maximum rounds down — both so the converted
+ * bound stays inside the real one. Passing a floor through `maxForUnit` instead
+ * turns a 1-hour minimum into 0 days, which then admits a zero-length duration.
+ * The result never drops below 1: these settings are all positive whole numbers,
+ * and 0 is the wire's "unset" sentinel rather than something a user types.
+ */
+export function minForUnit(minHours: number, unit: DurationUnit): number {
+  if (unit !== "DAYS") {
+    return Math.max(1, minHours);
+  }
+
+  return Math.max(1, Math.ceil(minHours / HOURS_PER_DAY));
+}

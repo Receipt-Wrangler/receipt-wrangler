@@ -33,8 +33,26 @@ part 'system_task.g.dart';
 /// * [resultDescription] 
 /// * [apiKeyId] 
 /// * [childSystemTasks] 
+/// * [hasSourceFile] - Whether the upload behind this task is still on disk AND the caller may reach it. Resolved per caller, since this listing is app-scoped and spans groups the caller may not belong to.
 @BuiltValue()
 abstract class SystemTask implements BaseModel, Built<SystemTask, SystemTaskBuilder> {
+  /// Whether the upload behind this task is still on disk AND the caller may reach it. Resolved per caller, since this listing is app-scoped and spans groups the caller may not belong to.
+  @BuiltValueField(wireName: r'hasSourceFile')
+  bool? get hasSourceFile;
+
+  @BuiltValueField(wireName: r'groupId')
+  int? get groupId;
+
+  @BuiltValueField(wireName: r'startedAt')
+  String? get startedAt;
+
+  @BuiltValueField(wireName: r'apiKeyId')
+  String? get apiKeyId;
+
+  @BuiltValueField(wireName: r'type')
+  SystemTaskType? get type;
+  // enum typeEnum {  OCR_PROCESSING,  CHAT_COMPLETION,  MAGIC_FILL,  QUICK_SCAN,  EMAIL_READ,  EMAIL_UPLOAD,  SYSTEM_EMAIL_CONNECTIVITY_CHECK,  RECEIPT_PROCESSING_SETTINGS_CONNECTIVITY_CHECK,  RECEIPT_UPLOADED,  RECEIPT_UPDATED,  PROMPT_GENERATED,  API_KEY_DELETED,  HTML_TO_PDF,  };
+
   @BuiltValueField(wireName: r'associatedEntityId')
   int? get associatedEntityId;
 
@@ -45,24 +63,11 @@ abstract class SystemTask implements BaseModel, Built<SystemTask, SystemTaskBuil
   AssociatedEntityType? get associatedEntityType;
   // enum associatedEntityTypeEnum {  NOOP_ENTITY_TYPE,  RECEIPT,  SYSTEM_EMAIL,  RECEIPT_PROCESSING_SETTINGS,  PROMPT,  API_KEY,  };
 
-  @BuiltValueField(wireName: r'groupId')
-  int? get groupId;
-
   @BuiltValueField(wireName: r'childSystemTasks')
   BuiltList<SystemTask>? get childSystemTasks;
 
-  @BuiltValueField(wireName: r'startedAt')
-  String? get startedAt;
-
-  @BuiltValueField(wireName: r'apiKeyId')
-  String? get apiKeyId;
-
   @BuiltValueField(wireName: r'resultDescription')
   String? get resultDescription;
-
-  @BuiltValueField(wireName: r'type')
-  SystemTaskType? get type;
-  // enum typeEnum {  OCR_PROCESSING,  CHAT_COMPLETION,  MAGIC_FILL,  QUICK_SCAN,  EMAIL_READ,  EMAIL_UPLOAD,  SYSTEM_EMAIL_CONNECTIVITY_CHECK,  RECEIPT_PROCESSING_SETTINGS_CONNECTIVITY_CHECK,  RECEIPT_UPLOADED,  RECEIPT_UPDATED,  PROMPT_GENERATED,  API_KEY_DELETED,  HTML_TO_PDF,  };
 
   @BuiltValueField(wireName: r'receiptId')
   int? get receiptId;
@@ -100,6 +105,13 @@ class _$SystemTaskSerializer implements PrimitiveSerializer<SystemTask> {
     SystemTask object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
+    if (object.hasSourceFile != null) {
+      yield r'hasSourceFile';
+      yield serializers.serialize(
+        object.hasSourceFile,
+        specifiedType: const FullType(bool),
+      );
+    }
     if (object.groupId != null) {
       yield r'groupId';
       yield serializers.serialize(
@@ -238,6 +250,13 @@ class _$SystemTaskSerializer implements PrimitiveSerializer<SystemTask> {
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
+        case r'hasSourceFile':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.hasSourceFile = valueDes;
+          break;
         case r'groupId':
           final valueDes = serializers.deserialize(
             value,

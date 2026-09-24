@@ -14,6 +14,8 @@ class _$SystemSettings extends SystemSettings {
   @override
   final int? pdfDpi;
   @override
+  final int? tempFileRetentionHours;
+  @override
   final String? currencyDisplay;
   @override
   final bool? showLoginQr;
@@ -65,6 +67,7 @@ class _$SystemSettings extends SystemSettings {
       {this.mcpEnabled,
       this.currencyThousandthsSeparator,
       this.pdfDpi,
+      this.tempFileRetentionHours,
       this.currencyDisplay,
       this.showLoginQr,
       this.currencyHideDecimalPlaces,
@@ -102,6 +105,7 @@ class _$SystemSettings extends SystemSettings {
         mcpEnabled == other.mcpEnabled &&
         currencyThousandthsSeparator == other.currencyThousandthsSeparator &&
         pdfDpi == other.pdfDpi &&
+        tempFileRetentionHours == other.tempFileRetentionHours &&
         currencyDisplay == other.currencyDisplay &&
         showLoginQr == other.showLoginQr &&
         currencyHideDecimalPlaces == other.currencyHideDecimalPlaces &&
@@ -133,6 +137,7 @@ class _$SystemSettings extends SystemSettings {
     _$hash = $jc(_$hash, mcpEnabled.hashCode);
     _$hash = $jc(_$hash, currencyThousandthsSeparator.hashCode);
     _$hash = $jc(_$hash, pdfDpi.hashCode);
+    _$hash = $jc(_$hash, tempFileRetentionHours.hashCode);
     _$hash = $jc(_$hash, currencyDisplay.hashCode);
     _$hash = $jc(_$hash, showLoginQr.hashCode);
     _$hash = $jc(_$hash, currencyHideDecimalPlaces.hashCode);
@@ -165,6 +170,7 @@ class _$SystemSettings extends SystemSettings {
           ..add('mcpEnabled', mcpEnabled)
           ..add('currencyThousandthsSeparator', currencyThousandthsSeparator)
           ..add('pdfDpi', pdfDpi)
+          ..add('tempFileRetentionHours', tempFileRetentionHours)
           ..add('currencyDisplay', currencyDisplay)
           ..add('showLoginQr', showLoginQr)
           ..add('currencyHideDecimalPlaces', currencyHideDecimalPlaces)
@@ -212,6 +218,11 @@ class SystemSettingsBuilder
   int? _pdfDpi;
   int? get pdfDpi => _$this._pdfDpi;
   set pdfDpi(covariant int? pdfDpi) => _$this._pdfDpi = pdfDpi;
+
+  int? _tempFileRetentionHours;
+  int? get tempFileRetentionHours => _$this._tempFileRetentionHours;
+  set tempFileRetentionHours(covariant int? tempFileRetentionHours) =>
+      _$this._tempFileRetentionHours = tempFileRetentionHours;
 
   String? _currencyDisplay;
   String? get currencyDisplay => _$this._currencyDisplay;
@@ -338,6 +349,7 @@ class SystemSettingsBuilder
       _mcpEnabled = $v.mcpEnabled;
       _currencyThousandthsSeparator = $v.currencyThousandthsSeparator;
       _pdfDpi = $v.pdfDpi;
+      _tempFileRetentionHours = $v.tempFileRetentionHours;
       _currencyDisplay = $v.currencyDisplay;
       _showLoginQr = $v.showLoginQr;
       _currencyHideDecimalPlaces = $v.currencyHideDecimalPlaces;
@@ -387,6 +399,7 @@ class SystemSettingsBuilder
             mcpEnabled: mcpEnabled,
             currencyThousandthsSeparator: currencyThousandthsSeparator,
             pdfDpi: pdfDpi,
+            tempFileRetentionHours: tempFileRetentionHours,
             currencyDisplay: currencyDisplay,
             showLoginQr: showLoginQr,
             currencyHideDecimalPlaces: currencyHideDecimalPlaces,

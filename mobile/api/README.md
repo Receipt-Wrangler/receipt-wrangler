@@ -164,8 +164,10 @@ Class | Method | HTTP request | Description
 [*SystemSettingsApi*](doc/SystemSettingsApi.md) | [**getSystemSettings**](doc/SystemSettingsApi.md#getsystemsettings) | **GET** /systemSettings | Get system settings
 [*SystemSettingsApi*](doc/SystemSettingsApi.md) | [**restartTaskServer**](doc/SystemSettingsApi.md#restarttaskserver) | **POST** /systemSettings/restartTaskServer | Restart task server
 [*SystemSettingsApi*](doc/SystemSettingsApi.md) | [**updateSystemSettings**](doc/SystemSettingsApi.md#updatesystemsettings) | **PUT** /systemSettings | Update system settings
+[*SystemTaskApi*](doc/SystemTaskApi.md) | [**downloadSystemTaskSourceFile**](doc/SystemTaskApi.md#downloadsystemtasksourcefile) | **GET** /systemTask/{id}/sourceFile/download | Download an activity&#39;s source file
 [*SystemTaskApi*](doc/SystemTaskApi.md) | [**getPagedActivities**](doc/SystemTaskApi.md#getpagedactivities) | **POST** /systemTask/getPagedActivities | Gets paged activities
 [*SystemTaskApi*](doc/SystemTaskApi.md) | [**getPagedSystemTasks**](doc/SystemTaskApi.md#getpagedsystemtasks) | **POST** /systemTask/getPagedSystemTasks | Gets paged system tasks
+[*SystemTaskApi*](doc/SystemTaskApi.md) | [**getSystemTaskSourceFile**](doc/SystemTaskApi.md#getsystemtasksourcefile) | **GET** /systemTask/{id}/sourceFile | Get an activity&#39;s source file
 [*SystemTaskApi*](doc/SystemTaskApi.md) | [**rerunActivity**](doc/SystemTaskApi.md#rerunactivity) | **POST** /systemTask/rerunActivity/{id} | Attempts to rerun activity
 [*TagApi*](doc/TagApi.md) | [**createTag**](doc/TagApi.md#createtag) | **POST** /tag/ | Create tag
 [*TagApi*](doc/TagApi.md) | [**deleteTag**](doc/TagApi.md#deletetag) | **DELETE** /tag/{tagId} | Delete tag
@@ -292,6 +294,7 @@ Class | Method | HTTP request | Description
  - [SystemSettings](doc/SystemSettings.md)
  - [SystemTask](doc/SystemTask.md)
  - [SystemTaskPagedRequestFilter](doc/SystemTaskPagedRequestFilter.md)
+ - [SystemTaskSourceFileView](doc/SystemTaskSourceFileView.md)
  - [SystemTaskStatus](doc/SystemTaskStatus.md)
  - [SystemTaskType](doc/SystemTaskType.md)
  - [Tag](doc/Tag.md)

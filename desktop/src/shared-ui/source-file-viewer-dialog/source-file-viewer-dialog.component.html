@@ -1,0 +1,10 @@
+<app-dialog [headerText]="data.name || 'Source file'">
+  <app-image-viewer [imageBase64]="data.encodedImage"></app-image-viewer>
+  <div class="d-flex justify-content-end mt-3">
+    <app-button
+      buttonText="Close"
+      matButtonType="basic"
+      (clicked)="close()"
+    ></app-button>
+  </div>
+</app-dialog>

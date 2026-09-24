@@ -131,6 +131,7 @@ model/systemEmail.ts
 model/systemSettings.ts
 model/systemTask.ts
 model/systemTaskPagedRequestFilter.ts
+model/systemTaskSourceFileView.ts
 model/systemTaskStatus.ts
 model/systemTaskType.ts
 model/tag.ts

@@ -1,6 +1,13 @@
-import { Component, OnInit, ViewEncapsulation, computed, input, signal } from "@angular/core";
+import { Component, OnInit, ViewEncapsulation, computed, inject, input, signal } from "@angular/core";
+import { MatDialog } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
+import { DEFAULT_DIALOG_CONFIG } from "../../constants/dialog.constant";
+import {
+  SourceFileViewerDialogComponent,
+  SourceFileViewerDialogData
+} from "../../shared-ui/source-file-viewer-dialog/source-file-viewer-dialog.component";
+import { downloadFile, filenameFromContentDisposition } from "../../utils/file";
 import {
   Activity,
   Group,
@@ -43,6 +50,8 @@ export class ActivityComponent implements OnInit {
 
   protected readonly Permission = Permission;
 
+  private readonly dialog = inject(MatDialog);
+
   constructor(
     private systemTaskService: SystemTaskService,
     private snackbarService: SnackbarService,
@@ -66,6 +75,38 @@ export class ActivityComponent implements OnInit {
         tap(() => {
           this.snackbarService.success("Activity has been successfully queued.");
           this.ranActivities.update(prev => ({ ...prev, [id]: true }));
+        })
+      ).subscribe();
+  }
+
+  public onPreviewButtonClick(id: number): void {
+    this.systemTaskService
+      .getSystemTaskSourceFile(id)
+      .pipe(
+        take(1),
+        tap((sourceFile) => {
+          const data: SourceFileViewerDialogData = {
+            encodedImage: sourceFile.encodedImage,
+            name: sourceFile.name
+          };
+          this.dialog.open(SourceFileViewerDialogComponent, { ...DEFAULT_DIALOG_CONFIG, data });
+        })
+      ).subscribe();
+  }
+
+  public onDownloadButtonClick(id: number): void {
+    // Observed as a response rather than a body: the original file name is only
+    // on Content-Disposition, and an activity row does not carry it.
+    this.systemTaskService
+      .downloadSystemTaskSourceFile(id, "response")
+      .pipe(
+        take(1),
+        tap((response) => {
+          if (!response.body) {
+            return;
+          }
+
+          downloadFile(response.body, filenameFromContentDisposition(response.headers.get("Content-Disposition")));
         })
       ).subscribe();
   }

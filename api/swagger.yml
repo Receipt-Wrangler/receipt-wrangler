@@ -2741,6 +2741,75 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /systemTask/{id}/sourceFile:
+    get:
+      tags:
+        - SystemTask
+      summary: Get an activity's source file
+      description: >-
+        Returns the upload behind a quick scan or email upload activity, converted for display, so
+        a user can see what a failed activity was working from.
+      operationId: getSystemTaskSourceFile
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the system task
+      responses:
+        200:
+          description: The activity's source file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemTaskSourceFileView"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: The source file is no longer available
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /systemTask/{id}/sourceFile/download:
+    get:
+      tags:
+        - SystemTask
+      summary: Download an activity's source file
+      description: >-
+        Returns the upload behind a quick scan or email upload activity verbatim, so a user can
+        enter a failed receipt by hand.
+      operationId: downloadSystemTaskSourceFile
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the system task
+      responses:
+        200:
+          description: The activity's source file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: The source file is no longer available
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /prompt/:
     post:
       tags:
@@ -3923,6 +3992,7 @@ components:
         - "email_polling"
         - "email_receipt_processing"
         - "email_receipt_image_cleanup"
+        - "system_clean_up"
     ExportFormat:
       type: string
       enum:
@@ -3966,6 +4036,12 @@ components:
           format: uint64
         canBeRestarted:
           type: boolean
+        hasSourceFile:
+          type: boolean
+          description: >-
+            Whether the upload behind this activity is still on disk, so it can be previewed or
+            downloaded. False once the temp-file retention window has passed, or for an activity
+            that never had an upload.
     BaseModel:
       type: object
       required:
@@ -6059,6 +6135,13 @@ components:
                 chosen for human convenience does not extend third-party client tokens.
                 1-720 (30 days); 0 means unset and falls back to the default.
               default: 24
+            tempFileRetentionHours:
+              type: integer
+              description: >-
+                How long a file in temp/ is kept once nothing can still act on it, i.e. how long a
+                user has to rerun, preview or download the source image of a failed upload.
+                24-8760 (1 year); 0 means unset and falls back to the default.
+              default: 720
     UpsertSystemSettingsCommand:
       type: object
       required:
@@ -6138,6 +6221,14 @@ components:
             entirely to leave the currently configured value unchanged.
           minimum: 0
           maximum: 720
+        tempFileRetentionHours:
+          type: integer
+          description: >-
+            How long a temp file is kept once nothing can still act on it, in hours. Accepted values
+            are 24-8760 (1 year), or 0 meaning unset, which falls back to the default of 720 (30
+            days). Omit the key entirely to leave the currently configured value unchanged.
+          minimum: 0
+          maximum: 8760
     CheckEmailConnectivityCommand:
       type: object
       properties:
@@ -6191,6 +6282,24 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/SystemTask"
+            hasSourceFile:
+              type: boolean
+              description: >-
+                Whether the upload behind this task is still on disk AND the caller may reach it.
+                Resolved per caller, since this listing is app-scoped and spans groups the caller
+                may not belong to.
+    SystemTaskSourceFileView:
+      type: object
+      required:
+        - name
+        - encodedImage
+      properties:
+        name:
+          type: string
+          description: The upload's original file name
+        encodedImage:
+          type: string
+          description: Base64 encoded image, converted for display
     GetSystemTaskCommand:
       allOf:
         - $ref: "#/components/schemas/PagedRequestCommand"

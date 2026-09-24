@@ -144,6 +144,28 @@ func (service PermissionService) GetVisibleUserIdsForUserInGroup(viewerId uint, 
 	return visible, false, nil
 }
 
+// UserVisibleInGroup reports whether viewerId may see targetId within groupId, for
+// member-presence isolation. It is the single-row form of the set returned by
+// GetVisibleUserIdsForUserInGroup: unrestricted short-circuits to true, and the set always
+// contains the viewer, so a user is always visible to themselves.
+//
+// It exists because this exact closure was being re-inlined per call site (the comment
+// notification fan-out in handlers/comments.go, and again in its test) while the only
+// in-package equivalent, groupVisibilityResolver.isVisible, is unexported and memoized for
+// batch use. A per-request gate on one row wants neither the batch machinery nor a
+// hand-copied closure it can drift from.
+func (service PermissionService) UserVisibleInGroup(viewerId uint, targetId uint, groupId uint) (bool, error) {
+	visible, unrestricted, err := service.GetVisibleUserIdsForUserInGroup(viewerId, groupId)
+	if err != nil {
+		return false, err
+	}
+	if unrestricted {
+		return true, nil
+	}
+
+	return isUserVisible(targetId, viewerId, visible), nil
+}
+
 // ActivityVisibilityResolver returns the injected resolver the system-task repository uses
 // to filter activities by member isolation IN SQL: for a group it reports the ran-by user
 // ids the caller may see, or unrestricted == true (see every actor). Mirrors

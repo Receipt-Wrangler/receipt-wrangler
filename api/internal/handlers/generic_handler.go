@@ -10,6 +10,13 @@ import (
 	"receipt-wrangler/api/internal/utils"
 )
 
+// unauthorizedEntityMessage is the body EVERY authorization denial writes. A
+// handler that denies for a reason of its own -- a row it could not load, an
+// actor the caller may not see -- has to reuse this exact text, or the wording
+// tells the caller which check refused and so whether the entity exists. See
+// activityAccessDeniedMessage in system_task.go for the current instance.
+const unauthorizedEntityMessage = "User is unauthorized to access entity"
+
 func HandleRequest(handler structs.Handler) {
 	if len(handler.ResponseType) > 0 {
 		handler.Writer.Header().Set("Content-Type", handler.ResponseType)
@@ -26,7 +33,7 @@ func HandleRequest(handler structs.Handler) {
 		err := db.Model(models.Receipt{}).Where("id = ?", handler.ReceiptId).Select("group_id", "paid_by_user_id").First(&receipt).Error
 		if err != nil {
 			logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-			utils.WriteCustomErrorResponse(handler.Writer, "User is unauthorized to access entity", http.StatusForbidden)
+			utils.WriteCustomErrorResponse(handler.Writer, unauthorizedEntityMessage, http.StatusForbidden)
 			return
 		}
 
@@ -40,7 +47,7 @@ func HandleRequest(handler structs.Handler) {
 		err := db.Model(models.Receipt{}).Where("id IN (?)", handler.ReceiptIds).Select("group_id", "paid_by_user_id").Find(&receipts).Error
 		if err != nil {
 			logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
-			utils.WriteCustomErrorResponse(handler.Writer, "User is unauthorized to access entity", http.StatusForbidden)
+			utils.WriteCustomErrorResponse(handler.Writer, unauthorizedEntityMessage, http.StatusForbidden)
 			return
 		}
 
@@ -164,6 +171,6 @@ func denyUnauthorized(handler structs.Handler, err error) bool {
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
 	}
-	utils.WriteCustomErrorResponse(handler.Writer, "User is unauthorized to access entity", http.StatusForbidden)
+	utils.WriteCustomErrorResponse(handler.Writer, unauthorizedEntityMessage, http.StatusForbidden)
 	return false
 }

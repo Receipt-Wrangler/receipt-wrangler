@@ -127,6 +127,29 @@ func (repository FileRepository) GetBytesFromImageBytes(imageData []byte) ([]byt
 	return bytes, nil
 }
 
+// BuildDisplayImageString turns raw file bytes into a data URI a browser can
+// render in an <img>: a PDF rasterizes, HEIC transcodes, anything else passes
+// through.
+//
+// Every browser-facing image response goes through this. Calling
+// BuildEncodedImageString on unconverted bytes is the trap it closes — GetFileType
+// relabels a PDF as image/jpeg WITHOUT converting it, so the result is a
+// well-formed data URI carrying bytes the browser cannot decode: a broken image
+// with no error anywhere.
+//
+// Reading the bytes stays the caller's job, because that half is a trust boundary
+// and legitimately differs — data/ goes through the containment-checked
+// utils.ReadDataFile, temp/ through os.ReadFile plus AssertWithinTempDirectory,
+// and a multipart upload has no path at all. This half is identical everywhere.
+func (repository FileRepository) BuildDisplayImageString(raw []byte) (string, error) {
+	converted, err := repository.GetBytesFromImageBytes(raw)
+	if err != nil {
+		return "", err
+	}
+
+	return repository.BuildEncodedImageString(converted)
+}
+
 func (repository FileRepository) IsImage(imageData []byte) (bool, error) {
 	validatedFileType, err := repository.ValidateFileType(imageData)
 	if err != nil {
@@ -461,6 +484,18 @@ func (repository FileRepository) ZipFiles(filenames []string, fileContents [][]b
 
 func (repository FileRepository) GetTempDirectoryPath() string {
 	return filepath.Join(config.GetBasePath(), "temp")
+}
+
+// AssertWithinTempDirectory returns an error when path resolves outside temp/.
+//
+// temp/ is deliberately exempt from the data-scoped helpers (see api/CLAUDE.md →
+// "Filesystem Access & Path-Traversal Safety"): those resolve against data/ and
+// would reject every temp path. That exemption holds for paths the server builds
+// itself, but a temp path read back out of an asynq payload is attacker-adjacent
+// — the payload is JSON in Redis — so anything sourced from one must come
+// through here before it is opened or served.
+func (repository FileRepository) AssertWithinTempDirectory(path string) error {
+	return utils.AssertWithinDir(repository.GetTempDirectoryPath(), path)
 }
 
 func (repository FileRepository) GetTestJpgBytes() ([]byte, error) {
