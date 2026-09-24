@@ -33,31 +33,72 @@
 </ng-template>
 
 <ng-template let-element="element" #resultDescriptionCell>
-  <div class="d-flex align-items-center gap-2">
-    <div class="description-preview">
-      <ng-container
-        *ngIf="element.type === SystemTaskType.EmailRead"
-      >
-        Captured Metadata:
-      </ng-container>
-      <ng-container
-        *ngIf="element.type === SystemTaskType.EmailUpload || element.type === SystemTaskType.QuickScan"
-      >
-        Receipt data from AI:
-      </ng-container>
-      <app-pretty-json
-        [json]="element.resultDescription"
-        [verticalJson]="false"
-      ></app-pretty-json>
+  @let receiptUpdate = receiptUpdates().get(element.id);
+  @if (receiptUpdate) {
+    <div class="d-flex align-items-center gap-2">
+      <div class="description-preview" data-testid="receipt-update-summary">
+        {{
+          receiptUpdate.changedKeys.length
+            ? "Changed: " + receiptUpdate.changedKeys.join(", ")
+            : "No changes"
+        }}
+      </div>
+      <app-button
+        data-testid="receipt-update-diff-open"
+        icon="open_in_new"
+        matButtonType="iconButton"
+        tooltip="View changes"
+        (clicked)="openReceiptUpdateDialog(receiptUpdate.snapshots)"
+      ></app-button>
     </div>
-    <app-button
-      *ngIf="(element.resultDescription?.length || 0) > descriptionInlineMaxLength"
-      icon="open_in_new"
-      matButtonType="iconButton"
-      tooltip="View full description"
-      (clicked)="openDescriptionDialog(element)"
-    ></app-button>
-  </div>
+  } @else {
+    <div class="d-flex align-items-center gap-2">
+      <div class="description-preview">
+        <ng-container
+          *ngIf="element.type === SystemTaskType.EmailRead"
+        >
+          Captured Metadata:
+        </ng-container>
+        <ng-container
+          *ngIf="element.type === SystemTaskType.EmailUpload || element.type === SystemTaskType.QuickScan"
+        >
+          Receipt data from AI:
+        </ng-container>
+        <app-pretty-json
+          [json]="element.resultDescription"
+          [verticalJson]="false"
+        ></app-pretty-json>
+      </div>
+      <app-button
+        *ngIf="(element.resultDescription?.length || 0) > descriptionInlineMaxLength"
+        icon="open_in_new"
+        matButtonType="iconButton"
+        tooltip="View full description"
+        (clicked)="openDescriptionDialog(element)"
+      ></app-button>
+    </div>
+  }
 </ng-template>
 
 
+
+<ng-template let-element="element" #sourceFileCell>
+  @if (element.hasSourceFile) {
+    <div class="d-flex align-items-center gap-1">
+      <app-button
+        icon="visibility"
+        matButtonType="iconButton"
+        tooltip="Preview source file"
+        data-testid="system-task-source-file-preview"
+        (clicked)="openSourceFileDialog(element)"
+      ></app-button>
+      <app-button
+        icon="download"
+        matButtonType="iconButton"
+        tooltip="Download source file"
+        data-testid="system-task-source-file-download"
+        (clicked)="downloadSourceFile(element)"
+      ></app-button>
+    </div>
+  }
+</ng-template>

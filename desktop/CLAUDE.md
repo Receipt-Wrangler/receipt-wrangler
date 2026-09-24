@@ -326,6 +326,46 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   list-page add action, and do NOT use a bespoke page-title header.
 If a design appears to require a new pattern, confirm with the user before diverging.
 
+### The chip picker's close-on-select preference
+
+`app-autocomlete` in `[multiple]` mode (Categories, Tags, the user/group/icon pickers, the role
+form's permission picker, report filters) deliberately **re-opens** its option panel after every
+pick, so several values can be chosen in a row. `closeChipSelectOnSelect` on `UserPreferences` flips
+that per user; the default is **off**, i.e. the panel stays open exactly as before.
+
+Three things about it are load-bearing:
+
+- **The component reads the preference itself**, from `AuthState.closeChipSelectOnSelect`, rather
+  than taking an `@Input`. It is global by design — the setting says "all of these pickers" — and
+  threading a flag through the twenty-odd call sites would only create a way for one of them to
+  disagree with the rest. The default (`?? false`) lives in the selector, not at the reader.
+- **`closePanel()` alone does not close it.** `MatAutocompleteTrigger` opens on `focus`, and
+  Material returns focus to the input after a selection, so the panel comes straight back.
+  `clearFilterAndClosePanel()` therefore also **blurs** `inputMultiple()`. This is also why the e2e
+  asserts the blur *before* asserting the panel is hidden: Material closes the panel on selection by
+  itself, so "hidden" alone would pass even if the preference were ignored entirely.
+- **Removing a chip is deliberately NOT covered.** `removeOption()` refocuses the input, which opens
+  the panel again regardless of the preference. The setting is about selecting, and a removal that
+  left the field blurred would make removing several chips take an extra click each.
+
+The panel handling runs inside the existing `setTimeout(…, 0)` in `optionSelected()`, so the two
+tests in `autocomlete.component.spec.ts` that call `jest.runAllTimers()` are the only ones that
+exercise it at all — every other `optionSelected` case stops at the `FormArray` push. They stub the
+trigger (`textarea.component.spec.ts` is the precedent), because `CUSTOM_ELEMENTS_SCHEMA` leaves the
+template's real `#auto` trigger unresolvable.
+
+Because the component now injects `Store`, **any spec that instantiates a real `AutocomleteComponent`
+needs `AuthState` registered** — `NgxsModule.forRoot([AuthState])`. That covers the base spec, the
+`category-autocomplete` / `tag-autocomplete` / `grant-picker` specs, and `system-settings-form`
+(which registered only `SystemSettingsState`).
+
+`desktop/e2e/chip-select-close-on-select.spec.ts` is the wire test: the Jest specs drive the
+component against a mocked store, so only the e2e proves the checkbox reaches the picker through
+`PUT /userPreferences` -> the stored column -> AppData -> `AuthState`. It **provisions its own
+account**, because the preference is per-user and global and the suite runs `fullyParallel` —
+flipping it on a shared e2e account would change behavior under every spec running as that account
+at the same time.
+
 ### The shared badge (`app-badge`)
 
 `src/shared-ui/badge/` — a small uppercase badge (`text` + `tone` signal inputs) used to mark an item
@@ -557,6 +597,21 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     `TokenRefreshService` keeps its own logout-on-refresh-failure path for a truly dead session.
     Background `GET` 403s propagate silently for callers to handle (e.g. the `getRoles` +
     `catchError` reads above).
+  - **One toast per error, and the server's `errorMsg` always wins.** `MatSnackBar.open()`
+    dismisses whatever is already showing, so two `snackbarService.error(...)` calls in one tick
+    means only the *last* is readable. The server-supplied `errorMsg` is the user-friendly message;
+    Angular's generic `HttpErrorResponse.message` ("Http failure response for ...: 500 Internal
+    Server Error") is a **fallback only** for a 5xx that carries no message at all, so an
+    infra-level failure (nginx 502, gateway timeout) is not silent. The two branches must stay
+    mutually exclusive — **do not restore them as two independent `if`s.** They were, and the
+    second one only stayed harmless because its regex was broken: `new RegExp("5d{2}")` matches the
+    literal `5dd`, never `"500"`. Repairing it to `5\d{2}` (commit `4bb640c`, 2026-03-23) activated
+    the override, and since nearly every Go handler writes 5xx through `WriteCustomErrorResponse`
+    with an `errorMsg`, the useful message was being replaced app-wide — most visibly on a failed
+    login, where "Invalid credentials." lasted a few milliseconds. `queueMode` suppresses **both**
+    branches, like the 403 one. Pinned by three cases in `http-interceptor.spec.ts`
+    (5xx-with-`errorMsg`, 5xx-without, and 5xx-in-queue-mode) and by
+    `e2e/auth.spec.ts` → "a wrong password reports it and leaves the form filled in".
   - **Category/tag catalogs:** AppData also carries `groupCategories` / `groupTags` (keyed by group
     id, filtered to the user's grants), stored via `SetGroupCatalog` and read with the
     `AuthState.groupCategories(groupId)` / `groupTags(groupId)` selectors. The **receipt form** and
@@ -689,7 +744,7 @@ control and its direct `PUT /api/customField/:id` 403s, and a type change 400s e
 ### Custom fields as receipts-table columns
 
 The **Configure Columns** dialog (`src/receipts/column-configuration-dialog/`) lists every custom
-field after the nine built-in columns, and each one can be turned into a sortable table column.
+field after the ten built-in columns, and each one can be turned into a sortable table column.
 
 - **`custom_<id>` is the column's `matColumnDef` *and* the `orderBy` sent to the API** — the same key
   the reporting engine uses (`receiptsource.CustomFieldKey`). `src/utils/receipt-table-columns.ts`
@@ -758,7 +813,31 @@ field after the nine built-in columns, and each one can be turned into a sortabl
   display, numeric sorting on it (amounts chosen so a text sort is visibly wrong), a SELECT sorting by
   option text rather than option id, and the column healing away when its field is deleted. Money is
   asserted with a **separator-tolerant** regex because the currency configuration is a global System
-  Setting on the shared CI backend that this spec must not mutate.
+  Setting on the shared CI backend that this spec must not mutate. **Configure Columns** sits inside
+  the `⋮` overflow menu, so its helpers go through `openReceiptsOverflowMenu` first.
+
+### The Comment column (`first_comment`)
+
+The tenth built-in column shows the receipt's **first** comment and sorts on it. It is the last
+built-in in `DEFAULT_RECEIPT_TABLE_COLUMNS`.
+
+- **Hidden by default, with no merge code.** The default entry is `visible: false`, and
+  `mergeCustomFieldColumns` appends a missing built-in with its default's visibility. So a layout
+  saved before this column existed gains it **unchecked**, and upgrading widens nobody's table.
+- **`first_comment` is both the `matColumnDef` and the `orderBy`**, the same convention as
+  `custom_<id>`. `sort()` already sends `sortState.active` verbatim, so sorting needed no client
+  code. The header reads `RECEIPT_COLUMN_DISPLAY_NAMES.first_comment` rather than a new literal.
+- **The value is `Receipt.firstComment`**, which only the paged list returns. The server has already
+  applied member isolation, so a comment the viewer may not see is never in the payload.
+  `hideComments` is deliberately **not** applied here; that group setting stays receipt-form-only.
+  See `api/CLAUDE.md` → "The first comment".
+- The cell (`#firstCommentCell`, `data-testid="receipt-first-comment"`) is one ellipsised line capped
+  at 20rem, so a long comment can't stretch the row. `matTooltip` shows the full text, which is why
+  `ReceiptsModule` now imports `MatTooltipModule`.
+- **E2E:** `e2e/receipt-comment-column.spec.ts` (serial, admin storageState, own seeded group) covers:
+  - the column offered unchecked and unbadged;
+  - the first comment shown, never a later one that sorts lower;
+  - the `first_comment` sort in both directions against the real API.
 
 ### Seeding the receipt group
 
@@ -1019,7 +1098,7 @@ redirect, and administer the provider rows.
   existing convention for these tables — `setColumns()` runs in `ngAfterViewInit` and mutates a plain
   property, which trips NG0100 in the dev-mode check-no-changes pass.
 
-## Session lifetime settings (Hours/Days selector over an hours-based API)
+## Duration settings (Hours/Days selector over an hours-based API)
 
 The System Settings form exposes two configurable refresh-token lifetimes (see `api/CLAUDE.md` →
 "Session lifetime"): a **Session** `app-form-section` with **"Stay signed in for"**
@@ -1040,12 +1119,33 @@ the 24h default for the `0`/null the API sends when the setting is unset — so 
 `Number(null)` and `Number("")` are both `0`, so an emptied number field would otherwise submit a
 zero-length lifetime.
 
-**The max tracks the selected unit** (720 hours === 30 days). `listenForDurationUnitChanges(value,
-unit)` — one parameterised method called twice — re-applies
-`[Validators.required, durationValueValidator(maxForUnit(...))]` whenever the unit flips, the same
-shape as `urlValidators()` above (`setValidators` replaces the whole list, so `required` must be
-re-supplied each time rather than declared in `initForm`). All four controls are also added to the
-**view-mode disable block**, or they stay editable on the read-only page.
+**The bounds track the selected unit** (720 hours === 30 days).
+`listenForDurationUnitChanges(value, unit, maxHours, minHours = 1)` — one parameterised method called
+once per setting — re-applies
+`[Validators.required, durationValueValidator(maxForUnit(...), minForUnit(...))]` whenever the unit
+flips, the same shape as `urlValidators()` above (`setValidators` replaces the whole list, so
+`required` must be re-supplied each time rather than declared in `initForm`). Every control is also
+added to the **view-mode disable block**, or it stays editable on the read-only page.
+
+**A third consumer: `tempFileRetentionHours`** — a "Temporary Files" section holding **"Keep failed
+uploads for"** (how long a failed upload's image is kept so the user can rerun, preview or download
+it; see `api/CLAUDE.md` → "Temporary file retention & cleanup"). Three things it does differently, all
+of them traps:
+
+- **Its bounds are its own** — 24 to 8760 hours. `MAX_TOKEN_LIFETIME_HOURS` is the *token* cap; reusing
+  it would cap a year-long retention at 30 days. Hence the bounds became parameters of
+  `listenForDurationUnitChanges`, which previously hardcoded that constant *inside* the method (only
+  the control names were parameters), so both existing call sites had to be updated.
+- **Seed it as `splitHours(settings?.tempFileRetentionHours || 720)`.** `splitHours` falls back to
+  `DEFAULT_DURATION_HOURS` (24) for the `0`/null the API sends when unset, which would render this
+  setting as "1 Days" instead of its real 30-day default.
+- **A floor converts with `minForUnit`, never `maxForUnit`.** `maxForUnit` floors, which turns a
+  1-hour minimum into **0 days** and admits a zero-length duration; `minForUnit` rounds up and never
+  yields zero. `durationValueValidator` gained an optional `min` for this, so the 24-hour floor is a
+  field-level message rather than a bare server 400.
+
+The spec's `.duration-row` count assertion is now **3**, and both exact `toEqual` assertions (on
+`form.value` and on the `updateSystemSettings` payload) carry the new control pair.
 
 **E2E:** `e2e/session-lifetime.spec.ts` (serial, admin `storageState`; the setting is **global**, so
 `afterAll` re-reads live settings and restores only the captured field). It is the only test that
@@ -1064,6 +1164,47 @@ cookie expiry lands in the configured window while the `jwt` cookie stays inside
   explanation. This validator emits its message as the error *value*, which takes that component's
   `typeof value === "string"` path and renders verbatim. Reach for the same trick for any new
   validator whose error key is not in that map.
+
+## Activity source file (preview / download)
+
+A failed quick scan or email upload keeps its image, so the user can retrieve it and enter the receipt
+by hand — the endpoints and the retention window are in `api/CLAUDE.md` → "Activity source files".
+
+- **Two places render it.** The dashboard **activity widget**'s `itemMetaTemplate`
+  (`activity-source-file-preview` / `-download`, beside the existing rerun button), and an **opt-in
+  column** on the shared `app-task-table` behind `[showSourceFileActions]="true"` — only the System
+  Settings → System Tasks page passes it, so the component's other host is unchanged. The column id
+  goes into `displayedColumns` **before** the `"expand"` push (`expand` stays last, and `mat-table`
+  throws on a displayed id with no matching `columns` entry).
+- **Both gate on `item.hasSourceFile` and the group permission**, and the server decides the flag —
+  on the app-scoped tasks table it is resolved per caller, so a button never appears where the
+  endpoint would 403.
+- **Gate on `item.groupId`, NOT the widget's `groupId()`.** The activity widget's rerun button had
+  this wrong: on the "All" dashboard `groupId()` is the synthetic aggregate, which never appears in
+  `AuthState.groupPermissions`, so every control silently vanished for activities the user was
+  entitled to act on. Mobile fixed it long ago and documents the reasoning at
+  `group_activity_list_item.dart`; desktop never did. Rerun was fixed in the same change, and
+  `activity.component.spec.ts` pins it by setting the two ids to different values.
+- **`SourceFileViewerDialogComponent`** (`shared-ui/source-file-viewer-dialog/`) wraps
+  `app-image-viewer` in `app-dialog`, opened with `DEFAULT_DIALOG_CONFIG` — shaped on
+  `DescriptionViewerDialogComponent`, and declared **and** exported in `SharedUiModule`.
+- **The download is observed as a `response`, not a body.** The original file name is only on
+  `Content-Disposition` and an activity row does not carry it, so
+  `filenameFromContentDisposition` (`src/utils/file.ts`) reads it back before handing off to the
+  shared `downloadFile`.
+
+**E2E:** `e2e/failed-activity-source-file.spec.ts` (serial, admin storageState). It is the only test
+that proves the image actually survived in `temp/` through a failure and that the asynq payload still
+resolves to it. Making a quick scan fail is the whole trick: the spec points the **global** AI
+provider at an unreachable host rather than assuming the backend has none configured, which is what
+makes it work against the shared demo backend as well as a local database. It therefore mutates
+global state, runs serially, restores what it found, and leans on the `e2e-shared-backend` job-level
+concurrency group. It asserts the preview converts, the download is **byte-identical** to the
+uploaded fixture, a non-member 403s on both endpoints, and the tasks table renders the controls.
+
+`e2e/temp-file-retention.spec.ts` covers the setting's own round trip (days in, hours stored, days
+rendered back) and the 24-hour floor. **Do not try to e2e the sweeper** — the 24-hour minimum
+retention makes it unobservable; its coverage is the Go table tests.
 
 ## Signals & Zoneless Change Detection
 
@@ -1237,6 +1378,12 @@ Angular no longer uses zone.js. Change detection is triggered ONLY by:
 
 **Key implications:**
 - Plain property mutations (`this.foo = 'bar'`) in async callbacks (subscribe, setTimeout, Promise.then) will NOT trigger change detection. Always use signals for state that affects templates.
+  - **`finalize()` is an async callback too, and a success path can mask the bug.** The login form
+    kept `isLoading` as a plain field reset in `finalize()` for ~5 months after the zoneless
+    migration (`d3b4246`, which never touched that file): on success `router.navigate()` happened to
+    trigger CD so the reset repainted, while on **failure** nothing did and the spinner stuck
+    forever. State only written on a failure path is the easiest kind to miss — check that a
+    converted signal is exercised by a test on the *error* branch, not just the happy one.
 - `ChangeDetectorRef.detectChanges()` still works but is rarely needed — prefer signals.
 - `setTimeout` still works for delays but won't auto-trigger CD. The callback must write to a signal if the template needs updating.
 - All `@HostListener` handlers automatically trigger CD (same as template events).
@@ -1576,6 +1723,9 @@ why this feature needed no API change. Picking a month **overwrites** whatever t
   Pre-existing; the chip just surfaces it for the first time.
 - **Arrow steps from "All time"/"Custom" seed the current month** and then apply the delta, so `‹`
   and `›` never do the same thing.
+- **`RECEIPT_DATE_FILTER_FIELDS` has a second consumer: the Report Builder's period "Date field"
+  picker.** That one is server-backed, so a new key there needs the API side too. See "Period date
+  field" under "Reports (Report Builder)".
 
 ### Receipt summary (the totals under the table)
 
@@ -1654,6 +1804,28 @@ for the wire contract.
   the filter" asserts that), detaching the submit button mid-click. Tab blurs the input, which closes
   the panel when it is open and is harmless when it is not. Escape is fine on the **settings page**
   version of the same picker — there is no dialog behind it there to swallow the keypress.
+- **Placement is a per-group setting, and the block MOVES rather than being cloned.**
+  `receipts-table.component.html` holds one `<ng-template #receiptTotals>` with one set of
+  bindings, rendered through `*ngTemplateOutlet` at one of two anchors: `TOP` puts it immediately
+  after `</app-table-header>` — **above `app-summary-card`**, because that card annotates a row
+  *selection* and is transient while these totals describe the whole filter — and `BOTTOM` leaves
+  it under `.table-container` where it has always been. Two elements behind separate `@if`s would
+  drift and would each need handling in the e2e suite.
+  - **`summaryPosition()` reads `summary()?.position`, never `GroupState`.** Same reason the
+    `enabled` gate does: the cached `groupReceiptSettings` is stale the moment an admin changes the
+    configuration. Nothing flickers on first load, because the component renders nothing until the
+    response arrives.
+  - **The component owns its own vertical rhythm** via a `position` input and a
+    `.receipt-totals--top` modifier that moves the `$spacing-md` to the bottom edge. The receipts
+    page adds no margin of its own.
+  - **The settings control is an `app-select` outside the `canManageDefaultCustomFields` branch**,
+    with the toggle and the status checkboxes — it reads no catalog, and gating it would lock an
+    admin without `app.custom-fields.read` out of deciding where their own summary goes.
+  - **Placement is asserted as DOCUMENT ORDER, and only in e2e.** The block renders at both
+    positions, so "is it visible" passes whichever anchor is wrong. The Jest spec asserts the
+    derivation only: `receipts-table.component.spec.ts` never renders the template — every case
+    there drives the component class, and `app-table` resolves to a custom element under
+    `CUSTOM_ELEMENTS_SCHEMA`, so the `viewChild.required` in `ngAfterViewInit` cannot resolve.
 - **The chip row must never be asserted by count or position.** It lists every group the admin
   belongs to whose summary is enabled, and the suite runs `fullyParallel` against a shared backend,
   so a group leaked by a crashed earlier run would break an exact-count assertion — and, sorting
@@ -1753,6 +1925,65 @@ written as a side effect of real work, so there is no endpoint that creates one)
 the Jest specs cannot: the server narrows (`totalCount` included, which is what proves the predicates
 land before the count), the "System" sentinel matches unattributed rows, a Started At of the task's
 own day matches while the previous day does not, and the filter survives a reload.
+
+## Receipt update diff (System Tasks)
+
+An **Updated Receipt** (`RECEIPT_UPDATED`) row stores the receipt before and after the edit. The
+description cell summarizes it ("Changed: name, amount", or "No changes") and its open button shows
+`app-receipt-update-diff-dialog` (`src/shared-ui/receipt-update-diff-dialog/`): the two receipts as
+pretty-printed JSON, before on the left and after on the right, like a split-view diff.
+
+- **The description is double-encoded, which is why it has its own parser.** The API stores
+  `{"before":"<receipt JSON>","after":"<receipt JSON>"}`, each side a JSON *string*.
+  `PrettyJsonPipe`'s cleanup rewrites every `"` inside a string value to `'`, so the rebuilt text is
+  invalid JSON and the pipe falls back to printing the raw escaped string. That was the "busted"
+  display. `parseReceiptUpdateDescription` (`src/utils/receipt-update-description.ts`) parses each
+  side once more and never throws. A **failed** update stores its plain error text, which returns
+  `undefined`, and that row renders through the old `app-pretty-json` path like every other task.
+  `RECEIPT_UPDATED` is the only double-encoded type, so the pipe is untouched.
+- **`TaskTableComponent.receiptUpdates` parses once per page** (a `computed` over the data source,
+  keyed by task id), not per change-detection pass, since each row holds two whole receipts.
+- **The summary ignores the record-keeping fields at every depth**: the API's `BaseModel`, i.e.
+  `id`, `createdAt`, `updatedAt`, `createdBy` and `createdByString`. An update deletes and recreates
+  the receipt's items (linked items included) and custom field values, so they come back with new ids
+  and timestamps on *every* save, and it bumps `updatedAt` on the receipt, its categories and its tags.
+  Comparing those would list `receiptItems`, `customFields`, `categories` and `tags` on every row
+  whose receipt has any. The **diff itself is deliberately raw**, so those lines still show as changed
+  there.
+- **The diff is hand-written** (`src/utils/line-diff.ts`): it trims the common prefix and suffix, runs
+  Myers' O(ND) diff on the rest, and keeps each round's frontier only for the diagonals it can read,
+  so memory is O(D²). Removed and added lines in one run are paired side by side as `changed` rows,
+  and `inlineChange` marks the part that differs. It avoids a new runtime dependency (and the
+  sandbox lockfile drift above). `line-diff.spec.ts` fuzzes it against a reference LCS, so a
+  regression that stays *valid* but stops being *minimal* still fails.
+- **"All lines" is the default**, and "Changes only" (`collapseUnchanged`, 3 lines of context)
+  replaces longer unchanged runs with a "⋯ N unchanged lines" row. A run of one line is shown rather
+  than replaced by a marker the same size.
+- **The code cell's content is written on one template line.** The column is `white-space: pre-wrap`,
+  so template whitespace inside the `<td>` would render as indentation.
+- **Older rows are versioned, and the dialog says how far to trust "before".** The API writes
+  `version: 2`. A row without the key is version 1, whose own "before" is incomplete (see
+  `api/CLAUDE.md` → "Receipt update snapshots"). The listing rebuilds such a row from an earlier
+  complete copy when one exists, and names it in `beforeSource`. `receiptUpdateBeforeState` turns
+  that into one of three states, and the dialog renders a notice for the last two
+  (`data-testid="receipt-diff-version-notice"`, `data-before-state`):
+  - `complete`: a version 2 row; no notice.
+  - `rebuilt`: an `alert-info` naming the copy, "as saved when it was created" or "by the previous
+    update", and its date. It also warns that bulk status changes can fold in.
+  - `incomplete`: an `alert-warning` that item categories and tags, shares and custom field names
+    can show as changed when they weren't.
+  The notice sits **inside** the scroll box, above the table, so it scrolls away rather than
+  shrinking the diff; the sticky header still pins to the box's top. Nothing else on the desktop
+  branches on the version, because the summary and diff simply read the rebuilt "before".
+
+**E2E:** `e2e/receipt-update-diff.spec.ts` updates a receipt through the real API and asserts the
+row summary, the old/new name on the correct sides, and the "Changes only" collapse. The receipt
+keeps an unchanged item across the update under test, so the summary assertion also proves the
+server-side item recreation is not reported as an edit (it fails if only `updatedAt` is ignored).
+It also asserts the stored row carries `version: 2` and that the dialog shows no notice. The current
+API cannot write a version 1 row, so that path is covered by the Go service tests and the Jest specs. It narrows the
+paged response to its own task with `page.route` + `route.fetch()`, so the row is still the real
+server's output while other specs' tasks stay out of the way.
 
 ## Quick Scan Configuration
 
@@ -2122,11 +2353,56 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
       currency configuration is a global System Setting on the shared CI backend that this spec must
       not mutate; the seeded value is `1500.50` precisely so the thousands separator and trailing
       zero prove formatting ran.
+- **Period date field.** A **"Date field"** `app-select` sits in Parameters, after "Period covering"
+  and its custom Start/End. It chooses which receipt date the period filters on, bound to
+  `period.dateField`, and the hint reads "Resolves to … on Added At". See `api/CLAUDE.md` →
+  "The period's date field" for the wire contract.
+  - **Its options are `RECEIPT_DATE_FILTER_FIELDS` mapped as-is** (`periodDateFieldOptions`), so they
+    match the receipts table's quick date filter in content and order by construction.
+    `ReportBuilderValue.period.dateField` is typed `ReceiptDateFilterFieldKey`, and the panel spec
+    pins the list.
+  - **A new report defaults to `DEFAULT_QUICK_DATE_FIELD`, and the mapper always sends the field**, so
+    a saved template records which date it covers.
+  - **Rehydrating goes through `toReportPeriodDateField`** (`report-period.util.ts`), which falls back
+    to the **literal** `LEGACY_REPORT_PERIOD_DATE_FIELD` (`"date"`), not the quick filter's default.
+    Templates saved before the picker have no field and always ran on the receipt date; a later
+    change to the table's default must not change what they cover. The swagger field is a plain
+    `string`, so an unrecognized stored value lands on `"date"` too. Re-saving a legacy template writes
+    `dateField: "date"`, so that round trip is intentionally not a fixpoint.
+  - **The drill-in never resolves the period itself.** `report-preview-panel.openReceipts()` hands
+    the dialog the same `toReportRequestCommand` the preview sends. `report-receipts-dialog` makes
+    one `ReportService.getReportReceipts(command)` call (`POST /report/receipts`), and the server
+    runs the report's own filter and period.
+    - It used to build the BETWEEN here, per group, via `getReceiptsForGroup`. That disagreed with
+      the count chip in three ways:
+      - it used the browser's time zone, not the server's;
+      - on SQLite its ISO bounds compared as text and dropped first-day receipts;
+      - the report-generator `-1` paid-by matched nothing.
+    - The subtitle still formats the period client-side (display only) and names the field.
+    - The subtitle's count is the preview's `receiptCount`, falling back to the response's
+      `totalCount`, not the list length: the server caps the list at 100.
+    - When the list is shorter than its `totalCount`, a `report-receipt-truncated` notice reads
+      "Showing the newest N of M receipts", so a partial list is never passed off as the whole report.
+  - **E2E:** `e2e/report-period-date-field.spec.ts` (serial, admin storageState, own group).
+    - Seeds two receipts dated 2024-01-01, one RESOLVED. The server stamps both "resolved" and "added"
+      with now.
+    - Asserts the options and order, and the counts per field across a past window and a window from
+      2025.
+    - The drill-in under Added At lists both receipts, and a saved template reopens on its field.
+    - A second block runs the browser in `timezoneId: 'America/Los_Angeles'` against the UTC backend.
+      A receipt dated 03:00 UTC on January 1 must appear in the January drill-in, matching the chip.
+      This was verified to fail with the old client-side bounds.
+    - The count chip reads `receipt_long<N> receipts` (icon ligature flush against the number), so it
+      is matched with `(?<!\d)N receipts`.
+    - The label contains "field", so a bare `getByLabel('Field')` elsewhere on the builder now
+      resolves two elements. `report-grouping-label.spec.ts` scopes its column-picker lookup to the
+      dialog for that reason.
 - **Live preview** (`report-preview-panel`): the container debounces the form (~450ms, `switchMap`) into
   `POST /report/preview` and renders the engine's returned HTML in a **sandboxed `<iframe srcdoc>`**
   (`sandbox="allow-same-origin"`, scripts disabled; sized to content on load). The response's
-  `receiptCount` drives the chip that opens the receipts drill-in (`report-receipts-dialog`, paged
-  receipts across scope with the filter + resolved period). The drill-in is a read-only list → detail
+  `receiptCount` drives the chip that opens the receipts drill-in (`report-receipts-dialog`, the
+  receipts the report covers, listed server-side by `POST /report/receipts` from the preview's own
+  command; see "Period date field" above). The drill-in is a read-only list → detail
   inspector: a `selected` signal toggles the list (clickable rows) and a per-receipt breakdown card
   (amount/category/paid-by/tags via the shared `customCurrency`/`name`/`user` pipes + `app-status-chip`);
   "Open full receipt" does `window.open(\`/receipts/${id}/view\`, "_blank")` to view it in a new tab.

@@ -177,6 +177,31 @@
     ></app-input>
   </app-form-section>
   <app-form-section
+    headerText="Temporary Files"
+  >
+    <p class="text-muted mb-3">
+      How long an uploaded file is kept once nothing can still act on it. A quick scan or email upload
+      that fails keeps its image for this long, so you can retry it, or preview and download the
+      original to enter the receipt by hand. After that the file is reclaimed and those options
+      disappear. Minimum 24 hours, maximum 8760 hours (1 year).
+    </p>
+    <div class="d-flex gap-3 mb-3 duration-row">
+      <app-input
+        label="Keep failed uploads for"
+        type="number"
+        [inputFormControl]="form | formGet:'tempFileRetentionValue'"
+        [readonly]="formConfig.mode | inputReadonly"
+      ></app-input>
+      <app-select
+        label="Unit"
+        optionValueKey="value"
+        optionDisplayKey="displayValue"
+        [inputFormControl]="form | formGet:'tempFileRetentionUnit'"
+        [options]="durationUnits"
+      ></app-select>
+    </div>
+  </app-form-section>
+  <app-form-section
     headerText="MCP Server"
   >
     <p class="text-muted mb-3">

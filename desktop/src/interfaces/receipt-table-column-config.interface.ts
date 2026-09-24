@@ -18,4 +18,7 @@ export const DEFAULT_RECEIPT_TABLE_COLUMNS: ReceiptTableColumnConfig[] = [
   { matColumnDef: 'tags', visible: true, order: 6 },
   { matColumnDef: 'status', visible: true, order: 7 },
   { matColumnDef: 'resolved_date', visible: true, order: 8 },
+  // Opt-in: mergeCustomFieldColumns appends a missing built-in with the visibility
+  // it has here, so an existing saved layout gains the column unchecked.
+  { matColumnDef: 'first_comment', visible: false, order: 9 },
 ];

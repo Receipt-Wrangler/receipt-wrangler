@@ -55,6 +55,9 @@ func ExportAllReceiptsFromGroup(w http.ResponseWriter, r *http.Request) {
 					pagedRequest,
 					getExportReceiptAssociations(),
 					permissionService.PaidByListResolver(token.UserId),
+					// The export honours the table's sort, which may be the
+					// Comment column.
+					permissionService.CommentAuthorVisibilityResolver(token.UserId),
 				)
 			if err != nil {
 				return http.StatusInternalServerError, err

@@ -29,6 +29,7 @@ Name | Type | Description | Notes
 **mobileServerUrl** | **String** | Server/API URL mobile clients connect to; encoded into the login QR's deep link | [optional] 
 **refreshTokenValidForHours** | **int** | How long a refresh token stays valid, in hours. Accepted values are 1-720 (30 days), or 0 meaning unset, which falls back to the default of 24. Omit the key entirely to leave the currently configured value unchanged. | [optional] 
 **mcpRefreshTokenValidForHours** | **int** | How long an MCP/OAuth connector refresh token stays valid, in hours. Accepted values are 1-720 (30 days), or 0 meaning unset, which falls back to the default of 24. Omit the key entirely to leave the currently configured value unchanged. | [optional] 
+**tempFileRetentionHours** | **int** | How long a temp file is kept once nothing can still act on it, in hours. Accepted values are 24-8760 (1 year), or 0 meaning unset, which falls back to the default of 720 (30 days). Omit the key entirely to leave the currently configured value unchanged. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

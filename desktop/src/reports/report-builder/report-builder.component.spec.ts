@@ -435,7 +435,12 @@ describe("ReportBuilderComponent", () => {
     const configuration: ReportRequestCommand = {
       name: "Full Report",
       groupIds: ["3", "7"],
-      period: { preset: ReportPeriod.PresetEnum.Custom, startDate: "2026-03-01", endDate: "2026-03-31" },
+      period: {
+        preset: ReportPeriod.PresetEnum.Custom,
+        startDate: "2026-03-01",
+        endDate: "2026-03-31",
+        dateField: "resolvedDate",
+      },
       filter,
       groupBy: ["group", "category"],
       detail: { mode: ReportDetail.ModeEnum.Aggregate, by: "category" },
@@ -476,6 +481,7 @@ describe("ReportBuilderComponent", () => {
     expect(form.get("period.preset")!.value).toBe(ReportPeriod.PresetEnum.Custom);
     expect([start.getFullYear(), start.getMonth(), start.getDate()]).toEqual([2026, 2, 1]);
     expect([end.getFullYear(), end.getMonth(), end.getDate()]).toEqual([2026, 2, 31]);
+    expect(form.get("period.dateField")!.value).toBe("resolvedDate");
 
     // Every builder filter field's value + operation.
     expect(form.get("filter.name.value")!.value).toBe("coffee");

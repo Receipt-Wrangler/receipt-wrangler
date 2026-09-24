@@ -1,8 +1,9 @@
-import { Component, OnInit, ViewEncapsulation } from "@angular/core";
+import { HttpErrorResponse } from "@angular/common/http";
+import { Component, OnInit, ViewEncapsulation, signal } from "@angular/core";
 import { FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
-import { BehaviorSubject, catchError, finalize, of, switchMap, tap, } from "rxjs";
+import { BehaviorSubject, catchError, EMPTY, finalize, switchMap, tap, } from "rxjs";
 import { AppData, AuthService, OidcProviderSummary } from "src/open-api";
 import { SnackbarService } from "src/services";
 import { setAppData } from "src/utils";
@@ -28,7 +29,7 @@ export class AuthForm implements OnInit {
   public primaryButtonText: string = "";
   public secondaryButtonText: string = "";
   public secondaryButtonRouterLink: string[] = [];
-  public isLoading = false;
+  public readonly isLoading = signal<boolean>(false);
   public readonly oidcProviders = this.store.selectSignal(
     FeatureConfigState.oidcProviders
   );
@@ -149,17 +150,25 @@ export class AuthForm implements OnInit {
         tap(() => {
           this.login();
         }),
-        catchError((err) =>
-          of(
-            this.snackbarService.error(err.error["username"] ?? err["errMsg"])
-          )
-        )
+        catchError((err: HttpErrorResponse) => {
+          // A sign-up validation failure is a flat field map with no errorMsg
+          // (api/internal/structs/utils.go), so the interceptor stays silent and
+          // this is the only report. Anything carrying errorMsg has already been
+          // toasted by the interceptor — toasting again would dismiss it.
+          const usernameError = err.error?.["username"];
+
+          if (usernameError) {
+            this.snackbarService.error(usernameError);
+          }
+
+          return EMPTY;
+        })
       )
       .subscribe();
   }
 
   private login(): void {
-    this.isLoading = true;
+    this.isLoading.set(true);
     this.authSerivce
       .login(this.form.value)
       .pipe(
@@ -169,7 +178,8 @@ export class AuthForm implements OnInit {
             this.store.selectSnapshot(GroupState.dashboardLink),
           ]),
         ),
-        finalize(() => this.isLoading = false)
+        catchError(() => EMPTY), // the HTTP interceptor surfaces the failure toast
+        finalize(() => this.isLoading.set(false))
       )
       .subscribe();
   }

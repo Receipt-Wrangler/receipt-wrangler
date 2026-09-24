@@ -22,6 +22,8 @@ class _$Receipt extends Receipt {
   @override
   final String date;
   @override
+  final String? firstComment;
+  @override
   final int groupId;
   @override
   final int id;
@@ -55,6 +57,7 @@ class _$Receipt extends Receipt {
       this.createdAt,
       this.createdBy,
       required this.date,
+      this.firstComment,
       required this.groupId,
       required this.id,
       this.imageFiles,
@@ -85,6 +88,7 @@ class _$Receipt extends Receipt {
         createdAt == other.createdAt &&
         createdBy == other.createdBy &&
         date == other.date &&
+        firstComment == other.firstComment &&
         groupId == other.groupId &&
         id == other.id &&
         imageFiles == other.imageFiles &&
@@ -108,6 +112,7 @@ class _$Receipt extends Receipt {
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, createdBy.hashCode);
     _$hash = $jc(_$hash, date.hashCode);
+    _$hash = $jc(_$hash, firstComment.hashCode);
     _$hash = $jc(_$hash, groupId.hashCode);
     _$hash = $jc(_$hash, id.hashCode);
     _$hash = $jc(_$hash, imageFiles.hashCode);
@@ -133,6 +138,7 @@ class _$Receipt extends Receipt {
           ..add('createdAt', createdAt)
           ..add('createdBy', createdBy)
           ..add('date', date)
+          ..add('firstComment', firstComment)
           ..add('groupId', groupId)
           ..add('id', id)
           ..add('imageFiles', imageFiles)
@@ -183,6 +189,10 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
   String? _date;
   String? get date => _$this._date;
   set date(String? date) => _$this._date = date;
+
+  String? _firstComment;
+  String? get firstComment => _$this._firstComment;
+  set firstComment(String? firstComment) => _$this._firstComment = firstComment;
 
   int? _groupId;
   int? get groupId => _$this._groupId;
@@ -247,6 +257,7 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
       _createdAt = $v.createdAt;
       _createdBy = $v.createdBy;
       _date = $v.date;
+      _firstComment = $v.firstComment;
       _groupId = $v.groupId;
       _id = $v.id;
       _imageFiles = $v.imageFiles?.toBuilder();
@@ -290,6 +301,7 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
             createdBy: createdBy,
             date:
                 BuiltValueNullFieldError.checkNotNull(date, r'Receipt', 'date'),
+            firstComment: firstComment,
             groupId: BuiltValueNullFieldError.checkNotNull(
                 groupId, r'Receipt', 'groupId'),
             id: BuiltValueNullFieldError.checkNotNull(id, r'Receipt', 'id'),

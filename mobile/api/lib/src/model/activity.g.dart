@@ -25,6 +25,8 @@ class _$Activity extends Activity {
   final int? groupId;
   @override
   final bool? canBeRestarted;
+  @override
+  final bool? hasSourceFile;
 
   factory _$Activity([void Function(ActivityBuilder)? updates]) =>
       (ActivityBuilder()..update(updates))._build();
@@ -38,7 +40,8 @@ class _$Activity extends Activity {
       this.ranByUserId,
       this.receiptId,
       this.groupId,
-      this.canBeRestarted})
+      this.canBeRestarted,
+      this.hasSourceFile})
       : super._();
   @override
   Activity rebuild(void Function(ActivityBuilder) updates) =>
@@ -59,7 +62,8 @@ class _$Activity extends Activity {
         ranByUserId == other.ranByUserId &&
         receiptId == other.receiptId &&
         groupId == other.groupId &&
-        canBeRestarted == other.canBeRestarted;
+        canBeRestarted == other.canBeRestarted &&
+        hasSourceFile == other.hasSourceFile;
   }
 
   @override
@@ -74,6 +78,7 @@ class _$Activity extends Activity {
     _$hash = $jc(_$hash, receiptId.hashCode);
     _$hash = $jc(_$hash, groupId.hashCode);
     _$hash = $jc(_$hash, canBeRestarted.hashCode);
+    _$hash = $jc(_$hash, hasSourceFile.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -89,7 +94,8 @@ class _$Activity extends Activity {
           ..add('ranByUserId', ranByUserId)
           ..add('receiptId', receiptId)
           ..add('groupId', groupId)
-          ..add('canBeRestarted', canBeRestarted))
+          ..add('canBeRestarted', canBeRestarted)
+          ..add('hasSourceFile', hasSourceFile))
         .toString();
   }
 }
@@ -134,6 +140,11 @@ class ActivityBuilder implements Builder<Activity, ActivityBuilder> {
   set canBeRestarted(bool? canBeRestarted) =>
       _$this._canBeRestarted = canBeRestarted;
 
+  bool? _hasSourceFile;
+  bool? get hasSourceFile => _$this._hasSourceFile;
+  set hasSourceFile(bool? hasSourceFile) =>
+      _$this._hasSourceFile = hasSourceFile;
+
   ActivityBuilder() {
     Activity._defaults(this);
   }
@@ -150,6 +161,7 @@ class ActivityBuilder implements Builder<Activity, ActivityBuilder> {
       _receiptId = $v.receiptId;
       _groupId = $v.groupId;
       _canBeRestarted = $v.canBeRestarted;
+      _hasSourceFile = $v.hasSourceFile;
       _$v = null;
     }
     return this;
@@ -184,6 +196,7 @@ class ActivityBuilder implements Builder<Activity, ActivityBuilder> {
           receiptId: receiptId,
           groupId: groupId,
           canBeRestarted: canBeRestarted,
+          hasSourceFile: hasSourceFile,
         );
     replace(_$result);
     return _$result;

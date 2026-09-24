@@ -234,6 +234,41 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /report/receipts:
+    post:
+      tags:
+        - Report
+      summary: List the receipts a report covers
+      description:
+        Lists the receipts the report configuration covers, newest first, for
+        the builder's drill-in. The period and filter resolve exactly as they do
+        for the report, so the list agrees with the preview's receipt count.
+        Capped at 100 receipts; totalCount is every covered receipt. Requires the
+        same permissions as the preview.
+      operationId: getReportReceipts
+      requestBody:
+        description: The report builder configuration
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequestCommand"
+      responses:
+        200:
+          description: The covered receipts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedData"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /report/template:
     post:
       tags:
@@ -2706,6 +2741,75 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /systemTask/{id}/sourceFile:
+    get:
+      tags:
+        - SystemTask
+      summary: Get an activity's source file
+      description: >-
+        Returns the upload behind a quick scan or email upload activity, converted for display, so
+        a user can see what a failed activity was working from.
+      operationId: getSystemTaskSourceFile
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the system task
+      responses:
+        200:
+          description: The activity's source file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemTaskSourceFileView"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: The source file is no longer available
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /systemTask/{id}/sourceFile/download:
+    get:
+      tags:
+        - SystemTask
+      summary: Download an activity's source file
+      description: >-
+        Returns the upload behind a quick scan or email upload activity verbatim, so a user can
+        enter a failed receipt by hand.
+      operationId: downloadSystemTaskSourceFile
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: Id of the system task
+      responses:
+        200:
+          description: The activity's source file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          description: The source file is no longer available
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /prompt/:
     post:
       tags:
@@ -4199,6 +4303,15 @@ components:
       enum:
         - "START"
         - "END"
+    ReceiptSummaryPosition:
+      description: >-
+        Where a group's receipt summary renders relative to its receipts list. A client
+        that meets a value added later must degrade to BOTTOM, which is where the block
+        rendered before the setting existed, rather than failing the whole payload.
+      type: string
+      enum:
+        - "TOP"
+        - "BOTTOM"
     QueueName:
       type: string
       enum:
@@ -4206,6 +4319,7 @@ components:
         - "email_polling"
         - "email_receipt_processing"
         - "email_receipt_image_cleanup"
+        - "system_clean_up"
     ExportFormat:
       type: string
       enum:
@@ -4249,6 +4363,12 @@ components:
           format: uint64
         canBeRestarted:
           type: boolean
+        hasSourceFile:
+          type: boolean
+          description: >-
+            Whether the upload behind this activity is still on disk, so it can be previewed or
+            downloaded. False once the temp-file retention window has passed, or for an activity
+            that never had an upload.
     BaseModel:
       type: object
       required:
@@ -4731,6 +4851,9 @@ components:
         date:
           type: string
           description: Receipt date
+        firstComment:
+          type: string
+          description: Text of the receipt's earliest comment the caller may see. Only populated by the paged receipt list (POST /receipt/group/{groupId}); absent when there is no such comment.
         groupId:
           type: integer
           description: Group foreign key
@@ -5186,6 +5309,7 @@ components:
       required:
         - enabled
         - configurationGroupId
+        - position
         - overall
         - statuses
       properties:
@@ -5199,6 +5323,8 @@ components:
           type: integer
           format: uint64
           description: The group whose settings produced this breakdown
+        position:
+          $ref: "#/components/schemas/ReceiptSummaryPosition"
         overall:
           $ref: "#/components/schemas/ReceiptSummaryRow"
         statuses:
@@ -5223,7 +5349,7 @@ components:
           description: Number of records per page
         orderBy:
           type: string
-          description: field to order on
+          description: field to order on - a receipt column, custom_<id> for a custom field, or first_comment for the receipt's first comment
         sortDirection:
           type: string
           $ref: "#/components/schemas/SortDirection"
@@ -5570,6 +5696,12 @@ components:
               $ref: "#/components/schemas/ReceiptStatus"
               description: Default quick scan status
               default: "OPEN"
+            closeChipSelectOnSelect:
+              type: boolean
+              description:
+                Whether multi-select chip fields close their option list after
+                each selection
+              default: false
             userShortcuts:
               type: array
               items:
@@ -5707,6 +5839,8 @@ components:
                 UpdateGroupReceiptSettingsCommand.receiptSummaryStatuses.
               items:
                 $ref: "#/components/schemas/ReceiptStatus"
+            receiptSummaryPosition:
+              $ref: "#/components/schemas/ReceiptSummaryPosition"
     UpdateGroupReceiptSettingsCommand:
       type: object
       properties:
@@ -5818,6 +5952,17 @@ components:
             entirely. An unrecognized status is a 400.
           items:
             $ref: "#/components/schemas/ReceiptStatus"
+        receiptSummaryPosition:
+          allOf:
+            - $ref: "#/components/schemas/ReceiptSummaryPosition"
+          description: >-
+            Where the receipt summary renders relative to the receipts list. OMIT the key
+            to leave the stored value unchanged - a client that does not render this
+            control must omit it rather than send a zero value, or it moves the block for
+            the whole group. Needs no extra permission, for the same reason the statuses
+            do not. Anything but TOP or BOTTOM is a 400, an empty string included: on this
+            write side an explicit empty would reset a configured position, so omitting the
+            key is the only way to leave it alone.
     GroupSettings:
       type: object
       required:
@@ -6468,6 +6613,13 @@ components:
                 chosen for human convenience does not extend third-party client tokens.
                 1-720 (30 days); 0 means unset and falls back to the default.
               default: 24
+            tempFileRetentionHours:
+              type: integer
+              description: >-
+                How long a file in temp/ is kept once nothing can still act on it, i.e. how long a
+                user has to rerun, preview or download the source image of a failed upload.
+                24-8760 (1 year); 0 means unset and falls back to the default.
+              default: 720
     UpsertSystemSettingsCommand:
       type: object
       required:
@@ -6550,6 +6702,14 @@ components:
             entirely to leave the currently configured value unchanged.
           minimum: 0
           maximum: 720
+        tempFileRetentionHours:
+          type: integer
+          description: >-
+            How long a temp file is kept once nothing can still act on it, in hours. Accepted values
+            are 24-8760 (1 year), or 0 meaning unset, which falls back to the default of 720 (30
+            days). Omit the key entirely to leave the currently configured value unchanged.
+          minimum: 0
+          maximum: 8760
     CheckEmailConnectivityCommand:
       type: object
       properties:
@@ -6603,6 +6763,24 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/SystemTask"
+            hasSourceFile:
+              type: boolean
+              description: >-
+                Whether the upload behind this task is still on disk AND the caller may reach it.
+                Resolved per caller, since this listing is app-scoped and spans groups the caller
+                may not belong to.
+    SystemTaskSourceFileView:
+      type: object
+      required:
+        - name
+        - encodedImage
+      properties:
+        name:
+          type: string
+          description: The upload's original file name
+        encodedImage:
+          type: string
+          description: Base64 encoded image, converted for display
     GetSystemTaskCommand:
       allOf:
         - $ref: "#/components/schemas/PagedRequestCommand"
@@ -7103,6 +7281,14 @@ components:
         endDate:
           type: string
           description: End date (YYYY-MM-DD), read only when preset is custom
+        dateField:
+          type: string
+          description: >-
+            Which receipt date the period covers, as a ReceiptPagedRequestFilter
+            date key: date, resolvedDate or createdAt. Omitted means date. A plain
+            string rather than an enum on purpose: this rides inside
+            ReportTemplate.configuration, and a value added to a closed enum
+            would fail that whole payload on already-released mobile builds.
     ReportDetail:
       type: object
       required:

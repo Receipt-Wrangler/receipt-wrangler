@@ -40,9 +40,14 @@ type ReceiptSummaryRow struct {
 //
 // Statuses and every CustomFieldTotals must be non-nil so they serialize as [] rather
 // than null — the generated Dart deserializer has no null guard.
+// Position rides on the response rather than being read from the client's cached
+// GroupReceiptSettings, for the same reason Enabled does: the cache is stale the moment
+// an admin changes the configuration, and placement is configuration. It is always one of
+// the two real values — never "" — see ReceiptSummaryPosition.OrDefault.
 type ReceiptSummary struct {
-	Enabled              bool                `json:"enabled"`
-	ConfigurationGroupId uint                `json:"configurationGroupId"`
-	Overall              ReceiptSummaryRow   `json:"overall"`
-	Statuses             []ReceiptSummaryRow `json:"statuses"`
+	Enabled              bool                          `json:"enabled"`
+	ConfigurationGroupId uint                          `json:"configurationGroupId"`
+	Position             models.ReceiptSummaryPosition `json:"position"`
+	Overall              ReceiptSummaryRow             `json:"overall"`
+	Statuses             []ReceiptSummaryRow           `json:"statuses"`
 }

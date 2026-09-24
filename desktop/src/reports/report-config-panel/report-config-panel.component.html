@@ -35,9 +35,17 @@
     </div>
   }
 
+  <app-select
+    label="Date field"
+    optionValueKey="value"
+    optionDisplayKey="displayValue"
+    [options]="periodDateFieldOptions"
+    [inputFormControl]="form() | formGet: 'period.dateField'"
+  ></app-select>
+
   <div class="report-config__hint">
     <mat-icon>event</mat-icon>
-    Resolves to <strong>{{ periodLabel() }}</strong>
+    Resolves to <strong>{{ periodLabel() }}</strong> on <strong>{{ periodDateFieldLabel() }}</strong>
   </div>
 </app-report-section>
 

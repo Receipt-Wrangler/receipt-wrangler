@@ -1,6 +1,6 @@
 import { Component, computed, input, output } from "@angular/core";
 import { MatChipsModule } from "@angular/material/chips";
-import { Group, ReceiptSummary, ReceiptSummaryRow } from "../../open-api";
+import { Group, ReceiptSummary, ReceiptSummaryPosition, ReceiptSummaryRow } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { formatStatus } from "../../utils";
 
@@ -39,6 +39,15 @@ export class ReceiptTotalsComponent {
   public readonly selectedConfigGroupId = input<number | undefined>(undefined);
 
   public readonly configGroupSelected = output<number>();
+
+  /**
+   * Where the block sits relative to the table. The parent decides WHICH anchor renders
+   * it; this only tells the component which of its own edges faces the table, so it keeps
+   * owning its vertical rhythm instead of the receipts page reaching in with a margin.
+   */
+  public readonly position = input<ReceiptSummaryPosition>(ReceiptSummaryPosition.Bottom);
+
+  public readonly isTop = computed(() => this.position() === ReceiptSummaryPosition.Top);
 
   public readonly show = computed(() => !!this.summary()?.enabled);
 

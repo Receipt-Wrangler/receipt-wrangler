@@ -120,6 +120,36 @@ func TestUpsertSystemSettingsCommand_Validate_ValidInputs(t *testing.T) {
 				return cmd
 			}(),
 		},
+		// Same two-flavoured "no value" as the lifetimes above: omitted leaves
+		// the stored window alone, an explicit zero means "use the default".
+		"valid with an omitted temp file retention": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.TempFileRetentionHours = nil
+				return cmd
+			}(),
+		},
+		"valid with an unset temp file retention": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.TempFileRetentionHours = intPtr(0)
+				return cmd
+			}(),
+		},
+		"valid with the minimum temp file retention": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.TempFileRetentionHours = intPtr(MinTempFileRetentionHours)
+				return cmd
+			}(),
+		},
+		"valid with the maximum temp file retention": {
+			command: func() UpsertSystemSettingsCommand {
+				cmd := validSystemSettingsCommand()
+				cmd.TempFileRetentionHours = intPtr(MaxTempFileRetentionHours)
+				return cmd
+			}(),
+		},
 	}
 
 	for testName, test := range tests {
@@ -250,6 +280,22 @@ func TestUpsertSystemSettingsCommand_Validate_InvalidInputs(t *testing.T) {
 			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.McpRefreshTokenValidForHours = intPtr(721) },
 			expectedError: "mcpRefreshTokenValidForHours",
 		},
+		"temp file retention below the floor": {
+			modify: func(cmd *UpsertSystemSettingsCommand) {
+				cmd.TempFileRetentionHours = intPtr(MinTempFileRetentionHours - 1)
+			},
+			expectedError: "tempFileRetentionHours",
+		},
+		"temp file retention above the ceiling": {
+			modify: func(cmd *UpsertSystemSettingsCommand) {
+				cmd.TempFileRetentionHours = intPtr(MaxTempFileRetentionHours + 1)
+			},
+			expectedError: "tempFileRetentionHours",
+		},
+		"negative temp file retention": {
+			modify:        func(cmd *UpsertSystemSettingsCommand) { cmd.TempFileRetentionHours = intPtr(-1) },
+			expectedError: "tempFileRetentionHours",
+		},
 	}
 
 	for testName, test := range tests {
@@ -356,4 +402,89 @@ func TestUpsertSystemSettingsCommand_Validate_RefreshTokenLifetimes(t *testing.T
 
 func intPtr(value int) *int {
 	return &value
+}
+
+func strPtr(value string) *string {
+	return &value
+}
+
+// OmittedColumns is what keeps a partial PUT from resetting a field it
+// never mentioned: the repository writes every column (Select("*")), so a value
+// that is not excluded here is silently overwritten with zero.
+func TestOmittedColumnsNamesEveryUnsentField(t *testing.T) {
+	tests := map[string]struct {
+		modify   func(cmd *UpsertSystemSettingsCommand)
+		expected []string
+	}{
+		"all omitted": {
+			modify:   func(cmd *UpsertSystemSettingsCommand) {},
+			expected: []string{"RefreshTokenValidForHours", "McpRefreshTokenValidForHours", "TempFileRetentionHours", "ServerPublicUrl"},
+		},
+		"retention sent, lifetimes omitted": {
+			modify: func(cmd *UpsertSystemSettingsCommand) {
+				cmd.TempFileRetentionHours = intPtr(48)
+			},
+			expected: []string{"RefreshTokenValidForHours", "McpRefreshTokenValidForHours", "ServerPublicUrl"},
+		},
+		"lifetimes sent, retention omitted": {
+			modify: func(cmd *UpsertSystemSettingsCommand) {
+				cmd.RefreshTokenValidForHours = intPtr(24)
+				cmd.McpRefreshTokenValidForHours = intPtr(24)
+			},
+			expected: []string{"TempFileRetentionHours", "ServerPublicUrl"},
+		},
+		"all sent": {
+			modify: func(cmd *UpsertSystemSettingsCommand) {
+				cmd.RefreshTokenValidForHours = intPtr(24)
+				cmd.McpRefreshTokenValidForHours = intPtr(24)
+				cmd.TempFileRetentionHours = intPtr(48)
+				cmd.ServerPublicUrl = strPtr("https://receipts.example.com")
+			},
+			expected: []string{},
+		},
+	}
+
+	for testName, test := range tests {
+		t.Run(testName, func(t *testing.T) {
+			command := UpsertSystemSettingsCommand{}
+			test.modify(&command)
+
+			got := command.OmittedColumns()
+			if len(got) != len(test.expected) {
+				t.Fatalf("expected %v, got %v", test.expected, got)
+			}
+			for i, column := range test.expected {
+				if got[i] != column {
+					t.Errorf("column %d = %q, want %q", i, got[i], column)
+				}
+			}
+		})
+	}
+}
+
+// ApplyOmittedValues exists so the response echoes the stored value rather
+// than the misleading zero that ToSystemSettings' JSON round trip produces for a
+// nil pointer.
+func TestApplyOmittedValuesEchoesStoredValues(t *testing.T) {
+	existing := models.SystemSettings{
+		RefreshTokenValidForHours:    100,
+		McpRefreshTokenValidForHours: 200,
+		TempFileRetentionHours:       300,
+		ServerPublicUrl:              "https://receipts.example.com",
+	}
+
+	command := UpsertSystemSettingsCommand{TempFileRetentionHours: intPtr(48)}
+	updated := models.SystemSettings{TempFileRetentionHours: 48}
+
+	command.ApplyOmittedValues(existing, &updated)
+
+	if updated.RefreshTokenValidForHours != 100 || updated.McpRefreshTokenValidForHours != 200 {
+		t.Errorf("expected the omitted lifetimes to be carried forward, got %+v", updated)
+	}
+	if updated.TempFileRetentionHours != 48 {
+		t.Errorf("expected the sent retention to survive, got %d", updated.TempFileRetentionHours)
+	}
+	if updated.ServerPublicUrl != "https://receipts.example.com" {
+		t.Errorf("expected the omitted server public url to be carried forward, got %q", updated.ServerPublicUrl)
+	}
 }

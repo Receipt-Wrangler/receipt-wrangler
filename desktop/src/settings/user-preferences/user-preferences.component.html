@@ -35,6 +35,15 @@
         [addBlankOption]="true"
       ></app-status-select>
     </app-form-section>
+    <app-form-section headerText="Selection preferences">
+      <app-checkbox
+        class="d-block mb-3"
+        label="Close the option list after each selection?"
+        helpText="Applies to every multi-select field that shows its choices as chips - categories, tags, users, groups and so on. Leave it off to keep the list open so you can pick several in a row."
+        [inputFormControl]="form | formGet : 'closeChipSelectOnSelect'"
+        [readonly]="formConfig.mode | inputReadonly"
+      ></app-checkbox>
+    </app-form-section>
     <app-form-section
       headerText="Shortcuts"
       [headerButtonsTemplate]="shortcutHeaderButtons"

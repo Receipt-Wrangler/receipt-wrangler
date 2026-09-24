@@ -39,6 +39,10 @@ export interface UserPreferences {
      * Default quick scan status
      */
     quickScanDefaultStatus?: ReceiptStatus;
+    /**
+     * Whether multi-select chip fields close their option list after each selection
+     */
+    closeChipSelectOnSelect?: boolean;
     userShortcuts?: Array<UserShortcut>;
 }
 export namespace UserPreferences {

@@ -35,6 +35,7 @@ import { ConfirmationDialogComponent } from "./confirmation-dialog/confirmation-
 import { CopyButtonComponent } from "./copy-button/copy-button.component";
 import { DeleteButtonComponent } from "./delete-button/delete-button.component";
 import { DescriptionViewerDialogComponent } from "./description-viewer-dialog/description-viewer-dialog.component";
+import { ReceiptUpdateDiffDialogComponent } from "./receipt-update-diff-dialog/receipt-update-diff-dialog.component";
 import { DialogFooterComponent } from "./dialog-footer/dialog-footer.component";
 import { DialogComponent } from "./dialog/dialog.component";
 import { EditButtonComponent } from "./edit-button/edit-button.component";
@@ -47,6 +48,7 @@ import { FormComponent } from "./form/form.component";
 import { GroupAutocompleteComponent } from "./group-autocomplete/group-autocomplete.component";
 import { HelpIconComponent } from "./help-icon/help-icon.component";
 import { ImageViewerComponent } from "./image-viewer/image-viewer.component";
+import { SourceFileViewerDialogComponent } from "./source-file-viewer-dialog/source-file-viewer-dialog.component";
 import { PrettyJsonComponent } from "./pretty-json/pretty-json.component";
 import { QueueStartMenuComponent } from "./queue-start-menu/queue-start-menu.component";
 import { QuickScanButtonComponent } from "./quick-scan-button/quick-scan-button.component";
@@ -82,6 +84,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     CopyButtonComponent,
     DeleteButtonComponent,
     DescriptionViewerDialogComponent,
+    ReceiptUpdateDiffDialogComponent,
     DialogComponent,
     DialogFooterComponent,
     EditButtonComponent,
@@ -111,6 +114,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     AccordionComponent,
     PrettyJsonComponent,
     ImageViewerComponent,
+    SourceFileViewerDialogComponent,
     QueueStartMenuComponent,
     EditableListComponent,
     IconAutocompleteComponent,
@@ -157,6 +161,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     CopyButtonComponent,
     DeleteButtonComponent,
     DescriptionViewerDialogComponent,
+    ReceiptUpdateDiffDialogComponent,
     DialogComponent,
     DialogFooterComponent,
     EditButtonComponent,
@@ -185,6 +190,7 @@ import { ImageCanvasComponent } from './image-canvas/image-canvas.component';
     AccordionComponent,
     PrettyJsonComponent,
     ImageViewerComponent,
+    SourceFileViewerDialogComponent,
     QueueStartMenuComponent,
     EditableListComponent,
     IconAutocompleteComponent,

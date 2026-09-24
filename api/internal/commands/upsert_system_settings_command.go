@@ -18,6 +18,19 @@ const (
 	MaxRefreshTokenValidForHours = 720 // 30 days
 )
 
+// Bounds and default for the temp-file retention window, here for the same
+// reason as the refresh-token bounds above: the validator below and the
+// read-side clamp in wranglerasynq must not drift.
+//
+// The floor is a day because the window doubles as the grace period a user has
+// to rerun or download a failed upload — anything shorter reintroduces the bug
+// this setting exists to fix. The ceiling is a year.
+const (
+	MinTempFileRetentionHours     = 24
+	MaxTempFileRetentionHours     = 8760 // 365 days
+	DefaultTempFileRetentionHours = 720  // 30 days
+)
+
 type UpsertSystemSettingsCommand struct {
 	EnableLocalSignUp                   bool                                  `json:"enableLocalSignUp"`
 	DebugOcr                            bool                                  `json:"debugOcr"`
@@ -44,6 +57,7 @@ type UpsertSystemSettingsCommand struct {
 	// on UpdateGroupReceiptSettingsCommand.
 	RefreshTokenValidForHours    *int `json:"refreshTokenValidForHours"`
 	McpRefreshTokenValidForHours *int `json:"mcpRefreshTokenValidForHours"`
+	TempFileRetentionHours       *int `json:"tempFileRetentionHours"`
 	// ServerPublicUrl is a pointer for the same reason, and the stakes are higher
 	// than a reset default: it builds the OIDC redirect URI registered at each
 	// identity provider, so clearing it makes every provider reject the callback
@@ -153,7 +167,29 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 		errorMap["mcpRefreshTokenValidForHours"] = msg
 	}
 
+	if msg := validateTempFileRetentionHours(command.TempFileRetentionHours); len(msg) > 0 {
+		errorMap["tempFileRetentionHours"] = msg
+	}
+
 	return vErr
+}
+
+// validateTempFileRetentionHours bounds the temp-file retention window, returning
+// an empty string when the value is acceptable.
+//
+// Same two-flavoured "no value" as the refresh-token lifetimes: a nil pointer
+// means the key was omitted and leaves the stored value alone, while an explicit
+// 0 means "unset" and lets the read-side clamp fall back to the built-in default.
+func validateTempFileRetentionHours(hours *int) string {
+	if hours == nil || *hours == 0 {
+		return ""
+	}
+
+	if *hours < MinTempFileRetentionHours || *hours > MaxTempFileRetentionHours {
+		return "Temporary file retention must be between 24 and 8760 hours (1 year)"
+	}
+
+	return ""
 }
 
 // validateRefreshTokenValidForHours bounds a refresh-token lifetime, returning an
@@ -222,7 +258,7 @@ func (command *UpsertSystemSettingsCommand) ToSystemSettings(id uint) (models.Sy
 // written cannot be clobbered, and unlike a row lock this works identically on
 // SQLite, MySQL and Postgres.
 func (command *UpsertSystemSettingsCommand) OmittedColumns() []string {
-	columns := make([]string, 0, 3)
+	columns := make([]string, 0, 4)
 
 	if command.RefreshTokenValidForHours == nil {
 		columns = append(columns, "RefreshTokenValidForHours")
@@ -230,6 +266,10 @@ func (command *UpsertSystemSettingsCommand) OmittedColumns() []string {
 
 	if command.McpRefreshTokenValidForHours == nil {
 		columns = append(columns, "McpRefreshTokenValidForHours")
+	}
+
+	if command.TempFileRetentionHours == nil {
+		columns = append(columns, "TempFileRetentionHours")
 	}
 
 	if command.ServerPublicUrl == nil {
@@ -253,6 +293,10 @@ func (command *UpsertSystemSettingsCommand) ApplyOmittedValues(existing models.S
 
 	if command.McpRefreshTokenValidForHours == nil {
 		updated.McpRefreshTokenValidForHours = existing.McpRefreshTokenValidForHours
+	}
+
+	if command.TempFileRetentionHours == nil {
+		updated.TempFileRetentionHours = existing.TempFileRetentionHours
 	}
 
 	if command.ServerPublicUrl == nil {

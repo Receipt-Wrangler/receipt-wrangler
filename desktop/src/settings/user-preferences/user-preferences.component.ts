@@ -57,6 +57,8 @@ export class UserPreferencesComponent extends BaseFormComponent implements OnIni
       quickScanDefaultPaidById: userPreferences?.quickScanDefaultPaidById ?? "",
       quickScanDefaultGroupId: userPreferences?.quickScanDefaultGroupId ?? "",
       quickScanDefaultStatus: userPreferences?.quickScanDefaultStatus ?? "",
+      closeChipSelectOnSelect:
+        userPreferences?.closeChipSelectOnSelect ?? false,
       userShortcuts: this.formBuilder.array(this.originalUserShortcuts().map((userShortcut, i) => this.buildUserShortcut(i, userShortcut))),
     });
 

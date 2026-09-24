@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormControl } from "@angular/forms";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
+import { NgxsModule } from "@ngxs/store";
+import { AuthState } from "../store/auth.state";
 
 import { CategoryAutocompleteComponent } from "./category-autocomplete.component";
 
@@ -10,7 +12,7 @@ describe("CategoryAutocompleteComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CategoryAutocompleteComponent, NoopAnimationsModule],
+      imports: [CategoryAutocompleteComponent, NgxsModule.forRoot([AuthState]), NoopAnimationsModule],
     })
       .compileComponents();
 

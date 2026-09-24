@@ -302,7 +302,10 @@ func (repository SystemTaskRepository) GetPagedActivities(
 	}
 
 	query := db.Model(&models.SystemTask{}).
-		Omit("can_be_restarted").
+		// GORM infers the SELECT list from the structs.Activity destination, so
+		// every computed field on it has to be named here or the query asks for a
+		// column that does not exist.
+		Omit("can_be_restarted", "has_source_file").
 		Where("type IN ?", systemTaskTypesToGet).
 		Where("group_id IN ?", command.GroupIds).
 		Not(db.Where("type = ? AND ran_by_user_id IS NULL", models.RECEIPT_UPLOADED))

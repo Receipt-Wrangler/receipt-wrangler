@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:openapi/src/model/receipt_status.dart';
 import 'package:built_collection/built_collection.dart';
+import 'package:openapi/src/model/receipt_summary_position.dart';
 import 'package:openapi/src/model/quick_scan_default_paid_by_type.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -40,6 +41,7 @@ part 'update_group_receipt_settings_command.g.dart';
 /// * [receiptSummaryEnabled] - Show the block of totals under this group's receipts table. OMIT the key to leave the stored value unchanged - a client that does not render this section must omit it rather than send false, or it switches the summary off for the whole group.
 /// * [receiptSummaryCustomFieldIds] - CURRENCY custom field ids to total in the receipt summary. OMIT the key to leave the configured set unchanged (clients that hide this control, e.g. for a user without app.custom-fields.read, must omit it); send an empty array to clear it. Requires app.custom-fields.read - a caller without it gets a 403. Every id must be an existing CURRENCY custom field - anything else is a 400, because only a currency value can be summed.
 /// * [receiptSummaryStatuses] - Receipt statuses to break out as their own row in the receipt summary. OMIT the key to leave the configured set unchanged; send an empty array to clear it. Unlike the custom field ids this needs NO extra permission - gating it would lock an admin without app.custom-fields.read out of the feature entirely. An unrecognized status is a 400.
+/// * [receiptSummaryPosition] - Where the receipt summary renders relative to the receipts list. OMIT the key to leave the stored value unchanged - a client that does not render this control must omit it rather than send a zero value, or it moves the block for the whole group. Needs no extra permission, for the same reason the statuses do not. Anything but TOP or BOTTOM is a 400, an empty string included: on this write side an explicit empty would reset a configured position, so omitting the key is the only way to leave it alone.
 @BuiltValue()
 abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupReceiptSettingsCommand, UpdateGroupReceiptSettingsCommandBuilder> {
   /// Hide receipt images
@@ -145,6 +147,11 @@ abstract class UpdateGroupReceiptSettingsCommand implements Built<UpdateGroupRec
   /// Receipt statuses to break out as their own row in the receipt summary. OMIT the key to leave the configured set unchanged; send an empty array to clear it. Unlike the custom field ids this needs NO extra permission - gating it would lock an admin without app.custom-fields.read out of the feature entirely. An unrecognized status is a 400.
   @BuiltValueField(wireName: r'receiptSummaryStatuses')
   BuiltList<ReceiptStatus>? get receiptSummaryStatuses;
+
+  /// Where the receipt summary renders relative to the receipts list. OMIT the key to leave the stored value unchanged - a client that does not render this control must omit it rather than send a zero value, or it moves the block for the whole group. Needs no extra permission, for the same reason the statuses do not. Anything but TOP or BOTTOM is a 400, an empty string included: on this write side an explicit empty would reset a configured position, so omitting the key is the only way to leave it alone.
+  @BuiltValueField(wireName: r'receiptSummaryPosition')
+  ReceiptSummaryPosition? get receiptSummaryPosition;
+  // enum receiptSummaryPositionEnum {  TOP,  BOTTOM,  };
 
   UpdateGroupReceiptSettingsCommand._();
 
@@ -351,6 +358,13 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
         specifiedType: const FullType(BuiltList, [FullType(ReceiptStatus)]),
       );
     }
+    if (object.receiptSummaryPosition != null) {
+      yield r'receiptSummaryPosition';
+      yield serializers.serialize(
+        object.receiptSummaryPosition,
+        specifiedType: const FullType(ReceiptSummaryPosition),
+      );
+    }
   }
 
   @override
@@ -555,6 +569,13 @@ class _$UpdateGroupReceiptSettingsCommandSerializer implements PrimitiveSerializ
             specifiedType: const FullType(BuiltList, [FullType(ReceiptStatus)]),
           ) as BuiltList<ReceiptStatus>;
           result.receiptSummaryStatuses.replace(valueDes);
+          break;
+        case r'receiptSummaryPosition':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(ReceiptSummaryPosition),
+          ) as ReceiptSummaryPosition;
+          result.receiptSummaryPosition = valueDes;
           break;
         default:
           unhandled.add(key);

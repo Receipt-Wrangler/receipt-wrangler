@@ -45,4 +45,11 @@ type SystemSettings struct {
 	// human convenience does not silently extend tokens held by third-party
 	// clients. Zero means "unset" and falls back to the built-in default.
 	McpRefreshTokenValidForHours int `json:"mcpRefreshTokenValidForHours" gorm:"default:24"`
+	// TempFileRetentionHours is how long a file in temp/ is kept once nothing can
+	// still act on it — how long a user has to rerun, preview or download the
+	// source image of an upload that failed. Zero means "unset" and falls back to
+	// the built-in default; the read-side clamp, not this column default, is what
+	// guarantees a sane value, since AutoMigrate's back-fill of an added column on
+	// the pre-existing row is engine-dependent.
+	TempFileRetentionHours int `json:"tempFileRetentionHours" gorm:"default:720"`
 }

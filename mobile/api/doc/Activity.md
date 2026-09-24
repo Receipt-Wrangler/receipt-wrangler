@@ -17,6 +17,7 @@ Name | Type | Description | Notes
 **receiptId** | **int** |  | [optional] 
 **groupId** | **int** |  | [optional] 
 **canBeRestarted** | **bool** |  | [optional] 
+**hasSourceFile** | **bool** | Whether the upload behind this activity is still on disk, so it can be previewed or downloaded. False once the temp-file retention window has passed, or for an activity that never had an upload. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

@@ -186,6 +186,16 @@
     </mat-menu>
   </div>
 </app-table-header>
+
+<!--
+  The TOP anchor. Above app-summary-card deliberately: that card is the who-owes-whom
+  settlement for a row SELECTION, so it is transient and belongs next to the table it
+  annotates, while these totals describe the whole filter and are the page's headline.
+  Below the header either way -- the header owns the title and the filter controls.
+-->
+@if (summaryAtTop()) {
+  <ng-container *ngTemplateOutlet="receiptTotals"></ng-container>
+}
 <app-summary-card
   *ngIf="selectedReceiptIds().length"
   @fadeInOut
@@ -229,17 +239,24 @@
   ></app-table>
 </div>
 
+@if (!summaryAtTop()) {
+  <ng-container *ngTemplateOutlet="receiptTotals"></ng-container>
+}
+
 <!--
-  Totals for the whole current filter, not just this page. Rendered below the table (the paginator
-  lives inside app-table) so it reads as a footer to the list. It renders nothing at all unless the
-  group has the summary configured.
+  ONE set of bindings, rendered at whichever anchor the group configured. Two copies of the
+  element behind separate @ifs would drift, and each would need its own data-testid handling
+  in the e2e suite.
 -->
-<app-receipt-totals
-  [summary]="summary()"
-  [configGroups]="summaryConfigGroupOptions()"
-  [selectedConfigGroupId]="summaryConfigGroupId()"
-  (configGroupSelected)="summaryConfigGroupSelected($event)"
-></app-receipt-totals>
+<ng-template #receiptTotals>
+  <app-receipt-totals
+    [summary]="summary()"
+    [position]="summaryPosition()"
+    [configGroups]="summaryConfigGroupOptions()"
+    [selectedConfigGroupId]="summaryConfigGroupId()"
+    (configGroupSelected)="summaryConfigGroupSelected($event)"
+  ></app-receipt-totals>
+</ng-template>
 
 <ng-template #createdAtCell let-element="element"
 >{{ element.createdAt | date }}
@@ -277,6 +294,16 @@
 
 <ng-template #resolvedDateCell let-element="element">
   {{ element.resolvedDate | date : "medium" }}
+</ng-template>
+
+<ng-template #firstCommentCell let-element="element">
+  <span
+    class="receipt-first-comment"
+    data-testid="receipt-first-comment"
+    [matTooltip]="element.firstComment"
+  >
+    {{ element.firstComment }}
+  </span>
 </ng-template>
 
 <ng-template #customFieldCell let-element="element" let-column="column">

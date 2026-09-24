@@ -114,6 +114,23 @@ const List<ReceiptFilterField> receiptFilterFields = [
   ),
 ];
 
+/// The date fields the quick date control can be pointed at, in the order
+/// [receiptFilterFields] declares them: Receipt Date, Resolved Date, Added At.
+///
+/// Derived rather than restated, exactly as desktop's
+/// `RECEIPT_DATE_FILTER_FIELDS` is, so the stepper's field picker, the "Add
+/// filter" sheet and the condition card can never name a field differently.
+/// Desktop narrows on the *key* because TypeScript needs the runtime check to
+/// justify the narrower type it claims; Dart needs no such narrowing, so
+/// filtering on the type is both honest and self-maintaining -- a new
+/// `ReceiptFilterFieldType.date` field reaches the picker with no second edit.
+final List<ReceiptFilterField> receiptDateFilterFields = receiptFilterFields
+    .where((field) => field.type == ReceiptFilterFieldType.date)
+    .toList(growable: false);
+
+/// The date field the quick date control starts on.
+const String defaultQuickDateFieldKey = "date";
+
 /// The field named [key], or null when nothing declares it.
 ReceiptFilterField? receiptFilterFieldByKey(String key) {
   for (final field in receiptFilterFields) {

@@ -23,6 +23,11 @@ type Receipt struct {
 	ReceiptItems []Item             `json:"receiptItems"`
 	Comments     []Comment          `json:"comments"`
 	CustomFields []CustomFieldValue `json:"customFields"`
+	// FirstComment is the text of the earliest comment the caller may see, a
+	// transient projection filled only by the paged receipts list (see
+	// PermissionService.LoadFirstVisibleComments). omitempty keeps it off every
+	// other response, where it is never loaded.
+	FirstComment *string `gorm:"-" json:"firstComment,omitempty"`
 }
 
 func (r *Receipt) ToString() (string, error) {

@@ -2,7 +2,12 @@ import { AbstractControl, ValidationErrors, ValidatorFn } from "@angular/forms";
 
 /**
  * Bounds a duration setting edited as a number + unit pair: a whole number, at
- * least 1, at most `max` (expressed in the currently selected unit).
+ * least `min`, at most `max` (both expressed in the currently selected unit).
+ *
+ * `min` defaults to 1 because most of these settings only need a positive whole
+ * number. Pass it when the API enforces a real floor — without it a value the
+ * server rejects passes client validation and comes back as a bare 400 with
+ * nothing attached to the field.
  *
  * It replaces `Validators.min` / `Validators.max` here for two reasons:
  *
@@ -16,7 +21,7 @@ import { AbstractControl, ValidationErrors, ValidatorFn } from "@angular/forms";
  *   the error *value* takes the `typeof value === "string"` path in that
  *   component, which renders it verbatim.
  */
-export function durationValueValidator(max: number): ValidatorFn {
+export function durationValueValidator(max: number, min: number = 1): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
     const raw = control.value;
 
@@ -34,8 +39,8 @@ export function durationValueValidator(max: number): ValidatorFn {
       return { duration: "Must be a whole number." };
     }
 
-    if (value < 1) {
-      return { duration: "Must be at least 1." };
+    if (value < min) {
+      return { duration: `Must be at least ${min}.` };
     }
 
     if (value > max) {

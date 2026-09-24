@@ -116,6 +116,7 @@ model/receiptStatus.ts
 model/receiptSummary.ts
 model/receiptSummaryCommand.ts
 model/receiptSummaryCustomFieldTotal.ts
+model/receiptSummaryPosition.ts
 model/receiptSummaryRow.ts
 model/reportColumn.ts
 model/reportDetail.ts
@@ -136,6 +137,7 @@ model/systemEmail.ts
 model/systemSettings.ts
 model/systemTask.ts
 model/systemTaskPagedRequestFilter.ts
+model/systemTaskSourceFileView.ts
 model/systemTaskStatus.ts
 model/systemTaskType.ts
 model/tag.ts

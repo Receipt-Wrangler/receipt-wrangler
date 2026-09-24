@@ -15,6 +15,7 @@ Name | Type | Description | Notes
 **createdAt** | **String** |  | 
 **createdBy** | **int** |  | [optional] 
 **date** | **String** | Receipt date | 
+**firstComment** | **String** | Text of the receipt's earliest comment the caller may see. Only populated by the paged receipt list (POST /receipt/group/{groupId}); absent when there is no such comment. | [optional] 
 **groupId** | **int** |  | 
 **id** | **int** |  | 
 **imageFiles** | [**BuiltList&lt;FileData&gt;**](FileData.md) | Files associated to receipt | [optional] 
@@ -45,6 +46,7 @@ Name | Type | Description | Notes
 **resultDescription** | **String** |  | [optional] 
 **apiKeyId** | **String** |  | [optional] 
 **childSystemTasks** | [**BuiltList&lt;SystemTask&gt;**](SystemTask.md) |  | [optional] 
+**hasSourceFile** | **bool** | Whether the upload behind this activity is still on disk, so it can be previewed or downloaded. False once the temp-file retention window has passed, or for an activity that never had an upload. | [optional] 
 **aiType** | [**AiType**](AiType.md) |  | [optional] 
 **url** | **String** | URL for custom endpoints | [optional] 
 **key** | **String** | Key for endpoints that require authentication | [optional] 

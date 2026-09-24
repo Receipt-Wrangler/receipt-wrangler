@@ -42,6 +42,7 @@ part 'system_settings.g.dart';
 /// * [mobileServerUrl] - Server/API URL mobile clients connect to; encoded into the login QR's deep link
 /// * [refreshTokenValidForHours] - How long a refresh token stays valid, in hours. Refresh tokens rotate on every use, so this is how long a user can be away and still return signed in, not an absolute session cap. 1-720 (30 days); 0 means unset and falls back to the default.
 /// * [mcpRefreshTokenValidForHours] - The same for MCP/OAuth connector refresh tokens, kept separate so a long window chosen for human convenience does not extend third-party client tokens. 1-720 (30 days); 0 means unset and falls back to the default.
+/// * [tempFileRetentionHours] - How long a file in temp/ is kept once nothing can still act on it, i.e. how long a user has to rerun, preview or download the source image of a failed upload. 24-8760 (1 year); 0 means unset and falls back to the default.
 @BuiltValue()
 abstract class SystemSettings implements BaseModel, Built<SystemSettings, SystemSettingsBuilder> {
   /// Whether the OAuth 2.1-protected MCP server is enabled
@@ -55,6 +56,10 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
   /// DPI used when rasterizing PDFs for OCR/vision processing
   @BuiltValueField(wireName: r'pdfDpi')
   int? get pdfDpi;
+
+  /// How long a file in temp/ is kept once nothing can still act on it, i.e. how long a user has to rerun, preview or download the source image of a failed upload. 24-8760 (1 year); 0 means unset and falls back to the default.
+  @BuiltValueField(wireName: r'tempFileRetentionHours')
+  int? get tempFileRetentionHours;
 
   /// Currency display
   @BuiltValueField(wireName: r'currencyDisplay')
@@ -135,6 +140,7 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
   static void _defaults(SystemSettingsBuilder b) => b
       ..mcpEnabled = false
       ..pdfDpi = 300
+      ..tempFileRetentionHours = 720
       ..currencyDisplay = r'$'
       ..currencyHideDecimalPlaces = false
       ..numWorkers = 1
@@ -176,6 +182,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
       yield r'pdfDpi';
       yield serializers.serialize(
         object.pdfDpi,
+        specifiedType: const FullType(int),
+      );
+    }
+    if (object.tempFileRetentionHours != null) {
+      yield r'tempFileRetentionHours';
+      yield serializers.serialize(
+        object.tempFileRetentionHours,
         specifiedType: const FullType(int),
       );
     }
@@ -377,6 +390,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
             specifiedType: const FullType(int),
           ) as int;
           result.pdfDpi = valueDes;
+          break;
+        case r'tempFileRetentionHours':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.tempFileRetentionHours = valueDes;
           break;
         case r'currencyDisplay':
           final valueDes = serializers.deserialize(

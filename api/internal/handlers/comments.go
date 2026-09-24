@@ -49,15 +49,7 @@ func AddComment(w http.ResponseWriter, r *http.Request) {
 			// recipients always receive.
 			permissionService := services.NewPermissionService(nil)
 			authorVisibleTo := func(authorId uint, recipientId uint, groupId uint) (bool, error) {
-				visibleUserIds, unrestricted, err := permissionService.GetVisibleUserIdsForUserInGroup(recipientId, groupId)
-				if err != nil {
-					return false, err
-				}
-				if unrestricted {
-					return true, nil
-				}
-				_, ok := visibleUserIds[authorId]
-				return ok, nil
+				return permissionService.UserVisibleInGroup(recipientId, authorId, groupId)
 			}
 
 			comment, err := commentRepository.AddComment(upsertCommentCommand, authorVisibleTo)

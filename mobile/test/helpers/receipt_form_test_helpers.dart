@@ -102,6 +102,10 @@ api.GroupReceiptSettings buildGroupReceiptSettings({
   bool hideImages = false,
   List<int>? defaultCustomFieldIds,
   bool? applyDefaultCustomFieldsOnIngest,
+  bool? receiptSummaryEnabled,
+  api.ReceiptSummaryPosition? receiptSummaryPosition,
+  List<int>? receiptSummaryCustomFieldIds,
+  List<api.ReceiptStatus>? receiptSummaryStatuses,
 }) =>
     (api.GroupReceiptSettingsBuilder()
           ..id = id ?? groupId
@@ -112,6 +116,14 @@ api.GroupReceiptSettings buildGroupReceiptSettings({
           ..hideComments = hideComments
           ..hideImages = hideImages
           ..applyDefaultCustomFieldsOnIngest = applyDefaultCustomFieldsOnIngest
+          ..receiptSummaryEnabled = receiptSummaryEnabled
+          ..receiptSummaryPosition = receiptSummaryPosition
+          ..receiptSummaryCustomFieldIds = receiptSummaryCustomFieldIds == null
+              ? null
+              : ListBuilder<int>(receiptSummaryCustomFieldIds)
+          ..receiptSummaryStatuses = receiptSummaryStatuses == null
+              ? null
+              : ListBuilder<api.ReceiptStatus>(receiptSummaryStatuses)
           ..defaultCustomFieldIds = defaultCustomFieldIds == null
               ? null
               : ListBuilder<int>(defaultCustomFieldIds))
@@ -132,6 +144,7 @@ api.Group buildGroup({
   List<api.GroupMember> members = const [],
   List<int>? defaultCustomFieldIds,
   bool isAllGroup = false,
+  bool? receiptSummaryEnabled,
 }) =>
     (api.GroupBuilder()
           ..id = id
@@ -144,6 +157,7 @@ api.Group buildGroup({
               buildGroupReceiptSettings(
                 groupId: id,
                 defaultCustomFieldIds: defaultCustomFieldIds,
+                receiptSummaryEnabled: receiptSummaryEnabled,
               )))
         .build();
 

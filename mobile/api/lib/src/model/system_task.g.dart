@@ -8,23 +8,25 @@ part of 'system_task.dart';
 
 class _$SystemTask extends SystemTask {
   @override
+  final bool? hasSourceFile;
+  @override
+  final int? groupId;
+  @override
+  final String? startedAt;
+  @override
+  final String? apiKeyId;
+  @override
+  final SystemTaskType? type;
+  @override
   final int? associatedEntityId;
   @override
   final String? endedAt;
   @override
   final AssociatedEntityType? associatedEntityType;
   @override
-  final int? groupId;
-  @override
   final BuiltList<SystemTask>? childSystemTasks;
   @override
-  final String? startedAt;
-  @override
-  final String? apiKeyId;
-  @override
   final String? resultDescription;
-  @override
-  final SystemTaskType? type;
   @override
   final int? receiptId;
   @override
@@ -46,15 +48,16 @@ class _$SystemTask extends SystemTask {
       (SystemTaskBuilder()..update(updates))._build();
 
   _$SystemTask._(
-      {this.associatedEntityId,
-      this.endedAt,
-      this.associatedEntityType,
+      {this.hasSourceFile,
       this.groupId,
-      this.childSystemTasks,
       this.startedAt,
       this.apiKeyId,
-      this.resultDescription,
       this.type,
+      this.associatedEntityId,
+      this.endedAt,
+      this.associatedEntityType,
+      this.childSystemTasks,
+      this.resultDescription,
       this.receiptId,
       this.ranByUserId,
       this.status,
@@ -75,15 +78,16 @@ class _$SystemTask extends SystemTask {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is SystemTask &&
+        hasSourceFile == other.hasSourceFile &&
+        groupId == other.groupId &&
+        startedAt == other.startedAt &&
+        apiKeyId == other.apiKeyId &&
+        type == other.type &&
         associatedEntityId == other.associatedEntityId &&
         endedAt == other.endedAt &&
         associatedEntityType == other.associatedEntityType &&
-        groupId == other.groupId &&
         childSystemTasks == other.childSystemTasks &&
-        startedAt == other.startedAt &&
-        apiKeyId == other.apiKeyId &&
         resultDescription == other.resultDescription &&
-        type == other.type &&
         receiptId == other.receiptId &&
         ranByUserId == other.ranByUserId &&
         status == other.status &&
@@ -97,15 +101,16 @@ class _$SystemTask extends SystemTask {
   @override
   int get hashCode {
     var _$hash = 0;
+    _$hash = $jc(_$hash, hasSourceFile.hashCode);
+    _$hash = $jc(_$hash, groupId.hashCode);
+    _$hash = $jc(_$hash, startedAt.hashCode);
+    _$hash = $jc(_$hash, apiKeyId.hashCode);
+    _$hash = $jc(_$hash, type.hashCode);
     _$hash = $jc(_$hash, associatedEntityId.hashCode);
     _$hash = $jc(_$hash, endedAt.hashCode);
     _$hash = $jc(_$hash, associatedEntityType.hashCode);
-    _$hash = $jc(_$hash, groupId.hashCode);
     _$hash = $jc(_$hash, childSystemTasks.hashCode);
-    _$hash = $jc(_$hash, startedAt.hashCode);
-    _$hash = $jc(_$hash, apiKeyId.hashCode);
     _$hash = $jc(_$hash, resultDescription.hashCode);
-    _$hash = $jc(_$hash, type.hashCode);
     _$hash = $jc(_$hash, receiptId.hashCode);
     _$hash = $jc(_$hash, ranByUserId.hashCode);
     _$hash = $jc(_$hash, status.hashCode);
@@ -121,15 +126,16 @@ class _$SystemTask extends SystemTask {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'SystemTask')
+          ..add('hasSourceFile', hasSourceFile)
+          ..add('groupId', groupId)
+          ..add('startedAt', startedAt)
+          ..add('apiKeyId', apiKeyId)
+          ..add('type', type)
           ..add('associatedEntityId', associatedEntityId)
           ..add('endedAt', endedAt)
           ..add('associatedEntityType', associatedEntityType)
-          ..add('groupId', groupId)
           ..add('childSystemTasks', childSystemTasks)
-          ..add('startedAt', startedAt)
-          ..add('apiKeyId', apiKeyId)
           ..add('resultDescription', resultDescription)
-          ..add('type', type)
           ..add('receiptId', receiptId)
           ..add('ranByUserId', ranByUserId)
           ..add('status', status)
@@ -145,6 +151,27 @@ class _$SystemTask extends SystemTask {
 class SystemTaskBuilder
     implements Builder<SystemTask, SystemTaskBuilder>, BaseModelBuilder {
   _$SystemTask? _$v;
+
+  bool? _hasSourceFile;
+  bool? get hasSourceFile => _$this._hasSourceFile;
+  set hasSourceFile(covariant bool? hasSourceFile) =>
+      _$this._hasSourceFile = hasSourceFile;
+
+  int? _groupId;
+  int? get groupId => _$this._groupId;
+  set groupId(covariant int? groupId) => _$this._groupId = groupId;
+
+  String? _startedAt;
+  String? get startedAt => _$this._startedAt;
+  set startedAt(covariant String? startedAt) => _$this._startedAt = startedAt;
+
+  String? _apiKeyId;
+  String? get apiKeyId => _$this._apiKeyId;
+  set apiKeyId(covariant String? apiKeyId) => _$this._apiKeyId = apiKeyId;
+
+  SystemTaskType? _type;
+  SystemTaskType? get type => _$this._type;
+  set type(covariant SystemTaskType? type) => _$this._type = type;
 
   int? _associatedEntityId;
   int? get associatedEntityId => _$this._associatedEntityId;
@@ -162,32 +189,16 @@ class SystemTaskBuilder
           covariant AssociatedEntityType? associatedEntityType) =>
       _$this._associatedEntityType = associatedEntityType;
 
-  int? _groupId;
-  int? get groupId => _$this._groupId;
-  set groupId(covariant int? groupId) => _$this._groupId = groupId;
-
   ListBuilder<SystemTask>? _childSystemTasks;
   ListBuilder<SystemTask> get childSystemTasks =>
       _$this._childSystemTasks ??= ListBuilder<SystemTask>();
   set childSystemTasks(covariant ListBuilder<SystemTask>? childSystemTasks) =>
       _$this._childSystemTasks = childSystemTasks;
 
-  String? _startedAt;
-  String? get startedAt => _$this._startedAt;
-  set startedAt(covariant String? startedAt) => _$this._startedAt = startedAt;
-
-  String? _apiKeyId;
-  String? get apiKeyId => _$this._apiKeyId;
-  set apiKeyId(covariant String? apiKeyId) => _$this._apiKeyId = apiKeyId;
-
   String? _resultDescription;
   String? get resultDescription => _$this._resultDescription;
   set resultDescription(covariant String? resultDescription) =>
       _$this._resultDescription = resultDescription;
-
-  SystemTaskType? _type;
-  SystemTaskType? get type => _$this._type;
-  set type(covariant SystemTaskType? type) => _$this._type = type;
 
   int? _receiptId;
   int? get receiptId => _$this._receiptId;
@@ -230,15 +241,16 @@ class SystemTaskBuilder
   SystemTaskBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
+      _hasSourceFile = $v.hasSourceFile;
+      _groupId = $v.groupId;
+      _startedAt = $v.startedAt;
+      _apiKeyId = $v.apiKeyId;
+      _type = $v.type;
       _associatedEntityId = $v.associatedEntityId;
       _endedAt = $v.endedAt;
       _associatedEntityType = $v.associatedEntityType;
-      _groupId = $v.groupId;
       _childSystemTasks = $v.childSystemTasks?.toBuilder();
-      _startedAt = $v.startedAt;
-      _apiKeyId = $v.apiKeyId;
       _resultDescription = $v.resultDescription;
-      _type = $v.type;
       _receiptId = $v.receiptId;
       _ranByUserId = $v.ranByUserId;
       _status = $v.status;
@@ -270,15 +282,16 @@ class SystemTaskBuilder
     try {
       _$result = _$v ??
           _$SystemTask._(
+            hasSourceFile: hasSourceFile,
+            groupId: groupId,
+            startedAt: startedAt,
+            apiKeyId: apiKeyId,
+            type: type,
             associatedEntityId: associatedEntityId,
             endedAt: endedAt,
             associatedEntityType: associatedEntityType,
-            groupId: groupId,
             childSystemTasks: _childSystemTasks?.build(),
-            startedAt: startedAt,
-            apiKeyId: apiKeyId,
             resultDescription: resultDescription,
-            type: type,
             receiptId: receiptId,
             ranByUserId: ranByUserId,
             status: status,

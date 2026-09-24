@@ -21,6 +21,10 @@ export interface Activity {
     receiptId?: number;
     groupId?: number;
     canBeRestarted?: boolean;
+    /**
+     * Whether the upload behind this activity is still on disk, so it can be previewed or downloaded. False once the temp-file retention window has passed, or for an activity that never had an upload.
+     */
+    hasSourceFile?: boolean;
 }
 export namespace Activity {
 }

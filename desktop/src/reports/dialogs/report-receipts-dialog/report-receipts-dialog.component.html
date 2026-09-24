@@ -4,7 +4,14 @@
   @if (!loading() && hasError()) {
     <div class="drill__warning" data-testid="report-receipt-error">
       <mat-icon>warning</mat-icon>
-      Some groups couldn't be loaded — this list may be incomplete.
+      The receipts couldn't be loaded.
+    </div>
+  }
+
+  @if (!loading() && !hasError() && truncated()) {
+    <div class="drill__warning" data-testid="report-receipt-truncated">
+      <mat-icon>info</mat-icon>
+      Showing the newest {{ receipts().length }} of {{ totalCount() }} receipts.
     </div>
   }
 

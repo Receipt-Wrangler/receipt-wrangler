@@ -15,7 +15,7 @@ part 'receipt_paged_request_command.g.dart';
 /// Properties:
 /// * [page] - Page number
 /// * [pageSize] - Number of records per page
-/// * [orderBy] - field to order on
+/// * [orderBy] - field to order on - a receipt column, custom_<id> for a custom field, or first_comment for the receipt's first comment
 /// * [sortDirection] 
 /// * [filter] 
 /// * [fullReceipts] - Whether to include all receipt associations (receiptItems, comments, customFields, imageFiles, etc.)
@@ -29,7 +29,7 @@ abstract class ReceiptPagedRequestCommand implements Built<ReceiptPagedRequestCo
   @BuiltValueField(wireName: r'pageSize')
   int get pageSize;
 
-  /// field to order on
+  /// field to order on - a receipt column, custom_<id> for a custom field, or first_comment for the receipt's first comment
   @BuiltValueField(wireName: r'orderBy')
   String? get orderBy;
 

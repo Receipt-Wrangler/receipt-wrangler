@@ -37,14 +37,21 @@ export const httpInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => e);
       }
 
-      const regex = new RegExp("5\\d{2}");
+      // The server's errorMsg is the user-friendly message and always wins when
+      // present. Angular's generic HttpErrorResponse.message ("Http failure
+      // response for /api/login/: 500 Internal Server Error") is only a fallback
+      // for a 5xx that carries no message at all, so an infra-level failure is
+      // not silent. These must stay mutually exclusive: MatSnackBar.open()
+      // dismisses whatever is already showing, so toasting both replaced the
+      // useful message with the useless one before the user could read it.
+      if (!receiptQueueMode) {
+        const serverMessage = e.error?.errorMsg;
 
-      if (e.error?.errorMsg && !receiptQueueMode) {
-        snackbarService.error(e.error?.errorMsg);
-      }
-
-      if (regex.test(e.status.toString())) {
-        snackbarService.error(e.message);
+        if (serverMessage) {
+          snackbarService.error(serverMessage);
+        } else if (e.status >= 500) {
+          snackbarService.error(e.message);
+        }
       }
 
       return throwError(() => e);

@@ -22,6 +22,7 @@ part 'activity.g.dart';
 /// * [receiptId] 
 /// * [groupId] 
 /// * [canBeRestarted] 
+/// * [hasSourceFile] - Whether the upload behind this activity is still on disk, so it can be previewed or downloaded. False once the temp-file retention window has passed, or for an activity that never had an upload.
 @BuiltValue()
 abstract class Activity implements Built<Activity, ActivityBuilder> {
   @BuiltValueField(wireName: r'id')
@@ -52,6 +53,10 @@ abstract class Activity implements Built<Activity, ActivityBuilder> {
 
   @BuiltValueField(wireName: r'canBeRestarted')
   bool? get canBeRestarted;
+
+  /// Whether the upload behind this activity is still on disk, so it can be previewed or downloaded. False once the temp-file retention window has passed, or for an activity that never had an upload.
+  @BuiltValueField(wireName: r'hasSourceFile')
+  bool? get hasSourceFile;
 
   Activity._();
 
@@ -126,6 +131,13 @@ class _$ActivitySerializer implements PrimitiveSerializer<Activity> {
       yield r'canBeRestarted';
       yield serializers.serialize(
         object.canBeRestarted,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.hasSourceFile != null) {
+      yield r'hasSourceFile';
+      yield serializers.serialize(
+        object.hasSourceFile,
         specifiedType: const FullType(bool),
       );
     }
@@ -214,6 +226,13 @@ class _$ActivitySerializer implements PrimitiveSerializer<Activity> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.canBeRestarted = valueDes;
+          break;
+        case r'hasSourceFile':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.hasSourceFile = valueDes;
           break;
         default:
           unhandled.add(key);

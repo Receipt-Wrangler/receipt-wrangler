@@ -861,6 +861,7 @@ export async function apiSetGroupSummaryConfig(
     enabled: boolean;
     statuses?: string[];
     currencyCustomFieldIds?: number[];
+    position?: 'TOP' | 'BOTTOM';
   },
 ): Promise<void> {
   const what = 'set receipt summary config';
@@ -871,6 +872,9 @@ export async function apiSetGroupSummaryConfig(
   }
   if (config.currencyCustomFieldIds !== undefined) {
     command['receiptSummaryCustomFieldIds'] = config.currencyCustomFieldIds;
+  }
+  if (config.position !== undefined) {
+    command['receiptSummaryPosition'] = config.position;
   }
 
   await putGroupReceiptSettings(api, groupId, command, what);
@@ -990,6 +994,105 @@ export async function apiDeleteRoleByName(
 }
 
 /**
+ * Creates a receipt-processing configuration pointed at an unreachable host, so
+ * every AI call made through it fails.
+ *
+ * `isVisionModel` is set so the pipeline skips OCR and goes straight to the AI
+ * call -- that keeps the failure fast and independent of whether Tesseract is
+ * installed on the backend under test.
+ */
+export async function apiCreateUnreachableProcessingSettings(
+  api: APIRequestContext,
+  name: string,
+): Promise<{ id: number; promptId: number }> {
+  const promptRes = await api.post('/api/prompt/', {
+    data: {
+      name,
+      description: 'e2e: forces a failed quick scan',
+      prompt: 'Extract the receipt. @categories @tags',
+    },
+  });
+  if (!promptRes.ok()) {
+    throw new Error(
+      `create prompt failed: HTTP ${promptRes.status()} ${await promptRes.text()}`,
+    );
+  }
+  const prompt = (await promptRes.json()) as { id: number };
+
+  const res = await api.post('/api/receiptProcessingSettings/', {
+    data: {
+      name,
+      description: 'e2e: forces a failed quick scan',
+      aiType: 'OPEN_AI_CUSTOM',
+      // Reserved for documentation examples, so it can never resolve.
+      url: 'http://invalid.example:9/v1',
+      key: 'e2e',
+      model: 'e2e',
+      isVisionModel: true,
+      promptId: prompt.id,
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `create receipt processing settings failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+  const settings = (await res.json()) as { id: number };
+
+  return { id: settings.id, promptId: prompt.id };
+}
+
+/**
+ * Overlays one field onto the live system settings. Re-reads first so a
+ * concurrent change to an unrelated setting is not clobbered by a stale
+ * snapshot -- the PUT is an upsert needing the full object.
+ */
+export async function apiPatchSystemSettings(
+  api: APIRequestContext,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const getResponse = await api.get('/api/systemSettings');
+  if (!getResponse.ok()) {
+    throw new Error(`GET /api/systemSettings failed: HTTP ${getResponse.status()}`);
+  }
+  const current = await getResponse.json();
+
+  const putResponse = await api.put('/api/systemSettings', {
+    data: { ...current, ...patch },
+  });
+  if (!putResponse.ok()) {
+    throw new Error(
+      `PUT /api/systemSettings failed: HTTP ${putResponse.status()} ${await putResponse.text()}`,
+    );
+  }
+}
+
+/** Posts a quick scan of [file] for [groupId]. Fire-and-forget on the server. */
+export async function apiQuickScan(
+  api: APIRequestContext,
+  groupId: number,
+  paidByUserId: number,
+  file: { name: string; mimeType: string; buffer: Buffer },
+): Promise<void> {
+  const res = await api.post('/api/receipt/quickScan', {
+    multipart: {
+      files: file,
+      groupIds: String(groupId),
+      paidByUserIds: String(paidByUserId),
+      statuses: 'OPEN',
+      categoryIds: '',
+      tagIds: '',
+      comments: '',
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `quick scan failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+}
+
+/**
  * Creates an API key and immediately deletes it, which records exactly one
  * `API_KEY_DELETED` system task attributed to the caller.
  *
@@ -1031,6 +1134,55 @@ export async function apiRecordApiKeyDeletedSystemTask(
   if (!deleteRes.ok()) {
     throw new Error(`delete api key failed: HTTP ${deleteRes.status()}`);
   }
+}
+
+/**
+ * Polls the activity feed until a QUICK_SCAN row for [groupId] is FAILED and
+ * still carries its upload, then returns it.
+ */
+export async function apiWaitForFailedQuickScan(
+  api: APIRequestContext,
+  groupId: number,
+  timeoutMs = 60_000,
+): Promise<{ id: number; hasSourceFile: boolean }> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const res = await api.post('/api/systemTask/getPagedActivities', {
+      data: {
+        groupIds: [groupId],
+        orderBy: 'started_at',
+        sortDirection: 'desc',
+        page: 1,
+        pageSize: 25,
+      },
+    });
+    if (res.ok()) {
+      const paged = (await res.json()) as {
+        data: { id: number; type: string; status: string; hasSourceFile: boolean }[];
+      };
+      const failed = paged.data.find(
+        (activity) => activity.type === 'QUICK_SCAN' && activity.status === 'FAILED',
+      );
+      if (failed?.hasSourceFile) {
+        return failed;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  throw new Error(`no failed quick scan with a source file appeared for group ${groupId}`);
+}
+
+/** Deletes a receipt-processing configuration and its prompt. */
+export async function apiDeleteProcessingSettings(
+  api: APIRequestContext,
+  settingsId: number,
+  promptId: number,
+): Promise<void> {
+  await api.delete(`/api/receiptProcessingSettings/${settingsId}`);
+  await api.delete(`/api/prompt/${promptId}`);
 }
 
 /**

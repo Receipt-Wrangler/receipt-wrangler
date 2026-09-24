@@ -1,4 +1,7 @@
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
@@ -70,8 +73,120 @@ describe('AuthForm', () => {
     expect(component).toBeTruthy();
   });
 
+  // Regression guard: isLoading used to be a plain field reset inside finalize().
+  // Under zoneless change detection nothing repaints on the failure path (the
+  // success path only repainted because router.navigate() triggers CD), so the
+  // loading GIF stayed up forever and the user never got their form back.
+  it('clears the spinner and restores the populated form when login fails', async () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    component.form.setValue({
+      username: 'wrangler',
+      password: 'wrong-password',
+    });
+
+    component.submit();
+    await fixture.whenStable();
+
+    // The spinner is up while the request is in flight.
+    expect(component.isLoading()).toBe(true);
+    expect(
+      fixture.nativeElement.querySelector('.loading-container')
+    ).toBeTruthy();
+
+    httpTesting
+      .expectOne('/api/login/')
+      .flush(
+        { errorMsg: 'Invalid credentials.' },
+        { status: 500, statusText: 'Internal Server Error' }
+      );
+
+    await fixture.whenStable();
+
+    expect(component.isLoading()).toBe(false);
+    expect(fixture.nativeElement.querySelector('.loading-container')).toBeNull();
+
+    // The form is back in the DOM, still rendering what the user typed.
+    const inputs: HTMLInputElement[] = Array.from(
+      fixture.nativeElement.querySelectorAll('app-input input')
+    );
+    expect(inputs.map((input) => input.value)).toEqual([
+      'wrangler',
+      'wrong-password',
+    ]);
+
+    httpTesting.verify();
+  });
+
   // The QR itself is unit-tested in shared-ui/login-qr; these two only pin that
   // the login page still wires the shared component up.
+  // The sign-up catchError previously did `err.error["username"] ?? err["errMsg"]`,
+  // which is undefined for an errorMsg body (the wire key lives under .error), so a
+  // 500 opened a blank snackbar over the interceptor's correct one. These two pin
+  // each branch. Note the functional httpInterceptor is NOT registered in this
+  // TestBed, so "no local toast" here means the interceptor is the only reporter.
+  // Sign-up mode attaches the uniqueUsername async validator, which fires a
+  // getUsernameCount request and leaves the form PENDING (so submit() would
+  // no-op). Settle it here so each test drives the real submit path.
+  async function enterSignUpMode(httpTesting: HttpTestingController) {
+    component.isSignUp.next(true);
+    component.form.setValue({
+      username: 'wrangler',
+      password: 'hunter2',
+      displayname: 'Wrangler',
+    });
+    await fixture.whenStable();
+
+    httpTesting.expectOne('/api/user/wrangler').flush(0);
+    await fixture.whenStable();
+    expect(component.form.valid).toBe(true);
+  }
+
+  it('surfaces a sign-up field validation error, which the interceptor ignores', async () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    const errorSpy = jest
+      .spyOn(TestBed.inject(SnackbarService), 'error')
+      .mockImplementation(() => {});
+    await enterSignUpMode(httpTesting);
+
+    component.submit();
+    await fixture.whenStable();
+
+    httpTesting
+      .expectOne('/api/signUp')
+      .flush(
+        { username: 'Username must be unique' },
+        { status: 400, statusText: 'Bad Request' }
+      );
+    await fixture.whenStable();
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith('Username must be unique');
+    httpTesting.verify();
+  });
+
+  it('leaves an errorMsg sign-up failure to the interceptor', async () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    const errorSpy = jest
+      .spyOn(TestBed.inject(SnackbarService), 'error')
+      .mockImplementation(() => {});
+    await enterSignUpMode(httpTesting);
+
+    component.submit();
+    await fixture.whenStable();
+
+    httpTesting
+      .expectOne('/api/signUp')
+      .flush(
+        { errorMsg: 'Something broke' },
+        { status: 500, statusText: 'Internal Server Error' }
+      );
+    await fixture.whenStable();
+
+    // No second toast: the interceptor already reported it.
+    expect(errorSpy).not.toHaveBeenCalled();
+    httpTesting.verify();
+  });
+
   it('does not render the login QR when loginQrUrl is empty', () => {
     // Default featureConfig carries an empty loginQrUrl.
     expect(

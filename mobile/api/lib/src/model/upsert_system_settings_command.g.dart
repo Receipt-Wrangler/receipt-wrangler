@@ -49,6 +49,8 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
   final int? refreshTokenValidForHours;
   @override
   final int? mcpRefreshTokenValidForHours;
+  @override
+  final int? tempFileRetentionHours;
 
   factory _$UpsertSystemSettingsCommand(
           [void Function(UpsertSystemSettingsCommandBuilder)? updates]) =>
@@ -75,7 +77,8 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
       this.showLoginQr,
       this.mobileServerUrl,
       this.refreshTokenValidForHours,
-      this.mcpRefreshTokenValidForHours})
+      this.mcpRefreshTokenValidForHours,
+      this.tempFileRetentionHours})
       : super._();
   @override
   UpsertSystemSettingsCommand rebuild(
@@ -111,7 +114,8 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
         showLoginQr == other.showLoginQr &&
         mobileServerUrl == other.mobileServerUrl &&
         refreshTokenValidForHours == other.refreshTokenValidForHours &&
-        mcpRefreshTokenValidForHours == other.mcpRefreshTokenValidForHours;
+        mcpRefreshTokenValidForHours == other.mcpRefreshTokenValidForHours &&
+        tempFileRetentionHours == other.tempFileRetentionHours;
   }
 
   @override
@@ -138,6 +142,7 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
     _$hash = $jc(_$hash, mobileServerUrl.hashCode);
     _$hash = $jc(_$hash, refreshTokenValidForHours.hashCode);
     _$hash = $jc(_$hash, mcpRefreshTokenValidForHours.hashCode);
+    _$hash = $jc(_$hash, tempFileRetentionHours.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -166,7 +171,8 @@ class _$UpsertSystemSettingsCommand extends UpsertSystemSettingsCommand {
           ..add('showLoginQr', showLoginQr)
           ..add('mobileServerUrl', mobileServerUrl)
           ..add('refreshTokenValidForHours', refreshTokenValidForHours)
-          ..add('mcpRefreshTokenValidForHours', mcpRefreshTokenValidForHours))
+          ..add('mcpRefreshTokenValidForHours', mcpRefreshTokenValidForHours)
+          ..add('tempFileRetentionHours', tempFileRetentionHours))
         .toString();
   }
 }
@@ -286,6 +292,11 @@ class UpsertSystemSettingsCommandBuilder
   set mcpRefreshTokenValidForHours(int? mcpRefreshTokenValidForHours) =>
       _$this._mcpRefreshTokenValidForHours = mcpRefreshTokenValidForHours;
 
+  int? _tempFileRetentionHours;
+  int? get tempFileRetentionHours => _$this._tempFileRetentionHours;
+  set tempFileRetentionHours(int? tempFileRetentionHours) =>
+      _$this._tempFileRetentionHours = tempFileRetentionHours;
+
   UpsertSystemSettingsCommandBuilder() {
     UpsertSystemSettingsCommand._defaults(this);
   }
@@ -315,6 +326,7 @@ class UpsertSystemSettingsCommandBuilder
       _mobileServerUrl = $v.mobileServerUrl;
       _refreshTokenValidForHours = $v.refreshTokenValidForHours;
       _mcpRefreshTokenValidForHours = $v.mcpRefreshTokenValidForHours;
+      _tempFileRetentionHours = $v.tempFileRetentionHours;
       _$v = null;
     }
     return this;
@@ -375,6 +387,7 @@ class UpsertSystemSettingsCommandBuilder
             mobileServerUrl: mobileServerUrl,
             refreshTokenValidForHours: refreshTokenValidForHours,
             mcpRefreshTokenValidForHours: mcpRefreshTokenValidForHours,
+            tempFileRetentionHours: tempFileRetentionHours,
           );
     } catch (_) {
       late String _$failedField;

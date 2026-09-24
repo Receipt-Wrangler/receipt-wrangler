@@ -70,6 +70,7 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 				pagedRequest,
 				associations,
 				permissionService.PaidByListResolver(token.UserId),
+				permissionService.CommentAuthorVisibilityResolver(token.UserId),
 			)
 			if err != nil {
 				return http.StatusInternalServerError, err
@@ -84,6 +85,13 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 			// Mask user references (created-by, charged-to) and drop non-visible
 			// comment authors the caller may not see.
 			err = permissionService.MaskReceiptsForMemberVisibility(token.UserId, receipts)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			// The receipts table's Comment column. One query per page, applying
+			// the same member isolation as the masking above.
+			err = permissionService.LoadFirstVisibleComments(token.UserId, receipts)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

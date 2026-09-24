@@ -59,6 +59,10 @@ export interface PagedDataDataInner {
      * Receipt date
      */
     date: string;
+    /**
+     * Text of the receipt\'s earliest comment the caller may see. Only populated by the paged receipt list (POST /receipt/group/{groupId}); absent when there is no such comment.
+     */
+    firstComment?: string;
     groupId: number;
     id: number;
     /**
@@ -128,6 +132,10 @@ export interface PagedDataDataInner {
     resultDescription?: string;
     apiKeyId?: string;
     childSystemTasks?: Array<SystemTask>;
+    /**
+     * Whether the upload behind this activity is still on disk, so it can be previewed or downloaded. False once the temp-file retention window has passed, or for an activity that never had an upload.
+     */
+    hasSourceFile?: boolean;
     aiType?: AiType;
     /**
      * URL for custom endpoints

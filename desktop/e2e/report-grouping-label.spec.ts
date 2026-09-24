@@ -79,7 +79,9 @@ test.describe('Report Builder — grouping column headings', () => {
     // field is locked: it is chosen by the grouping level, not here.
     await expect(page.getByText('Grouping column')).toBeVisible();
     await expect(page.getByTestId('picker-back')).toHaveCount(0);
-    const field = page.getByLabel('Field');
+    // Scoped to the dialog: getByLabel matches substrings, and the config panel
+    // behind it has a "Date field" select.
+    const field = page.getByRole('dialog').getByLabel('Field');
     await expect(field).toHaveJSProperty('readOnly', true);
     await expect(field).toHaveValue('Paid By');
     // The label is seeded with the heading the column currently carries.

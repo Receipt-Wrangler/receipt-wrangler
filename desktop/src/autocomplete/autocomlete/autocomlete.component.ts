@@ -1,8 +1,10 @@
-import { Component, effect, ElementRef, Input, OnInit, signal, TemplateRef, input, viewChild } from "@angular/core";
+import { Component, effect, ElementRef, inject, Input, OnInit, signal, TemplateRef, input, viewChild } from "@angular/core";
 import { FormArray, FormControl, Validators } from "@angular/forms";
 import { MatAutocompleteSelectedEvent, MatAutocompleteTrigger, } from "@angular/material/autocomplete";
+import { Store } from "@ngxs/store";
 import { map, Observable, of, startWith } from "rxjs";
 import { BaseInputComponent } from "../../base-input";
+import { AuthState } from "../../store/auth.state";
 
 @Component({
     selector: "app-autocomlete",
@@ -52,6 +54,17 @@ export class AutocomleteComponent
   public isRequired: boolean = false;
 
   public singleOptionSelected = signal(false);
+
+  private readonly store = inject(Store);
+
+  /**
+   * Read here rather than taken as an input: the preference is global by
+   * design, so threading it through the twenty-odd call sites would only create
+   * a way for one of them to disagree with the rest.
+   */
+  private readonly closeOnSelect = this.store.selectSignal(
+    AuthState.closeChipSelectOnSelect
+  );
 
   private optionsEffect = effect(() => {
     this.options();
@@ -158,19 +171,39 @@ export class AutocomleteComponent
         );
       }
       setTimeout(() => {
-        this.clearFilterAndOpenPanel();
+        if (this.closeOnSelect()) {
+          this.clearFilterAndClosePanel();
+        } else {
+          this.clearFilterAndOpenPanel();
+        }
       }, 0);
     } else {
       this.inputFormControl.setValue(event.option.value);
     }
   }
 
-  private clearFilterAndOpenPanel(): void {
+  private clearFilterInput(): void {
     if (this.inputId) {
-      (document.getElementById(this.inputId) as any).value = "";
+      const input = document.getElementById(this.inputId) as HTMLInputElement | null;
+      if (input) {
+        input.value = "";
+      }
     }
     this.filterFormControl.setValue("");
+  }
+
+  private clearFilterAndOpenPanel(): void {
+    this.clearFilterInput();
     this.matAutocompleteTrigger().openPanel();
+  }
+
+  // Material closes the panel itself on selection, but MatAutocompleteTrigger
+  // re-opens on focus - so leaving the cursor in the input is what would bring
+  // it straight back. Blurring is what actually makes the close stick.
+  private clearFilterAndClosePanel(): void {
+    this.clearFilterInput();
+    this.matAutocompleteTrigger().closePanel();
+    this.inputMultiple().nativeElement.blur();
   }
 
   public removeOption(index: number) {

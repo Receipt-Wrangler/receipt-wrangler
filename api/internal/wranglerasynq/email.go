@@ -35,10 +35,10 @@ func StartEmailPolling() error {
 		logging.LogStd(logging.LOG_LEVEL_INFO, err.Error())
 	}
 
-	_, err = inspector.DeleteAllScheduledTasks(string(models.EmailReceiptImageCleanupQueue))
-	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_INFO, err.Error())
-	}
+	// The temp-file sweep used to be scheduled from here; it now lives in
+	// StartSystemCleanUpTasks so it runs regardless of email configuration. Drain
+	// whatever the old cron left behind on its queue.
+	retireEmailReceiptImageCleanupQueue(inspector)
 
 	payload := EmailPollTaskPayload{
 		PollAllGroups: true,
@@ -51,12 +51,6 @@ func StartEmailPolling() error {
 
 	pollTask := asynq.NewTask(EmailPoll, payloadBytes)
 	_, err = RegisterTask(GetPollTimeString(systemSettings.EmailPollingInterval), pollTask, models.EmailPollingQueue, 0)
-	if err != nil {
-		return err
-	}
-
-	cleanUpTask := asynq.NewTask(EmailProcessImageCleanUp, nil)
-	_, err = RegisterTask(GetPollTimeString(systemSettings.EmailPollingInterval*2), cleanUpTask, models.EmailReceiptImageCleanupQueue, 0)
 	if err != nil {
 		return err
 	}
