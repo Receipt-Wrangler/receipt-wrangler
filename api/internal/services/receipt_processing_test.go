@@ -14,6 +14,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
 
@@ -492,6 +493,64 @@ func TestBuildPrompt_InterpolatesVariables(t *testing.T) {
 	}
 	if !strings.Contains(realPrompt, "year=") {
 		t.Errorf("expected current-year substitution, got: %q", realPrompt)
+	}
+	if cmd.Status != models.SYSTEM_TASK_SUCCEEDED {
+		t.Errorf("expected SUCCEEDED, got: %s", cmd.Status)
+	}
+}
+
+func TestBuildPrompt_InterpolatesCustomFields(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	db := repositories.GetDB()
+
+	customField := models.CustomField{
+		Name:        "VAT",
+		Type:        models.CURRENCY,
+		Description: "VAT amount",
+	}
+	if err := db.Create(&customField).Error; err != nil {
+		t.Fatalf("seed custom field: %v", err)
+	}
+
+	prompt := models.Prompt{
+		Name:   "bpcf",
+		Prompt: "customFields=@customFields",
+	}
+	if err := db.Create(&prompt).Error; err != nil {
+		t.Fatalf("seed prompt: %v", err)
+	}
+
+	service := ReceiptProcessingService{
+		ReceiptProcessingSettings: models.ReceiptProcessingSettings{PromptId: prompt.ID},
+	}
+	realPrompt, cmd, err := service.buildPrompt(service.ReceiptProcessingSettings, "ocr")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// The @customFields token must be substituted (no literal token left).
+	if strings.Contains(realPrompt, string(structs.CUSTOM_FIELDS)) {
+		t.Errorf("expected @customFields to be substituted, got: %q", realPrompt)
+	}
+	// Parse the interpolated JSON rather than asserting on exact formatting:
+	// the prompt was "customFields=<json>", so everything after '=' is the
+	// serialised custom-field list.
+	_, jsonPart, found := strings.Cut(realPrompt, "=")
+	if !found {
+		t.Fatalf("could not locate interpolated JSON in prompt: %q", realPrompt)
+	}
+	var fields []models.CustomField
+	if err := json.Unmarshal([]byte(strings.TrimSpace(jsonPart)), &fields); err != nil {
+		t.Fatalf("interpolated custom fields not valid JSON: %v (%q)", err, jsonPart)
+	}
+	if len(fields) != 1 {
+		t.Fatalf("expected 1 custom field, got %d", len(fields))
+	}
+	if fields[0].Name != "VAT" {
+		t.Errorf("expected field name VAT, got %q", fields[0].Name)
+	}
+	if fields[0].Type != models.CURRENCY {
+		t.Errorf("expected field type CURRENCY, got %q", fields[0].Type)
 	}
 	if cmd.Status != models.SYSTEM_TASK_SUCCEEDED {
 		t.Errorf("expected SUCCEEDED, got: %s", cmd.Status)
