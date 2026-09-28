@@ -3438,11 +3438,12 @@ paths:
 
 
         A browser navigates to this URL and is redirected (302) to the identity
-        provider. A native client passes client=mobile and gets the authorization URL
-        as JSON instead, because it authenticates with a bearer token and the external
-        user agent it must use cannot carry one; it then opens that URL itself and
-        waits on its private-use scheme, which the callback returns to with
-        ?linked={name} or ?error={code}.
+        provider. A native client passes client=mobile and gets a launch URL as JSON
+        instead, because it authenticates with a bearer token and the external user
+        agent it must use cannot carry one. It opens that launch URL in the external
+        browser, which is what actually starts the flow - and what receives the
+        binding cookie the callback checks. The app then waits on its private-use
+        scheme, which the callback returns to with ?linked={name} or ?error={code}.
       operationId: oidcLinkStart
       parameters:
         - name: name
@@ -3454,9 +3455,10 @@ paths:
         - name: client
           in: query
           description:
-            Which client is connecting. Mobile receives the authorization URL as JSON
-            rather than a redirect. No codeChallenge is needed here, unlike a mobile
-            login - a link mints no exchange code and no session.
+            Which client is connecting. Mobile receives a launch URL as JSON rather
+            than a redirect. No codeChallenge is needed here, unlike a mobile login -
+            a link's callback hands back only ?linked={name}, which is not a
+            credential, so there is nothing for the app to bind.
           required: false
           schema:
             type: string
@@ -3466,7 +3468,7 @@ paths:
             default: desktop
       responses:
         200:
-          description: The authorization URL, for client=mobile
+          description: The launch URL, for client=mobile
           content:
             application/json:
               schema:
@@ -3482,6 +3484,43 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /oidc/link/{name}/launch:
+    get:
+      tags:
+        - Oidc
+      summary: Open a mobile "connect account" flow in the browser
+      description:
+        The browser-facing half of a mobile link. A mobile client opens this URL, from
+        oidcLinkStart's launchUrl, in the external user agent; it is never called as an
+        API request.
+
+
+        Unauthenticated because it has to be reachable by that browser, which cannot
+        carry a bearer token. The single-use handle in the query is the authorization -
+        oidcLinkStart minted it moments earlier for the caller it had already
+        authenticated and permission-checked. Letting the browser make this request is
+        what allows the flow to be bound to it, which is the defense the callback
+        relies on.
+      operationId: oidcLinkLaunch
+      parameters:
+        - name: name
+          in: path
+          description: The provider's slug
+          required: true
+          schema:
+            type: string
+        - name: h
+          in: query
+          description: The single-use launch handle from oidcLinkStart
+          required: true
+          schema:
+            type: string
+      responses:
+        302:
+          description:
+            Redirect to the identity provider, or back to the app's scheme with an
+            error code if the handle is unknown, spent or expired
+      security: []
   /oidc/connections:
     get:
       tags:
@@ -5513,14 +5552,15 @@ components:
     OidcLinkStartView:
       type: object
       description:
-        The authorization URL for a mobile "connect account" flow. Safe to hand to the
-        caller - its state belongs to a session already bound to that caller's user id,
-        so holding it grants nothing the bearer token did not already.
+        The URL a mobile client opens in the external browser to begin a "connect
+        account" flow. It points back at this API, not at the identity provider, and
+        that indirection is the point - following it is what lets the server bind the
+        flow to the browser that will return with the callback.
       properties:
-        authorizationUrl:
+        launchUrl:
           type: string
       required:
-        - authorizationUrl
+        - launchUrl
     OidcFlowErrorView:
       type: object
       description:

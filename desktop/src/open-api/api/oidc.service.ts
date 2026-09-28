@@ -404,10 +404,85 @@ export class OidcService {
     }
 
     /**
-     * Connect a provider to the signed-in account
-     * Starts the same flow as a login, but the session proves who the caller is, so the callback links the identity directly instead of matching or provisioning. Requires app.account.update, the same permission as disconnecting one.  A browser navigates to this URL and is redirected (302) to the identity provider. A native client passes client&#x3D;mobile and gets the authorization URL as JSON instead, because it authenticates with a bearer token and the external user agent it must use cannot carry one; it then opens that URL itself and waits on its private-use scheme, which the callback returns to with ?linked&#x3D;{name} or ?error&#x3D;{code}.
+     * Open a mobile \&quot;connect account\&quot; flow in the browser
+     * The browser-facing half of a mobile link. A mobile client opens this URL, from oidcLinkStart\&#39;s launchUrl, in the external user agent; it is never called as an API request.  Unauthenticated because it has to be reachable by that browser, which cannot carry a bearer token. The single-use handle in the query is the authorization - oidcLinkStart minted it moments earlier for the caller it had already authenticated and permission-checked. Letting the browser make this request is what allows the flow to be bound to it, which is the defense the callback relies on.
      * @param name The provider\&#39;s slug
-     * @param client Which client is connecting. Mobile receives the authorization URL as JSON rather than a redirect. No codeChallenge is needed here, unlike a mobile login - a link mints no exchange code and no session.
+     * @param h The single-use launch handle from oidcLinkStart
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     */
+    public oidcLinkLaunch(name: string, h: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public oidcLinkLaunch(name: string, h: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public oidcLinkLaunch(name: string, h: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public oidcLinkLaunch(name: string, h: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: undefined, context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (name === null || name === undefined) {
+            throw new Error('Required parameter name was null or undefined when calling oidcLinkLaunch.');
+        }
+        if (h === null || h === undefined) {
+            throw new Error('Required parameter h was null or undefined when calling oidcLinkLaunch.');
+        }
+
+        let localVarQueryParameters = new HttpParams({encoder: this.encoder});
+        if (h !== undefined && h !== null) {
+          localVarQueryParameters = this.addToHttpParams(localVarQueryParameters,
+            <any>h, 'h');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        let localVarHttpHeaderAcceptSelected: string | undefined = options && options.httpHeaderAccept;
+        if (localVarHttpHeaderAcceptSelected === undefined) {
+            // to determine the Accept header
+            const httpHeaderAccepts: string[] = [
+            ];
+            localVarHttpHeaderAcceptSelected = this.configuration.selectHeaderAccept(httpHeaderAccepts);
+        }
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        let localVarHttpContext: HttpContext | undefined = options && options.context;
+        if (localVarHttpContext === undefined) {
+            localVarHttpContext = new HttpContext();
+        }
+
+        let localVarTransferCache: boolean | undefined = options && options.transferCache;
+        if (localVarTransferCache === undefined) {
+            localVarTransferCache = true;
+        }
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/oidc/link/${this.configuration.encodeParam({name: "name", value: name, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}/launch`;
+        return this.httpClient.request<any>('get', `${this.configuration.basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                params: localVarQueryParameters,
+                responseType: <any>responseType_,
+                withCredentials: this.configuration.withCredentials,
+                headers: localVarHeaders,
+                observe: observe,
+                transferCache: localVarTransferCache,
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Connect a provider to the signed-in account
+     * Starts the same flow as a login, but the session proves who the caller is, so the callback links the identity directly instead of matching or provisioning. Requires app.account.update, the same permission as disconnecting one.  A browser navigates to this URL and is redirected (302) to the identity provider. A native client passes client&#x3D;mobile and gets a launch URL as JSON instead, because it authenticates with a bearer token and the external user agent it must use cannot carry one. It opens that launch URL in the external browser, which is what actually starts the flow - and what receives the binding cookie the callback checks. The app then waits on its private-use scheme, which the callback returns to with ?linked&#x3D;{name} or ?error&#x3D;{code}.
+     * @param name The provider\&#39;s slug
+     * @param client Which client is connecting. Mobile receives a launch URL as JSON rather than a redirect. No codeChallenge is needed here, unlike a mobile login - a link\&#39;s callback hands back only ?linked&#x3D;{name}, which is not a credential, so there is nothing for the app to bind.
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      */

@@ -13,6 +13,7 @@ Method | HTTP request | Description
 [**getOidcConnections**](OidcApi.md#getoidcconnections) | **GET** /oidc/connections | List the caller&#39;s connected accounts
 [**oidcCallback**](OidcApi.md#oidccallback) | **GET** /oidc/{name}/callback | OIDC redirect URI
 [**oidcExchange**](OidcApi.md#oidcexchange) | **POST** /oidc/exchange | Redeem a mobile sign-in code
+[**oidcLinkLaunch**](OidcApi.md#oidclinklaunch) | **GET** /oidc/link/{name}/launch | Open a mobile \&quot;connect account\&quot; flow in the browser
 [**oidcLinkStart**](OidcApi.md#oidclinkstart) | **GET** /oidc/link/{name} | Connect a provider to the signed-in account
 [**oidcLogin**](OidcApi.md#oidclogin) | **GET** /oidc/{name}/login | Start an OIDC login
 
@@ -193,12 +194,56 @@ No authorization required
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
+# **oidcLinkLaunch**
+> oidcLinkLaunch(name, h)
+
+Open a mobile \"connect account\" flow in the browser
+
+The browser-facing half of a mobile link. A mobile client opens this URL, from oidcLinkStart's launchUrl, in the external user agent; it is never called as an API request.  Unauthenticated because it has to be reachable by that browser, which cannot carry a bearer token. The single-use handle in the query is the authorization - oidcLinkStart minted it moments earlier for the caller it had already authenticated and permission-checked. Letting the browser make this request is what allows the flow to be bound to it, which is the defense the callback relies on.
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+
+final api = Openapi().getOidcApi();
+final String name = name_example; // String | The provider's slug
+final String h = h_example; // String | The single-use launch handle from oidcLinkStart
+
+try {
+    api.oidcLinkLaunch(name, h);
+} catch on DioException (e) {
+    print('Exception when calling OidcApi->oidcLinkLaunch: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **name** | **String**| The provider's slug | 
+ **h** | **String**| The single-use launch handle from oidcLinkStart | 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: Not defined
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
 # **oidcLinkStart**
 > OidcLinkStartView oidcLinkStart(name, client)
 
 Connect a provider to the signed-in account
 
-Starts the same flow as a login, but the session proves who the caller is, so the callback links the identity directly instead of matching or provisioning. Requires app.account.update, the same permission as disconnecting one.  A browser navigates to this URL and is redirected (302) to the identity provider. A native client passes client=mobile and gets the authorization URL as JSON instead, because it authenticates with a bearer token and the external user agent it must use cannot carry one; it then opens that URL itself and waits on its private-use scheme, which the callback returns to with ?linked={name} or ?error={code}.
+Starts the same flow as a login, but the session proves who the caller is, so the callback links the identity directly instead of matching or provisioning. Requires app.account.update, the same permission as disconnecting one.  A browser navigates to this URL and is redirected (302) to the identity provider. A native client passes client=mobile and gets a launch URL as JSON instead, because it authenticates with a bearer token and the external user agent it must use cannot carry one. It opens that launch URL in the external browser, which is what actually starts the flow - and what receives the binding cookie the callback checks. The app then waits on its private-use scheme, which the callback returns to with ?linked={name} or ?error={code}.
 
 ### Example
 ```dart
@@ -210,7 +255,7 @@ import 'package:openapi/api.dart';
 
 final api = Openapi().getOidcApi();
 final String name = name_example; // String | The provider's slug
-final String client = client_example; // String | Which client is connecting. Mobile receives the authorization URL as JSON rather than a redirect. No codeChallenge is needed here, unlike a mobile login - a link mints no exchange code and no session.
+final String client = client_example; // String | Which client is connecting. Mobile receives a launch URL as JSON rather than a redirect. No codeChallenge is needed here, unlike a mobile login - a link's callback hands back only ?linked={name}, which is not a credential, so there is nothing for the app to bind.
 
 try {
     final response = api.oidcLinkStart(name, client);
@@ -225,7 +270,7 @@ try {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **name** | **String**| The provider's slug | 
- **client** | **String**| Which client is connecting. Mobile receives the authorization URL as JSON rather than a redirect. No codeChallenge is needed here, unlike a mobile login - a link mints no exchange code and no session. | [optional] [default to 'desktop']
+ **client** | **String**| Which client is connecting. Mobile receives a launch URL as JSON rather than a redirect. No codeChallenge is needed here, unlike a mobile login - a link's callback hands back only ?linked={name}, which is not a credential, so there is nothing for the app to bind. | [optional] [default to 'desktop']
 
 ### Return type
 

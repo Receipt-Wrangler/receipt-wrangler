@@ -96,9 +96,45 @@ func (repository OidcSessionRepository) ConsumeExchangeCode(codeHash string) (bo
 	return result.RowsAffected == 1, nil
 }
 
-// DeleteExpiredOidcSessions is the cleanup cron's worker. Both tables are already
-// guarded by expires_at inside the consume statements' WHERE clauses, so this is
-// hygiene rather than a security control.
+func (repository OidcSessionRepository) CreateLinkLaunch(launch *models.OidcLinkLaunch) error {
+	return repository.GetDB().Create(launch).Error
+}
+
+// ConsumeLinkLaunch atomically burns a mobile link launch handle and returns the
+// row it claimed, mirroring ConsumeAuthSession.
+//
+// Unlike the exchange code there is nothing to verify first, so this consumes
+// outright rather than loading and burning separately: the handle IS the proof,
+// and the browser presenting it gets exactly one attempt.
+//
+// Reported as (launch, claimed, error): claimed=false means the handle was
+// unknown, already used, or expired, which are deliberately indistinguishable.
+func (repository OidcSessionRepository) ConsumeLinkLaunch(launchHash string) (models.OidcLinkLaunch, bool, error) {
+	db := repository.GetDB()
+
+	result := db.Model(&models.OidcLinkLaunch{}).
+		Where("launch_hash = ? AND used = ? AND expires_at > ?", launchHash, false, time.Now()).
+		Update("used", true)
+	if result.Error != nil {
+		return models.OidcLinkLaunch{}, false, result.Error
+	}
+
+	if result.RowsAffected != 1 {
+		return models.OidcLinkLaunch{}, false, nil
+	}
+
+	var launch models.OidcLinkLaunch
+	err := db.Model(&models.OidcLinkLaunch{}).Where("launch_hash = ?", launchHash).First(&launch).Error
+	if err != nil {
+		return models.OidcLinkLaunch{}, false, err
+	}
+
+	return launch, true, nil
+}
+
+// DeleteExpiredOidcSessions is the cleanup cron's worker. All three tables are
+// already guarded by expires_at inside the consume statements' WHERE clauses, so
+// this is hygiene rather than a security control.
 func (repository OidcSessionRepository) DeleteExpiredOidcSessions() error {
 	db := repository.GetDB()
 	now := time.Now()
@@ -108,5 +144,10 @@ func (repository OidcSessionRepository) DeleteExpiredOidcSessions() error {
 		return err
 	}
 
-	return db.Where("expires_at < ? OR used = ?", now, true).Delete(&models.OidcExchangeCode{}).Error
+	err = db.Where("expires_at < ? OR used = ?", now, true).Delete(&models.OidcExchangeCode{}).Error
+	if err != nil {
+		return err
+	}
+
+	return db.Where("expires_at < ? OR used = ?", now, true).Delete(&models.OidcLinkLaunch{}).Error
 }

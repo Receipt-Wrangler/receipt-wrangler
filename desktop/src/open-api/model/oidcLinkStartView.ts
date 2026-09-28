@@ -10,9 +10,9 @@
 
 
 /**
- * The authorization URL for a mobile \"connect account\" flow. Safe to hand to the caller - its state belongs to a session already bound to that caller\'s user id, so holding it grants nothing the bearer token did not already.
+ * The URL a mobile client opens in the external browser to begin a \"connect account\" flow. It points back at this API, not at the identity provider, and that indirection is the point - following it is what lets the server bind the flow to the browser that will return with the callback.
  */
 export interface OidcLinkStartView { 
-    authorizationUrl: string;
+    launchUrl: string;
 }
 

@@ -8,14 +8,14 @@ import 'package:built_value/serializer.dart';
 
 part 'oidc_link_start_view.g.dart';
 
-/// The authorization URL for a mobile \"connect account\" flow. Safe to hand to the caller - its state belongs to a session already bound to that caller's user id, so holding it grants nothing the bearer token did not already.
+/// The URL a mobile client opens in the external browser to begin a \"connect account\" flow. It points back at this API, not at the identity provider, and that indirection is the point - following it is what lets the server bind the flow to the browser that will return with the callback.
 ///
 /// Properties:
-/// * [authorizationUrl] 
+/// * [launchUrl] 
 @BuiltValue()
 abstract class OidcLinkStartView implements Built<OidcLinkStartView, OidcLinkStartViewBuilder> {
-  @BuiltValueField(wireName: r'authorizationUrl')
-  String get authorizationUrl;
+  @BuiltValueField(wireName: r'launchUrl')
+  String get launchUrl;
 
   OidcLinkStartView._();
 
@@ -40,9 +40,9 @@ class _$OidcLinkStartViewSerializer implements PrimitiveSerializer<OidcLinkStart
     OidcLinkStartView object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
-    yield r'authorizationUrl';
+    yield r'launchUrl';
     yield serializers.serialize(
-      object.authorizationUrl,
+      object.launchUrl,
       specifiedType: const FullType(String),
     );
   }
@@ -68,12 +68,12 @@ class _$OidcLinkStartViewSerializer implements PrimitiveSerializer<OidcLinkStart
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
-        case r'authorizationUrl':
+        case r'launchUrl':
           final valueDes = serializers.deserialize(
             value,
             specifiedType: const FullType(String),
           ) as String;
-          result.authorizationUrl = valueDes;
+          result.launchUrl = valueDes;
           break;
         default:
           unhandled.add(key);

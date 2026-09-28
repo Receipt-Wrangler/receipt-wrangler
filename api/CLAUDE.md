@@ -1290,8 +1290,23 @@ the redirect could destroy a valid code just by presenting a wrong verifier. Pin
 **skips the whole match/provision tree** and writes the link directly — the session proves identity,
 nothing is inferred from a claim. This is what makes `linkByUsername = false` a comfortable default.
 `middleware.UnifiedAuthMiddleware` reads the `jwt` **cookie** before the header, so a plain top-level
-link navigation authenticates. Unlinking refuses when it is the caller's last identity *and*
-`ProvisionedUser` is true — that account has only the discarded random password.
+link navigation authenticates. Unlinking refuses when it is the caller's last identity *and* the
+**account** is passwordless — that account has only the discarded random password.
+
+**`ProvisionedUser` is an account fact held on every identity, not a per-row one**, and that is load
+bearing. It used to mean "this identity created the account", so exactly one row carried it — and
+unlinking *that* row first destroyed the only record that the account had no password, letting the
+next unlink strand it. Provisioned by Google, link GitHub, drop Google, drop GitHub, locked out. Three
+places now maintain the invariant: `provisionUser` sets it, `resolveLink` **inherits** it when
+attaching a second provider, and `ClearProvisionedFlagForUser` clears it across all of them when a
+password is actually set. `UnlinkIdentity` also re-asserts it across what remains before deleting a
+flagged row, so an account whose rows predate the invariant heals the first time it is touched rather
+than needing a data migration. The wire name stays `provisionedUser` — it is `required` and
+non-nullable in the generated Dart client, so renaming it would break released builds for nothing.
+
+Clearing on password-set is what makes the refusal's own advice work. The message says "ask an
+administrator to set one before disconnecting"; before this, the administrator could comply and the
+unlink stayed refused, because nothing observed the reset (`handlers.ResetPassword`).
 
 **It is gated on `app.account.update`**, the same permission as `DeleteOidcConnection`. Connecting a
 provider ADDS a way to sign into an account, so it is at least as privileged as disconnecting one;
@@ -1302,20 +1317,72 @@ body rather than on a `structs.Handler` because this route answers with a redire
 `GetPagedApiKeys`' `app.api-keys.read-any` check.
 
 **A mobile link start answers with JSON, not a 302** — `GET /oidc/link/{name}?client=mobile` returns
-`structs.OidcLinkStartView{authorizationUrl}` and the app opens that URL itself. This is not a
-stylistic split: the app authenticates with a **bearer token**, and the external user agent RFC 8252
-requires cannot carry one, so a redirect into that browser arrives unauthenticated and is refused.
-The whole flow-start error vocabulary follows it (`structs.OidcFlowError{errorCode}`, mapped to
-404/400/403/502 by `writeOidcFlowError`), so a failure reaches the app in the same shape as a success
-instead of as an unparseable redirect. `resolveClientType` therefore runs **before** the provider
-lookup — otherwise an unknown-provider failure took the desktop branch and the app got HTML.
+`structs.OidcLinkStartView{launchUrl}`. This is not a stylistic split: the app authenticates with a
+**bearer token**, and the external user agent RFC 8252 requires cannot carry one, so a redirect into
+that browser arrives unauthenticated and is refused. The whole flow-start error vocabulary follows it
+(`structs.OidcFlowError{errorCode}`, mapped to 404/400/403/502 by `writeOidcFlowError`), so a failure
+reaches the app in the same shape as a success instead of as an unparseable redirect.
+`resolveClientType` therefore runs **before** the provider lookup — otherwise an unknown-provider
+failure took the desktop branch and the app got HTML.
 
-**A mobile link needs no `codeChallenge`**, unlike a mobile login. The challenge binds the login's
-one-time exchange code to the app that started the flow; a link mints no exchange code and no session,
-and the caller already proved who they are with a bearer token on the start request. `startFlow`
-therefore requires it only when `linkUserId == nil`. The callback returns to
-`io.receiptwrangler://oidc?linked={name}` (or `?error={code}`) — **never** the desktop profile path,
-which would strand the external browser on a page the app never sees.
+**That start creates NO session — it hands out a launch handle, and the browser starts the session.**
+This is the one genuinely subtle part of the feature, and it exists because of a real hole. It first
+shipped returning the IdP's **authorization URL** directly, reasoned as "safe, because the caller
+already proved who they are with a bearer token on the start request". That is true of the *start* and
+false of the *callback*, which is a separate unauthenticated browser request — and the callback is
+where the link is written. Identity providers leak the authorization URL by Referer from their own
+login pages, so anyone who obtained it could authenticate as **themselves**, drive the callback, and
+have their identity grafted onto the caller's account.
+
+PKCE cannot fix that, and it is worth knowing why, because it looks like it should. Binding the link
+to the app's own challenge is circular: the challenge would come from the victim's session, so the
+victim's app holds a matching verifier by construction, and on Android the attacker can deep-link
+their result into the victim's waiting `flutter_web_auth_2` (the manifest's `CallbackActivity` is
+`exported` + `BROWSABLE`). **A post-callback artifact cannot retroactively bind an unbound callback.**
+
+So: `LinkStart` creates a single-use `models.OidcLinkLaunch` and returns
+`{serverPublicUrl}/api/oidc/link/{name}/launch?h=…`. The app opens *that*, the external browser
+follows it to `oidc.LinkLaunch` (unauthenticated — the handle is the authorization), and **that**
+request creates the auth session and sets the binding cookie. The handle never reaches the IdP: a 302
+does not make the redirecting URL the next request's Referer.
+
+**Every session is bound, mobile included** (`store.go`, `flow.go`). This too was wrong at first:
+`BindingHash` was skipped for all mobile sessions because "an external user agent may not carry the
+cookie", and the callback's check read `len(session.BindingHash) > 0 && …`, which turned it into a
+no-op for exactly those sessions. The premise was false for **mobile login** — the app hands the login
+URL itself to `flutter_web_auth_2`, so the browser fetches the start and round-trips the cookie fine,
+and the gap was a live session-fixation bug there too. The check is now unconditional and fails closed
+on an empty hash.
+
+**KNOWN RESIDUAL — the launch endpoint can be pointed at someone else's browser.** `LinkLaunch` is
+unauthenticated by necessity, and the handle it consumes names the account to link. So an attacker
+holding a handle *for their own account* can send that URL to a victim: the victim's browser gets the
+binding, the victim authenticates at the identity provider, and their identity is attached to the
+**attacker's** account. The victim's later "Log in with X" then lands in the attacker's account.
+
+It is narrower than what it replaced — it needs active phishing plus an identity-provider login,
+where the previous shape needed only a leaked URL — and it fails outright if either party has already
+linked that provider (`ErrAlreadyLinked` / `ErrIdentityLinkedElsewhere`). The 2-minute single-use TTL
+raises the bar further. It is **not** closed.
+
+Closing it needs the app to prove it ran the flow, and note *which* proof works. A handle-only
+confirmation does not: the attacker holds the handle too. What cuts the attacker out is a secret the
+**callback** mints and hands to the browser that completed the flow — they never receive it. So:
+the callback stops linking inline for mobile, mints a completion code against the launch row, and
+redirects with it; the app redeems it on an authenticated call that checks the caller owns the row
+(and a PKCE challenge carried from the start, so a rogue app on the device that grabs the private-use
+redirect cannot redeem it either). Note this only works **on top of** the launch hop: without the
+binding, the same completion code is redeemable by the victim's own app on the attacker's behalf,
+because the challenge would be the victim's own.
+
+**A mobile link needs no `codeChallenge`**, unlike a mobile login — but for a different reason than
+first documented. The challenge binds the login's one-time exchange code to the app that started the
+flow; a link's callback hands back only `?linked={name}`, which is not a credential, so there is
+nothing to bind. Binding and PKCE defend different things: binding stops an attacker **driving** your
+flow, PKCE stops a rogue app **stealing its result**. `startFlow` requires the challenge only when
+`linkUserId == nil`. The callback returns to `io.receiptwrangler://oidc?linked={name}` (or
+`?error={code}`) — **never** the desktop profile path, which would strand the external browser on a
+page the app never sees.
 
 The static route segments (`link`, `exchange`, `connections`) come first so chi's resolution stays
 unambiguous, and `commands.ReservedOidcProviderNames` rejects them as slugs from the other direction.

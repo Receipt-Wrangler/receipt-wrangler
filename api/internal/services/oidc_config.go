@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net/url"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/repositories"
 	"strings"
@@ -52,4 +53,13 @@ func IsServerPublicUrlConfigured() bool {
 // this application never sees the error.
 func BuildOidcRedirectUri(providerName string) string {
 	return GetServerPublicUrl() + "/api/oidc/" + providerName + "/callback"
+}
+
+// BuildOidcLinkLaunchUri is the URL a mobile app opens in the external browser
+// to start a "connect account" flow. Unlike the redirect URI it is never
+// registered anywhere -- it is this server talking to itself, one hop earlier --
+// but it is built from the same origin so the browser lands back on the host
+// that will set and later check the binding cookie.
+func BuildOidcLinkLaunchUri(providerName string, handle string) string {
+	return GetServerPublicUrl() + "/api/oidc/link/" + providerName + "/launch?h=" + url.QueryEscape(handle)
 }

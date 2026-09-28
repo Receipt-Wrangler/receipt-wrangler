@@ -33,11 +33,27 @@ type OidcIdentity struct {
 	PreferredUsername string `json:"preferredUsername"`
 	Email             string `json:"email"`
 
-	// ProvisionedUser records that this identity created the local account. Such
-	// an account only ever had a random, discarded password, so unlinking its last
-	// identity would strand it with no way back in — see the unlink lockout guard
-	// in the OIDC service. Kept here rather than as a User column so the User model
-	// does not have to widen.
+	// ProvisionedUser records that THE ACCOUNT has no password of its own: it was
+	// created by an OIDC provisioning login, which only ever gave it a random,
+	// discarded password. Unlinking its last identity would strand it with no way
+	// back in — see the unlink lockout guard in the OIDC service.
+	//
+	// INVARIANT: it is held identically on EVERY identity of such an account, and
+	// on none of an account that has a real password. Three places maintain it —
+	// provisionUser sets it, resolveLink inherits it when attaching a second
+	// provider, and ClearProvisionedFlagForUser clears it across all of them when a
+	// password is actually set.
+	//
+	// The name is narrower than the meaning, and deliberately unchanged: it is on
+	// the wire as `provisionedUser`, required and non-nullable in the generated Dart
+	// client, so renaming it would break already-released mobile builds for a
+	// cosmetic gain.
+	//
+	// It reads like it belongs on User, and it originally meant the narrower "this
+	// identity created the account", which is why it lives here. Holding it per
+	// identity is what made the first version of the lockout guard wrong: the fact
+	// died with the row that carried it. The invariant above is what repairs that
+	// without widening the User model.
 	ProvisionedUser bool `gorm:"not null;default:false" json:"provisionedUser"`
 
 	LastLoginAt *time.Time `json:"lastLoginAt"`

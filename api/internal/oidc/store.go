@@ -20,8 +20,15 @@ const (
 	// tight: the code buys a full session with no further proof of user.
 	exchangeCodeTTL = 2 * time.Minute
 
-	// randomTokenBytes is the entropy behind state, nonce, the browser binding and
-	// the exchange code.
+	// linkLaunchTTL bounds the gap between an app asking to connect an account and
+	// the external browser actually opening. That is one hand-off with no user
+	// interaction in between, so it can be tighter than the login TTL. Kept
+	// separate from exchangeCodeTTL rather than shared: these bound different
+	// things and should be free to diverge.
+	linkLaunchTTL = 2 * time.Minute
+
+	// randomTokenBytes is the entropy behind state, nonce, the browser binding,
+	// the exchange code and the link launch handle.
 	randomTokenBytes = 32
 )
 
@@ -82,12 +89,21 @@ func createAuthSession(params newAuthSessionParams) (createdAuthSession, error) 
 		ExpiresAt:           time.Now().Add(authSessionTTL),
 	}
 
-	// The desktop leg is bound to the browser that started it by a cookie; the
-	// mobile leg cannot be (an external user agent may not carry it) and is bound
-	// instead by the app-held PKCE verifier at the exchange endpoint.
-	if params.ClientType != models.OidcClientMobile {
-		session.BindingHash = hashSecret(binding)
-	}
+	// EVERY session is bound to the user agent that started it, mobile included.
+	//
+	// This used to be skipped for mobile, on the reasoning that an external user
+	// agent may not carry a cookie. That was wrong: the app hands the login URL
+	// itself to flutter_web_auth_2, so the external browser -- not the app -- is
+	// what fetches /oidc/{name}/login, and it takes the Set-Cookie and returns it
+	// on the callback exactly as the desktop browser does. The mobile LINK start is
+	// the one request the app really does make itself, which is why it creates no
+	// session at all and hands out a launch handle instead; the browser then calls
+	// the launch endpoint and lands here like everyone else.
+	//
+	// PKCE does not substitute for this. Binding stops an attacker DRIVING your
+	// flow; PKCE stops a rogue app STEALING the result of it. They defend different
+	// things and the mobile login leg needs both.
+	session.BindingHash = hashSecret(binding)
 
 	err = repositories.NewOidcSessionRepository(nil).CreateAuthSession(&session)
 	if err != nil {
@@ -134,6 +150,33 @@ func getExchangeCode(code string) (models.OidcExchangeCode, error) {
 
 func consumeExchangeCode(code string) (bool, error) {
 	return repositories.NewOidcSessionRepository(nil).ConsumeExchangeCode(hashSecret(code))
+}
+
+// createLinkLaunch issues the handle that lets the external browser start a
+// mobile link on behalf of an already-authenticated user.
+func createLinkLaunch(userId uint, providerId uint) (string, error) {
+	handle, err := utils.GetRandomUrlSafeString(randomTokenBytes)
+	if err != nil {
+		return "", err
+	}
+
+	row := models.OidcLinkLaunch{
+		LaunchHash:     hashSecret(handle),
+		UserId:         userId,
+		OidcProviderId: providerId,
+		ExpiresAt:      time.Now().Add(linkLaunchTTL),
+	}
+
+	err = repositories.NewOidcSessionRepository(nil).CreateLinkLaunch(&row)
+	if err != nil {
+		return "", err
+	}
+
+	return handle, nil
+}
+
+func consumeLinkLaunch(handle string) (models.OidcLinkLaunch, bool, error) {
+	return repositories.NewOidcSessionRepository(nil).ConsumeLinkLaunch(hashSecret(handle))
 }
 
 // hashSecret is the single hashing entry point for every OIDC bearer secret, so

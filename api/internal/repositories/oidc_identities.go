@@ -71,6 +71,43 @@ func (repository OidcIdentityRepository) CountIdentitiesForUser(userId uint) (in
 	return count, err
 }
 
+// CountProvisionedIdentitiesForUser counts the account's identities that are
+// flagged as belonging to a passwordless account.
+//
+// The flag is held on EVERY identity of such an account, not just the one that
+// created it -- see the invariant on models.OidcIdentity.ProvisionedUser -- so
+// any non-zero count means the account still has no password of its own.
+func (repository OidcIdentityRepository) CountProvisionedIdentitiesForUser(userId uint) (int64, error) {
+	db := repository.GetDB()
+	var count int64
+
+	err := db.Model(&models.OidcIdentity{}).
+		Where("user_id = ? AND provisioned_user = ?", userId, true).
+		Count(&count).Error
+
+	return count, err
+}
+
+// SetProvisionedFlagForUser re-asserts the passwordless fact across every
+// identity the account holds, restoring the invariant on rows that predate it.
+func (repository OidcIdentityRepository) SetProvisionedFlagForUser(userId uint) error {
+	return repository.GetDB().
+		Model(&models.OidcIdentity{}).
+		Where("user_id = ?", userId).
+		Update("provisioned_user", true).Error
+}
+
+// ClearProvisionedFlagForUser records that the account now has a real password,
+// across every identity it holds. Called when a password is actually set, which
+// is what makes the lockout guard's advice -- "ask an administrator to set one"
+// -- something that works rather than a dead end.
+func (repository OidcIdentityRepository) ClearProvisionedFlagForUser(userId uint) error {
+	return repository.GetDB().
+		Model(&models.OidcIdentity{}).
+		Where("user_id = ?", userId).
+		Update("provisioned_user", false).Error
+}
+
 func (repository OidcIdentityRepository) CreateIdentity(identity *models.OidcIdentity) error {
 	return repository.GetDB().Create(identity).Error
 }

@@ -326,7 +326,32 @@ func resolveLink(provider models.OidcProvider, claims idTokenClaims, userId uint
 		return err
 	}
 
-	return createIdentity(provider, userId, claims, false)
+	// The new identity INHERITS whether the account is passwordless, rather than
+	// assuming a linked account always has a password of its own.
+	//
+	// This is what keeps the lockout guard honest. The flag used to mean "this
+	// identity created the account", so it lived on exactly one row -- and
+	// unlinking that row first destroyed the only record that the account has no
+	// password, letting the next unlink strand it. Held on every identity, the fact
+	// survives until the last one goes.
+	passwordless, err := accountIsPasswordless(userId)
+	if err != nil {
+		return err
+	}
+
+	return createIdentity(provider, userId, claims, passwordless)
+}
+
+// accountIsPasswordless reports whether this account still has no password of its
+// own -- it was created by an OIDC provisioning login and nobody has set one
+// since. Such an account cannot afford to lose its last identity.
+func accountIsPasswordless(userId uint) (bool, error) {
+	count, err := repositories.NewOidcIdentityRepository(nil).CountProvisionedIdentitiesForUser(userId)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }
 
 // UnlinkIdentity removes one of the caller's connected providers.
@@ -334,6 +359,12 @@ func resolveLink(provider models.OidcProvider, claims idTokenClaims, userId uint
 // The guard is the reason ProvisionedUser exists: an account created by OIDC only
 // ever had a random, discarded password, so unlinking its LAST identity would
 // strand it with no way back in. Refuse and point at an administrator instead.
+//
+// The question is asked of the ACCOUNT, never of the row being removed. Asking
+// the row was the original bug: with a provisioned Google and a later-linked
+// GitHub, dropping Google passed the guard (two identities remained) and then
+// dropping GitHub passed it too (that row was not the provisioning one), leaving
+// an account with no identities and a bcrypt hash of a password nobody knew.
 func UnlinkIdentity(userId uint, providerName string) error {
 	providerRow, err := repositories.NewOidcProviderRepository(nil).GetOidcProviderByName(providerName)
 	if err != nil {
@@ -347,14 +378,34 @@ func UnlinkIdentity(userId uint, providerName string) error {
 		return err
 	}
 
-	if identity.ProvisionedUser {
-		count, countErr := identityRepository.CountIdentitiesForUser(userId)
-		if countErr != nil {
-			return countErr
+	count, err := identityRepository.CountIdentitiesForUser(userId)
+	if err != nil {
+		return err
+	}
+
+	if count <= 1 {
+		passwordless, passwordlessErr := accountIsPasswordless(userId)
+		if passwordlessErr != nil {
+			return passwordlessErr
 		}
 
-		if count <= 1 {
+		if passwordless {
 			return ErrWouldLockOut
+		}
+	}
+
+	// Removing an identity must not take the account's passwordless fact with it.
+	//
+	// resolveLink holds that fact on every identity precisely so it survives a
+	// delete, but rows written before that invariant existed carry it on only the
+	// one that provisioned the account -- and deleting that one first is the
+	// original bug in a different disguise. Re-asserting it across what remains
+	// heals such an account the first time it is touched, which is why this needs
+	// no data migration.
+	if identity.ProvisionedUser {
+		err = identityRepository.SetProvisionedFlagForUser(userId)
+		if err != nil {
+			return err
 		}
 	}
 

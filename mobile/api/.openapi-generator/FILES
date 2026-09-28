@@ -351,5 +351,3 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/oidc_flow_error_view_test.dart
-test/oidc_link_start_view_test.dart

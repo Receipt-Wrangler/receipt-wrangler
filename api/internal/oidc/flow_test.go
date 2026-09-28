@@ -255,14 +255,44 @@ func TestMobileLoginRequiresCodeChallenge(t *testing.T) {
 	}
 }
 
-func TestMobileLoginDoesNotSetBindingCookie(t *testing.T) {
+// TestMobileLoginSetsBindingCookie inverts an assertion that used to read "the
+// mobile leg must not depend on a cookie the external user agent may not carry".
+//
+// That premise was wrong, and it cost the mobile legs their login-CSRF defense.
+// The app hands the LOGIN URL itself to flutter_web_auth_2, so the external
+// browser is what fetches this start -- it takes the Set-Cookie and returns it on
+// the callback exactly as a desktop browser does. Skipping it meant anyone who
+// obtained the authorization URL could complete the flow as themselves and have
+// the victim's app sign into THEIR account.
+func TestMobileLoginSetsBindingCookie(t *testing.T) {
 	defer teardownOidcTest()
 	_, provider := setupOidcTest(t, oidcTestOptions{})
 
 	recorder := startLogin(t, provider.Name, "client=mobile&codeChallenge="+challengeFor("verifier-for-the-mobile-app-1234567890"))
 
-	if findCookie(recorder.Result().Cookies(), bindingCookieName) != nil {
-		t.Error("the mobile leg must not depend on a cookie the external user agent may not carry")
+	if findCookie(recorder.Result().Cookies(), bindingCookieName) == nil {
+		t.Error("the mobile login leg must be bound to the browser that started it")
+	}
+}
+
+// TestMobileLoginCallbackRefusesAnUnboundBrowser is the login-side twin of the
+// link regression: a correct state without the binding cookie must not complete.
+func TestMobileLoginCallbackRefusesAnUnboundBrowser(t *testing.T) {
+	defer teardownOidcTest()
+	idp, provider := setupOidcTest(t, oidcTestOptions{allowProvisioning: true})
+
+	recorder := startLogin(t, provider.Name, "client=mobile&codeChallenge="+challengeFor("verifier-for-the-mobile-app-1234567890"))
+
+	state, _ := loginAndExtractFrom(t, recorder)
+	idp.setClaims(claimsFor(idp, "unbound-mobile-subject", nonceFromAuthUrl(t, recorder), "unbound"))
+
+	callback := runCallback(t, provider.Name, url.Values{
+		"code":  {"abc"},
+		"state": {state},
+	}, nil)
+
+	if code := oidcErrorCode(t, callback); code != errInvalidState {
+		t.Errorf("expected %q for an unbound callback, got %q", errInvalidState, code)
 	}
 }
 
@@ -510,7 +540,7 @@ func TestCallbackMobileReturnsCodeNotTokens(t *testing.T) {
 	state, _ := loginAndExtractFrom(t, loginRecorder)
 	idp.setClaims(claimsFor(idp, "subject-mobile", nonceFromAuthUrl(t, loginRecorder), "mobileuser"))
 
-	recorder := runCallback(t, provider.Name, url.Values{"code": {"abc"}, "state": {state}}, nil)
+	recorder := runCallback(t, provider.Name, url.Values{"code": {"abc"}, "state": {state}}, loginRecorder.Result().Cookies())
 
 	location := recorder.Header().Get("Location")
 	if !strings.HasPrefix(location, mobileCallbackScheme) {
@@ -529,8 +559,14 @@ func TestCallbackMobileReturnsCodeNotTokens(t *testing.T) {
 
 	// A private-use scheme is unverifiable on Android, so this URL must never carry
 	// anything that is a credential on its own.
-	if len(recorder.Result().Cookies()) > 0 {
-		t.Error("the mobile leg must not set cookies")
+	//
+	// Asserted against the TOKEN cookies rather than against any cookie at all:
+	// the mobile leg is now bound like every other one, so the callback
+	// legitimately emits the expiry that retires the binding cookie.
+	for _, name := range []string{"jwt", "refreshToken"} {
+		if findCookie(recorder.Result().Cookies(), name) != nil {
+			t.Errorf("the mobile leg must not set the %s cookie", name)
+		}
 	}
 
 	for _, key := range []string{"jwt", "token", "access_token", "refresh_token", "refreshToken"} {
@@ -592,3 +628,41 @@ func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
 }
 
 var _ = commands.UpsertOidcProviderCommand{}
+
+// TestCallbackRefusesASessionWithNoBinding isolates the fail-closed half of the
+// binding defense.
+//
+// createAuthSession sets a hash on every session, so in normal operation this
+// can't happen -- which is exactly why it needs its own test. The check used to
+// read `len(session.BindingHash) > 0 && !bindingMatches(...)`, so an unbound
+// session was waved straight through rather than refused, and anything that
+// managed to create one (a code path that forgot, a row left by an older build)
+// silently lost the defense. A missing binding is a bug, not a mode.
+func TestCallbackRefusesASessionWithNoBinding(t *testing.T) {
+	defer teardownOidcTest()
+	idp, provider := setupOidcTest(t, oidcTestOptions{allowProvisioning: true})
+
+	recorder := startLogin(t, provider.Name, "")
+	state, cookies := loginAndExtractFrom(t, recorder)
+	idp.setClaims(claimsFor(idp, "no-binding-subject", nonceFromAuthUrl(t, recorder), "nobinding"))
+
+	// Strip the binding the session was created with, leaving the row in the shape
+	// the old escape hatch would have accepted.
+	err := repositories.GetDB().
+		Model(&models.OidcAuthSession{}).
+		Where("state_hash = ?", hashSecret(state)).
+		Update("binding_hash", "").Error
+	if err != nil {
+		t.Fatalf("failed to blank the binding hash: %v", err)
+	}
+
+	// Even WITH the original cookie, an unbound session must not complete.
+	callback := runCallback(t, provider.Name, url.Values{
+		"code":  {"abc"},
+		"state": {state},
+	}, cookies)
+
+	if code := oidcErrorCode(t, callback); code != errInvalidState {
+		t.Errorf("expected %q for a session with no binding, got %q", errInvalidState, code)
+	}
+}

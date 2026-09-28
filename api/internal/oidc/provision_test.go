@@ -444,3 +444,175 @@ func TestLinkByUsernameInexactMatchRefusesRatherThanDuplicating(t *testing.T) {
 		t.Errorf("the existing account must be untouched, got username %q", stored.Username)
 	}
 }
+
+// TestUnlinkRefusesEvenAfterTheProvisioningIdentityIsGone is the regression test
+// for the lockout finding, and the shape no existing test covered: every other
+// unlink case has exactly ONE identity, which is the one arrangement where the
+// buggy guard happened to behave correctly.
+//
+// The old guard asked the row being removed whether it had provisioned the
+// account. With a provisioned first provider and a second linked later, dropping
+// the first passed (two identities remained) and dropping the second passed too
+// (that row was not the provisioning one) -- leaving an account with no
+// identities and a bcrypt hash of a password nobody ever knew.
+func TestUnlinkRefusesEvenAfterTheProvisioningIdentityIsGone(t *testing.T) {
+	defer teardownOidcTest()
+	idp, provider := setupOidcTest(t, oidcTestOptions{allowProvisioning: true})
+
+	second := createTestProvider(t, idp.issuer(), providerOptions{
+		name:     "secondidp",
+		clientId: "test-client-id",
+	})
+
+	user, err := resolveUser(provider, claims("two-provider-subject", "twoprovider"))
+	if err != nil {
+		t.Fatalf("expected provisioning to succeed, got %v", err)
+	}
+
+	if err := resolveLink(second, claims("two-provider-second", "twoprovider"), user.ID); err != nil {
+		t.Fatalf("expected the second provider to link, got %v", err)
+	}
+
+	// Dropping the provisioning identity is fine -- one way in remains.
+	if err := UnlinkIdentity(user.ID, provider.Name); err != nil {
+		t.Fatalf("expected the first unlink to succeed, got %v", err)
+	}
+
+	// Dropping the last one is not, and this is what used to be allowed.
+	err = UnlinkIdentity(user.ID, second.Name)
+	if !errors.Is(err, ErrWouldLockOut) {
+		t.Fatalf("expected ErrWouldLockOut on the last identity, got %v", err)
+	}
+
+	count, err := repositories.NewOidcIdentityRepository(nil).CountIdentitiesForUser(user.ID)
+	if err != nil {
+		t.Fatalf("failed to count identities: %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("expected the account to keep its last way in, got %d identities", count)
+	}
+}
+
+// TestLinkingToAPasswordlessAccountInheritsTheFlag pins the invariant that makes
+// the guard above work: the fact lives on every identity, so it survives the
+// deletion of the one that recorded it first.
+func TestLinkingToAPasswordlessAccountInheritsTheFlag(t *testing.T) {
+	defer teardownOidcTest()
+	idp, provider := setupOidcTest(t, oidcTestOptions{allowProvisioning: true})
+
+	second := createTestProvider(t, idp.issuer(), providerOptions{
+		name:     "inheritidp",
+		clientId: "test-client-id",
+	})
+
+	user, err := resolveUser(provider, claims("inherit-subject", "inherit"))
+	if err != nil {
+		t.Fatalf("expected provisioning to succeed, got %v", err)
+	}
+
+	if err := resolveLink(second, claims("inherit-second", "inherit"), user.ID); err != nil {
+		t.Fatalf("expected the second provider to link, got %v", err)
+	}
+
+	identity, err := repositories.NewOidcIdentityRepository(nil).GetIdentityForUser(second.ID, user.ID)
+	if err != nil {
+		t.Fatalf("failed to load the linked identity: %v", err)
+	}
+
+	if !identity.ProvisionedUser {
+		t.Error("an identity linked to a passwordless account must inherit the flag")
+	}
+}
+
+// TestLinkingToAnAccountWithAPasswordDoesNotSetTheFlag is the other half: the
+// invariant must not leak onto accounts that were never passwordless, or every
+// ordinary user would be refused their last unlink.
+func TestLinkingToAnAccountWithAPasswordDoesNotSetTheFlag(t *testing.T) {
+	defer teardownOidcTest()
+	_, provider := setupOidcTest(t, oidcTestOptions{})
+
+	user := createTestUser(t, "haspassword")
+
+	if err := resolveLink(provider, claims("haspassword-subject", "haspassword"), user.ID); err != nil {
+		t.Fatalf("expected the link to succeed, got %v", err)
+	}
+
+	identity, err := repositories.NewOidcIdentityRepository(nil).GetIdentityForUser(provider.ID, user.ID)
+	if err != nil {
+		t.Fatalf("failed to load the linked identity: %v", err)
+	}
+
+	if identity.ProvisionedUser {
+		t.Error("an account with its own password must not be marked passwordless")
+	}
+
+	if err := UnlinkIdentity(user.ID, provider.Name); err != nil {
+		t.Errorf("expected the unlink to be allowed, got %v", err)
+	}
+}
+
+// TestClearingTheProvisionedFlagUnblocksTheUnlink covers the remedy the lockout
+// error actually promises -- "ask an administrator to set one before
+// disconnecting". Before this, an administrator could comply and the unlink was
+// still refused, because nothing observed the reset.
+func TestClearingTheProvisionedFlagUnblocksTheUnlink(t *testing.T) {
+	defer teardownOidcTest()
+	_, provider := setupOidcTest(t, oidcTestOptions{allowProvisioning: true})
+
+	user, err := resolveUser(provider, claims("remedy-subject", "remedy"))
+	if err != nil {
+		t.Fatalf("expected provisioning to succeed, got %v", err)
+	}
+
+	if err := UnlinkIdentity(user.ID, provider.Name); !errors.Is(err, ErrWouldLockOut) {
+		t.Fatalf("expected ErrWouldLockOut before a password is set, got %v", err)
+	}
+
+	if err := repositories.NewOidcIdentityRepository(nil).ClearProvisionedFlagForUser(user.ID); err != nil {
+		t.Fatalf("failed to clear the provisioned flag: %v", err)
+	}
+
+	if err := UnlinkIdentity(user.ID, provider.Name); err != nil {
+		t.Errorf("expected the unlink to be allowed once a password exists, got %v", err)
+	}
+}
+
+// TestUnlinkRepairsALegacyAccountThatPredatesTheInvariant covers the database
+// that already exists.
+//
+// The flag is now held on every identity of a passwordless account, but rows
+// written before that was true carry it on only ONE -- the identity that
+// provisioned the account. Deleting that row first would take the fact with it
+// and the next unlink would strand the account, which is the original bug in a
+// different disguise. Unlinking re-asserts the flag across what remains, so such
+// an account heals the first time it is touched.
+func TestUnlinkRepairsALegacyAccountThatPredatesTheInvariant(t *testing.T) {
+	defer teardownOidcTest()
+	idp, provider := setupOidcTest(t, oidcTestOptions{allowProvisioning: true})
+
+	second := createTestProvider(t, idp.issuer(), providerOptions{
+		name:     "legacyidp",
+		clientId: "test-client-id",
+	})
+
+	user, err := resolveUser(provider, claims("legacy-subject", "legacy"))
+	if err != nil {
+		t.Fatalf("expected provisioning to succeed, got %v", err)
+	}
+
+	// The legacy shape: a second identity linked before resolveLink inherited the
+	// flag, so it sits at false while the account still has no password.
+	if err := createIdentity(second, user.ID, claims("legacy-second", "legacy"), false); err != nil {
+		t.Fatalf("failed to seed the legacy identity: %v", err)
+	}
+
+	if err := UnlinkIdentity(user.ID, provider.Name); err != nil {
+		t.Fatalf("expected the first unlink to succeed, got %v", err)
+	}
+
+	err = UnlinkIdentity(user.ID, second.Name)
+	if !errors.Is(err, ErrWouldLockOut) {
+		t.Fatalf("expected ErrWouldLockOut on the last identity, got %v", err)
+	}
+}

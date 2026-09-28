@@ -8,13 +8,13 @@ part of 'oidc_link_start_view.dart';
 
 class _$OidcLinkStartView extends OidcLinkStartView {
   @override
-  final String authorizationUrl;
+  final String launchUrl;
 
   factory _$OidcLinkStartView(
           [void Function(OidcLinkStartViewBuilder)? updates]) =>
       (OidcLinkStartViewBuilder()..update(updates))._build();
 
-  _$OidcLinkStartView._({required this.authorizationUrl}) : super._();
+  _$OidcLinkStartView._({required this.launchUrl}) : super._();
   @override
   OidcLinkStartView rebuild(void Function(OidcLinkStartViewBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -26,14 +26,13 @@ class _$OidcLinkStartView extends OidcLinkStartView {
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is OidcLinkStartView &&
-        authorizationUrl == other.authorizationUrl;
+    return other is OidcLinkStartView && launchUrl == other.launchUrl;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
-    _$hash = $jc(_$hash, authorizationUrl.hashCode);
+    _$hash = $jc(_$hash, launchUrl.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -41,7 +40,7 @@ class _$OidcLinkStartView extends OidcLinkStartView {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'OidcLinkStartView')
-          ..add('authorizationUrl', authorizationUrl))
+          ..add('launchUrl', launchUrl))
         .toString();
   }
 }
@@ -50,10 +49,9 @@ class OidcLinkStartViewBuilder
     implements Builder<OidcLinkStartView, OidcLinkStartViewBuilder> {
   _$OidcLinkStartView? _$v;
 
-  String? _authorizationUrl;
-  String? get authorizationUrl => _$this._authorizationUrl;
-  set authorizationUrl(String? authorizationUrl) =>
-      _$this._authorizationUrl = authorizationUrl;
+  String? _launchUrl;
+  String? get launchUrl => _$this._launchUrl;
+  set launchUrl(String? launchUrl) => _$this._launchUrl = launchUrl;
 
   OidcLinkStartViewBuilder() {
     OidcLinkStartView._defaults(this);
@@ -62,7 +60,7 @@ class OidcLinkStartViewBuilder
   OidcLinkStartViewBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
-      _authorizationUrl = $v.authorizationUrl;
+      _launchUrl = $v.launchUrl;
       _$v = null;
     }
     return this;
@@ -84,8 +82,8 @@ class OidcLinkStartViewBuilder
   _$OidcLinkStartView _build() {
     final _$result = _$v ??
         _$OidcLinkStartView._(
-          authorizationUrl: BuiltValueNullFieldError.checkNotNull(
-              authorizationUrl, r'OidcLinkStartView', 'authorizationUrl'),
+          launchUrl: BuiltValueNullFieldError.checkNotNull(
+              launchUrl, r'OidcLinkStartView', 'launchUrl'),
         );
     replace(_$result);
     return _$result;

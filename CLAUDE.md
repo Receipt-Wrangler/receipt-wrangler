@@ -278,10 +278,18 @@ pieces have to agree:
   is usable end-to-end from the phone alone. It is gated on **`app.account.update`**, the same
   permission as disconnecting one — adding a way to sign in is at least as privileged as removing
   one. **The two clients start it differently and must**: the desktop navigates and gets a 302,
-  while mobile calls it as an authenticated API request and opens the returned URL itself, because
-  a bearer token cannot ride into the external user agent RFC 8252 requires. Wiring mobile's
-  Connect button to the *login* flow instead — which is how it first shipped — silently provisions a
-  second account rather than linking.
+  while mobile calls it as an authenticated API request, because a bearer token cannot ride into the
+  external user agent RFC 8252 requires. Wiring mobile's Connect button to the *login* flow instead
+  — which is how it first shipped — silently provisions a second account rather than linking.
+- **Every OIDC flow is bound to the user agent that started it**, by a cookie, mobile included. The
+  mobile link start is the one request an app rather than a browser makes, so it creates no session:
+  it returns a single-use **launch URL** on this API, and the browser following that is what mints
+  the session and receives the binding. Two earlier shortcuts here were both holes — skipping the
+  binding for mobile (the callback check was `len(hash) > 0 && …`, a no-op for exactly those
+  sessions) and handing the app the IdP's authorization URL directly (providers leak it by Referer,
+  and the callback could not tell the app's browser from an attacker's). Neither is fixable with
+  PKCE, which defends a different thing: binding stops an attacker **driving** your flow, PKCE stops
+  a rogue app **stealing its result**. See `api/CLAUDE.md` → "Linking an existing account".
 - **`FeatureConfig.oidcProviders` must serialize as `[]`, never `null`**, and
   `OidcProviderSummary.name` must stay `type: string` and **never become an enum** — the
   generated Dart deserializer has no null guard and closed enums throw on unknown values, the

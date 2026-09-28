@@ -60,11 +60,20 @@ type OidcConnectionView struct {
 // cannot carry one. So the app starts the flow as an ordinary authenticated API
 // call and opens the URL this carries itself.
 //
-// It is safe to hand to the caller: the URL's state belongs to a session already
-// bound to that caller's user id, so possessing it grants nothing the bearer
-// token did not already.
+// LaunchUrl points back at THIS server, not at the identity provider, and that
+// indirection is the security property. It used to carry the authorization URL
+// directly, justified as "possessing it grants nothing the bearer token did not
+// already" -- which was wrong. That URL carries the state, identity providers
+// leak it by Referer from their own login pages, and the callback it leads to had
+// no way to tell the app's browser from anyone else's. Whoever held it could
+// complete the flow as themselves and have their identity grafted onto this
+// caller's account.
+//
+// Now the app opens a launch URL here instead. The external browser follows it,
+// so the SERVER gets to mint the session and set a binding cookie on the agent
+// that will return with the callback -- the same defense every other leg has.
 type OidcLinkStartView struct {
-	AuthorizationUrl string `json:"authorizationUrl"`
+	LaunchUrl string `json:"launchUrl"`
 }
 
 // OidcFlowError reports a failure from a flow start that answers with JSON

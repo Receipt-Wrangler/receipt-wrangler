@@ -112,6 +112,7 @@ Class | Method | HTTP request | Description
 [*OidcApi*](doc/OidcApi.md) | [**getOidcConnections**](doc/OidcApi.md#getoidcconnections) | **GET** /oidc/connections | List the caller&#39;s connected accounts
 [*OidcApi*](doc/OidcApi.md) | [**oidcCallback**](doc/OidcApi.md#oidccallback) | **GET** /oidc/{name}/callback | OIDC redirect URI
 [*OidcApi*](doc/OidcApi.md) | [**oidcExchange**](doc/OidcApi.md#oidcexchange) | **POST** /oidc/exchange | Redeem a mobile sign-in code
+[*OidcApi*](doc/OidcApi.md) | [**oidcLinkLaunch**](doc/OidcApi.md#oidclinklaunch) | **GET** /oidc/link/{name}/launch | Open a mobile \&quot;connect account\&quot; flow in the browser
 [*OidcApi*](doc/OidcApi.md) | [**oidcLinkStart**](doc/OidcApi.md#oidclinkstart) | **GET** /oidc/link/{name} | Connect a provider to the signed-in account
 [*OidcApi*](doc/OidcApi.md) | [**oidcLogin**](doc/OidcApi.md#oidclogin) | **GET** /oidc/{name}/login | Start an OIDC login
 [*OidcProviderApi*](doc/OidcProviderApi.md) | [**createOidcProvider**](doc/OidcProviderApi.md#createoidcprovider) | **POST** /oidcProvider/ | Create an OIDC provider

@@ -2268,15 +2268,27 @@ the system browser and redeems the one-time code that comes back. See `api/CLAUD
   account has **not** connected, which is exactly the case where that happens. It shipped wired to
   the login flow and reported "Account connected" while doing it.
   - **The start is an API call, not a navigation.** `GET /oidc/link/{name}?client=mobile` returns
-    `{authorizationUrl}` as JSON, and the app opens that URL in the external user agent itself. It
-    cannot be a redirect: this app authenticates with a **bearer token** (`auth_interceptor.dart`),
-    which the browser RFC 8252 requires has no way to carry, so a 302 into it arrives
-    unauthenticated. The callback returns to `io.receiptwrangler://oidc?linked={name}`, parsed by
+    `{launchUrl}` as JSON. It cannot be a redirect: this app authenticates with a **bearer token**
+    (`auth_interceptor.dart`), which the browser RFC 8252 requires has no way to carry, so a 302 into
+    it arrives unauthenticated.
+  - **What comes back points at OUR API, not the identity provider, and that matters.** It first
+    shipped returning the provider's authorization URL for the app to open directly, which meant the
+    browser never touched our server before the callback — so the server had nothing to bind the flow
+    to. Providers leak that URL by Referer from their own login pages, and anyone holding it could
+    authenticate as themselves and have their identity attached to this account. Opening a launch URL
+    instead lets the server set a binding cookie on the browser that will return with the callback.
+    Do not "simplify" this back into one hop. See `api/CLAUDE.md` → "Linking an existing account" for
+    why PKCE cannot substitute (the challenge would be the victim's own, and Android's `exported`
+    `CallbackActivity` lets an attacker deep-link a result into the waiting flow).
+  - The callback returns to `io.receiptwrangler://oidc?linked={name}`, parsed by
     `extractLinkedProviderFromCallback` — a **link carries no `code`**, because it mints no session.
-  - **No `codeChallenge` is sent**, unlike a login: there is no exchange code to bind, and the
-    bearer token on the start request already proved who the caller is.
+  - **No `codeChallenge` is sent**, unlike a login — but not because the bearer token on the start
+    "already proved who the caller is", which was the original and wrong reasoning. It is because a
+    link hands the app back nothing redeemable; the flow is bound by cookie instead.
   - Disconnect is hidden for a provisioned account's **last** connection, matching the server's
-    lockout guard; the server refuses it either way. A failed load yields no section rather than an
+    lockout guard; the server refuses it either way. The flag is an **account** fact replicated onto
+    every identity, so this per-connection predicate is also the account-level one — see
+    `api/CLAUDE.md`. A failed load yields no section rather than an
     error, so an older server or a caller without `app.account.read` degrades quietly.
 - **`app_links` is not involved** — `flutter_web_auth_2` captures the callback itself, so the existing
   deep-link handler in `lib/main.dart` and its test seams are untouched.

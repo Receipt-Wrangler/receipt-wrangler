@@ -147,11 +147,19 @@ Future<api.AppData> signInWithOidc({
 ///
 /// That is why the URL is fetched rather than navigated to: the external user
 /// agent RFC 8252 requires has no session with the API, so a 302 into it would
-/// arrive unauthenticated. The app opens the returned authorization URL itself
-/// and waits on its private-use scheme, which the callback returns to with
-/// `?linked=` or `?error=`.
+/// arrive unauthenticated.
+///
+/// What comes back is a LAUNCH url pointing at our own API, not the identity
+/// provider's authorization URL, and the indirection is a security property
+/// rather than a detour. Opening the provider URL directly meant the browser
+/// never touched our server before the callback, so the server had nothing to
+/// bind the flow to -- and anyone who obtained that URL, which providers leak by
+/// Referer from their own login pages, could complete the flow as themselves and
+/// have their identity attached to this account. Following the launch URL lets
+/// the server set a binding cookie on the browser that will return with the
+/// callback, which is what makes the callback safe to act on.
 Future<String> linkWithOidc({required String providerName}) async {
-  final String authorizationUrl;
+  final String launchUrl;
 
   try {
     final response = await OpenApiClient.client.getOidcApi().oidcLinkStart(
@@ -159,12 +167,12 @@ Future<String> linkWithOidc({required String providerName}) async {
           client: 'mobile',
         );
 
-    final url = response.data?.authorizationUrl;
+    final url = response.data?.launchUrl;
     if (url == null || url.isEmpty) {
       throw OidcSignInException('Could not connect that account. Please try again.');
     }
 
-    authorizationUrl = url;
+    launchUrl = url;
   } on DioException catch (e) {
     throw OidcSignInException(oidcErrorMessage(_errorCodeFrom(e)));
   }
@@ -172,7 +180,7 @@ Future<String> linkWithOidc({required String providerName}) async {
   String callbackUrl;
   try {
     callbackUrl = await FlutterWebAuth2.authenticate(
-      url: authorizationUrl,
+      url: launchUrl,
       callbackUrlScheme: oidcCallbackScheme,
     );
   } on PlatformException catch (e) {

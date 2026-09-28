@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	// bindingCookieName holds the browser-binding secret for the desktop leg.
+	// bindingCookieName holds the user-agent-binding secret. Set on every leg,
+	// mobile included -- the external browser round-trips it the same way.
 	bindingCookieName = "oidc_session"
 
 	// bindingCookiePath scopes the cookie to the OIDC routes: nothing else needs
@@ -69,7 +70,7 @@ const (
 
 // Login starts an OIDC login. Unauthenticated.
 func Login(w http.ResponseWriter, r *http.Request) {
-	startFlow(w, r, nil)
+	startFlow(w, r, nil, resolveClientType(r))
 }
 
 // LinkStart starts a "connect account" flow for the authenticated caller. It is
@@ -105,7 +106,88 @@ func LinkStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	startFlow(w, r, &userId)
+	// Mobile is the one caller that is not a browser: the app makes this request
+	// itself, with a bearer token, because an external user agent cannot carry one.
+	// That means there is nobody here to hand a binding cookie to -- so this start
+	// deliberately creates NO session. It hands back a single-use launch handle and
+	// lets the external browser start the real flow at LinkLaunch, where it gets
+	// bound like every other leg.
+	if clientType == models.OidcClientMobile {
+		startMobileLinkLaunch(w, r, userId)
+		return
+	}
+
+	startFlow(w, r, &userId, clientType)
+}
+
+// startMobileLinkLaunch answers a mobile link start with the URL the app should
+// open in the external browser. The handle in it is the browser's authorization
+// to start a link for this user, and it is single-use and short-lived.
+//
+// It is safe to put in a URL the browser navigates to: a 302 does not make the
+// redirecting URL the next request's Referer, so the handle never reaches the
+// identity provider the way the authorization URL's own state does. That Referer
+// leak is exactly the attack this whole hop exists to defeat.
+func startMobileLinkLaunch(w http.ResponseWriter, r *http.Request, userId uint) {
+	name := chi.URLParam(r, "name")
+
+	providerRow, err := repositories.NewOidcProviderRepository(nil).GetEnabledOidcProviderByName(name)
+	if err != nil {
+		writeOidcFlowError(w, errUnknownProvider)
+		return
+	}
+
+	handle, err := createLinkLaunch(userId, providerRow.ID)
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to create an OIDC link launch: "+err.Error())
+		writeOidcFlowError(w, errServerError)
+		return
+	}
+
+	writeOidcJson(w, http.StatusOK, structs.OidcLinkStartView{
+		LaunchUrl: services.BuildOidcLinkLaunchUri(providerRow.Name, handle),
+	})
+}
+
+// LinkLaunch is the browser-facing half of a mobile link, and the reason the
+// mobile leg can be bound at all.
+//
+// Unauthenticated on purpose: the single-use launch handle IS the authorization.
+// An authenticated LinkStart minted it moments ago for this user, after checking
+// app.account.update. Consuming it here lets the EXTERNAL BROWSER be the thing
+// that creates the auth session, which is what makes a binding cookie possible.
+func LinkLaunch(w http.ResponseWriter, r *http.Request) {
+	handle := strings.TrimSpace(r.URL.Query().Get("h"))
+	if len(handle) == 0 {
+		redirectWithError(w, r, models.OidcClientMobile, errInvalidRequest)
+		return
+	}
+
+	launch, claimed, err := consumeLinkLaunch(handle)
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to consume an OIDC link launch: "+err.Error())
+		redirectWithError(w, r, models.OidcClientMobile, errServerError)
+		return
+	}
+
+	// Unknown, expired or already spent all collapse to the same answer, so a
+	// caller cannot probe which handles exist.
+	if !claimed {
+		redirectWithError(w, r, models.OidcClientMobile, errInvalidState)
+		return
+	}
+
+	// The handle is bound to one provider. Presenting it at another provider's
+	// launch URL is a caller confusing itself rather than an attack -- only the
+	// user who asked for it ever held it -- but the mismatch is still not a thing
+	// we should act on.
+	providerRow, err := repositories.NewOidcProviderRepository(nil).GetEnabledOidcProviderByName(chi.URLParam(r, "name"))
+	if err != nil || providerRow.ID != launch.OidcProviderId {
+		redirectWithError(w, r, models.OidcClientMobile, errInvalidState)
+		return
+	}
+
+	startFlow(w, r, &launch.UserId, models.OidcClientMobile)
 }
 
 // resolveClientType reads which client is driving the flow. Anything that is not
@@ -118,17 +200,19 @@ func resolveClientType(r *http.Request) string {
 	return models.OidcClientDesktop
 }
 
-func startFlow(w http.ResponseWriter, r *http.Request, linkUserId *uint) {
+// startFlow creates the auth session and sends the user agent to the identity
+// provider. Every caller is a BROWSER -- a login navigation, a desktop link
+// navigation, or LinkLaunch -- which is what lets it bind the session to the
+// agent unconditionally. The client type is passed in rather than sniffed from
+// the query because LinkLaunch knows it from the handle, not from the URL.
+func startFlow(w http.ResponseWriter, r *http.Request, linkUserId *uint, clientType string) {
 	name := chi.URLParam(r, "name")
 
-	// Resolved BEFORE the provider lookup so even an unknown-provider failure is
-	// reported in the form this caller can act on.
-	clientType := resolveClientType(r)
 	isLink := linkUserId != nil
 
 	providerRow, err := repositories.NewOidcProviderRepository(nil).GetEnabledOidcProviderByName(name)
 	if err != nil {
-		failFlowStart(w, r, clientType, isLink, errUnknownProvider)
+		failBrowserFlowStart(w, r, clientType, isLink, errUnknownProvider)
 		return
 	}
 
@@ -137,15 +221,16 @@ func startFlow(w http.ResponseWriter, r *http.Request, linkUserId *uint) {
 	if clientType == models.OidcClientMobile && !isLink {
 		mobileChallenge = strings.TrimSpace(r.URL.Query().Get("codeChallenge"))
 
-		// The mobile LOGIN leg has no browser cookie to bind to, so the app's own
-		// PKCE challenge is the only thing tying the exchange back to the app that
-		// started the flow. Without it the handoff code would be bearer-only.
+		// A mobile LOGIN hands the app a one-time exchange code, which buys a full
+		// session. The app's PKCE challenge is what ties that code to the app that
+		// started the flow, so a rogue app claiming the private-use scheme gets
+		// something it cannot redeem. This is separate from the binding cookie above,
+		// which stops an attacker DRIVING the flow rather than stealing its result.
 		//
-		// A mobile LINK needs none: it mints no exchange code and no session -- the
-		// caller already proved who they are with a bearer token on this very
-		// request, which is what LinkUserId records.
+		// A mobile LINK needs none: its callback hands back only ?linked={name},
+		// which is not a credential. Nothing is minted for the app to protect.
 		if len(mobileChallenge) == 0 {
-			failFlowStart(w, r, clientType, isLink, errInvalidRequest)
+			failBrowserFlowStart(w, r, clientType, isLink, errInvalidRequest)
 			return
 		}
 	}
@@ -153,14 +238,14 @@ func startFlow(w http.ResponseWriter, r *http.Request, linkUserId *uint) {
 	discovered, err := GetProvider(providerRow)
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "OIDC discovery failed for provider "+providerRow.Name+": "+err.Error())
-		failFlowStart(w, r, clientType, isLink, errProviderError)
+		failBrowserFlowStart(w, r, clientType, isLink, errProviderError)
 		return
 	}
 
 	config, err := buildOauthConfig(providerRow, discovered, services.BuildOidcRedirectUri(providerRow.Name))
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to build OIDC config for provider "+providerRow.Name+": "+err.Error())
-		failFlowStart(w, r, clientType, isLink, errServerError)
+		failBrowserFlowStart(w, r, clientType, isLink, errServerError)
 		return
 	}
 
@@ -175,29 +260,22 @@ func startFlow(w http.ResponseWriter, r *http.Request, linkUserId *uint) {
 	})
 	if err != nil {
 		logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to create OIDC auth session: "+err.Error())
-		failFlowStart(w, r, clientType, isLink, errServerError)
+		failBrowserFlowStart(w, r, clientType, isLink, errServerError)
 		return
 	}
 
-	if clientType != models.OidcClientMobile {
-		http.SetCookie(w, buildBindingCookie(created.Binding))
-	}
+	// Unconditional, mobile included. The authorization URL about to be built
+	// carries the state, and identity providers leak it -- their login pages load
+	// third-party resources and hand the whole URL over as a Referer. This cookie
+	// is what makes a leaked state worthless: the attacker cannot produce it, so
+	// their callback is refused.
+	http.SetCookie(w, buildBindingCookie(created.Binding))
 
 	authUrl := config.AuthCodeURL(
 		created.State,
 		oidc.Nonce(created.Nonce),
 		oauth2.S256ChallengeOption(verifier),
 	)
-
-	// A mobile link is the one start that answers with JSON instead of a redirect.
-	// The app authenticates with a bearer token, which the external user agent
-	// RFC 8252 requires cannot carry -- so the app calls this as an ordinary API
-	// request and opens the returned URL itself. Every other start is already a
-	// browser navigation and stays a 302.
-	if clientType == models.OidcClientMobile && isLink {
-		writeOidcJson(w, http.StatusOK, structs.OidcLinkStartView{AuthorizationUrl: authUrl})
-		return
-	}
 
 	http.Redirect(w, r, authUrl, http.StatusFound)
 }
@@ -256,11 +334,19 @@ func Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Browser binding -- the login-CSRF defense. Without it an attacker can
-	// start a flow, harvest the state and code, and plant them in a victim's
-	// browser, silently signing the victim into the ATTACKER's account. The
-	// attacker cannot produce the victim's cookie.
-	if len(session.BindingHash) > 0 && !bindingMatches(r, session.BindingHash) {
+	// 4. User-agent binding -- the login-CSRF defense, and the single most
+	// load-bearing check here. Without it an attacker who obtains the state (the
+	// identity provider's own login page leaks the authorization URL by Referer)
+	// can complete the flow as THEMSELVES and have the result land on the victim:
+	// signed into the attacker's account on a login, or the attacker's identity
+	// grafted onto the victim's account on a link.
+	//
+	// Unconditional by design. This used to read `len(session.BindingHash) > 0 &&`,
+	// which turned the check into a no-op for every mobile session, because
+	// createAuthSession skipped the hash for mobile. No session is created unbound
+	// any more, so an empty hash is a bug rather than a mode, and it must fail
+	// closed here rather than wave the callback through.
+	if !bindingMatches(r, session.BindingHash) {
 		redirectWithError(w, r, clientType, errInvalidState)
 		return
 	}
@@ -497,17 +583,26 @@ func resolutionErrorCode(err error) string {
 	}
 }
 
-// failFlowStart reports a failure from the START of a flow, in whatever form the
-// caller can act on. Three cases, because the callers genuinely differ: a mobile
-// link is an API call and gets JSON, a desktop link is a navigation from the
-// profile page and returns there, and a login is a navigation from the login
-// screen and returns there.
+// failFlowStart reports a failure from a start that the APP called directly --
+// LinkStart, which a mobile client reaches as an ordinary bearer-authenticated
+// API request and a desktop client reaches as a browser navigation. The mobile
+// case gets JSON so the failure arrives in the same shape as the success.
+//
+// Not for startFlow: every caller of that is a browser, including LinkLaunch,
+// and handing a browser a JSON body would strand it on a blank page.
 func failFlowStart(w http.ResponseWriter, r *http.Request, clientType string, isLink bool, code string) {
 	if clientType == models.OidcClientMobile && isLink {
 		writeOidcFlowError(w, code)
 		return
 	}
 
+	failBrowserFlowStart(w, r, clientType, isLink, code)
+}
+
+// failBrowserFlowStart reports a start failure to a user agent, sending it back
+// wherever it came from: the profile page for a link, the login screen for a
+// login, and the app's own scheme for either on mobile.
+func failBrowserFlowStart(w http.ResponseWriter, r *http.Request, clientType string, isLink bool, code string) {
 	if isLink {
 		redirectLinkError(w, r, clientType, code)
 		return

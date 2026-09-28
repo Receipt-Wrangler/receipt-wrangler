@@ -32,12 +32,23 @@ type OidcAuthSession struct {
 	// the caller's job, and skipping it re-opens ID-token replay.
 	NonceHash string `gorm:"not null;size:64" json:"-"`
 
-	// BindingHash is sha256 of a short-lived HttpOnly cookie value set at login
-	// start. It defends against login CSRF: without it an attacker can start a
-	// flow, harvest the state, and have a victim's browser complete it — silently
-	// signing the victim into the attacker's account. Empty for mobile, where the
-	// external user agent may not carry the cookie; the mobile leg is bound
-	// instead by the app-held PKCE verifier at the exchange endpoint.
+	// BindingHash is sha256 of a short-lived HttpOnly cookie value set when the
+	// flow starts. It defends against login CSRF: without it an attacker can start
+	// a flow, harvest the state, and complete it as themselves — signing the victim
+	// into the attacker's account on a login, or grafting the attacker's identity
+	// onto the victim's account on a link.
+	//
+	// Set on EVERY session, mobile included. It used to be skipped for mobile, on
+	// the reasoning that an external user agent may not carry the cookie. That was
+	// wrong: the app hands the login URL itself to flutter_web_auth_2, so the
+	// external browser is what fetches the start, and it round-trips the cookie the
+	// same way a desktop browser does. The mobile LINK start is the one request the
+	// app genuinely makes itself — and it creates no session at all, handing out an
+	// OidcLinkLaunch so the browser can start one instead.
+	//
+	// The column stays nullable rather than NOT NULL: the invariant is enforced
+	// where it is created, and the callback fails closed on an empty hash, so a
+	// schema change would buy nothing that a sweep of stale rows does not.
 	BindingHash string `gorm:"size:64" json:"-"`
 
 	// CodeVerifier is OUR PKCE verifier toward the IdP, encrypted at rest.
