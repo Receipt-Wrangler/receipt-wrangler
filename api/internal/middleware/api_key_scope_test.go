@@ -25,82 +25,108 @@ func scopeRequest(t *testing.T, key string, method string, path string) int {
 	return w.Result().StatusCode
 }
 
-// routeCase is one row of the inventory: a real route, and whether it reads.
+// routeCase is one row of the inventory: a real route, and what it does.
 type routeCase struct {
 	method string
 	path   string
-	read   bool
+	class  requestClass
+}
+
+// scopePermits states the whole rule as a matrix rather than deriving it, so a
+// change to apiKeyScopePermits cannot quietly change what the table expects of
+// it. Read across: "w" is literal, and neither single scope reaches an endpoint
+// that both discloses and changes.
+var scopePermits = map[string]map[requestClass]bool{
+	"r":  {classRead: true, classWrite: false, classReadWrite: false},
+	"w":  {classRead: false, classWrite: true, classReadWrite: false},
+	"rw": {classRead: true, classWrite: true, classReadWrite: true},
+}
+
+func className(class requestClass) string {
+	switch class {
+	case classRead:
+		return "read"
+	case classWrite:
+		return "write"
+	case classReadWrite:
+		return "read-write"
+	default:
+		return "unknown"
+	}
 }
 
 // everyRoute is the whole authenticated surface, classified.
 //
-// This table is what makes the allowlist maintainable. A route added without
-// thought about its scope shows up here as a missing row, and the two
-// writes-dressed-as-reads at the bottom are the ones a reviewer would otherwise
-// wave through.
+// This table is what makes the allowlists maintainable. A route added without
+// thought about its scope shows up here as a missing row, and the two sections
+// at the bottom -- writes that disclose, and writes with read-ish names -- are
+// the ones a reviewer would otherwise wave through.
 var everyRoute = []routeCase{
 	// Reads over GET -- the ordinary case.
-	{http.MethodGet, "/api/receipt/1", true},
-	{http.MethodGet, "/api/group/1", true},
-	{http.MethodGet, "/api/category/", true},
-	{http.MethodGet, "/api/search/", true},
-	{http.MethodGet, "/api/report/template/1", true},
-	{http.MethodGet, "/api/systemTask/1/sourceFile", true},
+	{http.MethodGet, "/api/receipt/1", classRead},
+	{http.MethodGet, "/api/group/1", classRead},
+	{http.MethodGet, "/api/category/", classRead},
+	{http.MethodGet, "/api/search/", classRead},
+	{http.MethodGet, "/api/report/template/1", classRead},
+	{http.MethodGet, "/api/systemTask/1/sourceFile", classRead},
 
 	// Reads over POST -- the allowlist.
-	{http.MethodPost, "/api/apiKey/paged", true},
-	{http.MethodPost, "/api/category/getPagedCategories", true},
-	{http.MethodPost, "/api/customField/getPagedCustomFields", true},
-	{http.MethodPost, "/api/group/getPagedGroups", true},
-	{http.MethodPost, "/api/prompt/getPagedPrompts", true},
-	{http.MethodPost, "/api/tag/getPagedTags", true},
-	{http.MethodPost, "/api/user/getPagedUsers", true},
-	{http.MethodPost, "/api/receiptProcessingSettings/getPagedProcessingSettings", true},
-	{http.MethodPost, "/api/systemEmail/getSystemEmails", true},
-	{http.MethodPost, "/api/systemTask/getPagedSystemTasks", true},
-	{http.MethodPost, "/api/systemTask/getPagedActivities", true},
-	{http.MethodPost, "/api/report/template/list", true},
-	{http.MethodPost, "/api/report/generate", true},
-	{http.MethodPost, "/api/report/preview", true},
-	{http.MethodPost, "/api/report/receipts", true},
-	{http.MethodPost, "/api/receiptImage/convertToJpg", true},
-	{http.MethodPost, "/api/export/", true},
-	{http.MethodPost, "/api/export/7", true},
-	{http.MethodPost, "/api/receipt/group/7", true},
-	{http.MethodPost, "/api/receipt/group/7/summary", true},
-	{http.MethodPost, "/api/widget/pieChart/7", true},
-	{http.MethodPost, "/api/report/template/7/generate", true},
-	{http.MethodPost, "/api/report/template/7/render", true},
+	{http.MethodPost, "/api/apiKey/paged", classRead},
+	{http.MethodPost, "/api/category/getPagedCategories", classRead},
+	{http.MethodPost, "/api/customField/getPagedCustomFields", classRead},
+	{http.MethodPost, "/api/group/getPagedGroups", classRead},
+	{http.MethodPost, "/api/prompt/getPagedPrompts", classRead},
+	{http.MethodPost, "/api/tag/getPagedTags", classRead},
+	{http.MethodPost, "/api/user/getPagedUsers", classRead},
+	{http.MethodPost, "/api/receiptProcessingSettings/getPagedProcessingSettings", classRead},
+	{http.MethodPost, "/api/systemEmail/getSystemEmails", classRead},
+	{http.MethodPost, "/api/systemTask/getPagedSystemTasks", classRead},
+	{http.MethodPost, "/api/systemTask/getPagedActivities", classRead},
+	{http.MethodPost, "/api/report/template/list", classRead},
+	{http.MethodPost, "/api/report/generate", classRead},
+	{http.MethodPost, "/api/report/preview", classRead},
+	{http.MethodPost, "/api/report/receipts", classRead},
+	{http.MethodPost, "/api/receiptImage/convertToJpg", classRead},
+	{http.MethodPost, "/api/export/", classRead},
+	{http.MethodPost, "/api/export/7", classRead},
+	{http.MethodPost, "/api/receipt/group/7", classRead},
+	{http.MethodPost, "/api/receipt/group/7/summary", classRead},
+	{http.MethodPost, "/api/widget/pieChart/7", classRead},
+	{http.MethodPost, "/api/report/template/7/generate", classRead},
+	{http.MethodPost, "/api/report/template/7/render", classRead},
 
 	// Writes.
-	{http.MethodPost, "/api/receipt/", false},
-	{http.MethodPut, "/api/receipt/1", false},
-	{http.MethodDelete, "/api/receipt/1", false},
-	{http.MethodPost, "/api/receipt/quickScan", false},
-	{http.MethodPost, "/api/receipt/bulkStatusUpdate", false},
-	{http.MethodPost, "/api/receipt/1/duplicate", false},
-	{http.MethodPost, "/api/apiKey/", false},
-	{http.MethodPut, "/api/apiKey/1", false},
-	{http.MethodDelete, "/api/apiKey/1", false},
-	{http.MethodPost, "/api/category/", false},
-	{http.MethodPost, "/api/group/", false},
-	{http.MethodPut, "/api/group/1", false},
-	{http.MethodPost, "/api/report/template", false},
-	{http.MethodPut, "/api/report/template/1", false},
-	{http.MethodDelete, "/api/report/template/1", false},
-	{http.MethodPost, "/api/report/template/1/duplicate", false},
-	{http.MethodPost, "/api/user/1/resetPassword", false},
-	{http.MethodDelete, "/api/user/bulk", false},
-	{http.MethodPost, "/api/import/importConfigJson", false},
-	{http.MethodPost, "/api/systemSettings/restartTaskServer", false},
+	{http.MethodPost, "/api/receipt/", classWrite},
+	{http.MethodPut, "/api/receipt/1", classWrite},
+	{http.MethodDelete, "/api/receipt/1", classWrite},
+	{http.MethodPost, "/api/receipt/quickScan", classWrite},
+	{http.MethodPost, "/api/receipt/bulkStatusUpdate", classWrite},
+	{http.MethodPost, "/api/apiKey/", classWrite},
+	{http.MethodPut, "/api/apiKey/1", classWrite},
+	{http.MethodDelete, "/api/apiKey/1", classWrite},
+	{http.MethodPost, "/api/category/", classWrite},
+	{http.MethodPost, "/api/group/", classWrite},
+	{http.MethodPut, "/api/group/1", classWrite},
+	{http.MethodPost, "/api/report/template", classWrite},
+	{http.MethodPut, "/api/report/template/1", classWrite},
+	{http.MethodDelete, "/api/report/template/1", classWrite},
+	{http.MethodPost, "/api/user/1/resetPassword", classWrite},
+	{http.MethodDelete, "/api/user/bulk", classWrite},
+	{http.MethodPost, "/api/import/importConfigJson", classWrite},
+	{http.MethodPost, "/api/systemSettings/restartTaskServer", classWrite},
+
+	// Writes that DISCLOSE. Both take nothing but an id and answer with the
+	// source's contents, so a write-only key could read through them.
+	{http.MethodPost, "/api/receipt/1/duplicate", classReadWrite},
+	{http.MethodPost, "/api/report/template/1/duplicate", classReadWrite},
 
 	// Writes that LOOK like reads. Each persists a row or enqueues a task while
 	// carrying a read-ish name, and two of them carry a ".read" permission.
-	{http.MethodPost, "/api/systemEmail/checkConnectivity", false},
-	{http.MethodPost, "/api/receiptProcessingSettings/checkConnectivity", false},
-	{http.MethodPost, "/api/prompt/createDefaultPrompt", false},
-	{http.MethodPost, "/api/group/1/pollGroupEmail", false},
-	{http.MethodPost, "/api/systemTask/rerunActivity/1", false},
+	{http.MethodPost, "/api/systemEmail/checkConnectivity", classWrite},
+	{http.MethodPost, "/api/receiptProcessingSettings/checkConnectivity", classWrite},
+	{http.MethodPost, "/api/prompt/createDefaultPrompt", classWrite},
+	{http.MethodPost, "/api/group/1/pollGroupEmail", classWrite},
+	{http.MethodPost, "/api/systemTask/rerunActivity/1", classWrite},
 }
 
 // TestApiKeyScopeIsEnforcedAcrossEveryRoute is the regression test for the
@@ -113,36 +139,29 @@ func TestApiKeyScopeIsEnforcedAcrossEveryRoute(t *testing.T) {
 
 	user := createTestUser()
 
-	scopes := map[string]struct {
-		key        string
-		allowsRead bool
-	}{}
-
-	for _, scope := range []string{"r", "w", "rw"} {
+	keys := map[string]string{}
+	for scope := range scopePermits {
 		_, key, err := createTestApiKey(user.ID, scope)
 		if err != nil {
 			t.Fatalf("failed to create a %q key: %v", scope, err)
 		}
 
-		scopes[scope] = struct {
-			key        string
-			allowsRead bool
-		}{key: key, allowsRead: scope != "w"}
+		keys[scope] = key
 	}
 
 	for _, route := range everyRoute {
-		for scope, held := range scopes {
-			// Literal semantics: "r" reads only, "w" writes only, "rw" both.
-			allowed := route.read == held.allowsRead || scope == "rw"
-
+		for scope, key := range keys {
 			want := http.StatusForbidden
-			if allowed {
+			if scopePermits[scope][route.class] {
 				want = http.StatusOK
 			}
 
-			got := scopeRequest(t, held.key, route.method, route.path)
+			got := scopeRequest(t, key, route.method, route.path)
 			if got != want {
-				t.Errorf("scope %q on %s %s: got %d, want %d", scope, route.method, route.path, got, want)
+				t.Errorf(
+					"scope %q on %s %s (%s): got %d, want %d",
+					scope, route.method, route.path, className(route.class), got, want,
+				)
 			}
 		}
 	}
@@ -162,7 +181,9 @@ func TestReadOnlyPostPathMatching(t *testing.T) {
 		{"/api/receipt/group/", false},  // empty parameter
 		{"/api/receipt/group//", false}, // ditto
 		{"/api/receipt/group/7/other", false},
-		{"/api/receipt/1/duplicate", false}, // "group" is literal, not a parameter
+		// "group" is literal, not a parameter. Both duplicate routes are
+		// read-AND-write, which classifyRequest settles before this matcher runs.
+		{"/api/receipt/1/duplicate", false},
 		{"/api/export", true},
 		{"/api/export/", true},
 		{"/api/export/7", true},
@@ -189,28 +210,24 @@ func TestReadOnlyPostPathMatching(t *testing.T) {
 // TestApiKeyScopePermitsIsLiteral covers the rule directly, including the
 // fail-closed behaviour for a scope that should be unreachable.
 func TestApiKeyScopePermitsIsLiteral(t *testing.T) {
-	cases := []struct {
-		scope     string
-		readOnly  bool
-		permitted bool
-	}{
-		{"r", true, true},
-		{"r", false, false},
-		{"w", true, false},
-		{"w", false, true},
-		{"rw", true, true},
-		{"rw", false, true},
-		// Neither the command validator nor Claims.Validate lets these through, so
-		// reaching here with one is a bug -- and a bug must not widen access.
-		{"", true, false},
-		{"", false, false},
-		{"x", true, false},
-		{"x", false, false},
+	for scope, expected := range scopePermits {
+		for _, class := range []requestClass{classRead, classWrite, classReadWrite} {
+			if got := apiKeyScopePermits(scope, class); got != expected[class] {
+				t.Errorf(
+					"apiKeyScopePermits(%q, %s) = %v, want %v",
+					scope, className(class), got, expected[class],
+				)
+			}
+		}
 	}
 
-	for _, c := range cases {
-		if got := apiKeyScopePermits(c.scope, c.readOnly); got != c.permitted {
-			t.Errorf("apiKeyScopePermits(%q, readOnly=%v) = %v, want %v", c.scope, c.readOnly, got, c.permitted)
+	// Neither the command validator nor Claims.Validate lets these through, so
+	// reaching here with one is a bug -- and a bug must not widen access.
+	for _, scope := range []string{"", "x", "R", "W"} {
+		for _, class := range []requestClass{classRead, classWrite, classReadWrite} {
+			if apiKeyScopePermits(scope, class) {
+				t.Errorf("scope %q permitted a %s request", scope, className(class))
+			}
 		}
 	}
 }
@@ -316,5 +333,54 @@ func TestMountedRouterPreservesUrlPathForScopeMatching(t *testing.T) {
 
 	if !isReadOnlyPostPath(seen) {
 		t.Errorf("the path a mounted middleware actually sees (%q) does not match the allowlist", seen)
+	}
+}
+
+// TestClassifyRequest pins the classifier, and with it the one assumption the
+// method-based model makes: that a write does not disclose.
+//
+// The duplicate endpoints break that assumption -- they take nothing but an id
+// and answer with the source's contents -- so they must NOT fall through to the
+// plain-write branch, where a write-only key would reach them and read through
+// them.
+func TestClassifyRequest(t *testing.T) {
+	cases := []struct {
+		method string
+		path   string
+		class  requestClass
+	}{
+		{http.MethodGet, "/api/receipt/1", classRead},
+		{http.MethodHead, "/api/receipt/1", classRead},
+		{http.MethodOptions, "/api/receipt/1", classRead},
+		{http.MethodPost, "/api/receipt/group/7", classRead},
+		{http.MethodPost, "/api/receipt/", classWrite},
+		{http.MethodPut, "/api/receipt/1", classWrite},
+		{http.MethodPatch, "/api/receipt/1", classWrite},
+		{http.MethodDelete, "/api/receipt/1", classWrite},
+
+		{http.MethodPost, "/api/receipt/1/duplicate", classReadWrite},
+		{http.MethodPost, "/api/receipt/1/duplicate/", classReadWrite},
+		{http.MethodPost, "/api/report/template/7/duplicate", classReadWrite},
+
+		// Near misses, which must stay plain writes rather than widen the rule.
+		{http.MethodPost, "/api/receipt/duplicate", classWrite},
+		{http.MethodPost, "/api/receipt//duplicate", classWrite},
+		{http.MethodPost, "/api/receipt/1/duplicatex", classWrite},
+		{http.MethodPost, "/api/receipt/1/duplicate/extra", classWrite},
+		{http.MethodPost, "/api/report/template/duplicate", classWrite},
+
+		// The method still decides: only POST consults the pattern lists.
+		{http.MethodPut, "/api/receipt/1/duplicate", classWrite},
+		{http.MethodGet, "/api/receipt/1/duplicate", classRead},
+	}
+
+	for _, c := range cases {
+		got := classifyRequest(httptest.NewRequest(c.method, c.path, nil))
+		if got != c.class {
+			t.Errorf(
+				"classifyRequest(%s %s) = %s, want %s",
+				c.method, c.path, className(got), className(c.class),
+			)
+		}
 	}
 }

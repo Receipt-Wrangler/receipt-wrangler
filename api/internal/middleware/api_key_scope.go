@@ -21,24 +21,53 @@ import (
 //
 // The scopes are LITERAL: "r" denies writes, "w" denies reads, "rw" allows both.
 
-// isReadOnlyRequest reports whether a request only reads.
+// requestClass is what a request does to the caller, which is not always what it
+// does to the database.
+//
+// "Read" here means DISCLOSURE, not "touched a row". The gate operates on HTTP
+// requests, never on queries: UpdateReceipt internally reads the receipt,
+// re-resolves permissions and merges hidden associations, and none of that is a
+// read in this sense because none of it reaches the caller. A write-scoped key
+// may PUT all day and the server reads whatever it needs.
+//
+// The corollary is the one easy to miss: a WRITE that returns data is a read
+// too. See classReadWrite.
+type requestClass int
+
+const (
+	classRead requestClass = iota
+	classWrite
+	classReadWrite
+)
+
+// classifyRequest decides what a request discloses and what it changes.
 //
 // The HTTP method decides, which fails closed: a write endpoint added later is
 // denied to an "r" key with nobody having to remember. The opposite mistake -- a
 // new read-over-POST wrongly denied -- surfaces immediately as a broken call
 // rather than sitting there as a silent hole.
 //
-// The allowlist below is the exception, and it is not small: this API serves 23
-// reads over POST, because PagedRequestCommand and friends read their filter from
-// a JSON body.
-func isReadOnlyRequest(r *http.Request) bool {
+// The allowlists below are the exceptions, and the read one is not small: this
+// API serves 23 reads over POST, because PagedRequestCommand and friends read
+// their filter from a JSON body.
+func classifyRequest(r *http.Request) requestClass {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
-		return true
+		return classRead
 	case http.MethodPost:
-		return isReadOnlyPostPath(r.URL.Path)
+		// Read-and-write is checked first: both lists are POST paths, and an
+		// endpoint that discloses must never be classified by the weaker rule.
+		if matchesAny(r.URL.Path, readWritePostPatterns) {
+			return classReadWrite
+		}
+
+		if isReadOnlyPostPath(r.URL.Path) {
+			return classRead
+		}
+
+		return classWrite
 	default:
-		return false
+		return classWrite
 	}
 }
 
@@ -47,12 +76,39 @@ func isReadOnlyRequest(r *http.Request) bool {
 // An unrecognized or empty scope permits nothing -- UpsertApiKeyCommand and
 // Claims.Validate both reject anything outside the three values, so reaching here
 // with something else is a bug, and a bug must not widen access.
-func apiKeyScopePermits(scope string, readOnly bool) bool {
-	if readOnly {
-		return strings.Contains(scope, "r")
-	}
+func apiKeyScopePermits(scope string, class requestClass) bool {
+	reads := strings.Contains(scope, "r")
+	writes := strings.Contains(scope, "w")
 
-	return strings.Contains(scope, "w")
+	switch class {
+	case classRead:
+		return reads
+	case classWrite:
+		return writes
+	case classReadWrite:
+		return reads && writes
+	default:
+		return false
+	}
+}
+
+// readWritePostPatterns are endpoints that BOTH disclose and change, so only a
+// key holding read and write may call them.
+//
+// Both duplicate endpoints take nothing but an id, supply no content of their
+// own, and return the SOURCE's contents in the response. Classified as plain
+// writes -- which is what the method says -- a write-only key could read any
+// receipt or report template it may duplicate simply by duplicating it and
+// reading the answer. That defeats the one thing write-without-read exists for:
+// a key that feeds data in and cannot pull data out.
+//
+// This is the assumption the method-based model hides: it takes for granted that
+// a write does not disclose. That is an assumption, not a guarantee, so an
+// endpoint that breaks it is named here rather than forced into a binary that
+// does not fit.
+var readWritePostPatterns = [][]string{
+	{"api", "receipt", "*", "duplicate"},
+	{"api", "report", "template", "*", "duplicate"},
 }
 
 // readOnlyPostPaths are the endpoints that READ but answer over POST, because
@@ -122,8 +178,18 @@ func isReadOnlyPostPath(path string) bool {
 		return true
 	}
 
+	return matchesAny(path, readOnlyPostPatterns)
+}
+
+// matchesAny reports whether a path matches any of the segment patterns.
+func matchesAny(path string, patterns [][]string) bool {
+	trimmed := strings.Trim(path, "/")
+	if len(trimmed) == 0 {
+		return false
+	}
+
 	segments := strings.Split(trimmed, "/")
-	for _, pattern := range readOnlyPostPatterns {
+	for _, pattern := range patterns {
 		if segmentsMatch(segments, pattern) {
 			return true
 		}

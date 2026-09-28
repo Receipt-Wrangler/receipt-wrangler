@@ -1116,6 +1116,21 @@ surfaces as a broken call rather than a silent hole.
 `PagedRequestCommand` and friends read their filter from a JSON body: every paged list, five report
 endpoints, both exports, the pie chart, the receipt summary and `convertToJpg`.
 
+**"Read" means DISCLOSURE to the caller, never "touched a row".** The gate operates on HTTP
+requests, not on queries. `UpdateReceipt` internally reads the receipt, re-resolves permissions and
+merges hidden associations — none of that is a read in this sense, because none of it reaches the
+caller. A `w` key may PUT all day and the server reads whatever it needs to serve it.
+
+**The corollary is the one easy to miss: a write that RETURNS data is a read too.** The method-based
+model takes for granted that a write does not disclose, and that is an assumption rather than a
+guarantee. `POST /api/receipt/{id}/duplicate` and `POST /api/report/template/{id}/duplicate` break
+it — each takes nothing but an id, supplies no content of its own, and answers with the **source's**
+contents. Classified as plain writes, a `w`-only key could read any receipt or template it may
+duplicate simply by duplicating it and reading the answer, which defeats the one thing
+write-without-read exists for. Both are named in `readWritePostPatterns` and classify as
+`classReadWrite`, which only `rw` satisfies. An endpoint that both discloses and changes belongs on
+that list rather than forced into a binary that does not fit it.
+
 **Do not derive read-vs-write from the declared permissions.** It is the obvious shortcut and it
 fails OPEN. Both `checkConnectivity` endpoints persist a `SystemTask` while carrying a `.read`
 permission (`services/ai.go`, `services/system_email.go`), and `app.reports.generate` sits on a pure
@@ -1135,8 +1150,10 @@ This is an **enforcement change with teeth** — an existing `r` key being used 
 getting 403s. That is the promise finally being kept, but it will break integrations on upgrade.
 
 Tests: `middleware/api_key_scope_test.go` — a table over the whole route inventory × all three
-scopes, the path matcher's near-misses, the literal rule including fail-closed on an unknown scope,
-the last-used stamp surviving on a read, and a JWT caller being unaffected.
+scopes (expectations stated as an explicit matrix, not derived from the function under test), the
+classifier's near-misses for both pattern lists, the path matcher's near-misses, the literal rule
+including fail-closed on an unknown scope, the last-used stamp surviving on a read, and a JWT caller
+being unaffected.
 `TestUnifiedAuthMiddleware_ApiKeyScopes` used to assert a `w` key succeeding on a **GET** — it
 documented the gap, and its name is a large part of why the gap survived review.
 

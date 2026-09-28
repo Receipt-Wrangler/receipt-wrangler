@@ -49,7 +49,7 @@ func UnifiedAuthMiddleware(next http.Handler) http.Handler {
 			// read-only key must still be able to record that it was used. Deriving
 			// the predicate from "does this request write anything" would get that
 			// backwards.
-			if !apiKeyScopePermits(dbApiKey.Scope, isReadOnlyRequest(r)) {
+			if !apiKeyScopePermits(dbApiKey.Scope, classifyRequest(r)) {
 				logging.LogStd(
 					logging.LOG_LEVEL_ERROR,
 					"API key with scope \""+dbApiKey.Scope+"\" refused for "+r.Method+" "+r.URL.Path,
