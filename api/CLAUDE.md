@@ -1810,6 +1810,20 @@ so the desktop renders both dialogs from one row component.
     Failed; email's carry `ran_by_user_id = 0` rather than NULL, so the "System" ran-by filter does
     not match them. Pinned by `TestCreateReceiptRecordsFailedUploadTaskWhenItOwnsTheTask` and
     `TestCreateReceiptLeavesFailedUploadTaskToTheCaller`.
+  - **`DuplicateReceipt` is all or nothing.** The new receipt and its image files are created in
+    one `db.Transaction`, and `copyDuplicateImages` removes any file it already wrote when a later
+    one fails, so a failed duplicate leaves no receipt, no `FileData` and no files. Its task records
+    FAILED with the error and no receipt link: `ReceiptId` / `AssociatedEntityId` are set only once
+    the transaction commits. Three details are load-bearing:
+    - **`err` is a named result**, read by the deferred `CreateSystemTaskFromError`. It used to be a
+      plain local that the image loop shadowed with `:=`, so a failed copy returned a 500 while the
+      task said SUCCEEDED.
+    - **The copy runs on the transaction** (`NewFileRepository(tx)`): `BuildFilePath` looks the new
+      receipt's group up by id, and the row is not visible on another connection yet.
+    - **It copies the stored bytes** (`utils.ReadDataFile`), never `GetBytesForFileData`, which is
+      the display conversion. That rasterized a PDF or transcoded HEIC to JPEG and saved it under the
+      original name and file type, so the duplicate's "receipt.pdf" downloaded as a JPEG.
+    Pinned by `services/duplicate_receipt_test.go`.
 
 The handler is unchanged: `GetSystemTasks` already passes the whole command through and the
 `app.system-tasks.read` gate still applies. Note this endpoint has **no** member-isolation filtering
