@@ -41,12 +41,18 @@ func (repository SystemTaskRepository) GetPagedSystemTasks(command commands.GetS
 	}
 
 	filteredSystemTaskTypes := []models.SystemTaskType{
-		models.RECEIPT_UPLOADED,
 		models.CHAT_COMPLETION,
 		models.OCR_PROCESSING,
 	}
 
-	query := db.Model(&models.SystemTask{}).Where("type NOT IN ?", filteredSystemTaskTypes)
+	// A RECEIPT_UPLOADED row with a parent belongs to a quick scan or email upload
+	// and is shown by expanding that parent row, so only the parentless ones (manual
+	// create, duplicate) are listed at the top level. Keying on the parent id is
+	// safe for this type alone: an EMAIL_UPLOAD also has a parent and is still a
+	// top-level row.
+	query := db.Model(&models.SystemTask{}).
+		Where("type NOT IN ?", filteredSystemTaskTypes).
+		Not(db.Where("type = ? AND associated_system_task_id IS NOT NULL", models.RECEIPT_UPLOADED))
 
 	if command.AssociatedEntityId != 0 {
 		query = query.Where("associated_entity_id = ?", command.AssociatedEntityId)

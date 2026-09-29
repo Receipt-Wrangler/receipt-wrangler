@@ -174,8 +174,16 @@ func TestGetSystemTasksRebuildsVersionOneReceiptUpdates(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &paged); err != nil {
 		t.Fatalf("reading response: %v", err)
 	}
-	if len(paged.Data) != 1 || paged.Data[0].ID != updated.ID {
-		t.Fatalf("expected only the update row, got %+v", paged.Data)
+	// The parentless RECEIPT_UPLOADED row is listed too; only the update row is
+	// rebuilt, so pick it out by id.
+	var updateRow *models.SystemTask
+	for i := range paged.Data {
+		if paged.Data[i].ID == updated.ID {
+			updateRow = &paged.Data[i]
+		}
+	}
+	if updateRow == nil {
+		t.Fatalf("expected the update row, got %+v", paged.Data)
 	}
 
 	var description struct {
@@ -185,7 +193,7 @@ func TestGetSystemTasksRebuildsVersionOneReceiptUpdates(t *testing.T) {
 			SystemTaskId uint `json:"systemTaskId"`
 		} `json:"beforeSource"`
 	}
-	if err := json.Unmarshal([]byte(paged.Data[0].ResultDescription), &description); err != nil {
+	if err := json.Unmarshal([]byte(updateRow.ResultDescription), &description); err != nil {
 		t.Fatalf("reading description: %v", err)
 	}
 	if description.Before != created || description.Version != 1 || description.BeforeSource.SystemTaskId != uploaded.ID {

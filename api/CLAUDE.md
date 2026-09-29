@@ -1789,11 +1789,27 @@ so the desktop renders both dialogs from one row component.
     instants, retains the original hazard.
   - **`ended_at` is nullable, so any filter on it excludes tasks that are still running.** That is
     the correct reading of "ended before X"; it is not special-cased.
-- **The three child-only types stay excluded.** `filteredSystemTaskTypes` (`RECEIPT_UPLOADED`,
-  `CHAT_COMPLETION`, `OCR_PROCESSING`) is applied before the filter, so a `type` filter narrows
-  within the top-level rows. The desktop's Type picker omits them for the same reason; keep
+- **The two child-only types stay excluded.** `filteredSystemTaskTypes` (`CHAT_COMPLETION`,
+  `OCR_PROCESSING`) is applied before the filter, so a `type` filter narrows within the top-level
+  rows. The desktop's Type picker omits them for the same reason; keep
   `CHILD_ONLY_SYSTEM_TASK_TYPES` in `desktop/src/constants/system-task-type-options.ts` in sync with
   the Go list, which `TestGetPagedSystemTasksExcludesChildTaskTypes` pins.
+- **`RECEIPT_UPLOADED` is listed only when it has no parent.** Manual creates and duplicates record
+  a parentless row, and the admin page is the only place those surface. Quick scan and email record
+  theirs as a child of the QUICK_SCAN / EMAIL_UPLOAD task, and the table already shows it by
+  expanding that row, so a `Not(type = RECEIPT_UPLOADED AND associated_system_task_id IS NOT NULL)`
+  keeps them from being listed twice. A parent id is the right test for this type alone — an
+  EMAIL_UPLOAD also has a parent (see "Hydration traps") and is still a top-level row. The Type
+  picker offers "Receipt Uploaded", and it returns only the parentless rows.
+  - **`CreateReceipt` records its own failure only when `createSystemTask` is true.** That flag
+    means "this call owns the upload task": the manual form passes `true`, so a failed create now
+    shows as a FAILED Receipt Uploaded row. Quick scan and email pass `false` because
+    `CreateReceiptUploadedSystemTask` already records the failure as a child. The guard used to be
+    inverted, which recorded nothing for a manual failure and a second, parentless row for every
+    quick scan and email failure. Rows of that second kind written before the fix still list, as
+    Failed; email's carry `ran_by_user_id = 0` rather than NULL, so the "System" ran-by filter does
+    not match them. Pinned by `TestCreateReceiptRecordsFailedUploadTaskWhenItOwnsTheTask` and
+    `TestCreateReceiptLeavesFailedUploadTaskToTheCaller`.
 
 The handler is unchanged: `GetSystemTasks` already passes the whole command through and the
 `app.system-tasks.read` gate still applies. Note this endpoint has **no** member-isolation filtering

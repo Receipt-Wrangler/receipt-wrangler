@@ -484,8 +484,11 @@ func (repository ReceiptRepository) CreateReceipt(
 		notificationRepository.ClearTransaction()
 		return nil
 	})
+	// Only record the failure when this call owns the upload task. Quick scan and
+	// email pass false because they record their own, failure included, as a child
+	// of the task that ran them.
 	if err != nil {
-		if !createSystemTask {
+		if createSystemTask {
 			createFailedUpdateSystemTask(systemTask, err)
 		}
 		return models.Receipt{}, err
@@ -493,7 +496,7 @@ func (repository ReceiptRepository) CreateReceipt(
 
 	fullyLoadedReceipt, err := repository.GetFullyLoadedReceiptById(utils.UintToString(receipt.ID))
 	if err != nil {
-		if !createSystemTask {
+		if createSystemTask {
 			createFailedUpdateSystemTask(systemTask, err)
 		}
 		return models.Receipt{}, err
@@ -504,7 +507,7 @@ func (repository ReceiptRepository) CreateReceipt(
 	// a clear failure here instead of a downstream foreign key violation.
 	if fullyLoadedReceipt.ID == 0 {
 		err = fmt.Errorf("created receipt %s could not be reloaded", utils.UintToString(receipt.ID))
-		if !createSystemTask {
+		if createSystemTask {
 			createFailedUpdateSystemTask(systemTask, err)
 		}
 		return models.Receipt{}, err

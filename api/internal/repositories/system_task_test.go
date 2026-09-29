@@ -227,22 +227,41 @@ func systemTaskFilterCommand(filter commands.SystemTaskPagedRequestFilter) comma
 	}
 }
 
-// The three child-only types are never returned as top-level rows, which is why
-// the desktop's Type picker omits them (CHILD_ONLY_SYSTEM_TASK_TYPES in
-// desktop/src/constants/system-task-type-options.ts). Keep the two in sync.
+// seedReceiptUploadedChild records the RECEIPT_UPLOADED task a quick scan or
+// email upload writes under its parent task.
+func seedReceiptUploadedChild(db *gorm.DB, parent models.SystemTask, startedAt time.Time) models.SystemTask {
+	task := models.SystemTask{
+		Type:                   models.RECEIPT_UPLOADED,
+		Status:                 models.SYSTEM_TASK_SUCCEEDED,
+		AssociatedEntityType:   models.NOOP_ENTITY_TYPE,
+		StartedAt:              startedAt,
+		AssociatedSystemTaskId: &parent.ID,
+	}
+	db.Create(&task)
+
+	return task
+}
+
+// The two child-only types are never returned as top-level rows, and neither is
+// a RECEIPT_UPLOADED row with a parent, which the table shows by expanding that
+// parent. A parentless RECEIPT_UPLOADED (manual create, duplicate) is listed.
+// The desktop's Type picker omits the child-only types for the same reason
+// (CHILD_ONLY_SYSTEM_TASK_TYPES in desktop/src/constants/system-task-type-options.ts);
+// keep the two in sync.
 func TestGetPagedSystemTasksExcludesChildTaskTypes(t *testing.T) {
 	defer TruncateTestDb()
 	db := GetDB()
 	now := time.Now()
 
 	for _, childType := range []models.SystemTaskType{
-		models.RECEIPT_UPLOADED,
 		models.CHAT_COMPLETION,
 		models.OCR_PROCESSING,
 	} {
 		seedSystemTask(db, childType, nil, now, nil)
 	}
-	seedSystemTask(db, models.QUICK_SCAN, nil, now, nil)
+	quickScan := seedSystemTask(db, models.QUICK_SCAN, nil, now, nil)
+	child := seedReceiptUploadedChild(db, quickScan, now)
+	manual := seedSystemTask(db, models.RECEIPT_UPLOADED, nil, now, nil)
 
 	repository := NewSystemTaskRepository(nil)
 	results, count, err := repository.GetPagedSystemTasks(systemTaskFilterCommand(commands.SystemTaskPagedRequestFilter{}))
@@ -250,8 +269,45 @@ func TestGetPagedSystemTasksExcludesChildTaskTypes(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if count != 1 || len(results) != 1 || results[0].Type != models.QUICK_SCAN {
-		t.Errorf("expected only the QUICK_SCAN task, got count=%d rows=%d", count, len(results))
+	if count != 2 || len(results) != 2 {
+		t.Fatalf("expected the QUICK_SCAN and the parentless upload, got count=%d rows=%d", count, len(results))
+	}
+
+	for _, result := range results {
+		switch result.ID {
+		case quickScan.ID:
+			if len(result.ChildSystemTasks) != 1 || result.ChildSystemTasks[0].ID != child.ID {
+				t.Errorf("expected the child upload nested under the QUICK_SCAN, got %+v", result.ChildSystemTasks)
+			}
+		case manual.ID:
+		default:
+			t.Errorf("unexpected top-level task %d of type %v", result.ID, result.Type)
+		}
+	}
+}
+
+func TestGetPagedSystemTasksReceiptUploadedFilterReturnsOnlyParentlessRows(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+	now := time.Now()
+
+	quickScan := seedSystemTask(db, models.QUICK_SCAN, nil, now, nil)
+	seedReceiptUploadedChild(db, quickScan, now)
+	manual := seedSystemTask(db, models.RECEIPT_UPLOADED, nil, now, nil)
+
+	repository := NewSystemTaskRepository(nil)
+	results, count, err := repository.GetPagedSystemTasks(systemTaskFilterCommand(commands.SystemTaskPagedRequestFilter{
+		Type: commands.PagedRequestField{
+			Operation: commands.CONTAINS,
+			Value:     []interface{}{string(models.RECEIPT_UPLOADED)},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if count != 1 || len(results) != 1 || results[0].ID != manual.ID {
+		t.Errorf("expected only the parentless upload, got count=%d rows=%d", count, len(results))
 	}
 }
 

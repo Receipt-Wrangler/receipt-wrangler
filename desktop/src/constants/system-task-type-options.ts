@@ -11,9 +11,12 @@ import { SystemTaskType } from "../open-api";
  * zero rows, so they are dropped from the options below. Keep in sync with
  * `filteredSystemTaskTypes` in `api/internal/repositories/system_task.go`
  * (pinned there by `TestGetPagedSystemTasksExcludesChildTaskTypes`).
+ *
+ * Receipt Uploaded is not listed: a manual create or duplicate records one with
+ * no parent, and those are top-level rows. Only the ones under a quick scan or
+ * email upload are nested.
  */
 export const CHILD_ONLY_SYSTEM_TASK_TYPES: readonly SystemTaskType[] = [
-  SystemTaskType.ReceiptUploaded,
   SystemTaskType.ChatCompletion,
   SystemTaskType.OcrProcessing,
 ];
