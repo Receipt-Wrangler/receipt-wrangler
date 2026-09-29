@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { creds, stubTokenRefresh } from './helpers/auth';
 import {
+  apiCreateGroup,
+  apiCreateReceipt,
+  apiDeleteGroupById,
   apiGetUserId,
   apiPagedSystemTasks,
   apiRecordApiKeyDeletedSystemTask,
@@ -20,7 +23,9 @@ import {
 //   - a Started At of the task's own day matches it while the previous day does
 //     not, which is the whole-day widening the timestamp columns need;
 //   - the filter survives a reload, since SystemTaskTableState is persisted to
-//     localStorage and serializes every Date to an ISO string.
+//     localStorage and serializes every Date to an ISO string;
+//   - a manually created receipt's Receipt Uploaded task is a top-level row,
+//     while the ones nested under a quick scan or email upload are not.
 //
 // Runs as admin (the page is gated on app.system-tasks.read) and seeds its own
 // task, so the assertions do not depend on what else the shared backend holds.
@@ -32,13 +37,35 @@ test.describe('System tasks filter', () => {
 
   const apiKeyName = uniqueName('sys-task-filter');
   let adminUserId: number;
+  let groupId: number | undefined;
+  let receiptId: number;
 
   test.beforeAll(async () => {
     await withAdminApi(async (api) => {
       adminUserId = await apiGetUserId(api, creds('admin').username);
       // Records exactly one API_KEY_DELETED task, ran by the admin, right now.
       await apiRecordApiKeyDeletedSystemTask(api, apiKeyName);
+
+      // A receipt created through the form's endpoint records a parentless
+      // RECEIPT_UPLOADED task, ran by the admin.
+      groupId = (await apiCreateGroup(api, uniqueName('sys-task-filter'))).id;
+      receiptId = await apiCreateReceipt(api, {
+        groupId,
+        paidByUserId: adminUserId,
+        name: uniqueName('sys-task-receipt'),
+      });
     });
+  });
+
+  test.afterAll(async () => {
+    if (groupId === undefined) {
+      return;
+    }
+    try {
+      await withAdminApi((api) => apiDeleteGroupById(api, String(groupId)));
+    } catch {
+      // best effort: a leaked group must not mask the result
+    }
   });
 
   const gotoSystemTasks = async (page: Page): Promise<void> => {
@@ -65,12 +92,38 @@ test.describe('System tasks filter', () => {
       expect(byType.totalCount).toBeLessThanOrEqual(unfiltered.totalCount);
       expect(byType.data.every((task) => task.type === 'API_KEY_DELETED')).toBe(true);
 
-      // The three child-only types never appear as top-level rows, which is why
-      // the Type picker omits them.
+      // The child-only types never appear as top-level rows, which is why the
+      // Type picker omits them.
       const childOnly = await apiPagedSystemTasks(api, {
-        type: { operation: 'CONTAINS', value: ['RECEIPT_UPLOADED'] },
+        type: { operation: 'CONTAINS', value: ['CHAT_COMPLETION'] },
       });
       expect(childOnly.totalCount).toBe(0);
+    });
+  });
+
+  test('a manual receipt upload is a top-level row, and nested uploads are not', async () => {
+    await withAdminApi(async (api) => {
+      const byType = { type: { operation: 'CONTAINS', value: ['RECEIPT_UPLOADED'] } };
+
+      // Narrowed to the admin so the seeded row stays on the first page however
+      // many uploads other specs record meanwhile.
+      const adminUploads = await apiPagedSystemTasks(api, {
+        ...byType,
+        ranBy: { operation: 'CONTAINS', value: [adminUserId] },
+      });
+      const seeded = adminUploads.data.find((task) => task.receiptId === receiptId);
+      expect(seeded).toBeDefined();
+      expect(seeded?.status).toBe('SUCCEEDED');
+
+      // Not narrowed by ran-by: a quick scan's upload has no user, so this is
+      // the query a nested row would leak into. associatedSystemTaskId is on the
+      // wire though not in swagger.
+      const uploads = await apiPagedSystemTasks(api, byType);
+      expect(uploads.totalCount).toBeGreaterThan(0);
+      expect(uploads.data.every((task) => task.type === 'RECEIPT_UPLOADED')).toBe(true);
+      for (const task of uploads.data) {
+        expect(task).toHaveProperty('associatedSystemTaskId', null);
+      }
     });
   });
 

@@ -1817,12 +1817,17 @@ dialog. `SystemTaskTableState.filter` is the single slice all three read and wri
   most of the table. Same reason the report builder's paid-by picker is a plain `app-autocomlete`.
   Both types offer the same `CONTAINS`-only operation, so the row is identical either way. The API
   turns the sentinel into an `IS NULL` disjunct (see `api/CLAUDE.md` → "System task filtering").
-- **The Type picker omits three types.** `SYSTEM_TASK_TYPE_OPTIONS`
-  (`src/constants/system-task-type-options.ts`) drops `RECEIPT_UPLOADED`, `CHAT_COMPLETION` and
-  `OCR_PROCESSING`: `GetPagedSystemTasks` never returns them as top-level rows (they are children,
-  shown in an expanded row), so offering them would be a picker that can only ever return zero rows.
-  Keep `CHILD_ONLY_SYSTEM_TASK_TYPES` in sync with `filteredSystemTaskTypes` in the Go repository —
+- **The Type picker omits two types.** `SYSTEM_TASK_TYPE_OPTIONS`
+  (`src/constants/system-task-type-options.ts`) drops `CHAT_COMPLETION` and `OCR_PROCESSING`:
+  `GetPagedSystemTasks` never returns them as top-level rows (they are children, shown in an
+  expanded row), so offering them would be a picker that can only ever return zero rows. Keep
+  `CHILD_ONLY_SYSTEM_TASK_TYPES` in sync with `filteredSystemTaskTypes` in the Go repository —
   `TestGetPagedSystemTasksExcludesChildTaskTypes` pins that side.
+- **"Receipt Uploaded" is offered, and matches only parentless rows.** A manual create or duplicate
+  records one with no parent, and those are top-level rows; a quick scan or email upload's stays
+  nested under its parent. The row needs no special rendering: `SystemTaskTypePipe` already labels
+  it and the generic description path pretty-prints the receipt JSON. See `api/CLAUDE.md` →
+  "System task filtering".
 - **The persisted slice predates the filter, so every read must tolerate its absence.**
   `systemTaskTable` was already in both storage-key lists, so an existing session rehydrates with no
   `filter` key at all. `SystemTaskTableState.filter` / `.numFiltersApplied` and the
@@ -1853,7 +1858,9 @@ by creating and deleting an API key (`apiRecordApiKeyDeletedSystemTask` — syst
 written as a side effect of real work, so there is no endpoint that creates one), then asserts what
 the Jest specs cannot: the server narrows (`totalCount` included, which is what proves the predicates
 land before the count), the "System" sentinel matches unattributed rows, a Started At of the task's
-own day matches while the previous day does not, and the filter survives a reload.
+own day matches while the previous day does not, and the filter survives a reload. It also creates a
+receipt through `POST /api/receipt` in a throwaway group and asserts its Receipt Uploaded task comes
+back top-level, with every row the type filter returns parentless.
 
 ## Receipt update diff (System Tasks)
 

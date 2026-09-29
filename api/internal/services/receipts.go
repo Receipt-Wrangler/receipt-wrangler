@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm/clause"
 	"os"
 	"receipt-wrangler/api/internal/commands"
+	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
@@ -622,10 +623,17 @@ func (service ReceiptService) resolveAllowedTagIds(userId uint, groupId uint) (m
 	return permissionService.GetGroupTagIdsForUser(userId, groupId)
 }
 
+// DuplicateReceipt copies a receipt, its items, comments and images, all or
+// nothing: the new receipt and its image files are created together or not at
+// all, and the RECEIPT_UPLOADED task records which.
+//
+// err is a named result so the deferred task always records the error actually
+// returned. It used to read a local err that the image loop shadowed, so a
+// failed copy was recorded as SUCCEEDED.
 func (service ReceiptService) DuplicateReceipt(
 	userId uint,
 	receiptId string,
-) (models.Receipt, error) {
+) (_ models.Receipt, err error) {
 	db := repositories.GetDB()
 	newReceipt := models.Receipt{}
 
@@ -713,43 +721,87 @@ func (service ReceiptService) DuplicateReceipt(
 		newReceipt.Comments = append(newReceipt.Comments, newComment)
 	}
 
-	err = db.Create(&newReceipt).Error
+	var resultString string
+	var copiedPaths []string
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&newReceipt).Error; err != nil {
+			return err
+		}
+
+		description, err := newReceipt.ToString()
+		if err != nil {
+			return err
+		}
+		resultString = description
+
+		copiedPaths, err = copyDuplicateImages(tx, receipt.ImageFiles, newReceipt.ImageFiles)
+		return err
+	})
 	if err != nil {
+		// Keyed on the transaction's error rather than the copy's, so a failed
+		// commit is covered too: either way the rows are gone, and so must be the
+		// files they would have referenced.
+		for _, path := range copiedPaths {
+			if removeErr := utils.RemoveDataPath(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to remove an image copied for a failed duplicate: "+removeErr.Error())
+			}
+		}
 		return models.Receipt{}, err
 	}
+
+	// Only once committed, so a failed duplicate's task never links to a receipt
+	// that was rolled back.
 	systemTaskCommand.AssociatedEntityId = newReceipt.ID
 	systemTaskCommand.ReceiptId = &newReceipt.ID
-
-	resultString, err := newReceipt.ToString()
-	if err != nil {
-		return models.Receipt{}, err
-	}
-
 	systemTaskCommand.ResultDescription = resultString
 
-	// Copy receipt images
-	fileRepository := repositories.NewFileRepository(nil)
-	for i, fileData := range newReceipt.ImageFiles {
-		srcFileData := receipt.ImageFiles[i]
-		srcImageBytes, err := fileRepository.GetBytesForFileData(srcFileData)
-		if err != nil {
-			return models.Receipt{}, err
-		}
+	return newReceipt, nil
+}
 
-		dstPath, err := fileRepository.BuildFilePath(
-			utils.UintToString(newReceipt.ID),
-			utils.UintToString(fileData.ID),
-			fileData.Name,
+// copyDuplicateImages writes each source image's stored bytes, unconverted, to
+// the path of its counterpart on the duplicate, so the copy is byte-identical
+// (a PDF stays a PDF). It runs on the transaction that created the duplicate,
+// because BuildFilePath looks the new receipt's group up and the row is not
+// visible outside it yet.
+//
+// It returns every path it wrote or tried to write, on success and on failure
+// alike, so the caller can remove them if the transaction does not commit.
+func copyDuplicateImages(tx *gorm.DB, sources []models.FileData, copies []models.FileData) ([]string, error) {
+	fileRepository := repositories.NewFileRepository(tx)
+	written := make([]string, 0, len(copies))
+
+	for i, copied := range copies {
+		source := sources[i]
+		sourcePath, err := fileRepository.BuildFilePath(
+			utils.UintToString(source.ReceiptId),
+			utils.UintToString(source.ID),
+			source.Name,
 		)
 		if err != nil {
-			return models.Receipt{}, err
+			return written, err
 		}
 
-		err = utils.WriteDataFile(dstPath, srcImageBytes)
+		imageBytes, err := utils.ReadDataFile(sourcePath)
 		if err != nil {
-			return models.Receipt{}, err
+			return written, err
+		}
+
+		copyPath, err := fileRepository.BuildFilePath(
+			utils.UintToString(copied.ReceiptId),
+			utils.UintToString(copied.ID),
+			copied.Name,
+		)
+		if err != nil {
+			return written, err
+		}
+
+		// Tracked before writing: a write that fails partway can still leave a
+		// created or truncated file behind.
+		written = append(written, copyPath)
+		if err := utils.WriteDataFile(copyPath, imageBytes); err != nil {
+			return written, err
 		}
 	}
 
-	return newReceipt, nil
+	return written, nil
 }

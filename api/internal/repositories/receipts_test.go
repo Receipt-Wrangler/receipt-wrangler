@@ -120,6 +120,75 @@ func TestShouldCreateReceipt(t *testing.T) {
 	}
 }
 
+// failingReceiptCommand fails its insert inside CreateReceipt's transaction: the
+// status passes ToReceipt but is rejected by ReceiptStatus.Value().
+func failingReceiptCommand() commands.UpsertReceiptCommand {
+	return commands.UpsertReceiptCommand{
+		Name:         "Failing Receipt",
+		Amount:       decimal.NewFromFloat(10),
+		Date:         time.Now(),
+		PaidByUserID: 1,
+		Status:       models.ReceiptStatus("NOT_A_STATUS"),
+		GroupId:      1,
+	}
+}
+
+func getReceiptUploadedTasks() []models.SystemTask {
+	var tasks []models.SystemTask
+	GetDB().Where("type = ?", models.RECEIPT_UPLOADED).Find(&tasks)
+	return tasks
+}
+
+// A failed manual create records a parentless FAILED RECEIPT_UPLOADED task, which
+// is what makes it visible on the admin System Tasks page.
+func TestCreateReceiptRecordsFailedUploadTaskWhenItOwnsTheTask(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	_, err := NewReceiptRepository(nil).CreateReceipt(failingReceiptCommand(), 1, true)
+	if err == nil {
+		utils.PrintTestError(t, err, "an error")
+		return
+	}
+
+	tasks := getReceiptUploadedTasks()
+	if len(tasks) != 1 {
+		utils.PrintTestError(t, len(tasks), 1)
+		return
+	}
+
+	task := tasks[0]
+	if task.Status != models.SYSTEM_TASK_FAILED {
+		utils.PrintTestError(t, task.Status, models.SYSTEM_TASK_FAILED)
+	}
+	if task.ResultDescription != err.Error() {
+		utils.PrintTestError(t, task.ResultDescription, err.Error())
+	}
+	if task.RanByUserId == nil || *task.RanByUserId != 1 {
+		utils.PrintTestError(t, task.RanByUserId, 1)
+	}
+	if task.AssociatedSystemTaskId != nil {
+		utils.PrintTestError(t, task.AssociatedSystemTaskId, nil)
+	}
+}
+
+// Quick scan and email pass createSystemTask=false and record the failure
+// themselves, so CreateReceipt must not add a second, parentless one.
+func TestCreateReceiptLeavesFailedUploadTaskToTheCaller(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	_, err := NewReceiptRepository(nil).CreateReceipt(failingReceiptCommand(), 1, false)
+	if err == nil {
+		utils.PrintTestError(t, err, "an error")
+		return
+	}
+
+	if tasks := getReceiptUploadedTasks(); len(tasks) != 0 {
+		utils.PrintTestError(t, len(tasks), 0)
+	}
+}
+
 // TestShouldCreateReceiptWithinOuterTransaction guards against a regression where
 // CreateReceipt, when bound to an outer transaction (as QuickScan and email
 // attachment ingest do), reloaded the receipt on a fresh pooled connection that
