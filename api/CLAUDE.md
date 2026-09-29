@@ -1811,10 +1811,13 @@ so the desktop renders both dialogs from one row component.
     not match them. Pinned by `TestCreateReceiptRecordsFailedUploadTaskWhenItOwnsTheTask` and
     `TestCreateReceiptLeavesFailedUploadTaskToTheCaller`.
   - **`DuplicateReceipt` is all or nothing.** The new receipt and its image files are created in
-    one `db.Transaction`, and `copyDuplicateImages` removes any file it already wrote when a later
-    one fails, so a failed duplicate leaves no receipt, no `FileData` and no files. Its task records
-    FAILED with the error and no receipt link: `ReceiptId` / `AssociatedEntityId` are set only once
-    the transaction commits. Three details are load-bearing:
+    one `db.Transaction`. `copyDuplicateImages` returns every path it wrote or tried to write, and
+    `DuplicateReceipt` removes them whenever the transaction returns an error, so a failed commit is
+    covered as well as a failed copy. Each path is tracked **before** its write, because a write
+    that fails partway can leave a truncated file. A failed duplicate therefore leaves no receipt, no
+    `FileData` and no files. Its task records FAILED with the error and no receipt link:
+    `ReceiptId` / `AssociatedEntityId` are set only once the transaction commits. Three details are
+    load-bearing:
     - **`err` is a named result**, read by the deferred `CreateSystemTaskFromError`. It used to be a
       plain local that the image loop shadowed with `:=`, so a failed copy returned a 500 while the
       task said SUCCEEDED.

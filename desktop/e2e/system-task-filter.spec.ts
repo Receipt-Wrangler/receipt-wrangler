@@ -121,7 +121,9 @@ test.describe('System tasks filter', () => {
       const uploads = await apiPagedSystemTasks(api, byType);
       expect(uploads.totalCount).toBeGreaterThan(0);
       expect(uploads.data.every((task) => task.type === 'RECEIPT_UPLOADED')).toBe(true);
-      expect(uploads.data.every((task) => !task.associatedSystemTaskId)).toBe(true);
+      for (const task of uploads.data) {
+        expect(task).toHaveProperty('associatedSystemTaskId', null);
+      }
     });
   });
 

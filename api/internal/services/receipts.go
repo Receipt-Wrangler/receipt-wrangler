@@ -722,6 +722,7 @@ func (service ReceiptService) DuplicateReceipt(
 	}
 
 	var resultString string
+	var copiedPaths []string
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&newReceipt).Error; err != nil {
 			return err
@@ -733,9 +734,18 @@ func (service ReceiptService) DuplicateReceipt(
 		}
 		resultString = description
 
-		return copyDuplicateImages(tx, receipt.ImageFiles, newReceipt.ImageFiles)
+		copiedPaths, err = copyDuplicateImages(tx, receipt.ImageFiles, newReceipt.ImageFiles)
+		return err
 	})
 	if err != nil {
+		// Keyed on the transaction's error rather than the copy's, so a failed
+		// commit is covered too: either way the rows are gone, and so must be the
+		// files they would have referenced.
+		for _, path := range copiedPaths {
+			if removeErr := utils.RemoveDataPath(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to remove an image copied for a failed duplicate: "+removeErr.Error())
+			}
+		}
 		return models.Receipt{}, err
 	}
 
@@ -752,21 +762,13 @@ func (service ReceiptService) DuplicateReceipt(
 // the path of its counterpart on the duplicate, so the copy is byte-identical
 // (a PDF stays a PDF). It runs on the transaction that created the duplicate,
 // because BuildFilePath looks the new receipt's group up and the row is not
-// visible outside it yet. On failure it removes what it already wrote, so the
-// rollback leaves no files behind either.
-func copyDuplicateImages(tx *gorm.DB, sources []models.FileData, copies []models.FileData) (err error) {
+// visible outside it yet.
+//
+// It returns every path it wrote or tried to write, on success and on failure
+// alike, so the caller can remove them if the transaction does not commit.
+func copyDuplicateImages(tx *gorm.DB, sources []models.FileData, copies []models.FileData) ([]string, error) {
 	fileRepository := repositories.NewFileRepository(tx)
 	written := make([]string, 0, len(copies))
-	defer func() {
-		if err == nil {
-			return
-		}
-		for _, path := range written {
-			if removeErr := utils.RemoveDataPath(path); removeErr != nil {
-				logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to remove an image copied for a failed duplicate: "+removeErr.Error())
-			}
-		}
-	}()
 
 	for i, copied := range copies {
 		source := sources[i]
@@ -776,12 +778,12 @@ func copyDuplicateImages(tx *gorm.DB, sources []models.FileData, copies []models
 			source.Name,
 		)
 		if err != nil {
-			return err
+			return written, err
 		}
 
 		imageBytes, err := utils.ReadDataFile(sourcePath)
 		if err != nil {
-			return err
+			return written, err
 		}
 
 		copyPath, err := fileRepository.BuildFilePath(
@@ -790,14 +792,16 @@ func copyDuplicateImages(tx *gorm.DB, sources []models.FileData, copies []models
 			copied.Name,
 		)
 		if err != nil {
-			return err
+			return written, err
 		}
 
-		if err := utils.WriteDataFile(copyPath, imageBytes); err != nil {
-			return err
-		}
+		// Tracked before writing: a write that fails partway can still leave a
+		// created or truncated file behind.
 		written = append(written, copyPath)
+		if err := utils.WriteDataFile(copyPath, imageBytes); err != nil {
+			return written, err
+		}
 	}
 
-	return nil
+	return written, nil
 }
