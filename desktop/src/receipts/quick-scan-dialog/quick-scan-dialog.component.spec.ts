@@ -453,6 +453,30 @@ describe("QuickScanDialogComponent", () => {
       expect(component.comments.at(0).valid).toBe(true);
     });
 
+    it("should show and require the comment when the caller's role requires one", () => {
+      // The group's own quick-scan config leaves the comment off entirely.
+      store.reset({
+        auth: {
+          groupPermissions: { 2: ["group.comments.create"] },
+          groupReceiptRequirements: { 2: { commentRequired: true, imageRequired: false } },
+        },
+        groups: {
+          groups: [{ id: 2, groupReceiptSettings: {} }],
+          selectedGroupId: "",
+          selectedDashboardId: "",
+        },
+      });
+
+      component.fileLoaded({} as any);
+      component.groupIds.at(0).setValue(2);
+
+      expect(component.showComment(0)).toBe(true);
+      expect(component.comments.at(0).valid).toBe(false);
+
+      component.comments.at(0).setValue("Required by role");
+      expect(component.comments.at(0).valid).toBe(true);
+    });
+
     it("should accept a comment at the maximum length and reject one over it", () => {
       seedStore({ quickScanCommentEnabled: true });
 

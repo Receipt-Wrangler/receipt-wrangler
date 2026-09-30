@@ -86,6 +86,10 @@ export class RoleFormComponent {
     // forgetting to assign a new member fails closed.
     requiresIndividualCategoryGrants: new FormControl<boolean>(false, { nonNullable: true }),
     requiresIndividualTagGrants: new FormControl<boolean>(false, { nonNullable: true }),
+    // Group-role-only: members of this role must keep at least one comment /
+    // image on the group's receipts (the server resolves waivers and enforces).
+    requireReceiptComment: new FormControl<boolean>(false, { nonNullable: true }),
+    requireReceiptImage: new FormControl<boolean>(false, { nonNullable: true }),
   });
 
   // ----- State signals -----
@@ -374,6 +378,8 @@ export class RoleFormComponent {
           skipDefaultGroupCreation: role.skipDefaultGroupCreation ?? false,
           requiresIndividualCategoryGrants: role.requiresIndividualCategoryGrants ?? false,
           requiresIndividualTagGrants: role.requiresIndividualTagGrants ?? false,
+          requireReceiptComment: role.requireReceiptComment ?? false,
+          requireReceiptImage: role.requireReceiptImage ?? false,
         });
         this.type.set(role.scope === PermissionScope.Group ? "group" : "app");
         this.granted.set(new Set(role.permissions));
@@ -454,6 +460,8 @@ export class RoleFormComponent {
     this.form.controls.skipDefaultGroupCreation.setValue(false);
     this.form.controls.requiresIndividualCategoryGrants.setValue(false);
     this.form.controls.requiresIndividualTagGrants.setValue(false);
+    this.form.controls.requireReceiptComment.setValue(false);
+    this.form.controls.requireReceiptImage.setValue(false);
   }
 
   // ----- Report template matrix helpers -----
@@ -589,6 +597,8 @@ export class RoleFormComponent {
       // Supervisor exemption: holders see, and are seen by, all members of an
       // isolated group. Only meaningful on group roles.
       payload.seesAllMembers = this.form.controls.seesAllMembers.value;
+      payload.requireReceiptComment = this.form.controls.requireReceiptComment.value;
+      payload.requireReceiptImage = this.form.controls.requireReceiptImage.value;
     } else {
       // Personal-group creation is an app-role concept: users created with this
       // role skip the automatic "My Receipts" group.

@@ -483,6 +483,62 @@ describe("RoleFormComponent", () => {
     expect(component.form.controls.seesAllMembers.value).toBe(false);
   });
 
+  it("includes the receipt requirements in a GROUP payload", async () => {
+    const { component, fixture } = await setup();
+    component.pickType("group");
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('[data-testid="require-receipt-comment"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="require-receipt-image"]')).toBeTruthy();
+
+    component.form.controls.name.setValue("Strict Role");
+    component.toggle("group.receipts.read");
+    component.form.controls.requireReceiptComment.setValue(true);
+    component.form.controls.requireReceiptImage.setValue(true);
+
+    component.submit();
+
+    expect(component.lastPayload?.requireReceiptComment).toBe(true);
+    expect(component.lastPayload?.requireReceiptImage).toBe(true);
+  });
+
+  it("defaults the receipt requirements to false in a GROUP payload", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.name.setValue("Plain Group Role");
+    component.toggle("group.receipts.read");
+
+    component.submit();
+
+    expect(component.lastPayload?.requireReceiptComment).toBe(false);
+    expect(component.lastPayload?.requireReceiptImage).toBe(false);
+  });
+
+  it("omits the receipt requirements from an APP payload and hides the controls", async () => {
+    const { component, fixture } = await setup();
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('[data-testid="require-receipt-comment"]')).toBeNull();
+    component.form.controls.name.setValue("App Role");
+    component.toggle("app.users.read");
+    component.form.controls.requireReceiptComment.setValue(true);
+    component.form.controls.requireReceiptImage.setValue(true);
+
+    component.submit();
+
+    expect(component.lastPayload?.requireReceiptComment).toBeUndefined();
+    expect(component.lastPayload?.requireReceiptImage).toBeUndefined();
+  });
+
+  it("resets the receipt requirements when switching role type", async () => {
+    const { component } = await setup();
+    component.pickType("group");
+    component.form.controls.requireReceiptComment.setValue(true);
+    component.form.controls.requireReceiptImage.setValue(true);
+
+    component.pickType("app");
+    expect(component.form.controls.requireReceiptComment.value).toBe(false);
+    expect(component.form.controls.requireReceiptImage.value).toBe(false);
+  });
+
   it("includes skipDefaultGroupCreation in an APP payload when enabled", async () => {
     const { component } = await setup();
     component.form.controls.name.setValue("Restricted App Role");
@@ -736,6 +792,27 @@ describe("RoleFormComponent", () => {
       });
 
       expect(component.form.controls.seesAllMembers.value).toBe(true);
+    });
+
+    it("rehydrates the receipt requirements on edit", async () => {
+      const strictGroupRole: Role = {
+        id: 15,
+        name: "Strict Group Role",
+        scope: "GROUP",
+        isDefault: false,
+        isSystem: false,
+        permissions: ["group.receipts.read"],
+        requireReceiptComment: true,
+        requireReceiptImage: true,
+      };
+      const { component } = await setup(ALL_DESCRIPTORS, {
+        routeId: "15",
+        routeScope: "group",
+        roles: [strictGroupRole],
+      });
+
+      expect(component.form.controls.requireReceiptComment.value).toBe(true);
+      expect(component.form.controls.requireReceiptImage.value).toBe(true);
     });
 
     it("rehydrates skipDefaultGroupCreation on edit", async () => {

@@ -8,7 +8,7 @@ import { of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
 import { PipesModule } from "src/pipes/pipes.module";
 import { ApiModule, Comment, CommentService, Permission } from "../../open-api";
-import { AuthState } from "../../store";
+import { AuthState, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { ReceiptCommentsComponent } from "./receipt-comments.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
@@ -44,7 +44,7 @@ describe("ReceiptCommentsComponent", () => {
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         ReactiveFormsModule,
-        NgxsModule.forRoot([AuthState]),
+        NgxsModule.forRoot([AuthState, UserState]),
         MatSnackBarModule,
         PipesModule],
     providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
@@ -135,6 +135,79 @@ describe("ReceiptCommentsComponent", () => {
       userId: 1,
       receiptId: 1,
       comment: "new comment",
+    });
+  });
+
+  it("mirrors the comment count into a signal on every mutation", () => {
+    fixture.componentRef.setInput("comments", comments);
+    component.ngOnInit();
+    expect(component.commentCount()).toEqual(2);
+
+    fixture.componentRef.setInput("mode", FormMode.add);
+    component.deleteComment(0);
+    expect(component.commentCount()).toEqual(1);
+
+    store.reset({ auth: { userId: 1 } });
+    component.newCommentFormControl.patchValue("another");
+    component.addComment();
+    expect(component.commentCount()).toEqual(2);
+  });
+
+  describe("last comment when the role requires one", () => {
+    const render = async (
+      mode: FormMode,
+      initialComments: Comment[],
+      preventDeletingLastComment: boolean
+    ): Promise<ComponentFixture<ReceiptCommentsComponent>> => {
+      store.reset({
+        users: { users: [] },
+        auth: {
+          userId: "1",
+          groupPermissions: {
+            5: [Permission.GroupCommentsCreate, Permission.GroupCommentsDelete],
+          },
+        },
+      });
+      const lockedFixture = TestBed.createComponent(ReceiptCommentsComponent);
+      lockedFixture.componentRef.setInput("mode", mode);
+      lockedFixture.componentRef.setInput("groupId", 5);
+      lockedFixture.componentRef.setInput("comments", initialComments);
+      lockedFixture.componentRef.setInput(
+        "preventDeletingLastComment",
+        preventDeletingLastComment
+      );
+      lockedFixture.detectChanges();
+      await lockedFixture.whenStable();
+      return lockedFixture;
+    };
+
+    const deleteButtons = (f: ComponentFixture<ReceiptCommentsComponent>) =>
+      f.nativeElement.querySelectorAll('[data-testid="comment-delete"]');
+
+    it("hides delete on the only saved comment in edit mode", async () => {
+      const locked = await render(FormMode.edit, [comments[0]], true);
+
+      expect(locked.componentInstance.isLastCommentLocked()).toBe(true);
+      expect(deleteButtons(locked).length).toBe(0);
+    });
+
+    it("keeps delete while more than one comment remains", async () => {
+      const unlocked = await render(FormMode.edit, comments, true);
+
+      expect(unlocked.componentInstance.isLastCommentLocked()).toBe(false);
+      expect(deleteButtons(unlocked).length).toBe(2);
+    });
+
+    it("keeps delete when nothing is required", async () => {
+      const unlocked = await render(FormMode.edit, [comments[0]], false);
+
+      expect(deleteButtons(unlocked).length).toBe(1);
+    });
+
+    it("never locks an unsaved add-mode comment", async () => {
+      const addMode = await render(FormMode.add, [comments[0]], true);
+
+      expect(addMode.componentInstance.isLastCommentLocked()).toBe(false);
     });
   });
 

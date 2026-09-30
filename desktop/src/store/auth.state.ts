@@ -2,7 +2,8 @@ import { Injectable } from "@angular/core";
 import { Action, createSelector, Selector, State, StateContext } from "@ngxs/store";
 
 import { hasAll, hasAny } from "../utils/permission.utils";
-import { Category, Icon, Tag, UserPreferences } from "../open-api";
+import { receiptRequirementsFor } from "../utils/receipt-requirements";
+import { Category, Icon, ReceiptRequirements, Tag, UserPreferences } from "../open-api";
 import { User } from "../open-api/model/user";
 import { AuthStateInterface } from "./auth-state.interface";
 import { Logout, SetAuthState, SetGroupCatalog, SetIcons, SetPermissions, SetUserPreferences } from "./auth.state.actions";
@@ -90,6 +91,25 @@ export class AuthState {
     });
   }
 
+  @Selector()
+  static groupReceiptRequirements(state: AuthStateInterface): {
+    [groupId: number]: ReceiptRequirements;
+  } {
+    return state.groupReceiptRequirements ?? {};
+  }
+
+  /**
+   * The caller's role-required receipt fields in a group. The server resolves
+   * them (including the hidden-field / no-comment-permission waivers) and only
+   * sends groups where something is required, so an absent group requires
+   * nothing.
+   */
+  static receiptRequirements(groupId: number) {
+    return createSelector([AuthState], (state: AuthStateInterface): ReceiptRequirements =>
+      receiptRequirementsFor(state.groupReceiptRequirements, groupId)
+    );
+  }
+
   static hasAppPermission(permission: string) {
     return createSelector([AuthState], (state: AuthStateInterface) => {
       return hasAll(state.appPermissions ?? [], permission);
@@ -137,11 +157,12 @@ export class AuthState {
   @Action(SetPermissions)
   setPermissions(
     { patchState }: StateContext<AuthStateInterface>,
-    { appPermissions, groupPermissions }: SetPermissions
+    { appPermissions, groupPermissions, groupReceiptRequirements }: SetPermissions
   ) {
     patchState({
       appPermissions,
       groupPermissions,
+      groupReceiptRequirements,
     });
   }
 
@@ -167,6 +188,7 @@ export class AuthState {
       userPreferences: undefined,
       appPermissions: undefined,
       groupPermissions: undefined,
+      groupReceiptRequirements: undefined,
       groupCategories: undefined,
       groupTags: undefined,
     });

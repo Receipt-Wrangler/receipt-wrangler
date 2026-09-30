@@ -73,6 +73,7 @@
       *ngIf="
         commentControl?.value?.userId?.toString() === loggedInUserId()
          && (mode() === formMode.add || (mode() === formMode.edit && canDeleteComments()))
+         && !isLastCommentLocked()
       "
     >
       <app-delete-button

@@ -1,4 +1,4 @@
-import { Component, OnInit, Signal, input, output, signal } from "@angular/core";
+import { Component, OnInit, Signal, computed, input, output, signal } from "@angular/core";
 import { FormArray, FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
@@ -23,6 +23,22 @@ export class ReceiptCommentsComponent implements OnInit {
   public readonly receiptId = input<number>();
   public readonly groupId = input<number>();
   public readonly commentsUpdated = output<FormArray>();
+  // Set by the receipt form when the caller's group role requires a comment:
+  // in edit mode the last saved comment then offers no delete (the server
+  // refuses it anyway). Add-mode comments are unsaved, so they stay deletable.
+  public readonly preventDeletingLastComment = input<boolean>(false);
+
+  // commentsArray is not reactive, so its length is mirrored into a signal on
+  // every mutation - the receipt form reads it for its required-comment check.
+  private readonly commentCountSignal = signal(0);
+  public readonly commentCount = this.commentCountSignal.asReadonly();
+
+  public readonly isLastCommentLocked = computed(
+    () =>
+      this.preventDeletingLastComment() &&
+      this.mode() === FormMode.edit &&
+      this.commentCount() <= 1
+  );
 
   public canCreateComments!: Signal<boolean>;
 
@@ -62,6 +78,11 @@ export class ReceiptCommentsComponent implements OnInit {
     this.internalComments().forEach((c) => {
       this.commentsArray.push(this.buildCommentFormGroup(c));
     });
+    this.syncCommentCount();
+  }
+
+  private syncCommentCount(): void {
+    this.commentCountSignal.set(this.commentsArray.length);
   }
 
   private buildCommentFormGroup(comment?: Comment): FormGroup {
@@ -86,6 +107,7 @@ export class ReceiptCommentsComponent implements OnInit {
     const mode = this.mode();
     if (isValid && mode === FormMode.add) {
       this.commentsArray.push(this.buildCommentFormGroup(newComment));
+      this.syncCommentCount();
       this.newCommentFormControl.reset();
       this.commentsUpdated.emit(this.commentsArray);
     } else if (isValid && mode === FormMode.edit) {
@@ -96,6 +118,7 @@ export class ReceiptCommentsComponent implements OnInit {
           tap((comment: Comment) => {
             this.internalComments.update(comments => [...comments, comment]);
             this.commentsArray.push(this.buildCommentFormGroup(newComment));
+            this.syncCommentCount();
             this.snackbarService.success("Comment successfully added");
             this.newCommentFormControl.reset();
           })
@@ -120,6 +143,7 @@ export class ReceiptCommentsComponent implements OnInit {
       magicComments.forEach((comment) => {
         this.commentsArray.push(this.buildCommentFormGroup(comment));
       });
+      this.syncCommentCount();
       this.commentsUpdated.emit(this.commentsArray);
     } else if (mode === FormMode.edit) {
       magicComments.forEach((comment) => {
@@ -136,6 +160,7 @@ export class ReceiptCommentsComponent implements OnInit {
             tap((createdComment: Comment) => {
               this.internalComments.update((existing) => [...existing, createdComment]);
               this.commentsArray.push(this.buildCommentFormGroup(newComment));
+              this.syncCommentCount();
             })
           )
           .subscribe();
@@ -156,6 +181,7 @@ export class ReceiptCommentsComponent implements OnInit {
             take(1),
             tap(() => {
               this.commentsArray.removeAt(index);
+              this.syncCommentCount();
               this.internalComments.set(this.internalComments().filter(
                 (c) => c.id !== comment.id
               ));
@@ -167,6 +193,7 @@ export class ReceiptCommentsComponent implements OnInit {
 
       case FormMode.add:
         this.commentsArray.removeAt(index);
+        this.syncCommentCount();
         break;
     }
   }

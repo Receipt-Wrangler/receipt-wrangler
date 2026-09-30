@@ -481,6 +481,8 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     selection instead of losing it. `user-form` is the only submit in the app with two writes, so this
     is where the general "toast in a `tap` on the write it describes" convention needs stating: the
     message must speak for *all* the writes it covers, not just the first.
+- **Receipt requirements (`role-form`, group roles only):** "Require a comment / an image on
+  receipts". See **Role-required receipt fields & single-call create** below.
 - **Require-individual-assignment toggles (`role-form`, group roles only):** two `app-checkbox`es in
   the grants section bound to `requiresIndividualCategoryGrants` / `requiresIndividualTagGrants`. When
   on, a member of that role with no individual assignment sees **nothing** rather than the role's set,
@@ -961,6 +963,48 @@ skips it silently asserts against the old group. The third replaced a
 `button:has(mat-icon:has-text("list_alt"))` locator. Note
 `getByTestId('receipt-manage-custom-fields').getByRole('button')` is a **strict-mode violation**: the
 `cdkMenuTrigger` also puts `role="button"` on the `<app-button>` host, so use `.locator('button')`.
+
+### Role-required receipt fields & single-call create
+
+A group role can require its members to keep **at least one comment** and/or **one image** on the
+group's receipts. The server resolves and enforces it; see `api/CLAUDE.md` → "Role-required receipt
+fields & single-call create" for the contract.
+
+- **Role form:** two `app-checkbox`es in a "Receipt requirements" card inside `@if (showGrants())`
+  (`data-testid="require-receipt-comment"` / `"require-receipt-image"`), bound to
+  `requireReceiptComment` / `requireReceiptImage`. Wired like `seesAllMembers`: hydrated in
+  `loadRole`, reset in `pickType`, serialized only in `submit()`'s `showGrants()` branch (APP scope
+  400s them).
+- **Store:** `SetPermissions` carries AppData's `groupReceiptRequirements` as an optional third
+  argument (dispatched only from `setAppData`). Read it through `AuthState.receiptRequirements(groupId)`
+  or `receiptRequirementsFor(map, groupId)` (`src/utils/receipt-requirements.ts`), which default to
+  nothing required. The server has already applied the waivers (hidden field, no comment permission),
+  so **never re-derive them from group settings**.
+- **Create is ONE call.** `createReceipt()` sends `ReceiptService.createReceiptWithFiles(form.value,
+  filesToUpload() files)` (`POST /receipt/withFiles`, multipart). The comments ride `form.value`.
+  The old `createReceipt` + per-image `uploadReceiptImage` `forkJoin` is gone; the create is atomic,
+  so there is no "receipt added, images failed" state. Don't call the deprecated JSON `createReceipt`.
+- **Submit guard** mirrors the server, keyed on the form's **current** `groupId` (a `currentGroupId`
+  signal written in `listenForGroupChanges`), so it re-evaluates on a group change and checks the
+  destination group in edit mode. `isImageMissing()` counts `filesToUpload()` in add mode and
+  `images()` in edit mode (the receipt's own `imageFiles` while those load). `isCommentMissing()` reads
+  the comments child's `commentCount` signal: `commentsArray` is not reactive, so the child mirrors its
+  length on every mutation. That covers queued comments in add mode and the saved comments, updated
+  live, in edit mode. A miss shows an inline hint in the section (`receipt-image-required-hint` /
+  `receipt-comment-required-hint`) and blocks submit with a snackbar.
+- **Last item in edit mode:** the image remove button (`receipt-image-remove`) is disabled by
+  `isLastImageLocked()`, and `app-receipt-comments` takes `[preventDeletingLastComment]`, hiding
+  delete on the only comment (`isLastCommentLocked`). Add-mode items are unsaved, so they stay
+  deletable. To swap the only image, upload the new one first.
+- **Quick scan:** `resolveQuickScanFieldConfig` takes `roleRequiresComment`, which shows **and**
+  requires the comment even when the group's config leaves it off. It still yields to `hideComments`
+  and `group.comments.create`.
+- **E2E:** `e2e/receipt-role-requirements.spec.ts` (serial). An admin provisions the role through
+  the role form (`createRole`'s new `requireReceiptComment` / `requireReceiptImage` options) and a
+  group with e2e-user in it. The spec covers the flags round-tripping, create blocked without a
+  comment and then an image, then saving in exactly one `POST /api/receipt/withFiles` with no
+  `/receiptImage` upload, edit refusing the last image/comment (UI and server 400), and quick scan
+  requiring the comment (UI, plus the server's 400 without one).
 
 ## Login QR (mobile app setup)
 
@@ -2057,8 +2101,8 @@ Two cross-component seams support this (each with its own focused spec):
   (the single-select display is seeded from the control only once on init), so
   `AutocomleteComponent.syncSingleDisplay()` re-seeds it after the patch.
 - **Comments:** the `app-receipt-comments` child owns the comments array and is **mode-aware**, so Magic Fill
-  hands them to `ReceiptCommentsComponent.addMagicFilledComments()` — add mode collects them for the create
-  submit; edit mode POSTs each via `CommentService` because the receipt-**update** path does not persist
+  hands them to `ReceiptCommentsComponent.addMagicFilledComments()` — add mode collects them for the
+  single-call create submit; edit mode POSTs each via `CommentService` because the receipt-**update** path does not persist
   comments (they're individual resources — see `api/CLAUDE.md` → `UpdateReceipt`).
 - **Custom fields** reference a field by id only (the magic-fill response carries no field definition), so a
   value whose `customFieldId` isn't in the loaded catalog pool is skipped, and adding one flips its

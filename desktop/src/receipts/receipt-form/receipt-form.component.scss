@@ -1,3 +1,6 @@
+@use "../../variables.scss" as variables;
+@use "sass:map";
+
 // The Images pane is the same height as the Details pane beside it, so the two
 // columns move together instead of a short image box floating next to a tall
 // form. Bootstrap's .row is already display:flex with the initial
@@ -69,4 +72,10 @@ app-form-section.rw-images-pane {
   right: 0.5rem;
   // Above the stage, and above ngx-bootstrap's carousel controls (z-index: 1).
   z-index: 2;
+}
+
+// Inline hint for a role-required image/comment the receipt does not have yet.
+.rw-requirement-hint {
+  color: map.get(variables.$warn-palette, 600);
+  font-size: 0.875rem;
 }

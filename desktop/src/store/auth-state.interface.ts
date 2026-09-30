@@ -1,4 +1,4 @@
-import { Category, Icon, Tag } from "../open-api";
+import { Category, Icon, ReceiptRequirements, Tag } from "../open-api";
 import { UserPreferences } from "../open-api/model/userPreferences";
 
 export interface AuthStateInterface {
@@ -16,4 +16,7 @@ export interface AuthStateInterface {
   // only through these maps.
   groupCategories?: { [groupId: number]: Category[] };
   groupTags?: { [groupId: number]: Tag[] };
+  // Role-required receipt fields per group, already resolved server-side
+  // (waivers applied). Only groups where something is required are present.
+  groupReceiptRequirements?: { [groupId: number]: ReceiptRequirements };
 }
