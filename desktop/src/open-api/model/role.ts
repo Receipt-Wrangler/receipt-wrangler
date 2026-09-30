@@ -60,6 +60,14 @@ export interface Role {
      */
     requiresIndividualTagGrants?: boolean;
     /**
+     * Whether a GROUP role requires its members to keep at least one comment on the group\'s receipts (waived when the group hides comments or the member lacks group.comments.create). Always false for app roles.
+     */
+    requireReceiptComment?: boolean;
+    /**
+     * Whether a GROUP role requires its members to keep at least one image on the group\'s receipts (waived when the group hides images). Always false for app roles.
+     */
+    requireReceiptImage?: boolean;
+    /**
      * Per-template action grants restricting which report templates a GROUP role\'s members may act on. Empty means unrestricted (every template the role\'s group access reaches). Always empty for app roles.
      */
     reportTemplateGrants?: Array<ReportTemplateGrant>;

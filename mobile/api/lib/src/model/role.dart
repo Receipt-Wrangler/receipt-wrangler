@@ -31,6 +31,8 @@ part 'role.g.dart';
 /// * [skipDefaultGroupCreation] - Whether users created with this APP role skip the automatic personal \"My Receipts\" group. The virtual \"All\" group is always created. Applies at user-creation time only — changing it never adds or removes a group for an existing user. Always false for group roles.
 /// * [requiresIndividualCategoryGrants] - Whether a GROUP role requires per-member category assignment. When true, a member holding this role with no individual category grants sees NO categories, rather than falling back to the role's set. Always false for app roles.
 /// * [requiresIndividualTagGrants] - Tag counterpart of requiresIndividualCategoryGrants. Always false for app roles.
+/// * [requireReceiptComment] - Whether a GROUP role requires its members to keep at least one comment on the group's receipts (waived when the group hides comments or the member lacks group.comments.create). Always false for app roles.
+/// * [requireReceiptImage] - Whether a GROUP role requires its members to keep at least one image on the group's receipts (waived when the group hides images). Always false for app roles.
 /// * [reportTemplateGrants] - Per-template action grants restricting which report templates a GROUP role's members may act on. Empty means unrestricted (every template the role's group access reaches). Always empty for app roles.
 @BuiltValue()
 abstract class Role implements Built<Role, RoleBuilder> {
@@ -92,6 +94,14 @@ abstract class Role implements Built<Role, RoleBuilder> {
   /// Tag counterpart of requiresIndividualCategoryGrants. Always false for app roles.
   @BuiltValueField(wireName: r'requiresIndividualTagGrants')
   bool? get requiresIndividualTagGrants;
+
+  /// Whether a GROUP role requires its members to keep at least one comment on the group's receipts (waived when the group hides comments or the member lacks group.comments.create). Always false for app roles.
+  @BuiltValueField(wireName: r'requireReceiptComment')
+  bool? get requireReceiptComment;
+
+  /// Whether a GROUP role requires its members to keep at least one image on the group's receipts (waived when the group hides images). Always false for app roles.
+  @BuiltValueField(wireName: r'requireReceiptImage')
+  bool? get requireReceiptImage;
 
   /// Per-template action grants restricting which report templates a GROUP role's members may act on. Empty means unrestricted (every template the role's group access reaches). Always empty for app roles.
   @BuiltValueField(wireName: r'reportTemplateGrants')
@@ -217,6 +227,20 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
       yield r'requiresIndividualTagGrants';
       yield serializers.serialize(
         object.requiresIndividualTagGrants,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.requireReceiptComment != null) {
+      yield r'requireReceiptComment';
+      yield serializers.serialize(
+        object.requireReceiptComment,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.requireReceiptImage != null) {
+      yield r'requireReceiptImage';
+      yield serializers.serialize(
+        object.requireReceiptImage,
         specifiedType: const FullType(bool),
       );
     }
@@ -361,6 +385,20 @@ class _$RoleSerializer implements PrimitiveSerializer<Role> {
             specifiedType: const FullType(bool),
           ) as bool;
           result.requiresIndividualTagGrants = valueDes;
+          break;
+        case r'requireReceiptComment':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.requireReceiptComment = valueDes;
+          break;
+        case r'requireReceiptImage':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.requireReceiptImage = valueDes;
           break;
         case r'reportTemplateGrants':
           final valueDes = serializers.deserialize(

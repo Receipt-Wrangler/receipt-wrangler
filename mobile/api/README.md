@@ -117,6 +117,7 @@ Class | Method | HTTP request | Description
 [*PromptApi*](doc/PromptApi.md) | [**updatePromptById**](doc/PromptApi.md#updatepromptbyid) | **PUT** /prompt/{id} | Update prompt by id
 [*ReceiptApi*](doc/ReceiptApi.md) | [**bulkReceiptStatusUpdate**](doc/ReceiptApi.md#bulkreceiptstatusupdate) | **POST** /receipt/bulkStatusUpdate | Bulk receipt status update
 [*ReceiptApi*](doc/ReceiptApi.md) | [**createReceipt**](doc/ReceiptApi.md#createreceipt) | **POST** /receipt/ | Create receipt
+[*ReceiptApi*](doc/ReceiptApi.md) | [**createReceiptWithFiles**](doc/ReceiptApi.md#createreceiptwithfiles) | **POST** /receipt/withFiles | Create receipt with files
 [*ReceiptApi*](doc/ReceiptApi.md) | [**deleteReceiptById**](doc/ReceiptApi.md#deletereceiptbyid) | **DELETE** /receipt/{receiptId} | Delete receipt
 [*ReceiptApi*](doc/ReceiptApi.md) | [**duplicateReceipt**](doc/ReceiptApi.md#duplicatereceipt) | **POST** /receipt/{receiptId}/duplicate | Duplicate receipt
 [*ReceiptApi*](doc/ReceiptApi.md) | [**getReceiptById**](doc/ReceiptApi.md#getreceiptbyid) | **GET** /receipt/{receiptId} | Get receipt
@@ -269,6 +270,7 @@ Class | Method | HTTP request | Description
  - [ReceiptPagedRequestCommand](doc/ReceiptPagedRequestCommand.md)
  - [ReceiptPagedRequestFilter](doc/ReceiptPagedRequestFilter.md)
  - [ReceiptProcessingSettings](doc/ReceiptProcessingSettings.md)
+ - [ReceiptRequirements](doc/ReceiptRequirements.md)
  - [ReceiptStatus](doc/ReceiptStatus.md)
  - [ReceiptSummary](doc/ReceiptSummary.md)
  - [ReceiptSummaryCommand](doc/ReceiptSummaryCommand.md)

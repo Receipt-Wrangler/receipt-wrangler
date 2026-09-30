@@ -71,6 +71,7 @@ export * from './receipt';
 export * from './receiptPagedRequestCommand';
 export * from './receiptPagedRequestFilter';
 export * from './receiptProcessingSettings';
+export * from './receiptRequirements';
 export * from './receiptStatus';
 export * from './receiptSummary';
 export * from './receiptSummaryCommand';

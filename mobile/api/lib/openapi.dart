@@ -110,6 +110,7 @@ export 'package:openapi/src/model/receipt.dart';
 export 'package:openapi/src/model/receipt_paged_request_command.dart';
 export 'package:openapi/src/model/receipt_paged_request_filter.dart';
 export 'package:openapi/src/model/receipt_processing_settings.dart';
+export 'package:openapi/src/model/receipt_requirements.dart';
 export 'package:openapi/src/model/receipt_status.dart';
 export 'package:openapi/src/model/receipt_summary.dart';
 export 'package:openapi/src/model/receipt_summary_command.dart';

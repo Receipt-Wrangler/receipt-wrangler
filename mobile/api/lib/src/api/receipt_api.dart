@@ -136,7 +136,7 @@ class ReceiptApi {
   }
 
   /// Create receipt
-  /// This will create a receipt [SYSTEM USER]
+  /// This will create a receipt [SYSTEM USER]. Deprecated in favour of createReceiptWithFiles, which carries the receipt&#39;s images in the same call; kept for already-released clients. It enforces the caller&#39;s role-required fields, so when the caller&#39;s group role requires an image this endpoint always returns 400 (it cannot carry one).
   ///
   /// Parameters:
   /// * [upsertReceiptCommand] - Receipt to create
@@ -149,6 +149,7 @@ class ReceiptApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Receipt] as data
   /// Throws [DioException] if API call or serialization fails
+  @Deprecated('This operation has been deprecated')
   Future<Response<Receipt>> createReceipt({ 
     required UpsertReceiptCommand upsertReceiptCommand,
     CancelToken? cancelToken,
@@ -188,6 +189,116 @@ class ReceiptApi {
     try {
       const _type = FullType(UpsertReceiptCommand);
       _bodyData = _serializers.serialize(upsertReceiptCommand, specifiedType: _type);
+
+    } catch(error, stackTrace) {
+      throw DioException(
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Receipt? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null ? null : _serializers.deserialize(
+        rawResponse,
+        specifiedType: const FullType(Receipt),
+      ) as Receipt;
+
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Receipt>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Create receipt with files
+  /// Creates a receipt, its comments and its images in one atomic call: a failure anywhere leaves no receipt, image or file behind. Requires group.receipts.create in the receipt&#39;s group. Every file must be an image or PDF (checked before anything is written). Returns 400 when the caller&#39;s group role requires a comment (key &#x60;comments&#x60;) or an image (key &#x60;files&#x60;) that the request does not carry. [SYSTEM USER]
+  ///
+  /// Parameters:
+  /// * [receipt] 
+  /// * [files] - Images (or PDFs) to attach to the new receipt. Together with the receipt they share the server's 50 MB request body limit.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Receipt] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Receipt>> createReceiptWithFiles({ 
+    required UpsertReceiptCommand receipt,
+    BuiltList<MultipartFile>? files,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/receipt/withFiles';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'multipart/form-data',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = FormData.fromMap(<String, dynamic>{
+        r'receipt': encodeFormParameter(_serializers, receipt, const FullType(UpsertReceiptCommand)),
+        if (files != null) r'files': files.toList(),
+      });
 
     } catch(error, stackTrace) {
       throw DioException(

@@ -27,6 +27,8 @@ part 'upsert_role_command.g.dart';
 /// * [skipDefaultGroupCreation] - Whether users created with this APP role skip the automatic personal \"My Receipts\" group (the virtual \"All\" group is always created). Only valid on app roles; applies at user-creation time only.
 /// * [requiresIndividualCategoryGrants] - Whether this GROUP role requires per-member category assignment. When true, a member with no individual category grants sees NO categories instead of falling back to the role's set, so an unassigned member fails closed. Only valid on group roles.
 /// * [requiresIndividualTagGrants] - Tag counterpart of requiresIndividualCategoryGrants. Only valid on group roles.
+/// * [requireReceiptComment] - Whether members of this GROUP role must keep at least one comment on the group's receipts. Only valid on group roles.
+/// * [requireReceiptImage] - Whether members of this GROUP role must keep at least one image on the group's receipts. Only valid on group roles.
 /// * [reportTemplateGrants] - Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
 @BuiltValue()
 abstract class UpsertRoleCommand implements Built<UpsertRoleCommand, UpsertRoleCommandBuilder> {
@@ -74,6 +76,14 @@ abstract class UpsertRoleCommand implements Built<UpsertRoleCommand, UpsertRoleC
   /// Tag counterpart of requiresIndividualCategoryGrants. Only valid on group roles.
   @BuiltValueField(wireName: r'requiresIndividualTagGrants')
   bool? get requiresIndividualTagGrants;
+
+  /// Whether members of this GROUP role must keep at least one comment on the group's receipts. Only valid on group roles.
+  @BuiltValueField(wireName: r'requireReceiptComment')
+  bool? get requireReceiptComment;
+
+  /// Whether members of this GROUP role must keep at least one image on the group's receipts. Only valid on group roles.
+  @BuiltValueField(wireName: r'requireReceiptImage')
+  bool? get requireReceiptImage;
 
   /// Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
   @BuiltValueField(wireName: r'reportTemplateGrants')
@@ -177,6 +187,20 @@ class _$UpsertRoleCommandSerializer implements PrimitiveSerializer<UpsertRoleCom
       yield r'requiresIndividualTagGrants';
       yield serializers.serialize(
         object.requiresIndividualTagGrants,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.requireReceiptComment != null) {
+      yield r'requireReceiptComment';
+      yield serializers.serialize(
+        object.requireReceiptComment,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.requireReceiptImage != null) {
+      yield r'requireReceiptImage';
+      yield serializers.serialize(
+        object.requireReceiptImage,
         specifiedType: const FullType(bool),
       );
     }
@@ -293,6 +317,20 @@ class _$UpsertRoleCommandSerializer implements PrimitiveSerializer<UpsertRoleCom
             specifiedType: const FullType(bool),
           ) as bool;
           result.requiresIndividualTagGrants = valueDes;
+          break;
+        case r'requireReceiptComment':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.requireReceiptComment = valueDes;
+          break;
+        case r'requireReceiptImage':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.requireReceiptImage = valueDes;
           break;
         case r'reportTemplateGrants':
           final valueDes = serializers.deserialize(

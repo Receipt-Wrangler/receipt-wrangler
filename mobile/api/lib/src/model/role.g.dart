@@ -40,6 +40,10 @@ class _$Role extends Role {
   @override
   final bool? requiresIndividualTagGrants;
   @override
+  final bool? requireReceiptComment;
+  @override
+  final bool? requireReceiptImage;
+  @override
   final BuiltList<ReportTemplateGrant>? reportTemplateGrants;
 
   factory _$Role([void Function(RoleBuilder)? updates]) =>
@@ -62,6 +66,8 @@ class _$Role extends Role {
       this.skipDefaultGroupCreation,
       this.requiresIndividualCategoryGrants,
       this.requiresIndividualTagGrants,
+      this.requireReceiptComment,
+      this.requireReceiptImage,
       this.reportTemplateGrants})
       : super._();
   @override
@@ -92,6 +98,8 @@ class _$Role extends Role {
         requiresIndividualCategoryGrants ==
             other.requiresIndividualCategoryGrants &&
         requiresIndividualTagGrants == other.requiresIndividualTagGrants &&
+        requireReceiptComment == other.requireReceiptComment &&
+        requireReceiptImage == other.requireReceiptImage &&
         reportTemplateGrants == other.reportTemplateGrants;
   }
 
@@ -114,6 +122,8 @@ class _$Role extends Role {
     _$hash = $jc(_$hash, skipDefaultGroupCreation.hashCode);
     _$hash = $jc(_$hash, requiresIndividualCategoryGrants.hashCode);
     _$hash = $jc(_$hash, requiresIndividualTagGrants.hashCode);
+    _$hash = $jc(_$hash, requireReceiptComment.hashCode);
+    _$hash = $jc(_$hash, requireReceiptImage.hashCode);
     _$hash = $jc(_$hash, reportTemplateGrants.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -139,6 +149,8 @@ class _$Role extends Role {
           ..add('requiresIndividualCategoryGrants',
               requiresIndividualCategoryGrants)
           ..add('requiresIndividualTagGrants', requiresIndividualTagGrants)
+          ..add('requireReceiptComment', requireReceiptComment)
+          ..add('requireReceiptImage', requireReceiptImage)
           ..add('reportTemplateGrants', reportTemplateGrants))
         .toString();
   }
@@ -226,6 +238,16 @@ class RoleBuilder implements Builder<Role, RoleBuilder> {
   set requiresIndividualTagGrants(bool? requiresIndividualTagGrants) =>
       _$this._requiresIndividualTagGrants = requiresIndividualTagGrants;
 
+  bool? _requireReceiptComment;
+  bool? get requireReceiptComment => _$this._requireReceiptComment;
+  set requireReceiptComment(bool? requireReceiptComment) =>
+      _$this._requireReceiptComment = requireReceiptComment;
+
+  bool? _requireReceiptImage;
+  bool? get requireReceiptImage => _$this._requireReceiptImage;
+  set requireReceiptImage(bool? requireReceiptImage) =>
+      _$this._requireReceiptImage = requireReceiptImage;
+
   ListBuilder<ReportTemplateGrant>? _reportTemplateGrants;
   ListBuilder<ReportTemplateGrant> get reportTemplateGrants =>
       _$this._reportTemplateGrants ??= ListBuilder<ReportTemplateGrant>();
@@ -256,6 +278,8 @@ class RoleBuilder implements Builder<Role, RoleBuilder> {
       _skipDefaultGroupCreation = $v.skipDefaultGroupCreation;
       _requiresIndividualCategoryGrants = $v.requiresIndividualCategoryGrants;
       _requiresIndividualTagGrants = $v.requiresIndividualTagGrants;
+      _requireReceiptComment = $v.requireReceiptComment;
+      _requireReceiptImage = $v.requireReceiptImage;
       _reportTemplateGrants = $v.reportTemplateGrants?.toBuilder();
       _$v = null;
     }
@@ -299,6 +323,8 @@ class RoleBuilder implements Builder<Role, RoleBuilder> {
             skipDefaultGroupCreation: skipDefaultGroupCreation,
             requiresIndividualCategoryGrants: requiresIndividualCategoryGrants,
             requiresIndividualTagGrants: requiresIndividualTagGrants,
+            requireReceiptComment: requireReceiptComment,
+            requireReceiptImage: requireReceiptImage,
             reportTemplateGrants: _reportTemplateGrants?.build(),
           );
     } catch (_) {

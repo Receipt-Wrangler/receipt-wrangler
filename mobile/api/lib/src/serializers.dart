@@ -87,6 +87,7 @@ import 'package:openapi/src/model/receipt.dart';
 import 'package:openapi/src/model/receipt_paged_request_command.dart';
 import 'package:openapi/src/model/receipt_paged_request_filter.dart';
 import 'package:openapi/src/model/receipt_processing_settings.dart';
+import 'package:openapi/src/model/receipt_requirements.dart';
 import 'package:openapi/src/model/receipt_status.dart';
 import 'package:openapi/src/model/receipt_summary.dart';
 import 'package:openapi/src/model/receipt_summary_command.dart';
@@ -225,6 +226,7 @@ part 'serializers.g.dart';
   ReceiptPagedRequestCommand,
   ReceiptPagedRequestFilter,
   ReceiptProcessingSettings,
+  ReceiptRequirements,
   ReceiptStatus,
   ReceiptSummary,
   ReceiptSummaryCommand,

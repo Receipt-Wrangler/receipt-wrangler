@@ -24,6 +24,8 @@ Name | Type | Description | Notes
 **skipDefaultGroupCreation** | **bool** | Whether users created with this APP role skip the automatic personal \"My Receipts\" group. The virtual \"All\" group is always created. Applies at user-creation time only — changing it never adds or removes a group for an existing user. Always false for group roles. | [optional] 
 **requiresIndividualCategoryGrants** | **bool** | Whether a GROUP role requires per-member category assignment. When true, a member holding this role with no individual category grants sees NO categories, rather than falling back to the role's set. Always false for app roles. | [optional] 
 **requiresIndividualTagGrants** | **bool** | Tag counterpart of requiresIndividualCategoryGrants. Always false for app roles. | [optional] 
+**requireReceiptComment** | **bool** | Whether a GROUP role requires its members to keep at least one comment on the group's receipts (waived when the group hides comments or the member lacks group.comments.create). Always false for app roles. | [optional] 
+**requireReceiptImage** | **bool** | Whether a GROUP role requires its members to keep at least one image on the group's receipts (waived when the group hides images). Always false for app roles. | [optional] 
 **reportTemplateGrants** | [**BuiltList&lt;ReportTemplateGrant&gt;**](ReportTemplateGrant.md) | Per-template action grants restricting which report templates a GROUP role's members may act on. Empty means unrestricted (every template the role's group access reaches). Always empty for app roles. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
