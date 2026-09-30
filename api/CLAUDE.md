@@ -2158,6 +2158,22 @@ never let it) and the create is atomic.
   `HideComments` / permission waivers). Quick scan always has an image. Resolved once per group.
 - **Out of scope:** bulk status update, duplicate, email ingest (no user) and import.
 
+### The synthetic "All" group is never a destination
+
+**Both creates and Quick Scan reject it with a 400**, as `UpdateReceipt` already did for a move.
+A caller's All-group membership carries the default unrestricted role, so its
+`group.receipts.create` passes the declarative gate, and the receipt would then live under a role
+that sidesteps every real group's grant and visibility controls. One helper,
+`isAllGroupDestination` (`handlers/receipts.go`), holds the rule for all four paths; a group that
+does not exist is *not* the All group, so the permission check after it still denies that.
+- **Creates:** checked first inside `enforceReceiptCreate`, so it answers before any 403 check and
+  before any file is written (`allGroupCreateMessage`).
+- **Quick Scan:** checked per file before `ResolveQuickScanFields` and before anything is enqueued;
+  a 400 validator error keyed `files.<i>.groupId`, matching that resolver's keys.
+- Neither client can send it in normal use (both pickers exclude the All group), so this closes a
+  crafted-request hole rather than changing a flow. Email ingest and import are out of scope: their
+  destination is configuration, not caller input.
+
 Tests: `commands/upsert_role_command_test.go` (APP rejected), `repositories/roles_test.go`
 (`TestGroupRoleReceiptRequirementsRoundTrip` incl. toggle-off via `GetAllRoles`,
 `TestGetMemberReceiptRequirementFlags`), `services/roles_test.go` (service round-trip),
@@ -2184,6 +2200,22 @@ production line is broken:
 `writeCreatedReceipt`'s category/tag strip and member masking are **not** targeted there: on a fresh
 create the caller can only attach what it may see and is itself the creator, so there is nothing for
 them to hide.
+
+**The partial-write clean-up has a test hook.** `CreateReceiptImage` writes through the unexported
+`writeReceiptImageFile`, which `repositories.SetReceiptImageWriterForTests` swaps (returning a
+restore func). A real filesystem will not fail halfway through a file on demand, and that is the one
+case where a row exists and a truncated file sits on disk: `CreateReceiptWithFiles` tracks the path
+from the row id so the rollback removes it. `TestCreateReceiptWithFiles_PartialWriteIsRemoved` writes
+half the second image and then fails; it was checked to fail when a failed write's path is not
+tracked. Nothing else reassigns the variable.
+
+**Parsing has direct unit tests** in `commands/create_receipt_with_files_command_test.go` (no DB):
+both encodings, the documented precedence (a non-empty form value wins over the file part; an empty
+one falls back to it), every error, and `files` keeping order, names and exact bytes, with an absent
+`files` giving an empty, non-nil slice. The precedence case was checked to fail when the two reads
+are swapped. The All-group rejections are pinned by `TestCreateReceiptWithFiles_AllGroupRejected`,
+`TestCreateReceipt_LegacyEndpointAllGroupRejected` and `TestQuickScanHandlerAllGroupRejected`, each
+with a real-group positive control.
 
 ## Group Default Custom Fields
 

@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -342,6 +343,68 @@ func TestCreateReceiptWithFiles_FailureLeavesNothingBehind(t *testing.T) {
 	}
 	if tasks[0].ReceiptId != nil {
 		t.Errorf("task receipt id = %d, want none for a rolled-back create", *tasks[0].ReceiptId)
+	}
+}
+
+// A write that fails partway leaves a truncated file on disk after its row was
+// created. That file is tracked from the row's id and removed with the rest when
+// the transaction rolls back. A real filesystem will not fail mid-file on demand,
+// so the write is swapped for one that writes half the bytes and then errors.
+func TestCreateReceiptWithFiles_PartialWriteIsRemoved(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	user, group, groupPath := seedCreateWithFilesGroup(t)
+	jpg := readTestJpg(t)
+
+	writes := 0
+	var partialPath string
+	restore := repositories.SetReceiptImageWriterForTests(func(path string, data []byte) error {
+		writes++
+		if writes == 1 {
+			return utils.WriteDataFile(path, data)
+		}
+		partialPath = path
+		if err := utils.WriteDataFile(path, data[:len(data)/2]); err != nil {
+			t.Fatalf("write the partial file: %v", err)
+		}
+		return errors.New("disk full")
+	})
+	defer restore()
+
+	_, err := NewReceiptService(nil).CreateReceiptWithFiles(
+		createWithFilesCommand(group.ID, user.ID, "Should not survive"),
+		[]commands.ReceiptFileUpload{{Name: "first.jpg", Bytes: jpg}, {Name: "second.jpg", Bytes: jpg}},
+		user.ID,
+	)
+	if err == nil {
+		t.Fatal("expected CreateReceiptWithFiles to fail")
+	}
+	if partialPath == "" {
+		t.Fatal("the second write never ran, so the partial-write branch was not exercised")
+	}
+
+	if _, statErr := os.Stat(partialPath); !os.IsNotExist(statErr) {
+		t.Errorf("the half-written file is still on disk at %s (stat err %v)", partialPath, statErr)
+	}
+	entries, readErr := os.ReadDir(groupPath)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		t.Fatalf("read group dir: %v", readErr)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected no files left in the group directory, got %d", len(entries))
+	}
+
+	db := repositories.GetDB()
+	var receiptCount, fileDataCount, commentCount int64
+	db.Model(&models.Receipt{}).Count(&receiptCount)
+	db.Model(&models.FileData{}).Count(&fileDataCount)
+	db.Model(&models.Comment{}).Count(&commentCount)
+	if receiptCount != 0 || fileDataCount != 0 || commentCount != 0 {
+		t.Errorf("expected nothing persisted, got %d receipts, %d images, %d comments", receiptCount, fileDataCount, commentCount)
+	}
+
+	tasks := receiptUploadedTasks(t)
+	if len(tasks) != 1 || tasks[0].Status != models.SYSTEM_TASK_FAILED {
+		t.Fatalf("expected one FAILED RECEIPT_UPLOADED task, got %+v", tasks)
 	}
 }
 

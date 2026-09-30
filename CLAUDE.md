@@ -506,6 +506,9 @@ desktop role form — mobile has no role UI). **All three components.**
 - **The JSON `POST /receipt/` is deprecated but kept** for already-released mobile builds. It enforces
   the same rules, so for a role requiring an image it always 400s with an "update your app" message —
   deliberately: an old client can never attach an image at create time.
+- **The synthetic "All" group is never a destination.** Both creates and Quick Scan 400 it, as a
+  move on update already did; neither client's group picker offers it, so this only closes a crafted
+  request. See `api/CLAUDE.md` → "The synthetic \"All\" group is never a destination".
 - E2e per client: `desktop/e2e/receipt-role-requirements.spec.ts` and
   `mobile/integration_test/receipt_role_requirements_test.dart`. See `api/CLAUDE.md`,
   `desktop/CLAUDE.md` and `mobile/CLAUDE.md` → "Role-required receipt fields & single-call create".

@@ -201,7 +201,7 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 
 	stringId := utils.UintToString(command.GroupId)
 
-	// TODO: Clean up to make sure group id is not an all group, and remove middleware sets and checks
+	// TODO: remove middleware sets and checks
 	handler := structs.Handler{
 		ErrorMessage:     errMessage,
 		Writer:           w,
@@ -295,6 +295,27 @@ func CreateReceiptWithFiles(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
+const (
+	allGroupCreateMessage = "Receipts cannot be created in the All group"
+	allGroupMoveMessage   = "Receipts cannot be moved into the All group"
+)
+
+// isAllGroupDestination reports whether groupId is the synthetic "All" group,
+// which may never hold a receipt: it is a cross-group view, and a caller's
+// All-group membership carries the default unrestricted role, so its
+// group.receipts.create would pass the declarative gate and the receipt would
+// live under a role that sidesteps every real group's grant and visibility
+// controls. Every write that names a destination group — both creates, quick
+// scan and a move on update — rejects it. A group that does not exist is not
+// the All group; the permission check that follows denies it.
+func isAllGroupDestination(groupId uint) (bool, error) {
+	isAllGroup, err := repositories.NewGroupRepository(nil).IsAllGroup(groupId)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, err
+	}
+	return isAllGroup, nil
+}
+
 // enforceReceiptCreate runs every check a receipt create must pass beyond its
 // declarative group.receipts.create gate — category/tag grants, member
 // visibility, custom-field selection (403s), then the caller's role-required
@@ -307,6 +328,17 @@ func enforceReceiptCreate(
 	imageCount int,
 	imageRequiredMessage string,
 ) (bool, error) {
+	// The synthetic All group is a cross-group view, not a real container — see
+	// isAllGroupDestination. Checked first, so nothing else is resolved for it.
+	isAllGroup, err := isAllGroupDestination(command.GroupId)
+	if err != nil {
+		return false, err
+	}
+	if isAllGroup {
+		utils.WriteCustomErrorResponse(w, allGroupCreateMessage, http.StatusBadRequest)
+		return false, nil
+	}
+
 	allowed, denyMessage, err := enforceReceiptGrantSelection(userId, command.GroupId, command)
 	if err != nil {
 		return false, err
@@ -399,6 +431,23 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 
 			fileRepository := repositories.NewFileRepository(nil)
 			token := structs.GetClaims(r)
+
+			// No scanned file may land in the synthetic All group (see
+			// isAllGroupDestination); refused before anything is resolved or enqueued.
+			allGroupErrs := structs.ValidatorError{Errors: make(map[string]string)}
+			for i, groupId := range quickScanCommand.GroupIds {
+				isAllGroup, err := isAllGroupDestination(groupId)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				if isAllGroup {
+					allGroupErrs.Errors[fmt.Sprintf("files.%d.groupId", i)] = allGroupCreateMessage
+				}
+			}
+			if len(allGroupErrs.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, allGroupErrs, http.StatusBadRequest)
+				return 0, nil
+			}
 
 			// Resolve per-file quick-scan fields against each target group's receipt settings:
 			// enforce the group's required fields (synchronously, so we can 400 before enqueuing
@@ -562,12 +611,12 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 				// All group under a role that sidesteps any real group's grant and
 				// member-visibility controls. Reject it up front. A non-existent
 				// destination falls through to the permission check, which denies it.
-				isAllGroup, err := repositories.NewGroupRepository(nil).IsAllGroup(command.GroupId)
-				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				isAllGroup, err := isAllGroupDestination(command.GroupId)
+				if err != nil {
 					return http.StatusInternalServerError, err
 				}
 				if isAllGroup {
-					utils.WriteCustomErrorResponse(w, "Receipts cannot be moved into the All group", http.StatusBadRequest)
+					utils.WriteCustomErrorResponse(w, allGroupMoveMessage, http.StatusBadRequest)
 					return 0, nil
 				}
 

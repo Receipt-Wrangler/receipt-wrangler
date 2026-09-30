@@ -478,6 +478,77 @@ func TestCreateReceiptWithFiles_InvalidReceiptIs400(t *testing.T) {
 	assertNothingWritten(t, groupId)
 }
 
+// ---------- the synthetic All group is never a destination ----------
+
+// seedAllGroupMember puts userId in a real All-group row with perms — the exact
+// condition under which the declarative group.receipts.create gate would pass.
+func seedAllGroupMember(t *testing.T, userId uint, perms []string) uint {
+	t.Helper()
+	allGroup := models.Group{Name: "All", IsAllGroup: true}
+	if err := repositories.GetDB().Create(&allGroup).Error; err != nil {
+		t.Fatalf("seed all group: %v", err)
+	}
+	addMemberWithRole(t, userId, allGroup.ID, "all-group-member", perms)
+	cleanUpGroupDir(t, allGroup.ID)
+	return allGroup.ID
+}
+
+func TestCreateReceiptWithFiles_AllGroupRejected(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, realGroupId := seedRequirementGroup(t, "cwf-all-real", false, false)
+	allGroupId := seedAllGroupMember(t, userId, requirementPerms)
+
+	w := createWithFilesRequest(t, userId, receiptJson(allGroupId, userId, "into All"), false,
+		uploadFile{"a.jpg", readHandlerTestJpg(t)})
+	if w.Result().StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (body %s)", w.Result().StatusCode, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), allGroupCreateMessage) {
+		t.Errorf("body = %s, want the All group message", w.Body.String())
+	}
+	assertNothingWritten(t, allGroupId)
+
+	// Positive control: the same caller into a real group succeeds.
+	w = createWithFilesRequest(t, userId, receiptJson(realGroupId, userId, "into a real group"), false,
+		uploadFile{"a.jpg", readHandlerTestJpg(t)})
+	if w.Result().StatusCode != http.StatusOK {
+		t.Fatalf("real group status = %d, want 200 (body %s)", w.Result().StatusCode, w.Body.String())
+	}
+}
+
+func TestCreateReceipt_LegacyEndpointAllGroupRejected(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, _ := seedRequirementGroup(t, "legacy-all-real", false, false)
+	allGroupId := seedAllGroupMember(t, userId, requirementPerms)
+
+	w, r := createReceiptRequest(userId, receiptJson(allGroupId, userId, ""))
+	CreateReceipt(w, r)
+	if w.Result().StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (body %s)", w.Result().StatusCode, w.Body.String())
+	}
+	if n := countRows(t, &models.Receipt{}); n != 0 {
+		t.Errorf("receipts = %d, want 0", n)
+	}
+}
+
+func TestQuickScanHandlerAllGroupRejected(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, realGroupId := seedQuickScanCommenter(t, true, models.GroupReceiptSettings{})
+	allGroupId := seedAllGroupMember(t, userId, []string{
+		permissions.GroupReceiptsQuickScan, permissions.GroupReceiptsRead, permissions.GroupReceiptsCreate,
+	})
+
+	w := quickScanCommentRequest(t, userId, allGroupId, nil)
+	assertValidatorKey(t, w, "files.0.groupId")
+
+	// Positive control: the same scan into a real group gets past the check (it
+	// fails later on the fake image, which is not what this asserts).
+	w = quickScanCommentRequest(t, userId, realGroupId, nil)
+	if w.Result().StatusCode == http.StatusBadRequest && strings.Contains(w.Body.String(), "files.0.groupId") {
+		t.Errorf("a real group was rejected as the All group: %s", w.Body.String())
+	}
+}
+
 // ---------- deprecated POST /receipt/ ----------
 
 func TestCreateReceipt_LegacyEndpointEnforcesRoleRequirements(t *testing.T) {
