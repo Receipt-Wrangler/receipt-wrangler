@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 
+import 'form_actions.dart';
 import 'pump.dart';
 
 /// From the GroupSelect screen, taps the [groupName] card to enter the group
@@ -56,6 +57,11 @@ Future<void> openReceiptEditForm(
   await _drain(tester);
   await tester.tap(find.text('Edit').hitTestable());
   await pumpUntilFound(tester, find.byType(BottomSubmitButton));
+  // The submit button renders while the form body is still loading, so it
+  // proves the route mounted, not the form: a submit tapped now finds no
+  // FormBuilder state and is a silent no-op. Wait for a field, as
+  // receipt_edit_test does.
+  await pumpUntilFound(tester, formField('name'));
 }
 
 /// [openReceiptEditForm], then the form's "View Comments" action -- the
