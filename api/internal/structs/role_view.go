@@ -36,6 +36,11 @@ type RoleView struct {
 	// group-scoped; app roles serialize false.
 	RequiresIndividualCategoryGrants bool `json:"requiresIndividualCategoryGrants"`
 	RequiresIndividualTagGrants      bool `json:"requiresIndividualTagGrants"`
+	// RequireReceiptComment / RequireReceiptImage mark a group role whose members
+	// must supply at least one comment / image on the group's receipts. Always
+	// group-scoped; app roles serialize false.
+	RequireReceiptComment bool `json:"requireReceiptComment"`
+	RequireReceiptImage   bool `json:"requireReceiptImage"`
 	// ReportTemplateGrants restrict which report templates a group role's members
 	// may act on, per action. Empty means unrestricted (every template the role's
 	// group access reaches). Always group-scoped; app roles serialize an empty

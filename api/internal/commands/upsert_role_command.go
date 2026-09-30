@@ -47,6 +47,11 @@ type UpsertRoleCommand struct {
 	// and default false ⇒ no effect on existing roles.
 	RequiresIndividualCategoryGrants bool `json:"requiresIndividualCategoryGrants"`
 	RequiresIndividualTagGrants      bool `json:"requiresIndividualTagGrants"`
+	// RequireReceiptComment / RequireReceiptImage make members holding this group
+	// role supply at least one comment / image on the group's receipts.
+	// Group-scoped only and default false ⇒ no effect on existing roles.
+	RequireReceiptComment bool `json:"requireReceiptComment"`
+	RequireReceiptImage   bool `json:"requireReceiptImage"`
 	// ReportTemplateGrants restrict which report templates members of a group role
 	// may act on, per action. Group-scoped only and opt-in: an empty set means
 	// unrestricted (act on every template the role's group access reaches). Each
@@ -120,15 +125,17 @@ func (command *UpsertRoleCommand) Validate() structs.ValidatorError {
 		}
 	}
 
-	// Category/tag/paid-by grants and member-visibility settings are a group-role
-	// concept (they slice the global pool / narrow visibility per group role); they
-	// make no sense on an app role.
+	// Category/tag/paid-by grants, member-visibility settings and receipt
+	// requirements are a group-role concept (they slice the global pool / narrow
+	// visibility / constrain receipts per group role); they make no sense on an
+	// app role.
 	if command.Scope == permissions.ScopeApp &&
 		(len(command.CategoryGrants) > 0 || len(command.TagGrants) > 0 ||
 			len(command.PaidByUserGrants) > 0 || command.IncludeOwnPaidReceipts ||
 			command.SeesAllMembers ||
-			command.RequiresIndividualCategoryGrants || command.RequiresIndividualTagGrants) {
-		errors["grants"] = "Category, tag, paid-by, and member-visibility settings are only valid on group roles"
+			command.RequiresIndividualCategoryGrants || command.RequiresIndividualTagGrants ||
+			command.RequireReceiptComment || command.RequireReceiptImage) {
+		errors["grants"] = "Category, tag, paid-by, member-visibility, and receipt requirement settings are only valid on group roles"
 	}
 
 	// Skipping personal-group creation is an app-role concept: it acts when the

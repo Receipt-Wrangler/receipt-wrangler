@@ -533,3 +533,53 @@ func TestDeleteRoleRejectsDefault(t *testing.T) {
 		utils.PrintTestError(t, err, "default role should be untouched")
 	}
 }
+
+func TestCreateAndUpdateRoleRoundTripReceiptRequirements(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	service := NewRoleService(nil)
+
+	roleView, err := service.CreateRole(commands.UpsertRoleCommand{
+		Name:                  "Thorough",
+		Scope:                 permissions.ScopeGroup,
+		Permissions:           []string{permissions.GroupReceiptsCreate},
+		RequireReceiptComment: true,
+		RequireReceiptImage:   true,
+	})
+	if err != nil {
+		t.Fatalf("CreateRole: %v", err)
+	}
+	if !roleView.RequireReceiptComment || !roleView.RequireReceiptImage {
+		t.Errorf("created view = (%v, %v), want (true, true)", roleView.RequireReceiptComment, roleView.RequireReceiptImage)
+	}
+
+	stored, err := repositories.NewRoleRepository(nil).GetGroupRoleById(roleView.Id)
+	if err != nil {
+		t.Fatalf("GetGroupRoleById: %v", err)
+	}
+	if !stored.RequireReceiptComment || !stored.RequireReceiptImage {
+		t.Errorf("stored = (%v, %v), want (true, true)", stored.RequireReceiptComment, stored.RequireReceiptImage)
+	}
+
+	// Toggling one off through the service must stick.
+	updated, err := service.UpdateRole(roleView.Id, commands.UpsertRoleCommand{
+		Name:                  "Thorough",
+		Scope:                 permissions.ScopeGroup,
+		Permissions:           []string{permissions.GroupReceiptsCreate},
+		RequireReceiptComment: false,
+		RequireReceiptImage:   true,
+	})
+	if err != nil {
+		t.Fatalf("UpdateRole: %v", err)
+	}
+	if updated.RequireReceiptComment || !updated.RequireReceiptImage {
+		t.Errorf("updated view = (%v, %v), want (false, true)", updated.RequireReceiptComment, updated.RequireReceiptImage)
+	}
+
+	stored, err = repositories.NewRoleRepository(nil).GetGroupRoleById(roleView.Id)
+	if err != nil {
+		t.Fatalf("GetGroupRoleById: %v", err)
+	}
+	if stored.RequireReceiptComment || !stored.RequireReceiptImage {
+		t.Errorf("stored after update = (%v, %v), want (false, true)", stored.RequireReceiptComment, stored.RequireReceiptImage)
+	}
+}

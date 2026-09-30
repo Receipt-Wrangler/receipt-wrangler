@@ -2072,6 +2072,101 @@ a real paid-by and status — neither field is ever null/empty**. This is why th
   produced by the default prompt and aren't resolved here, so a future prompt emitting id-only item-level
   categories would hit the same validation failure.
 
+## Role-required receipt fields & single-call create
+
+A group role can require its members to keep **at least one comment** and/or **at least one image**
+on the group's receipts: `GroupRoleDefinition.RequireReceiptComment` / `RequireReceiptImage`
+(`not null;default:false`, so AutoMigrate adds them and existing roles are unchanged — no migration).
+Carried on `UpsertRoleCommand` / `RoleView` / swagger `Role` + `UpsertRoleCommand` as
+`requireReceiptComment` / `requireReceiptImage`; **group scope only** (`Validate` rejects them on APP
+under the shared `grants` key, like `seesAllMembers`). Persisted by
+`RoleRepository.SetGroupRoleReceiptRequirements` — a separate map-form `Updates`, for the same
+transposable-bools reason as `SetGroupRoleIndividualGrantConfig` — called inside `CreateRole` /
+`UpdateRole`'s transactions; `GetAllRoles` and `groupRoleToView` read them back.
+
+**Never read the raw flags to decide anything — resolve them.**
+`ReceiptService.ResolveReceiptRequirements(userId, groupId)` (`services/receipt_requirements.go`)
+returns `structs.ReceiptRequirements{commentRequired, imageRequired}` with the waivers applied:
+
+- **comment** waived when the group sets `HideComments` **or** the caller lacks
+  `group.comments.create` (the same pair `IsQuickScanCommentShown` + quick scan's permission check
+  use — a caller who can't comment must never be required to);
+- **image** waived when the group sets `HideImages` (no permission waiver: images ride the create,
+  which `group.receipts.create` covers);
+- a non-member, a member with no role, and the synthetic **All** group require nothing.
+
+The flags come from `RoleRepository.GetMemberReceiptRequirementFlags` — **one** join over
+`group_members` → `group_role_definitions` → `groups` for any number of groups (All group filtered in
+Go, since `is_all_group` is nullable). The common case (no flag set) therefore costs one query; the
+settings and the permission are read only when a flag is on. The batched
+`ResolveReceiptRequirementsForGroups` builds **`AppData.groupReceiptRequirements`**
+(`map[groupId]ReceiptRequirements`) from the groups' preloaded settings and the loop's already
+resolved group permissions, still one query. Only groups where something is required are present
+(absent ⇒ nothing required); the map is never `null` (`{}` when empty). It is deliberately **not** in
+AppData's swagger `required` list, so a newer mobile build can still parse an older server's payload.
+
+### `POST /receipt/withFiles` (`createReceiptWithFiles`)
+
+Create is **one multipart call** carrying the receipt, its comments and its images, so the server
+sees the images at create time (the old flow — JSON create, then one `POST /receiptImage` per image —
+never let it) and the create is atomic.
+
+- **Wire shape:** `multipart/form-data` with part **`receipt`** = `UpsertReceiptCommand` JSON (comments
+  included) and zero or more **`files`** parts (binary). Swagger declares
+  `encoding: receipt: contentType: application/json`. Generated clients differ in how they encode a
+  model inside multipart, so `CreateReceiptWithFilesCommand.LoadDataFromRequest` accepts `receipt`
+  **either as a plain form value or as a file part** (e.g. `application/json`), in that order. A
+  missing/malformed part or a failed `Validate` is a **400** (the legacy JSON create still uses 500).
+- **Order:** parse → `group.receipts.create` gate (`HandleRequest`) → **every file through
+  `ValidateFileType` before anything is written** (400 keyed `files.<i>`) → the shared
+  `enforceReceiptCreate` (grant selection, member visibility, custom-field selection — 403s — then
+  the requirement check) → `ReceiptService.CreateReceiptWithFiles` → `writeCreatedReceipt` (the same
+  category/tag strip + member masking as `CreateReceipt`). Both create handlers share
+  `enforceReceiptCreate` and `writeCreatedReceipt`, so they cannot drift.
+- **`CreateReceiptWithFiles`** runs `CreateReceipt(…, createSystemTask=false)` plus
+  `CreateReceiptImage` per file in **one `db.Transaction`**. Files are written inside it (the new
+  receipt's group is only visible there), so every written path is tracked and removed if the
+  transaction fails — the `DuplicateReceipt` pattern. `CreateReceiptImage` now returns the row (with
+  its id) alongside a **write** error so a partially written file can be located too. The
+  `RECEIPT_UPLOADED` task is recorded afterwards from a deferred `CreateSystemTaskFromError`, like
+  `DuplicateReceipt` — `CreateReceipt`'s own task write would run on another connection. The response
+  is re-read after commit, so it carries `imageFiles`.
+- **Size:** `ParseMultipartForm(MultipartFormMaxSize)` is only the in-memory threshold (larger parts
+  spill to temp files, which net/http removes after the request). The real cap is nginx's
+  `client_max_body_size 50M` in `docker/default.conf`, which now bounds **all** of a create's images
+  together, as it already does for a multi-file quick scan.
+- **The old `POST /receipt/` stays** (`deprecated: true` in swagger) for already-released mobile
+  builds. It enforces the same requirements with an image count of 0, so while an image is required
+  it always 400s — with a `files` message telling the user to **update their app**.
+
+### Where the requirement is enforced
+
+`handlers/receipt_requirement_enforcement.go` — every failure is a **400 validator error keyed
+`comments` / `files`** (`WriteValidatorErrorResponse`):
+
+- **Both creates** — comment = any non-blank `command.Comments[].comment`; image = files in the call.
+- **`UpdateReceipt`** — against the **target** group (the destination when moving, so a move into a
+  requiring group is refused), using the **stored** `currentReceipt.Comments` / `ImageFiles`
+  (`GetFullyLoadedReceiptById` preloads both). Edit mode adds images and comments immediately through
+  their own endpoints, so the stored receipt is the truth; judging the command would let a client
+  claim a comment it never saved.
+- **`DeleteComment` / `RemoveReceiptImage`** — refuse removing the **last** one while it is required
+  in the receipt's group (`enforceCommentDeleteKeepsRequired` / `enforceImageDeleteKeepsRequired`).
+  To swap the only image, upload the new one first.
+- **Quick scan** (`ResolveQuickScanFields`) — a role-required comment **shows and requires** the
+  field even when the group's quick-scan config leaves it off (the resolver already carries the
+  `HideComments` / permission waivers). Quick scan always has an image. Resolved once per group.
+- **Out of scope:** bulk status update, duplicate, email ingest (no user) and import.
+
+Tests: `commands/upsert_role_command_test.go` (APP rejected), `repositories/roles_test.go`
+(`TestGroupRoleReceiptRequirementsRoundTrip` incl. toggle-off via `GetAllRoles`,
+`TestGetMemberReceiptRequirementFlags`), `services/roles_test.go` (service round-trip),
+`services/receipt_requirements_test.go` (resolver matrix incl. batched parity, nothing-required
+cases, AppData `{}`, `CreateReceiptWithFiles` happy path + a mid-transaction failure leaving no
+receipt/FileData/comment/file and a FAILED task, quick-scan role comment), and
+`handlers/receipt_requirement_enforcement_test.go` (both `receipt` encodings, invalid file type
+writes nothing, both creates, update incl. a move, last comment/image delete, quick scan).
+
 ## Group Default Custom Fields
 
 Group admins declare, in **Group Receipt Settings**, the set of custom fields that should always be

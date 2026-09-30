@@ -805,3 +805,100 @@ func copyDuplicateImages(tx *gorm.DB, sources []models.FileData, copies []models
 
 	return written, nil
 }
+
+// CreateReceiptWithFiles creates a receipt and every uploaded image in ONE
+// transaction, so a create either lands whole or leaves nothing behind — no
+// receipt, no FileData, no file on disk. The files must already have passed
+// ValidateFileType; the caller checks them before anything is written.
+//
+// Files are written to disk inside the transaction (BuildFilePath resolves the
+// receipt's group, and the row is only visible there), so every path written is
+// tracked and removed if the transaction does not commit — the same approach as
+// DuplicateReceipt. The RECEIPT_UPLOADED task is recorded once the outcome is
+// known, like DuplicateReceipt's, rather than by CreateReceipt, whose own task
+// write would run outside this transaction.
+func (service ReceiptService) CreateReceiptWithFiles(
+	command commands.UpsertReceiptCommand,
+	files []commands.ReceiptFileUpload,
+	userId uint,
+) (_ models.Receipt, err error) {
+	db := service.GetDB()
+
+	systemTaskCommand := commands.UpsertSystemTaskCommand{
+		Type:                 models.RECEIPT_UPLOADED,
+		Status:               models.SYSTEM_TASK_SUCCEEDED,
+		AssociatedEntityType: models.RECEIPT,
+		StartedAt:            time.Now(),
+		RanByUserId:          &userId,
+		GroupId:              &command.GroupId,
+	}
+	defer func() {
+		_, taskErr := NewSystemTaskService(nil).CreateSystemTaskFromError(systemTaskCommand, err)
+		if taskErr != nil {
+			logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to record the receipt upload task: "+taskErr.Error())
+		}
+	}()
+
+	var createdReceiptId uint
+	writtenPaths := make([]string, 0, len(files))
+	err = db.Transaction(func(tx *gorm.DB) error {
+		createdReceipt, txErr := repositories.NewReceiptRepository(tx).CreateReceipt(command, userId, false)
+		if txErr != nil {
+			return txErr
+		}
+		createdReceiptId = createdReceipt.ID
+
+		receiptImageRepository := repositories.NewReceiptImageRepository(tx)
+		fileRepository := repositories.NewFileRepository(tx)
+		for _, file := range files {
+			fileData := models.FileData{
+				Name:      file.Name,
+				Size:      uint(len(file.Bytes)),
+				ReceiptId: createdReceiptId,
+			}
+
+			createdFile, imageErr := receiptImageRepository.CreateReceiptImage(fileData, file.Bytes)
+			// A row id comes back even when the write itself failed, so a partially
+			// written file is tracked too.
+			if createdFile.ID != 0 {
+				path, pathErr := fileRepository.BuildFilePath(
+					utils.UintToString(createdReceiptId),
+					utils.UintToString(createdFile.ID),
+					createdFile.Name,
+				)
+				if pathErr != nil {
+					return pathErr
+				}
+				writtenPaths = append(writtenPaths, path)
+			}
+			if imageErr != nil {
+				return imageErr
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		for _, path := range writtenPaths {
+			if removeErr := utils.RemoveDataPath(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				logging.LogStd(logging.LOG_LEVEL_ERROR, "Failed to remove an image written for a failed receipt create: "+removeErr.Error())
+			}
+		}
+		return models.Receipt{}, err
+	}
+
+	receipt, err := repositories.NewReceiptRepository(nil).GetFullyLoadedReceiptById(utils.UintToString(createdReceiptId))
+	if err != nil {
+		return models.Receipt{}, err
+	}
+
+	resultDescription, err := receipt.ToString()
+	if err != nil {
+		return models.Receipt{}, err
+	}
+	systemTaskCommand.AssociatedEntityId = receipt.ID
+	systemTaskCommand.ReceiptId = &receipt.ID
+	systemTaskCommand.ResultDescription = resultDescription
+
+	return receipt, nil
+}

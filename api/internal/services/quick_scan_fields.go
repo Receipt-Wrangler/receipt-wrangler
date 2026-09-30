@@ -31,6 +31,7 @@ func (service ReceiptService) ResolveQuickScanFields(command commands.QuickScanC
 	// Only the role's permission list is cached globally; the membership lookup behind each check is
 	// not, so cache the resolved answer per group for multi-file scans.
 	commentPermissionCache := make(map[uint]bool)
+	requirementsCache := make(map[uint]structs.ReceiptRequirements)
 	resolved := make([]ResolvedQuickScanFields, len(command.Files))
 	configErr := structs.ValidatorError{Errors: make(map[string]string)}
 
@@ -95,10 +96,30 @@ func (service ReceiptService) ResolveQuickScanFields(command commands.QuickScanC
 
 			commentShown = canComment
 		}
+		commentRequired := commentShown && settings.IsQuickScanCommentRequired()
+
+		// A group role that requires a comment on the group's receipts shows and requires the field
+		// even when the group's own quick-scan config leaves it off. The resolved requirement
+		// already carries the same waivers (HideComments, no group.comments.create), so it never
+		// requires a field the caller could not fill.
+		requirements, cached := requirementsCache[groupId]
+		if !cached {
+			resolvedRequirements, err := service.ResolveReceiptRequirements(uploaderUserId, groupId)
+			if err != nil {
+				return nil, structs.ValidatorError{}, err
+			}
+
+			requirements = resolvedRequirements
+			requirementsCache[groupId] = requirements
+		}
+		if requirements.CommentRequired {
+			commentShown = true
+			commentRequired = true
+		}
 
 		if !commentShown {
 			comment = ""
-		} else if settings.IsQuickScanCommentRequired() && len(comment) == 0 {
+		} else if commentRequired && len(comment) == 0 {
 			configErr.Errors[fileKey+".comment"] = "Comment is required"
 		} else if utf8.RuneCountInString(comment) > models.MaxCommentLength {
 			// Counted in runes, not bytes: the Comment column is varchar(500), which MySQL and

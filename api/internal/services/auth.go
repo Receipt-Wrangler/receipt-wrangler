@@ -429,6 +429,14 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 		tags = []models.Tag{}
 	}
 
+	// Resolved from the loop's permissions and the groups' preloaded receipt
+	// settings, so it costs one query regardless of group count. Must run before
+	// the isolation filter below, which only trims members.
+	groupReceiptRequirements, err := NewReceiptService(nil).ResolveReceiptRequirementsForGroups(userId, groups, groupPermissions)
+	if err != nil {
+		return appData, err
+	}
+
 	// Member-presence isolation: an isolated member receives only the users and
 	// co-members they are allowed to see (no-op for unrestricted viewers). Applied
 	// at this serialization boundary, NOT inside GetGroupsForUser / GetAllUserViews,
@@ -473,6 +481,7 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 	appData.Icons = structs.Icons
 	appData.AppPermissions = appPermissions
 	appData.GroupPermissions = groupPermissions
+	appData.GroupReceiptRequirements = groupReceiptRequirements
 
 	if r != nil {
 		claims := structs.GetClaims(r)

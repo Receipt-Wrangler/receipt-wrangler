@@ -218,6 +218,15 @@ func RemoveReceiptImage(w http.ResponseWriter, r *http.Request) {
 		Writer:           w,
 		Request:          r,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			token := structs.GetClaims(r)
+			allowed, err := enforceImageDeleteKeepsRequired(w, token.UserId, fileData.ReceiptId, fileData.ID)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				return 0, nil
+			}
+
 			err = db.Delete(fileData).Error
 			if err != nil {
 				return http.StatusInternalServerError, err

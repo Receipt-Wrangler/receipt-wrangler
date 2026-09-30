@@ -69,9 +69,12 @@ func (repository ReceiptImageRepository) CreateReceiptImage(fileData models.File
 		return models.FileData{}, err
 	}
 
+	// The row (and its id) is returned alongside a write error so a caller running
+	// this inside its own transaction can locate, and remove, a partially written
+	// file once that transaction rolls back.
 	err = utils.WriteDataFile(filePath, fileBytes)
 	if err != nil {
-		return models.FileData{}, err
+		return fileData, err
 	}
 
 	return fileData, nil

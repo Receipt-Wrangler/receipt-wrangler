@@ -97,7 +97,15 @@ func DeleteComment(w http.ResponseWriter, r *http.Request) {
 			commentRepository := repositories.NewCommentRepository(nil)
 			token := structs.GetClaims(r)
 
-			err := commentRepository.DeleteComment(commentId, token.UserId)
+			allowed, err := enforceCommentDeleteKeepsRequired(w, token.UserId, comment.ReceiptId, commentId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				return 0, nil
+			}
+
+			err = commentRepository.DeleteComment(commentId, token.UserId)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
