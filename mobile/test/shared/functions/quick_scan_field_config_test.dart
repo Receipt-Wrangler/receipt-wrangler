@@ -59,6 +59,7 @@ void main() {
         null,
         hasGroup: false,
         canCreateComments: true,
+        commentRequiredByRole: false,
       );
 
       expectNoFieldsShown(config);
@@ -75,6 +76,7 @@ void main() {
         ),
         hasGroup: false,
         canCreateComments: true,
+        commentRequiredByRole: false,
       );
 
       expectNoFieldsShown(config);
@@ -90,6 +92,7 @@ void main() {
         null,
         hasGroup: true,
         canCreateComments: true,
+        commentRequiredByRole: false,
       );
 
       // Paid-by/status shown+required; categories/tags hidden.
@@ -122,6 +125,7 @@ void main() {
         ),
         hasGroup: true,
         canCreateComments: true,
+        commentRequiredByRole: false,
       );
 
       expect(config.showPaidBy, isTrue);
@@ -153,6 +157,7 @@ void main() {
         ),
         hasGroup: true,
         canCreateComments: true,
+        commentRequiredByRole: false,
       );
 
       expect(config.showPaidBy, isFalse);
@@ -174,6 +179,7 @@ void main() {
         _settings(commentEnabled: true, commentRequired: true),
         hasGroup: true,
         canCreateComments: false,
+        commentRequiredByRole: false,
       );
 
       expect(config.showComment, isFalse);
@@ -190,6 +196,7 @@ void main() {
         ),
         hasGroup: true,
         canCreateComments: true,
+        commentRequiredByRole: false,
       );
 
       expect(config.showComment, isFalse);
@@ -201,10 +208,65 @@ void main() {
         _settings(commentEnabled: true, commentRequired: false),
         hasGroup: true,
         canCreateComments: true,
+        commentRequiredByRole: false,
       );
 
       expect(config.showComment, isTrue);
       expect(config.requireComment, isFalse);
+    });
+    test('a role-required comment is shown and required when the config leaves it off',
+        () {
+      // Mirrors the backend's ResolveQuickScanFields: the role's requirement is
+      // ORed in, or the scan would be 400'd for a comment the form never showed.
+      final config = resolveQuickScanFieldConfig(
+        _settings(commentEnabled: false),
+        hasGroup: true,
+        canCreateComments: true,
+        commentRequiredByRole: true,
+      );
+
+      expect(config.showComment, isTrue);
+      expect(config.requireComment, isTrue);
+    });
+
+    test('a role-required comment upgrades a shown, optional comment', () {
+      final config = resolveQuickScanFieldConfig(
+        _settings(commentEnabled: true, commentRequired: false),
+        hasGroup: true,
+        canCreateComments: true,
+        commentRequiredByRole: true,
+      );
+
+      expect(config.showComment, isTrue);
+      expect(config.requireComment, isTrue);
+    });
+
+    test('a role-required comment touches no other field', () {
+      final config = resolveQuickScanFieldConfig(
+        _settings(),
+        hasGroup: true,
+        canCreateComments: true,
+        commentRequiredByRole: true,
+      );
+
+      // The backend defaults for everything else are unchanged.
+      expect(config.showPaidBy, isTrue);
+      expect(config.requirePaidBy, isTrue);
+      expect(config.showStatus, isTrue);
+      expect(config.requireStatus, isTrue);
+      expect(config.showCategories, isFalse);
+      expect(config.showTags, isFalse);
+    });
+
+    test('with no group picked the role requirement shows nothing', () {
+      final config = resolveQuickScanFieldConfig(
+        null,
+        hasGroup: false,
+        canCreateComments: true,
+        commentRequiredByRole: true,
+      );
+
+      expectNoFieldsShown(config);
     });
   });
 }

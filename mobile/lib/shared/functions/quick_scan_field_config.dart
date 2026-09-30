@@ -64,10 +64,19 @@ const noGroupQuickScanFieldConfig = QuickScanFieldConfig(
 /// a choice, so it keeps the backend-mirroring defaults below rather than collapsing
 /// the form to the Group field alone. Required, like [canCreateComments], so both
 /// call sites - the form and the submit - must supply it and cannot drift.
+///
+/// [commentRequiredByRole] is the caller's group-role comment requirement
+/// (`PermissionsModel.receiptRequirements(groupId).commentRequired`). It is ORed
+/// in: the comment is shown AND required even when the group's quick-scan config
+/// leaves it off, mirroring the backend's `ResolveQuickScanFields`, which would
+/// otherwise 400 the scan. The server resolves that flag with the `hideComments`
+/// and `group.comments.create` waivers already applied, so it is never true for
+/// a caller who could not fill the field. Required for the same no-drift reason.
 QuickScanFieldConfig resolveQuickScanFieldConfig(
   GroupReceiptSettings? settings, {
   required bool hasGroup,
   required bool canCreateComments,
+  required bool commentRequiredByRole,
 }) {
   if (!hasGroup) {
     return noGroupQuickScanFieldConfig;
@@ -80,9 +89,10 @@ QuickScanFieldConfig resolveQuickScanFieldConfig(
   // hideComments hides comments for the whole group, so it hides the quick-scan
   // comment too - without changing the stored toggle (mirrors the backend's
   // GroupReceiptSettings.IsQuickScanCommentShown).
-  final showComment = (settings?.quickScanCommentEnabled ?? false) &&
+  final configShowsComment = (settings?.quickScanCommentEnabled ?? false) &&
       !(settings?.hideComments ?? false) &&
       canCreateComments;
+  final showComment = configShowsComment || commentRequiredByRole;
 
   return QuickScanFieldConfig(
     showPaidBy: showPaidBy,
@@ -95,7 +105,7 @@ QuickScanFieldConfig resolveQuickScanFieldConfig(
     showTags: showTags,
     requireTags: showTags && (settings?.quickScanTagsRequired ?? false),
     showComment: showComment,
-    requireComment:
-        showComment && (settings?.quickScanCommentRequired ?? false),
+    requireComment: commentRequiredByRole ||
+        (configShowsComment && (settings?.quickScanCommentRequired ?? false)),
   );
 }

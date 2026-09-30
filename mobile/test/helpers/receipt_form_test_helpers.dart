@@ -17,6 +17,7 @@ import 'package:receipt_wrangler_mobile/models/receipt_model.dart';
 import 'package:receipt_wrangler_mobile/models/system_settings_model.dart';
 import 'package:receipt_wrangler_mobile/models/tag_model.dart';
 import 'package:receipt_wrangler_mobile/models/user_model.dart';
+import 'package:receipt_wrangler_mobile/receipts/nav/receipt_bottom_sheet_builder.dart';
 import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_form.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/screen_wrapper.dart';
@@ -243,6 +244,13 @@ Future<ReceiptFormHarness> pumpReceiptForm(
   /// underneath the button. Defaults off, leaving every existing case's tree
   /// unchanged.
   bool pinnedSubmitButton = false,
+  /// Mounts the REAL submit button (`ReceiptBottomSheetBuilder`'s) as the
+  /// scaffold's bottom sheet, the way `ReceiptFormScreen` does, so a test can
+  /// drive the submit path itself. Off by default: every existing case keeps
+  /// its tree.
+  bool realSubmitButton = false,
+  /// The caller's permissions. Defaults to an empty [PermissionsModel].
+  PermissionsModel? permissionsModel,
   /// Wraps the whole pumped tree. Only the `tool/demo_capture/` screenshot
   /// harness uses it, to put the form inside a capture surface — this helper
   /// owns the `pumpWidget` call, so a caller cannot nest the result itself.
@@ -273,17 +281,40 @@ Future<ReceiptFormHarness> pumpReceiptForm(
         '/receipts/:receiptId/edit',
         '/receipts/:receiptId/view',
       ])
-        GoRoute(
-          path: path,
-          builder: (_, __) => pinnedSubmitButton
-              ? ScreenWrapper(
-                  bottomSheetWidget: BottomSubmitButton(onPressed: () {}),
-                  child: const SingleChildScrollView(child: ReceiptForm()),
-                )
-              : const Scaffold(
-                  body: SingleChildScrollView(child: ReceiptForm()),
-                ),
-        ),
+        if (realSubmitButton)
+          // A submit navigates to the view route. In the app that screen first
+          // re-fetches the receipt, so the departing form's GlobalKey is gone
+          // before a new form mounts; mounting a second ReceiptForm right away
+          // here would hold the model's one form key twice. The view route is a
+          // marker instead, which is also what a test asserts the landing on.
+          GoRoute(
+            path: path,
+            builder: (_, state) => path.endsWith('/view')
+                ? Scaffold(
+                    body: Text(
+                        'receipt ${state.pathParameters['receiptId']} view'),
+                  )
+                : Scaffold(
+                    body: const SingleChildScrollView(child: ReceiptForm()),
+                    bottomSheet: Builder(
+                      builder: (context) =>
+                          ReceiptBottomSheetBuilder(context, model)
+                              .buildReceiptSubmitButton(state.fullPath!),
+                    ),
+                  ),
+          )
+        else
+          GoRoute(
+            path: path,
+            builder: (_, __) => pinnedSubmitButton
+                ? ScreenWrapper(
+                    bottomSheetWidget: BottomSubmitButton(onPressed: () {}),
+                    child: const SingleChildScrollView(child: ReceiptForm()),
+                  )
+                : const Scaffold(
+                    body: SingleChildScrollView(child: ReceiptForm()),
+                  ),
+          ),
     ],
   );
 
@@ -299,9 +330,13 @@ Future<ReceiptFormHarness> pumpReceiptForm(
         ChangeNotifierProvider<SystemSettingsModel>(
           create: (_) => SystemSettingsModel(),
         ),
-        ChangeNotifierProvider<PermissionsModel>(
-          create: (_) => PermissionsModel(),
-        ),
+        permissionsModel == null
+            ? ChangeNotifierProvider<PermissionsModel>(
+                create: (_) => PermissionsModel(),
+              )
+            : ChangeNotifierProvider<PermissionsModel>.value(
+                value: permissionsModel,
+              ),
         ChangeNotifierProvider<AuthModel>(create: (_) => AuthModel()),
         ChangeNotifierProvider<LoadingModel>(create: (_) => LoadingModel()),
       ],

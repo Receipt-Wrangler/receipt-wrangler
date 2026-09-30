@@ -181,6 +181,8 @@ Future<int> createRole({
   String description = 'e2e custom role',
   bool includeOwnPaidReceipts = false,
   List<int> paidByUserGrants = const [],
+  bool requireReceiptComment = false,
+  bool requireReceiptImage = false,
 }) async {
   final body = <String, dynamic>{
     'name': name,
@@ -195,6 +197,13 @@ Future<int> createRole({
   if (includeOwnPaidReceipts || paidByUserGrants.isNotEmpty) {
     body['includeOwnPaidReceipts'] = includeOwnPaidReceipts;
     body['paidByUserGrants'] = paidByUserGrants;
+  }
+  // Role-required receipt fields (group scope only; the server rejects them on
+  // an APP role). Only sent when set, so every existing caller's body is
+  // unchanged.
+  if (requireReceiptComment || requireReceiptImage) {
+    body['requireReceiptComment'] = requireReceiptComment;
+    body['requireReceiptImage'] = requireReceiptImage;
   }
   final res = await http
       .post(
@@ -939,6 +948,34 @@ Future<PermFixture> provisionGroupMemberWithoutPermission(
     scope: 'GROUP',
     permissions: perms,
     jwt: jwt,
+  );
+  addTearDown(
+      () async => deleteRole(roleId, scope: 'GROUP', jwt: await apiLogin()));
+
+  return provisionPermUser(groupRoleId: roleId, withReceipt: withReceipt);
+}
+
+/// Provisions a user in a fixture group whose GROUP role is a copy of "Legacy
+/// Editor" (create, update and both comment permissions) that additionally
+/// requires a comment ([comment]) and/or an image ([image]) on the group's
+/// receipts. The admin that owns the group keeps Legacy Owner, which requires
+/// nothing, so admin-API seeding (e.g. [createReceipt]) is unaffected.
+///
+/// Same LIFO teardown ordering as [provisionGroupMemberWithoutPermission]: the
+/// role-delete is registered first so it runs after the group and user are gone.
+Future<PermFixture> provisionMemberWithReceiptRequirements({
+  bool comment = false,
+  bool image = false,
+  bool withReceipt = false,
+}) async {
+  final jwt = await apiLogin(); // admin
+  final roleId = await createRole(
+    name: 'e2e-req-${_unique()}',
+    scope: 'GROUP',
+    permissions: await rolePermissionsByName('Legacy Editor', 'GROUP', jwt: jwt),
+    jwt: jwt,
+    requireReceiptComment: comment,
+    requireReceiptImage: image,
   );
   addTearDown(
       () async => deleteRole(roleId, scope: 'GROUP', jwt: await apiLogin()));

@@ -20,9 +20,9 @@ import '../helpers/permission_test_helpers.dart';
 void main() {
   const groupId = 7;
 
-  api.Comment comment() => (api.CommentBuilder()
-        ..id = 1
-        ..comment = 'hello'
+  api.Comment comment({int id = 1, String text = 'hello'}) => (api.CommentBuilder()
+        ..id = id
+        ..comment = text
         ..receiptId = 1
         ..userId = 1
         ..createdAt = DateTime.now().toIso8601String())
@@ -45,13 +45,21 @@ void main() {
   // rather than a brittle bare find.byType (house rule in mobile/CLAUDE.md).
   const commentsKey = ValueKey('comments-under-test');
 
-  Widget wrap(List<Permission> groupPermissions, List<api.Comment> comments) {
+  Widget wrap(
+    List<Permission> groupPermissions,
+    List<api.Comment> comments, {
+    api.ReceiptRequirements? requirements,
+  }) {
     return MultiProvider(
       providers: [
         // Test-owned notifiers are injected with create: so the provider owns
         // their lifecycle (mobile/CLAUDE.md).
         ChangeNotifierProvider(
-          create: (_) => seededPermissions(group: {groupId: groupPermissions}),
+          create: (_) => seededPermissions(
+            group: {groupId: groupPermissions},
+            receiptRequirements:
+                requirements == null ? const {} : {groupId: requirements},
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => ReceiptModel()
@@ -77,15 +85,14 @@ void main() {
     );
   }
 
-  SlidableWidget firstSlidable(WidgetTester tester) =>
-      tester.widget<SlidableWidget>(
-        find
-            .descendant(
-              of: find.byKey(commentsKey),
-              matching: find.byType(SlidableWidget),
-            )
-            .first,
-      );
+  List<SlidableWidget> slidables(WidgetTester tester) => tester
+      .widgetList<SlidableWidget>(find.descendant(
+        of: find.byKey(commentsKey),
+        matching: find.byType(SlidableWidget),
+      ))
+      .toList();
+
+  SlidableWidget firstSlidable(WidgetTester tester) => slidables(tester).first;
 
   group('ReceiptComments swipe-to-delete gate (edit state)', () {
     testWidgets('enabled with group.comments.delete', (tester) async {
@@ -104,6 +111,47 @@ void main() {
       await tester.pump();
 
       expect(firstSlidable(tester).slideEnabled, isFalse);
+    });
+  });
+  group('ReceiptComments keeps a role-required comment (edit state)', () {
+    const canDelete = [Permission.groupPeriodCommentsPeriodDelete];
+
+    testWidgets('the only comment cannot be swiped away', (tester) async {
+      await tester.pumpWidget(wrap(canDelete, [comment()],
+          requirements: receiptRequirements(comment: true)));
+      await tester.pump();
+
+      expect(firstSlidable(tester).slideEnabled, isFalse);
+    });
+
+    testWidgets('with two, either can go', (tester) async {
+      await tester.pumpWidget(wrap(
+          canDelete, [comment(id: 1), comment(id: 2, text: 'second')],
+          requirements: receiptRequirements(comment: true)));
+      await tester.pump();
+
+      expect(slidables(tester).map((s) => s.slideEnabled), [true, true]);
+    });
+
+    testWidgets('a blank comment does not count, and stays deletable',
+        (tester) async {
+      // The server counts only non-blank comments, so the real one is the last
+      // that satisfies the requirement.
+      await tester.pumpWidget(wrap(
+          canDelete, [comment(id: 1, text: '  '), comment(id: 2)],
+          requirements: receiptRequirements(comment: true)));
+      await tester.pump();
+
+      expect(slidables(tester).map((s) => s.slideEnabled), [true, false]);
+    });
+
+    testWidgets('without the requirement the last comment is deletable',
+        (tester) async {
+      await tester.pumpWidget(wrap(canDelete, [comment()],
+          requirements: receiptRequirements(image: true)));
+      await tester.pump();
+
+      expect(firstSlidable(tester).slideEnabled, isTrue);
     });
   });
 }

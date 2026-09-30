@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/slidable_widget.dart';
 
 import 'helpers/api.dart';
@@ -51,7 +50,7 @@ void main() {
         username: fixture.username,
         password: fixture.password,
       );
-      await _openReceiptCommentsInEditMode(
+      await openReceiptCommentsInEditMode(
         tester,
         fixture.groupName!,
         fixture.receiptName!,
@@ -87,7 +86,7 @@ void main() {
         username: fixture.username,
         password: fixture.password,
       );
-      await _openReceiptCommentsInEditMode(
+      await openReceiptCommentsInEditMode(
         tester,
         fixture.groupName!,
         fixture.receiptName!,
@@ -115,35 +114,3 @@ void main() {
 Finder _commentField() => find.byWidgetPredicate(
       (w) => w is FormBuilderTextField && w.name == 'comment',
     );
-
-/// Opens [receiptName] in [groupName] and navigates to its **edit-state**
-/// comment screen — the same path as `receipt_comments_test.dart`: receipt list
-/// → receipt view → Edit popup → edit form → "View Comments". Reaching edit
-/// state requires `group.receipts.update`, held by the Legacy Editor baseline.
-Future<void> _openReceiptCommentsInEditMode(
-  WidgetTester tester,
-  String groupName,
-  String receiptName,
-) async {
-  await openGroupReceipts(tester, groupName, receiptName);
-
-  // Open the receipt view (same as permission_receipt_edit_test.dart).
-  await tester.tap(find.text(receiptName));
-
-  // Move to the edit form via the edit popup (gated on group.receipts.update).
-  final menuButton = find.byType(PopupMenuButton<dynamic>);
-  await pumpUntilFound(tester, menuButton);
-  await tester.tap(menuButton);
-  await pumpUntilFound(tester, find.text('Edit').hitTestable());
-  for (int i = 0; i < 5; i++) {
-    await tester.pump(const Duration(milliseconds: 100));
-  }
-  await tester.tap(find.text('Edit').hitTestable());
-  await pumpUntilFound(tester, find.byType(BottomSubmitButton));
-
-  // Open the comments screen in edit state via the form's "View Comments" action.
-  final commentsButton = find.byTooltip('View Comments');
-  await pumpUntilFound(tester, commentsButton);
-  await tester.tap(commentsButton);
-  await pumpUntilFound(tester, find.text('Receipt Comments'));
-}

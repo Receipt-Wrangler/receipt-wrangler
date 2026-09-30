@@ -13,8 +13,11 @@ import '../../client/client.dart';
 import '../../models/auth_model.dart';
 import '../../models/custom_field_model.dart';
 import '../../models/loading_model.dart';
+import '../../models/permissions_model.dart';
 import '../../models/receipt_model.dart';
 import '../../shared/functions/custom_field_values.dart';
+import '../../shared/functions/receipt_requirements.dart';
+import '../../shared/functions/receipt_upload.dart';
 import '../../shared/widgets/bottom_submit_button.dart';
 import '../../utils/date.dart';
 import '../../utils/forms.dart';
@@ -271,38 +274,15 @@ class ReceiptBottomSheetBuilder {
   }
 
   Future<void> addReceipt(api.UpsertReceiptCommand receiptToAdd) async {
-    final receiptResponse = await OpenApiClient.client
-        .getReceiptApi()
-        .createReceipt(upsertReceiptCommand: receiptToAdd);
-    final newReceiptId = receiptResponse.data!.id;
-
-    final images = receiptModel.imagesToUploadBehaviorSubject.value;
-    if (images.isNotEmpty) {
-      final imageFutures = images.map(
-        (image) => OpenApiClient.client
-            .getReceiptImageApi()
-            .uploadReceiptImage(
-                file: image.multipartFile, receiptId: newReceiptId),
-      );
-      try {
-        await Future.wait(imageFutures);
-      } catch (e) {
-        // Receipt was created server-side, but at least one image upload
-        // failed. Surface a partial-failure message and still navigate so
-        // the user can see the receipt and retry the uploads from there
-        // -- otherwise they'd think nothing happened and might re-submit.
-        showErrorSnackbar(
-          context,
-          "Receipt added, but one or more images failed to upload. "
-          "Open the receipt to retry.",
-        );
-        context.go("/receipts/$newReceiptId/view");
-        return;
-      }
-    }
+    // One atomic call carrying the comments (on the command) and the staged
+    // images: a failure creates nothing, so there is no half-created receipt
+    // to report — the error surfaces through the caller's catch and the form
+    // stays put for a retry.
+    final receipt = await createReceiptWithImages(
+        receiptToAdd, receiptModel.imagesToUploadBehaviorSubject.value);
 
     showSuccessSnackbar(context, "Receipt added successfully");
-    context.go("/receipts/$newReceiptId/view");
+    context.go("/receipts/${receipt.id}/view");
   }
 
   Future<void> updateReceipt(api.UpsertReceiptCommand receiptToUpdate) async {
@@ -315,6 +295,19 @@ class ReceiptBottomSheetBuilder {
 
     receiptModel.setReceipt(updatedReceiptResponse.data as api.Receipt, true);
     context.go("/receipts/${receipt.id}/view");
+  }
+
+  String? _missingRequirementsMessage(Object? groupId) {
+    if (groupId is! int) {
+      return null;
+    }
+    final requirements = Provider.of<PermissionsModel>(context, listen: false)
+        .receiptRequirements(groupId);
+    return receiptSubmitRequirementsMessage(
+      requirements,
+      receiptModel: receiptModel,
+      formState: formState,
+    );
   }
 
   Widget buildReceiptSubmitButton(String fullPath) {
@@ -343,6 +336,16 @@ class ReceiptBottomSheetBuilder {
           // `formState` field (WranglerFormState) used inside this closure.
           final state = receiptModel.receiptFormKey.currentState;
           if (state == null || !state.saveAndValidate()) {
+            return;
+          }
+          // The group role's required fields, judged against the group the
+          // receipt is being saved INTO (a move is checked against the
+          // destination, as the server does). The server enforces this
+          // either way; checking here saves a round trip and names the fix.
+          final requirementsMessage =
+              _missingRequirementsMessage(state.value["groupId"]);
+          if (requirementsMessage != null) {
+            showErrorSnackbar(context, requirementsMessage);
             return;
           }
           // The Consumer rebuild + spinner is still useful UX -- it

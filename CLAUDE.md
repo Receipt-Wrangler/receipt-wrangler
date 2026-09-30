@@ -484,6 +484,32 @@ disagree. **Client-only on both sides**: no backend, `swagger.yml` or generated-
 See `desktop/CLAUDE.md` → "The month stepper targets one date field" and `mobile/CLAUDE.md` → "Quick
 date filter" for the per-client details.
 
+### Role-Required Receipt Fields & Single-Call Create
+
+A group role can require its members to keep **at least one comment** and/or **at least one image**
+on the group's receipts (`requireReceiptComment` / `requireReceiptImage`, group roles only, set on the
+desktop role form — mobile has no role UI). **All three components.**
+
+- **The server is the authority.** It enforces on create, on update (against the receipt's **stored**
+  comments/images, since edit mode still adds those immediately through their own endpoints), on
+  deleting the last comment/image (refused — replace by adding first, then deleting), and on the Quick
+  Scan comment. Each failure is a 400 validator error keyed `comments` / `files`.
+- **Waivers keep a user from being stuck:** the comment rule is off when the group hides comments or
+  the caller lacks `group.comments.create`; the image rule is off when the group hides images. The
+  resolved result rides AppData as `groupReceiptRequirements` (only groups with a requirement; absent
+  = nothing required; never `null`), which both clients use for their pre-submit check.
+- **Create is one call: `POST /receipt/withFiles`** (multipart: `receipt` + `files`), storing the
+  receipt, its comments and its images in one transaction. That is what lets the server see images at
+  create time — the old flow uploaded them after the receipt existed. The generated clients encode the
+  `receipt` part differently (desktop: an `application/json` blob part; Dart: a JSON form value), and
+  the server accepts both. Both clients use it; the "receipt added but images failed" state is gone.
+- **The JSON `POST /receipt/` is deprecated but kept** for already-released mobile builds. It enforces
+  the same rules, so for a role requiring an image it always 400s with an "update your app" message —
+  deliberately: an old client can never attach an image at create time.
+- E2e per client: `desktop/e2e/receipt-role-requirements.spec.ts` and
+  `mobile/integration_test/receipt_role_requirements_test.dart`. See `api/CLAUDE.md`,
+  `desktop/CLAUDE.md` and `mobile/CLAUDE.md` → "Role-required receipt fields & single-call create".
+
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
 - **Desktop**: NGXS store with actions/selectors, persistent storage for auth/preferences

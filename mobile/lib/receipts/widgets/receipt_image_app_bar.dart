@@ -9,7 +9,9 @@ import 'package:rxdart/rxdart.dart';
 import '../../models/loading_model.dart';
 import '../../client/client.dart';
 import '../../interfaces/upload_multipart_file_data.dart';
+import '../../models/permissions_model.dart';
 import '../../models/receipt_model.dart';
+import '../../shared/functions/receipt_requirements.dart';
 import '../../shared/functions/receipt_upload.dart';
 import '../../shared/functions/receipt_image_gallery.dart';
 import '../../shared/widgets/receipt_edit_popup_menu.dart';
@@ -48,25 +50,28 @@ class ReceiptImageAppBar extends StatelessWidget implements PreferredSizeWidget 
   }
 
   Widget _buildImageActions(BuildContext context, ReceiptModel receiptModel) {
-    List<PopupMenuEntry> options = [];
-    
-    if (_isEditMode()) {
-      options = _buildEditModeActions(context, receiptModel);
-    } else {
-      options = _buildViewModeActions(context, receiptModel);
-    }
-
-    options.add(_buildImageDownloadButton(context, receiptModel));
-    options.add(_buildViewInFullScreenButton(context, receiptModel));
-
     var combinedStream = Rx.merge([
       receiptModel.imagesToUploadBehaviorSubject.stream,
       receiptModel.imageBehaviorSubject.stream
     ]).asBroadcastStream();
 
+    // The entries are built inside the builder so they follow the image lists:
+    // whether Delete is offered, and whether it is enabled, both depend on how
+    // many images there are right now.
     return StreamBuilder(
         stream: combinedStream,
         builder: (context, snapshot) {
+          List<PopupMenuEntry> options = [];
+
+          if (_isEditMode()) {
+            options = _buildEditModeActions(context, receiptModel);
+          } else {
+            options = _buildViewModeActions(context, receiptModel);
+          }
+
+          options.add(_buildImageDownloadButton(context, receiptModel));
+          options.add(_buildViewInFullScreenButton(context, receiptModel));
+
           return ReceiptEditPopupMenu(
               groupId: receiptModel.receipt.groupId,
               popupMenuChildren: options,
@@ -148,6 +153,7 @@ class ReceiptImageAppBar extends StatelessWidget implements PreferredSizeWidget 
     return PopupMenuItem(
       child: const Text("Delete Image"),
       value: "delete",
+      enabled: !_keepsRequiredImage(context, receiptModel),
       onTap: () async => await _deleteImage(context, receiptModel),
     );
   }
@@ -197,6 +203,24 @@ class ReceiptImageAppBar extends StatelessWidget implements PreferredSizeWidget 
       }
       showApiErrorSnackbar(context, e);
     }
+  }
+
+  /// Edit only: while the receipt's group role requires an image, its last
+  /// saved image cannot be deleted — the server refuses that with a 400. To
+  /// swap the only image, upload the new one first. Add state removes a staged
+  /// image locally and the submit guard catches an empty set.
+  bool _keepsRequiredImage(BuildContext context, ReceiptModel receiptModel) {
+    if (formState != WranglerFormState.edit) {
+      return false;
+    }
+    final requirements = Provider.of<PermissionsModel>(context, listen: false)
+        .receiptRequirements(receiptModel.receipt.groupId);
+    return isLastRequiredItem(
+      required: requirements.imageRequired,
+      remaining: receiptModel.imageBehaviorSubject.value
+          .where((image) => image != null)
+          .length,
+    );
   }
 
   bool _areImagesToUpload(ReceiptModel receiptModel) {

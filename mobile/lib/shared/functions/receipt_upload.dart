@@ -1,5 +1,7 @@
+import 'package:built_collection/built_collection.dart';
 import 'package:cunning_document_scanner/cunning_document_scanner.dart'
     show CunningDocumentScannerException;
+import 'package:dio/dio.dart' show MultipartFile;
 import 'package:flutter/material.dart';
 import 'package:openapi/openapi.dart' as api;
 import 'package:provider/provider.dart';
@@ -164,6 +166,41 @@ void stageImagesForUpload(
   receiptModel.imagesToUploadBehaviorSubject
       .add([...receiptModel.imagesToUploadBehaviorSubject.value, ...images]);
 }
+
+/// Creates [receipt] — its comments included — together with the staged
+/// [images] in ONE call (`POST /receipt/withFiles`), and returns the created
+/// receipt.
+///
+/// The create is atomic server-side: either the receipt, its comments and every
+/// image are stored, or nothing is. That replaced a JSON create followed by one
+/// `uploadReceiptImage` per image, which could leave a receipt without some of
+/// its images and never let the server see the images at create time — which the
+/// role-required image check needs.
+///
+/// Each file is rebuilt from its bytes rather than sending the staged
+/// [UploadMultipartFileData.multipartFile]: a dio `MultipartFile` can be
+/// finalized only once, so resending the same instance after a failed create
+/// (a 400, a dropped connection) would throw before the retry left the device.
+Future<api.Receipt> createReceiptWithImages(
+  api.UpsertReceiptCommand receipt,
+  List<UploadMultipartFileData> images,
+) async {
+  final response =
+      await OpenApiClient.client.getReceiptApi().createReceiptWithFiles(
+            receipt: receipt,
+            files: images.isEmpty
+                ? null
+                : BuiltList<MultipartFile>(images.map(_freshMultipartFile)),
+          );
+  return response.data!;
+}
+
+MultipartFile _freshMultipartFile(UploadMultipartFileData image) =>
+    MultipartFile.fromBytes(
+      image.bytes,
+      filename: image.filename,
+      contentType: image.multipartFile.contentType,
+    );
 
 /// Uploads [images] to an already-saved receipt, one API call each.
 Future<void> uploadImagesToReceipt(BuildContext context,

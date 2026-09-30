@@ -5,6 +5,7 @@ import 'package:receipt_wrangler_mobile/enums/form_state.dart';
 import 'package:receipt_wrangler_mobile/models/auth_model.dart';
 import 'package:receipt_wrangler_mobile/models/permissions_model.dart';
 import 'package:receipt_wrangler_mobile/shared/functions/permissions.dart';
+import 'package:receipt_wrangler_mobile/shared/functions/receipt_requirements.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/slidable_delete_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/slidable_widget.dart';
 import 'package:receipt_wrangler_mobile/utils/snackbar.dart';
@@ -34,12 +35,20 @@ class _ReceiptComments extends State<ReceiptComments> {
     // issues a real DELETE, so gate it on `group.comments.delete` for the
     // receipt's group (mirrors the desktop comment gate).
     var slideEnabled = formState == WranglerFormState.add;
+    // Edit only: while the receipt's group role requires a comment, the last
+    // one the server counts cannot be deleted (it would refuse with a 400).
+    var keepsRequiredComment = false;
     if (formState == WranglerFormState.edit) {
       final receiptModel = Provider.of<ReceiptModel>(context, listen: false);
       final permissionsModel =
           Provider.of<PermissionsModel>(context, listen: false);
-      slideEnabled =
-          canCommentDelete(permissionsModel, receiptModel.receipt.groupId);
+      final groupId = receiptModel.receipt.groupId;
+      slideEnabled = canCommentDelete(permissionsModel, groupId);
+      keepsRequiredComment = isLastRequiredItem(
+        required:
+            permissionsModel.receiptRequirements(groupId).commentRequired,
+        remaining: countNonBlankComments(widget.comments),
+      );
     }
 
     return ListView.builder(
@@ -48,12 +57,14 @@ class _ReceiptComments extends State<ReceiptComments> {
           ? null
           : EdgeInsets.only(bottom: 60),
       itemBuilder: (context, index) {
+        final comment = widget.comments[index];
         return SlidableWidget(
-            slideEnabled: slideEnabled,
+            slideEnabled: slideEnabled &&
+                !(keepsRequiredComment && comment.comment.trim().isNotEmpty),
             endActionPaneChildren: [buildDeleteButton(index)],
             slidableChild: Column(
               children: [
-                buildCommentRow(widget.comments[index], index),
+                buildCommentRow(comment, index),
                 SizedBox(height: 10),
               ],
             ));
