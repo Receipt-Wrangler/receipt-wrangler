@@ -79,9 +79,15 @@ func receiptJson(groupId uint, paidBy uint, comment string) string {
 	if comment != "" {
 		comments = fmt.Sprintf(`,"comments":[{"comment":%q,"userId":%d}]`, comment, paidBy)
 	}
+	return receiptJsonWith(groupId, paidBy, comments)
+}
+
+// receiptJsonWith builds a valid receipt body with extra appended verbatim as
+// further top-level fields (it must start with a comma).
+func receiptJsonWith(groupId uint, paidBy uint, extra string) string {
 	return fmt.Sprintf(
 		`{"name":"R","amount":"5","date":"2026-09-01T00:00:00Z","groupId":%d,"paidByUserId":%d,"status":"OPEN"%s}`,
-		groupId, paidBy, comments,
+		groupId, paidBy, extra,
 	)
 }
 
@@ -123,13 +129,44 @@ func createWithFilesRequest(t *testing.T, userId uint, receipt string, receiptAs
 		t.Fatalf("close writer: %v", err)
 	}
 
+	return rawCreateWithFilesRequest(userId, body, writer.FormDataContentType())
+}
+
+// rawCreateWithFilesRequest sends body to CreateReceiptWithFiles as userId with
+// the given content type, for bodies createWithFilesRequest cannot build.
+func rawCreateWithFilesRequest(userId uint, body *bytes.Buffer, contentType string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api", body)
-	r.Header.Set("Content-Type", writer.FormDataContentType())
+	r.Header.Set("Content-Type", contentType)
 	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
 
 	CreateReceiptWithFiles(w, r)
 	return w
+}
+
+// assertNothingWritten fails when a rejected create left any receipt, image row,
+// comment, or image file under groupId's data directory behind.
+func assertNothingWritten(t *testing.T, groupId uint) {
+	t.Helper()
+	for name, model := range map[string]interface{}{
+		"receipts": &models.Receipt{}, "file data": &models.FileData{}, "comments": &models.Comment{},
+	} {
+		if n := countRows(t, model); n != 0 {
+			t.Errorf("%s = %d, want 0", name, n)
+		}
+	}
+
+	groupPath, err := repositories.NewFileRepository(nil).BuildGroupPath(groupId, "")
+	if err != nil {
+		t.Fatalf("BuildGroupPath: %v", err)
+	}
+	entries, err := os.ReadDir(groupPath)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("read group dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("group dir holds %d entries, want 0", len(entries))
+	}
 }
 
 func assertValidatorKey(t *testing.T, w *httptest.ResponseRecorder, key string) map[string]string {
@@ -194,13 +231,7 @@ func TestCreateReceiptWithFiles_InvalidFileTypeWritesNothing(t *testing.T) {
 	w := createWithFilesRequest(t, userId, receiptJson(groupId, userId, ""), false,
 		uploadFile{"a.jpg", readHandlerTestJpg(t)}, uploadFile{"notes.txt", []byte("plain text, not an image")})
 	assertValidatorKey(t, w, "files.1")
-
-	if n := countRows(t, &models.Receipt{}); n != 0 {
-		t.Errorf("receipts = %d, want 0", n)
-	}
-	if n := countRows(t, &models.FileData{}); n != 0 {
-		t.Errorf("file data = %d, want 0", n)
-	}
+	assertNothingWritten(t, groupId)
 }
 
 func TestCreateReceiptWithFiles_EnforcesRoleRequirements(t *testing.T) {
@@ -212,9 +243,7 @@ func TestCreateReceiptWithFiles_EnforcesRoleRequirements(t *testing.T) {
 	if _, ok := errs["files"]; !ok {
 		t.Errorf("expected a files error too, got %+v", errs)
 	}
-	if n := countRows(t, &models.Receipt{}); n != 0 {
-		t.Errorf("receipts = %d, want 0", n)
-	}
+	assertNothingWritten(t, groupId)
 }
 
 func TestCreateReceiptWithFiles_MissingReceiptPartIs400(t *testing.T) {
@@ -243,6 +272,210 @@ func TestCreateReceiptWithFiles_RequiresCreatePermission(t *testing.T) {
 	if w.Result().StatusCode != http.StatusForbidden {
 		t.Errorf("status = %d, want 403", w.Result().StatusCode)
 	}
+}
+
+// ---------- POST /receipt/withFiles: zero images ----------
+
+// The common case: a role that requires nothing, a receipt with a comment and no
+// images at all. Both clients now send every create through this endpoint.
+func TestCreateReceiptWithFiles_NoFilesNoRequirements(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, groupId := seedRequirementGroup(t, "cwf-no-files", false, false)
+
+	w := createWithFilesRequest(t, userId, receiptJson(groupId, userId, "No image needed"), false)
+	if w.Result().StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %s)", w.Result().StatusCode, w.Body.String())
+	}
+
+	var created models.Receipt
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(created.ImageFiles) != 0 {
+		t.Errorf("imageFiles = %d, want 0", len(created.ImageFiles))
+	}
+	if len(created.Comments) != 1 || created.Comments[0].Comment != "No image needed" {
+		t.Errorf("comments = %+v, want the submitted one", created.Comments)
+	}
+
+	if n := countRows(t, &models.Receipt{}); n != 1 {
+		t.Errorf("receipts = %d, want 1", n)
+	}
+	if n := countRows(t, &models.FileData{}); n != 0 {
+		t.Errorf("file data = %d, want 0", n)
+	}
+	if n := countRows(t, &models.Comment{}); n != 1 {
+		t.Errorf("comments = %d, want 1", n)
+	}
+}
+
+// Requiring a comment must not also require an image.
+func TestCreateReceiptWithFiles_CommentOnlyRequirementNeedsNoImage(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, groupId := seedRequirementGroup(t, "cwf-comment-only", true, false)
+
+	w := createWithFilesRequest(t, userId, receiptJson(groupId, userId, "Has a comment"), false)
+	if w.Result().StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %s)", w.Result().StatusCode, w.Body.String())
+	}
+	if n := countRows(t, &models.Receipt{}); n != 1 {
+		t.Errorf("receipts = %d, want 1", n)
+	}
+}
+
+// ---------- POST /receipt/withFiles: the shared 403 checks ----------
+//
+// These checks are shared with the deprecated JSON create and tested there too;
+// these cases prove the new endpoint actually runs them. Each attaches a real
+// image, so they also prove the checks run before anything is written.
+
+func assertForbiddenAndNothingWritten(t *testing.T, w *httptest.ResponseRecorder, groupId uint) {
+	t.Helper()
+	if w.Result().StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 (body %s)", w.Result().StatusCode, w.Body.String())
+	}
+	assertNothingWritten(t, groupId)
+}
+
+func TestCreateReceiptWithFiles_DeniedForDisallowedCategory(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	allowed := models.Category{Name: "Groceries"}
+	repositories.GetDB().Create(&allowed)
+	disallowed := models.Category{Name: "Salary"}
+	repositories.GetDB().Create(&disallowed)
+	userId, groupId := seedRestrictedReceiptCreator(t, []uint{allowed.ID})
+	cleanUpGroupDir(t, groupId)
+
+	body := receiptJsonWith(groupId, userId, fmt.Sprintf(`,"categories":[{"id":%d,"name":"Salary"}]`, disallowed.ID))
+	w := createWithFilesRequest(t, userId, body, false, uploadFile{"a.jpg", readHandlerTestJpg(t)})
+	assertForbiddenAndNothingWritten(t, w, groupId)
+}
+
+func TestCreateReceiptWithFiles_DeniedForNewCategoryWithoutCreatePermission(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	allowed := models.Category{Name: "Groceries"}
+	repositories.GetDB().Create(&allowed)
+	// The member holds no app role, so no app.categories.create.
+	userId, groupId := seedRestrictedReceiptCreator(t, []uint{allowed.ID})
+	cleanUpGroupDir(t, groupId)
+
+	body := receiptJsonWith(groupId, userId, `,"categories":[{"name":"Brand New"}]`)
+	w := createWithFilesRequest(t, userId, body, false, uploadFile{"a.jpg", readHandlerTestJpg(t)})
+	assertForbiddenAndNothingWritten(t, w, groupId)
+}
+
+func TestCreateReceiptWithFiles_DeniedForNonVisiblePaidBy(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	fx := seedIsolatedReceiptGroupHandler(t, true)
+	cleanUpGroupDir(t, fx.groupId)
+
+	// Member A plants member B, whom A cannot see, as the payer.
+	w := createWithFilesRequest(t, fx.memberAId, receiptJson(fx.groupId, fx.memberBId, ""), false,
+		uploadFile{"a.jpg", readHandlerTestJpg(t)})
+	assertForbiddenAndNothingWritten(t, w, fx.groupId)
+}
+
+func TestCreateReceiptWithFiles_DeniedForCustomFieldWithoutAccess(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, groupId := seedRestrictedReceiptCreator(t, nil)
+	cleanUpGroupDir(t, groupId)
+	field := seedCustomField(t)
+
+	body := receiptJsonWith(groupId, userId, fmt.Sprintf(`,"customFields":[{"customFieldId":%d}]`, field.ID))
+	w := createWithFilesRequest(t, userId, body, false, uploadFile{"a.jpg", readHandlerTestJpg(t)})
+	assertForbiddenAndNothingWritten(t, w, groupId)
+}
+
+// Positive control for the 403 cases: the same restricted creator, choosing a
+// category it may see, succeeds — so the denials above are about the selection,
+// not about the fixture.
+func TestCreateReceiptWithFiles_AllowedForGrantedCategory(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	allowed := models.Category{Name: "Groceries"}
+	repositories.GetDB().Create(&allowed)
+	userId, groupId := seedRestrictedReceiptCreator(t, []uint{allowed.ID})
+	cleanUpGroupDir(t, groupId)
+
+	body := receiptJsonWith(groupId, userId, fmt.Sprintf(`,"categories":[{"id":%d,"name":"Groceries"}]`, allowed.ID))
+	w := createWithFilesRequest(t, userId, body, false, uploadFile{"a.jpg", readHandlerTestJpg(t)})
+	if w.Result().StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %s)", w.Result().StatusCode, w.Body.String())
+	}
+	if n := countRows(t, &models.FileData{}); n != 1 {
+		t.Errorf("file data = %d, want 1", n)
+	}
+}
+
+// ---------- POST /receipt/withFiles: invalid bodies ----------
+
+func TestCreateReceiptWithFiles_InvalidBodiesAre400(t *testing.T) {
+	multipartBody := func(t *testing.T, build func(*multipart.Writer)) (*bytes.Buffer, string) {
+		t.Helper()
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		build(writer)
+		if err := writer.Close(); err != nil {
+			t.Fatalf("close writer: %v", err)
+		}
+		return body, writer.FormDataContentType()
+	}
+
+	cases := []struct {
+		name  string
+		build func(t *testing.T, groupId uint, userId uint) (*bytes.Buffer, string)
+	}{
+		{"malformed receipt form value", func(t *testing.T, groupId uint, userId uint) (*bytes.Buffer, string) {
+			return multipartBody(t, func(w *multipart.Writer) {
+				w.WriteField("receipt", `{"name":"R",`)
+			})
+		}},
+		{"malformed receipt json file part", func(t *testing.T, groupId uint, userId uint) (*bytes.Buffer, string) {
+			return multipartBody(t, func(w *multipart.Writer) {
+				header := make(textproto.MIMEHeader)
+				header.Set("Content-Disposition", `form-data; name="receipt"; filename="receipt.json"`)
+				header.Set("Content-Type", "application/json")
+				part, _ := w.CreatePart(header)
+				part.Write([]byte(`not json`))
+			})
+		}},
+		{"empty receipt value and no file part", func(t *testing.T, groupId uint, userId uint) (*bytes.Buffer, string) {
+			return multipartBody(t, func(w *multipart.Writer) {
+				w.WriteField("receipt", "")
+			})
+		}},
+		{"not multipart at all", func(t *testing.T, groupId uint, userId uint) (*bytes.Buffer, string) {
+			return bytes.NewBufferString(receiptJson(groupId, userId, "")), "application/json"
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer repositories.TruncateTestDb()
+			userId, groupId := seedRequirementGroup(t, "cwf-invalid", false, false)
+
+			body, contentType := tc.build(t, groupId, userId)
+			w := rawCreateWithFilesRequest(userId, body, contentType)
+			if w.Result().StatusCode != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400 (body %s)", w.Result().StatusCode, w.Body.String())
+			}
+			assertNothingWritten(t, groupId)
+		})
+	}
+}
+
+// A well-formed receipt that fails validation is refused before any image is
+// written, and the error names the field.
+func TestCreateReceiptWithFiles_InvalidReceiptIs400(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, groupId := seedRequirementGroup(t, "cwf-no-name", false, false)
+
+	noName := fmt.Sprintf(
+		`{"name":"","amount":"5","date":"2026-09-01T00:00:00Z","groupId":%d,"paidByUserId":%d,"status":"OPEN"}`,
+		groupId, userId,
+	)
+	w := createWithFilesRequest(t, userId, noName, false, uploadFile{"a.jpg", readHandlerTestJpg(t)})
+	assertValidatorKey(t, w, "name")
+	assertNothingWritten(t, groupId)
 }
 
 // ---------- deprecated POST /receipt/ ----------

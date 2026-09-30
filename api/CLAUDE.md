@@ -2167,6 +2167,24 @@ receipt/FileData/comment/file and a FAILED task, quick-scan role comment), and
 `handlers/receipt_requirement_enforcement_test.go` (both `receipt` encodings, invalid file type
 writes nothing, both creates, update incl. a move, last comment/image delete, quick scan).
 
+That handler file also pins the new endpoint on its own, because the old one shares its checks and
+would otherwise hide a regression in the new one. Each case was verified to **fail** when its
+production line is broken:
+- **Zero images** — the common case: no requirement, and a comment-only requirement, both create a
+  receipt with no `files` part (fails if the image rule fires when not required).
+- **The shared 403 chain** — disallowed category, new category without `app.categories.create`, a
+  non-visible payer, a custom field without `app.custom-fields.read`, each with an image attached
+  and asserting nothing was written (`assertNothingWritten`: no receipt/FileData/comment rows, no
+  file in the group directory), plus a granted-category positive control. These fail if
+  `CreateReceiptWithFiles` stops calling `enforceReceiptCreate`.
+- **Invalid bodies** — malformed JSON as a form value or as a JSON file part, an empty `receipt`, a
+  non-multipart body, and a receipt failing `Validate` (400 keyed `name`), all writing nothing.
+  These fail if a parse error stops being a 400.
+
+`writeCreatedReceipt`'s category/tag strip and member masking are **not** targeted there: on a fresh
+create the caller can only attach what it may see and is itself the creator, so there is nothing for
+them to hide.
+
 ## Group Default Custom Fields
 
 Group admins declare, in **Group Receipt Settings**, the set of custom fields that should always be
