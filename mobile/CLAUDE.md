@@ -667,6 +667,63 @@ The sibling closed enums (`ItemStatus`, `GroupStatus`, `SystemTaskStatus`, `Perm
 catalog) are **still intolerant**. Adding a value to any of them is a breaking change for released
 builds until they get the same treatment.
 
+### Role-required receipt fields & single-call create
+
+A group role can require its members to keep at least one comment and/or one image on the group's
+receipts. The server owns the rule and enforces it (see `api/CLAUDE.md` → "Role-required receipt
+fields & single-call create"); mobile has **no role UI** and only reads the result, to fail early
+instead of round-tripping a 400.
+
+- **Delivery.** `AppData.groupReceiptRequirements` (`BuiltMap<String, ReceiptRequirements>?`) is
+  already resolved server-side, waivers included (`hideComments` / `hideImages`, no
+  `group.comments.create`, the All group). Only groups where something is required are present.
+  `storeAppData` passes it to `PermissionsModel.setReceiptRequirements`;
+  `receiptRequirements(groupId)` answers both-false for an absent group **and for a null map** — the
+  field is deliberately outside AppData's swagger `required` list, so an older server's payload
+  still parses. Pinned by `test/models/receipt_requirements_ingest_test.dart`.
+- **Create is ONE multipart call.** `addReceipt` (`receipt_bottom_sheet_builder.dart`) calls
+  `createReceiptWithImages` (`lib/shared/functions/receipt_upload.dart`) →
+  `ReceiptApi.createReceiptWithFiles(receipt:, files:)`: the command carries the staged comments,
+  `files` the staged images. It is **atomic** — a failure creates nothing — so the old JSON
+  `createReceipt` + per-image `uploadReceiptImage` flow and its "Receipt added, but one or more images
+  failed to upload" partial branch are gone. A failed create leaves the user on the add form. The
+  deprecated JSON create is kept server-side for released builds only; do not call it.
+  - **Each file is rebuilt from its bytes** (`MultipartFile.fromBytes`) rather than sending the
+    staged `UploadMultipartFileData.multipartFile`: a dio `MultipartFile` can be finalized only
+    once, so resending it after a failed create would throw before the retry left the device.
+  - Edit is unchanged: images and comments still go through their own endpoints immediately.
+- **Submit guard** (`buildReceiptSubmitButton`, after `saveAndValidate`): judged against the form's
+  `groupId` (the destination on a move, as the server does) by `receiptSubmitRequirementsMessage`
+  (`lib/shared/functions/receipt_requirements.dart`). Add checks the **staged** images and
+  `receiptModel.comments`; edit checks the **saved** ones — `imageBehaviorSubject` once the images
+  screen has loaded it, else `receipt.imageFiles`. Only non-blank comments count, matching the server.
+- **Last-item deletes, edit state only:** the comment swipe (`receipt_comments.dart`) is disabled on
+  the last non-blank comment, and "Delete Image" (`receipt_image_app_bar.dart`) on the last saved
+  image, while that field is required in the receipt's group. To swap the only image, upload first.
+  The image menu's entries are now built **inside** its `StreamBuilder`, so they follow the image
+  list instead of being fixed at the app bar's build.
+- **Quick Scan:** `resolveQuickScanFieldConfig` takes a required `commentRequiredByRole` and ORs it
+  in — the comment is shown **and** required even when the group's quick-scan config leaves it off,
+  mirroring the server's `ResolveQuickScanFields` (which would otherwise 400 the scan).
+- **Known gap:** a requirement 400 the client did not predict (stale AppData) is a validator-shaped
+  body (`{"comments": "..."}`) with no `errorMsg`, so `showApiErrorSnackbar` shows the generic
+  "An error occurred".
+- **`openReceiptEditForm` waits for the `name` field, not just the submit button.** The edit
+  screen's `BottomSubmitButton` mounts while the form body is still loading, so a submit tapped
+  on that signal finds no `FormBuilder` state and is a silent no-op (the handler's defensive null
+  check) -- `receipt_role_requirements_test`'s edit case timed out on exactly that until the helper
+  waited the way `receipt_edit_test` already did.
+- **Tests:** `test/shared/functions/receipt_requirements_test.dart`,
+  `test/shared/functions/receipt_create_with_images_test.dart` (one call, no follow-up upload, fresh
+  files on retry), `test/widgets/receipt_submit_requirements_test.dart` (the real submit button on the
+  real form, via `pumpReceiptForm(realSubmitButton: true, permissionsModel: ...)`),
+  `receipt_image_app_bar_test.dart`, and new cases in `receipt_comments_test.dart`,
+  `quick_scan_form_test.dart` and `quick_scan_field_config_test.dart`. **E2E:**
+  `integration_test/receipt_role_requirements_test.dart` (add blocked then created in one call with
+  both, edit save blocked, last comment locked, Quick Scan comment required) and
+  `integration_test/receipt_add_partial_image_test.dart` (a server-rejected file creates nothing; a
+  valid one is stored with the receipt).
+
 ### Receipt entry (Scan / Add)
 
 The bottom-nav slot that used to open an "Add" menu is a **direct action**. A **tap** scans; a
@@ -938,7 +995,7 @@ default starts blank.
 
 The show/require derivation for all five fields lives in **one** pure helper —
 `resolveQuickScanFieldConfig(GroupReceiptSettings?, {required bool hasGroup, required bool
-canCreateComments})` → `QuickScanFieldConfig` (`lib/shared/functions/quick_scan_field_config.dart`)
+canCreateComments, required bool commentRequiredByRole})` → `QuickScanFieldConfig` (`lib/shared/functions/quick_scan_field_config.dart`)
 — reused by both the form's `build()` and `_submitQuickScan`, so the two can't drift from each
 other or from `resolveQuickScanFields`. `hasGroup: false` returns `noGroupQuickScanFieldConfig`
 (all ten flags false). Covered by `test/shared/functions/quick_scan_field_config_test.dart`.
@@ -2445,7 +2502,7 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - **Destination markers must be unique to the destination.** `find.text('Name')` matches on BOTH `/view` and
   `/edit` receipt forms, so it cannot prove an Edit navigation happened — use `find.byType(BottomSubmitButton)`
   (only mounted on edit/add paths) instead.
-- **Quick Scan image input on Linux:** the old `"Unsupported platform"` throw is **gone** — `getGalleryImages` and its `Platform.operatingSystem` switch were deleted (see "Picking receipt files"), so `installFileSelectorMock()` now reaches the file source on desktop and `quick_scan_test.dart` / `receipt_add_gallery_test.dart` / `receipt_add_partial_image_test.dart` run un-skipped — all three verified green on the Linux runner. `receipt_add_gallery_test.dart` needed the `hitTestable()` + frame-drain hardening before its popup-menu tap (tap-flake pattern 2 above); it had never run on Linux, so it had never needed it. **Assert the file source, not the photo one:** `image_picker_linux` is implemented on top of `file_selector_linux`, so on Linux the file-selector mock intercepts *both* and no Linux e2e can tell the two apart. The **document scanner** (`installDocumentScannerMock()`, `openQuickScanImageForm` in `helpers/quick_scan_actions.dart`) is still the way in when a spec wants a source that is neither picker.
+- **Quick Scan image input on Linux:** the old `"Unsupported platform"` throw is **gone** — `getGalleryImages` and its `Platform.operatingSystem` switch were deleted (see "Picking receipt files"), so `installFileSelectorMock()` now reaches the file source on desktop and `quick_scan_test.dart` / `receipt_add_gallery_test.dart` / `receipt_add_partial_image_test.dart` run un-skipped — all three verified green on the Linux runner (`receipt_add_partial_image_test.dart` was since rewritten for the atomic create — see "Role-required receipt fields & single-call create" — and is green on Linux again). `receipt_add_gallery_test.dart` needed the `hitTestable()` + frame-drain hardening before its popup-menu tap (tap-flake pattern 2 above); it had never run on Linux, so it had never needed it. **Assert the file source, not the photo one:** `image_picker_linux` is implemented on top of `file_selector_linux`, so on Linux the file-selector mock intercepts *both* and no Linux e2e can tell the two apart. The **document scanner** (`installDocumentScannerMock()`, `openQuickScanImageForm` in `helpers/quick_scan_actions.dart`) is still the way in when a spec wants a source that is neither picker.
 - **Reaching the receipt entry points:** a **tap** on the scan slot is a direct action, so manual entry is reached by **holding** it — `openManualReceiptForm(tester)` (`helpers/receipt_test_helpers.dart`) is the shared path, and it works on every screen and in every flag state (the receipts-screen overflow menu does not). Use `scanNavSlot()` rather than `find.text('Add')` when you only need to *reach* the slot: its label is "Scan" or "Add" depending on the caller's gates.
 - **Driving camera permission states:** set `debugCameraAccessOverride` (`lib/utils/permissions.dart`) rather than swapping the permission channel mock — login bootstrap also touches permission_handler, and the override pins only the branch under test. See `quick_scan_camera_denied_test.dart`. The suite uses the first-party `integration_test` package, which **cannot** drive native OS permission dialogs; that would need Patrol.
 - **Shared channel mocks live in `test/helpers/channel_mocks.dart`,** not here: the widget suite is the gating one and must not import from `integration_test/`. `helpers/platform_mocks.dart` re-exports them, along with `test/helpers/image_picker_mock.dart` (`installImagePickerMock` / `installFailingImagePickerMock`) which lives there for the same reason. `installPermissionMocks(status:, requestStatus:)` is the parameterised variant (`PermissionStatusWire` names the wire ints); `installCameraGalleryPermissionMocks()` is the always-granted one the scanner path needs.
@@ -2485,7 +2542,8 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 - `integration_test/permission_add_menu_test.dart` / `permission_receipt_edit_test.dart` — permission-gating coverage (add-menu gate, edit-popup gate, swipe-to-edit gate) using per-spec provisioned users/groups. The add-menu spec also gates **"Quick Scan"** on `group.receipts.quick-scan` (flag on via `enableAiPoweredReceiptsForTest`, isolating the permission from the `aiPoweredReceipts` flag): a Legacy Editor **minus** quick-scan hides it while "Add Manual Receipt" stays; a full Legacy Editor shows it.
 - `integration_test/permission_search_test.dart` — search bottom-nav destination gated on `app.receipts.search` (deny via a custom app role minus that permission; allow via a Legacy User).
 - `integration_test/permission_dashboard_redirect_test.dart` — group dashboards route gated on `group.dashboards.read` (deny → redirected to the receipts list via a custom group role minus that permission; allow via a Legacy Viewer). Landing is told apart by `GroupReceiptsList` vs `GroupDashboardWrapper`.
-- `integration_test/permission_comments_test.dart` — comment **deny** paths on the edit-state comment screen: `group.comments.create` hidden → no input; `group.comments.delete` hidden → swipe-to-delete disabled. Members are provisioned from the **Legacy Editor** baseline (holds `group.receipts.update`, needed to reach edit state) minus the permission under test, via `provisionGroupMemberWithoutPermission(..., baselineRole: 'Legacy Editor')`.
+- `integration_test/permission_comments_test.dart` — comment **deny** paths on the edit-state comment screen: `group.comments.create` hidden → no input; `group.comments.delete` hidden → swipe-to-delete disabled. Members are provisioned from the **Legacy Editor** baseline (holds `group.receipts.update`, needed to reach edit state) minus the permission under test, via `provisionGroupMemberWithoutPermission(..., baselineRole: 'Legacy Editor')`. Its navigation lives in `helpers/nav.dart` (`openReceiptEditForm` / `openReceiptCommentsInEditMode`).
+- `integration_test/receipt_role_requirements_test.dart` — role-required receipt fields against a real role (`provisionMemberWithReceiptRequirements` → `createRole(..., requireReceiptComment:, requireReceiptImage:)`). See "Role-required receipt fields & single-call create".
 - `integration_test/permission_paid_by_visibility_test.dart` — group-role paid-by visibility: a member restricted to "their own receipts" (via `provisionPaidByOwnMember` → `createRole(..., includeOwnPaidReceipts: true)`) sees only their own receipt in the group list; the admin-paid receipt is filtered out server-side. Mirrors desktop `paid-by-visibility.spec.ts` (list axis).
 - `integration_test/permission_receipt_category_visibility_test.dart` — non-admin sees the per-group **category and tag** catalogs in the receipt-form pickers (sourced from `groupCategories` / `groupTags`, not the admin-only flat lists).
 - `integration_test/reports_list_test.dart` — the Reports **list** view: seeds a template via `createReportTemplate` and asserts the row renders (regression guard for the `aggFunc` omitempty deserialization fix), the "No reports found" empty state, and the avatar-menu gate (`app.reports.read`/`readAll` shown, Legacy User hidden). Uses `provisionUserWithAppPermissions` in `permission_fixtures.dart`.

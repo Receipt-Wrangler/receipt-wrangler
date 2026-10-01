@@ -80,6 +80,7 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ReceiptPagedRequestCommand.serializer)
       ..add(ReceiptPagedRequestFilter.serializer)
       ..add(ReceiptProcessingSettings.serializer)
+      ..add(ReceiptRequirements.serializer)
       ..add(ReceiptStatus.serializer)
       ..add(ReceiptSummary.serializer)
       ..add(ReceiptSummaryCommand.serializer)
@@ -191,6 +192,12 @@ Serializers _$serializers = (Serializers().toBuilder()
             const FullType(BuiltList, const [const FullType(String)])
           ]),
           () => MapBuilder<String, BuiltList<String>>())
+      ..addBuilderFactory(
+          const FullType(BuiltMap, const [
+            const FullType(String),
+            const FullType(ReceiptRequirements)
+          ]),
+          () => MapBuilder<String, ReceiptRequirements>())
       ..addBuilderFactory(
           const FullType(BuiltMap, const [
             const FullType(String),

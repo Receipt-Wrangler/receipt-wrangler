@@ -1,4 +1,4 @@
-import { Component, EmbeddedViewRef, HostListener, Injector, OnInit, Signal, TemplateRef, runInInjectionContext, signal, viewChild } from "@angular/core";
+import { Component, EmbeddedViewRef, HostListener, Injector, OnInit, Signal, TemplateRef, computed, runInInjectionContext, signal, viewChild } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { AbstractControl, FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
@@ -8,7 +8,7 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { addHours } from "date-fns";
-import { debounceTime, catchError, finalize, forkJoin, iif, map, of, startWith, switchMap, take, tap } from "rxjs";
+import { debounceTime, catchError, finalize, forkJoin, map, of, startWith, take, tap } from "rxjs";
 import { CarouselComponent } from "src/carousel/carousel/carousel.component";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS } from "src/constants";
 import { RECEIPT_STATUS_OPTIONS } from "src/constants/receipt-status-options";
@@ -38,6 +38,7 @@ import { QueueMode, ReceiptQueueService } from "../../services/receipt-queue.ser
 import { StatefulMenuItem } from "../../standalone/components/filtered-stateful-menu/stateful-menu-item";
 import { AuthState, FeatureConfigState, GroupState, UserState } from "../../store";
 import { downloadFile } from "../../utils/file";
+import { missingReceiptRequirementsMessage, receiptRequirementsFor } from "../../utils/receipt-requirements";
 import { ItemListComponent } from "../item-list/item-list.component";
 import { ReceiptCommentsComponent } from "../receipt-comments/receipt-comments.component";
 import { ShareListComponent } from "../share-list/share-list.component";
@@ -141,6 +142,21 @@ export class ReceiptFormComponent implements OnInit {
   public canDuplicate: Signal<boolean> = signal(false);
 
   public selectedGroup = signal<Group | undefined>(undefined);
+
+  // The form's current group id (the target group in edit mode too - the server
+  // checks an update against the group the receipt is moving into).
+  private readonly currentGroupId = signal<number | string | null | undefined>(undefined);
+
+  private readonly requirementsByGroup = this.store.selectSignal(AuthState.groupReceiptRequirements);
+
+  /**
+   * The caller's role-required receipt fields in the form's current group,
+   * already resolved server-side (hidden-field and permission waivers applied).
+   * Re-evaluates when the group changes.
+   */
+  public readonly receiptRequirements = computed(() =>
+    receiptRequirementsFor(this.requirementsByGroup(), this.currentGroupId())
+  );
 
   public editLink = "";
 
@@ -509,6 +525,7 @@ export class ReceiptFormComponent implements OnInit {
       untilDestroyed(this),
       startWith(this.form.get("groupId")?.value),
       tap((groupId) => {
+        this.currentGroupId.set(groupId);
         this.setCategoryTagPoolsForGroup(groupId);
         const paidBy = this.form.get("paidByUserId");
         const users = this.store.selectSnapshot(UserState.users);
@@ -627,7 +644,58 @@ export class ReceiptFormComponent implements OnInit {
       });
   }
 
+  /**
+   * Whether the group requires an image and the receipt has none. Add mode
+   * counts the queued uploads; edit mode the saved images, which update live
+   * as images are added and removed (falling back to the receipt's own list
+   * while they are still loading).
+   */
+  public isImageMissing(): boolean {
+    if (this.mode === FormMode.view || !this.receiptRequirements().imageRequired) {
+      return false;
+    }
+    return this.imageCount() === 0;
+  }
+
+  /**
+   * Whether the group requires a comment and the receipt has none. The comments
+   * child mirrors its list's length into a signal: queued comments in add mode,
+   * the receipt's saved comments (updated live) in edit mode.
+   */
+  public isCommentMissing(): boolean {
+    if (this.mode === FormMode.view || !this.receiptRequirements().commentRequired) {
+      return false;
+    }
+    return (this.receiptCommentsComponent()?.commentCount() ?? 0) === 0;
+  }
+
+  /** In edit mode the server refuses deleting the last required image. */
+  public isLastImageLocked(): boolean {
+    return (
+      this.mode === FormMode.edit &&
+      this.receiptRequirements().imageRequired &&
+      this.imageCount() <= 1
+    );
+  }
+
+  /** Passed to the comments child: in edit mode the last comment is kept. */
+  public isCommentDeletionLimited(): boolean {
+    return this.mode === FormMode.edit && this.receiptRequirements().commentRequired;
+  }
+
+  private imageCount(): number {
+    if (this.mode === FormMode.add) {
+      return this.filesToUpload().length;
+    }
+    return this.imagesLoading()
+      ? (this.originalReceipt?.imageFiles?.length ?? 0)
+      : this.images().length;
+  }
+
   public removeImage(): void {
+    if (this.isLastImageLocked()) {
+      return;
+    }
     const index = this.currentImageIndex;
 
     if (this.mode === FormMode.add) {
@@ -1275,6 +1343,15 @@ export class ReceiptFormComponent implements OnInit {
       return;
     }
 
+    // Mirrors the server's role-required fields check, so the user is told
+    // before a round trip rather than by a 400.
+    const missingComment = this.isCommentMissing();
+    const missingImage = this.isImageMissing();
+    if (missingComment || missingImage) {
+      this.snackbarService.error(missingReceiptRequirementsMessage(missingComment, missingImage));
+      return;
+    }
+
     if (this.originalReceipt) {
       this.updateReceipt();
     } else if (this.mode === FormMode.add) {
@@ -1282,33 +1359,20 @@ export class ReceiptFormComponent implements OnInit {
     }
   }
 
+  // One multipart call carries the receipt, its comments (on the form value)
+  // and its queued images, so the server sees the images at create time and the
+  // create is atomic - there is no "receipt added but images failed" state.
   private createReceipt(): void {
-    let route: string;
     this.receiptService
-      .createReceipt(this.form.value)
+      .createReceiptWithFiles(
+        this.form.value,
+        this.filesToUpload().map((file) => file.file)
+      )
       .pipe(
         take(1),
         tap((r: Receipt) => {
           this.snackbarService.success("Successfully added receipt");
-          route = `/receipts/${r.id}/view`;
-        }),
-        switchMap((receipt) =>
-          iif(
-            () => this.filesToUpload().length > 0,
-            forkJoin(
-              this.filesToUpload().map((file) => {
-                return this.receiptImageService.uploadReceiptImage(
-                  file.file,
-                  receipt.id,
-                  ""
-                );
-              })
-            ),
-            of("")
-          )
-        ),
-        tap(() => {
-          this.router.navigate([route]);
+          this.router.navigate([`/receipts/${r.id}/view`]);
         })
       )
       .subscribe();

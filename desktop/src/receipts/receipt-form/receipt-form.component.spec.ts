@@ -1,12 +1,12 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
-import { provideHttpClientTesting } from "@angular/common/http/testing";
+import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
-import { ReactiveFormsModule, Validators } from "@angular/forms";
+import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
-import { ActivatedRoute } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { BehaviorSubject, of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
@@ -1331,6 +1331,232 @@ describe("ReceiptFormComponent", () => {
       component.duplicateReceipt();
 
       expect(receiptService.duplicateReceipt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("role-required receipt fields", () => {
+    let store: Store;
+    let receiptService: ReceiptService;
+    let receiptImageService: ReceiptImageService;
+    let snackbarError: jest.SpyInstance;
+    let commentCount: number;
+
+    const group = (id: number): any => ({
+      id,
+      name: `Group ${id}`,
+      isAllGroup: false,
+      groupMembers: [],
+      groupReceiptSettings: {},
+    });
+
+    const pngFile = (name: string) => new File(["x"], name, { type: "image/png" });
+
+    const fillValidForm = (): void => {
+      component.form.patchValue({
+        name: "Lunch",
+        amount: "12.00",
+        paidByUserId: 1,
+        groupId: 7,
+      });
+    };
+
+    const queueComment = (text: string): void => {
+      component.updateComments(
+        new FormArray([
+          new FormGroup({
+            comment: new FormControl(text),
+            userId: new FormControl(1),
+            receiptId: new FormControl(null),
+          }),
+        ])
+      );
+      commentCount = 1;
+    };
+
+    beforeEach(() => {
+      store = TestBed.inject(Store);
+      receiptService = TestBed.inject(ReceiptService);
+      receiptImageService = TestBed.inject(ReceiptImageService);
+      snackbarError = jest.spyOn(TestBed.inject(SnackbarService), "error");
+      jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+      commentCount = 0;
+
+      store.dispatch(new SetGroups([group(7), group(8)]));
+      store.dispatch(
+        new SetPermissions(
+          [],
+          {
+            7: [Permission.GroupReceiptsCreate, Permission.GroupReceiptsUpdate],
+            8: [Permission.GroupReceiptsCreate, Permission.GroupReceiptsUpdate],
+          },
+          { 7: { commentRequired: true, imageRequired: true } }
+        )
+      );
+
+      // Neither child is declared under CUSTOM_ELEMENTS_SCHEMA; stub the two the
+      // submit path and the comment check read.
+      Object.defineProperty(component, "shareListComponent", {
+        value: () => ({ userExpansionPanels: () => [] }),
+      });
+      Object.defineProperty(component, "receiptCommentsComponent", {
+        value: () => ({ commentCount: () => commentCount }),
+      });
+      // Resolves to a bare element under CUSTOM_ELEMENTS_SCHEMA once rendered.
+      Object.defineProperty(component, "paidByAutocomplete", { value: () => undefined });
+    });
+
+    const openAddForm = (): void => {
+      store.dispatch(new SetSelectedGroupId("7"));
+      routeDataSubject.next({ mode: FormMode.add, customFields: [] });
+    };
+
+    const openEditForm = (receipt: any): void => {
+      routeDataSubject.next({ mode: FormMode.edit, customFields: [], receipt });
+    };
+
+    it("creates with exactly one request carrying the files and comments", () => {
+      const httpMock = TestBed.inject(HttpTestingController);
+      const createSpy = jest.spyOn(receiptService, "createReceiptWithFiles");
+      const uploadSpy = jest.spyOn(receiptImageService, "uploadReceiptImage");
+      openAddForm();
+      fillValidForm();
+      queueComment("Business lunch");
+      const files = [pngFile("a.png"), pngFile("b.png")];
+      component.filesToUpload.set(files.map((file) => ({ file, receiptId: 0 })));
+
+      component.submit();
+
+      expect(createSpy).toHaveBeenCalledTimes(1);
+      const [receipt, sentFiles] = createSpy.mock.calls[0] as any[];
+      expect(receipt.comments).toEqual([
+        { comment: "Business lunch", userId: 1, receiptId: null },
+      ]);
+      expect(sentFiles).toEqual(files);
+
+      const request = httpMock.expectOne((req) => req.url.endsWith("/receipt/withFiles"));
+      expect(request.request.method).toBe("POST");
+      const body = request.request.body as FormData;
+      expect(body.getAll("files").length).toBe(2);
+      expect(body.get("receipt")).toBeTruthy();
+      request.flush({ id: 42 });
+
+      expect(uploadSpy).not.toHaveBeenCalled();
+      expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(["/receipts/42/view"]);
+      httpMock.verify();
+    });
+
+    it("still creates in one request when the group requires nothing", () => {
+      store.dispatch(new SetPermissions([], { 7: [Permission.GroupReceiptsCreate] }, {}));
+      const createSpy = jest
+        .spyOn(receiptService, "createReceiptWithFiles")
+        .mockReturnValue(of({ id: 5 }) as any);
+      openAddForm();
+      fillValidForm();
+
+      component.submit();
+
+      expect(createSpy).toHaveBeenCalledWith(component.form.value, []);
+    });
+
+    it("blocks an add-mode submit without the required image", () => {
+      const createSpy = jest.spyOn(receiptService, "createReceiptWithFiles");
+      openAddForm();
+      fillValidForm();
+      queueComment("Has a comment");
+
+      component.submit();
+
+      expect(component.isImageMissing()).toBe(true);
+      expect(component.isCommentMissing()).toBe(false);
+      expect(snackbarError).toHaveBeenCalledWith(
+        "Your role requires an image on this group's receipts."
+      );
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it("blocks an add-mode submit without the required comment", () => {
+      const createSpy = jest.spyOn(receiptService, "createReceiptWithFiles");
+      openAddForm();
+      fillValidForm();
+      component.filesToUpload.set([{ file: pngFile("a.png"), receiptId: 0 }]);
+
+      component.submit();
+
+      expect(snackbarError).toHaveBeenCalledWith(
+        "Your role requires a comment on this group's receipts."
+      );
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it("renders the inline hints while the required fields are missing", () => {
+      openAddForm();
+      fillValidForm();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('[data-testid="receipt-image-required-hint"]')).toBeTruthy();
+      expect(el.querySelector('[data-testid="receipt-comment-required-hint"]')).toBeTruthy();
+    });
+
+    it("re-evaluates the requirements when the group changes", () => {
+      openAddForm();
+      fillValidForm();
+      expect(component.isImageMissing()).toBe(true);
+
+      component.form.get("groupId")?.setValue(8);
+
+      expect(component.receiptRequirements()).toEqual({
+        commentRequired: false,
+        imageRequired: false,
+      });
+      expect(component.isImageMissing()).toBe(false);
+      expect(component.isCommentMissing()).toBe(false);
+    });
+
+    it("checks the saved images and comments in edit mode", () => {
+      const updateSpy = jest.spyOn(receiptService, "updateReceipt");
+      openEditForm({ id: 3, name: "R", amount: "1.00", paidByUserId: 1, groupId: 7 });
+      component.images.set([]);
+
+      component.submit();
+
+      expect(snackbarError).toHaveBeenCalledWith(
+        "Your role requires an image and a comment on this group's receipts."
+      );
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
+
+    it("locks removing the last image in edit mode when an image is required", () => {
+      const deleteSpy = jest.spyOn(receiptImageService, "deleteReceiptImageById");
+      openEditForm({ id: 3, name: "R", amount: "1.00", paidByUserId: 1, groupId: 7 });
+      component.images.set([{ id: 11 } as any]);
+
+      expect(component.isLastImageLocked()).toBe(true);
+      component.removeImage();
+      expect(deleteSpy).not.toHaveBeenCalled();
+
+      component.images.set([{ id: 11 } as any, { id: 12 } as any]);
+      expect(component.isLastImageLocked()).toBe(false);
+    });
+
+    it("limits comment deletion only in edit mode when a comment is required", () => {
+      openEditForm({ id: 3, name: "R", amount: "1.00", paidByUserId: 1, groupId: 7 });
+      expect(component.isCommentDeletionLimited()).toBe(true);
+
+      component.form.get("groupId")?.setValue(8);
+      expect(component.isCommentDeletionLimited()).toBe(false);
+    });
+
+    it("requires nothing in view mode", () => {
+      routeDataSubject.next({
+        mode: FormMode.view,
+        customFields: [],
+        receipt: { id: 3, name: "R", amount: "1.00", groupId: 7 },
+      });
+
+      expect(component.isImageMissing()).toBe(false);
+      expect(component.isCommentMissing()).toBe(false);
+      expect(component.isLastImageLocked()).toBe(false);
     });
   });
 });

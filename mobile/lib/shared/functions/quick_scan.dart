@@ -217,6 +217,9 @@ Future<void> _submitQuickScan(
       // call sites stay textually identical and cannot drift.
       hasGroup: groupId > 0,
       canCreateComments: canCommentCreate(permissionsModel, groupId),
+      commentRequiredByRole: permissionsModel
+          .receiptRequirements(groupId)
+          .commentRequired,
     );
     final showPaidBy = config.showPaidBy;
     final requirePaidBy = config.requirePaidBy;

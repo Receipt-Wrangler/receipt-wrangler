@@ -58,6 +58,13 @@ export interface CreateRoleOptions {
    */
   requiresIndividualCategories?: boolean;
   requiresIndividualTags?: boolean;
+  /**
+   * Group-role only: ticks "Require a comment on receipts" / "Require an image
+   * on receipts", so members must keep at least one of each on the group's
+   * receipts (enforced server-side on create, update and delete-last).
+   */
+  requireReceiptComment?: boolean;
+  requireReceiptImage?: boolean;
 }
 
 /**
@@ -137,6 +144,13 @@ export async function createRole(page: Page, opts: CreateRoleOptions): Promise<v
     await page
       .getByText('Require an individual tag assignment for each member')
       .click();
+  }
+
+  if (opts.requireReceiptComment) {
+    await page.getByTestId('require-receipt-comment').getByRole('checkbox').check();
+  }
+  if (opts.requireReceiptImage) {
+    await page.getByTestId('require-receipt-image').getByRole('checkbox').check();
   }
 
   await page.getByRole('button', { name: 'Save Role' }).click();
@@ -568,6 +582,9 @@ export interface UpsertRolePayload {
    */
   requiresIndividualCategoryGrants?: boolean;
   requiresIndividualTagGrants?: boolean;
+  /** GROUP roles only: members must keep a comment / an image on receipts. */
+  requireReceiptComment?: boolean;
+  requireReceiptImage?: boolean;
 }
 
 /**

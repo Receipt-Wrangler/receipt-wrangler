@@ -17,6 +17,7 @@ String permissionWireName(Permission permission) =>
 class PermissionsModel extends ChangeNotifier {
   List<String> _appPermissions = const [];
   Map<int, List<String>> _groupPermissions = const {};
+  Map<int, ReceiptRequirements> _groupReceiptRequirements = const {};
 
   /// Replaces the stored permissions from `AppData`.
   ///
@@ -44,6 +45,34 @@ class PermissionsModel extends ChangeNotifier {
     };
     notifyListeners();
   }
+
+  /// Replaces the stored role-required receipt fields from
+  /// `AppData.groupReceiptRequirements`.
+  ///
+  /// The server has already resolved these from the user's group role with
+  /// the group's waivers applied (hidden comments/images, no comment
+  /// permission), and only sends groups where something is required. A null
+  /// map — an older server that predates the field — means nothing is
+  /// required anywhere. Keys arrive as strings and are parsed to ints.
+  void setReceiptRequirements(Map<String, ReceiptRequirements>? requirements) {
+    _groupReceiptRequirements = {
+      for (final entry in (requirements ?? const {}).entries)
+        if (int.tryParse(entry.key) != null)
+          int.parse(entry.key): entry.value,
+    };
+    notifyListeners();
+  }
+
+  /// What the user must supply on [groupId]'s receipts. An absent group
+  /// requires nothing, so this defaults to both flags false.
+  ReceiptRequirements receiptRequirements(int groupId) =>
+      _groupReceiptRequirements[groupId] ?? _nothingRequired;
+
+  static final ReceiptRequirements _nothingRequired = ReceiptRequirements(
+    (b) => b
+      ..commentRequired = false
+      ..imageRequired = false,
+  );
 
   /// True when the user holds [permission] at the app scope.
   bool hasAppPermission(Permission permission) =>

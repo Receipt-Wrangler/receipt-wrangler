@@ -50,6 +50,14 @@ export interface UpsertRoleCommand {
      */
     requiresIndividualTagGrants?: boolean;
     /**
+     * Whether members of this GROUP role must keep at least one comment on the group\'s receipts. Only valid on group roles.
+     */
+    requireReceiptComment?: boolean;
+    /**
+     * Whether members of this GROUP role must keep at least one image on the group\'s receipts. Only valid on group roles.
+     */
+    requireReceiptImage?: boolean;
+    /**
      * Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access.
      */
     reportTemplateGrants?: Array<ReportTemplateGrant>;

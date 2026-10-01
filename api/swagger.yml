@@ -1415,7 +1415,13 @@ paths:
       tags:
         - Receipt
       summary: Create receipt
-      description: This will create a receipt [SYSTEM USER]
+      deprecated: true
+      description: >-
+        This will create a receipt [SYSTEM USER]. Deprecated in favour of
+        createReceiptWithFiles, which carries the receipt's images in the same
+        call; kept for already-released clients. It enforces the caller's
+        role-required fields, so when the caller's group role requires an image
+        this endpoint always returns 400 (it cannot carry one).
       requestBody:
         description: Receipt to create
         required: true
@@ -1431,6 +1437,47 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Receipt"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /receipt/withFiles:
+    post:
+      tags:
+        - Receipt
+      summary: Create receipt with files
+      description: >-
+        Creates a receipt, its comments and its images in one atomic call: a
+        failure anywhere leaves no receipt, image or file behind. Requires
+        group.receipts.create in the receipt's group. Every file must be an image
+        or PDF (checked before anything is written). Returns 400 when the
+        caller's group role requires a comment (key `comments`) or an image (key
+        `files`) that the request does not carry. [SYSTEM USER]
+      requestBody:
+        description: Receipt to create, with its images
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateReceiptWithFilesCommand"
+            encoding:
+              receipt:
+                contentType: application/json
+      operationId: createReceiptWithFiles
+      responses:
+        200:
+          description: The created receipt, including its imageFiles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Receipt"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
         500:
           $ref: "#/components/responses/Internal"
       security:
@@ -1453,6 +1500,8 @@ paths:
       responses:
         200:
           $ref: "#/components/responses/Ok"
+        400:
+          $ref: "#/components/responses/BadRequest"
         500:
           $ref: "#/components/responses/Internal"
       security:
@@ -3792,6 +3841,18 @@ components:
           description: >-
             Tag counterpart of requiresIndividualCategoryGrants. Always false for app
             roles.
+        requireReceiptComment:
+          type: boolean
+          description: >-
+            Whether a GROUP role requires its members to keep at least one comment
+            on the group's receipts (waived when the group hides comments or the
+            member lacks group.comments.create). Always false for app roles.
+        requireReceiptImage:
+          type: boolean
+          description: >-
+            Whether a GROUP role requires its members to keep at least one image on
+            the group's receipts (waived when the group hides images). Always false
+            for app roles.
         reportTemplateGrants:
           type: array
           description: >-
@@ -3871,6 +3932,16 @@ components:
           description: >-
             Tag counterpart of requiresIndividualCategoryGrants. Only valid on group
             roles.
+        requireReceiptComment:
+          type: boolean
+          description: >-
+            Whether members of this GROUP role must keep at least one comment on
+            the group's receipts. Only valid on group roles.
+        requireReceiptImage:
+          type: boolean
+          description: >-
+            Whether members of this GROUP role must keep at least one image on the
+            group's receipts. Only valid on group roles.
         reportTemplateGrants:
           type: array
           description: >-
@@ -5633,6 +5704,33 @@ components:
         fallbackPromptId:
           type: integer
           description: Fallback prompt foreign key
+    CreateReceiptWithFilesCommand:
+      type: object
+      required:
+        - receipt
+      properties:
+        receipt:
+          $ref: "#/components/schemas/UpsertReceiptCommand"
+        files:
+          type: array
+          description: >-
+            Images (or PDFs) to attach to the new receipt. Together with the
+            receipt they share the server's 50 MB request body limit.
+          items:
+            type: string
+            format: binary
+    ReceiptRequirements:
+      type: object
+      required:
+        - commentRequired
+        - imageRequired
+      properties:
+        commentRequired:
+          type: boolean
+          description: At least one comment is required on the group's receipts
+        imageRequired:
+          type: boolean
+          description: At least one image is required on the group's receipts
     ReceiptFileUploadCommand:
       type: object
       required:
@@ -5790,6 +5888,15 @@ components:
             type: array
             items:
               type: string
+        groupReceiptRequirements:
+          type: object
+          description: >-
+            What the calling user must supply on each group's receipts, keyed by
+            group id, resolved from their group role with the group's waivers
+            applied. Only groups where something is required are present; an
+            absent group requires nothing. Always an object, never null.
+          additionalProperties:
+            $ref: "#/components/schemas/ReceiptRequirements"
         groupCategories:
           type: object
           description: >-

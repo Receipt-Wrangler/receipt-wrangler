@@ -128,6 +128,14 @@
                 (fileLoaded)="imageFileLoaded($event)"
               >
               </app-upload-image>
+              @if (isImageMissing()) {
+                <div
+                  class="rw-requirement-hint"
+                  data-testid="receipt-image-required-hint"
+                >
+                  Your role requires at least one image on this group's receipts.
+                </div>
+              }
               <div
                 class="rw-images-pane__stage"
                 *ngIf="
@@ -195,13 +203,28 @@
             headerText="Comments"
             [indent]="false"
           >
-            <app-receipt-comments
-              [receiptId]="originalReceipt?.id"
-              [groupId]="originalReceipt?.groupId"
-              [comments]="originalReceipt?.comments ?? []"
-              [mode]="mode"
-              (commentsUpdated)="updateComments($event)"
-            ></app-receipt-comments>
+            @if (isCommentMissing()) {
+              <div
+                class="rw-requirement-hint mb-2"
+                data-testid="receipt-comment-required-hint"
+              >
+                Your role requires at least one comment on this group's receipts.
+              </div>
+            }
+            <!-- Keyed on the receipt id: the queue re-uses this form for the next
+                 receipt, and the comments child only reads its inputs on init, so
+                 without a fresh instance it would keep the previous receipt's
+                 comments (and the required-comment check would count them). -->
+            @for (receipt of [originalReceipt]; track receipt?.id) {
+              <app-receipt-comments
+                [receiptId]="receipt?.id"
+                [groupId]="receipt?.groupId"
+                [comments]="receipt?.comments ?? []"
+                [mode]="mode"
+                [preventDeletingLastComment]="isCommentDeletionLimited()"
+                (commentsUpdated)="updateComments($event)"
+              ></app-receipt-comments>
+            }
           </app-form-section>
         </div>
       }
@@ -426,11 +449,12 @@
     *ngIf="
       !(mode | inputReadonly) && (images().length > 0 || filesToUpload().length > 0)
     "
+    data-testid="receipt-image-remove"
     matButtonType="iconButton"
     icon="delete"
-    tooltip="Remove Image"
+    [tooltip]="isLastImageLocked() ? 'An image is required, so the last one cannot be removed' : 'Remove Image'"
     color="warn"
-    [disabled]="!canEditReceipt() || (showProgressBar() ?? false)"
+    [disabled]="!canEditReceipt() || isLastImageLocked() || (showProgressBar() ?? false)"
     (clicked)="removeImage()"
   ></app-button>
 </ng-template>

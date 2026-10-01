@@ -355,6 +355,8 @@ func (repository RoleRepository) GetAllRoles() ([]structs.RoleView, error) {
 			PaidByUserGrants:       paidByUserGrantIdsFromRole(role),
 			IncludeOwnPaidReceipts: role.IncludeOwnPaidReceipts,
 			SeesAllMembers:         role.SeesAllMembers,
+			RequireReceiptComment:  role.RequireReceiptComment,
+			RequireReceiptImage:    role.RequireReceiptImage,
 			ReportTemplateGrants:   ReportTemplateGrantsFromRole(role),
 		})
 	}
@@ -683,6 +685,77 @@ func (repository RoleRepository) SetGroupRoleIndividualGrantConfig(groupRoleId u
 			"requires_individual_category_grants": requiresCategories,
 			"requires_individual_tag_grants":      requiresTags,
 		}).Error
+}
+
+// SetGroupRoleReceiptRequirements records whether a group role requires its
+// members to supply a comment / an image on the group's receipts.
+//
+// A separate method for the same reason as SetGroupRoleIndividualGrantConfig:
+// appending two more bools to CreateGroupRole / UpdateGroupRole would make their
+// trailing arguments trivially transposable. Uses the map form so a toggled-off
+// false persists.
+func (repository RoleRepository) SetGroupRoleReceiptRequirements(groupRoleId uint, requireComment bool, requireImage bool) error {
+	return repository.GetDB().Model(&models.GroupRoleDefinition{}).
+		Where("id = ?", groupRoleId).
+		Updates(map[string]interface{}{
+			"require_receipt_comment": requireComment,
+			"require_receipt_image":   requireImage,
+		}).Error
+}
+
+// MemberReceiptRequirementFlags are the RAW receipt-requirement flags of a
+// member's group role, before any per-group waiver is applied.
+type MemberReceiptRequirementFlags struct {
+	RequireComment bool
+	RequireImage   bool
+}
+
+// GetMemberReceiptRequirementFlags returns, keyed by group id, the receipt
+// requirement flags of the role userId holds in each of groupIds — in one query,
+// so AppData can resolve every group at once. Only groups whose role sets at
+// least one flag are present: a non-member, a membership with no role, and the
+// synthetic "All" group (a cross-group view that owns no receipts) are all absent,
+// which callers read as "nothing required".
+func (repository RoleRepository) GetMemberReceiptRequirementFlags(userId uint, groupIds []uint) (map[uint]MemberReceiptRequirementFlags, error) {
+	result := make(map[uint]MemberReceiptRequirementFlags)
+	if len(groupIds) == 0 {
+		return result, nil
+	}
+
+	type flagRow struct {
+		GroupID               uint
+		IsAllGroup            *bool
+		RequireReceiptComment bool
+		RequireReceiptImage   bool
+	}
+	var rows []flagRow
+
+	err := repository.GetDB().Table("group_members AS gm").
+		Select("gm.group_id AS group_id, g.is_all_group AS is_all_group, grd.require_receipt_comment AS require_receipt_comment, grd.require_receipt_image AS require_receipt_image").
+		Joins("JOIN group_role_definitions AS grd ON grd.id = gm.group_role_id").
+		Joins("JOIN groups AS g ON g.id = gm.group_id").
+		Where("gm.user_id = ? AND gm.group_id IN ?", userId, groupIds).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		// is_all_group is nullable (no NOT NULL on the column), so it is scanned
+		// as a pointer and filtered here rather than in SQL.
+		if row.IsAllGroup != nil && *row.IsAllGroup {
+			continue
+		}
+		if !row.RequireReceiptComment && !row.RequireReceiptImage {
+			continue
+		}
+		result[row.GroupID] = MemberReceiptRequirementFlags{
+			RequireComment: row.RequireReceiptComment,
+			RequireImage:   row.RequireReceiptImage,
+		}
+	}
+
+	return result, nil
 }
 
 // GetGroupRoleReportTemplateGrants returns a group role's report-template grant

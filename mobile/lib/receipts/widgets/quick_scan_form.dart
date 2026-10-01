@@ -258,6 +258,9 @@ class _QuickScanForm extends State<QuickScanForm> {
       settings,
       hasGroup: groupId > 0,
       canCreateComments: canCommentCreate(permissionsModel, groupId),
+      commentRequiredByRole: permissionsModel
+          .receiptRequirements(groupId)
+          .commentRequired,
     );
     final showPaidBy = config.showPaidBy;
     final requirePaidBy = config.requirePaidBy;

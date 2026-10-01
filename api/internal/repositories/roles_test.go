@@ -579,3 +579,105 @@ func TestGetAllRolesReturnsIsDefault(t *testing.T) {
 		utils.PrintTestError(t, "Default App IsDefault", true)
 	}
 }
+
+// The receipt-requirement flags persist, read back through GetAllRoles, and
+// toggle back off — the setter uses the map form because GORM's struct Updates
+// skips zero-value bools.
+func TestGroupRoleReceiptRequirementsRoundTrip(t *testing.T) {
+	defer TruncateTestDb()
+	repository := NewRoleRepository(nil)
+
+	role, err := repository.CreateGroupRole("Thorough", "", []string{permissions.GroupReceiptsCreate}, nil, nil, nil, false, false)
+	if err != nil {
+		t.Fatalf("CreateGroupRole: %v", err)
+	}
+
+	readBack := func() (bool, bool) {
+		t.Helper()
+		roles, err := repository.GetAllRoles()
+		if err != nil {
+			t.Fatalf("GetAllRoles: %v", err)
+		}
+		for _, view := range roles {
+			if view.Scope == permissions.ScopeGroup && view.Id == role.ID {
+				return view.RequireReceiptComment, view.RequireReceiptImage
+			}
+		}
+		t.Fatalf("role %d missing from GetAllRoles", role.ID)
+		return false, false
+	}
+
+	if comment, image := readBack(); comment || image {
+		t.Errorf("new role flags = (%v, %v), want (false, false)", comment, image)
+	}
+
+	if err := repository.SetGroupRoleReceiptRequirements(role.ID, true, true); err != nil {
+		t.Fatalf("SetGroupRoleReceiptRequirements: %v", err)
+	}
+	if comment, image := readBack(); !comment || !image {
+		t.Errorf("flags = (%v, %v), want (true, true)", comment, image)
+	}
+
+	if err := repository.SetGroupRoleReceiptRequirements(role.ID, false, true); err != nil {
+		t.Fatalf("SetGroupRoleReceiptRequirements: %v", err)
+	}
+	if comment, image := readBack(); comment || !image {
+		t.Errorf("flags = (%v, %v), want (false, true)", comment, image)
+	}
+}
+
+// GetMemberReceiptRequirementFlags reports only memberships whose role sets a
+// flag, and never the synthetic All group.
+func TestGetMemberReceiptRequirementFlags(t *testing.T) {
+	defer TruncateTestDb()
+	db := GetDB()
+	repository := NewRoleRepository(nil)
+
+	user := models.User{Username: "flags-user", Password: "p"}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	requiring, err := repository.CreateGroupRole("Requiring", "", []string{}, nil, nil, nil, false, false)
+	if err != nil {
+		t.Fatalf("seed role: %v", err)
+	}
+	if err := repository.SetGroupRoleReceiptRequirements(requiring.ID, true, false); err != nil {
+		t.Fatalf("set flags: %v", err)
+	}
+	plain, err := repository.CreateGroupRole("Plain", "", []string{}, nil, nil, nil, false, false)
+	if err != nil {
+		t.Fatalf("seed role: %v", err)
+	}
+
+	requiredGroup := models.Group{Name: "flags-required"}
+	plainGroup := models.Group{Name: "flags-plain"}
+	noRoleGroup := models.Group{Name: "flags-no-role"}
+	allGroup := models.Group{Name: "flags-all", IsAllGroup: true}
+	for _, group := range []*models.Group{&requiredGroup, &plainGroup, &noRoleGroup, &allGroup} {
+		if err := db.Create(group).Error; err != nil {
+			t.Fatalf("seed group: %v", err)
+		}
+	}
+	for _, member := range []models.GroupMember{
+		{GroupID: requiredGroup.ID, UserID: user.ID, GroupRoleID: &requiring.ID},
+		{GroupID: plainGroup.ID, UserID: user.ID, GroupRoleID: &plain.ID},
+		{GroupID: noRoleGroup.ID, UserID: user.ID},
+		{GroupID: allGroup.ID, UserID: user.ID, GroupRoleID: &requiring.ID},
+	} {
+		if err := db.Create(&member).Error; err != nil {
+			t.Fatalf("seed member: %v", err)
+		}
+	}
+
+	flags, err := repository.GetMemberReceiptRequirementFlags(user.ID, []uint{requiredGroup.ID, plainGroup.ID, noRoleGroup.ID, allGroup.ID, 9999})
+	if err != nil {
+		t.Fatalf("GetMemberReceiptRequirementFlags: %v", err)
+	}
+	if len(flags) != 1 {
+		t.Fatalf("flags = %+v, want only group %d", flags, requiredGroup.ID)
+	}
+	if got := flags[requiredGroup.ID]; !got.RequireComment || got.RequireImage {
+		t.Errorf("flags[%d] = %+v, want comment only", requiredGroup.ID, got)
+	}
+}

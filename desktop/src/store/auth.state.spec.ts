@@ -37,6 +37,52 @@ describe("AuthState", () => {
     expect(store.selectSnapshot(AuthState.hasGroupPermission(1, "group.view"))).toBe(false);
   });
 
+  describe("receiptRequirements", () => {
+    it("reflects the resolved requirements for a group", () => {
+      store.dispatch(
+        new SetPermissions(APP_PERMISSIONS, GROUP_PERMISSIONS, {
+          1: { commentRequired: true, imageRequired: false },
+        })
+      );
+
+      expect(store.selectSnapshot(AuthState.receiptRequirements(1))).toEqual({
+        commentRequired: true,
+        imageRequired: false,
+      });
+    });
+
+    it("defaults to nothing required for an absent group and when never set", () => {
+      expect(store.selectSnapshot(AuthState.receiptRequirements(1))).toEqual({
+        commentRequired: false,
+        imageRequired: false,
+      });
+
+      store.dispatch(
+        new SetPermissions(APP_PERMISSIONS, GROUP_PERMISSIONS, {
+          1: { commentRequired: true, imageRequired: true },
+        })
+      );
+      expect(store.selectSnapshot(AuthState.receiptRequirements(2))).toEqual({
+        commentRequired: false,
+        imageRequired: false,
+      });
+    });
+
+    it("is cleared by Logout", () => {
+      store.dispatch(
+        new SetPermissions(APP_PERMISSIONS, GROUP_PERMISSIONS, {
+          1: { commentRequired: true, imageRequired: true },
+        })
+      );
+      store.dispatch(new Logout());
+
+      expect(store.selectSnapshot(AuthState.receiptRequirements(1))).toEqual({
+        commentRequired: false,
+        imageRequired: false,
+      });
+    });
+  });
+
   it("SetGroupCatalog stores per-group categories and tags", () => {
     store.dispatch(new SetGroupCatalog(GROUP_CATEGORIES as any, GROUP_TAGS as any));
 

@@ -382,3 +382,30 @@ func TestUpsertRoleCommandDuplicateActionWithinReportTemplateGrant(t *testing.T)
 		t.Errorf("expected reportTemplateGrants error, got %+v", vErr.Errors)
 	}
 }
+
+func TestUpsertRoleCommandReceiptRequirementsValidOnGroupScope(t *testing.T) {
+	command := UpsertRoleCommand{
+		Name:                  "Thorough Group Role",
+		Scope:                 permissions.ScopeGroup,
+		Permissions:           []string{permissions.GroupReceiptsCreate},
+		RequireReceiptComment: true,
+		RequireReceiptImage:   true,
+	}
+
+	vErr := command.Validate()
+	if len(vErr.Errors) > 0 {
+		t.Errorf("expected no errors, got %+v", vErr.Errors)
+	}
+}
+
+func TestUpsertRoleCommandReceiptRequirementsRejectedOnAppScope(t *testing.T) {
+	for name, command := range map[string]UpsertRoleCommand{
+		"comment": {Name: "App Role", Scope: permissions.ScopeApp, RequireReceiptComment: true},
+		"image":   {Name: "App Role", Scope: permissions.ScopeApp, RequireReceiptImage: true},
+	} {
+		vErr := command.Validate()
+		if _, ok := vErr.Errors["grants"]; !ok {
+			t.Errorf("%s: expected grants error, got %+v", name, vErr.Errors)
+		}
+	}
+}

@@ -159,4 +159,54 @@ describe("resolveQuickScanFieldConfig", () => {
     expect(config.showComment).toBe(true);
     expect(config.requireComment).toBe(false);
   });
+
+  describe("role-required comment", () => {
+    it("shows and requires the comment even when the group's config leaves it off", () => {
+      const config = resolveQuickScanFieldConfig(settings({ quickScanCommentEnabled: false }), {
+        hasGroup: true,
+        canCreateComments: true,
+        roleRequiresComment: true,
+      });
+
+      expect(config.showComment).toBe(true);
+      expect(config.requireComment).toBe(true);
+    });
+
+    it("makes a shown-but-optional comment required", () => {
+      const config = resolveQuickScanFieldConfig(
+        settings({ quickScanCommentEnabled: true, quickScanCommentRequired: false }),
+        { hasGroup: true, canCreateComments: true, roleRequiresComment: true }
+      );
+
+      expect(config.requireComment).toBe(true);
+    });
+
+    it("still yields to hideComments and the comment permission", () => {
+      const hidden = resolveQuickScanFieldConfig(settings({ hideComments: true }), {
+        hasGroup: true,
+        canCreateComments: true,
+        roleRequiresComment: true,
+      });
+      const noPermission = resolveQuickScanFieldConfig(settings(), {
+        hasGroup: true,
+        canCreateComments: false,
+        roleRequiresComment: true,
+      });
+
+      expect(hidden.showComment).toBe(false);
+      expect(hidden.requireComment).toBe(false);
+      expect(noPermission.showComment).toBe(false);
+      expect(noPermission.requireComment).toBe(false);
+    });
+
+    it("does nothing before a group is picked", () => {
+      const config = resolveQuickScanFieldConfig(undefined, {
+        hasGroup: false,
+        canCreateComments: true,
+        roleRequiresComment: true,
+      });
+
+      expect(config.showComment).toBe(false);
+    });
+  });
 });

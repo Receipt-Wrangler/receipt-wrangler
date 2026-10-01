@@ -145,6 +145,8 @@ Future<GlobalKey<FormBuilderState>> _pumpFormGroups(
   // The comment field is additionally gated on group.comments.create, so every
   // group the test uses is granted it unless a test opts out.
   bool canCreateComments = true,
+  // Groups whose role requires a comment (AppData.groupReceiptRequirements).
+  Set<int> commentRequiredGroupIds = const {},
 }) async {
   final image = _image(
     imageGroupId,
@@ -161,6 +163,12 @@ Future<GlobalKey<FormBuilderState>> _pumpFormGroups(
               canCreateComments
                   ? const ['group.comments.create']
                   : const <String>[],
+      })
+      ..setReceiptRequirements({
+        for (final id in commentRequiredGroupIds)
+          '$id': api.ReceiptRequirements((b) => b
+            ..commentRequired = true
+            ..imageRequired = false),
       });
 
   await tester.pumpWidget(
@@ -213,11 +221,13 @@ Future<GlobalKey<FormBuilderState>> _pumpForm(
   required api.GroupReceiptSettings settings,
   int imageGroupId = _groupId,
   bool canCreateComments = true,
+  Set<int> commentRequiredGroupIds = const {},
 }) => _pumpFormGroups(
   tester,
   groups: [_group(settings)],
   imageGroupId: imageGroupId,
   canCreateComments: canCreateComments,
+  commentRequiredGroupIds: commentRequiredGroupIds,
 );
 
 Finder _commentField() => find.byWidgetPredicate(
@@ -798,6 +808,20 @@ void main() {
     );
 
     expect(_commentField(), findsNothing);
+  });
+
+  testWidgets('a role-required comment is shown and required even when the '
+      'group config leaves it off', (tester) async {
+    await _pumpForm(
+      tester,
+      settings: _settings(),
+      commentRequiredGroupIds: {_groupId},
+    );
+
+    final comment = tester.widget(_commentField()) as FormBuilderTextField;
+    expect(comment.validator, isNotNull);
+    expect(comment.validator!(null), isNotNull, reason: 'empty fails');
+    expect(comment.validator!('A note'), isNull);
   });
 
   testWidgets('keeps a typed comment when the group changes', (tester) async {

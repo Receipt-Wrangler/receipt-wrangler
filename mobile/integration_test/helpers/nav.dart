@@ -1,5 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 
+import 'form_actions.dart';
 import 'pump.dart';
 
 /// From the GroupSelect screen, taps the [groupName] card to enter the group
@@ -32,6 +35,48 @@ Future<void> openGroupReceipts(
   await _drain(tester);
   await tester.tap(find.text('Receipts').hitTestable());
   await pumpUntilFound(tester, find.text(receiptName));
+}
+
+/// Opens [receiptName] in [groupName] and moves it to the **edit** form via the
+/// view's popup menu. Reaching edit state requires `group.receipts.update`.
+/// Returns once the edit form's submit button is mounted -- the marker unique to
+/// edit/add, since `find.text('Name')` also matches the view form.
+Future<void> openReceiptEditForm(
+  WidgetTester tester,
+  String groupName,
+  String receiptName,
+) async {
+  await openGroupReceipts(tester, groupName, receiptName);
+
+  await tester.tap(find.text(receiptName));
+
+  final menuButton = find.byType(PopupMenuButton<dynamic>);
+  await pumpUntilFound(tester, menuButton);
+  await tester.tap(menuButton);
+  await pumpUntilFound(tester, find.text('Edit').hitTestable());
+  await _drain(tester);
+  await tester.tap(find.text('Edit').hitTestable());
+  await pumpUntilFound(tester, find.byType(BottomSubmitButton));
+  // The submit button renders while the form body is still loading, so it
+  // proves the route mounted, not the form: a submit tapped now finds no
+  // FormBuilder state and is a silent no-op. Wait for a field, as
+  // receipt_edit_test does.
+  await pumpUntilFound(tester, formField('name'));
+}
+
+/// [openReceiptEditForm], then the form's "View Comments" action -- the
+/// edit-state comment screen, where adds and deletes hit the API immediately.
+Future<void> openReceiptCommentsInEditMode(
+  WidgetTester tester,
+  String groupName,
+  String receiptName,
+) async {
+  await openReceiptEditForm(tester, groupName, receiptName);
+
+  final commentsButton = find.byTooltip('View Comments');
+  await pumpUntilFound(tester, commentsButton);
+  await tester.tap(commentsButton);
+  await pumpUntilFound(tester, find.text('Receipt Comments'));
 }
 
 /// Drains the tail of a page/sheet transition so a follow-up tap computes its

@@ -39,6 +39,15 @@ type GroupRoleDefinition struct {
 	// resolves to the current member at query time rather than a fixed user id.
 	IncludeOwnPaidReceipts bool `gorm:"not null;default:false" json:"includeOwnPaidReceipts"`
 
+	// RequireReceiptComment / RequireReceiptImage make a member holding this role
+	// supply at least one comment / image on the group's receipts, enforced on
+	// create, update and on deleting the last one. The raw flags are waived per
+	// group (hidden comments/images, no group.comments.create) — resolve them
+	// through ReceiptService.ResolveReceiptRequirements, never read them directly.
+	// Default false ⇒ no effect on existing roles.
+	RequireReceiptComment bool `gorm:"not null;default:false" json:"requireReceiptComment"`
+	RequireReceiptImage   bool `gorm:"not null;default:false" json:"requireReceiptImage"`
+
 	// PaidByVisibilityRestricted records whether the admin opted into paid-by
 	// filtering at all (any specific user grant OR include-own). It is what keeps a
 	// configured role restricted even after its grant rows are removed — e.g. when a

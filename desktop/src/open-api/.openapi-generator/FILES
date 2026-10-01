@@ -106,6 +106,7 @@ model/receipt.ts
 model/receiptPagedRequestCommand.ts
 model/receiptPagedRequestFilter.ts
 model/receiptProcessingSettings.ts
+model/receiptRequirements.ts
 model/receiptStatus.ts
 model/receiptSummary.ts
 model/receiptSummaryCommand.ts

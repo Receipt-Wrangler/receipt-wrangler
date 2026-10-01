@@ -20,6 +20,8 @@ Name | Type | Description | Notes
 **skipDefaultGroupCreation** | **bool** | Whether users created with this APP role skip the automatic personal \"My Receipts\" group (the virtual \"All\" group is always created). Only valid on app roles; applies at user-creation time only. | [optional] 
 **requiresIndividualCategoryGrants** | **bool** | Whether this GROUP role requires per-member category assignment. When true, a member with no individual category grants sees NO categories instead of falling back to the role's set, so an unassigned member fails closed. Only valid on group roles. | [optional] 
 **requiresIndividualTagGrants** | **bool** | Tag counterpart of requiresIndividualCategoryGrants. Only valid on group roles. | [optional] 
+**requireReceiptComment** | **bool** | Whether members of this GROUP role must keep at least one comment on the group's receipts. Only valid on group roles. | [optional] 
+**requireReceiptImage** | **bool** | Whether members of this GROUP role must keep at least one image on the group's receipts. Only valid on group roles. | [optional] 
 **reportTemplateGrants** | [**BuiltList&lt;ReportTemplateGrant&gt;**](ReportTemplateGrant.md) | Per-template action grants for a GROUP role, restricting which report templates its members may act on. Only valid on group roles; omit or leave empty for unrestricted access. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

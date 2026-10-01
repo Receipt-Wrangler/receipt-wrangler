@@ -239,6 +239,33 @@
           <div class="rw-card rw-form-section">
             <div class="rw-perm-header">
               <div>
+                <h2>Receipt requirements</h2>
+                <div class="hint hint-inline">
+                  Members with this role must keep at least one comment or image
+                  on the group's receipts. Not enforced when the group hides
+                  that field.
+                </div>
+              </div>
+            </div>
+
+            <app-checkbox
+              data-testid="require-receipt-comment"
+              label="Require a comment on receipts"
+              [inputFormControl]="form | formGet: 'requireReceiptComment'"
+              [readonly]="isViewMode()"
+            ></app-checkbox>
+
+            <app-checkbox
+              data-testid="require-receipt-image"
+              label="Require an image on receipts"
+              [inputFormControl]="form | formGet: 'requireReceiptImage'"
+              [readonly]="isViewMode()"
+            ></app-checkbox>
+          </div>
+
+          <div class="rw-card rw-form-section">
+            <div class="rw-perm-header">
+              <div>
                 <h2>Category &amp; tag access</h2>
                 <div class="hint hint-inline">
                   Limit members to specific categories and tags. Leave empty for

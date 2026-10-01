@@ -90,6 +90,7 @@ doc/ReceiptPagedRequestCommand.md
 doc/ReceiptPagedRequestFilter.md
 doc/ReceiptProcessingSettings.md
 doc/ReceiptProcessingSettingsApi.md
+doc/ReceiptRequirements.md
 doc/ReceiptStatus.md
 doc/ReceiptSummary.md
 doc/ReceiptSummaryCommand.md
@@ -270,6 +271,7 @@ lib/src/model/receipt.dart
 lib/src/model/receipt_paged_request_command.dart
 lib/src/model/receipt_paged_request_filter.dart
 lib/src/model/receipt_processing_settings.dart
+lib/src/model/receipt_requirements.dart
 lib/src/model/receipt_status.dart
 lib/src/model/receipt_summary.dart
 lib/src/model/receipt_summary_command.dart
@@ -333,3 +335,4 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
+test/receipt_requirements_test.dart

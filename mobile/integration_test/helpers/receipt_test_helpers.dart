@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:receipt_wrangler_mobile/constants/receipt_entry.dart';
+import 'package:receipt_wrangler_mobile/receipts/widgets/receipt_comments.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/receipt_edit_popup_menu.dart';
 
@@ -151,4 +154,77 @@ Future<int> submitManualReceiptForm(WidgetTester tester) async {
   // extract the id from the URL.
   await pumpUntilFound(tester, find.byType(ReceiptEditPopupMenu));
   return receiptIdFromUrl(currentUrl(tester));
+}
+
+/// From the add/edit receipt form, opens the Images screen, attaches whatever
+/// `installFileSelectorMock` serves through the **file** source, and returns to
+/// the form. On the add form the file is only staged; it rides the create.
+Future<void> attachFileFromReceiptForm(WidgetTester tester) async {
+  // Tap the Tooltip wrapper for explicit semantics. Find the popup menu by
+  // widget type, not by icon: PopupMenuButton's default icon is
+  // `Icons.adaptive.more`, which differs between Android and iOS.
+  final imagesButton = find.byTooltip('View Images');
+  await tester.ensureVisible(imagesButton);
+  await tester.pump();
+  await tester.tap(imagesButton);
+  // Drain the iOS Cupertino page-transition slide-in (~400ms) before probing
+  // the popup, or the tap lands where the button will be, not where it is.
+  for (int i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await pumpUntilFound(tester, find.byType(PopupMenuButton));
+  await tester.tap(find.byType(PopupMenuButton));
+  // The popup scales in; wait until the item is hittable, then drain the open
+  // animation before tapping (tap-flake pattern 2 in mobile/CLAUDE.md).
+  await pumpUntilFound(tester, find.text(uploadFileLabel).hitTestable());
+  for (int i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await tester.tap(find.text(uploadFileLabel).hitTestable());
+  await tester.pumpAndSettle(const Duration(seconds: 2));
+
+  await tester.tap(find.byIcon(Icons.arrow_back));
+  await pumpUntilFound(tester, find.text('Name'));
+}
+
+/// From the add/edit receipt form, opens the Comments screen, sends [comment]
+/// and returns to the form. On the add form the comment is only staged on the
+/// model; it rides the create.
+Future<void> addCommentFromReceiptForm(
+  WidgetTester tester,
+  String comment,
+) async {
+  final commentsButton = find.byTooltip('View Comments');
+  await tester.ensureVisible(commentsButton);
+  await tester.pump();
+  await tester.tap(commentsButton);
+  await pumpUntilFound(tester, find.text('Receipt Comments'));
+  for (int i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+
+  final commentField = find.byWidgetPredicate(
+    (w) => w is FormBuilderTextField && w.name == 'comment',
+  );
+  await pumpUntilFound(tester, commentField);
+  await tester.enterText(commentField, comment);
+  // The send button is enabled off a stream; wait for the ENABLED button, not
+  // merely its existence, or the tap is a no-op.
+  final sendButton = find.byWidgetPredicate((w) =>
+      w is IconButton &&
+      w.icon is Icon &&
+      (w.icon as Icon).icon == Icons.send &&
+      w.onPressed != null);
+  await pumpUntilFound(tester, sendButton.hitTestable());
+  await tester.tap(sendButton.hitTestable());
+  // Scoped to the list: in add state the input keeps its text after a send,
+  // so a bare find.text would match the field and return at once.
+  await pumpUntilFound(
+    tester,
+    find.descendant(
+        of: find.byType(ReceiptComments), matching: find.text(comment)),
+  );
+
+  await tester.tap(find.byIcon(Icons.arrow_back));
+  await pumpUntilFound(tester, find.text('Name'));
 }

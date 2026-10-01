@@ -13,6 +13,21 @@ type ReceiptImageRepository struct {
 	BaseRepository
 }
 
+// writeReceiptImageFile is the write CreateReceiptImage makes. It is a variable
+// only so a test can make it fail partway through a file (see
+// SetReceiptImageWriterForTests); nothing else should reassign it.
+var writeReceiptImageFile = utils.WriteDataFile
+
+// SetReceiptImageWriterForTests swaps the file write CreateReceiptImage makes and
+// returns a function restoring the real one. Tests only: it exists so a caller's
+// clean-up of a partially written image can be proven, which a real filesystem
+// will not produce on demand.
+func SetReceiptImageWriterForTests(write func(path string, data []byte) error) (restore func()) {
+	previous := writeReceiptImageFile
+	writeReceiptImageFile = write
+	return func() { writeReceiptImageFile = previous }
+}
+
 func NewReceiptImageRepository(tx *gorm.DB) ReceiptImageRepository {
 	repository := ReceiptImageRepository{BaseRepository: BaseRepository{
 		DB: GetDB(),
@@ -69,9 +84,12 @@ func (repository ReceiptImageRepository) CreateReceiptImage(fileData models.File
 		return models.FileData{}, err
 	}
 
-	err = utils.WriteDataFile(filePath, fileBytes)
+	// The row (and its id) is returned alongside a write error so a caller running
+	// this inside its own transaction can locate, and remove, a partially written
+	// file once that transaction rolls back.
+	err = writeReceiptImageFile(filePath, fileBytes)
 	if err != nil {
-		return models.FileData{}, err
+		return fileData, err
 	}
 
 	return fileData, nil

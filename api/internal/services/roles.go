@@ -92,6 +92,14 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 			return txErr
 		}
 
+		if txErr := roleRepository.SetGroupRoleReceiptRequirements(
+			role.ID,
+			command.RequireReceiptComment,
+			command.RequireReceiptImage,
+		); txErr != nil {
+			return txErr
+		}
+
 		roleView = structs.RoleView{
 			Id:                               role.ID,
 			Name:                             role.Name,
@@ -106,6 +114,8 @@ func (service RoleService) CreateRole(command commands.UpsertRoleCommand) (struc
 			SeesAllMembers:                   command.SeesAllMembers,
 			RequiresIndividualCategoryGrants: command.RequiresIndividualCategoryGrants,
 			RequiresIndividualTagGrants:      command.RequiresIndividualTagGrants,
+			RequireReceiptComment:            command.RequireReceiptComment,
+			RequireReceiptImage:              command.RequireReceiptImage,
 			ReportTemplateGrants:             reportTemplateGrantsToView(reportTemplateGrants),
 		}
 
@@ -200,6 +210,14 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			return txErr
 		}
 
+		if txErr := roleRepository.SetGroupRoleReceiptRequirements(
+			id,
+			command.RequireReceiptComment,
+			command.RequireReceiptImage,
+		); txErr != nil {
+			return txErr
+		}
+
 		roleView = structs.RoleView{
 			Id:                               role.ID,
 			Name:                             role.Name,
@@ -215,6 +233,8 @@ func (service RoleService) UpdateRole(id uint, command commands.UpsertRoleComman
 			SeesAllMembers:                   command.SeesAllMembers,
 			RequiresIndividualCategoryGrants: command.RequiresIndividualCategoryGrants,
 			RequiresIndividualTagGrants:      command.RequiresIndividualTagGrants,
+			RequireReceiptComment:            command.RequireReceiptComment,
+			RequireReceiptImage:              command.RequireReceiptImage,
 			ReportTemplateGrants:             reportTemplateGrantsToView(reportTemplateGrants),
 		}
 
@@ -554,6 +574,8 @@ func groupRoleToView(role models.GroupRoleDefinition, isDefault bool) structs.Ro
 		SeesAllMembers:                   role.SeesAllMembers,
 		RequiresIndividualCategoryGrants: role.RequiresIndividualCategoryGrants,
 		RequiresIndividualTagGrants:      role.RequiresIndividualTagGrants,
+		RequireReceiptComment:            role.RequireReceiptComment,
+		RequireReceiptImage:              role.RequireReceiptImage,
 		ReportTemplateGrants:             repositories.ReportTemplateGrantsFromRole(role),
 	}
 }

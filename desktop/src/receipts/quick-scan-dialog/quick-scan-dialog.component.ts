@@ -12,6 +12,7 @@ import { AuthState, GroupState } from "../../store";
 import { codePointMaxLengthValidator, trimmedRequiredValidator } from "../../validators";
 import { UploadImageComponent } from "../upload-image/upload-image.component";
 import { QuickScanFieldConfig, resolveQuickScanFieldConfig } from "./quick-scan-field-config";
+import { receiptRequirementsFor } from "../../utils/receipt-requirements";
 
 // Mirrors the backend's models.MaxCommentLength (the Comment column is varchar(500), which
 // MySQL/Postgres measure in characters) and mobile's FormBuilderTextField maxLength, so an
@@ -165,6 +166,10 @@ export class QuickScanDialogComponent implements OnInit {
     return resolveQuickScanFieldConfig(this.settingsForIndex(index), {
       hasGroup: this.hasGroupAt(index),
       canCreateComments: this.canCommentForIndex(index),
+      roleRequiresComment: receiptRequirementsFor(
+        this.store.selectSnapshot(AuthState.groupReceiptRequirements),
+        this.groupIds.at(index)?.value
+      ).commentRequired,
     });
   }
 

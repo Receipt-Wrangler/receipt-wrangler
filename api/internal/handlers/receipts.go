@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -176,6 +177,11 @@ func GetReceiptsForGroupIds(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
+// CreateReceipt is the original JSON create. Deprecated in favour of
+// CreateReceiptWithFiles, it is kept for already-released mobile builds, which
+// upload images in separate calls after it returns. It enforces the same
+// role-required fields, so a role that requires an image necessarily rejects it —
+// with a message telling the user to update their app.
 func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 	errMessage := "Error creating receipt"
 	token := structs.GetClaims(r)
@@ -195,7 +201,7 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 
 	stringId := utils.UintToString(command.GroupId)
 
-	// TODO: Clean up to make sure group id is not an all group, and remove middleware sets and checks
+	// TODO: remove middleware sets and checks
 	handler := structs.Handler{
 		ErrorMessage:     errMessage,
 		Writer:           w,
@@ -204,34 +210,11 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 		GroupPermissions: []string{permissions.GroupReceiptsCreate},
 		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
-			allowed, denyMessage, err := enforceReceiptGrantSelection(token.UserId, command.GroupId, command)
+			allowed, err := enforceReceiptCreate(w, token.UserId, command, 0, legacyCreateImageRequiredMessage)
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
 			if !allowed {
-				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
-				return 0, nil
-			}
-
-			// An isolated member may not plant a payer or charged-to user outside
-			// their member-visible set for the group.
-			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, command.GroupId, command)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-			if !allowed {
-				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
-				return 0, nil
-			}
-
-			// A new receipt has no existing custom fields, so any custom field present
-			// is an add — blocked unless the caller can manage custom fields.
-			allowed, denyMessage, err = enforceReceiptCustomFieldSelection(token.UserId, command, nil)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-			if !allowed {
-				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
 				return 0, nil
 			}
 
@@ -241,32 +224,180 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, err
 			}
 
-			permissionService := services.NewPermissionService(nil)
-			err = permissionService.FilterReceiptCategoriesTagsForReceipt(token.UserId, &createdReceipt)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			// Mask user references (created-by, charged-to) and drop non-visible
-			// comment authors the caller may not see.
-			err = permissionService.MaskReceiptForMemberVisibility(token.UserId, &createdReceipt)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			bytes, err := json.Marshal(createdReceipt)
-			if err != nil {
-				return http.StatusInternalServerError, err
-			}
-
-			w.WriteHeader(200)
-			w.Write(bytes)
-
-			return 0, nil
+			return writeCreatedReceipt(w, token.UserId, createdReceipt)
 		},
 	}
 
 	HandleRequest(handler)
+}
+
+// CreateReceiptWithFiles creates a receipt, its comments and its images in one
+// multipart call (see CreateReceiptWithFilesCommand), atomically: a failure
+// anywhere leaves nothing behind. Images ride the create, so
+// group.receipts.create covers them; the separate upload endpoint's
+// group.receipts.update gate does not apply.
+func CreateReceiptWithFiles(w http.ResponseWriter, r *http.Request) {
+	errMessage := "Error creating receipt"
+	token := structs.GetClaims(r)
+
+	command := commands.CreateReceiptWithFilesCommand{}
+	err := command.LoadDataFromRequest(r)
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
+		utils.WriteCustomErrorResponse(w, errMessage, http.StatusBadRequest)
+		return
+	}
+	vErrs := command.Receipt.Validate(token.UserId, true)
+	if len(vErrs.Errors) > 0 {
+		structs.WriteValidatorErrorResponse(w, vErrs, http.StatusBadRequest)
+		return
+	}
+
+	handler := structs.Handler{
+		ErrorMessage:     errMessage,
+		Writer:           w,
+		Request:          r,
+		GroupId:          utils.UintToString(command.Receipt.GroupId),
+		GroupPermissions: []string{permissions.GroupReceiptsCreate},
+		ResponseType:     constants.ApplicationJson,
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			// Every file is checked before anything is written, so a bad file
+			// rejects the whole create rather than failing it halfway.
+			fileRepository := repositories.NewFileRepository(nil)
+			fileErrs := structs.ValidatorError{Errors: make(map[string]string)}
+			for i, file := range command.Files {
+				if _, err := fileRepository.ValidateFileType(file.Bytes); err != nil {
+					fileErrs.Errors[fmt.Sprintf("files.%d", i)] = "Invalid file type"
+				}
+			}
+			if len(fileErrs.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, fileErrs, http.StatusBadRequest)
+				return 0, nil
+			}
+
+			allowed, err := enforceReceiptCreate(w, token.UserId, command.Receipt, len(command.Files), receiptImageRequiredMessage)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
+				return 0, nil
+			}
+
+			createdReceipt, err := services.NewReceiptService(nil).CreateReceiptWithFiles(command.Receipt, command.Files, token.UserId)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			return writeCreatedReceipt(w, token.UserId, createdReceipt)
+		},
+	}
+
+	HandleRequest(handler)
+}
+
+const (
+	allGroupCreateMessage = "Receipts cannot be created in the All group"
+	allGroupMoveMessage   = "Receipts cannot be moved into the All group"
+)
+
+// isAllGroupDestination reports whether groupId is the synthetic "All" group,
+// which may never hold a receipt: it is a cross-group view, and a caller's
+// All-group membership carries the default unrestricted role, so its
+// group.receipts.create would pass the declarative gate and the receipt would
+// live under a role that sidesteps every real group's grant and visibility
+// controls. Every write that names a destination group — both creates, quick
+// scan and a move on update — rejects it. A group that does not exist is not
+// the All group; the permission check that follows denies it.
+func isAllGroupDestination(groupId uint) (bool, error) {
+	isAllGroup, err := repositories.NewGroupRepository(nil).IsAllGroup(groupId)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, err
+	}
+	return isAllGroup, nil
+}
+
+// enforceReceiptCreate runs every check a receipt create must pass beyond its
+// declarative group.receipts.create gate — category/tag grants, member
+// visibility, custom-field selection (403s), then the caller's role-required
+// fields (400) — writing the rejection itself. It returns false when the create
+// was rejected. Shared by both create endpoints so they cannot drift.
+func enforceReceiptCreate(
+	w http.ResponseWriter,
+	userId uint,
+	command commands.UpsertReceiptCommand,
+	imageCount int,
+	imageRequiredMessage string,
+) (bool, error) {
+	// The synthetic All group is a cross-group view, not a real container — see
+	// isAllGroupDestination. Checked first, so nothing else is resolved for it.
+	isAllGroup, err := isAllGroupDestination(command.GroupId)
+	if err != nil {
+		return false, err
+	}
+	if isAllGroup {
+		utils.WriteCustomErrorResponse(w, allGroupCreateMessage, http.StatusBadRequest)
+		return false, nil
+	}
+
+	allowed, denyMessage, err := enforceReceiptGrantSelection(userId, command.GroupId, command)
+	if err != nil {
+		return false, err
+	}
+	if !allowed {
+		utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+		return false, nil
+	}
+
+	// An isolated member may not plant a payer or charged-to user outside
+	// their member-visible set for the group.
+	allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(userId, command.GroupId, command)
+	if err != nil {
+		return false, err
+	}
+	if !allowed {
+		utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+		return false, nil
+	}
+
+	// A new receipt has no existing custom fields, so any custom field present
+	// is an add — blocked unless the caller can manage custom fields.
+	allowed, denyMessage, err = enforceReceiptCustomFieldSelection(userId, command, nil)
+	if err != nil {
+		return false, err
+	}
+	if !allowed {
+		utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+		return false, nil
+	}
+
+	return enforceReceiptRequirements(w, userId, command.GroupId, receiptCommandHasComment(command), imageCount > 0, imageRequiredMessage)
+}
+
+// writeCreatedReceipt strips the categories/tags and masks the users the caller
+// may not see, then writes the created receipt as the response.
+func writeCreatedReceipt(w http.ResponseWriter, userId uint, createdReceipt models.Receipt) (int, error) {
+	permissionService := services.NewPermissionService(nil)
+	err := permissionService.FilterReceiptCategoriesTagsForReceipt(userId, &createdReceipt)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	// Mask user references (created-by, charged-to) and drop non-visible
+	// comment authors the caller may not see.
+	err = permissionService.MaskReceiptForMemberVisibility(userId, &createdReceipt)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	bytes, err := json.Marshal(createdReceipt)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(bytes)
+
+	return 0, nil
 }
 
 func QuickScan(w http.ResponseWriter, r *http.Request) {
@@ -300,6 +431,23 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 
 			fileRepository := repositories.NewFileRepository(nil)
 			token := structs.GetClaims(r)
+
+			// No scanned file may land in the synthetic All group (see
+			// isAllGroupDestination); refused before anything is resolved or enqueued.
+			allGroupErrs := structs.ValidatorError{Errors: make(map[string]string)}
+			for i, groupId := range quickScanCommand.GroupIds {
+				isAllGroup, err := isAllGroupDestination(groupId)
+				if err != nil {
+					return http.StatusInternalServerError, err
+				}
+				if isAllGroup {
+					allGroupErrs.Errors[fmt.Sprintf("files.%d.groupId", i)] = allGroupCreateMessage
+				}
+			}
+			if len(allGroupErrs.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, allGroupErrs, http.StatusBadRequest)
+				return 0, nil
+			}
 
 			// Resolve per-file quick-scan fields against each target group's receipt settings:
 			// enforce the group's required fields (synchronously, so we can 400 before enqueuing
@@ -463,12 +611,12 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 				// All group under a role that sidesteps any real group's grant and
 				// member-visibility controls. Reject it up front. A non-existent
 				// destination falls through to the permission check, which denies it.
-				isAllGroup, err := repositories.NewGroupRepository(nil).IsAllGroup(command.GroupId)
-				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				isAllGroup, err := isAllGroupDestination(command.GroupId)
+				if err != nil {
 					return http.StatusInternalServerError, err
 				}
 				if isAllGroup {
-					utils.WriteCustomErrorResponse(w, "Receipts cannot be moved into the All group", http.StatusBadRequest)
+					utils.WriteCustomErrorResponse(w, allGroupMoveMessage, http.StatusBadRequest)
 					return 0, nil
 				}
 
@@ -526,6 +674,26 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			}
 			if !allowed {
 				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
+				return 0, nil
+			}
+
+			// In edit mode images and comments are added and removed through their
+			// own endpoints (which refuse to remove the last required one), so the
+			// update is judged on what the receipt already STORES, against the group
+			// it will live in. A move into a group whose role requires a field the
+			// receipt lacks is therefore refused.
+			allowed, err = enforceReceiptRequirements(
+				w,
+				token.UserId,
+				targetGroupId,
+				receiptHasComment(currentReceipt),
+				len(currentReceipt.ImageFiles) > 0,
+				receiptImageRequiredMessage,
+			)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+			if !allowed {
 				return 0, nil
 			}
 
