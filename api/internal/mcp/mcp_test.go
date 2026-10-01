@@ -196,6 +196,33 @@ func listCategories(t *testing.T, userId uint) []models.Category {
 	return categories
 }
 
+func TestListGroupsReturnsGroupsEnvelope(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := createUser(t, "group-member")
+	group := models.Group{Name: "MCP group"}
+	if err := repositories.GetDB().Create(&group).Error; err != nil {
+		t.Fatalf("failed to create group: %v", err)
+	}
+	addGroupMember(t, user.ID, group.ID, nil)
+
+	_, out, err := handleListGroups(context.Background(), requestForUser(user.ID), emptyInput{})
+	if err != nil {
+		t.Fatalf("handleListGroups returned error: %v", err)
+	}
+	envelope, ok := out.(map[string]any)
+	if !ok {
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	groups, ok := envelope["groups"].([]models.Group)
+	if !ok {
+		t.Fatalf("expected groups result, got %T", envelope["groups"])
+	}
+	if len(groups) != 1 || groups[0].ID != group.ID {
+		t.Errorf("expected the member group, got %+v", groups)
+	}
+}
+
 // An app.categories.read holder (admin / category manager) sees the whole pool,
 // matching the admin-only REST global list.
 func TestListCategoriesAppReaderSeesAll(t *testing.T) {
@@ -301,6 +328,37 @@ func TestListTagsRestrictedToGroupGrants(t *testing.T) {
 	}
 	if len(tags) != 1 || tags[0].ID != allowedTag.ID {
 		t.Errorf("expected only the granted tag, got %+v", tags)
+	}
+}
+
+func TestListDashboardsReturnsDashboardsEnvelope(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := createUser(t, "dashboard-member")
+	group := models.Group{Name: "MCP dashboards"}
+	if err := repositories.GetDB().Create(&group).Error; err != nil {
+		t.Fatalf("failed to create group: %v", err)
+	}
+	addGroupMember(t, user.ID, group.ID, []string{permissions.GroupDashboardsRead})
+	dashboard := models.Dashboard{Name: "MCP dashboard", UserID: user.ID, GroupID: group.ID}
+	if err := repositories.GetDB().Create(&dashboard).Error; err != nil {
+		t.Fatalf("failed to create dashboard: %v", err)
+	}
+
+	_, out, err := handleListDashboards(context.Background(), requestForUser(user.ID), listDashboardsInput{GroupId: utils.UintToString(group.ID)})
+	if err != nil {
+		t.Fatalf("handleListDashboards returned error: %v", err)
+	}
+	envelope, ok := out.(map[string]any)
+	if !ok {
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	dashboards, ok := envelope["dashboards"].([]models.Dashboard)
+	if !ok {
+		t.Fatalf("expected dashboards result, got %T", envelope["dashboards"])
+	}
+	if len(dashboards) != 1 || dashboards[0].ID != dashboard.ID {
+		t.Errorf("expected the user's dashboard, got %+v", dashboards)
 	}
 }
 
