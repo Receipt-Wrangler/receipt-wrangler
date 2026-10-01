@@ -185,9 +185,13 @@ func listCategories(t *testing.T, userId uint) []models.Category {
 	if err != nil {
 		t.Fatalf("handleListCategories returned error: %v", err)
 	}
-	categories, ok := out.([]models.Category)
+	envelope, ok := out.(map[string]any)
 	if !ok {
-		t.Fatalf("expected []models.Category, got %T", out)
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	categories, ok := envelope["categories"].([]models.Category)
+	if !ok {
+		t.Fatalf("expected categories result, got %T", envelope["categories"])
 	}
 	return categories
 }
@@ -287,9 +291,13 @@ func TestListTagsRestrictedToGroupGrants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handleListTags returned error: %v", err)
 	}
-	tags, ok := out.([]models.Tag)
+	envelope, ok := out.(map[string]any)
 	if !ok {
-		t.Fatalf("expected []models.Tag, got %T", out)
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	tags, ok := envelope["tags"].([]models.Tag)
+	if !ok {
+		t.Fatalf("expected tags result, got %T", envelope["tags"])
 	}
 	if len(tags) != 1 || tags[0].ID != allowedTag.ID {
 		t.Errorf("expected only the granted tag, got %+v", tags)
@@ -355,9 +363,13 @@ func TestSearchReceiptsScopesToUserGroups(t *testing.T) {
 		t.Fatalf("handleSearchReceipts returned error: %v", err)
 	}
 
-	results, ok := out.([]structs.SearchResult)
+	envelope, ok := out.(map[string]any)
 	if !ok {
-		t.Fatalf("expected []structs.SearchResult, got %T", out)
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	results, ok := envelope["receipts"].([]structs.SearchResult)
+	if !ok {
+		t.Fatalf("expected receipts result, got %T", envelope["receipts"])
 	}
 	if len(results) != 2 {
 		t.Errorf("expected 2 receipts from the user's group, got %d", len(results))
@@ -475,9 +487,13 @@ func TestSearchReceiptsEnforcesPaidByVisibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handleSearchReceipts returned error: %v", err)
 	}
-	results, ok := out.([]structs.SearchResult)
+	envelope, ok := out.(map[string]any)
 	if !ok {
-		t.Fatalf("expected []structs.SearchResult, got %T", out)
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	results, ok := envelope["receipts"].([]structs.SearchResult)
+	if !ok {
+		t.Fatalf("expected receipts result, got %T", envelope["receipts"])
 	}
 	if len(results) != 1 || results[0].PaidByUserId != allowedPayer.ID {
 		t.Errorf("expected only the receipt paid by the allowed payer, got %+v", results)

@@ -91,7 +91,7 @@ func handleSearchReceipts(ctx context.Context, req *mcpsdk.CallToolRequest, in s
 		return nil, nil, err
 	}
 
-	return nil, results, nil
+	return nil, map[string]any{"receipts": results}, nil
 }
 
 func handleGetReceipt(ctx context.Context, req *mcpsdk.CallToolRequest, in getReceiptInput) (*mcpsdk.CallToolResult, any, error) {
@@ -137,7 +137,7 @@ func handleListGroups(ctx context.Context, req *mcpsdk.CallToolRequest, _ emptyI
 		return nil, nil, err
 	}
 
-	return nil, groups, nil
+	return nil, map[string]any{"groups": groups}, nil
 }
 
 func handleListCategories(ctx context.Context, req *mcpsdk.CallToolRequest, _ emptyInput) (*mcpsdk.CallToolResult, any, error) {
@@ -165,7 +165,7 @@ func handleListCategories(ctx context.Context, req *mcpsdk.CallToolRequest, _ em
 		return nil, nil, err
 	}
 
-	return nil, visible, nil
+	return nil, map[string]any{"categories": visible}, nil
 }
 
 func handleListTags(ctx context.Context, req *mcpsdk.CallToolRequest, _ emptyInput) (*mcpsdk.CallToolResult, any, error) {
@@ -193,7 +193,7 @@ func handleListTags(ctx context.Context, req *mcpsdk.CallToolRequest, _ emptyInp
 		return nil, nil, err
 	}
 
-	return nil, visible, nil
+	return nil, map[string]any{"tags": visible}, nil
 }
 
 // visibleByGrants filters a global catalog (categories or tags) to what the user
@@ -272,7 +272,7 @@ func handleListDashboards(ctx context.Context, req *mcpsdk.CallToolRequest, in l
 		return nil, nil, err
 	}
 
-	return nil, dashboards, nil
+	return nil, map[string]any{"dashboards": dashboards}, nil
 }
 
 // claimsFromRequest retrieves the verified user claims that verifyToken stashed
