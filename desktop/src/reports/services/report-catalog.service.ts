@@ -31,11 +31,16 @@ export class ReportCatalogService {
     ...this.customFields().flatMap(customFieldDimensions),
   ]);
 
+  /** The currency custom fields: the only custom fields a report can sum, or split. */
+  public readonly currencyCustomFields = computed<ReportField[]>(() =>
+    this.customFields()
+      .filter((field) => field.type === CustomFieldType.Currency)
+      .map(customFieldToField)
+  );
+
   public readonly measures = computed<ReportField[]>(() => [
     ...REPORT_BUILTIN_MEASURES,
-    ...this.customFields()
-      .filter((field) => field.type === CustomFieldType.Currency)
-      .map(customFieldToField),
+    ...this.currencyCustomFields(),
   ]);
 
   /**

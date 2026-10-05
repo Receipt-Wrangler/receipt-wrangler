@@ -153,6 +153,32 @@
   <app-checkbox label="Grand totals" [inputFormControl]="form() | formGet: 'grandTotals'"></app-checkbox>
 </app-report-section>
 
+<!-- Splitting -->
+<app-report-section icon="call_split" headerText="Splitting" subtitle="Divide a shared receipt instead of counting it in full">
+  <app-checkbox label="Split amounts equally across categories" data-testid="report-split-categories"
+    [inputFormControl]="form() | formGet: 'splitCategoriesEqually'"></app-checkbox>
+  @if (splitState().categoryInactive) {
+    <div class="report-config__note" data-testid="report-split-categories-inactive">
+      <mat-icon>info</mat-icon>
+      No effect until the report groups or aggregates by Category.
+    </div>
+  }
+  <app-checkbox label="Split amounts equally across tags" data-testid="report-split-tags"
+    [inputFormControl]="form() | formGet: 'splitTagsEqually'"></app-checkbox>
+  @if (splitState().tagInactive) {
+    <div class="report-config__note" data-testid="report-split-tags-inactive">
+      <mat-icon>info</mat-icon>
+      No effect until the report groups or aggregates by Tag.
+    </div>
+  }
+  @if (splitState().anyTicked && currencyFields().length > 0) {
+    <app-autocomlete label="Don't split these currency fields" data-testid="report-split-excluded"
+      optionValueKey="key" optionFilterKey="label" optionDisplayKey="label"
+      [options]="currencyFields()" [multiple]="true" [creatable]="false"
+      [inputFormControl]="$any(splitExcludedArray)"></app-autocomlete>
+  }
+</app-report-section>
+
 <!-- Document -->
 <app-report-section icon="article" headerText="Document" subtitle="Title, preamble & footer · supports variables">
   <app-input label="Title" [inputFormControl]="form() | formGet: 'document.title'"></app-input>

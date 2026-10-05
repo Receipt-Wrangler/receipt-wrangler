@@ -44,6 +44,37 @@ func NewReportDataService(tx *gorm.DB) ReportDataService {
 //
 // The returned catalog carries every built-in field plus one per custom field.
 func (service ReportDataService) Rows(userId uint, groupId string, filter commands.ReceiptPagedRequestFilter) (reporting.FieldCatalog, []reporting.Row, error) {
+	rowSet, err := service.RowsWithSplit(userId, groupId, filter, receiptsource.SplitOptions{})
+	if err != nil {
+		return reporting.FieldCatalog{}, nil, err
+	}
+	return rowSet.Catalog, rowSet.Rows, nil
+}
+
+// ReportRowSet is what RowsWithSplit returns: the engine's catalog and rows, and
+// how many rows each fetched receipt became. Without a split every receipt is
+// one row; with one, a receipt becomes a row per bucket it is divided across,
+// which is why a receipt count cannot be read off len(Rows).
+type ReportRowSet struct {
+	Catalog        reporting.FieldCatalog
+	Rows           []reporting.Row
+	RowsPerReceipt []int
+}
+
+// RowsWithSplit is Rows with the receipts' money optionally divided across their
+// categories and/or tags (receiptsource.Source.Split).
+//
+// The split runs BEFORE the restricted-category substitution, so a receipt is
+// divided by its true number of categories rather than by how many the caller
+// can see: a visible category's share is the same for every viewer, and the
+// (Restricted) bucket receives exactly the hidden categories' shares. Copies the
+// substitution made indistinguishable are merged back afterwards.
+func (service ReportDataService) RowsWithSplit(
+	userId uint,
+	groupId string,
+	filter commands.ReceiptPagedRequestFilter,
+	splitOptions receiptsource.SplitOptions,
+) (ReportRowSet, error) {
 	customFieldRepository := repositories.NewCustomFieldRepository(service.TX)
 	permissionService := NewPermissionService(service.TX)
 
@@ -56,28 +87,36 @@ func (service ReportDataService) Rows(userId uint, groupId string, filter comman
 		SortDirection: commands.ASCENDING,
 	})
 	if err != nil {
-		return reporting.FieldCatalog{}, nil, err
+		return ReportRowSet{}, err
 	}
 
 	source, err := receiptsource.New(customFields)
 	if err != nil {
-		return reporting.FieldCatalog{}, nil, err
+		return ReportRowSet{}, err
 	}
 
 	// The extra preloads are what receiptsource reads beyond the always-loaded
 	// Categories/Tags.
 	receipts, _, err := service.fetchReceipts(userId, groupId, filter, []string{"PaidByUser", "Group", "CustomFields"}, -1)
 	if err != nil {
-		return reporting.FieldCatalog{}, nil, err
+		return ReportRowSet{}, err
 	}
+
+	split := source.Split(receipts, splitOptions)
 
 	// Replace categories/tags the caller cannot see with a (Restricted) marker so
 	// they aggregate into their own bucket rather than disappearing.
-	if err := permissionService.SubstituteRestrictedCategoriesTags(userId, receipts); err != nil {
-		return reporting.FieldCatalog{}, nil, err
+	if err := permissionService.SubstituteRestrictedCategoriesTags(userId, split.Receipts); err != nil {
+		return ReportRowSet{}, err
 	}
 
-	return source.Catalog(), source.Rows(receipts), nil
+	merged, rowsPerReceipt := source.Merge(split)
+
+	return ReportRowSet{
+		Catalog:        source.Catalog(),
+		Rows:           source.Rows(merged),
+		RowsPerReceipt: rowsPerReceipt,
+	}, nil
 }
 
 // Receipts fetches the same receipts Rows turns into report rows, for a caller

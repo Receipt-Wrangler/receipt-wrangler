@@ -38,6 +38,9 @@ function buildForm(formBuilder: FormBuilder): FormGroup {
       endDate: formBuilder.control<Date | null>(null),
       dateField: formBuilder.control<string>("date"),
     }),
+    splitCategoriesEqually: formBuilder.control(false),
+    splitTagsEqually: formBuilder.control(false),
+    splitExcludedFields: formBuilder.array([]),
     document: formBuilder.group({ intro: formBuilder.control("") }),
   });
 }
@@ -331,6 +334,53 @@ describe("ReportConfigPanelComponent", () => {
     expect(
       component.dimensionOptions().find((option) => option.value === "custom_8")?.badge
     ).toBe("Custom");
+  });
+
+  // ---- splitting ---------------------------------------------------------
+
+  it("offers only the currency custom fields as fields a split can leave whole", () => {
+    loadCustomFields();
+    expect(component.currencyFields().map((field) => field.key)).toEqual(["custom_7"]);
+  });
+
+  it("reports nothing ticked by default", () => {
+    expect(component.splitState()).toEqual({
+      anyTicked: false,
+      categoryInactive: false,
+      tagInactive: false,
+    });
+  });
+
+  it("treats a category split as applied when the report aggregates by category", () => {
+    form.get("splitCategoriesEqually")!.setValue(true);
+    expect(component.splitState()).toEqual({
+      anyTicked: true,
+      categoryInactive: false,
+      tagInactive: false,
+    });
+  });
+
+  it("flags a tag split until the report groups by tag", () => {
+    form.get("splitTagsEqually")!.setValue(true);
+    expect(component.splitState().tagInactive).toBe(true);
+
+    component.addGroupBy("tag");
+    expect(component.splitState().tagInactive).toBe(false);
+
+    component.removeGroupBy(0);
+    expect(component.splitState().tagInactive).toBe(true);
+  });
+
+  it("re-evaluates the category split when the aggregate dimension or mode changes", () => {
+    form.get("splitCategoriesEqually")!.setValue(true);
+    expect(component.splitState().categoryInactive).toBe(false);
+
+    form.get("detail.by")!.setValue("tag");
+    expect(component.splitState().categoryInactive).toBe(true);
+
+    form.get("detail.by")!.setValue("category");
+    component.setDetailMode(ReportDetail.ModeEnum.Records);
+    expect(component.splitState().categoryInactive).toBe(true);
   });
 
   // ---- detail mode -------------------------------------------------------

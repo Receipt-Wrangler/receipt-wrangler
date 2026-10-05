@@ -25,7 +25,12 @@ import {
   toFieldOptions,
 } from "../models/report-catalog.constants";
 import { CHIP_COLORS, groupInitials } from "../models/report-chip.util";
-import { isDimensionColumnDisabled, ReportColumnValue } from "../models/report-command.mapper";
+import {
+  isDimensionColumnDisabled,
+  isSplitActive,
+  ReportColumnValue,
+  ReportSplitDimension,
+} from "../models/report-command.mapper";
 import {
   buildColumnGroup,
   buildGroupByGroup,
@@ -123,6 +128,7 @@ export class ReportConfigPanelComponent implements OnInit {
 
   public readonly dimensions = this.catalog.dimensions;
   public readonly measures = this.catalog.measures;
+  public readonly currencyFields = this.catalog.currencyCustomFields;
 
   public readonly periodOptions = REPORT_PERIOD_PRESETS.map((preset) => ({
     value: preset.id,
@@ -211,12 +217,34 @@ export class ReportConfigPanelComponent implements OnInit {
   });
 
   /**
+   * Which split boxes are ticked, and which of those do nothing because the report
+   * never buckets receipts by that dimension — those get a note rather than
+   * silently being ignored by the server.
+   */
+  public readonly splitState = computed(() => {
+    this.revision();
+    const categories = this.form().get("splitCategoriesEqually")!.value as boolean;
+    const tags = this.form().get("splitTagsEqually")!.value as boolean;
+    return {
+      anyTicked: categories || tags,
+      categoryInactive: categories && !this.splitApplies("category"),
+      tagInactive: tags && !this.splitApplies("tag"),
+    };
+  });
+
+  /**
    * "aggregate by" is bound straight to detail.by and grouping mutates a FormArray,
    * so re-tick the revision signal when either changes to recompute which columns
-   * are disabled (a dimension column is only shown when it matches one of them).
+   * are disabled (a dimension column is only shown when it matches one of them)
+   * and whether a ticked split box applies. The split boxes re-tick it too.
    */
   public ngOnInit(): void {
-    merge(this.form().get("detail")!.valueChanges, this.groupByArray.valueChanges)
+    merge(
+      this.form().get("detail")!.valueChanges,
+      this.groupByArray.valueChanges,
+      this.form().get("splitCategoriesEqually")!.valueChanges,
+      this.form().get("splitTagsEqually")!.valueChanges
+    )
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.bump());
 
@@ -241,6 +269,10 @@ export class ReportConfigPanelComponent implements OnInit {
 
   public get columnsArray(): FormArray {
     return this.form().get("columns") as FormArray;
+  }
+
+  public get splitExcludedArray(): FormArray {
+    return this.form().get("splitExcludedFields") as FormArray;
   }
 
   public get filterGroup(): FormGroup {
@@ -409,6 +441,15 @@ export class ReportConfigPanelComponent implements OnInit {
   }
 
   // ---- helpers -----------------------------------------------------------
+
+  private splitApplies(dimension: ReportSplitDimension): boolean {
+    return isSplitActive(
+      dimension,
+      this.detailMode,
+      this.form().get("detail.by")!.value as string,
+      readGroupByFields(this.groupByArray)
+    );
+  }
 
   private labelForField(key: string): string {
     return this.dimensions().find((field) => field.key === key)?.label ?? key;

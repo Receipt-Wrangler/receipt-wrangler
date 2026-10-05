@@ -484,6 +484,25 @@ disagree. **Client-only on both sides**: no backend, `swagger.yml` or generated-
 See `desktop/CLAUDE.md` → "The month stepper targets one date field" and `mobile/CLAUDE.md` → "Quick
 date filter" for the per-client details.
 
+### Report Split Options
+
+The Report Builder can divide a receipt's money **equally across its categories and/or tags** instead
+of counting it in full in each (two checkboxes, plus a per-report list of currency custom fields to
+leave whole). **Backend + desktop**; mobile only regenerates its client and carries the keys through
+a template preview.
+
+- **The server does all the arithmetic**, before the engine: it splits each receipt into one copy per
+  category (× tag), with cents spread so the shares add back up exactly, and it divides by the
+  receipt's **true** category count even for a viewer who sees some as `(Restricted)`. See
+  `api/CLAUDE.md` → "Splitting a receipt equally across categories / tags".
+- **A box only applies where the report cuts by that dimension** (a grouping level or the aggregate
+  dimension). The desktop flags a ticked box that does nothing rather than letting it look applied.
+- **All three keys are optional and omitted when unset**, so existing templates are unchanged and no
+  configuration-version bump was needed. The excluded keys are plain strings on the contract, never
+  an enum, so a released mobile build cannot fail a template payload on them.
+- E2e: `desktop/e2e/report-split-equally.spec.ts`. Mobile has no builder, so its guard is the ingest
+  test `mobile/test/models/report_split_ingest_test.dart`.
+
 ### Role-Required Receipt Fields & Single-Call Create
 
 A group role can require its members to keep **at least one comment** and/or **at least one image**

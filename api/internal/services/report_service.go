@@ -15,6 +15,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/reporting"
+	"receipt-wrangler/api/internal/reporting/receiptsource"
 	"receipt-wrangler/api/internal/reporting/render"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
@@ -217,9 +218,9 @@ type reportBuild struct {
 
 // buildModel runs the shared pipeline both entry points need: resolve the period,
 // load rows across every covered group under the one catalog, resolve the document
-// variables, build the spec, and run the pure engine. rowLimit > 0 caps the rows
-// fed to the engine (for the preview sample); receiptCount is always the true
-// pre-cap total. It reads the clock once, via the now passed in.
+// variables, build the spec, and run the pure engine. rowLimit > 0 caps the
+// receipts fed to the engine (for the preview sample); receiptCount is always the
+// true pre-cap total. It reads the clock once, via the now passed in.
 func (service ReportService) buildModel(
 	userId uint,
 	command commands.ReportRequestCommand,
@@ -228,14 +229,12 @@ func (service ReportService) buildModel(
 ) (reportBuild, error) {
 	filter, periodLabel := prepareReportFilter(userId, command, now)
 
-	catalog, rows, err := service.loadRows(userId, command.GroupIds, filter)
+	catalog, rows, rowsPerReceipt, err := service.loadRows(userId, command.GroupIds, filter, reportSplitOptions(command))
 	if err != nil {
 		return reportBuild{}, err
 	}
-	receiptCount := len(rows)
-	if rowLimit > 0 && len(rows) > rowLimit {
-		rows = rows[:rowLimit]
-	}
+	receiptCount := len(rowsPerReceipt)
+	rows = capRowsToReceipts(rows, rowsPerReceipt, rowLimit)
 
 	groupNames, err := service.groupNames(command.GroupIds)
 	if err != nil {
@@ -356,28 +355,98 @@ func (service ReportService) receipts(
 
 // loadRows gathers the engine rows across every covered group under a single
 // catalog. The custom-field catalog is a global pool, so it is identical for each
-// group; the rows are concatenated. Rows applies grant-narrowing on its own copy
-// of the filter per group, so the caller's filter is reused unchanged.
+// group; the rows are concatenated, as are the per-receipt row counts. The data
+// service applies grant-narrowing on its own copy of the filter per group, so the
+// caller's filter is reused unchanged.
 func (service ReportService) loadRows(
 	userId uint,
 	groupIds []string,
 	filter commands.ReceiptPagedRequestFilter,
-) (reporting.FieldCatalog, []reporting.Row, error) {
+	splitOptions receiptsource.SplitOptions,
+) (reporting.FieldCatalog, []reporting.Row, []int, error) {
 	dataService := NewReportDataService(service.TX)
 
 	var catalog reporting.FieldCatalog
 	var rows []reporting.Row
+	var rowsPerReceipt []int
 	for index, groupId := range groupIds {
-		groupCatalog, groupRows, err := dataService.Rows(userId, groupId, filter)
+		rowSet, err := dataService.RowsWithSplit(userId, groupId, filter, splitOptions)
 		if err != nil {
-			return reporting.FieldCatalog{}, nil, err
+			return reporting.FieldCatalog{}, nil, nil, err
 		}
 		if index == 0 {
-			catalog = groupCatalog
+			catalog = rowSet.Catalog
 		}
-		rows = append(rows, groupRows...)
+		rows = append(rows, rowSet.Rows...)
+		rowsPerReceipt = append(rowsPerReceipt, rowSet.RowsPerReceipt...)
 	}
-	return catalog, rows, nil
+	return catalog, rows, rowsPerReceipt, nil
+}
+
+// capRowsToReceipts keeps the rows of the first limit receipts. It cuts on whole
+// receipts, so a split receipt's shares are never partly in the sample; without
+// a split every receipt is one row and this is a plain row cap. limit <= 0
+// keeps everything.
+//
+// The sample is deliberately the first receipts in loadRows' order — each group
+// newest first, groups in GroupIds order — not the newest across all groups.
+// That order is exactly what Generate renders (records-mode rows keep input
+// order), so the capped preview stays a prefix of the real report rather than a
+// different selection of it.
+func capRowsToReceipts(rows []reporting.Row, rowsPerReceipt []int, limit int) []reporting.Row {
+	if limit <= 0 || len(rowsPerReceipt) <= limit {
+		return rows
+	}
+
+	end := 0
+	for _, count := range rowsPerReceipt[:limit] {
+		end += count
+	}
+	return rows[:end]
+}
+
+// reportSplitOptions decides which of the request's split boxes take effect.
+//
+// A split applies only to a dimension the report attributes by — a grouping
+// level, or the aggregate detail dimension. Anywhere else it would change
+// nothing a reader sees but the number of rows (a records-mode report would list
+// each receipt once per category), so a ticked box on a report that never cuts by
+// that dimension is a no-op.
+//
+// A currency custom field the report groups or aggregates by is never split,
+// whether or not it was excluded: dividing it would move receipts between its
+// own buckets, so grouping by "Tip" would show buckets nobody entered.
+func reportSplitOptions(command commands.ReportRequestCommand) receiptsource.SplitOptions {
+	options := receiptsource.SplitOptions{
+		Categories: command.SplitCategoriesEqually && reportAttributesBy(command, receiptsource.KeyCategory),
+		Tags:       command.SplitTagsEqually && reportAttributesBy(command, receiptsource.KeyTag),
+	}
+	if !options.Active() {
+		return options
+	}
+
+	options.Excluded = map[uint]struct{}{}
+	excludedKeys := append([]string{}, command.SplitExcludedFields...)
+	excludedKeys = append(excludedKeys, command.GroupBy...)
+	if command.Detail.Mode == commands.ReportDetailAggregate {
+		excludedKeys = append(excludedKeys, command.Detail.By)
+	}
+	for _, key := range excludedKeys {
+		if customFieldId, ok := receiptsource.ParseCustomFieldKey(key); ok {
+			options.Excluded[customFieldId] = struct{}{}
+		}
+	}
+
+	return options
+}
+
+// reportAttributesBy reports whether the report buckets receipts by key: as a
+// grouping level, or as the dimension an aggregate detail rolls up by.
+func reportAttributesBy(command commands.ReportRequestCommand, key reporting.FieldKey) bool {
+	if command.Detail.Mode == commands.ReportDetailAggregate && command.Detail.By == string(key) {
+		return true
+	}
+	return slices.Contains(command.GroupBy, string(key))
 }
 
 // renderedFile is one rendered format awaiting download assembly.

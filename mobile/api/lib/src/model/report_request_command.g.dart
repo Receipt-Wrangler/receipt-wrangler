@@ -93,6 +93,12 @@ class _$ReportRequestCommand extends ReportRequestCommand {
   @override
   final bool? grandTotals;
   @override
+  final bool? splitCategoriesEqually;
+  @override
+  final bool? splitTagsEqually;
+  @override
+  final BuiltList<String>? splitExcludedFields;
+  @override
   final ReportDocument? document;
   @override
   final BuiltList<ReportRequestCommandFormatsEnum> formats;
@@ -112,6 +118,9 @@ class _$ReportRequestCommand extends ReportRequestCommand {
       required this.columns,
       this.subtotals,
       this.grandTotals,
+      this.splitCategoriesEqually,
+      this.splitTagsEqually,
+      this.splitExcludedFields,
       this.document,
       required this.formats})
       : super._();
@@ -138,6 +147,9 @@ class _$ReportRequestCommand extends ReportRequestCommand {
         columns == other.columns &&
         subtotals == other.subtotals &&
         grandTotals == other.grandTotals &&
+        splitCategoriesEqually == other.splitCategoriesEqually &&
+        splitTagsEqually == other.splitTagsEqually &&
+        splitExcludedFields == other.splitExcludedFields &&
         document == other.document &&
         formats == other.formats;
   }
@@ -155,6 +167,9 @@ class _$ReportRequestCommand extends ReportRequestCommand {
     _$hash = $jc(_$hash, columns.hashCode);
     _$hash = $jc(_$hash, subtotals.hashCode);
     _$hash = $jc(_$hash, grandTotals.hashCode);
+    _$hash = $jc(_$hash, splitCategoriesEqually.hashCode);
+    _$hash = $jc(_$hash, splitTagsEqually.hashCode);
+    _$hash = $jc(_$hash, splitExcludedFields.hashCode);
     _$hash = $jc(_$hash, document.hashCode);
     _$hash = $jc(_$hash, formats.hashCode);
     _$hash = $jf(_$hash);
@@ -174,6 +189,9 @@ class _$ReportRequestCommand extends ReportRequestCommand {
           ..add('columns', columns)
           ..add('subtotals', subtotals)
           ..add('grandTotals', grandTotals)
+          ..add('splitCategoriesEqually', splitCategoriesEqually)
+          ..add('splitTagsEqually', splitTagsEqually)
+          ..add('splitExcludedFields', splitExcludedFields)
           ..add('document', document)
           ..add('formats', formats))
         .toString();
@@ -230,6 +248,22 @@ class ReportRequestCommandBuilder
   bool? get grandTotals => _$this._grandTotals;
   set grandTotals(bool? grandTotals) => _$this._grandTotals = grandTotals;
 
+  bool? _splitCategoriesEqually;
+  bool? get splitCategoriesEqually => _$this._splitCategoriesEqually;
+  set splitCategoriesEqually(bool? splitCategoriesEqually) =>
+      _$this._splitCategoriesEqually = splitCategoriesEqually;
+
+  bool? _splitTagsEqually;
+  bool? get splitTagsEqually => _$this._splitTagsEqually;
+  set splitTagsEqually(bool? splitTagsEqually) =>
+      _$this._splitTagsEqually = splitTagsEqually;
+
+  ListBuilder<String>? _splitExcludedFields;
+  ListBuilder<String> get splitExcludedFields =>
+      _$this._splitExcludedFields ??= ListBuilder<String>();
+  set splitExcludedFields(ListBuilder<String>? splitExcludedFields) =>
+      _$this._splitExcludedFields = splitExcludedFields;
+
   ReportDocumentBuilder? _document;
   ReportDocumentBuilder get document =>
       _$this._document ??= ReportDocumentBuilder();
@@ -258,6 +292,9 @@ class ReportRequestCommandBuilder
       _columns = $v.columns.toBuilder();
       _subtotals = $v.subtotals;
       _grandTotals = $v.grandTotals;
+      _splitCategoriesEqually = $v.splitCategoriesEqually;
+      _splitTagsEqually = $v.splitTagsEqually;
+      _splitExcludedFields = $v.splitExcludedFields?.toBuilder();
       _document = $v.document?.toBuilder();
       _formats = $v.formats.toBuilder();
       _$v = null;
@@ -293,6 +330,9 @@ class ReportRequestCommandBuilder
             columns: columns.build(),
             subtotals: subtotals,
             grandTotals: grandTotals,
+            splitCategoriesEqually: splitCategoriesEqually,
+            splitTagsEqually: splitTagsEqually,
+            splitExcludedFields: _splitExcludedFields?.build(),
             document: _document?.build(),
             formats: formats.build(),
           );
@@ -314,6 +354,8 @@ class ReportRequestCommandBuilder
         _$failedField = 'columns';
         columns.build();
 
+        _$failedField = 'splitExcludedFields';
+        _splitExcludedFields?.build();
         _$failedField = 'document';
         _document?.build();
         _$failedField = 'formats';

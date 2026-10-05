@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"receipt-wrangler/api/internal/reporting/receiptsource"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
@@ -89,8 +90,19 @@ type ReportRequestCommand struct {
 	Columns       []ReportColumn    `json:"columns"`
 	Subtotals     bool              `json:"subtotals"`
 	GrandTotals   bool              `json:"grandTotals"`
-	Document      ReportDocument    `json:"document"`
-	Formats       []string          `json:"formats"`
+	// SplitCategoriesEqually and SplitTagsEqually divide a receipt's money
+	// equally across its categories / tags instead of attributing the whole of
+	// it to every bucket. Each takes effect only when the report attributes by
+	// that dimension (a grouping level, or the aggregate detail dimension).
+	SplitCategoriesEqually bool `json:"splitCategoriesEqually,omitempty"`
+	SplitTagsEqually       bool `json:"splitTagsEqually,omitempty"`
+	// SplitExcludedFields names the currency custom fields (by their
+	// receiptsource.CustomFieldKey) that a split leaves whole. Like
+	// GroupByLabels, an entry naming a field that no longer exists or is not
+	// currency is ignored rather than rejected.
+	SplitExcludedFields []string       `json:"splitExcludedFields,omitempty"`
+	Document            ReportDocument `json:"document"`
+	Formats             []string       `json:"formats"`
 }
 
 // ReportPeriod is the reporting window. Preset is one of the ReportPeriod*
@@ -192,6 +204,7 @@ func (command *ReportRequestCommand) Validate() structs.ValidatorError {
 	command.validateDetail(errorMap)
 	command.validateColumns(errorMap)
 	command.validateFormats(errorMap)
+	command.validateSplit(errorMap)
 
 	return structs.ValidatorError{Errors: errorMap}
 }
@@ -289,6 +302,18 @@ func (command *ReportRequestCommand) validateFormats(errorMap map[string]string)
 	for _, format := range command.Formats {
 		if !validReportFormats[format] {
 			errorMap["formats"] = "Unsupported format: " + format
+			return
+		}
+	}
+}
+
+// validateSplit checks only the shape of each excluded key. Whether it names an
+// existing currency field is not checked: a stale entry is ignored, so a field
+// deleted after a template was saved cannot break the template.
+func (command *ReportRequestCommand) validateSplit(errorMap map[string]string) {
+	for _, key := range command.SplitExcludedFields {
+		if _, ok := receiptsource.ParseCustomFieldKey(key); !ok {
+			errorMap["splitExcludedFields"] = "Invalid custom field key: " + key
 			return
 		}
 	}
