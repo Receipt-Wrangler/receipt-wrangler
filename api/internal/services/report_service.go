@@ -387,6 +387,12 @@ func (service ReportService) loadRows(
 // receipts, so a split receipt's shares are never partly in the sample; without
 // a split every receipt is one row and this is a plain row cap. limit <= 0
 // keeps everything.
+//
+// The sample is deliberately the first receipts in loadRows' order — each group
+// newest first, groups in GroupIds order — not the newest across all groups.
+// That order is exactly what Generate renders (records-mode rows keep input
+// order), so the capped preview stays a prefix of the real report rather than a
+// different selection of it.
 func capRowsToReceipts(rows []reporting.Row, rowsPerReceipt []int, limit int) []reporting.Row {
 	if limit <= 0 || len(rowsPerReceipt) <= limit {
 		return rows

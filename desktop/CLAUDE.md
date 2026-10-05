@@ -2481,7 +2481,7 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
     (`report-split-categories-inactive` / `report-split-tags-inactive`) otherwise; the split
     controls' `valueChanges` join the `revision` merge so it re-derives.
   - **The mapper emits each flag only when true and the exclusions only when non-empty**, so an
-    untouched report still maps to byte-identical the command it always did. Exclusions are kept
+    untouched report still maps to a command byte-identical to the one it always did. Exclusions are kept
     while both boxes are off, so un-ticking and re-ticking does not lose them, and they are
     **deduplicated** there: with `optionValueKey` set, `app-autocomlete`'s reference-equality filter
     never hides an already-picked option, so the same field can be picked twice.
