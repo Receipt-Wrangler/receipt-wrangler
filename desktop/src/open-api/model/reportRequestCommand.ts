@@ -46,6 +46,18 @@ export interface ReportRequestCommand {
      * Emit one grand-total row across everything
      */
     grandTotals?: boolean;
+    /**
+     * Divide each receipt\'s money equally across its categories instead of attributing the whole amount to every category. Takes effect only when the report groups or aggregates by category. Omitted means false.
+     */
+    splitCategoriesEqually?: boolean;
+    /**
+     * Divide each receipt\'s money equally across its tags instead of attributing the whole amount to every tag. Takes effect only when the report groups or aggregates by tag. Omitted means false.
+     */
+    splitTagsEqually?: boolean;
+    /**
+     * Currency custom field keys (custom_<id>) that a split leaves whole. An entry naming a field that no longer exists or is not a currency field is ignored.
+     */
+    splitExcludedFields?: Array<string>;
     document?: ReportDocument;
     /**
      * One or more output formats; multiple are zipped together

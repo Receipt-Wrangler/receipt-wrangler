@@ -387,6 +387,9 @@ export async function apiCreateReceipt(
      */
     amount?: string;
     customFields?: ReceiptCustomFieldValue[];
+    /** Existing categories / tags to attach, as returned by apiCreateCategory / apiCreateTag. */
+    categories?: { id: number; name: string }[];
+    tags?: { id: number; name: string }[];
   },
 ): Promise<number> {
   const res = await api.post('/api/receipt', {
@@ -398,6 +401,8 @@ export async function apiCreateReceipt(
       paidByUserId: opts.paidByUserId,
       status: opts.status ?? 'OPEN',
       ...(opts.customFields ? { customFields: opts.customFields } : {}),
+      ...(opts.categories ? { categories: opts.categories } : {}),
+      ...(opts.tags ? { tags: opts.tags } : {}),
     },
   });
   if (!res.ok()) {

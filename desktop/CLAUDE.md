@@ -2469,6 +2469,27 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   action. **Save-as-new is retired** — the list's Duplicate row action covers copying. The template's
   name is the report's own name (no separate dialog), enabled under the same validity as Generate plus a
   non-empty name (`canSaveTemplate`). See `api/CLAUDE.md` → "Report templates".
+- **Splitting** (`report-config-panel`, a section after Totals): two `app-checkbox`es,
+  "Split amounts equally across categories" / "…across tags", bound to `splitCategoriesEqually` /
+  `splitTagsEqually`, plus a "Don't split these currency fields" `app-autocomlete`
+  (`optionValueKey="key"`, over `ReportCatalogService.currencyCustomFields`, which `measures()` now
+  reuses) shown only while a box is ticked and a currency field exists. See `api/CLAUDE.md` →
+  "Splitting a receipt equally across categories / tags" for what the server does with them.
+  - **A ticked box that does nothing says so.** `isSplitActive` (`report-command.mapper.ts`) is the
+    client twin of the server's `reportSplitOptions`: a split applies only when the report groups by
+    that dimension or aggregates by it. `splitState()` drives a note
+    (`report-split-categories-inactive` / `report-split-tags-inactive`) otherwise; the split
+    controls' `valueChanges` join the `revision` merge so it re-derives.
+  - **The mapper emits each flag only when true and the exclusions only when non-empty**, so an
+    untouched report still maps to byte-identical the command it always did. Exclusions are kept
+    while both boxes are off, so un-ticking and re-ticking does not lose them, and they are
+    **deduplicated** there: with `optionValueKey` set, `app-autocomlete`'s reference-equality filter
+    never hides an already-picked option, so the same field can be picked twice.
+  - **E2E:** `e2e/report-split-equally.spec.ts` (serial, own seeded group, categories, tags and a
+    currency field) — the split figures in the real preview, the inactive note clearing once the
+    report groups by tag, the picked exclusion riding the preview request, and a template
+    round-tripping the flags. The exclusion input is driven with `fill`, not `click`: the empty
+    field's floating label intercepts the click.
 - **Generate gating**: the generate bar's Generate button is
   `*hasAppPermission="Permission.AppReportsGenerate"`-gated (preview is not — it stays group-scoped),
   matching the endpoint, which now ANDs `app.reports.generate` with the per-group `group.reports.read`.

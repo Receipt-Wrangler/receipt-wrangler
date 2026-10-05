@@ -3,6 +3,7 @@ import { ReportColumn, ReportDetail, ReportPeriod } from "../../open-api";
 import {
   enabledReportColumns,
   isDimensionColumnDisabled,
+  isSplitActive,
   ReportBuilderValue,
   toReportRequestCommand,
   toReportRequestCommandForSave,
@@ -27,6 +28,9 @@ function baseValue(): ReportBuilderValue {
     ],
     subtotals: true,
     grandTotals: false,
+    splitCategoriesEqually: false,
+    splitTagsEqually: false,
+    splitExcludedFields: [],
     document: { title: "", intro: "", footer: "" },
     formats: { csv: false, xlsx: true, pdf: true },
   };
@@ -215,5 +219,64 @@ describe("isDimensionColumnDisabled", () => {
       columns: [dim("category"), dim("tag"), agg()],
     } as any as ReportBuilderValue;
     expect(enabledReportColumns(value).map((c) => c.field ?? c.name)).toEqual(["tag", "Y"]);
+  });
+});
+
+describe("split options", () => {
+  it("omits every split key when nothing is split", () => {
+    // An untouched report must map to exactly the command it always did.
+    const command = toReportRequestCommand(baseValue());
+    expect("splitCategoriesEqually" in command).toBe(false);
+    expect("splitTagsEqually" in command).toBe(false);
+    expect("splitExcludedFields" in command).toBe(false);
+  });
+
+  it("emits each split flag on its own", () => {
+    const categories = baseValue();
+    categories.splitCategoriesEqually = true;
+    const categoriesCommand = toReportRequestCommand(categories);
+    expect(categoriesCommand.splitCategoriesEqually).toBe(true);
+    expect("splitTagsEqually" in categoriesCommand).toBe(false);
+
+    const tags = baseValue();
+    tags.splitTagsEqually = true;
+    const tagsCommand = toReportRequestCommand(tags);
+    expect(tagsCommand.splitTagsEqually).toBe(true);
+    expect("splitCategoriesEqually" in tagsCommand).toBe(false);
+  });
+
+  it("emits the excluded fields once each, in order", () => {
+    const value = baseValue();
+    value.splitCategoriesEqually = true;
+    value.splitExcludedFields = ["custom_3", "custom_1", "custom_3"];
+    expect(toReportRequestCommand(value).splitExcludedFields).toEqual(["custom_3", "custom_1"]);
+  });
+
+  it("keeps the excluded fields while both boxes are off, so a re-tick restores them", () => {
+    const value = baseValue();
+    value.splitExcludedFields = ["custom_3"];
+    expect(toReportRequestCommandForSave(value).splitExcludedFields).toEqual(["custom_3"]);
+  });
+});
+
+describe("isSplitActive", () => {
+  const Aggregate = ReportDetail.ModeEnum.Aggregate;
+  const Records = ReportDetail.ModeEnum.Records;
+
+  it("applies when the report aggregates by the dimension", () => {
+    expect(isSplitActive("category", Aggregate, "category", [])).toBe(true);
+  });
+
+  it("applies when the dimension is a grouping level, in either mode", () => {
+    expect(isSplitActive("tag", Aggregate, "category", ["group", "tag"])).toBe(true);
+    expect(isSplitActive("tag", Records, "", ["tag"])).toBe(true);
+  });
+
+  it("does not apply when the report never buckets by the dimension", () => {
+    expect(isSplitActive("category", Aggregate, "tag", ["paid_by"])).toBe(false);
+  });
+
+  it("ignores a stray aggregate-by in records mode", () => {
+    expect(isSplitActive("category", Records, "category", [])).toBe(false);
   });
 });

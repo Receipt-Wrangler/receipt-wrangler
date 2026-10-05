@@ -27,6 +27,9 @@ part 'report_request_command.g.dart';
 /// * [columns] 
 /// * [subtotals] - Emit a subtotal row at each grouping level
 /// * [grandTotals] - Emit one grand-total row across everything
+/// * [splitCategoriesEqually] - Divide each receipt's money equally across its categories instead of attributing the whole amount to every category. Takes effect only when the report groups or aggregates by category. Omitted means false.
+/// * [splitTagsEqually] - Divide each receipt's money equally across its tags instead of attributing the whole amount to every tag. Takes effect only when the report groups or aggregates by tag. Omitted means false.
+/// * [splitExcludedFields] - Currency custom field keys (custom_<id>) that a split leaves whole. An entry naming a field that no longer exists or is not a currency field is ignored.
 /// * [document] 
 /// * [formats] - One or more output formats; multiple are zipped together
 @BuiltValue()
@@ -67,6 +70,18 @@ abstract class ReportRequestCommand implements Built<ReportRequestCommand, Repor
   /// Emit one grand-total row across everything
   @BuiltValueField(wireName: r'grandTotals')
   bool? get grandTotals;
+
+  /// Divide each receipt's money equally across its categories instead of attributing the whole amount to every category. Takes effect only when the report groups or aggregates by category. Omitted means false.
+  @BuiltValueField(wireName: r'splitCategoriesEqually')
+  bool? get splitCategoriesEqually;
+
+  /// Divide each receipt's money equally across its tags instead of attributing the whole amount to every tag. Takes effect only when the report groups or aggregates by tag. Omitted means false.
+  @BuiltValueField(wireName: r'splitTagsEqually')
+  bool? get splitTagsEqually;
+
+  /// Currency custom field keys (custom_<id>) that a split leaves whole. An entry naming a field that no longer exists or is not a currency field is ignored.
+  @BuiltValueField(wireName: r'splitExcludedFields')
+  BuiltList<String>? get splitExcludedFields;
 
   @BuiltValueField(wireName: r'document')
   ReportDocument? get document;
@@ -159,6 +174,27 @@ class _$ReportRequestCommandSerializer implements PrimitiveSerializer<ReportRequ
       yield serializers.serialize(
         object.grandTotals,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.splitCategoriesEqually != null) {
+      yield r'splitCategoriesEqually';
+      yield serializers.serialize(
+        object.splitCategoriesEqually,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.splitTagsEqually != null) {
+      yield r'splitTagsEqually';
+      yield serializers.serialize(
+        object.splitTagsEqually,
+        specifiedType: const FullType(bool),
+      );
+    }
+    if (object.splitExcludedFields != null) {
+      yield r'splitExcludedFields';
+      yield serializers.serialize(
+        object.splitExcludedFields,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
       );
     }
     if (object.document != null) {
@@ -265,6 +301,27 @@ class _$ReportRequestCommandSerializer implements PrimitiveSerializer<ReportRequ
             specifiedType: const FullType(bool),
           ) as bool;
           result.grandTotals = valueDes;
+          break;
+        case r'splitCategoriesEqually':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.splitCategoriesEqually = valueDes;
+          break;
+        case r'splitTagsEqually':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(bool),
+          ) as bool;
+          result.splitTagsEqually = valueDes;
+          break;
+        case r'splitExcludedFields':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(BuiltList, [FullType(String)]),
+          ) as BuiltList<String>;
+          result.splitExcludedFields.replace(valueDes);
           break;
         case r'document':
           final valueDes = serializers.deserialize(

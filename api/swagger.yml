@@ -6876,6 +6876,27 @@ components:
         grandTotals:
           type: boolean
           description: Emit one grand-total row across everything
+        splitCategoriesEqually:
+          type: boolean
+          description: >-
+            Divide each receipt's money equally across its categories instead of
+            attributing the whole amount to every category. Takes effect only
+            when the report groups or aggregates by category. Omitted means
+            false.
+        splitTagsEqually:
+          type: boolean
+          description: >-
+            Divide each receipt's money equally across its tags instead of
+            attributing the whole amount to every tag. Takes effect only when
+            the report groups or aggregates by tag. Omitted means false.
+        splitExcludedFields:
+          type: array
+          items:
+            type: string
+          description: >-
+            Currency custom field keys (custom_<id>) that a split leaves whole.
+            An entry naming a field that no longer exists or is not a currency
+            field is ignored.
         document:
           $ref: "#/components/schemas/ReportDocument"
         formats:

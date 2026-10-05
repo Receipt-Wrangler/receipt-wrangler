@@ -463,6 +463,82 @@ add 'unresolvable-custom-field-value-wins' 'receiptsource/receiptsource.go' \
 
 		winners[key] = customFieldValue.ID'
 
+# --- receiptsource: splitting a receipt across its categories / tags ---------
+
+# TestAllocateGrid_MarginalsMatchSingleDimensionSplits — restarting the column
+# pointer every row piles the leftover units onto the first tags, so a tag's
+# total stops matching a split across tags alone.
+add 'split-column-pointer-resets-per-row' 'receiptsource/split.go' \
+'	column := 0
+	for row := 0; row < rows; row++ {' \
+'	for row := 0; row < rows; row++ {
+		column := 0'
+
+# TestAllocateGrid_SingleRow — dropping the leftover units loses cents, so the
+# shares stop adding back up to the receipt.
+add 'split-leftover-units-dropped' 'receiptsource/split.go' \
+'			if extraByColumn[col] {
+				share.Add(share, big.NewInt(1))
+			}' \
+'			_ = extraByColumn[col]'
+
+# TestAllocateGrid_SingleRow — a refund must split into negative shares.
+add 'split-sign-dropped' 'receiptsource/split.go' \
+'			if negative {
+				share.Neg(share)
+			}' \
+'			_ = negative'
+
+# TestAllocateGrid_SingleRow — a value entered with more places than cents keeps
+# them, or 10.555 loses its last digit.
+add 'split-scale-fixed-at-cents' 'receiptsource/split.go' \
+'	if places := -value.Exponent(); places > scale {
+		scale = places
+	}' \
+'	_ = value.Exponent()'
+
+# TestSplit_Categories — the leftover cent follows the category id, not the
+# order the database returned the categories in.
+add 'split-categories-unsorted' 'receiptsource/split.go' \
+'	sort.SliceStable(distinct, func(i, j int) bool {
+		if distinct[i].ID != distinct[j].ID {
+			return distinct[i].ID < distinct[j].ID
+		}
+		return distinct[i].Name < distinct[j].Name
+	})
+	return distinct
+}
+
+func distinctTags' \
+'	return distinct
+}
+
+func distinctTags'
+
+# TestSplit_CurrencyCustomFields — an excluded field is carried whole.
+add 'split-ignores-exclusions' 'receiptsource/split.go' \
+'	_, excluded := options.Excluded[customFieldValue.CustomFieldId]
+	return !excluded' \
+'	return true'
+
+# TestSplit_DoesNotMutateTheInput — an unsplit dimension's list must be copied,
+# or the restricted substitution of one copy rewrites the caller's receipt.
+add 'split-shares-the-tag-slice' 'receiptsource/split.go' \
+'			copied.Tags = append([]models.Tag(nil), tagLists[col]...)' \
+'			copied.Tags = tagLists[col]'
+
+# TestMerge_NeverFoldsDifferentReceipts — two receipts are never one row, however
+# alike they look.
+add 'merge-ignores-origin' 'receiptsource/split.go' \
+'	key.WriteString(strconv.Itoa(origin))' \
+'	key.WriteString(strconv.Itoa(0 * origin))'
+
+# TestMerge_FoldsCopiesTheSubstitutionMadeIdentical — merging must not add up a
+# value every copy carried whole.
+add 'merge-sums-excluded-values' 'receiptsource/split.go' \
+'		if index >= len(from.CustomFields) || !s.isSplitCustomFieldValue(customFieldValue, options) {' \
+'		if index >= len(from.CustomFields) || customFieldValue.CurrencyValue == nil {'
+
 # ----------------------------------------------------------------------------
 
 green() { printf '\033[32m%s\033[0m' "$1"; }

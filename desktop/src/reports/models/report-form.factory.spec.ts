@@ -135,6 +135,44 @@ describe("buildReportFormFromCommand", () => {
     expect(roundTrip(command)).toEqual(command);
   });
 
+  it("round-trips the split options", () => {
+    const command: ReportRequestCommand = {
+      name: "Shared Spend",
+      groupIds: ["1"],
+      period: { preset: ReportPeriod.PresetEnum.ThisMonth, dateField: "date" },
+      filter: canonicalFilter({}),
+      groupBy: ["tag"],
+      detail: { mode: ReportDetail.ModeEnum.Aggregate, by: "category" },
+      columns: [
+        { kind: ReportColumn.KindEnum.Dimension, name: "Category", label: "Category", field: "category" },
+        { kind: ReportColumn.KindEnum.Aggregate, name: "Total", label: "Total", aggFunc: ReportColumn.AggFuncEnum.Sum, measure: "amount" },
+      ],
+      subtotals: true,
+      grandTotals: true,
+      splitCategoriesEqually: true,
+      splitTagsEqually: true,
+      splitExcludedFields: ["custom_4", "custom_9"],
+      formats: [ReportRequestCommand.FormatsEnum.Pdf],
+    };
+
+    expect(roundTrip(command)).toEqual(command);
+  });
+
+  it("hydrates a template saved before the split options existed with them off", () => {
+    const form = buildReportFormFromCommand(fb, host, {
+      name: "Old",
+      groupIds: ["1"],
+      period: { preset: ReportPeriod.PresetEnum.ThisMonth },
+      detail: { mode: ReportDetail.ModeEnum.Records },
+      columns: [{ kind: ReportColumn.KindEnum.Dimension, name: "Name", label: "Name", field: "name" }],
+      formats: [ReportRequestCommand.FormatsEnum.Csv],
+    });
+
+    expect(form.get("splitCategoriesEqually")!.value).toBe(false);
+    expect(form.get("splitTagsEqually")!.value).toBe(false);
+    expect(readStringArray(form.get("splitExcludedFields") as FormArray)).toEqual([]);
+  });
+
   it("parses custom-period date strings back into Date objects", () => {
     const command: ReportRequestCommand = {
       name: "Dates",

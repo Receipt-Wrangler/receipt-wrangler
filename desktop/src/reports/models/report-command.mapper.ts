@@ -51,8 +51,30 @@ export interface ReportBuilderValue {
   columns: ReportColumnValue[];
   subtotals: boolean;
   grandTotals: boolean;
+  splitCategoriesEqually: boolean;
+  splitTagsEqually: boolean;
+  // Currency custom field keys (custom_<id>) a split leaves whole.
+  splitExcludedFields: string[];
   document: { title: string; intro: string; footer: string };
   formats: Record<ReportRequestFormat, boolean>;
+}
+
+/** The two dimensions a receipt's money can be split equally across. */
+export type ReportSplitDimension = "category" | "tag";
+
+/**
+ * Whether a split across [dimension] changes anything: the report has to bucket
+ * receipts by it, as a grouping level or as the aggregate-by dimension. Anywhere
+ * else the server ignores the box (reportSplitOptions in report_service.go), so
+ * the builder flags it rather than letting the user think it applied.
+ */
+export function isSplitActive(
+  dimension: ReportSplitDimension,
+  mode: ReportDetail.ModeEnum,
+  detailBy: string,
+  groupBy: string[]
+): boolean {
+  return groupBy.includes(dimension) || (mode === ReportDetail.ModeEnum.Aggregate && detailBy === dimension);
 }
 
 /**
@@ -165,6 +187,20 @@ function mapReportCommand(value: ReportBuilderValue, columns: ReportColumnValue[
   const groupByLabels = toGroupByLabels(value.groupBy);
   if (groupByLabels) {
     command.groupByLabels = groupByLabels;
+  }
+
+  // Emitted only when set, so an untouched report maps to exactly the command it
+  // always did. The exclusions are kept while both boxes are off, so unticking
+  // and re-ticking a split does not lose them.
+  if (value.splitCategoriesEqually) {
+    command.splitCategoriesEqually = true;
+  }
+  if (value.splitTagsEqually) {
+    command.splitTagsEqually = true;
+  }
+  const splitExcludedFields = [...new Set(value.splitExcludedFields ?? [])];
+  if (splitExcludedFields.length > 0) {
+    command.splitExcludedFields = splitExcludedFields;
   }
 
   const { title, intro, footer } = value.document;

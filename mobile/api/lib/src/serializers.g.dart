@@ -305,6 +305,9 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(ReportColumn)]),
           () => ListBuilder<ReportColumn>())
       ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(String)]),
+          () => ListBuilder<String>())
+      ..addBuilderFactory(
           const FullType(BuiltList,
               const [const FullType(ReportRequestCommandFormatsEnum)]),
           () => ListBuilder<ReportRequestCommandFormatsEnum>())
