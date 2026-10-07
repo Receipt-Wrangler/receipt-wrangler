@@ -18,7 +18,7 @@ func TestUpsertPromptCommand_Validate_ValidInputs(t *testing.T) {
 		"valid with all template vars": {
 			command: UpsertPromptCommand{
 				Name:   "Test Prompt",
-				Prompt: "Use @categories @tags @ocrText and @currentYear",
+				Prompt: "Use @categories @tags @ocrText @customFields and @currentYear",
 			},
 		},
 		"valid with single template var": {
