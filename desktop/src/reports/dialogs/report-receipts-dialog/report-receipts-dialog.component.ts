@@ -9,11 +9,13 @@ import {
 } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
+import { Store } from "@ngxs/store";
 import { Receipt, ReportRequestCommand, ReportService } from "../../../open-api";
+import { SystemSettingsState } from "../../../store/system-settings.state";
 import { ReportBuilderValue } from "../../models/report-command.mapper";
 import {
   formatPeriodRange,
-  reportPeriodDateFieldLabel,
+  reportPeriodDateFieldHint,
   resolvePeriodRange,
   toReportPeriodDateField,
 } from "../../models/report-period.util";
@@ -30,9 +32,9 @@ export interface ReportReceiptsDialogData {
 
 /**
  * Lists the receipts a report covers. The server resolves the report's filter and
- * period (on its own clock and time zone) and runs the report's own query, so the
- * list matches the preview's count; resolving the period here would use the
- * browser's time zone instead. Read-only — it exists so a user can sanity-check
+ * period (on its own clock, in the app time zone) and runs the report's own query,
+ * so the list matches the preview's count. The subtitle resolves the period in
+ * the same app zone, never the browser's. Read-only — it exists so a user can sanity-check
  * what's flowing into the report.
  */
 @Component({
@@ -46,6 +48,7 @@ export class ReportReceiptsDialogComponent {
   private readonly reportService = inject(ReportService);
   private readonly dialogRef = inject(MatDialogRef<ReportReceiptsDialogComponent>);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly store = inject(Store);
 
   public readonly loading = signal<boolean>(true);
   public readonly receipts = signal<Receipt[]>([]);
@@ -64,10 +67,11 @@ export class ReportReceiptsDialogComponent {
   public readonly truncated = computed(() => this.receipts().length < this.totalCount());
 
   constructor(@Inject(MAT_DIALOG_DATA) data: ReportReceiptsDialogData) {
+    const timeZone = this.store.selectSnapshot(SystemSettingsState.timeZone);
     const range = formatPeriodRange(
-      resolvePeriodRange(data.period.preset, data.period.startDate, data.period.endDate)
+      resolvePeriodRange(data.period.preset, data.period.startDate, data.period.endDate, timeZone)
     );
-    const dateField = reportPeriodDateFieldLabel(toReportPeriodDateField(data.period.dateField));
+    const dateField = reportPeriodDateFieldHint(toReportPeriodDateField(data.period.dateField), timeZone);
     this.periodLabel = `${range} on ${dateField}`;
     this.providedCount = data.receiptCount;
     this.load(data.command);

@@ -15,6 +15,7 @@ import {
 import { buildColumnGroup } from "../models/report-form.factory";
 import { ReportCatalogService } from "../services/report-catalog.service";
 import { ReportConfigPanelComponent } from "./report-config-panel.component";
+import { SystemSettingsState } from "src/store/system-settings.state";
 
 const GROUPS = [
   { id: 1, name: "Household" },
@@ -62,7 +63,13 @@ describe("ReportConfigPanelComponent", () => {
       providers: [
         provideZonelessChangeDetection(),
         FormBuilder,
-        { provide: Store, useValue: { selectSignal: () => signal(GROUPS) } },
+        {
+          provide: Store,
+          useValue: {
+            selectSignal: (selector: unknown) =>
+              signal(selector === SystemSettingsState.timeZone ? "America/New_York" : GROUPS),
+          },
+        },
         { provide: MatDialog, useValue: dialog },
         { provide: CustomFieldService, useValue: customFieldService },
       ],
@@ -469,11 +476,13 @@ describe("ReportConfigPanelComponent", () => {
     ]);
   });
 
-  it("periodDateFieldLabel names the date field the period covers", () => {
+  // An instant field is read in the app time zone, so the hint names it; the
+  // receipt date is a calendar day no zone shifts, so it is named alone.
+  it("periodDateFieldLabel names the date field the period covers, and its zone", () => {
     expect(component.periodDateFieldLabel()).toBe("Receipt Date");
 
     form.get("period.dateField")!.setValue("createdAt");
-    expect(component.periodDateFieldLabel()).toBe("Added At");
+    expect(component.periodDateFieldLabel()).toBe("Added At (America/New_York)");
   });
 
   it("insertVariable appends tokens to the document intro", () => {

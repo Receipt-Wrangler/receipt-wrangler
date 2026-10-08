@@ -1555,6 +1555,43 @@ helpers `withAdminApi` + `apiDeleteUserByName` / `apiDeleteGroupById` / `apiDele
   spec rather than an extension of `group-viewer-visibility.spec.ts`, whose serial block has a known
   pre-existing failure — a Legacy User can't load `/groups` — that would skip any test appended to it.)
 
+## App time zone (dates)
+
+One admin-set IANA zone (System Setting `timeZone`, default `UTC`) decides every calendar boundary.
+It reaches the desktop on AppData and lives in **`SystemSettingsState.timeZone`** (persisted slice;
+the selector falls back to `UTC` for a hydrated slice that predates the key), set by `setAppData`.
+All helpers are in `src/utils/app-time-zone.ts`. The rules (root `CLAUDE.md` holds the table):
+
+- **Two kinds of value.** A receipt's `date` and DATE custom fields are **calendar days**, stored as
+  midnight UTC and read by their **UTC** day, so no zone ever shifts them. `createdAt`,
+  `resolvedDate`, `updatedAt`, task `startedAt`/`endedAt` etc. are **instants**, shown in the app zone.
+- **Display: the `appDate` pipe** (`src/pipes/app-date.pipe.ts`, standalone, exported by
+  `PipesModule`) replaces Angular's `date` pipe everywhere — do not add a bare `| date`.
+  `value | appDate[:format]` is instant mode: `DatePipe` formatting with `offsetAt(value, zone)`
+  (DatePipe takes an offset, not an IANA name, and the offset depends on DST at that instant).
+  `value | appDate:format:'calendar'` shows the stored UTC day. Format strings are DatePipe's
+  (default `mediumDate`); empty/unparseable → `null`, so `(x | appDate) || 'Never'` works.
+  - **It is impure on purpose**: it reads the zone signal in `transform`, which the template's
+    reactive consumer tracks, so a zone change repaints every date under zoneless CD. A pure pipe
+    would keep its cached string. It memoizes on (value, format, mode, zone).
+  - Code that builds strings outside a template uses `formatAppDate(...)` (e.g. `SearchResultPipe`).
+  - **Filter chips deliberately do not use it**: a filter value is the day the user *picked*, a
+    local-midnight `Date`, so the chips keep formatting it on the browser's calendar.
+- **Wire rule.** Date **filters** go out as a bare `yyyy-MM-dd` via `toDateWireFilter(filter, keys)`
+  (`src/utils/date-wire-filter.ts`), applied **at the request, never in the store** (the datepicker
+  would misread a stored bare day as UTC midnight). Callers: `ReceiptFilterService.buildPagedRequestCommand`
+  (table, summary, filtered-receipts widget), the pie-chart widget, CSV export, the report builder's
+  preview/generate (`toReportRequestCommand` — **not** the save path, whose filter reloads into the
+  datepickers) and system tasks (`toSystemTaskWireFilter`). The server turns the day into a range in
+  the right zone. **Receipt dates** go out as midnight UTC of the picked day
+  (`2026-09-30T00:00:00.000Z`, `toMidnightUtc`), converted in `ReceiptFormComponent.buildSubmitCommand()`
+  on a copy of the form value; on load `calendarDayToLocalDate` turns the stored UTC day into the
+  datepicker's local midnight (also used for magic fill, replacing the old `getTimezoneOffset` hack).
+- **"Today" is `todayInZone(zone)`**, a local-midnight `Date` of the zone's calendar day: the month
+  stepper's seed and shortcuts, the `WITHIN_CURRENT_MONTH` implied range in `app-filter-field`, a new
+  receipt's default date, and the report period hint, which also names the zone for instant fields
+  ("… on Added At (America/New_York)"; Receipt Date is named alone).
+
 ## Filter dialogs (the shared pieces)
 
 Two tables have a `{ operation, value }` filter dialog — receipts and system tasks — and they are
@@ -1694,7 +1731,8 @@ why this feature needed no API change. Picking a month **overwrites** whatever t
   every field with `if Filter.Date.Value != nil` and the dialog stores `value: null` for that
   operation, so it never reaches the query builder — the badge counts it and nothing is filtered.
   Pre-existing; the chip just surfaces it for the first time.
-- **Arrow steps from "All time"/"Custom" seed the current month** and then apply the delta, so `‹`
+- **Arrow steps from "All time"/"Custom" seed the current month** — the **app time zone's**, via
+  the stepper's `[timeZone]` input (see "App time zone") — and then apply the delta, so `‹`
   and `›` never do the same thing.
 - **`RECEIPT_DATE_FILTER_FIELDS` has a second consumer: the Report Builder's period "Date field"
   picker.** That one is server-backed, so a new key there needs the API side too. See "Period date
@@ -1886,7 +1924,8 @@ dialog. `SystemTaskTableState.filter` is the single slice all three read and wri
 - **Date fields are timestamps, and the server widens them to whole days.** `EQUALS` means that
   calendar day, `BETWEEN` runs to the end of the last day. See `api/CLAUDE.md` → "System task
   filtering" for the query side.
-- **The date fields go on the wire as `YYYY-MM-DD`, normalized by `toSystemTaskWireFilter`**
+- **The date fields go on the wire as `YYYY-MM-DD`, normalized by `toSystemTaskWireFilter`** (now a
+  thin wrapper over the shared `toDateWireFilter` — see "App time zone")
   (`src/utils/system-task-filter.ts`) where `TaskTableComponent` assembles the request. The
   datepicker writes a local-midnight `Date`, which serializes as an *instant*; the server resolves
   that instant to a day in **its** zone, so a UTC-4 browser picking Sep 22 selects Sep 21 against an
@@ -2358,7 +2397,8 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
       - it used the browser's time zone, not the server's;
       - on SQLite its ISO bounds compared as text and dropped first-day receipts;
       - the report-generator `-1` paid-by matched nothing.
-    - The subtitle still formats the period client-side (display only) and names the field.
+    - The subtitle still formats the period client-side (display only), resolving "today" in the
+      app time zone, and names the field — plus the zone for an instant field.
     - The subtitle's count is the preview's `receiptCount`, falling back to the response's
       `totalCount`, not the list length: the server caps the list at 100.
     - When the list is shorter than its `totalCount`, a `report-receipt-truncated` notice reads
@@ -2370,8 +2410,9 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
       2025.
     - The drill-in under Added At lists both receipts, and a saved template reopens on its field.
     - A second block runs the browser in `timezoneId: 'America/Los_Angeles'` against the UTC backend.
-      A receipt dated 03:00 UTC on January 1 must appear in the January drill-in, matching the chip.
-      This was verified to fail with the old client-side bounds.
+      A receipt dated 03:00 UTC on January 1 must appear in the January drill-in, matching the chip,
+      and the drill-in shows it as **Jan 1, 2024** (a calendar day, not the browser's Dec 31). The
+      browser zone plays no part in either.
     - The count chip reads `receipt_long<N> receipts` (icon ligature flush against the number), so it
       is matched with `(?<!\d)N receipts`.
     - The label contains "field", so a bare `getByLabel('Field')` elsewhere on the builder now

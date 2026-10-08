@@ -37,11 +37,11 @@
 </ng-template>
 
 <ng-template #createdAtCell let-element="element">
-  {{ element.createdAt | date : "short" }}
+  {{ element.createdAt | appDate : "short" }}
 </ng-template>
 
 <ng-template #updatedAtCell let-element="element">
-  {{ element.updatedAt | date : "short" }}
+  {{ element.updatedAt | appDate : "short" }}
 </ng-template>
 
 <ng-template #actionsCell let-element="element" let-index="index">

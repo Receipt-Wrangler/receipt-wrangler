@@ -24,6 +24,7 @@
       <app-month-stepper
         [value]="stepperMonth()"
         [label]="stepperLabel()"
+        [timeZone]="timeZone()"
         (monthSelected)="monthSelected($event)"
         (allTimeSelected)="allTimeSelected()"
       ></app-month-stepper>
@@ -259,11 +260,11 @@
 </ng-template>
 
 <ng-template #createdAtCell let-element="element"
->{{ element.createdAt | date }}
+>{{ element.createdAt | appDate }}
 </ng-template>
 
 <ng-template #dateCell let-element="element"
->{{ element.date | date }}
+>{{ element.date | appDate: "mediumDate" : "calendar" }}
 </ng-template>
 
 <ng-template #nameCell let-element="element">
@@ -293,7 +294,7 @@
 </ng-template>
 
 <ng-template #resolvedDateCell let-element="element">
-  {{ element.resolvedDate | date : "medium" }}
+  {{ element.resolvedDate | appDate : "medium" }}
 </ng-template>
 
 <ng-template #firstCommentCell let-element="element">

@@ -1,5 +1,5 @@
 import { NgModule } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { SearchbarComponent } from './searchbar/searchbar.component';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -19,6 +19,5 @@ import { SearchResultPipe } from './pipes/search-result.pipe';
     ReactiveFormsModule,
   ],
   exports: [SearchbarComponent],
-  providers: [DatePipe],
 })
 export class SearchbarModule {}

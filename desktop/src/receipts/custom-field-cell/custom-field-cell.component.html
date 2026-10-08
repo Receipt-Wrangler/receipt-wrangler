@@ -6,7 +6,7 @@
       {{ currencyValue() | customCurrency }}
     </ng-container>
     <ng-container *ngSwitchCase="CustomFieldType.Date">
-      {{ customFieldValue.dateValue | date }}
+      {{ customFieldValue.dateValue | appDate: "mediumDate" : "calendar" }}
     </ng-container>
     <ng-container *ngSwitchCase="CustomFieldType.Text">
       {{ customFieldValue.stringValue }}

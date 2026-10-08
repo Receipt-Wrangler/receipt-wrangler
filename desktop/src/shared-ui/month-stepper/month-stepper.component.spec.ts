@@ -137,6 +137,36 @@ describe("MonthStepperComponent", () => {
       expect(emitted).toEqual([monthRelativeToToday(0), monthRelativeToToday(-1)]);
     });
 
+    // 9PM Sep 30 in New York is Oct 1 in UTC: "this month" is the app zone's.
+    // Fake timers are safe here because nothing below awaits whenStable().
+    describe("in the app time zone", () => {
+      afterEach(() => jest.useRealTimers());
+
+      const atLateSep30Eastern = (zone: string): void => {
+        fixture.componentRef.setInput("timeZone", zone);
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date("2026-10-01T01:00:00Z"));
+      };
+
+      it("seeds the shortcuts from the zone's today", () => {
+        atLateSep30Eastern("America/New_York");
+        component.pickRelativeMonth(0);
+        component.pickRelativeMonth(-1);
+
+        expect(emitted).toEqual([
+          { year: 2026, month: 8 },
+          { year: 2026, month: 7 },
+        ]);
+      });
+
+      it("steps from the zone's month when nothing is selected", () => {
+        atLateSep30Eastern("UTC");
+        component.step(-1);
+
+        expect(emitted).toEqual([{ year: 2026, month: 8 }]);
+      });
+    });
+
     it("emits all time separately", () => {
       component.pickAllTime();
 

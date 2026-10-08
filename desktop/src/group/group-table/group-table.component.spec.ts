@@ -18,6 +18,8 @@ import { ApiModule, Group, GroupsService, Permission } from "../../open-api";
 import { AuthState, GroupState, SetGroups } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { GroupTableState } from "../../store/group-table.state";
+import { SystemSettingsState } from "../../store/system-settings.state";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
 
 import { GroupTableComponent } from "./group-table.component";
 
@@ -38,7 +40,8 @@ describe("GroupTableComponent", () => {
         DirectivesModule,
         MatDialogModule,
         MatSnackBarModule,
-        NgxsModule.forRoot([AuthState, GroupState, GroupTableState]),
+        AppDatePipe,
+        NgxsModule.forRoot([AuthState, GroupState, GroupTableState, SystemSettingsState]),
         NoopAnimationsModule,
         SharedUiModule,
         TableModule,

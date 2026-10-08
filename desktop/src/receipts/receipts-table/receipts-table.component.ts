@@ -13,6 +13,7 @@ import { ReceiptFilterService } from "src/services/receipt-filter.service";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { ResetReceiptFilter, SetColumnConfig, SetPage, SetPageSize, SetQuickDateField, SetReceiptFilterData, SetReceiptFilterField, SetSummaryConfigGroupId, } from "src/store/receipt-table.actions";
 import { DEFAULT_RECEIPT_ORDER_BY, DEFAULT_RECEIPT_SORT_DIRECTION, ReceiptTableState, } from "src/store/receipt-table.state";
+import { SystemSettingsState } from "src/store/system-settings.state";
 import { TableColumn } from "src/table/table-column.interface";
 import { TableComponent } from "src/table/table/table.component";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS, RECEIPT_DATE_FILTER_FIELDS, ReceiptDateFilterFieldKey } from "../../constants";
@@ -209,6 +210,9 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   /** The date field the quick date control writes to. */
   public quickDateField = this.store.selectSignal(ReceiptTableState.quickDateField);
 
+  /** The app time zone, which decides the month stepper's "this month". */
+  public timeZone = this.store.selectSignal(SystemSettingsState.timeZone);
+
   public readonly dateFilterFields = RECEIPT_DATE_FILTER_FIELDS;
 
   public quickDateFieldLabel = computed(
@@ -253,6 +257,9 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         // still has to name itself here.
         groups,
         users,
+        // Not appDate: a filter value is the day the user PICKED, held as a
+        // local-midnight Date (or its ISO string once persisted), so it is read
+        // on the browser's calendar — the same day toDateWireFilter sends.
         formatDate: (value) => this.datePipe.transform(value as string) ?? "",
         formatCurrency: (value) => this.customCurrencyPipe.transform(value as number),
       }

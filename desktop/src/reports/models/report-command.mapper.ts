@@ -1,5 +1,6 @@
 import { format } from "date-fns";
-import { ReceiptDateFilterFieldKey } from "src/constants";
+import { RECEIPT_DATE_FILTER_KEYS, ReceiptDateFilterFieldKey } from "src/constants";
+import { toDateWireFilter } from "../../utils/date-wire-filter";
 import {
   ReceiptPagedRequestFilter,
   ReportColumn,
@@ -235,7 +236,12 @@ function toGroupByLabels(
  * command feeds both preview and generate.
  */
 export function toReportRequestCommand(value: ReportBuilderValue): ReportRequestCommand {
-  return mapReportCommand(value, enabledReportColumns(value));
+  const command = mapReportCommand(value, enabledReportColumns(value));
+
+  // Date filter values go out as the picked calendar day (see toDateWireFilter).
+  // Not on the save path: a saved template's filter is fed back into the
+  // builder's datepickers, which would misread a bare yyyy-MM-dd as UTC midnight.
+  return { ...command, filter: toDateWireFilter(command.filter, RECEIPT_DATE_FILTER_KEYS) };
 }
 
 /**

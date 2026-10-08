@@ -1,3 +1,4 @@
+import { AppDatePipe } from "../pipes/app-date.pipe";
 import { CommonModule } from "@angular/common";
 import { NgModule } from "@angular/core";
 import { MatButtonModule } from "@angular/material/button";
@@ -11,6 +12,7 @@ import { NotificationsListComponent } from "./notifications-list/notifications-l
 @NgModule({
   declarations: [NotificationsListComponent, NotificationComponent],
   imports: [
+    AppDatePipe,
     ButtonModule,
     CommonModule,
     MatButtonModule,

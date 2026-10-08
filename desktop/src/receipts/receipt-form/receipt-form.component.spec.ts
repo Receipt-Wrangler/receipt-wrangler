@@ -88,8 +88,10 @@ describe("ReceiptFormComponent", () => {
 
   it("should init form correctly when there is no initial data", () => {
     jest.useFakeTimers();
+    // Midday UTC, so "today" in the default UTC app zone is Jan 1 whatever the
+    // test machine's own zone; the form holds it as that day's local midnight.
+    jest.setSystemTime(new Date(Date.UTC(2020, 0, 1, 12)));
     const mockedDate = new Date(2020, 0, 1);
-    jest.setSystemTime(mockedDate);
     component.ngOnInit();
 
     expect(component.form.value).toEqual({
@@ -112,8 +114,6 @@ describe("ReceiptFormComponent", () => {
   });
 
   it("should patch magic fill values correctly", () => {
-    // Mock timezone offset to be EST
-    Date.prototype.getTimezoneOffset = () => 240;
     component.images.set([{ id: 1 } as any]);
     component.ngOnInit();
     component.mode = FormMode.edit;
@@ -162,7 +162,9 @@ describe("ReceiptFormComponent", () => {
 
     expect(receiptValue.name).toEqual(magicReceipt.name);
     expect(receiptValue.amount).toEqual(magicReceipt.amount);
-    expect(receiptValue.date).toEqual(new Date("2023-08-05T04:00:00.000Z"));
+    // Midnight UTC from the API is shown as that calendar day in the picker:
+    // the local midnight of Aug 5, in any browser zone.
+    expect(receiptValue.date).toEqual(new Date(2023, 7, 5));
     expect(receiptValue.categories).toEqual([component.categories[0]]);
     expect(receiptValue.tags).toEqual([component.tags[1]]);
     expect(snackbarSpy).toHaveBeenCalledWith(
@@ -308,14 +310,6 @@ describe("ReceiptFormComponent", () => {
   // backend can return (paid-by, status, items, shares, custom fields, comments),
   // not just the header fields, and drops nothing on the way into the form.
   describe("magicFill — full receipt ingest", () => {
-    // A test below overrides the timezone offset for a deterministic date
-    // assertion; capture the real one (before any test runs) and restore it so
-    // the override can't leak into later tests.
-    const originalGetTimezoneOffset = Date.prototype.getTimezoneOffset;
-    afterEach(() => {
-      Date.prototype.getTimezoneOffset = originalGetTimezoneOffset;
-    });
-
     function stubCarousel(index = 0): void {
       Object.defineProperty(component, "carouselComponent", {
         value: () => ({ currentlyShownImageIndex: index }),
@@ -378,8 +372,6 @@ describe("ReceiptFormComponent", () => {
     ] as any[];
 
     it("ingests every field of a full magic-filled receipt", () => {
-      // Fix the timezone offset so the date assertion is deterministic.
-      Date.prototype.getTimezoneOffset = () => 0;
       component.images.set([{ id: 1 } as any]);
       routeDataSubject.next({ mode: FormMode.edit, customFields: customFieldDefs });
       component.mode = FormMode.edit;
@@ -444,7 +436,7 @@ describe("ReceiptFormComponent", () => {
       // Scalars
       expect(value.name).toEqual("Full Receipt");
       expect(value.amount).toEqual("100.00");
-      expect(value.date).toEqual(new Date("2023-08-05T00:00:00.000Z"));
+      expect(value.date).toEqual(new Date(2023, 7, 5));
       expect(value.paidByUserId).toEqual(7);
       expect(value.status).toEqual(ReceiptStatus.NeedsAttention);
       expect(syncSingleDisplay).toHaveBeenCalled();
@@ -478,7 +470,7 @@ describe("ReceiptFormComponent", () => {
       expect(value.customFields.length).toEqual(5);
       const byId = (id: number) => value.customFields.find((c: any) => c.customFieldId === id);
       expect(byId(1).stringValue).toEqual("hello");
-      expect(byId(2).dateValue).toEqual("2023-08-05T00:00:00.000Z");
+      expect(byId(2).dateValue).toEqual(new Date(2023, 7, 5));
       expect(byId(3).selectValue).toEqual(42);
       expect(byId(4).currencyValue).toEqual("9.99");
       expect(byId(5).booleanValue).toEqual(true);
@@ -1455,7 +1447,10 @@ describe("ReceiptFormComponent", () => {
 
       component.submit();
 
-      expect(createSpy).toHaveBeenCalledWith(component.form.value, []);
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Lunch", groupId: 7 }),
+        []
+      );
     });
 
     it("blocks an add-mode submit without the required image", () => {
@@ -1557,6 +1552,77 @@ describe("ReceiptFormComponent", () => {
       expect(component.isImageMissing()).toBe(false);
       expect(component.isCommentMissing()).toBe(false);
       expect(component.isLastImageLocked()).toBe(false);
+    });
+  });
+
+  // A receipt's date and DATE custom fields are calendar days: stored as
+  // midnight UTC, shown in the datepicker as that day's local midnight, and sent
+  // back as midnight UTC of whatever day is picked.
+  describe("calendar dates on load and submit", () => {
+    let receiptService: ReceiptService;
+
+    beforeEach(() => {
+      receiptService = TestBed.inject(ReceiptService);
+      jest.spyOn(TestBed.inject(Router), "navigate").mockResolvedValue(true);
+      // The store persists across this file; clear any role requirement an
+      // earlier describe left on group 7 so submit reaches the request.
+      TestBed.inject(Store).dispatch(new SetPermissions([], {}, {}));
+      Object.defineProperty(component, "shareListComponent", {
+        value: () => ({ userExpansionPanels: () => [] }),
+      });
+      Object.defineProperty(component, "receiptCommentsComponent", {
+        value: () => ({ commentCount: () => 0 }),
+      });
+      Object.defineProperty(component, "paidByAutocomplete", { value: () => undefined });
+    });
+
+    const editReceipt = {
+      id: 3,
+      name: "R",
+      amount: "1.00",
+      paidByUserId: 1,
+      groupId: 7,
+      date: "2026-09-30T00:00:00Z",
+      customFields: [{ customFieldId: 2, dateValue: "2026-10-01T00:00:00Z" }],
+    };
+
+    it("shows a stored midnight-UTC date as that calendar day in the picker", () => {
+      routeDataSubject.next({ mode: FormMode.edit, customFields: [], receipt: editReceipt });
+
+      const value = component.form.getRawValue();
+      expect(value.date).toEqual(new Date(2026, 8, 30));
+      expect(value.customFields[0].dateValue).toEqual(new Date(2026, 9, 1));
+    });
+
+    it("sends the picked days as midnight UTC, leaving the form's Dates alone", () => {
+      const updateSpy = jest
+        .spyOn(receiptService, "updateReceipt")
+        .mockReturnValue(of({}) as any);
+      routeDataSubject.next({ mode: FormMode.edit, customFields: [], receipt: editReceipt });
+      component.form.patchValue({ date: new Date(2026, 8, 15) });
+
+      component.submit();
+
+      const [, sent] = updateSpy.mock.calls[0] as any[];
+      expect(sent.date).toBe("2026-09-15T00:00:00.000Z");
+      expect(sent.customFields[0].dateValue).toBe("2026-10-01T00:00:00.000Z");
+      expect(component.form.getRawValue().date).toEqual(new Date(2026, 8, 15));
+    });
+
+    it("leaves an empty custom date empty", () => {
+      const updateSpy = jest
+        .spyOn(receiptService, "updateReceipt")
+        .mockReturnValue(of({}) as any);
+      routeDataSubject.next({
+        mode: FormMode.edit,
+        customFields: [],
+        receipt: { ...editReceipt, customFields: [{ customFieldId: 2 }] },
+      });
+
+      component.submit();
+
+      const [, sent] = updateSpy.mock.calls[0] as any[];
+      expect(sent.customFields[0].dateValue).toBeNull();
     });
   });
 });

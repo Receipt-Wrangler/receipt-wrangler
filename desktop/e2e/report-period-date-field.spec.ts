@@ -127,7 +127,8 @@ test.describe.serial('Report Builder — period date field', () => {
 
     await pickDateField(page, 'Resolved Date');
     await expectReceiptCount(page, 1);
-    await expect(page.getByText(/Resolves to .* on Resolved Date/)).toBeVisible();
+    // An instant field is read in the app time zone, and the hint names it.
+    await expect(page.getByText(/Resolves to .* on Resolved Date \([^)]+\)/)).toBeVisible();
 
     await pickDateField(page, 'Added At');
     await expectReceiptCount(page, 2);
@@ -135,7 +136,7 @@ test.describe.serial('Report Builder — period date field', () => {
     // The drill-in lists what the report covers, so it narrows on the same field.
     await page.getByTestId('report-receipt-count').click();
     const drillIn = page.getByRole('dialog');
-    await expect(drillIn.getByText(/2025-01-01 to 2099-12-31 on Added At/)).toBeVisible();
+    await expect(drillIn.getByText(/2025-01-01 to 2099-12-31 on Added At \([^)]+\)/)).toBeVisible();
     await expect(drillIn.getByTestId('report-receipt-row')).toHaveCount(2);
   });
 
@@ -162,12 +163,12 @@ test.describe.serial('Report Builder — period date field', () => {
   });
 });
 
-// The drill-in lists what the report covers even when the browser and the server
-// disagree on what day it is. The server resolves the period on its own clock (UTC
-// here, as the Docker images run), and the browser is in Los Angeles: a receipt
-// dated 03:00 UTC on January 1 is in the server's January and in the browser's
-// December 31. A drill-in that resolved the period in the browser would leave it
-// out of the list while the count chip includes it.
+// The browser's own zone plays no part in a report. A receipt's date is a calendar
+// day — stored as midnight UTC of the day it names, read by its UTC day — so a
+// receipt dated 03:00 UTC on January 1 is a January 1 receipt for a January period
+// whatever zone the browser or the app is in. Here the browser is in Los Angeles,
+// where that instant is still December 31: the count, the drill-in list and the
+// date the drill-in shows must all say January 1 regardless.
 test.describe.serial('Report Builder — drill-in across time zones', () => {
   test.use({ timezoneId: 'America/Los_Angeles' });
 
@@ -208,5 +209,7 @@ test.describe.serial('Report Builder — drill-in across time zones', () => {
     const drillIn = page.getByRole('dialog');
     await expect(drillIn.getByTestId('report-receipt-row')).toHaveCount(1);
     await expect(drillIn.getByText(receiptName)).toBeVisible();
+    // Shown as its calendar day, not as the browser's (Dec 31, 2023).
+    await expect(drillIn.getByTestId('report-receipt-row')).toContainText('Jan 1, 2024');
   });
 });

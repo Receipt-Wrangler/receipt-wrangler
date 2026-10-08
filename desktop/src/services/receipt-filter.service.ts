@@ -4,6 +4,8 @@ import { SortDirection } from "@angular/material/sort";
 import { Store } from "@ngxs/store";
 import { Observable } from "rxjs";
 import { ReceiptTableState } from "src/store/receipt-table.state";
+import { RECEIPT_DATE_FILTER_KEYS } from "../constants/receipt-filter-fields.constant";
+import { toDateWireFilter } from "../utils/date-wire-filter";
 import { PagedData, ReceiptPagedRequestCommand, ReceiptService, ReceiptSummary } from "../open-api";
 
 @Injectable({
@@ -99,6 +101,11 @@ export class ReceiptFilterService {
       (filterData.filter as any).amount.value = 0;
     }
 
-    return filterData;
+    // Date values go out as the picked calendar day. Done on a copy, here at
+    // the request, never in the persisted filter: see toDateWireFilter.
+    return {
+      ...filterData,
+      filter: toDateWireFilter(filterData.filter, RECEIPT_DATE_FILTER_KEYS),
+    };
   }
 }

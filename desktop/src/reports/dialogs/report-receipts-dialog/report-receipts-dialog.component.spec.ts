@@ -1,5 +1,5 @@
 import { CurrencyPipe } from "@angular/common";
-import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
+import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection, signal } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
@@ -14,6 +14,7 @@ import {
   ReportService,
 } from "../../../open-api";
 import { PipesModule } from "../../../pipes";
+import { SystemSettingsState } from "../../../store/system-settings.state";
 import {
   ReportReceiptsDialogComponent,
   ReportReceiptsDialogData,
@@ -57,8 +58,19 @@ function configure(
       provideZonelessChangeDetection(),
       { provide: ReportService, useValue: reportService },
       { provide: MatDialogRef, useValue: { close: jest.fn() } },
-      // The row pipes (user, customCurrency) read the store; nothing here asserts on them.
-      { provide: Store, useValue: { selectSnapshot: jest.fn(() => ({})) } },
+      // The row pipes (user, customCurrency) read the store; nothing here asserts
+      // on them. The app time zone is the one value the subtitle reads.
+      {
+        provide: Store,
+        useValue: {
+          selectSnapshot: jest.fn((selector) =>
+            selector === SystemSettingsState.timeZone ? "America/New_York" : {}
+          ),
+          selectSignal: jest.fn((selector) =>
+            signal(selector === SystemSettingsState.timeZone ? "America/New_York" : {})
+          ),
+        },
+      },
       CurrencyPipe,
       {
         provide: MAT_DIALOG_DATA,
@@ -106,9 +118,10 @@ describe("ReportReceiptsDialogComponent", () => {
     openSpy.mockRestore();
   });
 
-  it("names the date field in the subtitle", () => {
+  // Added At is an instant, so the subtitle says which zone its days are read in.
+  it("names the date field and the app time zone in the subtitle", () => {
     const { component } = configure();
-    expect(component.periodLabel).toBe("2026-05-01 to 2026-05-31 on Added At");
+    expect(component.periodLabel).toBe("2026-05-01 to 2026-05-31 on Added At (America/New_York)");
   });
 
   it("names the receipt date when the period names no date field", () => {

@@ -21,7 +21,7 @@
       <div class="d-flex flex-column m-2">
         <span>Version: {{ about()?.version || 'unknown' }}</span>
         @if (about()?.buildDate !== "unknown") {
-          <span>Build Date: {{ (about()?.buildDate | date) || 'unknown' }}</span>
+          <span>Build Date: {{ (about()?.buildDate | appDate) || 'unknown' }}</span>
         } @else {
           <span>Build Date: unknown</span>
         }

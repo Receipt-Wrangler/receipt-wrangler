@@ -10,6 +10,8 @@ import { AuthState } from "../../store/auth.state";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { DirectivesModule } from "../../directives/directives.module";
 import { NotificationComponent } from "./notification.component";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { SystemSettingsState } from "../../store/system-settings.state";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
 describe("NotificationComponent", () => {
@@ -23,7 +25,8 @@ describe("NotificationComponent", () => {
     declarations: [NotificationComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
-        NgxsModule.forRoot([GroupState, AuthState]),
+        AppDatePipe,
+        NgxsModule.forRoot([GroupState, AuthState, SystemSettingsState]),
         DirectivesModule,
         RouterTestingModule],
     providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]

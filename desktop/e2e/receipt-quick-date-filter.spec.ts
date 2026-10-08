@@ -51,19 +51,21 @@ test.describe('Receipts quick date filter', () => {
    */
   const REFERENCE_TIME = new Date();
 
+  // The stepper's "this month" is the app time zone's, not the browser's, and
+  // the e2e backend runs on the default UTC zone — so every month below is a
+  // UTC month, whatever zone the test runner is in.
+
   /** An ISO date in the middle of the month [delta] months from the reference. */
   function isoInMonth(delta: number): string {
     return new Date(
-      Date.UTC(REFERENCE_TIME.getFullYear(), REFERENCE_TIME.getMonth() + delta, 15),
+      Date.UTC(REFERENCE_TIME.getUTCFullYear(), REFERENCE_TIME.getUTCMonth() + delta, 15),
     ).toISOString();
   }
 
   function monthLabel(delta: number): string {
     return new Date(
-      REFERENCE_TIME.getFullYear(),
-      REFERENCE_TIME.getMonth() + delta,
-      1,
-    ).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      Date.UTC(REFERENCE_TIME.getUTCFullYear(), REFERENCE_TIME.getUTCMonth() + delta, 1),
+    ).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   }
 
   const stepperLabel = (page: Page) => page.getByTestId('receipts-month-label');
@@ -111,8 +113,8 @@ test.describe('Receipts quick date filter', () => {
   test.beforeEach(async ({ page }) => {
     await stubTokenRefresh(page);
     // Pin the app's clock to the same instant. The component reads its own
-    // new Date() for This month / Last month and for an arrow press with
-    // nothing selected, so a spec-side reference alone would still disagree
+    // clock (today in the app time zone) for This month / Last month and for
+    // an arrow press with nothing selected, so a spec-side reference alone would still disagree
     // with it across a month boundary. setFixedTime only changes what Date
     // returns — timers keep running, so animations are unaffected.
     await page.clock.setFixedTime(REFERENCE_TIME);

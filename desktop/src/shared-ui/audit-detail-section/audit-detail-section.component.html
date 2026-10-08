@@ -12,12 +12,12 @@
     <ng-container *ngIf="data?.createdByString">{{ data?.createdByString }}</ng-container>
     <ng-container *ngIf="data?.createdBy">{{ (data?.createdBy?.toString() | user)?.displayName }}</ng-container>
   </span>
-      <span class="mb-1">Added at: {{ data?.createdAt | date : "medium" }}</span>
-      <span>Updated at: {{ data?.updatedAt | date : "medium" }}</span>
+      <span class="mb-1">Added at: {{ data?.createdAt | appDate : "medium" }}</span>
+      <span>Updated at: {{ data?.updatedAt | appDate : "medium" }}</span>
       <ng-container *ngIf="data?.resolvedDate">
     <span class="mt-2">
       Resolved at:
-      {{ data?.resolvedDate | date : "medium" }}
+      {{ data?.resolvedDate | appDate : "medium" }}
     </span>
       </ng-container>
     </div>
