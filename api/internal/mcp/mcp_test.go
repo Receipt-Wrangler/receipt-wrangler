@@ -185,11 +185,42 @@ func listCategories(t *testing.T, userId uint) []models.Category {
 	if err != nil {
 		t.Fatalf("handleListCategories returned error: %v", err)
 	}
-	categories, ok := out.([]models.Category)
+	envelope, ok := out.(map[string]any)
 	if !ok {
-		t.Fatalf("expected []models.Category, got %T", out)
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	categories, ok := envelope["categories"].([]models.Category)
+	if !ok {
+		t.Fatalf("expected categories result, got %T", envelope["categories"])
 	}
 	return categories
+}
+
+func TestListGroupsReturnsGroupsEnvelope(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := createUser(t, "group-member")
+	group := models.Group{Name: "MCP group"}
+	if err := repositories.GetDB().Create(&group).Error; err != nil {
+		t.Fatalf("failed to create group: %v", err)
+	}
+	addGroupMember(t, user.ID, group.ID, nil)
+
+	_, out, err := handleListGroups(context.Background(), requestForUser(user.ID), emptyInput{})
+	if err != nil {
+		t.Fatalf("handleListGroups returned error: %v", err)
+	}
+	envelope, ok := out.(map[string]any)
+	if !ok {
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	groups, ok := envelope["groups"].([]models.Group)
+	if !ok {
+		t.Fatalf("expected groups result, got %T", envelope["groups"])
+	}
+	if len(groups) != 1 || groups[0].ID != group.ID {
+		t.Errorf("expected the member group, got %+v", groups)
+	}
 }
 
 // An app.categories.read holder (admin / category manager) sees the whole pool,
@@ -287,12 +318,47 @@ func TestListTagsRestrictedToGroupGrants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handleListTags returned error: %v", err)
 	}
-	tags, ok := out.([]models.Tag)
+	envelope, ok := out.(map[string]any)
 	if !ok {
-		t.Fatalf("expected []models.Tag, got %T", out)
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	tags, ok := envelope["tags"].([]models.Tag)
+	if !ok {
+		t.Fatalf("expected tags result, got %T", envelope["tags"])
 	}
 	if len(tags) != 1 || tags[0].ID != allowedTag.ID {
 		t.Errorf("expected only the granted tag, got %+v", tags)
+	}
+}
+
+func TestListDashboardsReturnsDashboardsEnvelope(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := createUser(t, "dashboard-member")
+	group := models.Group{Name: "MCP dashboards"}
+	if err := repositories.GetDB().Create(&group).Error; err != nil {
+		t.Fatalf("failed to create group: %v", err)
+	}
+	addGroupMember(t, user.ID, group.ID, []string{permissions.GroupDashboardsRead})
+	dashboard := models.Dashboard{Name: "MCP dashboard", UserID: user.ID, GroupID: group.ID}
+	if err := repositories.GetDB().Create(&dashboard).Error; err != nil {
+		t.Fatalf("failed to create dashboard: %v", err)
+	}
+
+	_, out, err := handleListDashboards(context.Background(), requestForUser(user.ID), listDashboardsInput{GroupId: utils.UintToString(group.ID)})
+	if err != nil {
+		t.Fatalf("handleListDashboards returned error: %v", err)
+	}
+	envelope, ok := out.(map[string]any)
+	if !ok {
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	dashboards, ok := envelope["dashboards"].([]models.Dashboard)
+	if !ok {
+		t.Fatalf("expected dashboards result, got %T", envelope["dashboards"])
+	}
+	if len(dashboards) != 1 || dashboards[0].ID != dashboard.ID {
+		t.Errorf("expected the user's dashboard, got %+v", dashboards)
 	}
 }
 
@@ -355,9 +421,13 @@ func TestSearchReceiptsScopesToUserGroups(t *testing.T) {
 		t.Fatalf("handleSearchReceipts returned error: %v", err)
 	}
 
-	results, ok := out.([]structs.SearchResult)
+	envelope, ok := out.(map[string]any)
 	if !ok {
-		t.Fatalf("expected []structs.SearchResult, got %T", out)
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	results, ok := envelope["receipts"].([]structs.SearchResult)
+	if !ok {
+		t.Fatalf("expected receipts result, got %T", envelope["receipts"])
 	}
 	if len(results) != 2 {
 		t.Errorf("expected 2 receipts from the user's group, got %d", len(results))
@@ -475,9 +545,13 @@ func TestSearchReceiptsEnforcesPaidByVisibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handleSearchReceipts returned error: %v", err)
 	}
-	results, ok := out.([]structs.SearchResult)
+	envelope, ok := out.(map[string]any)
 	if !ok {
-		t.Fatalf("expected []structs.SearchResult, got %T", out)
+		t.Fatalf("expected result envelope, got %T", out)
+	}
+	results, ok := envelope["receipts"].([]structs.SearchResult)
+	if !ok {
+		t.Fatalf("expected receipts result, got %T", envelope["receipts"])
 	}
 	if len(results) != 1 || results[0].PaidByUserId != allowedPayer.ID {
 		t.Errorf("expected only the receipt paid by the allowed payer, got %+v", results)
