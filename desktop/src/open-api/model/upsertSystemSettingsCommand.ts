@@ -82,6 +82,10 @@ export interface UpsertSystemSettingsCommand {
      * How long a temp file is kept once nothing can still act on it, in hours. Accepted values are 24-8760 (1 year), or 0 meaning unset, which falls back to the default of 720 (30 days). Omit the key entirely to leave the currently configured value unchanged.
      */
     tempFileRetentionHours?: number;
+    /**
+     * The app time zone, an IANA name such as America/New_York that the server can load (an unknown name is a 400 under the timeZone key). Omit the key entirely to leave the currently configured value unchanged.
+     */
+    timeZone?: string;
 }
 export namespace UpsertSystemSettingsCommand {
 }

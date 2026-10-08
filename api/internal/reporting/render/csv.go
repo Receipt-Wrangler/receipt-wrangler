@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"receipt-wrangler/api/internal/reporting"
 )
@@ -26,10 +27,14 @@ import (
 // it a date bucket prints an RFC 3339 instant and a currency bucket a bare
 // decimal. Leaving it at its zero value (TypeString) renders every bucket as
 // plain text, which is what a caller that has no catalog gets.
+//
+// Location is the zone a date bucket names its calendar day in — the field's
+// own FieldRef.Location. Nil means UTC.
 type Dimension struct {
 	Key      reporting.FieldKey
 	Label    string
 	DataType reporting.DataType
+	Location *time.Location
 }
 
 const (
@@ -185,7 +190,7 @@ func columnHeading(column reporting.ColumnDescriptor) string {
 // dimension's declared type. The (None) bucket — a null value — gets the
 // report's name for it.
 func formatDimension(value reporting.Value, dimension Dimension, currency *reporting.CurrencyFormat, noneLabel string) string {
-	return SanitizeCSVField(formatLabelValue(value, dimension.DataType, currency, noneLabel))
+	return SanitizeCSVField(formatLabelValue(value, dimension.DataType, dimension.Location, currency, noneLabel))
 }
 
 // formatCell renders one report cell the way this format presents it: money per
@@ -205,7 +210,7 @@ func formatCell(column reporting.ColumnDescriptor, cell reporting.Cell, noneLabe
 	if column.Kind == reporting.ColumnLabel {
 		parts := make([]string, 0, len(cell.Values))
 		for _, value := range cell.Values {
-			parts = append(parts, SanitizeCSVField(formatLabelValue(value, column.DataType, currency, noneLabel)))
+			parts = append(parts, SanitizeCSVField(formatLabelValue(value, column.DataType, column.Location, currency, noneLabel)))
 		}
 		return strings.Join(parts, ", ")
 	}

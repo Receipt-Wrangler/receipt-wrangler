@@ -7,10 +7,16 @@ import (
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"strings"
+	"time"
 )
 
 type ReceiptCsvService struct {
 	CsvService
+
+	// Location is the app time zone Added At and Resolved Date are printed in.
+	// Nil reads it from System Settings when the CSV is built. A receipt's own
+	// Date is a calendar day and is always printed in UTC.
+	Location *time.Location
 }
 
 func NewReceiptCsvService() ReceiptCsvService {
@@ -39,11 +45,15 @@ func (service *ReceiptCsvService) BuildReceiptCsv(receipts []models.Receipt) (st
 	}
 	rowData := make([][]string, 0, len(receipts))
 	dateFormat := "2006-01-02"
+	location := service.Location
+	if location == nil {
+		location = repositories.GetAppLocation()
+	}
 
 	for _, receipt := range receipts {
 		resolvedDateString := ""
 		if receipt.ResolvedDate != nil {
-			resolvedDateString = receipt.ResolvedDate.Format(dateFormat)
+			resolvedDateString = receipt.ResolvedDate.In(location).Format(dateFormat)
 		}
 
 		for _, item := range receipt.ReceiptItems {
@@ -51,8 +61,8 @@ func (service *ReceiptCsvService) BuildReceiptCsv(receipts []models.Receipt) (st
 		}
 		newRow := []string{
 			utils.UintToString(receipt.ID),
-			receipt.CreatedAt.Format(dateFormat),
-			receipt.Date.Format(dateFormat),
+			receipt.CreatedAt.In(location).Format(dateFormat),
+			receipt.Date.UTC().Format(dateFormat),
 			render.SanitizeCSVField(receipt.Name),
 			render.SanitizeCSVField(receipt.PaidByUser.DisplayName),
 			receipt.Amount.String(),
@@ -99,7 +109,7 @@ func (service *ReceiptCsvService) BuildItemCsv(items []models.Item) ([]byte, err
 			utils.UintToString(item.ID),
 			utils.UintToString(item.ReceiptId),
 			render.SanitizeCSVField(item.Receipt.Name),
-			item.Receipt.Date.Format(dateFormat),
+			item.Receipt.Date.UTC().Format(dateFormat),
 			render.SanitizeCSVField(item.Name),
 			render.SanitizeCSVField(item.ChargedToUser.DisplayName),
 			item.Amount.String(),

@@ -400,6 +400,10 @@ func intPtr(value int) *int {
 	return &value
 }
 
+func stringPtr(value string) *string {
+	return &value
+}
+
 // OmittedLifetimeColumns is what keeps a partial PUT from resetting a field it
 // never mentioned: the repository writes every column (Select("*")), so a value
 // that is not excluded here is silently overwritten with zero.
@@ -410,26 +414,33 @@ func TestOmittedLifetimeColumnsNamesEveryUnsentField(t *testing.T) {
 	}{
 		"all omitted": {
 			modify:   func(cmd *UpsertSystemSettingsCommand) {},
-			expected: []string{"RefreshTokenValidForHours", "McpRefreshTokenValidForHours", "TempFileRetentionHours"},
+			expected: []string{"RefreshTokenValidForHours", "McpRefreshTokenValidForHours", "TempFileRetentionHours", "TimeZone"},
 		},
 		"retention sent, lifetimes omitted": {
 			modify: func(cmd *UpsertSystemSettingsCommand) {
 				cmd.TempFileRetentionHours = intPtr(48)
 			},
-			expected: []string{"RefreshTokenValidForHours", "McpRefreshTokenValidForHours"},
+			expected: []string{"RefreshTokenValidForHours", "McpRefreshTokenValidForHours", "TimeZone"},
 		},
 		"lifetimes sent, retention omitted": {
 			modify: func(cmd *UpsertSystemSettingsCommand) {
 				cmd.RefreshTokenValidForHours = intPtr(24)
 				cmd.McpRefreshTokenValidForHours = intPtr(24)
 			},
-			expected: []string{"TempFileRetentionHours"},
+			expected: []string{"TempFileRetentionHours", "TimeZone"},
+		},
+		"only time zone sent": {
+			modify: func(cmd *UpsertSystemSettingsCommand) {
+				cmd.TimeZone = stringPtr("America/New_York")
+			},
+			expected: []string{"RefreshTokenValidForHours", "McpRefreshTokenValidForHours", "TempFileRetentionHours"},
 		},
 		"all sent": {
 			modify: func(cmd *UpsertSystemSettingsCommand) {
 				cmd.RefreshTokenValidForHours = intPtr(24)
 				cmd.McpRefreshTokenValidForHours = intPtr(24)
 				cmd.TempFileRetentionHours = intPtr(48)
+				cmd.TimeZone = stringPtr("UTC")
 			},
 			expected: []string{},
 		},
@@ -473,5 +484,60 @@ func TestApplyOmittedLifetimesEchoesStoredValues(t *testing.T) {
 	}
 	if updated.TempFileRetentionHours != 48 {
 		t.Errorf("expected the sent retention to survive, got %d", updated.TempFileRetentionHours)
+	}
+}
+
+// An omitted time zone echoes the stored one; a sent one survives.
+func TestApplyOmittedLifetimesEchoesTheStoredTimeZone(t *testing.T) {
+	existing := models.SystemSettings{TimeZone: "America/New_York"}
+
+	omitted := UpsertSystemSettingsCommand{}
+	updated := models.SystemSettings{}
+	omitted.ApplyOmittedLifetimes(existing, &updated)
+	if updated.TimeZone != "America/New_York" {
+		t.Errorf("omitted time zone = %q, want the stored America/New_York", updated.TimeZone)
+	}
+
+	sent := UpsertSystemSettingsCommand{TimeZone: stringPtr("Europe/Berlin")}
+	updated = models.SystemSettings{TimeZone: "Europe/Berlin"}
+	sent.ApplyOmittedLifetimes(existing, &updated)
+	if updated.TimeZone != "Europe/Berlin" {
+		t.Errorf("sent time zone = %q, want Europe/Berlin", updated.TimeZone)
+	}
+}
+
+// A sent time zone must be a name the runtime can load. Omitting it is always
+// valid; "Local" and "" are refused because they would read as the server
+// process's zone and as UTC respectively, never as what the admin meant.
+func TestUpsertSystemSettingsCommand_Validate_TimeZone(t *testing.T) {
+	valid := []string{"UTC", "America/New_York", "Europe/Berlin", "Asia/Kolkata", "Australia/Sydney"}
+	invalid := []string{"", "Local", "Not/AZone", "America/New York", " UTC", "../../etc/passwd", "EST5EDT,M3.2.0,M11.1.0"}
+
+	t.Run("omitted", func(t *testing.T) {
+		cmd := validSystemSettingsCommand()
+		if vErr := cmd.Validate(); len(vErr.Errors) > 0 {
+			t.Errorf("omitted time zone: unexpected errors %v", vErr.Errors)
+		}
+	})
+
+	for _, name := range valid {
+		t.Run("accepts "+name, func(t *testing.T) {
+			cmd := validSystemSettingsCommand()
+			cmd.TimeZone = stringPtr(name)
+			if vErr := cmd.Validate(); len(vErr.Errors) > 0 {
+				t.Errorf("unexpected errors %v", vErr.Errors)
+			}
+		})
+	}
+
+	for _, name := range invalid {
+		t.Run("rejects "+name, func(t *testing.T) {
+			cmd := validSystemSettingsCommand()
+			cmd.TimeZone = stringPtr(name)
+			vErr := cmd.Validate()
+			if _, exists := vErr.Errors["timeZone"]; !exists {
+				t.Errorf("expected a timeZone error for %q, got %v", name, vErr.Errors)
+			}
+		})
 	}
 }

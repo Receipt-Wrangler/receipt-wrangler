@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/reporting"
@@ -426,7 +427,7 @@ func TestSplit_CurrencyCustomFields(t *testing.T) {
 	source, err := New(append(testCustomFields(),
 		models.CustomField{BaseModel: models.BaseModel{ID: 6}, Name: "Tip", Type: models.CURRENCY},
 		models.CustomField{BaseModel: models.BaseModel{ID: 7}, Name: "Deposit", Type: models.CURRENCY},
-	))
+	), time.UTC)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -609,7 +610,7 @@ func TestMerge_WithoutCollisionsIsOneRowPerCopy(t *testing.T) {
 func TestMerge_FoldsCopiesTheSubstitutionMadeIdentical(t *testing.T) {
 	source, err := New(append(testCustomFields(),
 		models.CustomField{BaseModel: models.BaseModel{ID: 6}, Name: "Tip", Type: models.CURRENCY},
-	))
+	), time.UTC)
 	if err != nil {
 		t.Fatal(err)
 	}

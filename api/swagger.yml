@@ -5863,6 +5863,13 @@ components:
         currencyHideDecimalPlaces:
           type: boolean
           description: Whether to hide decimal places
+        timeZone:
+          type: string
+          description: >-
+            The app time zone, an IANA name such as America/New_York ("UTC" when unset or
+            invalid). Clients work out "today" and display instants (Added At, Resolved Date) in
+            it. A receipt's Date is a calendar day and is always read in UTC. A plain string, not
+            an enum, so a released client never fails the payload on a zone it does not know.
         icons:
           type: array
           description: Icons in the system
@@ -6249,6 +6256,14 @@ components:
                 user has to rerun, preview or download the source image of a failed upload.
                 24-8760 (1 year); 0 means unset and falls back to the default.
               default: 720
+            timeZone:
+              type: string
+              description: >-
+                The app time zone, an IANA name such as America/New_York. Every calendar boundary
+                (which day an Added At or Resolved Date falls on, "today", "this month", report
+                periods) is worked out in it. A receipt's Date is a calendar day and never shifts
+                with it.
+              default: UTC
     UpsertSystemSettingsCommand:
       type: object
       required:
@@ -6336,6 +6351,12 @@ components:
             days). Omit the key entirely to leave the currently configured value unchanged.
           minimum: 0
           maximum: 8760
+        timeZone:
+          type: string
+          description: >-
+            The app time zone, an IANA name such as America/New_York that the server can load
+            (an unknown name is a 400 under the timeZone key). Omit the key entirely to leave the
+            currently configured value unchanged.
     CheckEmailConnectivityCommand:
       type: object
       properties:

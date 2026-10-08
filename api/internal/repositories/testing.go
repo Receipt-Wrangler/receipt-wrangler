@@ -1,8 +1,10 @@
 package repositories
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"receipt-wrangler/api/internal/commands"
 	config "receipt-wrangler/api/internal/env"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
@@ -187,4 +189,30 @@ func TruncateTestDb() {
 
 func RemoveTestDb() {
 	os.Remove("./test.db")
+}
+
+// SetAppTimeZoneForTests changes the app time zone through the same
+// UpdateSystemSettings path an admin's save takes, carrying every other stored
+// setting over unchanged. TruncateTestDb removes the settings row, which puts
+// the zone back to its UTC default.
+func SetAppTimeZoneForTests(name string) error {
+	repository := NewSystemSettingsRepository(nil)
+	existing, err := repository.GetSystemSettings()
+	if err != nil {
+		return err
+	}
+
+	bytes, err := json.Marshal(existing)
+	if err != nil {
+		return err
+	}
+
+	var command commands.UpsertSystemSettingsCommand
+	if err := json.Unmarshal(bytes, &command); err != nil {
+		return err
+	}
+	command.TimeZone = &name
+
+	_, err = repository.UpdateSystemSettings(command)
+	return err
 }

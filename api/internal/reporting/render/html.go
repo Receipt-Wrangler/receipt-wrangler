@@ -54,7 +54,9 @@ func HTML(model reporting.ReportModel, groupBy []Dimension, chrome DocumentChrom
 		Footer:   chrome.Footer,
 	}
 	if !model.Meta.GeneratedAt.IsZero() {
-		document.GeneratedAt = model.Meta.GeneratedAt.UTC().Format("2006-01-02 15:04:05 UTC")
+		// Printed in the app's time zone and named by its abbreviation, so the
+		// reader is never left guessing which clock the time was read off.
+		document.GeneratedAt = model.Meta.GeneratedAt.In(locationOrUTC(model.Meta.Location)).Format("2006-01-02 15:04:05 MST")
 	}
 
 	var buffer bytes.Buffer

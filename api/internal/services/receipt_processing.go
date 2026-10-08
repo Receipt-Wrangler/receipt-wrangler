@@ -508,7 +508,10 @@ func (service ReceiptProcessingService) buildTemplateVariableMap(ocrText string)
 		return result, err
 	}
 
-	currentYearString := utils.UintToString(uint(time.Now().Year()))
+	// The year as the app's users see it, not the server process's, so a
+	// receipt scanned just after midnight on Jan 1 in the app zone is dated in
+	// the new year.
+	currentYearString := utils.UintToString(uint(time.Now().In(repositories.NewSystemSettingsRepository(service.TX).AppLocation()).Year()))
 
 	result[structs.CATEGORIES] = categoriesString
 	result[structs.TAGS] = tagsString

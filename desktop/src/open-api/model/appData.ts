@@ -62,6 +62,10 @@ export interface AppData {
      */
     currencyHideDecimalPlaces?: boolean;
     /**
+     * The app time zone, an IANA name such as America/New_York (\"UTC\" when unset or invalid). Clients work out \"today\" and display instants (Added At, Resolved Date) in it. A receipt\'s Date is a calendar day and is always read in UTC. A plain string, not an enum, so a released client never fails the payload on a zone it does not know.
+     */
+    timeZone?: string;
+    /**
      * Icons in the system
      */
     icons: Array<Icon>;

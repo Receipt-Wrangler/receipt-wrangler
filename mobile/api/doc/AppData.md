@@ -23,6 +23,7 @@ Name | Type | Description | Notes
 **currencyDecimalSeparator** | [**CurrencySeparator**](CurrencySeparator.md) |  | [optional] 
 **currencySymbolPosition** | [**CurrencySymbolPosition**](CurrencySymbolPosition.md) |  | [optional] 
 **currencyHideDecimalPlaces** | **bool** | Whether to hide decimal places | [optional] 
+**timeZone** | **String** | The app time zone, an IANA name such as America/New_York (\"UTC\" when unset or invalid). Clients work out \"today\" and display instants (Added At, Resolved Date) in it. A receipt's Date is a calendar day and is always read in UTC. A plain string, not an enum, so a released client never fails the payload on a zone it does not know. | [optional] 
 **icons** | [**BuiltList&lt;Icon&gt;**](Icon.md) | Icons in the system | 
 **appPermissions** | **BuiltList&lt;String&gt;** | The calling user's effective app-level permissions. Deliberately typed as plain strings rather than the Permission enum: this is server-resolved data, not a contract. A granted entry may be a wildcard (e.g. \"app.*\"), which is not an enum member, and a client built before a newly added permission must still be able to parse the payload. Clients match these with the wildcard matcher. | 
 **groupPermissions** | [**BuiltMap&lt;String, BuiltList&lt;String&gt;&gt;**](BuiltList.md) | The calling user's effective group-level permissions, keyed by group id. Plain strings for the same reason as appPermissions. | 

@@ -3,6 +3,7 @@ package reporting
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 var (
@@ -109,6 +110,13 @@ type FieldRef struct {
 	// receipt's categories or tags. Grouping on one fans the row out into every
 	// bucket, so the row double-counts.
 	Multi bool
+
+	// Location is the zone a date field's values are read in when a renderer
+	// names the calendar day they fall on. A producer declares it per field:
+	// a calendar-day field (a receipt's Date) is UTC, an instant (Added At) is
+	// the app's time zone. Nil means UTC. It is presentation only — the engine
+	// never reads it, and bucket identity stays the canonical instant.
+	Location *time.Location
 }
 
 // Role reports whether the field cuts the data or measures it.

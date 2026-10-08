@@ -46,4 +46,11 @@ type SystemSettings struct {
 	// guarantees a sane value, since AutoMigrate's back-fill of an added column on
 	// the pre-existing row is engine-dependent.
 	TempFileRetentionHours int `json:"tempFileRetentionHours" gorm:"default:720"`
+	// TimeZone is the IANA name (e.g. "America/New_York") the app works out
+	// calendar boundaries in: which day an instant such as created_at falls on,
+	// "today", "this month", report periods and {{generatedAt}}. A receipt's own
+	// Date is a calendar day and never shifts with it. An empty or unknown value
+	// resolves to UTC (see repositories.GetAppLocation), which is also the
+	// default, so an existing install behaves exactly as before.
+	TimeZone string `json:"timeZone" gorm:"default:UTC"`
 }

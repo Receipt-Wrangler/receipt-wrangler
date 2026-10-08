@@ -30,6 +30,7 @@ func Run(spec ReportSpec, catalog FieldCatalog, rows []Row, meta MetaInput) (Rep
 			GeneratedAt: meta.GeneratedAt,
 			Params:      copyParams(meta.Params),
 			Currency:    meta.Currency,
+			Location:    meta.Location,
 			NoneLabel:   compiled.spec.NoneLabel,
 		},
 		Columns: run.descriptors(),
@@ -394,6 +395,8 @@ func (e engineRun) descriptors() []ColumnDescriptor {
 		case ColumnArithmetic:
 			descriptor.Expr = column.expr
 			descriptor.ExprSrc = column.exprSrc
+		case ColumnLabel:
+			descriptor.Location = column.fieldRef.Location
 		}
 
 		descriptors = append(descriptors, descriptor)

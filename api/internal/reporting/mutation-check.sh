@@ -463,6 +463,57 @@ add 'unresolvable-custom-field-value-wins' 'receiptsource/receiptsource.go' \
 
 		winners[key] = customFieldValue.ID'
 
+# --- the app time zone: which calendar day a date names ---------------------
+
+# TestSource_InstantPeriodFieldsUseTheAppZone — Added At is an instant: its
+# calendar parts are the app zone's. Reading it in UTC is the reported bug (a
+# receipt added at 9PM Sep 30 Eastern lands in October).
+add 'created-at-parts-read-in-utc' 'receiptsource/receiptsource.go' \
+'receipt.CreatedAt, s.location)' \
+'receipt.CreatedAt, time.UTC)'
+
+# TestSource_InstantPeriodFieldsUseTheAppZone — the same for Resolved Date.
+add 'resolved-date-parts-read-in-utc' 'receiptsource/receiptsource.go' \
+'*receipt.ResolvedDate, s.location)' \
+'*receipt.ResolvedDate, time.UTC)'
+
+# TestSource_InstantPeriodFieldsUseTheAppZone — a receipt's Date is a calendar
+# day stored as midnight UTC; reading it in the app zone moves it a day west of
+# Greenwich.
+add 'date-parts-read-in-app-zone' 'receiptsource/receiptsource.go' \
+'receipt.Date, time.UTC)' \
+'receipt.Date, s.location)'
+
+# TestSource_InstantPeriodFieldsUseTheAppZone — a DATE custom field is a
+# calendar day too.
+add 'custom-date-parts-read-in-app-zone' 'receiptsource/receiptsource.go' \
+'setDateParts(row, day, month, year, moment, time.UTC)' \
+'setDateParts(row, day, month, year, moment, s.location)'
+
+# TestSource_DateFieldsDeclareTheirDisplayZone — the catalog is where a renderer
+# learns an instant's zone.
+add 'created-at-field-declares-utc' 'receiptsource/receiptsource.go' \
+'{Key: KeyCreatedAt, Label: "Added At", DataType: reporting.TypeDate, Location: location},' \
+'{Key: KeyCreatedAt, Label: "Added At", DataType: reporting.TypeDate, Location: time.UTC},'
+
+# TestCSV_DateDimensionsAndLabelsUseTheFieldsLocation — the engine must carry a
+# label column's zone through to the renderer.
+add 'label-descriptor-drops-location' 'engine.go' \
+'			descriptor.Location = column.fieldRef.Location' \
+'			descriptor.Location = nil'
+
+# TestFormatLabelValue_DateUsesTheFieldsLocation — a date is named in its
+# field's zone, not forced to UTC.
+add 'label-date-ignores-location' 'render/value.go' \
+'			return moment.In(locationOrUTC(location)).Format(dimensionDateLayout)' \
+'			return moment.UTC().Format(dimensionDateLayout)'
+
+# TestHTML_FooterPrintsGeneratedAtInTheAppZone — the footer is read off the app
+# zone's clock.
+add 'footer-ignores-app-zone' 'render/html.go' \
+'model.Meta.GeneratedAt.In(locationOrUTC(model.Meta.Location))' \
+'model.Meta.GeneratedAt.UTC()'
+
 # --- receiptsource: splitting a receipt across its categories / tags ---------
 
 # TestAllocateGrid_MarginalsMatchSingleDimensionSplits — restarting the column

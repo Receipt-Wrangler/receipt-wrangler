@@ -42,6 +42,7 @@ part 'system_settings.g.dart';
 /// * [refreshTokenValidForHours] - How long a refresh token stays valid, in hours. Refresh tokens rotate on every use, so this is how long a user can be away and still return signed in, not an absolute session cap. 1-720 (30 days); 0 means unset and falls back to the default.
 /// * [mcpRefreshTokenValidForHours] - The same for MCP/OAuth connector refresh tokens, kept separate so a long window chosen for human convenience does not extend third-party client tokens. 1-720 (30 days); 0 means unset and falls back to the default.
 /// * [tempFileRetentionHours] - How long a file in temp/ is kept once nothing can still act on it, i.e. how long a user has to rerun, preview or download the source image of a failed upload. 24-8760 (1 year); 0 means unset and falls back to the default.
+/// * [timeZone] - The app time zone, an IANA name such as America/New_York. Every calendar boundary (which day an Added At or Resolved Date falls on, \"today\", \"this month\", report periods) is worked out in it. A receipt's Date is a calendar day and never shifts with it.
 @BuiltValue()
 abstract class SystemSettings implements BaseModel, Built<SystemSettings, SystemSettingsBuilder> {
   /// Whether the OAuth 2.1-protected MCP server is enabled
@@ -67,6 +68,10 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
   /// Whether to show the mobile-setup QR code on the desktop login page
   @BuiltValueField(wireName: r'showLoginQr')
   bool? get showLoginQr;
+
+  /// The app time zone, an IANA name such as America/New_York. Every calendar boundary (which day an Added At or Resolved Date falls on, \"today\", \"this month\", report periods) is worked out in it. A receipt's Date is a calendar day and never shifts with it.
+  @BuiltValueField(wireName: r'timeZone')
+  String? get timeZone;
 
   /// Whether to hide decimal places
   @BuiltValueField(wireName: r'currencyHideDecimalPlaces')
@@ -144,6 +149,7 @@ abstract class SystemSettings implements BaseModel, Built<SystemSettings, System
       ..createdByString = ''
       ..updatedAt = ''
       ..showLoginQr = false
+      ..timeZone = 'UTC'
       ..debugOcr = false
       ..refreshTokenValidForHours = 24
       ..createdBy = 0
@@ -272,6 +278,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
       yield serializers.serialize(
         object.showLoginQr,
         specifiedType: const FullType(bool),
+      );
+    }
+    if (object.timeZone != null) {
+      yield r'timeZone';
+      yield serializers.serialize(
+        object.timeZone,
+        specifiedType: const FullType(String),
       );
     }
     if (object.mcpPublicUrl != null) {
@@ -476,6 +489,13 @@ class _$SystemSettingsSerializer implements PrimitiveSerializer<SystemSettings> 
             specifiedType: const FullType(bool),
           ) as bool;
           result.showLoginQr = valueDes;
+          break;
+        case r'timeZone':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.timeZone = valueDes;
           break;
         case r'mcpPublicUrl':
           final valueDes = serializers.deserialize(

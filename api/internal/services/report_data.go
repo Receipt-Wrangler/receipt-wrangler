@@ -10,6 +10,7 @@ import (
 	"receipt-wrangler/api/internal/reporting/receiptsource"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/utils"
+	"time"
 )
 
 // ReportDataService resolves a group's receipts into the reporting engine's two
@@ -21,6 +22,11 @@ import (
 // reporting.Run. A caller assembles the spec and runs the report.
 type ReportDataService struct {
 	BaseService
+
+	// Location is the app time zone the rows' instants (Added At, Resolved
+	// Date) are bucketed in. Nil reads it from System Settings when rows are
+	// built; ReportService sets it so one report resolves the zone once.
+	Location *time.Location
 }
 
 func NewReportDataService(tx *gorm.DB) ReportDataService {
@@ -90,7 +96,12 @@ func (service ReportDataService) RowsWithSplit(
 		return ReportRowSet{}, err
 	}
 
-	source, err := receiptsource.New(customFields)
+	location := service.Location
+	if location == nil {
+		location = repositories.NewSystemSettingsRepository(service.TX).AppLocation()
+	}
+
+	source, err := receiptsource.New(customFields, location)
 	if err != nil {
 		return ReportRowSet{}, err
 	}

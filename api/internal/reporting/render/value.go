@@ -1,6 +1,10 @@
 package render
 
-import "receipt-wrangler/api/internal/reporting"
+import (
+	"time"
+
+	"receipt-wrangler/api/internal/reporting"
+)
 
 // dimensionDateLayout is how a date reads when it names a bucket or fills a
 // label column. It matches the derived date-period fields receiptsource emits
@@ -15,9 +19,12 @@ const dimensionDateLayout = "2006-01-02"
 // without this a boolean prints "true", a date prints an RFC 3339 instant, and a
 // currency amount prints a bare decimal with no symbol. Which of those a value
 // is cannot be read off the value alone in every case, so the caller supplies
-// the field's declared data type. Dates are printed in UTC because the engine
-// emits date buckets in UTC; printing them in another zone would name a
-// different calendar day than the one the bucket was built from.
+// the field's declared data type. A date names its calendar day in the zone its
+// field declares (location; nil means UTC): a calendar-day field such as a
+// receipt's Date is stored as midnight UTC and must be read in UTC, while an
+// instant such as Added At is read in the app's time zone. The engine emits
+// date buckets in UTC (its canonical form), so the zone is applied here, at
+// presentation, and never changes which values share a bucket.
 //
 // The type is a declaration, not a guarantee: a producer may hand over a value
 // whose payload disagrees with it. Each branch therefore checks the payload and
@@ -25,6 +32,7 @@ const dimensionDateLayout = "2006-01-02"
 func formatLabelValue(
 	value reporting.Value,
 	dataType reporting.DataType,
+	location *time.Location,
 	currency *reporting.CurrencyFormat,
 	noneLabel string,
 ) string {
@@ -43,7 +51,7 @@ func formatLabelValue(
 
 	case reporting.TypeDate:
 		if moment, isDate := value.Time(); isDate {
-			return moment.UTC().Format(dimensionDateLayout)
+			return moment.In(locationOrUTC(location)).Format(dimensionDateLayout)
 		}
 
 	case reporting.TypeCurrency:
@@ -56,4 +64,13 @@ func formatLabelValue(
 	}
 
 	return value.String()
+}
+
+// locationOrUTC treats an undeclared zone as UTC, so a producer that never sets
+// one keeps the engine's canonical reading.
+func locationOrUTC(location *time.Location) *time.Location {
+	if location == nil {
+		return time.UTC
+	}
+	return location
 }

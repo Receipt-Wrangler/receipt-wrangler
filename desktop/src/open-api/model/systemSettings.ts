@@ -93,6 +93,10 @@ export interface SystemSettings {
      * How long a file in temp/ is kept once nothing can still act on it, i.e. how long a user has to rerun, preview or download the source image of a failed upload. 24-8760 (1 year); 0 means unset and falls back to the default.
      */
     tempFileRetentionHours?: number;
+    /**
+     * The app time zone, an IANA name such as America/New_York. Every calendar boundary (which day an Added At or Resolved Date falls on, \"today\", \"this month\", report periods) is worked out in it. A receipt\'s Date is a calendar day and never shifts with it.
+     */
+    timeZone?: string;
 }
 export namespace SystemSettings {
 }
