@@ -1,4 +1,4 @@
-import { toCalendarDay } from "./app-time-zone";
+import { calendarDayToLocalDate, toCalendarDay } from "./app-time-zone";
 
 /**
  * A filter as it goes on the wire: the value of every key in `dateKeys` becomes
@@ -61,4 +61,52 @@ function toWireDay(value: unknown): unknown {
   }
 
   return value;
+}
+
+/**
+ * The inverse of `toDateWireFilter`, for a filter read back from the server (a
+ * saved report template) into a form: the value of every key in `dateKeys`
+ * becomes the **local-midnight** `Date` the datepickers work in.
+ *
+ * - A bare `yyyy-MM-dd` (what every save now writes) is that day.
+ * - A legacy ISO instant (`2026-09-01T04:00:00.000Z`, written before saves sent
+ *   bare days) is the calendar day **as written** — its first ten characters —
+ *   which is exactly the day the server reads it as. Showing any other day would
+ *   make the builder disagree with the report it generates.
+ * - Anything else (a `Date`, an empty or unparseable value) passes through.
+ *
+ * Returns a new object and never mutates `filter`.
+ */
+export function fromDateWireFilter<T extends object>(
+  filter: T | undefined | null,
+  dateKeys: readonly string[],
+): T | undefined {
+  if (!filter) {
+    return undefined;
+  }
+
+  const form = { ...filter } as Record<string, unknown>;
+  for (const key of dateKeys) {
+    const entry = form[key] as { value?: unknown } | null | undefined;
+    if (entry && typeof entry === "object") {
+      form[key] = { ...entry, value: fromWireDay(entry.value) };
+    }
+  }
+
+  return form as T;
+}
+
+const AS_WRITTEN_DAY_PATTERN = /^(\d{4}-\d{2}-\d{2})(T|$)/;
+
+function fromWireDay(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(fromWireDay);
+  }
+
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const day = AS_WRITTEN_DAY_PATTERN.exec(value);
+  return day ? calendarDayToLocalDate(day[1]) : value;
 }

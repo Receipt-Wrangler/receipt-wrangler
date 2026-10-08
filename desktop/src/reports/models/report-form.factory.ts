@@ -1,7 +1,8 @@
 import { parseISO } from "date-fns";
 import { FormArray, FormBuilder, FormControl, FormGroup } from "@angular/forms";
-import { DEFAULT_QUICK_DATE_FIELD, ReceiptDateFilterFieldKey } from "src/constants";
+import { DEFAULT_QUICK_DATE_FIELD, RECEIPT_DATE_FILTER_KEYS, ReceiptDateFilterFieldKey } from "src/constants";
 import { ReportColumn, ReportDetail, ReportPeriod, ReportRequestCommand } from "../../open-api";
+import { fromDateWireFilter } from "../../utils/date-wire-filter";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { ReportColumnValue } from "./report-command.mapper";
 import { toReportPeriodDateField } from "./report-period.util";
@@ -97,7 +98,13 @@ export function buildReportFormFromCommand(
         toReportPeriodDateField(command.period?.dateField)
       ),
     }),
-    filter: buildReceiptFilterForm(command.filter ?? {}, thisContext),
+    // Stored date filter values are calendar days on the wire (yyyy-MM-dd, or a
+    // legacy instant read by its day as written); the datepickers need local
+    // midnight, or Material would parse a bare day as UTC midnight.
+    filter: buildReceiptFilterForm(
+      fromDateWireFilter(command.filter, RECEIPT_DATE_FILTER_KEYS) ?? {},
+      thisContext
+    ),
     groupBy: formBuilder.array<FormGroup>(
       (command.groupBy ?? []).map((key) =>
         buildGroupByGroup(formBuilder, key, command.groupByLabels?.[key] ?? "")

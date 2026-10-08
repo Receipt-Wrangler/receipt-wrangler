@@ -1581,9 +1581,16 @@ All helpers are in `src/utils/app-time-zone.ts`. The rules (root `CLAUDE.md` hol
   (`src/utils/date-wire-filter.ts`), applied **at the request, never in the store** (the datepicker
   would misread a stored bare day as UTC midnight). Callers: `ReceiptFilterService.buildPagedRequestCommand`
   (table, summary, filtered-receipts widget), the pie-chart widget, CSV export, the report builder's
-  preview/generate (`toReportRequestCommand` — **not** the save path, whose filter reloads into the
-  datepickers) and system tasks (`toSystemTaskWireFilter`). The server turns the day into a range in
-  the right zone. **Receipt dates** go out as midnight UTC of the picked day
+  preview/generate (`toReportRequestCommand`) **and save** (`toReportRequestCommandForSave`), and
+  system tasks (`toSystemTaskWireFilter`). The server turns the day into a range in the right zone.
+  - **Saved report templates store bare days too.** The server generates a template later and reads
+    an instant by its calendar day *as written*; a local midnight east of UTC is written as the
+    previous day (`2026-08-31T15:00:00.000Z` for a Tokyo Sep 1), so a stored instant silently covered
+    the wrong days. The way back is `fromDateWireFilter(filter, keys)` in `buildReportFormFromCommand`:
+    a bare day becomes the datepicker's local midnight, and a **legacy instant** loads as its first
+    ten characters — the day as written, which is the day the server generates it for, so the builder
+    never disagrees with the report. A re-save rewrites it as a bare day. The round-trip specs
+    (`report-form.factory.spec.ts`) pin both, through the save mapper as well as generate. **Receipt dates** go out as midnight UTC of the picked day
   (`2026-09-30T00:00:00.000Z`, `toMidnightUtc`), converted in `ReceiptFormComponent.buildSubmitCommand()`
   on a copy of the form value; on load `calendarDayToLocalDate` turns the stored UTC day into the
   datepicker's local midnight (also used for magic fill, replacing the old `getTimezoneOffset` hack).
@@ -1591,6 +1598,27 @@ All helpers are in `src/utils/app-time-zone.ts`. The rules (root `CLAUDE.md` hol
   stepper's seed and shortcuts, the `WITHIN_CURRENT_MONTH` implied range in `app-filter-field`, a new
   receipt's default date, and the report period hint, which also names the zone for instant fields
   ("… on Added At (America/New_York)"; Receipt Date is named alone).
+- **The setting** is a "Time Zone" `app-form-section` on the System Settings form (above Currency
+  Format): a single-select `app-autocomlete` (`data-testid="system-settings-time-zone"`,
+  `[creatable]="false"`, `Validators.required`) over `timeZoneOptions()` — `UTC` first, then
+  `Intl.supportedValuesOf('timeZone')` (~420 bare strings; the autocomplete filters and renders plain
+  strings itself, so no `{ value, displayValue }` objects are needed). Two traps:
+  - **It must pass a `displayWith`** (`timeZoneDisplayWith`). The autocomplete's default returns
+    `""`, which would blank the field the moment a zone is picked.
+  - Seeded from `originalSystemSettings?.timeZone || "UTC"`, added to the view-mode disable block, read
+    through `getRawValue()` like every other control, and dispatched as `SetTimeZone` after a
+    successful save (next to `SetCurrencyData`), so the open app repaints in the new zone without a
+    reload. Other sessions pick it up from AppData on their next load. Both full-object `toEqual`s in
+    the spec carry the key.
+- **E2E:** `e2e/app-time-zone.spec.ts` (serial, admin storageState; `timeZone` is **global**, so
+  `beforeAll` captures it and `afterAll` restores the captured value). It picks `America/New_York` in
+  the typeahead (clearing the current value first — a single-select goes `readonly` once filled),
+  asserts `GET /api/systemSettings` stored it, then checks a seeded receipt's **"Added at"** line
+  (`appDate:"medium"`) against its real `createdAt` formatted in New York, and the report builder's
+  hint naming the zone; switching back to UTC through the API (so the browser learns it from AppData)
+  moves both back. `created_at` cannot be set through the API, so the "late Sep 30 Eastern lands in
+  last month" case is pinned by the Go report tests instead. Whitespace is normalized before
+  comparing, because Angular's CLDR data puts a U+202F before AM/PM.
 
 ## Filter dialogs (the shared pieces)
 

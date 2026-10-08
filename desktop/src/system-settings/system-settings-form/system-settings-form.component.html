@@ -95,6 +95,25 @@
     </app-form-section>
   </app-form-section>
   <app-form-section
+    headerText="Time Zone"
+  >
+    <p class="text-muted mb-3">
+      Decides which day a moment in time falls on: when a receipt was added or resolved, what
+      "today" and "last month" mean in reports and filters, and how times are shown. A receipt's own
+      Date is a calendar day and never shifts with this setting.
+    </p>
+    <app-autocomlete
+      data-testid="system-settings-time-zone"
+      label="Time zone"
+      hint="An IANA time zone, e.g. America/New_York. Takes effect immediately, no restart required."
+      [inputFormControl]="form | formGet:'timeZone'"
+      [options]="timeZones"
+      [displayWith]="timeZoneDisplayWith"
+      [creatable]="false"
+      [readonly]="formConfig.mode | inputReadonly"
+    ></app-autocomlete>
+  </app-form-section>
+  <app-form-section
     headerText="Currency Format"
   >
     <div class="d-flex flex-column mb-3">

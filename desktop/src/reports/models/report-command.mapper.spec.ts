@@ -1,5 +1,5 @@
 import { RECEIPT_DATE_FILTER_FIELDS } from "src/constants";
-import { ReportColumn, ReportDetail, ReportPeriod } from "../../open-api";
+import { FilterOperation, ReportColumn, ReportDetail, ReportPeriod } from "../../open-api";
 import {
   enabledReportColumns,
   isDimensionColumnDisabled,
@@ -183,6 +183,29 @@ describe("toReportRequestCommandForSave", () => {
   it("matches the generate mapper when no column is disabled", () => {
     const value = baseValue();
     expect(toReportRequestCommandForSave(value)).toEqual(toReportRequestCommand(value));
+  });
+
+  // The server generates a saved template later and reads an instant by its day
+  // as written. A local midnight east of UTC is written as the previous day, so
+  // the save path has to send the picked day itself, exactly like generate does.
+  it("saves date filter values as the picked calendar day", () => {
+    const value = baseValue();
+    value.filter = {
+      date: { operation: FilterOperation.Equals, value: new Date(2026, 8, 30) },
+      createdAt: {
+        operation: FilterOperation.Between,
+        value: [new Date(2026, 8, 1), new Date(2026, 8, 30)],
+      },
+      amount: { operation: FilterOperation.GreaterThan, value: 5 },
+    } as any;
+
+    const filter = toReportRequestCommandForSave(value).filter as any;
+
+    expect(filter.date.value).toBe("2026-09-30");
+    expect(filter.createdAt.value).toEqual(["2026-09-01", "2026-09-30"]);
+    expect(filter.amount.value).toBe(5);
+    // The builder's own form value is left as the datepickers wrote it.
+    expect((value.filter as any).date.value).toBeInstanceOf(Date);
   });
 });
 

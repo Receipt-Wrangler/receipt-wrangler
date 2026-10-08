@@ -20,8 +20,9 @@ import {
 import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 import { SnackbarService } from "../../services";
 import { SetFeatureConfig } from "../../store";
-import { SetCurrencyData, SetCurrencyDisplay } from "../../store/system-settings.state.actions";
+import { SetCurrencyData, SetCurrencyDisplay, SetTimeZone } from "../../store/system-settings.state.actions";
 import { DurationUnit, maxForUnit, minForUnit, splitHours, toHours } from "../../utils";
+import { DEFAULT_APP_TIME_ZONE, timeZoneOptions } from "../../utils/app-time-zone";
 import { absoluteUrlValidator, durationValueValidator } from "../../validators";
 
 interface QueueData extends FormOption {
@@ -125,6 +126,15 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
     }
   ];
 
+  // Plain IANA names (~420): the autocomplete filters and renders bare strings
+  // itself, so there is no value/display split to model. Built once — the list
+  // is static for the browser's lifetime.
+  public readonly timeZones: string[] = timeZoneOptions();
+
+  // The autocomplete's default displayWith renders "", which would blank the
+  // field once a zone is picked.
+  public readonly timeZoneDisplayWith = (zone: string | null): string => zone ?? "";
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private featureConfigService: FeatureConfigService,
@@ -175,6 +185,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       currencyDecimalSeparator: [this.originalSystemSettings.currencyDecimalSeparator, [Validators.required]],
       currencySymbolPosition: [this.originalSystemSettings.currencySymbolPosition, [Validators.required]],
       currencyHideDecimalPlaces: [this.originalSystemSettings.currencyHideDecimalPlaces],
+      timeZone: [this.originalSystemSettings?.timeZone || DEFAULT_APP_TIME_ZONE, [Validators.required]],
       receiptProcessingSettingsId: [this.originalSystemSettings?.receiptProcessingSettingsId],
       fallbackReceiptProcessingSettingsId: [this.originalSystemSettings?.fallbackReceiptProcessingSettingsId],
       pdfDpi: [this.originalSystemSettings?.pdfDpi, [Validators.min(72), Validators.max(1200)]],
@@ -201,6 +212,7 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
       this.form.get("currencyDecimalSeparator")?.disable();
       this.form.get("currencySymbolPosition")?.disable();
       this.form.get("currencyHideDecimalPlaces")?.disable();
+      this.form.get("timeZone")?.disable();
       this.form.get("mcpEnabled")?.disable();
       this.form.get("mcpPublicUrl")?.disable();
       this.form.get("showLoginQr")?.disable();
@@ -420,6 +432,9 @@ export class SystemSettingsFormComponent extends BaseFormComponent implements On
             formValue["currencyThousandthsSeparator"],
             formValue["currencyHideDecimalPlaces"]
           ))),
+        // Every appDate pipe and "today" reads the zone from the store, so the
+        // app repaints in the new zone without a reload.
+        switchMap(() => this.store.dispatch(new SetTimeZone(formValue["timeZone"]))),
       )
       .subscribe();
   }

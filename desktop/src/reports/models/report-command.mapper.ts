@@ -236,12 +236,7 @@ function toGroupByLabels(
  * command feeds both preview and generate.
  */
 export function toReportRequestCommand(value: ReportBuilderValue): ReportRequestCommand {
-  const command = mapReportCommand(value, enabledReportColumns(value));
-
-  // Date filter values go out as the picked calendar day (see toDateWireFilter).
-  // Not on the save path: a saved template's filter is fed back into the
-  // builder's datepickers, which would misread a bare yyyy-MM-dd as UTC midnight.
-  return { ...command, filter: toDateWireFilter(command.filter, RECEIPT_DATE_FILTER_KEYS) };
+  return withWireDates(mapReportCommand(value, enabledReportColumns(value)));
 }
 
 /**
@@ -253,5 +248,17 @@ export function toReportRequestCommand(value: ReportBuilderValue): ReportRequest
  * such a column omitted.
  */
 export function toReportRequestCommandForSave(value: ReportBuilderValue): ReportRequestCommand {
-  return mapReportCommand(value, value.columns);
+  return withWireDates(mapReportCommand(value, value.columns));
+}
+
+/**
+ * Date filter values go out as the picked calendar day (see toDateWireFilter) on
+ * every path — preview, generate **and save**. A saved template is generated
+ * later by the server, which reads an instant by the calendar day as written; a
+ * local midnight east of UTC is written as the previous day, so a stored instant
+ * would silently cover the wrong days. buildReportFormFromCommand turns the
+ * stored day back into the datepicker's local midnight on load.
+ */
+function withWireDates(command: ReportRequestCommand): ReportRequestCommand {
+  return { ...command, filter: toDateWireFilter(command.filter, RECEIPT_DATE_FILTER_KEYS) };
 }

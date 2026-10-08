@@ -46,8 +46,7 @@ export function setAppData(store: Store, appData: AppData): Observable<any[]> {
       appData.currencyThousandthsSeparator ?? CurrencySeparator.Comma,
       appData.currencyHideDecimalPlaces ?? false
     )),
-    // TODO(regen): read the typed `appData.timeZone` once the client is regenerated.
-    store.dispatch(new SetTimeZone((appData as any).timeZone ?? DEFAULT_APP_TIME_ZONE)),
+    store.dispatch(new SetTimeZone(appData.timeZone || DEFAULT_APP_TIME_ZONE)),
     store.dispatch(new SetIcons(appData.icons)),
     store.dispatch(new SetAbout(appData.about)),
     selectedGroupIdObservable,

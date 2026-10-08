@@ -323,13 +323,43 @@ describe("buildReportFormFromCommand", () => {
     expect(form.get("filter.amount.value")!.value).toEqual([5, 50]);
     expect(form.get("filter.amount.operation")!.value).toBe(FilterOperation.Between);
 
-    expect(form.get("filter.date.value")!.value).toEqual(["2026-01-01", "2026-01-31"]);
+    // The stored bare days land in the datepickers as local midnight (a bare string
+    // would be parsed by Material as UTC midnight, the previous day west of UTC).
+    expect(form.get("filter.date.value")!.value).toEqual([new Date(2026, 0, 1), new Date(2026, 0, 31)]);
     expect(form.get("filter.date.operation")!.value).toBe(FilterOperation.Between);
 
     expect(form.get("filter.paidBy.value")!.value).toEqual([11, 12]);
     expect(form.get("filter.categories.value")!.value).toEqual([2, 3]);
     expect(form.get("filter.tags.value")!.value).toEqual([7]);
     expect(form.get("filter.status.value")!.value).toEqual(["OPEN"]);
+  });
+
+  it("round-trips a template through the SAVE mapper, date filter included", () => {
+    const command = commandWithFilter({
+      date: { operation: FilterOperation.Equals, value: "2026-09-30" },
+      createdAt: { operation: FilterOperation.Between, value: ["2026-09-01", "2026-09-30"] },
+    });
+
+    const form = buildReportFormFromCommand(fb, host, command);
+    expect(toReportRequestCommandForSave(form.getRawValue() as ReportBuilderValue)).toEqual(command);
+  });
+
+  // Templates saved before the save path sent bare days hold instants. They load
+  // on the day as written (the day the server generates them for) and re-save in
+  // the canonical bare-day form.
+  it("loads a legacy instant date filter by its day as written and re-saves it as a bare day", () => {
+    const legacy = commandWithFilter({
+      createdAt: {
+        operation: FilterOperation.Between,
+        value: ["2026-08-31T15:00:00.000Z", "2026-09-30T04:00:00.000Z"],
+      },
+    });
+
+    const form = buildReportFormFromCommand(fb, host, legacy);
+    expect(form.get("filter.createdAt.value")!.value).toEqual([new Date(2026, 7, 31), new Date(2026, 8, 30)]);
+
+    const saved = toReportRequestCommandForSave(form.getRawValue() as ReportBuilderValue);
+    expect((saved.filter as any).createdAt.value).toEqual(["2026-08-31", "2026-09-30"]);
   });
 
   it("round-trips a value-less date filter (WITHIN_CURRENT_MONTH)", () => {
