@@ -392,89 +392,21 @@ func TestGetPagedSystemTasksFiltersByRanBy(t *testing.T) {
 	}
 }
 
-// The headline whole-day case, asserted on the bound values rather than on
-// rows: started_at carries a time of day, so a raw comparison against the
-// datepicker's midnight would drop a task that ran late on the last day of the
-// range. It has to be asserted this way because the test DB is SQLite, which
-// stores timestamps as text and compares them lexically — there, a raw bound
-// happens to sort *after* every row on the same day (" " < "T"), so the row
-// count alone cannot tell the widened path from the broken one. A real
-// Postgres/MySQL deployment casts to a timestamp and drops those rows.
-func TestApplyTimestampDayFilterWidensBoundsToWholeDays(t *testing.T) {
-	defer TruncateTestDb()
-
-	repository := NewSystemTaskRepository(nil)
-	day := time.Date(2026, 3, 11, 0, 0, 0, 0, time.Local)
-	nextDay := day.AddDate(0, 0, 1)
-
-	tests := map[string]struct {
-		field    commands.PagedRequestField
-		expected []time.Time
-	}{
-		"equals covers the whole day": {
-			field:    commands.PagedRequestField{Operation: commands.EQUALS, Value: day.Format(time.RFC3339)},
-			expected: []time.Time{day, nextDay},
-		},
-		"greater than starts at the next day": {
-			field:    commands.PagedRequestField{Operation: commands.GREATER_THAN, Value: day.Format(time.RFC3339)},
-			expected: []time.Time{nextDay},
-		},
-		"less than stops at the start of the day": {
-			field:    commands.PagedRequestField{Operation: commands.LESS_THAN, Value: day.Format(time.RFC3339)},
-			expected: []time.Time{day},
-		},
-		"between runs to the end of the last day": {
-			field: commands.PagedRequestField{
-				Operation: commands.BETWEEN,
-				Value: []interface{}{
-					time.Date(2026, 3, 10, 0, 0, 0, 0, time.Local).Format(time.RFC3339),
-					day.Format(time.RFC3339),
-				},
-			},
-			expected: []time.Time{time.Date(2026, 3, 10, 0, 0, 0, 0, time.Local), nextDay},
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			query := GetDB().Session(&gorm.Session{DryRun: true}).Model(&models.SystemTask{})
-			query = repository.applyTimestampDayFilter(query, test.field, "started_at")
-
-			var results []models.SystemTask
-			statement := query.Find(&results).Statement
-
-			bounds := []time.Time{}
-			for _, variable := range statement.Vars {
-				if bound, ok := variable.(time.Time); ok {
-					bounds = append(bounds, bound)
-				}
-			}
-
-			if len(bounds) != len(test.expected) {
-				t.Fatalf("expected %d bounds, got %d (%v) -- SQL: %s",
-					len(test.expected), len(bounds), bounds, statement.SQL.String())
-			}
-
-			for i, expected := range test.expected {
-				if !bounds[i].Equal(expected) {
-					t.Errorf("bound %d: expected %v, got %v", i, expected, bounds[i])
-				}
-			}
-		})
-	}
-}
-
+// The whole-day bound values (and why they are asserted off a DryRun rather
+// than row counts) are pinned for every column by TestBuildDayFilterQuery* in
+// base_repository_test.go; the cases below check the behaviour end to end with
+// the default app time zone, UTC.
 func TestGetPagedSystemTasksBetweenIncludesTasksLateOnTheEndDay(t *testing.T) {
 	defer TruncateTestDb()
 	db := GetDB()
 
-	rangeStart := time.Date(2026, 3, 10, 0, 0, 0, 0, time.Local)
-	rangeEnd := time.Date(2026, 3, 12, 0, 0, 0, 0, time.Local)
+	rangeStart := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)
+	rangeEnd := time.Date(2026, 3, 12, 0, 0, 0, 0, time.UTC)
 
-	lateOnEndDay := seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 12, 23, 30, 0, 0, time.Local), nil)
-	insideRange := seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 11, 9, 0, 0, 0, time.Local), nil)
-	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 13, 0, 30, 0, 0, time.Local), nil)
-	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 9, 23, 30, 0, 0, time.Local), nil)
+	lateOnEndDay := seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 12, 23, 30, 0, 0, time.UTC), nil)
+	insideRange := seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 11, 9, 0, 0, 0, time.UTC), nil)
+	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 13, 0, 30, 0, 0, time.UTC), nil)
+	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 9, 23, 30, 0, 0, time.UTC), nil)
 
 	repository := NewSystemTaskRepository(nil)
 	results, count, err := repository.GetPagedSystemTasks(systemTaskFilterCommand(commands.SystemTaskPagedRequestFilter{
@@ -511,11 +443,11 @@ func TestGetPagedSystemTasksEqualsMatchesTheWholeDay(t *testing.T) {
 	defer TruncateTestDb()
 	db := GetDB()
 
-	day := time.Date(2026, 3, 11, 0, 0, 0, 0, time.Local)
+	day := time.Date(2026, 3, 11, 0, 0, 0, 0, time.UTC)
 
-	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 11, 0, 0, 1, 0, time.Local), nil)
-	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 11, 23, 59, 59, 0, time.Local), nil)
-	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 12, 0, 0, 1, 0, time.Local), nil)
+	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 11, 0, 0, 1, 0, time.UTC), nil)
+	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 11, 23, 59, 59, 0, time.UTC), nil)
+	seedSystemTask(db, models.QUICK_SCAN, nil, time.Date(2026, 3, 12, 0, 0, 1, 0, time.UTC), nil)
 
 	repository := NewSystemTaskRepository(nil)
 	_, count, err := repository.GetPagedSystemTasks(systemTaskFilterCommand(commands.SystemTaskPagedRequestFilter{
@@ -538,9 +470,9 @@ func TestGetPagedSystemTasksLessThanOnEndedAtExcludesRunningTasks(t *testing.T) 
 	defer TruncateTestDb()
 	db := GetDB()
 
-	started := time.Date(2026, 3, 10, 8, 0, 0, 0, time.Local)
-	endedEarlier := time.Date(2026, 3, 10, 9, 0, 0, 0, time.Local)
-	endedOnCutoffDay := time.Date(2026, 3, 11, 9, 0, 0, 0, time.Local)
+	started := time.Date(2026, 3, 10, 8, 0, 0, 0, time.UTC)
+	endedEarlier := time.Date(2026, 3, 10, 9, 0, 0, 0, time.UTC)
+	endedOnCutoffDay := time.Date(2026, 3, 11, 9, 0, 0, 0, time.UTC)
 
 	seedSystemTask(db, models.QUICK_SCAN, nil, started, &endedEarlier)
 	seedSystemTask(db, models.QUICK_SCAN, nil, started, &endedOnCutoffDay)
@@ -550,7 +482,7 @@ func TestGetPagedSystemTasksLessThanOnEndedAtExcludesRunningTasks(t *testing.T) 
 	_, count, err := repository.GetPagedSystemTasks(systemTaskFilterCommand(commands.SystemTaskPagedRequestFilter{
 		EndedAt: commands.PagedRequestField{
 			Operation: commands.LESS_THAN,
-			Value:     time.Date(2026, 3, 11, 0, 0, 0, 0, time.Local).Format(time.RFC3339),
+			Value:     time.Date(2026, 3, 11, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
 		},
 	}))
 	if err != nil {
@@ -623,40 +555,6 @@ func TestGetPagedSystemTasksCombinesTypeWithASystemRanByDisjunction(t *testing.T
 
 	if count != 2 {
 		t.Errorf("expected only the 2 QUICK_SCAN tasks, got %d", count)
-	}
-}
-
-// The wire format is a bare calendar day precisely so the server cannot resolve
-// it into the adjacent one. Before this, a UTC-4 browser's local midnight on the
-// 22nd arrived as 2026-09-22T04:00:00Z and became the 21st under a US Pacific
-// API.
-func TestStartOfDayValueReadsACalendarDayWithoutZoneDrift(t *testing.T) {
-	zones := []string{"UTC", "America/Los_Angeles", "Australia/Sydney"}
-
-	for _, zoneName := range zones {
-		t.Run(zoneName, func(t *testing.T) {
-			zone, err := time.LoadLocation(zoneName)
-			if err != nil {
-				t.Skipf("zone %s unavailable: %v", zoneName, err)
-			}
-
-			original := time.Local
-			time.Local = zone
-			defer func() { time.Local = original }()
-
-			day, ok := startOfDayValue("2026-09-22")
-			if !ok {
-				t.Fatal("expected the calendar day to parse")
-			}
-
-			if day.Format(time.DateOnly) != "2026-09-22" {
-				t.Errorf("expected 2026-09-22, got %s", day.Format(time.DateOnly))
-			}
-
-			if hour, minute := day.Hour(), day.Minute(); hour != 0 || minute != 0 {
-				t.Errorf("expected local midnight, got %02d:%02d", hour, minute)
-			}
-		})
 	}
 }
 

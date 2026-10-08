@@ -49,4 +49,8 @@ export const RECEIPT_DATE_FILTER_FIELDS: readonly ReceiptDateFilterField[] =
     (["date", "resolvedDate", "createdAt"] as readonly string[]).includes(field.key),
   );
 
+/** The receipt filter keys whose values are dates — what `toDateWireFilter` normalizes. */
+export const RECEIPT_DATE_FILTER_KEYS: readonly ReceiptDateFilterFieldKey[] =
+  RECEIPT_DATE_FILTER_FIELDS.map((field) => field.key);
+
 export const DEFAULT_QUICK_DATE_FIELD: ReceiptDateFilterFieldKey = "date";

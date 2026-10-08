@@ -417,7 +417,9 @@ the job. A bucket keeps whichever value created it and drops the rest, so what i
 on the *class*, not on which member arrived first. Dates compare by instant, so `2026-05-01T00:00:00Z`
 and `2026-04-30T19:00:00-05:00` merge — and a renderer formatting a calendar day would print a
 different day for each. `Value.canonical()` normalizes a date to UTC, so **date buckets are emitted in
-UTC**.
+UTC**. That is identity, not presentation: which calendar day a renderer *names* is the field's
+declared `FieldRef.Location` (UTC for a calendar day, the app's time zone for an instant), carried on
+`ColumnDescriptor.Location` / `render.Dimension.Location` and applied only when formatting.
 
 **3. Buckets are sorted, and no output is ever produced by ranging a Go map.** Siblings sort by typed
 value with `(None)` last. Records preserve input order — ordering them is the caller's query's job.
@@ -480,7 +482,7 @@ into a live `=SUM(...)` cell formula instead of a computed value.
 `[]models.Receipt` + `[]models.CustomField` into `[]reporting.Row`.
 
 ```go
-source, err := receiptsource.New(customFields)   // needs CustomField.Options loaded
+source, err := receiptsource.New(customFields, appLocation) // needs CustomField.Options loaded
 model,  err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), meta)
 ```
 
@@ -491,8 +493,10 @@ It offers `receipt_id`, `name`, `amount`, `date`, `resolved_date`, `created_at`,
 Each date field also carries derived `_day` / `_month` / `_year` **string** fields — `date_month`,
 `created_at_year`, `resolved_date_day`, and so on. A report groups by one of these to bucket receipts by
 calendar period; the raw date fields carry the exact instant, so grouping by `date` puts every receipt
-in its own bucket. The strings are zero-padded ISO in UTC (`2026-05`), so they sort chronologically as
-plain text.
+in its own bucket. The strings are zero-padded ISO (`2026-05`), cut in **UTC** for a calendar day (`date`,
+DATE custom fields, stored as midnight UTC) and in the **app time zone** passed to `New` for an instant
+(`created_at`, `resolved_date`) — the package takes the zone as a parameter and never reads a setting. They
+sort chronologically as plain text.
 
 The caller must preload `PaidByUser`, `Group`, `Categories`, `Tags`, `CustomFields`. An unloaded
 association resolves to no value, which surfaces as a `(None)` bucket rather than as a crash.
@@ -547,7 +551,7 @@ read the model the way a renderer would.
 ### Mutation checking
 
 ```bash
-./internal/reporting/mutation-check.sh          # all 43 mutations
+./internal/reporting/mutation-check.sh          # all 63 mutations
 ./internal/reporting/mutation-check.sh avg      # only those matching "avg"
 ```
 

@@ -5,17 +5,19 @@ import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from "@angular
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
-import { of } from "rxjs";
+import { of, throwError } from "rxjs";
 import { AutocompleteModule } from "../../autocomplete/autocomplete.module";
 import { CheckboxModule } from "../../checkbox/checkbox.module";
 import { InputModule } from "../../input/index";
-import { CurrencySeparator, CurrencySymbolPosition, QueueName, SystemSettingsService } from "../../open-api";
+import { FormMode } from "../../enums/form-mode.enum";
+import { CurrencySeparator, CurrencySymbolPosition, FeatureConfigService, QueueName, SystemSettingsService } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import { SnackbarService } from "../../services";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { AuthState } from "../../store/auth.state";
 import { SystemSettingsState } from "../../store/system-settings.state";
+import { SetTimeZone } from "../../store/system-settings.state.actions";
 import { TaskQueueFormControlPipe } from "../pipes/task-queue-form-control.pipe";
 
 import { SystemSettingsFormComponent } from "./system-settings-form.component";
@@ -117,6 +119,8 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: null,
       currencySymbolPosition: null,
       currencyHideDecimalPlaces: null,
+      // Unset on the wire (an older server): seeds the server's own default.
+      timeZone: "UTC",
       pdfDpi: null,
       taskConcurrency: null,
       taskQueueConfigurations: [
@@ -155,6 +159,7 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: true,
+      timeZone: "America/New_York",
       pdfDpi: 300,
       taskConcurrency: 12,
       taskQueueConfigurations: [{
@@ -182,6 +187,7 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: true,
+      timeZone: "America/New_York",
       pdfDpi: 300,
       taskConcurrency: 12,
       taskQueueConfigurations: [{
@@ -469,6 +475,7 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: false,
+      timeZone: "Europe/Berlin",
       pdfDpi: "300",
       taskConcurrency: "12",
       mcpEnabled: true,
@@ -503,6 +510,7 @@ describe("SystemSettingsFormComponent", () => {
       currencyDecimalSeparator: CurrencySeparator.Period,
       currencySymbolPosition: CurrencySymbolPosition.Start,
       currencyHideDecimalPlaces: false,
+      timeZone: "Europe/Berlin",
       pdfDpi: 300,
       taskConcurrency: 12,
       taskQueueConfigurations: [
@@ -524,5 +532,95 @@ describe("SystemSettingsFormComponent", () => {
 
     expect(snackbarServiceSpy).toHaveBeenCalled();
     expect(routerSpy).toHaveBeenCalled();
+  });
+
+  describe("time zone", () => {
+    function setRouteSettings(settings: object): void {
+      const activatedRoute = TestBed.inject(ActivatedRoute);
+      activatedRoute.snapshot.data["systemSettings"] = {
+        taskQueueConfigurations: [],
+        ...settings,
+      };
+    }
+
+    it("seeds the stored zone", () => {
+      setRouteSettings({ timeZone: "Asia/Tokyo" });
+      component.ngOnInit();
+
+      expect(component.form.get("timeZone")!.value).toEqual("Asia/Tokyo");
+    });
+
+    it("is required", () => {
+      component.ngOnInit();
+      const timeZone = component.form.get("timeZone")!;
+
+      timeZone.setValue(null);
+      expect(timeZone.hasError("required")).toBe(true);
+
+      timeZone.setValue("America/New_York");
+      expect(timeZone.valid).toBe(true);
+    });
+
+    it("offers UTC first, then the browser's IANA zones", () => {
+      expect(component.timeZones[0]).toEqual("UTC");
+      expect(component.timeZones.filter((zone) => zone === "UTC").length).toEqual(1);
+    });
+
+    it("shows the picked zone's name rather than the autocomplete's blank default", () => {
+      expect(component.timeZoneDisplayWith("Europe/Berlin")).toEqual("Europe/Berlin");
+      expect(component.timeZoneDisplayWith(null)).toEqual("");
+    });
+
+    it("renders the picker with its test id", () => {
+      const picker: HTMLElement | null = fixture.nativeElement.querySelector(
+        '[data-testid="system-settings-time-zone"]'
+      );
+
+      expect(picker).not.toBeNull();
+      expect(picker!.tagName.toLowerCase()).toEqual("app-autocomlete");
+    });
+
+    it("is disabled in view mode but still read by getRawValue", () => {
+      setRouteSettings({ timeZone: "America/New_York" });
+      const activatedRoute = TestBed.inject(ActivatedRoute);
+      activatedRoute.snapshot.data["formConfig"] = { mode: FormMode.view };
+      component.ngOnInit();
+
+      expect(component.form.get("timeZone")!.disabled).toBe(true);
+      expect(component.form.getRawValue().timeZone).toEqual("America/New_York");
+    });
+
+    it("dispatches the saved zone once the save succeeds", () => {
+      const systemSettingsService = TestBed.inject(SystemSettingsService);
+      const featureConfigService = TestBed.inject(FeatureConfigService);
+      jest.spyOn(systemSettingsService, "updateSystemSettings").mockReturnValue(of(null as any));
+      jest.spyOn(featureConfigService, "getFeatureConfig").mockReturnValue(of({} as any));
+      const dispatchSpy = jest.spyOn(store, "dispatch");
+
+      setRouteSettings({ timeZone: "UTC" });
+      component.ngOnInit();
+      component.form.get("timeZone")!.setValue("America/New_York");
+      component.submit();
+
+      expect(systemSettingsService.updateSystemSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ timeZone: "America/New_York" })
+      );
+      expect(dispatchSpy).toHaveBeenCalledWith(new SetTimeZone("America/New_York"));
+      expect(store.selectSnapshot(SystemSettingsState.timeZone)).toEqual("America/New_York");
+    });
+
+    it("does not dispatch a zone the server rejected", () => {
+      const systemSettingsService = TestBed.inject(SystemSettingsService);
+      jest
+        .spyOn(systemSettingsService, "updateSystemSettings")
+        .mockReturnValue(throwError(() => new Error("400")) as any);
+      const dispatchSpy = jest.spyOn(store, "dispatch");
+
+      component.ngOnInit();
+      component.form.get("timeZone")!.setValue("America/New_York");
+      component.submit();
+
+      expect(dispatchSpy).not.toHaveBeenCalledWith(new SetTimeZone("America/New_York"));
+    });
   });
 });

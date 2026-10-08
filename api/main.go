@@ -14,6 +14,10 @@ import (
 	"receipt-wrangler/api/internal/wranglerasynq"
 	"syscall"
 	"time"
+	// Embeds the IANA zone database so the app time zone setting resolves
+	// identically on an image without /usr/share/zoneinfo, rather than an
+	// accepted name silently falling back to UTC.
+	_ "time/tzdata"
 
 	"golang.org/x/net/context"
 

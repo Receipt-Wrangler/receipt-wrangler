@@ -93,6 +93,31 @@ func createFailedUpdateSystemTask(command commands.UpsertSystemTaskCommand, err 
 	repository.CreateSystemTask(command)
 }
 
+// NormalizeReceiptCalendarDates stores a receipt's Date and every DATE custom
+// field value as midnight UTC of the calendar day the client wrote. They are
+// calendar days, not moments: the day must not shift with the app time zone, so
+// it is pinned to one canonical instant and always read back in UTC.
+//
+// "As written" means the value's own offset is kept when the day is read, never
+// converted: a browser's local midnight ("2026-09-01T00:00:00-04:00"), an AI's
+// midnight UTC and an older mobile build's local wall time sent with a literal
+// Z all name Sep 1. CreateReceipt and UpdateReceipt are the chokepoints every
+// writer reaches (the form, quick scan, email, AI and single-call create).
+// Values already stored are left alone; they are read by their UTC day.
+func NormalizeReceiptCalendarDates(receipt *models.Receipt) {
+	receipt.Date = utils.CalendarDayUTC(receipt.Date)
+
+	for index := range receipt.CustomFields {
+		dateValue := receipt.CustomFields[index].DateValue
+		if dateValue == nil {
+			continue
+		}
+
+		normalized := utils.CalendarDayUTC(*dateValue)
+		receipt.CustomFields[index].DateValue = &normalized
+	}
+}
+
 func (repository ReceiptRepository) UpdateReceipt(id string, command commands.UpsertReceiptCommand, userId uint) (models.Receipt, error) {
 	db := repository.GetDB()
 
@@ -120,6 +145,7 @@ func (repository ReceiptRepository) UpdateReceipt(id string, command commands.Up
 		createFailedUpdateSystemTask(systemTask, err)
 		return models.Receipt{}, err
 	}
+	NormalizeReceiptCalendarDates(&updatedReceipt)
 
 	err = db.Table("receipts").Where("id = ?", id).Preload(clause.Associations).Find(&currentReceipt).Error
 	if err != nil {
@@ -368,6 +394,7 @@ func (repository ReceiptRepository) CreateReceipt(
 	if err != nil {
 		return models.Receipt{}, err
 	}
+	NormalizeReceiptCalendarDates(&receipt)
 
 	if receipt.GroupId > 0 {
 		receipt.CreatedBy = &createdByUserID
@@ -950,18 +977,21 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 		}
 	}
 
-	// Date
-	if pagedRequest.Filter.Date.Value != nil {
-		var date interface{}
-		isBetweenOperation := pagedRequest.Filter.Date.Operation == commands.BETWEEN
-		if isBetweenOperation {
-			date = pagedRequest.Filter.Date.Value.([]interface{})
-		} else {
-			date = pagedRequest.Filter.Date.Value.(string)
-		}
+	// The three dates are compared as whole calendar days. A receipt's Date is a
+	// calendar day stored as midnight UTC, so its days are UTC days; Resolved
+	// Date and Added At are instants, so theirs are the app zone's. "Today" for
+	// WITHIN_CURRENT_MONTH is always the app zone's. See BuildDayFilterQuery.
+	appLocation := repository.AppLocation()
 
-		query = repository.BuildFilterQuery(query, date, pagedRequest.Filter.Date.Operation, "date", isBetweenOperation)
-	}
+	// Date
+	query = repository.BuildDayFilterQuery(
+		query,
+		pagedRequest.Filter.Date.Value,
+		pagedRequest.Filter.Date.Operation,
+		"date",
+		time.UTC,
+		appLocation,
+	)
 
 	// Paid By
 	if pagedRequest.Filter.PaidBy.Value != nil {
@@ -1025,42 +1055,24 @@ func (repository ReceiptRepository) BuildGormFilterQuery(pagedRequest commands.R
 	}
 
 	// Resolved Date
-	if pagedRequest.Filter.ResolvedDate.Value != nil {
-		var resolvedDate interface{}
-		isBetweenOperation := pagedRequest.Filter.ResolvedDate.Operation == commands.BETWEEN
-		if isBetweenOperation {
-			resolvedDate = pagedRequest.Filter.ResolvedDate.Value.(interface{})
-		} else {
-			resolvedDate = pagedRequest.Filter.ResolvedDate.Value.(string)
-		}
-
-		query = repository.BuildFilterQuery(
-			query,
-			resolvedDate,
-			pagedRequest.Filter.ResolvedDate.Operation,
-			"resolved_date",
-			isBetweenOperation,
-		)
-	}
+	query = repository.BuildDayFilterQuery(
+		query,
+		pagedRequest.Filter.ResolvedDate.Value,
+		pagedRequest.Filter.ResolvedDate.Operation,
+		"resolved_date",
+		appLocation,
+		appLocation,
+	)
 
 	// Added At
-	if pagedRequest.Filter.CreatedAt.Value != nil {
-		var addedAt interface{}
-		isBetweenOperation := pagedRequest.Filter.CreatedAt.Operation == commands.BETWEEN
-		if isBetweenOperation {
-			addedAt = pagedRequest.Filter.CreatedAt.Value.([]interface{})
-		} else {
-			addedAt = pagedRequest.Filter.CreatedAt.Value.(string)
-		}
-
-		query = repository.BuildFilterQuery(
-			query,
-			addedAt,
-			pagedRequest.Filter.CreatedAt.Operation,
-			"created_at",
-			isBetweenOperation,
-		)
-	}
+	query = repository.BuildDayFilterQuery(
+		query,
+		pagedRequest.Filter.CreatedAt.Value,
+		pagedRequest.Filter.CreatedAt.Operation,
+		"created_at",
+		appLocation,
+		appLocation,
+	)
 
 	return query, nil
 }

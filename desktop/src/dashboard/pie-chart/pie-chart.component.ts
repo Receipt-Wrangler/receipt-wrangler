@@ -7,6 +7,8 @@ import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 import { PipesModule } from "../../pipes/pipes.module";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { ChartGrouping, PieChartData, PieChartDataCommand, Widget, WidgetService } from "../../open-api";
+import { RECEIPT_DATE_FILTER_KEYS } from "../../constants/receipt-filter-fields.constant";
+import { toDateWireFilter } from "../../utils/date-wire-filter";
 
 // Register the datalabels plugin
 Chart.register(ChartDataLabels);
@@ -118,7 +120,8 @@ export class PieChartComponent implements OnInit, OnChanges {
 
     const command: PieChartDataCommand = {
       chartGrouping: config.chartGrouping,
-      filter: config.filter,
+      // The picked calendar day, not a browser-local instant: see toDateWireFilter.
+      filter: toDateWireFilter(config.filter, RECEIPT_DATE_FILTER_KEYS),
     };
 
     this.isLoading.set(true);

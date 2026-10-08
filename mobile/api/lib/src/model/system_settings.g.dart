@@ -20,6 +20,8 @@ class _$SystemSettings extends SystemSettings {
   @override
   final bool? showLoginQr;
   @override
+  final String? timeZone;
+  @override
   final bool? currencyHideDecimalPlaces;
   @override
   final String? mcpPublicUrl;
@@ -70,6 +72,7 @@ class _$SystemSettings extends SystemSettings {
       this.tempFileRetentionHours,
       this.currencyDisplay,
       this.showLoginQr,
+      this.timeZone,
       this.currencyHideDecimalPlaces,
       this.mcpPublicUrl,
       this.currencyDecimalSeparator,
@@ -108,6 +111,7 @@ class _$SystemSettings extends SystemSettings {
         tempFileRetentionHours == other.tempFileRetentionHours &&
         currencyDisplay == other.currencyDisplay &&
         showLoginQr == other.showLoginQr &&
+        timeZone == other.timeZone &&
         currencyHideDecimalPlaces == other.currencyHideDecimalPlaces &&
         mcpPublicUrl == other.mcpPublicUrl &&
         currencyDecimalSeparator == other.currencyDecimalSeparator &&
@@ -140,6 +144,7 @@ class _$SystemSettings extends SystemSettings {
     _$hash = $jc(_$hash, tempFileRetentionHours.hashCode);
     _$hash = $jc(_$hash, currencyDisplay.hashCode);
     _$hash = $jc(_$hash, showLoginQr.hashCode);
+    _$hash = $jc(_$hash, timeZone.hashCode);
     _$hash = $jc(_$hash, currencyHideDecimalPlaces.hashCode);
     _$hash = $jc(_$hash, mcpPublicUrl.hashCode);
     _$hash = $jc(_$hash, currencyDecimalSeparator.hashCode);
@@ -173,6 +178,7 @@ class _$SystemSettings extends SystemSettings {
           ..add('tempFileRetentionHours', tempFileRetentionHours)
           ..add('currencyDisplay', currencyDisplay)
           ..add('showLoginQr', showLoginQr)
+          ..add('timeZone', timeZone)
           ..add('currencyHideDecimalPlaces', currencyHideDecimalPlaces)
           ..add('mcpPublicUrl', mcpPublicUrl)
           ..add('currencyDecimalSeparator', currencyDecimalSeparator)
@@ -233,6 +239,10 @@ class SystemSettingsBuilder
   bool? get showLoginQr => _$this._showLoginQr;
   set showLoginQr(covariant bool? showLoginQr) =>
       _$this._showLoginQr = showLoginQr;
+
+  String? _timeZone;
+  String? get timeZone => _$this._timeZone;
+  set timeZone(covariant String? timeZone) => _$this._timeZone = timeZone;
 
   bool? _currencyHideDecimalPlaces;
   bool? get currencyHideDecimalPlaces => _$this._currencyHideDecimalPlaces;
@@ -352,6 +362,7 @@ class SystemSettingsBuilder
       _tempFileRetentionHours = $v.tempFileRetentionHours;
       _currencyDisplay = $v.currencyDisplay;
       _showLoginQr = $v.showLoginQr;
+      _timeZone = $v.timeZone;
       _currencyHideDecimalPlaces = $v.currencyHideDecimalPlaces;
       _mcpPublicUrl = $v.mcpPublicUrl;
       _currencyDecimalSeparator = $v.currencyDecimalSeparator;
@@ -402,6 +413,7 @@ class SystemSettingsBuilder
             tempFileRetentionHours: tempFileRetentionHours,
             currencyDisplay: currencyDisplay,
             showLoginQr: showLoginQr,
+            timeZone: timeZone,
             currencyHideDecimalPlaces: currencyHideDecimalPlaces,
             mcpPublicUrl: mcpPublicUrl,
             currencyDecimalSeparator: currencyDecimalSeparator,

@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { NgxsModule } from '@ngxs/store';
+import { SystemSettingsState } from '../../../store/system-settings.state';
 import { DateBlockComponent } from './date-block.component';
 
 describe('DateBlockComponent', () => {
@@ -8,7 +10,7 @@ describe('DateBlockComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DateBlockComponent]
+      imports: [DateBlockComponent, NgxsModule.forRoot([SystemSettingsState])]
     })
     .compileComponents();
     

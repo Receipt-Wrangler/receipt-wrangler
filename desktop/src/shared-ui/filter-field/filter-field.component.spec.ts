@@ -1,7 +1,10 @@
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormControl, FormGroup, ReactiveFormsModule } from "@angular/forms";
+import { NgxsModule, Store } from "@ngxs/store";
 import { PipesModule } from "src/pipes/pipes.module";
+import { SystemSettingsState } from "src/store/system-settings.state";
+import { SetTimeZone } from "src/store/system-settings.state.actions";
 import { FilterOperation } from "../../open-api";
 import { OperationsPipe } from "../receipt-filter/operations.pipe";
 import { FilterFieldComponent } from "./filter-field.component";
@@ -37,7 +40,7 @@ describe("FilterFieldComponent", () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [FilterFieldComponent, OperationsPipe],
-      imports: [ReactiveFormsModule, PipesModule],
+      imports: [ReactiveFormsModule, PipesModule, NgxsModule.forRoot([SystemSettingsState])],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();
   });
@@ -79,5 +82,21 @@ describe("FilterFieldComponent", () => {
     expect(element.querySelectorAll("app-datepicker").length).toBe(2);
     expect(component.startOfMonthFormControl.disabled).toBe(true);
     expect(component.endOfTodayFormControl.disabled).toBe(true);
+  });
+
+  // The server resolves WITHIN_CURRENT_MONTH in the app zone: at 9PM Sep 30 in
+  // New York (Oct 1 UTC) the implied range is still September.
+  it("shows the WITHIN_CURRENT_MONTH range from the app zone's today", () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-10-01T01:00:00Z"));
+    try {
+      TestBed.inject(Store).dispatch(new SetTimeZone("America/New_York"));
+      render("date", FilterOperation.WithinCurrentMonth);
+
+      expect(component.startOfMonthFormControl.value).toEqual(new Date(2026, 8, 1));
+      expect(component.endOfTodayFormControl.value).toEqual(new Date(2026, 8, 30, 23, 59, 59, 999));
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

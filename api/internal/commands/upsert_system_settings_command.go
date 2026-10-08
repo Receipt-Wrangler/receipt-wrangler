@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"strings"
+	"time"
 )
 
 // Bounds on the configurable refresh-token lifetimes. They live here rather than
@@ -58,6 +59,10 @@ type UpsertSystemSettingsCommand struct {
 	RefreshTokenValidForHours    *int `json:"refreshTokenValidForHours"`
 	McpRefreshTokenValidForHours *int `json:"mcpRefreshTokenValidForHours"`
 	TempFileRetentionHours       *int `json:"tempFileRetentionHours"`
+	// TimeZone is an IANA zone name. A pointer for the same omitted-key reason
+	// as the lifetimes above: a client that does not know the field (an older
+	// build) must not reset a configured zone to "".
+	TimeZone *string `json:"timeZone"`
 }
 
 func (command *UpsertSystemSettingsCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -153,8 +158,39 @@ func (command *UpsertSystemSettingsCommand) Validate() structs.ValidatorError {
 		errorMap["tempFileRetentionHours"] = msg
 	}
 
+	if msg := validateTimeZone(command.TimeZone); len(msg) > 0 {
+		errorMap["timeZone"] = msg
+	}
+
 	return vErr
 }
+
+// validateTimeZone requires a sent time zone to be a name the Go runtime can
+// load. The embedded time/tzdata (imported by main) makes this independent of
+// the host's zoneinfo, so a name accepted here resolves identically everywhere.
+// A nil pointer means the key was omitted and is always valid. An explicit ""
+// is rejected rather than read as "unset": the column default is "UTC", and a
+// blank would only ever reach the resolver's fallback.
+func validateTimeZone(timeZone *string) string {
+	if timeZone == nil {
+		return ""
+	}
+
+	// time.LoadLocation reads "" as UTC and "Local" as the process zone; the
+	// latter is exactly the implicit dependency this setting exists to remove.
+	name := *timeZone
+	if name == "" || name == "Local" {
+		return invalidTimeZoneMessage
+	}
+
+	if _, err := time.LoadLocation(name); err != nil {
+		return invalidTimeZoneMessage
+	}
+
+	return ""
+}
+
+const invalidTimeZoneMessage = "Time zone must be an IANA time zone name like America/New_York"
 
 // validateTempFileRetentionHours bounds the temp-file retention window, returning
 // an empty string when the value is acceptable.
@@ -230,9 +266,10 @@ func (command *UpsertSystemSettingsCommand) ToSystemSettings(id uint) (models.Sy
 	return systemSettings, nil
 }
 
-// OmittedLifetimeColumns names the pointer-backed duration fields the request did
-// not send, so the repository can leave those columns out of the UPDATE entirely.
-// Despite the name it covers every such field, not only the token lifetimes.
+// OmittedLifetimeColumns names the pointer-backed fields the request did not
+// send, so the repository can leave those columns out of the UPDATE entirely.
+// Despite the name it covers every such field (the durations and the time
+// zone), not only the token lifetimes.
 //
 // Skipping the column is what makes a concurrent update safe. Copying the stored
 // value onto the row instead (see ApplyOmittedLifetimes) would still write it,
@@ -241,7 +278,7 @@ func (command *UpsertSystemSettingsCommand) ToSystemSettings(id uint) (models.Sy
 // written cannot be clobbered, and unlike a row lock this works identically on
 // SQLite, MySQL and Postgres.
 func (command *UpsertSystemSettingsCommand) OmittedLifetimeColumns() []string {
-	columns := make([]string, 0, 3)
+	columns := make([]string, 0, 4)
 
 	if command.RefreshTokenValidForHours == nil {
 		columns = append(columns, "RefreshTokenValidForHours")
@@ -255,13 +292,17 @@ func (command *UpsertSystemSettingsCommand) OmittedLifetimeColumns() []string {
 		columns = append(columns, "TempFileRetentionHours")
 	}
 
+	if command.TimeZone == nil {
+		columns = append(columns, "TimeZone")
+	}
+
 	return columns
 }
 
-// ApplyOmittedLifetimes carries the stored values of the pointer-backed duration
-// fields onto the settings a PUT is about to write, for any key the request
-// omitted. Despite the name it covers every such field, not only the token
-// lifetimes.
+// ApplyOmittedLifetimes carries the stored values of the pointer-backed fields
+// onto the settings a PUT is about to write, for any key the request omitted.
+// Despite the name it covers every such field (the durations and the time
+// zone), not only the token lifetimes.
 //
 // ToSystemSettings round-trips the command through JSON, so a nil pointer lands
 // as 0 on the model. The columns themselves are excluded from the UPDATE by
@@ -278,5 +319,9 @@ func (command *UpsertSystemSettingsCommand) ApplyOmittedLifetimes(existing model
 
 	if command.TempFileRetentionHours == nil {
 		updated.TempFileRetentionHours = existing.TempFileRetentionHours
+	}
+
+	if command.TimeZone == nil {
+		updated.TimeZone = existing.TimeZone
 	}
 }

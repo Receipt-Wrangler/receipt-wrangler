@@ -532,6 +532,38 @@ desktop role form — mobile has no role UI). **All three components.**
   `mobile/integration_test/receipt_role_requirements_test.dart`. See `api/CLAUDE.md`,
   `desktop/CLAUDE.md` and `mobile/CLAUDE.md` → "Role-required receipt fields & single-call create".
 
+### App Time Zone
+
+One admin-editable **System Setting**, `timeZone` (an IANA name, default `UTC` so existing installs
+behave exactly as before), decides which calendar day an instant falls on and what "today" and "this
+month" are — for filters, report periods, report buckets and labels alike. Before it, the server's
+process zone, hard-coded UTC and the browser's zone each answered part of that question, so a "Last
+Month" report on a UTC container left out a receipt added at 9PM on Sep 30 Eastern.
+
+| Value | Kind | Zone its day is read in |
+|---|---|---|
+| `receipts.date`, DATE custom field values | calendar day | UTC — stored as midnight UTC of the day |
+| `created_at` (Added At), `resolved_date`, task `started_at` / `ended_at` | instant | app zone |
+| "today", "this month", report presets, `@currentYear`, `{{generatedAt}}`, the PDF footer | clock | app zone |
+
+Unchanged: log timestamps, token expiry, `@every` schedules, sort order.
+
+- **Filters send calendar days, not instants.** A date filter value is a bare `yyyy-MM-dd`; the
+  server turns it into a range in the right zone for that column (`BuildDayFilterQuery`). An RFC 3339
+  value is still accepted and read as the day **as written** — which is what keeps already-released
+  mobile builds, which send local wall time with a literal `Z`, landing on the day the user picked.
+- **A receipt's Date never shifts with the zone.** The server stores it (and DATE custom fields) as
+  midnight UTC of the as-written day on every create/update; existing rows are not migrated and are
+  read by their UTC day. Clients send midnight UTC of the picked day and display it in UTC.
+- **`timeZone` is a plain string on the contract, never an enum** (`SystemSettings`,
+  `UpsertSystemSettingsCommand`, `AppData`; optional everywhere). The update command's field is a
+  pointer, so a client that omits the key leaves the stored zone alone. `AppData.timeZone` is the
+  *resolved* name — `"UTC"` when unset or invalid, never `""`.
+- **Per client:** the backend is complete (see `api/CLAUDE.md` → "App time zone"). The desktop reads
+  `AppData.timeZone`, edits the setting on System Settings, sends filter days as `yyyy-MM-dd` and
+  displays instants in the app zone (see `desktop/CLAUDE.md`). Mobile only carries the regenerated
+  client for now; building filters and displaying dates in the app zone is a pending follow-up.
+
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
 - **Desktop**: NGXS store with actions/selectors, persistent storage for auth/preferences

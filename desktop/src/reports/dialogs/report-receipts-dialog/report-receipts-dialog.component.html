@@ -36,7 +36,7 @@
         <span class="drill__card-icon"><mat-icon>receipt</mat-icon></span>
         <div class="drill__card-heading">
           <div class="drill__card-name">{{ receipt.name }}</div>
-          <div class="drill__card-date">{{ receipt.date | date: "mediumDate" }}</div>
+          <div class="drill__card-date">{{ receipt.date | appDate: "mediumDate" : "calendar" }}</div>
         </div>
         <app-status-chip [status]="receipt.status"></app-status-chip>
       </div>
@@ -60,7 +60,7 @@
         </div>
         <div class="drill__cell">
           <div class="drill__cell-label">Date</div>
-          <div class="drill__cell-value">{{ receipt.date | date: "mediumDate" }}</div>
+          <div class="drill__cell-value">{{ receipt.date | appDate: "mediumDate" : "calendar" }}</div>
         </div>
       </div>
     </div>
@@ -85,7 +85,7 @@
           @for (receipt of receipts(); track receipt.id) {
             <tr class="drill__row" (click)="viewReceipt(receipt)" data-testid="report-receipt-row">
               <td class="drill__row-name">{{ receipt.name }}</td>
-              <td>{{ receipt.date | date: "mediumDate" }}</td>
+              <td>{{ receipt.date | appDate: "mediumDate" : "calendar" }}</td>
               <td>{{ receipt.categories | name }}</td>
               <td>{{ (receipt.paidByUserId?.toString() | user)?.displayName }}</td>
               <td class="drill__num">{{ receipt.amount | customCurrency }}</td>

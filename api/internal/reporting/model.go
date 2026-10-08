@@ -35,6 +35,10 @@ type Meta struct {
 	// renderers fall back to their bare numeric formatting.
 	Currency  *CurrencyFormat
 	NoneLabel string
+
+	// Location is the zone a renderer prints GeneratedAt in (the app's time
+	// zone), passed through from MetaInput. Nil means UTC.
+	Location *time.Location
 }
 
 // CurrencyFormat is the app's money-display configuration — a renderer hint the
@@ -59,6 +63,11 @@ type ColumnDescriptor struct {
 	// For arithmetic it is currency when any column it reads is currency, since
 	// money combined with a count is still money.
 	DataType DataType
+
+	// Location is, for a label column over a date field, the zone its source
+	// field declares for naming a calendar day (FieldRef.Location). Nil means
+	// UTC.
+	Location *time.Location
 
 	Format string
 

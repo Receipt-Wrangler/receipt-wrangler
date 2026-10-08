@@ -61,6 +61,9 @@ export class SystemTaskTableComponent implements OnInit {
   public filterChips = computed<SystemTaskFilterChip[]>(() =>
     buildSystemTaskFilterChips(this.filter(), {
       users: this.users(),
+      // Not appDate: a filter value is the day the user PICKED, held as a
+      // local-midnight Date (or its ISO string once persisted), so it is read
+      // on the browser's calendar — the same day toDateWireFilter sends.
       formatDate: (value) => this.datePipe.transform(value as string) ?? "",
     })
   );

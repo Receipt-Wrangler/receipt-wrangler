@@ -4,7 +4,7 @@
       <div class="w-100 d-flex flex-column">
         <strong>{{ notification().title }}</strong>
         <div>{{ parsedBody }}</div>
-        <small>{{ notification().createdAt | date }}</small>
+        <small>{{ notification().createdAt | appDate }}</small>
       </div>
     </div>
   </a>

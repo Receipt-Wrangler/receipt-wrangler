@@ -1671,6 +1671,29 @@ is what makes the field picker testable at all: the API stamps `resolved_date` w
 create, so its two date columns fall in different months, and filtering "this month" returns the
 *other* row on `resolvedDate` than on `date`. Nothing but a real column change on the wire produces
 that.
+
+### App time zone (server-side; mobile not yet zone-aware)
+
+The server now has one admin-set **app time zone** (System Setting `timeZone`, IANA, default `UTC`)
+that decides every calendar boundary -- "this month", report periods, which day a `createdAt` /
+`resolvedDate` falls on. See the root `CLAUDE.md` -> "App time zone" for the rules. **On mobile this
+is a regenerated client only**: `AppData` (and `SystemSettings`) gained an optional `String?
+timeZone`, which nothing reads yet. Mobile never PUTs system settings, so it cannot clobber it.
+
+- **Mobile keeps working unchanged.** It still builds filter values and receipt dates in
+  **device-local wall time with a literal `Z`** (`formatDate(zuluDateFormat, ...)`, so a local
+  midnight goes out as `…T00:00:00Z`). The server reads any RFC 3339 filter value by its **calendar
+  day as written** and turns that day into a range in the right zone (app zone for instant columns,
+  UTC for a receipt's `date`), and it normalizes a written receipt `date` to midnight UTC of its
+  as-written day -- so the fake-`Z` values land on exactly the day the user picked.
+- **What is still device-local** (the pending follow-up): the quick date filter's "today" seed and
+  shortcuts, every displayed instant (Added At, Resolved Date, activity times), and the
+  `WITHIN_CURRENT_MONTH` display. Desktop already does all of these through the app zone
+  (`desktop/CLAUDE.md` -> "App time zone (dates)"); a device in a different zone from the install's
+  setting can show a time, or a "this month", one day off from what the server resolves. Port it by
+  reading `AppData.timeZone` -- never by changing what goes on the wire, which the server already
+  interprets correctly.
+
 ### Receipt summary
 
 A block of totals **pinned** above or below the receipts list, covering the whole current filter

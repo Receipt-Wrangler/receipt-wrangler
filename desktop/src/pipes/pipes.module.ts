@@ -1,5 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { NgModule } from "@angular/core";
+import { AppDatePipe } from "./app-date.pipe";
 import { CustomCurrencyPipe } from "./custom-currency.pipe";
 import { CustomFieldTypePipe } from "./custom-field-type.pipe";
 import { DurationPipe } from "./duration.pipe";
@@ -32,8 +33,9 @@ import { UserPipe } from "./user.pipe";
     StatusPipe,
     UserPipe,
   ],
-  imports: [CommonModule],
+  imports: [CommonModule, AppDatePipe],
   exports: [
+    AppDatePipe,
     CustomCurrencyPipe,
     CustomFieldTypePipe,
     DurationPipe,

@@ -2,6 +2,7 @@ import { A11yModule } from "@angular/cdk/a11y";
 import { ConnectedPosition, OverlayModule } from "@angular/cdk/overlay";
 import { Component, computed, input, linkedSignal, output, signal } from "@angular/core";
 import { ButtonModule } from "../../button";
+import { todayInZone } from "../../utils/app-time-zone";
 import { FilterMonth, monthOfDate, shiftMonth } from "../../utils/receipt-date-filter";
 
 const MONTH_LABELS = [
@@ -49,6 +50,13 @@ export class MonthStepperComponent {
    */
   public readonly label = input.required<string>();
 
+  /**
+   * The app time zone, which decides what "this month" is. Passed in rather than
+   * read from the store, so the stepper stays presentational. Unset falls back
+   * to the browser's own calendar.
+   */
+  public readonly timeZone = input<string | null | undefined>(undefined);
+
   public readonly monthSelected = output<FilterMonth>();
 
   public readonly allTimeSelected = output<void>();
@@ -69,14 +77,24 @@ export class MonthStepperComponent {
    * underneath the open panel still re-seeds it.
    */
   public readonly pagedYear = linkedSignal(
-    () => this.value()?.year ?? new Date().getFullYear()
+    () => this.value()?.year ?? this.today().getFullYear()
   );
 
   public readonly canPageBack = computed(() => this.pagedYear() > MIN_YEAR);
 
   public readonly canPageForward = computed(
-    () => this.pagedYear() < new Date().getFullYear() + MAX_YEAR_OFFSET
+    () => this.pagedYear() < this.today().getFullYear() + MAX_YEAR_OFFSET
   );
+
+  /**
+   * Today's calendar day in the app zone. A method, not a `computed`, so it is
+   * read fresh on every use and a page left open past midnight still steps from
+   * the right month.
+   */
+  private today(): Date {
+    const zone = this.timeZone();
+    return zone ? todayInZone(zone) : new Date();
+  }
 
   public togglePanel(): void {
     this.panelOpen.update((open) => !open);
@@ -106,7 +124,7 @@ export class MonthStepperComponent {
    * no-oping.
    */
   public step(delta: number): void {
-    this.monthSelected.emit(shiftMonth(this.value() ?? monthOfDate(new Date()), delta));
+    this.monthSelected.emit(shiftMonth(this.value() ?? monthOfDate(this.today()), delta));
   }
 
   /** Leaves the panel open — paging is a view concern, not a selection. */
@@ -121,7 +139,7 @@ export class MonthStepperComponent {
 
   /** `0` is this month, `-1` last month. */
   public pickRelativeMonth(delta: number): void {
-    this.monthSelected.emit(shiftMonth(monthOfDate(new Date()), delta));
+    this.monthSelected.emit(shiftMonth(monthOfDate(this.today()), delta));
     this.closePanel();
   }
 

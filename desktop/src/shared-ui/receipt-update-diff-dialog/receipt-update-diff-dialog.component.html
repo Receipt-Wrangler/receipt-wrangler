@@ -22,7 +22,7 @@
               ? "when it was created"
               : "by the previous update"
           }}
-          ({{ beforeSource.recordedAt | date: "medium" }}) instead. Changes made
+          ({{ beforeSource.recordedAt | appDate: "medium" }}) instead. Changes made
           without editing the receipt, such as bulk status updates, can also
           show here.
         } @else {
@@ -44,13 +44,13 @@
           <th colspan="2">
             Before
             @if (beforeUpdatedAt) {
-              <span class="receipt-diff__timestamp">{{ beforeUpdatedAt | date: "medium" }}</span>
+              <span class="receipt-diff__timestamp">{{ beforeUpdatedAt | appDate: "medium" }}</span>
             }
           </th>
           <th colspan="2" class="receipt-diff__right-start">
             After
             @if (afterUpdatedAt) {
-              <span class="receipt-diff__timestamp">{{ afterUpdatedAt | date: "medium" }}</span>
+              <span class="receipt-diff__timestamp">{{ afterUpdatedAt | appDate: "medium" }}</span>
             }
           </th>
         </tr>

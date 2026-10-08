@@ -227,9 +227,17 @@ func (service ReportService) buildModel(
 	now time.Time,
 	rowLimit int,
 ) (reportBuild, error) {
-	filter, periodLabel := prepareReportFilter(userId, command, now)
+	settings, err := repositories.NewSystemSettingsRepository(service.TX).GetSystemSettings()
+	if err != nil {
+		return reportBuild{}, err
+	}
+	// The app time zone is resolved once per report, so the period, the row
+	// buckets, the labels and the footer cannot disagree about it.
+	location := repositories.ResolveAppLocation(settings.TimeZone)
 
-	catalog, rows, rowsPerReceipt, err := service.loadRows(userId, command.GroupIds, filter, reportSplitOptions(command))
+	filter, periodLabel := prepareReportFilter(userId, command, now, location)
+
+	catalog, rows, rowsPerReceipt, err := service.loadRows(userId, command.GroupIds, filter, reportSplitOptions(command), location)
 	if err != nil {
 		return reportBuild{}, err
 	}
@@ -241,18 +249,13 @@ func (service ReportService) buildModel(
 		return reportBuild{}, err
 	}
 
-	title, chrome := service.resolveDocument(userId, groupNames, periodLabel, now, command.Name, command.Document)
+	title, chrome := service.resolveDocument(userId, groupNames, periodLabel, now.In(location), command.Name, command.Document)
 
 	spec, err := buildReportSpec(command)
 	if err != nil {
 		return reportBuild{}, &ReportSpecError{Err: err}
 	}
 	spec.Title = title
-
-	settings, err := repositories.NewSystemSettingsRepository(service.TX).GetSystemSettings()
-	if err != nil {
-		return reportBuild{}, err
-	}
 
 	meta := reporting.MetaInput{
 		GeneratedAt: now,
@@ -261,6 +264,7 @@ func (service ReportService) buildModel(
 			"Groups": strings.Join(groupNames, ", "),
 		},
 		Currency: currencyFormat(settings),
+		Location: location,
 	}
 
 	model, err := reporting.Run(spec, catalog, rows, meta)
@@ -295,14 +299,19 @@ func currencyFormat(settings models.SystemSettings) *reporting.CurrencyFormat {
 // to it: the "report generator" paid-by sentinel becomes the caller, and the period
 // becomes a BETWEEN on the receipt date it covers. The report and its receipts
 // drill-in both start here, so they cover the same receipts.
+//
+// The period's presets ("this month", "last month") are worked out from now in
+// the app's time zone, so a server running in UTC still agrees with the users
+// on which month it is.
 func prepareReportFilter(
 	userId uint,
 	command commands.ReportRequestCommand,
 	now time.Time,
+	location *time.Location,
 ) (commands.ReceiptPagedRequestFilter, string) {
 	filter := command.Filter
 	resolveReportGeneratorPaidBy(&filter, userId)
-	periodLabel := applyPeriod(&filter, command.Period, now)
+	periodLabel := applyPeriod(&filter, command.Period, now.In(location))
 	return filter, periodLabel
 }
 
@@ -322,7 +331,7 @@ func (service ReportService) receipts(
 	command commands.ReportRequestCommand,
 	now time.Time,
 ) (structs.PagedData, error) {
-	filter, _ := prepareReportFilter(userId, command, now)
+	filter, _ := prepareReportFilter(userId, command, now, repositories.NewSystemSettingsRepository(service.TX).AppLocation())
 	dataService := NewReportDataService(service.TX)
 
 	// Each group loads only its newest reportReceiptsCap receipts, which is enough:
@@ -363,8 +372,10 @@ func (service ReportService) loadRows(
 	groupIds []string,
 	filter commands.ReceiptPagedRequestFilter,
 	splitOptions receiptsource.SplitOptions,
+	location *time.Location,
 ) (reporting.FieldCatalog, []reporting.Row, []int, error) {
 	dataService := NewReportDataService(service.TX)
+	dataService.Location = location
 
 	var catalog reporting.FieldCatalog
 	var rows []reporting.Row
@@ -654,6 +665,7 @@ func buildDimensions(groupBy []reporting.FieldKey, catalog reporting.FieldCatalo
 		if field, ok := catalog.Get(key); ok {
 			dimension.Label = field.Label
 			dimension.DataType = field.DataType
+			dimension.Location = field.Location
 		}
 		// A grouping level renders as a leading column, and the request may name
 		// that column itself. A blank override means "use the catalog label", and
@@ -698,19 +710,26 @@ func resolveReportGeneratorPaidBy(filter *commands.ReceiptPagedRequestFilter, us
 	filter.PaidBy.Value = resolved
 }
 
-// applyPeriod resolves the request's period into an inclusive date window, writes
-// it onto the filter slot of the receipt date the period covers (overwriting any
-// condition already there), and returns a human-readable label for the document
-// preamble and the {{period}} variable. Presets are computed from now; custom uses
-// the supplied bounds (already validated by the command). A date field the filter
-// has no slot for falls back to the receipt date: the stored-template paths run a
-// configuration without re-validating it, so this stays lenient like
+// applyPeriod resolves the request's period into an inclusive range of calendar
+// days, writes it onto the filter slot of the receipt date the period covers
+// (overwriting any condition already there), and returns a human-readable label
+// for the document preamble and the {{period}} variable. Presets are computed
+// from now, which the caller has already put in the app's time zone; custom uses
+// the supplied bounds (already validated by the command). A date field the
+// filter has no slot for falls back to the receipt date: the stored-template
+// paths run a configuration without re-validating it, so this stays lenient like
 // resolvePeriodBounds' default.
+//
+// The bounds are written as bare calendar days ("2006-01-02"), not instants.
+// Which instants a day covers depends on the column — a receipt's Date is a UTC
+// calendar day, Added At and Resolved Date are app-zone instants — and the
+// receipt filter's day builder (BuildDayFilterQuery) is the one place that knows
+// that, so the period, the receipts table and the drill-in cannot disagree.
 func applyPeriod(filter *commands.ReceiptPagedRequestFilter, period commands.ReportPeriod, now time.Time) string {
 	start, end := resolvePeriodBounds(period, now)
 
-	dayStart := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, now.Location())
-	dayEnd := time.Date(end.Year(), end.Month(), end.Day(), 23, 59, 59, 999999999, now.Location())
+	startDay := start.Format(time.DateOnly)
+	endDay := end.Format(time.DateOnly)
 
 	field := filter.DateFilterField(period.DateFilterKey())
 	if field == nil {
@@ -718,10 +737,10 @@ func applyPeriod(filter *commands.ReceiptPagedRequestFilter, period commands.Rep
 	}
 	*field = commands.PagedRequestField{
 		Operation: commands.BETWEEN,
-		Value:     []interface{}{dayStart, dayEnd},
+		Value:     []interface{}{startDay, endDay},
 	}
 
-	return dayStart.Format("2006-01-02") + " to " + dayEnd.Format("2006-01-02")
+	return startDay + " to " + endDay
 }
 
 func resolvePeriodBounds(period commands.ReportPeriod, now time.Time) (time.Time, time.Time) {

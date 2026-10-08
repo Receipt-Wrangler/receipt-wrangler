@@ -17,11 +17,11 @@
 </ng-template>
 
 <ng-template let-element="element" #startedAtCell>
-  {{ element.startedAt | date: "short" }}
+  {{ element.startedAt | appDate: "short" }}
 </ng-template>
 
 <ng-template let-element="element" #endedAtCell>
-  {{ element.endedAt | date: "short" }}
+  {{ element.endedAt | appDate: "short" }}
 </ng-template>
 
 <ng-template let-element="element" #statusCell>

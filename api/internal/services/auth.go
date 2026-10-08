@@ -478,6 +478,7 @@ func GetAppData(userId uint, r *http.Request) (structs.AppData, error) {
 	appData.CurrencyDecimalSeparator = systemSettings.CurrencyDecimalSeparator
 	appData.CurrencySymbolPosition = systemSettings.CurrencySymbolPosition
 	appData.CurrencyHideDecimalPlaces = systemSettings.CurrencyHideDecimalPlaces
+	appData.TimeZone = repositories.ResolveAppLocation(systemSettings.TimeZone).String()
 	appData.Icons = structs.Icons
 	appData.AppPermissions = appPermissions
 	appData.GroupPermissions = groupPermissions

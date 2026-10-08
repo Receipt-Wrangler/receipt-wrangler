@@ -36,6 +36,7 @@ part 'upsert_system_settings_command.g.dart';
 /// * [refreshTokenValidForHours] - How long a refresh token stays valid, in hours. Accepted values are 1-720 (30 days), or 0 meaning unset, which falls back to the default of 24. Omit the key entirely to leave the currently configured value unchanged.
 /// * [mcpRefreshTokenValidForHours] - How long an MCP/OAuth connector refresh token stays valid, in hours. Accepted values are 1-720 (30 days), or 0 meaning unset, which falls back to the default of 24. Omit the key entirely to leave the currently configured value unchanged.
 /// * [tempFileRetentionHours] - How long a temp file is kept once nothing can still act on it, in hours. Accepted values are 24-8760 (1 year), or 0 meaning unset, which falls back to the default of 720 (30 days). Omit the key entirely to leave the currently configured value unchanged.
+/// * [timeZone] - The app time zone, an IANA name such as America/New_York that the server can load (an unknown name is a 400 under the timeZone key). Omit the key entirely to leave the currently configured value unchanged.
 @BuiltValue()
 abstract class UpsertSystemSettingsCommand implements Built<UpsertSystemSettingsCommand, UpsertSystemSettingsCommandBuilder> {
   /// Whether local sign up is enabled
@@ -119,6 +120,10 @@ abstract class UpsertSystemSettingsCommand implements Built<UpsertSystemSettings
   /// How long a temp file is kept once nothing can still act on it, in hours. Accepted values are 24-8760 (1 year), or 0 meaning unset, which falls back to the default of 720 (30 days). Omit the key entirely to leave the currently configured value unchanged.
   @BuiltValueField(wireName: r'tempFileRetentionHours')
   int? get tempFileRetentionHours;
+
+  /// The app time zone, an IANA name such as America/New_York that the server can load (an unknown name is a 400 under the timeZone key). Omit the key entirely to leave the currently configured value unchanged.
+  @BuiltValueField(wireName: r'timeZone')
+  String? get timeZone;
 
   UpsertSystemSettingsCommand._();
 
@@ -279,6 +284,13 @@ class _$UpsertSystemSettingsCommandSerializer implements PrimitiveSerializer<Ups
       yield serializers.serialize(
         object.tempFileRetentionHours,
         specifiedType: const FullType(int),
+      );
+    }
+    if (object.timeZone != null) {
+      yield r'timeZone';
+      yield serializers.serialize(
+        object.timeZone,
+        specifiedType: const FullType(String),
       );
     }
   }
@@ -450,6 +462,13 @@ class _$UpsertSystemSettingsCommandSerializer implements PrimitiveSerializer<Ups
             specifiedType: const FullType(int),
           ) as int;
           result.tempFileRetentionHours = valueDes;
+          break;
+        case r'timeZone':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.timeZone = valueDes;
           break;
         default:
           unhandled.add(key);

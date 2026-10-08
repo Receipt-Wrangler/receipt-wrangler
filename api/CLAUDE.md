@@ -1360,6 +1360,95 @@ explicit-value endpoint round trips), `repositories/system_settings_test.go` (th
 shape and the concurrent-update guard), and `desktop/e2e/session-lifetime.spec.ts` (the only
 end-to-end proof that the setting reaches the `Set-Cookie` header).
 
+## App time zone
+
+One admin-editable System Setting decides which calendar day an instant falls on, what "today" and
+"this month" are, and therefore what every period means. Before it, the answer was split between the
+server process's zone (report presets, `WITHIN_CURRENT_MONTH`, system-task day filters,
+`{{generatedAt}}`), hard-coded UTC (report buckets and labels, the PDF footer) and the browser — so a
+"Last Month" report run on a UTC container left out a receipt added at 9PM on Sep 30 Eastern, which
+is 01:00 UTC on Oct 1.
+
+**The rules (root `CLAUDE.md` → "App Time Zone" holds the same table):**
+
+| Value | Kind | Zone its day is read in |
+|---|---|---|
+| `receipts.date`, custom field `date_value` | calendar day | UTC — stored as midnight UTC |
+| `created_at`, `resolved_date`, task `started_at` / `ended_at` | instant | app zone |
+| "today", "this month", report presets, `@currentYear`, `{{generatedAt}}`, the PDF footer | clock | app zone |
+
+Unchanged: log timestamps, token expiry, `@every` schedules and sort order.
+
+- **The setting.** `SystemSettings.TimeZone` (IANA name, `gorm:"default:UTC"`, so an existing install
+  behaves exactly as before). `UpsertSystemSettingsCommand.TimeZone` is a `*string` and joins the
+  pointer-field machinery of the lifetimes (see "Session lifetime"): `nil` ⇒ the column is in
+  `OmittedLifetimeColumns()` and dropped from the UPDATE, and `ApplyOmittedLifetimes` echoes the
+  stored value. A sent value must load with `time.LoadLocation`; `""` and `"Local"` are refused too
+  (one reads as UTC, the other as the process zone). Failures are a 400 under `timeZone`.
+  `main.go` imports `_ "time/tzdata"`, so a name that validates resolves identically on an image
+  without `/usr/share/zoneinfo` instead of silently becoming UTC.
+- **The resolver.** `repositories.GetAppLocation()` reads the setting **live, with no cache** (the
+  `IsMcpEnabled` / `GetRefreshTokenLifetime` pattern), so a save applies on the next request.
+  `BaseRepository.AppLocation()` is the same read through the repository's transaction.
+  `ResolveAppLocation(name)` maps `""`, `"Local"` or an unloadable name to UTC and logs a bad name
+  once; it caches parsed zones by **name**, never the setting. It lives in `repositories` so filter
+  builders can call it without a parameter threaded through every caller; services use it too.
+  **`AppData.timeZone`** carries the *resolved* name (`"UTC"`, never `""`).
+- **Day filters: `BaseRepository.BuildDayFilterQuery(query, value, op, column, columnLoc, appLoc)`.**
+  The one builder for every date filter — receipts (`date` with `time.UTC`, `resolved_date` /
+  `created_at` with the app zone) and system tasks (`started_at` / `ended_at`, app zone). It replaced
+  `applyTimestampDayFilter` / `startOfDayValue` and the receipt builder's raw `date = ?` comparisons.
+  - Ranges: `EQUALS d` ⇒ `[start(d), start(d+1))`, `GREATER_THAN d` ⇒ `>= start(d+1)`, `LESS_THAN d`
+    ⇒ `< start(d)`, `BETWEEN [a,b]` ⇒ `[start(a), start(b+1))`, where `start` is midnight in
+    `columnLoc`. Adding a calendar day (not 24h) keeps DST days 23 or 25 hours long.
+    `WITHIN_CURRENT_MONTH` ⇒ month start through the end of today, **today being the app zone's**
+    even for the UTC `date` column (`currentMonthBounds`).
+  - Accepted values: a bare `yyyy-MM-dd` (what clients send), an RFC 3339 string read as the day
+    **as written** (its own offset, never converted — this is what lands an older mobile build's
+    fake-`Z` local wall time on the day the user picked), or a `time.Time` read in its own location.
+    `CalendarDayOf` / `StartOfCalendarDay` are the exported pieces.
+  - Every bound is converted to **UTC** before it reaches the driver, so it compares correctly
+    against UTC-stored timestamps on every engine (SQLite compares them as text).
+  - Every unwrap is comma-ok: a wrong-typed or unparseable value adds no predicate. The receipt
+    builder's bare `.(string)` / `.([]interface{})` assertions on the three date fields, which
+    panicked on a malformed body, are gone.
+  - `BuildFilterQuery`'s own `WITHIN_CURRENT_MONTH` branch (any other caller) uses the app zone too.
+- **Calendar dates on write.** `NormalizeReceiptCalendarDates` stores `Receipt.Date` and every custom
+  field `DateValue` as midnight UTC of the as-written day (`utils.CalendarDayUTC`). It runs in
+  `ReceiptRepository.CreateReceipt` and `UpdateReceipt`, right after `ToReceipt`, which every writer
+  reaches: the form, single-call create, quick scan, email and AI. Duplicate copies stored values
+  verbatim. **Existing rows are not migrated** — they are read by their UTC day.
+- **Reports.** `buildModel` resolves the zone once, from the settings row it already reads for the
+  currency format. `applyPeriod` works on `now.In(loc)` and writes the BETWEEN as **bare calendar
+  days**, so the day builder decides per column what instants a day covers — the report, its
+  drill-in and the receipts table cannot disagree. `{{generatedAt}}` and the period label are in the
+  app zone; `MetaInput.Location` carries it to the HTML footer (`2006-01-02 15:04:05 MST`).
+  `ReportDataService.Location` passes it to `receiptsource.New(customFields, loc)`, whose catalog
+  declares each date field's `Location` (UTC for `date` and DATE custom fields, the app zone for
+  `created_at` / `resolved_date`); `buildDimensions` copies it onto `render.Dimension`, and the
+  engine copies a label column's onto `ColumnDescriptor.Location`. Bucket identity stays the
+  canonical UTC instant — the zone only changes the derived period strings and how a day is named.
+- **Elsewhere.** `receipt_csv.go` prints Added At / Resolved Date in the app zone and the receipt
+  Date in UTC; `@currentYear` in AI prompts is the app zone's year.
+- **Contract.** `timeZone` is a plain `type: string` (not an enum: tzdata changes, and a closed Dart
+  enum would fail the whole AppData payload) on `SystemSettings`, `UpsertSystemSettingsCommand` and
+  `AppData`, and in no `required` list. `commands/time_zone_contract_test.go` pins it.
+- **Clients.** The desktop reads `AppData.timeZone`, sends filter dates as `yyyy-MM-dd`, sends a
+  receipt Date as midnight UTC of the picked day, and displays instants in the app zone. Mobile only
+  carries the regenerated client: its fake-`Z` filters and dates already land on the right day under
+  the as-written rule; displaying in the app zone is a follow-up.
+
+**Tests:** `repositories/app_time_zone_test.go` (resolver default / configured / invalid / live after
+a real settings save; `BuildDayFilterQuery` bounds per operation and zone via `DryRun`, a DST day,
+every wire form equal to the bare day, wrong-typed values, `currentMonthBounds`; the receipt filter
+reading each column in its own zone, and the reported bug as a row count; write normalization on
+create and update), `services/report_time_zone_test.go` (the reported bug end to end — UTC excludes,
+New York includes on the next `buildModel`, UTC excludes again — plus calendar Dates unaffected,
+presets / label / `{{generatedAt}}` per zone, buckets and footer, AppData), the CSV case in
+`services/receipt_csv_service_test.go`, `handlers/system_settings_time_zone_test.go` (persist,
+omitted key, 400), `commands/upsert_system_settings_command_test.go` (validation, omitted column),
+and the pure `receiptsource` / `render` cases, each with a `mutation-check.sh` entry.
+
 ## Temporary file retention & cleanup
 
 `temp/` holds the files the ingest pipelines work from. Everything that writes
@@ -1490,7 +1579,7 @@ A System Setting, default **720** (30 days), bounds **24-8760** (1 year), `0`
 means unset. It follows the `RefreshTokenValidForHours` machinery exactly — see
 "Session lifetime" above for the `*int` command field, `OmittedLifetimeColumns`
 and why an omitted key is *dropped from the UPDATE* rather than copied. Despite
-their names, both helpers now cover every pointer-backed duration field.
+their names, both helpers now cover every pointer-backed field, the time zone included.
 
 `tempFileRetention()` is the read-side clamp, the same shape as
 `repositories.pdfRasterizationDpi`: **the clamp, not the validator, is the real
@@ -1773,20 +1862,17 @@ so the desktop renders both dialogs from one row component.
   `OWN_PAID_RECEIPTS_OPTION_ID` convention) for those, and `applyRanByFilter` splits the sentinel out
   of the id list: sentinel only ⇒ `IS NULL`, ids only ⇒ `IN ?`, both ⇒
   `IS NULL OR ran_by_user_id IN ?`. Ids decode as `float64` through `encoding/json`, hence `toInt64`.
-- **`started_at` / `ended_at` are compared as whole calendar days** (`applyTimestampDayFilter`).
-  Unlike the date-only column the receipt `date` filter compares against, these carry a time of day,
-  so a raw comparison to the datepicker's midnight would make `EQUALS` never match and `BETWEEN` drop
-  everything after midnight on the end day. `EQUALS d` ⇒ `[startOfDay(d), startOfDay(d)+24h)`,
-  `GREATER_THAN d` ⇒ `>= startOfDay(d)+24h`, `LESS_THAN d` ⇒ `< startOfDay(d)`, `BETWEEN [a,b]` ⇒
-  `[startOfDay(a), startOfDay(b)+24h)`; `WITHIN_CURRENT_MONTH` delegates to `BuildFilterQuery`, which
-  already does the right thing.
-  - **The wire format is a bare calendar day, `yyyy-MM-dd`.** "Day" resolves in the server's
-    location (`time.Local`, the same zone `WITHIN_CURRENT_MONTH` already uses), so an *instant*
-    would be ambiguous: resolving it here picks the day in the server's zone, and a UTC-4 browser
-    picking Sep 22 lands on Sep 21 against an API in America/Los_Angeles. The desktop normalizes to
-    a calendar day before sending (`toSystemTaskWireFilter`); `startOfDayValue` parses that first
-    and still accepts a full RFC 3339 instant for any other caller. The receipt filter, which sends
-    instants, retains the original hazard.
+- **`started_at` / `ended_at` are compared as whole calendar days in the app time zone**, through
+  the shared `BaseRepository.BuildDayFilterQuery` (see "App time zone" below), which the receipt
+  filter uses too. These carry a time of day, so a raw comparison to the datepicker's midnight would
+  make `EQUALS` never match and `BETWEEN` drop everything after midnight on the end day.
+  `EQUALS d` ⇒ `[start(d), start(d+1))`, `GREATER_THAN d` ⇒ `>= start(d+1)`, `LESS_THAN d` ⇒
+  `< start(d)`, `BETWEEN [a,b]` ⇒ `[start(a), start(b+1))`, `WITHIN_CURRENT_MONTH` ⇒ month start
+  through the end of the app zone's today.
+  - **The wire format is a bare calendar day, `yyyy-MM-dd`**, which the desktop sends
+    (`toDateWireFilter`). An RFC 3339 value is still accepted and read as the day **as written**.
+    The day used to resolve in the server process's zone (`time.Local`); it is now the app time
+    zone setting, so the server's own zone plays no part.
   - **`ended_at` is nullable, so any filter on it excludes tasks that are still running.** That is
     the correct reading of "ended before X"; it is not special-cased.
 - **The two child-only types stay excluded.** `filteredSystemTaskTypes` (`CHAT_COMPLETION`,
@@ -1832,11 +1918,11 @@ The handler is unchanged: `GetSystemTasks` already passes the whole command thro
 `app.system-tasks.read` gate still applies. Note this endpoint has **no** member-isolation filtering
 (unlike `GetPagedActivities`) — it is admin-only by that permission.
 
-**Tests:** `repositories/system_task_test.go` — `TestApplyTimestampDayFilterWidensBoundsToWholeDays`
-asserts the **bound values** off a `DryRun` statement rather than row counts, because the test DB is
-SQLite: it stores timestamps as text and compares them lexically, where a raw bound happens to sort
-*after* every row on the same day (`" " < "T"`), so a row count alone cannot tell the widened path
-from the broken one. The behavioural cases (`...FiltersByType`, `...FiltersByRanBy`,
+**Tests:** the bound values live in `repositories/app_time_zone_test.go`
+(`TestBuildDayFilterQuery*`), asserted off a `DryRun` statement rather than row counts, because the
+test DB is SQLite: it stores timestamps as text and compares them lexically, where a raw bound
+happens to sort *after* every row on the same day (`" " < "T"`), so a row count alone cannot tell
+the widened path from the broken one. The behavioural cases in `repositories/system_task_test.go` (`...FiltersByType`, `...FiltersByRanBy`,
 `...BetweenIncludesTasksLateOnTheEndDay`, `...EqualsMatchesTheWholeDay`,
 `...LessThanOnEndedAtExcludesRunningTasks`, `...IgnoresWrongTypedFilterValues`) all assert
 `totalCount` alongside the rows. Also `commands/get_system_task_command_test.go` (the wire keys, the
@@ -2690,7 +2776,7 @@ go list -deps receipt-wrangler/api/internal/reporting | grep -E 'gorm|repositori
 non-receipt widget adds a *sibling* of it; the engine core never changes.
 
 ```go
-source, err := receiptsource.New(customFields)          // needs CustomField.Options loaded
+source, err := receiptsource.New(customFields, appLocation) // needs CustomField.Options loaded
 model, err := reporting.Run(spec, source.Catalog(), source.Rows(receipts), meta)
 ```
 
@@ -2700,8 +2786,11 @@ association resolves to no value, which surfaces as a `(None)` bucket — not an
 **Date period grouping — derived string fields.** `date`, `resolved_date` and `created_at` are
 `TypeDate`, so grouping by one buckets on the exact instant (one group per receipt). To group by
 calendar period, `receiptsource` also offers derived **string** fields `<base>_day` / `_month` /
-`_year` (e.g. `date_month`, `created_at_year`, `resolved_date_day`) — zero-padded ISO in **UTC**, so
-they sort chronologically as plain text. A report groups by one of these instead of the raw date field;
+`_year` (e.g. `date_month`, `created_at_year`, `resolved_date_day`) — zero-padded ISO, so they sort
+chronologically as plain text. **Which zone the parts are cut in depends on the field** (see "App time
+zone"): `date` and every DATE custom field are calendar days, read in **UTC**; `created_at` and
+`resolved_date` are instants, read in the **app time zone** passed to `receiptsource.New`. The
+package never reads the setting itself — the zone is a parameter, so it stays pure. A report groups by one of these instead of the raw date field;
 a nil `resolved_date` emits none of its period fields (→ `(None)`). A **date custom field** gets the
 same treatment: `CustomFieldPeriodKeys(id)` yields `custom_<id>_day` / `_month` / `_year`, labelled off
 the field's own name (`"Due Date (Month)"`) through the shared `dateFieldRefs` / `setDateParts` helpers.
@@ -2723,7 +2812,8 @@ field's type to present them: without it a bool prints `true`, a date an RFC 333
 bare decimal. `render.Dimension` therefore carries a `DataType` (populated by `buildDimensions` from the
 catalog), and `render/value.go`'s shared `formatLabelValue` is used by **every** label-ish cell —
 `formatDimension` (the CSV walk *and* `walk.go`, so HTML/PDF and XLSX too) and `joinLabel` (XLSX) —
-mapping bool → `Yes`/`No`, date → `2006-01-02` **UTC** (matching the derived `_day` field), currency →
+mapping bool → `Yes`/`No`, date → `2006-01-02` **in the field's own `FieldRef.Location`** (UTC for a
+calendar day, the app zone for an instant — matching the derived `_day` field), currency →
 `Meta.Currency`'s format (bare 2dp when unset). A declared type that disagrees with a value's payload
 falls through to the value's own rendering rather than substituting a zero. A label column is still a
 **string** cell in XLSX even when it holds money — it names a bucket rather than measuring one, and a
@@ -2844,7 +2934,7 @@ picker.
   builder's "N receipts" chip opens a list of what the report covers.
   - **Why the server builds it.** The list used to build its own period BETWEEN in the browser, and
     disagreed with the count in three ways:
-    - it used the browser's time zone, not the server clock's;
+    - it used the browser's time zone, not the server's (now the app time zone setting);
     - on SQLite, its ISO `…T…` bounds compared as text against the stored `YYYY-MM-DD HH:MM:SS…`,
       dropping first-day receipts;
     - it sent the "report generator" paid-by sentinel (`-1`) as-is, which matches nothing.
@@ -2873,7 +2963,7 @@ picker.
     - One receipt per field, with inclusive bounds, presets, and the AND with a Date filter.
     - For the drill-in:
       - parity with the report on every field;
-      - a server in America/Los_Angeles at the May 31/June 1 boundary;
+      - the app zone set to America/Los_Angeles, then UTC, at the May 31/June 1 boundary;
       - the `-1` sentinel;
       - custom-field definitions;
       - merge order;
@@ -3085,7 +3175,7 @@ listing, not an aggregation.)
 | Multi-value fan-out | A receipt with two tags is attributed to **both** buckets in full, so it double-counts, and that double count propagates to the grand total. Intended — matches `services/pie_chart.go`. Two multi-value levels produce a cross product. But only **distinct** values fan out: a receipt tagged `"Alex"` twice is attributed once. The opt-in split (below the table) is done **before** the engine, by splitting receipts, so this rule never changes. |
 | Multi-valued measures | Refused (`ErrMeasureIsMultiValued`). Summing a field that resolves to several values would silently read the first and drop the rest. A `Multi` field is still a fine dimension and a fine display label. Note `Multi` is a **producer's declaration**, never checked against the rows: a catalog that lies loses values in `Row.Measure`. |
 | Bucket keys | Two values share a bucket key **exactly when `compareValues` finds them equal**. Numbers key on `decimal.String()` (canonical, lossless); dates key on `Unix()` seconds + `Nanosecond()` and **never `UnixNano()`**, which is undefined outside 1678–2262 — a zero `time.Time` and a date in 585 share one. A coarser key merges buckets *and* makes the surviving bucket's value depend on input order. |
-| Bucket **values** | A bucket keeps `Value.canonical()`, not whichever member arrived first. Agreeing with `compareValues` is only half the job: dates compare by instant, so one instant in two zones merges, and `Value.Time()` would otherwise hand a renderer an arbitrary one of them (`2026-05-01T00:00:00Z` vs `2026-04-30T19:00:00-05:00` format as different **calendar days**). **Date buckets are emitted in UTC.** A producer wanting calendar-day grouping in a local zone must truncate before handing rows over. |
+| Bucket **values** | A bucket keeps `Value.canonical()`, not whichever member arrived first. Agreeing with `compareValues` is only half the job: dates compare by instant, so one instant in two zones merges, and `Value.Time()` would otherwise hand a renderer an arbitrary one of them (`2026-05-01T00:00:00Z` vs `2026-04-30T19:00:00-05:00` format as different **calendar days**). **Date buckets are emitted in UTC** — that is bucket *identity* and must not change. The zone a day is *named* in is presentation: a producer declares it per field (`FieldRef.Location`, carried to `ColumnDescriptor.Location` / `render.Dimension.Location`) and the renderer applies it. Calendar-period grouping in a zone is done by the producer (`receiptsource`'s `_day`/`_month`/`_year` strings), never by the engine. |
 | Unknown enums | `Validate` rejects an `AggFunc` or `DetailMode` outside the known set (`ErrUnknownAggFunc`, `ErrUnknownDetailMode`). Both used to fail silently — an unknown reduction fell through `finalize` and blanked the column; an unknown detail mode skipped the label-column check. Ask "is this aggregate mode?" only through `DetailSpec.isAggregate()`; two spellings of it once disagreed. |
 | Enum switch drift | `AggFunc` is switched on in **four** places (`String`, `valid`, `aggFuncFromName`, `accumulator.finalize`) and Go forces none of them to agree. `enums_test.go` pins them to each other exhaustively over all 256 values. **Adding a reduction means updating all four** — `valid()` alone would let `Validate` accept a column `finalize` blanks. `finalize`'s fallthrough stays `Null()`, not a `panic`: nothing in this package panics, the line is unreachable through `Validate`, and drift is a compile-time mistake caught at `go test` time. |
 | Formula size | `ParseArithmetic`/`ParseAggregate` refuse source over `maxFormulaLength` (1 KB) **before parsing**. expr's 10k-node cap does *not* bound this: a parenthesis builds no node, so nesting is bounded only by the goroutine stack (~640 B/paren; ~1.6M overflows the default 1 GB), and a Go stack overflow is a fatal error `recover` cannot catch. |
@@ -3093,7 +3183,7 @@ listing, not an aggregation.)
 | Empty dimension | Explicit `(None)` bucket (`IsNone: true`, `Value` null). Never dropped. |
 | Ordering | Buckets sort by typed value with `(None)` last; records preserve input order. **Never range a Go map to produce output** (`pie_chart.go` has exactly this bug). |
 | Formatting | The engine emits raw typed values. Currency symbols and decimal places are a renderer's job. |
-| `GeneratedAt` | An **input** (`MetaInput`), never `time.Now()`. Determinism depends on it. |
+| `GeneratedAt` | An **input** (`MetaInput`), never `time.Now()`. Determinism depends on it. The zone it is printed in (`MetaInput.Location`, the app zone) is an input too; the HTML footer prints it with the zone's abbreviation. |
 | `IsNone` | Equals `Value.IsNull()` for group nodes and **aggregate-mode** detail rows only. The synthetic `Root` and every **records-mode** detail row carry a null `Value` with `IsNone: false`. It is **not** a global biconditional — do not "fix" the engine to make it one. |
 
 ### Columns and formulas
@@ -3155,7 +3245,7 @@ only tests the plausible paths — and note the two `12:00` entries look like su
 ### Mutation checking
 
 ```bash
-./internal/reporting/mutation-check.sh          # all 55 mutations, engine + receiptsource
+./internal/reporting/mutation-check.sh          # all 63 mutations, engine + receiptsource + render
 ./internal/reporting/mutation-check.sh avg      # only those matching "avg"
 ```
 

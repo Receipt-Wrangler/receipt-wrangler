@@ -3,7 +3,6 @@ package repositories
 import (
 	"errors"
 	"math"
-	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -89,8 +88,13 @@ func (repository SystemTaskRepository) buildSystemTaskFilterQuery(query *gorm.DB
 	}
 
 	query = repository.applyRanByFilter(query, filter.RanBy)
-	query = repository.applyTimestampDayFilter(query, filter.StartedAt, "started_at")
-	query = repository.applyTimestampDayFilter(query, filter.EndedAt, "ended_at")
+
+	// started_at / ended_at are instants, so their days are the app zone's.
+	// ended_at is nullable, so any filter on it excludes tasks that are still
+	// running — the correct reading of "ended before X".
+	location := repository.AppLocation()
+	query = repository.BuildDayFilterQuery(query, filter.StartedAt.Value, filter.StartedAt.Operation, "started_at", location, location)
+	query = repository.BuildDayFilterQuery(query, filter.EndedAt.Value, filter.EndedAt.Operation, "ended_at", location, location)
 
 	return query
 }
@@ -137,98 +141,6 @@ func (repository SystemTaskRepository) applyRanByFilter(query *gorm.DB, field co
 	default:
 		return query
 	}
-}
-
-// applyTimestampDayFilter compares a timestamp column against whole calendar
-// days. started_at / ended_at carry a time of day, unlike the date-only column
-// the receipt filter compares against, so a raw comparison to the datepicker's
-// midnight would make EQUALS never match and BETWEEN drop everything after
-// midnight on the end day.
-//
-// "Day" resolves in the server's location, the same zone WITHIN_CURRENT_MONTH
-// already uses — a client in a different zone can therefore shift the boundary
-// by a day, exactly as it can for receipts.
-//
-// ended_at is nullable, so any filter on it excludes tasks that are still
-// running. That is the correct reading of "ended before X".
-func (repository SystemTaskRepository) applyTimestampDayFilter(query *gorm.DB, field commands.PagedRequestField, column string) *gorm.DB {
-	if field.Value == nil {
-		return query
-	}
-
-	if field.Operation == commands.WITHIN_CURRENT_MONTH {
-		return repository.BuildFilterQuery(query, field.Value, field.Operation, column, false)
-	}
-
-	if field.Operation == commands.BETWEEN {
-		bounds, ok := field.Value.([]interface{})
-		if !ok || len(bounds) != 2 {
-			return query
-		}
-
-		start, startOk := startOfDayValue(bounds[0])
-		end, endOk := startOfDayValue(bounds[1])
-		if !startOk || !endOk {
-			return query
-		}
-
-		return query.Where(column+" >= ? AND "+column+" < ?", start, end.AddDate(0, 0, 1))
-	}
-
-	day, ok := startOfDayValue(field.Value)
-	if !ok {
-		return query
-	}
-
-	switch field.Operation {
-	case commands.EQUALS:
-		return query.Where(column+" >= ? AND "+column+" < ?", day, day.AddDate(0, 0, 1))
-	case commands.GREATER_THAN:
-		return query.Where(column+" >= ?", day.AddDate(0, 0, 1))
-	case commands.LESS_THAN:
-		return query.Where(column+" < ?", day)
-	default:
-		return query
-	}
-}
-
-// startOfDayValue parses a filter value into the midnight that begins its
-// calendar day in the server's location.
-//
-// The wire format is a bare calendar day, yyyy-MM-dd: the desktop normalizes
-// the datepicker's local-midnight Date to one before sending
-// (toSystemTaskWireFilter). An instant would be ambiguous — resolving it here
-// picks the day in the *server's* zone, so a client far enough east or west
-// selects the adjacent one. Full RFC 3339 instants are still accepted, for any
-// caller that sends one; a time.Time is accepted so Go callers and tests can
-// pass one directly.
-func startOfDayValue(value interface{}) (time.Time, bool) {
-	var parsed time.Time
-
-	switch typed := value.(type) {
-	case time.Time:
-		parsed = typed
-	case string:
-		if len(typed) == 0 {
-			return time.Time{}, false
-		}
-
-		// A bare calendar day is already midnight-local, and carries no zone to
-		// misread.
-		var err error
-		parsed, err = time.ParseInLocation(time.DateOnly, typed, time.Local)
-		if err != nil {
-			parsed, err = time.Parse(time.RFC3339, typed)
-			if err != nil {
-				return time.Time{}, false
-			}
-		}
-	default:
-		return time.Time{}, false
-	}
-
-	local := parsed.In(time.Local)
-	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local), true
 }
 
 // toInt64 normalizes a JSON-decoded number. Ids arrive as float64 through

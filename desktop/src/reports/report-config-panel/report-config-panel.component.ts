@@ -16,6 +16,7 @@ import { merge } from "rxjs";
 import { RECEIPT_DATE_FILTER_FIELDS, ReceiptDateFilterFieldKey } from "src/constants";
 import { DEFAULT_DIALOG_CONFIG } from "src/constants/dialog.constant";
 import { GroupState } from "src/store";
+import { SystemSettingsState } from "src/store/system-settings.state";
 import { BadgeTone, CUSTOM_FIELD_BADGE } from "src/shared-ui/badge/badge.component";
 import { ReportColumn, ReportDetail, ReportPeriod } from "../../open-api";
 import {
@@ -38,7 +39,7 @@ import {
 } from "../models/report-form.factory";
 import {
   formatPeriodRange,
-  reportPeriodDateFieldLabel,
+  reportPeriodDateFieldHint,
   resolvePeriodRange,
 } from "../models/report-period.util";
 import { ReportCatalogService } from "../services/report-catalog.service";
@@ -124,6 +125,9 @@ export class ReportConfigPanelComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly allGroups = this.store.selectSignal(GroupState.groupsWithoutAll);
+
+  /** The app time zone: the period hint resolves "today" in it and names it. */
+  private readonly timeZone = this.store.selectSignal(SystemSettingsState.timeZone);
   private readonly revision = signal(0);
 
   public readonly dimensions = this.catalog.dimensions;
@@ -287,10 +291,11 @@ export class ReportConfigPanelComponent implements OnInit {
     return this.form().get("detail.mode")!.value;
   }
 
-  /** The label of the receipt date the period covers, shown in the hint. */
+  /** The receipt date the period covers, and the zone it is read in, shown in the hint. */
   public periodDateFieldLabel(): string {
-    return reportPeriodDateFieldLabel(
-      this.form().get("period.dateField")!.value as ReceiptDateFilterFieldKey
+    return reportPeriodDateFieldHint(
+      this.form().get("period.dateField")!.value as ReceiptDateFilterFieldKey,
+      this.timeZone()
     );
   }
 
@@ -301,7 +306,7 @@ export class ReportConfigPanelComponent implements OnInit {
     if (this.periodPreset === ReportPeriod.PresetEnum.Custom && (!start || !end)) {
       return "a custom range";
     }
-    return formatPeriodRange(resolvePeriodRange(this.periodPreset, start, end));
+    return formatPeriodRange(resolvePeriodRange(this.periodPreset, start, end, this.timeZone()));
   }
 
   // ---- scope -------------------------------------------------------------

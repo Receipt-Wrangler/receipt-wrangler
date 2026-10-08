@@ -147,8 +147,10 @@ func TestReportService_ResolvePeriodBounds(t *testing.T) {
 // caller set it. The label describes the window only, whatever field it covers.
 func TestReportService_ApplyPeriodWritesTheChosenDateSlot(t *testing.T) {
 	now := time.Date(2026, 6, 15, 10, 0, 0, 0, time.UTC)
-	wantStart := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
-	wantEnd := time.Date(2026, 6, 30, 23, 59, 59, 999999999, time.UTC)
+	// The bounds are bare calendar days: which instants a day covers depends on
+	// the column, and the receipt filter's day builder resolves that.
+	wantStart := "2026-06-01"
+	wantEnd := "2026-06-30"
 
 	tests := []struct {
 		dateField string
@@ -193,7 +195,7 @@ func TestReportService_ApplyPeriodWritesTheChosenDateSlot(t *testing.T) {
 				if !ok || len(bounds) != 2 {
 					t.Fatalf("%s value = %v, want a two-element bound slice", key, slot.Value)
 				}
-				if !bounds[0].(time.Time).Equal(wantStart) || !bounds[1].(time.Time).Equal(wantEnd) {
+				if bounds[0] != wantStart || bounds[1] != wantEnd {
 					t.Errorf("%s bounds = %v..%v, want %v..%v", key, bounds[0], bounds[1], wantStart, wantEnd)
 				}
 			}

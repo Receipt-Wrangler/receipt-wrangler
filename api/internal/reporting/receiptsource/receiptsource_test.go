@@ -45,7 +45,7 @@ func testCustomFields() []models.CustomField {
 func mustNew(t *testing.T) Source {
 	t.Helper()
 
-	source, err := New(testCustomFields())
+	source, err := New(testCustomFields(), time.UTC)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -398,10 +398,11 @@ func TestSource_NilResolvedDateOmitsResolvedPeriodFields(t *testing.T) {
 	}
 }
 
-// The period fields are derived in UTC by design (matching the engine's date
-// buckets), so a non-UTC instant near midnight is bucketed by its UTC calendar
-// day, not its local one. This pins that choice: a later switch to a local zone
-// would have to break this test deliberately.
+// The period fields are derived in an explicit zone, never the value's own
+// location: a receipt Date in UTC always, and an instant in the source's app
+// zone — UTC here. So a value loaded with a -05:00 offset near midnight is
+// bucketed by its UTC calendar day, not the offset it happened to carry.
+// TestSource_InstantPeriodFieldsUseTheAppZone covers a non-UTC app zone.
 func TestSource_DatePeriodFieldsTruncateInUTC(t *testing.T) {
 	minus5 := time.FixedZone("minus5", -5*60*60)
 	receipt := fullReceipt()
@@ -496,7 +497,7 @@ func TestNew_RejectsDuplicateCustomFieldIds(t *testing.T) {
 	_, err := New([]models.CustomField{
 		{BaseModel: models.BaseModel{ID: 1}, Name: "HST", Type: models.CURRENCY},
 		{BaseModel: models.BaseModel{ID: 1}, Name: "GST", Type: models.CURRENCY},
-	})
+	}, time.UTC)
 
 	if !errors.Is(err, reporting.ErrDuplicateField) {
 		t.Errorf("New() error = %v, want %v", err, reporting.ErrDuplicateField)
@@ -504,7 +505,7 @@ func TestNew_RejectsDuplicateCustomFieldIds(t *testing.T) {
 }
 
 func TestNew_NoCustomFields(t *testing.T) {
-	source, err := New(nil)
+	source, err := New(nil, time.UTC)
 	if err != nil {
 		t.Fatalf("New(nil) error = %v", err)
 	}
@@ -524,11 +525,11 @@ func TestNew_CatalogIsIndependentOfDefinitionOrder(t *testing.T) {
 		reversed[left], reversed[right] = reversed[right], reversed[left]
 	}
 
-	first, err := New(forward)
+	first, err := New(forward, time.UTC)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	second, err := New(reversed)
+	second, err := New(reversed, time.UTC)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -727,7 +728,7 @@ func TestSource_SelectWithUnknownOption(t *testing.T) {
 func TestSource_SelectWithUnloadedOptions(t *testing.T) {
 	source, err := New([]models.CustomField{
 		{BaseModel: models.BaseModel{ID: childFieldID}, Name: "Child", Type: models.SELECT},
-	})
+	}, time.UTC)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -1021,7 +1022,7 @@ func TestSource_EmptyStatusIsTheEmptyString(t *testing.T) {
 func TestSource_UnknownCustomFieldType(t *testing.T) {
 	source, err := New([]models.CustomField{
 		{BaseModel: models.BaseModel{ID: 9}, Name: "Mystery", Type: models.CustomFieldType("SOMETHING_NEW")},
-	})
+	}, time.UTC)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -1052,7 +1053,7 @@ func TestSource_OptionsOnANonSelectFieldAreIgnored(t *testing.T) {
 		Name:      "HST",
 		Type:      models.CURRENCY,
 		Options:   []models.CustomFieldOption{{BaseModel: models.BaseModel{ID: 10}, Value: "Alex"}},
-	}})
+	}}, time.UTC)
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
@@ -1095,5 +1096,96 @@ func TestSource_DuplicateCategoriesAreOneBucket(t *testing.T) {
 	number, _ := model.GrandTotals[0].Value().Decimal()
 	if !number.Equal(dec("10.00")) {
 		t.Errorf("grand total = %s, want 10.00", number)
+	}
+}
+
+// An instant's calendar parts (Added At, Resolved Date) are read in the app
+// zone the source was built with; a calendar day (Date, a DATE custom field) is
+// read in UTC whatever that zone is. 01:00 UTC on Oct 1 is still Sep 30 in New
+// York.
+func TestSource_InstantPeriodFieldsUseTheAppZone(t *testing.T) {
+	newYork, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	receipt := fullReceipt()
+	receipt.CreatedAt = time.Date(2026, 10, 1, 1, 0, 0, 0, time.UTC)
+	resolved := time.Date(2027, 1, 1, 2, 0, 0, 0, time.UTC)
+	receipt.ResolvedDate = &resolved
+	receipt.Date = time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	due := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	receipt.CustomFields = []models.CustomFieldValue{{CustomFieldId: dueDateFieldID, DateValue: &due}}
+	dueDay, dueMonth, _ := CustomFieldPeriodKeys(dueDateFieldID)
+
+	tests := []struct {
+		location *time.Location
+		want     map[reporting.FieldKey]string
+	}{
+		{time.UTC, map[reporting.FieldKey]string{
+			KeyCreatedAtDay: "2026-10-01", KeyCreatedAtMonth: "2026-10", KeyCreatedAtYear: "2026",
+			KeyResolvedDateDay: "2027-01-01", KeyResolvedDateYear: "2027",
+			KeyDateDay: "2026-10-01", KeyDateMonth: "2026-10",
+			dueDay: "2026-07-01", dueMonth: "2026-07",
+		}},
+		{newYork, map[reporting.FieldKey]string{
+			KeyCreatedAtDay: "2026-09-30", KeyCreatedAtMonth: "2026-09", KeyCreatedAtYear: "2026",
+			KeyResolvedDateDay: "2026-12-31", KeyResolvedDateYear: "2026",
+			// Calendar days do not move.
+			KeyDateDay: "2026-10-01", KeyDateMonth: "2026-10",
+			dueDay: "2026-07-01", dueMonth: "2026-07",
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.location.String(), func(t *testing.T) {
+			source, err := New(testCustomFields(), test.location)
+			if err != nil {
+				t.Fatal(err)
+			}
+			row := source.Rows([]models.Receipt{receipt})[0]
+			for key, want := range test.want {
+				if text, _ := row.Measure(key).Text(); text != want {
+					t.Errorf("%s = %q, want %q", key, text, want)
+				}
+			}
+		})
+	}
+}
+
+// Each date field declares the zone a renderer names its day in: the app zone
+// for an instant, UTC for a calendar day. Nil builds a UTC source.
+func TestSource_DateFieldsDeclareTheirDisplayZone(t *testing.T) {
+	newYork, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := New(testCustomFields(), newYork)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[reporting.FieldKey]*time.Location{
+		KeyCreatedAt:                   newYork,
+		KeyResolvedDate:                newYork,
+		KeyDate:                        time.UTC,
+		CustomFieldKey(dueDateFieldID): time.UTC,
+	}
+	for key, location := range want {
+		field, ok := source.Catalog().Get(key)
+		if !ok {
+			t.Fatalf("catalog is missing %s", key)
+		}
+		if field.Location != location {
+			t.Errorf("%s declares %v, want %v", key, field.Location, location)
+		}
+	}
+
+	utcSource, err := New(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt := models.Receipt{BaseModel: models.BaseModel{CreatedAt: time.Date(2026, 10, 1, 1, 0, 0, 0, time.UTC)}}
+	if text, _ := utcSource.Rows([]models.Receipt{receipt})[0].Measure(KeyCreatedAtDay).Text(); text != "2026-10-01" {
+		t.Errorf("nil location created_at_day = %q, want the UTC day", text)
 	}
 }

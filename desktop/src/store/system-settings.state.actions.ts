@@ -17,3 +17,9 @@ export class SetCurrencyData {
   ) {}
 }
 
+
+export class SetTimeZone {
+  static readonly type = "[SystemSettingsState] Set Time Zone";
+
+  constructor(public timeZone: string) {}
+}

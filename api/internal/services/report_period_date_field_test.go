@@ -374,10 +374,11 @@ func TestReportService_Receipts_MatchTheReportOnEachDateField(t *testing.T) {
 	}
 }
 
-// The period resolves on the server clock, in its time zone, for the list as for
-// the report. A receipt added at 20:00 on May 31 in Los Angeles is already June 1
-// in UTC: a server in Los Angeles counts it in May, and so does its drill-in,
-// whatever time zone the browser asking for the list is in.
+// The period resolves in the app time zone, for the list as for the report. A
+// receipt added at 20:00 on May 31 in Los Angeles is already June 1 in UTC: with
+// the app zone set to Los Angeles both count it in May, and with the default UTC
+// both count it in June — whatever zone the server process or the browser is in.
+// The instant is stored in UTC, as a server running in a UTC container stores it.
 func TestReportService_Receipts_AgreeWithTheReportAcrossTimeZones(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	clearGroupRoleGrantCacheAll()
@@ -388,20 +389,25 @@ func TestReportService_Receipts_AgreeWithTheReportAcrossTimeZones(t *testing.T) 
 		t.Fatalf("load location: %v", err)
 	}
 	userId, groupIds := seedReportUserInGroups(t, "rpt-drill-tz", "Household")
-	// Stored in the server's own zone, as a server running there stores it.
-	addedMay31 := time.Date(2026, 5, 31, 20, 0, 0, 0, losAngeles)
+	addedMay31 := time.Date(2026, 5, 31, 20, 0, 0, 0, losAngeles).UTC()
 	seedPeriodReceipt(t, "added-may-31", userId, groupIds[0], periodFarDate, nil, addedMay31)
 
-	now := time.Date(2026, 6, 20, 12, 0, 0, 0, losAngeles)
+	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
 	tests := []struct {
+		zone       string
 		start, end string
 		want       []string
 	}{
-		{"2026-05-01", "2026-05-31", []string{"added-may-31"}},
-		{"2026-06-01", "2026-06-30", []string{}},
+		{"America/Los_Angeles", "2026-05-01", "2026-05-31", []string{"added-may-31"}},
+		{"America/Los_Angeles", "2026-06-01", "2026-06-30", []string{}},
+		{"UTC", "2026-05-01", "2026-05-31", []string{}},
+		{"UTC", "2026-06-01", "2026-06-30", []string{"added-may-31"}},
 	}
 	for _, test := range tests {
-		t.Run(test.start, func(t *testing.T) {
+		t.Run(test.zone+"/"+test.start, func(t *testing.T) {
+			if err := repositories.SetAppTimeZoneForTests(test.zone); err != nil {
+				t.Fatal(err)
+			}
 			command := periodRecordsCommand(groupIds, commands.ReportPeriod{
 				Preset: commands.ReportPeriodCustom, StartDate: test.start, EndDate: test.end,
 				DateField: commands.ReceiptFilterKeyCreatedAt,

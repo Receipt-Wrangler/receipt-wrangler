@@ -206,7 +206,7 @@ func joinLabel(cell reporting.Cell, descriptor reporting.ColumnDescriptor, curre
 	}
 	parts := make([]string, 0, len(cell.Values))
 	for _, value := range cell.Values {
-		parts = append(parts, formatLabelValue(value, descriptor.DataType, currency, noneLabel))
+		parts = append(parts, formatLabelValue(value, descriptor.DataType, descriptor.Location, currency, noneLabel))
 	}
 	return strings.Join(parts, ", ")
 }

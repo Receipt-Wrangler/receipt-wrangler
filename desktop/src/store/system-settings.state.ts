@@ -1,7 +1,8 @@
 import { Injectable } from "@angular/core";
 import { Action, Selector, State, StateContext, } from "@ngxs/store";
 import { CurrencySeparator, CurrencySymbolPosition } from "../open-api/index";
-import { SetCurrencyData, SetCurrencyDisplay } from "./system-settings.state.actions";
+import { DEFAULT_APP_TIME_ZONE } from "../utils/app-time-zone";
+import { SetCurrencyData, SetCurrencyDisplay, SetTimeZone } from "./system-settings.state.actions";
 
 export interface SystemSettingsStateInterface {
   currencyDisplay: string;
@@ -9,6 +10,8 @@ export interface SystemSettingsStateInterface {
   currencyDecimalSeparator: CurrencySeparator;
   currencyThousandthsSeparator: CurrencySeparator;
   currencyHideDecimalPlaces: boolean;
+  /** The app time zone (IANA name). See `src/utils/app-time-zone.ts`. */
+  timeZone: string;
 }
 
 @State<SystemSettingsStateInterface>({
@@ -18,7 +21,8 @@ export interface SystemSettingsStateInterface {
     currencyDecimalSeparator: CurrencySeparator.Period,
     currencyThousandthsSeparator: CurrencySeparator.Comma,
     currencySymbolPosition: CurrencySymbolPosition.Start,
-    currencyHideDecimalPlaces: false
+    currencyHideDecimalPlaces: false,
+    timeZone: DEFAULT_APP_TIME_ZONE,
   },
 })
 @Injectable()
@@ -48,6 +52,16 @@ export class SystemSettingsState {
     return state.currencyHideDecimalPlaces;
   }
 
+  /**
+   * Falls back here as well as in the defaults: defaults never run for a slice
+   * hydrated from localStorage, so a session persisted before this key existed
+   * would otherwise read `undefined`.
+   */
+  @Selector()
+  static timeZone(state: SystemSettingsStateInterface): string {
+    return state?.timeZone || DEFAULT_APP_TIME_ZONE;
+  }
+
   @Selector()
   static state(state: SystemSettingsStateInterface): SystemSettingsStateInterface {
     return state;
@@ -73,6 +87,16 @@ export class SystemSettingsState {
       currencyThousandthsSeparator: payload.currencyThousandthsSeparator,
       currencyDecimalSeparator: payload.currencyDecimalSeparator,
       currencyHideDecimalPlaces: payload.currencyHideDecimalPlaces
+    });
+  }
+
+  @Action(SetTimeZone)
+  setTimeZone(
+    { patchState }: StateContext<SystemSettingsStateInterface>,
+    payload: SetTimeZone
+  ) {
+    patchState({
+      timeZone: payload.timeZone || DEFAULT_APP_TIME_ZONE,
     });
   }
 }

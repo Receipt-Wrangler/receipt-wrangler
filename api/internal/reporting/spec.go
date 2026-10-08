@@ -135,4 +135,8 @@ type MetaInput struct {
 	// model for the renderers. The engine does not interpret it. Nil leaves the
 	// renderers on their bare numeric formatting.
 	Currency *CurrencyFormat
+
+	// Location is the app's time zone, carried through for the renderers to
+	// print GeneratedAt in. The engine does not read it. Nil means UTC.
+	Location *time.Location
 }

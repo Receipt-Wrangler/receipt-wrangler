@@ -74,7 +74,7 @@
 </ng-template>
 
 <ng-template #updatedCell let-element="element">
-  {{ (element.updatedAt || element.createdAt) | date : "short" }}
+  {{ (element.updatedAt || element.createdAt) | appDate : "short" }}
 </ng-template>
 
 <ng-template #actionsCell let-element="element">

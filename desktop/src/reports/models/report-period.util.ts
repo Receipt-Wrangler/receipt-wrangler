@@ -1,6 +1,6 @@
 import {
+  endOfDay,
   endOfMonth,
-  endOfToday,
   format,
   startOfMonth,
   startOfQuarter,
@@ -9,6 +9,7 @@ import {
 } from "date-fns";
 import { RECEIPT_DATE_FILTER_FIELDS, ReceiptDateFilterFieldKey } from "src/constants";
 import { ReportPeriod } from "../../open-api";
+import { DEFAULT_APP_TIME_ZONE, todayInZone } from "../../utils/app-time-zone";
 
 export interface PeriodRange {
   start: Date;
@@ -19,13 +20,18 @@ export interface PeriodRange {
  * Resolves a period preset (or a custom start/end) into a concrete date window,
  * mirroring the backend's resolvePeriodBounds so the builder's "resolves to …"
  * hint and the receipts drill-in agree with what the report will actually cover.
+ *
+ * "Today" is the app time zone's, as it is on the server, so the hint names the
+ * same month the report covers whatever zone the browser is in. Only the
+ * calendar days of the result are meaningful.
  */
 export function resolvePeriodRange(
   preset: ReportPeriod.PresetEnum,
   startDate: Date | null,
-  endDate: Date | null
+  endDate: Date | null,
+  timeZone: string = DEFAULT_APP_TIME_ZONE
 ): PeriodRange {
-  const now = new Date();
+  const now = todayInZone(timeZone);
   switch (preset) {
     case ReportPeriod.PresetEnum.ThisMonth:
       return { start: startOfMonth(now), end: endOfMonth(now) };
@@ -40,9 +46,9 @@ export function resolvePeriodRange(
     case ReportPeriod.PresetEnum.Ytd:
       return { start: startOfYear(now), end: now };
     case ReportPeriod.PresetEnum.Custom:
-      return { start: startDate ?? startOfMonth(now), end: endDate ?? endOfToday() };
+      return { start: startDate ?? startOfMonth(now), end: endDate ?? endOfDay(now) };
     default:
-      return { start: startOfMonth(now), end: endOfToday() };
+      return { start: startOfMonth(now), end: endOfDay(now) };
   }
 }
 
@@ -75,4 +81,14 @@ export function toReportPeriodDateField(value?: string | null): ReceiptDateFilte
 /** The picker's label for a period date field, e.g. "Added At". */
 export function reportPeriodDateFieldLabel(key: ReceiptDateFilterFieldKey): string {
   return RECEIPT_DATE_FILTER_FIELDS.find((field) => field.key === key)?.label ?? "";
+}
+
+/**
+ * The hint's name for the period date field, with the time zone its days are
+ * read in when that matters: "Added At (America/New_York)". The receipt date is
+ * a calendar day that no zone shifts, so it is named alone.
+ */
+export function reportPeriodDateFieldHint(key: ReceiptDateFilterFieldKey, timeZone: string): string {
+  const label = reportPeriodDateFieldLabel(key);
+  return key === "date" ? label : `${label} (${timeZone || DEFAULT_APP_TIME_ZONE})`;
 }

@@ -1,5 +1,6 @@
 import { format } from "date-fns";
-import { ReceiptDateFilterFieldKey } from "src/constants";
+import { RECEIPT_DATE_FILTER_KEYS, ReceiptDateFilterFieldKey } from "src/constants";
+import { toDateWireFilter } from "../../utils/date-wire-filter";
 import {
   ReceiptPagedRequestFilter,
   ReportColumn,
@@ -235,7 +236,7 @@ function toGroupByLabels(
  * command feeds both preview and generate.
  */
 export function toReportRequestCommand(value: ReportBuilderValue): ReportRequestCommand {
-  return mapReportCommand(value, enabledReportColumns(value));
+  return withWireDates(mapReportCommand(value, enabledReportColumns(value)));
 }
 
 /**
@@ -247,5 +248,17 @@ export function toReportRequestCommand(value: ReportBuilderValue): ReportRequest
  * such a column omitted.
  */
 export function toReportRequestCommandForSave(value: ReportBuilderValue): ReportRequestCommand {
-  return mapReportCommand(value, value.columns);
+  return withWireDates(mapReportCommand(value, value.columns));
+}
+
+/**
+ * Date filter values go out as the picked calendar day (see toDateWireFilter) on
+ * every path — preview, generate **and save**. A saved template is generated
+ * later by the server, which reads an instant by the calendar day as written; a
+ * local midnight east of UTC is written as the previous day, so a stored instant
+ * would silently cover the wrong days. buildReportFormFromCommand turns the
+ * stored day back into the datepicker's local midnight on load.
+ */
+function withWireDates(command: ReportRequestCommand): ReportRequestCommand {
+  return { ...command, filter: toDateWireFilter(command.filter, RECEIPT_DATE_FILTER_KEYS) };
 }

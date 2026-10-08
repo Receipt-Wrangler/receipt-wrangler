@@ -98,4 +98,55 @@ describe("ReceiptFilterService", () => {
       });
     });
   });
+
+  // Date filters go out as the calendar day picked; the server resolves the day
+  // in the right zone. Converted on the request only - the persisted filter
+  // keeps the datepickers' Dates.
+  describe("date filter values on the wire", () => {
+    function seedMonthFilter(): void {
+      const filter = buildDefaultReceiptFilter();
+      filter.createdAt = {
+        operation: FilterOperation.Between,
+        value: [new Date(2026, 8, 1), new Date(2026, 8, 30, 23, 59, 59)],
+      } as any;
+      filter.date = { operation: FilterOperation.Equals, value: new Date(2026, 8, 15) } as any;
+
+      store.dispatch(
+        new SetReceiptFilterData({ page: 1, pageSize: 25, orderBy: "date", sortDirection: "desc", filter } as any)
+      );
+    }
+
+    it("sends date values as yyyy-MM-dd on the table request", () => {
+      seedMonthFilter();
+
+      const command = service.buildPagedRequestCommand() as any;
+
+      expect(command.filter.createdAt.value).toEqual(["2026-09-01", "2026-09-30"]);
+      expect(command.filter.date.value).toBe("2026-09-15");
+      expect(store.selectSnapshot(ReceiptTableState.filterData).filter.createdAt.value[0]).toEqual(
+        new Date(2026, 8, 1)
+      );
+    });
+
+    it("sends the same days on the summary request", () => {
+      const spy = jest
+        .spyOn(receiptService, "getReceiptSummaryForGroup")
+        .mockReturnValue(of({} as ReceiptSummary) as any);
+      seedMonthFilter();
+
+      service.getReceiptSummaryForGroup("1", 1).subscribe();
+
+      expect((spy.mock.calls[0][1] as any).filter.createdAt.value).toEqual(["2026-09-01", "2026-09-30"]);
+    });
+
+    it("converts a widget's own filter too", () => {
+      const command = service.buildPagedRequestCommand(undefined, undefined, undefined, undefined, {
+        page: 1,
+        pageSize: 10,
+        filter: { resolvedDate: { operation: FilterOperation.GreaterThan, value: "2026-09-15" } },
+      } as any) as any;
+
+      expect(command.filter.resolvedDate.value).toBe("2026-09-15");
+    });
+  });
 });

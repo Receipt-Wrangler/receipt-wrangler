@@ -38,6 +38,8 @@ class _$AppData extends AppData {
   @override
   final bool? currencyHideDecimalPlaces;
   @override
+  final String? timeZone;
+  @override
   final BuiltList<Icon> icons;
   @override
   final BuiltList<String> appPermissions;
@@ -69,6 +71,7 @@ class _$AppData extends AppData {
       this.currencyDecimalSeparator,
       this.currencySymbolPosition,
       this.currencyHideDecimalPlaces,
+      this.timeZone,
       required this.icons,
       required this.appPermissions,
       required this.groupPermissions,
@@ -102,6 +105,7 @@ class _$AppData extends AppData {
         currencyDecimalSeparator == other.currencyDecimalSeparator &&
         currencySymbolPosition == other.currencySymbolPosition &&
         currencyHideDecimalPlaces == other.currencyHideDecimalPlaces &&
+        timeZone == other.timeZone &&
         icons == other.icons &&
         appPermissions == other.appPermissions &&
         groupPermissions == other.groupPermissions &&
@@ -128,6 +132,7 @@ class _$AppData extends AppData {
     _$hash = $jc(_$hash, currencyDecimalSeparator.hashCode);
     _$hash = $jc(_$hash, currencySymbolPosition.hashCode);
     _$hash = $jc(_$hash, currencyHideDecimalPlaces.hashCode);
+    _$hash = $jc(_$hash, timeZone.hashCode);
     _$hash = $jc(_$hash, icons.hashCode);
     _$hash = $jc(_$hash, appPermissions.hashCode);
     _$hash = $jc(_$hash, groupPermissions.hashCode);
@@ -156,6 +161,7 @@ class _$AppData extends AppData {
           ..add('currencyDecimalSeparator', currencyDecimalSeparator)
           ..add('currencySymbolPosition', currencySymbolPosition)
           ..add('currencyHideDecimalPlaces', currencyHideDecimalPlaces)
+          ..add('timeZone', timeZone)
           ..add('icons', icons)
           ..add('appPermissions', appPermissions)
           ..add('groupPermissions', groupPermissions)
@@ -244,6 +250,10 @@ class AppDataBuilder implements Builder<AppData, AppDataBuilder> {
   set currencyHideDecimalPlaces(bool? currencyHideDecimalPlaces) =>
       _$this._currencyHideDecimalPlaces = currencyHideDecimalPlaces;
 
+  String? _timeZone;
+  String? get timeZone => _$this._timeZone;
+  set timeZone(String? timeZone) => _$this._timeZone = timeZone;
+
   ListBuilder<Icon>? _icons;
   ListBuilder<Icon> get icons => _$this._icons ??= ListBuilder<Icon>();
   set icons(ListBuilder<Icon>? icons) => _$this._icons = icons;
@@ -304,6 +314,7 @@ class AppDataBuilder implements Builder<AppData, AppDataBuilder> {
       _currencyDecimalSeparator = $v.currencyDecimalSeparator;
       _currencySymbolPosition = $v.currencySymbolPosition;
       _currencyHideDecimalPlaces = $v.currencyHideDecimalPlaces;
+      _timeZone = $v.timeZone;
       _icons = $v.icons.toBuilder();
       _appPermissions = $v.appPermissions.toBuilder();
       _groupPermissions = $v.groupPermissions.toBuilder();
@@ -349,6 +360,7 @@ class AppDataBuilder implements Builder<AppData, AppDataBuilder> {
             currencyDecimalSeparator: currencyDecimalSeparator,
             currencySymbolPosition: currencySymbolPosition,
             currencyHideDecimalPlaces: currencyHideDecimalPlaces,
+            timeZone: timeZone,
             icons: icons.build(),
             appPermissions: appPermissions.build(),
             groupPermissions: groupPermissions.build(),

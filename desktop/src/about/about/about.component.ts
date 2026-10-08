@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, inject } from "@angular/core";
 import { Store } from "@ngxs/store";
 import { About } from "../../open-api/index";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { AboutState } from "../../store/about.state";
 import { FeatureConfigState } from "../../store/feature-config.state";
@@ -14,6 +15,7 @@ interface Link {
 @Component({
     selector: "app-about",
     imports: [
+        AppDatePipe,
         CommonModule,
         SharedUiModule
     ],

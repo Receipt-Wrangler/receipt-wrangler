@@ -116,14 +116,18 @@ func CustomFieldPeriodKeys(customFieldID uint) (day, month, year reporting.Field
 // Categories and tags are multi-valued: grouping on one fans a receipt out into
 // every bucket it belongs to, attributing the whole amount to each, exactly as
 // the dashboard pie chart does.
-func builtinFields() []reporting.FieldRef {
+//
+// The two kinds of date are read in different zones (see New): a receipt's Date
+// is a calendar day, read in UTC; Resolved Date and Added At are instants, read
+// in the app's time zone.
+func builtinFields(location *time.Location) []reporting.FieldRef {
 	fields := []reporting.FieldRef{
 		{Key: KeyReceiptID, Label: "Receipt Id", DataType: reporting.TypeNumber},
 		{Key: KeyName, Label: "Name", DataType: reporting.TypeString},
 		{Key: KeyAmount, Label: "Amount", DataType: reporting.TypeCurrency},
-		{Key: KeyDate, Label: "Date", DataType: reporting.TypeDate},
-		{Key: KeyResolvedDate, Label: "Resolved Date", DataType: reporting.TypeDate},
-		{Key: KeyCreatedAt, Label: "Added At", DataType: reporting.TypeDate},
+		{Key: KeyDate, Label: "Date", DataType: reporting.TypeDate, Location: time.UTC},
+		{Key: KeyResolvedDate, Label: "Resolved Date", DataType: reporting.TypeDate, Location: location},
+		{Key: KeyCreatedAt, Label: "Added At", DataType: reporting.TypeDate, Location: location},
 		{Key: KeyStatus, Label: "Status", DataType: reporting.TypeString},
 		{Key: KeyPaidBy, Label: "Paid By", DataType: reporting.TypeString},
 		{Key: KeyGroup, Label: "Group", DataType: reporting.TypeString},
@@ -162,6 +166,12 @@ type Source struct {
 	// options maps a select field's id to its option values by option id, which
 	// is how a stored option id becomes the text a reader sees.
 	options map[uint]map[uint]string
+
+	// location is the app's time zone: the zone an instant (created_at,
+	// resolved_date) is read in to decide which calendar day, month and year it
+	// falls in. Calendar-day fields (date, DATE custom fields) are always read
+	// in UTC, since they are stored as midnight UTC of their day.
+	location *time.Location
 }
 
 // New builds a Source over the custom fields a report may reference. Pass them
@@ -170,7 +180,17 @@ type Source struct {
 //
 // Two custom fields sharing an id are rejected, since they would claim the same
 // field key.
-func New(customFields []models.CustomField) (Source, error) {
+//
+// location is the app's time zone, which decides the calendar day of an
+// instant (Added At, Resolved Date): a receipt added at 01:00 UTC on Oct 1 was
+// added on Sep 30 in New York. A calendar-day field (Date, a DATE custom field)
+// ignores it and is read in UTC. Nil means UTC. The source takes the zone as a
+// parameter rather than reading it, so the package stays free of settings.
+func New(customFields []models.CustomField, location *time.Location) (Source, error) {
+	if location == nil {
+		location = time.UTC
+	}
+
 	// Sort by id so the catalog does not depend on the order the definitions
 	// arrived in.
 	sorted := make([]models.CustomField, len(customFields))
@@ -178,11 +198,12 @@ func New(customFields []models.CustomField) (Source, error) {
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
 
 	source := Source{
-		types:   make(map[uint]models.CustomFieldType, len(sorted)),
-		options: make(map[uint]map[uint]string),
+		types:    make(map[uint]models.CustomFieldType, len(sorted)),
+		options:  make(map[uint]map[uint]string),
+		location: location,
 	}
 
-	fields := builtinFields()
+	fields := builtinFields(location)
 	for _, customField := range sorted {
 		source.types[customField.ID] = customField.Type
 
@@ -194,11 +215,16 @@ func New(customFields []models.CustomField) (Source, error) {
 			source.options[customField.ID] = values
 		}
 
-		fields = append(fields, reporting.FieldRef{
+		customFieldRef := reporting.FieldRef{
 			Key:      CustomFieldKey(customField.ID),
 			Label:    customField.Name,
 			DataType: dataTypeFor(customField.Type),
-		})
+		}
+		if customField.Type == models.DATE {
+			// A DATE custom field is a calendar day, like the receipt's Date.
+			customFieldRef.Location = time.UTC
+		}
+		fields = append(fields, customFieldRef)
 
 		if customField.Type == models.DATE {
 			day, month, year := CustomFieldPeriodKeys(customField.ID)
@@ -265,12 +291,12 @@ func (s Source) row(receipt *models.Receipt) reporting.Row {
 		KeyTag:       tagValues(receipt.Tags),
 	}
 
-	setDateParts(row, KeyDateDay, KeyDateMonth, KeyDateYear, receipt.Date)
-	setDateParts(row, KeyCreatedAtDay, KeyCreatedAtMonth, KeyCreatedAtYear, receipt.CreatedAt)
+	setDateParts(row, KeyDateDay, KeyDateMonth, KeyDateYear, receipt.Date, time.UTC)
+	setDateParts(row, KeyCreatedAtDay, KeyCreatedAtMonth, KeyCreatedAtYear, receipt.CreatedAt, s.location)
 
 	if receipt.ResolvedDate != nil {
 		row[KeyResolvedDate] = []reporting.Value{reporting.DateVal(*receipt.ResolvedDate)}
-		setDateParts(row, KeyResolvedDateDay, KeyResolvedDateMonth, KeyResolvedDateYear, *receipt.ResolvedDate)
+		setDateParts(row, KeyResolvedDateDay, KeyResolvedDateMonth, KeyResolvedDateYear, *receipt.ResolvedDate, s.location)
 	}
 	if displayName := userDisplayName(receipt.PaidByUser); len(displayName) > 0 {
 		row[KeyPaidBy] = []reporting.Value{reporting.Str(displayName)}
@@ -285,15 +311,17 @@ func (s Source) row(receipt *models.Receipt) reporting.Row {
 }
 
 // setDateParts writes the day/month/year strings derived from one date onto the
-// row. Each is zero-padded ISO in UTC ("2006-01-02" / "2006-01" / "2006"), so
-// the values sort chronologically as plain strings and group into calendar
-// buckets. The zone is fixed to UTC so a bucket does not depend on where the
-// instant is read.
-func setDateParts(row reporting.Row, dayKey, monthKey, yearKey reporting.FieldKey, moment time.Time) {
-	utc := moment.UTC()
-	row[dayKey] = []reporting.Value{reporting.Str(utc.Format("2006-01-02"))}
-	row[monthKey] = []reporting.Value{reporting.Str(utc.Format("2006-01"))}
-	row[yearKey] = []reporting.Value{reporting.Str(utc.Format("2006"))}
+// row. Each is zero-padded ISO ("2006-01-02" / "2006-01" / "2006"), so the
+// values sort chronologically as plain strings and group into calendar buckets.
+//
+// The zone is an explicit argument, never the value's own location, so a
+// bucket does not depend on how the instant happened to be loaded: UTC for a
+// calendar-day field, the app's time zone for an instant.
+func setDateParts(row reporting.Row, dayKey, monthKey, yearKey reporting.FieldKey, moment time.Time, location *time.Location) {
+	local := moment.In(location)
+	row[dayKey] = []reporting.Value{reporting.Str(local.Format("2006-01-02"))}
+	row[monthKey] = []reporting.Value{reporting.Str(local.Format("2006-01"))}
+	row[yearKey] = []reporting.Value{reporting.Str(local.Format("2006"))}
 }
 
 // addCustomFields resolves each of a receipt's custom field values against its
@@ -336,7 +364,7 @@ func (s Source) addCustomFields(row reporting.Row, receipt *models.Receipt) {
 		// the parts always describe the value that actually won.
 		if moment, isDate := value.Time(); isDate {
 			day, month, year := CustomFieldPeriodKeys(customFieldValue.CustomFieldId)
-			setDateParts(row, day, month, year, moment)
+			setDateParts(row, day, month, year, moment, time.UTC)
 		}
 	}
 }

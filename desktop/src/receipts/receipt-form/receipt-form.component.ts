@@ -7,7 +7,6 @@ import { MatSnackBarRef } from "@angular/material/snack-bar";
 import { ActivatedRoute, Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
-import { addHours } from "date-fns";
 import { debounceTime, catchError, finalize, forkJoin, map, of, startWith, take, tap } from "rxjs";
 import { CarouselComponent } from "src/carousel/carousel/carousel.component";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS } from "src/constants";
@@ -37,6 +36,8 @@ import { SnackbarService } from "../../services";
 import { QueueMode, ReceiptQueueService } from "../../services/receipt-queue.service";
 import { StatefulMenuItem } from "../../standalone/components/filtered-stateful-menu/stateful-menu-item";
 import { AuthState, FeatureConfigState, GroupState, UserState } from "../../store";
+import { SystemSettingsState } from "../../store/system-settings.state";
+import { calendarDayToLocalDate, todayInZone, toMidnightUtc } from "../../utils/app-time-zone";
 import { downloadFile } from "../../utils/file";
 import { missingReceiptRequirementsMessage, receiptRequirementsFor } from "../../utils/receipt-requirements";
 import { ItemListComponent } from "../item-list/item-list.component";
@@ -459,7 +460,14 @@ export class ReceiptFormComponent implements OnInit {
         this.originalReceipt?.categories ?? []
       ),
       tags: this.formBuilder.array(this.originalReceipt?.tags ?? []),
-      date: [this.originalReceipt?.date ?? new Date(), Validators.required],
+      // A calendar day: stored as midnight UTC, shown in the datepicker as the
+      // local midnight of that UTC day. A new receipt defaults to the app zone's
+      // today, not the browser's.
+      date: [
+        calendarDayToLocalDate(this.originalReceipt?.date) ??
+          todayInZone(this.store.selectSnapshot(SystemSettingsState.timeZone)),
+        Validators.required,
+      ],
       paidByUserId: [
         this.originalReceipt?.paidByUserId ?? "",
         Validators.required,
@@ -511,7 +519,8 @@ export class ReceiptFormComponent implements OnInit {
       receiptId: this.originalReceipt?.id ?? 0,
       customFieldId: value.customFieldId,
       stringValue: value?.stringValue ?? null,
-      dateValue: value?.dateValue ?? null,
+      // Same calendar-day handling as the receipt's own date.
+      dateValue: calendarDayToLocalDate(value?.dateValue),
       selectValue: value?.selectValue ?? null,
       currencyValue: value?.currencyValue ?? null,
       booleanValue: value?.booleanValue ?? false,
@@ -801,9 +810,8 @@ export class ReceiptFormComponent implements OnInit {
       if (value && value !== keysWithDefaults[key]) {
         switch (key) {
           case "date":
-            value = this.handleDateMagicFill(value as string);
             this.form.patchValue({
-              date: value,
+              date: this.handleDateMagicFill(value as string),
             });
             break;
           case "paidByUserId":
@@ -1051,7 +1059,7 @@ export class ReceiptFormComponent implements OnInit {
     });
   }
 
-  private handleDateMagicFill(value: string): Date {
+  private handleDateMagicFill(value: string): Date | null {
     return this.formatMagicFilledDate(value);
   }
 
@@ -1079,12 +1087,11 @@ export class ReceiptFormComponent implements OnInit {
     return itemsToPush.length > 0;
   }
 
-  private formatMagicFilledDate(date: string): Date {
-    const dateObj = addHours(
-      new Date(date),
-      new Date().getTimezoneOffset() / 60
-    );
-    return dateObj;
+  // Magic fill returns the date as midnight UTC of the day it read, so it
+  // becomes the datepicker's local midnight of that UTC day — the same
+  // conversion a saved receipt's date gets on load.
+  private formatMagicFilledDate(date: string): Date | null {
+    return calendarDayToLocalDate(date);
   }
 
   public uploadImageButtonClicked(): void {
@@ -1359,13 +1366,32 @@ export class ReceiptFormComponent implements OnInit {
     }
   }
 
+  // The form value as it goes on the wire. The receipt's date and every DATE
+  // custom field are calendar days, sent as midnight UTC of the day picked
+  // ("2026-09-30T00:00:00.000Z") rather than the datepicker's local midnight,
+  // which is a different UTC day east of Greenwich. Converted on a copy, never
+  // in the form, so the datepickers keep their local Dates.
+  private buildSubmitCommand(): any {
+    const value = this.form.value;
+
+    return {
+      ...value,
+      date: value.date ? toMidnightUtc(value.date) : value.date,
+      customFields: (value.customFields ?? []).map((customField: CustomFieldValue) =>
+        customField.dateValue
+          ? { ...customField, dateValue: toMidnightUtc(customField.dateValue as Date | string) }
+          : customField
+      ),
+    };
+  }
+
   // One multipart call carries the receipt, its comments (on the form value)
   // and its queued images, so the server sees the images at create time and the
   // create is atomic - there is no "receipt added but images failed" state.
   private createReceipt(): void {
     this.receiptService
       .createReceiptWithFiles(
-        this.form.value,
+        this.buildSubmitCommand(),
         this.filesToUpload().map((file) => file.file)
       )
       .pipe(
@@ -1380,7 +1406,7 @@ export class ReceiptFormComponent implements OnInit {
 
   private updateReceipt(): void {
     this.receiptService
-      .updateReceipt(this.originalReceipt?.id as number, this.form.value)
+      .updateReceipt(this.originalReceipt?.id as number, this.buildSubmitCommand())
       .pipe(
         take(1),
         tap(() => {
