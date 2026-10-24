@@ -205,15 +205,16 @@ in two ways that `npm install` and `npm audit` both report as clean:
    `Missing: @noble/hashes@1.4.0 from lock file`. `npm install` accepts that lockfile happily; only
    `npm ci` rejects it. (That particular pair left the tree with `webpack-dev-server` when the
    builders moved to `@angular/build`; the hoisting failure mode did not.)
-2. **It drifts the tree past CI's Node floor.** CI pins Node **20.19.6** (`ci.yml`, `release.yml`,
-   `e2e.yml`). A fresh resolve pulled `jsdom` 29→30, `whatwg-url` 16→17 and `@asamuzakjp/*`, all of
-   which declare `node: ^22.x || >=24` and emit `EBADENGINE` on Node 20.
+2. **It drifts the tree past CI's Node floor.** CI pins Node **24.22.1** (`ci.yml`, `release.yml`,
+   `e2e.yml`), the same version as the Docker build stage (`node:24.22.1-alpine`). When CI was still on
+   Node 20, a fresh resolve pulled `jsdom` 29→30, `whatwg-url` 16→17 and `@asamuzakjp/*`, all of
+   which declare `node: ^22.x || >=24` and emitted `EBADENGINE` there.
 
 **Do this instead** — update the lockfile incrementally, and when npm refuses to move a
 peer-coupled family in place (the Angular packages are one), delete just those entries and let it
 re-resolve that subtree only:
 
-Do every step below with **CI's own Node and npm** (Node 20.19.6, which bundles npm 10.8.2 — unpack
+Do every step below with **CI's own Node and npm** (Node 24.22.1, which bundles npm 11.19.1 — unpack
 the `nodejs.org/dist` tarball and put its `bin/` first on `PATH` if your machine has another), so the
 lockfile is written by the same npm that later runs `npm ci` on it.
 
@@ -263,13 +264,12 @@ every sibling peer at `4.1.12` except `@vitest/browser-webdriverio: ^4.1.11`, an
 resolve with `npm install --before=<ISO time just before it>` — the cutoff only constrains entries
 being re-resolved, and nothing about it persists. Check every fixed version you need predates it.
 
-**Then let a newer npm prune optional-peer strays.** Re-placing a package with optional peers can make
-npm 10 record packages reachable *only* through those peers (`"optional": true, "peer": true` —
+**Optional-peer strays come from npm 10.** Re-placing a package with optional peers can make npm 10
+record packages reachable *only* through those peers (`"optional": true, "peer": true` —
 `@angular/build`'s `less`, vite's `terser` / `jiti` and their deps, 25 entries in 2026-10). npm 11
-prunes them, so they would churn the lockfile for the next person on npm 11, and they install code
-nothing uses. Run `npx npm@11 install --package-lock-only` once (the Docker build's
-`node:lts-alpine` ships npm 11); if it changes the lockfile, check the diff is deletion-only, then
-confirm npm 10.8.2 still `npm ci`s it and leaves it unchanged on `npm install`.
+prunes them. CI and the Docker build both run npm 11, so a lockfile written with CI's npm is already
+clean. If one was written with npm 10, run `npx npm@11 install --package-lock-only` once and check
+the diff is deletion-only.
 
 **Always gate on `npm ci`, not `npm install`.** `npm ci` applies a stricter sync check, so a lockfile
 that installs fine locally can still fail the build. Run the full gate before pushing any dependency
@@ -278,7 +278,7 @@ it, not an afterthought:
 
 ```bash
 rm -rf node_modules
-npm ci --verbose          # real install, exactly what CI runs (on Node 20.19.6) — must exit 0
+npm ci --verbose          # real install, exactly what CI runs (on Node 24.22.1) — must exit 0
 npm audit                 # must report 0 vulnerabilities
 npm run test:ci           # must pass
 npm run build             # must succeed
@@ -290,7 +290,7 @@ npm run build             # must succeed
 node -e '
 const semver = require("semver");
 const lock = require("./package-lock.json");
-const NODE = "20.19.6";
+const NODE = "24.22.1";
 const bad = Object.entries(lock.packages)
   .filter(([, p]) => p.engines?.node && !semver.satisfies(NODE, p.engines.node))
   .map(([k, p]) => k.replace("node_modules/", "") + "@" + p.version + " needs " + p.engines.node);

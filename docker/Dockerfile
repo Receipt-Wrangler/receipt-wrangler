@@ -1,4 +1,4 @@
-FROM node:lts-alpine as node
+FROM node:24.22.1-alpine as node
 WORKDIR /app
 
 # Define build arguments
@@ -42,6 +42,11 @@ ENV BUILD_DATE=${BUILD_DATE}
 
 # Set version
 ENV VERSION=${VERSION}
+
+# Apply Debian security updates to packages already in the base image
+# (e.g. libbrotli1); apt-get install only upgrades one when a new package
+# happens to require the newer version
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
 # Install tesseract dependencies
 RUN bash set-up-dependencies.sh
