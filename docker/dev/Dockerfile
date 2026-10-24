@@ -1,7 +1,11 @@
 FROM golang:1.26-trixie
 
+# Apply Debian security updates to packages already in the base image
+# (e.g. libbrotli1); apt-get install only upgrades one when a new package
+# happens to require the newer version
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+
 # First install curl if not already installed
-RUN apt-get update
 RUN apt-get install -y curl
 
 # Setup NodeSource repository for the LTS version
