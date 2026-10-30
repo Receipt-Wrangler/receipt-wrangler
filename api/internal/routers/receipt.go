@@ -15,6 +15,7 @@ func BuildReceiptRouter() *chi.Mux {
 	receiptRouter.Post("/group/{groupId}", handlers.GetPagedReceiptsForGroup)
 	receiptRouter.Post("/group/{groupId}/summary", handlers.GetReceiptSummaryForGroup)
 	receiptRouter.Post("/bulkStatusUpdate", handlers.BulkReceiptStatusUpdate)
+	receiptRouter.Post("/bulkDelete", handlers.BulkDeleteReceipts)
 	receiptRouter.Post("/", handlers.CreateReceipt)
 	receiptRouter.Post("/withFiles", handlers.CreateReceiptWithFiles)
 	receiptRouter.Post("/{id}/duplicate", handlers.DuplicateReceipt)

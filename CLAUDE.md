@@ -659,6 +659,23 @@ Unchanged: log timestamps, token expiry, `@every` schedules, sort order.
   displays instants in the app zone (see `desktop/CLAUDE.md`). Mobile only carries the regenerated
   client for now; building filters and displaying dates in the app zone is a pending follow-up.
 
+### Bulk Receipt Delete
+
+**Delete Selected Receipts** in the receipts table's overflow menu. **Backend + desktop**; mobile only
+carries the regenerated client (it has no receipt delete or multi-select).
+
+- **Partial success, reported per receipt.** `POST /receipt/bulkDelete` deletes what the caller may
+  and answers 200 with `{deletedReceiptIds, failures: [{receiptId, message}]}`; the desktop lists the
+  failures by name in a dialog. It deliberately bypasses `HandleRequest`'s all-or-nothing `ReceiptIds`
+  gate and checks in the service instead.
+- **Each receipt is judged in its own group** (`group.receipts.delete`, then paid-by visibility),
+  never the group being browsed, so the All group's unrestricted membership grants nothing. The
+  desktop's gate follows the same rule: it offers the entry when any selected row's own group grants
+  delete.
+- A missing receipt and a forbidden one read the same, and both lists serialize as `[]`.
+
+See `api/CLAUDE.md` → "Bulk receipt delete" and `desktop/CLAUDE.md` → "Delete Selected Receipts".
+
 ### Email Ingestion (IMAP)
 
 Groups receive receipts by email through an IMAP System Email polled by the API. **Backend +

@@ -9,6 +9,7 @@ All URIs are relative to */api*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
+[**bulkDeleteReceipts**](ReceiptApi.md#bulkdeletereceipts) | **POST** /receipt/bulkDelete | Bulk delete receipts
 [**bulkReceiptStatusUpdate**](ReceiptApi.md#bulkreceiptstatusupdate) | **POST** /receipt/bulkStatusUpdate | Bulk receipt status update
 [**createReceipt**](ReceiptApi.md#createreceipt) | **POST** /receipt/ | Create receipt
 [**createReceiptWithFiles**](ReceiptApi.md#createreceiptwithfiles) | **POST** /receipt/withFiles | Create receipt with files
@@ -21,6 +22,53 @@ Method | HTTP request | Description
 [**quickScanReceipt**](ReceiptApi.md#quickscanreceipt) | **POST** /receipt/quickScan | Quick scan a receipt
 [**updateReceipt**](ReceiptApi.md#updatereceipt) | **PUT** /receipt/{receiptId} | Update receipt
 
+
+# **bulkDeleteReceipts**
+> BulkReceiptDeleteResult bulkDeleteReceipts(bulkReceiptDeleteCommand)
+
+Bulk delete receipts
+
+This will delete every listed receipt the caller may delete (group.receipts.delete on the receipt's own group) and report each one it did not delete. Receipts are deleted independently, so a refused receipt does not stop the others [SYSTEM USER]
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getReceiptApi();
+final BulkReceiptDeleteCommand bulkReceiptDeleteCommand = ; // BulkReceiptDeleteCommand | Receipt ids to delete
+
+try {
+    final response = api.bulkDeleteReceipts(bulkReceiptDeleteCommand);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling ReceiptApi->bulkDeleteReceipts: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **bulkReceiptDeleteCommand** | [**BulkReceiptDeleteCommand**](BulkReceiptDeleteCommand.md)| Receipt ids to delete | 
+
+### Return type
+
+[**BulkReceiptDeleteResult**](BulkReceiptDeleteResult.md)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **bulkReceiptStatusUpdate**
 > BuiltList<Receipt> bulkReceiptStatusUpdate(bulkStatusUpdateCommand)

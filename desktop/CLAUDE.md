@@ -2103,6 +2103,26 @@ Two consequences for tests and styles:
   `ViewEncapsulation.None` + `app-receipts-table { … }` nesting in the component's SCSS cannot reach
   it — the `N selected` section label is styled at the top level of that file instead.
 
+### Delete Selected Receipts
+
+`receipts-bulk-delete` in the selection section calls `POST /receipt/bulkDelete`
+(`bulkDeleteReceipts`), which deletes what the caller may and reports the rest (see `api/CLAUDE.md` →
+"Bulk receipt delete").
+
+- **Gated per selected row, not on `this.groupId`.** `canBulkDelete` is true when any selected row's
+  **own** `groupId` grants `group.receipts.delete`, the same rule as the row's delete button. The
+  header flags (`canEdit` and friends) read `this.groupId`, which on the All view is the caller's
+  All-group membership and says nothing about the groups the receipts live in. A mixed selection
+  still offers the entry; the server refuses the receipts it must.
+- **After the call: clear the selection, then `getFilteredReceipts()`.** `SelectionModel` holds row
+  objects and survives a data replace, so without the clear it keeps counting deleted receipts. The
+  refetch also corrects `totalCount` and the totals, which the single delete's in-place patch does not.
+- **Full success is a snackbar; anything refused opens `BulkDeleteResultDialogComponent`**
+  (`src/receipts/bulk-delete-result-dialog/`), which lists each failed receipt by name with the
+  server's message. Names come from the selected rows, falling back to `Receipt #<id>`.
+- E2e: `e2e/receipt-bulk-delete.spec.ts` (a Viewer group and an Owner group, deleted together from
+  the All view).
+
 The chips row is inline markup (`mat-chip-set` / `matChipRemove`) with every label built by the pure
 `buildReceiptFilterChips` util, so `ReceiptsModule` must import **`MatChipsModule`** — `SharedUiModule`
 imports it but does not export it. It makes no exceptions: see "Every active condition is chipped"
