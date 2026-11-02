@@ -128,17 +128,32 @@ func TestBulkDeleteReceipts_NothingDeletableStillAnswersOk(t *testing.T) {
 }
 
 // Both lists must be [] rather than null: the generated Dart client has no null guard.
+// Asserted on the raw body, since a decoded null and a decoded [] look the same.
 func TestBulkDeleteReceipts_EmptyListsSerializeAsArrays(t *testing.T) {
 	defer tearDownGenericHandlerTest()
 	repositories.CreateTestGroupWithUsers()
 	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsDelete)
 	receiptId := seedReceipt(t, 1, 1, 0)
+	const missing uint = 9999
 
-	w, r := bulkDeleteReceiptsRequest(1, bulkDeleteBody(t, receiptId))
-	BulkDeleteReceipts(w, r)
+	cases := map[string]struct {
+		receiptId uint
+		want      string
+	}{
+		"nothing refused": {receiptId: receiptId, want: `"failures":[]`},
+		"nothing deleted": {receiptId: missing, want: `"deletedReceiptIds":[]`},
+	}
 
-	if !strings.Contains(w.Body.String(), `"failures":[]`) {
-		utils.PrintTestError(t, w.Body.String(), `"failures":[]`)
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			w, r := bulkDeleteReceiptsRequest(1, bulkDeleteBody(t, testCase.receiptId))
+			BulkDeleteReceipts(w, r)
+
+			assertStatus(t, w, http.StatusOK)
+			if !strings.Contains(w.Body.String(), testCase.want) {
+				utils.PrintTestError(t, w.Body.String(), testCase.want)
+			}
+		})
 	}
 }
 

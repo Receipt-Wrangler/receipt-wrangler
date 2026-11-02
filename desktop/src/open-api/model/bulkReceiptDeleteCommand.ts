@@ -11,7 +11,7 @@
 
 export interface BulkReceiptDeleteCommand { 
     /**
-     * Receipt ids to delete. Must be non-empty with no duplicates
+     * Receipt ids to delete. Between 1 and 500 ids, with no duplicates
      */
     receiptIds: Array<number>;
 }

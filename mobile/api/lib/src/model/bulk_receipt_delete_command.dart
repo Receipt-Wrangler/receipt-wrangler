@@ -12,10 +12,10 @@ part 'bulk_receipt_delete_command.g.dart';
 /// BulkReceiptDeleteCommand
 ///
 /// Properties:
-/// * [receiptIds] - Receipt ids to delete. Must be non-empty with no duplicates
+/// * [receiptIds] - Receipt ids to delete. Between 1 and 500 ids, with no duplicates
 @BuiltValue()
 abstract class BulkReceiptDeleteCommand implements Built<BulkReceiptDeleteCommand, BulkReceiptDeleteCommandBuilder> {
-  /// Receipt ids to delete. Must be non-empty with no duplicates
+  /// Receipt ids to delete. Between 1 and 500 ids, with no duplicates
   @BuiltValueField(wireName: r'receiptIds')
   BuiltList<int> get receiptIds;
 

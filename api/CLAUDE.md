@@ -3191,7 +3191,10 @@ with a real-group positive control.
 Deletes the receipts in `BulkReceiptDeleteCommand.receiptIds` that the caller may delete and reports
 each one it did not. It answers **200 with a `BulkReceiptDeleteResult`** (`deletedReceiptIds`,
 `failures: [{receiptId, message}]`) for any valid request, including one where nothing was deleted.
-An empty or duplicated id list is a 400 keyed `receiptIds`.
+An empty or duplicated id list, or one longer than `MaxBulkReceiptDeleteIds` (500, mirrored as
+`maxItems` in swagger), is a 400 keyed `receiptIds`. The cap keeps the single `id IN ?` lookup under
+every engine's bind-parameter limit (999 on old SQLite builds) and bounds the deletes one request
+runs; the desktop sends at most one table page (100).
 
 - **It does not use `HandleRequest`'s `ReceiptIds` gate**, deliberately. That gate is all-or-nothing:
   one receipt the caller may not delete refuses the whole request with a 403. The desktop sends a

@@ -9,11 +9,9 @@
       </li>
     }
   </ul>
-  <div class="d-flex justify-content-end mt-3">
-    <app-button
-      buttonText="Close"
-      matButtonType="basic"
-      (clicked)="close()"
-    ></app-button>
-  </div>
+  <app-dialog-footer
+    cancelButtonTooltip="Close"
+    [showSubmitButton]="false"
+    (cancelClicked)="close()"
+  ></app-dialog-footer>
 </app-dialog>

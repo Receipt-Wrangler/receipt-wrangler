@@ -48,8 +48,14 @@ describe("BulkDeleteResultDialogComponent", () => {
     ]);
   });
 
-  it("closes", () => {
-    component.close();
+  // Nothing to submit: the shared footer renders its cancel button alone, which closes.
+  it("uses the shared footer as a dismiss-only footer", () => {
+    const footer = fixture.nativeElement.querySelector("app-dialog-footer");
+
+    expect(footer.showSubmitButton).toBe(false);
+    expect(footer.getAttribute("cancelButtonTooltip")).toBe("Close");
+
+    footer.dispatchEvent(new CustomEvent("cancelClicked"));
 
     expect(component.matDialogRef.close).toHaveBeenCalled();
   });

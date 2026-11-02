@@ -358,7 +358,10 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
   fields that hold an existing external secret (system email, receipt-processing settings). The
   generate handler is synchronous by design: `type` is a plain `@Input`, so under zoneless CD only
   the click event's CD pass renders the reveal (the clipboard write is a detached side effect).
-- **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`.
+- **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`. A dialog with nothing to
+  submit (one that only reports a result) still uses the footer, with `[showSubmitButton]="false"`
+  and `cancelButtonTooltip="Close"`, so its cancel button is the dismiss action — see
+  `bulk-delete-result-dialog`. Do not hand-build a Close row.
 - **Confirming an action:** the shared **`ConfirmationDialogComponent`**
   (`src/shared-ui/confirmation-dialog/`). Open it with `matDialog.open(ConfirmationDialogComponent)`,
   set `componentInstance.headerText` / `componentInstance.dialogContent` (two plain `@Input()`s — it
@@ -2119,7 +2122,8 @@ Two consequences for tests and styles:
   refetch also corrects `totalCount` and the totals, which the single delete's in-place patch does not.
 - **Full success is a snackbar; anything refused opens `BulkDeleteResultDialogComponent`**
   (`src/receipts/bulk-delete-result-dialog/`), which lists each failed receipt by name with the
-  server's message. Names come from the selected rows, falling back to `Receipt #<id>`.
+  server's message. Names come from the selected rows, falling back to `Receipt #<id>`. It closes
+  through the shared footer's dismiss-only mode.
 - E2e: `e2e/receipt-bulk-delete.spec.ts` (a Viewer group and an Owner group, deleted together from
   the All view).
 

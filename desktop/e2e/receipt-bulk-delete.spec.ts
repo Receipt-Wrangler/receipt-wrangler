@@ -150,7 +150,9 @@ test.describe('Bulk receipt delete', () => {
     );
     await expect(failures).not.toContainText(ownerReceiptName);
 
-    await result.getByRole('button', { name: 'Close' }).click();
+    // The shared footer in dismiss-only mode: its cancel button is the only action.
+    await expect(result.getByTestId('dialog-submit-button')).toHaveCount(0);
+    await result.getByTestId('dialog-cancel-button').click();
     await expect(result).toBeHidden();
 
     // The table refetched: the permitted receipt is gone, its neighbour stays.

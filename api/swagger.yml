@@ -5478,9 +5478,11 @@ components:
       properties:
         receiptIds:
           type: array
+          minItems: 1
+          maxItems: 500
           items:
             type: integer
-          description: Receipt ids to delete. Must be non-empty with no duplicates
+          description: Receipt ids to delete. Between 1 and 500 ids, with no duplicates
     BulkReceiptDeleteResult:
       required:
         - deletedReceiptIds
