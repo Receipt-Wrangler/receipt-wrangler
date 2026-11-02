@@ -1,7 +1,8 @@
 <app-button
   icon="close"
   matButtonType="iconButton"
-  tooltip="Cancel"
+  [tooltip]="tooltip()"
+  [ariaLabel]="tooltip()"
   color="warn"
   [disabled]="mode() === formMode.view || disabled()"
   (clicked)="clicked.emit()"

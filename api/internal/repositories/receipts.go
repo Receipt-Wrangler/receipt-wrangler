@@ -1333,6 +1333,23 @@ func (repository ReceiptRepository) GetReceiptForAuthorization(id string) (model
 	return receipt, nil
 }
 
+// GetReceiptsForAuthorization is the batched form of GetReceiptForAuthorization.
+// Ids that match no receipt are simply absent from the result.
+func (repository ReceiptRepository) GetReceiptsForAuthorization(ids []uint) ([]models.Receipt, error) {
+	db := repository.GetDB()
+	var receipts []models.Receipt
+
+	err := db.Model(models.Receipt{}).
+		Where("id IN ?", ids).
+		Select("id", "group_id", "paid_by_user_id").
+		Find(&receipts).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return receipts, nil
+}
+
 func (repository ReceiptRepository) FilterLinkedItemsFromReceiptItems(receipt *models.Receipt) {
 	if len(receipt.ReceiptItems) == 0 {
 		return

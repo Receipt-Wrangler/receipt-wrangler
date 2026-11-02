@@ -29,4 +29,23 @@ describe('ButtonComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  describe('icon button accessible name', () => {
+    const renderIconButton = (ariaLabel?: string): HTMLButtonElement => {
+      fixture.componentRef.setInput('matButtonType', 'iconButton');
+      if (ariaLabel !== undefined) {
+        fixture.componentRef.setInput('ariaLabel', ariaLabel);
+      }
+      fixture.detectChanges();
+      return fixture.nativeElement.querySelector('button');
+    };
+
+    it('takes its aria-label from ariaLabel', () => {
+      expect(renderIconButton('Close').getAttribute('aria-label')).toBe('Close');
+    });
+
+    it('carries no aria-label by default', () => {
+      expect(renderIconButton().hasAttribute('aria-label')).toBe(false);
+    });
+  });
 });

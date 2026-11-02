@@ -15,6 +15,9 @@ doc/AssociatedEntityType.md
 doc/AssociatedGroup.md
 doc/AuthApi.md
 doc/BaseModel.md
+doc/BulkReceiptDeleteCommand.md
+doc/BulkReceiptDeleteFailure.md
+doc/BulkReceiptDeleteResult.md
 doc/BulkStatusUpdateCommand.md
 doc/BulkUserDeleteCommand.md
 doc/Category.md
@@ -220,6 +223,9 @@ lib/src/model/associated_api_keys.dart
 lib/src/model/associated_entity_type.dart
 lib/src/model/associated_group.dart
 lib/src/model/base_model.dart
+lib/src/model/bulk_receipt_delete_command.dart
+lib/src/model/bulk_receipt_delete_failure.dart
+lib/src/model/bulk_receipt_delete_result.dart
 lib/src/model/bulk_status_update_command.dart
 lib/src/model/bulk_user_delete_command.dart
 lib/src/model/category.dart
@@ -353,4 +359,6 @@ lib/src/model/widget.dart
 lib/src/model/widget_type.dart
 lib/src/serializers.dart
 pubspec.yaml
-test/receipt_requirements_test.dart
+test/bulk_receipt_delete_command_test.dart
+test/bulk_receipt_delete_failure_test.dart
+test/bulk_receipt_delete_result_test.dart

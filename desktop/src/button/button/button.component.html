@@ -67,6 +67,7 @@
       [routerLink]="buttonRouterLink()"
       [queryParams]="buttonQueryParams()"
       [matTooltip]="tooltip()"
+      [attr.aria-label]="ariaLabel() || null"
       [matBadgeColor]="matBadgeColor()"
       [matBadge]="matBadgeContent()"
       (click)="emitClicked($event)"

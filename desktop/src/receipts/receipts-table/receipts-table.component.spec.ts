@@ -16,8 +16,11 @@ import { SetColumnConfig, SetReceiptFilterData } from "src/store/receipt-table.a
 import { ReceiptTableState } from "src/store/receipt-table.state";
 import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { MonthStepperComponent } from "../../shared-ui/month-stepper/month-stepper.component";
-import { ApiModule, CustomField, CustomFieldType, FilterOperation, Group, Permission, Receipt, ReceiptService, ReceiptStatus, ReceiptSummary, ReceiptSummaryPosition } from "../../open-api";
+import { ApiModule, BulkReceiptDeleteResult, CustomField, CustomFieldType, FilterOperation, Group, Permission, Receipt, ReceiptService, ReceiptStatus, ReceiptSummary, ReceiptSummaryPosition } from "../../open-api";
+import { DEFAULT_DIALOG_CONFIG } from "../../constants";
+import { SnackbarService } from "../../services";
 import { ReceiptFilterService } from "../../services/receipt-filter.service";
+import { BulkDeleteResultDialogComponent } from "../bulk-delete-result-dialog/bulk-delete-result-dialog.component";
 import { AuthState, GroupState, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { SetGroups } from "../../store/group.state.actions";
@@ -575,6 +578,142 @@ describe("ReceiptsTableComponent", () => {
       component.duplicateReceipt(row);
 
       expect(receiptService.duplicateReceipt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("bulk delete", () => {
+    const groceries = { id: 1, name: "Groceries", groupId: 5 } as Receipt;
+    const fuel = { id: 2, name: "Fuel", groupId: 6 } as Receipt;
+
+    const select = (receipts: Receipt[]) => {
+      const clear = jest.fn();
+      Object.defineProperty(component, "table", {
+        value: () => ({
+          selection: {
+            selected: receipts,
+            clear,
+            changed: of({ source: { selected: receipts } }),
+          },
+        }),
+      });
+      component.ngAfterViewInit();
+      return clear;
+    };
+
+    describe("gating", () => {
+      // Group 6 grants read only. The All view's own membership grants delete, which
+      // must not count: no receipt lives in the All group.
+      beforeEach(() => {
+        store.dispatch(
+          new SetPermissions([], {
+            5: [Permission.GroupReceiptsDelete],
+            6: [Permission.GroupReceiptsRead],
+            99: [Permission.GroupReceiptsDelete],
+          })
+        );
+        component.groupId = "99";
+      });
+
+      it("is offered when a selected receipt's own group grants delete", () => {
+        select([groceries]);
+
+        expect(component.canBulkDelete()).toEqual(true);
+      });
+
+      it("is offered for a mixed selection, leaving the refusals to the server", () => {
+        select([groceries, fuel]);
+
+        expect(component.canBulkDelete()).toEqual(true);
+      });
+
+      it("is withheld when no selected receipt's group grants delete", () => {
+        select([fuel]);
+
+        expect(component.canBulkDelete()).toEqual(false);
+      });
+    });
+
+    describe("deleting", () => {
+      let receiptService: ReceiptService;
+      let dialog: MatDialog;
+      let snackbar: SnackbarService;
+      let refresh: jest.SpyInstance;
+
+      const stubConfirmation = (confirmed: boolean | undefined) =>
+        jest.spyOn(dialog, "open").mockReturnValue({
+          componentInstance: {},
+          afterClosed: () => of(confirmed),
+        } as any);
+
+      const stubResult = (result: BulkReceiptDeleteResult) =>
+        jest.spyOn(receiptService, "bulkDeleteReceipts").mockReturnValue(of(result) as any);
+
+      beforeEach(() => {
+        receiptService = TestBed.inject(ReceiptService);
+        dialog = TestBed.inject(MatDialog);
+        snackbar = TestBed.inject(SnackbarService);
+        jest.spyOn(snackbar, "success").mockImplementation(() => undefined);
+        refresh = jest.spyOn(component, "getFilteredReceipts").mockImplementation(() => undefined);
+      });
+
+      it("deletes the selection, clears it and refreshes once confirmed", () => {
+        const clear = select([groceries, fuel]);
+        const open = stubConfirmation(true);
+        stubResult({ deletedReceiptIds: [1, 2], failures: [] });
+
+        component.deleteSelectedReceipts();
+
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open).toHaveBeenCalledWith(ConfirmationDialogComponent, DEFAULT_DIALOG_CONFIG);
+        expect(receiptService.bulkDeleteReceipts).toHaveBeenCalledWith({ receiptIds: [1, 2] });
+        expect(clear).toHaveBeenCalled();
+        expect(refresh).toHaveBeenCalled();
+        expect(snackbar.success).toHaveBeenCalledWith("2 receipts successfully deleted");
+      });
+
+      it("names each receipt the server refused, with its reason", () => {
+        select([groceries, fuel]);
+        const open = stubConfirmation(true);
+        stubResult({
+          deletedReceiptIds: [1],
+          failures: [{ receiptId: 2, message: "You do not have permission to delete this receipt" }],
+        });
+
+        component.deleteSelectedReceipts();
+
+        expect(snackbar.success).not.toHaveBeenCalled();
+        expect(refresh).toHaveBeenCalled();
+        expect(open).toHaveBeenLastCalledWith(BulkDeleteResultDialogComponent, {
+          ...DEFAULT_DIALOG_CONFIG,
+          data: {
+            deletedCount: 1,
+            requestedCount: 2,
+            failures: [{ name: "Fuel", message: "You do not have permission to delete this receipt" }],
+          },
+        });
+      });
+
+      it("does nothing when the dialog is cancelled", () => {
+        select([groceries]);
+        stubConfirmation(false);
+        jest.spyOn(receiptService, "bulkDeleteReceipts");
+
+        component.deleteSelectedReceipts();
+
+        expect(receiptService.bulkDeleteReceipts).not.toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
+      });
+
+      // A backdrop click / ESC closes with undefined rather than false.
+      it("does nothing when the dialog is dismissed", () => {
+        select([groceries]);
+        stubConfirmation(undefined);
+        jest.spyOn(receiptService, "bulkDeleteReceipts");
+
+        component.deleteSelectedReceipts();
+
+        expect(receiptService.bulkDeleteReceipts).not.toHaveBeenCalled();
+      });
     });
   });
 });

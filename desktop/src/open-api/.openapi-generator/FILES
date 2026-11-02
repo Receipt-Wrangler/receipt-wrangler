@@ -46,6 +46,9 @@ model/associatedApiKeys.ts
 model/associatedEntityType.ts
 model/associatedGroup.ts
 model/baseModel.ts
+model/bulkReceiptDeleteCommand.ts
+model/bulkReceiptDeleteFailure.ts
+model/bulkReceiptDeleteResult.ts
 model/bulkStatusUpdateCommand.ts
 model/bulkUserDeleteCommand.ts
 model/category.ts

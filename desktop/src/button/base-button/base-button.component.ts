@@ -30,6 +30,12 @@ export class BaseButtonComponent {
 
   public readonly tooltip = input<string>("");
 
+  /**
+   * The accessible name of an icon-only button. Its mat-icon is aria-hidden and a
+   * tooltip is only a description, so without this a screen reader has no name.
+   */
+  public readonly ariaLabel = input<string>();
+
   public readonly matBadgeContent = input<any>();
 
   public readonly matBadgeColor = input<ThemePalette>("primary");

@@ -72,6 +72,7 @@ export class TableComponent implements OnChanges {
 
     if (changes["dataSource"]) {
       this.setRowIndexes();
+      this.deselectRowsNoLongerShown();
     }
   }
 
@@ -116,6 +117,21 @@ export class TableComponent implements OnChanges {
 
     this.rowIndexes = indexes;
     this.rowIndexesByReference = byReference;
+  }
+
+  // The selection holds row objects, so after a refetch (filter, sort, a delete)
+  // every selected row is a stale object the table no longer shows, and a bulk
+  // action would quietly act on it. Deselecting only rows missing from the new
+  // data, rather than clearing, keeps the selection across an update that reuses
+  // the same row objects, such as the receipts table's in-place status patch.
+  // Relies on the same replace-don't-mutate rule as setRowIndexes.
+  private deselectRowsNoLongerShown(): void {
+    const stale = this.selection.selected.filter(
+      (row) => !this.rowIndexesByReference.has(row)
+    );
+    if (stale.length > 0) {
+      this.selection.deselect(...stale);
+    }
   }
 
   public isAllSelected() {

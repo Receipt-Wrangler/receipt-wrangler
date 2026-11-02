@@ -1,14 +1,18 @@
 <div class="d-flex justify-content-end align-items-center">
-  <app-submit-button
-    data-testid="dialog-submit-button"
-    [tooltip]="submitButtonTooltip()"
-    [disabled]="
-      disableWhenProgressBarIsShown() ? showProgressBar() ?? false : false
-    "
-    [type]="submitButtonType()"
-    (clicked)="submitClicked.emit()"
-  ></app-submit-button>
+  @if (showSubmitButton()) {
+    <app-submit-button
+      data-testid="dialog-submit-button"
+      [tooltip]="submitButtonTooltip()"
+      [disabled]="
+        disableWhenProgressBarIsShown() ? showProgressBar() ?? false : false
+      "
+      [type]="submitButtonType()"
+      (clicked)="submitClicked.emit()"
+    ></app-submit-button>
+  }
   <app-cancel-button
+    data-testid="dialog-cancel-button"
+    [tooltip]="cancelButtonTooltip()"
     [disabled]="
       disableWhenProgressBarIsShown() ? showProgressBar() ?? false : false
     "

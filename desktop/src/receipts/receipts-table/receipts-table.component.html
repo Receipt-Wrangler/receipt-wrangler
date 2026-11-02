@@ -185,6 +185,17 @@
             <span>Bulk Status Update</span>
           </button>
         }
+
+        @if (canBulkDelete()) {
+          <button
+            mat-menu-item
+            data-testid="receipts-bulk-delete"
+            (click)="deleteSelectedReceipts()"
+          >
+            <mat-icon>delete</mat-icon>
+            <span>Delete Selected Receipts</span>
+          </button>
+        }
       }
     </mat-menu>
   </div>

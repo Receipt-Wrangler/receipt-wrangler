@@ -927,6 +927,49 @@ func DeleteReceipt(w http.ResponseWriter, r *http.Request) {
 	HandleRequest(handler)
 }
 
+// BulkDeleteReceipts deliberately declares no ReceiptIds or GroupPermissions:
+// HandleRequest's multi-receipt gate refuses the whole request when any one receipt
+// is denied, and this endpoint reports per receipt instead. The same checks --
+// group.receipts.delete on each receipt's own group, then paid-by visibility -- run
+// in ReceiptService.BulkDeleteReceiptsForUser.
+func BulkDeleteReceipts(w http.ResponseWriter, r *http.Request) {
+	handler := structs.Handler{
+		ErrorMessage: "Error deleting receipts",
+		Writer:       w,
+		Request:      r,
+		ResponseType: constants.ApplicationJson,
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			command := commands.BulkReceiptDeleteCommand{}
+			vErr, err := command.LoadDataFromRequestAndValidate(w, r)
+			if err != nil {
+				return http.StatusBadRequest, err
+			}
+			if len(vErr.Errors) > 0 {
+				structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
+				return 0, nil
+			}
+
+			token := structs.GetClaims(r)
+			receiptService := services.NewReceiptService(nil)
+			result, err := receiptService.BulkDeleteReceiptsForUser(token.UserId, command.ReceiptIds)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			bytes, err := utils.MarshalResponseData(result)
+			if err != nil {
+				return http.StatusInternalServerError, err
+			}
+
+			w.WriteHeader(http.StatusOK)
+			w.Write(bytes)
+			return 0, nil
+		},
+	}
+
+	HandleRequest(handler)
+}
+
 func DuplicateReceipt(w http.ResponseWriter, r *http.Request) {
 	receiptId := chi.URLParam(r, "id")
 

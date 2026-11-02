@@ -26,6 +26,9 @@ import 'package:openapi/src/model/associated_api_keys.dart';
 import 'package:openapi/src/model/associated_entity_type.dart';
 import 'package:openapi/src/model/associated_group.dart';
 import 'package:openapi/src/model/base_model.dart';
+import 'package:openapi/src/model/bulk_receipt_delete_command.dart';
+import 'package:openapi/src/model/bulk_receipt_delete_failure.dart';
+import 'package:openapi/src/model/bulk_receipt_delete_result.dart';
 import 'package:openapi/src/model/bulk_status_update_command.dart';
 import 'package:openapi/src/model/bulk_user_delete_command.dart';
 import 'package:openapi/src/model/category.dart';
@@ -172,6 +175,9 @@ part 'serializers.g.dart';
   AssociatedEntityType,
   AssociatedGroup,
   BaseModel,$BaseModel,
+  BulkReceiptDeleteCommand,
+  BulkReceiptDeleteFailure,
+  BulkReceiptDeleteResult,
   BulkStatusUpdateCommand,
   BulkUserDeleteCommand,
   Category,

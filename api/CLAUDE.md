@@ -3186,6 +3186,46 @@ are swapped. The All-group rejections are pinned by `TestCreateReceiptWithFiles_
 `TestCreateReceipt_LegacyEndpointAllGroupRejected` and `TestQuickScanHandlerAllGroupRejected`, each
 with a real-group positive control.
 
+## Bulk receipt delete (`POST /receipt/bulkDelete`)
+
+Deletes the receipts in `BulkReceiptDeleteCommand.receiptIds` that the caller may delete and reports
+each one it did not. It answers **200 with a `BulkReceiptDeleteResult`** (`deletedReceiptIds`,
+`failures: [{receiptId, message}]`) for any valid request, including one where nothing was deleted.
+An empty or duplicated id list, or one longer than `MaxBulkReceiptDeleteIds` (500, mirrored as
+`maxItems` in swagger), is a 400 keyed `receiptIds`. The cap keeps the single `id IN ?` lookup under
+every engine's bind-parameter limit (999 on old SQLite builds) and bounds the deletes one request
+runs; the desktop sends at most one table page (100).
+
+- **It does not use `HandleRequest`'s `ReceiptIds` gate**, deliberately. That gate is all-or-nothing:
+  one receipt the caller may not delete refuses the whole request with a 403. The desktop sends a
+  selection that can span groups (the All view), and the point of the endpoint is to delete what may
+  be deleted and name the rest. The handler declares no permissions; the checks run in
+  `ReceiptService.BulkDeleteReceiptsForUser`, the same "enforce in the service" shape as
+  `GetReceiptForUser`.
+- **Each receipt is judged in its own group**, never the group being browsed: `group.receipts.delete`
+  there, resolved once per distinct group, and then `FilterReceiptsByPaidBy`, so a receipt hidden by
+  paid-by visibility is refused exactly as the single `DELETE /receipt/{id}` refuses it. The caller's
+  All-group membership grants nothing here, since no receipt lives in the All group. No
+  `OrAppPermissions` bypass, the same as the single delete.
+- **A missing receipt and a forbidden one get the same message**
+  (`BulkReceiptDeleteDeniedMessage`), so a failure never reveals that a receipt exists. A delete that
+  errors is logged and reported as `BulkReceiptDeleteErrorMessage`.
+- **Everything is authorized before anything is deleted**, so a permission lookup error is a 500 with
+  nothing removed. Each delete then reuses `DeleteReceipt` in its own transaction: one failure does not
+  undo the others, which is what partial success means here. It inherits that function's existing
+  behavior (items are detached and swept later by `AfterReceiptUpdated`; image files are removed
+  inside its transaction).
+- **Both result lists are `[]`, never `null`** (`structs.NewBulkReceiptDeleteResult`); the generated
+  Dart client has no null guard. Mobile does not call the endpoint; it only carries the generated
+  client.
+- API-key scope: a plain write (`classWrite`). The response discloses only ids the caller sent.
+
+Tests: `commands/bulk_receipt_delete_command_test.go` and `handlers/receipt_bulk_delete_test.go`
+(partial success across groups in request order, missing reads as forbidden, paid-by refusal, the
+All-group membership granting nothing, `[]` serialization, invalid bodies, and the receipt's own rows
+removed with foreign keys off). The paid-by and per-group checks were each verified to fail their
+tests when removed.
+
 ## Group Default Custom Fields
 
 Group admins declare, in **Group Receipt Settings**, the set of custom fields that should always be

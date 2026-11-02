@@ -128,6 +128,7 @@ Class | Method | HTTP request | Description
 [*PromptApi*](doc/PromptApi.md) | [**getPagedPrompts**](doc/PromptApi.md#getpagedprompts) | **POST** /prompt/getPagedPrompts | Gets paged prompts
 [*PromptApi*](doc/PromptApi.md) | [**getPromptById**](doc/PromptApi.md#getpromptbyid) | **GET** /prompt/{id} | Get prompt by id
 [*PromptApi*](doc/PromptApi.md) | [**updatePromptById**](doc/PromptApi.md#updatepromptbyid) | **PUT** /prompt/{id} | Update prompt by id
+[*ReceiptApi*](doc/ReceiptApi.md) | [**bulkDeleteReceipts**](doc/ReceiptApi.md#bulkdeletereceipts) | **POST** /receipt/bulkDelete | Bulk delete receipts
 [*ReceiptApi*](doc/ReceiptApi.md) | [**bulkReceiptStatusUpdate**](doc/ReceiptApi.md#bulkreceiptstatusupdate) | **POST** /receipt/bulkStatusUpdate | Bulk receipt status update
 [*ReceiptApi*](doc/ReceiptApi.md) | [**createReceipt**](doc/ReceiptApi.md#createreceipt) | **POST** /receipt/ | Create receipt
 [*ReceiptApi*](doc/ReceiptApi.md) | [**createReceiptWithFiles**](doc/ReceiptApi.md#createreceiptwithfiles) | **POST** /receipt/withFiles | Create receipt with files
@@ -222,6 +223,9 @@ Class | Method | HTTP request | Description
  - [AssociatedEntityType](doc/AssociatedEntityType.md)
  - [AssociatedGroup](doc/AssociatedGroup.md)
  - [BaseModel](doc/BaseModel.md)
+ - [BulkReceiptDeleteCommand](doc/BulkReceiptDeleteCommand.md)
+ - [BulkReceiptDeleteFailure](doc/BulkReceiptDeleteFailure.md)
+ - [BulkReceiptDeleteResult](doc/BulkReceiptDeleteResult.md)
  - [BulkStatusUpdateCommand](doc/BulkStatusUpdateCommand.md)
  - [BulkUserDeleteCommand](doc/BulkUserDeleteCommand.md)
  - [Category](doc/Category.md)

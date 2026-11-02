@@ -20,6 +20,9 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(AssociatedApiKeys.serializer)
       ..add(AssociatedEntityType.serializer)
       ..add(AssociatedGroup.serializer)
+      ..add(BulkReceiptDeleteCommand.serializer)
+      ..add(BulkReceiptDeleteFailure.serializer)
+      ..add(BulkReceiptDeleteResult.serializer)
       ..add(BulkStatusUpdateCommand.serializer)
       ..add(BulkUserDeleteCommand.serializer)
       ..add(Category.serializer)
@@ -408,6 +411,16 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(int)]),
           () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(
+              BuiltList, const [const FullType(BulkReceiptDeleteFailure)]),
+          () => ListBuilder<BulkReceiptDeleteFailure>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(int)]),
           () => ListBuilder<int>())

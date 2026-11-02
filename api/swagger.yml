@@ -1657,6 +1657,38 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /receipt/bulkDelete:
+    post:
+      tags:
+        - Receipt
+      summary: Bulk delete receipts
+      description:
+        This will delete every listed receipt the caller may delete
+        (group.receipts.delete on the receipt's own group) and report each one
+        it did not delete. Receipts are deleted independently, so a refused
+        receipt does not stop the others [SYSTEM USER]
+      operationId: bulkDeleteReceipts
+      requestBody:
+        description: Receipt ids to delete
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkReceiptDeleteCommand"
+      responses:
+        200:
+          description: Which receipts were deleted, and why each other one was not
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkReceiptDeleteResult"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /receipt/group/{groupId}:
     post:
       tags:
@@ -5439,6 +5471,48 @@ components:
           items:
             type: integer
           description: Receipt ids to update
+    BulkReceiptDeleteCommand:
+      required:
+        - receiptIds
+      type: object
+      properties:
+        receiptIds:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: integer
+          description: Receipt ids to delete. Between 1 and 500 ids, with no duplicates
+    BulkReceiptDeleteResult:
+      required:
+        - deletedReceiptIds
+        - failures
+      type: object
+      properties:
+        deletedReceiptIds:
+          type: array
+          items:
+            type: integer
+          description: Receipt ids that were deleted
+        failures:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkReceiptDeleteFailure"
+          description: One entry per requested receipt that was not deleted
+    BulkReceiptDeleteFailure:
+      required:
+        - receiptId
+        - message
+      type: object
+      properties:
+        receiptId:
+          type: integer
+          description: Requested receipt id that was not deleted
+        message:
+          type: string
+          description:
+            Why it was not deleted. A missing receipt and one the caller may
+            not delete read the same, so this never reveals that a receipt exists
     BulkUserDeleteCommand:
       required:
         - userIds

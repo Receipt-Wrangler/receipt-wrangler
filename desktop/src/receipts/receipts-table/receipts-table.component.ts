@@ -7,7 +7,7 @@ import { MatTableDataSource } from "@angular/material/table";
 import { ActivatedRoute, Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
-import { catchError, EMPTY, map, Subject, switchMap, take, tap } from "rxjs";
+import { catchError, EMPTY, filter, map, Subject, switchMap, take, tap } from "rxjs";
 import { fadeInOut } from "src/animations";
 import { ReceiptFilterService } from "src/services/receipt-filter.service";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
@@ -53,6 +53,7 @@ import { buildReceiptFilterChips, ReceiptFilterChip } from "../../utils/receipt-
 import { isFilterEntryActive } from "../../utils/receipt-filter-entry";
 import { resolveSummaryConfigGroup, summaryConfigGroups } from "../../utils/receipt-summary";
 import { openQuickScanDialog } from "../quick-scan-dialog/open-quick-scan-dialog";
+import { BulkDeleteResultDialogComponent, BulkDeleteResultDialogData } from "../bulk-delete-result-dialog/bulk-delete-result-dialog.component";
 import { BulkStatusUpdateComponent } from "../bulk-resolve-dialog/bulk-status-update-dialog.component";
 import { ColumnConfigurationDialogComponent } from "../column-configuration-dialog/column-configuration-dialog.component";
 
@@ -63,6 +64,10 @@ import { ColumnConfigurationDialogComponent } from "../column-configuration-dial
  */
 interface ReceiptTableColumn extends TableColumn {
   customField?: CustomField;
+}
+
+function receiptNoun(count: number): string {
+  return count === 1 ? "receipt" : "receipts";
 }
 
 @UntilDestroy()
@@ -294,6 +299,14 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   public selectedReceiptIds = signal<number[]>([]);
 
+  /**
+   * Judged per selected row against that receipt's OWN group, like the row delete
+   * button, never against this.groupId: on the All group that is the caller's
+   * All-group membership, which says nothing about the groups the receipts live in.
+   * The server still checks every receipt and reports the ones it refused.
+   */
+  public canBulkDelete = signal(false);
+
   public firstSort: boolean = true;
 
   public canEdit: boolean = false;
@@ -455,8 +468,17 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
     this.table()?.selection?.changed
       .pipe(
         untilDestroyed(this),
-        map((event) => (event.source.selected as Receipt[]).map((r) => r.id)),
-        tap((ids) => this.selectedReceiptIds.set(ids))
+        map((event) => event.source.selected as Receipt[]),
+        tap((receipts) => {
+          this.selectedReceiptIds.set(receipts.map((r) => r.id));
+          this.canBulkDelete.set(
+            receipts.some((r) =>
+              this.store.selectSnapshot(
+                AuthState.hasGroupPermission(r.groupId, Permission.GroupReceiptsDelete)
+              )
+            )
+          );
+        })
       )
       .subscribe();
   }
@@ -832,6 +854,58 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
               )
               .subscribe();
           }
+        })
+      )
+      .subscribe();
+  }
+
+  /**
+   * Deletes what the server allows and reports the rest: the selection can span
+   * groups on the All view, and the server refuses each receipt the caller may not
+   * delete without refusing the others.
+   */
+  public deleteSelectedReceipts(): void {
+    const selected = this.table().selection.selected as Receipt[];
+    const count = selected.length;
+    const dialogRef = this.matDialog.open(ConfirmationDialogComponent, DEFAULT_DIALOG_CONFIG);
+
+    dialogRef.componentInstance.headerText = "Delete Receipts";
+    dialogRef.componentInstance.dialogContent = `Are you sure you would like to delete ${count} selected ${receiptNoun(count)}? This action is irreversible.`;
+
+    dialogRef
+      .afterClosed()
+      .pipe(
+        take(1),
+        filter(Boolean),
+        switchMap(() =>
+          this.receiptService.bulkDeleteReceipts({ receiptIds: selected.map((r) => r.id) })
+        ),
+        tap((result) => {
+          // Cleared before the refetch: the selection holds row objects, so it would
+          // otherwise keep counting receipts that are gone.
+          this.table().selection.clear();
+          this.getFilteredReceipts();
+
+          if (result.failures.length === 0) {
+            const deleted = result.deletedReceiptIds.length;
+            this.snackbarService.success(`${deleted} ${receiptNoun(deleted)} successfully deleted`);
+            return;
+          }
+
+          this.matDialog.open<BulkDeleteResultDialogComponent, BulkDeleteResultDialogData>(
+            BulkDeleteResultDialogComponent,
+            {
+              ...DEFAULT_DIALOG_CONFIG,
+              data: {
+                deletedCount: result.deletedReceiptIds.length,
+                requestedCount: count,
+                failures: result.failures.map((failure) => ({
+                  name: selected.find((r) => r.id === failure.receiptId)?.name ?? `Receipt #${failure.receiptId}`,
+                  message: failure.message,
+                })),
+              },
+            }
+          );
         })
       )
       .subscribe();

@@ -12,6 +12,8 @@ export class CancelButtonComponent {
 
   public readonly disabled = input<boolean>(false);
 
+  public readonly tooltip = input<string>("Cancel");
+
   public readonly clicked = output<void>();
 
   public formMode = FormMode;

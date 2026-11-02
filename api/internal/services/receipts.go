@@ -249,6 +249,82 @@ func (service ReceiptService) DeleteReceipt(id string) error {
 	return nil
 }
 
+// The per-receipt messages a bulk delete reports. The refusal is one message for a
+// receipt that is missing, in a group where the caller lacks group.receipts.delete,
+// or hidden by paid-by visibility, so a failure cannot reveal that a receipt exists.
+const (
+	BulkReceiptDeleteDeniedMessage = "You do not have permission to delete this receipt"
+	BulkReceiptDeleteErrorMessage  = "Error deleting receipt"
+)
+
+// BulkDeleteReceiptsForUser deletes every receipt in receiptIds the caller may
+// delete and reports each one it did not, in request order. Each receipt is
+// authorized against its OWN group, never the group the caller is browsing: the
+// synthetic All group's membership carries an unrestricted role, and no receipt
+// lives in it. Everything is authorized before anything is deleted, and each
+// delete runs in its own transaction, so one failure does not undo the others.
+func (service ReceiptService) BulkDeleteReceiptsForUser(userId uint, receiptIds []uint) (structs.BulkReceiptDeleteResult, error) {
+	result := structs.NewBulkReceiptDeleteResult()
+	receiptRepository := repositories.NewReceiptRepository(service.TX)
+	permissionService := NewPermissionService(service.TX)
+
+	receipts, err := receiptRepository.GetReceiptsForAuthorization(receiptIds)
+	if err != nil {
+		return result, err
+	}
+
+	canDeleteInGroup := make(map[uint]bool)
+	permitted := make([]models.Receipt, 0, len(receipts))
+	for _, receipt := range receipts {
+		canDelete, resolved := canDeleteInGroup[receipt.GroupId]
+		if !resolved {
+			canDelete, err = permissionService.HasGroupPermissions(userId, receipt.GroupId, permissions.GroupReceiptsDelete)
+			if err != nil {
+				return result, err
+			}
+			canDeleteInGroup[receipt.GroupId] = canDelete
+		}
+
+		if canDelete {
+			permitted = append(permitted, receipt)
+		}
+	}
+
+	visible, err := permissionService.FilterReceiptsByPaidBy(userId, permitted)
+	if err != nil {
+		return result, err
+	}
+
+	deletable := make(map[uint]struct{}, len(visible))
+	for _, receipt := range visible {
+		deletable[receipt.ID] = struct{}{}
+	}
+
+	for _, receiptId := range receiptIds {
+		if _, ok := deletable[receiptId]; !ok {
+			result.Failures = append(result.Failures, structs.BulkReceiptDeleteFailure{
+				ReceiptId: receiptId,
+				Message:   BulkReceiptDeleteDeniedMessage,
+			})
+			continue
+		}
+
+		err = service.DeleteReceipt(utils.UintToString(receiptId))
+		if err != nil {
+			logging.LogStd(logging.LOG_LEVEL_ERROR, fmt.Sprintf("bulk delete of receipt %d failed: %s", receiptId, err.Error()))
+			result.Failures = append(result.Failures, structs.BulkReceiptDeleteFailure{
+				ReceiptId: receiptId,
+				Message:   BulkReceiptDeleteErrorMessage,
+			})
+			continue
+		}
+
+		result.DeletedReceiptIds = append(result.DeletedReceiptIds, receiptId)
+	}
+
+	return result, nil
+}
+
 // QuickScanParams carries the inputs for a single quick-scanned file: the caller's claims, the
 // per-file values the handler already resolved against the group's quick-scan configuration, and the
 // uploaded file's location. Grouped into a struct rather than passed positionally because the

@@ -24,4 +24,15 @@ describe("CancelButtonComponent", () => {
   it("should create", () => {
     expect(component).toBeTruthy();
   });
+
+  // The button is icon-only, so its tooltip text doubles as its accessible name.
+  it("names the button after its tooltip", () => {
+    const button = (): HTMLButtonElement => fixture.nativeElement.querySelector("button");
+    expect(button().getAttribute("aria-label")).toBe("Cancel");
+
+    fixture.componentRef.setInput("tooltip", "Close");
+    fixture.detectChanges();
+
+    expect(button().getAttribute("aria-label")).toBe("Close");
+  });
 });

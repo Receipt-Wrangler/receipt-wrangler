@@ -104,6 +104,7 @@ var everyRoute = []routeCase{
 	// did not supply -- unlike the duplicate endpoints below.
 	{http.MethodPost, "/api/receipt/withFiles", classWrite},
 	{http.MethodPost, "/api/receipt/bulkStatusUpdate", classWrite},
+	{http.MethodPost, "/api/receipt/bulkDelete", classWrite},
 	{http.MethodPost, "/api/apiKey/", classWrite},
 	{http.MethodPut, "/api/apiKey/1", classWrite},
 	{http.MethodDelete, "/api/apiKey/1", classWrite},
