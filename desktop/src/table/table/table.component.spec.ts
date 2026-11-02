@@ -175,4 +175,38 @@ describe('TableComponent', () => {
       expect(component.indexFor(data[1])).toBe(1);
     });
   });
+
+  // The selection holds row objects, so a selected row the table no longer shows
+  // must not survive into the next bulk action.
+  describe('selection across data changes', () => {
+    const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
+
+    const replaceData = (data: any[]) => {
+      fixture.componentRef.setInput('dataSource', new MatTableDataSource(data));
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => {
+      replaceData(rows);
+      component.selection.select(rows[0], rows[1]);
+    });
+
+    it('drops the selection when a refetch brings new row objects', () => {
+      replaceData([{ id: 1 }, { id: 2 }, { id: 3 }]);
+
+      expect(component.selection.selected).toEqual([]);
+    });
+
+    it('keeps the selection when the new data reuses the same row objects', () => {
+      replaceData([...rows]);
+
+      expect(component.selection.selected).toEqual([rows[0], rows[1]]);
+    });
+
+    it('drops only a selected row that is no longer shown', () => {
+      replaceData([rows[1], rows[2]]);
+
+      expect(component.selection.selected).toEqual([rows[1]]);
+    });
+  });
 });

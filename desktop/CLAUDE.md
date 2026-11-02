@@ -361,7 +361,9 @@ the user explicitly confirms the divergence**. Examples of standards to follow:
 - **Tables:** `app-table`; **dialogs:** `app-dialog` + `app-dialog-footer`. A dialog with nothing to
   submit (one that only reports a result) still uses the footer, with `[showSubmitButton]="false"`
   and `cancelButtonTooltip="Close"`, so its cancel button is the dismiss action — see
-  `bulk-delete-result-dialog`. Do not hand-build a Close row.
+  `bulk-delete-result-dialog`. Do not hand-build a Close row. The cancel button is icon-only, so it
+  passes its tooltip as `ariaLabel` (an `app-button` input that sets `aria-label` on an icon button);
+  an icon-only `app-button` has no accessible name without one, since `mat-icon` is `aria-hidden`.
 - **Confirming an action:** the shared **`ConfirmationDialogComponent`**
   (`src/shared-ui/confirmation-dialog/`). Open it with `matDialog.open(ConfirmationDialogComponent)`,
   set `componentInstance.headerText` / `componentInstance.dialogContent` (two plain `@Input()`s — it
@@ -2117,9 +2119,16 @@ Two consequences for tests and styles:
   header flags (`canEdit` and friends) read `this.groupId`, which on the All view is the caller's
   All-group membership and says nothing about the groups the receipts live in. A mixed selection
   still offers the entry; the server refuses the receipts it must.
-- **After the call: clear the selection, then `getFilteredReceipts()`.** `SelectionModel` holds row
-  objects and survives a data replace, so without the clear it keeps counting deleted receipts. The
-  refetch also corrects `totalCount` and the totals, which the single delete's in-place patch does not.
+- **After the call: clear the selection, then `getFilteredReceipts()`.** The clear is immediate
+  feedback; the refetch also corrects `totalCount` and the totals, which the single delete's in-place
+  patch does not.
+- **The shared `app-table` keeps its selection to rows it shows.** `SelectionModel` holds row
+  objects, so on every `dataSource` change `TableComponent` deselects rows missing from the new data
+  (`deselectRowsNoLongerShown`). A refetch (filter, sort, month stepper) brings new objects and drops
+  the whole selection; an update that reuses the row objects (the bulk status patch) keeps it; a
+  single-row delete drops just that row. Before this, a selection survived a filter change
+  invisibly, so the next bulk action could act on receipts no longer on screen. It also keeps a bulk
+  delete within one page, far under the API's 500-id cap.
 - **Full success is a snackbar; anything refused opens `BulkDeleteResultDialogComponent`**
   (`src/receipts/bulk-delete-result-dialog/`), which lists each failed receipt by name with the
   server's message. Names come from the selected rows, falling back to `Receipt #<id>`. It closes

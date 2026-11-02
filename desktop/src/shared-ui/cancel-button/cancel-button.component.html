@@ -2,6 +2,7 @@
   icon="close"
   matButtonType="iconButton"
   [tooltip]="tooltip()"
+  [ariaLabel]="tooltip()"
   color="warn"
   [disabled]="mode() === formMode.view || disabled()"
   (clicked)="clicked.emit()"
