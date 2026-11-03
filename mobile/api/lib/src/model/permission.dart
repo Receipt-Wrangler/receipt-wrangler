@@ -189,6 +189,9 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'app.receipts.search')
   static const Permission appPeriodReceiptsPeriodSearch = _$appPeriodReceiptsPeriodSearch;
   /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'app.receipt-history.read')
+  static const Permission appPeriodReceiptHistoryPeriodRead = _$appPeriodReceiptHistoryPeriodRead;
+  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'app.reports.create')
   static const Permission appPeriodReportsPeriodCreate = _$appPeriodReportsPeriodCreate;
   /// All permission keys the API recognizes.

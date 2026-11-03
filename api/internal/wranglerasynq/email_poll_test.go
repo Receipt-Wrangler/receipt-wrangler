@@ -61,7 +61,8 @@ func TestPollEmail_QueuesEachAttachmentForEachGroup(t *testing.T) {
 		}
 
 		metadata := payload.Metadata
-		if metadata.Subject != "Receipt 42" || metadata.FromEmail != "bob@example.com" || metadata.FromName != "Bob" || metadata.To != "receipts@example.org" {
+		if metadata.Subject != "Receipt 42" || metadata.FromEmail != "bob@example.com" || metadata.FromName != "Bob" || metadata.To != "receipts@example.org" ||
+			metadata.Inbox != systemEmail.Username {
 			t.Errorf("Metadata = %+v", metadata)
 		}
 		if !metadata.Date.Equal(time.Date(2024, 1, 2, 3, 0, 0, 0, time.UTC)) {

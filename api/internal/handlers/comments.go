@@ -52,7 +52,12 @@ func AddComment(w http.ResponseWriter, r *http.Request) {
 				return permissionService.UserVisibleInGroup(recipientId, authorId, groupId)
 			}
 
-			comment, err := commentRepository.AddComment(upsertCommentCommand, authorVisibleTo)
+			var comment models.Comment
+			err := repositories.NewReceiptChangeRecorder(token.UserId, upsertCommentCommand.ReceiptId).Record(func() error {
+				var addErr error
+				comment, addErr = commentRepository.AddComment(upsertCommentCommand, authorVisibleTo)
+				return addErr
+			})
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -105,7 +110,11 @@ func DeleteComment(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
-			err = commentRepository.DeleteComment(commentId, token.UserId)
+			// Recorded only past the refusal above, so a delete the role
+			// requirement turned away (a 400) never shows as a failed change.
+			err = repositories.NewReceiptChangeRecorder(token.UserId, comment.ReceiptId).Record(func() error {
+				return commentRepository.DeleteComment(commentId, token.UserId)
+			})
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

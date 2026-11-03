@@ -1,0 +1,50 @@
+<div class="rw-history-drawer__header">
+  <div class="rw-history-drawer__heading">
+    <h2 class="rw-history-drawer__title" [id]="titleId">Receipt History</h2>
+    @if (summary()) {
+      <small class="rw-history-drawer__summary" data-testid="receipt-history-summary">{{ summary() }}</small>
+    }
+  </div>
+  <app-button
+    #closeButton
+    class="rw-history-drawer__close"
+    data-testid="receipt-history-close"
+    matButtonType="iconButton"
+    color="accent"
+    icon="close"
+    tooltip="Close"
+    ariaLabel="Close receipt history"
+    (clicked)="close()"
+  ></app-button>
+</div>
+
+<div class="rw-history-drawer__body">
+  @if (history.isLoading()) {
+    <div class="rw-history-drawer__state" role="status" data-testid="receipt-history-loading">
+      <mat-spinner [diameter]="32"></mat-spinner>
+      <span>Loading history…</span>
+    </div>
+  } @else if (history.status() === "error") {
+    <div class="rw-history-drawer__state" role="alert" data-testid="receipt-history-error">
+      <span>Couldn't load this receipt's history.</span>
+      <app-button
+        data-testid="receipt-history-retry"
+        matButtonType="basic"
+        color="accent"
+        buttonText="Try again"
+        (clicked)="retry()"
+      ></app-button>
+    </div>
+  } @else if (days().length === 0) {
+    <div class="rw-history-drawer__state" data-testid="receipt-history-empty">
+      No changes have been recorded for this receipt yet.
+    </div>
+  } @else {
+    @for (day of days(); track day.key) {
+      <h3 class="rw-history-day" data-testid="receipt-history-day">{{ day.label }}</h3>
+      @for (entry of day.entries; track entry.systemTaskId) {
+        <app-receipt-history-entry [receiptId]="receiptId()" [entry]="entry"></app-receipt-history-entry>
+      }
+    }
+  }
+</div>

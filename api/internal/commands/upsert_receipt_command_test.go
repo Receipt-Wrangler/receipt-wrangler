@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"github.com/shopspring/decimal"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
@@ -184,5 +185,28 @@ func TestUpsertReceiptCommand_Validate_EmptyCommand(t *testing.T) {
 	// name, date, groupId, paidByUserId, status
 	if len(vErr.Errors) < 5 {
 		utils.PrintTestError(t, len(vErr.Errors), "at least 5")
+	}
+}
+
+// The email origin is server-set: a request body cannot set it, and ToReceipt,
+// which round-trips through JSON, still carries what the server set.
+func TestUpsertReceiptCommand_EmailOriginIsServerSet(t *testing.T) {
+	var command UpsertReceiptCommand
+	body := `{"name":"R","emailInbox":"forged@example.com","emailSender":"forged@example.com"}`
+	if err := json.Unmarshal([]byte(body), &command); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if command.EmailInbox != "" || command.EmailSender != "" {
+		t.Errorf("a request set the email origin: inbox %q, sender %q", command.EmailInbox, command.EmailSender)
+	}
+
+	command.EmailInbox = "receipts@example.com"
+	command.EmailSender = "store@example.com"
+	receipt, err := command.ToReceipt()
+	if err != nil {
+		t.Fatalf("ToReceipt: %v", err)
+	}
+	if receipt.EmailInbox != "receipts@example.com" || receipt.EmailSender != "store@example.com" {
+		t.Errorf("ToReceipt lost the email origin: inbox %q, sender %q", receipt.EmailInbox, receipt.EmailSender)
 	}
 }

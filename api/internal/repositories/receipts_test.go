@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
+	"strings"
 	"testing"
 	"time"
 )
@@ -1860,5 +1861,66 @@ func TestUpdateReceiptSystemTaskSnapshotsAreLoadedToTheSameDepth(t *testing.T) {
 		if len(receipt.CustomFields) != 1 || receipt.CustomFields[0].CustomField.Name != "PO Number" {
 			t.Errorf("%s: expected the custom field definition to be loaded, got %+v", side, receipt.CustomFields)
 		}
+	}
+}
+
+// A receipt made from an email keeps where it came from: CreateReceipt stores
+// the inbox and sender the email task set, the RECEIPT_UPLOADED copy carries
+// them, and an update (whose command never carries them) leaves them alone.
+func TestEmailOriginIsStoredAndSurvivesAnUpdate(t *testing.T) {
+	defer teardownReceiptTest()
+	setupReceiptTest()
+
+	command := commands.UpsertReceiptCommand{
+		Name:            "From email",
+		Amount:          decimal.NewFromFloat(12.00),
+		Date:            time.Now(),
+		PaidByUserID:    1,
+		Status:          models.OPEN,
+		GroupId:         1,
+		CreatedByString: "Email Integration",
+		EmailInbox:      "receipts@example.com",
+		EmailSender:     "store@example.com",
+	}
+
+	repository := NewReceiptRepository(nil)
+	created, err := repository.CreateReceipt(command, 0, true)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if created.EmailInbox != "receipts@example.com" || created.EmailSender != "store@example.com" {
+		t.Errorf("created = inbox %q, sender %q", created.EmailInbox, created.EmailSender)
+	}
+
+	var upload models.SystemTask
+	if err := GetDB().Where("type = ? AND receipt_id = ?", models.RECEIPT_UPLOADED, created.ID).First(&upload).Error; err != nil {
+		t.Fatalf("load the upload task: %v", err)
+	}
+	if !strings.Contains(upload.ResultDescription, `"emailInbox":"receipts@example.com"`) ||
+		!strings.Contains(upload.ResultDescription, `"emailSender":"store@example.com"`) {
+		t.Errorf("RECEIPT_UPLOADED description = %s, want the email origin", upload.ResultDescription)
+	}
+
+	update := command
+	update.Name = "Renamed"
+	update.EmailInbox = ""
+	update.EmailSender = ""
+	updated, err := repository.UpdateReceipt(utils.UintToString(created.ID), update, 1)
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if updated.Name != "Renamed" || updated.EmailInbox != "receipts@example.com" || updated.EmailSender != "store@example.com" {
+		t.Errorf("updated = name %q, inbox %q, sender %q; want the origin kept", updated.Name, updated.EmailInbox, updated.EmailSender)
+	}
+}
+
+// A receipt not made from an email serializes no email origin at all.
+func TestReceiptWithoutAnEmailOriginOmitsIt(t *testing.T) {
+	serialized, err := (&models.Receipt{Name: "Manual"}).ToString()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(serialized, "emailInbox") || strings.Contains(serialized, "emailSender") {
+		t.Errorf("serialized = %s, want no email keys", serialized)
 	}
 }

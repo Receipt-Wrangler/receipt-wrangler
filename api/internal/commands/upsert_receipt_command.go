@@ -24,6 +24,10 @@ type UpsertReceiptCommand struct {
 	Comments        []UpsertCommentCommand          `json:"comments"`
 	CustomFields    []UpsertCustomFieldValueCommand `json:"customFields"`
 	CreatedByString string                          `json:"createdByString"`
+	// EmailInbox and EmailSender are server-set by the email task and never
+	// read from a request (json:"-"); ToReceipt copies them explicitly.
+	EmailInbox  string `json:"-"`
+	EmailSender string `json:"-"`
 }
 
 func (receipt *UpsertReceiptCommand) LoadDataFromRequest(w http.ResponseWriter, r *http.Request) error {
@@ -111,6 +115,10 @@ func (receipt *UpsertReceiptCommand) ToReceipt() (models.Receipt, error) {
 	if err != nil {
 		return result, err
 	}
+
+	// json:"-" keeps these off the round trip above, so they are copied here.
+	result.EmailInbox = receipt.EmailInbox
+	result.EmailSender = receipt.EmailSender
 
 	return result, nil
 }

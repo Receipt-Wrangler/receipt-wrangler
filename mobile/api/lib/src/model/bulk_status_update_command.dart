@@ -14,7 +14,7 @@ part 'bulk_status_update_command.g.dart';
 /// Properties:
 /// * [comment] - Optional comment to leave on each receipt
 /// * [status] - Status to update to
-/// * [receiptIds] - Receipt ids to update
+/// * [receiptIds] - Receipt ids to update. At most 500 ids
 @BuiltValue()
 abstract class BulkStatusUpdateCommand implements Built<BulkStatusUpdateCommand, BulkStatusUpdateCommandBuilder> {
   /// Optional comment to leave on each receipt
@@ -25,7 +25,7 @@ abstract class BulkStatusUpdateCommand implements Built<BulkStatusUpdateCommand,
   @BuiltValueField(wireName: r'status')
   String get status;
 
-  /// Receipt ids to update
+  /// Receipt ids to update. At most 500 ids
   @BuiltValueField(wireName: r'receiptIds')
   BuiltList<int> get receiptIds;
 

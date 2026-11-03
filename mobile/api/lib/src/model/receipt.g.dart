@@ -45,6 +45,10 @@ class _$Receipt extends Receipt {
   final String? updatedAt;
   @override
   final String? createdByString;
+  @override
+  final String? emailInbox;
+  @override
+  final String? emailSender;
 
   factory _$Receipt([void Function(ReceiptBuilder)? updates]) =>
       (ReceiptBuilder()..update(updates))._build();
@@ -68,7 +72,9 @@ class _$Receipt extends Receipt {
       required this.status,
       required this.tags,
       this.updatedAt,
-      this.createdByString})
+      this.createdByString,
+      this.emailInbox,
+      this.emailSender})
       : super._();
   @override
   Receipt rebuild(void Function(ReceiptBuilder) updates) =>
@@ -99,7 +105,9 @@ class _$Receipt extends Receipt {
         status == other.status &&
         tags == other.tags &&
         updatedAt == other.updatedAt &&
-        createdByString == other.createdByString;
+        createdByString == other.createdByString &&
+        emailInbox == other.emailInbox &&
+        emailSender == other.emailSender;
   }
 
   @override
@@ -124,6 +132,8 @@ class _$Receipt extends Receipt {
     _$hash = $jc(_$hash, tags.hashCode);
     _$hash = $jc(_$hash, updatedAt.hashCode);
     _$hash = $jc(_$hash, createdByString.hashCode);
+    _$hash = $jc(_$hash, emailInbox.hashCode);
+    _$hash = $jc(_$hash, emailSender.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -149,7 +159,9 @@ class _$Receipt extends Receipt {
           ..add('status', status)
           ..add('tags', tags)
           ..add('updatedAt', updatedAt)
-          ..add('createdByString', createdByString))
+          ..add('createdByString', createdByString)
+          ..add('emailInbox', emailInbox)
+          ..add('emailSender', emailSender))
         .toString();
   }
 }
@@ -243,6 +255,14 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
   set createdByString(String? createdByString) =>
       _$this._createdByString = createdByString;
 
+  String? _emailInbox;
+  String? get emailInbox => _$this._emailInbox;
+  set emailInbox(String? emailInbox) => _$this._emailInbox = emailInbox;
+
+  String? _emailSender;
+  String? get emailSender => _$this._emailSender;
+  set emailSender(String? emailSender) => _$this._emailSender = emailSender;
+
   ReceiptBuilder() {
     Receipt._defaults(this);
   }
@@ -269,6 +289,8 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
       _tags = $v.tags.toBuilder();
       _updatedAt = $v.updatedAt;
       _createdByString = $v.createdByString;
+      _emailInbox = $v.emailInbox;
+      _emailSender = $v.emailSender;
       _$v = null;
     }
     return this;
@@ -317,6 +339,8 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
             tags: tags.build(),
             updatedAt: updatedAt,
             createdByString: createdByString,
+            emailInbox: emailInbox,
+            emailSender: emailSender,
           );
     } catch (_) {
       late String _$failedField;

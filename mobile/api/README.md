@@ -135,6 +135,8 @@ Class | Method | HTTP request | Description
 [*ReceiptApi*](doc/ReceiptApi.md) | [**deleteReceiptById**](doc/ReceiptApi.md#deletereceiptbyid) | **DELETE** /receipt/{receiptId} | Delete receipt
 [*ReceiptApi*](doc/ReceiptApi.md) | [**duplicateReceipt**](doc/ReceiptApi.md#duplicatereceipt) | **POST** /receipt/{receiptId}/duplicate | Duplicate receipt
 [*ReceiptApi*](doc/ReceiptApi.md) | [**getReceiptById**](doc/ReceiptApi.md#getreceiptbyid) | **GET** /receipt/{receiptId} | Get receipt
+[*ReceiptApi*](doc/ReceiptApi.md) | [**getReceiptHistory**](doc/ReceiptApi.md#getreceipthistory) | **GET** /receipt/{receiptId}/history | Get receipt change history
+[*ReceiptApi*](doc/ReceiptApi.md) | [**getReceiptHistorySnapshots**](doc/ReceiptApi.md#getreceipthistorysnapshots) | **GET** /receipt/{receiptId}/history/{systemTaskId}/snapshots | Get the receipt snapshots behind one history entry
 [*ReceiptApi*](doc/ReceiptApi.md) | [**getReceiptSummaryForGroup**](doc/ReceiptApi.md#getreceiptsummaryforgroup) | **POST** /receipt/group/{groupId}/summary | Gets the receipt summary for a group
 [*ReceiptApi*](doc/ReceiptApi.md) | [**getReceiptsForGroup**](doc/ReceiptApi.md#getreceiptsforgroup) | **POST** /receipt/group/{groupId} | Gets receipts
 [*ReceiptApi*](doc/ReceiptApi.md) | [**hasAccessToReceipt**](doc/ReceiptApi.md#hasaccesstoreceipt) | **GET** /receipt/hasAccess | Has access to receipt
@@ -290,6 +292,12 @@ Class | Method | HTTP request | Description
  - [QueueName](doc/QueueName.md)
  - [QuickScanDefaultPaidByType](doc/QuickScanDefaultPaidByType.md)
  - [Receipt](doc/Receipt.md)
+ - [ReceiptHistory](doc/ReceiptHistory.md)
+ - [ReceiptHistoryActor](doc/ReceiptHistoryActor.md)
+ - [ReceiptHistoryChange](doc/ReceiptHistoryChange.md)
+ - [ReceiptHistoryEntry](doc/ReceiptHistoryEntry.md)
+ - [ReceiptHistorySnapshots](doc/ReceiptHistorySnapshots.md)
+ - [ReceiptHistoryValue](doc/ReceiptHistoryValue.md)
  - [ReceiptPagedRequestCommand](doc/ReceiptPagedRequestCommand.md)
  - [ReceiptPagedRequestFilter](doc/ReceiptPagedRequestFilter.md)
  - [ReceiptProcessingSettings](doc/ReceiptProcessingSettings.md)

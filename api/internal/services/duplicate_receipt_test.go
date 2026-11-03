@@ -116,6 +116,30 @@ func TestDuplicateReceipt_CopiesImageBytesUnconverted(t *testing.T) {
 	}
 }
 
+// A duplicate is made by a user, so it does not inherit the source's email
+// origin.
+func TestDuplicateReceipt_DoesNotCopyTheEmailOrigin(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user, receipt, _, _ := seedDuplicateSource(t)
+	err := repositories.GetDB().Model(&models.Receipt{}).Where("id = ?", receipt.ID).
+		Updates(map[string]interface{}{"email_inbox": "receipts@example.com", "email_sender": "store@example.com"}).Error
+	if err != nil {
+		t.Fatalf("set the email origin: %v", err)
+	}
+
+	duplicate, err := NewReceiptService(nil).DuplicateReceipt(user.ID, utils.UintToString(receipt.ID))
+	if err != nil {
+		t.Fatalf("DuplicateReceipt: %v", err)
+	}
+
+	var stored models.Receipt
+	repositories.GetDB().First(&stored, duplicate.ID)
+	if duplicate.EmailInbox != "" || duplicate.EmailSender != "" || stored.EmailInbox != "" || stored.EmailSender != "" {
+		t.Errorf("duplicate carries inbox %q / %q, sender %q / %q; want none", duplicate.EmailInbox, stored.EmailInbox, duplicate.EmailSender, stored.EmailSender)
+	}
+}
+
 // A duplicate whose second image cannot be copied leaves nothing behind — no
 // receipt, no FileData, not even the first image it did copy — and its task says
 // it failed.

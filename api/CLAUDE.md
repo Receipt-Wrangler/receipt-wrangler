@@ -364,6 +364,17 @@ the venv and `PYTHONPATH` — so do not strip those from the Dockerfiles.
   `email.go` from both the cron poll and `POST /group/{id}/pollGroupEmail`. Its three seams —
   `connect`, `lookupTXT`, `enqueue` — are fields, and `newEmailPoller` is a package variable so tests
   drive `PollEmail` end to end with fakes.
+- **The email's origin is kept on the receipt.** `EmailMetadata.Inbox` is the login
+  (`SystemEmail.Username`) of the row that actually logged in — `planMessage` hands it to
+  `emailMetadataOf` — so the EMAIL_READ description shows the inbox beside `fromEmail`. The task stamps
+  the receipt with `applyEmailOrigin` (`email_process_handler.go`): `CreatedByString`
+  (`constants.EMAIL_INTEGRATION_CREATED_BY`), `EmailInbox` and `EmailSender` (the From address). The
+  receipt is their durable home, because deleting a System Email deletes its EMAIL_READ rows, and the
+  RECEIPT_UPLOADED copy carries them into System Tasks and the receipt history. They are server-set
+  only: `json:"-"` on `UpsertReceiptCommand` (`ToReceipt` copies them explicitly), skipped by
+  `UpdateReceipt`'s struct `Updates` (zero values), cleared by `DuplicateReceipt`, and cleared by member
+  masking along with the creator. Jobs queued before the upgrade carry a sender but no inbox; older
+  receipts carry neither.
 
 ### What happens to each message
 
@@ -810,6 +821,9 @@ will be dropped in a later release.
   **admin-by-default**: Legacy Admin picks these up automatically (its set is every app permission), while
   non-admins get them only via a custom role that grants them. Per-group generation additionally stays
   gated by the group-scoped `group.reports.read`. See "Category/tag delivery on AppData" below.
+  `app.receipt-history.read` (the receipt change history) is admin-by-default the same way: Legacy
+  Admin picks it up, Legacy User's fixed list does not carry it (`permissions/legacy_test.go` →
+  `TestLegacyAppUserExcludesReceiptHistoryRead`). See "Receipt history" below.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.
@@ -1270,6 +1284,10 @@ it for any per-request check; use the resolvers below when filtering a set.
   `BaseModel.CreatedBy`/`CreatedByString` on the receipt and every nested entity, and item/linked-item
   `ChargedToUserId`. Fields are nulled, **not** replaced with `(Restricted)` — presence must be hidden,
   not announced. `paid_by_user_id` is never masked (row visibility already guarantees a visible payer).
+  A receipt's **email origin** (`EmailInbox` / `EmailSender`) is cleared whenever its `CreatedBy` ends up
+  nil for a restricted viewer — the same rule that blanks `CreatedByString`. An email receipt's creator
+  is `0`, never a member, so an isolated plain member never sees its inbox or sender
+  (`TestMemberIsolation_Mask_EmailOriginClearedWithTheCreator`).
 - **Comments / activities (row drop)** — comments authored by a non-visible user are dropped;
   `GetActivitiesForGroups` drops rows whose `RanByUserId` is non-visible **in that activity's group**.
   Activity visibility is filtered **in the SQL query, before `COUNT`/`LIMIT`**, via
@@ -1292,6 +1310,10 @@ it for any per-request check; use the resolvers below when filtering a set.
   `PaidByListResolver` (per group), called once per group by `ReportService.loadRows`, so an isolated
   group contributes only visible-payer receipts and an open group contributes everyone; the only
   user-identity a report row exposes is `paid_by` (row-hidden, never masked).
+- **Receipt history** — every snapshot is judged **as if it lived in the receipt's current group**: an
+  entry made by a user the caller cannot see there is dropped (a quick scan keeps its entry but loses
+  the scanner), an entry with a snapshot paid by a hidden payer is dropped, and every snapshot goes
+  through `FilterReceiptCategoriesTags` and `MaskReceiptsForMemberVisibility`. See "Receipt history".
 
 **Write-side guards:**
 - **Receipt upsert** — `enforceReceiptMemberVisibilitySelection` rejects a `paidByUserId` or item
@@ -1426,6 +1448,12 @@ callers holding `app.categories.read` / `app.tags.read`, and empty otherwise. Be
 receive categories/tags **only** through the per-group `GroupCategories` / `GroupTags` maps — the
 desktop receipt form sources its pickers from there.
 
+**`app.receipt-history.read` (Receipts):** the gate on `GET /receipt/{id}/history` and its snapshots
+endpoint, ANDed with `group.receipts.read` in the receipt's group — there is no `OrAppPermissions`
+bypass, so even an app-wide reader must be able to read the receipt itself. Legacy Admin auto-includes
+it; Legacy User deliberately does not. Existing installs pick it up through `SeedSystemRoles`' add-only
+reconciliation on the next boot. See "Receipt history" below.
+
 **`app.api-keys.read-any` (Security):** listing *all* users' API keys (`GetPagedApiKeys` with
 `associatedApiKeys=ALL`) requires `app.api-keys.read-any`, checked in the handler body via the
 `PermissionService` — the legacy `token.UserRole == ADMIN` check in
@@ -1527,6 +1555,7 @@ including fail-closed on an unknown scope — the invalid set carries the substr
 `models/api_key_scope_test.go`'s own invalid table) rather than only values that never contained an
 `r` or a `w`, which is why the original four passed trivially — the last-used stamp surviving on a
 read, and a JWT caller being unaffected.
+The receipt history's two GETs are in the inventory as reads.
 `TestUnifiedAuthMiddleware_ApiKeyScopes` used to assert a `w` key succeeding on a **GET** — it
 documented the gap, and its name is a large part of why the gap survived review.
 `middleware/auth_source_test.go` covers the marker: both JWT shapes (header and cookie) and every
@@ -2813,18 +2842,45 @@ the widened path from the broken one. The behavioural cases in `repositories/sys
 
 ## Receipt update snapshots (`RECEIPT_UPDATED`)
 
-`ReceiptRepository.UpdateReceipt` records a `RECEIPT_UPDATED` system task whose description is
+Every change to a receipt records a `RECEIPT_UPDATED` system task whose description is
 `{"before": "<receipt JSON>", "after": "<receipt JSON>", "version": 2}`. Each side is
 `Receipt.ToString()`, so the value is **double-encoded**. The desktop parses it itself and renders a
-side-by-side diff (see `desktop/CLAUDE.md` → "Receipt update diff"), so keep the format stable: an old
-row must still parse.
+side-by-side diff (see `desktop/CLAUDE.md` → "Receipt update diff"), and the receipt history diffs it
+on the server (see "Receipt history"), so keep the format stable: an old row must still parse.
+
+**One writer: `repositories.ReceiptChangeRecorder`** (`receipt_change_recorder.go`).
+`NewReceiptChangeRecorder(ranByUserId, receiptIds...)`, then `CaptureBefore()` → the change →
+`RecordSuccess()` or `RecordFailure(err)`; `Record(change)` wraps the sequence. One row per receipt
+(duplicate ids collapse; an id with no receipt records nothing on success), each with `ReceiptId`,
+`GroupId` (the group before the change), `RanByUserId` and `AssociatedEntity` RECEIPT/id. A failure
+before `CaptureBefore` names the receipt only as its associated entity, as `UpdateReceipt` always did.
+
+| Call site | What is wrapped |
+|---|---|
+| `UpdateReceipt` (`repositories/receipts.go`) | the whole update; uses the steps directly, since it returns the reloaded receipt |
+| `AddComment` / `DeleteComment` (`handlers/comments.go`) | the DB write only; the delete is wrapped **after** the role-requirement refusal, so its 400 is not a failed change |
+| `UploadReceiptImage` / `RemoveReceiptImage` (`handlers/receipt_image.go`) | the `FileData` write; the removed file is deleted after recording |
+| `BulkReceiptStatusUpdate` (`handlers/receipts.go`) | the transaction; one row per receipt from two batched loads, and the bulk comment is in each "after". Capped at `commands.MaxBulkStatusUpdateIds` (500, the bulk-delete bound; swagger `maxItems`), refused with a 400 **before** the permission gate's own receipt lookup |
+
+**Failure semantics differ on purpose.** `UpdateReceipt` keeps its old contract: if recording fails
+after the commit, it records a FAILED row and returns the error. The newer sites go through `Record`,
+which **logs and still succeeds** once the change has committed — a 500 for a saved comment or image
+invites a retry that duplicates it — and writes nothing, since a FAILED row would contradict a change
+that happened. A change that itself fails, or cannot be captured beforehand, is a FAILED row (deleting
+another user's comment, refused inside the repository, is one). The one difference from the old inline
+code: if `UpdateReceipt`'s "before" load itself fails, the FAILED row no longer names the group.
+
+**`GetFullyLoadedReceiptsByIds`** is the batch form of `GetFullyLoadedReceiptById`; both build on the
+private `fullyLoadedReceiptQuery`, so their depth cannot drift
+(`TestGetFullyLoadedReceiptsByIdsMatchesSingleLoader`). Each recorded change costs two full receipt
+loads and stores two snapshots.
 
 **The format is versioned** by `repositories.ReceiptUpdateDescriptionVersion`. A row with **no
 `version` key is version 1**: its "before" is incomplete (below). **Version 2** rows have a complete
 "before". Bump the constant whenever the snapshot format changes; the repository test pins the
 literal `2`, and the desktop's `COMPLETE_RECEIPT_UPDATE_VERSION` must agree.
 
-**Both sides are loaded with `GetFullyLoadedReceiptById`.** `before` used to be serialized from
+**Both sides are fully loaded.** `before` used to be serialized from
 `currentReceipt`, which only preloads `clause.Associations`, one level deep. Loaded that way, the
 snapshot has no item categories, tags or linked items and no custom field definitions, and it lists
 linked items as top-level items (`FilterLinkedItemsFromReceiptItems` never ran). Every update would
@@ -2838,21 +2894,95 @@ loader.
 successful version 1 row it swaps the incomplete "before" for the **nearest earlier complete copy of
 the same receipt**: the previous `RECEIPT_UPDATED` row's "after", or the `RECEIPT_UPLOADED` copy
 stored when the receipt was created. The form, Quick Scan, email and duplicate all store one. It adds
-`"beforeSource": {type, systemTaskId, recordedAt}` and keeps `version: 1`.
+`"beforeSource": {type, systemTaskId, recordedAt}` and keeps `version: 1`. The rule itself is the pure
+`nearestEarlierReceiptCopy`, shared with the receipt history.
 - **One query per page** fetches the candidates, below the page's highest version 1 id.
-- A receipt is matched on `receipt_id`, or on `associated_entity_type = RECEIPT` plus its id.
-  Quick Scan and email uploads carry only the former; old rows may carry only the latter.
+- A receipt is matched on `receipt_id`, or on `associated_entity_type = RECEIPT` plus its id
+  (`repositories.WhereReceiptTasks`, shared with the history). Quick Scan and email uploads carry only
+  the former; old rows may carry only the latter. Both are indexed: `SystemTask.ReceiptId`, and
+  `idx_system_task_associated_entity` on (type, id).
 - A candidate is used only if it parses and its `id` is that receipt's.
 - A row with no usable candidate is left as stored.
-- Why it stays version 1: a change that writes no update row, such as a bulk status change, falls
-  inside a rebuilt comparison, and a version 2 row's own "before" would not have it.
+- Why it stays version 1 (historical): a change that wrote no update row — a bulk status change, a
+  comment, an image — fell inside a rebuilt comparison, and a version 2 row's own "before" would not
+  have it. Those changes now record their own rows, so this only matters for old activity.
 - Why on read: `resultDescription` is a free-form string, so there is no swagger change or client
   regeneration. Mobile never reads it. And the stored history is never rewritten.
 - Only the System Tasks listing does this; `getPagedActivities` doesn't display descriptions.
 
 Tests: `services/receipt_update_history_test.go` covers the matching rules, and
 `handlers/system_task_handler_test.go` → `TestGetSystemTasksRebuildsVersionOneReceiptUpdates`
-covers the listing.
+covers the listing. `repositories/receipt_change_recorder_test.go` covers the recorder, and the
+comment, image and bulk recordings are pinned in `handlers/comments_test.go`,
+`handlers/receipt_image_test.go` and `handlers/receipts_test.go`.
+
+## Receipt history
+
+`GET /receipt/{id}/history` (`getReceiptHistory`) returns a receipt's change history, newest first;
+`GET /receipt/{id}/history/{systemTaskId}/snapshots` (`getReceiptHistorySnapshots`) returns one
+entry's before/after JSON, loaded lazily so the list stays light. Handlers in
+`handlers/receipt_history.go`, service in `services/receipt_history.go`, the pure diff in
+`services/receipt_history_diff.go`, response types and codes in `structs/receipt_history.go`. **The
+server computes the diff and redacts it; clients only format**, so the redaction rules stay in one
+place and the deferred mobile screen reuses the same response.
+
+**Authorization.** Both handlers use `structs.Handler{ReceiptId, AppPermissions:
+[app.receipt-history.read], GroupPermissions: [group.receipts.read]}` with no `OrAppPermissions`, so
+`HandleRequest` gives the app permission AND group read, paid-by visibility on the receipt as it is
+now, and a 403 for a missing receipt. A hidden, failed, foreign or unknown entry on the snapshots
+endpoint is the same 403 with the standard message (`ErrReceiptAccessDenied`).
+
+**Selection.** RECEIPT_UPLOADED and RECEIPT_UPDATED rows, both statuses, matched by
+`WhereReceiptTasks`; the QUICK_SCAN / EMAIL_UPLOAD parents in one extra query.
+- **Id-reuse guard** (`tasksSinceCreation`): rows older than the newest successful RECEIPT_UPLOADED
+  whose snapshot `id` is this receipt are dropped. A deleted receipt keeps its system tasks and SQLite
+  hands its id out again, so without this a new receipt inherits an old one's history.
+- **Version 1 rows** apply `nearestEarlierReceiptCopy` to the rows already loaded: `beforeState` is
+  COMPLETE (version 2), REBUILT (with `beforeSourceType` / `beforeSourceRecordedAt`) or INCOMPLETE
+  (no earlier copy; its own shallow "before" is compared).
+- **Actor**, a ran-by or parent id of 0 counting as none: a ran-by user → USER; a QUICK_SCAN parent →
+  QUICK_SCAN with the scanner; an EMAIL_UPLOAD parent → EMAIL; a **creation** whose snapshot has
+  `emailInbox` or the email created-by string → EMAIL (a missing parent link); otherwise SYSTEM. The
+  snapshot fallback is creation-only, since an update's snapshot describes the receipt's origin, not
+  who updated it.
+- FAILED rows carry `errorMessage` (the stored text) and no snapshots.
+
+**Redaction**, evaluated as if every snapshot lived in the receipt's **current** group (the group whose
+read permission admitted the caller): an entry by a USER the caller cannot see there is dropped; a
+quick scan keeps its entry but drops the scanner's id; an entry with any snapshot paid by someone
+`paidByAllowedForGroup` hides is dropped; every snapshot goes through `FilterReceiptCategoriesTags` and
+`MaskReceiptsForMemberVisibility` (with its recorded `GroupId` restored afterwards for the diff and the
+JSON). The snapshots endpoint marshals these redacted models, never the stored description. A GROUP
+change names a group only if the caller is a member or holds `app.groups.read`, else `(Restricted)` —
+which does reveal that some other group existed.
+
+**Diff rules** (`diffReceiptSnapshots`), in a fixed field order: EMAIL_INBOX, EMAIL_SENDER (creation
+only), NAME, AMOUNT (`decimal` value), DATE (UTC calendar day), GROUP, PAID_BY, STATUS, RESOLVED_DATE,
+CATEGORIES, TAGS (by id, shown by name), CUSTOM_FIELD (by field id; absent equals empty, and an unset
+checkbox equals an unticked one; the snapshot's own definition and option text win over the stored
+one), ITEM / SHARE, ITEM_CATEGORIES, ITEM_TAGS, COMMENT (by id, replies included), IMAGE (by id).
+BaseModel fields are never compared. The creation diffs an empty receipt, so only the fields it set
+appear, all ADDED.
+- **Items are matched as a multiset on (trimmed name, charged-to user)**, because every save deletes
+  and recreates them with new ids: equal amounts pair first, then the rest in order (a changed amount),
+  leftovers are ADDED/REMOVED. Linked items are included once each. A pair reports its item
+  categories/tags. **Only a share's status is reported** — a receipt status cascades to every item.
+- **Action**, read after redaction: FAILED; CREATED; status-type changes only (STATUS, RESOLVED_DATE,
+  share statuses, COMMENT) with STATUS among them → RESOLVED or STATUS_CHANGED; only COMMENT/IMAGE →
+  IMAGES_COMMENTS_UPDATED; anything else, including no visible change, UPDATED.
+- **Counts:** `changeCount` = change rows of successful entries other than the creation; `saveCount` =
+  successful entries; `contributorCount` = distinct actors (each user, and each kind of automation,
+  once).
+
+**Contract.** Every code (action, actor type, field, kind, value type, before state) is a **plain
+string**, never an enum — a closed Dart enum fails the whole payload on a value it does not know.
+`entries` and `changes` are always `[]`, never null. `structs/receipt_history_contract_test.go` pins
+both, and that the Go JSON keys equal the swagger properties. No pagination yet: snapshot JSON is
+fetched per entry on demand, so a receipt with hundreds of entries is the case to revisit.
+
+Tests: `services/receipt_history_diff_test.go` (pure), `services/receipt_history_test.go` (order and
+counts, origins, before states, the id-reuse guard, isolation, category stripping, a hidden past
+payer, group names, current-group judging, redacted snapshots), `handlers/receipt_history_test.go`.
 
 ## Receipt statuses
 

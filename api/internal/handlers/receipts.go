@@ -745,6 +745,16 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Checked before the permission gate, whose own receipt lookup takes the ids.
+	if len(bulkCommand.ReceiptIds) > commands.MaxBulkStatusUpdateIds {
+		utils.WriteCustomErrorResponse(
+			w,
+			fmt.Sprintf("At most %d receipts can be updated at once", commands.MaxBulkStatusUpdateIds),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
 	receiptIdStrings := make([]string, len(bulkCommand.ReceiptIds))
 	for i := 0; i < len(bulkCommand.ReceiptIds); i++ {
 		receiptIdStrings[i] = utils.UintToString(bulkCommand.ReceiptIds[i])
@@ -770,7 +780,8 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 				return http.StatusBadRequest, errors.New("Invalid status")
 			}
 
-			err := db.Transaction(func(tx *gorm.DB) error {
+			token := structs.GetClaims(r)
+			updateStatuses := func(tx *gorm.DB) error {
 				receiptRepository.SetTransaction(tx)
 				tErr := tx.Table("receipts").Where("id IN ?", bulkCommand.ReceiptIds).Select("id", "status", "resolved_date").Find(&receipts).Error
 				if tErr != nil {
@@ -789,7 +800,6 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 				}
 
 				if len(bulkCommand.Comment) > 0 {
-					token := structs.GetClaims(r)
 					comments := make([]models.Comment, len(bulkCommand.ReceiptIds))
 
 					for i := 0; i < len(bulkCommand.ReceiptIds); i++ {
@@ -815,6 +825,12 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 
 				receiptRepository.ClearTransaction()
 				return nil
+			}
+
+			// One RECEIPT_UPDATED row per receipt, so the bulk change and its
+			// comment show in each receipt's history like any other save.
+			err := repositories.NewReceiptChangeRecorder(token.UserId, bulkCommand.ReceiptIds...).Record(func() error {
+				return db.Transaction(updateStatuses)
 			})
 			if err != nil {
 				return http.StatusInternalServerError, err

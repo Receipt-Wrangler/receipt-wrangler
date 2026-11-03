@@ -27,6 +27,8 @@ Name | Type | Description | Notes
 **tags** | [**BuiltList&lt;Tag&gt;**](Tag.md) | Tags associated to receipt | 
 **updatedAt** | **String** |  | [optional] 
 **createdByString** | **String** | Created by entity's name | [optional] [default to '']
+**emailInbox** | **String** | Set by the server on a receipt created from an email: the System Email login (IMAP username) of the inbox the email was read from. Ignored on write. | [optional] 
+**emailSender** | **String** | Set by the server on a receipt created from an email: the sender's From address. Ignored on write. | [optional] 
 **description** | **String** | Custom Field description | [optional] 
 **prompt** | [**Prompt**](Prompt.md) |  | 
 **groupSettings** | [**GroupSettings**](GroupSettings.md) |  | [optional] 

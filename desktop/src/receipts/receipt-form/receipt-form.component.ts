@@ -42,6 +42,10 @@ import { downloadFile } from "../../utils/file";
 import { missingReceiptRequirementsMessage, receiptRequirementsFor } from "../../utils/receipt-requirements";
 import { ItemListComponent } from "../item-list/item-list.component";
 import { ReceiptCommentsComponent } from "../receipt-comments/receipt-comments.component";
+import {
+  HistoryDrawerOccupied,
+  saveBarInsetBesideDrawer,
+} from "../receipt-history-drawer/receipt-history.utils";
 import { ShareListComponent } from "../share-list/share-list.component";
 
 
@@ -107,6 +111,23 @@ export class ReceiptFormComponent implements OnInit {
   // editing an existing custom field's value is a receipt edit and stays allowed.
   public canManageCustomFields = this.store.selectSignal(
     AuthState.hasAppPermission(Permission.AppCustomFieldsRead)
+  );
+
+  // The history drawer is offered for a saved receipt, in view and edit mode.
+  // The server also requires group.receipts.read, which reaching the page
+  // already implies.
+  public readonly canViewHistory = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppReceiptHistoryRead)
+  );
+
+  public readonly historyOpen = signal(false);
+
+  // The band the open drawer covers, as it last measured it.
+  public readonly historyOccupied = signal<HistoryDrawerOccupied | null>(null);
+
+  // Keeps the fixed save bar beside the drawer instead of under it.
+  public readonly saveBarInset = computed(() =>
+    this.historyOpen() ? saveBarInsetBesideDrawer(this.historyOccupied()) : null
   );
 
   public customFields: CustomField[] = [];
@@ -1101,6 +1122,19 @@ export class ReceiptFormComponent implements OnInit {
   public updateComments(commentsArray: FormArray): void {
     this.form.removeControl("comments");
     this.form.addControl("comments", commentsArray);
+  }
+
+  public toggleHistory(): void {
+    if (this.historyOpen()) {
+      this.closeHistory();
+    } else {
+      this.historyOpen.set(true);
+    }
+  }
+
+  public closeHistory(): void {
+    this.historyOpen.set(false);
+    this.historyOccupied.set(null);
   }
 
   public duplicateReceipt(): void {

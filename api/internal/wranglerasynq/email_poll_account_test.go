@@ -81,6 +81,30 @@ func TestPollEmail_UsesTheNextRowWhenOneCannotLogIn(t *testing.T) {
 	}
 }
 
+// The inbox the metadata names is the row that logged in. Here the two rows
+// differ only in the case of their login, and the first cannot log in.
+func TestPollEmail_InboxIsTheRowThatLoggedIn(t *testing.T) {
+	fixture := newPollFixture(t)
+	stale, mailbox := fixture.addSystemEmailWithPassword("Receipts@Example.org", "an old password")
+	current, _ := fixture.addSystemEmail("receipts@example.org")
+	fixture.addGroup(stale, groupOptions{})
+	fixture.addGroup(current, groupOptions{})
+	mailbox.deliver(rawEmail("bob@example.com", "Receipt", "", jpegNamed("receipt.jpg", pollJpeg)))
+
+	if err := PollEmail(true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(fixture.enqueued) != 2 {
+		t.Fatalf("enqueued %d payloads, want one per group", len(fixture.enqueued))
+	}
+	for _, payload := range fixture.enqueued {
+		if payload.Metadata.Inbox != current.Username {
+			t.Errorf("Inbox = %q, want %q, the row that logged in", payload.Metadata.Inbox, current.Username)
+		}
+	}
+}
+
 func TestPollEmail_AccountsAreIsolated(t *testing.T) {
 	// The second group accepts anyone. The Python client routed the first
 	// account's mail to it anyway.

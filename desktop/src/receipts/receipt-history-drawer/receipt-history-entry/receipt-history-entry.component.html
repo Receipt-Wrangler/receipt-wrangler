@@ -1,0 +1,115 @@
+@let current = entry();
+<div
+  class="rw-history-entry"
+  data-testid="receipt-history-entry"
+  [attr.data-action]="current.action"
+>
+  <div class="rw-history-entry__rail" aria-hidden="true">
+    <app-avatar
+      [user]="actor().user"
+      [icon]="actor().icon"
+      [color]="actor().color"
+      [size]="32"
+    ></app-avatar>
+    <div class="rw-history-entry__line"></div>
+  </div>
+
+  <div class="rw-history-entry__body">
+    <div class="rw-history-entry__heading">
+      <strong class="rw-history-entry__actor" data-testid="receipt-history-actor">{{ actor().name }}</strong>
+      <span class="rw-history-entry__verb" data-testid="receipt-history-verb">{{ verb() }}</span>
+      <time
+        class="rw-history-entry__time"
+        [attr.datetime]="current.recordedAt"
+        [attr.title]="current.recordedAt | appDate : 'medium'"
+      >{{ current.recordedAt | appDate : "shortTime" }}</time>
+    </div>
+
+    @if (current.hasSnapshots) {
+      <div class="rw-history-entry__meta">
+        <button
+          type="button"
+          class="rw-history-link rw-history-link--small"
+          data-testid="receipt-history-json-toggle"
+          [attr.aria-expanded]="jsonOpen()"
+          [attr.aria-controls]="jsonId()"
+          (click)="toggleJson()"
+        >{{ jsonOpen() ? "Hide JSON" : "View JSON" }}</button>
+      </div>
+    }
+
+    @if (failed()) {
+      <div class="rw-history-failed" data-testid="receipt-history-failed">
+        <mat-icon class="rw-history-failed__icon">error_outline</mat-icon>
+        <span>Save failed{{ current.errorMessage ? ": " + current.errorMessage : "." }}</span>
+      </div>
+    }
+
+    @if (notice(); as beforeNotice) {
+      <div
+        class="rw-history-notice"
+        data-testid="receipt-history-notice"
+        [attr.data-before-state]="beforeNotice.state"
+      >
+        <mat-icon class="rw-history-notice__icon">info</mat-icon>
+        <span>{{ beforeNotice.text }}</span>
+      </div>
+    }
+
+    @if (jsonOpen()) {
+      <div [id]="jsonId()">
+        @if (json(); as jsonText) {
+          <pre class="rw-history-json" data-testid="receipt-history-json" tabindex="0">{{ jsonText }}</pre>
+        } @else if (snapshots.status() === "error") {
+          <div class="rw-history-json-status" role="status">Couldn't load the JSON for this entry.</div>
+        } @else {
+          <div class="rw-history-json-status" role="status">Loading JSON…</div>
+        }
+      </div>
+    }
+
+    @if (rows().length > 0) {
+      <div class="rw-history-changes" [id]="changesId()">
+        @for (row of visibleRows(); track $index) {
+          <div
+            class="rw-history-change"
+            data-testid="receipt-history-change"
+            [attr.data-field]="row.field"
+            [attr.data-kind]="row.kind"
+          >
+            <span class="rw-history-change__label">{{ row.label }}</span>
+            <span class="rw-history-change__values">
+              @if (row.from) {
+                <del
+                  class="rw-history-chip rw-history-chip--from"
+                  data-testid="receipt-history-from"
+                  [attr.title]="row.from.title ?? null"
+                >{{ row.from.text }}</del>
+              }
+              @if (row.arrow) {
+                <mat-icon class="rw-history-change__arrow">arrow_forward</mat-icon>
+              }
+              @if (row.to) {
+                <ins
+                  class="rw-history-chip rw-history-chip--to"
+                  data-testid="receipt-history-to"
+                  [attr.title]="row.to.title ?? null"
+                >{{ row.to.text }}</ins>
+              }
+            </span>
+          </div>
+        }
+        @if (hiddenCount() > 0) {
+          <button
+            type="button"
+            class="rw-history-link rw-history-more"
+            data-testid="receipt-history-show-more"
+            [attr.aria-expanded]="expanded()"
+            [attr.aria-controls]="changesId()"
+            (click)="toggleExpanded()"
+          >{{ expanded() ? "Show less" : "Show " + hiddenCount() + " more" }}</button>
+        }
+      </div>
+    }
+  </div>
+</div>

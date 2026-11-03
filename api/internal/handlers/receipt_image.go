@@ -68,7 +68,13 @@ func UploadReceiptImage(w http.ResponseWriter, r *http.Request) {
 				ReceiptId: receiptId,
 			}
 
-			createdFile, err := fileImageRepository.CreateReceiptImage(fileData, fileBytes)
+			token := structs.GetClaims(r)
+			var createdFile models.FileData
+			err = repositories.NewReceiptChangeRecorder(token.UserId, receiptId).Record(func() error {
+				var createErr error
+				createdFile, createErr = fileImageRepository.CreateReceiptImage(fileData, fileBytes)
+				return createErr
+			})
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}
@@ -227,7 +233,11 @@ func RemoveReceiptImage(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 
-			err = db.Delete(fileData).Error
+			// The row is what the receipt's history records; the file goes once
+			// the row is gone.
+			err = repositories.NewReceiptChangeRecorder(token.UserId, fileData.ReceiptId).Record(func() error {
+				return db.Delete(fileData).Error
+			})
 			if err != nil {
 				return http.StatusInternalServerError, err
 			}

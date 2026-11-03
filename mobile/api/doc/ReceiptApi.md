@@ -16,6 +16,8 @@ Method | HTTP request | Description
 [**deleteReceiptById**](ReceiptApi.md#deletereceiptbyid) | **DELETE** /receipt/{receiptId} | Delete receipt
 [**duplicateReceipt**](ReceiptApi.md#duplicatereceipt) | **POST** /receipt/{receiptId}/duplicate | Duplicate receipt
 [**getReceiptById**](ReceiptApi.md#getreceiptbyid) | **GET** /receipt/{receiptId} | Get receipt
+[**getReceiptHistory**](ReceiptApi.md#getreceipthistory) | **GET** /receipt/{receiptId}/history | Get receipt change history
+[**getReceiptHistorySnapshots**](ReceiptApi.md#getreceipthistorysnapshots) | **GET** /receipt/{receiptId}/history/{systemTaskId}/snapshots | Get the receipt snapshots behind one history entry
 [**getReceiptSummaryForGroup**](ReceiptApi.md#getreceiptsummaryforgroup) | **POST** /receipt/group/{groupId}/summary | Gets the receipt summary for a group
 [**getReceiptsForGroup**](ReceiptApi.md#getreceiptsforgroup) | **POST** /receipt/group/{groupId} | Gets receipts
 [**hasAccessToReceipt**](ReceiptApi.md#hasaccesstoreceipt) | **GET** /receipt/hasAccess | Has access to receipt
@@ -340,6 +342,102 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**Receipt**](Receipt.md)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getReceiptHistory**
+> ReceiptHistory getReceiptHistory(receiptId)
+
+Get receipt change history
+
+Returns the receipt's change history, newest first: its creation, every recorded change and every failed save. Built from the receipt's system tasks and redacted to what the caller may see on the receipt today (category/tag grants, member isolation, paid-by visibility). Requires app.receipt-history.read and group.receipts.read on the receipt's group [SYSTEM USER]
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getReceiptApi();
+final int receiptId = 56; // int | Id of the receipt
+
+try {
+    final response = api.getReceiptHistory(receiptId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling ReceiptApi->getReceiptHistory: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **receiptId** | **int**| Id of the receipt | 
+
+### Return type
+
+[**ReceiptHistory**](ReceiptHistory.md)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getReceiptHistorySnapshots**
+> ReceiptHistorySnapshots getReceiptHistorySnapshots(receiptId, systemTaskId)
+
+Get the receipt snapshots behind one history entry
+
+Returns the receipt as it was before and after one history entry, redacted exactly as the history is. Loaded on demand so the history list stays light. Same permissions as getReceiptHistory; an entry the caller cannot see is a 403 [SYSTEM USER]
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getReceiptApi();
+final int receiptId = 56; // int | Id of the receipt
+final int systemTaskId = 56; // int | systemTaskId of the history entry
+
+try {
+    final response = api.getReceiptHistorySnapshots(receiptId, systemTaskId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling ReceiptApi->getReceiptHistorySnapshots: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **receiptId** | **int**| Id of the receipt | 
+ **systemTaskId** | **int**| systemTaskId of the history entry | 
+
+### Return type
+
+[**ReceiptHistorySnapshots**](ReceiptHistorySnapshots.md)
 
 ### Authorization
 

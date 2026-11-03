@@ -1,11 +1,22 @@
 <div
   [matTooltip]="user()?.displayName ?? group()?.name ?? ''"
-  [style.background-color]="user()?.defaultAvatarColor ?? '#27b1ff'"
+  [style.background-color]="color() ?? user()?.defaultAvatarColor ?? '#27b1ff'"
+  [style.width.px]="sizing()?.size"
+  [style.height.px]="sizing()?.size"
+  [style.font-size.px]="sizing()?.fontSize"
   class="avatar d-flex justify-content-center align-items-center"
 >
-  
+  @if (icon()) {
+    <mat-icon
+      class="avatar__icon"
+      [style.width.px]="iconSize()"
+      [style.height.px]="iconSize()"
+      [style.font-size.px]="iconSize()"
+    >{{ icon() }}</mat-icon>
+  } @else {
   {{
     user()?.displayName?.toUpperCase() ?? group()?.name?.toUpperCase()
       | slice : 0 : 1
   }}
+  }
 </div>

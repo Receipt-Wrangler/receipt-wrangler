@@ -235,6 +235,43 @@ func TestMemberIsolation_Mask_CreatedByUnchangedForVisible(t *testing.T) {
 	}
 }
 
+// An email receipt's creator (CreatedBy 0) is never a member, so an isolated
+// plain member sees it masked, and its inbox and sender go with it. A viewer the
+// group does not restrict sees them.
+func TestMemberIsolation_Mask_EmailOriginClearedWithTheCreator(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	resetIsolationCaches()
+
+	fx := seedIsolatedReceiptGroup(t)
+	service := NewPermissionService(nil)
+	emailReceipt := func() models.Receipt {
+		integration := uint(0)
+		return models.Receipt{
+			BaseModel:    models.BaseModel{CreatedBy: &integration, CreatedByString: "Email Integration"},
+			GroupId:      fx.groupId,
+			PaidByUserID: fx.memberAId,
+			EmailInbox:   "receipts@example.com",
+			EmailSender:  "store@example.com",
+		}
+	}
+
+	masked := emailReceipt()
+	if err := service.MaskReceiptForMemberVisibility(fx.memberAId, &masked); err != nil {
+		t.Fatalf("mask: %v", err)
+	}
+	if masked.CreatedBy != nil || masked.CreatedByString != "" || masked.EmailInbox != "" || masked.EmailSender != "" {
+		t.Errorf("plain member sees %+v, want the creator and the email origin cleared", masked)
+	}
+
+	kept := emailReceipt()
+	if err := service.MaskReceiptForMemberVisibility(fx.supervisorId, &kept); err != nil {
+		t.Fatalf("mask: %v", err)
+	}
+	if kept.EmailInbox != "receipts@example.com" || kept.EmailSender != "store@example.com" {
+		t.Errorf("supervisor sees inbox %q, sender %q, want both kept", kept.EmailInbox, kept.EmailSender)
+	}
+}
+
 func TestMemberIsolation_Mask_ItemChargedToNonVisibleMasked(t *testing.T) {
 	defer repositories.TruncateTestDb()
 	resetIsolationCaches()

@@ -1,6 +1,7 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { By } from "@angular/platform-browser";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
@@ -1552,6 +1553,123 @@ describe("ReceiptFormComponent", () => {
       expect(component.isImageMissing()).toBe(false);
       expect(component.isCommentMissing()).toBe(false);
       expect(component.isLastImageLocked()).toBe(false);
+    });
+  });
+
+  describe("receipt history toggle", () => {
+    const savedReceipt = {
+      id: 5,
+      name: "Lunch",
+      amount: "1.00",
+      groupId: 7,
+      paidByUserId: 1,
+      date: "2026-09-30T00:00:00Z",
+      customFields: [],
+    };
+
+    function load(mode: FormMode, appPermissions: string[]): void {
+      TestBed.inject(Store).dispatch(new SetPermissions(appPermissions, {}, {}));
+      routeDataSubject.next({
+        mode,
+        customFields: [],
+        receipt: mode === FormMode.add ? undefined : savedReceipt,
+      });
+      fixture.detectChanges();
+    }
+
+    function query(selector: string): HTMLElement | null {
+      return fixture.nativeElement.querySelector(selector);
+    }
+
+    const toggle = () => query("[data-testid='receipt-history-toggle']");
+    const drawer = () => query("app-receipt-history-drawer");
+
+    // ButtonModule is not imported here (CUSTOM_ELEMENTS_SCHEMA), so the toggle is
+    // a bare element and its `clicked` output a plain DOM event.
+    function clickToggle(): void {
+      toggle()!.dispatchEvent(new CustomEvent("clicked"));
+      fixture.detectChanges();
+    }
+
+    it("is offered in view mode to a holder of the permission", () => {
+      load(FormMode.view, [Permission.AppReceiptHistoryRead]);
+
+      expect(toggle()).not.toBeNull();
+      expect(toggle()!.getAttribute("icon")).toBe("history");
+    });
+
+    it("is not offered without the permission", () => {
+      load(FormMode.view, [Permission.AppCustomFieldsRead]);
+
+      expect(toggle()).toBeNull();
+    });
+
+    it("is offered in edit mode too", () => {
+      load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
+
+      expect(toggle()).not.toBeNull();
+    });
+
+    it("is not offered in add mode, where there is no history yet", () => {
+      load(FormMode.add, [Permission.AppReceiptHistoryRead]);
+
+      expect(toggle()).toBeNull();
+    });
+
+    it("opens the drawer for the receipt, and closes it", () => {
+      load(FormMode.view, [Permission.AppReceiptHistoryRead]);
+      expect(drawer()).toBeNull();
+
+      clickToggle();
+      expect(drawer()).not.toBeNull();
+      expect((drawer() as any).receiptId).toBe(5);
+      expect(toggle()!.classList).toContain("rw-history-toggle--active");
+
+      clickToggle();
+      expect(drawer()).toBeNull();
+      expect(toggle()!.classList).not.toContain("rw-history-toggle--active");
+    });
+
+    describe("the save bar beside the open drawer", () => {
+      // SharedUiModule declares the real bar, so the input is read off it.
+      const barInset = () =>
+        fixture.debugElement.query(By.css("app-form-button-bar")).componentInstance.inset();
+      const occupied = { contentLeft: 82, width: 480, viewportWidth: 1440 };
+
+      it("keeps the bar clear of the drawer and the sidebar while it is open", () => {
+        load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
+        expect(barInset()).toBeNull();
+
+        clickToggle();
+        component.historyOccupied.set(occupied);
+        fixture.detectChanges();
+
+        expect(barInset()).toEqual({ left: 82, right: 480 });
+      });
+
+      it("gives the bar its full width back on close", () => {
+        load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
+        clickToggle();
+        component.historyOccupied.set(occupied);
+        fixture.detectChanges();
+
+        clickToggle();
+
+        expect(barInset()).toBeNull();
+        expect(component.historyOccupied()).toBeNull();
+      });
+    });
+
+    it("closes when the drawer asks to", () => {
+      load(FormMode.view, [Permission.AppReceiptHistoryRead]);
+      component.toggleHistory();
+      fixture.detectChanges();
+
+      drawer()!.dispatchEvent(new CustomEvent("closed"));
+      fixture.detectChanges();
+
+      expect(component.historyOpen()).toBe(false);
+      expect(drawer()).toBeNull();
     });
   });
 

@@ -231,6 +231,7 @@
   <app-form-button-bar
     [mode]="queueIndex >= 0 ? FormMode.edit : mode"
     [justifyContentEnd]="false"
+    [inset]="saveBarInset()"
   >
     <div class="w-100 row">
       <div class="d-flex col">
@@ -335,6 +336,19 @@
       icon="file_copy"
       [disabled]="!canDuplicate()"
       (clicked)="duplicateReceipt()"
+    ></app-button>
+  }
+  @if (mode !== formMode.add && canViewHistory()) {
+    <app-button
+      class="ms-1"
+      data-testid="receipt-history-toggle"
+      color="accent"
+      matButtonType="iconButton"
+      tooltip="Receipt history"
+      ariaLabel="Receipt history"
+      icon="history"
+      [class.rw-history-toggle--active]="historyOpen()"
+      (clicked)="toggleHistory()"
     ></app-button>
   }
 </ng-template>
@@ -480,3 +494,11 @@
     ></app-carousel>
   </div>
 </ng-template>
+
+@if (historyOpen() && mode !== formMode.add && canViewHistory() && originalReceipt) {
+  <app-receipt-history-drawer
+    [receiptId]="originalReceipt.id"
+    (occupiedChange)="historyOccupied.set($event)"
+    (closed)="closeHistory()"
+  ></app-receipt-history-drawer>
+}

@@ -1,0 +1,100 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
+// Class names are prefixed rw-history- because Bootstrap is a global stylesheet
+// (see desktop/CLAUDE.md -> "The shared badge").
+
+:host {
+  // Pinned to the viewport's right edge, from the bottom of the sticky app header
+  // down. `top` and `max-width` are overwritten inline once the header has been
+  // measured (see ReceiptHistoryDrawerComponent.frame); these are the fallbacks,
+  // 89px being the header's height (56px buttons + 2 x 16px padding + its 1px
+  // border).
+  position: fixed;
+  top: 89px;
+  right: 0;
+  bottom: 0;
+  width: 480px;
+  max-width: 100vw;
+  // Above the page and its sticky bits, below the app header (sticky-top, 1020),
+  // whose shadow should fall on the drawer. This only orders things inside
+  // mat-drawer-content's stacking context (z-index 1), so the CDK overlay
+  // container (z-index 1000 at the root) - dialogs, menus, tooltips, snackbars -
+  // stays above the drawer.
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: variables.$shadow-xl;
+}
+
+.rw-history-drawer__header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.rw-history-drawer__heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rw-history-drawer__title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.025em;
+  color: map.get(variables.$accent-palette, 900);
+}
+
+.rw-history-drawer__summary {
+  color: map.get(variables.$accent-palette, 500);
+}
+
+.rw-history-drawer__close {
+  flex: 0 0 auto;
+  margin: -6px -10px 0 0;
+}
+
+// The only part that scrolls, so the header stays put.
+.rw-history-drawer__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 24px 32px;
+}
+
+.rw-history-day {
+  padding: 16px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: map.get(variables.$accent-palette, 500);
+}
+
+.rw-history-drawer__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 0;
+  font-size: 14px;
+  text-align: center;
+  color: map.get(variables.$accent-palette, 500);
+}
+
+@media (max-width: 480px) {
+  .rw-history-drawer__header,
+  .rw-history-drawer__body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

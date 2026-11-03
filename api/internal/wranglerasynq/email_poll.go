@@ -481,7 +481,7 @@ func (poller emailPoller) planMessage(
 		return plan, nil
 	}
 
-	plan.payloads = buildEmailProcessPayloads(emailMetadataOf(message, attachments, groups), attachments, groups)
+	plan.payloads = buildEmailProcessPayloads(emailMetadataOf(systemEmail, message, attachments, groups), attachments, groups)
 	plan.summary = fmt.Sprintf(
 		"Email captured: subject=%q from=%q attachments=%d bodyLen=%d bodyHtmlLen=%d groups=%v",
 		message.Subject, message.From.Email, len(attachments), len(message.Body), len(message.BodyHtml), groupSettingsIdsOf(groups),
@@ -620,13 +620,22 @@ func saveEmailAttachment(attachment emailclient.Attachment) (savedEmailAttachmen
 	}, nil
 }
 
-func emailMetadataOf(message emailclient.Message, attachments []savedEmailAttachment, groups []models.GroupSettings) structs.EmailMetadata {
+// emailMetadataOf builds the metadata every task for the message carries.
+// systemEmail is the row that logged in, so Inbox names the mailbox the email
+// was actually read from, even when the account has several rows.
+func emailMetadataOf(
+	systemEmail models.SystemEmail,
+	message emailclient.Message,
+	attachments []savedEmailAttachment,
+	groups []models.GroupSettings,
+) structs.EmailMetadata {
 	metadataAttachments := make([]structs.Attachment, len(attachments))
 	for i, saved := range attachments {
 		metadataAttachments[i] = saved.attachment
 	}
 
 	return structs.EmailMetadata{
+		Inbox:            systemEmail.Username,
 		Date:             message.Date,
 		Subject:          message.Subject,
 		To:               message.To,

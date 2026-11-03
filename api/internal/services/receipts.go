@@ -763,6 +763,9 @@ func (service ReceiptService) DuplicateReceipt(
 	newReceipt.CreatedAt = time.Now()
 	newReceipt.UpdatedAt = time.Now()
 	newReceipt.CreatedBy = &userId
+	// A duplicate is made by a user, not read from an email.
+	newReceipt.EmailInbox = ""
+	newReceipt.EmailSender = ""
 
 	// Remove fks from any related data
 	for _, fileData := range receipt.ImageFiles {

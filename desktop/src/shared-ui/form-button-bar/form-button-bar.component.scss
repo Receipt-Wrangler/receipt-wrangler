@@ -7,6 +7,8 @@
   right: 0;
   z-index: 1000;
   pointer-events: none;
+  // Eases the bar into the band an inset leaves (see FormButtonBarInset).
+  transition: left 0.2s ease-in-out, right 0.2s ease-in-out;
 }
 
 .form-bar-backdrop {

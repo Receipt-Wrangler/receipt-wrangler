@@ -1627,6 +1627,76 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  /receipt/{receiptId}/history:
+    get:
+      tags:
+        - Receipt
+      summary: Get receipt change history
+      description: >-
+        Returns the receipt's change history, newest first: its creation, every recorded change
+        and every failed save. Built from the receipt's system tasks and redacted to what the
+        caller may see on the receipt today (category/tag grants, member isolation, paid-by
+        visibility). Requires app.receipt-history.read and group.receipts.read on the
+        receipt's group [SYSTEM USER]
+      operationId: getReceiptHistory
+      parameters:
+        - in: path
+          name: receiptId
+          schema:
+            type: integer
+          required: true
+          description: Id of the receipt
+      responses:
+        200:
+          description: The receipt's change history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptHistory"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /receipt/{receiptId}/history/{systemTaskId}/snapshots:
+    get:
+      tags:
+        - Receipt
+      summary: Get the receipt snapshots behind one history entry
+      description: >-
+        Returns the receipt as it was before and after one history entry, redacted exactly as
+        the history is. Loaded on demand so the history list stays light. Same permissions as
+        getReceiptHistory; an entry the caller cannot see is a 403 [SYSTEM USER]
+      operationId: getReceiptHistorySnapshots
+      parameters:
+        - in: path
+          name: receiptId
+          schema:
+            type: integer
+          required: true
+          description: Id of the receipt
+        - in: path
+          name: systemTaskId
+          schema:
+            type: integer
+          required: true
+          description: systemTaskId of the history entry
+      responses:
+        200:
+          description: The entry's redacted snapshots
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptHistorySnapshots"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
   /receipt/bulkStatusUpdate:
     post:
       tags:
@@ -4211,6 +4281,7 @@ components:
         - "app.account.update"
         - "app.account.delete"
         - "app.receipts.search"
+        - "app.receipt-history.read"
         - "app.reports.create"
         - "app.reports.delete"
         - "app.reports.duplicate"
@@ -5163,7 +5234,156 @@ components:
         createdByString:
           type: string
           description: Created by string, which is anything that is not a user
+        emailInbox:
+          type: string
+          description: >-
+            Set by the server on a receipt created from an email: the System Email login
+            (IMAP username) of the inbox the email was read from. Ignored on write.
+        emailSender:
+          type: string
+          description: >-
+            Set by the server on a receipt created from an email: the sender's From address.
+            Ignored on write.
       description: Receipt
+    ReceiptHistory:
+      type: object
+      description: A receipt's change history, newest entry first
+      required:
+        - entries
+        - changeCount
+        - saveCount
+        - contributorCount
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceiptHistoryEntry"
+        changeCount:
+          type: integer
+          description: Change rows across the successful entries other than the creation
+        saveCount:
+          type: integer
+          description: Successful entries
+        contributorCount:
+          type: integer
+          description: Distinct actors across all entries
+    ReceiptHistoryEntry:
+      type: object
+      description: One recorded event in a receipt's history
+      required:
+        - systemTaskId
+        - action
+        - recordedAt
+        - actor
+        - hasSnapshots
+        - changes
+      properties:
+        systemTaskId:
+          type: integer
+          format: uint64
+          description: The system task the entry was built from
+        action:
+          type: string
+          description: >-
+            What the entry did. One of CREATED, UPDATED, STATUS_CHANGED, RESOLVED,
+            IMAGES_COMMENTS_UPDATED, FAILED. A plain string, not an enum, so a client must
+            tolerate values it does not know.
+        recordedAt:
+          type: string
+          description: When the entry was recorded (RFC 3339 instant)
+        actor:
+          $ref: "#/components/schemas/ReceiptHistoryActor"
+        hasSnapshots:
+          type: boolean
+          description: Whether getReceiptHistorySnapshots has receipt copies for this entry
+        errorMessage:
+          type: string
+          description: The error a FAILED entry recorded
+        beforeState:
+          type: string
+          description: >-
+            How far the compared "before" can be trusted, on update entries. One of COMPLETE,
+            REBUILT (an older row compared against an earlier complete copy) or INCOMPLETE (an
+            older row with no such copy). Plain string.
+        beforeSourceType:
+          type: string
+          description: On a REBUILT entry, the system task type the "before" copy came from
+        beforeSourceRecordedAt:
+          type: string
+          description: On a REBUILT entry, when the "before" copy was recorded (RFC 3339 instant)
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceiptHistoryChange"
+    ReceiptHistoryActor:
+      type: object
+      description: Who or what made a history entry
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: One of USER, QUICK_SCAN, EMAIL, SYSTEM. Plain string.
+        userId:
+          type: integer
+          format: uint64
+          description: The user, for USER; the scanning user (when visible), for QUICK_SCAN
+    ReceiptHistoryChange:
+      type: object
+      description: One field-level change within a history entry
+      required:
+        - field
+        - kind
+      properties:
+        field:
+          type: string
+          description: >-
+            Which field changed. One of NAME, AMOUNT, DATE, GROUP, PAID_BY, STATUS,
+            RESOLVED_DATE, CATEGORIES, TAGS, CUSTOM_FIELD, ITEM, SHARE, ITEM_CATEGORIES,
+            ITEM_TAGS, COMMENT, IMAGE, EMAIL_INBOX, EMAIL_SENDER. Plain string.
+        kind:
+          type: string
+          description: One of CHANGED, ADDED, REMOVED. Plain string.
+        label:
+          type: string
+          description: >-
+            What the change is about, where the field alone does not say: the item's name
+            (ITEM, ITEM_CATEGORIES, ITEM_TAGS) or the custom field's name (CUSTOM_FIELD)
+        userId:
+          type: integer
+          format: uint64
+          description: The share's charged-to user (SHARE) or the comment's author (COMMENT)
+        from:
+          $ref: "#/components/schemas/ReceiptHistoryValue"
+        to:
+          $ref: "#/components/schemas/ReceiptHistoryValue"
+    ReceiptHistoryValue:
+      type: object
+      description: A typed value for the client to format
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: >-
+            How to format the value. One of TEXT, CURRENCY (decimal string), DATE (calendar
+            day, yyyy-MM-dd), INSTANT (RFC 3339), USER (see userId), STATUS (a receipt status
+            key), BOOLEAN ("true" / "false"). Plain string.
+        value:
+          type: string
+        userId:
+          type: integer
+          format: uint64
+    ReceiptHistorySnapshots:
+      type: object
+      description: >-
+        The receipt before and after one history entry, as JSON text, redacted to what the
+        caller may see. A creation entry has no "before".
+      properties:
+        before:
+          type: string
+        after:
+          type: string
     Tag:
       required:
         - name
@@ -5468,9 +5688,10 @@ components:
           description: Status to update to
         receiptIds:
           type: array
+          maxItems: 500
           items:
             type: integer
-          description: Receipt ids to update
+          description: Receipt ids to update. At most 500 ids
     BulkReceiptDeleteCommand:
       required:
         - receiptIds

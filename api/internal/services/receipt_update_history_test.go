@@ -30,6 +30,9 @@ type historyTaskOptions struct {
 	// Leaves receipt_id empty and names the receipt only as the associated
 	// entity, as rows from before that column did.
 	associatedEntityOnly bool
+	ranByUserId          *uint
+	// The task this one ran under: a QUICK_SCAN or EMAIL_UPLOAD for an upload.
+	associatedSystemTaskId *uint
 }
 
 func createHistoryTask(t *testing.T, options historyTaskOptions) models.SystemTask {
@@ -40,13 +43,15 @@ func createHistoryTask(t *testing.T, options historyTaskOptions) models.SystemTa
 	}
 	endedAt := time.Now()
 	task := models.SystemTask{
-		Type:                 options.taskType,
-		Status:               status,
-		AssociatedEntityType: models.RECEIPT,
-		AssociatedEntityId:   options.receiptId,
-		StartedAt:            time.Now(),
-		EndedAt:              &endedAt,
-		ResultDescription:    options.description,
+		Type:                   options.taskType,
+		Status:                 status,
+		AssociatedEntityType:   models.RECEIPT,
+		AssociatedEntityId:     options.receiptId,
+		StartedAt:              time.Now(),
+		EndedAt:                &endedAt,
+		ResultDescription:      options.description,
+		RanByUserId:            options.ranByUserId,
+		AssociatedSystemTaskId: options.associatedSystemTaskId,
 	}
 	if !options.associatedEntityOnly {
 		receiptId := options.receiptId

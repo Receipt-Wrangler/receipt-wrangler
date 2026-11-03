@@ -1,6 +1,9 @@
 @if (mode() && (mode() === formMode.edit || mode() == formMode.add)) {
   <div
     class="modern-form-bar"
+    data-testid="form-button-bar"
+    [style.left.px]="inset()?.left ?? null"
+    [style.right.px]="inset()?.right ?? null"
   >
     <div class="form-bar-backdrop"></div>
     <div class="form-bar-container">

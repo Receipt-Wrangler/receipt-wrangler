@@ -32,6 +32,16 @@ type EmailProcessTaskPayload struct {
 	RenderBodyPdf   bool
 }
 
+// applyEmailOrigin stamps a receipt about to be created from an email with
+// where it came from: the email integration as its creator, plus the inbox it
+// was read from and its sender. The receipt is their durable home; deleting a
+// System Email deletes its EMAIL_READ rows, which carry the same metadata.
+func applyEmailOrigin(command *commands.UpsertReceiptCommand, metadata structs.EmailMetadata) {
+	command.CreatedByString = constants.EMAIL_INTEGRATION_CREATED_BY
+	command.EmailInbox = metadata.Inbox
+	command.EmailSender = metadata.FromEmail
+}
+
 func HandleEmailProcessTask(context context.Context, task *asynq.Task) error {
 	taskId, err := GetTaskIdFromContext(context)
 	if err != nil {
@@ -209,7 +219,7 @@ func processEmailTask(taskId string, payload EmailProcessTaskPayload) error {
 		command.PaidByUserID = *groupSettingsToUse.EmailDefaultReceiptPaidById
 	}
 
-	command.CreatedByString = "Email Integration"
+	applyEmailOrigin(&command, payload.Metadata)
 
 	// Attach the group's default custom fields (as empty values) when the group opted into applying
 	// them to server-created receipts. Same helper as quick scan so the two ingest paths cannot drift.

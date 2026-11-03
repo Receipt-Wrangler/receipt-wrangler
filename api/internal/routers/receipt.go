@@ -11,6 +11,8 @@ func BuildReceiptRouter() *chi.Mux {
 	receiptRouter.Use(middleware.UnifiedAuthMiddleware)
 	receiptRouter.Get("/hasAccess", handlers.HasAccess)
 	receiptRouter.Get("/{id}", handlers.GetReceipt)
+	receiptRouter.Get("/{id}/history", handlers.GetReceiptHistory)
+	receiptRouter.Get("/{id}/history/{systemTaskId}/snapshots", handlers.GetReceiptHistorySnapshots)
 	receiptRouter.Put("/{id}", handlers.UpdateReceipt)
 	receiptRouter.Post("/group/{groupId}", handlers.GetPagedReceiptsForGroup)
 	receiptRouter.Post("/group/{groupId}/summary", handlers.GetReceiptSummaryForGroup)
