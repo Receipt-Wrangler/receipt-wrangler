@@ -1558,6 +1558,94 @@ describe("ReceiptFormComponent", () => {
   // A receipt's date and DATE custom fields are calendar days: stored as
   // midnight UTC, shown in the datepicker as that day's local midnight, and sent
   // back as midnight UTC of whatever day is picked.
+  describe("receipt history toggle", () => {
+    const savedReceipt = {
+      id: 5,
+      name: "Lunch",
+      amount: "1.00",
+      groupId: 7,
+      paidByUserId: 1,
+      date: "2026-09-30T00:00:00Z",
+      customFields: [],
+    };
+
+    function load(mode: FormMode, appPermissions: string[]): void {
+      TestBed.inject(Store).dispatch(new SetPermissions(appPermissions, {}, {}));
+      routeDataSubject.next({
+        mode,
+        customFields: [],
+        receipt: mode === FormMode.add ? undefined : savedReceipt,
+      });
+      fixture.detectChanges();
+    }
+
+    function query(selector: string): HTMLElement | null {
+      return fixture.nativeElement.querySelector(selector);
+    }
+
+    const toggle = () => query("[data-testid='receipt-history-toggle']");
+    const drawer = () => query("app-receipt-history-drawer");
+
+    // ButtonModule is not imported here (CUSTOM_ELEMENTS_SCHEMA), so the toggle is
+    // a bare element and its `clicked` output a plain DOM event.
+    function clickToggle(): void {
+      toggle()!.dispatchEvent(new CustomEvent("clicked"));
+      fixture.detectChanges();
+    }
+
+    it("is offered in view mode to a holder of the permission", () => {
+      load(FormMode.view, [Permission.AppReceiptHistoryRead]);
+
+      expect(toggle()).not.toBeNull();
+      expect(toggle()!.getAttribute("icon")).toBe("history");
+    });
+
+    it("is not offered without the permission", () => {
+      load(FormMode.view, [Permission.AppCustomFieldsRead]);
+
+      expect(toggle()).toBeNull();
+    });
+
+    // The drawer would cover the fixed save bar.
+    it("is not offered in edit mode", () => {
+      load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
+
+      expect(toggle()).toBeNull();
+    });
+
+    it("is not offered in add mode, where there is no history yet", () => {
+      load(FormMode.add, [Permission.AppReceiptHistoryRead]);
+
+      expect(toggle()).toBeNull();
+    });
+
+    it("opens the drawer for the receipt, and closes it", () => {
+      load(FormMode.view, [Permission.AppReceiptHistoryRead]);
+      expect(drawer()).toBeNull();
+
+      clickToggle();
+      expect(drawer()).not.toBeNull();
+      expect((drawer() as any).receiptId).toBe(5);
+      expect(toggle()!.classList).toContain("rw-history-toggle--active");
+
+      clickToggle();
+      expect(drawer()).toBeNull();
+      expect(toggle()!.classList).not.toContain("rw-history-toggle--active");
+    });
+
+    it("closes when the drawer asks to", () => {
+      load(FormMode.view, [Permission.AppReceiptHistoryRead]);
+      component.toggleHistory();
+      fixture.detectChanges();
+
+      drawer()!.dispatchEvent(new CustomEvent("closed"));
+      fixture.detectChanges();
+
+      expect(component.historyOpen()).toBe(false);
+      expect(drawer()).toBeNull();
+    });
+  });
+
   describe("calendar dates on load and submit", () => {
     let receiptService: ReceiptService;
 

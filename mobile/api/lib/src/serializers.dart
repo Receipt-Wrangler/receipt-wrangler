@@ -93,6 +93,12 @@ import 'package:openapi/src/model/prompt.dart';
 import 'package:openapi/src/model/queue_name.dart';
 import 'package:openapi/src/model/quick_scan_default_paid_by_type.dart';
 import 'package:openapi/src/model/receipt.dart';
+import 'package:openapi/src/model/receipt_history.dart';
+import 'package:openapi/src/model/receipt_history_actor.dart';
+import 'package:openapi/src/model/receipt_history_change.dart';
+import 'package:openapi/src/model/receipt_history_entry.dart';
+import 'package:openapi/src/model/receipt_history_snapshots.dart';
+import 'package:openapi/src/model/receipt_history_value.dart';
 import 'package:openapi/src/model/receipt_paged_request_command.dart';
 import 'package:openapi/src/model/receipt_paged_request_filter.dart';
 import 'package:openapi/src/model/receipt_processing_settings.dart';
@@ -242,6 +248,12 @@ part 'serializers.g.dart';
   QueueName,
   QuickScanDefaultPaidByType,
   Receipt,
+  ReceiptHistory,
+  ReceiptHistoryActor,
+  ReceiptHistoryChange,
+  ReceiptHistoryEntry,
+  ReceiptHistorySnapshots,
+  ReceiptHistoryValue,
   ReceiptPagedRequestCommand,
   ReceiptPagedRequestFilter,
   ReceiptProcessingSettings,

@@ -64,6 +64,8 @@ func className(class requestClass) string {
 var everyRoute = []routeCase{
 	// Reads over GET -- the ordinary case.
 	{http.MethodGet, "/api/receipt/1", classRead},
+	{http.MethodGet, "/api/receipt/1/history", classRead},
+	{http.MethodGet, "/api/receipt/1/history/2/snapshots", classRead},
 	{http.MethodGet, "/api/group/1", classRead},
 	{http.MethodGet, "/api/category/", classRead},
 	{http.MethodGet, "/api/search/", classRead},

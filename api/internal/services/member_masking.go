@@ -85,6 +85,13 @@ func (masker *receiptMemberMasker) apply(receipt *models.Receipt) error {
 	masker.visible = visible
 
 	masker.maskBaseModel(&receipt.BaseModel)
+	// The email origin rides with the creator: an email receipt's creator is not
+	// a member (CreatedBy 0), so a restricted viewer never sees it, and the
+	// inbox and sender would otherwise name what the masked creator hides.
+	if receipt.CreatedBy == nil {
+		receipt.EmailInbox = ""
+		receipt.EmailSender = ""
+	}
 
 	for i := range receipt.ReceiptItems {
 		item := &receipt.ReceiptItems[i]

@@ -337,6 +337,19 @@
       (clicked)="duplicateReceipt()"
     ></app-button>
   }
+  @if ((mode | inputReadonly) && canViewHistory()) {
+    <app-button
+      class="ms-1"
+      data-testid="receipt-history-toggle"
+      color="accent"
+      matButtonType="iconButton"
+      tooltip="Receipt history"
+      ariaLabel="Receipt history"
+      icon="history"
+      [class.rw-history-toggle--active]="historyOpen()"
+      (clicked)="toggleHistory()"
+    ></app-button>
+  }
 </ng-template>
 
 <ng-template #itemsSectionHeaderButtons>
@@ -480,3 +493,10 @@
     ></app-carousel>
   </div>
 </ng-template>
+
+@if (historyOpen() && (mode | inputReadonly) && canViewHistory() && originalReceipt) {
+  <app-receipt-history-drawer
+    [receiptId]="originalReceipt.id"
+    (closed)="closeHistory()"
+  ></app-receipt-history-drawer>
+}

@@ -96,6 +96,14 @@ export interface PagedDataDataInner {
      */
     createdByString?: string;
     /**
+     * Set by the server on a receipt created from an email: the System Email login (IMAP username) of the inbox the email was read from. Ignored on write.
+     */
+    emailInbox?: string;
+    /**
+     * Set by the server on a receipt created from an email: the sender\'s From address. Ignored on write.
+     */
+    emailSender?: string;
+    /**
      * Custom Field description
      */
     description?: string;

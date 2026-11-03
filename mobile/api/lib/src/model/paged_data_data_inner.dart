@@ -59,6 +59,8 @@ part 'paged_data_data_inner.g.dart';
 /// * [tags] - Tags associated to receipt
 /// * [updatedAt] 
 /// * [createdByString] - Created by entity's name
+/// * [emailInbox] - Set by the server on a receipt created from an email: the System Email login (IMAP username) of the inbox the email was read from. Ignored on write.
+/// * [emailSender] - Set by the server on a receipt created from an email: the sender's From address. Ignored on write.
 /// * [description] - Custom Field description
 /// * [prompt] 
 /// * [groupSettings] 

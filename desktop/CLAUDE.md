@@ -723,6 +723,11 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     member and 403'd on the backend; now they only render for holders, matching the receipts-table.
   - **Notification delete** (`notification/notification.component.html`): the per-notification delete
     control gates on `app.notifications.delete` via `*hasAppPermission`.
+  - **Receipt history** (`receipts/receipt-form/receipt-form.component.html`): the view header's
+    history toggle gates on the **app** permission `app.receipt-history.read` (a `canViewHistory`
+    selectSignal) **and** view mode. The server also requires `group.receipts.read` in the receipt's
+    group, which reaching the view page already implies, so no group check is repeated. Legacy Admin
+    holds it; Legacy User does not. See **Receipt history drawer** below.
   - **Group row actions** (`group/group-table/group-table.component.html`): edit gates on
     `group.update` OR `app.groups.update-settings`; **delete** gates on `group.delete` OR
     **`app.groups.delete`** (`orApp`), so an admin who switched the filter to **All Groups** can clean
@@ -2221,6 +2226,12 @@ description cell summarizes it ("Changed: name, amount", or "No changes") and it
 `app-receipt-update-diff-dialog` (`src/shared-ui/receipt-update-diff-dialog/`): the two receipts as
 pretty-printed JSON, before on the left and after on the right, like a split-view diff.
 
+**More things write these rows now.** Adding or deleting a comment, uploading or removing an image,
+and a bulk status update each record a version 2 `RECEIPT_UPDATED` row too (one per receipt for a
+bulk update), so they appear here and in the dashboard activity list as "Updated Receipt". Nothing
+on the desktop needed changing for it: they are ordinary before/after rows, summarized and diffed like
+any edit. The receipt history drawer (below) is built from the same rows.
+
 - **The description is double-encoded, which is why it has its own parser.** The API stores
   `{"before":"<receipt JSON>","after":"<receipt JSON>"}`, each side a JSON *string*.
   `PrettyJsonPipe`'s cleanup rewrites every `"` inside a string value to `'`, so the rebuilt text is
@@ -2272,6 +2283,71 @@ It also asserts the stored row carries `version: 2` and that the dialog shows no
 API cannot write a version 1 row, so that path is covered by the Go service tests and the Jest specs. It narrows the
 paged response to its own task with `page.route` + `route.fetch()`, so the row is still the real
 server's output while other specs' tasks stay out of the way.
+
+## Receipt history drawer
+
+A **history** icon button in the receipt view header (`receipt-history-toggle`, after Duplicate)
+opens `app-receipt-history-drawer` (`src/receipts/receipt-history-drawer/`, standalone, imported
+by `ReceiptsModule`): a right-hand timeline of the receipt's saves, newest first, grouped by day.
+**The server computes the diff and the redaction** (see `api/CLAUDE.md` → "Receipt history"); the
+desktop only formats what `GET /receipt/{id}/history` returns.
+
+- **Gating: `app.receipt-history.read` and view mode only.** In edit mode the drawer would cover the
+  fixed save bar, and add mode has no history yet. The drawer's own `@if` repeats the same three
+  conditions as the toggle, so it can never outlive them.
+- **Every code is a plain string, and every helper tolerates one it doesn't know.** Action, actor
+  type, field, kind, value type and before-state are not enums on the contract (a closed enum would
+  break released mobile builds on the first new value). `receipt-history.utils.ts` holds the pure
+  mapping with a fallback each: an unknown action reads "updated this receipt", an unknown actor
+  "System", an unknown field is title-cased, an unknown value type shows its raw value, an unknown
+  before-state shows no notice.
+- **Value formatting reuses the app's own formatting**, applied in the entry's `rows` computed:
+  `CustomCurrencyPipe` for CURRENCY, `formatAppDate(…, 'mediumDate', 'calendar')` for DATE (a calendar
+  day never shifts), `formatAppDate(…, 'medium')` for INSTANT (app zone), `UserState` for USER with an
+  "Unknown user" fallback, `formatStatus` for STATUS, Yes/No for BOOLEAN. A comment chip reads
+  `Author: “text”`, clipped at 60 characters with the full text as its `title`. Old values render in
+  a `<del>`, new ones in an `<ins>`, so the meaning survives without the colours.
+- **Day groups and times are in the app zone** (`groupHistoryByDay`, keyed `yyyy-MM-dd`). The label is
+  "Tuesday, Oct 13", with the year added only outside the current one.
+- **Loading: `rxResource`, once per open.** The parent renders the drawer only while it is open, so
+  each open is a fresh instance and a fresh request. Read the value through `hasValue()` — a
+  resource's `value()` throws in the error state. Loading, error (with **Try again** →
+  `reload()`), and empty states each have a test id.
+- **"View JSON" is lazy, and fetched once per entry.** The list carries no snapshots; the entry's own
+  `rxResource` has `undefined` params until the first open, then fixed params, so hiding and showing
+  again never refetches (a failed load does retry on the next open). It prints the created receipt
+  for a creation entry and `{ before, after }` otherwise, each side parsed from its JSON string.
+- **Stacking.** The drawer is `position: fixed`, `right: 0`, `bottom: 0`, 480px wide, `z-index: 1001`.
+  Its **top** is the bottom of `app-header` and its **max-width** is `calc(100vw - <header left>)`,
+  both measured once in `afterNextRender` (the header is sticky at the top of the scrolling
+  `mat-drawer-content`, so its bottom does not move as the page scrolls; the left edge keeps the
+  drawer out from under an open sidebar on a narrow screen). The stylesheet's fallbacks are 89px and
+  `100vw`. It lives inside `mat-drawer-content`'s stacking context (`z-index: 1`), so the CDK overlay
+  container — dialogs, menus, tooltips, snackbars — paints above it, and the header (`sticky-top`,
+  1020) keeps its shadow over it. Don't give any ancestor of the drawer a `transform`, `filter` or
+  `backdrop-filter`: that makes the ancestor the containing block for `position: fixed`, and the
+  drawer would pin to it instead of the viewport.
+- **Accessibility.** The host is `role="complementary"` with `aria-labelledby` on its title. Focus
+  moves to the close button on open and back to the toggle on close, but only when focus was in the
+  drawer (or lost with it), so a user who moved on keeps their place. **Esc** closes it unless the
+  press was already handled (`defaultPrevented`, which Material's menu/dialog/autocomplete set) or a
+  `MatDialog` is open. "Show N more" and "View JSON" carry `aria-expanded` / `aria-controls`.
+- **`app-avatar` gained `size` (default 50), `icon` and `color` inputs** for the timeline's 32px
+  avatars and the Quick Scan / Email / System icons. At the default size it binds no inline sizing,
+  so every existing avatar renders as before; `AvatarModule` now imports `MatIconModule`.
+- **Classes are `rw-history-*`** — Bootstrap's global `.alert` / `.badge` would otherwise leak in.
+- **Test ids:** `receipt-history-toggle`, `-drawer`, `-close`, `-summary`, `-day`, `-loading`,
+  `-error`, `-retry`, `-empty`, `-entry` (with `data-action`), `-actor`, `-verb`, `-failed`,
+  `-notice` (with `data-before-state`), `-json-toggle`, `-json`, `-change` (with `data-field` /
+  `data-kind`), `-from`, `-to`, `-show-more`.
+
+**E2E:** `e2e/receipt-history.spec.ts` (serial, admin storageState, own group). One receipt is
+created, edited, commented on and bulk-resolved through the API — the comment and the bulk resolve
+being the two changes that recorded nothing before — and the drawer must show all four entries with
+their verbs, the old and new name chips, the comment row, the summary line (checked against the API's
+own counts), the JSON behind an entry, and Esc closing with focus back on the toggle. The negative half
+adds e2e-user as a Legacy Viewer: the view page loads with no toggle, and both history endpoints 403.
+Helpers: `apiReceiptHistory` (raw response), `apiBulkStatusUpdate`, `apiGetRoleId`.
 
 ## Group email settings — Require Signed Sender
 

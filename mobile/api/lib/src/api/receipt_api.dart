@@ -17,6 +17,8 @@ import 'package:openapi/src/model/internal_error_response.dart';
 import 'package:openapi/src/model/paged_data.dart';
 import 'package:openapi/src/model/permission.dart';
 import 'package:openapi/src/model/receipt.dart';
+import 'package:openapi/src/model/receipt_history.dart';
+import 'package:openapi/src/model/receipt_history_snapshots.dart';
 import 'package:openapi/src/model/receipt_paged_request_command.dart';
 import 'package:openapi/src/model/receipt_status.dart';
 import 'package:openapi/src/model/receipt_summary.dart';
@@ -651,6 +653,180 @@ class ReceiptApi {
     }
 
     return Response<Receipt>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Get receipt change history
+  /// Returns the receipt&#39;s change history, newest first: its creation, every recorded change and every failed save. Built from the receipt&#39;s system tasks and redacted to what the caller may see on the receipt today (category/tag grants, member isolation, paid-by visibility). Requires app.receipt-history.read and group.receipts.read on the receipt&#39;s group [SYSTEM USER]
+  ///
+  /// Parameters:
+  /// * [receiptId] - Id of the receipt
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ReceiptHistory] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ReceiptHistory>> getReceiptHistory({ 
+    required int receiptId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/receipt/{receiptId}/history'.replaceAll('{' r'receiptId' '}', encodeQueryParameter(_serializers, receiptId, const FullType(int)).toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ReceiptHistory? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null ? null : _serializers.deserialize(
+        rawResponse,
+        specifiedType: const FullType(ReceiptHistory),
+      ) as ReceiptHistory;
+
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ReceiptHistory>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Get the receipt snapshots behind one history entry
+  /// Returns the receipt as it was before and after one history entry, redacted exactly as the history is. Loaded on demand so the history list stays light. Same permissions as getReceiptHistory; an entry the caller cannot see is a 403 [SYSTEM USER]
+  ///
+  /// Parameters:
+  /// * [receiptId] - Id of the receipt
+  /// * [systemTaskId] - systemTaskId of the history entry
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ReceiptHistorySnapshots] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ReceiptHistorySnapshots>> getReceiptHistorySnapshots({ 
+    required int receiptId,
+    required int systemTaskId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/receipt/{receiptId}/history/{systemTaskId}/snapshots'.replaceAll('{' r'receiptId' '}', encodeQueryParameter(_serializers, receiptId, const FullType(int)).toString()).replaceAll('{' r'systemTaskId' '}', encodeQueryParameter(_serializers, systemTaskId, const FullType(int)).toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ReceiptHistorySnapshots? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null ? null : _serializers.deserialize(
+        rawResponse,
+        specifiedType: const FullType(ReceiptHistorySnapshots),
+      ) as ReceiptHistorySnapshots;
+
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ReceiptHistorySnapshots>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

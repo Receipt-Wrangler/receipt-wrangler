@@ -6,17 +6,21 @@ import (
 	"time"
 )
 
+// SystemTask is one recorded task. The associated entity (type + id, as one
+// index) and ReceiptId are indexed for the lookup of a receipt's tasks
+// (repositories.WhereReceiptTasks), which the receipt history and the version
+// 1 snapshot rebuild both run.
 type SystemTask struct {
 	BaseModel
 	Type                   SystemTaskType       `json:"type"`
 	Status                 SystemTaskStatus     `json:"status"`
-	AssociatedEntityType   AssociatedEntityType `json:"associatedEntityType"`
-	AssociatedEntityId     uint                 `json:"associatedEntityId"`
+	AssociatedEntityType   AssociatedEntityType `gorm:"index:idx_system_task_associated_entity,priority:1" json:"associatedEntityType"`
+	AssociatedEntityId     uint                 `gorm:"index:idx_system_task_associated_entity,priority:2" json:"associatedEntityId"`
 	StartedAt              time.Time            `json:"startedAt"`
 	EndedAt                *time.Time           `json:"endedAt"`
 	ResultDescription      string               `json:"resultDescription"`
 	RanByUserId            *uint                `json:"ranByUserId"`
-	ReceiptId              *uint                `json:"receiptId"`
+	ReceiptId              *uint                `gorm:"index" json:"receiptId"`
 	GroupId                *uint                `json:"groupId"`
 	AssociatedSystemTask   *SystemTask          `json:"associatedSystemTask"`
 	AssociatedSystemTaskId *uint                `json:"associatedSystemTaskId"`

@@ -358,6 +358,16 @@ func (repository SystemTaskRepository) GetSystemTaskById(id uint) (models.System
 	return systemTask, nil
 }
 
+// WhereReceiptTasks is the condition matching the system tasks recorded for
+// the given receipts. Rows that predate the receipt_id column carry the receipt
+// only as their associated entity; Quick Scan and email uploads carry it only
+// in receipt_id (their associated entity is the processing settings). Pass it
+// to Where, which parenthesizes it. Both columns are indexed for it.
+func WhereReceiptTasks(db *gorm.DB, receiptIds []uint) *gorm.DB {
+	return db.Where("receipt_id IN ?", receiptIds).
+		Or("associated_entity_type = ? AND associated_entity_id IN ?", models.RECEIPT, receiptIds)
+}
+
 func (repository SystemTaskRepository) AssociateSystemTaskToReceipt(receiptId uint, systemTaskId uint) error {
 	db := repository.GetDB()
 	return db.Model(&models.SystemTask{}).Where("id = ?", systemTaskId).Update("receipt_id", receiptId).Error

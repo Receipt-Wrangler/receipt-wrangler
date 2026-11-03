@@ -1,5 +1,6 @@
 import {
   type APIRequestContext,
+  type APIResponse,
   expect,
   type Page,
   request as pwRequest,
@@ -433,6 +434,39 @@ export async function apiCreateComment(
   }
   const comment = (await res.json()) as { id: number };
   return comment.id;
+}
+
+/**
+ * Sets every receipt in [receiptIds] to [status] through the bulk endpoint the
+ * receipts table's bulk action uses, optionally leaving [comment] on each.
+ */
+export async function apiBulkStatusUpdate(
+  api: APIRequestContext,
+  opts: { receiptIds: number[]; status: string; comment?: string },
+): Promise<void> {
+  const res = await api.post('/api/receipt/bulkStatusUpdate', {
+    data: {
+      receiptIds: opts.receiptIds,
+      status: opts.status,
+      ...(opts.comment ? { comment: opts.comment } : {}),
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `bulk status update failed: HTTP ${res.status()} ${await res.text()}`,
+    );
+  }
+}
+
+/**
+ * Reads a receipt's change history. Returns the raw response so a spec can
+ * assert a denial (403) as well as read the body.
+ */
+export async function apiReceiptHistory(
+  api: APIRequestContext,
+  receiptId: number,
+): Promise<APIResponse> {
+  return api.get(`/api/receipt/${receiptId}/history`);
 }
 
 /**
@@ -1004,15 +1038,36 @@ export async function apiDeleteRoleByName(
   name: string,
   scope: 'APP' | 'GROUP',
 ): Promise<void> {
+  const role = await apiFindRole(api, name, scope);
+  if (role) {
+    await api.delete(`/api/role/${role.id}?scope=${scope}`);
+  }
+}
+
+/** Returns the id of the [scope] role named [name], e.g. a seeded 'Legacy Viewer'. */
+export async function apiGetRoleId(
+  api: APIRequestContext,
+  name: string,
+  scope: 'APP' | 'GROUP',
+): Promise<number> {
+  const role = await apiFindRole(api, name, scope);
+  if (!role) {
+    throw new Error(`${scope} role ${name} not found`);
+  }
+  return role.id;
+}
+
+async function apiFindRole(
+  api: APIRequestContext,
+  name: string,
+  scope: 'APP' | 'GROUP',
+): Promise<{ id: number } | undefined> {
   const roles = (await (await api.get('/api/role')).json()) as {
     id: number;
     name: string;
     scope: string;
   }[];
-  const role = roles.find((r) => r.name === name && r.scope === scope);
-  if (role) {
-    await api.delete(`/api/role/${role.id}?scope=${scope}`);
-  }
+  return roles.find((r) => r.name === name && r.scope === scope);
 }
 
 /**

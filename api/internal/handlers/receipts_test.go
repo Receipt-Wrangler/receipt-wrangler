@@ -430,3 +430,48 @@ func TestReceiptPagedRequestCommandShouldParseFullReceipts(t *testing.T) {
 		return
 	}
 }
+
+func bulkStatusUpdateRequest(userId uint, body string) (*httptest.ResponseRecorder, *http.Request) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/receipt/bulkStatusUpdate", strings.NewReader(body))
+	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
+	return w, r
+}
+
+// A bulk status update records one change per receipt, each carrying the bulk
+// comment in its after, so it reads in each receipt's history like any save.
+func TestBulkReceiptStatusUpdateRecordsAChangePerReceipt(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, groupId := seedGroupWithRole(t, "bulk-recorded", []string{permissions.GroupReceiptsUpdate})
+	first := seedReceipt(t, groupId, userId, 0)
+	second := seedReceipt(t, groupId, userId, 0)
+
+	w, r := bulkStatusUpdateRequest(userId, `{"comment":"Settled up","status":"RESOLVED","receiptIds":[`+
+		utils.UintToString(first)+`,`+utils.UintToString(second)+`]}`)
+	BulkReceiptStatusUpdate(w, r)
+	assertStatus(t, w, http.StatusOK)
+
+	for _, receiptId := range []uint{first, second} {
+		before, after := assertOneRecordedChange(t, receiptId, userId)
+		if before.Status != models.OPEN || after.Status != models.RESOLVED || after.ResolvedDate == nil ||
+			len(before.Comments) != 0 || len(after.Comments) != 1 || after.Comments[0].Comment != "Settled up" {
+			t.Errorf("receipt %d recorded %s -> %s with %d -> %d comments, want OPEN -> RESOLVED and the bulk comment",
+				receiptId, before.Status, after.Status, len(before.Comments), len(after.Comments))
+		}
+	}
+}
+
+// An invalid status is refused before anything changes, so nothing is recorded.
+func TestBulkReceiptStatusUpdateWithAnInvalidStatusRecordsNothing(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, groupId := seedGroupWithRole(t, "bulk-invalid", []string{permissions.GroupReceiptsUpdate})
+	receiptId := seedReceipt(t, groupId, userId, 0)
+
+	w, r := bulkStatusUpdateRequest(userId, `{"status":"NOT_A_STATUS","receiptIds":[`+utils.UintToString(receiptId)+`]}`)
+	BulkReceiptStatusUpdate(w, r)
+	assertStatus(t, w, http.StatusBadRequest)
+
+	if tasks := recordedReceiptChanges(t, receiptId); len(tasks) != 0 {
+		t.Errorf("recorded %+v, want nothing", tasks)
+	}
+}

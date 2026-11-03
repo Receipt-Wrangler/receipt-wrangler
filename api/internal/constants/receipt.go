@@ -8,6 +8,11 @@ const DEFAULT_RECEIPT_ORDER_BY = "created_at"
 // is also the desktop receipts table's column key, so the two must agree.
 const FIRST_COMMENT_ORDER_BY = "first_comment"
 
+// EMAIL_INTEGRATION_CREATED_BY is the created-by string of a receipt made from
+// an email, since no user created it. The receipt history reads it to tell an
+// email upload from a system one when the upload's parent task is missing.
+const EMAIL_INTEGRATION_CREATED_BY = "Email Integration"
+
 // CUSTOM_FIELD_ASSOCIATIONS loads a receipt's custom field values together with
 // the definition (and options) each value is read against.
 //

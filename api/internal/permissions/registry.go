@@ -93,6 +93,8 @@ const (
 
 	AppReceiptsSearch = "app.receipts.search"
 
+	AppReceiptHistoryRead = "app.receipt-history.read"
+
 	AppReportsRead      = "app.reports.read"
 	AppReportsCreate    = "app.reports.create"
 	AppReportsUpdate    = "app.reports.update"
@@ -228,6 +230,7 @@ var registry = []Descriptor{
 	{AppAccountDelete, "Delete Own Account", "Delete your own account.", "Account", ScopeApp},
 
 	{AppReceiptsSearch, "Search Receipts", "Search across receipts you can access.", "Receipts", ScopeApp},
+	{AppReceiptHistoryRead, "Read Receipt History", "View a receipt's change history. Also requires Read Receipts in the receipt's group.", "Receipts", ScopeApp},
 
 	{AppReportsRead, "Access Reports", "Access the report builder and saved report templates.", "Reports", ScopeApp},
 	{AppReportsCreate, "Save Report Templates", "Save a report configuration as a reusable template.", "Reports", ScopeApp},

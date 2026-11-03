@@ -46,6 +46,7 @@ import { CustomFieldPipe } from "./pipes/custom-field.pipe";
 import { QuickActionsDialogComponent } from "./quick-actions-dialog/quick-actions-dialog.component";
 import { QuickScanDialogComponent } from "./quick-scan-dialog/quick-scan-dialog.component";
 import { ReceiptCommentsComponent } from "./receipt-comments/receipt-comments.component";
+import { ReceiptHistoryDrawerComponent } from "./receipt-history-drawer/receipt-history-drawer.component";
 import { ReceiptFormComponent } from "./receipt-form/receipt-form.component";
 import { ReceiptsRoutingModule } from "./receipts-routing.module";
 import { ReceiptsTableComponent } from "./receipts-table/receipts-table.component";
@@ -109,6 +110,7 @@ import { UserTotalWithPercentagePipe } from "./user-total-with-percentage.pipe";
     FilteredStatefulMenuComponent,
     CheckboxModule,
     MonthStepperComponent,
+    ReceiptHistoryDrawerComponent,
     ReceiptTotalsComponent,
   ],
   exports: [

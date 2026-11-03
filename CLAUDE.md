@@ -676,6 +676,48 @@ carries the regenerated client (it has no receipt delete or multi-select).
 
 See `api/CLAUDE.md` → "Bulk receipt delete" and `desktop/CLAUDE.md` → "Delete Selected Receipts".
 
+### Receipt Change History
+
+A **History** button on the receipt view page opens a drawer listing every recorded change to the
+receipt, newest first. Each entry shows who made it (a user, Quick Scan, Email Upload or System),
+when, and field-level "from → to" chips. It also covers failed saves, and older rows whose "before"
+had to be rebuilt. **Backend + desktop.** Mobile only carries the regenerated client for now; the
+design handoff's mobile screen is a pending follow-up.
+
+- **Gated on `app.receipt-history.read`, an APP permission, AND `group.receipts.read`** on the
+  receipt's group, through `HandleRequest` with `ReceiptId`. That route also enforces paid-by
+  visibility on the receipt.
+  - App scope is what makes it **admin by default**. Legacy Admin is every app key, and Legacy User
+    is a fixed list that leaves it out.
+  - A group key would have landed in Legacy Owner, i.e. every group creator.
+- **The server builds the history and computes the diff; the client only formats.**
+  `GET /receipt/{id}/history` returns typed change rows: a field code, a kind, and `from`/`to`
+  values typed TEXT / CURRENCY / DATE / INSTANT / USER / STATUS / BOOLEAN. "View JSON" loads one
+  entry's receipt copies lazily, from `GET /receipt/{id}/history/{systemTaskId}/snapshots`.
+  - Diffing on the server keeps it as one implementation rather than a TS copy plus a Dart copy.
+  - The server is also where the redaction rules live.
+- **Redacted to the viewer, judged by the receipt's current group:**
+  - Snapshots go through the same category/tag grant filter and member masking as `GET /receipt`.
+  - Entries by a member the viewer cannot see are dropped.
+  - So are past states whose payer the viewer may not see.
+  - "View JSON" serves the redacted copies, never the stored description.
+- **Every enum-like field on the history contract is a plain string** (action, actor type, field,
+  kind, value type, beforeState). These are the closed-Dart-enum outages again. A client must
+  tolerate a code it does not know.
+- **More changes are recorded now.** Comment add/delete, image upload/delete and bulk status update
+  each write a version 2 `RECEIPT_UPDATED` row with full before/after snapshots, through one shared
+  recorder that `UpdateReceipt` also uses. Before this, they wrote nothing.
+  - These rows also show as "Updated Receipt" in group activity feeds and on System Tasks, where the
+    existing diff dialog handles them unchanged.
+  - If recording fails after the change has committed, the new call sites log it and still succeed.
+    `UpdateReceipt` keeps returning the error.
+- **Email-created receipts record where they came from.** See "Email Ingestion" below. The creation
+  entry lists the inbox and sender first.
+- **E2e:** `desktop/e2e/receipt-history.spec.ts`. The email capture has no IMAP server to drive in
+  e2e, so it is covered by Go tests.
+
+See `api/CLAUDE.md` → "Receipt history" and `desktop/CLAUDE.md` → "Receipt history drawer".
+
 ### Email Ingestion (IMAP)
 
 Groups receive receipts by email through an IMAP System Email polled by the API. **Backend +
@@ -701,6 +743,15 @@ desktop**; mobile only carries the regenerated client (it has no group email set
   checkbox on the group's email settings.
 - **Subject regexes are Go RE2**, validated on save; a stored Python-only regex is ignored at poll
   time rather than failing it.
+- **An email receipt records its inbox and sender.**
+  - The poll stamps `EmailMetadata.inbox`, the login of the System Email that read it, next to the
+    existing `fromEmail`. That puts it in the EMAIL_READ task's description.
+  - The email task copies both onto the receipt as `Receipt.emailInbox` / `emailSender`. Both are
+    optional, server-set strings that a request cannot write. Because they are on the receipt, they
+    reach the RECEIPT_UPLOADED snapshot that System Tasks shows, and the history's creation entry.
+  - The receipt is their durable home: deleting a System Email deletes its EMAIL_READ rows.
+  - Member masking clears them wherever it blanks `createdByString`.
+  - Receipts created before this change have neither field.
 
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access

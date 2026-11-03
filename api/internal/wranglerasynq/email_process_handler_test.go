@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/hibiken/asynq"
+	"receipt-wrangler/api/internal/commands"
+	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/structs"
@@ -132,5 +134,22 @@ func TestProcessEmailTask_ConversionFailureKeepsTheImageAndIsRecorded(t *testing
 	}
 	if !RerunSourceFilesPresent(models.EMAIL_UPLOAD, payloadBytes) {
 		t.Error("a rerun is refused, but the original it needs is still there")
+	}
+}
+
+func TestApplyEmailOrigin(t *testing.T) {
+	command := commands.UpsertReceiptCommand{Name: "Lunch"}
+	applyEmailOrigin(&command, structs.EmailMetadata{Inbox: "receipts@example.org", FromEmail: "bob@example.com", FromName: "Bob"})
+
+	if command.CreatedByString != constants.EMAIL_INTEGRATION_CREATED_BY ||
+		command.EmailInbox != "receipts@example.org" || command.EmailSender != "bob@example.com" {
+		t.Errorf("command = %+v, want the email integration with its inbox and sender", command)
+	}
+
+	// A job queued before the inbox was recorded still names its sender.
+	older := commands.UpsertReceiptCommand{}
+	applyEmailOrigin(&older, structs.EmailMetadata{FromEmail: "bob@example.com"})
+	if older.EmailInbox != "" || older.EmailSender != "bob@example.com" {
+		t.Errorf("command = %+v, want the sender alone", older)
 	}
 }

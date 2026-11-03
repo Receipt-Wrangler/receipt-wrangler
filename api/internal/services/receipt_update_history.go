@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"receipt-wrangler/api/internal/models"
+	"receipt-wrangler/api/internal/repositories"
 	"sort"
 	"time"
 )
@@ -56,7 +57,7 @@ func (service SystemTaskService) UpcastReceiptUpdateDescriptions(tasks []models.
 			continue
 		}
 		description, ok := parseReceiptUpdateDescription(task.ResultDescription)
-		if !ok || description.Version != 0 {
+		if !ok || !description.hasIncompleteBefore() {
 			continue
 		}
 		receiptId := systemTaskReceiptId(task)
@@ -81,38 +82,70 @@ func (service SystemTaskService) UpcastReceiptUpdateDescriptions(tasks []models.
 
 	for _, row := range rows {
 		task := &tasks[row.index]
-		for _, candidate := range candidatesByReceipt[row.receiptId] {
-			if candidate.ID >= task.ID {
-				continue
-			}
-			snapshot, ok := receiptSnapshotFromTask(candidate, row.receiptId)
-			if !ok {
-				continue
-			}
-
-			recordedAt := candidate.StartedAt
-			if candidate.EndedAt != nil {
-				recordedAt = *candidate.EndedAt
-			}
-			rebuilt, err := json.Marshal(receiptUpdateDescription{
-				Before:  snapshot,
-				After:   row.description.After,
-				Version: 1,
-				BeforeSource: &receiptUpdateBeforeSource{
-					Type:         candidate.Type,
-					SystemTaskId: candidate.ID,
-					RecordedAt:   recordedAt,
-				},
-			})
-			if err != nil {
-				return err
-			}
-			task.ResultDescription = string(rebuilt)
-			break
+		earlier, ok := nearestEarlierReceiptCopy(candidatesByReceipt[row.receiptId], row.receiptId, task.ID)
+		if !ok {
+			continue
 		}
+
+		rebuilt, err := json.Marshal(receiptUpdateDescription{
+			Before:       earlier.snapshot,
+			After:        row.description.After,
+			Version:      1,
+			BeforeSource: &earlier.source,
+		})
+		if err != nil {
+			return err
+		}
+		task.ResultDescription = string(rebuilt)
 	}
 
 	return nil
+}
+
+// earlierReceiptCopy is a complete copy of a receipt recorded before some task,
+// and where it came from.
+type earlierReceiptCopy struct {
+	snapshot string
+	source   receiptUpdateBeforeSource
+}
+
+// nearestEarlierReceiptCopy is the rule a version 1 row's "before" is rebuilt by,
+// shared by the System Tasks listing and the receipt history: the nearest earlier
+// complete copy of the same receipt — the previous successful RECEIPT_UPDATED's
+// "after", or the RECEIPT_UPLOADED copy stored when the receipt was created.
+//
+// candidates must be newest first. Only those below taskId are considered, and a
+// copy is used only if it parses as that same receipt.
+func nearestEarlierReceiptCopy(candidates []models.SystemTask, receiptId uint, taskId uint) (earlierReceiptCopy, bool) {
+	for _, candidate := range candidates {
+		if candidate.ID >= taskId || candidate.Status != models.SYSTEM_TASK_SUCCEEDED {
+			continue
+		}
+		snapshot, ok := receiptSnapshotFromTask(candidate, receiptId)
+		if !ok {
+			continue
+		}
+
+		return earlierReceiptCopy{
+			snapshot: snapshot,
+			source: receiptUpdateBeforeSource{
+				Type:         candidate.Type,
+				SystemTaskId: candidate.ID,
+				RecordedAt:   systemTaskRecordedAt(candidate),
+			},
+		}, true
+	}
+
+	return earlierReceiptCopy{}, false
+}
+
+// systemTaskRecordedAt is when a task's outcome was recorded: when it ended, or
+// when it started if it never recorded an end.
+func systemTaskRecordedAt(task models.SystemTask) time.Time {
+	if task.EndedAt != nil {
+		return *task.EndedAt
+	}
+	return task.StartedAt
 }
 
 // getReceiptSnapshotCandidates loads every successful task that may hold a
@@ -125,19 +158,13 @@ func (service SystemTaskService) getReceiptSnapshotCandidates(
 	db := service.GetDB()
 	var candidates []models.SystemTask
 
-	// Rows that predate the receipt_id column carry the receipt only as their
-	// associated entity; Quick Scan and email uploads carry it only in
-	// receipt_id (their associated entity is the processing settings).
-	receiptMatch := db.Where("receipt_id IN ?", receiptIds).
-		Or("associated_entity_type = ? AND associated_entity_id IN ?", models.RECEIPT, receiptIds)
-
 	err := db.Model(&models.SystemTask{}).
 		Select("id", "type", "status", "receipt_id", "associated_entity_type", "associated_entity_id",
 			"result_description", "started_at", "ended_at").
 		Where("type IN ?", []models.SystemTaskType{models.RECEIPT_UPDATED, models.RECEIPT_UPLOADED}).
 		Where("status = ?", models.SYSTEM_TASK_SUCCEEDED).
 		Where("id < ?", maxId).
-		Where(receiptMatch).
+		Where(repositories.WhereReceiptTasks(db, receiptIds)).
 		Find(&candidates).Error
 	if err != nil {
 		return nil, err
@@ -178,6 +205,12 @@ func receiptSnapshotFromTask(task models.SystemTask, receiptId uint) (string, bo
 	}
 
 	return snapshot, true
+}
+
+// hasIncompleteBefore reports whether a stored description is version 1 (it
+// has no "version" key), whose "before" was loaded one level deep.
+func (description receiptUpdateDescription) hasIncompleteBefore() bool {
+	return description.Version == 0
 }
 
 func parseReceiptUpdateDescription(value string) (receiptUpdateDescription, bool) {

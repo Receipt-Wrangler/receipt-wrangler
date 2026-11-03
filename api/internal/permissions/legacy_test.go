@@ -82,6 +82,23 @@ func TestLegacyAppUserExcludesReadAnyApiKeys(t *testing.T) {
 	}
 }
 
+func TestLegacyAppAdminIncludesReceiptHistoryRead(t *testing.T) {
+	// Legacy Admin is every app permission, so app.receipt-history.read flows into
+	// it automatically, and an upgrading install's admin picks it up on the next
+	// boot through the seeder's add-only reconciliation.
+	if !slices.Contains(LegacyAppAdminKeys(), AppReceiptHistoryRead) {
+		utilPrint(t, "Legacy Admin missing "+AppReceiptHistoryRead, "present")
+	}
+}
+
+func TestLegacyAppUserExcludesReceiptHistoryRead(t *testing.T) {
+	// Legacy User is a fixed subset. Receipt history is admin-by-default: a
+	// plain user gets it only through a custom role that grants it.
+	if slices.Contains(LegacyAppUserKeys(), AppReceiptHistoryRead) {
+		utilPrint(t, "Legacy User contains "+AppReceiptHistoryRead, "absent")
+	}
+}
+
 func TestLegacyAppAdminIncludesCustomFieldsUpdate(t *testing.T) {
 	// Legacy Admin is every app permission, so app.custom-fields.update flows into
 	// it automatically — an upgrading install's admin can edit custom fields on the

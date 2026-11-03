@@ -9,6 +9,9 @@ type Attachment struct {
 }
 
 type EmailMetadata struct {
+	// Inbox is the IMAP login (the System Email's username) of the mailbox the
+	// email was read from. Jobs queued before it existed carry it empty.
+	Inbox            string       `json:"inbox"`
 	Date             time.Time    `json:"date"`
 	Subject          string       `json:"subject"`
 	To               string       `json:"to"`

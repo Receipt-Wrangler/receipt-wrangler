@@ -79,3 +79,12 @@ app-form-section.rw-images-pane {
   color: map.get(variables.$warn-palette, 600);
   font-size: 0.875rem;
 }
+
+// The header's history toggle while the drawer is open: the design's pressed
+// state, the same pale-blue fill the header's active nav button uses. Scoped by
+// the host class (app-button renders its own <button>); it outranks
+// app-button's hover rule, so the state holds under the pointer too.
+app-button.rw-history-toggle--active ::ng-deep .mat-mdc-icon-button {
+  background-color: map.get(variables.$primary-palette, 100);
+  color: map.get(variables.$primary-palette, 600);
+}

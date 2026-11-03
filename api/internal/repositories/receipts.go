@@ -1,7 +1,6 @@
 package repositories
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -121,61 +120,40 @@ func NormalizeReceiptCalendarDates(receipt *models.Receipt) {
 func (repository ReceiptRepository) UpdateReceipt(id string, command commands.UpsertReceiptCommand, userId uint) (models.Receipt, error) {
 	db := repository.GetDB()
 
-	systemTaskResultDescription := map[string]interface{}{}
-	var endedAt time.Time
-	stringId, err := utils.StringToUint(id)
+	receiptId, err := utils.StringToUint(id)
 	if err != nil {
 		return models.Receipt{}, err
 	}
 	var currentReceipt models.Receipt
-	var ranByUserId = userId
-
-	systemTask := commands.UpsertSystemTaskCommand{
-		Type:                 models.RECEIPT_UPDATED,
-		AssociatedEntityType: models.RECEIPT,
-		AssociatedEntityId:   stringId,
-		StartedAt:            time.Now(),
-		EndedAt:              &endedAt,
-		Status:               models.SYSTEM_TASK_SUCCEEDED,
-		RanByUserId:          &ranByUserId,
-	}
+	recorder := NewReceiptChangeRecorder(userId, receiptId)
 
 	updatedReceipt, err := command.ToReceipt()
 	if err != nil {
-		createFailedUpdateSystemTask(systemTask, err)
+		recorder.RecordFailure(err)
 		return models.Receipt{}, err
 	}
 	NormalizeReceiptCalendarDates(&updatedReceipt)
 
 	err = db.Table("receipts").Where("id = ?", id).Preload(clause.Associations).Find(&currentReceipt).Error
 	if err != nil {
-		createFailedUpdateSystemTask(systemTask, err)
+		recorder.RecordFailure(err)
 		return models.Receipt{}, err
 	}
-
-	systemTask.GroupId = &currentReceipt.GroupId
-	systemTask.ReceiptId = &currentReceipt.ID
 
 	// NOTE: ID and field used for afterReceiptUpdated
 	updatedReceipt.ID = currentReceipt.ID
 	updatedReceipt.ResolvedDate = currentReceipt.ResolvedDate
 
-	// The "before" snapshot uses the same loader as "after" below, so the two
+	// The "before" snapshot is loaded fully, like "after" below, so the two
 	// sides of the system task diff are loaded to the same depth. currentReceipt
 	// only preloads one level (no item categories/tags/linked items, no custom
 	// field definitions, linked items not yet filtered out), which would make
 	// every update look like it changed those.
-	beforeReceipt, err := repository.GetFullyLoadedReceiptById(id)
+	err = recorder.CaptureBefore()
 	if err != nil {
-		createFailedUpdateSystemTask(systemTask, err)
+		recorder.RecordFailure(err)
 		return models.Receipt{}, err
 	}
-	before, err := beforeReceipt.ToString()
-	if err != nil {
-		createFailedUpdateSystemTask(systemTask, err)
-		return models.Receipt{}, err
-	}
-	systemTaskResultDescription["before"] = before
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 		repository.SetTransaction(tx)
@@ -249,42 +227,19 @@ func (repository ReceiptRepository) UpdateReceipt(id string, command commands.Up
 		return nil
 	})
 	if err != nil {
-		createFailedUpdateSystemTask(systemTask, err)
+		recorder.RecordFailure(err)
 		return models.Receipt{}, err
 	}
 
-	fullyLoadedReceipt, err := repository.GetFullyLoadedReceiptById(id)
+	// Unlike the other recorded changes, an update that cannot be recorded
+	// fails: the caller gets the error and a FAILED row says why.
+	afterReceipts, err := recorder.RecordSuccess()
 	if err != nil {
-		createFailedUpdateSystemTask(systemTask, err)
+		recorder.RecordFailure(err)
 		return models.Receipt{}, err
 	}
 
-	after, err := fullyLoadedReceipt.ToString()
-	if err != nil {
-		createFailedUpdateSystemTask(systemTask, err)
-		return models.Receipt{}, err
-	}
-
-	systemTaskResultDescription["after"] = after
-	systemTaskResultDescription["version"] = ReceiptUpdateDescriptionVersion
-	endedAt = time.Now()
-	systemTask.EndedAt = &endedAt
-
-	resultDescriptionBytes, err := json.Marshal(systemTaskResultDescription)
-	if err != nil {
-		createFailedUpdateSystemTask(systemTask, err)
-		return models.Receipt{}, err
-	}
-	systemTask.ResultDescription = string(resultDescriptionBytes)
-
-	systemTaskRepository := NewSystemTaskRepository(nil)
-	_, err = systemTaskRepository.CreateSystemTask(systemTask)
-	if err != nil {
-		createFailedUpdateSystemTask(systemTask, err)
-		return models.Receipt{}, err
-	}
-
-	return fullyLoadedReceipt, nil
+	return afterReceipts[receiptId], nil
 }
 
 // TODO: Delete categories/tags here associated with items before deleting the items mkay
@@ -1374,17 +1329,24 @@ func (repository ReceiptRepository) FilterLinkedItemsFromReceiptItems(receipt *m
 	receipt.ReceiptItems = filteredItems
 }
 
-func (repository ReceiptRepository) GetFullyLoadedReceiptById(id string) (models.Receipt, error) {
-	db := repository.GetDB()
-	var receipt models.Receipt
-
-	query := db.Model(models.Receipt{}).Where("id = ?", id).Preload(clause.Associations)
+// fullyLoadedReceiptQuery is the one definition of a fully loaded receipt,
+// shared by the single and batch loaders so their depth cannot drift: the
+// RECEIPT_UPDATED snapshots and the receipt history compare copies made by
+// both. Callers filter out linked items afterwards.
+func (repository ReceiptRepository) fullyLoadedReceiptQuery() *gorm.DB {
+	query := repository.GetDB().Model(models.Receipt{}).Preload(clause.Associations)
 
 	for _, association := range constants.FULL_RECEIPT_ASSOCIATIONS {
 		query = query.Preload(association)
 	}
 
-	err := query.Find(&receipt).Error
+	return query
+}
+
+func (repository ReceiptRepository) GetFullyLoadedReceiptById(id string) (models.Receipt, error) {
+	var receipt models.Receipt
+
+	err := repository.fullyLoadedReceiptQuery().Where("id = ?", id).Find(&receipt).Error
 	if err != nil {
 		return models.Receipt{}, err
 	}
@@ -1392,6 +1354,27 @@ func (repository ReceiptRepository) GetFullyLoadedReceiptById(id string) (models
 	repository.FilterLinkedItemsFromReceiptItems(&receipt)
 
 	return receipt, nil
+}
+
+// GetFullyLoadedReceiptsByIds is the batch form of GetFullyLoadedReceiptById,
+// loaded to the same depth in one set of queries, ordered by id. Ids that match
+// no receipt are simply absent from the result.
+func (repository ReceiptRepository) GetFullyLoadedReceiptsByIds(ids []uint) ([]models.Receipt, error) {
+	receipts := make([]models.Receipt, 0, len(ids))
+	if len(ids) == 0 {
+		return receipts, nil
+	}
+
+	err := repository.fullyLoadedReceiptQuery().Where("id IN ?", ids).Order("id").Find(&receipts).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range receipts {
+		repository.FilterLinkedItemsFromReceiptItems(&receipts[i])
+	}
+
+	return receipts, nil
 }
 
 func (repository ReceiptRepository) GetReceiptsByGroupIds(groupIds []string, querySelect string, queryPreload string) ([]models.Receipt, error) {

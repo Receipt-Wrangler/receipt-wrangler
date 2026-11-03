@@ -1,0 +1,226 @@
+@use "sass:map";
+@use "../../../variables.scss" as variables;
+
+// Every class is prefixed rw-history- on purpose: Bootstrap is a global
+// stylesheet here, and a bare .notice / .alert / .badge would pick up its rules.
+
+// The design's link blue, a step between $primary-palette 700 and 800; hover
+// moves to 700, as the design does.
+$link-color: #0079c0;
+// The design's pale red for the failure box and the "from" chip. The palette's
+// lightest red ($warn-palette 50) is too strong behind 13px text.
+$failure-surface: #fdecec;
+
+:host {
+  display: block;
+}
+
+.rw-history-entry {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 12px;
+}
+
+.rw-history-entry__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  app-avatar {
+    flex: 0 0 auto;
+  }
+}
+
+.rw-history-entry__line {
+  flex: 1;
+  width: 2px;
+  margin: 6px 0;
+  background: map.get(variables.$accent-palette, 200);
+}
+
+.rw-history-entry__body {
+  min-width: 0;
+  padding-bottom: 20px;
+}
+
+.rw-history-entry__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 32px;
+  padding-top: 6px;
+  line-height: 1.4;
+}
+
+.rw-history-entry__actor {
+  font-size: 14px;
+  color: map.get(variables.$accent-palette, 900);
+}
+
+.rw-history-entry__verb {
+  font-size: 14px;
+  color: map.get(variables.$accent-palette, 700);
+}
+
+.rw-history-entry__time {
+  margin-left: auto;
+  font-size: 12px;
+  color: map.get(variables.$accent-palette, 500);
+}
+
+.rw-history-entry__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: map.get(variables.$accent-palette, 400);
+}
+
+.rw-history-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: $link-color;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    color: map.get(variables.$primary-palette, 700);
+  }
+
+  &:focus-visible {
+    outline: 2px solid map.get(variables.$primary-palette, 600);
+    outline-offset: 2px;
+    border-radius: variables.$border-radius-sm;
+  }
+}
+
+.rw-history-link--small {
+  font-size: 11px;
+}
+
+// The failure box and the older-version notice share a shape.
+.rw-history-failed,
+.rw-history-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: variables.$border-radius-md;
+  line-height: 1.45;
+}
+
+.rw-history-failed {
+  background: $failure-surface;
+  color: map.get(variables.$warn-palette, 700);
+  font-size: 13px;
+}
+
+.rw-history-failed__icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.rw-history-notice {
+  background: rgba(map.get(variables.$primary-palette, 500), 0.08);
+  color: map.get(variables.$primary-palette, 800);
+  font-size: 12px;
+}
+
+.rw-history-notice__icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  font-size: 16px;
+}
+
+.rw-history-json {
+  max-height: 220px;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: variables.$border-radius-md;
+  background: map.get(variables.$accent-palette, 900);
+  color: map.get(variables.$accent-palette, 200);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.rw-history-json-status {
+  margin-top: 8px;
+  font-size: 12px;
+  color: map.get(variables.$accent-palette, 500);
+}
+
+.rw-history-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rw-history-change {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.rw-history-change__label {
+  color: map.get(variables.$accent-palette, 500);
+  overflow-wrap: anywhere;
+}
+
+.rw-history-change__values {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.rw-history-chip {
+  padding: 1px 6px;
+  border-radius: variables.$border-radius-sm;
+  overflow-wrap: anywhere;
+}
+
+.rw-history-chip--from {
+  background: $failure-surface;
+  color: map.get(variables.$warn-palette, 700);
+  text-decoration: line-through;
+  text-decoration-color: rgba(map.get(variables.$warn-palette, 700), 0.5);
+}
+
+.rw-history-chip--to {
+  background: map.get(variables.$success-palette, 50);
+  color: map.get(variables.$success-palette, 900);
+  // <ins> underlines by default; the green fill already says "added".
+  text-decoration: none;
+}
+
+.rw-history-change__arrow {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+  color: map.get(variables.$accent-palette, 400);
+}
+
+// Lines up under the values column: the 112px label column plus the 10px gap.
+.rw-history-more {
+  align-self: flex-start;
+  margin-left: 122px;
+}

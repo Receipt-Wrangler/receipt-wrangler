@@ -38,6 +38,8 @@ part 'receipt.g.dart';
 /// * [tags] - Tags associated to receipt
 /// * [updatedAt] 
 /// * [createdByString] - Created by string, which is anything that is not a user
+/// * [emailInbox] - Set by the server on a receipt created from an email: the System Email login (IMAP username) of the inbox the email was read from. Ignored on write.
+/// * [emailSender] - Set by the server on a receipt created from an email: the sender's From address. Ignored on write.
 @BuiltValue()
 abstract class Receipt implements Built<Receipt, ReceiptBuilder> {
   /// Receipt total amount
@@ -111,6 +113,14 @@ abstract class Receipt implements Built<Receipt, ReceiptBuilder> {
   /// Created by string, which is anything that is not a user
   @BuiltValueField(wireName: r'createdByString')
   String? get createdByString;
+
+  /// Set by the server on a receipt created from an email: the System Email login (IMAP username) of the inbox the email was read from. Ignored on write.
+  @BuiltValueField(wireName: r'emailInbox')
+  String? get emailInbox;
+
+  /// Set by the server on a receipt created from an email: the sender's From address. Ignored on write.
+  @BuiltValueField(wireName: r'emailSender')
+  String? get emailSender;
 
   Receipt._();
 
@@ -241,6 +251,20 @@ class _$ReceiptSerializer implements PrimitiveSerializer<Receipt> {
       yield r'createdByString';
       yield serializers.serialize(
         object.createdByString,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.emailInbox != null) {
+      yield r'emailInbox';
+      yield serializers.serialize(
+        object.emailInbox,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.emailSender != null) {
+      yield r'emailSender';
+      yield serializers.serialize(
+        object.emailSender,
         specifiedType: const FullType(String),
       );
     }
@@ -399,6 +423,20 @@ class _$ReceiptSerializer implements PrimitiveSerializer<Receipt> {
             specifiedType: const FullType(String),
           ) as String;
           result.createdByString = valueDes;
+          break;
+        case r'emailInbox':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.emailInbox = valueDes;
+          break;
+        case r'emailSender':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.emailSender = valueDes;
           break;
         default:
           unhandled.add(key);

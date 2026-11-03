@@ -23,6 +23,13 @@ type Receipt struct {
 	ReceiptItems []Item             `json:"receiptItems"`
 	Comments     []Comment          `json:"comments"`
 	CustomFields []CustomFieldValue `json:"customFields"`
+	// EmailInbox and EmailSender record where a receipt created from an email
+	// came from: the System Email login (IMAP username) it was read from, and
+	// the sender's From address. Only the email task sets them (see
+	// UpsertReceiptCommand, where they are json:"-"); they are empty on every
+	// other receipt. Member masking clears them along with a masked creator.
+	EmailInbox  string `json:"emailInbox,omitempty"`
+	EmailSender string `json:"emailSender,omitempty"`
 	// FirstComment is the text of the earliest comment the caller may see, a
 	// transient projection filled only by the paged receipts list (see
 	// PermissionService.LoadFirstVisibleComments). omitempty keeps it off every

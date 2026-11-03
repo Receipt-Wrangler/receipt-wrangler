@@ -1694,6 +1694,32 @@ timeZone`, which nothing reads yet. Mobile never PUTs system settings, so it can
   reading `AppData.timeZone` -- never by changing what goes on the wire, which the server already
   interprets correctly.
 
+### Receipt change history (regenerated client only)
+
+The server and desktop ship a per-receipt change history. See the root `CLAUDE.md` → "Receipt Change
+History". **On mobile this is a regenerated client only; nothing in `lib/` reads it yet.** The client
+gained:
+- `getReceiptApi().getReceiptHistory(...)` / `getReceiptHistorySnapshots(...)`
+- the `ReceiptHistory*` models
+- `Permission.appPeriodReceiptHistoryPeriodRead`
+- optional `Receipt.emailInbox` / `emailSender`
+
+Released builds are unaffected: the new Receipt fields are optional strings, and every history code
+is a plain `String`, never an enum.
+
+**The mobile screen is a pending follow-up**, and the design handoff already has it: a "History"
+item in the receipt view's overflow menu opening a day-grouped card list, with no JSON view. Three
+things to know when building it:
+
+- **`ReceiptEditPopupMenu` renders only for `group.receipts.update`**, and integration tests use it
+  as the "view mounted" marker. History therefore needs per-item gating that keeps the widget and its
+  hide-when-empty behaviour, so a read-only user with the permission sees a menu holding only
+  History.
+- **`UserModel.getUserById` throws on a missing id** despite its nullable signature, and history
+  regularly names deleted or masked users.
+- **The diff and redaction are already server-side**, so the screen only formats typed values. Do
+  not port a diff to Dart.
+
 ### Receipt summary
 
 A block of totals **pinned** above or below the receipts list, covering the whole current filter

@@ -109,6 +109,15 @@ export class ReceiptFormComponent implements OnInit {
     AuthState.hasAppPermission(Permission.AppCustomFieldsRead)
   );
 
+  // The history drawer is offered in view mode only (see the template): in edit
+  // mode it would cover the fixed save bar. The server also requires
+  // group.receipts.read, which reaching the view page already implies.
+  public readonly canViewHistory = this.store.selectSignal(
+    AuthState.hasAppPermission(Permission.AppReceiptHistoryRead)
+  );
+
+  public readonly historyOpen = signal(false);
+
   public customFields: CustomField[] = [];
 
   public customFieldsStatefulMenuItems: StatefulMenuItem[] = [];
@@ -1101,6 +1110,14 @@ export class ReceiptFormComponent implements OnInit {
   public updateComments(commentsArray: FormArray): void {
     this.form.removeControl("comments");
     this.form.addControl("comments", commentsArray);
+  }
+
+  public toggleHistory(): void {
+    this.historyOpen.update((open) => !open);
+  }
+
+  public closeHistory(): void {
+    this.historyOpen.set(false);
   }
 
   public duplicateReceipt(): void {
