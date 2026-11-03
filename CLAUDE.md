@@ -678,8 +678,9 @@ See `api/CLAUDE.md` → "Bulk receipt delete" and `desktop/CLAUDE.md` → "Delet
 
 ### Receipt Change History
 
-A **History** button on the receipt view page opens a drawer listing every recorded change to the
-receipt, newest first. Each entry shows who made it (a user, Quick Scan, Email Upload or System),
+A **History** button on the receipt view and edit pages opens a drawer listing every recorded
+change to the receipt, newest first. In edit mode the fixed save bar shrinks to fit between the left
+sidebar and the drawer, so Save stays usable. Each entry shows who made it (a user, Quick Scan, Email Upload or System),
 when, and field-level "from → to" chips. It also covers failed saves, and older rows whose "before"
 had to be rebuilt. **Backend + desktop.** Mobile only carries the regenerated client for now; the
 design handoff's mobile screen is a pending follow-up.

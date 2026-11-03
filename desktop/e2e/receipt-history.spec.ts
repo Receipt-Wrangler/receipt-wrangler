@@ -213,6 +213,47 @@ test.describe('Receipt history', () => {
     await expect(page.getByRole('button', { name: 'Receipt history', exact: true })).toBeFocused();
   });
 
+  // In edit mode the drawer sits over the fixed save bar's right end, where Save
+  // is. The bar shrinks to the band between the left sidebar and the drawer, so
+  // Save stays reachable with both open.
+  test('in edit mode the save bar stays usable beside the drawer and the sidebar', async ({ page }) => {
+    await stubTokenRefresh(page);
+    await page.goto(`/receipts/${receiptId}/edit`);
+
+    const sidebar = page.getByTestId('app-sidebar');
+    await expect(page.getByTestId('receipt-history-toggle')).toBeVisible();
+    if (!(await sidebar.isVisible())) {
+      await page.getByTestId('sidebar-toggle').click();
+    }
+    await expect(sidebar).toBeVisible();
+
+    await page.getByTestId('receipt-history-toggle').click();
+    const drawer = page.getByTestId('receipt-history-drawer');
+    await expect(drawer).toBeVisible();
+
+    // The bar eases into place, so poll until it sits between the two.
+    const bar = page.getByTestId('form-button-bar');
+    await expect
+      .poll(async () => {
+        const [barBox, drawerBox, sidebarBox] = await Promise.all([
+          bar.boundingBox(),
+          drawer.boundingBox(),
+          sidebar.boundingBox(),
+        ]);
+        return (
+          !!barBox &&
+          !!drawerBox &&
+          !!sidebarBox &&
+          barBox.x >= sidebarBox.x + sidebarBox.width - 1 &&
+          barBox.x + barBox.width <= drawerBox.x + 1
+        );
+      })
+      .toBe(true);
+
+    // A trial click fails if anything covers the button.
+    await bar.getByRole('button', { name: 'Save', exact: true }).click({ trial: true });
+  });
+
   test.describe('without the permission', () => {
     test.use({ storageState: 'e2e/.auth/user.json' });
 

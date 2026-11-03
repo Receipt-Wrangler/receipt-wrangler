@@ -2286,15 +2286,28 @@ server's output while other specs' tasks stay out of the way.
 
 ## Receipt history drawer
 
-A **history** icon button in the receipt view header (`receipt-history-toggle`, after Duplicate)
-opens `app-receipt-history-drawer` (`src/receipts/receipt-history-drawer/`, standalone, imported
+A **history** icon button in the receipt header (`receipt-history-toggle`, after Duplicate), in view
+and edit mode, opens `app-receipt-history-drawer` (`src/receipts/receipt-history-drawer/`, standalone, imported
 by `ReceiptsModule`): a right-hand timeline of the receipt's saves, newest first, grouped by day.
 **The server computes the diff and the redaction** (see `api/CLAUDE.md` → "Receipt history"); the
 desktop only formats what `GET /receipt/{id}/history` returns.
 
-- **Gating: `app.receipt-history.read` and view mode only.** In edit mode the drawer would cover the
-  fixed save bar, and add mode has no history yet. The drawer's own `@if` repeats the same three
-  conditions as the toggle, so it can never outlive them.
+- **Gating: `app.receipt-history.read`, in view and edit mode.** Add mode has no history yet. The
+  drawer's own `@if` repeats the same conditions as the toggle, so it can never outlive them. Saving
+  stays enabled with the drawer open. A save navigates to the view route, which recreates the form, so
+  the drawer closes, as it does on any navigation.
+- **The save bar shrinks beside the drawer instead of sitting under it.** `app-form-button-bar` is
+  `position: fixed` across the whole viewport with a centred card, so with the drawer open its right
+  end, where Save is, was covered. The shared bar now takes an optional **`inset`**
+  (`FormButtonBarInset { left, right }`, px). Null, the default every other form uses, leaves it
+  unchanged.
+  - The receipt form passes `saveBarInsetBesideDrawer(...)` while the drawer is open, which keeps the
+    bar **between the left sidebar and the drawer**. Both edges matter: the bar never measured the
+    sidebar, and lined up with it at 1440px only because of the centring. Narrowing just its right side
+    slides the centred card under the sidebar.
+  - Below `SAVE_BAR_MIN_WIDTH` (360px of band) the inset is null. On a screen that narrow the drawer
+    already covers the form, and the user closes it to save.
+  - The bar also shows in queue view mode (`queueIndex >= 0`), and the inset covers that too.
 - **Every code is a plain string, and every helper tolerates one it doesn't know.** Action, actor
   type, field, kind, value type and before-state are not enums on the contract (a closed enum would
   break released mobile builds on the first new value). `receipt-history.utils.ts` holds the pure
@@ -2318,10 +2331,17 @@ desktop only formats what `GET /receipt/{id}/history` returns.
   again never refetches (a failed load does retry on the next open). It prints the created receipt
   for a creation entry and `{ before, after }` otherwise, each side parsed from its JSON string.
 - **Stacking.** The drawer is `position: fixed`, `right: 0`, `bottom: 0`, 480px wide, `z-index: 1001`.
-  Its **top** is the bottom of `app-header` and its **max-width** is `calc(100vw - <header left>)`,
-  both measured once in `afterNextRender` (the header is sticky at the top of the scrolling
-  `mat-drawer-content`, so its bottom does not move as the page scrolls; the left edge keeps the
-  drawer out from under an open sidebar on a narrow screen). The stylesheet's fallbacks are 89px and
+  Its **top** is the bottom of `app-header` and its **max-width** is `calc(100vw - <header left>)`.
+  - Both are measured in `afterNextRender`, then re-measured by a `ResizeObserver` on `app-header` and
+    on the drawer itself.
+  - The header is sticky at the top of the scrolling `mat-drawer-content`, so its bottom does not move
+    as the page scrolls.
+  - Its box does change on a window resize and when the left sidebar opens or closes, and a one-off
+    measurement went stale on both. The left edge keeps the drawer out from under an open sidebar on a
+    narrow screen.
+  - Each measurement emits **`occupiedChange`** (`{ contentLeft, width, viewportWidth }`, deduplicated),
+    which drives the save bar's inset above.
+  - jsdom has no `ResizeObserver`, so it is guarded. The spec installs a stand-in to drive it. The stylesheet's fallbacks are 89px and
   `100vw`. It lives inside `mat-drawer-content`'s stacking context (`z-index: 1`), so the CDK overlay
   container — dialogs, menus, tooltips, snackbars — paints above it, and the header (`sticky-top`,
   1020) keeps its shadow over it. Don't give any ancestor of the drawer a `transform`, `filter` or
@@ -2345,7 +2365,14 @@ desktop only formats what `GET /receipt/{id}/history` returns.
 created, edited, commented on and bulk-resolved through the API — the comment and the bulk resolve
 being the two changes that recorded nothing before — and the drawer must show all four entries with
 their verbs, the old and new name chips, the comment row, the summary line (checked against the API's
-own counts), the JSON behind an entry, and Esc closing with focus back on the toggle. The negative half
+own counts), the JSON behind an entry, and Esc closing with focus back on the toggle.
+
+An edit-mode test opens the drawer with the sidebar open. It polls until the save bar's box sits between
+the sidebar (`app-sidebar`) and the drawer, then trial-clicks Save, which fails if anything covers it.
+With the inset removed, this test fails. The header's menu button gained `data-testid="sidebar-toggle"`
+for it.
+
+The negative half
 adds e2e-user as a Legacy Viewer: the view page loads with no toggle, and both history endpoints 403.
 Helpers: `apiReceiptHistory` (raw response), `apiBulkStatusUpdate`, `apiGetRoleId`.
 

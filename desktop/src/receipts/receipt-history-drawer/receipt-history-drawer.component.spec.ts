@@ -241,4 +241,95 @@ describe("ReceiptHistoryDrawerComponent", () => {
       expect(host().style.maxWidth).toBe("");
     });
   });
+
+  describe("the band it covers", () => {
+    // jsdom has no ResizeObserver; this stand-in records what is observed and
+    // lets a test fire the callback the way a resize would.
+    class FakeResizeObserver {
+      static instances: FakeResizeObserver[] = [];
+
+      observed: Element[] = [];
+
+      disconnected = false;
+
+      constructor(public callback: () => void) {
+        FakeResizeObserver.instances.push(this);
+      }
+
+      observe(target: Element): void {
+        this.observed.push(target);
+      }
+
+      disconnect(): void {
+        this.disconnected = true;
+      }
+    }
+
+    let header: HTMLElement;
+    let headerLeft: number;
+    let drawerWidth: number;
+    let occupied: jest.Mock;
+
+    beforeEach(() => {
+      FakeResizeObserver.instances = [];
+      (globalThis as any).ResizeObserver = FakeResizeObserver;
+      headerLeft = 82;
+      drawerWidth = 480;
+      header = document.createElement("app-header");
+      header.getBoundingClientRect = () => ({ top: 0, bottom: 89, left: headerLeft, height: 89 }) as DOMRect;
+      document.body.appendChild(header);
+      jest.spyOn(document.documentElement, "clientWidth", "get").mockReturnValue(1440);
+    });
+
+    afterEach(() => {
+      delete (globalThis as any).ResizeObserver;
+    });
+
+    async function createMeasured(): Promise<void> {
+      occupied = jest.fn();
+      fixture = TestBed.createComponent(ReceiptHistoryDrawerComponent);
+      component = fixture.componentInstance;
+      component.occupiedChange.subscribe(occupied);
+      fixture.nativeElement.getBoundingClientRect = () => ({ width: drawerWidth }) as DOMRect;
+      fixture.componentRef.setInput("receiptId", 1042);
+      await fixture.whenStable();
+    }
+
+    it("reports where the content starts, its width and the viewport's on open", async () => {
+      await createMeasured();
+
+      expect(occupied).toHaveBeenCalledTimes(1);
+      expect(occupied).toHaveBeenCalledWith({ contentLeft: 82, width: 480, viewportWidth: 1440 });
+    });
+
+    it("watches the header and itself, and re-measures when either resizes", async () => {
+      await createMeasured();
+      const observer = FakeResizeObserver.instances[0];
+      expect(observer.observed).toEqual([header, fixture.nativeElement]);
+
+      // The sidebar closes: the content area, and the header with it, starts at 0.
+      headerLeft = 0;
+      observer.callback();
+      await fixture.whenStable();
+
+      expect(occupied).toHaveBeenLastCalledWith({ contentLeft: 0, width: 480, viewportWidth: 1440 });
+      expect(host().style.maxWidth).toBe("calc(100vw - 0px)");
+    });
+
+    it("does not report the same band twice", async () => {
+      await createMeasured();
+
+      FakeResizeObserver.instances[0].callback();
+
+      expect(occupied).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops watching once closed", async () => {
+      await createMeasured();
+
+      fixture.destroy();
+
+      expect(FakeResizeObserver.instances[0].disconnected).toBe(true);
+    });
+  });
 });

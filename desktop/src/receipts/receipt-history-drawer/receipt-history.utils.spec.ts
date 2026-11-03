@@ -14,6 +14,8 @@ import {
   historyFieldLabel,
   historySnapshotsJson,
   historySummary,
+  SAVE_BAR_MIN_WIDTH,
+  saveBarInsetBesideDrawer,
   titleCaseCode,
 } from "./receipt-history.utils";
 
@@ -338,6 +340,30 @@ describe("receipt history utils", () => {
 
     it("keeps text that is not JSON instead of failing", () => {
       expect(JSON.parse(historySnapshotsJson({ before: "{oops", after: '{"name":"B"}' })).before).toBe("{oops");
+    });
+  });
+
+  describe("saveBarInsetBesideDrawer", () => {
+    it("keeps the bar between the sidebar and the drawer", () => {
+      expect(saveBarInsetBesideDrawer({ contentLeft: 82, width: 480, viewportWidth: 1440 })).toEqual({
+        left: 82,
+        right: 480,
+      });
+    });
+
+    it("insets right up to the minimum width the bar needs", () => {
+      const viewportWidth = 82 + 480 + SAVE_BAR_MIN_WIDTH;
+
+      expect(saveBarInsetBesideDrawer({ contentLeft: 82, width: 480, viewportWidth })).toEqual({
+        left: 82,
+        right: 480,
+      });
+      expect(saveBarInsetBesideDrawer({ contentLeft: 82, width: 480, viewportWidth: viewportWidth - 1 })).toBeNull();
+    });
+
+    it("leaves the bar alone before the drawer has been measured", () => {
+      expect(saveBarInsetBesideDrawer(null)).toBeNull();
+      expect(saveBarInsetBesideDrawer({ contentLeft: 0, width: 0, viewportWidth: 1440 })).toBeNull();
     });
   });
 });

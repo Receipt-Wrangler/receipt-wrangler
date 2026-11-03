@@ -20,7 +20,11 @@ import { ButtonModule } from "../../button";
 import { ReceiptService } from "../../open-api";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { ReceiptHistoryEntryComponent } from "./receipt-history-entry/receipt-history-entry.component";
-import { groupHistoryByDay, historySummary } from "./receipt-history.utils";
+import {
+  HistoryDrawerOccupied,
+  groupHistoryByDay,
+  historySummary,
+} from "./receipt-history.utils";
 
 let nextDrawerId = 0;
 
@@ -33,7 +37,10 @@ let nextDrawerId = 0;
  * time the drawer has been open.
  *
  * It is `position: fixed` with its top aligned to the bottom of the sticky app
- * header, measured once when it opens. It stacks inside `mat-drawer-content`'s
+ * header, measured when it opens and again whenever the header or the drawer
+ * resizes (a window resize, the sidebar opening or closing). Each measurement
+ * also reports the band the drawer covers (`occupiedChange`), so the host can
+ * keep its save bar beside it. It stacks inside `mat-drawer-content`'s
  * stacking context (`z-index: 1`), so the CDK overlay container — dialogs,
  * menus, tooltips and snackbars — still paints above it.
  */
@@ -56,6 +63,9 @@ export class ReceiptHistoryDrawerComponent {
   public readonly receiptId = input.required<number>();
 
   public readonly closed = output<void>();
+
+  /** The band the drawer covers, emitted on open and whenever it changes. */
+  public readonly occupiedChange = output<HistoryDrawerOccupied>();
 
   public readonly titleId = `rw-history-title-${nextDrawerId++}`;
 
@@ -100,16 +110,24 @@ export class ReceiptHistoryDrawerComponent {
     return frame ? `calc(100vw - ${frame.left}px)` : null;
   });
 
+  private resizeObserver?: ResizeObserver;
+
+  private lastOccupied?: HistoryDrawerOccupied;
+
   constructor() {
     // The toggle that opened the drawer, to hand focus back to on close.
     const opener = this.document.activeElement;
 
     afterNextRender(() => {
       this.measureFrame();
+      this.observeFrame();
       this.closeButton()?.nativeElement.querySelector("button")?.focus();
     });
 
-    inject(DestroyRef).onDestroy(() => this.restoreFocus(opener));
+    inject(DestroyRef).onDestroy(() => {
+      this.resizeObserver?.disconnect();
+      this.restoreFocus(opener);
+    });
   }
 
   public onEscape(event: Event): void {
@@ -131,12 +149,52 @@ export class ReceiptHistoryDrawerComponent {
   }
 
   // The app header is sticky at the top of the scrolling content area, so its
-  // bottom edge does not move as the page scrolls; measuring once is enough.
+  // bottom edge does not move as the page scrolls. It does move sideways, and the
+  // drawer's own width follows its max-width, so a resize re-measures both.
   private measureFrame(): void {
     const rect = this.document.querySelector("app-header")?.getBoundingClientRect();
     if (rect && rect.height > 0) {
       this.frame.set({ top: Math.round(rect.bottom), left: Math.max(0, Math.round(rect.left)) });
     }
+
+    this.emitOccupied();
+  }
+
+  // The header sits in the content area, so its box changes when the window is
+  // resized and when the sidebar opens or closes; the drawer's own box changes
+  // once its max-width follows. Absent in jsdom, where nothing lays out anyway.
+  private observeFrame(): void {
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    this.resizeObserver = new ResizeObserver(() => this.measureFrame());
+    const header = this.document.querySelector("app-header");
+    if (header) {
+      this.resizeObserver.observe(header);
+    }
+    this.resizeObserver.observe(this.host.nativeElement);
+  }
+
+  private emitOccupied(): void {
+    const occupied: HistoryDrawerOccupied = {
+      contentLeft: this.frame()?.left ?? 0,
+      width: Math.round(this.host.nativeElement.getBoundingClientRect().width),
+      viewportWidth: this.document.documentElement.clientWidth,
+    };
+
+    const last = this.lastOccupied;
+    if (
+      last &&
+      last.contentLeft === occupied.contentLeft &&
+      last.width === occupied.width &&
+      last.viewportWidth === occupied.viewportWidth
+    ) {
+      return;
+    }
+
+    this.lastOccupied = occupied;
+    this.occupiedChange.emit(occupied);
   }
 
   // Only when focus was in the drawer (or was lost with it): a user who moved on

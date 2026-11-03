@@ -1,6 +1,7 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { By } from "@angular/platform-browser";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from "@angular/forms";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
@@ -1555,9 +1556,6 @@ describe("ReceiptFormComponent", () => {
     });
   });
 
-  // A receipt's date and DATE custom fields are calendar days: stored as
-  // midnight UTC, shown in the datepicker as that day's local midnight, and sent
-  // back as midnight UTC of whatever day is picked.
   describe("receipt history toggle", () => {
     const savedReceipt = {
       id: 5,
@@ -1606,11 +1604,10 @@ describe("ReceiptFormComponent", () => {
       expect(toggle()).toBeNull();
     });
 
-    // The drawer would cover the fixed save bar.
-    it("is not offered in edit mode", () => {
+    it("is offered in edit mode too", () => {
       load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
 
-      expect(toggle()).toBeNull();
+      expect(toggle()).not.toBeNull();
     });
 
     it("is not offered in add mode, where there is no history yet", () => {
@@ -1633,6 +1630,36 @@ describe("ReceiptFormComponent", () => {
       expect(toggle()!.classList).not.toContain("rw-history-toggle--active");
     });
 
+    describe("the save bar beside the open drawer", () => {
+      // SharedUiModule declares the real bar, so the input is read off it.
+      const barInset = () =>
+        fixture.debugElement.query(By.css("app-form-button-bar")).componentInstance.inset();
+      const occupied = { contentLeft: 82, width: 480, viewportWidth: 1440 };
+
+      it("keeps the bar clear of the drawer and the sidebar while it is open", () => {
+        load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
+        expect(barInset()).toBeNull();
+
+        clickToggle();
+        component.historyOccupied.set(occupied);
+        fixture.detectChanges();
+
+        expect(barInset()).toEqual({ left: 82, right: 480 });
+      });
+
+      it("gives the bar its full width back on close", () => {
+        load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
+        clickToggle();
+        component.historyOccupied.set(occupied);
+        fixture.detectChanges();
+
+        clickToggle();
+
+        expect(barInset()).toBeNull();
+        expect(component.historyOccupied()).toBeNull();
+      });
+    });
+
     it("closes when the drawer asks to", () => {
       load(FormMode.view, [Permission.AppReceiptHistoryRead]);
       component.toggleHistory();
@@ -1646,6 +1673,9 @@ describe("ReceiptFormComponent", () => {
     });
   });
 
+  // A receipt's date and DATE custom fields are calendar days: stored as
+  // midnight UTC, shown in the datepicker as that day's local midnight, and sent
+  // back as midnight UTC of whatever day is picked.
   describe("calendar dates on load and submit", () => {
     let receiptService: ReceiptService;
 

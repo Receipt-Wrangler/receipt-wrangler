@@ -231,6 +231,7 @@
   <app-form-button-bar
     [mode]="queueIndex >= 0 ? FormMode.edit : mode"
     [justifyContentEnd]="false"
+    [inset]="saveBarInset()"
   >
     <div class="w-100 row">
       <div class="d-flex col">
@@ -337,7 +338,7 @@
       (clicked)="duplicateReceipt()"
     ></app-button>
   }
-  @if ((mode | inputReadonly) && canViewHistory()) {
+  @if (mode !== formMode.add && canViewHistory()) {
     <app-button
       class="ms-1"
       data-testid="receipt-history-toggle"
@@ -494,9 +495,10 @@
   </div>
 </ng-template>
 
-@if (historyOpen() && (mode | inputReadonly) && canViewHistory() && originalReceipt) {
+@if (historyOpen() && mode !== formMode.add && canViewHistory() && originalReceipt) {
   <app-receipt-history-drawer
     [receiptId]="originalReceipt.id"
+    (occupiedChange)="historyOccupied.set($event)"
     (closed)="closeHistory()"
   ></app-receipt-history-drawer>
 }

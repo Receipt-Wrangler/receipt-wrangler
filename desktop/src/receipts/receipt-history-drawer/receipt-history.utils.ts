@@ -9,6 +9,7 @@ import {
   User,
 } from "../../open-api";
 import { formatAppDate } from "../../pipes/app-date.pipe";
+import { FormButtonBarInset } from "../../shared-ui/form-button-bar/form-button-bar.component";
 import { todayInZone } from "../../utils/app-time-zone";
 import { formatStatus } from "../../utils/status.utils";
 
@@ -354,4 +355,39 @@ export function historySnapshotsJson(snapshots: ReceiptHistorySnapshots): string
   }
 
   return JSON.stringify({ before: parseSnapshot(snapshots.before), after }, null, 2);
+}
+
+/**
+ * The band the history drawer covers, as the drawer measures it: where the
+ * content area starts (the left sidebar's edge), the drawer's rendered width,
+ * and the viewport's width.
+ */
+export interface HistoryDrawerOccupied {
+  contentLeft: number;
+  width: number;
+  viewportWidth: number;
+}
+
+/**
+ * The narrowest the save bar may get beside the drawer and still fit its row of
+ * buttons. Below it the bar keeps its full width under the drawer, which on a
+ * screen that narrow already covers the form: the user closes it to save.
+ */
+export const SAVE_BAR_MIN_WIDTH = 360;
+
+/**
+ * Keeps the fixed save bar between the left sidebar and the drawer. Both edges
+ * matter: the bar centres its card, so narrowing only its right side would
+ * slide the card under the sidebar.
+ */
+export function saveBarInsetBesideDrawer(
+  occupied: HistoryDrawerOccupied | null | undefined,
+): FormButtonBarInset | null {
+  if (!occupied || occupied.width <= 0) {
+    return null;
+  }
+
+  const band = occupied.viewportWidth - occupied.contentLeft - occupied.width;
+
+  return band >= SAVE_BAR_MIN_WIDTH ? { left: occupied.contentLeft, right: occupied.width } : null;
 }
