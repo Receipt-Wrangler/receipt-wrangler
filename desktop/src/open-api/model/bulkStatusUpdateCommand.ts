@@ -19,7 +19,7 @@ export interface BulkStatusUpdateCommand {
      */
     status: string;
     /**
-     * Receipt ids to update
+     * Receipt ids to update. At most 500 ids
      */
     receiptIds: Array<number>;
 }

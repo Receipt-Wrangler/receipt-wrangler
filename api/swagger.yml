@@ -5688,9 +5688,10 @@ components:
           description: Status to update to
         receiptIds:
           type: array
+          maxItems: 500
           items:
             type: integer
-          description: Receipt ids to update
+          description: Receipt ids to update. At most 500 ids
     BulkReceiptDeleteCommand:
       required:
         - receiptIds

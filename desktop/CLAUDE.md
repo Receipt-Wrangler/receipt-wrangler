@@ -723,11 +723,12 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     member and 403'd on the backend; now they only render for holders, matching the receipts-table.
   - **Notification delete** (`notification/notification.component.html`): the per-notification delete
     control gates on `app.notifications.delete` via `*hasAppPermission`.
-  - **Receipt history** (`receipts/receipt-form/receipt-form.component.html`): the view header's
+  - **Receipt history** (`receipts/receipt-form/receipt-form.component.html`): the header's
     history toggle gates on the **app** permission `app.receipt-history.read` (a `canViewHistory`
-    selectSignal) **and** view mode. The server also requires `group.receipts.read` in the receipt's
-    group, which reaching the view page already implies, so no group check is repeated. Legacy Admin
-    holds it; Legacy User does not. See **Receipt history drawer** below.
+    selectSignal) **and** a saved receipt (view or edit mode, not add). The server also requires
+    `group.receipts.read` in the receipt's group, which reaching the view or edit page already
+    implies, so no group check is repeated. Legacy Admin holds it; Legacy User does not. See
+    **Receipt history drawer** below.
   - **Group row actions** (`group/group-table/group-table.component.html`): edit gates on
     `group.update` OR `app.groups.update-settings`; **delete** gates on `group.delete` OR
     **`app.groups.delete`** (`orApp`), so an admin who switched the filter to **All Groups** can clean

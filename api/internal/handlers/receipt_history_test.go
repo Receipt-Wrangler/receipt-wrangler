@@ -69,6 +69,18 @@ func seedReceiptWithHistory(t *testing.T) models.Receipt {
 	return receipt
 }
 
+// updateTaskIdOf is the id of the rename row seedReceiptWithHistory records, the
+// entry the snapshot cases mean (task 1 is the creation row, not this one).
+func updateTaskIdOf(t *testing.T, receipt models.Receipt) string {
+	t.Helper()
+	var update models.SystemTask
+	err := repositories.GetDB().Where("type = ? AND receipt_id = ?", models.RECEIPT_UPDATED, receipt.ID).First(&update).Error
+	if err != nil {
+		t.Fatalf("find the update row: %v", err)
+	}
+	return utils.UintToString(update.ID)
+}
+
 func assertForbiddenBody(t *testing.T, w *httptest.ResponseRecorder) {
 	t.Helper()
 	assertStatus(t, w, http.StatusForbidden)
@@ -131,7 +143,7 @@ func TestGetReceiptHistoryAuthorization(t *testing.T) {
 				call   func(w http.ResponseWriter, r *http.Request)
 			}{
 				{"history", "", GetReceiptHistory},
-				{"snapshots", "1", GetReceiptHistorySnapshots},
+				{"snapshots", updateTaskIdOf(t, receipt), GetReceiptHistorySnapshots},
 			} {
 				w, r := receiptHistoryRequest(2, receiptId, handler.taskId)
 				handler.call(w, r)
@@ -215,10 +227,7 @@ func TestGetReceiptHistorySnapshotsEndpoint(t *testing.T) {
 	grantAppPerms(t, 2, permissions.AppReceiptHistoryRead)
 	grantGroupPerms(t, 2, 1, permissions.GroupReceiptsRead)
 
-	var update models.SystemTask
-	repositories.GetDB().Where("type = ? AND receipt_id = ?", models.RECEIPT_UPDATED, receipt.ID).First(&update)
-
-	w, r := receiptHistoryRequest(2, utils.UintToString(receipt.ID), utils.UintToString(update.ID))
+	w, r := receiptHistoryRequest(2, utils.UintToString(receipt.ID), updateTaskIdOf(t, receipt))
 	GetReceiptHistorySnapshots(w, r)
 	assertStatus(t, w, http.StatusOK)
 

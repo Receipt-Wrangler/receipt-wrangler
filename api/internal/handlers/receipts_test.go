@@ -475,3 +475,29 @@ func TestBulkReceiptStatusUpdateWithAnInvalidStatusRecordsNothing(t *testing.T) 
 		t.Errorf("recorded %+v, want nothing", tasks)
 	}
 }
+
+// More ids than MaxBulkStatusUpdateIds are refused before anything is loaded,
+// changed or recorded.
+func TestBulkReceiptStatusUpdateOverTheLimitIsRefused(t *testing.T) {
+	defer repositories.TruncateTestDb()
+	userId, groupId := seedGroupWithRole(t, "bulk-limit", []string{permissions.GroupReceiptsUpdate})
+	receiptId := seedReceipt(t, groupId, userId, 0)
+
+	ids := []string{utils.UintToString(receiptId)}
+	for i := 0; i < commands.MaxBulkStatusUpdateIds; i++ {
+		ids = append(ids, utils.UintToString(receiptId+uint(i)+1))
+	}
+
+	w, r := bulkStatusUpdateRequest(userId, `{"status":"RESOLVED","receiptIds":[`+strings.Join(ids, ",")+`]}`)
+	BulkReceiptStatusUpdate(w, r)
+	assertStatus(t, w, http.StatusBadRequest)
+
+	var receipt models.Receipt
+	repositories.GetDB().First(&receipt, receiptId)
+	if receipt.Status != models.OPEN {
+		t.Errorf("status = %s, want it left OPEN", receipt.Status)
+	}
+	if tasks := recordedReceiptChanges(t, receiptId); len(tasks) != 0 {
+		t.Errorf("recorded %+v, want nothing", tasks)
+	}
+}

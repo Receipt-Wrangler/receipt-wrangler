@@ -745,6 +745,16 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Checked before the permission gate, whose own receipt lookup takes the ids.
+	if len(bulkCommand.ReceiptIds) > commands.MaxBulkStatusUpdateIds {
+		utils.WriteCustomErrorResponse(
+			w,
+			fmt.Sprintf("At most %d receipts can be updated at once", commands.MaxBulkStatusUpdateIds),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
 	receiptIdStrings := make([]string, len(bulkCommand.ReceiptIds))
 	for i := 0; i < len(bulkCommand.ReceiptIds); i++ {
 		receiptIdStrings[i] = utils.UintToString(bulkCommand.ReceiptIds[i])

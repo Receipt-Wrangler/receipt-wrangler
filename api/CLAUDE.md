@@ -2860,7 +2860,7 @@ before `CaptureBefore` names the receipt only as its associated entity, as `Upda
 | `UpdateReceipt` (`repositories/receipts.go`) | the whole update; uses the steps directly, since it returns the reloaded receipt |
 | `AddComment` / `DeleteComment` (`handlers/comments.go`) | the DB write only; the delete is wrapped **after** the role-requirement refusal, so its 400 is not a failed change |
 | `UploadReceiptImage` / `RemoveReceiptImage` (`handlers/receipt_image.go`) | the `FileData` write; the removed file is deleted after recording |
-| `BulkReceiptStatusUpdate` (`handlers/receipts.go`) | the transaction; one row per receipt from two batched loads, and the bulk comment is in each "after" |
+| `BulkReceiptStatusUpdate` (`handlers/receipts.go`) | the transaction; one row per receipt from two batched loads, and the bulk comment is in each "after". Capped at `commands.MaxBulkStatusUpdateIds` (500, the bulk-delete bound; swagger `maxItems`), refused with a 400 **before** the permission gate's own receipt lookup |
 
 **Failure semantics differ on purpose.** `UpdateReceipt` keeps its old contract: if recording fails
 after the commit, it records a FAILED row and returns the error. The newer sites go through `Record`,

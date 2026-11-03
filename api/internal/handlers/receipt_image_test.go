@@ -89,6 +89,7 @@ func TestRemoveReceiptImageRecordsAReceiptChangeAndRemovesTheFile(t *testing.T) 
 // The role-requirement refusal comes before the change, so nothing is recorded.
 func TestRemoveReceiptImageRefusedByRoleRequirementRecordsNothing(t *testing.T) {
 	defer repositories.TruncateTestDb()
+	defer services.ClearRolePermissionCacheForTests()
 	userId, groupId := seedRequirementGroup(t, "image-refused", false, true)
 	receiptId := seedReceipt(t, groupId, userId, 0)
 	only := addStoredImage(t, receiptId, "only.jpg")
