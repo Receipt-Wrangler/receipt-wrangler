@@ -366,6 +366,11 @@ a stale action at worst returns 403.
   - `canEditReceipt(permissionsModel, groupId)` (`lib/shared/functions/permissions.dart`) →
     `group.receipts.update`, used by the receipt-edit popup (`receipt_edit_popup_menu.dart`) and the
     receipt swipe-to-edit (`receipt_list_item.dart`).
+  - `canViewReceiptHistory(permissionsModel)` (same file) → the **app** permission
+    `app.receipt-history.read`, used by the History entry on the receipt view and edit menus
+    (`receipt_app_bar_action_builder.dart`). It goes in `ReceiptEditPopupMenu.alwaysShownChildren`,
+    which shows whatever the edit permission, so a read-only member who holds it gets a menu with
+    only History. See "Receipt change history" below.
   - `canCommentCreate` / `canCommentDelete` (same file) → `group.comments.create` /
     `group.comments.delete`, scoped to the receipt's group. The comment-input bottom sheet
     (`receipt_comment_screen.dart`) is hidden without create; the swipe-to-delete
@@ -1694,31 +1699,76 @@ timeZone`, which nothing reads yet. Mobile never PUTs system settings, so it can
   reading `AppData.timeZone` -- never by changing what goes on the wire, which the server already
   interprets correctly.
 
-### Receipt change history (regenerated client only)
+### Receipt change history
 
-The server and desktop ship a per-receipt change history. See the root `CLAUDE.md` → "Receipt Change
-History". **On mobile this is a regenerated client only; nothing in `lib/` reads it yet.** The client
-gained:
-- `getReceiptApi().getReceiptHistory(...)` / `getReceiptHistorySnapshots(...)`
-- the `ReceiptHistory*` models
-- `Permission.appPeriodReceiptHistoryPeriodRead`
-- optional `Receipt.emailInbox` / `emailSender`
+A **History** entry in the receipt's ⋮ menu opens `ReceiptHistoryScreen`
+(`lib/receipts/screens/receipt_history_screen.dart`). It lists every recorded change to the receipt,
+newest first, under day headers. Each card shows:
+- who made it (a user, Quick Scan, Email Upload or System) and when
+- field-level red → green chips
+- a red box for a failed save, and a blue notice for an older entry whose "before" was rebuilt or is
+  incomplete
+- "Show N more" after 3 changes
 
-Released builds are unaffected: the new Receipt fields are optional strings, and every history code
-is a plain `String`, never an enum.
+There is no JSON view on mobile. The design is `Receipt History Mobile.dc.html` in the handoff. See
+the root `CLAUDE.md` → "Receipt Change History" for the contract.
 
-**The mobile screen is a pending follow-up**, and the design handoff already has it: a "History"
-item in the receipt view's overflow menu opening a day-grouped card list, with no JSON view. Three
-things to know when building it:
-
-- **`ReceiptEditPopupMenu` renders only for `group.receipts.update`**, and integration tests use it
-  as the "view mounted" marker. History therefore needs per-item gating that keeps the widget and its
-  hide-when-empty behaviour, so a read-only user with the permission sees a menu holding only
-  History.
-- **`UserModel.getUserById` throws on a missing id** despite its nullable signature, and history
-  regularly names deleted or masked users.
-- **The diff and redaction are already server-side**, so the screen only formats typed values. Do
-  not port a diff to Dart.
+- **It is pushed, never routed.** The receipt form derives view/edit from the live URL
+  (`getFormState`, `lib/utils/forms.dart`). A `/receipts/:id/history` route would change the URL and
+  flip an open edit form underneath into view. `_pushHistoryAfterMenu`
+  (`receipt_app_bar_action_builder.dart`) pushes a `MaterialPageRoute` instead, the way the Comments
+  and Images sub-screens open, so an unsaved edit is still there on the way back.
+  - The push waits the same 50ms as `_goAfterMenu`, because a `PopupMenuItem`'s `onTap` runs
+    before its menu pops.
+- **Two menus, and only one of them is the view marker.**
+  - The view screen keeps `ReceiptEditPopupMenu`: Edit is in `popupMenuChildren` and History in
+    `alwaysShownChildren`.
+  - The edit screen, which had no menu, gains a plain `PopupMenuButton` (key
+    `receipt-edit-overflow-menu`) holding only History.
+  - It must not be a `ReceiptEditPopupMenu`. About a dozen integration specs wait for that widget to
+    mean "the /view shell has mounted", and an edit-screen copy would satisfy the wait before a save
+    lands.
+  - `ReceiptEditPopupMenu` still renders no button when it has nothing to show, which
+    `permission_receipt_edit_test.dart` pins for a read-only user without the permission.
+- **The server does the diff and the redaction; this only formats.** `lib/utils/receipt_history.dart`
+  turns the typed rows into text.
+  - Its wording mirrors the desktop drawer's `receipt-history.utils.ts` (verbs, field labels, the
+    two notices, the summary line). Nothing ties them together, so keep them in step by hand.
+  - **Every code is a plain `String`** (action, actor type, field, kind, value type, before-state).
+    Each helper falls back for one it does not know: an unknown action reads "updated this receipt",
+    an unknown field is title-cased, an unknown value type shows its raw value.
+    `test/models/receipt_history_ingest_test.dart` fails if a regen ever closes one into an enum.
+- **Times and day headers are in the device's time zone**, like every other date on mobile; desktop
+  uses the app zone (see "App time zone" above). A change late in the evening can therefore sit
+  under a different day on the two clients when the phone and the install disagree on the zone.
+- **A calendar day (a `DATE` value) is formatted from its date parts, never through `toLocal()`.**
+  `formatDate` (`utils/date.dart`) converts to local time, which moves a stored midnight-UTC day to
+  the previous day anywhere west of UTC. `formatHistoryCalendarDate` is the safe path, and its test
+  passes in UTC-11 and UTC+14.
+- **Avatars use each user's `defaultAvatarColor`** (`ReceiptHistoryActorAvatar`), not the shared
+  `UserAvatar`, which ignores the colour and asserts the user exists.
+  - History regularly names users who were deleted or are hidden from the viewer, so
+    **`UserModel.getUserById` now returns null for a missing id**, as its signature always said; it
+    used to throw `StateError`.
+  - Callers that `!` the result still fail on a miss, just with a null-check error. The `?? "Unknown"`
+    fallbacks elsewhere started working.
+- **Colours** are in `lib/constants/colors.dart`, under "Receipt history": the desktop drawer's chip
+  and box tints, with their contrast ratios.
+- **Tests:**
+  - `test/utils/receipt_history_test.dart` covers the formatting.
+  - `test/widgets/receipt_history_screen_test.dart` covers the screen against a mocked API: load,
+    collapse, failed and notice boxes, an unknown user, empty, error/retry, pull to refresh.
+  - `test/widgets/receipt_app_bar_action_builder_test.dart` covers both menus, the marker rule, and
+    that opening History leaves the URL alone.
+  - `test/widgets/receipt_edit_popup_menu_test.dart` covers the always-shown entries.
+  - `test/models/user_model_test.dart` and the ingest test above.
+- **E2e:** `integration_test/receipt_history_test.dart`.
+  - A read-only member holding the permission gets a menu with only History, and the screen shows the
+    server's entries, including a comment.
+  - History opened from the edit form returns to the form with the unsaved name still typed.
+  - A user without the permission has no History entry.
+  - The permission comes from giving the provisioned user the Legacy Admin app role
+    (`appRoleIdByName`).
 
 ### Receipt summary
 

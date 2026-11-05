@@ -134,3 +134,31 @@ const accentBlueDark = Color(0xFF0086D4);
 /// Border for a chip in the tinted "selected mode" treatment (the filter
 /// editor's operation chips). `$primary-palette` 100.
 const selectedChipBorder = Color(0xFFBBE6FF);
+
+// ---------------------------------------------------------------------------
+// Receipt history (lib/receipts/screens/receipt_history_screen.dart)
+//
+// The same values the desktop history drawer uses
+// (desktop/src/receipts/receipt-history-drawer/), so a change reads the same on
+// both clients. The chip and failure tints are the design's own, not palette
+// stops: there is no red or green M2 map in `variables.scss` beyond `$warn`.
+// ---------------------------------------------------------------------------
+
+/// The Quick Scan actor's avatar. `$primary-palette` 600.
+const historyQuickScanActor = Color(0xFF009EFA);
+
+/// A removed or replaced value's chip, and the failed-save box behind it.
+const historyRemovedSurface = Color(0xFFFDECEC);
+
+/// Text on [historyRemovedSurface]: 6.75:1.
+const historyRemovedText = Color(0xFFA02020);
+
+/// An added or new value's chip.
+const historyAddedSurface = Color(0xFFE8F5E9);
+
+/// Text on [historyAddedSurface]: 7.0:1.
+const historyAddedText = Color(0xFF1B5E20);
+
+/// Text on the older-version notice, which sits on [accentTint] (the design's
+/// `rgba(39,177,255,.08)` flattened against white). `$primary-palette` 800, 4.73:1.
+const historyNoticeText = Color(0xFF0072B4);
