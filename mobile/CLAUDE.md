@@ -1730,6 +1730,15 @@ the root `CLAUDE.md` → "Receipt Change History" for the contract.
     lands.
   - `ReceiptEditPopupMenu` still renders no button when it has nothing to show, which
     `permission_receipt_edit_test.dart` pins for a read-only user without the permission.
+- **History waits for the route's receipt to load.** The app bar renders before the receipt does,
+  while `ReceiptModel` still holds the default receipt or the previous screen's.
+  - Edit was already hidden then, because its gate reads the model's `groupId`. History is gated on
+    an app permission, so it would have appeared at once.
+  - That has two consequences. It opens the wrong receipt's history. And it makes the ⋮ menu appear
+    before the receipt has loaded, which `openReceiptEditForm` and `receipt_edit_test.dart` read as
+    "loaded", so they tapped a menu holding no Edit.
+  - So the builder offers History only when `receiptModel.receipt.id` matches the route's
+    `receiptId`.
 - **The server does the diff and the redaction; this only formats.** `lib/utils/receipt_history.dart`
   turns the typed rows into text.
   - Its wording mirrors the desktop drawer's `receipt-history.utils.ts` (verbs, field labels, the

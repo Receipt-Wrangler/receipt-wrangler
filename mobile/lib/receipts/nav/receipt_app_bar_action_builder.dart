@@ -34,12 +34,23 @@ class ReceiptAppBarActionBuilder {
   static const editOverflowMenuKey = ValueKey('receipt-edit-overflow-menu');
 
   List<Widget> buildAppBarMenu(GoRouterState state) {
-    return [_buildReceiptAppBarMenu(state.fullPath!)];
+    return [
+      _buildReceiptAppBarMenu(
+          state.fullPath!, state.pathParameters['receiptId']),
+    ];
   }
 
-  Widget _buildReceiptAppBarMenu(String fullPath) {
-    final canViewHistory = canViewReceiptHistory(
-        Provider.of<PermissionsModel>(context, listen: false));
+  Widget _buildReceiptAppBarMenu(String fullPath, String? routeReceiptId) {
+    // The app bar renders before the receipt loads, while the model still
+    // holds the default receipt (or the previous screen's). History is only
+    // offered once it holds the receipt this route names: earlier it would
+    // open the wrong receipt's history, and it would make the menu appear
+    // before the receipt loaded, which specs read as "loaded".
+    final receiptLoaded =
+        receiptModel.receipt.id.toString() == routeReceiptId;
+    final canViewHistory = receiptLoaded &&
+        canViewReceiptHistory(
+            Provider.of<PermissionsModel>(context, listen: false));
 
     if (fullPath.contains("view")) {
       return ReceiptEditPopupMenu(

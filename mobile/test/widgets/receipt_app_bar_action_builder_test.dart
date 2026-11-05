@@ -58,11 +58,12 @@ Future<GoRouter> _pump(
   required String mode,
   List<api.Permission> app = const [],
   List<api.Permission> group = const [api.Permission.groupPeriodReceiptsPeriodRead],
+  int loadedReceiptId = _receiptId,
 }) async {
   final receiptModel = ReceiptModel()
     ..setReceipt(
         getDefaultReceipt().rebuild((b) => b
-          ..id = _receiptId
+          ..id = loadedReceiptId
           ..groupId = _groupId),
         false);
   final router = _router('/receipts/$_receiptId/$mode');
@@ -127,6 +128,20 @@ void main() {
 
       expect(find.text('History'), findsOneWidget);
       expect(find.text('Edit'), findsNothing);
+    });
+
+    // The app bar renders while the receipt is still loading, when the model
+    // holds the default receipt (or the previous screen's). History must wait
+    // for this route's receipt, or it would open the wrong one's history.
+    testWidgets('offers no History until this route\'s receipt has loaded',
+        (tester) async {
+      await _pump(tester,
+          mode: 'view',
+          app: [api.Permission.appPeriodReceiptHistoryPeriodRead],
+          loadedReceiptId: 0);
+
+      expect(find.byType(ReceiptEditPopupMenu), findsOneWidget);
+      expect(_viewMenuButton(), findsNothing);
     });
 
     testWidgets('without the permission there is no History, and a read-only member no menu',
