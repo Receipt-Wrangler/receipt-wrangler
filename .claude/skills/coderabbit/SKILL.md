@@ -19,8 +19,8 @@ description: Address all CodeRabbit review comments on the current PR
 |---|---|---|
 | Identify the PR | `gh pr view --json …` | `list_pull_requests` with `head: "<owner>:<branch>"` |
 | Review threads, with resolved/outdated state | the GraphQL query in step 2 | `pull_request_read`, `method: get_review_comments` (page with `after`) |
-| Review bodies | `…/pulls/{n}/reviews` | `pull_request_read`, `method: get_reviews` |
-| PR conversation comments | `gh pr view {n} --comments` | `pull_request_read`, `method: get_comments` |
+| Review bodies | `…/pulls/{n}/reviews` | `pull_request_read`, `method: get_reviews` (fetch every page with `page`/`perPage`) |
+| PR conversation comments | `gh pr view {n} --comments` | `pull_request_read`, `method: get_comments` (fetch every page with `page`/`perPage`) |
 | Reply in a thread | `gh api …/pulls/{n}/comments -F in_reply_to=…` | `add_reply_to_pull_request_comment` |
 | PR-level comment | `gh pr comment` | `add_issue_comment` |
 
@@ -37,23 +37,27 @@ Inline comments and review-body findings live at different endpoints. Fetch both
   blocks, and summary findings live:
   `gh api --paginate repos/{owner}/{repo}/pulls/{n}/reviews`
 
-Filter to CodeRabbit. Its login is `coderabbitai[bot]` over REST, but `coderabbitai` over GraphQL
-and the MCP tools. Skip already-resolved threads. Extract the individual findings out of review
+Filter to CodeRabbit by matching both `coderabbitai` and `coderabbitai[bot]`. GraphQL and MCP's
+`get_review_comments` drop the `[bot]` suffix, while REST and MCP's `get_reviews` / `get_comments`
+keep it. Skip already-resolved threads. Extract the individual findings out of review
 bodies: one collapsed section ("Outside diff range comments", "Nitpick comments") often contains
 several distinct items, each with its own `file:line` header. Each is a separate finding.
 
 **Always run this GraphQL query too.** The REST comments payload has no resolved flag, so this is
 the only read that tells you which threads to skip. It's also the authoritative cross-check: if
 either REST call 404s under a token that works elsewhere, don't trust the empty result. If
-`totalCount` is over 100, page with `after`.
+`hasNextPage` is true on either connection, run the query again with `after:"<endCursor>"` on that
+connection, until it's false.
 
 ```bash
 gh api graphql -f query='
 { repository(owner:"{owner}", name:"{repo}") {
     pullRequest(number:{n}) {
-      reviewThreads(first:100){ totalCount nodes { isResolved isOutdated path
-        comments(first:10){ nodes { databaseId author{login} body } } } }
-      reviews(first:50){ totalCount nodes { author{login} state body } } } } }'
+      reviewThreads(first:100){ totalCount pageInfo{ hasNextPage endCursor }
+        nodes { isResolved isOutdated path
+          comments(first:10){ nodes { databaseId author{login} body } } } }
+      reviews(first:50){ totalCount pageInfo{ hasNextPage endCursor }
+        nodes { author{login} state body } } } } }'
 ```
 
 Build a numbered finding list before touching anything, and state the count.
@@ -181,7 +185,8 @@ them after I say go. The setup is in `desktop/CLAUDE.md` → "E2E Testing" and `
 
 ## 6. Commit, push, reply
 
-Commit and push first, so replies can reference the resolving commit. Then reply
+If you made fixes, commit and push first, so replies can reference the resolving commit. If every
+finding was pushed back on, there's nothing to commit, so go straight to the replies. Reply
 to **every** finding you evaluated: applied, partially applied, or skipped. An
 unanswered CodeRabbit comment looks like it was missed.
 

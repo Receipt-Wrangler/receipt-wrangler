@@ -908,8 +908,8 @@ For a feature that adds a new API endpoint and a corresponding UI:
 Addressing CodeRabbit review comments is the **`coderabbit` skill** (`/coderabbit`, defined in
 `.claude/skills/coderabbit/SKILL.md`). Follow it. Feedback from human reviewers or any other source
 follows the same skill from step 3 on. In short: always show the user the full disposition table
-and wait before changing anything, reject every finding on generated code, and commit and push
-before replying to each comment individually.
+and wait before changing anything, reject every finding on generated code, and reply to each
+comment individually, after committing and pushing any fixes.
 
 ## CLAUDE.md Maintenance
 
