@@ -203,11 +203,14 @@ Future<void> loadDemoFontsOrFail(WidgetTester tester) async {
 /// capture hangs until the test times out rather than failing. `runAsync` also
 /// **swallows** any error and returns null, surfacing it through
 /// `takeException`, hence the explicit `fail`.
-Future<img.Image> grabFrame(WidgetTester tester) async {
+///
+/// [pixelRatio] rasterizes the layer tree at that multiple of the logical size,
+/// so text stays sharp in a demo meant to be read rather than measured.
+Future<img.Image> grabFrame(WidgetTester tester, {double pixelRatio = 1.0}) async {
   final frame = await tester.runAsync(() async {
     final boundary = _boundaryKey.currentContext!.findRenderObject()!
         as RenderRepaintBoundary;
-    final image = await boundary.toImage();
+    final image = await boundary.toImage(pixelRatio: pixelRatio);
     try {
       final data = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
       return img.Image.fromBytes(
@@ -291,9 +294,15 @@ void writeSideBySidePng({
 /// Synchronous for the same reason the others are: `testWidgets` runs in
 /// fake-async, where `File.writeAsBytes` never completes and the test hangs
 /// until it times out.
+///
+/// [quantizerType] defaults to octree, which suits flat UI. Pass
+/// [img.QuantizerType.neural] when thin antialiased edges speckle: octree maps
+/// their rare near-white pixels to whatever dark bucket is closest, which reads
+/// as a dotted outline on a rounded card's corners.
 void writeGif({
   required List<({img.Image frame, int centis})> frames,
   required String path,
+  img.QuantizerType quantizerType = img.QuantizerType.octree,
 }) {
   final encoder = img.GifEncoder(
     repeat: 0,
@@ -305,7 +314,7 @@ void writeGif({
     // visible stripes. It also cleans up antialiased white text on a saturated
     // caption strip, which ghosts at 128.
     numColors: 256,
-    quantizerType: img.QuantizerType.octree,
+    quantizerType: quantizerType,
     dither: img.DitherKernel.none,
   );
 
