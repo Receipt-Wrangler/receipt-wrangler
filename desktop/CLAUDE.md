@@ -2648,6 +2648,23 @@ canvas collapses to its 2px border.
 `height: 100% !important` makes a hidden file input swallow the whole column and leaves the stage
 with nothing but its own 2px border.
 
+**The images spinner sits outside the stage, between `app-upload-image` and the stage.**
+`.rw-images-pane__stage` only renders once `images()` or `filesToUpload()` is non-empty, so a spinner
+inside it never showed: not for the first image, and not while the saved images loaded (`images()` is
+still `[]` then). It is gated on `imagesBusy()`, which covers three things:
+- `imagesLoading`: saved images being fetched.
+- `imagesProcessing`: the upload control still reading or converting a file. A PDF/HEIC goes through
+  `convertToJpg` first, which can take seconds.
+- An edit-mode upload in flight (`imageUploadsInFlight`).
+
+Every one of them resets in a `finalize`, so a failed request clears the spinner too.
+`app-upload-image` reports the second through its **`processingChange` output** (`true` when the first
+file starts, `false` when the last is emitted or fails). It is an output rather than a public signal
+because the host specs render that element under `CUSTOM_ELEMENTS_SCHEMA`. There a template-ref read
+like `#uploader.isProcessing()` would hit a bare DOM element and throw, while an unfired output costs
+nothing. The Quick Scan dialog uses the same output for its own spinner, which takes the place of the
+"Select images to upload" prompt while it shows.
+
 **The fullscreen dialog runs the same canvas.** `#expandedImageTemplate` passes
 `class="rw-carousel--fill"` and `stageHeight="100%"` exactly as the inline carousel does, plus a
 floating close button — it previously had **no way out but Esc and the backdrop**. The height chain

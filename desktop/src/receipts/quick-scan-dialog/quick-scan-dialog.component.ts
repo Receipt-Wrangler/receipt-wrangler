@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, ViewEncapsulation, inject, viewChild } from "@angular/core";
+import { Component, DestroyRef, OnInit, ViewEncapsulation, inject, signal, viewChild } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormArray, FormBuilder, FormControl, FormGroup, Validators } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
@@ -40,6 +40,9 @@ export class QuickScanDialogComponent implements OnInit {
   public form: FormGroup = new FormGroup({});
 
   public images: ReceiptFileUploadCommand[] = [];
+
+  /** Set from app-upload-image while a picked file is still being read or converted. */
+  public readonly imagesProcessing = signal(false);
 
   public currentlySelectedIndex: number = 0;
 
