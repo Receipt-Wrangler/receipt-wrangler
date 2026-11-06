@@ -3,11 +3,10 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:receipt_wrangler_mobile/shared/widgets/top_app_bar.dart';
-import 'package:receipt_wrangler_mobile/shared/widgets/user_avatar.dart';
 
 import 'helpers/api.dart';
 import 'helpers/login.dart';
+import 'helpers/nav.dart';
 import 'helpers/permission_fixtures.dart';
 import 'helpers/platform_mocks.dart';
 import 'helpers/pump.dart';
@@ -35,23 +34,6 @@ void main() {
       installLinuxDesktopMocks();
     }
   });
-
-  // Opens the avatar popup menu from the post-login GroupSelect landing. The
-  // popup mounts its items on the animation's first frame, so we wait on a stable
-  // item (User Profile) being hit-testable and drain a few frames before acting —
-  // the popup-menu tap-flake pattern documented in mobile/CLAUDE.md.
-  Future<void> openAvatarMenu(WidgetTester tester) async {
-    final avatar = find.descendant(
-      of: find.byType(TopAppBar),
-      matching: find.byType(UserAvatar),
-    );
-    await pumpUntilFound(tester, avatar);
-    await tester.tap(avatar);
-    await pumpUntilFound(tester, find.text('User Profile').hitTestable());
-    for (var i = 0; i < 5; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-  }
 
   Future<void> tapReports(WidgetTester tester) async {
     final reports = find.text('Reports').hitTestable();
