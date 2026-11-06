@@ -7,6 +7,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 )
 
@@ -19,7 +20,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 			systemSettingsService := services.NewSystemSettingsService(nil)
 			featureConfig, err := systemSettingsService.GetFeatureConfig()
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			if !featureConfig.EnableLocalSignUp {
@@ -37,7 +38,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 			_, err = userRepository.CreateUser(userData)
 
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

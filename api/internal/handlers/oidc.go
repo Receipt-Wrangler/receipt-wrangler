@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"receipt-wrangler/api/internal/stacktrace"
 
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/oidc"
@@ -31,15 +32,15 @@ func OidcExchange(w http.ResponseWriter, r *http.Request) {
 				// Every rejection reason is deliberately indistinguishable, so a caller
 				// cannot probe which codes exist.
 				if errors.Is(err, oidc.ErrInvalidExchange) {
-					return http.StatusBadRequest, err
+					return http.StatusBadRequest, stacktrace.WithStack(err)
 				}
 
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(appData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -65,12 +66,12 @@ func GetOidcConnections(w http.ResponseWriter, r *http.Request) {
 
 			identities, err := repositories.NewOidcIdentityRepository(nil).GetIdentitiesForUser(token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := json.Marshal(services.BuildOidcConnectionViews(identities))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -108,7 +109,7 @@ func DeleteOidcConnection(w http.ResponseWriter, r *http.Request) {
 			err := oidc.UnlinkIdentity(token.UserId, chi.URLParam(r, "name"))
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return http.StatusNotFound, err
+					return http.StatusNotFound, stacktrace.WithStack(err)
 				}
 
 				if errors.Is(err, oidc.ErrWouldLockOut) {
@@ -121,7 +122,7 @@ func DeleteOidcConnection(w http.ResponseWriter, r *http.Request) {
 					return 0, nil
 				}
 
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

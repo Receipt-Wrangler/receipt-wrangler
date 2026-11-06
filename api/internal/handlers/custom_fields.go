@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -27,7 +28,7 @@ func GetPagedCustomFields(w http.ResponseWriter, r *http.Request) {
 			pagedRequestCommand := commands.PagedRequestCommand{}
 			err := pagedRequestCommand.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := pagedRequestCommand.Validate()
@@ -39,7 +40,7 @@ func GetPagedCustomFields(w http.ResponseWriter, r *http.Request) {
 			customFieldsRepository := repositories.NewCustomFieldRepository(nil)
 			customFields, count, err := customFieldsRepository.GetPagedCustomFields(pagedRequestCommand)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			anyData := make([]any, len(customFields))
@@ -52,7 +53,7 @@ func GetPagedCustomFields(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -76,7 +77,7 @@ func CreateCustomField(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertCustomFieldCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate()
@@ -89,11 +90,11 @@ func CreateCustomField(w http.ResponseWriter, r *http.Request) {
 			customFieldsRepository := repositories.NewCustomFieldRepository(nil)
 			customField, err := customFieldsRepository.CreateCustomField(command, &token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			bytes, err := json.Marshal(customField)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -117,13 +118,13 @@ func UpdateCustomField(w http.ResponseWriter, r *http.Request) {
 			customFieldId := chi.URLParam(r, "id")
 			customFieldIdUint, err := utils.StringToUint(customFieldId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			command := commands.UpsertCustomFieldCommand{}
 			err = command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate()
@@ -136,9 +137,9 @@ func UpdateCustomField(w http.ResponseWriter, r *http.Request) {
 			existingCustomField, err := customFieldsRepository.GetCustomFieldById(customFieldIdUint)
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return http.StatusNotFound, err
+					return http.StatusNotFound, stacktrace.WithStack(err)
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs = command.ValidateUpdate(existingCustomField)
@@ -149,12 +150,12 @@ func UpdateCustomField(w http.ResponseWriter, r *http.Request) {
 
 			customField, err := customFieldsRepository.UpdateCustomField(customFieldIdUint, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := json.Marshal(customField)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -178,18 +179,18 @@ func GetCustomFieldById(w http.ResponseWriter, r *http.Request) {
 			customFieldId := chi.URLParam(r, "id")
 			customFieldIdUint, err := utils.StringToUint(customFieldId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			customFieldsRepository := repositories.NewCustomFieldRepository(nil)
 			customField, err := customFieldsRepository.GetCustomFieldById(customFieldIdUint)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := json.Marshal(customField)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -213,13 +214,13 @@ func DeleteCustomField(w http.ResponseWriter, r *http.Request) {
 			customFieldId := chi.URLParam(r, "id")
 			customFieldIdUint, err := utils.StringToUint(customFieldId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			customFieldsRepository := repositories.NewCustomFieldRepository(nil)
 			err = customFieldsRepository.DeleteCustomField(customFieldIdUint)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

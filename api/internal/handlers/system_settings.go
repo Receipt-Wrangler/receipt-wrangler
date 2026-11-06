@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"receipt-wrangler/api/internal/wranglerasynq"
@@ -25,12 +26,12 @@ func GetSystemSettings(w http.ResponseWriter, r *http.Request) {
 			systemSettingsRepository := repositories.NewSystemSettingsRepository(nil)
 			systemSettings, err := systemSettingsRepository.GetSystemSettings()
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(systemSettings)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -55,7 +56,7 @@ func UpdateSystemSettings(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertSystemSettingsCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate()
@@ -66,7 +67,7 @@ func UpdateSystemSettings(w http.ResponseWriter, r *http.Request) {
 
 			blocked, err := serverPublicUrlStillNeeded(command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			if blocked {
@@ -81,25 +82,25 @@ func UpdateSystemSettings(w http.ResponseWriter, r *http.Request) {
 
 			previousSystemSettings, err := systemSettingsRepository.GetSystemSettings()
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			updatedSystemSettings, err := systemSettingsRepository.UpdateSystemSettings(command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			if previousSystemSettings.EmailPollingInterval != updatedSystemSettings.EmailPollingInterval &&
 				updatedSystemSettings.EmailPollingInterval > 0 && config.GetDeployEnv() != "test" {
 				err = wranglerasynq.StartEmailPolling()
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 			}
 
 			responseBytes, err := utils.MarshalResponseData(updatedSystemSettings)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -151,7 +152,7 @@ func RestartTaskServer(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			err := wranglerasynq.RestartEmbeddedAsynqServer()
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

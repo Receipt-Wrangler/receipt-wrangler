@@ -7,6 +7,7 @@ import (
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -26,7 +27,7 @@ func ExportAllReceiptsFromGroup(w http.ResponseWriter, r *http.Request) {
 			pagedRequest := commands.ReceiptPagedRequestCommand{}
 			err := pagedRequest.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := pagedRequest.Validate()
@@ -40,11 +41,11 @@ func ExportAllReceiptsFromGroup(w http.ResponseWriter, r *http.Request) {
 
 			uintGroupId, err := utils.StringToUint(groupId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			err = permissionService.IntersectReceiptFilterWithGrants(token.UserId, uintGroupId, &pagedRequest.Filter)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			receiptRepository := repositories.NewReceiptRepository(nil)
@@ -62,25 +63,25 @@ func ExportAllReceiptsFromGroup(w http.ResponseWriter, r *http.Request) {
 					permissionService.CategoryTagVisibilityResolver(token.UserId),
 				)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			err = permissionService.FilterReceiptCategoriesTags(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Mask user references (created-by, item charged-to) the caller may
 			// not see before they are rendered into the CSV.
 			err = permissionService.MaskReceiptsForMemberVisibility(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			receiptCsvService := services.NewReceiptCsvService()
 			zip, err := receiptCsvService.GetZippedCsvFiles(receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.Header().Set("Content-Disposition", "attachment; filename=data.zip")
@@ -107,33 +108,33 @@ func ExportReceiptsById(w http.ResponseWriter, r *http.Request) {
 		GroupPermissions: []string{permissions.GroupReceiptsRead},
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			token := structs.GetClaims(r)
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			receipts, err := receiptRepository.GetReceiptsByIds(receiptIds, getExportReceiptAssociations())
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			permissionService := services.NewPermissionService(nil)
 			err = permissionService.FilterReceiptCategoriesTags(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Mask user references (created-by, item charged-to) the caller may
 			// not see before they are rendered into the CSV.
 			err = permissionService.MaskReceiptsForMemberVisibility(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			receiptCsvService := services.NewReceiptCsvService()
 			zip, err := receiptCsvService.GetZippedCsvFiles(receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.Header().Set("Content-Disposition", "attachment; filename=data.zip")

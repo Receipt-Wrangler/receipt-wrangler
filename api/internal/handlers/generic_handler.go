@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
@@ -32,7 +34,7 @@ func HandleRequest(handler structs.Handler) {
 		db := repositories.GetDB()
 		err := db.Model(models.Receipt{}).Where("id = ?", handler.ReceiptId).Select("group_id", "paid_by_user_id").First(&receipt).Error
 		if err != nil {
-			logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
+			logHandlerError(handler.Request, err)
 			utils.WriteCustomErrorResponse(handler.Writer, unauthorizedEntityMessage, http.StatusForbidden)
 			return
 		}
@@ -46,7 +48,7 @@ func HandleRequest(handler structs.Handler) {
 		db := repositories.GetDB()
 		err := db.Model(models.Receipt{}).Where("id IN (?)", handler.ReceiptIds).Select("group_id", "paid_by_user_id").Find(&receipts).Error
 		if err != nil {
-			logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
+			logHandlerError(handler.Request, err)
 			utils.WriteCustomErrorResponse(handler.Writer, unauthorizedEntityMessage, http.StatusForbidden)
 			return
 		}
@@ -68,7 +70,7 @@ func HandleRequest(handler structs.Handler) {
 	errCode, err := handler.HandlerFunction(handler.Writer, handler.Request)
 
 	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
+		logHandlerError(handler.Request, err)
 		utils.WriteCustomErrorResponse(handler.Writer, handler.ErrorMessage, errCode)
 		return
 	}
@@ -169,8 +171,19 @@ func enforcePaidByVisibility(handler structs.Handler, receipts []models.Receipt)
 
 func denyUnauthorized(handler structs.Handler, err error) bool {
 	if err != nil {
-		logging.LogStd(logging.LOG_LEVEL_ERROR, err.Error())
+		logHandlerError(handler.Request, err)
 	}
 	utils.WriteCustomErrorResponse(handler.Writer, unauthorizedEntityMessage, http.StatusForbidden)
 	return false
+}
+
+// logHandlerError logs err with the request it failed on and the stack it was
+// returned from, so the line says which endpoint and which line of it failed
+// instead of only naming this file. Handlers attach that stack with
+// stacktrace.WithStack where they return the error; one that arrives without a
+// stack gets one here, which still names the handler that called HandleRequest.
+// The query string is left out because it can carry credentials.
+func logHandlerError(r *http.Request, err error) {
+	err = stacktrace.WithStack(err)
+	logging.LogStd(logging.LOG_LEVEL_ERROR, fmt.Sprintf("%s %s: %s%s", r.Method, r.URL.Path, err.Error(), stacktrace.Format(err)))
 }

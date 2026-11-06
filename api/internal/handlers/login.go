@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
@@ -24,7 +25,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 			dbUser, firstAdminToLogin, err := services.LoginUser(userData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			if firstAdminToLogin {
@@ -41,13 +42,13 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 			jwt, refreshToken, accessTokenClaims, err := services.GenerateJWT(dbUser.ID)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			services.PrepareAccessTokenClaims(accessTokenClaims)
 
 			appData, err := services.GetAppData(dbUser.ID, nil)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			tokensInBodyOnly := r.URL.Query().Get("tokensInBody") == "true"
@@ -68,7 +69,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(appData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			w.WriteHeader(200)
 			w.Write(bytes)

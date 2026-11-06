@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -25,7 +26,7 @@ func CreateApiKey(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertApiKeyCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate()
@@ -39,7 +40,7 @@ func CreateApiKey(w http.ResponseWriter, r *http.Request) {
 
 			generatedKey, err := apiKeyService.CreateApiKey(token.UserId, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			response := structs.ApiKeyResult{
@@ -48,7 +49,7 @@ func CreateApiKey(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(response)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -72,7 +73,7 @@ func GetPagedApiKeys(w http.ResponseWriter, r *http.Request) {
 			command := commands.PagedApiKeyRequestCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate(r)
@@ -89,7 +90,7 @@ func GetPagedApiKeys(w http.ResponseWriter, r *http.Request) {
 				permissionService := services.NewPermissionService(nil)
 				canReadAny, err := permissionService.HasAppPermissions(token.UserId, permissions.AppApiKeysReadAny)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				if !canReadAny {
 					return http.StatusForbidden, errors.New("user is unauthorized to view all API keys")
@@ -101,7 +102,7 @@ func GetPagedApiKeys(w http.ResponseWriter, r *http.Request) {
 
 			apiKeys, count, err := apiKeyService.GetPagedApiKeys(command, userIdString)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			anyData := make([]any, len(apiKeys))
@@ -114,7 +115,7 @@ func GetPagedApiKeys(w http.ResponseWriter, r *http.Request) {
 				Data:       anyData,
 			})
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -142,7 +143,7 @@ func UpdateApiKey(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertApiKeyCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate()
@@ -156,7 +157,7 @@ func UpdateApiKey(w http.ResponseWriter, r *http.Request) {
 
 			err = apiKeyService.UpdateApiKey(id, token.UserId, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -188,12 +189,12 @@ func DeleteApiKey(w http.ResponseWriter, r *http.Request) {
 			permissionService := services.NewPermissionService(nil)
 			canDeleteAny, err := permissionService.HasAppPermissions(token.UserId, permissions.AppApiKeysDeleteAny)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			err = apiKeyService.DeleteApiKey(id, token.UserId, canDeleteAny)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

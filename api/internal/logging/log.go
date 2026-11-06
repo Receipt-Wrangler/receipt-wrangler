@@ -28,9 +28,10 @@ func InitLog() error {
 		return err
 	}
 
-	logFlags := log.Lshortfile | log.LstdFlags
+	// Date and time only. LogStd prefixes its caller's file and line itself;
+	// log.Lshortfile would name LogStd's own Println, the same line every time.
+	logFlags := log.LstdFlags
 
-	// Flags are for date time, file name, and line number
 	logger = log.New(logFile, "App", logFlags)
 	stdLogger = log.New(os.Stdout, "App", logFlags)
 

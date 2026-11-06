@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -23,12 +24,12 @@ func GetAllTags(w http.ResponseWriter, r *http.Request) {
 			tagsRepository := repositories.NewTagsRepository(nil)
 			tags, err := tagsRepository.GetAllTags("*")
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&tags)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -57,18 +58,18 @@ func CreateTag(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			tagRepository := repositories.NewTagsRepository(nil)
 			createdTag, err := tagRepository.CreateTag(tag)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&createdTag)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -93,13 +94,13 @@ func GetPagedTags(w http.ResponseWriter, r *http.Request) {
 			pagedRequestCommand := commands.PagedRequestCommand{}
 			err := pagedRequestCommand.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			tagsRepository := repositories.NewTagsRepository(nil)
 			tags, err := tagsRepository.GetAllPagedTags(pagedRequestCommand)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			anyData := make([]any, len(tags))
@@ -112,7 +113,7 @@ func GetPagedTags(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -138,18 +139,18 @@ func UpdateTag(w http.ResponseWriter, r *http.Request) {
 			tagUpsertCommand := commands.UpsertTagCommand{}
 			err := tagUpsertCommand.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			tagRepository := repositories.NewTagsRepository(nil)
 			updatedTag, err := tagRepository.UpdateTag(id, tagUpsertCommand)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(updatedTag)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -174,13 +175,13 @@ func DeleteTag(w http.ResponseWriter, r *http.Request) {
 
 			uintId, err := utils.StringToUint(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			tagRepository := repositories.NewTagsRepository(nil)
 			err = tagRepository.DeleteTag(uintId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -204,12 +205,12 @@ func GetTagNameCount(w http.ResponseWriter, r *http.Request) {
 			tagName := chi.URLParam(r, "tagName")
 			count, err := tagRepository.GetCount("tags", "name = ?", tagName)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(count)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)

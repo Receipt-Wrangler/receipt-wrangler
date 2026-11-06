@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 )
 
@@ -20,7 +21,7 @@ func ImportConfigJson(w http.ResponseWriter, r *http.Request) {
 			command := commands.ConfigImportCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate()
@@ -32,7 +33,7 @@ func ImportConfigJson(w http.ResponseWriter, r *http.Request) {
 			importService := services.NewImportService(nil)
 			err = importService.ImportConfigJson(command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			return 0, nil

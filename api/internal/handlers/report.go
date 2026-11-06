@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"receipt-wrangler/api/internal/stacktrace"
 	"strings"
 
 	"receipt-wrangler/api/internal/commands"
@@ -116,7 +117,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 					utils.WriteCustomErrorResponse(w, "Invalid report configuration: "+specErr.Error(), http.StatusBadRequest)
 					return 0, nil
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.Header().Set("Content-Type", report.ContentType)
@@ -168,12 +169,12 @@ func PreviewReport(w http.ResponseWriter, r *http.Request) {
 					utils.WriteCustomErrorResponse(w, "Invalid report configuration: "+specErr.Error(), http.StatusBadRequest)
 					return 0, nil
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(preview)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -208,12 +209,12 @@ func GetReportReceipts(w http.ResponseWriter, r *http.Request) {
 
 			pagedData, err := services.NewReportService(nil).Receipts(token.UserId, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -243,7 +244,7 @@ func DeleteReportTemplate(w http.ResponseWriter, r *http.Request) {
 
 			err := repositories.NewReportTemplateRepository(nil).DeleteReportTemplateById(utils.UintToString(template.ID))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			services.EvictAllGroupRoleGrants()
@@ -275,7 +276,7 @@ func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 			// AppPermissions gate can't express); deny outright without either.
 			canList, err := permissionService.HasAnyAppPermission(token.UserId, permissions.AppReportsRead, permissions.AppReportsReadAll)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !canList {
 				utils.WriteCustomErrorResponse(w, "User is unauthorized to access report templates", http.StatusForbidden)
@@ -284,7 +285,7 @@ func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 
 			command := commands.PagedRequestCommand{}
 			if err := command.LoadDataFromRequest(w, r); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate()
@@ -295,7 +296,7 @@ func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 
 			visibleIds, unrestricted, err := permissionService.VisibleTemplateIds(token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			var idFilter *[]uint
 			if !unrestricted {
@@ -304,7 +305,7 @@ func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 
 			templates, count, err := repositories.NewReportTemplateRepository(nil).GetPagedReportTemplates(command, idFilter)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			pagedData := structs.PagedData{}
@@ -312,7 +313,7 @@ func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 			for i := 0; i < len(templates); i++ {
 				actions, err := permissionService.AllowedActionsForTemplate(token.UserId, templates[i].ID)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				templates[i].AllowedActions = actions
 				data = append(data, templates[i])
@@ -322,7 +323,7 @@ func GetPagedReportTemplates(w http.ResponseWriter, r *http.Request) {
 
 			responseBytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -350,7 +351,7 @@ func GetReportTemplate(w http.ResponseWriter, r *http.Request) {
 
 			responseBytes, err := utils.MarshalResponseData(template)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -382,12 +383,12 @@ func DuplicateReportTemplate(w http.ResponseWriter, r *http.Request) {
 
 			template, err := repositories.NewReportTemplateRepository(nil).DuplicateReportTemplate(token.UserId, utils.UintToString(source.ID))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(template)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -432,7 +433,7 @@ func CreateReportTemplate(w http.ResponseWriter, r *http.Request) {
 			// (createAll bypasses that ceiling).
 			canCreate, err := permissionService.HasAnyAppPermission(token.UserId, permissions.AppReportsCreate, permissions.AppReportsCreateAll)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !canCreate {
 				utils.WriteCustomErrorResponse(w, "User is unauthorized to create report templates", http.StatusForbidden)
@@ -441,7 +442,7 @@ func CreateReportTemplate(w http.ResponseWriter, r *http.Request) {
 
 			canReport, err := permissionService.CanReportOverGroups(token.UserId, command.GroupIds, permissions.AppReportsCreateAll)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !canReport {
 				utils.WriteCustomErrorResponse(w, "User is unauthorized to create a report over one or more of these groups", http.StatusForbidden)
@@ -450,12 +451,12 @@ func CreateReportTemplate(w http.ResponseWriter, r *http.Request) {
 
 			template, err := repositories.NewReportTemplateRepository(nil).CreateReportTemplate(command, token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(template)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -503,7 +504,7 @@ func UpdateReportTemplate(w http.ResponseWriter, r *http.Request) {
 			// each of them (updateAll bypasses that ceiling).
 			canReport, err := permissionService.CanReportOverGroups(token.UserId, command.GroupIds, permissions.AppReportsUpdateAll)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !canReport {
 				utils.WriteCustomErrorResponse(w, "User is unauthorized to report over one or more of these groups", http.StatusForbidden)
@@ -516,12 +517,12 @@ func UpdateReportTemplate(w http.ResponseWriter, r *http.Request) {
 					utils.WriteCustomErrorResponse(w, "Report template not found", http.StatusNotFound)
 					return 0, nil
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(template)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -552,7 +553,7 @@ func GenerateReportFromTemplate(w http.ResponseWriter, r *http.Request) {
 
 			var command commands.ReportRequestCommand
 			if err := json.Unmarshal(template.Configuration, &command); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			token := structs.GetClaims(r)
@@ -563,7 +564,7 @@ func GenerateReportFromTemplate(w http.ResponseWriter, r *http.Request) {
 					utils.WriteCustomErrorResponse(w, "Invalid report configuration: "+specErr.Error(), http.StatusBadRequest)
 					return 0, nil
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.Header().Set("Content-Type", report.ContentType)
@@ -614,12 +615,12 @@ func RenderReportTemplate(w http.ResponseWriter, r *http.Request) {
 					utils.WriteCustomErrorResponse(w, "Invalid report configuration: "+specErr.Error(), http.StatusBadRequest)
 					return 0, nil
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(preview)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -645,12 +646,12 @@ func GetReportTemplateOptions(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			options, err := repositories.NewReportTemplateRepository(nil).GetAllTemplateOptions()
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(options)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

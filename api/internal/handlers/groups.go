@@ -10,6 +10,7 @@ import (
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"receipt-wrangler/api/internal/wranglerasynq"
@@ -30,7 +31,7 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 			command := commands.PagedGroupRequestCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate(r)
@@ -47,7 +48,7 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 				permissionService := services.NewPermissionService(nil)
 				canReadAll, err := permissionService.HasAppPermissions(token.UserId, permissions.AppGroupsRead)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				if !canReadAll {
 					return http.StatusForbidden, errors.New("user is unauthorized to view all groups")
@@ -59,7 +60,7 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 
 			groups, count, err := groupRepository.GetPagedGroups(command, userIdString)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// The settings row's id/status slices are `gorm:"-"`, so Preload(clause.Associations)
@@ -70,7 +71,7 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 			// would update rows nobody serializes.
 			if err := repositories.NewGroupReceiptSettingsRepository(nil).
 				LoadSettingsProjectionsForGroups(groups); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			anyData := make([]any, len(groups))
@@ -83,7 +84,7 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 				Data:       anyData,
 			})
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -110,7 +111,7 @@ func GetGroupsForUser(w http.ResponseWriter, r *http.Request) {
 
 			groups, err := groupService.GetGroupsForUser(utils.UintToString(token.UserId))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// TODO: 12/1/2023 This is a way for ensure all users have an all group. We can remove this in a few months
@@ -127,12 +128,12 @@ func GetGroupsForUser(w http.ResponseWriter, r *http.Request) {
 
 				_, err := groupsRepository.CreateAllGroup(token.UserId)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				groups, err = groupService.GetGroupsForUser(utils.UintToString(token.UserId))
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 			}
 
@@ -140,12 +141,12 @@ func GetGroupsForUser(w http.ResponseWriter, r *http.Request) {
 			// caller may see (no-op for unrestricted viewers).
 			permissionService := services.NewPermissionService(nil)
 			if err := permissionService.FilterGroupMembersForGroups(token.UserId, groups); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Attach each visible member's per-member category/tag grants.
 			if err := repositories.NewGroupMemberRepository(nil).LoadMemberGrantsForGroups(groups); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Same treatment for each group's receipt-settings projections, which are also
@@ -154,12 +155,12 @@ func GetGroupsForUser(w http.ResponseWriter, r *http.Request) {
 			// summary configuration from — an unloaded response would blank both, and would put
 			// a null where swagger promises an array.
 			if err := repositories.NewGroupReceiptSettingsRepository(nil).LoadSettingsProjectionsForGroups(groups); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(groups)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -187,7 +188,7 @@ func GetGroupById(w http.ResponseWriter, r *http.Request) {
 			groupRepository := repositories.NewGroupRepository(nil)
 			groups, err := groupRepository.GetGroupById(id, true, true, true)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Member-presence isolation: strip the roster to the members the caller
@@ -195,17 +196,17 @@ func GetGroupById(w http.ResponseWriter, r *http.Request) {
 			token := structs.GetClaims(r)
 			permissionService := services.NewPermissionService(nil)
 			if err := permissionService.FilterGroupMembersForGroup(token.UserId, &groups); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Attach each visible member's per-member category/tag grants.
 			if err := repositories.NewGroupMemberRepository(nil).LoadMemberGrantsForGroup(&groups); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(groups)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -229,7 +230,7 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertGroupCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate(true)
@@ -245,13 +246,13 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 			group, err := groupRepository.CreateGroup(command, token.UserId)
 
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// A brand-new group has no grants yet, but the response must still carry
 			// the empty arrays swagger declares rather than null.
 			if err := repositories.NewGroupMemberRepository(nil).LoadMemberGrantsForGroup(&group); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Same reasoning for the group's settings projections, with one wrinkle: CreateGroup
@@ -262,23 +263,23 @@ func CreateGroup(w http.ResponseWriter, r *http.Request) {
 			if err := repositories.NewGroupReceiptSettingsRepository(nil).LoadSettingsProjections(
 				[]*models.GroupReceiptSettings{&group.GroupReceiptSettings},
 			); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(group)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			fileRepository := repositories.NewFileRepository(nil)
 			groupPath, err := fileRepository.BuildGroupPath(group.ID, "")
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			err = utils.MakeDataDirectory(groupPath)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -304,7 +305,7 @@ func UpdateGroup(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertGroupCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate(true)
@@ -317,12 +318,12 @@ func UpdateGroup(w http.ResponseWriter, r *http.Request) {
 			groupRepository := repositories.NewGroupRepository(nil)
 			uintGroupId, err := utils.StringToUint(groupId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			isAllGroup, err := groupRepository.IsAllGroup(uintGroupId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if isAllGroup {
 				return http.StatusBadRequest, errors.New("cannot update all group")
@@ -337,15 +338,15 @@ func UpdateGroup(w http.ResponseWriter, r *http.Request) {
 			err = groupService.AuthorizeGroupMemberChanges(token.UserId, uintGroupId, command.GroupMembers)
 			if err != nil {
 				if errors.Is(err, services.ErrGroupMemberChangeForbidden) {
-					return http.StatusForbidden, err
+					return http.StatusForbidden, stacktrace.WithStack(err)
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			updatedGroup, err := groupRepository.UpdateGroup(command, groupId)
 
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Grants are transient (gorm:"-") and so are absent from anything the
@@ -354,12 +355,12 @@ func UpdateGroup(w http.ResponseWriter, r *http.Request) {
 			// reads its assignments from — an unloaded response would show every
 			// member as unassigned.
 			if err := repositories.NewGroupMemberRepository(nil).LoadMemberGrantsForGroup(&updatedGroup); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(updatedGroup)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -388,18 +389,18 @@ func UpdateGroupSettings(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			groupSettingsRepository := repositories.NewGroupSettingsRepository(nil)
 			updatedGroupSettings, err := groupSettingsRepository.UpdateGroupSettings(groupId, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(updatedGroupSettings)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -430,7 +431,7 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// The endpoint is gated on GroupUpdate only. Touching the group's default custom field
@@ -459,7 +460,7 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 				canReadCustomFields, err := services.NewPermissionService(nil).
 					HasAppPermissions(token.UserId, permissions.AppCustomFieldsRead)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				if !canReadCustomFields {
 					utils.WriteCustomErrorResponse(
@@ -475,7 +476,7 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 				if command.DefaultCustomFieldIds != nil {
 					vErr, err := validateDefaultCustomFieldIds(*command.DefaultCustomFieldIds)
 					if err != nil {
-						return http.StatusInternalServerError, err
+						return http.StatusInternalServerError, stacktrace.WithStack(err)
 					}
 					if len(vErr.Errors) > 0 {
 						structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
@@ -486,7 +487,7 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 				if command.ReceiptSummaryCustomFieldIds != nil {
 					vErr, err := validateReceiptSummaryCustomFieldIds(*command.ReceiptSummaryCustomFieldIds)
 					if err != nil {
-						return http.StatusInternalServerError, err
+						return http.StatusInternalServerError, stacktrace.WithStack(err)
 					}
 					if len(vErr.Errors) > 0 {
 						structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
@@ -498,12 +499,12 @@ func UpdateGroupReceiptSettings(w http.ResponseWriter, r *http.Request) {
 			groupReceiptSettingsRepository := repositories.NewGroupReceiptSettingsRepository(nil)
 			updatedGroupReceiptSettings, err := groupReceiptSettingsRepository.UpdateGroupReceiptSettings(groupId, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(updatedGroupReceiptSettings)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -534,11 +535,11 @@ func PollGroupEmail(w http.ResponseWriter, r *http.Request) {
 
 			uintGroupId, err := utils.StringToUint(groupId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			isAllGroup, err := groupRepository.IsAllGroup(uintGroupId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			if isAllGroup {
@@ -548,7 +549,7 @@ func PollGroupEmail(w http.ResponseWriter, r *http.Request) {
 
 				groups, err := groupService.GetGroupsForUser(utils.UintToString(token.UserId))
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				for _, group := range groups {
@@ -566,7 +567,7 @@ func PollGroupEmail(w http.ResponseWriter, r *http.Request) {
 			} else {
 				groupSettings, err := groupSettingsRepository.GetAllGroupSettings("group_id = ?", groupId)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				for _, groupSetting := range groupSettings {
@@ -584,13 +585,13 @@ func PollGroupEmail(w http.ResponseWriter, r *http.Request) {
 
 			payloadBytes, err := json.Marshal(taskPayload)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			task := asynq.NewTask(wranglerasynq.EmailPoll, payloadBytes)
 			_, err = wranglerasynq.EnqueueTask(task, models.EmailPollingQueue)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -620,13 +621,13 @@ func DeleteGroup(w http.ResponseWriter, r *http.Request) {
 
 			uintGroupId, err := utils.StringToUint(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			groupRepository := repositories.NewGroupRepository(nil)
 			isAllGroup, err := groupRepository.IsAllGroup(uintGroupId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if isAllGroup {
 				return http.StatusBadRequest, errors.New("cannot delete all group")
@@ -634,7 +635,7 @@ func DeleteGroup(w http.ResponseWriter, r *http.Request) {
 
 			err = groupService.DeleteGroup(id, false)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -682,7 +683,7 @@ func UpdateGroupMemberGrants(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			groupService := services.NewGroupService(nil)
@@ -700,16 +701,16 @@ func UpdateGroupMemberGrants(w http.ResponseWriter, r *http.Request) {
 				}, http.StatusBadRequest)
 				return 0, nil
 			case errors.Is(err, services.ErrInvalidGrant):
-				return http.StatusBadRequest, err
+				return http.StatusBadRequest, stacktrace.WithStack(err)
 			case errors.Is(err, services.ErrMemberNotInGroup):
-				return http.StatusNotFound, err
+				return http.StatusNotFound, stacktrace.WithStack(err)
 			case err != nil:
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			categoryIds, tagIds, err := groupService.GetMemberGrants(groupId, userId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(commands.UpdateGroupMemberGrantsCommand{
@@ -717,7 +718,7 @@ func UpdateGroupMemberGrants(w http.ResponseWriter, r *http.Request) {
 				TagIds:      tagIds,
 			})
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

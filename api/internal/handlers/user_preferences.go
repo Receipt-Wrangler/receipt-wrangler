@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
@@ -23,12 +24,12 @@ func GetUserPreferences(w http.ResponseWriter, r *http.Request) {
 
 			userPreferences, err := userPreferencesRepository.GetUserPreferencesOrCreate(token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&userPreferences)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -56,12 +57,12 @@ func UpdateUserPreferences(w http.ResponseWriter, r *http.Request) {
 			userPreferencesRepository := repositories.NewUserPreferencesRepository(nil)
 			updatedUserPreferences, err := userPreferencesRepository.UpdateUserPreferences(token.UserId, userPreferences)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&updatedUserPreferences)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
