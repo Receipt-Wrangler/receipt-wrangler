@@ -182,8 +182,10 @@ func denyUnauthorized(handler structs.Handler, err error) bool {
 // instead of only naming this file. Handlers attach that stack with
 // stacktrace.WithStack where they return the error; one that arrives without a
 // stack gets one here, which still names the handler that called HandleRequest.
-// The query string is left out because it can carry credentials.
+// The query string is left out because it can carry credentials. The path is
+// logged escaped: URL.Path is decoded, so a %0A in the request would write a
+// real newline and let the caller forge a log line.
 func logHandlerError(r *http.Request, err error) {
 	err = stacktrace.WithStack(err)
-	logging.LogStd(logging.LOG_LEVEL_ERROR, fmt.Sprintf("%s %s: %s%s", r.Method, r.URL.Path, err.Error(), stacktrace.Format(err)))
+	logging.LogStd(logging.LOG_LEVEL_ERROR, fmt.Sprintf("%s %s: %s%s", r.Method, r.URL.EscapedPath(), err.Error(), stacktrace.Format(err)))
 }

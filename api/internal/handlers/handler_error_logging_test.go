@@ -68,6 +68,32 @@ func TestHandlerErrorLog_NamesTheRequestAndTheLineThatFailed(t *testing.T) {
 	}
 }
 
+// URL.Path is decoded, so logging it would turn a %0A in the request into a
+// real newline and let the caller forge a log line. The path stays escaped.
+func TestHandlerErrorLog_AnEncodedNewlineInThePathCannotForgeALogLine(t *testing.T) {
+	defer tearDownGenericHandlerTest()
+	logged := captureAppLog(t)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/receipt/x%0AERROR:%20forged", nil)
+
+	HandleRequest(structs.Handler{
+		ErrorMessage: "failed",
+		Writer:       w,
+		Request:      r,
+		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
+			return http.StatusInternalServerError, errors.New("boom")
+		},
+	})
+
+	got := logged.String()
+	if want := "GET /api/receipt/x%0AERROR:%20forged: boom"; !strings.Contains(got, want) {
+		t.Errorf("log = %q\nwant it to contain %q", got, want)
+	}
+	if strings.Contains(got, "\nERROR: forged") {
+		t.Errorf("log = %q\nthe decoded newline started a forged line", got)
+	}
+}
+
 // A handler that returns an error without stacktrace.WithStack still gets a
 // stack from HandleRequest, which names the handler that called it.
 func TestHandlerErrorLog_AnErrorWithoutAStackStillNamesTheCaller(t *testing.T) {

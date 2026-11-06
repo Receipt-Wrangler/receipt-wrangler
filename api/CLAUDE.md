@@ -258,6 +258,8 @@ the same line for every endpoint.
   `logHandlerError`. It still names the handler that called `HandleRequest`, but not the line in
   that handler that failed.
 - **The query string is never logged**, because it can carry credentials.
+- **The path is logged escaped** (`URL.EscapedPath()`). `URL.Path` is decoded, so a `%0A` in the
+  request would write a real newline and let the caller forge a log line.
 - **A decode error does not name the field.** `encoding/json` passes a custom `UnmarshalJSON` error
   up without the field name, for example from `decimal.Decimal` given `""`. The stack still names
   the endpoint and the decode call.
