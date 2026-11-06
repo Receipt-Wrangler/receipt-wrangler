@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,13 +28,25 @@ String _at(DateTime local) => local.toUtc().toIso8601String();
 
 late _MockReceiptApi _receiptApi;
 
+Response<api.ReceiptHistory> _response(Map<String, Object?> json) =>
+    Response<api.ReceiptHistory>(
+      requestOptions: RequestOptions(path: ''),
+      statusCode: 200,
+      data: historyFromJson(json),
+    );
+
 void _answerWith(Map<String, Object?> json) {
   when(() => _receiptApi.getReceiptHistory(receiptId: any(named: 'receiptId')))
-      .thenAnswer((_) async => Response<api.ReceiptHistory>(
-            requestOptions: RequestOptions(path: ''),
-            statusCode: 200,
-            data: historyFromJson(json),
-          ));
+      .thenAnswer((_) async => _response(json));
+}
+
+/// Holds the next history request open until the returned completer is
+/// completed, so a test can look at the screen while a reload is in flight.
+Completer<Response<api.ReceiptHistory>> _holdNextAnswer() {
+  final pending = Completer<Response<api.ReceiptHistory>>();
+  when(() => _receiptApi.getReceiptHistory(receiptId: any(named: 'receiptId')))
+      .thenAnswer((_) => pending.future);
+  return pending;
 }
 
 Future<void> _pumpScreen(WidgetTester tester) async {
@@ -175,6 +189,31 @@ void main() {
     expect(_card(2), findsOneWidget);
   });
 
+  // A reload keeps the previous data while it waits, so the list has to stay
+  // up under the RefreshIndicator rather than collapse to the full-screen
+  // spinner (which would also unmount the indicator mid-refresh).
+  testWidgets('keeps the list on screen while a pull to refresh loads', (tester) async {
+    final history = historyJson([entryJson(systemTaskId: 2)], saveCount: 1, contributorCount: 1);
+    _answerWith(history);
+    await _pumpScreen(tester);
+
+    final reload = _holdNextAnswer();
+    await tester.fling(_card(2), const Offset(0, 400), 1000);
+    // The indicator spins until the reload completes, so pumpAndSettle would
+    // never return here.
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    verify(() => _receiptApi.getReceiptHistory(receiptId: _receiptId)).called(2);
+    expect(_card(2), findsOneWidget);
+    expect(find.byKey(ReceiptHistoryScreen.loadingKey), findsNothing);
+
+    reload.complete(_response(history));
+    await tester.pumpAndSettle();
+    expect(_card(2), findsOneWidget);
+  });
+
   testWidgets('says so when there is no history yet', (tester) async {
     _answerWith(historyJson([]));
 
@@ -196,6 +235,27 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(ReceiptHistoryScreen.errorKey), findsNothing);
+    expect(_card(2), findsOneWidget);
+  });
+
+  // A reload also keeps the previous error while it waits; without the
+  // `done` check the error stays up and Retry looks like it did nothing.
+  testWidgets('shows the spinner, not the error, while a retry loads', (tester) async {
+    when(() => _receiptApi.getReceiptHistory(receiptId: any(named: 'receiptId')))
+        .thenAnswer((_) async => throw Exception('offline'));
+    await _pumpScreen(tester);
+    expect(find.byKey(ReceiptHistoryScreen.errorKey), findsOneWidget);
+
+    final retry = _holdNextAnswer();
+    await tester.tap(find.byKey(ReceiptHistoryScreen.retryKey));
+    await tester.pump();
+
+    expect(find.byKey(ReceiptHistoryScreen.loadingKey), findsOneWidget);
+    expect(find.byKey(ReceiptHistoryScreen.errorKey), findsNothing);
+
+    retry.complete(_response(
+        historyJson([entryJson(systemTaskId: 2)], saveCount: 1, contributorCount: 1)));
+    await tester.pumpAndSettle();
     expect(_card(2), findsOneWidget);
   });
 }

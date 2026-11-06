@@ -1719,7 +1719,7 @@ the root `CLAUDE.md` → "Receipt Change History" for the contract.
   (`receipt_app_bar_action_builder.dart`) pushes a `MaterialPageRoute` instead, the way the Comments
   and Images sub-screens open, so an unsaved edit is still there on the way back.
   - The push waits the same 50ms as `_goAfterMenu`, because a `PopupMenuItem`'s `onTap` runs
-    before its menu pops.
+    right after the item pops its menu, while the menu is still animating closed.
 - **Two menus, and only one of them is the view marker.**
   - The view screen keeps `ReceiptEditPopupMenu`: Edit is in `popupMenuChildren` and History in
     `alwaysShownChildren`.
@@ -1767,6 +1767,9 @@ the root `CLAUDE.md` → "Receipt Change History" for the contract.
   - `test/utils/receipt_history_test.dart` covers the formatting.
   - `test/widgets/receipt_history_screen_test.dart` covers the screen against a mocked API: load,
     collapse, failed and notice boxes, an unknown user, empty, error/retry, pull to refresh.
+    A reload keeps the previous snapshot while it waits, so the screen shows the error only for a
+    finished failure and the spinner only when it has no data: pull to refresh keeps the list on
+    screen, and Retry shows the spinner rather than leaving the error up.
   - `test/widgets/receipt_app_bar_action_builder_test.dart` covers both menus, the marker rule, and
     that opening History leaves the URL alone.
   - `test/widgets/receipt_edit_popup_menu_test.dart` covers the always-shown entries.

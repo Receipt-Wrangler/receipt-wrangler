@@ -57,12 +57,12 @@ class _MockOpenapi extends Mock implements api.Openapi {}
 class _MockReceiptApi extends Mock implements api.ReceiptApi {}
 
 const _receiptId = 5;
-
-/// Twice the logical size: the GIF is read, so text has to stay sharp.
-const _pixelRatio = 2.0;
 const _groupId = 1;
 const _maya = 2;
 const _sam = 3;
+
+/// Twice the logical size: the GIF is read, so text has to stay sharp.
+const _pixelRatio = 2.0;
 
 void main() {
   const surface = Size(demoPhoneWidth, demoPanelHeight);

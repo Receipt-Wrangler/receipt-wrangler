@@ -105,7 +105,13 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
     AsyncSnapshot<api.ReceiptHistory> snapshot,
     HistoryValueFormatters formatters,
   ) {
-    if (snapshot.hasError) {
+    // A reload keeps the previous snapshot's data AND error while it waits
+    // (FutureBuilder re-enters `waiting` via `inState`). So the error view is
+    // for a finished failure only -- a Retry in flight shows the spinner -- and
+    // the spinner is for having nothing to show, so a pull to refresh keeps the
+    // list (and its RefreshIndicator) on screen.
+    if (snapshot.hasError &&
+        snapshot.connectionState == ConnectionState.done) {
       return Center(
         key: ReceiptHistoryScreen.errorKey,
         child: Column(
@@ -123,7 +129,7 @@ class _ReceiptHistoryScreenState extends State<ReceiptHistoryScreen> {
     }
 
     final history = snapshot.data;
-    if (snapshot.connectionState != ConnectionState.done || history == null) {
+    if (history == null) {
       return const Center(
         key: ReceiptHistoryScreen.loadingKey,
         child: CircularProgressIndicator(),
