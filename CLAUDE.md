@@ -682,8 +682,9 @@ A **History** button on the receipt view and edit pages opens a drawer listing e
 change to the receipt, newest first. In edit mode the fixed save bar shrinks to fit between the left
 sidebar and the drawer, so Save stays usable. Each entry shows who made it (a user, Quick Scan, Email Upload or System),
 when, and field-level "from → to" chips. It also covers failed saves, and older rows whose "before"
-had to be rebuilt. **Backend + desktop.** Mobile only carries the regenerated client for now; the
-design handoff's mobile screen is a pending follow-up.
+had to be rebuilt. **All three components.** On mobile, History is an entry in the receipt's ⋮ menu
+(view and edit) that opens a day-grouped card list; it has no JSON view, and shows times in the
+device's zone rather than the app zone. See `mobile/CLAUDE.md` → "Receipt change history".
 
 - **Gated on `app.receipt-history.read`, an APP permission, AND `group.receipts.read`** on the
   receipt's group, through `HandleRequest` with `ReceiptId`. That route also enforces paid-by
@@ -714,8 +715,9 @@ design handoff's mobile screen is a pending follow-up.
     `UpdateReceipt` keeps returning the error.
 - **Email-created receipts record where they came from.** See "Email Ingestion" below. The creation
   entry lists the inbox and sender first.
-- **E2e:** `desktop/e2e/receipt-history.spec.ts`. The email capture has no IMAP server to drive in
-  e2e, so it is covered by Go tests.
+- **E2e per client:** `desktop/e2e/receipt-history.spec.ts` and
+  `mobile/integration_test/receipt_history_test.dart`. The email capture has no IMAP server to drive
+  in e2e, so it is covered by Go tests.
 
 See `api/CLAUDE.md` → "Receipt history" and `desktop/CLAUDE.md` → "Receipt history drawer".
 

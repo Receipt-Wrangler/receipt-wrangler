@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../models/permissions_model.dart';
 import '../../models/receipt_model.dart';
+import '../../shared/functions/permissions.dart';
 import '../../shared/widgets/receipt_edit_popup_menu.dart';
+import '../screens/receipt_history_screen.dart';
 
 /// The receipt form screen's app-bar menu.
 ///
@@ -25,11 +29,29 @@ class ReceiptAppBarActionBuilder {
     this.receiptModel = receiptModel;
   }
 
+  static const historyMenuItemKey = ValueKey('receipt-history-menu-item');
+
+  static const editOverflowMenuKey = ValueKey('receipt-edit-overflow-menu');
+
   List<Widget> buildAppBarMenu(GoRouterState state) {
-    return [_buildReceiptAppBarMenu(state.fullPath!)];
+    return [
+      _buildReceiptAppBarMenu(
+          state.fullPath!, state.pathParameters['receiptId']),
+    ];
   }
 
-  Widget _buildReceiptAppBarMenu(String fullPath) {
+  Widget _buildReceiptAppBarMenu(String fullPath, String? routeReceiptId) {
+    // The app bar renders before the receipt loads, while the model still
+    // holds the default receipt (or the previous screen's). History is only
+    // offered once it holds the receipt this route names: earlier it would
+    // open the wrong receipt's history, and it would make the menu appear
+    // before the receipt loaded, which specs read as "loaded".
+    final receiptLoaded =
+        receiptModel.receipt.id.toString() == routeReceiptId;
+    final canViewHistory = receiptLoaded &&
+        canViewReceiptHistory(
+            Provider.of<PermissionsModel>(context, listen: false));
+
     if (fullPath.contains("view")) {
       return ReceiptEditPopupMenu(
           groupId: receiptModel.receipt.groupId,
@@ -39,10 +61,31 @@ class ReceiptAppBarActionBuilder {
               onTap: () => _goAfterMenu(
                   "/receipts/${receiptModel.receipt.id}/edit"),
             )
+          ],
+          alwaysShownChildren: [
+            if (canViewHistory) _buildHistoryMenuItem(),
           ]);
     }
 
+    // Deliberately a plain PopupMenuButton, not ReceiptEditPopupMenu:
+    // integration specs wait for that widget to mean "the /view shell has
+    // mounted", which this screen must not satisfy.
+    if (fullPath.contains("edit") && canViewHistory) {
+      return PopupMenuButton(
+        key: editOverflowMenuKey,
+        itemBuilder: (context) => [_buildHistoryMenuItem()],
+      );
+    }
+
     return SizedBox.shrink();
+  }
+
+  PopupMenuItem _buildHistoryMenuItem() {
+    return PopupMenuItem(
+      key: historyMenuItemKey,
+      child: Text("History"),
+      onTap: _pushHistoryAfterMenu,
+    );
   }
 
   // A PopupMenuItem invokes onTap *after* it pops the menu route. Navigating
@@ -54,5 +97,20 @@ class ReceiptAppBarActionBuilder {
     final router = GoRouter.of(context);
     Future.delayed(
         const Duration(milliseconds: 50), () => router.go(location));
+  }
+
+  // History is pushed onto the navigator rather than routed: the form derives
+  // view/edit from the live URL (getFormState), so a /history route would flip
+  // an open edit form underneath to view. Pushing leaves the URL alone, as the
+  // Comments and Images sub-screens do, and the edit form keeps its state.
+  void _pushHistoryAfterMenu() {
+    final navigator = Navigator.of(context);
+    final receiptId = receiptModel.receipt.id;
+    Future.delayed(
+      const Duration(milliseconds: 50),
+      () => navigator.push(MaterialPageRoute(
+        builder: (_) => ReceiptHistoryScreen(receiptId: receiptId),
+      )),
+    );
   }
 }

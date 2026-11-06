@@ -6,13 +6,32 @@ import '../../models/permissions_model.dart';
 import '../../utils/forms.dart';
 import '../functions/permissions.dart';
 
+/// The ⋮ menu on a receipt's view screens.
+///
+/// [popupMenuChildren] are the edit actions, shown only to a user who may edit
+/// the receipt (or on the add form). [alwaysShownChildren] are entries the
+/// caller has gated itself -- the receipt view's "History" -- shown whatever the
+/// edit permission, so a read-only member who may see the history still gets a
+/// menu holding only that. With nothing to show, the widget renders no button
+/// at all.
+///
+/// Integration specs wait for this widget to mean "the /view shell has
+/// mounted", so it stays on the view screens only; the edit screen's menu is a
+/// plain `PopupMenuButton` (see `ReceiptAppBarActionBuilder`).
 class ReceiptEditPopupMenu extends StatelessWidget {
-  const ReceiptEditPopupMenu(
-      {super.key, required this.groupId, required this.popupMenuChildren, this.formState});
+  const ReceiptEditPopupMenu({
+    super.key,
+    required this.groupId,
+    required this.popupMenuChildren,
+    this.alwaysShownChildren = const [],
+    this.formState,
+  });
 
   final int groupId;
 
   final List<PopupMenuEntry> popupMenuChildren;
+
+  final List<PopupMenuEntry> alwaysShownChildren;
 
   final WranglerFormState? formState;
 
@@ -27,14 +46,19 @@ class ReceiptEditPopupMenu extends StatelessWidget {
       canEdit = true;
     }
 
-    if (canEdit) {
-      return PopupMenuButton(
-        itemBuilder: (BuildContext context) {
-          return popupMenuChildren;
-        },
-      );
-    } else {
+    final children = [
+      if (canEdit) ...popupMenuChildren,
+      ...alwaysShownChildren,
+    ];
+
+    if (children.isEmpty) {
       return const SizedBox.shrink();
     }
+
+    return PopupMenuButton(
+      itemBuilder: (BuildContext context) {
+        return children;
+      },
+    );
   }
 }

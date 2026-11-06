@@ -12,7 +12,14 @@ class UserModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Null when no visible user has [id] -- a deleted user, or one member
+  /// isolation hides. It used to throw instead, despite the nullable return.
   UserView? getUserById(String id) {
-    return _users.firstWhere((user) => user.id.toString() == id);
+    for (final user in _users) {
+      if (user.id.toString() == id) {
+        return user;
+      }
+    }
+    return null;
   }
 }
