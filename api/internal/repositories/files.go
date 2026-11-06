@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"receipt-wrangler/api/internal/constants"
 	config "receipt-wrangler/api/internal/env"
+	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/utils"
 	"regexp"
@@ -254,81 +255,268 @@ func (repository FileRepository) pdfRasterizationDpi() float64 {
 	return dpi
 }
 
-func (repository FileRepository) ConvertPdfToJpg(bytes []byte) ([]byte, error) {
-	mw := imagick.NewMagickWand()
-	defer mw.Destroy()
+const (
+	// maxJpegDimension is the largest width or height a JPEG can hold (libjpeg's
+	// JPEG_MAX_DIMENSION).
+	maxJpegDimension = 65500
 
+	// maxPdfPages caps how many pages ConvertPdfToJpg will render. Each page is its own
+	// Ghostscript run, and the height limit alone does not bound that: tiny pages would let
+	// thousands through. Receipts rarely run past a few pages.
+	maxPdfPages = 20
+
+	// imageMagickHeightResource is MagickCore's HeightResource, the policy.xml "height"
+	// limit. imagick.v3 does not export it, so it is named by its position in MagickCore's
+	// ResourceType enum (resource_.h); TestImageMagickHeightResource_IsTheHeightLimit pins it.
+	imageMagickHeightResource = imagick.ResourceType(4)
+)
+
+// rasterizedPage is one PDF page, rendered, flattened onto white and spilled to temp/.
+type rasterizedPage struct {
+	path          string
+	width, height uint
+}
+
+// ConvertPdfToJpg rasterizes every page of a PDF at the PdfDpi system setting and stacks
+// them top to bottom into a single JPEG.
+//
+// It holds at most one rendered page in memory, plus the final image: each page is rendered
+// alone, flattened and spilled to temp/, and the final image is built at its exact size once
+// every page has been measured. Reading the whole PDF and appending held every page and a
+// full-height copy at once, enough to get the API OOM-killed on a 1 GB host. Ping cannot
+// measure pages up front: ImageMagick reports the document's largest page for every page.
+// See api/CLAUDE.md → "PDF rasterization".
+func (repository FileRepository) ConvertPdfToJpg(pdfBytes []byte) ([]byte, error) {
 	// PDFs are vector documents with no inherent pixel resolution. ImageMagick
 	// rasterizes them at a default of 72 DPI unless a resolution is set BEFORE
-	// the blob is read, which produces low-resolution images that degrade OCR
+	// the page is read, which produces low-resolution images that degrade OCR
 	// and vision-model accuracy. Set the rasterization density first; it is
 	// configurable via the PdfDpi system setting (default 300).
 	dpi := repository.pdfRasterizationDpi()
-	if err := mw.SetResolution(dpi, dpi); err != nil {
+
+	pdfPath, err := repository.BuildTempFilePath("pdf")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(pdfPath)
+	if err := os.WriteFile(pdfPath, pdfBytes, 0o600); err != nil {
 		return nil, err
 	}
 
-	if err := mw.ReadImageBlob(bytes); err != nil {
+	pageCount, err := countPdfPages(pdfPath)
+	if err != nil {
 		return nil, err
 	}
-
-	// Set the format to JPEG once, the setting is retained across frames.
-	if err := mw.SetImageFormat("jpeg"); err != nil {
-		return nil, err
+	if pageCount > maxPdfPages {
+		return nil, fmt.Errorf("pdf has %d pages; at most %d can be converted", pageCount, maxPdfPages)
 	}
 
-	// Must be *after* ReadImageFile
-	// Flatten image and remove alpha channel, to prevent alpha turning black in jpg
-	if err := mw.SetImageAlphaChannel(0); err != nil {
+	pages, err := repository.rasterizePdfPages(pdfPath, pageCount, dpi)
+	if err != nil {
 		return nil, err
 	}
+	defer removeRasterizedPages(pages)
 
-	// Find out how many images/pages we've got in a pdf.
-	numPages := int(mw.GetNumberImages())
+	return stackPagesAsJpeg(pages, dpi)
+}
 
-	// Create a new wand to store the final long image.
-	finalImage := imagick.NewMagickWand()
-	defer finalImage.Destroy()
+// maxPdfImageHeight is the tallest stacked image ConvertPdfToJpg can produce.
+func maxPdfImageHeight() uint {
+	return pdfImageHeightLimit(imagick.GetResourceLimit(imageMagickHeightResource))
+}
 
-	// Iterate over each page, processing it as needed.
-	for i := 0; i < numPages; i++ {
-		mw.SetIteratorIndex(i)
+// pdfImageHeightLimit is ImageMagick's height limit or the JPEG format's own, whichever is
+// lower. The binding casts MagickSizeType to int64, so "unlimited" arrives as -1.
+func pdfImageHeightLimit(imageMagickLimit int64) uint {
+	if imageMagickLimit > 0 && imageMagickLimit < maxJpegDimension {
+		return uint(imageMagickLimit)
+	}
+	return maxJpegDimension
+}
 
-		// Get the current image as a MagickWand.
-		// This is done because AddImage() expects a MagickWand, not a blob.
-		currImage := mw.GetImage()
+// countPdfPages pings the PDF for its page count only; see ConvertPdfToJpg for why ping's
+// page sizes are not used.
+func countPdfPages(pdfPath string) (int, error) {
+	mw := imagick.NewMagickWand()
+	defer mw.Destroy()
 
-		// Add the current image to the finalImage wand.
-		if err := finalImage.AddImage(currImage); err != nil {
-			currImage.Destroy()
+	// The pdf: prefix pins the decoder, so the bytes are never sniffed as another format.
+	if err := mw.PingImage("pdf:" + pdfPath); err != nil {
+		return 0, err
+	}
+
+	pageCount := int(mw.GetNumberImages())
+	if pageCount == 0 {
+		return 0, errors.New("pdf has no pages")
+	}
+	return pageCount, nil
+}
+
+// rasterizePdfPages renders each page to its own temp file, failing as soon as the pages
+// would stack taller than the final image may be. Without that check ImageMagick fails to
+// build the stacked image, and the old code went on to write the nil wand it got back,
+// which aborted the whole process. On error it removes every page it spilled.
+func (repository FileRepository) rasterizePdfPages(pdfPath string, pageCount int, dpi float64) ([]rasterizedPage, error) {
+	maxHeight := maxPdfImageHeight()
+	pages := make([]rasterizedPage, 0, pageCount)
+	var totalHeight uint
+
+	for i := 0; i < pageCount; i++ {
+		page, err := repository.rasterizePdfPage(pdfPath, i, dpi)
+		if err != nil {
+			removeRasterizedPages(pages)
 			return nil, err
 		}
+		pages = append(pages, page)
 
-		// Destroy the current image object as it's no longer needed.
-		currImage.Destroy()
+		totalHeight += page.height
+		if totalHeight > maxHeight {
+			removeRasterizedPages(pages)
+			return nil, fmt.Errorf(
+				"pdf is too tall to convert: %d of its %d pages already stack to %dpx at %g DPI, over the %dpx limit; lower the PDF DPI system setting",
+				i+1, pageCount, totalHeight, dpi, maxHeight,
+			)
+		}
 	}
 
-	// Now, we will append all the images stored in finalImage vertically.
-	// Resetting the wand is necessary for AppendImages to work.
-	finalImage.ResetIterator()
-	combinedImage := finalImage.AppendImages(true)
+	return pages, nil
+}
 
-	tempFilePath, err := repository.BuildTempFilePath("jpg")
+// rasterizePdfPage renders one page, flattens it onto white and spills it to temp/ as an
+// 8-bit MIFF. It is its own function so the deferred Destroy frees the page before the next
+// one renders: a defer in the caller's loop would hold every page until the end.
+func (repository FileRepository) rasterizePdfPage(pdfPath string, index int, dpi float64) (rasterizedPage, error) {
+	white, err := newWhitePixelWand()
+	if err != nil {
+		return rasterizedPage{}, err
+	}
+	defer white.Destroy()
+
+	page := imagick.NewMagickWand()
+	defer page.Destroy()
+
+	if err := page.SetResolution(dpi, dpi); err != nil {
+		return rasterizedPage{}, err
+	}
+	// The [index] suffix makes ImageMagick ask Ghostscript for this page alone.
+	if err := page.ReadImage(fmt.Sprintf("pdf:%s[%d]", pdfPath, index)); err != nil {
+		return rasterizedPage{}, err
+	}
+
+	// A CMYK PDF renders CMYK pages, and the stacked image is sRGB.
+	if err := page.TransformImageColorspace(imagick.COLORSPACE_SRGB); err != nil {
+		return rasterizedPage{}, err
+	}
+
+	// Ghostscript leaves anything the PDF does not paint transparent, with black underneath.
+	// JPEG has no alpha, so without flattening onto white those areas come out as black
+	// blocks. (The old SetImageAlphaChannel(0) was UndefinedAlphaChannel: a no-op.)
+	if err := page.SetImageBackgroundColor(white); err != nil {
+		return rasterizedPage{}, err
+	}
+	if err := page.SetImageAlphaChannel(imagick.ALPHA_CHANNEL_REMOVE); err != nil {
+		return rasterizedPage{}, err
+	}
+	if err := page.SetImageDepth(8); err != nil {
+		return rasterizedPage{}, err
+	}
+
+	path, err := repository.BuildTempFilePath("miff")
+	if err != nil {
+		return rasterizedPage{}, err
+	}
+	if err := page.WriteImage("miff:" + path); err != nil {
+		os.Remove(path)
+		return rasterizedPage{}, err
+	}
+
+	return rasterizedPage{path: path, width: page.GetImageWidth(), height: page.GetImageHeight()}, nil
+}
+
+// stackPagesAsJpeg builds the final image at its exact size and copies each spilled page
+// into place, reading one at a time.
+func stackPagesAsJpeg(pages []rasterizedPage, dpi float64) ([]byte, error) {
+	var width, height uint
+	for _, page := range pages {
+		width = max(width, page.width)
+		height += page.height
+	}
+
+	white, err := newWhitePixelWand()
 	if err != nil {
 		return nil, err
 	}
+	defer white.Destroy()
 
-	if err := combinedImage.WriteImage(tempFilePath); err != nil {
+	// A narrower page leaves white to its right, as AppendImages did.
+	canvas := imagick.NewMagickWand()
+	defer canvas.Destroy()
+	if err := canvas.NewImage(width, height, white); err != nil {
+		return nil, fmt.Errorf("could not create a %dx%d image for the pdf: %w", width, height, err)
+	}
+	// Carry the render DPI for Tesseract. It needs the unit too: without one, a JPEG's density
+	// is only an aspect ratio, and Tesseract sees 0 DPI and guesses.
+	if err := canvas.SetImageResolution(dpi, dpi); err != nil {
+		return nil, err
+	}
+	if err := canvas.SetImageUnits(imagick.RESOLUTION_PIXELS_PER_INCH); err != nil {
 		return nil, err
 	}
 
-	bytes, err = utils.ReadFile(tempFilePath)
+	y := 0
+	for _, page := range pages {
+		if err := copySpilledPage(canvas, page, y); err != nil {
+			return nil, err
+		}
+		y += int(page.height)
+	}
+
+	if err := canvas.SetImageDepth(8); err != nil {
+		return nil, err
+	}
+	if err := canvas.SetImageFormat("jpeg"); err != nil {
+		return nil, err
+	}
+
+	jpg, err := canvas.GetImageBlob()
+	if len(jpg) == 0 {
+		if err == nil {
+			err = errors.New("encoding the pdf as a jpeg produced no data")
+		}
+		return nil, err
+	}
 	if err != nil {
-		return nil, err
+		// GetImageBlob reports warnings as errors too; with a JPEG in hand, the encode worked.
+		logging.LogStd(logging.LOG_LEVEL_INFO, "ImageMagick warning while encoding a pdf as a jpeg: "+err.Error())
 	}
+	return jpg, nil
+}
 
-	os.Remove(tempFilePath)
-	return bytes, nil
+// copySpilledPage reads one spilled page and copies it onto the canvas at row y. Pages are
+// opaque by now, so a straight copy is enough.
+func copySpilledPage(canvas *imagick.MagickWand, page rasterizedPage, y int) error {
+	mw := imagick.NewMagickWand()
+	defer mw.Destroy()
+
+	if err := mw.ReadImage("miff:" + page.path); err != nil {
+		return err
+	}
+	return canvas.CompositeImage(mw, imagick.COMPOSITE_OP_COPY, true, 0, y)
+}
+
+func removeRasterizedPages(pages []rasterizedPage) {
+	for _, page := range pages {
+		os.Remove(page.path)
+	}
+}
+
+func newWhitePixelWand() (*imagick.PixelWand, error) {
+	white := imagick.NewPixelWand()
+	if !white.SetColor("white") {
+		white.Destroy()
+		return nil, errors.New("could not create a white pixel wand")
+	}
+	return white, nil
 }
 
 func (repository FileRepository) WriteTempFile(data []byte) (string, error) {
@@ -364,8 +552,8 @@ func (repository FileRepository) WriteTempFile(data []byte) (string, error) {
 func (repository FileRepository) BuildTempFilePath(fileType string) (string, error) {
 	tempPath := repository.GetTempDirectoryPath()
 	// Ensure the temp directory exists before returning a path under it.
-	// ConvertPdfToJpg writes here directly, and on a fresh checkout/runtime the
-	// directory may not exist yet, which would fail the subsequent write.
+	// ConvertPdfToJpg spills its PDF and rendered pages here, and on a fresh
+	// checkout/runtime the directory may not exist yet, which would fail the write.
 	utils.MakeDirectory(tempPath)
 
 	filename, err := utils.GetRandomString(10)

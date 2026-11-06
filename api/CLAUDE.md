@@ -371,6 +371,72 @@ When working with tests in this codebase, follow these critical requirements:
   `mif1`-branded file sniffs as `image/heif` and goes through the same `ConvertHeicToJpg`)
 - Python dependencies for additional image processing capabilities
 
+### PDF rasterization (`ConvertPdfToJpg`)
+
+`repositories.ConvertPdfToJpg` turns a PDF into **one tall JPEG**: every page at the `PdfDpi` System
+Setting (default 300), stacked top to bottom. Preview, Magic Fill, OCR/AI processing and the email
+pipeline all go through it, so its cost is paid on every view of a stored PDF.
+
+**It holds at most one rendered page in memory, plus the final image.** It used to read the whole
+PDF and `AppendImages`, which held every page *and* a full-height copy at once. Ghostscript renders
+each page as 16-bit RGBA, 8 bytes per pixel, so six Letter pages at 300 DPI peaked at +869 MB. That
+got the API OOM-killed on a 1 GB host: a SIGKILL, so no log line, then a container restart and a 502.
+Now it is +394 MB, measured with the same harness, and survives that host. The cost is about +1.2 s
+per six pages at 300 DPI. The flow:
+
+1. Write the PDF to `temp/` and **ping it for the page count only**. ImageMagick's PDF ping reports
+   the document's *largest* page for every page, even when one page is pinged alone, so it cannot
+   size anything.
+2. Render each page alone (`pdf:<path>[i]`, which becomes Ghostscript `-dFirstPage/-dLastPage`).
+   Convert it to sRGB, flatten it onto white and set depth 8. Spill it to `temp/` as a MIFF
+   (24 MB/page at 300 DPI, 6 MB at 150) and record its exact size.
+3. Build an opaque white canvas at the exact summed size, copy each spilled page into place one at
+   a time, and encode with `GetImageBlob`.
+
+The rules that keep it working:
+
+- **Each page lives in its own function with its own `defer Destroy()`.** A `defer` inside the loop
+  holds every page until return, which is the old peak.
+- **Flattening onto white is the black-block fix.** Ghostscript leaves unpainted areas transparent
+  with black underneath, and JPEG has no alpha. A PDF that uses transparency used to come out with
+  solid black blocks, or an all-black page: a transparent-background image, a `/ca` highlight, a
+  soft mask. Anti-aliased text edges came out black too. The old `SetImageAlphaChannel(0)` meant to
+  fix this, but `0` is `UndefinedAlphaChannel`, a no-op.
+- **sRGB first, because compositing only relabels the colorspace.** A CMYK page copied onto the RGB
+  canvas would land as garbage. The old code emitted a CMYK JPEG for a CMYK PDF; the output is
+  always RGB or gray now.
+- **The canvas carries the render DPI as its density, in pixels per inch.** Tesseract (through
+  leptonica) only reads a JPEG's density when it has a unit. Without one the density is an aspect
+  ratio, and Tesseract sees 0 DPI and guesses. The old appended output had the density but no unit,
+  so Tesseract never got the real DPI; it does now.
+- **At most `maxPdfPages` (20) pages.** This is checked right after the page count, before
+  anything renders. It is separate from the height limit because each page is its own Ghostscript
+  run: 1-pt pages render about 4 px tall, so thousands would pass the height check, all inside an
+  HTTP request (`convertToJpg` has no permission gate). The old code had no cap either, but
+  rendered every page in a single Ghostscript call.
+- **Spills are flat files in `temp/`, never a subdirectory.** Each has a `defer os.Remove`. The
+  hourly sweeper skips directories, so a flat file is what gets reclaimed after an OOM kill
+  interrupted the cleanup.
+- **Height limit:** the stacked image may not exceed `maxPdfImageHeight()`. That is `policy.xml`'s
+  height limit (32,000 px on the Debian package: 9 Letter pages at 300 DPI, 19 at 150) or JPEG's
+  65,500, whichever is lower.
+  - The running total is checked as pages render, so a too-tall PDF fails early, with an error that
+    names the limit, and never builds the canvas.
+  - This used to **abort the process**. `AppendImages` returned a wand wrapping NULL, and
+    `WriteImage` on it tripped a C assertion (SIGABRT).
+  - `imagick.v3` exports no constant for this limit, so `imageMagickHeightResource` names MagickCore's
+    `HeightResource` by its enum position (4). `TestImageMagickHeightResource_IsTheHeightLimit` pins
+    it.
+  - `policy.xml`'s value is a ceiling `SetResourceLimit` cannot raise, which is why the min logic is
+    tested as a pure function (`pdfImageHeightLimit`).
+- **`GetImageBlob` returns warnings as errors**, unlike `WriteImage`. An error that comes with a
+  non-empty blob is logged, not returned.
+
+Tests: `internal/repositories/files_pdf_test.go`. It covers transparency, a translucent fill, CMYK,
+mixed page sizes, rotation, resolution, temp cleanup on success and failure, and the height limit.
+`buildTestPdf` hand-assembles PDFs, so page geometry and transparency features are exact without
+binary fixtures.
+
 ## Email ingestion (IMAP)
 
 Groups receive receipts by email: a System Email (an IMAP account) is polled, each unread message is
@@ -2401,7 +2467,8 @@ there: the **quick-scan upload** (`handlers/receipts.go`, one per file in a
 multi-file scan), the **email attachment** (`wranglerasynq/email_poll.go`) **and its `image-` OCR
 copy** (made by the task, `wranglerasynq/email_process_handler.go`), the **email body image**, short-lived scratch from
 `MagicFillFromImage` / `ReadImageWithEasyOcr` / `ConvertPdfToJpg` (each with a
-`defer os.Remove`), and the **`DebugOcr` dumps** from `services/ocr.go`
+`defer os.Remove`; `ConvertPdfToJpg` writes the `.pdf` plus one `.miff` per rendered page, see
+"PDF rasterization"), and the **`DebugOcr` dumps** from `services/ocr.go`
 `writeDebuggingFiles`, which are never removed by the code that writes them.
 
 **`HandleTempFileCleanUpTask` (`wranglerasynq/temp_file_cleanup_handler.go`) is
