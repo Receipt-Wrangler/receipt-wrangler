@@ -103,7 +103,7 @@ func DeleteOidcConnection(w http.ResponseWriter, r *http.Request) {
 			// carries the same rule. Required-to-be-a-session, not
 			// refused-if-a-key, so an unmarked caller is denied too.
 			if token.AuthSource != structs.AuthSourceJwt {
-				return http.StatusForbidden, errors.New("an OIDC connection may only be removed by an interactive session")
+				return http.StatusForbidden, stacktrace.WithStack(errors.New("an OIDC connection may only be removed by an interactive session"))
 			}
 
 			err := oidc.UnlinkIdentity(token.UserId, chi.URLParam(r, "name"))

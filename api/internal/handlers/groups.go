@@ -51,7 +51,7 @@ func GetPagedGroups(w http.ResponseWriter, r *http.Request) {
 					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				if !canReadAll {
-					return http.StatusForbidden, errors.New("user is unauthorized to view all groups")
+					return http.StatusForbidden, stacktrace.WithStack(errors.New("user is unauthorized to view all groups"))
 				}
 			}
 
@@ -326,7 +326,7 @@ func UpdateGroup(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if isAllGroup {
-				return http.StatusBadRequest, errors.New("cannot update all group")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("cannot update all group"))
 			}
 
 			// Authorize the requested member/role changes before persisting them:
@@ -561,7 +561,7 @@ func PollGroupEmail(w http.ResponseWriter, r *http.Request) {
 				}
 
 				if disabledEmailIntegrationCnt == len(groups) {
-					return http.StatusBadRequest, errors.New("email integration is not enabled for any of your groups")
+					return http.StatusBadRequest, stacktrace.WithStack(errors.New("email integration is not enabled for any of your groups"))
 				}
 
 			} else {
@@ -572,7 +572,7 @@ func PollGroupEmail(w http.ResponseWriter, r *http.Request) {
 
 				for _, groupSetting := range groupSettings {
 					if !groupSetting.EmailIntegrationEnabled {
-						return http.StatusBadRequest, errors.New("email integration is not enabled for this group")
+						return http.StatusBadRequest, stacktrace.WithStack(errors.New("email integration is not enabled for this group"))
 					}
 					groupIdsToPoll = append(groupIdsToPoll, utils.UintToString(groupSetting.GroupId))
 				}
@@ -630,7 +630,7 @@ func DeleteGroup(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if isAllGroup {
-				return http.StatusBadRequest, errors.New("cannot delete all group")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("cannot delete all group"))
 			}
 
 			err = groupService.DeleteGroup(id, false)
@@ -669,11 +669,11 @@ func UpdateGroupMemberGrants(w http.ResponseWriter, r *http.Request) {
 			// the caller against. A body-supplied group/user id is never consulted.
 			groupId, err := utils.StringToUint(chi.URLParam(r, "groupId"))
 			if err != nil {
-				return http.StatusBadRequest, errors.New("invalid group id")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("invalid group id"))
 			}
 			userId, err := utils.StringToUint(chi.URLParam(r, "userId"))
 			if err != nil {
-				return http.StatusBadRequest, errors.New("invalid user id")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("invalid user id"))
 			}
 
 			command := commands.UpdateGroupMemberGrantsCommand{}

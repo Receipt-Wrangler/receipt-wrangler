@@ -118,7 +118,7 @@ func DeleteNotification(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if notification.UserId != token.UserId {
-				return http.StatusForbidden, errors.New("user cannot delete other user's notifications")
+				return http.StatusForbidden, stacktrace.WithStack(errors.New("user cannot delete other user's notifications"))
 			}
 
 			err = notificationRepository.DeleteNotificationById(id)

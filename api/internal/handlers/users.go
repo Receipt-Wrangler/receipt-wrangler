@@ -453,11 +453,11 @@ func ConvertDummyUserToNormalUser(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if !dbUser.IsDummyUser {
-				return http.StatusInternalServerError, errors.New("user is already a normal user")
+				return http.StatusInternalServerError, stacktrace.WithStack(errors.New("user is already a normal user"))
 			}
 
 			if len(resetPasswordData.Password) == 0 {
-				return http.StatusInternalServerError, errors.New("password cannot be empty")
+				return http.StatusInternalServerError, stacktrace.WithStack(errors.New("password cannot be empty"))
 			}
 
 			hashedPassword, err := utils.HashPassword(resetPasswordData.Password)
@@ -488,7 +488,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 			id := chi.URLParam(r, "id")
 			token := structs.GetClaims(r)
 			if utils.UintToString(token.UserId) == id {
-				return 500, errors.New("user cannot delete itself")
+				return 500, stacktrace.WithStack(errors.New("user cannot delete itself"))
 			}
 
 			err := services.DeleteUser(id)
@@ -543,7 +543,7 @@ func UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
 			updateProfileCommand := r.Context().Value("updateProfileCommand").(commands.UpdateProfileCommand)
 
 			if len(updateProfileCommand.DisplayName) == 0 {
-				return http.StatusBadRequest, errors.New("displayName is undefined")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("displayName is undefined"))
 			}
 
 			// TODO: move to repo
@@ -608,7 +608,7 @@ func BulkDeleteUsers(w http.ResponseWriter, r *http.Request) {
 			// Check if the current user is trying to delete themselves
 			for _, userId := range command.UserIds {
 				if userId == currentUserId {
-					return http.StatusBadRequest, errors.New("user cannot delete itself")
+					return http.StatusBadRequest, stacktrace.WithStack(errors.New("user cannot delete itself"))
 				}
 			}
 
@@ -638,7 +638,7 @@ func DeleteAccount(w http.ResponseWriter, r *http.Request) {
 			// it issued, whatever that key's scope. Required-to-be-a-session rather
 			// than refused-if-a-key, so an unmarked caller is denied too.
 			if token.AuthSource != structs.AuthSourceJwt {
-				return http.StatusForbidden, errors.New("an account may only be deleted by an interactive session")
+				return http.StatusForbidden, stacktrace.WithStack(errors.New("an account may only be deleted by an interactive session"))
 			}
 
 			command := r.Context().Value("deleteAccountCommand").(commands.DeleteAccountCommand)

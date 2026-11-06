@@ -24,7 +24,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if !featureConfig.EnableLocalSignUp {
-				return http.StatusNotFound, errors.New("Local sign up is disabled")
+				return http.StatusNotFound, stacktrace.WithStack(errors.New("Local sign up is disabled"))
 			}
 
 			userData := r.Context().Value("signUpCommand").(commands.SignUpCommand)

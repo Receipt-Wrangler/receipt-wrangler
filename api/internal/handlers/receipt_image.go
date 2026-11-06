@@ -298,7 +298,7 @@ func MagicFillFromImage(w http.ResponseWriter, r *http.Request) {
 					nil,
 				)
 				if taskErr != nil {
-					return http.StatusInternalServerError, taskErr
+					return http.StatusInternalServerError, stacktrace.WithStack(taskErr)
 				}
 
 				if err != nil {
@@ -344,7 +344,7 @@ func MagicFillFromImage(w http.ResponseWriter, r *http.Request) {
 					nil,
 				)
 				if taskErr != nil {
-					return http.StatusInternalServerError, taskErr
+					return http.StatusInternalServerError, stacktrace.WithStack(taskErr)
 				}
 
 				if err != nil {
@@ -443,7 +443,7 @@ func validateReceiptImageAccess(r *http.Request, requiredPermission string, rece
 		return http.StatusInternalServerError, stacktrace.WithStack(err)
 	}
 	if !hasPermission {
-		return http.StatusForbidden, errors.New("user is unauthorized to access entity")
+		return http.StatusForbidden, stacktrace.WithStack(errors.New("user is unauthorized to access entity"))
 	}
 
 	return 0, nil

@@ -240,7 +240,8 @@ the same line for every endpoint.
 
 - **Attach the stack where the handler returns the error:**
   `return http.StatusInternalServerError, stacktrace.WithStack(err)` (`internal/stacktrace`).
-  - Every `return <status>, err` in `internal/handlers` does this. New handlers should too.
+  - Every error a handler returns in `internal/handlers` is wrapped this way, including one built
+    inline (`stacktrace.WithStack(errors.New("..."))`). New handlers should do the same.
   - A nil error stays nil.
   - An error that already carries a stack is returned unchanged, so the innermost stack wins.
     Wrapping deeper, in a service or repository, is fine and shows that line first.

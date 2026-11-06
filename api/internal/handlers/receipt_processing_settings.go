@@ -234,7 +234,7 @@ func CheckReceiptProcessingSettingsConnectivity(w http.ResponseWriter, r *http.R
 
 				client, clientErr := services.NewAiService(stringId)
 				if clientErr != nil {
-					return http.StatusInternalServerError, clientErr
+					return http.StatusInternalServerError, stacktrace.WithStack(clientErr)
 				}
 
 				aiClient = client

@@ -427,7 +427,7 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			if len(vErr.Errors) > 0 {
 				structs.WriteValidatorErrorResponse(w, vErr, http.StatusInternalServerError)
-				return http.StatusInternalServerError, errors.New("validation error")
+				return http.StatusInternalServerError, stacktrace.WithStack(errors.New("validation error"))
 			}
 
 			fileRepository := repositories.NewFileRepository(nil)
@@ -774,11 +774,11 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 			var receipts []models.Receipt
 
 			if len(bulkCommand.Status) == 0 {
-				return http.StatusBadRequest, errors.New("Status required")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("Status required"))
 			}
 
 			if !utils.Contains(models.ReceiptStatuses(), bulkCommand.Status) {
-				return http.StatusBadRequest, errors.New("Invalid status")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("Invalid status"))
 			}
 
 			token := structs.GetClaims(r)
@@ -869,18 +869,18 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 
 			receiptId := r.URL.Query().Get("receiptId")
 			if len(receiptId) == 0 {
-				return http.StatusBadRequest, errors.New("receiptId required")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("receiptId required"))
 			}
 
 			permission := r.URL.Query().Get("permission")
 			if len(permission) == 0 {
-				return http.StatusBadRequest, errors.New("permission required")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("permission required"))
 			}
 
 			// The probe answers a group-scoped question, so only group permissions
 			// are meaningful here; reject typos and app-scoped keys up front.
 			if descriptor, ok := permissions.Get(permission); !ok || descriptor.Scope != permissions.ScopeGroup {
-				return http.StatusBadRequest, errors.New("invalid group permission")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("invalid group permission"))
 			}
 
 			receiptRepository := repositories.NewReceiptRepository(nil)
@@ -894,7 +894,7 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !hasAccess {
-				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
+				return http.StatusForbidden, stacktrace.WithStack(errors.New("user is unauthorized to access entity"))
 			}
 
 			// Paid-by visibility narrows access within a permitted group, so the
@@ -905,7 +905,7 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !paidByVisible {
-				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
+				return http.StatusForbidden, stacktrace.WithStack(errors.New("user is unauthorized to access entity"))
 			}
 
 			w.WriteHeader(200)

@@ -37,7 +37,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if dbUser.IsDummyUser {
-				return http.StatusInternalServerError, errors.New("dummy users cannot log in")
+				return http.StatusInternalServerError, stacktrace.WithStack(errors.New("dummy users cannot log in"))
 			}
 
 			jwt, refreshToken, accessTokenClaims, err := services.GenerateJWT(dbUser.ID)

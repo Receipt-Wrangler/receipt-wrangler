@@ -93,7 +93,7 @@ func GetPagedApiKeys(w http.ResponseWriter, r *http.Request) {
 					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				if !canReadAny {
-					return http.StatusForbidden, errors.New("user is unauthorized to view all API keys")
+					return http.StatusForbidden, stacktrace.WithStack(errors.New("user is unauthorized to view all API keys"))
 				}
 			}
 
