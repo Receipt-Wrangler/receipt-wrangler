@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:receipt_wrangler_mobile/shared/widgets/bottom_submit_button.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/top_app_bar.dart';
+import 'package:receipt_wrangler_mobile/shared/widgets/user_avatar.dart';
 
 import 'form_actions.dart';
 import 'pump.dart';
@@ -83,6 +85,24 @@ Future<void> openReceiptCommentsInEditMode(
 /// center from settled geometry.
 Future<void> _drain(WidgetTester tester) async {
   for (int i = 0; i < 5; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+/// Opens the avatar popup menu in the [TopAppBar] (User Profile / Reports /
+/// Logout). The popup mounts its items on the animation's first frame, so this
+/// waits on a stable item (User Profile) being hit-testable and drains a few
+/// frames before returning -- the popup-menu tap-flake pattern documented in
+/// mobile/CLAUDE.md.
+Future<void> openAvatarMenu(WidgetTester tester) async {
+  final avatar = find.descendant(
+    of: find.byType(TopAppBar),
+    matching: find.byType(UserAvatar),
+  );
+  await pumpUntilFound(tester, avatar);
+  await tester.tap(avatar);
+  await pumpUntilFound(tester, find.text('User Profile').hitTestable());
+  for (var i = 0; i < 5; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
 }

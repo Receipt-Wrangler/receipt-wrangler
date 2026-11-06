@@ -171,6 +171,18 @@ context comes from the nav rather than the app bar. The avatar menu in the same 
 navigates from `this.context` (the `_TopAppBar` **State** context, *above* the `AppBar`) — keep it that
 way.
 
+**A menu action goes on `PopupMenuItem.onTap`, never on a button nested inside the item.** The avatar
+menu's entries (User Profile, Reports, Logout) used to be `TextButton`s inside `PopupMenuItem`s that
+had no `onTap`. Only the button's box ran the action, about 72×32 of a 168×48 row. Anywhere else on the
+row hit the item's own InkWell, which closes the menu and does nothing else. So **Logout took two
+taps**: the first usually closed the menu, and the user had to reopen it and aim for the word.
+- `onTap` runs after the item pops the menu, so the caller needs no `Navigator.pop` of its own.
+- A bare `Text` child also takes the menu's own text colour and padding, which is what the buttons had
+  to restyle themselves to imitate.
+
+Pinned by `test/widgets/top_app_bar_avatar_menu_test.dart` (each entry, tapped at the row's far edge)
+and `integration_test/logout_test.dart`.
+
 The idle **child** is still swapped to `SizedBox.shrink()`: a permanently mounted
 `LinearProgressIndicator` animates forever and `pumpAndSettle` would never return (its default timeout
 is **ten minutes**, so that regression hangs CI rather than failing it). Height goes to zero instead of
@@ -2808,6 +2820,7 @@ All three runners source `api/dev/switch-to-sqlite.sh` for the four `E2E_*` cred
 #### Reference files
 
 - `integration_test/smoke_login_test.dart` — canonical smoke test.
+- `integration_test/logout_test.dart` — a single tap on the avatar menu's Logout **row**, clear of the label, reaches the login screen with no JWT left. Regression guard for the two-tap logout (see "A menu action goes on `PopupMenuItem.onTap`"). Opens the menu with `openAvatarMenu` (`helpers/nav.dart`), shared with `reports_list_test.dart`.
 - `integration_test/quick_scan_entry_test.dart` — the scan slot's tap (captures → seeded sheet) and hold (menu contents), against real roles, plus the receipts-screen overflow: one case asserting its labels and one **tapping** its Quick Scan through to the sheet (the app-bar teardown regression — see "`TopAppBar`'s loading bar is always mounted").
 - `integration_test/quick_scan_app_data_refresh_test.dart` — a group's comment field switched on **after** login reaches the running app when Quick Scan is next started. The only spec that proves the pre-scan AppData reload; every other quick-scan spec arranges its config before login, so none can distinguish a client that re-fetches from one that read the config once at login. Persists via the API and never touches `GroupModel`.
 - `integration_test/quick_scan_entry_gated_test.dart` — the tap falling through to the manual form, with the right banner for each of the two blocked reasons. Exercises **both** feature-flag fixtures: the permission case enables the flag (to isolate the permission from it), the ai-disabled case **pins it off** with `disableAiPoweredReceiptsForTest()` rather than assuming — which also removes its dependency on the preceding test's teardown having succeeded, since they share the one global.

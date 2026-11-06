@@ -77,9 +77,10 @@ void main() {
     expect(scheme.onSurface, isNot(scheme.primary),
         reason: 'the two must differ or this test proves nothing');
 
-    // The items are TextButtons, which default their foreground to
-    // colorScheme.primary — that is what made them render blue. They must use
-    // the colour a bare PopupMenuItem would have used instead.
+    // The items were once TextButtons, which default their foreground to
+    // colorScheme.primary — that is what made them render blue. They are bare
+    // PopupMenuItems now (see top_app_bar_avatar_menu_test.dart for why); this
+    // keeps them from drifting back to a button's colour.
     //
     // Assert the colour the RenderParagraph actually paints, not the declared
     // ButtonStyle: the style is only the mechanism, and a theme or a wrapping

@@ -217,6 +217,7 @@ jobs:
           script: >-
             ./run-e2e-android.sh
             integration_test/smoke_login_test.dart
+            integration_test/logout_test.dart
             integration_test/receipt_add_test.dart
             integration_test/receipt_add_gallery_test.dart
             integration_test/receipt_add_share_test.dart

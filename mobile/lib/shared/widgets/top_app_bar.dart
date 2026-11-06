@@ -98,11 +98,16 @@ class _TopAppBar extends State<TopAppBar> {
       return const SizedBox.shrink();
     }
 
-    // Each item pops the menu itself and then navigates from `this.context` --
-    // the State's context, which is the *parent* of the AppBar rather than
-    // something inside its toolbar. Keep it that way: a context taken from in
-    // here would be at the mercy of the toolbar's lifetime (see
-    // [_buildLoadingIndicator]).
+    // Each action is the PopupMenuItem's own `onTap`, which runs after the item
+    // pops the menu, so the WHOLE row is the tap target. Never nest a button in
+    // a PopupMenuItem instead: only the button's box would run the action, and
+    // a tap anywhere else on the row just closes the menu -- which is how
+    // Logout came to need two taps.
+    //
+    // Actions navigate from `this.context` -- the State's context, which is the
+    // *parent* of the AppBar rather than something inside its toolbar. Keep it
+    // that way: a context taken from in here would be at the mercy of the
+    // toolbar's lifetime (see [_buildLoadingIndicator]).
     return PopupMenuButton(
         key: const ValueKey('user-avatar-menu'),
         child: const UserAvatar(),
@@ -114,43 +119,19 @@ class _TopAppBar extends State<TopAppBar> {
             api.Permission.appPeriodReportsPeriodReadAll,
           ]);
 
-          // These items are TextButtons rather than the plain Text every other
-          // menu in the app uses, and a TextButton takes its foreground from
-          // `colorScheme.primary` -- so they rendered in the brand blue while
-          // every other menu rendered in ordinary text colour. Pin them to the
-          // colour a bare PopupMenuItem would have used.
-          final itemStyle = TextButton.styleFrom(
-            foregroundColor: Theme.of(context).colorScheme.onSurface,
-          );
-
           return [
             PopupMenuItem(
-              child: TextButton(
-                style: itemStyle,
-                onPressed: () {
-                  Navigator.pop(context);
-                  this.context.push('/profile');
-                },
-                child: const Text('User Profile'),
-              ),
+              onTap: () => this.context.push('/profile'),
+              child: const Text('User Profile'),
             ),
             if (canViewReports)
               PopupMenuItem(
-                child: TextButton(
-                  style: itemStyle,
-                  onPressed: () {
-                    Navigator.pop(context);
-                    this.context.push('/reports');
-                  },
-                  child: const Text('Reports'),
-                ),
+                onTap: () => this.context.push('/reports'),
+                child: const Text('Reports'),
               ),
             PopupMenuItem(
-              child: TextButton(
-                style: itemStyle,
-                onPressed: () => _logout(),
-                child: const Text('Logout'),
-              ),
+              onTap: _logout,
+              child: const Text('Logout'),
             ),
           ];
         });
