@@ -2029,8 +2029,9 @@ Two routes, and the choice is forced by what the demo has to show:
 
 #### Route 1 — desktop capture (headless Linux)
 
-There is no emulator in the Claude Code sandbox and the Go API is expensive to bring up there
-(ImageMagick 7 from source — see the root `CLAUDE.md`), so a demo of a **widget-level** change is
+There is no emulator in the Claude Code sandbox, and a widget-level change doesn't need the Go API,
+which takes an ImageMagick 7 source build to bring up there (`api/CLAUDE.md` → "Running in the
+Claude Code Web/Cloud Sandbox"). So a demo of a **widget-level** change is
 recorded by building a small harness against the **Linux desktop** target and driving real mouse
 clicks at it on a headless X server. Worked example, all committed and re-runnable:
 
@@ -2182,8 +2183,9 @@ frames are captured inside a widget test and encoded to GIF in pure Dart.
   picker, real theme and provider tree -- with only `getReceiptsForGroup` stubbed, by a fake that
   **decodes the filter the client actually sent** and returns the seeded rows inside it. So the rows
   narrowing is evidence rather than choreography: break the encoder and the demo visibly stops
-  filtering. That is also why route 1 was not an option for it -- driving the real control there
-  needs the Go API behind it, which the sandbox cannot bring up (ImageMagick 7 from source).
+  filtering. That is also why route 1 wasn't used for it: driving the real control there needs the
+  Go API behind it, which in the sandbox means an ImageMagick 7 source build first (`api/CLAUDE.md`
+  → "Running in the Claude Code Web/Cloud Sandbox"). Route 2 needs no backend at all.
 - **A demo of a new feature is one panel, not a pair.** The other demos here record the same screen
   twice across a `debugDisable*` seam because they document *fixes*. A new control has no seam and
   nothing to compare against, so `writeGif` takes frames that each carry their own hold time (in

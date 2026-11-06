@@ -131,7 +131,10 @@ that step — run the patch script by hand afterwards. Either way run `flutter a
 `flutter test`**: two of the four compile fine when missing (see `mobile/CLAUDE.md` → "Known
 dart-dio regressions").
 
-**Mobile regen without Flutter (e.g. the Claude Code web sandbox):** `mobile/api/pubspec.yaml` has
+**Mobile regen without Flutter:** Flutter isn't preinstalled in the Claude Code web sandbox, but it
+can be installed there (`mobile/CLAUDE.md` → "Flutter SDK Setup (Claude Code Environment)"), and
+the Linux app, `flutter analyze`, `flutter test` and `./run-e2e.sh` all work once it is. For a
+regen alone, the Dart SDK is a lighter alternative. `mobile/api/pubspec.yaml` has
 **no Flutter dependency**, so the standalone **Dart SDK** is enough to finish the regen — Flutter is
 only needed for the app itself. Point `DART_SDK` at the copy inside an existing Flutter install, or
 at a standalone SDK unpacked from the dart-archive, and confirm the version before generating
