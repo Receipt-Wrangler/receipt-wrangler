@@ -2505,6 +2505,17 @@ already enqueued outlive the deploy and would otherwise fail as unregistered.
 `DeleteAllScheduledTasks` alone is insufficient — it only touches the *scheduled*
 set, so `retireEmailReceiptImageCleanupQueue` drains **pending** too.
 
+It drains **only if the queue exists**, checked with `inspector.Queues()`. asynq
+records a queue in Redis only when a task is first enqueued to it, and nothing
+enqueues there any more. So on a Redis that never ran the old cron (a fresh
+install, or one that keeps no data across restarts) the queue is absent, and both
+deletes fail with `NOT_FOUND: ... queue "email_receipt_image_cleanup" does not
+exist`. That logged on every startup and every polling-interval save. The
+`DeleteAll*` calls return asynq's *internal* error type there, not
+`asynq.ErrQueueNotFound`, so `errors.Is` cannot catch it after the fact. Do not
+"fix" it by creating the queue: asynq has no create call, and enqueuing a task just
+to make the queue exist would bring back the thing being retired.
+
 **The symmetric case — a persisted list MISSING a name — is handled in
 `repositories/system_settings.go`, and it used to 400 every settings save.** An
 install that last saved before `SystemCleanUpQueue` existed has four

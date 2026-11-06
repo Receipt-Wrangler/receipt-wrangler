@@ -4,6 +4,7 @@ import (
 	"github.com/hibiken/asynq"
 	"receipt-wrangler/api/internal/logging"
 	"receipt-wrangler/api/internal/models"
+	"slices"
 )
 
 func StartSystemCleanUpTasks() error {
@@ -43,6 +44,14 @@ func StartSystemCleanUpTasks() error {
 	return err
 }
 
+// retiredQueueInspector is the part of *asynq.Inspector the drain uses, so a test
+// can stand in for Redis.
+type retiredQueueInspector interface {
+	Queues() ([]string, error)
+	DeleteAllScheduledTasks(queue string) (int, error)
+	DeleteAllPendingTasks(queue string) (int, error)
+}
+
 // retireEmailReceiptImageCleanupQueue drains what the pre-upgrade cleanup cron
 // left on its old queue. Scheduled and pending are both needed: DeleteAllScheduled
 // only touches tasks waiting on a future time, while anything the cron had already
@@ -51,8 +60,23 @@ func StartSystemCleanUpTasks() error {
 // The queue itself stays declared in models.QueueName — persisted
 // TaskQueueConfigurations reference it, QueueName.Value() whitelists it, and
 // UpsertSystemSettingsCommand.Validate requires a configuration for every name.
-func retireEmailReceiptImageCleanupQueue(inspector *asynq.Inspector) {
+func retireEmailReceiptImageCleanupQueue(inspector retiredQueueInspector) {
 	retiredQueue := string(models.EmailReceiptImageCleanupQueue)
+
+	// asynq records a queue in Redis only when a task is first enqueued to it, and
+	// nothing enqueues here any more. On a Redis that never ran the old cron — a
+	// fresh install, or a Redis that keeps no data across restarts — the queue does
+	// not exist, there is nothing to drain, and both deletes would fail with
+	// NOT_FOUND on every call. They report that through asynq's internal error
+	// type rather than asynq.ErrQueueNotFound, so it is checked for up front.
+	queues, err := inspector.Queues()
+	if err != nil {
+		logging.LogStd(logging.LOG_LEVEL_INFO, err.Error())
+		return
+	}
+	if !slices.Contains(queues, retiredQueue) {
+		return
+	}
 
 	if _, err := inspector.DeleteAllScheduledTasks(retiredQueue); err != nil {
 		logging.LogStd(logging.LOG_LEVEL_INFO, err.Error())
