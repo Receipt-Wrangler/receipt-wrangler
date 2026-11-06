@@ -260,6 +260,11 @@ const (
 	// JPEG_MAX_DIMENSION).
 	maxJpegDimension = 65500
 
+	// maxPdfPages caps how many pages ConvertPdfToJpg will render. Each page is its own
+	// Ghostscript run, and the height limit alone does not bound that: tiny pages would let
+	// thousands through. Receipts rarely run past a few pages.
+	maxPdfPages = 20
+
 	// imageMagickHeightResource is MagickCore's HeightResource, the policy.xml "height"
 	// limit. imagick.v3 does not export it, so it is named by its position in MagickCore's
 	// ResourceType enum (resource_.h); TestImageMagickHeightResource_IsTheHeightLimit pins it.
@@ -301,6 +306,9 @@ func (repository FileRepository) ConvertPdfToJpg(pdfBytes []byte) ([]byte, error
 	pageCount, err := countPdfPages(pdfPath)
 	if err != nil {
 		return nil, err
+	}
+	if pageCount > maxPdfPages {
+		return nil, fmt.Errorf("pdf has %d pages; at most %d can be converted", pageCount, maxPdfPages)
 	}
 
 	pages, err := repository.rasterizePdfPages(pdfPath, pageCount, dpi)
@@ -446,8 +454,12 @@ func stackPagesAsJpeg(pages []rasterizedPage, dpi float64) ([]byte, error) {
 	if err := canvas.NewImage(width, height, white); err != nil {
 		return nil, fmt.Errorf("could not create a %dx%d image for the pdf: %w", width, height, err)
 	}
-	// Keep the render density, as the appended pages did: Tesseract reads it.
+	// Carry the render DPI for Tesseract. It needs the unit too: without one, a JPEG's density
+	// is only an aspect ratio, and Tesseract sees 0 DPI and guesses.
 	if err := canvas.SetImageResolution(dpi, dpi); err != nil {
+		return nil, err
+	}
+	if err := canvas.SetImageUnits(imagick.RESOLUTION_PIXELS_PER_INCH); err != nil {
 		return nil, err
 	}
 

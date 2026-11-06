@@ -403,8 +403,15 @@ The rules that keep it working:
 - **sRGB first, because compositing only relabels the colorspace.** A CMYK page copied onto the RGB
   canvas would land as garbage. The old code emitted a CMYK JPEG for a CMYK PDF; the output is
   always RGB or gray now.
-- **The canvas carries the render DPI as its density**, as the appended pages did, because
-  Tesseract reads it.
+- **The canvas carries the render DPI as its density, in pixels per inch.** Tesseract (through
+  leptonica) only reads a JPEG's density when it has a unit. Without one the density is an aspect
+  ratio, and Tesseract sees 0 DPI and guesses. The old appended output had the density but no unit,
+  so Tesseract never got the real DPI; it does now.
+- **At most `maxPdfPages` (20) pages.** This is checked right after the page count, before
+  anything renders. It is separate from the height limit because each page is its own Ghostscript
+  run: 1-pt pages render about 4 px tall, so thousands would pass the height check, all inside an
+  HTTP request (`convertToJpg` has no permission gate). The old code had no cap either, but
+  rendered every page in a single Ghostscript call.
 - **Spills are flat files in `temp/`, never a subdirectory.** Each has a `defer os.Remove`. The
   hourly sweeper skips directories, so a flat file is what gets reclaimed after an OOM kill
   interrupted the cleanup.

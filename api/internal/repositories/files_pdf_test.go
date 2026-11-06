@@ -286,7 +286,8 @@ func TestConvertPdfToJpg_RotatedPageIsNotClipped(t *testing.T) {
 	assertSize(t, img, 300, 200)
 }
 
-// Tesseract reads the image's density, and the appended output used to carry the render DPI.
+// Tesseract reads the image's density, but only with a unit: without one, a JPEG's density
+// is an aspect ratio, and Tesseract sees 0 DPI and guesses.
 func TestConvertPdfToJpg_KeepsTheRenderResolution(t *testing.T) {
 	repository := usePdfConversion(t, 150)
 	pdf := buildTestPdf(t, testPdfPage{width: 72, height: 72, content: cornerMarker(72, "1 0 0")})
@@ -310,6 +311,9 @@ func TestConvertPdfToJpg_KeepsTheRenderResolution(t *testing.T) {
 	}
 	if x != 150 || y != 150 {
 		t.Errorf("resolution = %gx%g, want 150x150", x, y)
+	}
+	if units := mw.GetImageUnits(); units != imagick.RESOLUTION_PIXELS_PER_INCH {
+		t.Errorf("resolution units = %v, want pixels per inch", units)
 	}
 	if depth := mw.GetImageDepth(); depth != 8 {
 		t.Errorf("depth = %d, want 8", depth)
@@ -354,6 +358,40 @@ func TestConvertPdfToJpg_RejectsDocumentsTallerThanTheLimit(t *testing.T) {
 		t.Errorf("error %q should say the pdf is too tall and name the limit", err)
 	}
 	assertTempDirectoryEmpty(t, repository)
+}
+
+// Each page is its own Ghostscript run, so page count is capped separately from height:
+// tiny pages would otherwise let thousands through the height limit.
+func TestConvertPdfToJpg_PageLimit(t *testing.T) {
+	tinyPages := func(count int) []testPdfPage {
+		pages := make([]testPdfPage, count)
+		for i := range pages {
+			pages[i] = testPdfPage{width: 20, height: 20, content: "0 0 1 rg 0 0 10 10 re f"}
+		}
+		return pages
+	}
+
+	t.Run("allows exactly the limit", func(t *testing.T) {
+		repository := usePdfConversion(t, 72)
+
+		img := convertPdf(t, repository, buildTestPdf(t, tinyPages(maxPdfPages)...))
+
+		assertSize(t, img, 20, 20*maxPdfPages)
+	})
+
+	t.Run("rejects one page over it", func(t *testing.T) {
+		repository := usePdfConversion(t, 72)
+
+		_, err := repository.ConvertPdfToJpg(buildTestPdf(t, tinyPages(maxPdfPages+1)...))
+
+		if err == nil {
+			t.Fatal("expected an error for a pdf over the page limit")
+		}
+		if want := fmt.Sprintf("%d pages", maxPdfPages+1); !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q should name the page count (%s)", err, want)
+		}
+		assertTempDirectoryEmpty(t, repository)
+	})
 }
 
 // imagick.v3 has no constant for MagickCore's HeightResource, so the code names it by its
