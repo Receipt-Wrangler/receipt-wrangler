@@ -262,7 +262,9 @@ the same line for every endpoint.
   request would write a real newline and let the caller forge a log line.
 - **A decode error does not name the field.** `encoding/json` passes a custom `UnmarshalJSON` error
   up without the field name, for example from `decimal.Decimal` given `""`. The stack still names
-  the endpoint and the decode call.
+  the endpoint and the decode call. A custom field's `currencyValue` is the one decimal that now
+  accepts `""`, as no value (see "Group Default Custom Fields"). A receipt or item `amount` of `""`
+  still fails like this.
 - The logger no longer sets `log.Lshortfile`. It always printed `log.go:56`, LogStd's own
   `Println`, and LogStd adds its caller's file and line itself.
 
@@ -3510,6 +3512,16 @@ this screen. `UpdateGroupReceiptSettingsCommand.Validate` therefore checks nothi
 - **Users without `app.custom-fields.read` are gated out client-side**: the desktop and mobile
   receipt forms skip ids absent from their loaded catalog, which is empty without the permission, so
   their save would never have passed `enforceReceiptCustomFieldSelection` anyway.
+- **A blank `currencyValue` is read as no value** (`UpsertCustomFieldValueCommand.UnmarshalJSON`).
+  - **Why:** the desktop's masked currency input sends `""`, not `null`, for a field the user
+    emptied. `decimal.Decimal` rejects `""`, so the whole receipt save used to 500 with
+    `can't convert "" to decimal`. Defaults made that common, because the field is on every receipt.
+  - **What counts as blank:** `""`, whitespace and `null` all store `nil`, the same as an untouched
+    default. A cleared field is therefore blank on view, not $0.00, and the receipt summary and
+    reports skip it. An entered `"0"` is still a real zero, and text such as `"abc"` still fails.
+  - **Scope:** only `currencyValue`. A receipt or item `amount` is required and stays strict.
+  - **Tests:** `commands/upsert_custom_field_value_command_test.go` and
+    `handlers/receipt_custom_field_currency_test.go`.
 - **Tests**: `repositories/group_receipt_settings_test.go` (round-trip, replace, `[]` clears, `nil`
   leaves both unchanged, `json.Marshal` gives `[]`, the not-blanked custom field name, the batched
   loader across two groups, `GetGroupById` hydration), `repositories/custom_fields_test.go` (a
