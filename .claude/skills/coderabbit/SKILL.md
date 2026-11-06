@@ -155,9 +155,9 @@ In the Claude Code cloud sandbox:
   "Running in the Claude Code Web/Cloud Sandbox".
 - **`desktop/`** needs `npm install` first. Then `git restore desktop/package-lock.json`, since the
   sandbox's npm rewrites it.
-- **`mobile/`**: Flutter isn't installed there. A `mobile/api/`-only change can use the standalone
-  Dart SDK (root `CLAUDE.md` → "Mobile regen without Flutter"). For an app change, say the suite
-  and build didn't run and list them for me. Never report them as passing.
+- **`mobile/`** needs Flutter installed first, since it isn't there by default. Follow
+  `mobile/CLAUDE.md` → "Flutter SDK Setup (Claude Code Environment)", then run the suite and build
+  as above. There's no Android SDK, so the build is `flutter build linux --release`.
 
 ### Servers: you start them
 
