@@ -131,7 +131,10 @@ that step — run the patch script by hand afterwards. Either way run `flutter a
 `flutter test`**: two of the four compile fine when missing (see `mobile/CLAUDE.md` → "Known
 dart-dio regressions").
 
-**Mobile regen without Flutter (e.g. the Claude Code web sandbox):** `mobile/api/pubspec.yaml` has
+**Mobile regen without Flutter:** Flutter isn't preinstalled in the Claude Code web sandbox, but it
+can be installed there (`mobile/CLAUDE.md` → "Flutter SDK Setup (Claude Code Environment)"), and
+the Linux app, `flutter analyze`, `flutter test` and `./run-e2e.sh` all work once it is. For a
+regen alone, the Dart SDK is a lighter alternative. `mobile/api/pubspec.yaml` has
 **no Flutter dependency**, so the standalone **Dart SDK** is enough to finish the regen — Flutter is
 only needed for the app itself. Point `DART_SDK` at the copy inside an existing Flutter install, or
 at a standalone SDK unpacked from the dart-archive, and confirm the version before generating
@@ -902,14 +905,11 @@ For a feature that adds a new API endpoint and a corresponding UI:
 
 ### Code Review Feedback Disposition
 
-When addressing review feedback from CodeRabbit, human reviewers, or any other source, follow this protocol every time:
-
-1. **Read every comment** before acting. Don't fix-by-fix.
-2. **Build a disposition table for the user.** One row per comment: file/line, issue summary, decision (`ACCEPT` / `REJECT` / `ACCEPT + EXTEND` / `DEFER`), and a one-line justification. **Present this table inside the plan you write for the user** — it is for the user to review your reasoning before approving changes. Do NOT post this table as a bulk PR comment; it is a planning artifact, not a review response.
-3. **Verify each "ACCEPT" against current code** — reviewers (especially bots) sometimes flag false positives, stale code, or generator output they don't recognize as such. If a flag turns out to be invalid on inspection, flip the decision to `REJECT` with the reason ("verified — generator output, matches existing repo convention" / "verified — code already handles this case at line X").
-4. **Default to rejecting** comments that target auto-generated files (`desktop/src/open-api/`, `mobile/api/`) unless the comment identifies a real type/compile error the generator introduced. Hand-edits to generated files require an explicit justification and should match an established project precedent (search `git log` for "Fix build errors" / similar prior hand-patches).
-5. **Reply on each individual review-comment thread** with the per-comment decision and justification. Every CodeRabbit (or human) comment must get its own reply explaining whether you accepted or rejected and why — that is the audit trail the reviewer sees. Use `gh api -X POST /repos/<owner>/<repo>/pulls/<num>/comments/<comment_id>/replies` (review comments live on the pulls endpoint, not the issues one) with a JSON body of `{"body": "..."}`. Fetch the review-comment IDs via `gh api /repos/<owner>/<repo>/pulls/<num>/comments`.
-6. **Commit + push** only after every comment has an individual reply posted. The per-comment replies are the audit trail; the commit is the action.
+Addressing CodeRabbit review comments is the **`coderabbit` skill** (`/coderabbit`, defined in
+`.claude/skills/coderabbit/SKILL.md`). Follow it. Feedback from human reviewers or any other source
+follows the same skill from step 3 on. In short: always show the user the full disposition table
+and wait before changing anything, reject every finding on generated code, and reply to each
+comment individually, after committing and pushing any fixes.
 
 ## CLAUDE.md Maintenance
 
