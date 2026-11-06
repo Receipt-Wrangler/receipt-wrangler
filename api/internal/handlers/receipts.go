@@ -12,6 +12,7 @@ import (
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"receipt-wrangler/api/internal/wranglerasynq"
@@ -35,7 +36,7 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 			pagedRequest := commands.ReceiptPagedRequestCommand{}
 			err := pagedRequest.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			pagedData := structs.PagedData{}
@@ -57,11 +58,11 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 			// restricted user cannot probe receipt existence via a hidden filter.
 			uintGroupId, err := utils.StringToUint(groupId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			err = permissionService.IntersectReceiptFilterWithGrants(token.UserId, uintGroupId, &pagedRequest.Filter)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			receiptRepository := repositories.NewReceiptRepository(nil)
@@ -76,27 +77,27 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 				permissionService.CategoryTagVisibilityResolver(token.UserId),
 			)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Strip categories/tags the caller may not see from the results.
 			err = permissionService.FilterReceiptCategoriesTags(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Mask user references (created-by, charged-to) and drop non-visible
 			// comment authors the caller may not see.
 			err = permissionService.MaskReceiptsForMemberVisibility(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// The receipts table's Comment column. One query per page, applying
 			// the same member isolation as the masking above.
 			err = permissionService.LoadFirstVisibleComments(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			anyData := make([]any, len(receipts))
@@ -109,7 +110,7 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -139,7 +140,7 @@ func GetReceiptsForGroupIds(w http.ResponseWriter, r *http.Request) {
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			receipts, err := receiptRepository.GetReceiptsByGroupIds(groupIds, "*", clause.Associations)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Drop receipts hidden by the caller's paid-by visibility filter (this
@@ -147,24 +148,24 @@ func GetReceiptsForGroupIds(w http.ResponseWriter, r *http.Request) {
 			// categories/tags they may not see from what remains.
 			receipts, err = permissionService.FilterReceiptsByPaidBy(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			err = permissionService.FilterReceiptCategoriesTags(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Mask user references (created-by, charged-to) and drop non-visible
 			// comment authors the caller may not see.
 			err = permissionService.MaskReceiptsForMemberVisibility(token.UserId, receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -212,7 +213,7 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			allowed, err := enforceReceiptCreate(w, token.UserId, command, 0, legacyCreateImageRequiredMessage)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !allowed {
 				return 0, nil
@@ -221,7 +222,7 @@ func CreateReceipt(w http.ResponseWriter, r *http.Request) {
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			createdReceipt, err := receiptRepository.CreateReceipt(command, token.UserId, true)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			return writeCreatedReceipt(w, token.UserId, createdReceipt)
@@ -277,7 +278,7 @@ func CreateReceiptWithFiles(w http.ResponseWriter, r *http.Request) {
 
 			allowed, err := enforceReceiptCreate(w, token.UserId, command.Receipt, len(command.Files), receiptImageRequiredMessage)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !allowed {
 				return 0, nil
@@ -285,7 +286,7 @@ func CreateReceiptWithFiles(w http.ResponseWriter, r *http.Request) {
 
 			createdReceipt, err := services.NewReceiptService(nil).CreateReceiptWithFiles(command.Receipt, command.Files, token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			return writeCreatedReceipt(w, token.UserId, createdReceipt)
@@ -379,19 +380,19 @@ func writeCreatedReceipt(w http.ResponseWriter, userId uint, createdReceipt mode
 	permissionService := services.NewPermissionService(nil)
 	err := permissionService.FilterReceiptCategoriesTagsForReceipt(userId, &createdReceipt)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, stacktrace.WithStack(err)
 	}
 
 	// Mask user references (created-by, charged-to) and drop non-visible
 	// comment authors the caller may not see.
 	err = permissionService.MaskReceiptForMemberVisibility(userId, &createdReceipt)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, stacktrace.WithStack(err)
 	}
 
 	bytes, err := json.Marshal(createdReceipt)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, stacktrace.WithStack(err)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -426,7 +427,7 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			if len(vErr.Errors) > 0 {
 				structs.WriteValidatorErrorResponse(w, vErr, http.StatusInternalServerError)
-				return http.StatusInternalServerError, errors.New("validation error")
+				return http.StatusInternalServerError, stacktrace.WithStack(errors.New("validation error"))
 			}
 
 			fileRepository := repositories.NewFileRepository(nil)
@@ -438,7 +439,7 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 			for i, groupId := range quickScanCommand.GroupIds {
 				isAllGroup, err := isAllGroupDestination(groupId)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				if isAllGroup {
 					allGroupErrs.Errors[fmt.Sprintf("files.%d.groupId", i)] = allGroupCreateMessage
@@ -454,7 +455,7 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 			// anything) and backfill paid-by/status defaults for optional/hidden fields.
 			resolvedFields, configErr, err := services.NewReceiptService(nil).ResolveQuickScanFields(quickScanCommand, token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if len(configErr.Errors) > 0 {
 				structs.WriteValidatorErrorResponse(w, configErr, http.StatusBadRequest)
@@ -466,7 +467,7 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 			// enqueue), mirroring enforceReceiptGrantSelection on the normal create path.
 			allowed, denyMessage, err := enforceQuickScanGrantSelection(token.UserId, quickScanCommand)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !allowed {
 				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
@@ -478,12 +479,12 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 
 				_, err := quickScanCommand.Files[i].Read(fileBytes)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				tempPath, err := fileRepository.WriteTempFile(fileBytes)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				payload := wranglerasynq.QuickScanTaskPayload{
@@ -500,14 +501,14 @@ func QuickScan(w http.ResponseWriter, r *http.Request) {
 
 				payloadBytes, err := json.Marshal(payload)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				task := asynq.NewTask(wranglerasynq.QuickScan, payloadBytes)
 
 				_, err = wranglerasynq.EnqueueTask(task, models.QuickScanQueue)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 			}
 
@@ -538,14 +539,14 @@ func GetReceipt(w http.ResponseWriter, r *http.Request) {
 			receipt, err := services.NewReceiptService(nil).GetReceiptForUser(token.UserId, id)
 			if err != nil {
 				if errors.Is(err, services.ErrReceiptAccessDenied) {
-					return http.StatusForbidden, err
+					return http.StatusForbidden, stacktrace.WithStack(err)
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := json.Marshal(receipt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -574,7 +575,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate(token.UserId, false)
@@ -589,7 +590,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			// associations the caller may not see.
 			currentReceipt, err := receiptRepository.GetFullyLoadedReceiptById(receiptId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// A receipt's group may be changed on update (both clients support
@@ -613,7 +614,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 				// destination falls through to the permission check, which denies it.
 				isAllGroup, err := isAllGroupDestination(command.GroupId)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				if isAllGroup {
 					utils.WriteCustomErrorResponse(w, allGroupMoveMessage, http.StatusBadRequest)
@@ -622,7 +623,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 
 				canCreateInDestination, err := permissionService.HasGroupPermissions(token.UserId, command.GroupId, permissions.GroupReceiptsCreate)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				if !canCreateInDestination {
 					utils.WriteCustomErrorResponse(w, "User is unauthorized to move a receipt into the destination group", http.StatusForbidden)
@@ -633,7 +634,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 
 			allowed, denyMessage, err := enforceReceiptGrantSelection(token.UserId, targetGroupId, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !allowed {
 				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
@@ -644,7 +645,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			// their member-visible set for the group.
 			allowed, denyMessage, err = enforceReceiptMemberVisibilitySelection(token.UserId, targetGroupId, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !allowed {
 				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
@@ -655,7 +656,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			// they cannot see — the wholesale item replace would corrupt the split.
 			allowed, denyMessage, err = enforceReceiptChargedToPreservation(token.UserId, currentReceipt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !allowed {
 				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
@@ -670,7 +671,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			}
 			allowed, denyMessage, err = enforceReceiptCustomFieldSelection(token.UserId, command, currentCustomFieldIds)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !allowed {
 				utils.WriteCustomErrorResponse(w, denyMessage, http.StatusForbidden)
@@ -691,7 +692,7 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 				receiptImageRequiredMessage,
 			)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !allowed {
 				return 0, nil
@@ -702,29 +703,29 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 			// the selection check, which would otherwise reject the re-added ids.)
 			err = permissionService.MergeHiddenReceiptCategoriesTags(token.UserId, currentReceipt.GroupId, currentReceipt.Categories, currentReceipt.Tags, &command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			updatedReceipt, err := receiptRepository.UpdateReceipt(receiptId, command, token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			err = permissionService.FilterReceiptCategoriesTagsForReceipt(token.UserId, &updatedReceipt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Mask user references (created-by, charged-to) and drop non-visible
 			// comment authors the caller may not see.
 			err = permissionService.MaskReceiptForMemberVisibility(token.UserId, &updatedReceipt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := json.Marshal(updatedReceipt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -773,11 +774,11 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 			var receipts []models.Receipt
 
 			if len(bulkCommand.Status) == 0 {
-				return http.StatusBadRequest, errors.New("Status required")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("Status required"))
 			}
 
 			if !utils.Contains(models.ReceiptStatuses(), bulkCommand.Status) {
-				return http.StatusBadRequest, errors.New("Invalid status")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("Invalid status"))
 			}
 
 			token := structs.GetClaims(r)
@@ -833,17 +834,17 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 				return db.Transaction(updateStatuses)
 			})
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			err = db.Table("receipts").Where("id IN ?", bulkCommand.ReceiptIds).Select("id, resolved_date, status").Find(&receipts).Error
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&receipts)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -868,32 +869,32 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 
 			receiptId := r.URL.Query().Get("receiptId")
 			if len(receiptId) == 0 {
-				return http.StatusBadRequest, errors.New("receiptId required")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("receiptId required"))
 			}
 
 			permission := r.URL.Query().Get("permission")
 			if len(permission) == 0 {
-				return http.StatusBadRequest, errors.New("permission required")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("permission required"))
 			}
 
 			// The probe answers a group-scoped question, so only group permissions
 			// are meaningful here; reject typos and app-scoped keys up front.
 			if descriptor, ok := permissions.Get(permission); !ok || descriptor.Scope != permissions.ScopeGroup {
-				return http.StatusBadRequest, errors.New("invalid group permission")
+				return http.StatusBadRequest, stacktrace.WithStack(errors.New("invalid group permission"))
 			}
 
 			receiptRepository := repositories.NewReceiptRepository(nil)
 			receipt, err := receiptRepository.GetReceiptById(receiptId)
 			if err != nil {
-				return http.StatusBadRequest, err
+				return http.StatusBadRequest, stacktrace.WithStack(err)
 			}
 
 			hasAccess, err := permissionService.HasGroupPermissions(token.UserId, receipt.GroupId, permission)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !hasAccess {
-				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
+				return http.StatusForbidden, stacktrace.WithStack(errors.New("user is unauthorized to access entity"))
 			}
 
 			// Paid-by visibility narrows access within a permitted group, so the
@@ -901,10 +902,10 @@ func HasAccess(w http.ResponseWriter, r *http.Request) {
 			// receipt their group role hides (which would then 403 on fetch).
 			paidByVisible, err := permissionService.ReceiptPaidByVisible(token.UserId, receipt.GroupId, receipt.PaidByUserID)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !paidByVisible {
-				return http.StatusForbidden, errors.New("user is unauthorized to access entity")
+				return http.StatusForbidden, stacktrace.WithStack(errors.New("user is unauthorized to access entity"))
 			}
 
 			w.WriteHeader(200)
@@ -932,7 +933,7 @@ func DeleteReceipt(w http.ResponseWriter, r *http.Request) {
 
 			err := receiptService.DeleteReceipt(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -958,7 +959,7 @@ func BulkDeleteReceipts(w http.ResponseWriter, r *http.Request) {
 			command := commands.BulkReceiptDeleteCommand{}
 			vErr, err := command.LoadDataFromRequestAndValidate(w, r)
 			if err != nil {
-				return http.StatusBadRequest, err
+				return http.StatusBadRequest, stacktrace.WithStack(err)
 			}
 			if len(vErr.Errors) > 0 {
 				structs.WriteValidatorErrorResponse(w, vErr, http.StatusBadRequest)
@@ -969,12 +970,12 @@ func BulkDeleteReceipts(w http.ResponseWriter, r *http.Request) {
 			receiptService := services.NewReceiptService(nil)
 			result, err := receiptService.BulkDeleteReceiptsForUser(token.UserId, command.ReceiptIds)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(result)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -1002,12 +1003,12 @@ func DuplicateReceipt(w http.ResponseWriter, r *http.Request) {
 			receiptService := services.NewReceiptService(nil)
 			newReceipt, err := receiptService.DuplicateReceipt(token.UserId, receiptId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := json.Marshal(newReceipt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

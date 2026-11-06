@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -40,7 +41,7 @@ func GetReceiptHistory(w http.ResponseWriter, r *http.Request) {
 			token := structs.GetClaims(r)
 			receiptId, err := utils.StringToUint(chi.URLParam(r, "id"))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			history, err := services.NewReceiptHistoryService(nil).GetReceiptHistory(token.UserId, receiptId)
@@ -49,7 +50,7 @@ func GetReceiptHistory(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			return writeReceiptHistoryResponse(w, history)
@@ -63,7 +64,7 @@ func GetReceiptHistorySnapshots(w http.ResponseWriter, r *http.Request) {
 			token := structs.GetClaims(r)
 			receiptId, err := utils.StringToUint(chi.URLParam(r, "id"))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// An id that does not parse comes back 0, which names no entry and is
@@ -76,7 +77,7 @@ func GetReceiptHistorySnapshots(w http.ResponseWriter, r *http.Request) {
 				return 0, nil
 			}
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			return writeReceiptHistoryResponse(w, snapshots)
@@ -87,7 +88,7 @@ func GetReceiptHistorySnapshots(w http.ResponseWriter, r *http.Request) {
 func writeReceiptHistoryResponse(w http.ResponseWriter, body interface{}) (int, error) {
 	bytes, err := utils.MarshalResponseData(body)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, stacktrace.WithStack(err)
 	}
 
 	w.WriteHeader(http.StatusOK)

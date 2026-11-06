@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -25,12 +26,12 @@ func GetNotificationsForUser(w http.ResponseWriter, r *http.Request) {
 
 			notifications, err := notificationRepository.GetNotificationsForUser(token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(notifications)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -56,12 +57,12 @@ func GetNotificationCountForUser(w http.ResponseWriter, r *http.Request) {
 
 			result, err := notificationRepository.GetNotificationCountForUser(token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(result)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -87,7 +88,7 @@ func DeleteAllNotificationsForUser(w http.ResponseWriter, r *http.Request) {
 
 			err := notificationRepository.DeleteAllNotificationsForUser(token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -113,16 +114,16 @@ func DeleteNotification(w http.ResponseWriter, r *http.Request) {
 
 			notification, err := notificationRepository.GetNotificationById(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			if notification.UserId != token.UserId {
-				return http.StatusForbidden, errors.New("user cannot delete other user's notifications")
+				return http.StatusForbidden, stacktrace.WithStack(errors.New("user cannot delete other user's notifications"))
 			}
 
 			err = notificationRepository.DeleteNotificationById(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)

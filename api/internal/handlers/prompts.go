@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
@@ -23,7 +24,7 @@ func GetPagedPrompts(w http.ResponseWriter, r *http.Request) {
 			command := commands.PagedRequestCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate()
@@ -35,7 +36,7 @@ func GetPagedPrompts(w http.ResponseWriter, r *http.Request) {
 			promptRepository := repositories.NewPromptRepository(nil)
 			prompts, count, err := promptRepository.GetPagedPrompts(command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			pagedData := structs.PagedData{}
@@ -48,7 +49,7 @@ func GetPagedPrompts(w http.ResponseWriter, r *http.Request) {
 
 			responseBytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -73,12 +74,12 @@ func GetPromptById(w http.ResponseWriter, r *http.Request) {
 			promptRepository := repositories.NewPromptRepository(nil)
 			prompt, err := promptRepository.GetPromptById(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(prompt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -103,7 +104,7 @@ func UpdatePromptById(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertPromptCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate()
@@ -115,12 +116,12 @@ func UpdatePromptById(w http.ResponseWriter, r *http.Request) {
 			promptRepository := repositories.NewPromptRepository(nil)
 			prompt, err := promptRepository.UpdatePromptById(id, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(prompt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -144,7 +145,7 @@ func CreatePrompt(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertPromptCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate()
@@ -156,12 +157,12 @@ func CreatePrompt(w http.ResponseWriter, r *http.Request) {
 			promptRepository := repositories.NewPromptRepository(nil)
 			prompt, err := promptRepository.CreatePrompt(command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(prompt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -186,7 +187,7 @@ func DeletePromptById(w http.ResponseWriter, r *http.Request) {
 			promptRepository := repositories.NewPromptRepository(nil)
 			err := promptRepository.DeletePromptById(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -209,12 +210,12 @@ func CreateDefaultPrompt(w http.ResponseWriter, r *http.Request) {
 			promptService := services.NewPromptService(nil)
 			prompt, err := promptService.CreateDefaultPrompt()
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(prompt)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"receipt-wrangler/api/internal/stacktrace"
 
 	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/constants"
@@ -31,7 +32,7 @@ func GetPagedOidcProviders(w http.ResponseWriter, r *http.Request) {
 
 			err := pagedRequestCommand.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := pagedRequestCommand.Validate()
@@ -42,7 +43,7 @@ func GetPagedOidcProviders(w http.ResponseWriter, r *http.Request) {
 
 			providers, count, err := repositories.NewOidcProviderRepository(nil).GetPagedOidcProviders(pagedRequestCommand)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			views := services.BuildOidcProviderViews(providers)
@@ -56,7 +57,7 @@ func GetPagedOidcProviders(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -79,21 +80,21 @@ func GetOidcProviderById(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id, err := utils.StringToUint(chi.URLParam(r, "oidcProviderId"))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			provider, err := repositories.NewOidcProviderRepository(nil).GetOidcProviderById(id)
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return http.StatusNotFound, err
+					return http.StatusNotFound, stacktrace.WithStack(err)
 				}
 
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := json.Marshal(services.BuildOidcProviderView(provider))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -119,7 +120,7 @@ func CreateOidcProvider(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertOidcProviderCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate(true)
@@ -134,12 +135,12 @@ func CreateOidcProvider(w http.ResponseWriter, r *http.Request) {
 					return 0, nil
 				}
 
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := json.Marshal(view)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -162,13 +163,13 @@ func UpdateOidcProvider(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id, err := utils.StringToUint(chi.URLParam(r, "oidcProviderId"))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			command := commands.UpsertOidcProviderCommand{}
 			err = command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate(false)
@@ -181,10 +182,10 @@ func UpdateOidcProvider(w http.ResponseWriter, r *http.Request) {
 			existing, err := repository.GetOidcProviderById(id)
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return http.StatusNotFound, err
+					return http.StatusNotFound, stacktrace.WithStack(err)
 				}
 
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs = command.ValidateUpdate(existing)
@@ -199,7 +200,7 @@ func UpdateOidcProvider(w http.ResponseWriter, r *http.Request) {
 					return 0, nil
 				}
 
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Drop the cached discovery so an issuer or client-id change takes effect
@@ -209,7 +210,7 @@ func UpdateOidcProvider(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := json.Marshal(view)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -232,12 +233,12 @@ func DeleteOidcProvider(w http.ResponseWriter, r *http.Request) {
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			id, err := utils.StringToUint(chi.URLParam(r, "oidcProviderId"))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			err = repositories.NewOidcProviderRepository(nil).DeleteOidcProvider(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			oidc.InvalidateProvider(id)

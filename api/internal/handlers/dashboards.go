@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -25,7 +26,7 @@ func CreateDashboard(w http.ResponseWriter, r *http.Request) {
 		ResponseType:     constants.ApplicationJson,
 		HandlerFunction: func(w http.ResponseWriter, r *http.Request) (int, error) {
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			if len(vErr.Errors) > 0 {
@@ -38,12 +39,12 @@ func CreateDashboard(w http.ResponseWriter, r *http.Request) {
 
 			dashboard, err := dashboardRepository.CreateDashboard(command, token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(dashboard)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -71,17 +72,17 @@ func GetDashboardsForUser(w http.ResponseWriter, r *http.Request) {
 			token := structs.GetClaims(r)
 			uintGroupId, err := utils.StringToUint(groupId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			dashboards, err := dashboardRepository.GetDashboardsForUserByGroup(token.UserId, uintGroupId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(dashboards)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -133,17 +134,17 @@ func UpdateDashboard(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			dashboard, err := dashboardRepository.UpdateDashboardById(uintDashboardId, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(dashboard)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -190,12 +191,12 @@ func DeleteDashboard(w http.ResponseWriter, r *http.Request) {
 			dashboardRepository := repositories.NewDashboardRepository(nil)
 			err := dashboardRepository.DeleteDashboardById(uintDashboardId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(dashboard)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

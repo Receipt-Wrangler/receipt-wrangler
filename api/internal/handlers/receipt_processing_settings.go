@@ -8,6 +8,7 @@ import (
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -25,7 +26,7 @@ func GetPagedReceiptProcessingSettings(w http.ResponseWriter, r *http.Request) {
 			command := commands.PagedRequestCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate()
@@ -37,7 +38,7 @@ func GetPagedReceiptProcessingSettings(w http.ResponseWriter, r *http.Request) {
 			receiptProcessingSettingsRepository := repositories.NewReceiptProcessingSettings(nil)
 			receiptProcessingSettings, count, err := receiptProcessingSettingsRepository.GetPagedReceiptProcessingSettings(command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			pagedData := structs.PagedData{}
@@ -50,7 +51,7 @@ func GetPagedReceiptProcessingSettings(w http.ResponseWriter, r *http.Request) {
 
 			responseBytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -75,7 +76,7 @@ func CreateReceiptProcessingSettings(w http.ResponseWriter, r *http.Request) {
 
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate(false)
@@ -87,12 +88,12 @@ func CreateReceiptProcessingSettings(w http.ResponseWriter, r *http.Request) {
 			receiptProcessingSettingsRepository := repositories.NewReceiptProcessingSettings(nil)
 			settings, err := receiptProcessingSettingsRepository.CreateReceiptProcessingSettings(command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(settings)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -118,12 +119,12 @@ func GetReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request) {
 			receiptProcessingSettingsRepository := repositories.NewReceiptProcessingSettings(nil)
 			settings, err := receiptProcessingSettingsRepository.GetReceiptProcessingSettingsById(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(settings)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -151,7 +152,7 @@ func UpdateReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request)
 
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate(updateKey)
@@ -163,12 +164,12 @@ func UpdateReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request)
 			receiptProcessingSettingsRepository := repositories.NewReceiptProcessingSettings(nil)
 			settings, err := receiptProcessingSettingsRepository.UpdateReceiptProcessingSettingsById(id, updateKey, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(settings)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -194,7 +195,7 @@ func DeleteReceiptProcessingSettingsById(w http.ResponseWriter, r *http.Request)
 			receiptProcessingSettingsRepository := repositories.NewReceiptProcessingSettings(nil)
 			err := receiptProcessingSettingsRepository.DeleteReceiptProcessingSettingsById(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -217,7 +218,7 @@ func CheckReceiptProcessingSettingsConnectivity(w http.ResponseWriter, r *http.R
 			command := commands.CheckReceiptProcessingSettingsCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate()
@@ -233,7 +234,7 @@ func CheckReceiptProcessingSettingsConnectivity(w http.ResponseWriter, r *http.R
 
 				client, clientErr := services.NewAiService(stringId)
 				if clientErr != nil {
-					return http.StatusInternalServerError, clientErr
+					return http.StatusInternalServerError, stacktrace.WithStack(clientErr)
 				}
 
 				aiClient = client
@@ -261,12 +262,12 @@ func CheckReceiptProcessingSettingsConnectivity(w http.ResponseWriter, r *http.R
 
 			systemTask, err := aiClient.CheckConnectivity(token.UserId, decryptKey)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(systemTask)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

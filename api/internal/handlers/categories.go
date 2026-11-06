@@ -7,6 +7,7 @@ import (
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -24,12 +25,12 @@ func GetAllCategories(w http.ResponseWriter, r *http.Request) {
 			categoriesRepository := repositories.NewCategoryRepository(nil)
 			categories, err := categoriesRepository.GetAllCategories("*")
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&categories)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -53,18 +54,18 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 			category := models.Category{}
 			err := category.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			categoriesRepository := repositories.NewCategoryRepository(nil)
 			createdCategory, err := categoriesRepository.CreateCategory(category)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&createdCategory)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -89,13 +90,13 @@ func GetPagedCategories(w http.ResponseWriter, r *http.Request) {
 			pagedRequestCommand := commands.PagedRequestCommand{}
 			err := pagedRequestCommand.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			categoriesRepository := repositories.NewCategoryRepository(nil)
 			categories, err := categoriesRepository.GetAllPagedCategories(pagedRequestCommand)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			anyData := make([]any, len(categories))
@@ -108,7 +109,7 @@ func GetPagedCategories(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -132,13 +133,13 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request) {
 			id := chi.URLParam(r, "categoryId")
 			uintId, err := utils.StringToUint(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			category := models.Category{}
 			err = category.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			categoryRepository := repositories.NewCategoryRepository(nil)
@@ -146,12 +147,12 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request) {
 
 			updatedCategory, err := categoryRepository.UpdateCategory(category, "name, description")
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(updatedCategory)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -176,13 +177,13 @@ func DeleteCategory(w http.ResponseWriter, r *http.Request) {
 
 			uintId, err := utils.StringToUint(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			categoryRepository := repositories.NewCategoryRepository(nil)
 			err = categoryRepository.DeleteCategory(uintId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -206,12 +207,12 @@ func GetCategoryNameCount(w http.ResponseWriter, r *http.Request) {
 			categoryName := chi.URLParam(r, "categoryName")
 			count, err := categoryRepository.GetCount("categories", "name = ?", categoryName)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(count)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)

@@ -6,6 +6,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -26,7 +27,7 @@ func GetPieChartData(w http.ResponseWriter, r *http.Request) {
 			command := commands.PieChartDataCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate()
@@ -40,12 +41,12 @@ func GetPieChartData(w http.ResponseWriter, r *http.Request) {
 
 			pieChartData, err := pieChartService.GetPieChartData(token.UserId, groupId, command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(pieChartData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

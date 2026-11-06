@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 )
@@ -30,14 +31,14 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			results, err := services.NewReceiptService(nil).SearchReceiptsForUser(token.UserId, searchTerm, searchResultLimit)
 			if err != nil {
 				if errors.Is(err, services.ErrSearchForbidden) {
-					return http.StatusForbidden, err
+					return http.StatusForbidden, stacktrace.WithStack(err)
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(results)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)

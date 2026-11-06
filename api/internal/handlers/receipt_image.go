@@ -10,6 +10,7 @@ import (
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"time"
@@ -53,12 +54,12 @@ func UploadReceiptImage(w http.ResponseWriter, r *http.Request) {
 
 			_, err = file.Read(fileBytes)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			_, err = fileRepository.ValidateFileType(fileBytes)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			fileImageRepository := repositories.NewReceiptImageRepository(nil)
@@ -76,17 +77,17 @@ func UploadReceiptImage(w http.ResponseWriter, r *http.Request) {
 				return createErr
 			})
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			fileBytes, err = fileRepository.GetBytesForFileData(createdFile)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			encodedImage, err := fileRepository.BuildEncodedImageString(fileBytes)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			fileDataView := models.FileDataView{}.FromFileData(createdFile)
@@ -94,7 +95,7 @@ func UploadReceiptImage(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(fileDataView)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -133,18 +134,18 @@ func GetReceiptImage(w http.ResponseWriter, r *http.Request) {
 
 			err = db.Model(models.Receipt{}).Where("id = ?", fileData.ReceiptId).Select("id").Find(&receipt).Error
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			fileRepository := repositories.NewFileRepository(nil)
 			bytes, err = fileRepository.GetBytesForFileData(fileData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			imageData, err := fileRepository.BuildEncodedImageString(bytes)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			result = models.FileDataView{}.FromFileData(fileData)
@@ -152,7 +153,7 @@ func GetReceiptImage(w http.ResponseWriter, r *http.Request) {
 
 			resultBytes, err := utils.MarshalResponseData(result)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -190,7 +191,7 @@ func DownloadReceiptImage(w http.ResponseWriter, r *http.Request) {
 
 			path, err := fileRepository.BuildFilePath(utils.UintToString(fileData.ReceiptId), utils.UintToString(fileData.ID), fileData.Name)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.Header().Set("Content-Disposition", "attachment; filename="+fileData.Name)
@@ -227,7 +228,7 @@ func RemoveReceiptImage(w http.ResponseWriter, r *http.Request) {
 			token := structs.GetClaims(r)
 			allowed, err := enforceImageDeleteKeepsRequired(w, token.UserId, fileData.ReceiptId, fileData.ID)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			if !allowed {
 				return 0, nil
@@ -239,18 +240,18 @@ func RemoveReceiptImage(w http.ResponseWriter, r *http.Request) {
 				return db.Delete(fileData).Error
 			})
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			fileRepository := repositories.NewFileRepository(nil)
 			path, err := fileRepository.BuildFilePath(utils.UintToString(fileData.ReceiptId), id, fileData.Name)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			err = utils.RemoveDataPath(path)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -279,7 +280,7 @@ func MagicFillFromImage(w http.ResponseWriter, r *http.Request) {
 			if len(receiptImageId) > 0 {
 				errCode, err := validateReceiptImageAccess(r, permissions.GroupReceiptsMagicFill, receiptImageId)
 				if err != nil {
-					return errCode, err
+					return errCode, stacktrace.WithStack(err)
 				}
 
 				startTimer = time.Now()
@@ -297,30 +298,30 @@ func MagicFillFromImage(w http.ResponseWriter, r *http.Request) {
 					nil,
 				)
 				if taskErr != nil {
-					return http.StatusInternalServerError, taskErr
+					return http.StatusInternalServerError, stacktrace.WithStack(taskErr)
 				}
 
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				receiptCommand = command
 			} else {
 				err := r.ParseMultipartForm(constants.MultipartFormMaxSize)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				file, fileHeader, err := r.FormFile("file")
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 				defer file.Close()
 
 				fileBytes := make([]byte, fileHeader.Size)
 				_, err = file.Read(fileBytes)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				magicFillCommand := commands.MagicFillCommand{
@@ -343,11 +344,11 @@ func MagicFillFromImage(w http.ResponseWriter, r *http.Request) {
 					nil,
 				)
 				if taskErr != nil {
-					return http.StatusInternalServerError, taskErr
+					return http.StatusInternalServerError, stacktrace.WithStack(taskErr)
 				}
 
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				receiptCommand = command
@@ -355,7 +356,7 @@ func MagicFillFromImage(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(receiptCommand)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -385,31 +386,31 @@ func ConvertToJpg(w http.ResponseWriter, r *http.Request) {
 
 			err := r.ParseMultipartForm(50 << 20)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			file, fileHeader, err := r.FormFile("file")
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			fileBytes := make([]byte, fileHeader.Size)
 			_, err = file.Read(fileBytes)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// The standalone ValidateFileType this replaced was redundant —
 			// GetBytesFromImageBytes calls it first and returns the same error.
 			encodedString, err := fileRepository.BuildDisplayImageString(fileBytes)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			result["encodedImage"] = encodedString
 			bytes, err := utils.MarshalResponseData(result)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(200)
@@ -428,21 +429,21 @@ func validateReceiptImageAccess(r *http.Request, requiredPermission string, rece
 
 	receiptImageIdUint, err := utils.StringToUint(receiptImageId)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, stacktrace.WithStack(err)
 	}
 	receiptImageRepository := repositories.NewReceiptImageRepository(nil)
 
 	receiptImage, err := receiptImageRepository.GetReceiptImageById(receiptImageIdUint)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, stacktrace.WithStack(err)
 	}
 
 	hasPermission, err := permissionService.HasGroupPermissions(token.UserId, receiptImage.Receipt.GroupId, requiredPermission)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		return http.StatusInternalServerError, stacktrace.WithStack(err)
 	}
 	if !hasPermission {
-		return http.StatusForbidden, errors.New("user is unauthorized to access entity")
+		return http.StatusForbidden, stacktrace.WithStack(errors.New("user is unauthorized to access entity"))
 	}
 
 	return 0, nil

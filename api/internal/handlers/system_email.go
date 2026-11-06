@@ -7,6 +7,7 @@ import (
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -28,7 +29,7 @@ func GetAllSystemEmails(w http.ResponseWriter, r *http.Request) {
 			pagedCommand := commands.PagedRequestCommand{}
 			err := pagedCommand.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := pagedCommand.Validate()
@@ -40,12 +41,12 @@ func GetAllSystemEmails(w http.ResponseWriter, r *http.Request) {
 			systemEmailRepository := repositories.NewSystemEmailRepository(nil)
 			systemEmails, err := systemEmailRepository.GetPagedSystemEmails(pagedCommand)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			count, err := systemEmailRepository.GetCount("system_emails", "")
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			for i := 0; i < len(systemEmails); i++ {
@@ -55,7 +56,7 @@ func GetAllSystemEmails(w http.ResponseWriter, r *http.Request) {
 
 			bytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -81,12 +82,12 @@ func GetSystemEmailById(w http.ResponseWriter, r *http.Request) {
 
 			systemEmail, err := systemEmailRepository.GetSystemEmailById(systemEmailId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(systemEmail)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -110,7 +111,7 @@ func AddSystemEmail(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertSystemEmailCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate(true)
@@ -122,12 +123,12 @@ func AddSystemEmail(w http.ResponseWriter, r *http.Request) {
 			systemEmailRepository := repositories.NewSystemEmailRepository(nil)
 			systemEmail, err := systemEmailRepository.AddSystemEmail(command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(systemEmail)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -151,7 +152,7 @@ func UpdateSystemEmail(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertSystemEmailCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate(false)
@@ -169,12 +170,12 @@ func UpdateSystemEmail(w http.ResponseWriter, r *http.Request) {
 			systemEmailRepository := repositories.NewSystemEmailRepository(nil)
 			systemEmail, err := systemEmailRepository.UpdateSystemEmail(id, command, updatePassword)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(systemEmail)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -199,7 +200,7 @@ func DeleteSystemEmail(w http.ResponseWriter, r *http.Request) {
 
 			err := systemEmailRepository.DeleteSystemEmail(id)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -223,7 +224,7 @@ func CheckConnectivity(w http.ResponseWriter, r *http.Request) {
 
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate()
@@ -235,12 +236,12 @@ func CheckConnectivity(w http.ResponseWriter, r *http.Request) {
 			systemEmailService := services.NewSystemEmailService(nil)
 			systemTask, err := systemEmailService.CheckEmailConnectivity(command, token.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(systemTask)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

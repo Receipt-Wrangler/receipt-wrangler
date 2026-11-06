@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -21,7 +22,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 			jwt, refreshToken, accessTokenClaims, err := services.GenerateJWT(oldRefreshToken.UserId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			if utils.IsMobileApp(r) {
@@ -32,7 +33,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 				bytes, err := utils.MarshalResponseData(tokenPair)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				w.Header().Set("Content-Type", constants.ApplicationJson)
@@ -43,7 +44,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 				services.PrepareAccessTokenClaims(accessTokenClaims)
 				bytes, err := utils.MarshalResponseData(accessTokenClaims)
 				if err != nil {
-					return http.StatusInternalServerError, err
+					return http.StatusInternalServerError, stacktrace.WithStack(err)
 				}
 
 				accessTokenCookie, refreshTokenCookie := services.BuildTokenCookies(jwt, refreshToken)

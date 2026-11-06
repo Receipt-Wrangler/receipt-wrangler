@@ -15,6 +15,7 @@ import (
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 	"receipt-wrangler/api/internal/wranglerasynq"
@@ -31,7 +32,7 @@ func GetSystemTasks(w http.ResponseWriter, r *http.Request) {
 			command := commands.GetSystemTaskCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErr := command.Validate()
@@ -43,7 +44,7 @@ func GetSystemTasks(w http.ResponseWriter, r *http.Request) {
 			systemTaskRepository := repositories.NewSystemTaskRepository(nil)
 			systemTasks, count, err := systemTaskRepository.GetPagedSystemTasks(command)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Both hydration passes below run before the copy loop, which takes
@@ -53,7 +54,7 @@ func GetSystemTasks(w http.ResponseWriter, r *http.Request) {
 			// response compares them against an earlier complete copy instead.
 			err = services.NewSystemTaskService(nil).UpcastReceiptUpdateDescriptions(systemTasks)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// This table is app-scoped, so it lists groups the caller may not be a
@@ -62,7 +63,7 @@ func GetSystemTasks(w http.ResponseWriter, r *http.Request) {
 			token := structs.GetClaims(r)
 			err = wranglerasynq.SetSystemTaskHasSourceFile(systemTasks, groupSourceFileReader(token.UserId))
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			pagedData := structs.PagedData{}
@@ -77,7 +78,7 @@ func GetSystemTasks(w http.ResponseWriter, r *http.Request) {
 
 			responseBytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -130,16 +131,16 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 			permissionService := services.NewPermissionService(nil)
 			resolver, err := permissionService.ActivityVisibilityResolver(token.UserId, command.GroupIds)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			activities, count, err := systemTaskRepository.GetPagedActivities(command, resolver)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			err = wranglerasynq.SetActivityFlags(&activities)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			pagedData := structs.PagedData{}
@@ -154,7 +155,7 @@ func GetActivitiesForGroups(w http.ResponseWriter, r *http.Request) {
 
 			responseBytes, err := utils.MarshalResponseData(pagedData)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -204,18 +205,18 @@ func RerunActivity(w http.ResponseWriter, r *http.Request) {
 
 			queueName, err := wranglerasynq.SystemTaskToQueueName(systemTask.Type)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			inspector, err := wranglerasynq.GetAsynqInspector()
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 			defer inspector.Close()
 
 			taskInfo, err := inspector.GetTaskInfo(queueName, systemTask.AsynqTaskId)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// Inspector.RunTask does not refuse a task by state — it pushes back
@@ -238,7 +239,7 @@ func RerunActivity(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if err := inspector.RunTask(queueName, systemTask.AsynqTaskId); err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			return 0, nil
@@ -309,7 +310,7 @@ func GetSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 			// read error, which would serve an empty image as a success.
 			fileBytes, err := os.ReadFile(pathToRead)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			// BuildDisplayImageString, never BuildEncodedImageString: a quick scan's
@@ -318,7 +319,7 @@ func GetSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 			// render — silently, since GetFileType labels a PDF image/jpeg anyway.
 			encodedImage, err := fileRepository.BuildDisplayImageString(fileBytes)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			responseBytes, err := utils.MarshalResponseData(structs.SystemTaskSourceFileView{
@@ -326,7 +327,7 @@ func GetSystemTaskSourceFile(w http.ResponseWriter, r *http.Request) {
 				EncodedImage: encodedImage,
 			})
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

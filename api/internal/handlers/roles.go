@@ -7,6 +7,7 @@ import (
 	"receipt-wrangler/api/internal/constants"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/services"
+	"receipt-wrangler/api/internal/stacktrace"
 	"receipt-wrangler/api/internal/structs"
 	"receipt-wrangler/api/internal/utils"
 
@@ -24,12 +25,12 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 			roleService := services.NewRoleService(nil)
 			roles, err := roleService.GetRoles()
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&roles)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -53,7 +54,7 @@ func CreateRole(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertRoleCommand{}
 			err := command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate()
@@ -71,12 +72,12 @@ func CreateRole(w http.ResponseWriter, r *http.Request) {
 					}, http.StatusBadRequest)
 					return 0, nil
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&createdRole)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -108,7 +109,7 @@ func UpdateRole(w http.ResponseWriter, r *http.Request) {
 			command := commands.UpsertRoleCommand{}
 			err = command.LoadDataFromRequest(w, r)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			vErrs := command.Validate()
@@ -142,12 +143,12 @@ func UpdateRole(w http.ResponseWriter, r *http.Request) {
 					}, http.StatusBadRequest)
 					return 0, nil
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&updatedRole)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -215,7 +216,7 @@ func DeleteRole(w http.ResponseWriter, r *http.Request) {
 					utils.WriteCustomErrorResponse(w, "Role not found", http.StatusNotFound)
 					return 0, nil
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)
@@ -264,12 +265,12 @@ func SetDefaultRole(w http.ResponseWriter, r *http.Request) {
 					utils.WriteCustomErrorResponse(w, "Role not found", http.StatusNotFound)
 					return 0, nil
 				}
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			bytes, err := utils.MarshalResponseData(&updatedRole)
 			if err != nil {
-				return http.StatusInternalServerError, err
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
 			w.WriteHeader(http.StatusOK)

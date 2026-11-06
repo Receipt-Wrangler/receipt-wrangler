@@ -232,6 +232,43 @@ pre-installed binary works.
 - Environment variables override config file settings
 - Sample configuration in `config/config.sample.json`
 
+## Handler errors are logged with a stack trace
+
+A Go error carries no location. By the time a handler's error reaches `HandleRequest`, the frames
+that produced it have returned. So the log used to say `[generic_handler.go:71] ERROR: <message>`,
+the same line for every endpoint.
+
+- **Attach the stack where the handler returns the error:**
+  `return http.StatusInternalServerError, stacktrace.WithStack(err)` (`internal/stacktrace`).
+  - Every error a handler returns in `internal/handlers` is wrapped this way, including one built
+    inline (`stacktrace.WithStack(errors.New("..."))`). New handlers should do the same.
+  - A nil error stays nil.
+  - An error that already carries a stack is returned unchanged, so the innermost stack wins.
+    Wrapping deeper, in a service or repository, is fine and shows that line first.
+  - `Error()`, `errors.Is` and `errors.As` see the original error.
+- **`HandleRequest` logs the method, the path and the stack** (`logHandlerError`). Only this
+  module's frames are shown, innermost first:
+  ```text
+  ERROR:  PUT /api/receipt/12: error decoding string '""': can't convert "" to decimal
+  	internal/handlers.UpdateReceipt.func1 (receipts.go:578)
+  	internal/handlers.HandleRequest (generic_handler.go:70)
+  	internal/handlers.UpdateReceipt (receipts.go:737)
+  ```
+- **An error returned without a stack gets one taken in `HandleRequest`.** Its top frame is
+  `logHandlerError`. It still names the handler that called `HandleRequest`, but not the line in
+  that handler that failed.
+- **The query string is never logged**, because it can carry credentials.
+- **The path is logged escaped** (`URL.EscapedPath()`). `URL.Path` is decoded, so a `%0A` in the
+  request would write a real newline and let the caller forge a log line.
+- **A decode error does not name the field.** `encoding/json` passes a custom `UnmarshalJSON` error
+  up without the field name, for example from `decimal.Decimal` given `""`. The stack still names
+  the endpoint and the decode call.
+- The logger no longer sets `log.Lshortfile`. It always printed `log.go:56`, LogStd's own
+  `Println`, and LogStd adds its caller's file and line itself.
+
+Tests: `stacktrace/stacktrace_test.go` and `handlers/handler_error_logging_test.go`. The handler test
+drives `PUT /receipt/{id}` with `"amount": ""`, the case that prompted this.
+
 ## Filesystem Access & Path-Traversal Safety
 
 Group and receipt files live under the app's **data directory** (`<cwd>/data/<groupId>-<groupName>/…`).
