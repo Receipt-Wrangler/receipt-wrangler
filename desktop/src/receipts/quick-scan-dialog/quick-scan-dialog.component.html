@@ -3,8 +3,18 @@
     <app-upload-image
       [multiple]="true"
       (fileLoaded)="fileLoaded($event)"
+      (processingChange)="imagesProcessing.set($event)"
     ></app-upload-image>
-    @if (images.length === 0) {
+    @if (imagesProcessing()) {
+      <div
+        class="d-flex justify-content-center py-3"
+        role="status"
+        aria-label="Loading images"
+        data-testid="quick-scan-images-loading"
+      >
+        <mat-spinner [diameter]="40"></mat-spinner>
+      </div>
+    } @else if (images.length === 0) {
       <div
       >
         <strong> Select images to upload</strong>

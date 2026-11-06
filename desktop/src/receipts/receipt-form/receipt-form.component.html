@@ -126,8 +126,24 @@
                 class="w-100"
                 [receiptId]="originalReceipt?.id?.toString()"
                 (fileLoaded)="imageFileLoaded($event)"
+                (processingChange)="imagesProcessing.set($event)"
               >
               </app-upload-image>
+              <!--
+                Outside the stage on purpose: the stage only renders once there is an
+                image, so a spinner inside it never shows for the first one, nor while
+                the saved images load.
+              -->
+              @if (imagesBusy()) {
+                <div
+                  class="d-flex justify-content-center py-3"
+                  role="status"
+                  aria-label="Loading images"
+                  data-testid="receipt-images-loading"
+                >
+                  <mat-spinner [diameter]="40"></mat-spinner>
+                </div>
+              }
               @if (isImageMissing()) {
                 <div
                   class="rw-requirement-hint"
@@ -140,11 +156,6 @@
                 <div
                   class="rw-images-pane__stage"
                 >
-                  @if (imagesLoading()) {
-                    <div class="d-flex justify-content-center align-items-center">
-                      <mat-spinner></mat-spinner>
-                    </div>
-                  }
                   <app-carousel
                     class="rw-carousel--fill"
                     [images]="images()"

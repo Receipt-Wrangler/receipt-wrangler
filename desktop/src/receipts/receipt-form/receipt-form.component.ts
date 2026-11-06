@@ -188,6 +188,19 @@ export class ReceiptFormComponent implements OnInit {
 
   public imagesLoading = signal(false);
 
+  /** Set from app-upload-image while a picked file is still being read or converted. */
+  public readonly imagesProcessing = signal(false);
+
+  private readonly imageUploadsInFlight = signal(0);
+
+  /** Drives the Images section's spinner: saved images loading, or a new one on its way in. */
+  public readonly imagesBusy = computed(
+    () =>
+      this.imagesLoading() ||
+      this.imagesProcessing() ||
+      this.imageUploadsInFlight() > 0
+  );
+
   public showImages: boolean = true;
 
   public usersToOmit = signal<string[]>([]);
@@ -1174,6 +1187,7 @@ export class ReceiptFormComponent implements OnInit {
         this.filesToUpload.update(files => [...files, command]);
         break;
       case FormMode.edit:
+        this.imageUploadsInFlight.update(count => count + 1);
         this.receiptImageService
           .uploadReceiptImage(
             command.file,
@@ -1184,7 +1198,8 @@ export class ReceiptFormComponent implements OnInit {
             tap((data) => {
               this.snackbarService.success("Successfully uploaded image(s)");
               this.images.update(imgs => [...imgs, data]);
-              })
+            }),
+            finalize(() => this.imageUploadsInFlight.update(count => count - 1))
           )
           .subscribe();
         break;

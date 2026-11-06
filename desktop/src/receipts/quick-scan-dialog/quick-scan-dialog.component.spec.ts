@@ -66,6 +66,42 @@ describe("QuickScanDialogComponent", () => {
     expect(component).toBeTruthy();
   });
 
+  describe("images loading spinner", () => {
+    const spinner = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector('[data-testid="quick-scan-images-loading"]');
+
+    const render = async (): Promise<void> => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+
+    it("replaces the empty-state prompt while a file is converting", async () => {
+      component.imagesProcessing.set(true);
+      await render();
+
+      expect(spinner()).toBeTruthy();
+      expect(fixture.nativeElement.textContent).not.toContain("Select images to upload");
+
+      component.imagesProcessing.set(false);
+      await render();
+
+      expect(spinner()).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain("Select images to upload");
+    });
+
+    // app-upload-image is an unknown element under CUSTOM_ELEMENTS_SCHEMA, so the
+    // (processingChange) binding is a plain DOM listener on its host.
+    it("wires the upload control's processingChange to imagesProcessing", () => {
+      const set = jest.spyOn(component.imagesProcessing, "set");
+
+      fixture.nativeElement
+        .querySelector("app-upload-image")
+        .dispatchEvent(new CustomEvent("processingChange"));
+
+      expect(set).toHaveBeenCalled();
+    });
+  });
+
   it("should init form correctly", () => {
     component.ngOnInit();
 

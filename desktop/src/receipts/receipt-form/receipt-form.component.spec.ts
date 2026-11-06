@@ -9,7 +9,7 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
-import { BehaviorSubject, of } from "rxjs";
+import { BehaviorSubject, Subject, of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
 import { PipesModule } from "src/pipes/pipes.module";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
@@ -1272,6 +1272,117 @@ describe("ReceiptFormComponent", () => {
       button!.dispatchEvent(new CustomEvent("clicked"));
 
       expect(close).toHaveBeenCalled();
+    });
+  });
+
+  describe("images loading spinner", () => {
+    const spinner = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector('[data-testid="receipt-images-loading"]');
+
+    const render = async (): Promise<void> => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+
+    const command = () => ({
+      file: new File(["x"], "receipt.png", { type: "image/png" }),
+      receiptId: 3,
+    });
+
+    beforeEach(() => {
+      routeDataSubject.next({
+        mode: FormMode.edit,
+        customFields: [],
+        receipt: { id: 3, name: "R", amount: "1.00", paidByUserId: 1, groupId: 7 },
+      });
+    });
+
+    it("shows while an edit-mode upload is in flight", async () => {
+      const upload = new Subject<any>();
+      jest
+        .spyOn(TestBed.inject(ReceiptImageService), "uploadReceiptImage")
+        .mockReturnValue(upload as any);
+
+      component.imageFileLoaded(command());
+      await render();
+      expect(component.imagesBusy()).toBe(true);
+      expect(spinner()).toBeTruthy();
+
+      upload.next({ id: 9 });
+      upload.complete();
+      await render();
+      expect(component.imagesBusy()).toBe(false);
+      expect(spinner()).toBeNull();
+      expect(component.images().map((image) => image.id)).toEqual([9]);
+    });
+
+    // A spinner reset only on success would stick forever after a failed upload.
+    it("hides again when the upload fails", async () => {
+      const upload = new Subject<any>();
+      jest
+        .spyOn(TestBed.inject(ReceiptImageService), "uploadReceiptImage")
+        .mockReturnValue(upload as any);
+
+      component.imageFileLoaded(command());
+      expect(component.imagesBusy()).toBe(true);
+
+      upload.error(new Error("upload failed"));
+      await render();
+      expect(component.imagesBusy()).toBe(false);
+      expect(spinner()).toBeNull();
+    });
+
+    it("stays up until every concurrent upload has finished", () => {
+      const first = new Subject<any>();
+      const second = new Subject<any>();
+      jest
+        .spyOn(TestBed.inject(ReceiptImageService), "uploadReceiptImage")
+        .mockReturnValueOnce(first as any)
+        .mockReturnValueOnce(second as any);
+
+      component.imageFileLoaded(command());
+      component.imageFileLoaded(command());
+
+      first.next({ id: 1 });
+      first.complete();
+      expect(component.imagesBusy()).toBe(true);
+
+      second.next({ id: 2 });
+      second.complete();
+      expect(component.imagesBusy()).toBe(false);
+    });
+
+    it("shows while the upload control is still converting a file", async () => {
+      component.imagesProcessing.set(true);
+      await render();
+      expect(spinner()).toBeTruthy();
+
+      component.imagesProcessing.set(false);
+      await render();
+      expect(spinner()).toBeNull();
+    });
+
+    // The old spinner sat inside the stage, which only renders once images()
+    // is non-empty - never true while the saved images are still loading.
+    it("shows while the saved images load, before any image is on the stage", async () => {
+      component.imagesLoading.set(true);
+      await render();
+
+      expect(component.images()).toEqual([]);
+      expect(spinner()).toBeTruthy();
+    });
+
+    // app-upload-image is an unknown element under CUSTOM_ELEMENTS_SCHEMA, so the
+    // (processingChange) binding is a plain DOM listener on its host.
+    it("wires the upload control's processingChange to imagesProcessing", async () => {
+      await render();
+      const set = jest.spyOn(component.imagesProcessing, "set");
+
+      fixture.nativeElement
+        .querySelector("app-upload-image")
+        .dispatchEvent(new CustomEvent("processingChange"));
+
+      expect(set).toHaveBeenCalled();
     });
   });
 
