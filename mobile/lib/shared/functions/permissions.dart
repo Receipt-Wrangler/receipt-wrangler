@@ -42,11 +42,11 @@ bool canQuickScanReceipt(PermissionsModel permissionsModel, int groupId) {
       groupId, Permission.groupPeriodReceiptsPeriodQuickScan);
 }
 
-/// Whether the current user may open a receipt's change history. Gates on the
-/// app permission `app.receipt-history.read`, mirroring the desktop toggle. The
-/// server also requires `group.receipts.read` in the receipt's group, which
-/// reaching the receipt already implies, so no group check is repeated.
-bool canViewReceiptHistory(PermissionsModel permissionsModel) {
-  return permissionsModel
-      .hasAppPermission(Permission.appPeriodReceiptHistoryPeriodRead);
+/// Whether the current user may open the change history of a receipt saved in
+/// [groupId]. Gates on `group.receipts.history.read` in that group, mirroring
+/// the desktop toggle. The server also requires `group.receipts.read` there,
+/// which reaching the receipt already implies, so it is not repeated.
+bool canViewReceiptHistory(PermissionsModel permissionsModel, int groupId) {
+  return permissionsModel.hasGroupPermission(
+      groupId, Permission.groupPeriodReceiptsPeriodHistoryPeriodRead);
 }

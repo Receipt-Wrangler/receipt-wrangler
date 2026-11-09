@@ -90,35 +90,42 @@ func assertForbiddenBody(t *testing.T, w *httptest.ResponseRecorder) {
 }
 
 func TestGetReceiptHistoryAuthorization(t *testing.T) {
+	historyReader := []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsHistoryRead}
+
 	tests := []struct {
 		name      string
 		appPerms  []string
 		groupPerm []string
-		receiptId func(receipt models.Receipt) string
-		want      int
+		// otherGroupPerm is granted in group 2, which the receipt does not live in.
+		otherGroupPerm []string
+		receiptId      func(receipt models.Receipt) string
+		want           int
 	}{
 		{
-			name:      "allowed with the app permission and group read",
-			appPerms:  []string{permissions.AppReceiptHistoryRead},
-			groupPerm: []string{permissions.GroupReceiptsRead},
+			name:      "allowed with read and history read in the receipt's group",
+			groupPerm: historyReader,
 			want:      http.StatusOK,
 		},
 		{
-			name:      "denied without the app permission",
-			appPerms:  []string{permissions.AppReceiptsSearch},
+			name:      "denied without history read",
 			groupPerm: []string{permissions.GroupReceiptsRead},
 			want:      http.StatusForbidden,
 		},
 		{
 			name:      "denied without group read, even for an app-wide reader",
-			appPerms:  []string{permissions.AppReceiptHistoryRead, permissions.AppGroupsRead},
-			groupPerm: []string{permissions.GroupReceiptsUpdate},
+			appPerms:  []string{permissions.AppGroupsRead},
+			groupPerm: []string{permissions.GroupReceiptsHistoryRead, permissions.GroupReceiptsUpdate},
 			want:      http.StatusForbidden,
 		},
 		{
+			name:           "denied when history read is held only in another group",
+			groupPerm:      []string{permissions.GroupReceiptsRead},
+			otherGroupPerm: historyReader,
+			want:           http.StatusForbidden,
+		},
+		{
 			name:      "denied for a missing receipt",
-			appPerms:  []string{permissions.AppReceiptHistoryRead},
-			groupPerm: []string{permissions.GroupReceiptsRead},
+			groupPerm: historyReader,
 			receiptId: func(models.Receipt) string { return "404" },
 			want:      http.StatusForbidden,
 		},
@@ -131,6 +138,9 @@ func TestGetReceiptHistoryAuthorization(t *testing.T) {
 			receipt := seedReceiptWithHistory(t)
 			grantAppPerms(t, 2, test.appPerms...)
 			grantGroupPerms(t, 2, 1, test.groupPerm...)
+			if test.otherGroupPerm != nil {
+				grantGroupPerms(t, 2, 2, test.otherGroupPerm...)
+			}
 
 			receiptId := utils.UintToString(receipt.ID)
 			if test.receiptId != nil {
@@ -163,22 +173,45 @@ func TestGetReceiptHistoryDeniedWhenPaidByHidesTheReceipt(t *testing.T) {
 	payer := models.User{Username: "history-payer", Password: "x"}
 	repositories.GetDB().Create(&payer)
 	userId, groupId := seedPaidByRestrictedMember(t, nil, true)
-	grantAppPerms(t, userId, permissions.AppReceiptHistoryRead)
+	allowHistoryForMemberRole(t, userId, groupId)
 
+	ownReceipt := models.Receipt{Name: "Their own", GroupId: groupId, PaidByUserID: userId, Date: time.Now()}
+	repositories.GetDB().Create(&ownReceipt)
 	receipt := models.Receipt{Name: "Someone else's", GroupId: groupId, PaidByUserID: payer.ID, Date: time.Now()}
 	repositories.GetDB().Create(&receipt)
 
-	w, r := receiptHistoryRequest(userId, utils.UintToString(receipt.ID), "")
+	// The member can read history at all, so the denial below is the paid-by
+	// rule's and not a missing permission's.
+	w, r := receiptHistoryRequest(userId, utils.UintToString(ownReceipt.ID), "")
+	GetReceiptHistory(w, r)
+	assertStatus(t, w, http.StatusOK)
+
+	w, r = receiptHistoryRequest(userId, utils.UintToString(receipt.ID), "")
 	GetReceiptHistory(w, r)
 	assertForbiddenBody(t, w)
+}
+
+// allowHistoryForMemberRole adds history read to the role the member already
+// holds in groupId, keeping whatever else that role restricts.
+func allowHistoryForMemberRole(t *testing.T, userId uint, groupId uint) {
+	t.Helper()
+	db := repositories.GetDB()
+	var member models.GroupMember
+	if err := db.Where("user_id = ? AND group_id = ?", userId, groupId).First(&member).Error; err != nil || member.GroupRoleID == nil {
+		t.Fatalf("load the member's role: %v", err)
+	}
+	permission := models.GroupRolePermission{GroupRoleID: *member.GroupRoleID, Permission: permissions.GroupReceiptsHistoryRead}
+	if err := db.Create(&permission).Error; err != nil {
+		t.Fatalf("grant history read: %v", err)
+	}
+	services.ClearRolePermissionCacheForTests()
 }
 
 func TestGetReceiptHistoryResponseShape(t *testing.T) {
 	defer tearDownReceiptHistoryTest()
 	repositories.CreateTestGroupWithUsers()
 	receipt := seedReceiptWithHistory(t)
-	grantAppPerms(t, 2, permissions.AppReceiptHistoryRead)
-	grantGroupPerms(t, 2, 1, permissions.GroupReceiptsRead)
+	grantGroupPerms(t, 2, 1, permissions.GroupReceiptsRead, permissions.GroupReceiptsHistoryRead)
 
 	w, r := receiptHistoryRequest(2, utils.UintToString(receipt.ID), "")
 	GetReceiptHistory(w, r)
@@ -224,8 +257,7 @@ func TestGetReceiptHistorySnapshotsEndpoint(t *testing.T) {
 	defer tearDownReceiptHistoryTest()
 	repositories.CreateTestGroupWithUsers()
 	receipt := seedReceiptWithHistory(t)
-	grantAppPerms(t, 2, permissions.AppReceiptHistoryRead)
-	grantGroupPerms(t, 2, 1, permissions.GroupReceiptsRead)
+	grantGroupPerms(t, 2, 1, permissions.GroupReceiptsRead, permissions.GroupReceiptsHistoryRead)
 
 	w, r := receiptHistoryRequest(2, utils.UintToString(receipt.ID), updateTaskIdOf(t, receipt))
 	GetReceiptHistorySnapshots(w, r)

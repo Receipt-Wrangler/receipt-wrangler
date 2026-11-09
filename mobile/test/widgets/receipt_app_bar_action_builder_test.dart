@@ -53,11 +53,15 @@ GoRouter _router(String location) => GoRouter(
       ],
     );
 
+const _history = api.Permission.groupPeriodReceiptsPeriodHistoryPeriodRead;
+
+/// [group] is what the user holds in the receipt's group; [otherGroups] adds
+/// memberships elsewhere.
 Future<GoRouter> _pump(
   WidgetTester tester, {
   required String mode,
-  List<api.Permission> app = const [],
   List<api.Permission> group = const [api.Permission.groupPeriodReceiptsPeriodRead],
+  Map<int, List<api.Permission>> otherGroups = const {},
   int loadedReceiptId = _receiptId,
 }) async {
   final receiptModel = ReceiptModel()
@@ -71,7 +75,7 @@ Future<GoRouter> _pump(
   await tester.pumpWidget(MultiProvider(
     providers: [
       ChangeNotifierProvider<PermissionsModel>.value(
-          value: seededPermissions(app: app, group: {_groupId: group})),
+          value: seededPermissions(group: {_groupId: group, ...otherGroups})),
       ChangeNotifierProvider<ReceiptModel>.value(value: receiptModel),
       ChangeNotifierProvider<UserModel>(create: (_) => UserModel()),
     ],
@@ -108,8 +112,11 @@ void main() {
         (tester) async {
       await _pump(tester,
           mode: 'view',
-          app: [api.Permission.appPeriodReceiptHistoryPeriodRead],
-          group: [api.Permission.groupPeriodReceiptsPeriodUpdate]);
+          group: [
+            api.Permission.groupPeriodReceiptsPeriodRead,
+            api.Permission.groupPeriodReceiptsPeriodUpdate,
+            _history,
+          ]);
 
       await tester.tap(_viewMenuButton());
       await tester.pumpAndSettle();
@@ -121,7 +128,8 @@ void main() {
     testWidgets('a read-only member with the history permission gets only History',
         (tester) async {
       await _pump(tester,
-          mode: 'view', app: [api.Permission.appPeriodReceiptHistoryPeriodRead]);
+          mode: 'view',
+          group: [api.Permission.groupPeriodReceiptsPeriodRead, _history]);
 
       await tester.tap(_viewMenuButton());
       await tester.pumpAndSettle();
@@ -137,7 +145,7 @@ void main() {
         (tester) async {
       await _pump(tester,
           mode: 'view',
-          app: [api.Permission.appPeriodReceiptHistoryPeriodRead],
+          group: [api.Permission.groupPeriodReceiptsPeriodRead, _history],
           loadedReceiptId: 0);
 
       expect(find.byType(ReceiptEditPopupMenu), findsOneWidget);
@@ -151,6 +159,18 @@ void main() {
       expect(find.byType(ReceiptEditPopupMenu), findsOneWidget);
       expect(_viewMenuButton(), findsNothing);
     });
+
+    testWidgets('holding the permission only in another group offers no History',
+        (tester) async {
+      await _pump(tester,
+          mode: 'view',
+          otherGroups: {
+            _groupId + 1: [api.Permission.groupPeriodReceiptsPeriodRead, _history],
+          });
+
+      expect(find.byType(ReceiptEditPopupMenu), findsOneWidget);
+      expect(_viewMenuButton(), findsNothing);
+    });
   });
 
   group('edit mode', () {
@@ -159,8 +179,7 @@ void main() {
     testWidgets('offers History in a menu that is not the view marker', (tester) async {
       await _pump(tester,
           mode: 'edit',
-          app: [api.Permission.appPeriodReceiptHistoryPeriodRead],
-          group: [api.Permission.groupPeriodReceiptsPeriodUpdate]);
+          group: [api.Permission.groupPeriodReceiptsPeriodUpdate, _history]);
 
       expect(_editMenuButton(), findsOneWidget);
       expect(find.byType(ReceiptEditPopupMenu), findsNothing);
@@ -179,8 +198,7 @@ void main() {
     testWidgets('opens History on top without changing the URL', (tester) async {
       final router = await _pump(tester,
           mode: 'edit',
-          app: [api.Permission.appPeriodReceiptHistoryPeriodRead],
-          group: [api.Permission.groupPeriodReceiptsPeriodUpdate]);
+          group: [api.Permission.groupPeriodReceiptsPeriodUpdate, _history]);
 
       await tester.tap(_editMenuButton());
       await tester.pumpAndSettle();

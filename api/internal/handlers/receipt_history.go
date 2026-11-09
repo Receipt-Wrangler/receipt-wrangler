@@ -13,10 +13,10 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// receiptHistoryHandler gates both history endpoints the same way: the app
-// permission, group.receipts.read in the receipt's group (no app-level bypass)
-// and paid-by visibility on the receipt as it is now, all enforced by
-// HandleRequest, which also answers a missing receipt with its 403.
+// receiptHistoryHandler gates both history endpoints the same way: read and
+// history-read in the receipt's group as it is now (no app-level bypass) and
+// paid-by visibility on the receipt, all enforced by HandleRequest, which also
+// answers a missing receipt with its 403.
 func receiptHistoryHandler(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -28,8 +28,7 @@ func receiptHistoryHandler(
 		Writer:           w,
 		Request:          r,
 		ReceiptId:        chi.URLParam(r, "id"),
-		AppPermissions:   []string{permissions.AppReceiptHistoryRead},
-		GroupPermissions: []string{permissions.GroupReceiptsRead},
+		GroupPermissions: []string{permissions.GroupReceiptsRead, permissions.GroupReceiptsHistoryRead},
 		ResponseType:     constants.ApplicationJson,
 		HandlerFunction:  handlerFunction,
 	}

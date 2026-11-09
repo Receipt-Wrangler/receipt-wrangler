@@ -93,8 +93,6 @@ const (
 
 	AppReceiptsSearch = "app.receipts.search"
 
-	AppReceiptHistoryRead = "app.receipt-history.read"
-
 	AppReportsRead      = "app.reports.read"
 	AppReportsCreate    = "app.reports.create"
 	AppReportsUpdate    = "app.reports.update"
@@ -128,13 +126,14 @@ const (
 	// and lift the very restriction the feature exists to enforce.
 	GroupMembersGrantsUpdate = "group.members.grants.update"
 
-	GroupReceiptsCreate    = "group.receipts.create"
-	GroupReceiptsRead      = "group.receipts.read"
-	GroupReceiptsUpdate    = "group.receipts.update"
-	GroupReceiptsDelete    = "group.receipts.delete"
-	GroupReceiptsDuplicate = "group.receipts.duplicate"
-	GroupReceiptsMagicFill = "group.receipts.magic-fill"
-	GroupReceiptsQuickScan = "group.receipts.quick-scan"
+	GroupReceiptsCreate      = "group.receipts.create"
+	GroupReceiptsRead        = "group.receipts.read"
+	GroupReceiptsUpdate      = "group.receipts.update"
+	GroupReceiptsDelete      = "group.receipts.delete"
+	GroupReceiptsDuplicate   = "group.receipts.duplicate"
+	GroupReceiptsMagicFill   = "group.receipts.magic-fill"
+	GroupReceiptsQuickScan   = "group.receipts.quick-scan"
+	GroupReceiptsHistoryRead = "group.receipts.history.read"
 
 	GroupCommentsCreate = "group.comments.create"
 	GroupCommentsDelete = "group.comments.delete"
@@ -230,7 +229,6 @@ var registry = []Descriptor{
 	{AppAccountDelete, "Delete Own Account", "Delete your own account.", "Account", ScopeApp},
 
 	{AppReceiptsSearch, "Search Receipts", "Search across receipts you can access.", "Receipts", ScopeApp},
-	{AppReceiptHistoryRead, "Read Receipt History", "View a receipt's change history. Also requires Read Receipts in the receipt's group.", "Receipts", ScopeApp},
 
 	{AppReportsRead, "Access Reports", "Access the report builder and saved report templates.", "Reports", ScopeApp},
 	{AppReportsCreate, "Save Report Templates", "Save a report configuration as a reusable template.", "Reports", ScopeApp},
@@ -262,6 +260,7 @@ var registry = []Descriptor{
 	{GroupReceiptsDuplicate, "Duplicate Receipts", "Create a copy of an existing receipt.", "Receipts", ScopeGroup},
 	{GroupReceiptsMagicFill, "Magic Fill Receipts", "Run AI-powered data extraction on a receipt image to pre-fill receipt fields.", "Receipts", ScopeGroup},
 	{GroupReceiptsQuickScan, "Quick Scan Receipts", "Use the Quick Scan flow to rapidly capture and create receipts.", "Receipts", ScopeGroup},
+	{GroupReceiptsHistoryRead, "Read Receipt History", "View the change history of receipts in this group. Also requires Read Receipts.", "Receipts", ScopeGroup},
 
 	{GroupCommentsCreate, "Create Comments", "Add comments to receipts.", "Receipts", ScopeGroup},
 	{GroupCommentsDelete, "Delete Comments", "Remove comments.", "Receipts", ScopeGroup},

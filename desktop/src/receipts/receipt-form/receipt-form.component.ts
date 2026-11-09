@@ -113,12 +113,10 @@ export class ReceiptFormComponent implements OnInit {
     AuthState.hasAppPermission(Permission.AppCustomFieldsRead)
   );
 
-  // The history drawer is offered for a saved receipt, in view and edit mode.
-  // The server also requires group.receipts.read, which reaching the page
-  // already implies.
-  public readonly canViewHistory = this.store.selectSignal(
-    AuthState.hasAppPermission(Permission.AppReceiptHistoryRead)
-  );
+  // The history drawer is offered for a saved receipt, in view and edit mode,
+  // to a holder of group.receipts.history.read in the receipt's group. Set in
+  // setReceiptPermissions; deny-by-default until then.
+  public canViewHistory: Signal<boolean> = signal(false);
 
   public readonly historyOpen = signal(false);
 
@@ -461,6 +459,16 @@ export class ReceiptFormComponent implements OnInit {
     );
     this.canDuplicate = this.store.selectSignal(
       AuthState.hasGroupPermission(groupId, Permission.GroupReceiptsDuplicate)
+    );
+    // Judged in the group the receipt is saved in, as the server does - not the
+    // add target, and not a group the edit form is about to move it to. The
+    // server also requires group.receipts.read there, which reaching the page
+    // already implies.
+    this.canViewHistory = this.store.selectSignal(
+      AuthState.hasGroupPermission(
+        this.originalReceipt?.groupId ?? 0,
+        Permission.GroupReceiptsHistoryRead
+      )
     );
   }
 

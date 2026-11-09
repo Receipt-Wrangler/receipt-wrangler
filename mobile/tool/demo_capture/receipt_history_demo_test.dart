@@ -210,11 +210,11 @@ Widget _app() {
     ..status = api.ReceiptStatus.RESOLVED);
 
   final permissions = seededPermissions(
-    app: [api.Permission.appPeriodReceiptHistoryPeriodRead],
     group: {
       _groupId: [
         api.Permission.groupPeriodReceiptsPeriodRead,
         api.Permission.groupPeriodReceiptsPeriodUpdate,
+        api.Permission.groupPeriodReceiptsPeriodHistoryPeriodRead,
       ],
     },
   );

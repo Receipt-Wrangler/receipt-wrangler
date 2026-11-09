@@ -46,11 +46,14 @@ class ReceiptAppBarActionBuilder {
     // offered once it holds the receipt this route names: earlier it would
     // open the wrong receipt's history, and it would make the menu appear
     // before the receipt loaded, which specs read as "loaded".
+    // Judged in the group the receipt is saved in (`receipt`, not the edit
+    // form's working copy), as the server does.
     final receiptLoaded =
         receiptModel.receipt.id.toString() == routeReceiptId;
     final canViewHistory = receiptLoaded &&
         canViewReceiptHistory(
-            Provider.of<PermissionsModel>(context, listen: false));
+            Provider.of<PermissionsModel>(context, listen: false),
+            receiptModel.receipt.groupId);
 
     if (fullPath.contains("view")) {
       return ReceiptEditPopupMenu(

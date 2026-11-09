@@ -689,12 +689,19 @@ had to be rebuilt. **All three components.** On mobile, History is an entry in t
 (view and edit) that opens a day-grouped card list; it has no JSON view, and shows times in the
 device's zone rather than the app zone. See `mobile/CLAUDE.md` → "Receipt change history".
 
-- **Gated on `app.receipt-history.read`, an APP permission, AND `group.receipts.read`** on the
-  receipt's group, through `HandleRequest` with `ReceiptId`. That route also enforces paid-by
-  visibility on the receipt.
-  - App scope is what makes it **admin by default**. Legacy Admin is every app key, and Legacy User
-    is a fixed list that leaves it out.
-  - A group key would have landed in Legacy Owner, i.e. every group creator.
+- **Gated on `group.receipts.history.read` AND `group.receipts.read`, both in the receipt's
+  group**, through `HandleRequest` with `ReceiptId`. That route also enforces paid-by visibility on
+  the receipt. There is no app-level bypass.
+  - **It is a group permission because the data is a group's.** Who may audit a group's receipts is
+    decided per group, like every other rule inside one. Legacy Owner holds every group key, so a
+    group's creator sees its history by default; Legacy Editor and Viewer are fixed lists that leave
+    it out. Whether users may create groups at all is already the install's call
+    (`app.groups.create`).
+  - **It started as the app permission `app.receipt-history.read`**, which was all or nothing across
+    groups. That key never shipped in a release. A one-time data migration deletes it from app roles
+    on databases that ran the unreleased build (`api/CLAUDE.md` → "Receipt history").
+  - **Both clients judge it in the group the receipt is saved in**, as the server does: never the
+    add target, and never a group the edit form is about to move it to.
 - **The server builds the history and computes the diff; the client only formats.**
   `GET /receipt/{id}/history` returns typed change rows: a field code, a kind, and `from`/`to`
   values typed TEXT / CURRENCY / DATE / INSTANT / USER / STATUS / BOOLEAN. "View JSON" loads one

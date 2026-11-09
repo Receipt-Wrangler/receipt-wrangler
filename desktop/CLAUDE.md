@@ -743,11 +743,12 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   - **Notification delete** (`notification/notification.component.html`): the per-notification delete
     control gates on `app.notifications.delete` via `*hasAppPermission`.
   - **Receipt history** (`receipts/receipt-form/receipt-form.component.html`): the header's
-    history toggle gates on the **app** permission `app.receipt-history.read` (a `canViewHistory`
-    selectSignal) **and** a saved receipt (view or edit mode, not add). The server also requires
-    `group.receipts.read` in the receipt's group, which reaching the view or edit page already
-    implies, so no group check is repeated. Legacy Admin holds it; Legacy User does not. See
-    **Receipt history drawer** below.
+    history toggle gates on the **group** permission `group.receipts.history.read` in the receipt's
+    **saved** group (`originalReceipt.groupId`, set in `setReceiptPermissions` beside the other
+    receipt gates) **and** a saved receipt (view or edit mode, not add). It never follows the edit
+    form's group picker: the server judges the receipt where it lives now. The server also requires
+    `group.receipts.read` there, which reaching the page already implies. Legacy Owner holds it;
+    Legacy Editor and Viewer do not. See **Receipt history drawer** below.
   - **Group row actions** (`group/group-table/group-table.component.html`): edit gates on
     `group.update` OR `app.groups.update-settings`; **delete** gates on `group.delete` OR
     **`app.groups.delete`** (`orApp`), so an admin who switched the filter to **All Groups** can clean
@@ -2312,7 +2313,8 @@ by `ReceiptsModule`): a right-hand timeline of the receipt's saves, newest first
 **The server computes the diff and the redaction** (see `api/CLAUDE.md` → "Receipt history"); the
 desktop only formats what `GET /receipt/{id}/history` returns.
 
-- **Gating: `app.receipt-history.read`, in view and edit mode.** Add mode has no history yet. The
+- **Gating: `group.receipts.history.read` in the receipt's saved group, in view and edit mode.**
+  Add mode has no history yet. The
   drawer's own `@if` repeats the same conditions as the toggle, so it can never outlive them. Saving
   stays enabled with the drawer open. A save navigates to the view route, which recreates the form, so
   the drawer closes, as it does on any navigation.

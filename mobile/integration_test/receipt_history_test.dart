@@ -21,17 +21,16 @@ import 'helpers/pump.dart';
 /// The widget suite mocks the history response, so only this proves the menu
 /// entry reaches the real endpoint and renders what the server computed. It
 /// covers the three things a unit test cannot:
-///   - a read-only member holding `app.receipt-history.read` gets a view menu
+///   - a read-only member holding `group.receipts.history.read` gets a view menu
 ///     with only History, and the screen lists the server's entries, including
 ///     a comment (which recorded nothing before the history feature);
 ///   - History opened from the edit form leaves the form's unsaved input in
 ///     place -- it is pushed, not routed, because the form reads view/edit from
 ///     the URL;
-///   - without the permission there is no History entry.
+///   - without the permission in the receipt's group there is no History entry.
 ///
-/// The permission is granted by giving the provisioned user the Legacy Admin
-/// app role, which holds every app permission; their group role decides
-/// whether they can also edit.
+/// The permission is a group one, so each case is decided by the provisioned
+/// user's role in the fixture group alone.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -48,9 +47,6 @@ void main() {
     matching: find.byType(PopupMenuButton<dynamic>),
   );
 
-  Future<int> legacyAdminAppRoleId() async =>
-      appRoleIdByName('Legacy Admin', jwt: await apiLogin());
-
   // A popup mounts its items on the open animation's first frame, where a tap
   // computed from an item's centre misses: wait for hittability, then drain.
   Future<void> openMenu(WidgetTester tester, Finder button, Finder item) async {
@@ -65,9 +61,8 @@ void main() {
   testWidgets(
     'a read-only member with the permission opens History from the view menu',
     (tester) async {
-      final fixture = await provisionPermUser(
-        roleName: 'Legacy Viewer',
-        appRoleId: await legacyAdminAppRoleId(),
+      final fixture = await provisionGroupMemberWithPermissions(
+        ['group.receipts.history.read'],
         withReceipt: true,
       );
       const comment = 'e2e history comment';
@@ -101,9 +96,9 @@ void main() {
   testWidgets(
     'History opened from the edit form leaves the unsaved edit in place',
     (tester) async {
+      // Legacy Owner holds every group permission, the history included.
       final fixture = await provisionPermUser(
-        roleName: 'Legacy Editor',
-        appRoleId: await legacyAdminAppRoleId(),
+        roleName: 'Legacy Owner',
         withReceipt: true,
       );
 
@@ -134,7 +129,8 @@ void main() {
   );
 
   testWidgets('without the permission the menu offers no History', (tester) async {
-    // Default app role: Legacy User, which does not hold the permission.
+    // Legacy Editor does not hold it. The user also owns the personal group
+    // every new account gets, where they do, which must not carry over.
     final fixture = await provisionPermUser(
       roleName: 'Legacy Editor',
       withReceipt: true,

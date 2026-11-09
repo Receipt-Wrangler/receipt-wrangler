@@ -955,6 +955,32 @@ Future<PermFixture> provisionGroupMemberWithoutPermission(
   return provisionPermUser(groupRoleId: roleId, withReceipt: withReceipt);
 }
 
+/// Provisions a user in a fixture group whose GROUP role is [baselineRole]
+/// **plus** [extraPermissions] (the inverse of
+/// [provisionGroupMemberWithoutPermission]). Use for positive specs that need a
+/// group permission the baseline lacks — e.g. `group.receipts.history.read` on a
+/// read-only Legacy Viewer.
+///
+/// Same LIFO teardown ordering as [provisionGroupMemberWithoutPermission].
+Future<PermFixture> provisionGroupMemberWithPermissions(
+  List<String> extraPermissions, {
+  bool withReceipt = false,
+  String baselineRole = 'Legacy Viewer',
+}) async {
+  final jwt = await apiLogin(); // admin
+  final base = await rolePermissionsByName(baselineRole, 'GROUP', jwt: jwt);
+  final roleId = await createRole(
+    name: 'e2e-group-${_unique()}',
+    scope: 'GROUP',
+    permissions: {...base, ...extraPermissions}.toList(),
+    jwt: jwt,
+  );
+  addTearDown(
+      () async => deleteRole(roleId, scope: 'GROUP', jwt: await apiLogin()));
+
+  return provisionPermUser(groupRoleId: roleId, withReceipt: withReceipt);
+}
+
 /// Provisions a user in a fixture group whose GROUP role is a copy of "Legacy
 /// Editor" (create, update and both comment permissions) that additionally
 /// requires a comment ([comment]) and/or an image ([image]) on the group's
