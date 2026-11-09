@@ -17,24 +17,24 @@
 
 @if (commentsArray.length > 0) {
   <app-card>
-    <div
-      content *ngFor="let comment of commentsArray.controls; let index = index"
-    >
-      <ng-container
-        [ngTemplateOutlet]="commentDisplay"
-        [ngTemplateOutletContext]="{
-          commentControl: comment,
-          commentIndex: index
-        }"
-      ></ng-container>
-      <div
-        class="d-flex content-margin"
-        [ngClass]="{
-          'mb-2': mode() === formMode.edit
-        }"
-      >
+    @for (comment of commentsArray.controls; track comment; let index = $index) {
+      <div content>
+        <ng-container
+          [ngTemplateOutlet]="commentDisplay"
+          [ngTemplateOutletContext]="{
+            commentControl: comment,
+            commentIndex: index
+          }"
+        ></ng-container>
+        <div
+          class="d-flex content-margin"
+          [ngClass]="{
+            'mb-2': mode() === formMode.edit
+          }"
+        >
+        </div>
       </div>
-    </div>
+    }
   </app-card>
 } @else if (internalComments().length === 0 && mode() === formMode.view) {
   <div>No comments for this receipt</div>

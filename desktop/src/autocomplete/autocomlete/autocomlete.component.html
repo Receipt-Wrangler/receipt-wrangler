@@ -2,31 +2,32 @@
   <mat-label>{{ label }}</mat-label>
   @if (multiple) {
     <mat-chip-grid #chipGrid>
-      <mat-chip-row
-        *ngFor="let option of inputFormControl.value; let i = index"
-        (removed)="removeOption(i)"
-      >
-        @if (optionChipTemplate) {
-          <ng-template
-            [ngTemplateOutlet]="optionChipTemplate"
-            [ngTemplateOutletContext]="{
-              option: option
-            }"
-          ></ng-template>
-        } @else {
-          <div>
-            {{
-              option | optionDisplay : options() : optionDisplayKey() : optionValueKey
-            }}
-          </div>
-        }
-        @if (!readonly) {
-          <button matChipRemove>
-            <mat-icon>cancel</mat-icon>
-          </button>
-        }
-      </mat-chip-row
-      >
+      @for (option of inputFormControl.value; track option; let i = $index) {
+        <mat-chip-row
+          (removed)="removeOption(i)"
+        >
+          @if (optionChipTemplate) {
+            <ng-template
+              [ngTemplateOutlet]="optionChipTemplate"
+              [ngTemplateOutletContext]="{
+                option: option
+              }"
+            ></ng-template>
+          } @else {
+            <div>
+              {{
+                option | optionDisplay : options() : optionDisplayKey() : optionValueKey
+              }}
+            </div>
+          }
+          @if (!readonly) {
+            <button matChipRemove>
+              <mat-icon>cancel</mat-icon>
+            </button>
+          }
+        </mat-chip-row
+        >
+      }
     </mat-chip-grid>
     <input
       #inputMultiple
@@ -67,24 +68,25 @@
     (optionSelected)="optionSelected($event)"
     #auto="matAutocomplete"
   >
-    <mat-option
-      *ngFor="let option of filteredOptions | async"
-      [value]="optionValueKey ? option[optionValueKey] : option"
-    >
-      @if (optionTemplate) {
-        <ng-template
-          [ngTemplateOutlet]="optionTemplate"
-          [ngTemplateOutletContext]="{
-            option: option
-          }"
-        >
-        </ng-template>
-      } @else {
-        {{
-          option | optionDisplay : options() : optionDisplayKey() : optionValueKey
-        }}
-      }
-    </mat-option>
+    @for (option of filteredOptions | async; track option) {
+      <mat-option
+        [value]="optionValueKey ? option[optionValueKey] : option"
+      >
+        @if (optionTemplate) {
+          <ng-template
+            [ngTemplateOutlet]="optionTemplate"
+            [ngTemplateOutletContext]="{
+              option: option
+            }"
+          >
+          </ng-template>
+        } @else {
+          {{
+            option | optionDisplay : options() : optionDisplayKey() : optionValueKey
+          }}
+        }
+      </mat-option>
+    }
     @if (creatable() && (filteredOptions | async)?.length === 0 && filterFormControl?.value?.length > 0) {
       <mat-option [id]="creatableOptionId" [value]="filterFormControl.value"
       >Add {{ filterFormControl.value }}
@@ -92,8 +94,10 @@
       >
     }
   </mat-autocomplete>
-  <mat-error *ngFor="let err of formControlErrors | async">{{
-      err.message
-    }}
-  </mat-error>
+  @for (err of formControlErrors | async; track err) {
+    <mat-error>{{
+        err.message
+      }}
+    </mat-error>
+  }
 </mat-form-field>

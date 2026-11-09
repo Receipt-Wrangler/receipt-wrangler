@@ -9,14 +9,16 @@
 </div>
 <hr />
 <div class="d-flex flex-column align-items-center">
-  <div class="w-100" *ngFor="let notification of notifications()">
-    <app-notification
-      class="w-100"
-      [notification]="notification"
-      (notificationDeleted)="notificationDeleted($event)"
-    ></app-notification>
-    <hr />
-  </div>
+  @for (notification of notifications(); track notification) {
+    <div class="w-100">
+      <app-notification
+        class="w-100"
+        [notification]="notification"
+        (notificationDeleted)="notificationDeleted($event)"
+      ></app-notification>
+      <hr />
+    </div>
+  }
   @if (notifications().length === 0) {
     <div>All caught up!</div>
   }

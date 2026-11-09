@@ -29,10 +29,12 @@
         (blur)="inputBlur.emit($event)"
       />
     </div>
-    <mat-error *ngFor="let err of formControlErrors | async">{{
-        err.message
-      }}
-    </mat-error>
+    @for (err of formControlErrors | async; track err) {
+      <mat-error>{{
+          err.message
+        }}
+      </mat-error>
+    }
     @if (showVisibilityEye || showGeneratePassword) {
       <div matSuffix>
         @if (showGeneratePassword) {

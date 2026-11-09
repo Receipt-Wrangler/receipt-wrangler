@@ -25,31 +25,32 @@
       </td>
     </ng-container>
   }
-  <ng-container
-    *ngFor="let column of columns()"
-    [matColumnDef]="column.matColumnDef"
-  >
-    <th
-      mat-header-cell
-      *matHeaderCellDef
-      mat-sort-header
-      sortActionDescription="Sort by number"
-      [disabled]="!column.sortable"
+  @for (column of columns(); track column) {
+    <ng-container
+      [matColumnDef]="column.matColumnDef"
     >
-      {{ column.columnHeader }}
-    </th>
-    <td mat-cell *matCellDef="let element; let i = index">
-      @if (column.elementKey) {
-        {{ element[column.elementKey] }}
-      }
-      @if (column.template) {
-        <ng-template
-          [ngTemplateOutlet]="column.template"
-          [ngTemplateOutletContext]="{ element: element, index: indexFor(element), column: column }"
-        ></ng-template>
-      }
-    </td>
-  </ng-container>
+      <th
+        mat-header-cell
+        *matHeaderCellDef
+        mat-sort-header
+        sortActionDescription="Sort by number"
+        [disabled]="!column.sortable"
+      >
+        {{ column.columnHeader }}
+      </th>
+      <td mat-cell *matCellDef="let element; let i = index">
+        @if (column.elementKey) {
+          {{ element[column.elementKey] }}
+        }
+        @if (column.template) {
+          <ng-template
+            [ngTemplateOutlet]="column.template"
+            [ngTemplateOutletContext]="{ element: element, index: indexFor(element), column: column }"
+          ></ng-template>
+        }
+      </td>
+    </ng-container>
+  }
 
   <ng-container matColumnDef="expand">
     <th mat-header-cell *matHeaderCellDef aria-label="row actions"></th>

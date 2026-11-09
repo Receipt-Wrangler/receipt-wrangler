@@ -85,14 +85,14 @@
     <app-form-section
       headerText="Task Queue Configuration"
     >
-      <ng-container *ngFor="let data of queueData">
+      @for (data of queueData; track data) {
         <ng-template
           [ngTemplateOutlet]="queueCard"
           [ngTemplateOutletContext]="{
         queueData: data,
         }"
         ></ng-template>
-      </ng-container>
+      }
     </app-form-section>
   </app-form-section>
   <app-form-section

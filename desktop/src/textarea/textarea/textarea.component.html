@@ -25,13 +25,17 @@
     [hideSingleSelectionIndicator]="true"
     (optionSelected)="onOptionSelected()"
   >
-    <mat-option *ngFor="let option of filteredOptions" [value]="getOptionValue(option)">
-      {{ option }}
-    </mat-option>
+    @for (option of filteredOptions; track option) {
+      <mat-option [value]="getOptionValue(option)">
+        {{ option }}
+      </mat-option>
+    }
   </mat-autocomplete>
 
-  <mat-error *ngFor="let err of formControlErrors | async">{{
-      err.message
-    }}
-  </mat-error>
+  @for (err of formControlErrors | async; track err) {
+    <mat-error>{{
+        err.message
+      }}
+    </mat-error>
+  }
 </mat-form-field>

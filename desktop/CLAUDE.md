@@ -311,11 +311,25 @@ process.exit(bad.length ? 1 : 0);
 - Angular style guide followed for component organization
 - Lazy loading for feature modules to optimize bundle size
 - Templates use built-in control flow (`@if` / `@else`, `@switch` / `@case`, `@for`), not the
-  deprecated `*ngIf` / `ngSwitch` structural directives — both are fully migrated. `*ngFor` is the
-  one legacy directive still in the codebase and is being migrated separately; don't add new ones.
-  When wrapping an element Material projects into a named slot (`matSuffix`, `matIconSuffix`,
-  `mat-hint`, `mat-error`, `matChipRemove`, …), keep that element the block's **only** root node — a
-  block with several roots falls into the default `<ng-content>` slot instead.
+  deprecated `*ngIf` / `ngSwitch` / `*ngFor` structural directives — all three are fully migrated;
+  don't add new ones. When wrapping an element Material projects into a named slot (`matSuffix`,
+  `matIconSuffix`, `mat-hint`, `mat-error`, `matChipRemove`, …), keep that element the block's
+  **only** root node — a block with several roots falls into the default `<ng-content>` slot instead.
+  The same goes for an element a parent projects by attribute, like `app-card`'s `<div content>`.
+- **The `*ngFor` → `@for` migration tracks by item identity** (`track item`), because that is what
+  every one of those loops did before (none set a `trackBy`), so DOM reuse is unchanged. A few of
+  those sources rebuild every item on refresh — the `formControlErrors | async` error lists,
+  `summary-card`'s `keyvalue` rows, `item-list`, `share-list`, `searchbar`, `table`'s columns — and
+  so re-create all their rows, exactly as before. A different key there (an id, `$index`) is a
+  behavior change, not a cleanup, so choose it on purpose. New loops should pick a real key rather
+  than copy `track item`.
+- **Never feed `@for` an array you mutate in place after its view was checked.** `*ngFor` only
+  diffed in `ngDoCheck`, so a parent that `push`ed items in `ngAfterViewInit` got them rendered on
+  some later pass and nothing complained. `@for` reconciles during dev mode's check-no-changes pass
+  instead, creates the views there, and logs `NG0100`. The two system-task accordion hosts
+  (`receipt-processing-settings-child-system-task-accordion`, `system-email-child-system-task`) did
+  exactly this and now derive their panels with `computed()` — the zoneless rule below
+  (plain-field mutations are invisible to change detection) applied to a list.
 
 ### Use Established Patterns (do not invent one-offs)
 New UI MUST reuse the application's established patterns and shared components rather than

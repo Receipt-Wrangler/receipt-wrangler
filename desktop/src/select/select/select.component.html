@@ -33,20 +33,23 @@
       @if (addEmptyOption()) {
         <mat-option [value]="null"></mat-option>
       }
-      <mat-option
-        *ngFor="let option of options(); let i = index"
-        [value]="optionValueKey ? option[optionValueKey] : option"
-      >
-        {{ i | optionDisplay : option : optionDisplayKey() : optionsDisplayArray() }}
-        @let badge = badgeFor(option);
-        @if (badge) {
-          <app-badge [text]="badge" [tone]="optionBadgeTone()"></app-badge>
-        }
-      </mat-option>
+      @for (option of options(); track option; let i = $index) {
+        <mat-option
+          [value]="optionValueKey ? option[optionValueKey] : option"
+        >
+          {{ i | optionDisplay : option : optionDisplayKey() : optionsDisplayArray() }}
+          @let badge = badgeFor(option);
+          @if (badge) {
+            <app-badge [text]="badge" [tone]="optionBadgeTone()"></app-badge>
+          }
+        </mat-option>
+      }
     </mat-select>
   }
-  <mat-error *ngFor="let err of formControlErrors | async">{{
-      err.message
-    }}
-  </mat-error>
+  @for (err of formControlErrors | async; track err) {
+    <mat-error>{{
+        err.message
+      }}
+    </mat-error>
+  }
 </mat-form-field>
