@@ -12,6 +12,16 @@ import (
 // to existing users and group members.
 const assignLegacyEquivalentRolesMigration = "assign-legacy-equivalent-roles"
 
+// Name of the one-time migration that removes the retired app-scoped receipt
+// history permission from app roles.
+const removeAppReceiptHistoryReadMigration = "remove-app-receipt-history-read"
+
+// retiredAppReceiptHistoryRead gated the receipt history before it became the
+// group permission group.receipts.history.read. It never shipped in a release,
+// but databases that ran the unreleased build hold it: Legacy Admin picked it up
+// through the seeder's add-only reconciliation, which never takes a key back out.
+const retiredAppReceiptHistoryRead = "app.receipt-history.read"
+
 // dataMigration is a single one-time data migration. Each runs at most once per
 // database; once applied it is recorded in the data_migrations ledger so it is
 // skipped on subsequent boots.
@@ -24,6 +34,7 @@ type dataMigration struct {
 // migrations are appended here.
 var dataMigrations = []dataMigration{
 	{name: assignLegacyEquivalentRolesMigration, run: assignLegacyEquivalentRoles},
+	{name: removeAppReceiptHistoryReadMigration, run: removeAppReceiptHistoryRead},
 }
 
 // RunDataMigrations applies any registered one-time data migrations that have
@@ -115,4 +126,11 @@ func assignLegacyEquivalentRoles(tx *gorm.DB) error {
 	}
 
 	return nil
+}
+
+// removeAppReceiptHistoryRead deletes the retired key from every app role. Left
+// in place, it grants nothing, but a custom role still carrying it is refused on
+// its next save, because every permission on a role must exist in the registry.
+func removeAppReceiptHistoryRead(tx *gorm.DB) error {
+	return tx.Where("permission = ?", retiredAppReceiptHistoryRead).Delete(&models.AppRolePermission{}).Error
 }

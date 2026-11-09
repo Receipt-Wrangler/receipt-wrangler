@@ -124,8 +124,6 @@ const Permission _$appPeriodAccountPeriodDelete =
     const Permission._('appPeriodAccountPeriodDelete');
 const Permission _$appPeriodReceiptsPeriodSearch =
     const Permission._('appPeriodReceiptsPeriodSearch');
-const Permission _$appPeriodReceiptHistoryPeriodRead =
-    const Permission._('appPeriodReceiptHistoryPeriodRead');
 const Permission _$appPeriodReportsPeriodCreate =
     const Permission._('appPeriodReportsPeriodCreate');
 const Permission _$appPeriodReportsPeriodDelete =
@@ -175,6 +173,8 @@ const Permission _$groupPeriodReceiptsPeriodMagicFill =
     const Permission._('groupPeriodReceiptsPeriodMagicFill');
 const Permission _$groupPeriodReceiptsPeriodQuickScan =
     const Permission._('groupPeriodReceiptsPeriodQuickScan');
+const Permission _$groupPeriodReceiptsPeriodHistoryPeriodRead =
+    const Permission._('groupPeriodReceiptsPeriodHistoryPeriodRead');
 const Permission _$groupPeriodCommentsPeriodCreate =
     const Permission._('groupPeriodCommentsPeriodCreate');
 const Permission _$groupPeriodCommentsPeriodDelete =
@@ -318,8 +318,6 @@ Permission _$valueOf(String name) {
       return _$appPeriodAccountPeriodDelete;
     case 'appPeriodReceiptsPeriodSearch':
       return _$appPeriodReceiptsPeriodSearch;
-    case 'appPeriodReceiptHistoryPeriodRead':
-      return _$appPeriodReceiptHistoryPeriodRead;
     case 'appPeriodReportsPeriodCreate':
       return _$appPeriodReportsPeriodCreate;
     case 'appPeriodReportsPeriodDelete':
@@ -372,6 +370,8 @@ Permission _$valueOf(String name) {
       return _$groupPeriodReceiptsPeriodMagicFill;
     case 'groupPeriodReceiptsPeriodQuickScan':
       return _$groupPeriodReceiptsPeriodQuickScan;
+    case 'groupPeriodReceiptsPeriodHistoryPeriodRead':
+      return _$groupPeriodReceiptsPeriodHistoryPeriodRead;
     case 'groupPeriodCommentsPeriodCreate':
       return _$groupPeriodCommentsPeriodCreate;
     case 'groupPeriodCommentsPeriodDelete':
@@ -459,7 +459,6 @@ final BuiltSet<Permission> _$values = BuiltSet<Permission>(const <Permission>[
   _$appPeriodAccountPeriodUpdate,
   _$appPeriodAccountPeriodDelete,
   _$appPeriodReceiptsPeriodSearch,
-  _$appPeriodReceiptHistoryPeriodRead,
   _$appPeriodReportsPeriodCreate,
   _$appPeriodReportsPeriodDelete,
   _$appPeriodReportsPeriodDuplicate,
@@ -486,6 +485,7 @@ final BuiltSet<Permission> _$values = BuiltSet<Permission>(const <Permission>[
   _$groupPeriodReceiptsPeriodDuplicate,
   _$groupPeriodReceiptsPeriodMagicFill,
   _$groupPeriodReceiptsPeriodQuickScan,
+  _$groupPeriodReceiptsPeriodHistoryPeriodRead,
   _$groupPeriodCommentsPeriodCreate,
   _$groupPeriodCommentsPeriodDelete,
   _$groupPeriodDashboardsPeriodCreate,
@@ -592,8 +592,6 @@ class _$PermissionMeta {
   Permission get appPeriodAccountPeriodDelete => _$appPeriodAccountPeriodDelete;
   Permission get appPeriodReceiptsPeriodSearch =>
       _$appPeriodReceiptsPeriodSearch;
-  Permission get appPeriodReceiptHistoryPeriodRead =>
-      _$appPeriodReceiptHistoryPeriodRead;
   Permission get appPeriodReportsPeriodCreate => _$appPeriodReportsPeriodCreate;
   Permission get appPeriodReportsPeriodDelete => _$appPeriodReportsPeriodDelete;
   Permission get appPeriodReportsPeriodDuplicate =>
@@ -639,6 +637,8 @@ class _$PermissionMeta {
       _$groupPeriodReceiptsPeriodMagicFill;
   Permission get groupPeriodReceiptsPeriodQuickScan =>
       _$groupPeriodReceiptsPeriodQuickScan;
+  Permission get groupPeriodReceiptsPeriodHistoryPeriodRead =>
+      _$groupPeriodReceiptsPeriodHistoryPeriodRead;
   Permission get groupPeriodCommentsPeriodCreate =>
       _$groupPeriodCommentsPeriodCreate;
   Permission get groupPeriodCommentsPeriodDelete =>
@@ -735,7 +735,6 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'appPeriodAccountPeriodUpdate': 'app.account.update',
     'appPeriodAccountPeriodDelete': 'app.account.delete',
     'appPeriodReceiptsPeriodSearch': 'app.receipts.search',
-    'appPeriodReceiptHistoryPeriodRead': 'app.receipt-history.read',
     'appPeriodReportsPeriodCreate': 'app.reports.create',
     'appPeriodReportsPeriodDelete': 'app.reports.delete',
     'appPeriodReportsPeriodDuplicate': 'app.reports.duplicate',
@@ -762,6 +761,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'groupPeriodReceiptsPeriodDuplicate': 'group.receipts.duplicate',
     'groupPeriodReceiptsPeriodMagicFill': 'group.receipts.magic-fill',
     'groupPeriodReceiptsPeriodQuickScan': 'group.receipts.quick-scan',
+    'groupPeriodReceiptsPeriodHistoryPeriodRead': 'group.receipts.history.read',
     'groupPeriodCommentsPeriodCreate': 'group.comments.create',
     'groupPeriodCommentsPeriodDelete': 'group.comments.delete',
     'groupPeriodDashboardsPeriodCreate': 'group.dashboards.create',
@@ -839,7 +839,6 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'app.account.update': 'appPeriodAccountPeriodUpdate',
     'app.account.delete': 'appPeriodAccountPeriodDelete',
     'app.receipts.search': 'appPeriodReceiptsPeriodSearch',
-    'app.receipt-history.read': 'appPeriodReceiptHistoryPeriodRead',
     'app.reports.create': 'appPeriodReportsPeriodCreate',
     'app.reports.delete': 'appPeriodReportsPeriodDelete',
     'app.reports.duplicate': 'appPeriodReportsPeriodDuplicate',
@@ -866,6 +865,7 @@ class _$PermissionSerializer implements PrimitiveSerializer<Permission> {
     'group.receipts.duplicate': 'groupPeriodReceiptsPeriodDuplicate',
     'group.receipts.magic-fill': 'groupPeriodReceiptsPeriodMagicFill',
     'group.receipts.quick-scan': 'groupPeriodReceiptsPeriodQuickScan',
+    'group.receipts.history.read': 'groupPeriodReceiptsPeriodHistoryPeriodRead',
     'group.comments.create': 'groupPeriodCommentsPeriodCreate',
     'group.comments.delete': 'groupPeriodCommentsPeriodDelete',
     'group.dashboards.create': 'groupPeriodDashboardsPeriodCreate',

@@ -378,8 +378,10 @@ a stale action at worst returns 403.
   - `canEditReceipt(permissionsModel, groupId)` (`lib/shared/functions/permissions.dart`) →
     `group.receipts.update`, used by the receipt-edit popup (`receipt_edit_popup_menu.dart`) and the
     receipt swipe-to-edit (`receipt_list_item.dart`).
-  - `canViewReceiptHistory(permissionsModel)` (same file) → the **app** permission
-    `app.receipt-history.read`, used by the History entry on the receipt view and edit menus
+  - `canViewReceiptHistory(permissionsModel, groupId)` (same file) →
+    `group.receipts.history.read` in the group the receipt is **saved** in
+    (`receiptModel.receipt.groupId`, never the edit form's working copy), used by the History entry
+    on the receipt view and edit menus
     (`receipt_app_bar_action_builder.dart`). It goes in `ReceiptEditPopupMenu.alwaysShownChildren`,
     which shows whatever the edit permission, so a read-only member who holds it gets a menu with
     only History. See "Receipt change history" below.
@@ -1794,8 +1796,10 @@ the root `CLAUDE.md` → "Receipt Change History" for the contract.
     server's entries, including a comment.
   - History opened from the edit form returns to the form with the unsaved name still typed.
   - A user without the permission has no History entry.
-  - The permission comes from giving the provisioned user the Legacy Admin app role
-    (`appRoleIdByName`).
+  - Each case is decided by the user's role in the fixture group alone: a Legacy Viewer plus the
+    permission (`provisionGroupMemberWithPermissions`), Legacy Owner, and Legacy Editor without it.
+    The last also owns the personal group every new account gets, where it does hold the
+    permission, so it doubles as the "held only in another group" case.
 
 ### Receipt summary
 

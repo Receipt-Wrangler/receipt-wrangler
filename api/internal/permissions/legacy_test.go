@@ -82,20 +82,26 @@ func TestLegacyAppUserExcludesReadAnyApiKeys(t *testing.T) {
 	}
 }
 
-func TestLegacyAppAdminIncludesReceiptHistoryRead(t *testing.T) {
-	// Legacy Admin is every app permission, so app.receipt-history.read flows into
-	// it automatically, and an upgrading install's admin picks it up on the next
-	// boot through the seeder's add-only reconciliation.
-	if !slices.Contains(LegacyAppAdminKeys(), AppReceiptHistoryRead) {
-		utilPrint(t, "Legacy Admin missing "+AppReceiptHistoryRead, "present")
+func TestLegacyGroupOwnerIncludesReceiptHistoryRead(t *testing.T) {
+	// Legacy Owner is every group permission, so group.receipts.history.read
+	// flows into it automatically: a group's creator can read its receipts'
+	// history, and an upgrading install's owners pick it up on the next boot
+	// through the seeder's add-only reconciliation.
+	if !slices.Contains(LegacyGroupOwnerKeys(), GroupReceiptsHistoryRead) {
+		utilPrint(t, "Legacy Owner missing "+GroupReceiptsHistoryRead, "present")
 	}
 }
 
-func TestLegacyAppUserExcludesReceiptHistoryRead(t *testing.T) {
-	// Legacy User is a fixed subset. Receipt history is admin-by-default: a
-	// plain user gets it only through a custom role that grants it.
-	if slices.Contains(LegacyAppUserKeys(), AppReceiptHistoryRead) {
-		utilPrint(t, "Legacy User contains "+AppReceiptHistoryRead, "absent")
+func TestLegacyGroupEditorAndViewerExcludeReceiptHistoryRead(t *testing.T) {
+	// Legacy Editor and Viewer are fixed subsets. A member added to a group
+	// gets the history only through a role that grants it.
+	for name, keys := range map[string][]string{
+		"Legacy Editor": LegacyGroupEditorKeys(),
+		"Legacy Viewer": LegacyGroupViewerKeys(),
+	} {
+		if slices.Contains(keys, GroupReceiptsHistoryRead) {
+			utilPrint(t, name+" contains "+GroupReceiptsHistoryRead, "absent")
+		}
 	}
 }
 

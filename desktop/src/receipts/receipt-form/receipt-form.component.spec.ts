@@ -1678,8 +1678,9 @@ describe("ReceiptFormComponent", () => {
       customFields: [],
     };
 
-    function load(mode: FormMode, appPermissions: string[]): void {
-      TestBed.inject(Store).dispatch(new SetPermissions(appPermissions, {}, {}));
+    // Group permissions keyed by group id; the receipt lives in group 7.
+    function load(mode: FormMode, groupPermissions: Record<number, string[]>): void {
+      TestBed.inject(Store).dispatch(new SetPermissions([], groupPermissions, {}));
       routeDataSubject.next({
         mode,
         customFields: [],
@@ -1702,33 +1703,48 @@ describe("ReceiptFormComponent", () => {
       fixture.detectChanges();
     }
 
-    it("is offered in view mode to a holder of the permission", () => {
-      load(FormMode.view, [Permission.AppReceiptHistoryRead]);
+    it("is offered in view mode to a holder of the permission in the receipt's group", () => {
+      load(FormMode.view, { 7: [Permission.GroupReceiptsHistoryRead] });
 
       expect(toggle()).not.toBeNull();
       expect(toggle()!.getAttribute("icon")).toBe("history");
     });
 
     it("is not offered without the permission", () => {
-      load(FormMode.view, [Permission.AppCustomFieldsRead]);
+      load(FormMode.view, { 7: [Permission.GroupReceiptsRead] });
 
       expect(toggle()).toBeNull();
     });
 
+    it("is not offered when the permission is held only in another group", () => {
+      load(FormMode.view, { 7: [Permission.GroupReceiptsRead], 8: [Permission.GroupReceiptsHistoryRead] });
+
+      expect(toggle()).toBeNull();
+    });
+
+    it("stays with the saved group while the edit form moves the receipt", () => {
+      load(FormMode.edit, { 7: [Permission.GroupReceiptsHistoryRead] });
+
+      component.form.get("groupId")?.setValue(8);
+      fixture.detectChanges();
+
+      expect(toggle()).not.toBeNull();
+    });
+
     it("is offered in edit mode too", () => {
-      load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
+      load(FormMode.edit, { 7: [Permission.GroupReceiptsHistoryRead] });
 
       expect(toggle()).not.toBeNull();
     });
 
     it("is not offered in add mode, where there is no history yet", () => {
-      load(FormMode.add, [Permission.AppReceiptHistoryRead]);
+      load(FormMode.add, { 7: [Permission.GroupReceiptsHistoryRead] });
 
       expect(toggle()).toBeNull();
     });
 
     it("opens the drawer for the receipt, and closes it", () => {
-      load(FormMode.view, [Permission.AppReceiptHistoryRead]);
+      load(FormMode.view, { 7: [Permission.GroupReceiptsHistoryRead] });
       expect(drawer()).toBeNull();
 
       clickToggle();
@@ -1748,7 +1764,7 @@ describe("ReceiptFormComponent", () => {
       const occupied = { contentLeft: 82, width: 480, viewportWidth: 1440 };
 
       it("keeps the bar clear of the drawer and the sidebar while it is open", () => {
-        load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
+        load(FormMode.edit, { 7: [Permission.GroupReceiptsHistoryRead] });
         expect(barInset()).toBeNull();
 
         clickToggle();
@@ -1759,7 +1775,7 @@ describe("ReceiptFormComponent", () => {
       });
 
       it("gives the bar its full width back on close", () => {
-        load(FormMode.edit, [Permission.AppReceiptHistoryRead]);
+        load(FormMode.edit, { 7: [Permission.GroupReceiptsHistoryRead] });
         clickToggle();
         component.historyOccupied.set(occupied);
         fixture.detectChanges();
@@ -1772,7 +1788,7 @@ describe("ReceiptFormComponent", () => {
     });
 
     it("closes when the drawer asks to", () => {
-      load(FormMode.view, [Permission.AppReceiptHistoryRead]);
+      load(FormMode.view, { 7: [Permission.GroupReceiptsHistoryRead] });
       component.toggleHistory();
       fixture.detectChanges();
 

@@ -189,9 +189,6 @@ class Permission extends EnumClass {
   @BuiltValueEnumConst(wireName: r'app.receipts.search')
   static const Permission appPeriodReceiptsPeriodSearch = _$appPeriodReceiptsPeriodSearch;
   /// All permission keys the API recognizes.
-  @BuiltValueEnumConst(wireName: r'app.receipt-history.read')
-  static const Permission appPeriodReceiptHistoryPeriodRead = _$appPeriodReceiptHistoryPeriodRead;
-  /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'app.reports.create')
   static const Permission appPeriodReportsPeriodCreate = _$appPeriodReportsPeriodCreate;
   /// All permission keys the API recognizes.
@@ -269,6 +266,9 @@ class Permission extends EnumClass {
   /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.receipts.quick-scan')
   static const Permission groupPeriodReceiptsPeriodQuickScan = _$groupPeriodReceiptsPeriodQuickScan;
+  /// All permission keys the API recognizes.
+  @BuiltValueEnumConst(wireName: r'group.receipts.history.read')
+  static const Permission groupPeriodReceiptsPeriodHistoryPeriodRead = _$groupPeriodReceiptsPeriodHistoryPeriodRead;
   /// All permission keys the API recognizes.
   @BuiltValueEnumConst(wireName: r'group.comments.create')
   static const Permission groupPeriodCommentsPeriodCreate = _$groupPeriodCommentsPeriodCreate;

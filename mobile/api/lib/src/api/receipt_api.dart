@@ -665,7 +665,7 @@ class ReceiptApi {
   }
 
   /// Get receipt change history
-  /// Returns the receipt&#39;s change history, newest first: its creation, every recorded change and every failed save. Built from the receipt&#39;s system tasks and redacted to what the caller may see on the receipt today (category/tag grants, member isolation, paid-by visibility). Requires app.receipt-history.read and group.receipts.read on the receipt&#39;s group [SYSTEM USER]
+  /// Returns the receipt&#39;s change history, newest first: its creation, every recorded change and every failed save. Built from the receipt&#39;s system tasks and redacted to what the caller may see on the receipt today (category/tag grants, member isolation, paid-by visibility). Requires group.receipts.read and group.receipts.history.read on the receipt&#39;s group [SYSTEM USER]
   ///
   /// Parameters:
   /// * [receiptId] - Id of the receipt

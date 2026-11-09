@@ -389,6 +389,60 @@ func TestRunDataMigrationsRollsBackOnFailure(t *testing.T) {
 	}
 }
 
+// TestRunDataMigrationsRemovesRetiredAppReceiptHistoryRead covers a database that
+// ran the build where the receipt history was an app permission: the retired key
+// is deleted from every app role, and nothing else on those roles is touched.
+func TestRunDataMigrationsRemovesRetiredAppReceiptHistoryRead(t *testing.T) {
+	defer TruncateTestDb()
+	if err := SeedSystemRoles(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	db := GetDB()
+
+	custom := models.AppRole{Name: "History Reader"}
+	if err := db.Create(&custom).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+	adminId := appRoleIdByName(t, LegacyAdminRoleName)
+	for _, roleId := range []uint{adminId, custom.ID} {
+		row := models.AppRolePermission{AppRoleID: roleId, Permission: retiredAppReceiptHistoryRead}
+		if err := db.Create(&row).Error; err != nil {
+			utils.PrintTestError(t, err, nil)
+			return
+		}
+	}
+	kept := models.AppRolePermission{AppRoleID: custom.ID, Permission: permissions.AppReceiptsSearch}
+	if err := db.Create(&kept).Error; err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	if err := RunDataMigrations(); err != nil {
+		utils.PrintTestError(t, err, nil)
+		return
+	}
+
+	var retired int64
+	db.Model(&models.AppRolePermission{}).Where("permission = ?", retiredAppReceiptHistoryRead).Count(&retired)
+	if retired != 0 {
+		utils.PrintTestError(t, retired, 0)
+	}
+
+	var customKeys []string
+	db.Model(&models.AppRolePermission{}).Where("app_role_id = ?", custom.ID).Pluck("permission", &customKeys)
+	if len(customKeys) != 1 || customKeys[0] != permissions.AppReceiptsSearch {
+		utils.PrintTestError(t, customKeys, []string{permissions.AppReceiptsSearch})
+	}
+
+	var adminKeys int64
+	db.Model(&models.AppRolePermission{}).Where("app_role_id = ?", adminId).Count(&adminKeys)
+	if adminKeys != int64(len(permissions.LegacyAppAdminKeys())) {
+		utils.PrintTestError(t, adminKeys, len(permissions.LegacyAppAdminKeys()))
+	}
+}
+
 // TestNewGroupMemberPopulatesLegacyGroupRoleColumn guards the upgrade fix: on databases
 // upgraded from before the role rework the obsolete group_role column survives NOT NULL
 // with no default. The re-declared GroupMember.GroupRole field makes GORM write a value

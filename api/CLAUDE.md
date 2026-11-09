@@ -926,9 +926,6 @@ will be dropped in a later release.
   **admin-by-default**: Legacy Admin picks these up automatically (its set is every app permission), while
   non-admins get them only via a custom role that grants them. Per-group generation additionally stays
   gated by the group-scoped `group.reports.read`. See "Category/tag delivery on AppData" below.
-  `app.receipt-history.read` (the receipt change history) is admin-by-default the same way: Legacy
-  Admin picks it up, Legacy User's fixed list does not carry it (`permissions/legacy_test.go` →
-  `TestLegacyAppUserExcludesReceiptHistoryRead`). See "Receipt history" below.
 - `SeedSystemRoles` creates the roles with `IsDefault = false`; the **default** per scope is set
   separately by `EnsureDefaultRoles` (see "Default roles" below), the one-time data migration assigns
   the roles to existing users/members, and enforcement is wired in `HandleRequest`.
@@ -1553,11 +1550,13 @@ callers holding `app.categories.read` / `app.tags.read`, and empty otherwise. Be
 receive categories/tags **only** through the per-group `GroupCategories` / `GroupTags` maps — the
 desktop receipt form sources its pickers from there.
 
-**`app.receipt-history.read` (Receipts):** the gate on `GET /receipt/{id}/history` and its snapshots
-endpoint, ANDed with `group.receipts.read` in the receipt's group — there is no `OrAppPermissions`
-bypass, so even an app-wide reader must be able to read the receipt itself. Legacy Admin auto-includes
-it; Legacy User deliberately does not. Existing installs pick it up through `SeedSystemRoles`' add-only
-reconciliation on the next boot. See "Receipt history" below.
+**`group.receipts.history.read` (Receipts):** the gate on `GET /receipt/{id}/history` and its
+snapshots endpoint, ANDed with `group.receipts.read`, both in the receipt's group. There is no
+`OrAppPermissions` bypass, so an administrator reads a group's history only through a role in that
+group that grants it. Legacy Owner auto-includes it (`LegacyGroupOwnerKeys()` = every group key), so
+a group's creator can audit it by default; Legacy Editor and Viewer deliberately do not
+(`permissions/legacy_test.go`). Existing installs' Legacy Owner picks it up through `SeedSystemRoles`'
+add-only reconciliation on the next boot. See "Receipt history" below.
 
 **`app.api-keys.read-any` (Security):** listing *all* users' API keys (`GetPagedApiKeys` with
 `associatedApiKeys=ALL`) requires `app.api-keys.read-any`, checked in the handler body via the
@@ -3032,11 +3031,20 @@ entry's before/after JSON, loaded lazily so the list stays light. Handlers in
 server computes the diff and redacts it; clients only format**, so the redaction rules stay in one
 place and the deferred mobile screen reuses the same response.
 
-**Authorization.** Both handlers use `structs.Handler{ReceiptId, AppPermissions:
-[app.receipt-history.read], GroupPermissions: [group.receipts.read]}` with no `OrAppPermissions`, so
-`HandleRequest` gives the app permission AND group read, paid-by visibility on the receipt as it is
-now, and a 403 for a missing receipt. A hidden, failed, foreign or unknown entry on the snapshots
-endpoint is the same 403 with the standard message (`ErrReceiptAccessDenied`).
+**Authorization.** Both handlers use `structs.Handler{ReceiptId, GroupPermissions:
+[group.receipts.read, group.receipts.history.read]}` with no `OrAppPermissions`, so `HandleRequest`
+checks both in the receipt's group as it is now, then paid-by visibility on the receipt, and answers
+a missing receipt with a 403. A hidden, failed, foreign or unknown entry on the snapshots endpoint is
+the same 403 with the standard message (`ErrReceiptAccessDenied`).
+
+**It was an app permission first.** The feature first gated on `app.receipt-history.read`, which
+could only grant the history in every group a user can read or in none. It moved to the group key
+before any release. Databases that ran the unreleased build still hold the old key, because Legacy
+Admin picked it up through add-only seed reconciliation, which never takes a key back out. The
+one-time data migration `remove-app-receipt-history-read` (`repositories/data_migrations.go`) deletes
+it from every app role. Left in place it would grant nothing, but a custom role still carrying it
+would be refused on its next save, since every permission on a role must exist in the registry.
+Pinned by `TestRunDataMigrationsRemovesRetiredAppReceiptHistoryRead`.
 
 **Selection.** RECEIPT_UPLOADED and RECEIPT_UPDATED rows, both statuses, matched by
 `WhereReceiptTasks`; the QUICK_SCAN / EMAIL_UPLOAD parents in one extra query.

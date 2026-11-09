@@ -25,9 +25,12 @@ import {
 // specs build the history response by hand; this proves the drawer renders what
 // the real server computes.
 //
-// The negative half adds e2e-user to the group as a Legacy Viewer: they can read
-// the receipt (group.receipts.read) but their Legacy User app role lacks
-// app.receipt-history.read, so the toggle is absent and the API refuses.
+// The permission is the group one, group.receipts.history.read, judged in the
+// receipt's group. The admin created the group, so holds Legacy Owner there,
+// which carries every group permission. The negative half adds e2e-user as a
+// Legacy Viewer: they can read the receipt (group.receipts.read) but not its
+// history, so the toggle is absent and the API refuses - whatever they hold in
+// groups of their own.
 
 type HistoryChange = { field: string; kind: string; to?: { value?: string } };
 type HistoryEntry = { systemTaskId: number; action: string; hasSnapshots: boolean; changes: HistoryChange[] };
@@ -257,7 +260,7 @@ test.describe('Receipt history', () => {
   test.describe('without the permission', () => {
     test.use({ storageState: 'e2e/.auth/user.json' });
 
-    test('a Legacy User sees the receipt but no history toggle', async ({ page }) => {
+    test('a Legacy Viewer member sees the receipt but no history toggle', async ({ page }) => {
       await stubTokenRefresh(page);
       await page.goto(`/receipts/${receiptId}/view`);
 
@@ -266,7 +269,7 @@ test.describe('Receipt history', () => {
       await expect(page.getByTestId('receipt-history-toggle')).toHaveCount(0);
     });
 
-    test('the API refuses a Legacy User the history and its snapshots', async () => {
+    test('the API refuses a Legacy Viewer member the history and its snapshots', async () => {
       const history = await readHistory();
       const taskId = history.entries.find((entry) => entry.hasSnapshots)!.systemTaskId;
 

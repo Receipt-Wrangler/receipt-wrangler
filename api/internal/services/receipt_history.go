@@ -23,8 +23,9 @@ const restrictedGroupName = "(Restricted)"
 // ones included. The server computes the diff and the client only formats, so
 // the redaction rules stay in one place and every client shows the same thing.
 //
-// Its callers authorize the read first: app.receipt-history.read, plus
-// group.receipts.read and paid-by visibility on the receipt as it is now.
+// Its callers authorize the read first: group.receipts.read and
+// group.receipts.history.read in the receipt's group as it is now, plus paid-by
+// visibility on the receipt.
 type ReceiptHistoryService struct {
 	BaseService
 }

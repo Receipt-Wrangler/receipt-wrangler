@@ -99,6 +99,7 @@ const GROUP_MANAGER_KEYS = [
   "group.widgets.read",
   "group.activities.read",
   "group.activities.rerun",
+  "group.receipts.history.read",
   "group.view",
   "group.update",
 ];
@@ -225,9 +226,9 @@ const RESOURCE_ICONS: Record<string, string> = {
   "app.system-tasks": "task_alt",
   "app.imports": "file_upload",
   "app.api-keys": "key",
-  "app.receipt-history": "history",
   group: "workspaces",
   "group.receipts": "receipt_long",
+  "group.receipts.history": "history",
   "group.comments": "chat_bubble",
   "group.dashboards": "dashboard",
   "group.widgets": "widgets",
@@ -246,6 +247,7 @@ const RESOURCE_NAME_OVERRIDES: Record<string, string> = {
   "system-settings": "System Settings",
   "system-emails": "System Emails",
   "system-tasks": "System Tasks",
+  history: "Receipt History",
 };
 
 /** Prettifies the last segment of a resource key into a friendly title. */
