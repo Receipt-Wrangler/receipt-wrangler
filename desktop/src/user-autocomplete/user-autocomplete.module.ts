@@ -6,8 +6,7 @@ import { AutocompleteModule } from 'src/autocomplete/autocomplete.module';
 import { PipesModule } from 'src/pipes/pipes.module';
 
 @NgModule({
-  declarations: [UserAutocompleteComponent],
-  imports: [CommonModule, ReactiveFormsModule, AutocompleteModule, PipesModule],
+  imports: [CommonModule, ReactiveFormsModule, AutocompleteModule, PipesModule, UserAutocompleteComponent],
   exports: [UserAutocompleteComponent],
 })
 export class UserAutocompleteModule {}

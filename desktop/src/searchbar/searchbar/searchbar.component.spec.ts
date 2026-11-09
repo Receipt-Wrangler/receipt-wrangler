@@ -19,14 +19,13 @@ describe("SearchbarComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [SearchbarComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         MatAutocompleteModule,
         ReactiveFormsModule,
         MatFormFieldModule,
         MatInputModule,
-        NoopAnimationsModule],
+        NoopAnimationsModule, SearchbarComponent],
     providers: [
         { provide: Router, useValue: { navigateByUrl: jest.fn().mockResolvedValue(true) } },
         provideHttpClient(withInterceptorsFromDi()),

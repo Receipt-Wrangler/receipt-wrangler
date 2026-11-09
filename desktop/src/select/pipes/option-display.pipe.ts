@@ -1,9 +1,6 @@
 import { Pipe, PipeTransform } from "@angular/core";
 
-@Pipe({
-  name: "optionDisplay",
-  standalone: false,
-})
+@Pipe({ name: "optionDisplay" })
 export class OptionDisplayPipe implements PipeTransform {
 
   public transform(index: number, option: any, optionDisplayKey: string, optionsDisplayArray?: any[]): string {

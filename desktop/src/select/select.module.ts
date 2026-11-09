@@ -9,7 +9,6 @@ import { ReadonlyValuePipe } from "./pipes/readonly-value.pipe";
 import { SelectComponent } from "./select/select.component";
 
 @NgModule({
-  declarations: [SelectComponent, OptionDisplayPipe, ReadonlyValuePipe],
   imports: [
     CommonModule,
     MatSelectModule,
@@ -18,6 +17,7 @@ import { SelectComponent } from "./select/select.component";
     // Imported directly rather than through SharedUiModule: that module imports
     // SelectModule, so going the other way round would be a circular import.
     BadgeComponent,
+    SelectComponent, OptionDisplayPipe, ReadonlyValuePipe,
   ],
   exports: [SelectComponent],
   providers: [OptionDisplayPipe]

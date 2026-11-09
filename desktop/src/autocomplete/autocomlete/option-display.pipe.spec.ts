@@ -6,8 +6,7 @@ describe('OptionDisplayPipe', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [OptionDisplayPipe],
-      imports: [],
+      imports: [OptionDisplayPipe],
       providers: [OptionDisplayPipe],
     }).compileComponents();
 

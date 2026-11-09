@@ -1,16 +1,22 @@
 import { Component, effect, ElementRef, inject, Input, OnInit, signal, TemplateRef, input, viewChild } from "@angular/core";
-import { FormArray, FormControl, Validators } from "@angular/forms";
-import { MatAutocompleteSelectedEvent, MatAutocompleteTrigger, } from "@angular/material/autocomplete";
+import { FormArray, FormControl, Validators, ReactiveFormsModule } from "@angular/forms";
+import { MatAutocompleteSelectedEvent, MatAutocompleteTrigger, MatAutocomplete, MatOption } from "@angular/material/autocomplete";
 import { Store } from "@ngxs/store";
 import { map, Observable, of, startWith } from "rxjs";
 import { BaseInputComponent } from "../../base-input";
 import { AuthState } from "../../store/auth.state";
+import { MatFormField, MatLabel, MatInput, MatError } from "@angular/material/input";
+import { MatChipGrid, MatChipRow, MatChipRemove, MatChipInput } from "@angular/material/chips";
+import { NgTemplateOutlet, AsyncPipe } from "@angular/common";
+import { MatIcon } from "@angular/material/icon";
+import { ButtonComponent } from "../../button/button/button.component";
+import { OptionDisplayPipe } from "./option-display.pipe";
 
 @Component({
     selector: "app-autocomlete",
     templateUrl: "./autocomlete.component.html",
     styleUrls: ["./autocomlete.component.scss"],
-    standalone: false
+    imports: [MatFormField, MatLabel, MatChipGrid, MatChipRow, NgTemplateOutlet, MatChipRemove, MatIcon, MatInput, ReactiveFormsModule, MatAutocompleteTrigger, MatChipInput, ButtonComponent, MatAutocomplete, MatOption, MatError, AsyncPipe, OptionDisplayPipe]
 })
 export class AutocomleteComponent
   extends BaseInputComponent

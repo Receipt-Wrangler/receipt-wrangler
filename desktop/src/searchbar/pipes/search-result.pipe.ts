@@ -5,10 +5,7 @@ import { formatAppDate } from "../../pipes/app-date.pipe";
 import { GroupState } from "../../store";
 import { SystemSettingsState } from "../../store/system-settings.state";
 
-@Pipe({
-    name: "searchResult",
-    standalone: false
-})
+@Pipe({ name: "searchResult" })
 export class SearchResultPipe implements PipeTransform {
   constructor(private store: Store, @Inject(LOCALE_ID) private locale: string) {}
 

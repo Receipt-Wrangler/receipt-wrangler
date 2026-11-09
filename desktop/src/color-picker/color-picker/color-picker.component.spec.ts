@@ -13,12 +13,12 @@ describe('ColorPickerComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [ColorPickerComponent],
       imports: [
         ReactiveFormsModule,
         MatFormFieldModule,
         MatInputModule,
         NoopAnimationsModule,
+        ColorPickerComponent,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });

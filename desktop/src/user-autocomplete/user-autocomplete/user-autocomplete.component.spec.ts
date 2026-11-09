@@ -13,8 +13,7 @@ describe("UserAutocompleteComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [UserAutocompleteComponent],
-      imports: [StoreModule],
+      imports: [StoreModule, UserAutocompleteComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
         provideHttpClient(withInterceptorsFromDi()),

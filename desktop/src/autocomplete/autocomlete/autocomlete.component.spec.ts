@@ -6,7 +6,6 @@ import { NgxsModule, Store } from "@ngxs/store";
 import { BaseInputComponent } from "../../base-input";
 import { AuthState } from "../../store/auth.state";
 import { AutocomleteComponent } from "./autocomlete.component";
-import { OptionDisplayPipe } from "./option-display.pipe";
 
 describe("AutocomleteComponent", () => {
   let component: AutocomleteComponent;
@@ -15,15 +14,12 @@ describe("AutocomleteComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      // OptionDisplayPipe renders the chips. Only the panel-behavior cases
-      // below reach it - they are the only ones that let change detection
-      // run over the multiple-mode branch of the template.
-      declarations: [AutocomleteComponent, OptionDisplayPipe],
       imports: [
         BaseInputComponent,
         NgxsModule.forRoot([AuthState]),
         MatAutocompleteModule,
         ReactiveFormsModule,
+        AutocomleteComponent,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();

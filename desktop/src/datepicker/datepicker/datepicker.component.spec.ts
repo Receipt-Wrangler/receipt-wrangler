@@ -14,7 +14,6 @@ describe('DatepickerComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [DatepickerComponent],
       imports: [
         CommonModule,
         MatDatepickerModule,
@@ -23,6 +22,7 @@ describe('DatepickerComponent', () => {
         MatNativeDateModule,
         NoopAnimationsModule,
         ReactiveFormsModule,
+        DatepickerComponent,
       ],
     }).compileComponents();
 

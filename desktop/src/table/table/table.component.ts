@@ -3,9 +3,13 @@ import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { SelectionModel } from "@angular/cdk/collections";
 import { Component, Input, OnChanges, SimpleChanges, input, output, viewChild } from "@angular/core";
 import { MatPaginator, PageEvent } from "@angular/material/paginator";
-import { MatSort, Sort } from "@angular/material/sort";
-import { MatTableDataSource } from "@angular/material/table";
+import { MatSort, Sort, MatSortHeader } from "@angular/material/sort";
+import { MatTableDataSource, MatTable, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCellDef, MatCell, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow } from "@angular/material/table";
 import { TableColumn } from "../table-column.interface";
+import { MatCheckbox } from "@angular/material/checkbox";
+import { NgTemplateOutlet } from "@angular/common";
+import { ButtonComponent } from "../../button/button/button.component";
+import { RowExpandablePipe } from "./row-expandable.pipe";
 
 @Component({
   selector: "app-table",
@@ -18,7 +22,7 @@ import { TableColumn } from "../table-column.interface";
       transition("expanded <=> collapsed", animate("225ms cubic-bezier(0.4, 0.0, 0.2, 1)")),
     ]),
   ],
-  standalone: false
+  imports: [MatTable, MatSort, MatColumnDef, MatHeaderCellDef, MatHeaderCell, MatCheckbox, MatCellDef, MatCell, MatSortHeader, NgTemplateOutlet, ButtonComponent, MatHeaderRowDef, MatHeaderRow, MatRowDef, MatRow, MatPaginator, RowExpandablePipe]
 })
 export class TableComponent implements OnChanges {
   public readonly sort = viewChild.required(MatSort);

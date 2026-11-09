@@ -19,8 +19,7 @@ describe('SelectComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SelectComponent, OptionDisplayPipe, ReadonlyValuePipe],
-      imports: [MatSelectModule, ReactiveFormsModule, NoopAnimationsModule, BadgeComponent],
+      imports: [MatSelectModule, ReactiveFormsModule, NoopAnimationsModule, BadgeComponent, SelectComponent, OptionDisplayPipe, ReadonlyValuePipe],
       providers: [provideZonelessChangeDetection()],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();

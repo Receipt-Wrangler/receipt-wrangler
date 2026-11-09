@@ -14,13 +14,13 @@ describe("TextareaComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [TextareaComponent],
       imports: [
         MatFormFieldModule,
         MatInputModule,
         ReactiveFormsModule,
         NoopAnimationsModule,
-        MatAutocompleteModule
+        MatAutocompleteModule,
+        TextareaComponent
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();

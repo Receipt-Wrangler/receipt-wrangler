@@ -9,7 +9,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { SearchResultPipe } from './pipes/search-result.pipe';
 
 @NgModule({
-  declarations: [SearchbarComponent, SearchResultPipe],
   imports: [
     CommonModule,
     MatAutocompleteModule,
@@ -17,6 +16,7 @@ import { SearchResultPipe } from './pipes/search-result.pipe';
     MatIconModule,
     MatInputModule,
     ReactiveFormsModule,
+    SearchbarComponent, SearchResultPipe,
   ],
   exports: [SearchbarComponent],
 })

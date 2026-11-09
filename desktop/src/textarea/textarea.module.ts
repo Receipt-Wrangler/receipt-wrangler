@@ -8,7 +8,6 @@ import { MatMenu, MatMenuItem, MatMenuTrigger } from "@angular/material/menu";
 import { TextareaComponent } from "./textarea/textarea.component";
 
 @NgModule({
-  declarations: [TextareaComponent],
   imports: [
     CommonModule,
     MatFormFieldModule,
@@ -20,6 +19,7 @@ import { TextareaComponent } from "./textarea/textarea.component";
     MatAutocomplete,
     MatOption,
     MatAutocompleteTrigger,
+    TextareaComponent,
   ],
   exports: [TextareaComponent],
 })

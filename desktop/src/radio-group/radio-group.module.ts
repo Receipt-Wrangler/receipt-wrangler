@@ -5,8 +5,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { ReactiveFormsModule } from '@angular/forms';
 
 @NgModule({
-  declarations: [RadioGroupComponent],
-  imports: [CommonModule, MatRadioModule, ReactiveFormsModule],
+  imports: [CommonModule, MatRadioModule, ReactiveFormsModule, RadioGroupComponent],
   exports: [RadioGroupComponent],
 })
 export class RadioGroupModule {}

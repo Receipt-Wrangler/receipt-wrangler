@@ -5,8 +5,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { SlideToggleComponent } from './slide-toggle/slide-toggle.component';
 
 @NgModule({
-  declarations: [SlideToggleComponent],
-  imports: [CommonModule, MatSlideToggleModule],
+  imports: [CommonModule, MatSlideToggleModule, SlideToggleComponent],
   exports: [SlideToggleComponent],
 })
 export class SlideToggleModule {}

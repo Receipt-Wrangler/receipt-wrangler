@@ -11,7 +11,7 @@ import { UserState } from "../../store";
     templateUrl: "./user-autocomplete.component.html",
     styleUrls: ["./user-autocomplete.component.scss"],
     providers: [GroupMemberUserService],
-    standalone: false
+    imports: [AutocomleteComponent]
 })
 export class UserAutocompleteComponent {
   constructor(

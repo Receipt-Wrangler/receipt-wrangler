@@ -10,7 +10,6 @@ import { AutocomleteComponent } from "./autocomlete/autocomlete.component";
 import { OptionDisplayPipe } from "./autocomlete/option-display.pipe";
 
 @NgModule({
-  declarations: [AutocomleteComponent, OptionDisplayPipe],
   imports: [
     CommonModule,
     MatAutocompleteModule,
@@ -19,6 +18,7 @@ import { OptionDisplayPipe } from "./autocomlete/option-display.pipe";
     MatChipsModule,
     MatIconModule,
     ButtonModule,
+    AutocomleteComponent, OptionDisplayPipe,
   ],
   exports: [AutocomleteComponent],
 })

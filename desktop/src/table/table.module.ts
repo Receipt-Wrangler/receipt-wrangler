@@ -10,7 +10,6 @@ import { TableComponent } from "./table/table.component";
 import { RowExpandablePipe } from './table/row-expandable.pipe';
 
 @NgModule({
-  declarations: [TableComponent, RowExpandablePipe],
   imports: [
     CommonModule,
     MatTableModule,
@@ -19,6 +18,7 @@ import { RowExpandablePipe } from './table/row-expandable.pipe';
     MatCheckboxModule,
     MatIcon,
     ButtonModule,
+    TableComponent, RowExpandablePipe,
   ],
   exports: [TableComponent],
 })

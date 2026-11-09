@@ -9,7 +9,6 @@ import { ColorPickerComponent } from './color-picker/color-picker.component';
 import { ReactiveFormsModule } from '@angular/forms';
 
 @NgModule({
-  declarations: [ColorPickerComponent],
   imports: [
     CommonModule,
     MatButtonModule,
@@ -19,6 +18,7 @@ import { ReactiveFormsModule } from '@angular/forms';
     MatTooltipModule,
     MatInputModule,
     ReactiveFormsModule,
+    ColorPickerComponent,
   ],
   exports: [ColorPickerComponent],
 })

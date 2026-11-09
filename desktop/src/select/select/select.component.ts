@@ -1,12 +1,20 @@
 import { Component, Input, OnInit, input } from "@angular/core";
 import { BadgeTone } from "src/shared-ui/badge/badge.component";
 import { BaseInputComponent } from "../../base-input";
+import { MatFormField, MatLabel, MatInput, MatError } from "@angular/material/input";
+import { MatSelect, MatSelectTrigger } from "@angular/material/select";
+import { ReactiveFormsModule } from "@angular/forms";
+import { BadgeComponent } from "../../shared-ui/badge/badge.component";
+import { MatOption } from "@angular/material/autocomplete";
+import { AsyncPipe } from "@angular/common";
+import { OptionDisplayPipe } from "../pipes/option-display.pipe";
+import { ReadonlyValuePipe } from "../pipes/readonly-value.pipe";
 
 @Component({
     selector: "app-select",
     templateUrl: "./select.component.html",
     styleUrls: ["./select.component.scss"],
-    standalone: false
+    imports: [MatFormField, MatLabel, MatInput, MatSelect, ReactiveFormsModule, MatSelectTrigger, BadgeComponent, MatOption, MatError, AsyncPipe, OptionDisplayPipe, ReadonlyValuePipe]
 })
 export class SelectComponent extends BaseInputComponent implements OnInit {
   public readonly options = input<any[]>([]);
