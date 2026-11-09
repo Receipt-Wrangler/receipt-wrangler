@@ -1,17 +1,21 @@
 import { Component, Input, OnInit } from "@angular/core";
-import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { switchMap, take, tap } from "rxjs";
 import { User, UserService } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { UpdateUser } from "../../store";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { InputComponent } from "../../input/input/input.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 @Component({
     selector: "app-dummy-user-conversion-dialog",
     templateUrl: "./dummy-user-conversion-dialog.component.html",
     styleUrls: ["./dummy-user-conversion-dialog.component.scss"],
-    standalone: false
+    imports: [DialogComponent, ReactiveFormsModule, InputComponent, DialogFooterComponent, FormGetPipe]
 })
 export class DummyUserConversionDialogComponent implements OnInit {
   @Input() public user!: User;

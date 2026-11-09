@@ -37,7 +37,6 @@ describe('AuthForm', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [AuthForm],
     imports: [FeatureDirective,
         ButtonModule,
         InputModule,
@@ -48,7 +47,7 @@ describe('AuthForm', () => {
         ReactiveFormsModule,
         ApiModule,
         LoginQrComponent,
-        RouterTestingModule],
+        RouterTestingModule, AuthForm],
     providers: [
         SnackbarService,
         AppInitService,

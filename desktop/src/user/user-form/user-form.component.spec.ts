@@ -22,6 +22,8 @@ import { AddUser, AuthState, GroupState, SetGroups, UpdateUser, UserState } from
 import { SetPermissions } from "../../store/auth.state.actions";
 import { UserFormComponent } from "./user-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideNgxMask } from "ngx-mask";
+import { provideRouter } from "@angular/router";
 
 describe("UserFormComponent", () => {
   const defaultAppRole: Role = {
@@ -53,15 +55,16 @@ describe("UserFormComponent", () => {
   beforeEach(async () => {
     getRolesMock = jest.fn().mockReturnValue(of([] as Role[]));
     await TestBed.configureTestingModule({
-    declarations: [UserFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [NgxsModule.forRoot([AuthState, UserState, GroupState]),
         ReactiveFormsModule,
         PipesModule,
         MatDialogModule,
         MatSnackBarModule,
-        ApiModule],
+        ApiModule, UserFormComponent],
     providers: [
+        provideRouter([]),
+        provideNgxMask(),
         provideZonelessChangeDetection(),
         {
             provide: MatDialogRef,

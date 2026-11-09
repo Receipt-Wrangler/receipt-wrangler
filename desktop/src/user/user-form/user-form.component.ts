@@ -1,6 +1,6 @@
 import { Component, DestroyRef, Input, OnInit, computed, effect, inject, signal } from "@angular/core";
 import { takeUntilDestroyed, toSignal } from "@angular/core/rxjs-interop";
-import { FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
+import { FormBuilder, FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog, MatDialogRef } from "@angular/material/dialog";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
@@ -20,7 +20,7 @@ import {
   UserService,
 } from "../../open-api";
 import { hasAll } from "../../utils/permission.utils";
-import { GrantSelection } from "../../shared-ui/grant-picker/grant-picker.component";
+import { GrantSelection, GrantPickerComponent } from "../../shared-ui/grant-picker/grant-picker.component";
 import {
   buildMemberGrantRows,
   emptySelectionHint,
@@ -31,6 +31,14 @@ import { GroupState } from "../../store";
 import { openRolePreviewDialog } from "../../roles/role-preview/role-preview-dialog.component";
 import { SnackbarService, TokenRefreshService } from "../../services";
 import { AddUser, AuthState, UpdateUser } from "../../store";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { SubmitButtonComponent } from "../../shared-ui/submit-button/submit-button.component";
+import { CancelButtonComponent } from "../../shared-ui/cancel-button/cancel-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 @UntilDestroy()
 @Component({
@@ -38,7 +46,7 @@ import { AddUser, AuthState, UpdateUser } from "../../store";
     templateUrl: "./user-form.component.html",
     styleUrls: ["./user-form.component.scss"],
     providers: [UserValidators],
-    standalone: false
+    imports: [ReactiveFormsModule, FormSectionComponent, InputComponent, SelectComponent, ButtonComponent, CheckboxComponent, GrantPickerComponent, SubmitButtonComponent, CancelButtonComponent, FormGetPipe]
 })
 export class UserFormComponent implements OnInit {
   @Input() public user?: User;

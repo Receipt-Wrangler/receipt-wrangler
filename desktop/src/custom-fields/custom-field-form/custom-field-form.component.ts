@@ -1,5 +1,5 @@
 import { Component, Input, OnInit } from "@angular/core";
-import { FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { FormArray, FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Observable, take, tap } from "rxjs";
@@ -14,6 +14,15 @@ import {
 } from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
 import { trimmedRequiredValidator } from "../../validators/index";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 // Built once and shared by every option control: an option's value is its only
 // label, and an update matches options by id to rename them in place, so a blank
@@ -25,9 +34,9 @@ const optionValueRequiredValidator = trimmedRequiredValidator();
 @UntilDestroy()
 @Component({
   selector: "app-custom-field-form",
-  standalone: false,
   templateUrl: "./custom-field-form.component.html",
-  styleUrl: "./custom-field-form.component.scss"
+  styleUrl: "./custom-field-form.component.scss",
+  imports: [DialogComponent, ReactiveFormsModule, FormSectionComponent, InputComponent, SelectComponent, DeleteButtonComponent, DialogFooterComponent, AddButtonComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class CustomFieldFormComponent implements OnInit {
   @Input() public headerText: string = "";

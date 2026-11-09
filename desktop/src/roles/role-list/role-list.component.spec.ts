@@ -17,6 +17,9 @@ import {
 import { SnackbarService } from "../../services";
 import { RoleListComponent } from "./role-list.component";
 import { RoleListItem, RoleScope } from "./role-list-item.interface";
+import { provideStore } from "@ngxs/store";
+import { AuthState } from "../../store/auth.state";
+import { TableComponent } from "../../table/table/table.component";
 
 function listItem(overrides: Partial<RoleListItem> = {}): RoleListItem {
   return {
@@ -85,17 +88,24 @@ async function setup(
 
   TestBed.resetTestingModule();
   await TestBed.configureTestingModule({
-    declarations: [RoleListComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [ApiModule, CommonModule, RouterModule.forRoot([])],
+    imports: [ApiModule, CommonModule, RouterModule.forRoot([]), RoleListComponent],
     providers: [
+      provideStore([AuthState]),
       provideZonelessChangeDetection(),
       provideHttpClient(withInterceptorsFromDi()),
       provideHttpClientTesting(),
       { provide: MatDialog, useValue: matDialogMock },
       { provide: SnackbarService, useValue: snackbarMock },
     ],
-  }).compileComponents();
+  })
+    // The spec asserts on the component's own state; the real table would need
+    // its column templates registered before the synchronous test data lands.
+    .overrideComponent(RoleListComponent, {
+      remove: { imports: [TableComponent] },
+      add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] },
+    })
+    .compileComponents();
 
   const roleService = TestBed.inject(RoleService);
   jest.spyOn(roleService, "getRoles").mockReturnValue(of(roles) as any);

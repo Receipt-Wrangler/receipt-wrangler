@@ -56,7 +56,6 @@ describe("CustomFieldTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CustomFieldTableComponent],
       imports: [
         ApiModule,
         ButtonModule,
@@ -68,6 +67,7 @@ describe("CustomFieldTableComponent", () => {
         PipesModule,
         SharedUiModule,
         TableModule,
+        CustomFieldTableComponent,
       ],
       providers: [
         provideZonelessChangeDetection(),

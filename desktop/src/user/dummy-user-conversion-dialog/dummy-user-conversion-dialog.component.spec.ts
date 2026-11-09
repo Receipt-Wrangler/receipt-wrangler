@@ -12,6 +12,8 @@ import { SnackbarService } from "../../services";
 import { UpdateUser } from "../../store";
 import { StoreModule } from "../../store/store.module";
 import { DummyUserConversionDialogComponent } from "./dummy-user-conversion-dialog.component";
+import { provideNgxMask } from "ngx-mask";
+import { provideRouter } from "@angular/router";
 
 describe("DummyUserConversionDialogComponent", () => {
   let component: DummyUserConversionDialogComponent;
@@ -19,15 +21,17 @@ describe("DummyUserConversionDialogComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [DummyUserConversionDialogComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
         ApiModule,
         MatSnackBarModule,
         StoreModule,
         PipesModule,
+        DummyUserConversionDialogComponent,
       ],
       providers: [
+        provideRouter([]),
+        provideNgxMask(),
         SnackbarService,
         {
           provide: MatDialogRef,

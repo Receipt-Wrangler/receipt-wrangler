@@ -19,12 +19,6 @@ import { UserListComponent } from "./user-list/user-list.component";
 import { UserRoutingModule } from "./user-routing.module";
 
 @NgModule({
-  declarations: [
-    UserListComponent,
-    UserFormComponent,
-    ResetPasswordComponent,
-    DummyUserConversionDialogComponent,
-  ],
   imports: [
     ButtonModule,
     CheckboxModule,
@@ -40,6 +34,10 @@ import { UserRoutingModule } from "./user-routing.module";
     TableModule,
     UserRoutingModule,
     GrantPickerComponent,
+    UserListComponent,
+    UserFormComponent,
+    ResetPasswordComponent,
+    DummyUserConversionDialogComponent,
   ],
 })
 export class UserModule {}

@@ -16,12 +16,18 @@ import { SetOrderBy, SetPage, SetPageSize, SetSortDirection } from "../../store/
 import { AuthState } from "../../store/index";
 import { TableColumn } from "../../table/table-column.interface";
 import { CustomFieldFormComponent } from "../custom-field-form/custom-field-form.component";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { CustomFieldTypePipe } from "../../pipes/custom-field-type.pipe";
 
 @Component({
   selector: "app-custom-field-table",
   templateUrl: "./custom-field-table.component.html",
   styleUrl: "./custom-field-table.component.scss",
-  standalone: false
+  imports: [TableHeaderComponent, HasAppPermissionDirective, AddButtonComponent, TableComponent, EditButtonComponent, DeleteButtonComponent, CustomFieldTypePipe]
 })
 export class CustomFieldTableComponent implements OnInit, AfterViewInit {
   public readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");

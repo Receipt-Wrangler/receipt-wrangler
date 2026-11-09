@@ -12,7 +12,6 @@ import { OidcCallbackComponent } from "./oidc-callback/oidc-callback.component";
 import { AuthForm } from "./sign-up/auth-form.component";
 
 @NgModule({
-  declarations: [AuthForm, OidcCallbackComponent],
   imports: [
     AuthRoutingModule,
     ButtonModule,
@@ -24,6 +23,7 @@ import { AuthForm } from "./sign-up/auth-form.component";
     NgOptimizedImage,
     MatProgressSpinner,
     LoginQrComponent,
+    AuthForm, OidcCallbackComponent,
   ],
   exports: [AuthForm],
 })

@@ -15,10 +15,6 @@ import { CustomFieldsRoutingModule } from "./custom-fields-routing.module";
 
 
 @NgModule({
-  declarations: [
-    CustomFieldTableComponent,
-    CustomFieldFormComponent
-  ],
   imports: [
     CommonModule,
     CustomFieldsRoutingModule,
@@ -29,7 +25,9 @@ import { CustomFieldsRoutingModule } from "./custom-fields-routing.module";
     InputModule,
     PipesModule,
     SelectModule,
-    ButtonModule
+    ButtonModule,
+    CustomFieldTableComponent,
+    CustomFieldFormComponent
   ]
 })
 export class CustomFieldsModule {}

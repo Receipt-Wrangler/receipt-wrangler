@@ -1,17 +1,21 @@
 import { Component, Input, OnInit } from "@angular/core";
-import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { take, tap } from "rxjs";
 import { DuplicateValidator } from "src/validators/duplicate-validator";
 import { TagService, TagView, UpsertTagCommand } from "../../open-api";
 import { SnackbarService } from "../../services";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { InputComponent } from "../../input/input/input.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 @Component({
     selector: "app-tag-form",
     templateUrl: "./tag-form.component.html",
     styleUrls: ["./tag-form.component.scss"],
     providers: [DuplicateValidator],
-    standalone: false
+    imports: [DialogComponent, ReactiveFormsModule, InputComponent, DialogFooterComponent, FormGetPipe]
 })
 export class TagFormComponent implements OnInit {
   @Input() public headerText: string = "";

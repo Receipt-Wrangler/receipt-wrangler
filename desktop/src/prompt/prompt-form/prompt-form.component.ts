@@ -1,16 +1,26 @@
 import { Component, OnInit } from "@angular/core";
-import { AbstractControl, FormBuilder, ValidationErrors, ValidatorFn, Validators } from "@angular/forms";
+import { AbstractControl, FormBuilder, ValidationErrors, ValidatorFn, Validators, ReactiveFormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { take, tap } from "rxjs";
 import { BaseFormComponent } from "../../form";
 import { Prompt, PromptService } from "../../open-api";
 import { SnackbarService } from "../../services";
+import { FormHeaderComponent } from "../../shared-ui/form-header/form-header.component";
+import { AuditDetailSectionComponent } from "../../shared-ui/audit-detail-section/audit-detail-section.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { TextareaComponent } from "../../textarea/textarea/textarea.component";
+import { FormButtonBarComponent } from "../../shared-ui/form-button-bar/form-button-bar.component";
+import { SubmitButtonComponent } from "../../shared-ui/submit-button/submit-button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @Component({
     selector: "app-prompt-form",
     templateUrl: "./prompt-form.component.html",
     styleUrl: "./prompt-form.component.scss",
-    standalone: false
+    imports: [FormHeaderComponent, AuditDetailSectionComponent, ReactiveFormsModule, FormSectionComponent, InputComponent, TextareaComponent, FormButtonBarComponent, SubmitButtonComponent, EditButtonComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class PromptFormComponent extends BaseFormComponent implements OnInit {
   public originalPrompt?: Prompt;

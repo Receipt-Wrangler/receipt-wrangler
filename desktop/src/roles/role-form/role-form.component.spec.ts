@@ -1,9 +1,7 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { provideHttpClientTesting } from "@angular/common/http/testing";
 import {
-  Component,
   CUSTOM_ELEMENTS_SCHEMA,
-  Input,
   provideZonelessChangeDetection,
   signal,
 } from "@angular/core";
@@ -30,6 +28,9 @@ import {
 import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services/snackbar.service";
 import { RoleFormComponent } from "./role-form.component";
+import { provideNgxMask } from "ngx-mask";
+import { InputComponent } from "../../input/input/input.component";
+import { TextareaComponent } from "../../textarea/textarea/textarea.component";
 
 const APP_DESCRIPTORS: PermissionDescriptor[] = [
   { key: "app.users.create", label: "Create users", description: "", category: "Users", scope: "APP" },
@@ -51,14 +52,6 @@ const GROUP_DESCRIPTORS: PermissionDescriptor[] = [
   { key: "group.dashboards.read", label: "Read dashboards", description: "", category: "Dashboards", scope: "GROUP" },
   { key: "group.widgets.read", label: "Read widgets", description: "", category: "Widgets", scope: "GROUP" },
 ];
-
-// Stubbed because its `onlyIcon` input trips Angular's on*-event security check
-// when treated as an unknown element under CUSTOM_ELEMENTS_SCHEMA.
-@Component({ selector: "app-submit-button", template: "", standalone: false })
-class StubSubmitButtonComponent {
-  @Input() onlyIcon = false;
-  @Input() buttonText = "";
-}
 
 const ALL_DESCRIPTORS: PermissionDescriptor[] = [...APP_DESCRIPTORS, ...GROUP_DESCRIPTORS];
 
@@ -108,10 +101,10 @@ async function setup(
   };
 
   await TestBed.configureTestingModule({
-    declarations: [RoleFormComponent, StubSubmitButtonComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [ApiModule, PipesModule, ReactiveFormsModule, RouterModule.forRoot([])],
+    imports: [ApiModule, PipesModule, ReactiveFormsModule, RouterModule.forRoot([]), RoleFormComponent],
     providers: [
+      provideNgxMask(),
       provideZonelessChangeDetection(),
       provideHttpClient(withInterceptorsFromDi()),
       provideHttpClientTesting(),
@@ -121,7 +114,14 @@ async function setup(
       // reads UserState.users reactively via selectSignal, so a thin stub is sufficient.
       { provide: Store, useValue: { selectSignal: () => signal(options.users ?? []) } },
     ],
-  }).compileComponents();
+  })
+    // The spec drives the component, not the fields: rendering the real
+    // mat-form-fields trips NG0100 when the view-mode effect toggles the form.
+    .overrideComponent(RoleFormComponent, {
+      remove: { imports: [InputComponent, TextareaComponent] },
+      add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] },
+    })
+    .compileComponents();
 
   const permissionService = TestBed.inject(PermissionService);
   jest

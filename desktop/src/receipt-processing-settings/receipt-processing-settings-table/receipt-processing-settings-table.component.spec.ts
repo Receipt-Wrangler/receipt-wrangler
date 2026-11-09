@@ -14,8 +14,7 @@ describe("ReceiptProcessingSettingsTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [ReceiptProcessingSettingsTableComponent],
-    imports: [NgxsModule.forRoot(), TableModule, SharedUiModule],
+    imports: [NgxsModule.forRoot(), TableModule, SharedUiModule, ReceiptProcessingSettingsTableComponent],
     providers: [
         {
             provide: ActivatedRoute,

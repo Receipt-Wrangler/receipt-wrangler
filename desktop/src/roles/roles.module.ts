@@ -22,7 +22,6 @@ import { RoleListComponent } from "./role-list/role-list.component";
 import { RolesRoutingModule } from "./roles-routing.module";
 
 @NgModule({
-  declarations: [RoleListComponent, RoleFormComponent],
   imports: [
     ButtonModule,
     CheckboxModule,
@@ -43,6 +42,7 @@ import { RolesRoutingModule } from "./roles-routing.module";
     CategoryAutocompleteComponent,
     TagAutocompleteComponent,
     GrantPickerComponent,
+    RoleListComponent, RoleFormComponent,
   ],
 })
 export class RolesModule {}

@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, OnInit, TemplateRef, viewChild } from "@angular/core";
 import { MatDialog } from "@angular/material/dialog";
-import { ActivatedRoute } from "@angular/router";
+import { ActivatedRoute, RouterLink } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants";
@@ -19,6 +19,17 @@ import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog
 import { ReceiptProcessingSettingsTableState } from "../../store/receipt-processing-settings-table.state";
 import { TableColumn } from "../../table/table-column.interface";
 import { ReceiptProcessingSettingsTableService } from "./receipt-processing-settings-table.service";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { TableComponent } from "../../table/table/table.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { AsyncPipe } from "@angular/common";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { AiTypePipe } from "../pipes/ai-type.pipe";
+import { OcrEnginePipe } from "../pipes/ocr-engine.pipe";
 
 @Component({
     selector: "app-receipt-processing-settings-table",
@@ -30,7 +41,7 @@ import { ReceiptProcessingSettingsTableService } from "./receipt-processing-sett
             useClass: ReceiptProcessingSettingsTableService
         }
     ],
-    standalone: false
+    imports: [TableHeaderComponent, HasAppPermissionDirective, AddButtonComponent, TableComponent, RouterLink, EditButtonComponent, ButtonComponent, DeleteButtonComponent, AsyncPipe, AppDatePipe, AiTypePipe, OcrEnginePipe]
 })
 export class ReceiptProcessingSettingsTableComponent extends BaseTableComponent<ReceiptProcessingSettings> implements OnInit, AfterViewInit {
   protected readonly Permission = Permission;

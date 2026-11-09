@@ -11,12 +11,12 @@ import { TagFormComponent } from "./tag-form/tag-form.component";
 import { TagTableComponent } from "./tag-table/tag-table.component";
 import { TagsRoutingModule } from "./tags-routing.module";
 
-@NgModule({ declarations: [TagTableComponent, TagFormComponent], imports: [CommonModule,
+@NgModule({ imports: [CommonModule,
         DirectivesModule,
         InputModule,
         PipesModule,
         ReactiveFormsModule,
         SharedUiModule,
         TableModule,
-        TagsRoutingModule], providers: [provideHttpClient(withInterceptorsFromDi())] })
+        TagsRoutingModule, TagTableComponent, TagFormComponent], providers: [provideHttpClient(withInterceptorsFromDi())] })
 export class TagsModule {}

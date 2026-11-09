@@ -22,14 +22,13 @@ describe("UserListComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [UserListComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         DirectivesModule,
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, UserTableState]),
-        TableModule],
+        TableModule, UserListComponent],
     providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 }).compileComponents();
 

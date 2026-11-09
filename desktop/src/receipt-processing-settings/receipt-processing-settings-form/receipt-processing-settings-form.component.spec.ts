@@ -21,13 +21,12 @@ describe("ReceiptProcessingSettingsFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [ReceiptProcessingSettingsFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [NgxsModule.forRoot([ReceiptProcessingSettingsTaskTableState]),
         NoopAnimationsModule,
         PipesModule,
         ReactiveFormsModule,
-        SharedUiModule],
+        SharedUiModule, ReceiptProcessingSettingsFormComponent],
     providers: [
         {
             provide: ActivatedRoute,

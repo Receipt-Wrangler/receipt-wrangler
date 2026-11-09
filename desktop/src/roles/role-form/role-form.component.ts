@@ -1,7 +1,7 @@
 import { Component, DestroyRef, Signal, computed, effect, linkedSignal, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { FormArray, FormControl, FormGroup, Validators } from "@angular/forms";
-import { ActivatedRoute, Router } from "@angular/router";
+import { FormArray, FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { catchError, EMPTY, take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
@@ -23,9 +23,7 @@ import {
   UpsertRoleCommand,
   User,
 } from "../../open-api";
-import {
-  GrantSelection,
-} from "../../shared-ui/grant-picker/grant-picker.component";
+import { GrantSelection, GrantPickerComponent } from "../../shared-ui/grant-picker/grant-picker.component";
 import {
   CUSTOM_PRESET_ID,
   friendlyActionLabel,
@@ -38,6 +36,16 @@ import {
   ROLE_TYPES,
   RoleTypeMeta,
 } from "../role-presets";
+import { BreadcrumbComponent } from "../../shared-ui/breadcrumb/breadcrumb.component";
+import { MatIcon } from "@angular/material/icon";
+import { InputComponent } from "../../input/input/input.component";
+import { TextareaComponent } from "../../textarea/textarea/textarea.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
+import { FormButtonBarComponent } from "../../shared-ui/form-button-bar/form-button-bar.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { SubmitButtonComponent } from "../../shared-ui/submit-button/submit-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 export interface RolePermissionRow {
   key: string;
@@ -65,7 +73,21 @@ export interface PaidByGrantOption {
   selector: "app-role-form",
   templateUrl: "./role-form.component.html",
   styleUrls: ["./role-form.component.scss"],
-  standalone: false,
+  imports: [
+    BreadcrumbComponent,
+    ReactiveFormsModule,
+    MatIcon,
+    InputComponent,
+    TextareaComponent,
+    CheckboxComponent,
+    GrantPickerComponent,
+    AutocomleteComponent,
+    RouterLink,
+    FormButtonBarComponent,
+    ButtonComponent,
+    SubmitButtonComponent,
+    FormGetPipe,
+  ],
 })
 export class RoleFormComponent {
   public readonly roleTypes = ROLE_TYPES;

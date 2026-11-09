@@ -24,7 +24,6 @@ import { ReceiptProcessingSettingsTableComponent } from "./receipt-processing-se
 
 
 @NgModule({
-  declarations: [ReceiptProcessingSettingsTableComponent, ReceiptProcessingSettingsFormComponent, ReceiptProcessingSettingsChildSystemTaskAccordionComponent],
   imports: [
     CommonModule,
     DirectivesModule,
@@ -42,7 +41,8 @@ import { ReceiptProcessingSettingsTableComponent } from "./receipt-processing-se
     UrlHintPipe,
     ButtonModule,
     MatTooltip,
-    CheckboxModule
+    CheckboxModule,
+    ReceiptProcessingSettingsTableComponent, ReceiptProcessingSettingsFormComponent, ReceiptProcessingSettingsChildSystemTaskAccordionComponent
   ],
   exports: [
     ReceiptProcessingSettingsChildSystemTaskAccordionComponent

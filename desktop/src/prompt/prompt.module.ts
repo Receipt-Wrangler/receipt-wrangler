@@ -15,10 +15,6 @@ import { PromptTableComponent } from "./prompt-table/prompt-table.component";
 
 
 @NgModule({
-  declarations: [
-    PromptTableComponent,
-    PromptFormComponent
-  ],
   imports: [
     CommonModule,
     DirectivesModule,
@@ -30,6 +26,8 @@ import { PromptTableComponent } from "./prompt-table/prompt-table.component";
     InputModule,
     PipesModule,
     TextareaModule,
+    PromptTableComponent,
+    PromptFormComponent,
   ]
 })
 export class PromptModule {}

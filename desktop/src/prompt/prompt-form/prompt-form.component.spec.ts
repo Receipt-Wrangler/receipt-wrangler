@@ -19,9 +19,8 @@ describe("PromptFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [PromptFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [SharedUiModule, PipesModule, ReactiveFormsModule, NgxsModule.forRoot([])],
+    imports: [SharedUiModule, PipesModule, ReactiveFormsModule, NgxsModule.forRoot([]), PromptFormComponent],
     providers: [
         {
             provide: ActivatedRoute,

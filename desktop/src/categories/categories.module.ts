@@ -12,7 +12,6 @@ import { CategoryForm } from "./category-form/category-form.component";
 import { CategoryTableComponent } from "./category-table/category-table.component";
 
 @NgModule({
-  declarations: [CategoryTableComponent, CategoryForm],
   imports: [
     CategoriesRoutingModule,
     CommonModule,
@@ -22,6 +21,7 @@ import { CategoryTableComponent } from "./category-table/category-table.componen
     ReactiveFormsModule,
     SharedUiModule,
     TableModule,
+    CategoryTableComponent, CategoryForm,
   ],
   providers: [DuplicateValidator],
 })

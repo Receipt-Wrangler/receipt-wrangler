@@ -16,9 +16,8 @@ describe("PromptTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [PromptTableComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [TableModule, NgxsModule.forRoot([PromptTableState]), NoopAnimationsModule],
+    imports: [TableModule, NgxsModule.forRoot([PromptTableState]), NoopAnimationsModule, PromptTableComponent],
     providers: [{
             provide: ActivatedRoute,
             useValue: {

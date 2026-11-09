@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from "@angular/common/http";
 import { Component, OnInit, ViewEncapsulation, signal } from "@angular/core";
-import { FormBuilder, FormControl, FormGroup, Validators, } from "@angular/forms";
-import { ActivatedRoute, Router } from "@angular/router";
+import { FormBuilder, FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { BehaviorSubject, catchError, EMPTY, finalize, switchMap, tap, } from "rxjs";
 import { AppData, AuthService, OidcProviderSummary } from "src/open-api";
@@ -10,6 +10,12 @@ import { setAppData } from "src/utils";
 import { fadeIn, fadeInOut } from "../../animations";
 import { FeatureConfigState, GroupState } from "../../store";
 import { UserValidators } from "../../validators";
+import { InputComponent } from "../../input/input/input.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { FeatureDirective } from "../../directives/feature.directive";
+import { LoginQrComponent } from "../../shared-ui/login-qr/login-qr.component";
+import { AsyncPipe } from "@angular/common";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 @Component({
     selector: "app-auth-form",
@@ -18,7 +24,7 @@ import { UserValidators } from "../../validators";
     encapsulation: ViewEncapsulation.None,
     providers: [UserValidators],
     animations: [fadeInOut, fadeIn],
-    standalone: false
+    imports: [ReactiveFormsModule, InputComponent, ButtonComponent, FeatureDirective, RouterLink, LoginQrComponent, AsyncPipe, FormGetPipe]
 })
 export class AuthForm implements OnInit {
   public form: FormGroup = new FormGroup({});

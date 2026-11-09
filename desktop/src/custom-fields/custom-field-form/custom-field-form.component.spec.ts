@@ -14,6 +14,9 @@ import { SelectModule } from "../../select/select.module";
 import { SnackbarService } from "../../services";
 
 import { CustomFieldFormComponent } from "./custom-field-form.component";
+import { provideStore } from "@ngxs/store";
+import { provideNgxMask } from "ngx-mask";
+import { provideRouter } from "@angular/router";
 
 describe("CustomFieldFormComponent", () => {
   let component: CustomFieldFormComponent;
@@ -24,16 +27,19 @@ describe("CustomFieldFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CustomFieldFormComponent],
       imports: [
         MatDialogModule,
         MatSnackBarModule,
         NoopAnimationsModule,
         PipesModule,
         ReactiveFormsModule,
-        SelectModule
+        SelectModule,
+        CustomFieldFormComponent
       ],
       providers: [
+        provideRouter([]),
+        provideNgxMask(),
+        provideStore([]),
         {
           provide: MatDialogRef,
           useValue: {
