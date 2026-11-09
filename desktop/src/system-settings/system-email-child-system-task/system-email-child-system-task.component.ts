@@ -16,31 +16,29 @@ export class SystemEmailChildSystemTaskComponent {
   public readonly allReceiptProcessingSettings = input<ReceiptProcessingSettings[]>([]);
 
   /**
+   * The children that get a panel, in panel order. The template reads the task for panel `i`
+   * from HERE, not from `childTasks()`: an EMAIL_READ also carries an HTML_TO_PDF child when the
+   * group processes email bodies, created ahead of the uploads, so indexing the full list by
+   * panel position handed an upload's panel the render task and showed it empty.
+   */
+  public readonly emailUploadTasks = computed(() =>
+    this.childTasks().filter(task => task.type === SystemTaskType.EmailUpload)
+  );
+
+  /**
    * Derived rather than pushed in ngAfterViewInit: an array filled after the accordion had
    * already been checked only rendered on a later change-detection pass, which @for reports
    * as NG0100 in dev mode.
    */
-  public readonly accordionPanels = computed<AccordionPanel[]>(() => {
-    const panels: AccordionPanel[] = [];
+  public readonly accordionPanels = computed<AccordionPanel[]>(() =>
+    this.emailUploadTasks().map(task => {
+      const settings = this.allReceiptProcessingSettings().find(s => s.id === task.associatedEntityId);
 
-    this.childTasks().forEach(task => {
-      if (task.type === SystemTaskType.EmailUpload) {
-        const settings = this.allReceiptProcessingSettings().find(s => s.id === task.associatedEntityId);
-        let description = "";
-
-        if (settings) {
-          description = `Used ${settings?.name} to process Receipt`;
-        }
-
-
-        panels.push({
-          title: 'Email Upload Details',
-          description: description,
-          content: this.emailUploadDetails(),
-        });
-      }
+      return {
+        title: 'Email Upload Details',
+        description: settings ? `Used ${settings.name} to process Receipt` : "",
+        content: this.emailUploadDetails(),
+      };
     })
-
-    return panels;
-  });
+  );
 }

@@ -329,7 +329,10 @@ process.exit(bad.length ? 1 : 0);
   instead, creates the views there, and logs `NG0100`. The two system-task accordion hosts
   (`receipt-processing-settings-child-system-task-accordion`, `system-email-child-system-task`) did
   exactly this and now derive their panels with `computed()` — the zoneless rule below
-  (plain-field mutations are invisible to change detection) applied to a list.
+  (plain-field mutations are invisible to change detection) applied to a list. The accordion
+  hands each panel's content template its **panel** index, so a host that builds panels from a
+  filtered list must resolve that index against the same filtered list: the email host indexed
+  all its child tasks and showed an empty panel whenever an `HTML_TO_PDF` child came first.
 
 ### Use Established Patterns (do not invent one-offs)
 New UI MUST reuse the application's established patterns and shared components rather than
