@@ -14,8 +14,7 @@ describe("QuickScanButtonComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [QuickScanButtonComponent],
-      imports: [MatDialogModule, PipesModule, DirectivesModule, StoreModule],
+      imports: [MatDialogModule, PipesModule, DirectivesModule, StoreModule, QuickScanButtonComponent],
       providers: [
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),

@@ -16,8 +16,7 @@ describe("FilterBarComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [FilterBarComponent],
-      imports: [MatIconModule],
+      imports: [MatIconModule, FilterBarComponent],
       providers: [provideZonelessChangeDetection()],
     }).compileComponents();
 

@@ -21,12 +21,11 @@ describe("SummaryCardComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SummaryCardComponent, CardComponent],
       imports: [ApiModule,
         MatCardModule,
         MatListModule,
         NgxsModule.forRoot([UserState, SystemSettingsState]),
-        PipesModule],
+        PipesModule, SummaryCardComponent, CardComponent],
       providers: [
         CurrencyPipe,
         provideZonelessChangeDetection(),

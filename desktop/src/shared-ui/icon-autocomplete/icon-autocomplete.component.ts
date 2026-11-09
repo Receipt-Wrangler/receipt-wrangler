@@ -3,12 +3,14 @@ import { FormControl } from "@angular/forms";
 import { Store } from "@ngxs/store";
 import { Icon } from "../../open-api/index";
 import { AuthState } from "../../store/index";
+import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
+import { MatIcon } from "@angular/material/icon";
 
 @Component({
     selector: "app-icon-autocomplete",
     templateUrl: "./icon-autocomplete.component.html",
     styleUrl: "./icon-autocomplete.component.scss",
-    standalone: false
+    imports: [AutocomleteComponent, MatIcon]
 })
 export class IconAutocompleteComponent {
   public readonly inputFormControl = input.required<FormControl>();

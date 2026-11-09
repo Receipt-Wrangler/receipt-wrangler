@@ -11,8 +11,7 @@ describe("AuditDetailSectionComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [AuditDetailSectionComponent],
-      imports: [SharedUiModule, NgxsModule.forRoot([SystemSettingsState])]
+      imports: [SharedUiModule, NgxsModule.forRoot([SystemSettingsState]), AuditDetailSectionComponent]
     })
       .compileComponents();
 

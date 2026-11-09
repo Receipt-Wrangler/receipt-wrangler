@@ -22,13 +22,12 @@ describe("NotificationComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [NotificationComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         AppDatePipe,
         NgxsModule.forRoot([GroupState, AuthState, SystemSettingsState]),
         DirectivesModule,
-        RouterTestingModule],
+        RouterTestingModule, NotificationComponent],
     providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 });
 

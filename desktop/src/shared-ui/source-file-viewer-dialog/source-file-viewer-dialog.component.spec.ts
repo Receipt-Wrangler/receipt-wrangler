@@ -8,17 +8,17 @@ import { SourceFileViewerDialogComponent } from "./source-file-viewer-dialog.com
 // Stubbed rather than pulled in from SharedUiModule: the real app-image-viewer
 // renders an image canvas that wants a live image load, and the point here is the
 // binding, not their rendering.
-@Component({ selector: "app-dialog", template: "<ng-content></ng-content>", standalone: false })
+@Component({ selector: "app-dialog", template: "<ng-content></ng-content>" })
 class DialogStubComponent {
   @Input() public headerText?: string;
 }
 
-@Component({ selector: "app-image-viewer", template: "", standalone: false })
+@Component({ selector: "app-image-viewer", template: "" })
 class ImageViewerStubComponent {
   @Input() public imageBase64?: string;
 }
 
-@Component({ selector: "app-button", template: "", standalone: false })
+@Component({ selector: "app-button", template: "" })
 class ButtonStubComponent {
   @Input() public buttonText?: string;
   @Input() public matButtonType?: string;
@@ -32,17 +32,16 @@ describe("SourceFileViewerDialogComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [
-        SourceFileViewerDialogComponent,
-        DialogStubComponent,
-        ImageViewerStubComponent,
-        ButtonStubComponent,
-      ],
+      imports: [SourceFileViewerDialogComponent],
       providers: [
         { provide: MatDialogRef, useValue: dialogRef },
         { provide: MAT_DIALOG_DATA, useValue: data },
       ],
-    }).compileComponents();
+    })
+      .overrideComponent(SourceFileViewerDialogComponent, {
+        set: { imports: [DialogStubComponent, ImageViewerStubComponent, ButtonStubComponent] },
+      })
+      .compileComponents();
 
     fixture = TestBed.createComponent(SourceFileViewerDialogComponent);
     component = fixture.componentInstance;

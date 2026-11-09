@@ -13,7 +13,6 @@ describe("CarouselComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CarouselComponent],
       imports: [
         CommonModule,
         PipesModule,
@@ -21,6 +20,7 @@ describe("CarouselComponent", () => {
         MatButtonModule,
         MatIconModule,
         ButtonModule,
+        CarouselComponent,
       ],
     }).compileComponents();
 

@@ -9,8 +9,7 @@ describe("EditableListComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [EditableListComponent],
-      imports: [MatListModule, ButtonModule],
+      imports: [MatListModule, ButtonModule, EditableListComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(EditableListComponent);

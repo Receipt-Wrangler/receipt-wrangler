@@ -6,6 +6,13 @@ import { Store } from "@ngxs/store";
 import { FilterOperation } from "../../open-api";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { todayInZone } from "../../utils/app-time-zone";
+import { InputComponent } from "../../input/input/input.component";
+import { DatepickerComponent } from "../../datepicker/datepicker/datepicker.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { UserAutocompleteComponent } from "../../user-autocomplete/user-autocomplete/user-autocomplete.component";
+import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { OperationsPipe } from "../receipt-filter/operations.pipe";
 
 /**
  * One row of a filter dialog: the field's value editor beside its Operation
@@ -22,7 +29,7 @@ import { todayInZone } from "../../utils/app-time-zone";
   selector: "app-filter-field",
   templateUrl: "./filter-field.component.html",
   styleUrls: ["./filter-field.component.scss"],
-  standalone: false
+  imports: [InputComponent, DatepickerComponent, SelectComponent, UserAutocompleteComponent, AutocomleteComponent, FormGetPipe, OperationsPipe]
 })
 export class FilterFieldComponent implements OnInit {
   public readonly parentForm = input<FormGroup>(new FormGroup({}));

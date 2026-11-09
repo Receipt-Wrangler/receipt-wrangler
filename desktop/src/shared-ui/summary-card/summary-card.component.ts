@@ -1,13 +1,18 @@
 import { Component, effect, input, signal, untracked } from "@angular/core";
 import { take, tap } from "rxjs";
 import { UserService } from "../../open-api";
+import { CardComponent } from "../card/card.component";
+import { NgTemplateOutlet, KeyValuePipe } from "@angular/common";
+import { MatList, MatListItem } from "@angular/material/list";
+import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
+import { UserPipe } from "../../pipes/user.pipe";
 
 
 @Component({
     selector: "app-summary-card",
     templateUrl: "./summary-card.component.html",
     styleUrls: ["./summary-card.component.scss"],
-    standalone: false
+    imports: [CardComponent, NgTemplateOutlet, MatList, MatListItem, KeyValuePipe, CustomCurrencyPipe, UserPipe]
 })
 export class SummaryCardComponent {
   constructor(private userService: UserService) {

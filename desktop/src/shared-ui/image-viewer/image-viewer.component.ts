@@ -4,7 +4,7 @@ import { ImageCanvasComponent } from "../image-canvas/image-canvas.component";
 @Component({
     selector: "app-image-viewer",
     templateUrl: "./image-viewer.component.html",
-    standalone: false
+    imports: [ImageCanvasComponent]
 })
 export class ImageViewerComponent implements OnChanges, OnDestroy {
   @Input() public imageBase64?: string = "";

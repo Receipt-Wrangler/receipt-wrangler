@@ -10,8 +10,7 @@ describe("DeleteButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [DeleteButtonComponent],
-      imports: [ButtonModule, MatTableModule],
+      imports: [ButtonModule, MatTableModule, DeleteButtonComponent],
       providers: [
         {
           provide: ActivatedRoute,

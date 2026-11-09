@@ -10,8 +10,7 @@ describe("AddButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [AddButtonComponent],
-      imports: [ButtonModule],
+      imports: [ButtonModule, AddButtonComponent],
       providers: [
         provideZonelessChangeDetection(),
         { provide: ActivatedRoute, useValue: {} },

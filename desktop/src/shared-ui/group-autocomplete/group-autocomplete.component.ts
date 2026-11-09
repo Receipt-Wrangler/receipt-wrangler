@@ -3,12 +3,13 @@ import { FormControl } from "@angular/forms";
 import { Store } from "@ngxs/store";
 import { Group } from "../../open-api";
 import { GroupState } from "../../store";
+import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
 
 @Component({
     selector: "app-group-autocomplete",
     templateUrl: "./group-autocomplete.component.html",
     styleUrls: ["./group-autocomplete.component.scss"],
-    standalone: false
+    imports: [AutocomleteComponent]
 })
 export class GroupAutocompleteComponent {
   public readonly inputFormControl = input.required<FormControl>();

@@ -17,8 +17,7 @@ describe('StatusChipComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ StatusChipComponent ],
-      imports: [MatChipsModule, PipesModule],
+      imports: [MatChipsModule, PipesModule, StatusChipComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA]
     })
     .compileComponents();

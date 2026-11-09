@@ -1,12 +1,14 @@
 import { Component, OnInit, output, signal } from "@angular/core";
 import { take, tap } from "rxjs";
 import { Notification, NotificationsService } from "../../open-api";
+import { ButtonComponent } from "../../button/button/button.component";
+import { NotificationComponent } from "../notification/notification.component";
 
 @Component({
     selector: "app-notifications-list",
     templateUrl: "./notifications-list.component.html",
     styleUrls: ["./notifications-list.component.scss"],
-    standalone: false
+    imports: [ButtonComponent, NotificationComponent]
 })
 export class NotificationsListComponent implements OnInit {
   public notifications = signal<Notification[]>([]);

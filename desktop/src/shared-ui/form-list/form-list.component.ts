@@ -4,12 +4,19 @@ import {
   input,
   output
 } from '@angular/core';
+import { MatList, MatListItem } from '@angular/material/list';
+import { NgTemplateOutlet } from '@angular/common';
+import { EditButtonComponent } from '../edit-button/edit-button.component';
+import { DeleteButtonComponent } from '../delete-button/delete-button.component';
+import { SubmitButtonComponent } from '../submit-button/submit-button.component';
+import { CancelButtonComponent } from '../cancel-button/cancel-button.component';
+import { ButtonComponent } from '../../button/button/button.component';
 
 @Component({
     selector: 'app-form-list',
     templateUrl: './form-list.component.html',
     styleUrls: ['./form-list.component.scss'],
-    standalone: false
+    imports: [MatList, MatListItem, NgTemplateOutlet, EditButtonComponent, DeleteButtonComponent, SubmitButtonComponent, CancelButtonComponent, ButtonComponent]
 })
 export class FormListComponent {
   public readonly array = input<any[]>([]);

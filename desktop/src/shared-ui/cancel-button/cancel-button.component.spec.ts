@@ -10,8 +10,7 @@ describe("CancelButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CancelButtonComponent],
-      imports: [ButtonModule],
+      imports: [ButtonModule, CancelButtonComponent],
       providers: [{ provide: ActivatedRoute, useValue: {} }],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();

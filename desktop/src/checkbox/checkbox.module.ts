@@ -8,7 +8,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { SharedUiModule } from 'src/shared-ui/shared-ui.module';
 
 @NgModule({
-  declarations: [CheckboxComponent],
   imports: [
     CommonModule,
     ReactiveFormsModule,
@@ -16,6 +15,7 @@ import { SharedUiModule } from 'src/shared-ui/shared-ui.module';
     MatIconModule,
     MatTooltipModule,
     SharedUiModule,
+    CheckboxComponent,
   ],
   exports: [CheckboxComponent],
 })

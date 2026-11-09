@@ -3,12 +3,14 @@ import { Store } from "@ngxs/store";
 import { Permission, Receipt } from "../../open-api/index";
 import { QueueMode, ReceiptQueueService } from "../../services/receipt-queue.service";
 import { AuthState, GroupState } from "../../store/index";
+import { ButtonComponent } from "../../button/button/button.component";
+import { MatMenuTrigger, MatMenu, MatMenuItem } from "@angular/material/menu";
 
 @Component({
     selector: "app-queue-start-menu",
     templateUrl: "./queue-start-menu.component.html",
     styleUrl: "./queue-start-menu.component.scss",
-    standalone: false
+    imports: [ButtonComponent, MatMenuTrigger, MatMenu, MatMenuItem]
 })
 export class QueueStartMenuComponent implements OnInit {
   public readonly buttonText = input<string>("");

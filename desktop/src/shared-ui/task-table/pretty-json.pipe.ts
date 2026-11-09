@@ -3,10 +3,7 @@ import { DomSanitizer, SafeHtml } from "@angular/platform-browser";
 import { prettyPrintJson } from "pretty-print-json";
 import { DEFAULT_PRETTY_JSON_OPTIONS } from "../../receipt-processing-settings/constants/pretty-json";
 
-@Pipe({
-    name: "prettyJson",
-    standalone: false
-})
+@Pipe({ name: "prettyJson" })
 export class PrettyJsonPipe implements PipeTransform {
   constructor(private sanitizer: DomSanitizer) {}
 

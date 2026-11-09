@@ -10,8 +10,7 @@ describe("BreadcrumbComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [BreadcrumbComponent],
-      imports: [MatIconModule, RouterModule.forRoot([])],
+      imports: [MatIconModule, RouterModule.forRoot([]), BreadcrumbComponent],
       providers: [provideZonelessChangeDetection()],
     }).compileComponents();
 

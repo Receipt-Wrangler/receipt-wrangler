@@ -7,6 +7,7 @@ import { QueueMode, ReceiptQueueService } from "../../services/receipt-queue.ser
 import { StoreModule } from "../../store/store.module";
 
 import { QueueStartMenuComponent } from "./queue-start-menu.component";
+import { provideRouter } from "@angular/router";
 
 describe("QueueStartMenuComponent", () => {
   let component: QueueStartMenuComponent;
@@ -14,13 +15,14 @@ describe("QueueStartMenuComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [QueueStartMenuComponent],
       imports: [
         StoreModule,
         MatMenuModule,
+        QueueStartMenuComponent,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
+        provideRouter([]),
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),
       ]

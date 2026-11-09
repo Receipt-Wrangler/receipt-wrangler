@@ -10,7 +10,6 @@ import { SharedUiModule } from "../shared-ui/shared-ui.module";
 import { CarouselComponent } from "./carousel/carousel.component";
 
 @NgModule({
-  declarations: [CarouselComponent],
   imports: [
     ButtonModule,
     CommonModule,
@@ -20,6 +19,7 @@ import { CarouselComponent } from "./carousel/carousel.component";
     NgxCarouselModule.forRoot(),
     PipesModule,
     SharedUiModule,
+    CarouselComponent,
   ],
   exports: [CarouselComponent],
 })

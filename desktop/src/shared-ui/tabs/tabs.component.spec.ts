@@ -11,8 +11,7 @@ describe("TabsComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [TabsComponent],
-      imports: [MatTabsModule],
+      imports: [MatTabsModule, TabsComponent],
       providers: [{
         provide: ActivatedRoute,
         useValue: {}

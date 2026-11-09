@@ -10,7 +10,7 @@ describe("PrettyJsonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [PrettyJsonComponent, PrettyJsonPipe],
+      imports: [PrettyJsonComponent, PrettyJsonPipe],
       providers: [PrettyJsonPipe],
       schemas: [CUSTOM_ELEMENTS_SCHEMA]
     })

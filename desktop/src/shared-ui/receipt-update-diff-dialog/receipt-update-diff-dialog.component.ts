@@ -10,6 +10,12 @@ import {
   toJsonLines,
 } from "../../utils/receipt-update-description";
 import { FilterTab } from "../filter-bar/filter-tab.interface";
+import { DialogComponent } from "../dialog/dialog.component";
+import { NgTemplateOutlet } from "@angular/common";
+import { ButtonComponent } from "../../button/button/button.component";
+import { FilterBarComponent } from "../filter-bar/filter-bar.component";
+import { CopyButtonComponent } from "../copy-button/copy-button.component";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
 
 export interface ReceiptUpdateDiffDialogData {
   snapshots: ReceiptUpdateSnapshots;
@@ -37,7 +43,14 @@ export interface ReceiptDiffRow {
   selector: "app-receipt-update-diff-dialog",
   templateUrl: "./receipt-update-diff-dialog.component.html",
   styleUrl: "./receipt-update-diff-dialog.component.scss",
-  standalone: false,
+  imports: [
+    DialogComponent,
+    NgTemplateOutlet,
+    ButtonComponent,
+    FilterBarComponent,
+    CopyButtonComponent,
+    AppDatePipe,
+  ],
 })
 export class ReceiptUpdateDiffDialogComponent {
   public readonly headerText: string;

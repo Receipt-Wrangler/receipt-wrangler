@@ -38,8 +38,9 @@ describe("DashboardComponent", () => {
       } as Dashboard,
     ];
     await TestBed.configureTestingModule({
-    declarations: [DashboardComponent, SummaryCardComponent],
-    imports: [ApiModule,
+    declarations: [DashboardComponent],
+    imports: [SummaryCardComponent,
+        ApiModule,
         CommonModule,
         DashboardRoutingModule,
         MatCardModule,

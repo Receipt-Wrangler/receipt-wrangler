@@ -14,8 +14,8 @@ describe("UserShortcutComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [UserShortcutComponent, EditableListComponent, IconAutocompleteComponent],
-      imports: [MatIconModule, InputModule, PipesModule, MatListModule, ReactiveFormsModule],
+      declarations: [UserShortcutComponent],
+      imports: [EditableListComponent, IconAutocompleteComponent, MatIconModule, InputModule, PipesModule, MatListModule, ReactiveFormsModule],
     }).compileComponents();
 
     fixture = TestBed.createComponent(UserShortcutComponent);

@@ -5,9 +5,11 @@ import { NgxsModule, Store } from "@ngxs/store";
 import { PipesModule } from "src/pipes/pipes.module";
 import { SystemSettingsState } from "src/store/system-settings.state";
 import { SetTimeZone } from "src/store/system-settings.state.actions";
+import { UserState } from "src/store/user.state";
 import { FilterOperation } from "../../open-api";
 import { OperationsPipe } from "../receipt-filter/operations.pipe";
 import { FilterFieldComponent } from "./filter-field.component";
+import { provideNgxMask } from "ngx-mask";
 
 describe("FilterFieldComponent", () => {
   let fixture: ComponentFixture<FilterFieldComponent>;
@@ -39,8 +41,8 @@ describe("FilterFieldComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [FilterFieldComponent, OperationsPipe],
-      imports: [ReactiveFormsModule, PipesModule, NgxsModule.forRoot([SystemSettingsState])],
+      imports: [ReactiveFormsModule, PipesModule, NgxsModule.forRoot([SystemSettingsState, UserState]), FilterFieldComponent, OperationsPipe],
+      providers: [provideNgxMask()],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();
   });

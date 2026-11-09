@@ -10,8 +10,7 @@ describe('CardComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [CardComponent],
-      imports: [MatCardModule],
+      imports: [MatCardModule, CardComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });
     fixture = TestBed.createComponent(CardComponent);

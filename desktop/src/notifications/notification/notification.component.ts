@@ -2,12 +2,16 @@ import { Component, OnInit, input, output } from "@angular/core";
 import { take, tap } from "rxjs";
 import { ParameterizedDataParser } from "src/utils";
 import { Notification, NotificationsService, Permission } from "../../open-api";
+import { RouterLink } from "@angular/router";
+import { CancelButtonComponent } from "../../shared-ui/cancel-button/cancel-button.component";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
 
 @Component({
     selector: "app-notification",
     templateUrl: "./notification.component.html",
     styleUrls: ["./notification.component.scss"],
-    standalone: false
+    imports: [RouterLink, CancelButtonComponent, AppDatePipe, HasAppPermissionDirective]
 })
 export class NotificationComponent implements OnInit {
   public readonly notification = input.required<Notification>();

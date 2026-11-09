@@ -1,10 +1,14 @@
 import { Component, Input, signal, TemplateRef, input, output } from "@angular/core";
+import { MatList, MatListItem, MatListItemTitle, MatListItemLine, MatListItemMeta } from "@angular/material/list";
+import { NgTemplateOutlet } from "@angular/common";
+import { EditButtonComponent } from "../edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../delete-button/delete-button.component";
 
 @Component({
     selector: "app-editable-list",
     templateUrl: "./editable-list.component.html",
     styleUrl: "./editable-list.component.scss",
-    standalone: false
+    imports: [MatList, NgTemplateOutlet, MatListItem, MatListItemTitle, MatListItemLine, MatListItemMeta, EditButtonComponent, DeleteButtonComponent]
 })
 export class EditableListComponent {
   public readonly listData = input<any[]>([]);

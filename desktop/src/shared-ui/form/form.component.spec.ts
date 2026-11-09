@@ -17,13 +17,13 @@ describe("FormComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [FormComponent],
       imports: [
         PipesModule,
         ReactiveFormsModule,
         ButtonModule,
         SharedUiModule,
         StoreModule,
+        FormComponent,
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [

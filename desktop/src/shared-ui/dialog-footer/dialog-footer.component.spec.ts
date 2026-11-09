@@ -1,8 +1,11 @@
 import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import { NgxsModule } from "@ngxs/store";
 import { ButtonModule } from "../../button";
+import { CancelButtonComponent } from "../cancel-button/cancel-button.component";
 import { DialogFooterComponent } from "./dialog-footer.component";
+import { provideRouter } from "@angular/router";
 
 describe("DialogFooterComponent", () => {
   let component: DialogFooterComponent;
@@ -13,8 +16,8 @@ describe("DialogFooterComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [DialogFooterComponent],
-      imports: [ButtonModule, NgxsModule.forRoot([])],
+      imports: [ButtonModule, NgxsModule.forRoot([]), DialogFooterComponent],
+      providers: [provideRouter([])],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();
 
@@ -39,12 +42,14 @@ describe("DialogFooterComponent", () => {
     fixture.detectChanges();
 
     expect(query("dialog-submit-button")).toBeNull();
-    const cancel = query("dialog-cancel-button");
-    expect(cancel.tooltip).toBe("Close");
+    const cancel: CancelButtonComponent = fixture.debugElement
+      .query(By.css("[data-testid='dialog-cancel-button']"))
+      .componentInstance;
+    expect(cancel.tooltip()).toBe("Close");
 
     const cancelled = jest.fn();
     component.cancelClicked.subscribe(cancelled);
-    cancel.dispatchEvent(new CustomEvent("clicked"));
+    cancel.clicked.emit();
 
     expect(cancelled).toHaveBeenCalled();
   });

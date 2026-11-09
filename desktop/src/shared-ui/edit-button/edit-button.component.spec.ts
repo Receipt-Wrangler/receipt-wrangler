@@ -9,8 +9,7 @@ describe("EditButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [EditButtonComponent],
-      imports: [ButtonModule],
+      imports: [ButtonModule, EditButtonComponent],
       providers: [
         {
           provide: ActivatedRoute,

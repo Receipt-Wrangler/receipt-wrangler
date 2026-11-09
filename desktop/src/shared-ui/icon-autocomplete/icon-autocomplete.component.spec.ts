@@ -14,8 +14,7 @@ describe("IconAutocompleteComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [IconAutocompleteComponent],
-      imports: [AutocompleteModule, NgxsModule.forRoot([AuthState]), NoopAnimationsModule],
+      imports: [AutocompleteModule, NgxsModule.forRoot([AuthState]), NoopAnimationsModule, IconAutocompleteComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     })
       .compileComponents();

@@ -18,12 +18,12 @@ import { applyFormCommand } from "../../utils/index";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { OperationsPipe } from "./operations.pipe";
 import { ReceiptFilterComponent } from "./receipt-filter.component";
+import { provideRouter } from "@angular/router";
 
 @UntilDestroy()
 @Component({
   selector: "app-noop",
-  template: "",
-  standalone: false
+  template: ""
 })
 class NoopComponent {}
 
@@ -77,7 +77,6 @@ describe("ReceiptFilterComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [ReceiptFilterComponent, OperationsPipe],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [PipesModule,
         InputModule,
@@ -85,8 +84,9 @@ describe("ReceiptFilterComponent", () => {
         StoreModule,
         NoopAnimationsModule,
         PipesModule,
-        ReactiveFormsModule],
+        ReactiveFormsModule, ReceiptFilterComponent, OperationsPipe],
       providers: [
+        provideRouter([]),
         {
           provide: MatDialogRef,
           useValue: {

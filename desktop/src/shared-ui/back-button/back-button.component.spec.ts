@@ -9,8 +9,7 @@ describe("BackButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [BackButtonComponent],
-      imports: [ButtonModule],
+      imports: [ButtonModule, BackButtonComponent],
       providers: [
         {
           provide: ActivatedRoute,

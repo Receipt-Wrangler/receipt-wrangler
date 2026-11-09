@@ -10,8 +10,7 @@ import { TableColumn } from "../../table/table-column.interface";
 @Component({
     selector: "app-base-table",
     templateUrl: "./base-table.component.html",
-    styleUrl: "./base-table.component.scss",
-    standalone: false
+    styleUrl: "./base-table.component.scss"
 })
 export class BaseTableComponent<T> {
   public columns: TableColumn[] = [];

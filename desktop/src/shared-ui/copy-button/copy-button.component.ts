@@ -1,4 +1,5 @@
 import { Component, DestroyRef, inject, input, OnDestroy, output, signal } from "@angular/core";
+import { ButtonComponent } from "../../button/button/button.component";
 
 /**
  * Generic copy-to-clipboard icon button.
@@ -16,7 +17,7 @@ import { Component, DestroyRef, inject, input, OnDestroy, output, signal } from 
   selector: "app-copy-button",
   templateUrl: "./copy-button.component.html",
   styleUrl: "./copy-button.component.scss",
-  standalone: false,
+  imports: [ButtonComponent],
 })
 export class CopyButtonComponent implements OnDestroy {
   public readonly text = input.required<string>();

@@ -11,8 +11,7 @@ describe("SubmitButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SubmitButtonComponent],
-      imports: [ButtonModule, NgxsModule.forRoot([LayoutState])],
+      imports: [ButtonModule, NgxsModule.forRoot([LayoutState]), SubmitButtonComponent],
       providers: [
         {
           provide: ActivatedRoute,

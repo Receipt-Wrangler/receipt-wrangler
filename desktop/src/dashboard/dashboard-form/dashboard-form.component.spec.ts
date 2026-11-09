@@ -21,9 +21,10 @@ describe("DashboardFormComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [DashboardFormComponent, EditableListComponent],
+    declarations: [DashboardFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [MatSnackBarModule,
+    imports: [EditableListComponent,
+        MatSnackBarModule,
         NgxsModule.forRoot([GroupState, AuthState]),
         PipesModule,
         ReactiveFormsModule],

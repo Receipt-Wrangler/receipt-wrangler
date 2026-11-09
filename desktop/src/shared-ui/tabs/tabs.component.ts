@@ -1,13 +1,14 @@
 import { Component, OnChanges, OnInit, signal, SimpleChanges, input } from "@angular/core";
-import { ActivatedRoute, NavigationEnd, Router } from "@angular/router";
+import { ActivatedRoute, NavigationEnd, Router, RouterLinkActive, RouterLink, RouterOutlet } from "@angular/router";
 import { tap } from "rxjs";
 import { TabConfig } from "./tab-config.interface";
+import { MatTabNav, MatTabLink, MatTabNavPanel } from "@angular/material/tabs";
 
 @Component({
     selector: "app-tabs",
     templateUrl: "./tabs.component.html",
     styleUrls: ["./tabs.component.scss"],
-    standalone: false
+    imports: [MatTabNav, MatTabLink, RouterLinkActive, RouterLink, MatTabNavPanel, RouterOutlet]
 })
 export class TabsComponent implements OnInit, OnChanges {
   public readonly tabs = input<TabConfig[]>([]);

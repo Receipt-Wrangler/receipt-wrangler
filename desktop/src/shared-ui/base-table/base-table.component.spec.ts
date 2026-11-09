@@ -13,8 +13,7 @@ describe("BaseTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [BaseTableComponent],
-      imports: [NgxsModule.forRoot([])],
+      imports: [NgxsModule.forRoot([]), BaseTableComponent],
       providers: [
         {
           provide: BaseTableService,

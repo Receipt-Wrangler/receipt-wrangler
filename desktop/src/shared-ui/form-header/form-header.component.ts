@@ -1,11 +1,12 @@
-import { Location } from "@angular/common";
+import { Location, NgClass, NgTemplateOutlet } from "@angular/common";
 import { Component, Input, TemplateRef, input } from "@angular/core";
+import { BackButtonComponent } from "../back-button/back-button.component";
 
 @Component({
     selector: "app-form-header",
     templateUrl: "./form-header.component.html",
     styleUrls: ["./form-header.component.scss"],
-    standalone: false
+    imports: [NgClass, BackButtonComponent, NgTemplateOutlet]
 })
 export class FormHeaderComponent {
   public readonly headerText = input<string>("");

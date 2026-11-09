@@ -13,8 +13,7 @@ describe('StatusSelectComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [StatusSelectComponent],
-      imports: [SelectModule, NoopAnimationsModule],
+      imports: [SelectModule, NoopAnimationsModule, StatusSelectComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });
     fixture = TestBed.createComponent(StatusSelectComponent);

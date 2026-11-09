@@ -9,8 +9,7 @@ describe("CopyButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CopyButtonComponent],
-      imports: [ButtonModule],
+      imports: [ButtonModule, CopyButtonComponent],
       providers: [provideZonelessChangeDetection()],
     }).compileComponents();
 

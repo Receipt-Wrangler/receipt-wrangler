@@ -1,5 +1,7 @@
 import { Component, input } from "@angular/core";
 import { BreadcrumbItem } from "./breadcrumb-item.interface";
+import { RouterLink } from "@angular/router";
+import { MatIcon } from "@angular/material/icon";
 
 /**
  * Generic, reusable breadcrumb trail.
@@ -16,7 +18,7 @@ import { BreadcrumbItem } from "./breadcrumb-item.interface";
   selector: "app-breadcrumb",
   templateUrl: "./breadcrumb.component.html",
   styleUrl: "./breadcrumb.component.scss",
-  standalone: false,
+  imports: [RouterLink, MatIcon],
 })
 export class BreadcrumbComponent {
   public readonly items = input.required<BreadcrumbItem[]>();

@@ -4,6 +4,10 @@ import { UntilDestroy } from "@ngneat/until-destroy";
 import { FormMode } from "src/enums/form-mode.enum";
 import { ReceiptFileUploadCommand } from "../../interfaces";
 import { FileDataView } from "../../open-api";
+import { CarouselComponent as CarouselComponent_1, SlideComponent } from "ngx-bootstrap/carousel";
+import { NgTemplateOutlet } from "@angular/common";
+import { ButtonComponent } from "../../button/button/button.component";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @UntilDestroy()
 @Component({
@@ -11,7 +15,7 @@ import { FileDataView } from "../../open-api";
     templateUrl: "./carousel.component.html",
     styleUrls: ["./carousel.component.scss"],
     encapsulation: ViewEncapsulation.None,
-    standalone: false
+    imports: [CarouselComponent_1, SlideComponent, NgTemplateOutlet, ImageViewerComponent, ButtonComponent, InputReadonlyPipe]
 })
 export class CarouselComponent implements OnChanges {
   public readonly images = input<FileDataView[]>([]);

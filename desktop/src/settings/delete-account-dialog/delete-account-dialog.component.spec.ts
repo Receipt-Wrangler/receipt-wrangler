@@ -33,9 +33,9 @@ describe("DeleteAccountDialogComponent", () => {
     }
 
     await TestBed.configureTestingModule({
-      declarations: [CancelButtonComponent, DeleteAccountDialogComponent],
+      declarations: [DeleteAccountDialogComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [ButtonModule, ReactiveFormsModule, PipesModule],
+      imports: [CancelButtonComponent, ButtonModule, ReactiveFormsModule, PipesModule],
       providers,
     }).compileComponents();
 
