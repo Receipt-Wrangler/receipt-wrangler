@@ -11,10 +11,7 @@ import { AuthState } from "../store/auth.state";
  * first paint (e.g. AppData lands post-login) — unlike a one-shot
  * `selectSnapshot` in an input setter, which never updates.
  */
-@Directive({
-  selector: "[hasAppPermission]",
-  standalone: false,
-})
+@Directive({ selector: "[hasAppPermission]" })
 export class HasAppPermissionDirective {
   private readonly templateRef = inject(TemplateRef<unknown>);
   private readonly viewContainer = inject(ViewContainerRef);

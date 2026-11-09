@@ -18,8 +18,9 @@ describe("AutocomleteComponent", () => {
       // OptionDisplayPipe renders the chips. Only the panel-behavior cases
       // below reach it - they are the only ones that let change detection
       // run over the multiple-mode branch of the template.
-      declarations: [AutocomleteComponent, BaseInputComponent, OptionDisplayPipe],
+      declarations: [AutocomleteComponent, OptionDisplayPipe],
       imports: [
+        BaseInputComponent,
         NgxsModule.forRoot([AuthState]),
         MatAutocompleteModule,
         ReactiveFormsModule,

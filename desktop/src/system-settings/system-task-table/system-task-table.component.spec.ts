@@ -28,9 +28,10 @@ describe("SystemTaskTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SystemTaskTableComponent, ButtonComponent],
+      declarations: [SystemTaskTableComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [SharedUiModule,
+      imports: [ButtonComponent,
+        SharedUiModule,
         MatChipsModule,
         MatIconModule,
         NgxsModule.forRoot([SystemTaskTableState, UserState]),

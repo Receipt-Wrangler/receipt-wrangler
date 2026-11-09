@@ -4,10 +4,7 @@ import { Store } from "@ngxs/store";
 import { CurrencySeparator, CurrencySymbolPosition } from "../open-api/index";
 import { SystemSettingsState } from "../store/system-settings.state";
 
-@Pipe({
-    name: "customCurrency",
-    standalone: false
-})
+@Pipe({ name: "customCurrency" })
 export class CustomCurrencyPipe implements PipeTransform {
   constructor(private store: Store, private currencyPipe: CurrencyPipe) {}
 

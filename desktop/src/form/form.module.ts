@@ -5,11 +5,9 @@ import { BaseFormComponent } from './base-form/base-form.component';
 
 
 @NgModule({
-  declarations: [
-    BaseFormComponent
-  ],
   imports: [
-    CommonModule
+    CommonModule,
+    BaseFormComponent
   ],
   exports: [
     BaseFormComponent

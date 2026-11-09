@@ -1,10 +1,7 @@
 import { Directive, TemplateRef, ViewContainerRef, } from "@angular/core";
 import { EnvironmentService } from "src/services/environment.service";
 
-@Directive({
-    selector: "[appDevelopment]",
-    standalone: false
-})
+@Directive({ selector: "[appDevelopment]" })
 export class DevelopmentDirective {
   public hasView = false;
 

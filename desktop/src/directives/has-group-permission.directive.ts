@@ -21,10 +21,7 @@ export interface HasGroupPermissionInput {
  * Signal/effect-driven so it re-renders when the permission lists arrive after
  * first paint (e.g. AppData lands post-login).
  */
-@Directive({
-  selector: "[hasGroupPermission]",
-  standalone: false,
-})
+@Directive({ selector: "[hasGroupPermission]" })
 export class HasGroupPermissionDirective {
   private readonly templateRef = inject(TemplateRef<unknown>);
   private readonly viewContainer = inject(ViewContainerRef);

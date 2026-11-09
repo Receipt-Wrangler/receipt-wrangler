@@ -3,10 +3,7 @@ import { Store } from "@ngxs/store";
 import { Group } from "../open-api";
 import { GroupState } from "../store";
 
-@Pipe({
-    name: "group",
-    standalone: false
-})
+@Pipe({ name: "group" })
 export class GroupPipe implements PipeTransform {
   constructor(private store: Store) {}
 

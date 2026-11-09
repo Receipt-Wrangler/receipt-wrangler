@@ -10,8 +10,7 @@ describe("UserPipe", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [UserPipe],
-      imports: [NgxsModule.forRoot([UserState])],
+      imports: [NgxsModule.forRoot([UserState]), UserPipe],
       providers: [UserPipe],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     }).compileComponents();

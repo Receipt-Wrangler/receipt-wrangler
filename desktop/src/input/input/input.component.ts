@@ -5,12 +5,19 @@ import { CurrencySeparator, CurrencySymbolPosition } from "../../open-api/index"
 import { PasswordGeneratorService } from "../../services/password-generator.service";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { InputInterface } from "../input.interface";
+import { MatFormField, MatLabel, MatInput, MatError, MatSuffix, MatHint } from "@angular/material/input";
+import { ReactiveFormsModule } from "@angular/forms";
+import { NgxMaskDirective } from "ngx-mask";
+import { MatIconButton } from "@angular/material/button";
+import { MatTooltip } from "@angular/material/tooltip";
+import { MatIcon } from "@angular/material/icon";
+import { AsyncPipe } from "@angular/common";
 
 @Component({
   selector: "app-input",
   templateUrl: "./input.component.html",
   styleUrls: ["./input.component.scss"],
-  standalone: false
+  imports: [MatFormField, MatLabel, MatInput, ReactiveFormsModule, NgxMaskDirective, MatError, MatSuffix, MatIconButton, MatTooltip, MatIcon, MatHint, AsyncPipe]
 })
 export class InputComponent
   extends BaseInputComponent

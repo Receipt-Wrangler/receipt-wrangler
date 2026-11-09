@@ -6,18 +6,15 @@ import { HasAppPermissionDirective } from "./has-app-permission.directive";
 import { HasGroupPermissionDirective } from "./has-group-permission.directive";
 
 @NgModule({
-  declarations: [
-    DevelopmentDirective,
-    FeatureDirective,
-    HasAppPermissionDirective,
-    HasGroupPermissionDirective,
-  ],
   exports: [
     DevelopmentDirective,
     FeatureDirective,
     HasAppPermissionDirective,
     HasGroupPermissionDirective,
   ],
-  imports: [CommonModule],
+  imports: [CommonModule, DevelopmentDirective,
+    FeatureDirective,
+    HasAppPermissionDirective,
+    HasGroupPermissionDirective],
 })
 export class DirectivesModule {}

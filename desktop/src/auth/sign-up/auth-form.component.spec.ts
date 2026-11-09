@@ -37,8 +37,9 @@ describe('AuthForm', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [AuthForm, FeatureDirective],
-    imports: [ButtonModule,
+    declarations: [AuthForm],
+    imports: [FeatureDirective,
+        ButtonModule,
         InputModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, FeatureConfigState]),

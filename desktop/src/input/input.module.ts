@@ -11,7 +11,6 @@ import { NgxMaskDirective, provideNgxMask } from "ngx-mask";
 import { InputComponent } from "./input/input.component";
 
 @NgModule({
-  declarations: [InputComponent],
   imports: [
     CommonModule,
     MatButtonModule,
@@ -23,6 +22,7 @@ import { InputComponent } from "./input/input.component";
     MatTooltipModule,
     NgxMaskDirective,
     ReactiveFormsModule,
+    InputComponent,
   ],
   exports: [InputComponent],
   providers: [provideNgxMask()],

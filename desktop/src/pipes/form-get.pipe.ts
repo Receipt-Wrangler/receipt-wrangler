@@ -1,10 +1,7 @@
 import { Pipe, PipeTransform } from "@angular/core";
 import { FormControl, FormGroup } from "@angular/forms";
 
-@Pipe({
-    name: "formGet",
-    standalone: false
-})
+@Pipe({ name: "formGet" })
 export class FormGetPipe implements PipeTransform {
   transform(form: FormGroup, path: string): FormControl {
     const result = form.get(path);

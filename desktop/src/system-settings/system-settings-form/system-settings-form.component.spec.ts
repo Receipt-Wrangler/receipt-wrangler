@@ -30,9 +30,10 @@ describe("SystemSettingsFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [SystemSettingsFormComponent, CustomCurrencyPipe, TaskQueueFormControlPipe],
+    declarations: [SystemSettingsFormComponent, TaskQueueFormControlPipe],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [AutocompleteModule,
+    imports: [CustomCurrencyPipe,
+        AutocompleteModule,
         CheckboxModule,
         InputModule,
         NgxsModule.forRoot([SystemSettingsState, AuthState]),

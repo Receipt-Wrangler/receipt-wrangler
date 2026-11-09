@@ -17,8 +17,7 @@ import { StatusPipe } from "./status.pipe";
 import { UserPipe } from "./user.pipe";
 
 @NgModule({
-  declarations: [
-    CustomCurrencyPipe,
+  imports: [CommonModule, AppDatePipe, CustomCurrencyPipe,
     CustomFieldTypePipe,
     DurationPipe,
     FormArrayLastPipe,
@@ -31,9 +30,7 @@ import { UserPipe } from "./user.pipe";
     NamePipe,
     RoleNamePipe,
     StatusPipe,
-    UserPipe,
-  ],
-  imports: [CommonModule, AppDatePipe],
+    UserPipe],
   exports: [
     AppDatePipe,
     CustomCurrencyPipe,

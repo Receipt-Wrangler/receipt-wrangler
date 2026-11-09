@@ -3,8 +3,7 @@ import { CommonModule } from '@angular/common';
 import { BaseInputComponent } from './base-input/base-input.component';
 
 @NgModule({
-  declarations: [BaseInputComponent],
-  imports: [CommonModule],
+  imports: [CommonModule, BaseInputComponent],
   exports: [BaseInputComponent],
 })
 export class BaseInputModule {}

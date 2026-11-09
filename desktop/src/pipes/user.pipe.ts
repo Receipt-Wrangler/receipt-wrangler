@@ -3,10 +3,7 @@ import { Store } from "@ngxs/store";
 import { User } from "../open-api";
 import { UserState } from "../store";
 
-@Pipe({
-    name: "user",
-    standalone: false
-})
+@Pipe({ name: "user" })
 export class UserPipe implements PipeTransform {
   constructor(private store: Store) {}
 

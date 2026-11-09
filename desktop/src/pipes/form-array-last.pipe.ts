@@ -1,10 +1,7 @@
 import { Pipe, PipeTransform } from '@angular/core';
 import { FormArray, FormControl, FormGroup } from '@angular/forms';
 
-@Pipe({
-    name: 'formArrayLast',
-    standalone: false
-})
+@Pipe({ name: 'formArrayLast' })
 export class FormArrayLastPipe implements PipeTransform {
   public transform(array: FormArray): any {
     if (array.length === 0) {

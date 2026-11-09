@@ -25,9 +25,10 @@ describe("UserPreferencesComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [UserPreferencesComponent, InputReadonlyPipe],
+      declarations: [UserPreferencesComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
+        InputReadonlyPipe,
         ReactiveFormsModule,
         StoreModule,
         MatSnackBarModule,

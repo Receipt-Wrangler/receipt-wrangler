@@ -28,7 +28,6 @@ describe("InputComponent", () => {
     };
 
     await TestBed.configureTestingModule({
-      declarations: [InputComponent],
       imports: [
         CommonModule,
         MatButtonModule,
@@ -40,6 +39,7 @@ describe("InputComponent", () => {
         ReactiveFormsModule,
         NgxMaskDirective,
         NgxsModule.forRoot([SystemSettingsState]),
+        InputComponent,
       ],
       providers: [
         provideNgxMask(),

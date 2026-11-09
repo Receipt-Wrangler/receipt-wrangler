@@ -9,7 +9,6 @@ import { BaseButtonComponent } from "./base-button/base-button.component";
 import { ButtonComponent } from "./button/button.component";
 
 @NgModule({
-  declarations: [ButtonComponent, BaseButtonComponent],
   imports: [
     CommonModule,
     MatBadgeModule,
@@ -17,6 +16,7 @@ import { ButtonComponent } from "./button/button.component";
     MatIconModule,
     MatTooltipModule,
     RouterModule,
+    ButtonComponent, BaseButtonComponent,
   ],
   exports: [ButtonComponent],
 })
