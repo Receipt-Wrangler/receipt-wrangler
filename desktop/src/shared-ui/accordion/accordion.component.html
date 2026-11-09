@@ -2,32 +2,33 @@
   displayMode="flat"
   [multi]="true"
 >
-  <mat-expansion-panel
-    *ngFor="let panel of panels(); let i = index;"
-    hideToggle
-  >
-    <mat-expansion-panel-header>
-      <mat-panel-title>
-        <strong>{{ panel.title }} </strong>
-      </mat-panel-title>
-      <mat-panel-description>
-        @if (panel.description) {
-          {{ panel.description }}
-        }
-        @if (panel.descriptionTemplate) {
-          <ng-template
-            [ngTemplateOutlet]="$any(panel.descriptionTemplate)"
-            [ngTemplateOutletContext]="{ index: i }"
-          >
-          </ng-template>
-        }
-      </mat-panel-description>
-    </mat-expansion-panel-header>
-    <ng-template
-      [ngTemplateOutlet]="panel.content"
-      [ngTemplateOutletContext]="{ index: i }"
+  @for (panel of panels(); track panel; let i = $index) {
+    <mat-expansion-panel
+      hideToggle
     >
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <strong>{{ panel.title }} </strong>
+        </mat-panel-title>
+        <mat-panel-description>
+          @if (panel.description) {
+            {{ panel.description }}
+          }
+          @if (panel.descriptionTemplate) {
+            <ng-template
+              [ngTemplateOutlet]="$any(panel.descriptionTemplate)"
+              [ngTemplateOutletContext]="{ index: i }"
+            >
+            </ng-template>
+          }
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      <ng-template
+        [ngTemplateOutlet]="panel.content"
+        [ngTemplateOutletContext]="{ index: i }"
+      >
 
-    </ng-template>
-  </mat-expansion-panel>
+      </ng-template>
+    </mat-expansion-panel>
+  }
 </mat-accordion>

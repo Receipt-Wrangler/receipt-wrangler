@@ -3,51 +3,52 @@
   @if (array().length === 0) {
     <div class="mb-2">{{ nothingToDisplayText() }}</div>
   }
-  <mat-list-item
-    class="w-100 h-100"
-    *ngFor="let item of array(); let index = index; let last = last"
-    role="listitem"
-  >
-    <div class="d-flex align-items-center justify-content-center">
-      <div class="w-100 mb-2">
-        <ng-template
-          [ngTemplateOutlet]="
-            editingIndex === index ? itemEditTemplate() : itemDisplayTemplate()
-          "
-          [ngTemplateOutletContext]="{
-            index: index
-          }"
-        ></ng-template>
+  @for (item of array(); track item; let index = $index, last = $last) {
+    <mat-list-item
+      class="w-100 h-100"
+      role="listitem"
+    >
+      <div class="d-flex align-items-center justify-content-center">
+        <div class="w-100 mb-2">
+          <ng-template
+            [ngTemplateOutlet]="
+              editingIndex === index ? itemEditTemplate() : itemDisplayTemplate()
+            "
+            [ngTemplateOutletContext]="{
+              index: index
+            }"
+          ></ng-template>
+        </div>
+        @if (editingIndex !== index && !disabled()) {
+          <div>
+            <app-edit-button
+              color="accent"
+              (clicked)="onItemEditButtonClicked(index)"
+            ></app-edit-button>
+            <app-delete-button
+              (clicked)="onItemDeleteButtonClicked(index)"
+            ></app-delete-button>
+          </div>
+        }
+        @if (editingIndex === index) {
+          <div class="d-flex ms-2 w-25">
+            <app-submit-button
+              tooltip="Done"
+              [onlyIcon]="true"
+              [type]="'button'"
+              (clicked)="onDoneButtonClicked(index)"
+            ></app-submit-button>
+            <app-cancel-button
+              (clicked)="onItemCancelButtonClicked(index)"
+            ></app-cancel-button>
+          </div>
+        }
       </div>
-      @if (editingIndex !== index && !disabled()) {
-        <div>
-          <app-edit-button
-            color="accent"
-            (clicked)="onItemEditButtonClicked(index)"
-          ></app-edit-button>
-          <app-delete-button
-            (clicked)="onItemDeleteButtonClicked(index)"
-          ></app-delete-button>
-        </div>
+      @if (!last) {
+        <hr />
       }
-      @if (editingIndex === index) {
-        <div class="d-flex ms-2 w-25">
-          <app-submit-button
-            tooltip="Done"
-            [onlyIcon]="true"
-            [type]="'button'"
-            (clicked)="onDoneButtonClicked(index)"
-          ></app-submit-button>
-          <app-cancel-button
-            (clicked)="onItemCancelButtonClicked(index)"
-          ></app-cancel-button>
-        </div>
-      }
-    </div>
-    @if (!last) {
-      <hr />
-    }
-  </mat-list-item>
+    </mat-list-item>
+  }
   <div class="w-50">
     <app-button
       color="accent"

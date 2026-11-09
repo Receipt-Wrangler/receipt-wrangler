@@ -5,34 +5,35 @@
     </p>
 
     <div class="column-list" cdkDropList (cdkDropListDropped)="drop($event)">
-      <div
-        class="column-item"
-        *ngFor="let column of columns"
-        cdkDrag
-        [class.disabled]="!column.visible"
-      >
-        <div class="drag-handle" cdkDragHandle>
-          <mat-icon>drag_handle</mat-icon>
-        </div>
-
-        <mat-checkbox
-          [checked]="column.visible"
-          [disabled]="!canToggleOff(column)"
-          (change)="toggleColumnVisibility(column)"
-          class="column-checkbox"
+      @for (column of columns; track column) {
+        <div
+          class="column-item"
+          cdkDrag
+          [class.disabled]="!column.visible"
         >
-          {{ column.displayName }}
-        </mat-checkbox>
+          <div class="drag-handle" cdkDragHandle>
+            <mat-icon>drag_handle</mat-icon>
+          </div>
 
-        <!--
-          Outside the checkbox label on purpose: inside it, the badge would join
-          the checkbox's accessible name ("Tip Custom") and every locator that
-          picks a column by its field name would stop resolving.
-        -->
-        @if (column.isCustom) {
-          <app-badge [text]="customFieldBadge" data-testid="column-config-custom"></app-badge>
-        }
-      </div>
+          <mat-checkbox
+            [checked]="column.visible"
+            [disabled]="!canToggleOff(column)"
+            (change)="toggleColumnVisibility(column)"
+            class="column-checkbox"
+          >
+            {{ column.displayName }}
+          </mat-checkbox>
+
+          <!--
+            Outside the checkbox label on purpose: inside it, the badge would join
+            the checkbox's accessible name ("Tip Custom") and every locator that
+            picks a column by its field name would stop resolving.
+          -->
+          @if (column.isCustom) {
+            <app-badge [text]="customFieldBadge" data-testid="column-config-custom"></app-badge>
+          }
+        </div>
+      }
     </div>
   </div>
 

@@ -43,68 +43,70 @@
           </mat-panel-description>
         </mat-expansion-panel-header>
 
-        <div *ngFor="let itemData of items(); let i = index" class="item-row">
-          <app-card cardStyle="mb-2">
-            <div content class="d-flex flex-column item-form-container">
-              <div class="d-flex justify-content-end">
-                @if (!(mode | inputReadonly)) {
-                  <app-button
-                    matButtonType="iconButton"
-                    icon="call_split"
-                    tooltip="Split Item"
-                    [disabled]="!canEdit()"
-                    (clicked)="splitItem(itemData)"
-                  ></app-button>
-                  <app-delete-button
-                    tooltip="Remove Item"
-                    [disabled]="!canEdit()"
-                    (clicked)="removeItem(itemData)"
-                  ></app-delete-button>
-                }
-              </div>
-              <div class="row g-0">
-                <app-input
-                  class="col"
-                  #nameField
-                  label="Name"
-                  [inputId]="'name-' + i"
-                  [inputFormControl]="
-                    form() | formGet : 'receiptItems.' + itemData.arrayIndex + '.name'
-                  "
-                  [readonly]="mode | inputReadonly"
-                  (inputBlur)="addInlineItemOnBlur(i)"
-                >
-                </app-input>
-                <app-input
-                  class="col"
-                  label="Amount"
-                  [isCurrency]="true"
-                  [inputFormControl]="
-                    form() | formGet : 'receiptItems.' + itemData.arrayIndex + '.amount'
-                  "
-                  [readonly]="mode | inputReadonly"
-                  (inputBlur)="addInlineItemOnBlur(i)"
-                >
-                </app-input>
-                @if (!selectedGroup()?.groupReceiptSettings?.hideItemCategories) {
-                  <app-category-autocomplete
-                    [categories]="categories()"
-                    [inputFormControl]="form() | formGet : 'receiptItems.' + itemData.arrayIndex + '.categories'"
+        @for (itemData of items(); track itemData; let i = $index) {
+          <div class="item-row">
+            <app-card cardStyle="mb-2">
+              <div content class="d-flex flex-column item-form-container">
+                <div class="d-flex justify-content-end">
+                  @if (!(mode | inputReadonly)) {
+                    <app-button
+                      matButtonType="iconButton"
+                      icon="call_split"
+                      tooltip="Split Item"
+                      [disabled]="!canEdit()"
+                      (clicked)="splitItem(itemData)"
+                    ></app-button>
+                    <app-delete-button
+                      tooltip="Remove Item"
+                      [disabled]="!canEdit()"
+                      (clicked)="removeItem(itemData)"
+                    ></app-delete-button>
+                  }
+                </div>
+                <div class="row g-0">
+                  <app-input
+                    class="col"
+                    #nameField
+                    label="Name"
+                    [inputId]="'name-' + i"
+                    [inputFormControl]="
+                      form() | formGet : 'receiptItems.' + itemData.arrayIndex + '.name'
+                    "
                     [readonly]="mode | inputReadonly"
-                  ></app-category-autocomplete>
-                }
+                    (inputBlur)="addInlineItemOnBlur(i)"
+                  >
+                  </app-input>
+                  <app-input
+                    class="col"
+                    label="Amount"
+                    [isCurrency]="true"
+                    [inputFormControl]="
+                      form() | formGet : 'receiptItems.' + itemData.arrayIndex + '.amount'
+                    "
+                    [readonly]="mode | inputReadonly"
+                    (inputBlur)="addInlineItemOnBlur(i)"
+                  >
+                  </app-input>
+                  @if (!selectedGroup()?.groupReceiptSettings?.hideItemCategories) {
+                    <app-category-autocomplete
+                      [categories]="categories()"
+                      [inputFormControl]="form() | formGet : 'receiptItems.' + itemData.arrayIndex + '.categories'"
+                      [readonly]="mode | inputReadonly"
+                    ></app-category-autocomplete>
+                  }
 
-                @if (!selectedGroup()?.groupReceiptSettings?.hideItemTags) {
-                  <app-tag-autocomplete
-                    [tags]="tags()"
-                    [inputFormControl]="form() | formGet : 'receiptItems.' + itemData.arrayIndex + '.tags'"
-                    [readonly]="mode | inputReadonly"
-                  ></app-tag-autocomplete>
-                }
+                  @if (!selectedGroup()?.groupReceiptSettings?.hideItemTags) {
+                    <app-tag-autocomplete
+                      [tags]="tags()"
+                      [inputFormControl]="form() | formGet : 'receiptItems.' + itemData.arrayIndex + '.tags'"
+                      [readonly]="mode | inputReadonly"
+                    ></app-tag-autocomplete>
+                  }
+                </div>
               </div>
-            </div>
-          </app-card>
-        </div>
+            </app-card>
+          </div>
+        }
       </mat-expansion-panel>
     </mat-accordion>
   }

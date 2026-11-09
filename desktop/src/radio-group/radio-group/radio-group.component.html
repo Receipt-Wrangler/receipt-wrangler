@@ -1,5 +1,7 @@
 <mat-radio-group aria-label="Select an option" [formControl]="inputFormControl()">
-  <mat-radio-button *ngFor="let data of radioButtonData()" [value]="data.value">{{
-    data.displayValue
-  }}</mat-radio-button>
+  @for (data of radioButtonData(); track data) {
+    <mat-radio-button [value]="data.value">{{
+      data.displayValue
+    }}</mat-radio-button>
+  }
 </mat-radio-group>
