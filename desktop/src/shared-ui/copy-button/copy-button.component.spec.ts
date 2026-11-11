@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { provideZonelessChangeDetection } from "@angular/core";
-import { ButtonModule } from "../../button";
 import { CopyButtonComponent } from "./copy-button.component";
 
 describe("CopyButtonComponent", () => {
@@ -9,7 +8,7 @@ describe("CopyButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ButtonModule, CopyButtonComponent],
+      imports: [CopyButtonComponent],
       providers: [provideZonelessChangeDetection()],
     }).compileComponents();
 

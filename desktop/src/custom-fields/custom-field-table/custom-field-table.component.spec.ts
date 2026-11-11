@@ -10,16 +10,11 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
-import { ButtonModule } from "../../button";
-import { DirectivesModule } from "../../directives/directives.module";
 import { FormMode } from "../../enums/form-mode.enum";
 import { ApiModule, CustomField, PagedDataDataInner, Permission } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { AuthState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { CustomFieldTableState } from "../../store/custom-field-table.state";
-import { TableModule } from "../../table/table.module";
 
 import { CustomFieldTableComponent } from "./custom-field-table.component";
 
@@ -58,15 +53,10 @@ describe("CustomFieldTableComponent", () => {
     await TestBed.configureTestingModule({
       imports: [
         ApiModule,
-        ButtonModule,
-        DirectivesModule,
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, CustomFieldTableState]),
         NoopAnimationsModule,
-        PipesModule,
-        SharedUiModule,
-        TableModule,
         CustomFieldTableComponent,
       ],
       providers: [

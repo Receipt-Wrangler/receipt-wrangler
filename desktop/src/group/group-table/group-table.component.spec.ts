@@ -10,10 +10,6 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
-import { SharedUiModule } from "src/shared-ui/shared-ui.module";
-import { TableModule } from "src/table/table.module";
-import { ButtonModule } from "../../button";
-import { DirectivesModule } from "../../directives/directives.module";
 import { ApiModule, Group, GroupsService, Permission } from "../../open-api";
 import { AuthState, GroupState, SetGroups } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
@@ -35,15 +31,11 @@ describe("GroupTableComponent", () => {
     await TestBed.configureTestingModule({
       imports: [
         ApiModule,
-        ButtonModule,
-        DirectivesModule,
         MatDialogModule,
         MatSnackBarModule,
         AppDatePipe,
         NgxsModule.forRoot([AuthState, GroupState, GroupTableState, SystemSettingsState]),
         NoopAnimationsModule,
-        SharedUiModule,
-        TableModule,
         GroupTableComponent,
       ],
       providers: [

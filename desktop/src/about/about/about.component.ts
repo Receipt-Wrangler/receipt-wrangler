@@ -3,9 +3,11 @@ import { Component, inject } from "@angular/core";
 import { Store } from "@ngxs/store";
 import { About } from "../../open-api/index";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { AboutState } from "../../store/about.state";
 import { FeatureConfigState } from "../../store/feature-config.state";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { LoginQrComponent } from "../../shared-ui/login-qr/login-qr.component";
 
 interface Link {
   url: string;
@@ -17,7 +19,9 @@ interface Link {
     imports: [
         AppDatePipe,
         CommonModule,
-        SharedUiModule
+        DialogComponent,
+        FormSectionComponent,
+        LoginQrComponent
     ],
     templateUrl: "./about.component.html",
     styleUrl: "./about.component.scss"

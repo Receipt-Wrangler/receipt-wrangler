@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatTableModule } from "@angular/material/table";
 import { ActivatedRoute } from "@angular/router";
-import { ButtonModule } from "../../button";
 import { DeleteButtonComponent } from "./delete-button.component";
 
 describe("DeleteButtonComponent", () => {
@@ -10,7 +9,7 @@ describe("DeleteButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ButtonModule, MatTableModule, DeleteButtonComponent],
+      imports: [MatTableModule, DeleteButtonComponent],
       providers: [
         {
           provide: ActivatedRoute,

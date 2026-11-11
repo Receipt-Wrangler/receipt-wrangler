@@ -16,7 +16,6 @@ import { rxResource } from "@angular/core/rxjs-interop";
 import { MatDialog } from "@angular/material/dialog";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
 import { Store } from "@ngxs/store";
-import { ButtonModule } from "../../button";
 import { ReceiptService } from "../../open-api";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { ReceiptHistoryEntryComponent } from "./receipt-history-entry/receipt-history-entry.component";
@@ -25,6 +24,7 @@ import {
   groupHistoryByDay,
   historySummary,
 } from "./receipt-history.utils";
+import { ButtonComponent } from "../../button/button/button.component";
 
 let nextDrawerId = 0;
 
@@ -47,7 +47,7 @@ let nextDrawerId = 0;
 @Component({
   selector: "app-receipt-history-drawer",
   standalone: true,
-  imports: [ButtonModule, MatProgressSpinnerModule, ReceiptHistoryEntryComponent],
+  imports: [ButtonComponent, MatProgressSpinnerModule, ReceiptHistoryEntryComponent],
   templateUrl: "./receipt-history-drawer.component.html",
   styleUrl: "./receipt-history-drawer.component.scss",
   host: {

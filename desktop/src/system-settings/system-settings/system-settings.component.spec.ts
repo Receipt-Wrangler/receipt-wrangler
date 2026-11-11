@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { Permission } from "../../open-api";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { AuthState } from "../../store/auth.state";
 import { SetPermissions } from "../../store/auth.state.actions";
 
@@ -16,7 +15,7 @@ describe("SystemSettingsComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SharedUiModule, NgxsModule.forRoot([AuthState]), SystemSettingsComponent],
+      imports: [NgxsModule.forRoot([AuthState]), SystemSettingsComponent],
       providers: [
         provideZonelessChangeDetection(),
         {

@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute } from "@angular/router";
-import { ButtonModule } from "../../button";
 import { BackButtonComponent } from "./back-button.component";
 
 describe("BackButtonComponent", () => {
@@ -9,7 +8,7 @@ describe("BackButtonComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ButtonModule, BackButtonComponent],
+      imports: [BackButtonComponent],
       providers: [
         {
           provide: ActivatedRoute,

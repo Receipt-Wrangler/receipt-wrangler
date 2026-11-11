@@ -10,9 +10,7 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { Router } from "@angular/router";
 import { RouterTestingModule } from "@angular/router/testing";
 import { NgxsModule, Store } from "@ngxs/store";
-import { SharedUiModule } from "src/shared-ui/shared-ui.module";
 import { LayoutState } from "src/store/layout.state";
-import { DirectivesModule } from "../../directives/directives.module";
 import { ApiModule, Permission } from "../../open-api";
 import { AuthState, FeatureConfigState, GroupState, SetSelectedGroupId } from "../../store";
 import { SetAuthState, SetPermissions } from "../../store/auth.state.actions";
@@ -48,13 +46,11 @@ describe("SidebarComponent", () => {
     await TestBed.configureTestingModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [NgxsModule.forRoot([AuthState, LayoutState, GroupState, FeatureConfigState]),
-        DirectivesModule,
         MatMenuModule,
         MatSnackBarModule,
         MatSidenavModule,
         NoopAnimationsModule,
         RouterTestingModule,
-        SharedUiModule,
         ApiModule, SidebarComponent],
     providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi())]
 }).compileComponents();

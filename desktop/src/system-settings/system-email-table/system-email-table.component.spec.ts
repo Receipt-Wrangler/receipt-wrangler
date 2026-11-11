@@ -6,9 +6,7 @@ import {ActivatedRoute} from "@angular/router";
 import {NgxsModule} from "@ngxs/store";
 import {of} from "rxjs";
 import {ConfirmationDialogComponent} from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
-import {SharedUiModule} from "../../shared-ui/shared-ui.module";
 import {SystemEmailTableState} from "../../store/system-email-table.state";
-import {TableModule} from "../../table/table.module";
 
 import {SystemEmailTableComponent} from "./system-email-table.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
@@ -19,9 +17,8 @@ describe("SystemEmailsComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [SharedUiModule,
+    imports: [
         NgxsModule.forRoot([SystemEmailTableState]),
-        TableModule,
         NoopAnimationsModule, SystemEmailTableComponent],
     providers: [{
             provide: ActivatedRoute,

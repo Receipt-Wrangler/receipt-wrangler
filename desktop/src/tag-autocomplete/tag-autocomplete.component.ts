@@ -1,15 +1,13 @@
 import { Component, input } from "@angular/core";
 import { FormControl } from "@angular/forms";
-import { AutocompleteModule } from "../autocomplete/autocomplete.module";
 import { Tag } from "../open-api/index";
-import { PipesModule } from "../pipes/index";
+import { AutocomleteComponent } from "../autocomplete/autocomlete/autocomlete.component";
 
 @Component({
     selector: "app-tag-autocomplete",
     standalone: true,
     imports: [
-        AutocompleteModule,
-        PipesModule
+    AutocomleteComponent
     ],
     templateUrl: "./tag-autocomplete.component.html",
     styleUrl: "./tag-autocomplete.component.scss"

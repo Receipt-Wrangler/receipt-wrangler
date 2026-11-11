@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Receipt Wrangler is a full-stack receipt management and splitting application with OCR-powered scanning, AI-assisted data extraction, and multi-user group management. This is a **monorepo** containing three main components:
 
 - **api/** - Go backend service (port 8081)
-- **desktop/** - Angular 19 web interface (port 4200 dev, port 80 production)
+- **desktop/** - Angular 21 web interface (port 4200 dev, port 80 production)
 - **mobile/** - Flutter cross-platform mobile app
 - **docker/** - Monolith Docker build configuration
 
@@ -30,7 +30,7 @@ Each component has its own CLAUDE.md with detailed component-specific guidance. 
 
 ### Technology Stack
 - **Backend**: Go 1.26 with Chi router, GORM ORM, Asynq background jobs
-- **Frontend**: Angular 19 with NGXS state management, Material + Bootstrap UI
+- **Frontend**: Angular 21 (standalone components, no NgModules) with NGXS state management, Material + Bootstrap UI
 - **Mobile**: Flutter with Provider state management, go_router navigation
 - **Infrastructure**: Docker, nginx, PostgreSQL/MySQL/SQLite
 

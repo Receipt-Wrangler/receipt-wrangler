@@ -4,11 +4,11 @@ import { Chart, ChartConfiguration, ChartData } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { take, tap } from "rxjs";
 import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
-import { PipesModule } from "../../pipes/pipes.module";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { ChartGrouping, PieChartData, PieChartDataCommand, Widget, WidgetService } from "../../open-api";
 import { RECEIPT_DATE_FILTER_KEYS } from "../../constants/receipt-filter-fields.constant";
 import { toDateWireFilter } from "../../utils/date-wire-filter";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { PieChartUiComponent } from "../../shared-ui/pie-chart/pie-chart.component";
 
 // Register the datalabels plugin
 Chart.register(ChartDataLabels);
@@ -18,7 +18,7 @@ Chart.register(ChartDataLabels);
   templateUrl: "./pie-chart.component.html",
   styleUrls: ["./pie-chart.component.scss"],
   standalone: true,
-  imports: [CommonModule, SharedUiModule, PipesModule],
+  imports: [CommonModule, CardComponent, PieChartUiComponent],
   providers: [CurrencyPipe, CustomCurrencyPipe],
 })
 export class PieChartComponent implements OnInit, OnChanges {

@@ -8,11 +8,10 @@ import { Store } from "@ngxs/store";
 import { NgbPopoverModule } from "@ng-bootstrap/ng-bootstrap";
 import { of } from "rxjs";
 import { ToggleIsSidebarOpen } from "src/store/layout.state.actions";
-import { DirectivesModule } from "../../directives/directives.module";
 import { ApiModule, NotificationsService } from "../../open-api";
 import { SetAuthState, SetPermissions } from "../../store/auth.state.actions";
 import { SetSelectedGroupId } from "../../store/group.state.actions";
-import { StoreModule } from "../../store/store.module";
+import { provideTestStore } from "../../store/test-store";
 import { HeaderComponent } from "./header.component";
 import { provideRouter } from "@angular/router";
 
@@ -48,18 +47,17 @@ describe("HeaderComponent", () => {
     store.dispatch(new SetPermissions([], { 1: ["group.dashboards.read"] }));
 
   beforeEach(async () => {
-    // StoreModule persists auth (incl. permissions) to localStorage; clear it so
+    // The test store persists auth (incl. permissions) to localStorage; clear it so
     // granted permissions don't leak across tests in this file.
     localStorage.clear();
 
     await TestBed.configureTestingModule({
     imports: [ApiModule,
-        DirectivesModule,
         MatDialogModule,
         MatSnackBarModule,
         NgbPopoverModule,
-        StoreModule, HeaderComponent,],
-    providers: [provideRouter([]), provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()],
+        HeaderComponent,],
+    providers: [provideTestStore(), provideRouter([]), provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()],
     schemas: [NO_ERRORS_SCHEMA],
 }).compileComponents();
 

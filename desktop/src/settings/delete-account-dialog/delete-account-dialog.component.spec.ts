@@ -7,8 +7,6 @@ import {
   DeleteAccountDialogComponent,
   DeleteAccountDialogData,
 } from "./delete-account-dialog.component";
-import { ButtonModule } from "src/button";
-import { PipesModule } from "src/pipes/pipes.module";
 import { CancelButtonComponent } from "src/shared-ui/cancel-button/cancel-button.component";
 import { provideStore } from "@ngxs/store";
 import { provideNgxMask } from "ngx-mask";
@@ -38,7 +36,7 @@ describe("DeleteAccountDialogComponent", () => {
 
     await TestBed.configureTestingModule({
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [CancelButtonComponent, ButtonModule, ReactiveFormsModule, PipesModule, DeleteAccountDialogComponent],
+      imports: [CancelButtonComponent, ReactiveFormsModule, DeleteAccountDialogComponent],
       providers,
     }).compileComponents();
 

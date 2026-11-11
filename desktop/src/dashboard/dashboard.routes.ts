@@ -1,5 +1,4 @@
-import { NgModule } from "@angular/core";
-import { RouterModule, Routes } from "@angular/router";
+import { Routes } from "@angular/router";
 import { GroupGuard } from "src/guards/group.guard";
 import { DashboardComponent } from "./dashboard/dashboard.component";
 import { GroupDashboardsComponent } from "./group-dashboards/group-dashboards.component";
@@ -7,7 +6,7 @@ import { dashboardGuard } from "./guards/dashboard.guard";
 import { groupDashboardReadGuard } from "./guards/group-dashboard-read.guard";
 import { dashboardResolverFn } from "./resolvers/dashboard.resolver";
 
-const routes: Routes = [
+export const dashboardRoutes: Routes = [
   {
     path: "group/:groupId",
     component: GroupDashboardsComponent,
@@ -32,9 +31,3 @@ const routes: Routes = [
     pathMatch: "full",
   },
 ];
-
-@NgModule({
-  imports: [RouterModule.forChild(routes)],
-  exports: [RouterModule],
-})
-export class DashboardRoutingModule {}

@@ -10,11 +10,9 @@ import { of } from "rxjs";
 import { FormConfig } from "src/interfaces/form-config.interface";
 import { InputReadonlyPipe } from "src/pipes/input-readonly.pipe";
 import { EditableListComponent } from "src/shared-ui/editable-list/editable-list.component";
-import { SharedUiModule } from "src/shared-ui/shared-ui.module";
 import { Permission, UserPreferences, UserPreferencesService, UserShortcut } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { SetPermissions } from "../../store/auth.state.actions";
-import { StoreModule } from "../../store/store.module";
+import { provideTestStore } from "../../store/test-store";
 import { UserShortcutComponent } from "../user-shortcut/user-shortcut.component";
 
 import { UserPreferencesComponent } from "./user-preferences.component";
@@ -29,13 +27,11 @@ describe("UserPreferencesComponent", () => {
       imports: [
         InputReadonlyPipe,
         ReactiveFormsModule,
-        StoreModule,
         MatSnackBarModule,
-        PipesModule,
-        SharedUiModule,
         UserPreferencesComponent
       ],
       providers: [
+        provideTestStore(),
         UserPreferencesService,
         {
           provide: ActivatedRoute,

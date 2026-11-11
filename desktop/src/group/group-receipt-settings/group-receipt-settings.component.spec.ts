@@ -15,11 +15,9 @@ import {
   QuickScanDefaultPaidByType,
   ReceiptSummaryPosition,
 } from "../../open-api";
-import { PipesModule } from "../../pipes/index";
 import { SnackbarService } from "../../services";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { SetPermissions } from "../../store/auth.state.actions";
-import { StoreModule } from "../../store/store.module";
+import { provideTestStore } from "../../store/test-store";
 import { GroupReceiptSettingsComponent } from "./group-receipt-settings.component";
 
 describe("GroupReceiptSettingsComponent", () => {
@@ -101,12 +99,10 @@ describe("GroupReceiptSettingsComponent", () => {
     await TestBed.configureTestingModule({
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
-        SharedUiModule,
-        StoreModule,
-        PipesModule,
         GroupReceiptSettingsComponent
       ],
       providers: [
+        provideTestStore(),
         FormBuilder,
         GroupsService,
         { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },

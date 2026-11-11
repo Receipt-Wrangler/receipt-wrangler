@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { Subject } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
-import { PipesModule } from "src/pipes/pipes.module";
 import { KEYBOARD_SHORTCUT_ACTIONS } from "../../constants/keyboard-shortcuts.constant";
 import { Group } from "../../open-api";
 import { KeyboardShortcutService } from "../../services/keyboard-shortcut.service";
@@ -30,7 +29,7 @@ describe("ItemAddFormComponent", () => {
 
     await TestBed.configureTestingModule({
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [ReactiveFormsModule, PipesModule, ItemAddFormComponent],
+      imports: [ReactiveFormsModule, ItemAddFormComponent],
       providers: [
         provideNgxMask(),
         provideStore([]),

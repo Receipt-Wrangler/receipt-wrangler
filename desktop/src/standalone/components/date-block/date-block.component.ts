@@ -1,10 +1,10 @@
 import { CommonModule } from "@angular/common";
 import { Component, input } from "@angular/core";
-import { PipesModule } from "../../../pipes/index";
+import { AppDatePipe } from "../../../pipes/app-date.pipe";
 
 @Component({
     selector: "app-date-block",
-    imports: [CommonModule, PipesModule],
+    imports: [CommonModule, AppDatePipe],
     templateUrl: "./date-block.component.html",
     styleUrl: "./date-block.component.scss"
 })

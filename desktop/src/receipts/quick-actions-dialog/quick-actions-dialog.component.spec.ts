@@ -6,7 +6,6 @@ import { MatSnackBar } from "@angular/material/snack-bar";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
 import { User } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services/snackbar.service";
 import { QuickActionsDialogComponent } from "./quick-actions-dialog.component";
 import { UserState } from "../../store/user.state";
@@ -31,7 +30,7 @@ describe("QuickActionsDialogComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [NgxsModule.forRoot([UserState]), PipesModule, ReactiveFormsModule, QuickActionsDialogComponent],
+      imports: [NgxsModule.forRoot([UserState]), ReactiveFormsModule, QuickActionsDialogComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
         { provide: MatDialogRef, useValue: mockDialogRef },

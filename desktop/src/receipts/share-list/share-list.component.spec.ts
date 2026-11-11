@@ -8,7 +8,6 @@ import { MatExpansionPanel } from "@angular/material/expansion";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { FormMode } from "src/enums/form-mode.enum";
-import { PipesModule } from "src/pipes/pipes.module";
 import { InputComponent } from "../../input";
 import { Category, Group, Item, ItemStatus, Receipt, Tag, User } from "../../open-api";
 import { AuthState, UserState } from "../../store/index";
@@ -82,7 +81,7 @@ describe("ShareListComponent", () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [CurrencyPipe, PipesModule, NgxsModule.forRoot([AuthState, UserState, SystemSettingsState]), ShareListComponent, UserTotalWithPercentagePipe],
+      imports: [CurrencyPipe, NgxsModule.forRoot([AuthState, UserState, SystemSettingsState]), ShareListComponent, UserTotalWithPercentagePipe],
       providers: [
         provideNgxMask(),
         {

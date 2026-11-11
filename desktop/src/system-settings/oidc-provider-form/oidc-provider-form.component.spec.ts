@@ -8,15 +8,11 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { RouterTestingModule } from "@angular/router/testing";
 import { NgxsModule } from "@ngxs/store";
 import { config, of, Subject, throwError } from "rxjs";
-import { ButtonModule } from "../../button";
-import { CheckboxModule } from "../../checkbox/checkbox.module";
 import { FormMode } from "../../enums/form-mode.enum";
-import { InputModule } from "../../input";
 import { ApiModule, OidcProviderService, OidcProviderView } from "../../open-api";
-import { PipesModule } from "../../pipes/pipes.module";
 import { SnackbarService } from "../../services/snackbar.service";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { OidcProviderFormComponent } from "./oidc-provider-form.component";
+import { provideNgxMask } from "ngx-mask";
 
 describe("OidcProviderFormComponent", () => {
   let component: OidcProviderFormComponent;
@@ -41,19 +37,15 @@ describe("OidcProviderFormComponent", () => {
     await TestBed.configureTestingModule({
       imports: [
         ApiModule,
-        ButtonModule,
-        CheckboxModule,
-        InputModule,
         MatSnackBarModule,
         NgxsModule.forRoot([]),
         NoopAnimationsModule,
-        PipesModule,
         ReactiveFormsModule,
         RouterTestingModule,
-        SharedUiModule,
         OidcProviderFormComponent,
       ],
       providers: [
+        provideNgxMask(),
         SnackbarService,
         { provide: MatDialogRef, useValue: { close: jest.fn() } },
         provideHttpClient(withInterceptorsFromDi()),

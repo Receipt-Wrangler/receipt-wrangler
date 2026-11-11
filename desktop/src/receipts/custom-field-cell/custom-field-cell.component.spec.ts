@@ -1,7 +1,6 @@
 import { CommonModule, CurrencyPipe } from "@angular/common";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { NgxsModule, Store } from "@ngxs/store";
-import { PipesModule } from "../../pipes/pipes.module";
 import {
   CurrencySeparator,
   CurrencySymbolPosition,
@@ -44,7 +43,7 @@ describe("CustomFieldCellComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CommonModule, PipesModule, NgxsModule.forRoot([SystemSettingsState]), CustomFieldCellComponent],
+      imports: [CommonModule, NgxsModule.forRoot([SystemSettingsState]), CustomFieldCellComponent],
       providers: [CurrencyPipe],
     }).compileComponents();
 

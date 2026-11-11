@@ -8,13 +8,11 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { of } from "rxjs";
-import { PipesModule } from "src/pipes/pipes.module";
 import { SYSTEM_RAN_BY_OPTION_ID } from "src/constants";
 import { buildDefaultSystemTaskFilter } from "src/store/system-task-table.state";
 import { SetSystemTaskFilter } from "src/store/system-task-table.state.actions";
-import { InputModule } from "../../input";
 import { FilterOperation } from "../../open-api";
-import { StoreModule } from "../../store/store.module";
+import { provideTestStore } from "../../store/test-store";
 import { applyFormCommand } from "../../utils/index";
 import { buildSystemTaskFilterForm } from "../../utils/system-task-filter";
 import { SystemTaskFilterComponent } from "./system-task-filter.component";
@@ -56,15 +54,13 @@ describe("SystemTaskFilterComponent", () => {
     await TestBed.configureTestingModule({
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
-        InputModule,
         MatDialogModule,
         NoopAnimationsModule,
-        PipesModule,
         ReactiveFormsModule,
-        StoreModule,
         SystemTaskFilterComponent, NoopComponent,
       ],
       providers: [
+        provideTestStore(),
         provideRouter([]),
         { provide: MatDialogRef, useValue: { close: () => {} } },
         provideHttpClient(withInterceptorsFromDi()),

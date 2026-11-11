@@ -5,7 +5,6 @@ import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule } from "@ngxs/store";
-import { PipesModule } from "src/pipes/pipes.module";
 import { ApiModule } from "../../open-api";
 import { ResetPasswordComponent } from "./reset-password.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
@@ -20,11 +19,9 @@ describe("ResetPasswordComponent", () => {
     await TestBed.configureTestingModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
-        PipesModule,
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([]),
-        PipesModule,
         ReactiveFormsModule, ResetPasswordComponent],
     providers: [provideRouter([]), provideNgxMask(), { provide: MatDialogRef, useValue: {} }, provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 }).compileComponents();

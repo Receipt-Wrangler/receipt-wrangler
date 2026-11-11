@@ -9,7 +9,6 @@ import { ActivatedRoute } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
 import { of } from "rxjs";
 import { ApiModule, UserService } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { UserState } from "../../store";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { CardComponent } from "../card/card.component";
@@ -25,7 +24,7 @@ describe("SummaryCardComponent", () => {
         MatCardModule,
         MatListModule,
         NgxsModule.forRoot([UserState, SystemSettingsState]),
-        PipesModule, SummaryCardComponent, CardComponent],
+        SummaryCardComponent, CardComponent],
       providers: [
         CurrencyPipe,
         provideZonelessChangeDetection(),

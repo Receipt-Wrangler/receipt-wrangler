@@ -5,7 +5,6 @@ import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogModule, MatDialogRef } from "@angular/material/dialog";
 import { NgxsModule } from "@ngxs/store";
 import { ImportType } from "../../open-api";
-import { PipesModule } from "../../pipes";
 
 import { ImportFormComponent } from "./import-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
@@ -20,7 +19,6 @@ describe("ImportFormComponent", () => {
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ReactiveFormsModule,
         MatDialogModule,
-        PipesModule,
         NgxsModule.forRoot([]), ImportFormComponent],
     providers: [
         provideRouter([]),

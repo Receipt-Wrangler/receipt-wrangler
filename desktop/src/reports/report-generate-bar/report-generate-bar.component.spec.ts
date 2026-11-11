@@ -5,7 +5,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder, FormGroup } from "@angular/forms";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { provideRouter } from "@angular/router";
-import { ButtonModule } from "../../button/button.module";
 import { ReportGenerateBarComponent } from "./report-generate-bar.component";
 
 describe("ReportGenerateBarComponent", () => {
@@ -15,10 +14,10 @@ describe("ReportGenerateBarComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      // The real ButtonModule renders the Save/Generate app-buttons as real <button>s
+      // The real ButtonComponent renders the Save/Generate app-buttons as real <button>s
       // whose rendered/disabled state the DOM assertions below can inspect. The bar no
       // longer gates on permissions itself — the parent passes resolved booleans.
-      imports: [ButtonModule, NoopAnimationsModule, ReportGenerateBarComponent],
+      imports: [NoopAnimationsModule, ReportGenerateBarComponent],
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([]),

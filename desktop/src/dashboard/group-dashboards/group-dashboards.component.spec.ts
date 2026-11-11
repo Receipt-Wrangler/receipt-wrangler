@@ -8,14 +8,11 @@ import { ActivatedRoute, Params, Router } from "@angular/router";
 import { By } from "@angular/platform-browser";
 import { NgxsModule, Store } from "@ngxs/store";
 import { BehaviorSubject } from "rxjs";
-import { PipesModule } from "src/pipes/pipes.module";
 import { DashboardState } from "src/store/dashboard.state";
-import { ButtonModule } from "../../button";
 import { Dashboard, DashboardService } from "../../open-api";
 import { GroupState, SetSelectedDashboardId } from "../../store";
 import { AuthState } from "../../store/auth.state";
 import { SetPermissions } from "../../store/auth.state.actions";
-import { DirectivesModule } from "../../directives/directives.module";
 import { GroupDashboardsComponent } from "./group-dashboards.component";
 
 describe("GroupDashboardsComponent", () => {
@@ -55,12 +52,9 @@ describe("GroupDashboardsComponent", () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [PipesModule,
+      imports: [
         MatDialogModule,
         NgxsModule.forRoot([GroupState, DashboardState, AuthState]),
-        PipesModule,
-        ButtonModule,
-        DirectivesModule,
         MatSnackBarModule, GroupDashboardsComponent],
       providers: [
         DashboardService,

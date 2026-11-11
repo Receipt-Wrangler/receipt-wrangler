@@ -16,7 +16,6 @@ import {
   User,
   UserService,
 } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { SnackbarService, TokenRefreshService } from "../../services";
 import { AddUser, AuthState, GroupState, SetGroups, UpdateUser, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
@@ -58,7 +57,6 @@ describe("UserFormComponent", () => {
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [NgxsModule.forRoot([AuthState, UserState, GroupState]),
         ReactiveFormsModule,
-        PipesModule,
         MatDialogModule,
         MatSnackBarModule,
         ApiModule, UserFormComponent],

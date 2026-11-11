@@ -8,7 +8,6 @@ import { ApiModule, NotificationsService } from "../../open-api";
 import { GroupState } from "../../store";
 import { AuthState } from "../../store/auth.state";
 import { SetPermissions } from "../../store/auth.state.actions";
-import { DirectivesModule } from "../../directives/directives.module";
 import { NotificationComponent } from "./notification.component";
 import { AppDatePipe } from "../../pipes/app-date.pipe";
 import { SystemSettingsState } from "../../store/system-settings.state";
@@ -26,7 +25,6 @@ describe("NotificationComponent", () => {
     imports: [ApiModule,
         AppDatePipe,
         NgxsModule.forRoot([GroupState, AuthState, SystemSettingsState]),
-        DirectivesModule,
         RouterTestingModule, NotificationComponent],
     providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 });

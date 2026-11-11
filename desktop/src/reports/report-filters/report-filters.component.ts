@@ -55,7 +55,7 @@ const FILTER_FIELDS: FilterFieldDef[] = [
  * The builder's inline filter: the design's add-a-filter chip layout over the
  * exact ReceiptPagedRequestFilter contract. It reuses the shared filter form
  * (built by buildReceiptFilterForm in the root form, including BETWEEN handling)
- * and the SharedUiModule OperationsPipe, so it can't drift from the receipts
+ * and the shared-ui OperationsPipe, so it can't drift from the receipts
  * filter — only the presentation differs. Category/tag options are the union of the
  * user's group catalogs, so the picker is available regardless of the chosen scope.
  */

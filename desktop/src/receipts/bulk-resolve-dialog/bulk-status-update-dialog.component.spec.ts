@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { ReceiptStatus } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { BulkStatusUpdateComponent } from "./bulk-status-update-dialog.component";
 import { provideStore } from "@ngxs/store";
 import { provideRouter } from "@angular/router";
@@ -14,7 +13,7 @@ describe("BulkStatusUpdateComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ReactiveFormsModule, PipesModule, BulkStatusUpdateComponent],
+      imports: [ReactiveFormsModule, BulkStatusUpdateComponent],
       providers: [
         provideRouter([]),
         provideStore([]),

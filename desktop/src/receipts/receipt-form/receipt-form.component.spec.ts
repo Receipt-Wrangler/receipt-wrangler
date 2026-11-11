@@ -11,17 +11,16 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { BehaviorSubject, Subject, of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
-import { PipesModule } from "src/pipes/pipes.module";
 import { ConfirmationDialogComponent } from "src/shared-ui/confirmation-dialog/confirmation-dialog.component";
-import { SharedUiModule } from "src/shared-ui/shared-ui.module";
 import { ApiModule, CustomFieldType, Permission, ReceiptImageService, ReceiptService, ReceiptStatus } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { QueueMode } from "../../services/receipt-queue.service";
 import { StatefulMenuItem } from "../../standalone/components/filtered-stateful-menu/stateful-menu-item";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { SetGroups, SetSelectedGroupId } from "../../store/group.state.actions";
-import { StoreModule } from "../../store/store.module";
+import { provideTestStore } from "../../store/test-store";
 import { ReceiptFormComponent } from "./receipt-form.component";
+import { provideNgxMask } from "ngx-mask";
 
 describe("ReceiptFormComponent", () => {
   let component: ReceiptFormComponent;
@@ -33,15 +32,14 @@ describe("ReceiptFormComponent", () => {
     await TestBed.configureTestingModule({
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [ApiModule,
-        PipesModule,
         MatDialogModule,
         MatSnackBarModule,
-        StoreModule,
         NoopAnimationsModule,
-        PipesModule,
         ReactiveFormsModule,
-        SharedUiModule, ReceiptFormComponent],
+        ReceiptFormComponent],
       providers: [
+        provideNgxMask(),
+        provideTestStore(),
         {
           provide: ActivatedRoute,
           useValue: {
@@ -1693,8 +1691,8 @@ describe("ReceiptFormComponent", () => {
     const toggle = () => query("[data-testid='receipt-history-toggle']");
     const drawer = () => query("app-receipt-history-drawer");
 
-    // ButtonModule is not imported here (CUSTOM_ELEMENTS_SCHEMA), so the toggle is
-    // a bare element and its `clicked` output a plain DOM event.
+    // A `(clicked)` binding also listens for a DOM event of that name, so the spec
+    // dispatches one rather than reaching into the button.
     function clickToggle(): void {
       toggle()!.dispatchEvent(new CustomEvent("clicked"));
       fixture.detectChanges();
@@ -1740,7 +1738,7 @@ describe("ReceiptFormComponent", () => {
     });
 
     describe("the save bar beside the open drawer", () => {
-      // SharedUiModule declares the real bar, so the input is read off it.
+      // The real bar renders, so the input is read off it.
       const barInset = () =>
         fixture.debugElement.query(By.css("app-form-button-bar")).componentInstance.inset();
       const occupied = { contentLeft: 82, width: 480, viewportWidth: 1440 };

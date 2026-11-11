@@ -6,7 +6,6 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
-import { PipesModule } from "src/pipes/pipes.module";
 import { ApiModule, Comment, CommentService, Permission } from "../../open-api";
 import { AuthState, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
@@ -46,7 +45,7 @@ describe("ReceiptCommentsComponent", () => {
         ReactiveFormsModule,
         NgxsModule.forRoot([AuthState, UserState]),
         MatSnackBarModule,
-        PipesModule, ReceiptCommentsComponent],
+        ReceiptCommentsComponent],
     providers: [provideRouter([]), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 }).compileComponents();
 

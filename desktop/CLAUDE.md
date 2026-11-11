@@ -95,19 +95,29 @@ and run `npx playwright test`; leaving `E2E_BASE_URL` at `http://localhost:4200`
 ## Code Architecture
 
 ### Application Structure
-Receipt Wrangler Desktop is an Angular 19 application with modular architecture using:
+Receipt Wrangler Desktop is an Angular 21 application built from standalone components, using:
 
 - **State Management**: NGXS store with persistent storage for application state
 - **API Layer**: Auto-generated OpenAPI client in `src/open-api/` (do not manually edit these files)
-- **Component Architecture**: Feature modules with lazy-loaded routing
+- **Component Architecture**: Standalone components, directives and pipes; lazy-loaded feature routes
 - **UI Framework**: Angular Material + Bootstrap 5 + custom shared components
 
 ### Key Architectural Patterns
 
-#### Module Organization
-- Feature modules (receipts, dashboard, groups, etc.) with their own routing
+#### Standalone components, no NgModules
+- **Every component, directive and pipe is standalone** and lists what its template uses in its own
+  `imports`. There is no `@NgModule` in `src/` outside the generated `src/open-api/`. Keep it that way:
+  import the concrete component, directive or pipe (never a module of ours), and don't add
+  `standalone: false`.
+- **Routes are plain `Routes` arrays.** `src/app/app.routes.ts` (`appRoutes`, wired with
+  `provideRouter` in `app.config.ts`) lazy-loads each feature's `src/<feature>/<feature>.routes.ts`
+  with `loadChildren: () => import(...).then((m) => m.<feature>Routes)`.
+- **A provider lives where it is needed.** App-wide ones go in `src/app/app.config.ts` — including
+  `CurrencyPipe`, which `CustomCurrencyPipe` injects, and the `split` SVG icon registration. A
+  component that needs its own lists it in `providers`: `SelectComponent` → `OptionDisplayPipe` (for
+  `ReadonlyValuePipe`), `DatepickerComponent` → `provideNativeDateAdapter()`, the category and tag
+  forms → `DuplicateValidator`. A lazy route that needs a scoped one uses route `providers`.
 - Shared UI components in `src/shared-ui/` for reusable elements
-- Lazy-loaded modules for performance optimization
 - Centralized store management with NGXS states
 
 #### State Management (NGXS)
@@ -482,9 +492,8 @@ Three things about it are load-bearing:
   silently does nothing. The badge carries **no margin**: the two flex call sites space it with `gap`,
   and only `app-select` (where it follows inline text) adds `margin-left`, in its own stylesheet.
 
-Wiring: registered in `SharedUiModule`'s `imports` + `exports` (the `LoginQrComponent` pattern), which
-covers `ReceiptsModule` and `ReportsModule`. **`SelectModule` imports the component directly** —
-`SharedUiModule` imports `SelectModule`, so reaching it the other way would be a circular import.
+Wiring: standalone, imported directly by each component that renders it (`SelectComponent`,
+`ColumnConfigurationDialogComponent`, `ReportConfigPanelComponent`).
 
 Two call-site rules the e2e suites depend on:
 - **Keep the badge inside the `mat-option`'s text content.** `e2e/report-custom-fields.spec.ts`
@@ -711,7 +720,7 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
   - **Selectors** (`AuthState`): `hasAppPermission(perm)`, `hasAnyAppPermission(perms)`,
     `hasGroupPermission(groupId, perm, orApp = [])` — the group one applies the `orApp` app-scoped
     override first, mirroring the backend `OrAppPermissions` (admin-not-a-member) pattern.
-  - **Directives** (`DirectivesModule`, signal/`effect`-driven so they re-render when AppData lands after
+  - **Directives** (standalone, in `src/directives/`, signal/`effect`-driven so they re-render when AppData lands after
     first paint): `*hasAppPermission="Permission.X"` and
     `*hasGroupPermission="{ groupId, permission, orApp? }"`. Components expose the generated `Permission`
     const to reference it in templates.
@@ -926,7 +935,7 @@ built-in in `DEFAULT_RECEIPT_TABLE_COLUMNS`.
   See `api/CLAUDE.md` → "The first comment".
 - The cell (`#firstCommentCell`, `data-testid="receipt-first-comment"`) is one ellipsised line capped
   at 20rem, so a long comment can't stretch the row. `matTooltip` shows the full text, which is why
-  `ReceiptsModule` now imports `MatTooltipModule`.
+  `ReceiptsTableComponent` imports `MatTooltip`.
 - **E2E:** `e2e/receipt-comment-column.spec.ts` (serial, admin storageState, own seeded group) covers:
   - the column offered unchecked and unbadged;
   - the first comment shown, never a later one that sorts lower;
@@ -1393,7 +1402,7 @@ by hand — the endpoints and the retention window are in `api/CLAUDE.md` → "A
   `activity.component.spec.ts` pins it by setting the two ids to different values.
 - **`SourceFileViewerDialogComponent`** (`shared-ui/source-file-viewer-dialog/`) wraps
   `app-image-viewer` in `app-dialog`, opened with `DEFAULT_DIALOG_CONFIG` — shaped on
-  `DescriptionViewerDialogComponent`, and declared **and** exported in `SharedUiModule`.
+  `DescriptionViewerDialogComponent`.
 - **The download is observed as a `response`, not a body.** The original file name is only on
   `Content-Disposition` and an activity row does not carry it, so
   `filenameFromContentDisposition` (`src/utils/file.ts`) reads it back before handing off to the
@@ -1599,6 +1608,21 @@ Angular no longer uses zone.js. Change detection is triggered ONLY by:
 - Prefer `await fixture.whenStable()` over `fixture.detectChanges()` for most realistic test behavior.
 - Use `TestBed.flushEffects()` when testing effect-based logic.
 
+### Testing standalone components
+- Put the component under test in `TestBed` **`imports`**, never `declarations`. It brings its own
+  children, so they render for real — a TestBed `schemas: [CUSTOM_ELEMENTS_SCHEMA]` no longer applies to
+  its template. Add the providers the real children need (`provideRouter([])` for an `app-button`'s
+  `routerLink`, `provideNgxMask()` for `app-input`, the NGXS states they select from).
+- **Stub a child only when it needs setup the spec never asserts on**, and say why in a comment:
+  `TestBed.overrideComponent(Host, { remove: { imports: [Child] }, add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] } })`.
+  `set: { imports: [...] }` swaps in stub components.
+- **Read a child's inputs from its instance, not the DOM element.** A real component does not mirror an
+  input onto its host element: use `fixture.debugElement.query(...).componentInstance` (or
+  `getDebugNode(el)!.componentInstance`) and call the signal input.
+- A spec-local host component is standalone and imports what its template uses.
+- `provideTestStore()` (`src/store/test-store.ts`) is the shared NGXS store most component specs run
+  against; it goes in `providers`.
+
 ## E2E Testing
 
 End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angular UI against a real Go API. Config is `playwright.config.ts`.
@@ -1803,8 +1827,8 @@ All helpers are in `src/utils/app-time-zone.ts`. The rules (root `CLAUDE.md` hol
 - **Two kinds of value.** A receipt's `date` and DATE custom fields are **calendar days**, stored as
   midnight UTC and read by their **UTC** day, so no zone ever shifts them. `createdAt`,
   `resolvedDate`, `updatedAt`, task `startedAt`/`endedAt` etc. are **instants**, shown in the app zone.
-- **Display: the `appDate` pipe** (`src/pipes/app-date.pipe.ts`, standalone, exported by
-  `PipesModule`) replaces Angular's `date` pipe everywhere — do not add a bare `| date`.
+- **Display: the `appDate` pipe** (`src/pipes/app-date.pipe.ts`, standalone) replaces Angular's
+  `date` pipe everywhere — do not add a bare `| date`.
   `value | appDate[:format]` is instant mode: `DatePipe` formatting with `offsetAt(value, zone)`
   (DatePipe takes an offset, not an IANA name, and the offset depends on DST at that instant).
   `value | appDate:format:'calendar'` shows the stored UTC day. Format strings are DatePipe's
@@ -1864,7 +1888,7 @@ Two tables have a `{ operation, value }` filter dialog — receipts and system t
 **one implementation with two field lists**, not two dialogs. Anything new of this shape reuses these
 four pieces rather than copying a row template:
 
-- **`app-filter-field`** (`src/shared-ui/filter-field/`, declared *and exported* by `SharedUiModule`)
+- **`app-filter-field`** (`src/shared-ui/filter-field/`)
   renders one row: the value editor for the field's `type` beside its Operation `app-select`,
   switching shape with the selected operation (a two-slot range for `BETWEEN`, a **disabled** implied
   range for `WITHIN_CURRENT_MONTH`, a single editor otherwise). It is deliberately presentational and
@@ -1888,8 +1912,8 @@ four pieces rather than copying a row template:
   `isFilterEntryActive` (`src/utils/receipt-filter-entry.ts`) is likewise shared verbatim, which is
   what keeps every Filter badge and its chip row in agreement.
 
-**A chip row needs `MatChipsModule` in the consuming module** — `SharedUiModule` imports it but does
-not export it. `MatIconModule` too, for the `cancel` icon inside `matChipRemove`.
+**A chip row needs the chip pieces in the consuming component's own `imports`** (`MatChipSet`,
+`MatChip`, `MatChipRemove`), plus `MatIcon` for the `cancel` icon inside `matChipRemove`.
 
 ## Receipts table filtering
 
@@ -2014,7 +2038,7 @@ for the wire contract.
 - **`app-receipt-totals` (`src/receipts/receipt-totals/`), deliberately not named `*summary*`.**
   `app-summary-card` already renders on this very page as "Selected Receipt summary" — the
   who-owes-whom settlement card — and two components called summary on one screen is a trap.
-  Standalone, imported directly in `ReceiptsModule` (the `MonthStepperComponent` precedent), and
+  Standalone, imported directly by `ReceiptsTableComponent`, and
   purely presentational: it fetches nothing and knows nothing about the filter.
 - **A SECOND `Subject` + `switchMap`, not a `forkJoin` with the table.** A `forkJoin` would make the
   table repaint wait on the slower unpaged aggregate on the app's hottest screen; two independent
@@ -2162,8 +2186,8 @@ Two consequences for tests and styles:
   the All view).
 
 The chips row is inline markup (`mat-chip-set` / `matChipRemove`) with every label built by the pure
-`buildReceiptFilterChips` util, so `ReceiptsModule` must import **`MatChipsModule`** — `SharedUiModule`
-imports it but does not export it. It makes no exceptions: see "Every active condition is chipped"
+`buildReceiptFilterChips` util, so `ReceiptsTableComponent` imports the chip pieces
+(`MatChipSet`, `MatChip`, `MatChipRemove`) itself. It makes no exceptions: see "Every active condition is chipped"
 above. An id the caller cannot resolve (a category outside their grants,
 a group they have left) renders as the raw id rather than dropping the chip, so a filter that is
 actively removing rows is never invisible.
@@ -2308,7 +2332,7 @@ server's output while other specs' tasks stay out of the way.
 
 A **history** icon button in the receipt header (`receipt-history-toggle`, after Duplicate), in view
 and edit mode, opens `app-receipt-history-drawer` (`src/receipts/receipt-history-drawer/`, standalone, imported
-by `ReceiptsModule`): a right-hand timeline of the receipt's saves, newest first, grouped by day.
+by `ReceiptFormComponent`): a right-hand timeline of the receipt's saves, newest first, grouped by day.
 **The server computes the diff and the redaction** (see `api/CLAUDE.md` → "Receipt history"); the
 desktop only formats what `GET /receipt/{id}/history` returns.
 
@@ -2374,7 +2398,7 @@ desktop only formats what `GET /receipt/{id}/history` returns.
   `MatDialog` is open. "Show N more" and "View JSON" carry `aria-expanded` / `aria-controls`.
 - **`app-avatar` gained `size` (default 50), `icon` and `color` inputs** for the timeline's 32px
   avatars and the Quick Scan / Email / System icons. At the default size it binds no inline sizing,
-  so every existing avatar renders as before; `AvatarModule` now imports `MatIconModule`.
+  so every existing avatar renders as before; `AvatarComponent` imports `MatIcon`.
 - **Classes are `rw-history-*`** — Bootstrap's global `.alert` / `.badge` would otherwise leak in.
 - **Test ids:** `receipt-history-toggle`, `-drawer`, `-close`, `-summary`, `-day`, `-loading`,
   `-error`, `-retry`, `-empty`, `-entry` (with `data-action`), `-actor`, `-verb`, `-failed`,
@@ -2561,8 +2585,7 @@ and a free `cdkDrag` on the `<img>`.
 **A first attempt resized the form/image *panes* with a draggable splitter. That was reverted** — it
 moved the page layout, when the thing worth manipulating is the image. Don't reintroduce it.
 
-- **`app-image-canvas`** (`src/shared-ui/image-canvas/`, standalone, registered in `SharedUiModule`'s
-  `imports` + `exports`) is generic and presentational: it takes a resolved `src` and a `stageHeight`
+- **`app-image-canvas`** (`src/shared-ui/image-canvas/`, standalone) is generic and presentational: it takes a resolved `src` and a `stageHeight`
   and owns the whole interaction. The stage is a **fixed viewport** — the image is clipped by it and
   panned around — so growing the image can never move the surrounding page.
 - **Scale and pan are one transform on one element.** The old viewer put `scale()` on a wrapper div
@@ -2738,7 +2761,7 @@ so hiding images and clicking one of them used to throw.
 
 The **Report Builder** (`src/reports/`) is a two-pane screen for building and downloading receipt
 reports against the backend reporting engine (see `api/CLAUDE.md` → "Reporting Engine"). The lazy
-`ReportsModule` is gated by `appPermissionGuard` on **`app.reports.read` OR `app.reports.readAll`** (the
+`reportsRoutes` are gated by `appPermissionGuard` on **`app.reports.read` OR `app.reports.readAll`** (the
 avatar-menu "Reports" entry gates on the same via a `hasAnyAppPermission([...])` signal, since the
 `*hasAppPermission` directive is single-key). Its routes: `/reports` is the **templates list** landing
 (below), and the builder lives at `/reports/new` and `/reports/:id/edit` (both `fullHeight`).
@@ -2850,7 +2873,7 @@ endpoint); the builder's own ad-hoc generate still gates on `app.reports.generat
   (amount/category/paid-by/tags via the shared `customCurrency`/`name`/`user` pipes + `app-status-chip`);
   "Open full receipt" does `window.open(\`/receipts/${id}/view\`, "_blank")` to view it in a new tab.
 - **Filters** (`report-filters`): the design's inline add-a-filter chips, but built on the **shared**
-  `buildReceiptFilterForm` (`src/utils/receipt-filter.ts`) and SharedUiModule `OperationsPipe`, so it
+  `buildReceiptFilterForm` (`src/utils/receipt-filter.ts`) and the shared-ui `OperationsPipe`, so it
   produces the exact `ReceiptPagedRequestFilter` the receipts filter does (same BETWEEN handling) — only
   the presentation differs. Category/tag options are the union of the user's group catalogs.
   - **Visible rows on open-in-builder**: the form always holds every filter field; which rows *show* is a

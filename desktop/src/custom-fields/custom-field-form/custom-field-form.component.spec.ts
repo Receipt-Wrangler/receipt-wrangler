@@ -9,8 +9,6 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { of } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { CustomFieldOption, CustomFieldService, CustomFieldType } from "../../open-api";
-import { PipesModule } from "../../pipes";
-import { SelectModule } from "../../select/select.module";
 import { SnackbarService } from "../../services";
 
 import { CustomFieldFormComponent } from "./custom-field-form.component";
@@ -31,9 +29,7 @@ describe("CustomFieldFormComponent", () => {
         MatDialogModule,
         MatSnackBarModule,
         NoopAnimationsModule,
-        PipesModule,
         ReactiveFormsModule,
-        SelectModule,
         CustomFieldFormComponent
       ],
       providers: [

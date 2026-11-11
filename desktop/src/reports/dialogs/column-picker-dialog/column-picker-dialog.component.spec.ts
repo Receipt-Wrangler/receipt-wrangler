@@ -2,7 +2,6 @@ import { NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core"
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormBuilder } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
-import { PipesModule } from "../../../pipes";
 import { ReportColumn } from "../../../open-api";
 import { ColumnPickerDialogComponent, ColumnPickerDialogData } from "./column-picker-dialog.component";
 import { provideRouter } from "@angular/router";
@@ -16,7 +15,7 @@ function configure(data: ColumnPickerDialogData): {
 } {
   const close = jest.fn();
   TestBed.configureTestingModule({
-    imports: [PipesModule, ColumnPickerDialogComponent],
+    imports: [ColumnPickerDialogComponent],
     providers: [
       provideNgxMask(),
       provideStore([]),

@@ -10,7 +10,6 @@ import { MatTooltipModule } from "@angular/material/tooltip";
 import { ActivatedRoute, provideRouter, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, Subject, throwError } from "rxjs";
-import { PipesModule } from "src/pipes/pipes.module";
 import { DEFAULT_RECEIPT_TABLE_COLUMNS } from "src/interfaces";
 import { SetColumnConfig, SetReceiptFilterData } from "src/store/receipt-table.actions";
 import { ReceiptTableState } from "src/store/receipt-table.state";
@@ -48,7 +47,7 @@ describe("ReceiptsTableComponent", () => {
         MatMenuModule,
         MatChipsModule,
         MonthStepperComponent,
-        PipesModule, ReceiptsTableComponent],
+        ReceiptsTableComponent],
     providers: [
         {
             provide: ActivatedRoute,
@@ -764,7 +763,6 @@ describe("ReceiptsTableComponent receipt summary", () => {
         MatMenuModule,
         MatChipsModule,
         MonthStepperComponent,
-        PipesModule,
         ReceiptsTableComponent,
       ],
       providers: [

@@ -1,5 +1,4 @@
-import { NgModule } from "@angular/core";
-import { RouterModule, Routes } from "@angular/router";
+import { Routes } from "@angular/router";
 import { FormMode } from "src/enums/form-mode.enum";
 import { appPermissionGuard } from "src/guards/app-permission.guard";
 import { settingsLandingGuard } from "src/guards/settings-landing.guard";
@@ -10,7 +9,7 @@ import { SettingsComponent } from "./settings/settings.component";
 import { UserPreferencesComponent } from "./user-preferences/user-preferences.component";
 import { UserProfileComponent } from "./user-profile/user-profile.component";
 
-const routes: Routes = [
+export const settingsRoutes: Routes = [
   {
     path: "",
     canActivate: [settingsLandingGuard],
@@ -96,9 +95,3 @@ const routes: Routes = [
     ],
   },
 ];
-
-@NgModule({
-  imports: [RouterModule.forChild(routes)],
-  exports: [RouterModule],
-})
-export class SettingsRoutingModule {}

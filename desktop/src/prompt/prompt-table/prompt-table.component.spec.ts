@@ -5,7 +5,6 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
 import { PromptTableState } from "../../store/prompt-table.state";
-import { TableModule } from "../../table/table.module";
 
 import { PromptTableComponent } from "./prompt-table.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
@@ -17,7 +16,7 @@ describe("PromptTableComponent", () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [TableModule, NgxsModule.forRoot([PromptTableState]), NoopAnimationsModule, PromptTableComponent],
+    imports: [NgxsModule.forRoot([PromptTableState]), NoopAnimationsModule, PromptTableComponent],
     providers: [{
             provide: ActivatedRoute,
             useValue: {

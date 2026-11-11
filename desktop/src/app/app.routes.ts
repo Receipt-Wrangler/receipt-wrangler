@@ -1,12 +1,12 @@
-import { NgModule } from "@angular/core";
-import { RouterModule, Routes } from "@angular/router";
+import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { Routes } from "@angular/router";
 import { appPermissionGuard } from "src/guards/app-permission.guard";
 import { AuthGuard } from "src/guards/auth.guard";
 import { SidebarComponent } from "src/layout/sidebar/sidebar.component";
 import { Permission } from "../open-api";
 
 // set up dashboard
-const routes: Routes = [
+export const appRoutes: Routes = [
   {
     path: "",
     component: SidebarComponent,
@@ -14,25 +14,19 @@ const routes: Routes = [
       {
         path: "auth",
         loadChildren: () =>
-          import("../auth").then(
-            (m) => m.AuthModule
-          ),
+          import("../auth/auth.routes").then((m) => m.authRoutes),
         canActivate: [AuthGuard],
       },
       {
         path: "dashboard",
         loadChildren: () =>
-          import("../dashboard/dashboard.module").then(
-            (m) => m.DashboardModule
-          ),
+          import("../dashboard/dashboard.routes").then((m) => m.dashboardRoutes),
         canActivate: [AuthGuard],
       },
       {
         path: "categories",
         loadChildren: () =>
-          import("../categories/categories.module").then(
-            (m) => m.CategoriesModule
-          ),
+          import("../categories/categories.routes").then((m) => m.categoriesRoutes),
         canActivate: [AuthGuard, appPermissionGuard],
         data: {
           appPermissions: [Permission.AppCategoriesRead],
@@ -40,8 +34,11 @@ const routes: Routes = [
       },
       {
         path: "tags",
+        // Carried over unchanged from the former TagsModule: a route-scoped
+        // HttpClient that does not run the root httpInterceptor.
+        providers: [provideHttpClient(withInterceptorsFromDi())],
         loadChildren: () =>
-          import("../tags/tags.module").then((m) => m.TagsModule),
+          import("../tags/tags.routes").then((m) => m.tagsRoutes),
         canActivate: [AuthGuard, appPermissionGuard],
         data: {
           appPermissions: [Permission.AppTagsRead],
@@ -50,7 +47,7 @@ const routes: Routes = [
       {
         path: "custom-fields",
         loadChildren: () =>
-          import("../custom-fields/custom-fields.module").then((m) => m.CustomFieldsModule),
+          import("../custom-fields/custom-fields.routes").then((m) => m.customFieldsRoutes),
         canActivate: [AuthGuard, appPermissionGuard],
         data: {
           appPermissions: [Permission.AppCustomFieldsRead],
@@ -59,19 +56,19 @@ const routes: Routes = [
       {
         path: "groups",
         loadChildren: () =>
-          import("../group/group.module").then((m) => m.GroupsModule),
+          import("../group/group.routes").then((m) => m.groupRoutes),
         canActivate: [AuthGuard],
       },
       {
         path: "receipts",
         loadChildren: () =>
-          import("../receipts/receipts.module").then((m) => m.ReceiptsModule),
+          import("../receipts/receipts.routes").then((m) => m.receiptsRoutes),
         canActivate: [AuthGuard],
       },
       {
         path: "settings",
         loadChildren: () =>
-          import("../settings/settings.module").then((m) => m.SettingsModule),
+          import("../settings/settings.routes").then((m) => m.settingsRoutes),
         canActivate: [AuthGuard, appPermissionGuard],
         data: {
           appPermissions: [
@@ -84,7 +81,7 @@ const routes: Routes = [
       {
         path: "system-settings",
         loadChildren: () =>
-          import("../system-settings/system-settings.module").then((m) => m.SystemSettingsModule),
+          import("../system-settings/system-settings.routes").then((m) => m.systemSettingsRoutes),
         canActivate: [AuthGuard, appPermissionGuard],
         data: {
           appPermissions: [
@@ -100,7 +97,7 @@ const routes: Routes = [
       {
         path: "users",
         loadChildren: () =>
-          import("../user/user.module").then((m) => m.UserModule),
+          import("../user/user.routes").then((m) => m.userRoutes),
         canActivate: [AuthGuard, appPermissionGuard],
         data: {
           appPermissions: [Permission.AppUsersRead],
@@ -109,7 +106,7 @@ const routes: Routes = [
       {
         path: "roles",
         loadChildren: () =>
-          import("../roles/roles.module").then((m) => m.RolesModule),
+          import("../roles/roles.routes").then((m) => m.rolesRoutes),
         canActivate: [AuthGuard, appPermissionGuard],
         data: {
           appPermissions: [Permission.AppRolesRead],
@@ -118,7 +115,7 @@ const routes: Routes = [
       {
         path: "reports",
         loadChildren: () =>
-          import("../reports/reports.module").then((m) => m.ReportsModule),
+          import("../reports/reports.routes").then((m) => m.reportsRoutes),
         canActivate: [AuthGuard, appPermissionGuard],
         data: {
           // read OR readAll: an admin with only the "*All" bypass still reaches reports.
@@ -133,9 +130,3 @@ const routes: Routes = [
     ],
   },
 ];
-
-@NgModule({
-  imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule],
-})
-export class AppRoutingModule {}

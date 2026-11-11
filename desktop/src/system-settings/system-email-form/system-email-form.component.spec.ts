@@ -11,14 +11,13 @@ import { NgxsModule } from "@ngxs/store";
 import { of } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { ApiModule, SystemEmail, SystemEmailService } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { TABLE_SERVICE_INJECTION_TOKEN } from "../../services/injection-tokens/table-service";
 import { SystemEmailTaskTableService } from "../../services/system-email-task-table.service";
 import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { SystemEmailTaskTableState } from "../../store/system-email-task-table.state";
 
 import { SystemEmailFormComponent } from "./system-email-form.component";
+import { provideNgxMask } from "ngx-mask";
 
 describe("SystemEmailFormComponent", () => {
   let component: SystemEmailFormComponent;
@@ -29,13 +28,12 @@ describe("SystemEmailFormComponent", () => {
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [ApiModule,
         NgxsModule.forRoot([SystemEmailTaskTableState]),
-        PipesModule,
         MatDialogModule,
         MatSnackBarModule,
         ReactiveFormsModule,
-        SharedUiModule,
         NoopAnimationsModule, SystemEmailFormComponent],
       providers: [
+        provideNgxMask(),
         {
           provide: TABLE_SERVICE_INJECTION_TOKEN,
           useClass: SystemEmailTaskTableService

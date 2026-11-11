@@ -10,14 +10,6 @@ import { ActivatedRoute, Router, provideRouter } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { FormMode } from "src/enums/form-mode.enum";
-import { PipesModule } from "src/pipes/pipes.module";
-import { SelectModule } from "src/select/select.module";
-import { SharedUiModule } from "src/shared-ui/shared-ui.module";
-import { TableModule } from "src/table/table.module";
-import { UserAutocompleteModule } from "src/user-autocomplete/user-autocomplete.module";
-import { CheckboxModule } from "../../checkbox/checkbox.module";
-import { ButtonModule } from "../../button";
-import { InputModule } from "../../input";
 import { ApiModule, Group, GroupsService, GroupStatus, Permission } from "../../open-api";
 import { AddGroup, AuthState, UpdateGroup } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
@@ -34,21 +26,13 @@ describe("GroupFormComponent", () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
     imports: [ApiModule,
-        ButtonModule,
-        CheckboxModule,
-        PipesModule,
-        InputModule,
         MatCardModule,
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState]),
         NoopAnimationsModule,
-        PipesModule,
         ReactiveFormsModule,
-        SelectModule,
-        SharedUiModule,
-        TableModule,
-        UserAutocompleteModule, GroupFormComponent, GroupMemberFormComponent],
+        GroupFormComponent, GroupMemberFormComponent],
     providers: [
         provideRouter([]),
         {

@@ -5,16 +5,16 @@ import { toSignal } from "@angular/core/rxjs-interop";
 import { MatCheckbox } from "@angular/material/checkbox";
 import { MatMenuItem } from "@angular/material/menu";
 import { BaseButtonComponent } from "../../../button/base-button/base-button.component";
-import { ButtonModule } from "../../../button/index";
-import { InputModule } from "../../../input/index";
 import { StatefulMenuItem } from "./stateful-menu-item";
+import { ButtonComponent } from "../../../button/button/button.component";
+import { InputComponent } from "../../../input/input/input.component";
 
 @Component({
   selector: "app-filtered-stateful-menu",
   imports: [
     CdkMenuTrigger,
     CdkMenu,
-    ButtonModule, InputModule, MatMenuItem, MatCheckbox,
+    ButtonComponent, InputComponent, MatMenuItem, MatCheckbox,
   ],
   templateUrl: "./filtered-stateful-menu.component.html",
   styleUrl: "./filtered-stateful-menu.component.scss",

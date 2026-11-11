@@ -4,15 +4,14 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MatCardModule } from "@angular/material/card";
 import { MatDialogModule } from "@angular/material/dialog";
 import { MatListModule } from "@angular/material/list";
-import { ActivatedRoute, Params } from "@angular/router";
+import { ActivatedRoute, Params, RouterModule } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { BehaviorSubject, of } from "rxjs";
-import { PipesModule } from "src/pipes/pipes.module";
 import { DashboardState } from "src/store/dashboard.state";
 import { ApiModule, Dashboard, UserService, Widget, WidgetType } from "../../open-api";
 import { SummaryCardComponent } from "../../shared-ui/summary-card/summary-card.component";
 import { GroupState } from "../../store";
-import { DashboardRoutingModule } from "../dashboard-routing.module";
+import { dashboardRoutes } from "../dashboard.routes";
 import { DashboardComponent } from "./dashboard.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 
@@ -41,12 +40,12 @@ describe("DashboardComponent", () => {
     imports: [SummaryCardComponent,
         ApiModule,
         CommonModule,
-        DashboardRoutingModule,
+        RouterModule.forChild(dashboardRoutes),
         MatCardModule,
         MatDialogModule,
         MatListModule,
         NgxsModule.forRoot([GroupState, DashboardState]),
-        PipesModule, DashboardComponent],
+        DashboardComponent],
     providers: [
         {
             provide: ActivatedRoute,

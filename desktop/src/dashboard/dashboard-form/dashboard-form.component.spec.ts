@@ -7,7 +7,6 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of } from "rxjs";
 import { Dashboard, DashboardService, ReportService, WidgetType } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services";
 import { EditableListComponent } from "../../shared-ui/editable-list/editable-list.component";
 import { AuthState, GroupState } from "../../store";
@@ -28,7 +27,6 @@ describe("DashboardFormComponent", () => {
     imports: [EditableListComponent,
         MatSnackBarModule,
         NgxsModule.forRoot([GroupState, AuthState, LayoutState]),
-        PipesModule,
         ReactiveFormsModule, DashboardFormComponent],
     providers: [
         provideRouter([]),

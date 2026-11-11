@@ -8,17 +8,16 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { UntilDestroy } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { of } from "rxjs";
-import { PipesModule } from "src/pipes/pipes.module";
 import { SetReceiptFilter } from "src/store/receipt-table.actions";
 import { defaultReceiptFilter, } from "src/store/receipt-table.state";
-import { InputModule } from "../../input";
 import { Category, FilterOperation, ReceiptStatus, Tag } from "../../open-api";
-import { StoreModule } from "../../store/store.module";
+import { provideTestStore } from "../../store/test-store";
 import { applyFormCommand } from "../../utils/index";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { OperationsPipe } from "./operations.pipe";
 import { ReceiptFilterComponent } from "./receipt-filter.component";
 import { provideRouter } from "@angular/router";
+import { provideNgxMask } from "ngx-mask";
 
 @UntilDestroy()
 @Component({
@@ -78,14 +77,13 @@ describe("ReceiptFilterComponent", () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [PipesModule,
-        InputModule,
+      imports: [
         MatDialogModule,
-        StoreModule,
         NoopAnimationsModule,
-        PipesModule,
         ReactiveFormsModule, ReceiptFilterComponent, OperationsPipe],
       providers: [
+        provideNgxMask(),
+        provideTestStore(),
         provideRouter([]),
         {
           provide: MatDialogRef,

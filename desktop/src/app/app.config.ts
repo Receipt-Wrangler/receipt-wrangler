@@ -1,7 +1,10 @@
-import { ApplicationConfig, provideAppInitializer, provideZonelessChangeDetection, inject } from "@angular/core";
+import { ApplicationConfig, provideAppInitializer, provideEnvironmentInitializer, provideZonelessChangeDetection, inject } from "@angular/core";
+import { CurrencyPipe } from "@angular/common";
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
 import { importProvidersFrom } from "@angular/core";
+import { DomSanitizer } from "@angular/platform-browser";
 import { provideAnimationsAsync } from "@angular/platform-browser/animations/async";
+import { provideRouter } from "@angular/router";
 import { provideCharts, withDefaultRegisterables } from "ng2-charts";
 import { provideNgxMask } from "ngx-mask";
 import { withNgxsReduxDevtoolsPlugin } from "@ngxs/devtools-plugin";
@@ -9,14 +12,11 @@ import { withNgxsStoragePlugin } from "@ngxs/storage-plugin";
 import { provideStore } from "@ngxs/store";
 import { AppInitService, initAppData } from "src/services";
 import { httpInterceptor } from "../interceptors/http-interceptor";
+import { MatIconRegistry } from "@angular/material/icon";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { NgxMaskDirective, NgxMaskPipe } from "ngx-mask";
-import { AppRoutingModule } from "./app-routing.module";
-import { IconModule } from "../icon/icon.module";
-import { LayoutModule } from "../layout/layout.module";
 import { ApiModule, Configuration } from "../open-api";
-import { PipesModule } from "../pipes";
 import { AboutState } from "../store/about.state";
 import { ApiKeyTableState } from "../store/api-key-table.state";
 import { AuthState } from "../store/auth.state";
@@ -41,6 +41,7 @@ import { TagTableState } from "../store/tag-table.state";
 import { UserTableState } from "../store/user-table.state";
 import { UserState } from "../store/user.state";
 import { environment } from "src/environments/environment.development";
+import { appRoutes } from "./app.routes";
 
 const ngxsStates = [
   AboutState,
@@ -98,8 +99,18 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideAnimationsAsync(),
     provideHttpClient(withInterceptors([httpInterceptor])),
+    provideRouter(appRoutes),
     provideNgxMask(),
+    // CustomCurrencyPipe formats through Angular's CurrencyPipe.
+    CurrencyPipe,
     provideCharts(withDefaultRegisterables()),
+    // The receipt form's "split" icon is a custom SVG.
+    provideEnvironmentInitializer(() => {
+      inject(MatIconRegistry).addSvgIcon(
+        "split",
+        inject(DomSanitizer).bypassSecurityTrustResourceUrl("../assets/split.svg")
+      );
+    }),
     provideAppInitializer(() => {
       const initializerFn = (initAppData)(inject(AppInitService));
       return initializerFn();
@@ -112,14 +123,10 @@ export const appConfig: ApplicationConfig = {
     ),
     importProvidersFrom(
       ApiModule.forRoot(() => new Configuration({ basePath: undefined })),
-      AppRoutingModule,
-      IconModule,
-      LayoutModule,
       MatSnackBarModule,
       MatTooltipModule,
       NgxMaskDirective,
       NgxMaskPipe,
-      PipesModule,
     ),
   ],
 };

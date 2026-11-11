@@ -98,8 +98,8 @@ function receiptNoun(count: number): string {
   encapsulation: ViewEncapsulation.None,
   host: DEFAULT_HOST_CLASS,
   // The chip labels are built in TS rather than the template, so the formatting
-  // pipes are injected. CustomCurrencyPipe is declared in PipesModule and needs
-  // CurrencyPipe, neither of which is providedIn: "root".
+  // pipes are injected. CustomCurrencyPipe needs CurrencyPipe, neither of which
+  // is providedIn: "root".
   providers: [CurrencyPipe, CustomCurrencyPipe, DatePipe],
   imports: [TableHeaderComponent, AddButtonComponent, MonthStepperComponent, ButtonComponent, MatMenuTrigger, MatMenu, MatMenuItem, MatIcon, QueueStartMenuComponent, FeatureDirective, NgTemplateOutlet, SummaryCardComponent, MatChipSet, MatChip, MatChipRemove, TableComponent, ReceiptTotalsComponent, RouterLink, StatusChipComponent, MatTooltip, CustomFieldCellComponent, EditButtonComponent, HasGroupPermissionDirective, AppDatePipe, CustomCurrencyPipe, NamePipe, UserPipe]
 })

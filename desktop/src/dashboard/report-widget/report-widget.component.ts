@@ -4,10 +4,10 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { MatIconModule } from "@angular/material/icon";
 import { DomSanitizer, SafeHtml } from "@angular/platform-browser";
 import { EMPTY, Subscription, catchError, finalize, tap } from "rxjs";
-import { ButtonModule } from "../../button/index";
 import { Widget } from "../../open-api";
 import { ReportRunnerService } from "../../reports/services/report-runner.service";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
+import { ButtonComponent } from "../../button/button/button.component";
+import { CardComponent } from "../../shared-ui/card/card.component";
 
 /**
  * A view-only dashboard widget that renders a saved report template's HTML, exactly
@@ -24,7 +24,7 @@ import { SharedUiModule } from "../../shared-ui/shared-ui.module";
   templateUrl: "./report-widget.component.html",
   styleUrls: ["./report-widget.component.scss"],
   standalone: true,
-  imports: [CommonModule, SharedUiModule, ButtonModule, MatIconModule],
+  imports: [CommonModule, CardComponent, ButtonComponent, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReportWidgetComponent {

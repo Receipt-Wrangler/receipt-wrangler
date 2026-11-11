@@ -18,7 +18,6 @@ import {
   Tag,
   TagService,
 } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { AuthState } from "../../store";
 import { GroupMemberFormComponent } from "./group-member-form.component";
 import { UserState } from "../../store/user.state";
@@ -89,7 +88,6 @@ describe("GroupMemberFormComponent", () => {
     await TestBed.configureTestingModule({
       imports: [
         NgxsModule.forRoot([AuthState, UserState]),
-        PipesModule,
         ReactiveFormsModule,
         MatDialogModule,
         GroupMemberFormComponent,

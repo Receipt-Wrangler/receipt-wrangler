@@ -5,7 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 
 import { SourceFileViewerDialogComponent } from "./source-file-viewer-dialog.component";
 
-// Stubbed rather than pulled in from SharedUiModule: the real app-image-viewer
+// Stubbed rather than the real components: the real app-image-viewer
 // renders an image canvas that wants a live image load, and the point here is the
 // binding, not their rendering.
 @Component({ selector: "app-dialog", template: "<ng-content></ng-content>" })

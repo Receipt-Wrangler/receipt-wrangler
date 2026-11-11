@@ -7,8 +7,6 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { ActivatedRoute, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
 import { of, throwError } from "rxjs";
-import { PipesModule } from "src/pipes/pipes.module";
-import { DirectivesModule } from "../../directives";
 import { ApiModule, OidcConnectionView, OidcService, Permission, UserService } from "../../open-api";
 import { SnackbarService, TokenRefreshService } from "../../services";
 import { AuthState, FeatureConfigState, Logout, UserState } from "../../store";
@@ -35,12 +33,9 @@ describe("UserProfileComponent", () => {
     await TestBed.configureTestingModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
-        DirectivesModule,
-        PipesModule,
         MatDialogModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, FeatureConfigState, UserState]),
-        PipesModule,
         ReactiveFormsModule, UserProfileComponent],
     providers: [
         provideNgxMask(),

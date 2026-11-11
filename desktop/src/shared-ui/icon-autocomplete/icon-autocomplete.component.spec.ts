@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormControl } from "@angular/forms";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { NgxsModule } from "@ngxs/store";
-import { AutocompleteModule } from "../../autocomplete/autocomplete.module";
 import { AuthState } from "../../store/index";
 
 import { IconAutocompleteComponent } from "./icon-autocomplete.component";
@@ -14,7 +13,7 @@ describe("IconAutocompleteComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AutocompleteModule, NgxsModule.forRoot([AuthState]), NoopAnimationsModule, IconAutocompleteComponent],
+      imports: [NgxsModule.forRoot([AuthState]), NoopAnimationsModule, IconAutocompleteComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     })
       .compileComponents();

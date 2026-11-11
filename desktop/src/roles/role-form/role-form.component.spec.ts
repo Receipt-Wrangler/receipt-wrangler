@@ -25,7 +25,6 @@ import {
   RoleService,
   User,
 } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services/snackbar.service";
 import { RoleFormComponent } from "./role-form.component";
 import { provideNgxMask } from "ngx-mask";
@@ -102,7 +101,7 @@ async function setup(
 
   await TestBed.configureTestingModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [ApiModule, PipesModule, ReactiveFormsModule, RouterModule.forRoot([]), RoleFormComponent],
+    imports: [ApiModule, ReactiveFormsModule, RouterModule.forRoot([]), RoleFormComponent],
     providers: [
       provideNgxMask(),
       provideZonelessChangeDetection(),

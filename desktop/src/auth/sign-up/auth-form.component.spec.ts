@@ -17,10 +17,7 @@ jest.mock('qrcode', () => ({
   __esModule: true,
   toDataURL: jest.fn(),
 }));
-import { ButtonModule } from '../../button';
 import { FeatureDirective } from '../../directives/feature.directive';
-import { InputModule } from '../../input';
-import { PipesModule } from '../../pipes/pipes.module';
 import { AppInitService } from '../../services/app-init.service';
 import { SnackbarService } from '../../services/snackbar.service';
 import { AuthForm, buildOidcLoginUrl } from './auth-form.component';
@@ -30,6 +27,7 @@ import { AuthFormUtil } from './auth-form.util';
 import { LoginQrComponent } from '../../shared-ui/login-qr/login-qr.component';
 import { RouterTestingModule } from '@angular/router/testing';
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
+import { provideNgxMask } from 'ngx-mask';
 
 describe('AuthForm', () => {
   let component: AuthForm;
@@ -38,17 +36,15 @@ describe('AuthForm', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
     imports: [FeatureDirective,
-        ButtonModule,
-        InputModule,
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, FeatureConfigState]),
         NoopAnimationsModule,
-        PipesModule,
         ReactiveFormsModule,
         ApiModule,
         LoginQrComponent,
         RouterTestingModule, AuthForm],
     providers: [
+        provideNgxMask(),
         SnackbarService,
         AppInitService,
         AuthFormUtil,

@@ -14,6 +14,7 @@ import { FormGetPipe } from "../../pipes/form-get.pipe";
     selector: "app-category-form",
     templateUrl: "./category-form.component.html",
     styleUrls: ["./category-form.component.scss"],
+    providers: [DuplicateValidator],
     imports: [DialogComponent, ReactiveFormsModule, InputComponent, DialogFooterComponent, FormGetPipe]
 })
 export class CategoryForm implements OnInit {

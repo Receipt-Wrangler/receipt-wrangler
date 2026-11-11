@@ -13,7 +13,6 @@ import {
   ReportRequestCommand,
   ReportService,
 } from "../../../open-api";
-import { PipesModule } from "../../../pipes";
 import { SystemSettingsState } from "../../../store/system-settings.state";
 import {
   ReportReceiptsDialogComponent,
@@ -53,7 +52,7 @@ function configure(
 } {
   const reportService = { getReportReceipts: jest.fn(() => response) };
   TestBed.configureTestingModule({
-    imports: [PipesModule, ReportReceiptsDialogComponent],
+    imports: [ReportReceiptsDialogComponent],
     providers: [
       provideRouter([]),
       provideZonelessChangeDetection(),

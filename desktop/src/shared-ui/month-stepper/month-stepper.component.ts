@@ -1,9 +1,9 @@
 import { A11yModule } from "@angular/cdk/a11y";
 import { ConnectedPosition, OverlayModule } from "@angular/cdk/overlay";
 import { Component, computed, input, linkedSignal, output, signal } from "@angular/core";
-import { ButtonModule } from "../../button";
 import { todayInZone } from "../../utils/app-time-zone";
 import { FilterMonth, monthOfDate, shiftMonth } from "../../utils/receipt-date-filter";
+import { ButtonComponent } from "../../button/button/button.component";
 
 const MONTH_LABELS = [
   "January", "February", "March", "April", "May", "June",
@@ -38,7 +38,7 @@ const MAX_YEAR_OFFSET = 5;
   templateUrl: "./month-stepper.component.html",
   styleUrls: ["./month-stepper.component.scss"],
   standalone: true,
-  imports: [A11yModule, ButtonModule, OverlayModule],
+  imports: [A11yModule, ButtonComponent, OverlayModule],
 })
 export class MonthStepperComponent {
   /** The month currently shown, or null when the caller is showing something else. */

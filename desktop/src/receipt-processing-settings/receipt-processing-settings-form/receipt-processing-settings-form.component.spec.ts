@@ -6,14 +6,13 @@ import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { ActivatedRoute } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
 import { AiType, OcrEngine, ReceiptProcessingSettings } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { TABLE_SERVICE_INJECTION_TOKEN } from "../../services/injection-tokens/table-service";
 import { ReceiptProcessingSettingsTaskTableService } from "../../services/receipt-processing-settings-task-table.service";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 import { ReceiptProcessingSettingsTaskTableState } from "../../store/receipt-processing-settings-task-table.state";
 
 import { ReceiptProcessingSettingsFormComponent } from "./receipt-processing-settings-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideNgxMask } from "ngx-mask";
 
 describe("ReceiptProcessingSettingsFormComponent", () => {
   let component: ReceiptProcessingSettingsFormComponent;
@@ -24,10 +23,10 @@ describe("ReceiptProcessingSettingsFormComponent", () => {
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [NgxsModule.forRoot([ReceiptProcessingSettingsTaskTableState]),
         NoopAnimationsModule,
-        PipesModule,
         ReactiveFormsModule,
-        SharedUiModule, ReceiptProcessingSettingsFormComponent],
+        ReceiptProcessingSettingsFormComponent],
     providers: [
+        provideNgxMask(),
         {
             provide: ActivatedRoute,
             useValue: {

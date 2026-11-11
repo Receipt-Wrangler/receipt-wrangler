@@ -6,12 +6,11 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { NgxsModule } from "@ngxs/store";
 import { of } from "rxjs";
 import { PromptService } from "../../open-api";
-import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services";
-import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 
 import { PromptFormComponent } from "./prompt-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideNgxMask } from "ngx-mask";
 
 describe("PromptFormComponent", () => {
   let component: PromptFormComponent;
@@ -20,8 +19,9 @@ describe("PromptFormComponent", () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [SharedUiModule, PipesModule, ReactiveFormsModule, NgxsModule.forRoot([]), PromptFormComponent],
+    imports: [ReactiveFormsModule, NgxsModule.forRoot([]), PromptFormComponent],
     providers: [
+        provideNgxMask(),
         {
             provide: ActivatedRoute,
             useValue: {

@@ -3,7 +3,6 @@ import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, Validators } from "@angular/forms";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { ActivatedRoute } from "@angular/router";
-import { PipesModule } from "src/pipes/pipes.module";
 import { FormMode } from "../../enums/form-mode.enum";
 import { FormConfig } from "../../interfaces";
 import { Group, ReceiptStatus } from "../../open-api";
@@ -22,7 +21,7 @@ describe("GroupSettingsEmailComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [MatSnackBarModule, PipesModule, PipesModule, GroupSettingsEmailComponent],
+      imports: [MatSnackBarModule, GroupSettingsEmailComponent],
       providers: [
         provideStore([GroupState]),
         {
