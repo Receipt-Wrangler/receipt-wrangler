@@ -10,9 +10,6 @@ import { ImportFormComponent } from "./import-form/import-form.component";
 
 
 @NgModule({
-  declarations: [
-    ImportFormComponent
-  ],
   imports: [
     ButtonModule,
     CommonModule,
@@ -21,6 +18,7 @@ import { ImportFormComponent } from "./import-form/import-form.component";
     ReceiptsModule,
     SelectModule,
     SharedUiModule,
+    ImportFormComponent,
   ],
   exports: [
     ImportFormComponent

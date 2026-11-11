@@ -27,13 +27,6 @@ import { ReceiptListIconComponent } from "./receipt-list-icon/receipt-list-icon.
 import { SidebarComponent } from "./sidebar/sidebar.component";
 
 @NgModule({
-  declarations: [
-    AddReceiptIconComponent,
-    DashboardIconComponent,
-    HeaderComponent,
-    ReceiptListIconComponent,
-    SidebarComponent,
-  ],
   imports: [
     AutocompleteModule,
     AvatarModule,
@@ -58,6 +51,11 @@ import { SidebarComponent } from "./sidebar/sidebar.component";
     RouterModule,
     SearchbarModule,
     SharedUiModule,
+    AddReceiptIconComponent,
+    DashboardIconComponent,
+    HeaderComponent,
+    ReceiptListIconComponent,
+    SidebarComponent,
   ],
   exports: [HeaderComponent, AddReceiptIconComponent],
 })

@@ -1,5 +1,5 @@
 import { Component, OnInit, viewChild } from "@angular/core";
-import { FormBuilder, Validators } from "@angular/forms";
+import { FormBuilder, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { DomSanitizer, SafeHtml } from "@angular/platform-browser";
 import { Store } from "@ngxs/store";
@@ -14,13 +14,19 @@ import { DEFAULT_PRETTY_JSON_OPTIONS } from "../../receipt-processing-settings/c
 import { UploadImageComponent } from "../../receipts/upload-image/upload-image.component";
 import { SnackbarService } from "../../services";
 import { SetFeatureConfig } from "../../store";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 @Component({
     selector: "app-import-form",
     templateUrl: "./import-form.component.html",
     styleUrl: "./import-form.component.scss",
     animations: [fadeInOut],
-    standalone: false
+    imports: [DialogComponent, ReactiveFormsModule, UploadImageComponent, SelectComponent, DialogFooterComponent, ButtonComponent, DeleteButtonComponent, FormGetPipe]
 })
 export class ImportFormComponent extends BaseFormComponent implements OnInit {
   public readonly uploadImageComponent = viewChild.required(UploadImageComponent);

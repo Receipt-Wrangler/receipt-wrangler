@@ -46,7 +46,6 @@ describe("SidebarComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [SidebarComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [NgxsModule.forRoot([AuthState, LayoutState, GroupState, FeatureConfigState]),
         DirectivesModule,
@@ -56,7 +55,7 @@ describe("SidebarComponent", () => {
         NoopAnimationsModule,
         RouterTestingModule,
         SharedUiModule,
-        ApiModule],
+        ApiModule, SidebarComponent],
     providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi())]
 }).compileComponents();
 

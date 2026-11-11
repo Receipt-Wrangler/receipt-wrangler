@@ -14,6 +14,7 @@ import { SetAuthState, SetPermissions } from "../../store/auth.state.actions";
 import { SetSelectedGroupId } from "../../store/group.state.actions";
 import { StoreModule } from "../../store/store.module";
 import { HeaderComponent } from "./header.component";
+import { provideRouter } from "@angular/router";
 
 describe("HeaderComponent", () => {
   let component: HeaderComponent;
@@ -52,15 +53,13 @@ describe("HeaderComponent", () => {
     localStorage.clear();
 
     await TestBed.configureTestingModule({
-    declarations: [HeaderComponent],
     imports: [ApiModule,
         DirectivesModule,
         MatDialogModule,
         MatSnackBarModule,
         NgbPopoverModule,
-        StoreModule,
-    ],
-    providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()],
+        StoreModule, HeaderComponent,],
+    providers: [provideRouter([]), provideZonelessChangeDetection(), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()],
     schemas: [NO_ERRORS_SCHEMA],
 }).compileComponents();
 

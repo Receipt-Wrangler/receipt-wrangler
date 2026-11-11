@@ -8,7 +8,7 @@ describe('AddReceiptIconComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ AddReceiptIconComponent ]
+      imports: [AddReceiptIconComponent]
     })
     .compileComponents();
 

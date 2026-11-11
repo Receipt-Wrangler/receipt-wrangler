@@ -8,7 +8,7 @@ describe('DashboardIconComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ DashboardIconComponent ]
+      imports: [DashboardIconComponent]
     })
     .compileComponents();
 

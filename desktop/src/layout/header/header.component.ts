@@ -1,17 +1,27 @@
 import { Component, computed, effect, signal, untracked } from "@angular/core";
-import { Router } from "@angular/router";
+import { Router, RouterLinkActive, RouterLink } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
 import { LayoutState } from "src/store/layout.state";
 import { ToggleIsSidebarOpen } from "src/store/layout.state.actions";
 import { AuthService, NotificationsService, Permission } from "../../open-api";
 import { AuthState, GroupState } from "../../store";
+import { MatIconButton } from "@angular/material/button";
+import { MatTooltip } from "@angular/material/tooltip";
+import { MatIcon } from "@angular/material/icon";
+import { HasGroupPermissionDirective } from "../../directives/has-group-permission.directive";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { SearchbarComponent } from "../../searchbar/searchbar/searchbar.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { NgbPopover } from "@ng-bootstrap/ng-bootstrap";
+import { MatProgressBar } from "@angular/material/progress-bar";
+import { NotificationsListComponent } from "../../notifications/notifications-list/notifications-list.component";
 
 @Component({
     selector: "app-header",
     templateUrl: "./header.component.html",
     styleUrls: ["./header.component.scss"],
-    standalone: false
+    imports: [MatIconButton, MatTooltip, MatIcon, HasGroupPermissionDirective, RouterLinkActive, RouterLink, HasAppPermissionDirective, SearchbarComponent, ButtonComponent, NgbPopover, MatProgressBar, NotificationsListComponent]
 })
 export class HeaderComponent {
   public isLoggedIn = this.store.selectSignal(AuthState.isLoggedIn);
