@@ -42,6 +42,13 @@ with `context: .`). Per-component `api/Dockerfile` and `desktop/Dockerfile` used
 removed as dead config; do not add them back. Because the build context is the repo root, a
 `.dockerignore` is only ever consulted at the repo root too.
 
+### Fork Deployment (Oracle)
+This fork auto-deploys without server credentials in GitHub: `.github/workflows/deploy.yml` pushes
+`ghcr.io/ianrollo/receipt-wrangler:latest` (amd64 only), and a systemd timer on the VM pulls it.
+The runtime config (compose, `.env`, timer) and the 1 GB-RAM constraints live in `deploy/oracle/`.
+The inherited upstream workflows are disabled in the GitHub UI rather than deleted, so upstream
+merges stay conflict-free.
+
 ### Production Build (Monolith)
 The `docker/Dockerfile` builds a single container with both API and web interface:
 - Stage 1: Build Angular desktop app

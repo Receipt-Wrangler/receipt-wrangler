@@ -1,0 +1,13 @@
+[Unit]
+Description=Pull the latest Receipt Wrangler image and restart if it changed
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/receipt-wrangler
+ExecStart=/usr/bin/docker compose pull --quiet
+# `up -d` only recreates containers whose image actually changed.
+ExecStart=/usr/bin/docker compose up -d
+# The image is several GB (PyTorch, Chromium); don't let old ones fill the disk.
+ExecStart=/usr/bin/docker image prune -f

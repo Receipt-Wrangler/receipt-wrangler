@@ -1,0 +1,40 @@
+# Runtime stack for the Oracle E2.1.Micro (1 GB RAM). Lives in /opt/receipt-wrangler
+# on the server next to its .env; see README.md in this directory.
+services:
+  app:
+    image: ghcr.io/ianrollo/receipt-wrangler:latest
+    restart: unless-stopped
+    depends_on:
+      - redis
+    ports:
+      - "80:80"
+    env_file: .env
+    environment:
+      DB_ENGINE: sqlite
+      DB_FILENAME: wrangler.db
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    # Chromium (email-body rendering) crashes on Docker's 64 MB /dev/shm default.
+    shm_size: 256m
+    volumes:
+      - ./data:/app/receipt-wrangler-api/data
+      - ./sqlite:/app/receipt-wrangler-api/sqlite
+      - ./logs:/app/receipt-wrangler-api/logs
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Asynq requires noeviction: an evicted key is a lost job.
+    command: redis-server --save 60 1 --maxmemory 64mb --maxmemory-policy noeviction
+    volumes:
+      - ./redis:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
