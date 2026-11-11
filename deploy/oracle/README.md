@@ -43,12 +43,19 @@ curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker ubuntu   # log out and back in afterwards
 ```
 
+On Ubuntu 20.04 (this VM's image) the script fails at the end on `docker-model-plugin`, which
+Docker doesn't publish for focal. It has already added Docker's apt repo by then, so install the
+rest directly:
+`sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin`.
+
 **Open port 80.** Two places, both needed on Oracle:
 
 - Console → your VCN → Security List → add an ingress rule: source `0.0.0.0/0`, TCP, port `80`.
-- On the VM (Oracle's Ubuntu images ship a restrictive iptables):
+- On the VM (Oracle's Ubuntu images ship a restrictive iptables). The rule must land *before*
+  the chain's `REJECT`, whose position varies by image, so look it up rather than hard-coding it:
   ```bash
-  sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  n=$(sudo iptables -L INPUT --line-numbers -n | awk '$2=="REJECT"{print $1; exit}')
+  sudo iptables -I INPUT "$n" -m state --state NEW -p tcp --dport 80 -j ACCEPT
   sudo netfilter-persistent save
   ```
 
