@@ -8,6 +8,7 @@ import {
   ReportReceiptsDialogData,
 } from "../dialogs/report-receipts-dialog/report-receipts-dialog.component";
 import { ReportBuilderValue, toReportRequestCommand } from "../models/report-command.mapper";
+import { MatIcon } from "@angular/material/icon";
 
 /**
  * The live preview pane: renders the engine's HTML for the current configuration
@@ -19,8 +20,8 @@ import { ReportBuilderValue, toReportRequestCommand } from "../models/report-com
   selector: "app-report-preview-panel",
   templateUrl: "./report-preview-panel.component.html",
   styleUrls: ["./report-preview-panel.component.scss"],
-  standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatIcon],
 })
 export class ReportPreviewPanelComponent {
   public readonly form = input.required<FormGroup>();

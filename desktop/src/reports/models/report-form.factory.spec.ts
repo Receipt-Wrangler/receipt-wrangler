@@ -17,7 +17,9 @@ import {
 // @UntilDestroy()-decorated context — a throwaway host, exactly as the receipt
 // filter's own spec does.
 @UntilDestroy()
-@Component({ selector: "app-noop", template: "", standalone: false })
+@Component({
+  selector: "app-noop", template: ""
+})
 class NoopComponent {}
 
 describe("buildReportFormFromCommand", () => {
@@ -26,7 +28,7 @@ describe("buildReportFormFromCommand", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [NoopComponent],
+      imports: [NoopComponent],
       providers: [provideZonelessChangeDetection(), FormBuilder],
     }).compileComponents();
     host = TestBed.createComponent(NoopComponent).componentInstance;

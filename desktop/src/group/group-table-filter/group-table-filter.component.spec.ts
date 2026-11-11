@@ -19,9 +19,8 @@ describe("GroupTableFilterComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [GroupTableFilterComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
-    imports: [ReactiveFormsModule, NgxsModule.forRoot([GroupTableState]), PipesModule, ReactiveFormsModule],
+    imports: [ReactiveFormsModule, NgxsModule.forRoot([GroupTableState]), PipesModule, ReactiveFormsModule, GroupTableFilterComponent],
     providers: [
         { provide: MatDialogRef, useValue: { close: jest.fn() } },
         provideHttpClient(withInterceptorsFromDi()),

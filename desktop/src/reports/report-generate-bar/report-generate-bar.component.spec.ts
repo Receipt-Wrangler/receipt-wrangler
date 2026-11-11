@@ -15,11 +15,10 @@ describe("ReportGenerateBarComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ReportGenerateBarComponent],
       // The real ButtonModule renders the Save/Generate app-buttons as real <button>s
       // whose rendered/disabled state the DOM assertions below can inspect. The bar no
       // longer gates on permissions itself — the parent passes resolved booleans.
-      imports: [ButtonModule, NoopAnimationsModule],
+      imports: [ButtonModule, NoopAnimationsModule, ReportGenerateBarComponent],
       providers: [
         provideZonelessChangeDetection(),
         provideRouter([]),

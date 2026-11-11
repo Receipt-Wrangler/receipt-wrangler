@@ -14,7 +14,9 @@ import { ReadonlyValuePipe } from "../pipes/readonly-value.pipe";
     selector: "app-select",
     templateUrl: "./select.component.html",
     styleUrls: ["./select.component.scss"],
-    imports: [MatFormField, MatLabel, MatInput, MatSelect, ReactiveFormsModule, MatSelectTrigger, BadgeComponent, MatOption, MatError, AsyncPipe, OptionDisplayPipe, ReadonlyValuePipe]
+    imports: [MatFormField, MatLabel, MatInput, MatSelect, ReactiveFormsModule, MatSelectTrigger, BadgeComponent, MatOption, MatError, AsyncPipe, OptionDisplayPipe, ReadonlyValuePipe],
+    // ReadonlyValuePipe injects OptionDisplayPipe.
+    providers: [OptionDisplayPipe]
 })
 export class SelectComponent extends BaseInputComponent implements OnInit {
   public readonly options = input<any[]>([]);

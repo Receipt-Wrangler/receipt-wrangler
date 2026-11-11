@@ -2,10 +2,7 @@ import { Pipe, PipeTransform } from "@angular/core";
 import { Group, Permission } from "../../open-api";
 import { hasAll, hasAny } from "../../utils/permission.utils";
 
-@Pipe({
-    name: "groupTableEditButton",
-    standalone: false
-})
+@Pipe({ name: "groupTableEditButton" })
 export class GroupTableEditButtonPipe implements PipeTransform {
 
   public transform(

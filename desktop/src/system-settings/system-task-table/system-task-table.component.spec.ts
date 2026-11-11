@@ -28,7 +28,6 @@ describe("SystemTaskTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SystemTaskTableComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [ButtonComponent,
         SharedUiModule,
@@ -36,7 +35,7 @@ describe("SystemTaskTableComponent", () => {
         MatIconModule,
         NgxsModule.forRoot([SystemTaskTableState, UserState]),
         TableModule,
-        NoopAnimationsModule],
+        NoopAnimationsModule, SystemTaskTableComponent],
       providers: [{
         provide: ActivatedRoute,
         useValue: {

@@ -12,7 +12,9 @@ import { REPORT_GENERATOR_PAID_BY_ID, ReportFiltersComponent } from "./report-fi
 // filter needs an @UntilDestroy()-decorated context — a throwaway host, exactly as the
 // receipt filter's own spec and report-form.factory.spec do.
 @UntilDestroy()
-@Component({ selector: "app-noop", template: "", standalone: false })
+@Component({
+  selector: "app-noop", template: ""
+})
 class NoopComponent {}
 
 describe("ReportFiltersComponent", () => {
@@ -32,7 +34,7 @@ describe("ReportFiltersComponent", () => {
     };
 
     await TestBed.configureTestingModule({
-      declarations: [ReportFiltersComponent, NoopComponent],
+      imports: [ReportFiltersComponent, NoopComponent],
       providers: [
         provideZonelessChangeDetection(),
         FormBuilder,

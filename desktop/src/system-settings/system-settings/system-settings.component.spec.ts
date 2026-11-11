@@ -16,8 +16,7 @@ describe("SystemSettingsComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SystemSettingsComponent],
-      imports: [SharedUiModule, NgxsModule.forRoot([AuthState])],
+      imports: [SharedUiModule, NgxsModule.forRoot([AuthState]), SystemSettingsComponent],
       providers: [
         provideZonelessChangeDetection(),
         {

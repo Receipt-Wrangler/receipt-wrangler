@@ -30,7 +30,6 @@ describe('ApiKeyFormDialogComponent', () => {
     mockSnackbarService = { success: jest.fn(), error: jest.fn() } as unknown as jest.Mocked<SnackbarService>;
 
     await TestBed.configureTestingModule({
-      declarations: [ApiKeyFormDialogComponent],
       imports: [
         ReactiveFormsModule,
         MatIconModule,
@@ -39,7 +38,8 @@ describe('ApiKeyFormDialogComponent', () => {
         InputModule,
         PipesModule,
         SelectModule,
-        NgxsModule.forRoot([LayoutState])
+        NgxsModule.forRoot([LayoutState]),
+        ApiKeyFormDialogComponent
       ],
       providers: [
         { provide: MatDialogRef, useValue: mockDialogRef },

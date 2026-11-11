@@ -26,7 +26,6 @@ describe("OidcProviderTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [OidcProviderTableComponent],
       imports: [
         ApiModule,
         ButtonModule,
@@ -39,6 +38,7 @@ describe("OidcProviderTableComponent", () => {
         RouterTestingModule,
         SharedUiModule,
         TableModule,
+        OidcProviderTableComponent,
       ],
       providers: [
         SnackbarService,

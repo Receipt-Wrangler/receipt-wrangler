@@ -51,6 +51,19 @@ import {
   ColumnPickerDialogComponent,
   ColumnPickerDialogData,
 } from "../dialogs/column-picker-dialog/column-picker-dialog.component";
+import { ReportSectionComponent } from "../report-section/report-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { MatIcon } from "@angular/material/icon";
+import { SelectComponent } from "../../select/select/select.component";
+import { DatepickerComponent } from "../../datepicker/datepicker/datepicker.component";
+import { ReportFiltersComponent } from "../report-filters/report-filters.component";
+import { BadgeComponent } from "../../shared-ui/badge/badge.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { NgClass } from "@angular/common";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
+import { TextareaComponent } from "../../textarea/textarea/textarea.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 interface ScopeChip {
   index: number;
@@ -112,8 +125,22 @@ const KIND_META: Record<
   selector: "app-report-config-panel",
   templateUrl: "./report-config-panel.component.html",
   styleUrls: ["./report-config-panel.component.scss"],
-  standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    ReportSectionComponent,
+    InputComponent,
+    MatIcon,
+    SelectComponent,
+    DatepickerComponent,
+    ReportFiltersComponent,
+    BadgeComponent,
+    ButtonComponent,
+    NgClass,
+    CheckboxComponent,
+    AutocomleteComponent,
+    TextareaComponent,
+    FormGetPipe,
+  ],
 })
 export class ReportConfigPanelComponent implements OnInit {
   public readonly form = input.required<FormGroup>();

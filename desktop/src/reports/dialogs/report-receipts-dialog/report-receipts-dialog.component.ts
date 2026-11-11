@@ -19,6 +19,14 @@ import {
   resolvePeriodRange,
   toReportPeriodDateField,
 } from "../../models/report-period.util";
+import { DialogComponent } from "../../../shared-ui/dialog/dialog.component";
+import { MatIcon } from "@angular/material/icon";
+import { ButtonComponent } from "../../../button/button/button.component";
+import { StatusChipComponent } from "../../../shared-ui/status-chip/status-chip.component";
+import { AppDatePipe } from "../../../pipes/app-date.pipe";
+import { CustomCurrencyPipe } from "../../../pipes/custom-currency.pipe";
+import { NamePipe } from "../../../pipes/name.pipe";
+import { UserPipe } from "../../../pipes/user.pipe";
 
 export interface ReportReceiptsDialogData {
   // The command the preview ran, so the list covers exactly what it counted.
@@ -41,8 +49,17 @@ export interface ReportReceiptsDialogData {
   selector: "app-report-receipts-dialog",
   templateUrl: "./report-receipts-dialog.component.html",
   styleUrls: ["./report-receipts-dialog.component.scss"],
-  standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    DialogComponent,
+    MatIcon,
+    ButtonComponent,
+    StatusChipComponent,
+    AppDatePipe,
+    CustomCurrencyPipe,
+    NamePipe,
+    UserPipe,
+  ],
 })
 export class ReportReceiptsDialogComponent {
   private readonly reportService = inject(ReportService);

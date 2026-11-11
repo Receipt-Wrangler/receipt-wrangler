@@ -59,15 +59,14 @@ describe("ReportConfigPanelComponent", () => {
     customFieldService = { getPagedCustomFields: jest.fn(() => of({ data: [], totalCount: 0 })) };
 
     await TestBed.configureTestingModule({
-      declarations: [ReportConfigPanelComponent],
+      imports: [ReportConfigPanelComponent],
       providers: [
         provideZonelessChangeDetection(),
         FormBuilder,
         {
           provide: Store,
           useValue: {
-            selectSignal: (selector: unknown) =>
-              signal(selector === SystemSettingsState.timeZone ? "America/New_York" : GROUPS),
+            selectSignal: (selector: unknown) => signal(selector === SystemSettingsState.timeZone ? "America/New_York" : GROUPS),
           },
         },
         { provide: MatDialog, useValue: dialog },

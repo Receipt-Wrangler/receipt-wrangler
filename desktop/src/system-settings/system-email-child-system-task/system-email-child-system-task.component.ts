@@ -1,12 +1,14 @@
 import {Component, TemplateRef, computed, input, viewChild} from '@angular/core';
 import {ReceiptProcessingSettings, SystemTask, SystemTaskType} from "../../open-api";
 import {AccordionPanel} from "../../shared-ui/accordion/accordion-panel.interface";
+import { AccordionComponent } from '../../shared-ui/accordion/accordion.component';
+import { ReceiptProcessingSettingsChildSystemTaskAccordionComponent } from '../../receipt-processing-settings/receipt-processing-settings-child-system-task-accordion/receipt-processing-settings-child-system-task-accordion.component';
 
 @Component({
     selector: 'app-system-email-child-system-task',
     templateUrl: './system-email-child-system-task.component.html',
     styleUrl: './system-email-child-system-task.component.scss',
-    standalone: false
+    imports: [AccordionComponent, ReceiptProcessingSettingsChildSystemTaskAccordionComponent]
 })
 export class SystemEmailChildSystemTaskComponent {
   public readonly emailUploadDetails = viewChild.required<TemplateRef<any>>('emailUploadDetails');

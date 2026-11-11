@@ -15,6 +15,14 @@ import { ApiKeyTableState } from "../../store/api-key-table.state";
 import { ApiKeyFormDialogComponent } from "../api-key-form-dialog/api-key-form-dialog.component";
 import { ApiKeyTableFilterComponent } from "../api-key-table-filter/api-key-table-filter.component";
 import { ApiKeyTableService } from "./api-key-table.service";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { AsyncPipe } from "@angular/common";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { UserPipe } from "../../pipes/user.pipe";
 
 
 @UntilDestroy()
@@ -29,7 +37,7 @@ import { ApiKeyTableService } from "./api-key-table.service";
       useClass: ApiKeyTableService
     }
   ],
-  standalone: false
+  imports: [TableHeaderComponent, AddButtonComponent, ButtonComponent, TableComponent, EditButtonComponent, DeleteButtonComponent, AsyncPipe, AppDatePipe, UserPipe]
 })
 export class ApiKeyTableComponent extends BaseTableComponent<ApiKeyView> implements OnInit, AfterViewInit {
   private readonly nameCell = viewChild.required<TemplateRef<any>>("nameCell");

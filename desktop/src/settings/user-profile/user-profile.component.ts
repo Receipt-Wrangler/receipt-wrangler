@@ -16,12 +16,21 @@ import {
   DeleteAccountDialogData,
   DeleteAccountDialogResult,
 } from "../delete-account-dialog/delete-account-dialog.component";
+import { FormComponent } from "../../shared-ui/form/form.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { MatTooltip } from "@angular/material/tooltip";
+import { ColorPickerComponent } from "../../color-picker/color-picker/color-picker.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @Component({
     selector: "app-user-profile",
     templateUrl: "./user-profile.component.html",
     styleUrls: ["./user-profile.component.scss"],
-    standalone: false
+    imports: [FormComponent, FormSectionComponent, InputComponent, MatTooltip, ColorPickerComponent, ButtonComponent, HasAppPermissionDirective, FormGetPipe, InputReadonlyPipe]
 })
 export class UserProfileComponent implements OnInit {
   public form: FormGroup = new FormGroup({});

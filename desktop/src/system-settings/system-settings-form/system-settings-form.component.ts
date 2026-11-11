@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, ElementRef, OnInit, viewChild } from "@angular/core";
-import { FormArray, FormBuilder, FormGroup, ValidatorFn, Validators } from "@angular/forms";
+import { FormArray, FormBuilder, FormGroup, ValidatorFn, Validators, ReactiveFormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
@@ -24,6 +24,22 @@ import { SetCurrencyData, SetCurrencyDisplay, SetTimeZone } from "../../store/sy
 import { DurationUnit, maxForUnit, minForUnit, splitHours, toHours } from "../../utils";
 import { DEFAULT_APP_TIME_ZONE, timeZoneOptions } from "../../utils/app-time-zone";
 import { absoluteUrlValidator, durationValueValidator } from "../../validators";
+import { FormHeaderComponent } from "../../shared-ui/form-header/form-header.component";
+import { AlertComponent } from "../../alert/alert.component";
+import { AuditDetailSectionComponent } from "../../shared-ui/audit-detail-section/audit-detail-section.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { InputComponent } from "../../input/input/input.component";
+import { NgTemplateOutlet } from "@angular/common";
+import { SelectComponent } from "../../select/select/select.component";
+import { FormButtonBarComponent } from "../../shared-ui/form-button-bar/form-button-bar.component";
+import { SubmitButtonComponent } from "../../shared-ui/submit-button/submit-button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { TaskQueueFormControlPipe } from "../pipes/task-queue-form-control.pipe";
 
 interface QueueData extends FormOption {
   description: string;
@@ -36,7 +52,7 @@ interface QueueData extends FormOption {
   styleUrl: "./system-settings-form.component.scss",
   providers: [InputReadonlyPipe],
   animations: [fadeInOut],
-  standalone: false
+  imports: [FormHeaderComponent, AlertComponent, AuditDetailSectionComponent, ReactiveFormsModule, FormSectionComponent, CheckboxComponent, AutocomleteComponent, InputComponent, NgTemplateOutlet, SelectComponent, FormButtonBarComponent, SubmitButtonComponent, EditButtonComponent, CardComponent, ButtonComponent, CustomCurrencyPipe, FormGetPipe, InputReadonlyPipe, TaskQueueFormControlPipe]
 })
 export class SystemSettingsFormComponent extends BaseFormComponent implements OnInit, AfterViewInit {
   public readonly fallbackReceiptProcessingSettings = viewChild.required<AutocomleteComponent>("fallbackReceiptProcessingSettings");

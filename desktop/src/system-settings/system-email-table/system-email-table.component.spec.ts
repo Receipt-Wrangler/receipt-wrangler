@@ -19,11 +19,10 @@ describe("SystemEmailsComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [SystemEmailTableComponent],
     imports: [SharedUiModule,
         NgxsModule.forRoot([SystemEmailTableState]),
         TableModule,
-        NoopAnimationsModule],
+        NoopAnimationsModule, SystemEmailTableComponent],
     providers: [{
             provide: ActivatedRoute,
             useValue: {}

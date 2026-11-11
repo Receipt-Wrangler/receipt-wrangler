@@ -22,6 +22,12 @@ import { applyFormCommand } from "../../utils/form.utils";
 import { buildSystemTaskFilterChips, SystemTaskFilterChip } from "../../utils/system-task-filter-chips";
 import { buildSystemTaskFilterForm } from "../../utils/system-task-filter";
 import { SystemTaskFilterComponent } from "../system-task-filter/system-task-filter.component";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { MatChipSet, MatChip, MatChipRemove } from "@angular/material/chips";
+import { MatIcon } from "@angular/material/icon";
+import { SystemEmailChildSystemTaskComponent } from "../system-email-child-system-task/system-email-child-system-task.component";
+import { ReceiptProcessingSettingsChildSystemTaskAccordionComponent } from "../../receipt-processing-settings/receipt-processing-settings-child-system-task-accordion/receipt-processing-settings-child-system-task-accordion.component";
 
 @UntilDestroy()
 @Component({
@@ -35,7 +41,7 @@ import { SystemTaskFilterComponent } from "../system-task-filter/system-task-fil
     },
     DatePipe,
   ],
-  standalone: false
+  imports: [TableHeaderComponent, ButtonComponent, MatChipSet, MatChip, MatChipRemove, MatIcon, TaskTableComponent, SystemEmailChildSystemTaskComponent, ReceiptProcessingSettingsChildSystemTaskAccordionComponent]
 })
 export class SystemTaskTableComponent implements OnInit {
   public readonly expandedRowTemplate = viewChild.required<TemplateRef<any>>("expandedRowTemplate");

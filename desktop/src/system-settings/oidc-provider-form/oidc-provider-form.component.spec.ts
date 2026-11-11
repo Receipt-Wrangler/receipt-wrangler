@@ -39,7 +39,6 @@ describe("OidcProviderFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [OidcProviderFormComponent],
       imports: [
         ApiModule,
         ButtonModule,
@@ -52,6 +51,7 @@ describe("OidcProviderFormComponent", () => {
         ReactiveFormsModule,
         RouterTestingModule,
         SharedUiModule,
+        OidcProviderFormComponent,
       ],
       providers: [
         SnackbarService,

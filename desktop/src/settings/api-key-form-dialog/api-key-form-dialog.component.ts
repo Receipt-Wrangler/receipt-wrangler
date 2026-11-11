@@ -1,16 +1,23 @@
 import { Component, Input, OnInit } from "@angular/core";
-import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { take, tap } from "rxjs";
 import { API_KEY_SCOPE_OPTIONS } from "../../constants";
 import { ApiKeyResult, ApiKeyScope, ApiKeyService, ApiKeyView, UpsertApiKeyCommand } from "../../open-api";
 import { SnackbarService } from "../../services";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { InputComponent } from "../../input/input/input.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { MatIcon } from "@angular/material/icon";
+import { ButtonComponent } from "../../button/button/button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 @Component({
   selector: "app-api-key-form-dialog",
   templateUrl: "./api-key-form-dialog.component.html",
   styleUrls: ["./api-key-form-dialog.component.scss"],
-  standalone: false
+  imports: [DialogComponent, ReactiveFormsModule, InputComponent, SelectComponent, DialogFooterComponent, MatIcon, ButtonComponent, FormGetPipe]
 })
 export class ApiKeyFormDialogComponent implements OnInit {
   @Input() public headerText: string = "";

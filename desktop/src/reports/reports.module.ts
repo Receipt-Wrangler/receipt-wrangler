@@ -28,18 +28,6 @@ import { ReportTemplateListComponent } from "./report-template-list/report-templ
 import { ReportsRoutingModule } from "./reports-routing.module";
 
 @NgModule({
-  declarations: [
-    AddGroupDialogComponent,
-    ColumnPickerDialogComponent,
-    ReportBuilderComponent,
-    ReportConfigPanelComponent,
-    ReportFiltersComponent,
-    ReportGenerateBarComponent,
-    ReportPreviewPanelComponent,
-    ReportReceiptsDialogComponent,
-    ReportSectionComponent,
-    ReportTemplateListComponent,
-  ],
   imports: [
     AutocompleteModule,
     ButtonModule,
@@ -58,6 +46,16 @@ import { ReportsRoutingModule } from "./reports-routing.module";
     TableModule,
     TextareaModule,
     UserAutocompleteModule,
+    AddGroupDialogComponent,
+    ColumnPickerDialogComponent,
+    ReportBuilderComponent,
+    ReportConfigPanelComponent,
+    ReportFiltersComponent,
+    ReportGenerateBarComponent,
+    ReportPreviewPanelComponent,
+    ReportReceiptsDialogComponent,
+    ReportSectionComponent,
+    ReportTemplateListComponent,
   ],
 })
 export class ReportsModule {}

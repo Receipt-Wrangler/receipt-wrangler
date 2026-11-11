@@ -15,6 +15,7 @@ import { AuthState, FeatureConfigState, Logout, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { buildOidcDeleteConfirmationUrl, UserProfileComponent } from "./user-profile.component";
 import { DeleteAccountDialogComponent } from "../delete-account-dialog/delete-account-dialog.component";
+import { provideNgxMask } from "ngx-mask";
 
 function connection(overrides: Partial<OidcConnectionView> = {}): OidcConnectionView {
   return {
@@ -32,7 +33,6 @@ describe("UserProfileComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [UserProfileComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         DirectivesModule,
@@ -41,8 +41,9 @@ describe("UserProfileComponent", () => {
         MatSnackBarModule,
         NgxsModule.forRoot([AuthState, FeatureConfigState, UserState]),
         PipesModule,
-        ReactiveFormsModule],
+        ReactiveFormsModule, UserProfileComponent],
     providers: [
+        provideNgxMask(),
         {
             provide: ActivatedRoute,
             useValue: { snapshot: { data: { formConfig: {} } } },

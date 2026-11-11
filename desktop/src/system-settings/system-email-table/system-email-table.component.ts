@@ -3,7 +3,7 @@ import {MatDialog} from "@angular/material/dialog";
 import {PageEvent} from "@angular/material/paginator";
 import {Sort} from "@angular/material/sort";
 import {MatTableDataSource} from "@angular/material/table";
-import {ActivatedRoute} from "@angular/router";
+import { ActivatedRoute, RouterLink } from "@angular/router";
 import {Store} from "@ngxs/store";
 import {take, tap} from "rxjs";
 import {CheckEmailConnectivityCommand, Group, Permission, SystemEmail, SystemEmailService, SystemTaskStatus} from "../../open-api";
@@ -12,12 +12,20 @@ import {ConfirmationDialogComponent} from "../../shared-ui/confirmation-dialog/c
 import {SystemEmailTableState} from "../../store/system-email-table.state";
 import {SetOrderBy, SetPage, SetPageSize, SetSortDirection} from "../../store/system-email-table.state.actions";
 import {TableColumn} from "../../table/table-column.interface";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { TableComponent } from "../../table/table/table.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
 
 @Component({
     selector: "app-system-email-table",
     templateUrl: "./system-email-table.component.html",
     styleUrl: "./system-email-table.component.scss",
-    standalone: false
+    imports: [TableHeaderComponent, HasAppPermissionDirective, AddButtonComponent, TableComponent, RouterLink, EditButtonComponent, ButtonComponent, DeleteButtonComponent, AppDatePipe]
 })
 export class SystemEmailTableComponent implements OnInit, AfterViewInit {
   protected readonly Permission = Permission;

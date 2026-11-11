@@ -7,12 +7,19 @@ import { BaseFormComponent, FormCommand } from "src/form";
 import { FormListComponent } from "src/shared-ui/form-list/form-list.component";
 import { FormConfig } from "../../interfaces";
 import { Group, GroupSettingsWhiteListEmail, SubjectLineRegex, SystemEmail } from "../../open-api";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
+import { UserAutocompleteComponent } from "../../user-autocomplete/user-autocomplete/user-autocomplete.component";
+import { StatusSelectComponent } from "../../shared-ui/status-select/status-select.component";
+import { InputComponent } from "../../input/input/input.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @Component({
     selector: "app-group-settings-email",
     templateUrl: "./group-settings-email.component.html",
     styleUrls: ["./group-settings-email.component.scss"],
-    standalone: false
+    imports: [CheckboxComponent, AutocomleteComponent, UserAutocompleteComponent, StatusSelectComponent, FormListComponent, InputComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class GroupSettingsEmailComponent
   extends BaseFormComponent

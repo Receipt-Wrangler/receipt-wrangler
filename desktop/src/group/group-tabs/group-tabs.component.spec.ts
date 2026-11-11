@@ -5,6 +5,7 @@ import { NgxsModule, Store } from "@ngxs/store";
 import { Permission } from "../../open-api";
 import { AuthState, FeatureConfigState } from "../../store";
 import { GroupTabsComponent } from "./group-tabs.component";
+import { provideRouter } from "@angular/router";
 
 describe("GroupTabsComponent", () => {
   let component: GroupTabsComponent;
@@ -12,8 +13,8 @@ describe("GroupTabsComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [GroupTabsComponent],
-      imports: [ReactiveFormsModule, NgxsModule.forRoot([FeatureConfigState, AuthState])],
+      imports: [ReactiveFormsModule, NgxsModule.forRoot([FeatureConfigState, AuthState]), GroupTabsComponent],
+      providers: [provideRouter([])],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });
     fixture = TestBed.createComponent(GroupTabsComponent);

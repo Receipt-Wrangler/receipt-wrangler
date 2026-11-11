@@ -14,6 +14,17 @@ import { AuthState, GroupState, RemoveGroup } from "../../store";
 import { GroupTableState } from "../../store/group-table.state";
 import { GroupTableFilterComponent } from "../group-table-filter/group-table-filter.component";
 import { GroupTableService } from "./group-table.service";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { RouterLink } from "@angular/router";
+import { HasGroupPermissionDirective } from "../../directives/has-group-permission.directive";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { AsyncPipe } from "@angular/common";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { GroupTableEditButtonPipe } from "./group-table-edit-button.pipe";
 
 
 @UntilDestroy()
@@ -28,7 +39,7 @@ import { GroupTableService } from "./group-table.service";
             useClass: GroupTableService
         }
     ],
-    standalone: false
+    imports: [TableHeaderComponent, HasAppPermissionDirective, AddButtonComponent, ButtonComponent, TableComponent, RouterLink, HasGroupPermissionDirective, EditButtonComponent, DeleteButtonComponent, AsyncPipe, AppDatePipe, GroupTableEditButtonPipe]
 })
 export class GroupTableComponent extends BaseTableComponent<Group> implements OnInit, AfterViewInit {
   public groups = this.store.selectSignal(GroupState.groups);

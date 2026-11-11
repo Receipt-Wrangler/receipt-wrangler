@@ -33,7 +33,6 @@ describe("GroupFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [GroupFormComponent, GroupMemberFormComponent],
     imports: [ApiModule,
         ButtonModule,
         CheckboxModule,
@@ -49,7 +48,7 @@ describe("GroupFormComponent", () => {
         SelectModule,
         SharedUiModule,
         TableModule,
-        UserAutocompleteModule],
+        UserAutocompleteModule, GroupFormComponent, GroupMemberFormComponent],
     providers: [
         provideRouter([]),
         {

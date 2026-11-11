@@ -1,7 +1,7 @@
 import { Component, OnInit, viewChild } from "@angular/core";
-import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
-import { ActivatedRoute, Router } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { take, tap } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { FormConfig } from "../../interfaces";
@@ -18,6 +18,18 @@ import { TABLE_SERVICE_INJECTION_TOKEN } from "../../services/injection-tokens/t
 import { SystemEmailTaskTableService } from "../../services/system-email-task-table.service";
 import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
 import { TaskTableComponent } from "../../shared-ui/task-table/task-table.component";
+import { FormHeaderComponent } from "../../shared-ui/form-header/form-header.component";
+import { AuditDetailSectionComponent } from "../../shared-ui/audit-detail-section/audit-detail-section.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { InputComponent } from "../../input/input/input.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { FormButtonBarComponent } from "../../shared-ui/form-button-bar/form-button-bar.component";
+import { SubmitButtonComponent } from "../../shared-ui/submit-button/submit-button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { SystemEmailChildSystemTaskComponent } from "../system-email-child-system-task/system-email-child-system-task.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @Component({
   selector: "app-system-email-form",
@@ -27,7 +39,7 @@ import { TaskTableComponent } from "../../shared-ui/task-table/task-table.compon
     provide: TABLE_SERVICE_INJECTION_TOKEN,
     useClass: SystemEmailTaskTableService
   }],
-  standalone: false
+  imports: [FormHeaderComponent, ReactiveFormsModule, AuditDetailSectionComponent, FormSectionComponent, InputComponent, CheckboxComponent, TaskTableComponent, FormButtonBarComponent, SubmitButtonComponent, EditButtonComponent, RouterLink, ButtonComponent, SystemEmailChildSystemTaskComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class SystemEmailFormComponent implements OnInit {
   public readonly taskTableComponent = viewChild.required(TaskTableComponent);

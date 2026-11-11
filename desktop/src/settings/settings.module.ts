@@ -29,17 +29,6 @@ import { UserProfileComponent } from "./user-profile/user-profile.component";
 import { UserShortcutComponent } from './user-shortcut/user-shortcut.component';
 
 @NgModule({
-  declarations: [
-    ApiKeyFormDialogComponent,
-    ApiKeyTableComponent,
-    ApiKeyTableFilterComponent,
-    ApiKeysComponent,
-    DeleteAccountDialogComponent,
-    SettingsComponent,
-    UserProfileComponent,
-    UserPreferencesComponent,
-    UserShortcutComponent,
-  ],
   imports: [
     AutocompleteModule,
     ButtonModule,
@@ -60,6 +49,15 @@ import { UserShortcutComponent } from './user-shortcut/user-shortcut.component';
     SharedUiModule,
     TableModule,
     UserAutocompleteModule,
+    ApiKeyFormDialogComponent,
+    ApiKeyTableComponent,
+    ApiKeyTableFilterComponent,
+    ApiKeysComponent,
+    DeleteAccountDialogComponent,
+    SettingsComponent,
+    UserProfileComponent,
+    UserPreferencesComponent,
+    UserShortcutComponent,
   ],
 })
 export class SettingsModule {}

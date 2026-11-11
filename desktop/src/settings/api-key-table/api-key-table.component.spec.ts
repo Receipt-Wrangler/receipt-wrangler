@@ -26,7 +26,6 @@ describe("ApiKeyTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ApiKeyTableComponent],
       imports: [
         SharedUiModule,
         PipesModule,
@@ -34,6 +33,7 @@ describe("ApiKeyTableComponent", () => {
         TableModule,
         MatDialogModule,
         NoopAnimationsModule,
+        ApiKeyTableComponent,
       ],
       providers: [
         provideZonelessChangeDetection(),

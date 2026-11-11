@@ -9,6 +9,7 @@ import { NgxsModule } from "@ngxs/store";
 import { AuthState, GroupState } from "../../store/index";
 
 import { GroupDetailsComponent } from "./group-details.component";
+import { GroupFormComponent } from "../group-form/group-form.component";
 
 describe("GroupDetailsComponent", () => {
   let component: GroupDetailsComponent;
@@ -16,9 +17,8 @@ describe("GroupDetailsComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [GroupDetailsComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [ReactiveFormsModule, CommonModule, NgxsModule.forRoot([GroupState, AuthState])],
+      imports: [ReactiveFormsModule, CommonModule, NgxsModule.forRoot([GroupState, AuthState]), GroupDetailsComponent],
       providers: [
         {
           provide: ActivatedRoute,
@@ -34,6 +34,11 @@ describe("GroupDetailsComponent", () => {
         provideHttpClientTesting(),
       ]
     })
+      // The real group form needs route data this spec does not provide.
+      .overrideComponent(GroupDetailsComponent, {
+        remove: { imports: [GroupFormComponent] },
+        add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] },
+      })
       .compileComponents();
 
     fixture = TestBed.createComponent(GroupDetailsComponent);

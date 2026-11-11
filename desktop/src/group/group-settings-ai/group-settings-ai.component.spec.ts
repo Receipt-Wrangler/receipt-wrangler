@@ -5,6 +5,7 @@ import { FormConfig } from "../../interfaces";
 import { PipesModule } from "../../pipes";
 
 import { GroupSettingsAiComponent } from "./group-settings-ai.component";
+import { provideStore } from "@ngxs/store";
 
 describe("GroupSettingsAiComponent", () => {
   let component: GroupSettingsAiComponent;
@@ -12,9 +13,9 @@ describe("GroupSettingsAiComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [GroupSettingsAiComponent],
-      imports: [PipesModule],
+      imports: [PipesModule, GroupSettingsAiComponent],
       providers: [
+        provideStore([]),
         {
           provide: ActivatedRoute,
           useValue: {

@@ -3,6 +3,8 @@ import {ComponentFixture, TestBed} from '@angular/core/testing';
 import {SystemEmailChildSystemTaskComponent} from './system-email-child-system-task.component';
 import {CUSTOM_ELEMENTS_SCHEMA} from "@angular/core";
 import {ReceiptProcessingSettings, SystemTask, SystemTaskType} from "../../open-api";
+import { provideRouter } from "@angular/router";
+import { ReceiptProcessingSettingsChildSystemTaskAccordionComponent } from "../../receipt-processing-settings/receipt-processing-settings-child-system-task-accordion/receipt-processing-settings-child-system-task-accordion.component";
 
 function task(id: number, type: SystemTaskType, extra: Partial<SystemTask> = {}): SystemTask {
   return {id, type, ...extra} as SystemTask;
@@ -16,9 +18,14 @@ describe('SystemEmailChildSystemTaskComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SystemEmailChildSystemTaskComponent],
+      imports: [SystemEmailChildSystemTaskComponent],
+      providers: [provideRouter([])],
       schemas: [CUSTOM_ELEMENTS_SCHEMA]
     })
+      .overrideComponent(SystemEmailChildSystemTaskComponent, {
+        remove: { imports: [ReceiptProcessingSettingsChildSystemTaskAccordionComponent] },
+        add: { schemas: [CUSTOM_ELEMENTS_SCHEMA] },
+      })
       .compileComponents();
 
     fixture = TestBed.createComponent(SystemEmailChildSystemTaskComponent);

@@ -1,6 +1,12 @@
 import { Component, Inject, Optional } from "@angular/core";
 import { FormBuilder, FormGroup, Validators } from "@angular/forms";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { CancelButtonComponent } from "../../shared-ui/cancel-button/cancel-button.component";
+import { InputComponent } from "../../input/input/input.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 /** An identity provider the account can confirm its deletion with. */
 export interface DeleteAccountDialogProvider {
@@ -27,7 +33,7 @@ export type DeleteAccountDialogResult =
     selector: "app-delete-account-dialog",
     templateUrl: "./delete-account-dialog.component.html",
     styleUrls: ["./delete-account-dialog.component.scss"],
-    standalone: false
+    imports: [DialogComponent, ButtonComponent, CancelButtonComponent, InputComponent, DialogFooterComponent, FormGetPipe]
 })
 export class DeleteAccountDialogComponent {
   public form: FormGroup;

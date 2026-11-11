@@ -30,7 +30,6 @@ describe("SystemSettingsFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [SystemSettingsFormComponent, TaskQueueFormControlPipe],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [CustomCurrencyPipe,
         AutocompleteModule,
@@ -40,7 +39,7 @@ describe("SystemSettingsFormComponent", () => {
         PipesModule,
         ReactiveFormsModule,
         SharedUiModule,
-        NoopAnimationsModule],
+        NoopAnimationsModule, SystemSettingsFormComponent, TaskQueueFormControlPipe],
     providers: [
         provideZonelessChangeDetection(),
         CustomCurrencyPipe,

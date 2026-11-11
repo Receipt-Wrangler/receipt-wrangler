@@ -4,6 +4,9 @@ import { Store } from "@ngxs/store";
 import { AuthState, GroupState } from "src/store";
 import { Permission } from "../../../open-api";
 import { CHIP_COLORS, groupInitials } from "../../models/report-chip.util";
+import { DialogComponent } from "../../../shared-ui/dialog/dialog.component";
+import { MatIcon } from "@angular/material/icon";
+import { DialogFooterComponent } from "../../../shared-ui/dialog-footer/dialog-footer.component";
 
 export interface AddGroupDialogData {
   selectedGroupIds: string[];
@@ -26,8 +29,12 @@ interface GroupChoice {
   selector: "app-add-group-dialog",
   templateUrl: "./add-group-dialog.component.html",
   styleUrls: ["./add-group-dialog.component.scss"],
-  standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    DialogComponent,
+    MatIcon,
+    DialogFooterComponent,
+  ],
 })
 export class AddGroupDialogComponent {
   private readonly store = inject(Store);

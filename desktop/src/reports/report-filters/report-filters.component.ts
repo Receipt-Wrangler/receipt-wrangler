@@ -6,6 +6,12 @@ import { RECEIPT_STATUS_OPTIONS } from "src/constants";
 import { AuthState, GroupState, UserState } from "src/store";
 import { OperationsPipe } from "../../shared-ui/receipt-filter/operations.pipe";
 import { Category, FilterOperation, Tag } from "../../open-api";
+import { InputComponent } from "../../input/input/input.component";
+import { DatepickerComponent } from "../../datepicker/datepicker/datepicker.component";
+import { AutocomleteComponent } from "../../autocomplete/autocomlete/autocomlete.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 /**
  * The pinned "report generator" paid-by option id — negative so it never collides
@@ -57,8 +63,15 @@ const FILTER_FIELDS: FilterFieldDef[] = [
   selector: "app-report-filters",
   templateUrl: "./report-filters.component.html",
   styleUrls: ["./report-filters.component.scss"],
-  standalone: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    InputComponent,
+    DatepickerComponent,
+    AutocomleteComponent,
+    SelectComponent,
+    ButtonComponent,
+    FormGetPipe,
+  ],
 })
 export class ReportFiltersComponent implements OnInit {
   public readonly form = input.required<FormGroup>();

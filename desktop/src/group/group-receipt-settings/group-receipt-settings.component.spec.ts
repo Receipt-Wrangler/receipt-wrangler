@@ -99,12 +99,12 @@ describe("GroupReceiptSettingsComponent", () => {
 
   const configureTestBed = async (mode: FormMode = FormMode.edit, options: TestBedOptions = {}) => {
     await TestBed.configureTestingModule({
-      declarations: [GroupReceiptSettingsComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
         SharedUiModule,
         StoreModule,
-        PipesModule
+        PipesModule,
+        GroupReceiptSettingsComponent
       ],
       providers: [
         FormBuilder,
@@ -404,7 +404,7 @@ describe("GroupReceiptSettingsComponent", () => {
         By.css("[data-testid='group-default-custom-fields']")
       );
       expect(picker).toBeTruthy();
-      expect(picker.properties["readonly"]).toBe(true);
+      expect(picker.componentInstance.readonly).toBe(true);
     });
 
     it("should not mark the picker readonly in edit mode", async () => {
@@ -413,7 +413,7 @@ describe("GroupReceiptSettingsComponent", () => {
       const picker = fixture.debugElement.query(
         By.css("[data-testid='group-default-custom-fields']")
       );
-      expect(picker.properties["readonly"]).toBe(false);
+      expect(picker.componentInstance.readonly).toBe(false);
     });
   });
 

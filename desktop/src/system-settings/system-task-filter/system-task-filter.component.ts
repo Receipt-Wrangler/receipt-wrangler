@@ -13,6 +13,10 @@ import { setupAutoOperationSelection } from "src/utils/filter-form";
 import { take, tap } from "rxjs";
 import { FormCommand } from "../../form/index";
 import { UserState } from "../../store";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { FilterFieldComponent } from "../../shared-ui/filter-field/filter-field.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { ButtonComponent } from "../../button/button/button.component";
 
 /**
  * The System Tasks table's filter dialog. Deliberately the same shape as
@@ -24,7 +28,7 @@ import { UserState } from "../../store";
   selector: "app-system-task-filter",
   templateUrl: "./system-task-filter.component.html",
   styleUrls: ["./system-task-filter.component.scss"],
-  standalone: false
+  imports: [DialogComponent, FilterFieldComponent, DialogFooterComponent, ButtonComponent]
 })
 export class SystemTaskFilterComponent implements OnInit {
   @Input() public headerText: string = "";

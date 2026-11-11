@@ -26,7 +26,6 @@ describe("SystemEmailFormComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SystemEmailFormComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [ApiModule,
         NgxsModule.forRoot([SystemEmailTaskTableState]),
@@ -35,7 +34,7 @@ describe("SystemEmailFormComponent", () => {
         MatSnackBarModule,
         ReactiveFormsModule,
         SharedUiModule,
-        NoopAnimationsModule],
+        NoopAnimationsModule, SystemEmailFormComponent],
       providers: [
         {
           provide: TABLE_SERVICE_INJECTION_TOKEN,

@@ -9,6 +9,8 @@ import { FormConfig } from "../../interfaces";
 import { Group, ReceiptStatus } from "../../open-api";
 
 import { GroupSettingsEmailComponent } from "./group-settings-email.component";
+import { provideStore } from "@ngxs/store";
+import { GroupState } from "../../store/group.state";
 
 describe("GroupSettingsEmailComponent", () => {
   let component: GroupSettingsEmailComponent;
@@ -20,9 +22,9 @@ describe("GroupSettingsEmailComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [GroupSettingsEmailComponent],
-      imports: [MatSnackBarModule, PipesModule, PipesModule],
+      imports: [MatSnackBarModule, PipesModule, PipesModule, GroupSettingsEmailComponent],
       providers: [
+        provideStore([GroupState]),
         {
           provide: ActivatedRoute,
           useValue: {
@@ -30,6 +32,7 @@ describe("GroupSettingsEmailComponent", () => {
               data: {
                 formConfig: formConfig,
                 group: { id: 1 },
+                systemEmails: [],
               },
             },
           },

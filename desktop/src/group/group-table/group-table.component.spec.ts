@@ -33,7 +33,6 @@ describe("GroupTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [GroupTableComponent],
       imports: [
         ApiModule,
         ButtonModule,
@@ -45,6 +44,7 @@ describe("GroupTableComponent", () => {
         NoopAnimationsModule,
         SharedUiModule,
         TableModule,
+        GroupTableComponent,
       ],
       providers: [
         provideZonelessChangeDetection(),

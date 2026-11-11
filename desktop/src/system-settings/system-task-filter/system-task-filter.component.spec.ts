@@ -18,12 +18,12 @@ import { StoreModule } from "../../store/store.module";
 import { applyFormCommand } from "../../utils/index";
 import { buildSystemTaskFilterForm } from "../../utils/system-task-filter";
 import { SystemTaskFilterComponent } from "./system-task-filter.component";
+import { provideRouter } from "@angular/router";
 
 @UntilDestroy()
 @Component({
   selector: "app-noop",
-  template: "",
-  standalone: false
+  template: ""
 })
 class NoopComponent {}
 
@@ -54,7 +54,6 @@ describe("SystemTaskFilterComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [SystemTaskFilterComponent, NoopComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
         InputModule,
@@ -63,8 +62,10 @@ describe("SystemTaskFilterComponent", () => {
         PipesModule,
         ReactiveFormsModule,
         StoreModule,
+        SystemTaskFilterComponent, NoopComponent,
       ],
       providers: [
+        provideRouter([]),
         { provide: MatDialogRef, useValue: { close: () => {} } },
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),

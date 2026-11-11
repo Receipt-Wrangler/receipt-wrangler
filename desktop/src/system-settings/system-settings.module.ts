@@ -32,17 +32,6 @@ import { OidcProviderTableComponent } from "./oidc-provider-table/oidc-provider-
 
 
 @NgModule({
-  declarations: [SystemEmailTableComponent,
-    OidcProviderFormComponent,
-    OidcProviderTableComponent,
-    SystemSettingsComponent,
-    SystemEmailFormComponent,
-    SystemSettingsFormComponent,
-    SystemEmailChildSystemTaskComponent,
-    SystemTaskFilterComponent,
-    SystemTaskTableComponent,
-    TaskQueueFormControlPipe,
-  ],
   imports: [
     ButtonModule,
     CommonModule,
@@ -63,6 +52,16 @@ import { OidcProviderTableComponent } from "./oidc-provider-table/oidc-provider-
     SelectModule,
     MatHint,
     AlertComponent,
+    SystemEmailTableComponent,
+    OidcProviderFormComponent,
+    OidcProviderTableComponent,
+    SystemSettingsComponent,
+    SystemEmailFormComponent,
+    SystemSettingsFormComponent,
+    SystemEmailChildSystemTaskComponent,
+    SystemTaskFilterComponent,
+    SystemTaskTableComponent,
+    TaskQueueFormControlPipe,
   ]
 })
 export class SystemSettingsModule {

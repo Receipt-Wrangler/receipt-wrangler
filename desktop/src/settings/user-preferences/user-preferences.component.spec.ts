@@ -25,7 +25,6 @@ describe("UserPreferencesComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [UserPreferencesComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
         InputReadonlyPipe,
@@ -33,7 +32,8 @@ describe("UserPreferencesComponent", () => {
         StoreModule,
         MatSnackBarModule,
         PipesModule,
-        SharedUiModule
+        SharedUiModule,
+        UserPreferencesComponent
       ],
       providers: [
         UserPreferencesService,

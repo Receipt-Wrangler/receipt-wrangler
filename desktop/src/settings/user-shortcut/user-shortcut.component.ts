@@ -4,12 +4,19 @@ import { FormCommand } from "../../form/index";
 import { FormConfig } from "../../interfaces/index";
 import { UserShortcut } from "../../open-api/index";
 import { EditableListComponent } from "../../shared-ui/editable-list/editable-list.component";
+import { MatIcon } from "@angular/material/icon";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { InputComponent } from "../../input/input/input.component";
+import { IconAutocompleteComponent } from "../../shared-ui/icon-autocomplete/icon-autocomplete.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @Component({
     selector: "app-user-shortcut",
     templateUrl: "./user-shortcut.component.html",
     styleUrl: "./user-shortcut.component.scss",
-    standalone: false
+    imports: [EditableListComponent, MatIcon, CardComponent, InputComponent, IconAutocompleteComponent, DialogFooterComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class UserShortcutComponent {
 

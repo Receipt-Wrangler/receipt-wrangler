@@ -27,12 +27,24 @@ import {
 } from "../../store/oidc-provider-table.state.actions";
 import { TableColumn } from "../../table/table-column.interface";
 import { OidcProviderFormComponent } from "../oidc-provider-form/oidc-provider-form.component";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { HasAppPermissionDirective } from "../../directives/has-app-permission.directive";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
 
 @Component({
   selector: "app-oidc-provider-table",
   templateUrl: "./oidc-provider-table.component.html",
   styleUrl: "./oidc-provider-table.component.scss",
-  standalone: false,
+  imports: [
+    TableHeaderComponent,
+    HasAppPermissionDirective,
+    AddButtonComponent,
+    TableComponent,
+    EditButtonComponent,
+    DeleteButtonComponent,
+  ],
 })
 export class OidcProviderTableComponent implements OnInit, AfterViewInit {
   public readonly displayNameCell = viewChild.required<TemplateRef<any>>("displayNameCell");

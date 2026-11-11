@@ -15,12 +15,10 @@ describe("GroupSettingsComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [GroupSettingsComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [ApiModule,
         StoreModule,
-        MatSnackBarModule
-      ],
+        MatSnackBarModule, GroupSettingsComponent],
       providers: [
         {
           provide: ActivatedRoute,
@@ -29,6 +27,7 @@ describe("GroupSettingsComponent", () => {
               data: {
                 group: group,
                 formConfig: {},
+                systemEmails: [],
               },
             },
           },

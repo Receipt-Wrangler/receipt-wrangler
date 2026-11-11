@@ -30,19 +30,6 @@ import { GroupTableComponent } from "./group-table/group-table.component";
 import { GroupTabsComponent } from "./group-tabs/group-tabs.component";
 
 @NgModule({
-  declarations: [
-    GroupTableComponent,
-    GroupFormComponent,
-    GroupMemberFormComponent,
-    GroupSettingsComponent,
-    GroupSettingsEmailComponent,
-    GroupTabsComponent,
-    GroupDetailsComponent,
-    GroupTableFilterComponent,
-    GroupTableEditButtonPipe,
-    GroupSettingsAiComponent,
-    GroupReceiptSettingsComponent,
-  ],
   imports: [
     ButtonModule,
     CheckboxModule,
@@ -62,6 +49,17 @@ import { GroupTabsComponent } from "./group-tabs/group-tabs.component";
     UserAutocompleteModule,
     AutocompleteModule,
     GrantPickerComponent,
+    GroupTableComponent,
+    GroupFormComponent,
+    GroupMemberFormComponent,
+    GroupSettingsComponent,
+    GroupSettingsEmailComponent,
+    GroupTabsComponent,
+    GroupDetailsComponent,
+    GroupTableFilterComponent,
+    GroupTableEditButtonPipe,
+    GroupSettingsAiComponent,
+    GroupReceiptSettingsComponent,
   ],
   exports: [GroupTableComponent],
 })

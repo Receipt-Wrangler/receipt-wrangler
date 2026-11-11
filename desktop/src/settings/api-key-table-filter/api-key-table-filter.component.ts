@@ -1,5 +1,5 @@
 import { Component, OnInit } from "@angular/core";
-import { FormBuilder } from "@angular/forms";
+import { FormBuilder, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { BaseFormComponent } from "../../form";
@@ -9,12 +9,16 @@ import { AuthState } from "../../store";
 import { ApiKeyTableState } from "../../store/api-key-table.state";
 import { SetFilter } from "../../store/api-key-table.state.actions";
 import { associatedApiKeyOptions } from "./associated-api-key-options";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 @Component({
     selector: "app-api-key-table-filter",
     templateUrl: "./api-key-table-filter.component.html",
     styleUrl: "./api-key-table-filter.component.scss",
-    standalone: false
+    imports: [DialogComponent, ReactiveFormsModule, SelectComponent, DialogFooterComponent, FormGetPipe]
 })
 export class ApiKeyTableFilterComponent extends BaseFormComponent implements OnInit {
   constructor(
