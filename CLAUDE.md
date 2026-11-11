@@ -931,3 +931,17 @@ comment individually, after committing and pushing any fixes.
 - Each component has its own documentation: `api/CLAUDE.md`, `desktop/CLAUDE.md`, `mobile/CLAUDE.md`.
 - If a change alters behavior, configuration, architecture, commands, or conventions documented in a `CLAUDE.md` file,
   update that file to stay accurate before considering the task complete.
+
+## Security Posture (this fork)
+
+This is a personal instance with little data, and nothing on it is sensitive enough that a breach
+would matter much to the owner. Judge security by the consequences of a breach, not by hardening
+for its own sake. **Only raise a security concern when it is critical**, meaning one of:
+
+- A secret committed or exposed in the repo (keys, tokens, passwords, `.env` contents).
+- A reachable service or port that would let someone take over the whole machine with little effort.
+- Anything else of comparable severity.
+
+Do **not** bring up default credentials on the app, sign-ups being open, plain HTTP, missing HTTPS,
+rate limits, or similar hardening as to-dos or warnings. If one is relevant to a task, a one-line
+mention at most.
