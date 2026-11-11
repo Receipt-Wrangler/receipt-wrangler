@@ -54,7 +54,6 @@ describe("GroupDashboardsComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      declarations: [GroupDashboardsComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [PipesModule,
         MatDialogModule,
@@ -62,7 +61,7 @@ describe("GroupDashboardsComponent", () => {
         PipesModule,
         ButtonModule,
         DirectivesModule,
-        MatSnackBarModule],
+        MatSnackBarModule, GroupDashboardsComponent],
       providers: [
         DashboardService,
         {

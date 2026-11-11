@@ -3,13 +3,22 @@ import { UntilDestroy } from "@ngneat/until-destroy";
 import { take, tap } from "rxjs";
 import { ReceiptFilterService } from "src/services/receipt-filter.service";
 import { Receipt, ReceiptPagedRequestCommand, Widget } from "../../open-api";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { QueueStartMenuComponent } from "../../shared-ui/queue-start-menu/queue-start-menu.component";
+import { ExportButtonComponent } from "../../standalone/components/export-button/export-button.component";
+import { DashboardListComponent } from "../dashboard-list/dashboard-list.component";
+import { DateBlockComponent } from "../../standalone/components/date-block/date-block.component";
+import { StatusChipComponent } from "../../shared-ui/status-chip/status-chip.component";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
+import { UserPipe } from "../../pipes/user.pipe";
 
 @UntilDestroy()
 @Component({
   selector: "/app-filtered-receipts",
   templateUrl: "./filtered-receipts.component.html",
   styleUrls: ["./filtered-receipts.component.scss"],
-  standalone: false
+  imports: [CardComponent, QueueStartMenuComponent, ExportButtonComponent, DashboardListComponent, DateBlockComponent, StatusChipComponent, AppDatePipe, CustomCurrencyPipe, UserPipe]
 })
 export class FilteredReceiptsComponent implements OnInit {
   public readonly widget = input.required<Widget>();

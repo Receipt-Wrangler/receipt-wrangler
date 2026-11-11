@@ -1,7 +1,9 @@
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, getDebugNode } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { BulkDeleteResultDialogComponent, BulkDeleteResultDialogData } from "./bulk-delete-result-dialog.component";
+import { provideStore } from "@ngxs/store";
+import { provideRouter } from "@angular/router";
 
 describe("BulkDeleteResultDialogComponent", () => {
   let component: BulkDeleteResultDialogComponent;
@@ -18,8 +20,10 @@ describe("BulkDeleteResultDialogComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [BulkDeleteResultDialogComponent],
+      imports: [BulkDeleteResultDialogComponent],
       providers: [
+        provideRouter([]),
+        provideStore([]),
         { provide: MatDialogRef, useValue: { close: jest.fn() } },
         { provide: MAT_DIALOG_DATA, useValue: data },
       ],
@@ -50,12 +54,12 @@ describe("BulkDeleteResultDialogComponent", () => {
 
   // Nothing to submit: the shared footer renders its cancel button alone, which closes.
   it("uses the shared footer as a dismiss-only footer", () => {
-    const footer = fixture.nativeElement.querySelector("app-dialog-footer");
+    const footer = getDebugNode(fixture.nativeElement.querySelector("app-dialog-footer"))!.componentInstance;
 
-    expect(footer.showSubmitButton).toBe(false);
-    expect(footer.getAttribute("cancelButtonTooltip")).toBe("Close");
+    expect(footer.showSubmitButton()).toBe(false);
+    expect(footer.cancelButtonTooltip()).toBe("Close");
 
-    footer.dispatchEvent(new CustomEvent("cancelClicked"));
+    footer.cancelClicked.emit();
 
     expect(component.matDialogRef.close).toHaveBeenCalled();
   });

@@ -1,6 +1,6 @@
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
-import { CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import { CUSTOM_ELEMENTS_SCHEMA, getDebugNode } from "@angular/core";
 import { By } from "@angular/platform-browser";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from "@angular/forms";
@@ -31,7 +31,6 @@ describe("ReceiptFormComponent", () => {
   beforeEach(async () => {
     routeDataSubject = new BehaviorSubject<any>({});
     await TestBed.configureTestingModule({
-      declarations: [ReceiptFormComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [ApiModule,
         PipesModule,
@@ -41,8 +40,7 @@ describe("ReceiptFormComponent", () => {
         NoopAnimationsModule,
         PipesModule,
         ReactiveFormsModule,
-        SharedUiModule
-      ],
+        SharedUiModule, ReceiptFormComponent],
       providers: [
         {
           provide: ActivatedRoute,
@@ -1733,7 +1731,7 @@ describe("ReceiptFormComponent", () => {
 
       clickToggle();
       expect(drawer()).not.toBeNull();
-      expect((drawer() as any).receiptId).toBe(5);
+      expect(getDebugNode(drawer())!.componentInstance.receiptId()).toBe(5);
       expect(toggle()!.classList).toContain("rw-history-toggle--active");
 
       clickToggle();

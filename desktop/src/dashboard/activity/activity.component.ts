@@ -20,13 +20,24 @@ import {
 } from "../../open-api/index";
 import { SnackbarService } from "../../services/index";
 import { GroupState } from "../../store/index";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { DashboardListComponent } from "../dashboard-list/dashboard-list.component";
+import { DateBlockComponent } from "../../standalone/components/date-block/date-block.component";
+import { StatusChipComponent } from "../../shared-ui/status-chip/status-chip.component";
+import { HasGroupPermissionDirective } from "../../directives/has-group-permission.directive";
+import { ButtonComponent } from "../../button/button/button.component";
+import { TitleCasePipe } from "@angular/common";
+import { DurationPipe } from "../../pipes/duration.pipe";
+import { GroupPipe } from "../../pipes/group.pipe";
+import { UserPipe } from "../../pipes/user.pipe";
+import { SystemTaskTypePipe } from "../../shared-ui/task-table/system-task-type.pipe";
 
 @Component({
   selector: "app-activity",
   templateUrl: "./activity.component.html",
   styleUrl: "./activity.component.scss",
   encapsulation: ViewEncapsulation.None,
-  standalone: false
+  imports: [CardComponent, DashboardListComponent, DateBlockComponent, StatusChipComponent, HasGroupPermissionDirective, ButtonComponent, TitleCasePipe, DurationPipe, GroupPipe, UserPipe, SystemTaskTypePipe]
 })
 export class ActivityComponent implements OnInit {
   public readonly widget = input.required<Widget>();

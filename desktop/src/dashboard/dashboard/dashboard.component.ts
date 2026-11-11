@@ -7,6 +7,11 @@ import { DEFAULT_HOST_CLASS } from "src/constants";
 import { DashboardState } from "src/store/dashboard.state";
 import { Dashboard, WidgetType } from "../../open-api";
 import { GroupState } from "../../store";
+import { SummaryCardComponent } from "../../shared-ui/summary-card/summary-card.component";
+import { FilteredReceiptsComponent } from "../filtered-receipts/filtered-receipts.component";
+import { ActivityComponent } from "../activity/activity.component";
+import { PieChartComponent } from "../pie-chart/pie-chart.component";
+import { ReportWidgetComponent } from "../report-widget/report-widget.component";
 
 @UntilDestroy()
 @Component({
@@ -14,7 +19,7 @@ import { GroupState } from "../../store";
     templateUrl: "./dashboard.component.html",
     styleUrls: ["./dashboard.component.scss"],
     host: DEFAULT_HOST_CLASS,
-    standalone: false
+    imports: [SummaryCardComponent, FilteredReceiptsComponent, ActivityComponent, PieChartComponent, ReportWidgetComponent]
 })
 export class DashboardComponent implements OnInit {
   public selectedGroupId = this.store.selectSignal(GroupState.selectedGroupId);

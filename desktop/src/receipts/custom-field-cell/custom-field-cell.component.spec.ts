@@ -44,8 +44,7 @@ describe("CustomFieldCellComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CustomFieldCellComponent],
-      imports: [CommonModule, PipesModule, NgxsModule.forRoot([SystemSettingsState])],
+      imports: [CommonModule, PipesModule, NgxsModule.forRoot([SystemSettingsState]), CustomFieldCellComponent],
       providers: [CurrencyPipe],
     }).compileComponents();
 

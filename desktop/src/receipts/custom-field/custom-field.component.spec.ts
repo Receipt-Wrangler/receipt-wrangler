@@ -10,7 +10,7 @@ describe("CustomFieldComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [CustomFieldComponent, CustomFieldPipe]
+      imports: [CustomFieldComponent, CustomFieldPipe]
     })
       .compileComponents();
 

@@ -1,9 +1,16 @@
 import { Component, Input, OnInit, output } from "@angular/core";
-import { FormArray, FormBuilder, FormControl, FormGroup, Validators } from "@angular/forms";
+import { FormArray, FormBuilder, FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { RadioButtonData } from "src/radio-group/models";
 import { Item, Receipt, User } from "../../open-api";
 import { SnackbarService } from "../../services/index";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { RadioGroupComponent } from "../../radio-group/radio-group/radio-group.component";
+import { UserAutocompleteComponent } from "../../user-autocomplete/user-autocomplete/user-autocomplete.component";
+import { InputComponent } from "../../input/input/input.component";
+import { CheckboxComponent } from "../../checkbox/checkbox/checkbox.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 enum QuickActions {
   "SplitEvenly" = "Split Evenly",
@@ -15,7 +22,7 @@ enum QuickActions {
   selector: "app-quick-actions-dialog",
   templateUrl: "./quick-actions-dialog.component.html",
   styleUrls: ["./quick-actions-dialog.component.scss"],
-  standalone: false
+  imports: [DialogComponent, RadioGroupComponent, ReactiveFormsModule, UserAutocompleteComponent, InputComponent, CheckboxComponent, DialogFooterComponent, FormGetPipe]
 })
 export class QuickActionsDialogComponent implements OnInit {
   @Input() public originalReceipt?: Receipt;

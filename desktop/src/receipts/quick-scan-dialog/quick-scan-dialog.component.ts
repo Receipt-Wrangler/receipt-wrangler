@@ -1,6 +1,6 @@
 import { Component, DestroyRef, OnInit, ViewEncapsulation, inject, signal, viewChild } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { FormArray, FormBuilder, FormControl, FormGroup, Validators } from "@angular/forms";
+import { FormArray, FormBuilder, FormControl, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { Store } from "@ngxs/store";
 import { take, tap } from "rxjs";
@@ -13,6 +13,19 @@ import { codePointMaxLengthValidator, trimmedRequiredValidator } from "../../val
 import { UploadImageComponent } from "../upload-image/upload-image.component";
 import { QuickScanFieldConfig, resolveQuickScanFieldConfig } from "./quick-scan-field-config";
 import { receiptRequirementsFor } from "../../utils/receipt-requirements";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { MatProgressSpinner } from "@angular/material/progress-spinner";
+import { CarouselComponent, SlideComponent } from "ngx-bootstrap/carousel";
+import { GroupAutocompleteComponent } from "../../shared-ui/group-autocomplete/group-autocomplete.component";
+import { UserAutocompleteComponent } from "../../user-autocomplete/user-autocomplete/user-autocomplete.component";
+import { StatusSelectComponent } from "../../shared-ui/status-select/status-select.component";
+import { CategoryAutocompleteComponent } from "../../category-autocomplete/category-autocomplete.component";
+import { TagAutocompleteComponent } from "../../tag-autocomplete/tag-autocomplete.component";
+import { TextareaComponent } from "../../textarea/textarea/textarea.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
 
 // Mirrors the backend's models.MaxCommentLength (the Comment column is varchar(500), which
 // MySQL/Postgres measure in characters) and mobile's FormBuilderTextField maxLength, so an
@@ -32,7 +45,7 @@ const commentRequiredValidator = trimmedRequiredValidator();
     templateUrl: "./quick-scan-dialog.component.html",
     styleUrls: ["./quick-scan-dialog.component.scss"],
     encapsulation: ViewEncapsulation.None,
-    standalone: false
+    imports: [DialogComponent, ReactiveFormsModule, UploadImageComponent, MatProgressSpinner, CarouselComponent, SlideComponent, GroupAutocompleteComponent, UserAutocompleteComponent, StatusSelectComponent, CategoryAutocompleteComponent, TagAutocompleteComponent, TextareaComponent, DialogFooterComponent, ButtonComponent, DeleteButtonComponent, FormGetPipe]
 })
 export class QuickScanDialogComponent implements OnInit {
   public readonly uploadImageComponent = viewChild.required(UploadImageComponent);

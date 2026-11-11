@@ -5,6 +5,8 @@ import { MatDialogRef } from "@angular/material/dialog";
 import { ReceiptStatus } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { BulkStatusUpdateComponent } from "./bulk-status-update-dialog.component";
+import { provideStore } from "@ngxs/store";
+import { provideRouter } from "@angular/router";
 
 describe("BulkStatusUpdateComponent", () => {
   let component: BulkStatusUpdateComponent;
@@ -12,9 +14,10 @@ describe("BulkStatusUpdateComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [BulkStatusUpdateComponent],
-      imports: [ReactiveFormsModule, PipesModule],
+      imports: [ReactiveFormsModule, PipesModule, BulkStatusUpdateComponent],
       providers: [
+        provideRouter([]),
+        provideStore([]),
         {
           provide: MatDialogRef,
           useValue: {

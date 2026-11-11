@@ -1,5 +1,5 @@
 import { Component, OnInit, ViewEncapsulation, computed, signal, viewChildren, viewChild } from "@angular/core";
-import { FormArray, FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { FormArray, FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { MatDialogRef } from "@angular/material/dialog";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
@@ -14,6 +14,15 @@ import { AuthState, GroupState } from "../../store";
 import { buildReceiptFilterForm } from "../../utils/receipt-filter";
 import { chartGroupingOptions } from "../constants/chart-grouping-options";
 import { widgetTypeOptions } from "../constants/widget-options";
+import { DialogComponent } from "../../shared-ui/dialog/dialog.component";
+import { InputComponent } from "../../input/input/input.component";
+import { FormSectionComponent } from "../../shared-ui/form-section/form-section.component";
+import { DialogFooterComponent } from "../../shared-ui/dialog-footer/dialog-footer.component";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { SelectComponent } from "../../select/select/select.component";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { WidgetTypePipe } from "../widget-type.pipe";
 
 @UntilDestroy()
 @Component({
@@ -21,7 +30,7 @@ import { widgetTypeOptions } from "../constants/widget-options";
     templateUrl: "./dashboard-form.component.html",
     styleUrls: ["./dashboard-form.component.scss"],
     encapsulation: ViewEncapsulation.None,
-    standalone: false
+    imports: [DialogComponent, ReactiveFormsModule, InputComponent, FormSectionComponent, EditableListComponent, DialogFooterComponent, CardComponent, SelectComponent, ReceiptFilterComponent, AddButtonComponent, FormGetPipe, WidgetTypePipe]
 })
 export class DashboardFormComponent extends BaseFormComponent implements OnInit {
   public readonly receiptFilterComponents = viewChildren(ReceiptFilterComponent);

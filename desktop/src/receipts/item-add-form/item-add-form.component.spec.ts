@@ -8,6 +8,8 @@ import { KEYBOARD_SHORTCUT_ACTIONS } from "../../constants/keyboard-shortcuts.co
 import { Group } from "../../open-api";
 import { KeyboardShortcutService } from "../../services/keyboard-shortcut.service";
 import { ItemAddFormComponent } from "./item-add-form.component";
+import { provideStore } from "@ngxs/store";
+import { provideNgxMask } from "ngx-mask";
 
 describe("ItemAddFormComponent", () => {
   let component: ItemAddFormComponent;
@@ -27,10 +29,11 @@ describe("ItemAddFormComponent", () => {
     };
 
     await TestBed.configureTestingModule({
-      declarations: [ItemAddFormComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [ReactiveFormsModule, PipesModule],
+      imports: [ReactiveFormsModule, PipesModule, ItemAddFormComponent],
       providers: [
+        provideNgxMask(),
+        provideStore([]),
         { provide: KeyboardShortcutService, useValue: keyboardSpy }
       ]
     }).compileComponents();

@@ -1,10 +1,10 @@
-import { CurrencyPipe, DatePipe } from "@angular/common";
+import { CurrencyPipe, DatePipe, NgTemplateOutlet } from "@angular/common";
 import { AfterViewInit, Component, computed, OnInit, signal, TemplateRef, ViewEncapsulation, viewChild } from "@angular/core";
 import { MatDialog } from "@angular/material/dialog";
 import { PageEvent } from "@angular/material/paginator";
 import { Sort } from "@angular/material/sort";
 import { MatTableDataSource } from "@angular/material/table";
-import { ActivatedRoute, Router } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { UntilDestroy, untilDestroyed } from "@ngneat/until-destroy";
 import { Store } from "@ngxs/store";
 import { catchError, EMPTY, filter, map, Subject, switchMap, take, tap } from "rxjs";
@@ -56,6 +56,25 @@ import { openQuickScanDialog } from "../quick-scan-dialog/open-quick-scan-dialog
 import { BulkDeleteResultDialogComponent, BulkDeleteResultDialogData } from "../bulk-delete-result-dialog/bulk-delete-result-dialog.component";
 import { BulkStatusUpdateComponent } from "../bulk-resolve-dialog/bulk-status-update-dialog.component";
 import { ColumnConfigurationDialogComponent } from "../column-configuration-dialog/column-configuration-dialog.component";
+import { TableHeaderComponent } from "../../shared-ui/table-header/table-header.component";
+import { AddButtonComponent } from "../../shared-ui/add-button/add-button.component";
+import { MonthStepperComponent } from "../../shared-ui/month-stepper/month-stepper.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { MatMenuTrigger, MatMenu, MatMenuItem } from "@angular/material/menu";
+import { MatIcon } from "@angular/material/icon";
+import { QueueStartMenuComponent } from "../../shared-ui/queue-start-menu/queue-start-menu.component";
+import { FeatureDirective } from "../../directives/feature.directive";
+import { SummaryCardComponent } from "../../shared-ui/summary-card/summary-card.component";
+import { MatChipSet, MatChip, MatChipRemove } from "@angular/material/chips";
+import { ReceiptTotalsComponent } from "../receipt-totals/receipt-totals.component";
+import { StatusChipComponent } from "../../shared-ui/status-chip/status-chip.component";
+import { MatTooltip } from "@angular/material/tooltip";
+import { CustomFieldCellComponent } from "../custom-field-cell/custom-field-cell.component";
+import { EditButtonComponent } from "../../shared-ui/edit-button/edit-button.component";
+import { HasGroupPermissionDirective } from "../../directives/has-group-permission.directive";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { NamePipe } from "../../pipes/name.pipe";
+import { UserPipe } from "../../pipes/user.pipe";
 
 /**
  * A receipts-table column, carrying the custom field definition when the column
@@ -82,7 +101,7 @@ function receiptNoun(count: number): string {
   // pipes are injected. CustomCurrencyPipe is declared in PipesModule and needs
   // CurrencyPipe, neither of which is providedIn: "root".
   providers: [CurrencyPipe, CustomCurrencyPipe, DatePipe],
-  standalone: false
+  imports: [TableHeaderComponent, AddButtonComponent, MonthStepperComponent, ButtonComponent, MatMenuTrigger, MatMenu, MatMenuItem, MatIcon, QueueStartMenuComponent, FeatureDirective, NgTemplateOutlet, SummaryCardComponent, MatChipSet, MatChip, MatChipRemove, TableComponent, ReceiptTotalsComponent, RouterLink, StatusChipComponent, MatTooltip, CustomFieldCellComponent, EditButtonComponent, HasGroupPermissionDirective, AppDatePipe, CustomCurrencyPipe, NamePipe, UserPipe]
 })
 export class ReceiptsTableComponent implements OnInit, AfterViewInit {
   constructor(

@@ -1,5 +1,7 @@
 import { Component, computed, input } from "@angular/core";
 import { CustomField, CustomFieldType, CustomFieldValue, Receipt } from "../../open-api";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { CustomCurrencyPipe } from "../../pipes/custom-currency.pipe";
 
 /**
  * Renders one custom field's value for a receipt row in the receipts table.
@@ -11,8 +13,8 @@ import { CustomField, CustomFieldType, CustomFieldValue, Receipt } from "../../o
  */
 @Component({
   selector: "app-custom-field-cell",
-  standalone: false,
   templateUrl: "./custom-field-cell.component.html",
+  imports: [AppDatePipe, CustomCurrencyPipe],
 })
 export class CustomFieldCellComponent {
   public readonly receipt = input<Receipt | undefined>(undefined);

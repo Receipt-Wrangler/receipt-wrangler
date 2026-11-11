@@ -38,7 +38,6 @@ describe("DashboardComponent", () => {
       } as Dashboard,
     ];
     await TestBed.configureTestingModule({
-    declarations: [DashboardComponent],
     imports: [SummaryCardComponent,
         ApiModule,
         CommonModule,
@@ -47,7 +46,7 @@ describe("DashboardComponent", () => {
         MatDialogModule,
         MatListModule,
         NgxsModule.forRoot([GroupState, DashboardState]),
-        PipesModule],
+        PipesModule, DashboardComponent],
     providers: [
         {
             provide: ActivatedRoute,

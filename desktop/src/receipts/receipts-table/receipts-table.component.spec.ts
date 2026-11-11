@@ -38,7 +38,6 @@ describe("ReceiptsTableComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    declarations: [ReceiptsTableComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         NgxsModule.forRoot([ReceiptTableState, AuthState, GroupState, UserState]),
@@ -49,7 +48,7 @@ describe("ReceiptsTableComponent", () => {
         MatMenuModule,
         MatChipsModule,
         MonthStepperComponent,
-        PipesModule],
+        PipesModule, ReceiptsTableComponent],
     providers: [
         {
             provide: ActivatedRoute,
@@ -754,7 +753,6 @@ describe("ReceiptsTableComponent receipt summary", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ReceiptsTableComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       imports: [
         ApiModule,
@@ -767,6 +765,7 @@ describe("ReceiptsTableComponent receipt summary", () => {
         MatChipsModule,
         MonthStepperComponent,
         PipesModule,
+        ReceiptsTableComponent,
       ],
       providers: [
         {

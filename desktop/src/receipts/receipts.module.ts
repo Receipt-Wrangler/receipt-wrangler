@@ -55,24 +55,6 @@ import { UploadImageComponent } from "./upload-image/upload-image.component";
 import { UserTotalWithPercentagePipe } from "./user-total-with-percentage.pipe";
 
 @NgModule({
-  declarations: [
-    BulkDeleteResultDialogComponent,
-    BulkStatusUpdateComponent,
-    ColumnConfigurationDialogComponent,
-    CustomFieldCellComponent,
-    ItemAddFormComponent,
-    ItemListComponent,
-    ShareListComponent,
-    QuickActionsDialogComponent,
-    ReceiptCommentsComponent,
-    ReceiptFormComponent,
-    ReceiptsTableComponent,
-    UploadImageComponent,
-    UserTotalWithPercentagePipe,
-    QuickScanDialogComponent,
-    CustomFieldComponent,
-    CustomFieldPipe,
-  ],
   imports: [
     AutocompleteModule,
     AvatarModule,
@@ -112,6 +94,22 @@ import { UserTotalWithPercentagePipe } from "./user-total-with-percentage.pipe";
     MonthStepperComponent,
     ReceiptHistoryDrawerComponent,
     ReceiptTotalsComponent,
+    BulkDeleteResultDialogComponent,
+    BulkStatusUpdateComponent,
+    ColumnConfigurationDialogComponent,
+    CustomFieldCellComponent,
+    ItemAddFormComponent,
+    ItemListComponent,
+    ShareListComponent,
+    QuickActionsDialogComponent,
+    ReceiptCommentsComponent,
+    ReceiptFormComponent,
+    ReceiptsTableComponent,
+    UploadImageComponent,
+    UserTotalWithPercentagePipe,
+    QuickScanDialogComponent,
+    CustomFieldComponent,
+    CustomFieldPipe,
   ],
   exports: [
     UploadImageComponent

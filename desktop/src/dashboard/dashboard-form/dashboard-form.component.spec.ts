@@ -13,6 +13,9 @@ import { EditableListComponent } from "../../shared-ui/editable-list/editable-li
 import { AuthState, GroupState } from "../../store";
 import { DashboardFormComponent } from "./dashboard-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideNgxMask } from "ngx-mask";
+import { provideRouter } from "@angular/router";
+import { LayoutState } from "../../store/layout.state";
 
 describe("DashboardFormComponent", () => {
   let component: DashboardFormComponent;
@@ -21,14 +24,15 @@ describe("DashboardFormComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [DashboardFormComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [EditableListComponent,
         MatSnackBarModule,
-        NgxsModule.forRoot([GroupState, AuthState]),
+        NgxsModule.forRoot([GroupState, AuthState, LayoutState]),
         PipesModule,
-        ReactiveFormsModule],
+        ReactiveFormsModule, DashboardFormComponent],
     providers: [
+        provideRouter([]),
+        provideNgxMask(),
         provideZonelessChangeDetection(),
         DashboardService,
         MatDialog,

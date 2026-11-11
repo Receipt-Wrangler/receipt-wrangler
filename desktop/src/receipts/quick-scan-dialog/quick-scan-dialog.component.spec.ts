@@ -26,7 +26,6 @@ describe("QuickScanDialogComponent", () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-    declarations: [QuickScanDialogComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         CarouselModule,
@@ -36,7 +35,7 @@ describe("QuickScanDialogComponent", () => {
         NoopAnimationsModule,
         PipesModule,
         ReactiveFormsModule,
-        SharedUiModule],
+        SharedUiModule, QuickScanDialogComponent],
     providers: [
         {
             provide: ActivatedRoute,

@@ -19,6 +19,7 @@ import { downloadFile } from "../../utils/file";
 import { DashboardListComponent } from "../dashboard-list/dashboard-list.component";
 
 import { ActivityComponent } from "./activity.component";
+import { provideRouter } from "@angular/router";
 
 jest.mock("../../utils/file", () => ({
   ...jest.requireActual("../../utils/file"),
@@ -63,7 +64,6 @@ describe("ActivityComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ActivityComponent, DashboardListComponent],
       imports: [
         SharedUiModule,
         ScrollingModule,
@@ -74,8 +74,10 @@ describe("ActivityComponent", () => {
         // the same way DashboardModule does.
         SystemTaskTypePipe,
         NgxsModule.forRoot([AuthState, GroupState]),
+        ActivityComponent, DashboardListComponent,
       ],
       providers: [
+        provideRouter([]),
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptorsFromDi()),
         provideHttpClientTesting(),

@@ -17,6 +17,7 @@ import { UserTotalWithPercentagePipe } from "../user-total-with-percentage.pipe"
 import { buildItemForm } from "../utils/form.utils";
 
 import { ShareListComponent } from "./share-list.component";
+import { provideNgxMask } from "ngx-mask";
 
 describe("ShareListComponent", () => {
   let component: ShareListComponent;
@@ -80,10 +81,10 @@ describe("ShareListComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ShareListComponent, UserTotalWithPercentagePipe],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
-      imports: [CurrencyPipe, PipesModule, NgxsModule.forRoot([AuthState, UserState, SystemSettingsState])],
+      imports: [CurrencyPipe, PipesModule, NgxsModule.forRoot([AuthState, UserState, SystemSettingsState]), ShareListComponent, UserTotalWithPercentagePipe],
       providers: [
+        provideNgxMask(),
         {
           provide: ActivatedRoute,
           useValue: mockActivatedRoute,
@@ -104,7 +105,8 @@ describe("ShareListComponent", () => {
       users: {
         users: mockUsers
       },
-      systemSettings: {}
+      // The real app-input reads the currency separators from here.
+      systemSettings: store.snapshot().systemSettings
     });
 
     // Setup default component state

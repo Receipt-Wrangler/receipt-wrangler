@@ -7,13 +7,21 @@ import { FormMode } from "src/enums/form-mode.enum";
 import { Comment, CommentService, Permission } from "../../open-api";
 import { SnackbarService } from "../../services";
 import { AuthState } from "../../store";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { TextareaComponent } from "../../textarea/textarea/textarea.component";
+import { NgTemplateOutlet, NgClass } from "@angular/common";
+import { AvatarComponent } from "../../avatar/avatar/avatar.component";
+import { DeleteButtonComponent } from "../../shared-ui/delete-button/delete-button.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { AppDatePipe } from "../../pipes/app-date.pipe";
+import { UserPipe } from "../../pipes/user.pipe";
 
 @UntilDestroy()
 @Component({
     selector: "app-receipt-comments",
     templateUrl: "./receipt-comments.component.html",
     styleUrls: ["./receipt-comments.component.scss"],
-    standalone: false
+    imports: [CardComponent, TextareaComponent, NgTemplateOutlet, NgClass, AvatarComponent, DeleteButtonComponent, ButtonComponent, AppDatePipe, UserPipe]
 })
 export class ReceiptCommentsComponent implements OnInit {
   loggedInUserId = this.store.selectSignal(AuthState.userId);

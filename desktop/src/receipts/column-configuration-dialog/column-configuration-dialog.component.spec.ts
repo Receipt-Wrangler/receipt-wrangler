@@ -51,8 +51,7 @@ describe("ColumnConfigurationDialogComponent", () => {
     };
 
     await TestBed.configureTestingModule({
-      declarations: [ColumnConfigurationDialogComponent],
-      imports: [SharedUiModule, NgxsModule.forRoot([ReceiptTableState])],
+      imports: [SharedUiModule, NgxsModule.forRoot([ReceiptTableState]), ColumnConfigurationDialogComponent],
       providers: [
         { provide: MatDialogRef, useValue: mockDialogRef },
         { provide: MAT_DIALOG_DATA, useValue: mockDialogData },

@@ -17,13 +17,19 @@ import { Category, Group, Item, Tag } from "../../open-api";
 import { KeyboardShortcutService } from "../../services/keyboard-shortcut.service";
 import { buildItemForm } from "../utils/form.utils";
 import { KEYBOARD_SHORTCUT_ACTIONS, DISPLAY_SHORTCUTS } from "../../constants/keyboard-shortcuts.constant";
+import { CardComponent } from "../../shared-ui/card/card.component";
+import { CategoryAutocompleteComponent } from "../../category-autocomplete/category-autocomplete.component";
+import { TagAutocompleteComponent } from "../../tag-autocomplete/tag-autocomplete.component";
+import { ButtonComponent } from "../../button/button/button.component";
+import { FormGetPipe } from "../../pipes/form-get.pipe";
+import { InputReadonlyPipe } from "../../pipes/input-readonly.pipe";
 
 @Component({
   selector: "app-item-add-form",
   templateUrl: "./item-add-form.component.html",
   styleUrls: ["./item-add-form.component.scss"],
   encapsulation: ViewEncapsulation.None,
-  standalone: false
+  imports: [CardComponent, InputComponent, CategoryAutocompleteComponent, TagAutocompleteComponent, ButtonComponent, FormGetPipe, InputReadonlyPipe]
 })
 export class ItemAddFormComponent implements OnInit, OnDestroy {
   public readonly addForm = viewChild.required<ElementRef>("addForm");

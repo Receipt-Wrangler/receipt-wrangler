@@ -9,6 +9,7 @@ import { User } from "../../open-api";
 import { PipesModule } from "../../pipes";
 import { SnackbarService } from "../../services/snackbar.service";
 import { QuickActionsDialogComponent } from "./quick-actions-dialog.component";
+import { UserState } from "../../store/user.state";
 
 describe("QuickActionsDialogComponent", () => {
   let component: QuickActionsDialogComponent;
@@ -30,8 +31,7 @@ describe("QuickActionsDialogComponent", () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [QuickActionsDialogComponent],
-      imports: [NgxsModule.forRoot([]), PipesModule, ReactiveFormsModule],
+      imports: [NgxsModule.forRoot([UserState]), PipesModule, ReactiveFormsModule, QuickActionsDialogComponent],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
       providers: [
         { provide: MatDialogRef, useValue: mockDialogRef },

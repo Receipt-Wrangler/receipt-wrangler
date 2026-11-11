@@ -12,6 +12,7 @@ import { AuthState, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { ReceiptCommentsComponent } from "./receipt-comments.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
+import { provideRouter } from "@angular/router";
 
 describe("ReceiptCommentsComponent", () => {
   let component: ReceiptCommentsComponent;
@@ -40,14 +41,13 @@ describe("ReceiptCommentsComponent", () => {
     ];
 
     await TestBed.configureTestingModule({
-    declarations: [ReceiptCommentsComponent],
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     imports: [ApiModule,
         ReactiveFormsModule,
         NgxsModule.forRoot([AuthState, UserState]),
         MatSnackBarModule,
-        PipesModule],
-    providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
+        PipesModule, ReceiptCommentsComponent],
+    providers: [provideRouter([]), provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
 }).compileComponents();
 
     store = TestBed.inject(Store);

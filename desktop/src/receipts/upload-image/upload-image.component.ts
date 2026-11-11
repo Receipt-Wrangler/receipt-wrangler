@@ -7,8 +7,7 @@ import { ReceiptImageService } from "../../open-api";
 @Component({
     selector: "app-upload-image",
     templateUrl: "./upload-image.component.html",
-    styleUrls: ["./upload-image.component.scss"],
-    standalone: false
+    styleUrls: ["./upload-image.component.scss"]
 })
 export class UploadImageComponent {
   readonly uploadInput = viewChild.required<any>("uploadInput");

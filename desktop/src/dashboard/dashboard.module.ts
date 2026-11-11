@@ -28,15 +28,6 @@ import { ReportWidgetComponent } from "./report-widget/report-widget.component";
 import { WidgetTypePipe } from "./widget-type.pipe";
 
 @NgModule({
-  declarations: [
-    DashboardComponent,
-    DashboardFormComponent,
-    GroupDashboardsComponent,
-    FilteredReceiptsComponent,
-    WidgetTypePipe,
-    ActivityComponent,
-    DashboardListComponent,
-  ],
   imports: [
     CheckboxModule,
     CommonModule,
@@ -59,6 +50,13 @@ import { WidgetTypePipe } from "./widget-type.pipe";
     AvatarModule,
     DateBlockComponent,
     ExportButtonComponent,
+    DashboardComponent,
+    DashboardFormComponent,
+    GroupDashboardsComponent,
+    FilteredReceiptsComponent,
+    WidgetTypePipe,
+    ActivityComponent,
+    DashboardListComponent,
   ],
   exports: [
     WidgetTypePipe
