@@ -3,3 +3,6 @@
 
 # Redis snapshot, written wherever redis-server is started from
 dump.rdb
+
+# Local Oracle credentials
+OracleCreds.txt
