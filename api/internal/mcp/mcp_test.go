@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"receipt-wrangler/api/internal/models"
@@ -98,6 +99,32 @@ func TestHandlerAcceptsIssuedToken(t *testing.T) {
 	// bare GET for protocol reasons, but it must not be a 401.
 	if recorder.Code == http.StatusUnauthorized {
 		t.Fatalf("a valid issued token was rejected by the mcp auth layer")
+	}
+}
+
+// TestHandlerAcceptsProxiedHost pins the production shape: nginx reaches the API
+// on loopback but forwards the public Host. The SDK's localhost protection would
+// 403 that, which broke every MCP call behind the bundled proxy.
+func TestHandlerAcceptsProxiedHost(t *testing.T) {
+	defer repositories.TruncateTestDb()
+
+	user := createUser(t, "proxied")
+	accessToken, _, _, err := services.GenerateMcpJWT(user.ID, services.GetMcpResourceUrl())
+	if err != nil {
+		t.Fatalf("failed to generate jwt: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+	request.Host = "receipts.example.com"
+	loopback := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8081}
+	request = request.WithContext(context.WithValue(request.Context(), http.LocalAddrContextKey, loopback))
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+
+	recorder := httptest.NewRecorder()
+	NewHandler().ServeHTTP(recorder, request)
+
+	if recorder.Code == http.StatusForbidden && strings.Contains(recorder.Body.String(), "invalid Host header") {
+		t.Fatalf("a proxied request with a public Host was rejected: %s", recorder.Body.String())
 	}
 }
 

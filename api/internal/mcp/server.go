@@ -50,9 +50,14 @@ func NewHandler() http.Handler {
 
 	registerTools(server)
 
+	// The SDK's DNS rebinding protection 403s any request that arrives on a
+	// loopback address with a non-localhost Host header. In production every
+	// request does exactly that: nginx proxies to localhost:8081 and forwards the
+	// public Host. The protection targets unauthenticated local servers; this one
+	// requires a signed, audience-bound bearer token on every request.
 	streamable := mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
 		return server
-	}, nil)
+	}, &mcpsdk.StreamableHTTPOptions{DisableLocalhostProtection: true})
 
 	// The public URL — and therefore the token audience and the resource
 	// metadata URL — is a live System Setting, so it is read per request rather

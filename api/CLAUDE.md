@@ -1722,6 +1722,12 @@ Claude can read a user's data. It is **off by default** and Go-native (no separa
       no password of its own — see "OIDC (OpenID Connect) login" → "A provisioned account's password".
   - `/mcp` — Streamable HTTP MCP endpoint, guarded by bearer-token auth (401 +
     `WWW-Authenticate` advertising the protected-resource metadata)
+    - **The go-sdk's DNS rebinding protection is disabled** (`DisableLocalhostProtection` in
+      `mcp/server.go`). Since go-sdk added it, it 403s (`invalid Host header`) any request that arrives
+      on a loopback address with a non-localhost `Host` — which is every request in the Docker image,
+      where nginx proxies to `localhost:8081` and forwards the public `Host`. OAuth still succeeded,
+      so the break only showed at the first MCP call. Safe because every request needs a signed,
+      audience-bound bearer token. Test: `TestHandlerAcceptsProxiedHost`.
 - **Auth model**: the OAuth tokens are Receipt Wrangler HS512 JWTs, but **MCP-audience bound**.
   `services.GenerateMcpJWT` mints the access **and** refresh token with the audience set to the MCP
   resource URL (`GetMcpResourceUrl`, i.e. `mcpPublicUrl` + `/mcp`) instead of the normal
