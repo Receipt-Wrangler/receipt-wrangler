@@ -56,6 +56,38 @@ Likely phases:
 Touches all three components plus a `swagger.yml` change with both clients regenerated in the same
 change. Rough size: "record it + group totals by currency" is a week or so. Conversion is extra.
 
+## 5. Review queue for uncertain scans
+
+When a quick scan or email upload can't confidently read something (an unclear currency, a smudged
+total, an ambiguous date), flag the receipt with the specific concern instead of silently guessing.
+The user then works through a review queue to resolve each concern.
+
+What already exists:
+
+- A `NEEDS_ATTENTION` receipt status, and per-group/per-user default statuses for quick scan and
+  email (`QuickScanDefaultStatus`, `EmailDefaultReceiptStatus`). Setting the default to
+  `NEEDS_ATTENTION` and filtering on it is a crude queue available today, with no code.
+- Editable prompts (`api/internal/services/prompts.go`). The default prompt says "Omit any value if
+  not found with confidence", so uncertainty is currently **dropped silently**, not reported.
+- Receipt comments, which can carry a note to the reviewer.
+
+Likely phases:
+
+- **MVP (~1-2 days, backend only).** The prompt asks for a `concerns` array (field + question). If
+  it is non-empty, the receipt is saved as `NEEDS_ATTENTION` with the concerns posted as a system
+  comment. Both clients get this through the existing status filter and comments. Reuse the
+  existing status rather than adding one: a new value in the status enum would break
+  already-released mobile builds (closed-enum outages, see `CLAUDE.md`).
+- **Deterministic checks alongside the AI's.** An LLM is a poor judge of its own uncertainty, so add
+  rule-based flags: missing currency, line items not summing to the total, a future date, a likely
+  duplicate (same store, date and amount).
+- **Proper review UI (~1 week).** Store flags in their own table (field, question, resolved by and
+  when) and show each on the receipt form with a control to answer it. Resolving the last flag
+  moves the receipt out of the queue. Optionally rerun extraction with the answers added to the
+  prompt (the true "ask back").
+
+Pairs naturally with multicurrency (item 4): "currency unclear" is the first flag to build.
+
 ## Considered and deferred: Google Drive mirror
 
 Nightly copy into `Receipts/<yyyy-mm>/` with a monthly spreadsheet linking to each image.
