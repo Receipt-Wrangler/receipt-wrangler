@@ -1,0 +1,2 @@
+# These files are copied verbatim onto a Linux VM; CRLF breaks systemd units and .env values.
+* text eol=lf
