@@ -1,0 +1,10 @@
+{$SITE_ADDRESS} {
+	# The app's nginx raises its own 50 MB body limit; don't cap uploads lower here.
+	request_body {
+		max_size 50MB
+	}
+	# MCP's SSE streams must not be buffered.
+	reverse_proxy app:80 {
+		flush_interval -1
+	}
+}

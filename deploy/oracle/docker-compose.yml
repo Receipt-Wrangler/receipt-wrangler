@@ -6,8 +6,6 @@ services:
     restart: unless-stopped
     depends_on:
       - redis
-    ports:
-      - "80:80"
     env_file: .env
     environment:
       DB_ENGINE: sqlite
@@ -20,6 +18,27 @@ services:
       - ./data:/app/receipt-wrangler-api/data
       - ./sqlite:/app/receipt-wrangler-api/sqlite
       - ./logs:/app/receipt-wrangler-api/logs
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  # TLS terminator: gets and renews a Let's Encrypt certificate for SITE_ADDRESS (set in .env)
+  # and proxies to the app over the compose network, so the app itself is not published.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
     logging:
       driver: json-file
       options:

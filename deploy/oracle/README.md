@@ -50,12 +50,13 @@ rest directly:
 
 **Open port 80.** Two places, both needed on Oracle:
 
-- Console → your VCN → Security List → add an ingress rule: source `0.0.0.0/0`, TCP, port `80`.
+- Console → your VCN → Security List → add ingress rules: source `0.0.0.0/0`, TCP, ports `80` and `443`.
 - On the VM (Oracle's Ubuntu images ship a restrictive iptables). The rule must land *before*
   the chain's `REJECT`, whose position varies by image, so look it up rather than hard-coding it:
   ```bash
   n=$(sudo iptables -L INPUT --line-numbers -n | awk '$2=="REJECT"{print $1; exit}')
   sudo iptables -I INPUT "$n" -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  sudo iptables -I INPUT "$n" -m state --state NEW -p tcp --dport 443 -j ACCEPT
   sudo netfilter-persistent save
   ```
 
@@ -64,9 +65,9 @@ rest directly:
 
 ```bash
 sudo mkdir -p /opt/receipt-wrangler && sudo chown ubuntu: /opt/receipt-wrangler
-mv ~/docker-compose.yml ~/.env.example /opt/receipt-wrangler/
+mv ~/docker-compose.yml ~/Caddyfile ~/.env.example /opt/receipt-wrangler/
 cd /opt/receipt-wrangler
-cp .env.example .env
+cp .env.example .env   # also set SITE_ADDRESS to your hostname
 sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$(openssl rand -hex 32)/; s/^ENCRYPTION_KEY=.*/ENCRYPTION_KEY=$(openssl rand -hex 32)/" .env
 docker compose up -d
 
@@ -110,6 +111,10 @@ free -h                                          # watch swap use
 that tag and run `docker compose up -d`. The timer will then keep that version until you set it back to
 `latest`.
 
-**HTTPS:** the app runs on plain HTTP. With a domain pointed at the VM, put Caddy in front for
-automatic certificates, then turn on **System Settings → Secure cookies**. Turn it on only *after*
-HTTPS works, or the web app locks you out.
+**HTTPS:** Caddy (in the compose file) terminates TLS and renews the Let's Encrypt certificate
+automatically. `SITE_ADDRESS` in `.env` is the hostname it serves; the default is
+`<ip-with-dashes>.sslip.io`, a free name that resolves to the IP. To use a real domain, point its A
+record at the VM, change `SITE_ADDRESS`, and run `docker compose up -d`. It needs ports **80 and
+443** open (Security List ingress rules *and* iptables, as above). Certificate state lives in
+`caddy-data/`, so back it up with the rest or you'll just re-issue one. The app container is no
+longer published directly; everything goes through Caddy.

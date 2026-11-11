@@ -45,7 +45,8 @@ removed as dead config; do not add them back. Because the build context is the r
 ### Fork Deployment (Oracle)
 This fork auto-deploys without server credentials in GitHub: `.github/workflows/deploy.yml` pushes
 `ghcr.io/ianrollo/receipt-wrangler:latest` (amd64 only), and a systemd timer on the VM pulls it.
-The runtime config (compose, `.env`, timer) and the 1 GB-RAM constraints live in `deploy/oracle/`.
+HTTPS is Caddy in the same compose stack (Let's Encrypt via an `sslip.io` hostname, `SITE_ADDRESS` in
+`.env`). The runtime config (compose, Caddyfile, `.env`, timer) and the 1 GB-RAM constraints live in `deploy/oracle/`.
 The inherited upstream workflows are disabled in the GitHub UI rather than deleted, so upstream
 merges stay conflict-free.
 
