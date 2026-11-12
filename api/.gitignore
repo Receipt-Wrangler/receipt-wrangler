@@ -20,3 +20,8 @@ api
 
 # Redis snapshot written when redis-server is run from this directory
 dump.rdb
+
+# Debris Go tests leave in package folders
+api/internal/**/logs/
+api/internal/**/test.db
+api/internal/**/test.json
