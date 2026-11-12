@@ -9,12 +9,17 @@ Features this fork means to explore, and what has been built.
   ledger of payments, recoupments and notes; the server computes claimed, paid, outstanding and
   days waiting. This is item 3 below made concrete: a recoupment is the "differential" recorded
   against the claim it hit. See `CLAUDE.md` → "Reimbursement Claims".
+- **Claim packet** (2026-11-12). One zip per claim: `packet.pdf` (cover sheet with the figures,
+  the ledger, receipts with category subtotals, then every receipt with its images), the original
+  image files untouched, `receipts.csv` / `items.csv` with an Images column, and a `manifest.json`
+  carrying a SHA-256 for every file. This delivers items 1 and 2 below for claimed receipts; the
+  plain receipt export is unchanged.
 
 **Why this fork exists:** a personal record of payments that can be handed over as proof,
 exact transactions with their receipt images, independent of the system of whoever is disputing
 them. Features are judged by how well they produce that evidence.
 
-## 1. Include images in the receipt export (in progress, as part of the claim packet)
+## 1. Include images in the receipt export (done for claims via the packet; plain export still CSV-only)
 
 Today **Export to CSV** (filtered set or selected rows) zips `receipts.csv` + `items.csv` only;
 images can only be downloaded one at a time from each receipt.
@@ -28,7 +33,7 @@ images can only be downloaded one at a time from each receipt.
 Where: `api/internal/services/receipt_csv.go` (`GetZippedCsvFiles`), both handlers in
 `api/internal/handlers/export.go`. Filtering and permissions are already handled there.
 
-## 2. One-PDF evidence bundle (in progress, as the claim packet)
+## 2. One-PDF evidence bundle (done, as the claim packet)
 
 One page per transaction: date, amount, name and the image together, as a single PDF that is
 easy to hand over. Reuse the HTML-to-PDF path the Report Builder already uses
