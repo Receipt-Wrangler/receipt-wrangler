@@ -123,6 +123,8 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
 
   readonly firstCommentCell = viewChild.required<TemplateRef<any>>("firstCommentCell");
 
+  readonly claimCell = viewChild.required<TemplateRef<any>>("claimCell");
+
   readonly customFieldCell = viewChild.required<TemplateRef<any>>("customFieldCell");
 
   readonly actionsCell = viewChild.required<TemplateRef<any>>("actionsCell");
@@ -560,6 +562,14 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         template: this.firstCommentCell(),
         sortable: true,
       },
+      {
+        // Claims (fork feature). The server sets claimId/claimName only for a
+        // claim the viewer may see, and has no order for it.
+        columnHeader: RECEIPT_COLUMN_DISPLAY_NAMES["claim"],
+        matColumnDef: "claim",
+        template: this.claimCell(),
+        sortable: false,
+      },
     ] as ReceiptTableColumn[];
 
     // One column per custom field, after the built-in ones. They share a single
@@ -928,11 +938,9 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
    * changes, so there is nothing to refresh.
    */
   public addSelectedReceiptsToClaim(): void {
-    const receipts = (this.table().selection.selected as Receipt[]).map(({ id, name, groupId }) => ({
-      id,
-      name,
-      groupId,
-    }));
+    const receipts = (this.table().selection.selected as Receipt[]).map(
+      ({ id, name, groupId, claimId, claimName }) => ({ id, name, groupId, claimId, claimName })
+    );
     this.matDialog.open<AddToClaimDialogComponent, AddToClaimDialogData>(AddToClaimDialogComponent, {
       ...DEFAULT_DIALOG_CONFIG,
       data: { receipts },

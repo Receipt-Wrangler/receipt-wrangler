@@ -268,6 +268,31 @@ describe("ClaimFormComponent", () => {
     });
   });
 
+  describe("the receipt picker", () => {
+    // Visible in another claim of the group: not offered.
+    const fuel = { id: 4, name: "Fuel", groupId: 5, claimId: 40, claimName: "Voucher 13" } as Receipt;
+    // Loaded while it was on this claim and removed since: this claim is not "another".
+    const parking = { id: 5, name: "Parking", groupId: 5, claimId: 12, claimName: "Voucher 14" } as Receipt;
+
+    beforeEach(async () => {
+      receiptService.getReceiptsForGroup.mockReturnValue(
+        of({ totalCount: 5, data: [taxi, hotel, groceries, fuel, parking] })
+      );
+      await setUp(FormMode.view, { claim: claim() });
+    });
+
+    it("leaves out a receipt in another claim, and says how many it left out", () => {
+      stubDialog(undefined);
+
+      component.addReceipts();
+
+      expect(matDialog.open).toHaveBeenCalledWith(ClaimReceiptPickerDialogComponent, {
+        ...DEFAULT_DIALOG_CONFIG,
+        data: { claimName: "Voucher 14", candidates: [groceries, parking], inOtherClaimsCount: 1 },
+      });
+    });
+  });
+
   describe("viewing", () => {
     beforeEach(async () => {
       await setUp(FormMode.view, { claim: claim() });
@@ -337,7 +362,7 @@ describe("ClaimFormComponent", () => {
 
       expect(matDialog.open).toHaveBeenCalledWith(ClaimReceiptPickerDialogComponent, {
         ...DEFAULT_DIALOG_CONFIG,
-        data: { claimName: "Voucher 14", candidates: [groceries] },
+        data: { claimName: "Voucher 14", candidates: [groceries], inOtherClaimsCount: 0 },
       });
       expect(claimService.addReceiptsToClaim).toHaveBeenCalledWith(12, { receiptIds: [3] });
       expect(snackbarService.success).toHaveBeenCalledWith("Added 1 receipt to Voucher 14");

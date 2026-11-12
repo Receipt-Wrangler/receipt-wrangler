@@ -42,6 +42,7 @@ describe("receipt-table-columns", () => {
     it("names a built-in column and a custom field", () => {
       expect(columnDisplayName("resolved_date", [])).toBe("Resolved Date");
       expect(columnDisplayName("first_comment", [])).toBe("Comment");
+      expect(columnDisplayName("claim", [])).toBe("Claim");
       expect(columnDisplayName("custom_7", [customField(7, "Vendor")])).toBe("Vendor");
     });
 
@@ -92,6 +93,19 @@ describe("receipt-table-columns", () => {
       expect(comment).toBeDefined();
       expect(comment?.visible).toBe(false);
       expect(merged[merged.length - 1].matColumnDef).toBe("first_comment");
+    });
+
+    // The Claim column (fork feature) is opt-in the same way.
+    it("appends the Claim column hidden to a layout saved before it existed", () => {
+      const persisted = builtIns()
+        .filter((column) => column.matColumnDef !== "claim")
+        .map((column) => ({ ...column, visible: true }));
+
+      const merged = mergeCustomFieldColumns(persisted, [], true);
+
+      const claim = merged.find((column) => column.matColumnDef === "claim");
+      expect(claim?.visible).toBe(false);
+      expect(merged[merged.length - 1].matColumnDef).toBe("claim");
     });
 
     it("heals a missing built-in column", () => {

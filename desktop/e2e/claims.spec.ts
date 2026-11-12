@@ -19,12 +19,15 @@ import { readZipEntries } from './helpers/zip';
 // halves agree on the wire. This walks the main journey through the real UI and API:
 //
 //   - a claim created on the claim form, then filled from the receipts table's bulk action;
-//   - a receipt already in another claim refused and named, not moved;
+//   - a receipt already in another claim named by the bulk dialog before submitting, then refused
+//     and named, not moved;
+//   - the claim page's receipt picker leaving out a receipt that is in another claim;
 //   - a payment and a recoupment moving the server's figures;
 //   - the claim packet downloaded and opened: its PDF, CSVs, the original image byte for byte, and
 //     a manifest whose hashes match the files;
 //   - the receipt delete endpoints refusing a receipt that is in a claim, singly and in bulk;
-//   - a receipt moved to another group on the receipt form leaving its claim.
+//   - a receipt moved to another group on the receipt form: its claim shown, a warning on picking
+//     the new group, and the receipt leaving its claim on save.
 //
 // Runs as admin in two groups it provisions, so it touches no global setting and no shared
 // fixture. The tests share one claim and run in order. Money is typed as whole numbers and asserted
@@ -40,6 +43,8 @@ test.describe('Reimbursement claims', () => {
   const hotel = uniqueName('claim-hotel');
   const taxi = uniqueName('claim-taxi');
   const dinner = uniqueName('claim-dinner');
+  // Never put on a claim: the picker's proof that an unclaimed receipt is still offered.
+  const lunch = uniqueName('claim-lunch');
 
   let primary: { id: number; name: string };
   let other: { id: number; name: string };
@@ -65,6 +70,7 @@ test.describe('Reimbursement claims', () => {
       expect(upload.ok(), `image upload: HTTP ${upload.status()}`).toBe(true);
       taxiId = await apiCreateReceipt(api, { groupId: primary.id, paidByUserId, name: taxi, amount: '120.50' });
       await apiCreateReceipt(api, { groupId: primary.id, paidByUserId, name: dinner, amount: '15.00' });
+      await apiCreateReceipt(api, { groupId: primary.id, paidByUserId, name: lunch, amount: '9.00' });
     });
   });
 
@@ -160,8 +166,13 @@ test.describe('Reimbursement claims', () => {
     await gotoGroupReceipts(page, primary.id);
     await openAddToClaim(page, [taxi, dinner]);
     const dialog = page.getByRole('dialog').filter({ hasText: 'Add to a claim' });
+    // Named up front, from the claimId/claimName the receipts list carries.
+    const alreadyClaimed = dialog.getByTestId('add-to-claim-already-claimed');
+    await expect(alreadyClaimed).toContainText(`${claimName}: ${taxi}`);
+    await expect(alreadyClaimed).not.toContainText(dinner);
     await pickOption(page, 'add-to-claim-target', 'New claim from these receipts');
     await dialog.getByTestId('add-to-claim-name').getByRole('textbox').fill(secondClaimName);
+    // Still sent, not dropped: the server's refusal is the record.
     await dialog.getByTestId('dialog-submit-button').click();
 
     const result = page.getByRole('dialog').filter({ hasText: 'Some receipts could not be added' });
@@ -170,7 +181,8 @@ test.describe('Reimbursement claims', () => {
     );
     const failures = result.getByTestId('claim-receipts-result-failures');
     await expect(failures).toContainText(taxi);
-    await expect(failures).toContainText('already in another claim');
+    // The server names a claim the caller may see.
+    await expect(failures).toContainText(`already in claim '${claimName}'`);
     await expect(failures).not.toContainText(dinner);
     await result.getByRole('button', { name: 'Close' }).click();
     await expect(result).toBeHidden();
@@ -178,6 +190,28 @@ test.describe('Reimbursement claims', () => {
     // Refused, never moved: the first claim still holds it.
     await gotoClaim(page);
     await expect(page.getByTestId('claim-receipts')).toContainText(taxi);
+  });
+
+  test("the claim page's picker leaves out a receipt that is in another claim", async ({ page }) => {
+    await gotoClaim(page);
+    await page.getByTestId('claim-receipts-add').click();
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Add receipts' });
+    await expect(dialog).toBeVisible();
+
+    // Dinner went into the second claim above; it is left out and counted.
+    await expect(dialog.getByTestId('claim-receipt-picker-other-claims')).toHaveText(
+      '1 receipt already in another claim is not listed.',
+    );
+    const input = dialog.getByTestId('claim-receipt-picker').getByRole('combobox');
+    await input.click();
+    await expect(page.getByRole('option').filter({ hasText: lunch })).toBeVisible();
+    await expect(page.getByRole('option').filter({ hasText: dinner })).toHaveCount(0);
+    // Searching for it by name finds nothing either.
+    await input.fill(dinner);
+    await expect(page.getByRole('option')).toHaveCount(0);
+
+    await dialog.getByTestId('dialog-cancel-button').click();
+    await expect(dialog).toBeHidden();
   });
 
   test('records a payment and a recoupment, and the figures follow', async ({ page }) => {
@@ -292,11 +326,24 @@ test.describe('Reimbursement claims', () => {
 
   test('a receipt moved to another group leaves its claim', async ({ page }) => {
     await page.goto(`/receipts/${taxiId}/edit`);
+    // The receipt's claim, in the audit details, linking to the claim.
+    await expect(page.getByTestId('receipt-claim')).toContainText(`In claim: ${claimName}`);
+    await expect(page.getByTestId('receipt-claim').getByRole('link')).toHaveAttribute(
+      'href',
+      `/claims/${claimId}/view`,
+    );
+    const warning = page.getByTestId('receipt-claim-move-warning');
+    await expect(warning).toHaveCount(0);
+
     const group = page.getByTestId('receipt-group');
     // A filled single-select autocomplete is readonly; clear it to change the group.
     await group.getByTestId('autocomplete-clear').getByRole('button').click();
     await group.getByRole('combobox').click();
     await page.getByRole('option', { name: other.name, exact: true }).click();
+    // Warned, not blocked.
+    await expect(warning).toHaveText(
+      `Moving this receipt to another group will remove it from claim '${claimName}'.`,
+    );
     // Changing the group clears Paid By.
     await page.getByLabel('Paid By').click();
     await page.getByRole('option').first().click();

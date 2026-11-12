@@ -2,7 +2,9 @@
   <form [formGroup]="form" (ngSubmit)="submit()">
     @if (data.candidates.length === 0) {
       <p data-testid="claim-receipt-picker-empty">
-        Every receipt in this group you can see is already on {{ data.claimName }}.
+        Every receipt in this group you can see is already on {{ data.claimName }}@if (
+          data.inOtherClaimsCount > 0
+        ) { or another claim}.
       </p>
     } @else {
       <app-autocomlete
@@ -17,6 +19,11 @@
         [optionTemplate]="receiptOption"
         [inputFormControl]="$any(form | formGet : 'receipts')"
       ></app-autocomlete>
+      @if (data.inOtherClaimsCount > 0) {
+        <p class="claim-receipt-picker__note" data-testid="claim-receipt-picker-other-claims">
+          {{ inOtherClaimsNote }}
+        </p>
+      }
     }
     <app-dialog-footer
       submitButtonTooltip="Add to claim"

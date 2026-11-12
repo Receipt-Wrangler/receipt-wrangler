@@ -9,8 +9,13 @@ import { SharedUiModule } from "../../shared-ui/shared-ui.module";
 
 export interface ClaimReceiptPickerDialogData {
   claimName: string;
-  /** The claim group's receipts that are not already on this claim. */
+  /**
+   * The claim group's receipts that are on no claim the viewer can see. One in
+   * a hidden claim still appears here, and the server's refusal names it.
+   */
   candidates: Receipt[];
+  /** How many of the group's receipts are left out for being in another (visible) claim. */
+  inOtherClaimsCount: number;
 }
 
 /**
@@ -18,6 +23,10 @@ export interface ClaimReceiptPickerDialogData {
  * same chip picker the app uses to pick categories and tags (type to filter by
  * name). Closes with the picked receipts and writes nothing itself: the claim
  * page owns the request and reports its per-receipt result.
+ *
+ * A receipt already in another claim is left out rather than shown disabled:
+ * the shared chip autocomplete has no disabled option, and the server would
+ * refuse it anyway. A line under the field says how many were left out.
  *
  * The other way in is the receipts table's "Add selected receipts to a claim",
  * which brings the table's filters and month stepper with it; this one is for
@@ -41,6 +50,11 @@ export class ClaimReceiptPickerDialogComponent {
   public readonly form = inject(FormBuilder).group({
     receipts: new FormArray<any>([]),
   });
+
+  public readonly inOtherClaimsNote =
+    this.data.inOtherClaimsCount === 1
+      ? "1 receipt already in another claim is not listed."
+      : `${this.data.inOtherClaimsCount} receipts already in another claim are not listed.`;
 
   public cancel(): void {
     this.matDialogRef.close(undefined);

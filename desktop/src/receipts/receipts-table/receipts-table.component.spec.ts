@@ -130,7 +130,7 @@ describe("ReceiptsTableComponent", () => {
       for (const cell of [
         "createdAtCell", "dateCell", "nameCell", "paidByCell", "amountCell",
         "categoryCell", "tagCell", "statusCell", "resolvedDateCell",
-        "firstCommentCell", "customFieldCell", "actionsCell",
+        "firstCommentCell", "claimCell", "customFieldCell", "actionsCell",
       ]) {
         Object.defineProperty(component, cell, { value: () => ({}) });
       }
@@ -184,6 +184,32 @@ describe("ReceiptsTableComponent", () => {
       expect(column?.columnHeader).toEqual("Comment");
       expect(column?.sortable).toEqual(true);
       expect(component.displayedColumns()).toContain("first_comment");
+    });
+
+    // Claims (fork feature). The API has no claim order, so it must never be
+    // offered as a sort.
+    it("offers an unsortable Claim column, hidden until it is switched on", () => {
+      component.customFields.set([]);
+      store.dispatch(new SetColumnConfig(DEFAULT_RECEIPT_TABLE_COLUMNS));
+
+      (component as any).setColumns();
+
+      expect(component.displayedColumns()).not.toContain("claim");
+
+      store.dispatch(
+        new SetColumnConfig(
+          DEFAULT_RECEIPT_TABLE_COLUMNS.map((column) =>
+            column.matColumnDef === "claim" ? { ...column, visible: true } : column
+          )
+        )
+      );
+
+      (component as any).setColumns();
+
+      const column = component.columns().find((col) => col.matColumnDef === "claim");
+      expect(column?.columnHeader).toEqual("Claim");
+      expect(column?.sortable).toEqual(false);
+      expect(component.displayedColumns()).toContain("claim");
     });
 
     // mat-table throws on a displayed id it has no definition for, and a config
@@ -760,10 +786,13 @@ describe("ReceiptsTableComponent", () => {
       expect(component.canAddToClaim()).toEqual(false);
     });
 
-    it("opens the dialog with the selection's ids, names and groups", () => {
+    it("opens the dialog with the selection's ids, names, groups and claims", () => {
       const dialog = TestBed.inject(MatDialog);
       const open = jest.spyOn(dialog, "open").mockReturnValue({} as any);
-      select([{ ...groceries, amount: "12.00" } as Receipt, fuel]);
+      select([
+        { ...groceries, amount: "12.00", claimId: 40, claimName: "Voucher 13" } as Receipt,
+        fuel,
+      ]);
 
       component.addSelectedReceiptsToClaim();
 
@@ -771,7 +800,7 @@ describe("ReceiptsTableComponent", () => {
         ...DEFAULT_DIALOG_CONFIG,
         data: {
           receipts: [
-            { id: 1, name: "Groceries", groupId: 5 },
+            { id: 1, name: "Groceries", groupId: 5, claimId: 40, claimName: "Voucher 13" },
             { id: 2, name: "Fuel", groupId: 6 },
           ],
         },

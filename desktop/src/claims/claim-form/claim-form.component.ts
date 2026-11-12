@@ -37,6 +37,7 @@ import {
   claimStatusOptionsFor,
   claimStatusTone,
   DEFAULT_CLAIM_STATUS,
+  isInOtherClaim,
   unmatchedApiErrorMessage,
 } from "../claim.utils";
 import {
@@ -176,10 +177,22 @@ export class ClaimFormComponent implements OnInit, AfterViewInit {
     );
   });
 
-  private readonly candidateReceipts = computed(() => {
-    const onClaim = new Set(this.claim()?.receiptIds ?? []);
+  /**
+   * What the picker offers: the group's receipts not on this claim and not in
+   * another claim the viewer can see. The group list is loaded once, so a
+   * receipt's `claimId` there can be stale; both directions are harmless â€” one
+   * added here since is excluded by `receiptIds`, and one removed from here
+   * still reads as this claim's, which is not "another". One in a hidden claim
+   * carries no `claimId`, is offered, and the server's refusal reports it.
+   */
+  private readonly pickerReceipts = computed(() => {
+    const claim = this.claim();
+    const onClaim = new Set(claim?.receiptIds ?? []);
     const receipts = this.groupReceipts.hasValue() ? this.groupReceipts.value() : [];
-    return receipts.filter((receipt) => !onClaim.has(receipt.id));
+    const notOnClaim = receipts.filter((receipt) => !onClaim.has(receipt.id));
+    const candidates = notOnClaim.filter((receipt) => !isInOtherClaim(receipt, claim?.id));
+
+    return { candidates, inOtherClaimsCount: notOnClaim.length - candidates.length };
   });
 
   public readonly receiptsDataSource = computed(
@@ -355,7 +368,7 @@ export class ClaimFormComponent implements OnInit, AfterViewInit {
         ClaimReceiptPickerDialogComponent,
         {
           ...DEFAULT_DIALOG_CONFIG,
-          data: { claimName: claim.name, candidates: this.candidateReceipts() },
+          data: { claimName: claim.name, ...this.pickerReceipts() },
         }
       )
       .afterClosed()

@@ -17,6 +17,7 @@ import {
   applyClaimApiErrors,
   canUpdateClaims,
   CLAIM_STATUS_OPTIONS,
+  claimedReceiptsByClaim,
   claimStatusLabel,
   DEFAULT_CLAIM_STATUS,
   receiptGroupIds,
@@ -32,6 +33,9 @@ export interface AddToClaimDialogReceipt {
   id: number;
   name: string;
   groupId: number;
+  /** The receipt's own claim, when it is in one the viewer may see. */
+  claimId?: number;
+  claimName?: string;
 }
 
 export interface AddToClaimDialogData {
@@ -51,6 +55,11 @@ interface ClaimTargetOption {
  * A claim holds receipts of exactly one group. A selection made on the All view
  * can span groups; rather than guess which group the user meant and have the
  * server refuse the rest, the dialog says so and offers nothing to submit.
+ *
+ * Receipts already in another claim are named up front, by claim, but still
+ * sent: the server refuses them (it never moves a receipt between claims) and
+ * the result dialog reports it, which also covers a claim the viewer cannot
+ * see and so the client cannot know about.
  */
 @Component({
   selector: "app-add-to-claim-dialog",
@@ -126,6 +135,20 @@ export class AddToClaimDialogComponent {
       map((value) => value === NEW_CLAIM_OPTION)
     ),
     { initialValue: false }
+  );
+
+  /**
+   * The selected receipts already in a claim other than the chosen one, by
+   * claim. With no claim chosen yet, or a new one, every claimed receipt counts.
+   */
+  public readonly alreadyClaimed = toSignal(
+    this.form.controls.claimId.valueChanges.pipe(
+      startWith(this.form.controls.claimId.value),
+      map((target) =>
+        claimedReceiptsByClaim(this.data.receipts, typeof target === "number" ? target : undefined)
+      )
+    ),
+    { initialValue: [] }
   );
 
   public readonly submitting = signal(false);

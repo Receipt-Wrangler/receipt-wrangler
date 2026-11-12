@@ -1,0 +1,6 @@
+@if (claim(); as claim) {
+  @if (labelled()) {
+    <span>In claim: </span>
+  }
+  <a data-testid="receipt-claim-link" [routerLink]="['/claims', claim.id, 'view']">{{ claim.name }}</a>
+}

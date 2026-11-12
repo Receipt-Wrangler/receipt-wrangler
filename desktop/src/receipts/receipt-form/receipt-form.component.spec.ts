@@ -1803,6 +1803,77 @@ describe("ReceiptFormComponent", () => {
   // A receipt's date and DATE custom fields are calendar days: stored as
   // midnight UTC, shown in the datepicker as that day's local midnight, and sent
   // back as midnight UTC of whatever day is picked.
+  // Claims (fork feature): the receipt's claim in the audit details, and the
+  // warning that a group move takes the receipt out of it.
+  describe("the receipt's claim", () => {
+    const claimedReceipt = {
+      id: 5,
+      name: "Taxi",
+      amount: "1.00",
+      groupId: 7,
+      paidByUserId: 1,
+      date: "2026-09-30T00:00:00Z",
+      customFields: [],
+      claimId: 12,
+      claimName: "Voucher 14",
+    };
+
+    function load(mode: FormMode, receipt: object | undefined = claimedReceipt): void {
+      routeDataSubject.next({ mode, customFields: [], receipt });
+      fixture.detectChanges();
+    }
+
+    const warning = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector("[data-testid='receipt-claim-move-warning']");
+
+    const claimLink = (): HTMLElement | null =>
+      fixture.nativeElement.querySelector("[data-testid='receipt-claim']");
+
+    it("shows the claim in the audit details, in view and edit mode", () => {
+      load(FormMode.view);
+      expect(claimLink()).not.toBeNull();
+
+      load(FormMode.edit);
+      expect(claimLink()).not.toBeNull();
+    });
+
+    // Absent: in no claim, or in one the viewer may not see.
+    it("shows nothing for a receipt without a claim", () => {
+      load(FormMode.edit, { ...claimedReceipt, claimId: undefined, claimName: undefined });
+
+      expect(claimLink()).toBeNull();
+      component.form.get("groupId")?.setValue(8);
+      fixture.detectChanges();
+      expect(warning()).toBeNull();
+    });
+
+    it("warns, without blocking, once another group is picked", () => {
+      load(FormMode.edit);
+      expect(warning()).toBeNull();
+
+      component.form.get("groupId")?.setValue(8);
+      fixture.detectChanges();
+
+      expect(warning()?.textContent?.trim()).toBe(
+        "Moving this receipt to another group will remove it from claim 'Voucher 14'."
+      );
+    });
+
+    it("drops the warning when the group is put back or cleared", () => {
+      load(FormMode.edit);
+      component.form.get("groupId")?.setValue(8);
+      fixture.detectChanges();
+
+      component.form.get("groupId")?.setValue("7");
+      fixture.detectChanges();
+      expect(warning()).toBeNull();
+
+      component.form.get("groupId")?.setValue("");
+      fixture.detectChanges();
+      expect(warning()).toBeNull();
+    });
+  });
+
   describe("calendar dates on load and submit", () => {
     let receiptService: ReceiptService;
 

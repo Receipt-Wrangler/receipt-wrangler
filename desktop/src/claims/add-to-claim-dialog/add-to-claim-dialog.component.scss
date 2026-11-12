@@ -1,3 +1,12 @@
+@use "sass:map";
+@use "../../variables.scss" as variables;
+
 :host {
   display: block;
+}
+
+// Same tone as the receipt form's requirement hints: a heads-up, not an error.
+.add-to-claim-already-claimed {
+  color: map.get(variables.$warn-palette, 600);
+  font-size: 0.875rem;
 }

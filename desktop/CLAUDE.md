@@ -3113,9 +3113,34 @@ The API is `ReimbursementClaimService` (`api/swagger.yml`, tag `ReimbursementCla
   deleting. A receipt already in another claim is refused by the server, never moved.
   - Removing needs no confirmation, since re-adding is one click.
   - Deleting a ledger entry or the claim goes through `ConfirmationDialogComponent`.
+- **A receipt carries its claim.** The server sets `Receipt.claimId` / `claimName` on every read
+  path, but only for a claim the viewer may see. **Absent never proves "unclaimed"**: treat it as
+  "nothing to show", and leave the hidden case to the server's refusal. The helpers are in
+  `claim.utils.ts` (`isInOtherClaim`, `claimedReceiptsByClaim`, `claimGroupMoveWarning`), and
+  `ReceiptClaimLinkComponent` (`src/claims/receipt-claim-link/`, standalone) renders the name as a
+  link to `/claims/:id/view`, or nothing. Four places use them:
+  - **The picker hides** a receipt in another claim rather than showing it disabled: the shared chip
+    autocomplete has no disabled option, and the server would refuse it anyway. A line under the
+    field counts what was left out (`claim-receipt-picker-other-claims`). The group list is loaded
+    once, so a `claimId` there can be stale. That is harmless both ways: a receipt added since is
+    excluded by `receiptIds`, and one removed since still names this claim, which is not "another".
+  - **The bulk dialog names them up front**, by claim (`add-to-claim-already-claimed`), and leaves
+    out those already in the chosen claim, which the server counts as added. They are still
+    **sent**. The refusal and the result dialog stay the record, and cover the hidden case.
+  - **The receipt form warns on a group move.** Picking another group on a receipt with a
+    `claimName` shows "Moving this receipt to another group will remove it from claim 'â€¦'"
+    (`receipt-claim-move-warning`) under the group field. It uses the form's `rw-requirement-hint`
+    style and blocks nothing. It is driven by `claimMoveWarning()` off the private
+    `currentGroupId` signal, and is quiet in view mode and while the group is blank.
+  - **"In claim: <name>"** sits in the receipt form's audit details (`receipt-claim`), view and edit.
+    `app-audit-detail-section` gained an `<ng-content>` for it; nothing else projects into it.
+  - **The receipts table has an opt-in Claim column** (`claim`), the same way as Comment: in
+    `DEFAULT_RECEIPT_TABLE_COLUMNS` with `visible: false`, so `mergeCustomFieldColumns` appends it
+    unchecked to a saved layout. It is **not sortable**, because the API has no claim order.
 - **Two ways to add receipts.**
   - On the claim page, the `+` opens `ClaimReceiptPickerDialogComponent`: the shared multi-select
-    `app-autocomlete` over the group's other receipts, filtered by name.
+    `app-autocomlete` over the group's other receipts, filtered by name, without those in another
+    claim (above).
   - On the receipts table, **Add Selected Receipts to a Claim** (`data-testid="receipts-add-to-claim"`)
     sits in the overflow menu's selection section. It is a plain `mat-menu-item`, per "The overflow
     menu".
@@ -3174,11 +3199,12 @@ The API is `ReimbursementClaimService` (`api/swagger.yml`, tag `ReimbursementCla
   unexplained red field. It now lets both updates emit, pinned by the dialog spec.
 - **E2E:** `e2e/claims.spec.ts` (serial, admin storageState, two groups it provisions and deletes;
   no global setting touched). It walks the main journey over the real wire: a claim created on the
-  form and filled from the receipts table's bulk action, a receipt already in another claim refused
-  and named, a payment and a recoupment moving the server's figures (asserted separator-tolerantly,
-  amounts typed as whole numbers so any currency format works), the single and bulk delete
-  refusals naming the claim, and a receipt moved to another group on the receipt form leaving the
-  claim. The Jest specs mock `ReimbursementClaimService`, so this is the only proof the halves agree.
+  form and filled from the receipts table's bulk action, a receipt already in another claim named by
+  the bulk dialog before submitting and then refused and named, the claim page's picker leaving out
+  a receipt in another claim, a payment and a recoupment moving the server's figures (asserted
+  separator-tolerantly, amounts typed as whole numbers so any currency format works), the single
+  and bulk delete refusals naming the claim, and a receipt moved to another group on the receipt
+  form: its "In claim" link, the warning on picking the group, and leaving the claim on save. The Jest specs mock `ReimbursementClaimService`, so this is the only proof the halves agree.
   It also downloads the claim packet over the real wire (`beforeAll` uploads `fixtures/receipt.png`
   to one receipt) and opens the zip with `e2e/helpers/zip.ts`, a small central-directory reader
   (the project has no zip dependency). It checks the file name pattern, that `packet.pdf`,

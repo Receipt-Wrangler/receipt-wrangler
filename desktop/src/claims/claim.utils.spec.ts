@@ -7,6 +7,8 @@ import {
   buildUpsertClaimLedgerEntryCommand,
   canReadClaims,
   canUpdateClaims,
+  claimedReceiptsByClaim,
+  claimGroupMoveWarning,
   CLAIM_LEDGER_TYPE_OPTIONS,
   CLAIM_STATUS_OPTIONS,
   claimLedgerTypeOption,
@@ -14,6 +16,7 @@ import {
   claimStatusLabel,
   claimStatusOptionsFor,
   claimStatusTone,
+  isInOtherClaim,
   optionalCalendarDay,
   receiptGroupIds,
   unmatchedApiErrorMessage,
@@ -241,5 +244,47 @@ describe("claim.utils", () => {
 
   it("lists the distinct groups of a selection in first-seen order", () => {
     expect(receiptGroupIds([{ groupId: 6 }, { groupId: 5 }, { groupId: 6 }])).toEqual([6, 5]);
+  });
+
+  describe("a receipt's own claim", () => {
+    it("is another claim only when it is visible and not the one given", () => {
+      expect(isInOtherClaim({ claimId: 40, claimName: "Voucher 13" }, 12)).toBe(true);
+      expect(isInOtherClaim({ claimId: 12, claimName: "Voucher 14" }, 12)).toBe(false);
+      expect(isInOtherClaim({ claimId: 40, claimName: "Voucher 13" }, undefined)).toBe(true);
+      // Absent: in no claim, or in one hidden from the viewer.
+      expect(isInOtherClaim({}, 12)).toBe(false);
+    });
+
+    it("groups the claimed receipts of a selection by claim, in first-seen order", () => {
+      const receipts = [
+        { name: "Taxi" },
+        { name: "Fuel", claimId: 40, claimName: "Voucher 13" },
+        { name: "Parking", claimId: 39, claimName: "Voucher 12" },
+        { name: "Toll", claimId: 40, claimName: "Voucher 13" },
+        { name: "Hotel", claimId: 12, claimName: "Voucher 14" },
+      ];
+
+      expect(claimedReceiptsByClaim(receipts, 12)).toEqual([
+        { claimId: 40, claimName: "Voucher 13", receiptNames: ["Fuel", "Toll"] },
+        { claimId: 39, claimName: "Voucher 12", receiptNames: ["Parking"] },
+      ]);
+      expect(claimedReceiptsByClaim(receipts).map((group) => group.claimId)).toEqual([40, 39, 12]);
+    });
+
+    it("warns about a group move only once a different group is picked", () => {
+      const receipt = { groupId: 7, claimId: 12, claimName: "Voucher 14" };
+
+      expect(claimGroupMoveWarning(receipt, 8)).toBe(
+        "Moving this receipt to another group will remove it from claim 'Voucher 14'."
+      );
+      // The group control holds a number or a string, depending on how it was set.
+      expect(claimGroupMoveWarning(receipt, "8")).toBeDefined();
+      expect(claimGroupMoveWarning(receipt, 7)).toBeUndefined();
+      expect(claimGroupMoveWarning(receipt, "7")).toBeUndefined();
+      expect(claimGroupMoveWarning(receipt, "")).toBeUndefined();
+      expect(claimGroupMoveWarning(receipt, null)).toBeUndefined();
+      expect(claimGroupMoveWarning({ groupId: 7 }, 8)).toBeUndefined();
+      expect(claimGroupMoveWarning(undefined, 8)).toBeUndefined();
+    });
   });
 });

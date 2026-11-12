@@ -31,6 +31,7 @@ import { CheckboxModule } from "../checkbox/checkbox.module";
 import { DirectivesModule } from "../directives";
 import { InputModule } from "../input";
 import { MonthStepperComponent } from "../shared-ui/month-stepper/month-stepper.component";
+import { ReceiptClaimLinkComponent } from "../claims/receipt-claim-link/receipt-claim-link.component";
 import { ReceiptTotalsComponent } from "./receipt-totals/receipt-totals.component";
 import { FilteredStatefulMenuComponent } from "../standalone/components/filtered-stateful-menu/filtered-stateful-menu.component";
 import { TagAutocompleteComponent } from "../tag-autocomplete/tag-autocomplete.component";
@@ -112,6 +113,7 @@ import { UserTotalWithPercentagePipe } from "./user-total-with-percentage.pipe";
     MonthStepperComponent,
     ReceiptHistoryDrawerComponent,
     ReceiptTotalsComponent,
+    ReceiptClaimLinkComponent,
   ],
   exports: [
     UploadImageComponent

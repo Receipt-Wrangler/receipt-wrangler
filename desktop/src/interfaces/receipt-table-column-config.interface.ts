@@ -21,4 +21,7 @@ export const DEFAULT_RECEIPT_TABLE_COLUMNS: ReceiptTableColumnConfig[] = [
   // Opt-in: mergeCustomFieldColumns appends a missing built-in with the visibility
   // it has here, so an existing saved layout gains the column unchecked.
   { matColumnDef: 'first_comment', visible: false, order: 9 },
+  // Fork feature (claims): the receipt's claim, linking to it. Opt-in like the
+  // comment column, and not sortable â€” the API has no claim order.
+  { matColumnDef: 'claim', visible: false, order: 10 },
 ];

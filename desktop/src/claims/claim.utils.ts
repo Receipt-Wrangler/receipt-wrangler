@@ -243,3 +243,70 @@ export function receiptGroupIds(receipts: Pick<Receipt, "groupId">[]): number[] 
 export function receiptNoun(count: number): string {
   return count === 1 ? "receipt" : "receipts";
 }
+
+/*
+ * A receipt's own claim. The server sets `claimId` / `claimName` on every
+ * receipt it returns, but only when the receipt is in a claim the viewer may
+ * see, so their absence never proves a receipt is unclaimed: it means "nothing
+ * to show". The server's refusal stays the authority for the hidden case.
+ */
+export type ReceiptClaimRef = Pick<Receipt, "claimId" | "claimName">;
+
+/** Whether the receipt is in a (visible) claim other than `claimId`. */
+export function isInOtherClaim(receipt: ReceiptClaimRef, claimId: number | undefined): boolean {
+  return !!receipt.claimId && receipt.claimId !== claimId;
+}
+
+export interface ClaimedReceiptGroup {
+  claimId: number;
+  claimName: string;
+  receiptNames: string[];
+}
+
+/**
+ * The receipts of a selection that are already in a visible claim other than
+ * `targetClaimId`, grouped by that claim in first-seen order. A receipt already
+ * in the target claim is left out: the server counts it as added.
+ */
+export function claimedReceiptsByClaim(
+  receipts: (ReceiptClaimRef & Pick<Receipt, "name">)[],
+  targetClaimId?: number
+): ClaimedReceiptGroup[] {
+  const groups = new Map<number, ClaimedReceiptGroup>();
+  for (const receipt of receipts) {
+    if (!isInOtherClaim(receipt, targetClaimId)) {
+      continue;
+    }
+
+    const claimId = receipt.claimId as number;
+    const group = groups.get(claimId) ?? {
+      claimId,
+      claimName: receipt.claimName || `Claim #${claimId}`,
+      receiptNames: [],
+    };
+    group.receiptNames.push(receipt.name);
+    groups.set(claimId, group);
+  }
+
+  return Array.from(groups.values());
+}
+
+/**
+ * The receipt form's warning when the group field is changed on a receipt in a
+ * claim: the server unlinks a receipt that moves group, because a claim holds
+ * one group's receipts. Undefined while the group is unchanged or blank.
+ */
+export function claimGroupMoveWarning(
+  receipt: (ReceiptClaimRef & Pick<Receipt, "groupId">) | undefined,
+  groupId: unknown
+): string | undefined {
+  if (!receipt?.claimName || groupId === null || groupId === undefined || groupId === "") {
+    return undefined;
+  }
+
+  if (Number(groupId) === receipt.groupId) {
+    return undefined;
+  }
+
+  return `Moving this receipt to another group will remove it from claim '${receipt.claimName}'.`;
+}

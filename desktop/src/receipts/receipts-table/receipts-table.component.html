@@ -332,6 +332,10 @@
   </span>
 </ng-template>
 
+<ng-template #claimCell let-element="element">
+  <app-receipt-claim-link [receipt]="element"></app-receipt-claim-link>
+</ng-template>
+
 <ng-template #customFieldCell let-element="element" let-column="column">
   <app-custom-field-cell
     [receipt]="element"

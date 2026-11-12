@@ -143,6 +143,11 @@ describe("AddToClaimDialogComponent", () => {
       );
     });
 
+    it("names no receipt as already claimed when none is", () => {
+      expect(component.alreadyClaimed()).toEqual([]);
+      expect(fixture.nativeElement.querySelector("[data-testid='add-to-claim-already-claimed']")).toBeNull();
+    });
+
     it("requires a name for a new claim", () => {
       component.form.controls.claimId.setValue(NEW_CLAIM_OPTION);
       component.form.controls.name.setValue("   ");
@@ -196,6 +201,41 @@ describe("AddToClaimDialogComponent", () => {
 
       expect(component.form.controls.name.errors).toEqual({ error: "Name is too long" });
       expect(matDialogRef.close).not.toHaveBeenCalled();
+    });
+  });
+  // Named up front, so the result dialog's failure list is the exception.
+  describe("with receipts already in a claim", () => {
+    const fuel = { id: 3, name: "Fuel", groupId: 5, claimId: 40, claimName: "Voucher 13" };
+    const parking = { id: 4, name: "Parking", groupId: 5, claimId: 39, claimName: "Voucher 12" };
+    const toll = { id: 5, name: "Toll", groupId: 5, claimId: 39, claimName: "Voucher 12" };
+
+    beforeEach(async () => {
+      await setUp({ receipts: [taxi, fuel, parking, toll] });
+    });
+
+    it("names them by claim before a claim is picked", () => {
+      expect(text("add-to-claim-already-claimed")).toContain("Voucher 13: Fuel");
+      expect(text("add-to-claim-already-claimed")).toContain("Voucher 12: Parking, Toll");
+      expect(text("add-to-claim-already-claimed")).not.toContain("Taxi");
+    });
+
+    it("leaves out the ones already in the claim picked, which the server counts as added", async () => {
+      component.form.controls.claimId.setValue(40);
+      await fixture.whenStable();
+
+      expect(component.alreadyClaimed()).toEqual([
+        { claimId: 39, claimName: "Voucher 12", receiptNames: ["Parking", "Toll"] },
+      ]);
+      expect(text("add-to-claim-already-claimed")).not.toContain("Fuel");
+    });
+
+    it("still sends them, leaving the refusal to the server", () => {
+      claimService.addReceiptsToClaim.mockReturnValue(of({ receiptIds: [1, 3], failures: [] }));
+      component.form.controls.claimId.setValue(40);
+
+      component.submit();
+
+      expect(claimService.addReceiptsToClaim).toHaveBeenCalledWith(40, { receiptIds: [1, 3, 4, 5] });
     });
   });
 });

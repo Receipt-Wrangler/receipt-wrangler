@@ -51,6 +51,7 @@ import { ShareListComponent } from "../share-list/share-list.component";
 
 import { UploadImageComponent } from "../upload-image/upload-image.component";
 import { buildItemForm } from "../utils/form.utils";
+import { claimGroupMoveWarning } from "../../claims/claim.utils";
 
 @UntilDestroy()
 @Component({
@@ -718,6 +719,16 @@ export class ReceiptFormComponent implements OnInit {
       return false;
     }
     return (this.receiptCommentsComponent()?.commentCount() ?? 0) === 0;
+  }
+
+  /**
+   * Claims (fork feature): the server takes a receipt out of its claim when it
+   * moves group, so say so as soon as another group is picked. Non-blocking.
+   */
+  public claimMoveWarning(): string | undefined {
+    return this.mode === FormMode.view
+      ? undefined
+      : claimGroupMoveWarning(this.originalReceipt, this.currentGroupId());
   }
 
   /** In edit mode the server refuses deleting the last required image. */

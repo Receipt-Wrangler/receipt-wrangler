@@ -22,7 +22,17 @@
           [data]="originalReceipt"
           [formMode]="mode"
           [indent]="false"
-        ></app-audit-detail-section>
+        >
+          <!-- Claims (fork feature): the claim the receipt is in, when visible. -->
+          @if (originalReceipt?.claimId) {
+            <app-receipt-claim-link
+              class="mt-2"
+              data-testid="receipt-claim"
+              [receipt]="originalReceipt"
+              [labelled]="true"
+            ></app-receipt-claim-link>
+          }
+        </app-audit-detail-section>
       }
       <div class="row">
         <app-form-section
@@ -87,6 +97,15 @@
               [readonly]="mode | inputReadonly"
             >
             </app-group-autocomplete>
+            <!-- Claims (fork feature): a group move unlinks the receipt from its claim. -->
+            @if (claimMoveWarning(); as warning) {
+              <div
+                class="rw-requirement-hint w-100 mb-3"
+                data-testid="receipt-claim-move-warning"
+              >
+                {{ warning }}
+              </div>
+            }
             <app-user-autocomplete
               #paidByAutocomplete
               class="w-100"

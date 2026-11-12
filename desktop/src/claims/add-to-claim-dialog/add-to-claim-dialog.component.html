@@ -26,6 +26,17 @@
         {{ groupNames[0] }}. A receipt already in another claim is not moved.
       </p>
 
+      @if (alreadyClaimed().length > 0) {
+        <div class="add-to-claim-already-claimed" data-testid="add-to-claim-already-claimed">
+          <p class="mb-1">Already in another claim, so they will not be added:</p>
+          <ul class="mb-3">
+            @for (claimed of alreadyClaimed(); track claimed.claimId) {
+              <li>{{ claimed.claimName }}: {{ claimed.receiptNames.join(", ") }}</li>
+            }
+          </ul>
+        </div>
+      }
+
       @if (claims.isLoading()) {
         <mat-spinner diameter="32" class="mb-3"></mat-spinner>
       } @else {

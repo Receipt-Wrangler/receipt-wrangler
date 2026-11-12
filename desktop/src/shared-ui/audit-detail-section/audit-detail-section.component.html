@@ -25,6 +25,8 @@
       {{ data?.resolvedDate | appDate : "medium" }}
     </span>
       }
+      <!-- Extra read-only lines from the host form, e.g. the receipt's claim. -->
+      <ng-content></ng-content>
     </div>
   </app-form-section>
 }
