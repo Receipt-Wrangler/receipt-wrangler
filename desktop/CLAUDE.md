@@ -1626,6 +1626,31 @@ End-to-end tests live in `e2e/` and use **Playwright**. They drive the real Angu
 4. Start the Go API separately (`cd ../api && go run main.go`). Playwright auto-starts the Angular dev server via its `webServer` config, but it cannot launch the API.
 5. Run the tests: `npm run e2e` (or `npm run e2e:ui` for watch-style debugging).
 
+**On the owner's Windows machine** (no Docker, WSL or system Redis) there is a portable toolchain in
+`C:\Users\ianys\.rw-toolchain`, set up once and outside the repo. From Git Bash:
+
+```bash
+source /c/Users/ianys/.rw-toolchain/env.sh       # Go+CGO, ImageMagick 7, Redis
+bash $RW_TC/stack.sh start                       # Redis :6379, API :8081 (SQLite), ng serve :4200
+cd desktop && E2E_USER_USERNAME=e2e-user E2E_USER_PASSWORD=e2e-user-password \
+  E2E_ADMIN_USERNAME=e2e-admin E2E_ADMIN_PASSWORD=e2e-admin-password \
+  E2E_BASE_URL=http://localhost:4200 NODE_PATH=$PWD/node_modules \
+  npx playwright test -c $RW_TC/playwright.chrome.config.ts e2e/claims.spec.ts
+bash $RW_TC/stack.sh stop                        # stops whatever listens on 4200, 8081, 6379
+```
+
+- Redis is 7.4 built from source with the toolchain's MSYS2 gcc (`$RW_TC/redis`, carrying its own
+  `msys-2.0.dll`); no official portable Windows build exists.
+- The API's database, `data/`, `logs/` and `temp/` live in `$RW_TC/stack/run` (`BASE_PATH` points
+  there), so nothing lands in the repo. The two e2e accounts from step 2 already exist in that DB.
+- **Use `localhost`, not `127.0.0.1`, for `E2E_BASE_URL`.** The API runs as `-env dev`, which forces
+  `Secure` cookies, and Playwright's `APIRequestContext` (`withAdminApi` and friends) sends a
+  `Secure` cookie over plain http to `localhost` only. Against `127.0.0.1` every provisioning call
+  403s with "Unauthorized" while the browser logins still work.
+- **The suite runs on the system Chrome**, through `$RW_TC/playwright.chrome.config.ts`: it reuses
+  `playwright.config.ts` and only sets `channel: 'chrome'` (plus `NODE_PATH`, since it lives outside
+  the repo). `npm run e2e:install` downloads Chromium 1217, but its extraction stalls on this machine.
+
 ### CI
 
 In CI the same spec files run against the demo URL. GitHub secrets populate the `E2E_*` vars — point `E2E_BASE_URL` at `https://demo.receiptwrangler.io` and supply the secret credentials. When `E2E_BASE_URL` is remote, the config skips the `webServer` block and does not start a local dev server.
@@ -3117,9 +3142,18 @@ The API is `ReimbursementClaimService` (`api/swagger.yml`, tag `ReimbursementCla
   failure. Neither delete flow needed a change.
 - **Export.** The claim page's download button reuses `ReceiptExportService.exportReceiptsById` over
   the claim's receipt ids.
-- **No e2e yet.** The feature was built before its backend could run here. The Jest specs mock
-  `ReimbursementClaimService`, so they prove nothing about the wire. A Playwright spec covering
-  create → bulk add from the All view → ledger → figures is the follow-up.
+- **Validator swaps must emit.** `app-input` / `app-textarea` build their messages from the
+  control's `statusChanges` (`BaseInputComponent.formControlErrors`), so a validator change made with
+  `updateValueAndValidity({ emitEvent: false })` leaves the field red with **no message**. The ledger
+  dialog did exactly that when the type switched to Note, so saving a note with no text showed an
+  unexplained red field. It now lets both updates emit, pinned by the dialog spec.
+- **E2E:** `e2e/claims.spec.ts` (serial, admin storageState, two groups it provisions and deletes;
+  no global setting touched). It walks the main journey over the real wire: a claim created on the
+  form and filled from the receipts table's bulk action, a receipt already in another claim refused
+  and named, a payment and a recoupment moving the server's figures (asserted separator-tolerantly,
+  amounts typed as whole numbers so any currency format works), the single and bulk delete
+  refusals naming the claim, and a receipt moved to another group on the receipt form leaving the
+  claim. The Jest specs mock `ReimbursementClaimService`, so this is the only proof the halves agree.
 
 ## Testing Requirements
 

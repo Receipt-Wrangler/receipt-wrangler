@@ -4571,3 +4571,4 @@ clearing update), `handlers/claims_test.go` (the permission matrix, missing read
 All group both ways, per-receipt add/remove results, `[]` on the wire, paid-by and isolation
 filtering, ledger lifecycle, both delete refusals). The group-move detach, the bulk refusal and the
 paid-by filter were each mutation-checked: disabling them fails a named test.
+The wire, against the real desktop, is covered by `desktop/e2e/claims.spec.ts`.

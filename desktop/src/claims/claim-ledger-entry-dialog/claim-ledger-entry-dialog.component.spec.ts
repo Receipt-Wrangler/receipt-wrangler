@@ -88,6 +88,20 @@ describe("ClaimLedgerEntryDialogComponent", () => {
       expect(component.form.controls.note.hasError("required")).toBe(true);
     });
 
+    // app-input / app-textarea derive their messages from statusChanges, so a
+    // validator swap that does not emit leaves the field red with no message.
+    it("tells the inputs when the type swaps which field is required", () => {
+      const noteStatuses: string[] = [];
+      const amountStatuses: string[] = [];
+      component.form.controls.note.statusChanges.subscribe((status) => noteStatuses.push(status));
+      component.form.controls.amount.statusChanges.subscribe((status) => amountStatuses.push(status));
+
+      component.form.controls.type.setValue("NOTE");
+
+      expect(noteStatuses).toContain("INVALID");
+      expect(amountStatuses).toContain("VALID");
+    });
+
     it("creates the entry with a bare calendar day and closes with true", () => {
       claimService.createClaimLedgerEntry.mockReturnValue(of({}));
       component.form.setValue({

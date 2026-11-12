@@ -104,8 +104,10 @@ export class ClaimLedgerEntryDialogComponent {
 
     amount.setValidators(isNote ? null : Validators.required);
     note.setValidators(isNote ? trimmedRequiredValidator() : null);
-    amount.updateValueAndValidity({ emitEvent: false });
-    note.updateValueAndValidity({ emitEvent: false });
+    // Let these emit: app-input / app-textarea build their messages from
+    // statusChanges, so a silent swap leaves a field red with no message.
+    amount.updateValueAndValidity();
+    note.updateValueAndValidity();
   }
 
   public cancel(): void {
