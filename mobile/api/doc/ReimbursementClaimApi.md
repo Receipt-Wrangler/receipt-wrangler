@@ -15,6 +15,7 @@ Method | HTTP request | Description
 [**deleteClaim**](ReimbursementClaimApi.md#deleteclaim) | **DELETE** /claim/{claimId} | Delete claim
 [**deleteClaimLedgerEntry**](ReimbursementClaimApi.md#deleteclaimledgerentry) | **DELETE** /claim/{claimId}/ledgerEntry/{ledgerEntryId} | Delete a ledger entry
 [**getClaimById**](ReimbursementClaimApi.md#getclaimbyid) | **GET** /claim/{claimId} | Get claim
+[**getClaimPacket**](ReimbursementClaimApi.md#getclaimpacket) | **GET** /claim/{claimId}/packet | Download claim packet
 [**getClaimsForGroup**](ReimbursementClaimApi.md#getclaimsforgroup) | **GET** /claim/group/{groupId} | Get claims for a group
 [**removeReceiptsFromClaim**](ReimbursementClaimApi.md#removereceiptsfromclaim) | **POST** /claim/{claimId}/removeReceipts | Remove receipts from a claim
 [**updateClaim**](ReimbursementClaimApi.md#updateclaim) | **PUT** /claim/{claimId} | Update claim
@@ -306,6 +307,53 @@ Name | Type | Description  | Notes
 
  - **Content-Type**: Not defined
  - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getClaimPacket**
+> Uint8List getClaimPacket(claimId)
+
+Download claim packet
+
+Returns a zip (sent as Content-Type application/zip, with a Content-Disposition attachment filename built from the claim name and today's date in the app time zone) holding: packet.pdf (cover sheet with the claim's figures, the ledger, the receipts grouped with category subtotals, then one section per receipt with its fields, custom fields, items, comments and downscaled images); images/ (each receipt image's original file, byte for byte, named <receiptDate>_<receiptName>_<receiptId>_<n>.<ext>); receipts.csv and items.csv (the receipt export's columns, plus an Images column in receipts.csv); and manifest.json (the Claim, the receipt ids included, and the path, size and SHA-256 of every other file). Covers exactly what the caller may see of the claim, as getClaim does. Gated on group.receipts.read in the claim's group; a missing claim and one the caller may not see are the same 403. A claim over the packet's size bounds (receipts, images, or downscaled image bytes) is a 400 [SYSTEM USER]
+
+### Example
+```dart
+import 'package:openapi/api.dart';
+// TODO Configure API key authorization: apiKeyAuth
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKey = 'YOUR_API_KEY';
+// uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+//defaultApiClient.getAuthentication<ApiKeyAuth>('apiKeyAuth').apiKeyPrefix = 'Bearer';
+
+final api = Openapi().getReimbursementClaimApi();
+final int claimId = 56; // int | Id of the claim
+
+try {
+    final response = api.getClaimPacket(claimId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling ReimbursementClaimApi->getClaimPacket: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **claimId** | **int**| Id of the claim | 
+
+### Return type
+
+[**Uint8List**](Uint8List.md)
+
+### Authorization
+
+[apiKeyAuth](../README.md#apiKeyAuth), [bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/octet-stream, application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

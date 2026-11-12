@@ -8,6 +8,7 @@ import 'package:built_value/json_object.dart';
 import 'package:built_value/serializer.dart';
 import 'package:dio/dio.dart';
 
+import 'dart:typed_data';
 import 'package:openapi/src/api_util.dart';
 import 'package:openapi/src/model/claim.dart';
 import 'package:openapi/src/model/claim_ledger_entry.dart';
@@ -543,6 +544,90 @@ class ReimbursementClaimApi {
     }
 
     return Response<Claim>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Download claim packet
+  /// Returns a zip (sent as Content-Type application/zip, with a Content-Disposition attachment filename built from the claim name and today&#39;s date in the app time zone) holding: packet.pdf (cover sheet with the claim&#39;s figures, the ledger, the receipts grouped with category subtotals, then one section per receipt with its fields, custom fields, items, comments and downscaled images); images/ (each receipt image&#39;s original file, byte for byte, named &lt;receiptDate&gt;_&lt;receiptName&gt;_&lt;receiptId&gt;_&lt;n&gt;.&lt;ext&gt;); receipts.csv and items.csv (the receipt export&#39;s columns, plus an Images column in receipts.csv); and manifest.json (the Claim, the receipt ids included, and the path, size and SHA-256 of every other file). Covers exactly what the caller may see of the claim, as getClaim does. Gated on group.receipts.read in the claim&#39;s group; a missing claim and one the caller may not see are the same 403. A claim over the packet&#39;s size bounds (receipts, images, or downscaled image bytes) is a 400 [SYSTEM USER]
+  ///
+  /// Parameters:
+  /// * [claimId] - Id of the claim
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Uint8List] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Uint8List>> getClaimPacket({ 
+    required int claimId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/claim/{claimId}/packet'.replaceAll('{' r'claimId' '}', encodeQueryParameter(_serializers, claimId, const FullType(int)).toString());
+    final _options = Options(
+      method: r'GET',
+      responseType: ResponseType.bytes,
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'apiKeyAuth',
+            'keyName': 'Authorization',
+            'where': 'header',
+          },{
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Uint8List? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null ? null : rawResponse as Uint8List;
+
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Uint8List>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

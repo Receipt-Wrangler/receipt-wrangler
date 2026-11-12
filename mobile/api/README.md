@@ -160,6 +160,7 @@ Class | Method | HTTP request | Description
 [*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**deleteClaim**](doc/ReimbursementClaimApi.md#deleteclaim) | **DELETE** /claim/{claimId} | Delete claim
 [*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**deleteClaimLedgerEntry**](doc/ReimbursementClaimApi.md#deleteclaimledgerentry) | **DELETE** /claim/{claimId}/ledgerEntry/{ledgerEntryId} | Delete a ledger entry
 [*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**getClaimById**](doc/ReimbursementClaimApi.md#getclaimbyid) | **GET** /claim/{claimId} | Get claim
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**getClaimPacket**](doc/ReimbursementClaimApi.md#getclaimpacket) | **GET** /claim/{claimId}/packet | Download claim packet
 [*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**getClaimsForGroup**](doc/ReimbursementClaimApi.md#getclaimsforgroup) | **GET** /claim/group/{groupId} | Get claims for a group
 [*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**removeReceiptsFromClaim**](doc/ReimbursementClaimApi.md#removereceiptsfromclaim) | **POST** /claim/{claimId}/removeReceipts | Remove receipts from a claim
 [*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**updateClaim**](doc/ReimbursementClaimApi.md#updateclaim) | **PUT** /claim/{claimId} | Update claim

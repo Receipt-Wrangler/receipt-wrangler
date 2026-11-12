@@ -17,6 +17,12 @@ type ReceiptCsvService struct {
 	// Nil reads it from System Settings when the CSV is built. A receipt's own
 	// Date is a calendar day and is always printed in UTC.
 	Location *time.Location
+
+	// ImageNames, when non-nil, adds a trailing Images column to receipts.csv
+	// listing each receipt's image filenames, keyed by receipt id. The claim
+	// packet sets it to the names its images/ folder uses; the normal export
+	// leaves it nil, so its columns are unchanged.
+	ImageNames map[uint][]string
 }
 
 func NewReceiptCsvService() ReceiptCsvService {
@@ -42,6 +48,9 @@ func (service *ReceiptCsvService) BuildReceiptCsv(receipts []models.Receipt) (st
 		"Categories",
 		"Tags",
 		"Resolved Date",
+	}
+	if service.ImageNames != nil {
+		headers = append(headers, "Images")
 	}
 	rowData := make([][]string, 0, len(receipts))
 	dateFormat := "2006-01-02"
@@ -70,6 +79,9 @@ func (service *ReceiptCsvService) BuildReceiptCsv(receipts []models.Receipt) (st
 			render.SanitizeCSVField(service.BuildCategoryString(receipt.Categories)),
 			render.SanitizeCSVField(service.BuildTagString(receipt.Tags)),
 			resolvedDateString,
+		}
+		if service.ImageNames != nil {
+			newRow = append(newRow, render.SanitizeCSVField(strings.Join(service.ImageNames[receipt.ID], ",")))
 		}
 		rowData = append(rowData, newRow)
 	}

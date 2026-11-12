@@ -795,6 +795,12 @@ and paid. **Backend + desktop; mobile only carries the regenerated client.** See
   Go with `decimal`; "days waiting" counts to today in the app time zone. Calendar days are bare
   `yyyy-MM-dd` on the wire, money a two-place decimal string.
 - **The All group lists** the claims of every group the caller may read, but is never a destination.
+- **Claim packet: `GET /claim/{claimId}/packet` (`getClaimPacket`)** returns one zip per claim:
+  `packet.pdf` (cover, ledger, receipts with category subtotals, a page per receipt with its
+  downscaled images), `images/` (the originals, byte for byte), `receipts.csv` / `items.csv` (the
+  export plus an Images column) and `manifest.json` (SHA-256 of every other file). Same gate and
+  visibility as reading the claim; over its size bounds it is a 400. Declared as an octet-stream
+  binary so the generated client returns a `Blob`. See `api/CLAUDE.md` → "Claim packet".
 
 See `api/CLAUDE.md` → "Reimbursement claims (fork feature)".
 

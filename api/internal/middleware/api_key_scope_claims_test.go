@@ -15,6 +15,7 @@ var claimRoutes = []routeCase{
 	{"GET", "/api/claim/1", classRead},
 	{"PUT", "/api/claim/1", classWrite},
 	{"DELETE", "/api/claim/1", classWrite},
+	{"GET", "/api/claim/1/packet", classRead},
 	{"POST", "/api/claim/1/addReceipts", classWrite},
 	{"POST", "/api/claim/1/removeReceipts", classWrite},
 	{"POST", "/api/claim/1/ledgerEntry", classWrite},

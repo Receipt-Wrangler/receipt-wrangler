@@ -18,6 +18,7 @@ func BuildClaimRouter() *chi.Mux {
 	claimRouter.Get("/{claimId}", handlers.GetClaimById)
 	claimRouter.Put("/{claimId}", handlers.UpdateClaim)
 	claimRouter.Delete("/{claimId}", handlers.DeleteClaim)
+	claimRouter.Get("/{claimId}/packet", handlers.GetClaimPacket)
 	claimRouter.Post("/{claimId}/addReceipts", handlers.AddReceiptsToClaim)
 	claimRouter.Post("/{claimId}/removeReceipts", handlers.RemoveReceiptsFromClaim)
 	claimRouter.Post("/{claimId}/ledgerEntry", handlers.CreateClaimLedgerEntry)

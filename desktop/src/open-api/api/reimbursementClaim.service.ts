@@ -619,6 +619,74 @@ export class ReimbursementClaimService {
     }
 
     /**
+     * Download claim packet
+     * Returns a zip (sent as Content-Type application/zip, with a Content-Disposition attachment filename built from the claim name and today\&#39;s date in the app time zone) holding: packet.pdf (cover sheet with the claim\&#39;s figures, the ledger, the receipts grouped with category subtotals, then one section per receipt with its fields, custom fields, items, comments and downscaled images); images/ (each receipt image\&#39;s original file, byte for byte, named &lt;receiptDate&gt;_&lt;receiptName&gt;_&lt;receiptId&gt;_&lt;n&gt;.&lt;ext&gt;); receipts.csv and items.csv (the receipt export\&#39;s columns, plus an Images column in receipts.csv); and manifest.json (the Claim, the receipt ids included, and the path, size and SHA-256 of every other file). Covers exactly what the caller may see of the claim, as getClaim does. Gated on group.receipts.read in the claim\&#39;s group; a missing claim and one the caller may not see are the same 403. A claim over the packet\&#39;s size bounds (receipts, images, or downscaled image bytes) is a 400 [SYSTEM USER]
+     * @param claimId Id of the claim
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     */
+    public getClaimPacket(claimId: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/octet-stream' | 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Blob>;
+    public getClaimPacket(claimId: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/octet-stream' | 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Blob>>;
+    public getClaimPacket(claimId: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/octet-stream' | 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Blob>>;
+    public getClaimPacket(claimId: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/octet-stream' | 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (claimId === null || claimId === undefined) {
+            throw new Error('Required parameter claimId was null or undefined when calling getClaimPacket.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        let localVarCredential: string | undefined;
+        // authentication (apiKeyAuth) required
+        localVarCredential = this.configuration.lookupCredential('apiKeyAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', localVarCredential);
+        }
+
+        // authentication (bearerAuth) required
+        localVarCredential = this.configuration.lookupCredential('bearerAuth');
+        if (localVarCredential) {
+            localVarHeaders = localVarHeaders.set('Authorization', 'Bearer ' + localVarCredential);
+        }
+
+        let localVarHttpHeaderAcceptSelected: string | undefined = options && options.httpHeaderAccept;
+        if (localVarHttpHeaderAcceptSelected === undefined) {
+            // to determine the Accept header
+            const httpHeaderAccepts: string[] = [
+                'application/octet-stream',
+                'application/json'
+            ];
+            localVarHttpHeaderAcceptSelected = this.configuration.selectHeaderAccept(httpHeaderAccepts);
+        }
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        let localVarHttpContext: HttpContext | undefined = options && options.context;
+        if (localVarHttpContext === undefined) {
+            localVarHttpContext = new HttpContext();
+        }
+
+        let localVarTransferCache: boolean | undefined = options && options.transferCache;
+        if (localVarTransferCache === undefined) {
+            localVarTransferCache = true;
+        }
+
+
+        let localVarPath = `/claim/${this.configuration.encodeParam({name: "claimId", value: claimId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: undefined})}/packet`;
+        return this.httpClient.request('get', `${this.configuration.basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: "blob",
+                withCredentials: this.configuration.withCredentials,
+                headers: localVarHeaders,
+                observe: observe,
+                transferCache: localVarTransferCache,
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
      * Get claims for a group
      * Returns the group\&#39;s claims, newest first, each with its computed figures, linked receipt ids and ledger entries, plus a summary for an \&quot;outstanding and ageing\&quot; header. Every figure covers only what the caller may see (see Claim). Gated on group.receipts.read [SYSTEM USER]
      * @param groupId Id of the group. On GET this may be the caller\&#39;s synthetic \&quot;All\&quot; group, which lists the claims of every group where the caller holds group.receipts.read. POST rejects the All group with a 400.
