@@ -129,6 +129,18 @@ describe("HeaderComponent", () => {
     expect(dashboardButtonRendered()).toBe(true);
   });
 
+  it("should link Claims to the selected group's claim list", async () => {
+    logIn();
+    selectGroupOne();
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector("[data-testid='header-claims-link']")).not.toBeNull();
+    expect(component.claimsHeaderLink()).toEqual(["/claims/group", "1"]);
+
+    store.dispatch(new SetSelectedGroupId("2"));
+    expect(component.claimsHeaderLink()).toEqual(["/claims/group", "2"]);
+  });
+
   it("should not fetch the notification count without app.notifications.read", async () => {
     const countSpy = jest
       .spyOn(notificationsService, "getNotificationCount")

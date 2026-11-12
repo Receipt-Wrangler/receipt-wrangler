@@ -30,7 +30,7 @@ Method | HTTP request | Description
 
 Bulk delete receipts
 
-This will delete every listed receipt the caller may delete (group.receipts.delete on the receipt's own group) and report each one it did not delete. Receipts are deleted independently, so a refused receipt does not stop the others [SYSTEM USER]
+This will delete every listed receipt the caller may delete (group.receipts.delete on the receipt's own group) and report each one it did not delete. Receipts are deleted independently, so a refused receipt does not stop the others. A receipt that is in a reimbursement claim is refused with a failure naming the claim [SYSTEM USER]
 
 ### Example
 ```dart
@@ -220,7 +220,7 @@ Name | Type | Description  | Notes
 
 Delete receipt
 
-This will delete a receipt by id [SYSTEM USER]
+This will delete a receipt by id. A receipt that is in a reimbursement claim is refused with a 400 naming the claim; remove it from the claim first [SYSTEM USER]
 
 ### Example
 ```dart

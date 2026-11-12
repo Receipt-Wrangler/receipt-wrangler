@@ -1,0 +1,359 @@
+<form class="mb-4" [formGroup]="form" (ngSubmit)="submit()">
+  <app-form-header
+    [headerText]="headerText()"
+    [headerButtonsTemplate]="headerButtons"
+  ></app-form-header>
+
+  @if (claim(); as claim) {
+    <!-- The server's figures, never re-derived here. Refetched after every receipt or ledger change. -->
+    <section class="claim-figures" data-testid="claim-figures">
+      <div class="claim-figures__figure">
+        <span class="claim-figures__label">Status</span>
+        <app-status-chip
+          data-testid="claim-status"
+          [customStatus]="statusLabel(claim.status)"
+          [customStatusColor]="statusTone(claim.status)"
+        ></app-status-chip>
+      </div>
+      <div class="claim-figures__figure" data-testid="claim-figure-claimed">
+        <span class="claim-figures__label">Claimed</span>
+        <span class="claim-figures__value">{{ claim.effectiveClaimedAmount | customCurrency }}</span>
+        <span class="claim-figures__caption">
+          @if (claim.claimedAmount) {
+            Entered; receipts total {{ claim.receiptsTotal | customCurrency }}
+          } @else {
+            Receipts total
+          }
+        </span>
+      </div>
+      <div class="claim-figures__figure" data-testid="claim-figure-paid">
+        <span class="claim-figures__label">Paid</span>
+        <span class="claim-figures__value" [class.claim-amount--negative]="isNegative(claim.paidAmount)">
+          {{ claim.paidAmount | customCurrency }}
+        </span>
+        <span class="claim-figures__caption">
+          Payments {{ claim.paymentsTotal | customCurrency }} &minus;
+          recouped {{ claim.recoupmentsTotal | customCurrency }}
+        </span>
+      </div>
+      <div class="claim-figures__figure claim-figures__figure--headline" data-testid="claim-figure-outstanding">
+        <span class="claim-figures__label">Outstanding</span>
+        <span
+          class="claim-figures__value"
+          [class.claim-amount--negative]="isNegative(claim.outstandingAmount)"
+        >
+          {{ claim.outstandingAmount | customCurrency }}
+        </span>
+        @if (isNegative(claim.outstandingAmount)) {
+          <span class="claim-figures__caption">More received than claimed</span>
+        }
+      </div>
+      <div class="claim-figures__figure" data-testid="claim-figure-waiting">
+        <span class="claim-figures__label">Waiting</span>
+        <span class="claim-figures__value">
+          @if (claim.daysWaiting !== undefined && claim.daysWaiting !== null) {
+            {{ claim.daysWaiting }} {{ claim.daysWaiting === 1 ? "day" : "days" }}
+          } @else {
+            &mdash;
+          }
+        </span>
+        <span class="claim-figures__caption">
+          @if (claim.submittedDate) {
+            Submitted {{ claim.submittedDate | appDate : "mediumDate" : "calendar" }}
+          } @else {
+            Not submitted
+          }
+        </span>
+      </div>
+    </section>
+  }
+
+  <div class="row">
+    <app-form-section
+      class="col-12 col-lg-8"
+      headerText="Details"
+      [indent]="false"
+    >
+      @if (groupName()) {
+        <p class="claim-group" data-testid="claim-group">
+          {{ mode === FormMode.add ? "Will be added to" : "Group:" }} <strong>{{ groupName() }}</strong>
+        </p>
+      }
+      <app-input
+        data-testid="claim-name"
+        label="Name"
+        placeholder="Travel voucher, Rome to Lima"
+        [inputFormControl]="form | formGet : 'name'"
+        [readonly]="mode | inputReadonly"
+      ></app-input>
+      <div class="row">
+        <app-input
+          class="col-12 col-md-6"
+          data-testid="claim-reference-number"
+          label="Reference number"
+          placeholder="Voucher or travel authorization number"
+          [inputFormControl]="form | formGet : 'referenceNumber'"
+          [readonly]="mode | inputReadonly"
+        ></app-input>
+        <app-input
+          class="col-12 col-md-6"
+          data-testid="claim-type"
+          label="Type"
+          placeholder="Travel voucher, TQSA, ..."
+          [inputFormControl]="form | formGet : 'type'"
+          [readonly]="mode | inputReadonly"
+        ></app-input>
+      </div>
+      <div class="row">
+        <app-select
+          class="col-12 col-md-4"
+          data-testid="claim-status-select"
+          label="Status"
+          optionValueKey="value"
+          optionDisplayKey="displayValue"
+          [options]="statusOptions"
+          [inputFormControl]="form | formGet : 'status'"
+          [readonly]="mode | inputReadonly"
+        ></app-select>
+        <app-datepicker
+          class="col-12 col-md-4"
+          data-testid="claim-submitted-date"
+          label="Submitted"
+          [inputFormControl]="form | formGet : 'submittedDate'"
+          [readonly]="mode | inputReadonly"
+        ></app-datepicker>
+        <app-datepicker
+          class="col-12 col-md-4"
+          data-testid="claim-due-date"
+          label="Due"
+          [inputFormControl]="form | formGet : 'dueDate'"
+          [readonly]="mode | inputReadonly"
+        ></app-datepicker>
+      </div>
+      <app-input
+        data-testid="claim-claimed-amount"
+        label="Claimed amount"
+        type="text"
+        [isCurrency]="true"
+        [hint]="(mode | inputReadonly) ? undefined : 'Leave blank to claim the receipts total.'"
+        [inputFormControl]="form | formGet : 'claimedAmount'"
+        [readonly]="mode | inputReadonly"
+      ></app-input>
+      <app-textarea
+        data-testid="claim-notes"
+        label="Notes"
+        [inputFormControl]="form | formGet : 'notes'"
+        [readonly]="mode | inputReadonly"
+      ></app-textarea>
+    </app-form-section>
+
+    @if (claim(); as claim) {
+      <app-audit-detail-section
+        class="col-12 col-lg-4"
+        [data]="claim"
+        [formMode]="mode"
+        [indent]="false"
+      ></app-audit-detail-section>
+    }
+  </div>
+
+  @if (claim(); as claim) {
+    <app-form-section
+      headerText="Receipts"
+      [subtitle]="claim.receiptCount + (claim.receiptCount === 1 ? ' receipt' : ' receipts') + ' totalling ' + (claim.receiptsTotal | customCurrency)"
+      [headerButtonsTemplate]="receiptsButtons"
+      [indent]="false"
+    >
+      @if (claim.receiptIds.length === 0) {
+        <p class="claim-section-empty" data-testid="claim-receipts-empty">
+          No receipts on this claim yet.
+        </p>
+      } @else if (groupReceipts.isLoading()) {
+        <mat-spinner diameter="32"></mat-spinner>
+      } @else {
+        <app-table
+          data-testid="claim-receipts"
+          [columns]="receiptColumns()"
+          [displayedColumns]="receiptDisplayedColumns()"
+          [dataSource]="receiptsDataSource()"
+        ></app-table>
+      }
+    </app-form-section>
+
+    <app-form-section
+      class="d-block mt-4"
+      headerText="Ledger"
+      subtitle="Payments received, money taken back, and notes, oldest first."
+      [headerButtonsTemplate]="ledgerButtons"
+      [indent]="false"
+    >
+      @if (claim.ledgerEntries.length === 0) {
+        <p class="claim-section-empty" data-testid="claim-ledger-empty">
+          Nothing recorded yet. Add a payment when money arrives, or a recoupment
+          when it is taken back.
+        </p>
+      } @else {
+        <app-table
+          data-testid="claim-ledger"
+          [columns]="ledgerColumns()"
+          [displayedColumns]="ledgerDisplayedColumns()"
+          [dataSource]="ledgerDataSource()"
+        ></app-table>
+      }
+    </app-form-section>
+  }
+
+  <app-form-button-bar [mode]="mode">
+    @if (!(mode | inputReadonly)) {
+      <app-submit-button
+        data-testid="claim-submit"
+        [onlyIcon]="false"
+        [disabled]="!canUpdate()"
+        [buttonText]="mode === FormMode.add ? 'Add Claim' : 'Save'"
+      ></app-submit-button>
+    }
+  </app-form-button-bar>
+</form>
+
+<ng-template #headerButtons>
+  @if (claim(); as claim) {
+    @if ((mode | inputReadonly) && canUpdate()) {
+      <app-edit-button
+        class="ms-1"
+        data-testid="claim-edit"
+        color="accent"
+        [buttonRouterLink]="['/claims', claim.id.toString(), 'edit']"
+      ></app-edit-button>
+    }
+    @if (claim.receiptIds.length > 0) {
+      <app-button
+        data-testid="claim-export"
+        matButtonType="iconButton"
+        icon="download"
+        color="accent"
+        tooltip="Export this claim's receipts"
+        (clicked)="exportReceipts()"
+      ></app-button>
+    }
+    @if (canUpdate()) {
+      <app-delete-button
+        data-testid="claim-delete"
+        tooltip="Delete claim"
+        (clicked)="deleteClaim()"
+      ></app-delete-button>
+    }
+  }
+</ng-template>
+
+<ng-template #receiptsButtons>
+  @if (canUpdate()) {
+    <app-add-button
+      data-testid="claim-receipts-add"
+      tooltip="Add receipts"
+      [disabled]="groupReceipts.isLoading()"
+      (clicked)="addReceipts()"
+    ></app-add-button>
+  }
+</ng-template>
+
+<ng-template #ledgerButtons>
+  @if (canUpdate()) {
+    <app-add-button
+      data-testid="claim-ledger-add"
+      tooltip="Add ledger entry"
+      (clicked)="addLedgerEntry()"
+    ></app-add-button>
+  }
+</ng-template>
+
+<ng-template #receiptDateCell let-receipt="element">
+  {{ receipt.date | appDate : "mediumDate" : "calendar" }}
+</ng-template>
+
+<ng-template #receiptNameCell let-receipt="element">
+  <a [routerLink]="['/receipts', receipt.id, 'view']">{{ receipt.name }}</a>
+</ng-template>
+
+<ng-template #receiptPaidByCell let-receipt="element">
+  {{ (receipt.paidByUserId?.toString() | user)?.displayName }}
+</ng-template>
+
+<ng-template #receiptAmountCell let-receipt="element">
+  @if (receipt.amount !== undefined) {
+    {{ receipt.amount | customCurrency }}
+  }
+</ng-template>
+
+<ng-template #receiptStatusCell let-receipt="element">
+  @if (receipt.status) {
+    <app-status-chip [status]="receipt.status"></app-status-chip>
+  }
+</ng-template>
+
+<ng-template #receiptActionsCell let-receipt="element">
+  <app-button
+    data-testid="claim-receipt-remove"
+    matButtonType="iconButton"
+    icon="remove_circle_outline"
+    color="warn"
+    tooltip="Remove from claim"
+    (clicked)="removeReceipt(receipt)"
+  ></app-button>
+</ng-template>
+
+<ng-template #ledgerDateCell let-entry="element">
+  {{ entry.date | appDate : "mediumDate" : "calendar" }}
+</ng-template>
+
+<ng-template #ledgerTypeCell let-entry="element">
+  @let type = ledgerTypeOption(entry.type);
+  <span
+    class="claim-ledger-type"
+    [class.claim-ledger--payment]="entry.type === PAYMENT"
+    [class.claim-ledger--recoupment]="entry.type === RECOUPMENT"
+    [attr.data-testid]="'claim-ledger-type-' + entry.type"
+  >
+    <mat-icon aria-hidden="true">{{ type.icon }}</mat-icon>
+    {{ type.displayValue }}
+  </span>
+</ng-template>
+
+<ng-template #ledgerAmountCell let-entry="element">
+  @if (entry.amount) {
+    @switch (entry.type) {
+      @case (PAYMENT) {
+        <span class="claim-ledger-amount claim-ledger--payment" data-testid="claim-ledger-amount">
+          + {{ entry.amount | customCurrency }}
+        </span>
+      }
+      @case (RECOUPMENT) {
+        <span class="claim-ledger-amount claim-ledger--recoupment" data-testid="claim-ledger-amount">
+          &minus; {{ entry.amount | customCurrency }}
+        </span>
+      }
+      @default {
+        <span class="claim-ledger-amount claim-ledger--uncounted" data-testid="claim-ledger-amount">
+          {{ entry.amount | customCurrency }} (not counted)
+        </span>
+      }
+    }
+  }
+</ng-template>
+
+<ng-template #ledgerNoteCell let-entry="element">
+  <span class="claim-ledger-note">{{ entry.note }}</span>
+</ng-template>
+
+<ng-template #ledgerActionsCell let-entry="element">
+  <div class="d-flex">
+    <app-edit-button
+      data-testid="claim-ledger-edit"
+      color="accent"
+      (clicked)="editLedgerEntry(entry)"
+    ></app-edit-button>
+    <app-delete-button
+      data-testid="claim-ledger-delete"
+      (clicked)="deleteLedgerEntry(entry)"
+    ></app-delete-button>
+  </div>
+</ng-template>

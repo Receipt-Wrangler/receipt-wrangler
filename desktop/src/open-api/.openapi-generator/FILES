@@ -20,6 +20,7 @@ api/prompt.service.ts
 api/receipt.service.ts
 api/receiptImage.service.ts
 api/receiptProcessingSettings.service.ts
+api/reimbursementClaim.service.ts
 api/report.service.ts
 api/role.service.ts
 api/search.service.ts
@@ -56,6 +57,13 @@ model/categoryView.ts
 model/chartGrouping.ts
 model/checkEmailConnectivityCommand.ts
 model/checkReceiptProcessingSettingsConnectivityCommand.ts
+model/claim.ts
+model/claimLedgerEntry.ts
+model/claimList.ts
+model/claimListSummary.ts
+model/claimReceiptsCommand.ts
+model/claimReceiptsFailure.ts
+model/claimReceiptsResult.ts
 model/claims.ts
 model/comment.ts
 model/currencySeparator.ts
@@ -162,6 +170,8 @@ model/updateGroupSettingsCommand.ts
 model/updateProfileCommand.ts
 model/upsertApiKeyCommand.ts
 model/upsertCategoryCommand.ts
+model/upsertClaimCommand.ts
+model/upsertClaimLedgerEntryCommand.ts
 model/upsertCommentCommand.ts
 model/upsertCustomFieldCommand.ts
 model/upsertCustomFieldOptionCommand.ts

@@ -186,6 +186,17 @@
           </button>
         }
 
+        @if (canAddToClaim()) {
+          <button
+            mat-menu-item
+            data-testid="receipts-add-to-claim"
+            (click)="addSelectedReceiptsToClaim()"
+          >
+            <mat-icon>request_quote</mat-icon>
+            <span>Add Selected Receipts to a Claim</span>
+          </button>
+        }
+
         @if (canBulkDelete()) {
           <button
             mat-menu-item

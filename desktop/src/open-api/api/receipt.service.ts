@@ -131,7 +131,7 @@ export class ReceiptService {
 
     /**
      * Bulk delete receipts
-     * This will delete every listed receipt the caller may delete (group.receipts.delete on the receipt\&#39;s own group) and report each one it did not delete. Receipts are deleted independently, so a refused receipt does not stop the others [SYSTEM USER]
+     * This will delete every listed receipt the caller may delete (group.receipts.delete on the receipt\&#39;s own group) and report each one it did not delete. Receipts are deleted independently, so a refused receipt does not stop the others. A receipt that is in a reimbursement claim is refused with a failure naming the claim [SYSTEM USER]
      * @param bulkReceiptDeleteCommand Receipt ids to delete
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
@@ -507,7 +507,7 @@ export class ReceiptService {
 
     /**
      * Delete receipt
-     * This will delete a receipt by id [SYSTEM USER]
+     * This will delete a receipt by id. A receipt that is in a reimbursement claim is refused with a 400 naming the claim; remove it from the claim first [SYSTEM USER]
      * @param receiptId Id of receipt to get
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.

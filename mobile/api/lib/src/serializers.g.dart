@@ -30,6 +30,13 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(ChartGrouping.serializer)
       ..add(CheckEmailConnectivityCommand.serializer)
       ..add(CheckReceiptProcessingSettingsConnectivityCommand.serializer)
+      ..add(Claim.serializer)
+      ..add(ClaimLedgerEntry.serializer)
+      ..add(ClaimList.serializer)
+      ..add(ClaimListSummary.serializer)
+      ..add(ClaimReceiptsCommand.serializer)
+      ..add(ClaimReceiptsFailure.serializer)
+      ..add(ClaimReceiptsResult.serializer)
       ..add(Claims.serializer)
       ..add(Comment.serializer)
       ..add(CurrencySeparator.serializer)
@@ -139,6 +146,8 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..add(UpdateProfileCommand.serializer)
       ..add(UpsertApiKeyCommand.serializer)
       ..add(UpsertCategoryCommand.serializer)
+      ..add(UpsertClaimCommand.serializer)
+      ..add(UpsertClaimLedgerEntryCommand.serializer)
       ..add(UpsertCommentCommand.serializer)
       ..add(UpsertCustomFieldCommand.serializer)
       ..add(UpsertCustomFieldOptionCommand.serializer)
@@ -181,6 +190,9 @@ Serializers _$serializers = (Serializers().toBuilder()
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(Tag)]),
           () => ListBuilder<Tag>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(Claim)]),
+          () => ListBuilder<Claim>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(CustomFieldOption)]),
           () => ListBuilder<CustomFieldOption>())
@@ -432,9 +444,25 @@ Serializers _$serializers = (Serializers().toBuilder()
           const FullType(BuiltList, const [const FullType(int)]),
           () => ListBuilder<int>())
       ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
           const FullType(
               BuiltList, const [const FullType(BulkReceiptDeleteFailure)]),
           () => ListBuilder<BulkReceiptDeleteFailure>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(ClaimLedgerEntry)]),
+          () => ListBuilder<ClaimLedgerEntry>())
+      ..addBuilderFactory(
+          const FullType(BuiltList, const [const FullType(int)]),
+          () => ListBuilder<int>())
+      ..addBuilderFactory(
+          const FullType(
+              BuiltList, const [const FullType(ClaimReceiptsFailure)]),
+          () => ListBuilder<ClaimReceiptsFailure>())
       ..addBuilderFactory(
           const FullType(BuiltList, const [const FullType(int)]),
           () => ListBuilder<int>())

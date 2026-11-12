@@ -1,0 +1,45 @@
+@use "../../variables.scss" as variables;
+@use "sass:map";
+
+:host {
+  display: block;
+}
+
+// The page's headline figures: one row that wraps, mirroring the receipt
+// totals block under the receipts table.
+.claim-list-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: variables.$spacing-sm variables.$spacing-xl;
+  margin-bottom: variables.$spacing-md;
+}
+
+.claim-list-summary__figure {
+  display: flex;
+  flex-direction: column;
+}
+
+.claim-list-summary__label {
+  opacity: 0.7;
+  font-size: 0.875rem;
+}
+
+.claim-list-summary__value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.claim-list-summary__as-of {
+  opacity: 0.7;
+  font-size: 0.875rem;
+}
+
+.claim-list-message {
+  opacity: 0.8;
+}
+
+.claim-amount--negative {
+  color: map.get(variables.$warn-palette, 600);
+}

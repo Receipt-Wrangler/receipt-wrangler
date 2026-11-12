@@ -34,7 +34,7 @@ class ReceiptApi {
   const ReceiptApi(this._dio, this._serializers);
 
   /// Bulk delete receipts
-  /// This will delete every listed receipt the caller may delete (group.receipts.delete on the receipt&#39;s own group) and report each one it did not delete. Receipts are deleted independently, so a refused receipt does not stop the others [SYSTEM USER]
+  /// This will delete every listed receipt the caller may delete (group.receipts.delete on the receipt&#39;s own group) and report each one it did not delete. Receipts are deleted independently, so a refused receipt does not stop the others. A receipt that is in a reimbursement claim is refused with a failure naming the claim [SYSTEM USER]
   ///
   /// Parameters:
   /// * [bulkReceiptDeleteCommand] - Receipt ids to delete
@@ -463,7 +463,7 @@ class ReceiptApi {
   }
 
   /// Delete receipt
-  /// This will delete a receipt by id [SYSTEM USER]
+  /// This will delete a receipt by id. A receipt that is in a reimbursement claim is refused with a 400 naming the claim; remove it from the claim first [SYSTEM USER]
   ///
   /// Parameters:
   /// * [receiptId] - Id of receipt to get

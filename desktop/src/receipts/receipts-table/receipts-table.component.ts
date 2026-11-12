@@ -55,6 +55,7 @@ import { resolveSummaryConfigGroup, summaryConfigGroups } from "../../utils/rece
 import { openQuickScanDialog } from "../quick-scan-dialog/open-quick-scan-dialog";
 import { BulkDeleteResultDialogComponent, BulkDeleteResultDialogData } from "../bulk-delete-result-dialog/bulk-delete-result-dialog.component";
 import { BulkStatusUpdateComponent } from "../bulk-resolve-dialog/bulk-status-update-dialog.component";
+import { AddToClaimDialogComponent, AddToClaimDialogData } from "../../claims/add-to-claim-dialog/add-to-claim-dialog.component";
 import { ColumnConfigurationDialogComponent } from "../column-configuration-dialog/column-configuration-dialog.component";
 
 /**
@@ -307,6 +308,9 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
    */
   public canBulkDelete = signal(false);
 
+  /** Same per-row rule as canBulkDelete, for group.receipts.update (claims, a fork feature). */
+  public canAddToClaim = signal(false);
+
   public firstSort: boolean = true;
 
   public canEdit: boolean = false;
@@ -475,6 +479,13 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
             receipts.some((r) =>
               this.store.selectSnapshot(
                 AuthState.hasGroupPermission(r.groupId, Permission.GroupReceiptsDelete)
+              )
+            )
+          );
+          this.canAddToClaim.set(
+            receipts.some((r) =>
+              this.store.selectSnapshot(
+                AuthState.hasGroupPermission(r.groupId, Permission.GroupReceiptsUpdate)
               )
             )
           );
@@ -909,6 +920,23 @@ export class ReceiptsTableComponent implements OnInit, AfterViewInit {
         })
       )
       .subscribe();
+  }
+
+  /**
+   * Claims are a fork feature: the dialog picks or creates the claim, adds the
+   * receipts and reports the per-receipt result itself. Nothing on this table
+   * changes, so there is nothing to refresh.
+   */
+  public addSelectedReceiptsToClaim(): void {
+    const receipts = (this.table().selection.selected as Receipt[]).map(({ id, name, groupId }) => ({
+      id,
+      name,
+      groupId,
+    }));
+    this.matDialog.open<AddToClaimDialogComponent, AddToClaimDialogData>(AddToClaimDialogComponent, {
+      ...DEFAULT_DIALOG_CONFIG,
+      data: { receipts },
+    });
   }
 
   public duplicateReceipt(row: Receipt): void {

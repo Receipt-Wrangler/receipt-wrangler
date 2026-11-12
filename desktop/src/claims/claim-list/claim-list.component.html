@@ -1,0 +1,106 @@
+<app-table-header [headerText]="headerText()" [subtitle]="subtitle()">
+  @if (canAdd()) {
+    <app-add-button
+      data-testid="claim-add"
+      buttonText="Add Claim"
+      tooltip="Add Claim"
+      [buttonRouterLink]="['/claims/add']"
+    ></app-add-button>
+  }
+</app-table-header>
+
+@if (summary(); as summary) {
+  <section class="claim-list-summary" data-testid="claim-list-summary">
+    <div class="claim-list-summary__figure" data-testid="claim-list-summary-awaiting">
+      <span class="claim-list-summary__label">Awaiting settlement</span>
+      <span class="claim-list-summary__value">
+        {{ summary.awaitingCount }} of {{ summary.claimCount }}
+        {{ summary.claimCount === 1 ? "claim" : "claims" }}
+      </span>
+    </div>
+    <div class="claim-list-summary__figure" data-testid="claim-list-summary-outstanding">
+      <span class="claim-list-summary__label">Still owed</span>
+      <span class="claim-list-summary__value">{{ summary.outstandingTotal | customCurrency }}</span>
+    </div>
+    <div class="claim-list-summary__figure" data-testid="claim-list-summary-oldest">
+      <span class="claim-list-summary__label">Longest wait</span>
+      <span class="claim-list-summary__value">
+        @if (summary.oldestDaysWaiting !== undefined && summary.oldestDaysWaiting !== null) {
+          {{ summary.oldestDaysWaiting }} {{ summary.oldestDaysWaiting === 1 ? "day" : "days" }}
+        } @else {
+          &mdash;
+        }
+      </span>
+    </div>
+    <span class="claim-list-summary__as-of">
+      As of {{ summary.asOfDate | appDate : "mediumDate" : "calendar" }}
+    </span>
+  </section>
+}
+
+@if (claims.error()) {
+  <p class="claim-list-message" data-testid="claim-list-error">
+    Claims could not be loaded for this group.
+  </p>
+} @else if (claims.hasValue() && claims.value().claims.length === 0) {
+  <p class="claim-list-message" data-testid="claim-list-empty">
+    No claims yet.
+    @if (canAdd()) {
+      Add one here, or select receipts on the receipt list and choose
+      "Add selected receipts to a claim".
+    }
+  </p>
+} @else {
+  <div class="table-container">
+    <app-table
+      [columns]="columns()"
+      [displayedColumns]="displayedColumns()"
+      [dataSource]="dataSource()"
+    ></app-table>
+  </div>
+}
+
+<ng-template #nameCell let-claim="element">
+  <a data-testid="claim-list-name" [routerLink]="['/claims', claim.id, 'view']">{{ claim.name }}</a>
+</ng-template>
+
+<ng-template #groupCell let-claim="element">
+  {{ (claim.groupId.toString() | group)?.name }}
+</ng-template>
+
+<ng-template #statusCell let-claim="element">
+  <app-status-chip
+    [customStatus]="statusLabel(claim.status)"
+    [customStatusColor]="statusTone(claim.status)"
+  ></app-status-chip>
+</ng-template>
+
+<ng-template #submittedDateCell let-claim="element">
+  {{ claim.submittedDate | appDate : "mediumDate" : "calendar" }}
+</ng-template>
+
+<ng-template #dueDateCell let-claim="element">
+  {{ claim.dueDate | appDate : "mediumDate" : "calendar" }}
+</ng-template>
+
+<ng-template #claimedCell let-claim="element">
+  {{ claim.effectiveClaimedAmount | customCurrency }}
+</ng-template>
+
+<ng-template #paidCell let-claim="element">
+  <span [class.claim-amount--negative]="isNegative(claim.paidAmount)">
+    {{ claim.paidAmount | customCurrency }}
+  </span>
+</ng-template>
+
+<ng-template #outstandingCell let-claim="element">
+  <strong [class.claim-amount--negative]="isNegative(claim.outstandingAmount)">
+    {{ claim.outstandingAmount | customCurrency }}
+  </strong>
+</ng-template>
+
+<ng-template #daysWaitingCell let-claim="element">
+  @if (claim.daysWaiting !== undefined && claim.daysWaiting !== null) {
+    {{ claim.daysWaiting }}
+  }
+</ng-template>

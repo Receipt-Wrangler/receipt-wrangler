@@ -36,6 +36,17 @@
       >
         <mat-icon>receipt_long</mat-icon>
       </button>
+      <button
+        mat-icon-button
+        color="accent"
+        class="nav-button"
+        matTooltip="Claims"
+        data-testid="header-claims-link"
+        routerLinkActive="active-link"
+        [routerLink]="claimsHeaderLink()"
+      >
+        <mat-icon>request_quote</mat-icon>
+      </button>
       @for (shortcut of userPreferences()?.userShortcuts ?? []; track shortcut["id"]) {
         <a [href]="shortcut.url">
           <button

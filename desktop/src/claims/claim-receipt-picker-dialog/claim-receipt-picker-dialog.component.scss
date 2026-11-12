@@ -1,0 +1,16 @@
+:host {
+  display: block;
+}
+
+.claim-receipt-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+.claim-receipt-option__detail {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

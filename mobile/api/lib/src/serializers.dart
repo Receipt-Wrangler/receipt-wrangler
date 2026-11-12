@@ -36,6 +36,13 @@ import 'package:openapi/src/model/category_view.dart';
 import 'package:openapi/src/model/chart_grouping.dart';
 import 'package:openapi/src/model/check_email_connectivity_command.dart';
 import 'package:openapi/src/model/check_receipt_processing_settings_connectivity_command.dart';
+import 'package:openapi/src/model/claim.dart';
+import 'package:openapi/src/model/claim_ledger_entry.dart';
+import 'package:openapi/src/model/claim_list.dart';
+import 'package:openapi/src/model/claim_list_summary.dart';
+import 'package:openapi/src/model/claim_receipts_command.dart';
+import 'package:openapi/src/model/claim_receipts_failure.dart';
+import 'package:openapi/src/model/claim_receipts_result.dart';
 import 'package:openapi/src/model/claims.dart';
 import 'package:openapi/src/model/comment.dart';
 import 'package:openapi/src/model/currency_separator.dart';
@@ -141,6 +148,8 @@ import 'package:openapi/src/model/update_group_settings_command.dart';
 import 'package:openapi/src/model/update_profile_command.dart';
 import 'package:openapi/src/model/upsert_api_key_command.dart';
 import 'package:openapi/src/model/upsert_category_command.dart';
+import 'package:openapi/src/model/upsert_claim_command.dart';
+import 'package:openapi/src/model/upsert_claim_ledger_entry_command.dart';
 import 'package:openapi/src/model/upsert_comment_command.dart';
 import 'package:openapi/src/model/upsert_custom_field_command.dart';
 import 'package:openapi/src/model/upsert_custom_field_option_command.dart';
@@ -191,6 +200,13 @@ part 'serializers.g.dart';
   ChartGrouping,
   CheckEmailConnectivityCommand,
   CheckReceiptProcessingSettingsConnectivityCommand,
+  Claim,
+  ClaimLedgerEntry,
+  ClaimList,
+  ClaimListSummary,
+  ClaimReceiptsCommand,
+  ClaimReceiptsFailure,
+  ClaimReceiptsResult,
   Claims,
   Comment,
   CurrencySeparator,
@@ -296,6 +312,8 @@ part 'serializers.g.dart';
   UpdateProfileCommand,
   UpsertApiKeyCommand,
   UpsertCategoryCommand,
+  UpsertClaimCommand,
+  UpsertClaimLedgerEntryCommand,
   UpsertCommentCommand,
   UpsertCustomFieldCommand,
   UpsertCustomFieldOptionCommand,

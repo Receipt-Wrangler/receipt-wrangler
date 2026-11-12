@@ -21,6 +21,7 @@ import { DEFAULT_DIALOG_CONFIG } from "../../constants";
 import { SnackbarService } from "../../services";
 import { ReceiptFilterService } from "../../services/receipt-filter.service";
 import { BulkDeleteResultDialogComponent } from "../bulk-delete-result-dialog/bulk-delete-result-dialog.component";
+import { AddToClaimDialogComponent } from "../../claims/add-to-claim-dialog/add-to-claim-dialog.component";
 import { AuthState, GroupState, UserState } from "../../store";
 import { SetPermissions } from "../../store/auth.state.actions";
 import { SetGroups } from "../../store/group.state.actions";
@@ -713,6 +714,67 @@ describe("ReceiptsTableComponent", () => {
         component.deleteSelectedReceipts();
 
         expect(receiptService.bulkDeleteReceipts).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  // Claims (fork feature): the entry and its gate. The dialog itself is covered
+  // by add-to-claim-dialog.component.spec.ts.
+  describe("add selected receipts to a claim", () => {
+    const groceries = { id: 1, name: "Groceries", groupId: 5 } as Receipt;
+    const fuel = { id: 2, name: "Fuel", groupId: 6 } as Receipt;
+
+    const select = (receipts: Receipt[]) => {
+      Object.defineProperty(component, "table", {
+        value: () => ({
+          selection: {
+            selected: receipts,
+            changed: of({ source: { selected: receipts } }),
+          },
+        }),
+      });
+      component.ngAfterViewInit();
+    };
+
+    // The All view's own membership granting update must not count.
+    beforeEach(() => {
+      store.dispatch(
+        new SetPermissions([], {
+          5: [Permission.GroupReceiptsUpdate],
+          6: [Permission.GroupReceiptsRead],
+          99: [Permission.GroupReceiptsUpdate],
+        })
+      );
+      component.groupId = "99";
+    });
+
+    it("is offered when a selected receipt's own group grants update", () => {
+      select([groceries, fuel]);
+
+      expect(component.canAddToClaim()).toEqual(true);
+    });
+
+    it("is withheld when no selected receipt's group grants update", () => {
+      select([fuel]);
+
+      expect(component.canAddToClaim()).toEqual(false);
+    });
+
+    it("opens the dialog with the selection's ids, names and groups", () => {
+      const dialog = TestBed.inject(MatDialog);
+      const open = jest.spyOn(dialog, "open").mockReturnValue({} as any);
+      select([{ ...groceries, amount: "12.00" } as Receipt, fuel]);
+
+      component.addSelectedReceiptsToClaim();
+
+      expect(open).toHaveBeenCalledWith(AddToClaimDialogComponent, {
+        ...DEFAULT_DIALOG_CONFIG,
+        data: {
+          receipts: [
+            { id: 1, name: "Groceries", groupId: 5 },
+            { id: 2, name: "Fuel", groupId: 6 },
+          ],
+        },
       });
     });
   });

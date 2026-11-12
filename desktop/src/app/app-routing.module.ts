@@ -69,6 +69,13 @@ const routes: Routes = [
         canActivate: [AuthGuard],
       },
       {
+        // Reimbursement claims (fork feature).
+        path: "claims",
+        loadChildren: () =>
+          import("../claims/reimbursement-claims.module").then((m) => m.ReimbursementClaimsModule),
+        canActivate: [AuthGuard],
+      },
+      {
         path: "settings",
         loadChildren: () =>
           import("../settings/settings.module").then((m) => m.SettingsModule),

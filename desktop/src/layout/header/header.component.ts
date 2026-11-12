@@ -36,6 +36,11 @@ export class HeaderComponent {
     return [this.store.selectSnapshot(GroupState.dashboardLink)];
   });
 
+  // Reimbursement claims (fork feature). Built here rather than as a GroupState
+  // selector beside receiptListLink, to keep the fork's footprint in shared
+  // upstream files to this one line of logic.
+  public claimsHeaderLink = computed(() => ["/claims/group", this.selectedGroupId()]);
+
   public settingsBaseHeaderLink = computed(() => {
     this.selectedGroupId();
     return [this.store.selectSnapshot(GroupState.settingsLinkBase) + "/view"];

@@ -163,6 +163,13 @@ func (repository ReceiptRepository) UpdateReceipt(id string, command commands.Up
 			return txErr
 		}
 
+		// A claim only holds receipts of its own group, so a move leaves its claim.
+		if updatedReceipt.GroupId > 0 && currentReceipt.GroupId != updatedReceipt.GroupId {
+			if txErr = DetachReceiptFromClaims(tx, currentReceipt.ID); txErr != nil {
+				return txErr
+			}
+		}
+
 		txErr = tx.Session(&gorm.Session{FullSaveAssociations: true}).Model(&currentReceipt).Updates(&updatedReceipt).Error
 		if txErr != nil {
 			return txErr

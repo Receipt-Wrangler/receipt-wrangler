@@ -1,0 +1,37 @@
+<app-dialog headerText="Add receipts">
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    @if (data.candidates.length === 0) {
+      <p data-testid="claim-receipt-picker-empty">
+        Every receipt in this group you can see is already on {{ data.claimName }}.
+      </p>
+    } @else {
+      <app-autocomlete
+        data-testid="claim-receipt-picker"
+        inputId="claim-receipt-picker"
+        label="Receipts"
+        optionFilterKey="name"
+        optionDisplayKey="name"
+        hint="Type to search by name. A receipt already in another claim is refused, not moved."
+        [multiple]="true"
+        [options]="data.candidates"
+        [optionTemplate]="receiptOption"
+        [inputFormControl]="$any(form | formGet : 'receipts')"
+      ></app-autocomlete>
+    }
+    <app-dialog-footer
+      submitButtonTooltip="Add to claim"
+      [showSubmitButton]="data.candidates.length > 0"
+      (cancelClicked)="cancel()"
+    ></app-dialog-footer>
+  </form>
+</app-dialog>
+
+<ng-template #receiptOption let-option="option">
+  <span class="claim-receipt-option">
+    <span class="claim-receipt-option__name">{{ option.name }}</span>
+    <span class="claim-receipt-option__detail">
+      {{ option.date | appDate : "mediumDate" : "calendar" }} ·
+      {{ option.amount | customCurrency }}
+    </span>
+  </span>
+</ng-template>

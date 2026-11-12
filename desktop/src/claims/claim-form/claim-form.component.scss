@@ -1,0 +1,84 @@
+@use "../../variables.scss" as variables;
+@use "sass:map";
+
+:host {
+  display: block;
+}
+
+// The figures lead the page: the question this page answers is "what is still
+// owed on this claim, and since when?".
+.claim-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: variables.$spacing-md variables.$spacing-xl;
+  margin-bottom: variables.$spacing-lg;
+}
+
+.claim-figures__figure {
+  display: flex;
+  flex-direction: column;
+}
+
+.claim-figures__label {
+  opacity: 0.7;
+  font-size: 0.875rem;
+}
+
+.claim-figures__value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.claim-figures__figure--headline .claim-figures__value {
+  font-size: 1.75rem;
+}
+
+.claim-figures__caption {
+  opacity: 0.7;
+  font-size: 0.8125rem;
+}
+
+.claim-group {
+  margin-bottom: variables.$spacing-sm;
+}
+
+.claim-section-empty {
+  opacity: 0.8;
+}
+
+.claim-amount--negative {
+  color: map.get(variables.$warn-palette, 600);
+}
+
+// A payment and a recoupment must never be mistaken for each other: each has
+// its own icon, sign and colour.
+.claim-ledger-type {
+  display: inline-flex;
+  align-items: center;
+  gap: variables.$spacing-xs;
+}
+
+.claim-ledger-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.claim-ledger--payment {
+  color: map.get(variables.$success-palette, 800);
+}
+
+.claim-ledger--recoupment {
+  color: map.get(variables.$warn-palette, 600);
+  font-weight: 600;
+}
+
+.claim-ledger--uncounted {
+  opacity: 0.6;
+}
+
+.claim-ledger-note {
+  white-space: pre-wrap;
+  word-break: break-word;
+}

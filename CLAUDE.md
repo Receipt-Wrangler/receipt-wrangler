@@ -774,6 +774,30 @@ desktop**; mobile only carries the regenerated client (it has no group email set
   - Member masking clears them wherever it blanks `createdByString`.
   - Receipts created before this change have neither field.
 
+### Reimbursement Claims (fork feature)
+
+A **claim** bundles receipts of one group submitted together for reimbursement, with a ledger of
+payments, recoupments and notes afterwards, so the user keeps their own record of what was claimed
+and paid. **Backend + desktop; mobile only carries the regenerated client.** See `desktop/CLAUDE.md` →
+"Claims (reimbursement claims, fork feature)".
+
+- **Purely additive on the wire.** New paths under `/claim`, new `Claim*` schemas, swagger tag
+  `ReimbursementClaim` (generated `ReimbursementClaimService` / `ReimbursementClaimApi`, clear of the
+  desktop's hand-written `ClaimsService`). Status and ledger entry type are **plain strings, never
+  enums**, and every array is `[]`, so an already-released Android build is unaffected.
+- **No new permissions**: reads gate on `group.receipts.read`, writes on `group.receipts.update`,
+  in the claim's group. A new `Permission` value would be the closed-enum outage again.
+- **Receipts link through a table, not a column**, so the receipt model, payloads and history are
+  untouched. A receipt is in at most one claim, of its own group; moving it to another group unlinks
+  it. **A receipt in a claim cannot be deleted** through the receipt delete endpoints (400, or a
+  per-receipt failure in bulk delete, naming the claim); group and user deletes still cascade.
+- **Figures cover only what the viewer may see** (paid-by visibility, member isolation), computed in
+  Go with `decimal`; "days waiting" counts to today in the app time zone. Calendar days are bare
+  `yyyy-MM-dd` on the wire, money a two-place decimal string.
+- **The All group lists** the claims of every group the caller may read, but is never a destination.
+
+See `api/CLAUDE.md` → "Reimbursement claims (fork feature)".
+
 ### State Management Patterns
 - **Backend**: Service layer handles business logic, repositories handle data access
 - **Desktop**: NGXS store with actions/selectors, persistent storage for auth/preferences

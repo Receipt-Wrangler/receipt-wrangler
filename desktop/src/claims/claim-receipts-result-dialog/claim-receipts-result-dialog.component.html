@@ -1,0 +1,15 @@
+<app-dialog [headerText]="data.headerText">
+  <p data-testid="claim-receipts-result-summary">{{ data.summary }}</p>
+  <ul class="claim-receipts-result-failures" data-testid="claim-receipts-result-failures">
+    @for (failure of data.failures; track $index) {
+      <li>
+        <strong>{{ failure.name }}</strong>: {{ failure.message }}
+      </li>
+    }
+  </ul>
+  <app-dialog-footer
+    cancelButtonTooltip="Close"
+    [showSubmitButton]="false"
+    (cancelClicked)="close()"
+  ></app-dialog-footer>
+</app-dialog>

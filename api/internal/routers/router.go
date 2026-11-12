@@ -58,6 +58,9 @@ func BuildRootRouter() *chi.Mux {
 	commentRouter := BuildCommentRouter()
 	rootRouter.Mount("/api/comment", commentRouter)
 
+	// Reimbursement claims (fork feature)
+	rootRouter.Mount("/api/claim", BuildClaimRouter())
+
 	// Tag Router
 	tagRouter := BuildTagRouter()
 	rootRouter.Mount("/api/tag", tagRouter)

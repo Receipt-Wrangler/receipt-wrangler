@@ -931,7 +931,15 @@ func DeleteReceipt(w http.ResponseWriter, r *http.Request) {
 			id := chi.URLParam(r, "id")
 			receiptService := services.NewReceiptService(nil)
 
-			err := receiptService.DeleteReceipt(id)
+			refused, err := refuseDeletingReceiptInClaim(w, structs.GetClaims(r).UserId, id)
+			if err != nil {
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
+			}
+			if refused {
+				return 0, nil
+			}
+
+			err = receiptService.DeleteReceipt(id)
 			if err != nil {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}

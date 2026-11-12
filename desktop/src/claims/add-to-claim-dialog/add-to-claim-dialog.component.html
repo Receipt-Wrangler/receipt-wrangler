@@ -1,0 +1,65 @@
+<app-dialog headerText="Add to a claim">
+  @if (groupId === undefined) {
+    <p data-testid="add-to-claim-mixed-groups">
+      The {{ receiptCount }} selected receipts are in {{ groupIds.length }} groups
+      ({{ groupNames.join(", ") }}). A claim holds receipts from one group only, so
+      select receipts from a single group and try again.
+    </p>
+    <app-dialog-footer
+      cancelButtonTooltip="Close"
+      [showSubmitButton]="false"
+      (cancelClicked)="cancel()"
+    ></app-dialog-footer>
+  } @else if (!canUpdate) {
+    <p data-testid="add-to-claim-forbidden">
+      You do not have permission to change claims in {{ groupNames[0] }}.
+    </p>
+    <app-dialog-footer
+      cancelButtonTooltip="Close"
+      [showSubmitButton]="false"
+      (cancelClicked)="cancel()"
+    ></app-dialog-footer>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <p data-testid="add-to-claim-summary">
+        Add {{ receiptCount }} selected {{ receiptNoun }} to a claim in
+        {{ groupNames[0] }}. A receipt already in another claim is not moved.
+      </p>
+
+      @if (claims.isLoading()) {
+        <mat-spinner diameter="32" class="mb-3"></mat-spinner>
+      } @else {
+        <app-select
+          data-testid="add-to-claim-target"
+          label="Claim"
+          optionValueKey="value"
+          optionDisplayKey="displayValue"
+          [options]="targetOptions()"
+          [inputFormControl]="form | formGet : 'claimId'"
+        ></app-select>
+
+        @if (isNewClaim()) {
+          <app-input
+            data-testid="add-to-claim-name"
+            label="Name"
+            placeholder="Travel voucher, Rome to Lima"
+            [inputFormControl]="form | formGet : 'name'"
+          ></app-input>
+          <app-select
+            data-testid="add-to-claim-status"
+            label="Status"
+            optionValueKey="value"
+            optionDisplayKey="displayValue"
+            [options]="statusOptions"
+            [inputFormControl]="form | formGet : 'status'"
+          ></app-select>
+        }
+      }
+
+      <app-dialog-footer
+        submitButtonTooltip="Add to claim"
+        (cancelClicked)="cancel()"
+      ></app-dialog-footer>
+    </form>
+  }
+</app-dialog>

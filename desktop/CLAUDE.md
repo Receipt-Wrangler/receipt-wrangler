@@ -3019,6 +3019,108 @@ renders the **full dataset** (not the capped builder preview) and re-resolves ac
   (`app-select`) whose options come from `ReportService.getReportTemplates` — server-filtered to the
   caller's viewable templates (`reportTemplateOptions`, loaded in `ngOnInit`, `catchError`→empty).
 
+## Claims (reimbursement claims, fork feature)
+
+A claim is the user's own record of a submission to the department paying them back: which receipts
+went in, when it was submitted, what was claimed, what was paid and when, and anything later taken
+back. Everything lives in `src/claims/`, under `/claims`, lazy-loaded as `ReimbursementClaimsModule`.
+The API is `ReimbursementClaimService` (`api/swagger.yml`, tag `ReimbursementClaim`).
+
+- **Naming trap.** `src/services/claims.service.ts` (`ClaimsService`) and the generated `Claims`
+  model are about **JWT** claims. The feature's model is `Claim` (singular) and its service is
+  `ReimbursementClaimService`. The module is `ReimbursementClaimsModule`, not `ClaimsModule`, so
+  nothing reads as "the module that provides `ClaimsService`". New files take a `claim-` prefix.
+- **Pages.** `claim-list` at `/claims/group/:groupId` (`GroupGuard`, like the receipt list), and
+  `claim-form` at `/claims/add`, `/claims/:id/view` and `/claims/:id/edit`. The header's
+  `request_quote` button (`data-testid="header-claims-link"`) sits after Receipt List. It is built in
+  `HeaderComponent.claimsHeaderLink`, not as a `GroupState` selector, to keep the fork's edits to
+  upstream files small.
+- **The server computes every figure.** That covers `receiptsTotal`, `effectiveClaimedAmount`,
+  `paidAmount` (payments minus recoupments, can be negative), `outstandingAmount` (can be negative),
+  `daysWaiting` and the list `summary`. The client only formats them, with `customCurrency` and
+  `appDate`. Never add anything up here.
+- **Status and ledger type are plain strings.** `claim.utils.ts` labels and colours the known codes
+  (`CLAIM_STATUS_OPTIONS`, `CLAIM_LEDGER_TYPE_OPTIONS`). An unknown one renders as its **raw code**,
+  and `claimStatusOptionsFor` / `claimLedgerTypeOptionsFor` add it to the select so an edit form can
+  still show it. The status chip is the shared `app-status-chip` through
+  `customStatus` / `customStatusColor`, so no new colours were authored.
+- **Calendar days, not instants.** `submittedDate`, `dueDate`, entry `date` and `summary.asOfDate`
+  are bare `yyyy-MM-dd` both ways.
+  - Display: `appDate:"mediumDate":"calendar"`.
+  - Load into a datepicker: `calendarDayToLocalDate`.
+  - Send: `optionalCalendarDay` (`toCalendarDay`), with no zone conversion anywhere.
+  - A new ledger entry defaults to `todayInZone(appZone)`. `createdAt` / `updatedAt` are instants,
+    shown by the shared `app-audit-detail-section`.
+- **Gating.** Reading is `group.receipts.read` and every write is `group.receipts.update`. There
+  are no claim permissions. Both are judged in the claim's **own** group (`canUpdateClaims`), never
+  the group being browsed, which may be the All group.
+  - **The detail routes are gated in `claimResolverFn`**, since the claim's group is unknown until
+    it loads. A missing claim and a forbidden one are the same 403. The resolver toasts
+    `CLAIM_NOT_FOUND_MESSAGE` and redirects to the browsed group's list. The interceptor stays quiet
+    on a GET, so without the toast the page would simply never open.
+  - An edit the viewer may not make is redirected to `/claims/:id/view`.
+  - `/claims/add` uses `groupPermissionGuard` with `useAddTargetGroupId`.
+- **The All group.** The list spans every readable group there and adds a **Group** column.
+  - **"Add Claim" needs a real group.** It shows only when `GroupState.addTargetGroupId` resolves
+    (the browsed group, or the sole real group, exactly as the receipt form seeds) and that group
+    grants update. A multi-group user on All is told to open a group instead.
+  - `claim-form` in add mode with no add target is reachable only by URL. It toasts and leaves.
+- **Receipts on a claim.** A claim carries ids only.
+  - `claim-form` loads the claim group's receipts **once**, unpaged (`getReceiptsForGroup`,
+    `pageSize: -1`), and that one request feeds both the rows and the picker's candidates.
+  - The `rxResource` is keyed on a primitive `claimGroupId` computed. Keying it on `claim()` would
+    reload every receipt in the group after each ledger change, because each change refetches the
+    claim.
+  - An id the list did not return renders as `Receipt #<id>`.
+- **Writes return only what they wrote**, so the page refetches the claim (`refresh()`) after any
+  receipt or ledger change. The refetch never rebuilds the form, so an edit in progress on the
+  claim's own fields survives a ledger change. A failed refetch (the claim was deleted elsewhere)
+  toasts and returns to the list.
+- **Adding and removing receipts is partial success.** `reportClaimReceiptsResult` is the one
+  reporter: a snackbar when everything went through, otherwise `ClaimReceiptsResultDialogComponent`
+  naming each refusal. It is a mirror of the bulk-delete result dialog, whose wording is about
+  deleting. A receipt already in another claim is refused by the server, never moved.
+  - Removing needs no confirmation, since re-adding is one click.
+  - Deleting a ledger entry or the claim goes through `ConfirmationDialogComponent`.
+- **Two ways to add receipts.**
+  - On the claim page, the `+` opens `ClaimReceiptPickerDialogComponent`: the shared multi-select
+    `app-autocomlete` over the group's other receipts, filtered by name.
+  - On the receipts table, **Add Selected Receipts to a Claim** (`data-testid="receipts-add-to-claim"`)
+    sits in the overflow menu's selection section. It is a plain `mat-menu-item`, per "The overflow
+    menu".
+  - `canAddToClaim` mirrors `canBulkDelete`: any selected row's own group grants
+    `group.receipts.update`.
+  - It opens `AddToClaimDialogComponent`, which picks one of the group's claims or creates one. A new
+    claim is created first, then the receipts are added. A retry after a failed add reuses the claim
+    it already created.
+  - The claim select starts **blank** on purpose, because adding to the wrong claim is the mistake to
+    prevent.
+  - **A selection that spans groups is refused up front**, naming the groups, because a claim holds
+    one group's receipts. The alternative was guessing a group and letting the server refuse the
+    rest.
+- **The dialogs are standalone** (`imports: [SharedUiModule, …]`). The receipts table opens one, and
+  importing `ReimbursementClaimsModule` into `ReceiptsModule` would also register the claim routes
+  under `/receipts`.
+- **The ledger.** PAYMENT, RECOUPMENT and NOTE. A recoupment has its own icon (`undo`), a `−` sign and
+  the warn colour. A payment has `payments`, a `+` sign and green. A note's optional amount is shown
+  muted as "(not counted)". In `ClaimLedgerEntryDialogComponent` the amount is required for a payment
+  or recoupment, and the note text is required for a note. The validators swap as the type changes.
+- **Server 400s come in two shapes.** `{ errorMsg }` is toasted by the interceptor. A map keyed by
+  field goes onto the matching controls through the existing `applyApiErrors`
+  (`applyClaimApiErrors`). A key no control shows, such as `receiptIds`, is toasted
+  (`unmatchedApiErrorMessage`), so a 400 is never silent.
+- **Optional fields are omitted when blank.** `buildUpsertClaimCommand` drops an emptied field,
+  because PUT is a full replace and absent means cleared. The server reads a blank amount as no
+  amount.
+- **A receipt in a claim cannot be deleted.** Single delete gets a 400 whose `errorMsg` names the
+  claim, which the interceptor toasts while the row stays. Bulk delete lists it as an ordinary
+  failure. Neither delete flow needed a change.
+- **Export.** The claim page's download button reuses `ReceiptExportService.exportReceiptsById` over
+  the claim's receipt ids.
+- **No e2e yet.** The feature was built before its backend could run here. The Jest specs mock
+  `ReimbursementClaimService`, so they prove nothing about the wire. A Playwright spec covering
+  create → bulk add from the All view → ledger → figures is the follow-up.
+
 ## Testing Requirements
 
 **All new code must have accompanying unit tests.**

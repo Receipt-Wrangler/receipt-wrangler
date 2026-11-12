@@ -296,8 +296,17 @@ func (service ReceiptService) BulkDeleteReceiptsForUser(userId uint, receiptIds 
 	}
 
 	deletable := make(map[uint]struct{}, len(visible))
+	deletableIds := make([]uint, 0, len(visible))
 	for _, receipt := range visible {
 		deletable[receipt.ID] = struct{}{}
+		deletableIds = append(deletableIds, receipt.ID)
+	}
+
+	// A receipt in a claim is refused, not deleted out of it. Checked only for
+	// receipts the caller may delete, so a hidden one still reads as denied.
+	claimRefusals, err := NewClaimService(service.TX).ReceiptDeletionRefusals(userId, deletableIds)
+	if err != nil {
+		return result, err
 	}
 
 	for _, receiptId := range receiptIds {
@@ -305,6 +314,13 @@ func (service ReceiptService) BulkDeleteReceiptsForUser(userId uint, receiptIds 
 			result.Failures = append(result.Failures, structs.BulkReceiptDeleteFailure{
 				ReceiptId: receiptId,
 				Message:   BulkReceiptDeleteDeniedMessage,
+			})
+			continue
+		}
+		if message, inClaim := claimRefusals[receiptId]; inClaim {
+			result.Failures = append(result.Failures, structs.BulkReceiptDeleteFailure{
+				ReceiptId: receiptId,
+				Message:   message,
 			})
 			continue
 		}

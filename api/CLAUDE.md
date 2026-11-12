@@ -4442,3 +4442,132 @@ matches is a **failure**, not a pass; a mutant that **does not compile** was nev
 
 - `internal/reporting/{value,bucketkey,row,field,formula,eval,accumulator,model,validate,engine,invariants,golden,property,fuzz,passthrough,adversarial}_test.go`
 - `internal/reporting/receiptsource/receiptsource_test.go`
+
+## Reimbursement claims (fork feature)
+
+A **claim** bundles receipts of one group that were submitted together for reimbursement (a travel
+voucher, an allowance claim), with a **ledger** of what happened afterwards: payments received,
+recoupments (money the other party took back) and notes. It exists so the user keeps their own
+record of what was claimed, when, what was paid and what was taken back.
+
+The feature lives in its own files so upstream merges stay clean: `models/claim.go`,
+`commands/{upsert_claim,upsert_claim_ledger_entry,claim_receipts}_command.go` +
+`commands/claim_values.go`, `repositories/claims.go`, `services/claims.go`, `handlers/claims.go`,
+`routers/claim.go`, `structs/reimbursement_claim.go` (not `claims.go`: that is the JWT `Claims`).
+The swagger tag is **`ReimbursementClaim`** so the generated services (`ReimbursementClaimService`,
+`ReimbursementClaimApi`) stay clear of the desktop's hand-written `ClaimsService`; paths are under
+`/claim`, schemas are `Claim*` / `UpsertClaim*`, and both blocks in `swagger.yml` are fenced with
+`# --- Claims (fork feature)` comments.
+
+### Data model
+
+- **`claims`**: group, name, reference number, free-text type (column `claim_type`), status,
+  `submitted_date` / `due_date` (calendar days, stored as midnight UTC like `receipts.date`), an
+  optional explicit `claimed_amount` (`decimal(10,2)`), notes.
+- **`claim_receipts`**: the link table. **`receipt_id` is the primary key**, which is what makes "a
+  receipt is in at most one claim" a database guarantee. A column on `receipts` was rejected so the
+  receipt model, its payloads and its change history stay untouched.
+- **`claim_ledger_entries`**: `entry_type` (PAYMENT / RECOUPMENT / NOTE), date, optional amount
+  (always positive; the type gives the direction), note.
+- **Every foreign key cascades** (claim → group, link → receipt, link/entry → claim). That is what
+  lets `GroupService.DeleteGroup` and `UserService.DeleteUser`, which delete receipts and groups
+  outright, finish without knowing claims exist. `DeleteClaim` still deletes its children
+  explicitly, so it does not depend on the pragma (`TestClaimRepository_DeleteClaimRemovesChildrenWithoutForeignKeys`).
+- **Migration** is plain AutoMigrate of three new tables through `makeClaimMigrations()`, called at
+  the end of `MakeMigrations` (after the main list, so the referenced tables exist). No data
+  migration. Every keyed string column has an explicit `size` for MySQL.
+
+### Status and entry type are plain strings
+
+Statuses: DRAFT, SUBMITTED, PARTIALLY_PAID, PAID, DISPUTED, CLOSED, set by hand with **no state
+machine**. `models.ClaimStatusAwaitsSettlement` (SUBMITTED, PARTIALLY_PAID, DISPUTED) decides what
+counts as waiting; it rides the response as `awaitingSettlement`. Both status and entry type are
+`type: string` in swagger, never enums (the closed-Dart-enum outages): the server validates on write,
+reads tolerate anything, and an unknown entry type counts toward no figure.
+
+### Permissions: the existing receipt keys, no new ones
+
+Reads gate on **`group.receipts.read`**, every write on **`group.receipts.update`**, in the claim's
+own group. Adding keys would mean new `Permission` enum values, which released mobile builds parse as
+a closed set. Endpoints by id load the claim's `group_id` first (`handleClaimRequest`) and then go
+through `HandleRequest`; a missing claim gets the same 403 as a forbidden one.
+
+### What a viewer sees, and so what the figures cover
+
+Every figure is computed from exactly what the response shows, and nothing says that anything was
+left out (even a "partial" flag would leak presence under member isolation):
+
+- **Linked receipts** pass through `FilterReceiptsByPaidBy` (paid-by visibility, which already folds
+  in member isolation). A hidden receipt is absent from `receiptIds` and from every receipt figure.
+- **In a group with isolated members**, a claim or ledger entry recorded by a member the viewer
+  cannot see is dropped, as comments are (`claimVisibility.creatorVisible`, over
+  `GetVisibleUserIdsForUserInGroup`). In any other group everything is visible.
+- **Category/tag grants are irrelevant**: a claim returns receipt ids, never receipt contents.
+
+### Figures
+
+`foldClaim` (pure, so tested without a DB): `receiptsTotal`; `effectiveClaimedAmount` = the explicit
+amount if set, else the receipts total; `paidAmount` = payments − recoupments (can be negative);
+`outstandingAmount` = effective − paid (negative when overpaid); `daysWaiting` = calendar days from
+`submittedDate` to **today in the app time zone** (`todayInAppZone`), only while awaiting settlement,
+never negative. Money is folded with `shopspring/decimal`, **never a SQL SUM**, and goes out as a
+two-place decimal string. The list summary adds `outstandingAmount` over the awaiting claims only.
+
+### Endpoints
+
+`GET`/`POST /claim/group/{groupId}` (list / create), `GET`/`PUT`/`DELETE /claim/{claimId}`,
+`POST /claim/{claimId}/addReceipts` and `/removeReceipts`, `POST /claim/{claimId}/ledgerEntry`,
+`PUT`/`DELETE /claim/{claimId}/ledgerEntry/{ledgerEntryId}`.
+
+- **PUT is a full replace of the claim's own fields**; an omitted optional field is cleared. That is
+  safe only because nothing a client might hide lives on the command: receipts and entries have
+  their own endpoints, so a restricted editor's save can never drop a hidden receipt. **A field added
+  to `UpsertClaimCommand` later must be a pointer that leaves the stored value alone when nil**, or an
+  older client's save clears it.
+- **The All group lists claims** of every group where the caller holds `group.receipts.read`
+  (`readableGroupIds`, the same per-group gate as the receipts list). It is **never a destination**:
+  create there is a 400.
+- **Add/remove report per receipt** (`ClaimReceiptsResult`, both lists always `[]`), like bulk
+  delete. A receipt that is missing, in another group or hidden gets one message, so a failure never
+  reveals that a receipt exists. A receipt already in **another** claim is refused, never moved; one
+  already in this claim counts as added. The responses carry only ids the caller sent, so the client
+  refetches the claim for its figures.
+- **Every read is a GET and every write a plain write**, so `middleware/api_key_scope.go`'s
+  read-over-POST allowlist needed nothing (`middleware/api_key_scope_claims_test.go`).
+- Money accepts a string or a number; `""`, whitespace and `null` are no value (`OptionalAmount`),
+  because the desktop's currency mask sends `""`. Amounts: at most two places, below 100,000,000.
+
+### Receipts in a claim cannot be deleted
+
+`DELETE /receipt/{id}` answers **400 naming the claim** ("remove it from claim '…' first") and
+`POST /receipt/bulkDelete` reports it as an ordinary per-receipt failure, whatever the claim's status.
+The guard is `ClaimService.ReceiptDeletionRefusals`, called from `handlers.DeleteReceipt` (through
+`refuseDeletingReceiptInClaim`) and from `ReceiptService.BulkDeleteReceiptsForUser`, after the
+existing permission checks, so a hidden receipt still reads as denied. The claim is named only when
+the caller may see it. **It is deliberately not inside `ReceiptService.DeleteReceipt`**: group delete
+and user delete call that too, and must still finish; there the link goes with the cascade.
+
+### A receipt that moves group leaves its claim
+
+`ReceiptRepository.UpdateReceipt` calls `DetachReceiptFromClaims` inside its transaction when the
+group changes. Reads also require `receipts.group_id = claims.group_id`, as a second line of defence,
+and `AddReceiptsToClaim` replaces such a stale link rather than being blocked by it. Moving the
+receipt back does **not** rejoin it to the old claim.
+
+### Shared files this feature edits
+
+Kept to a few lines each: `repositories/db.go` (`MakeMigrations` calls `makeClaimMigrations`),
+`routers/router.go` (one `Mount`), `repositories/receipts.go` (`UpdateReceipt`'s detach on a group
+move), `handlers/receipts.go` (`DeleteReceipt`'s refusal) and `services/receipts.go`
+(`BulkDeleteReceiptsForUser`'s refusal).
+
+### Tests
+
+`commands/claim_commands_test.go` (validation, blank and numeric amounts, as-written days),
+`services/claims_fold_test.go` (every figure, decimal precision, negative outstanding, unknown status
+and type, the summary, the app-zone "today"), `repositories/claims_test.go` (round trip, one claim per
+receipt, the cascades, `DeleteClaim` with foreign keys off, the group-move detach, stale links, the
+clearing update), `handlers/claims_test.go` (the permission matrix, missing reads like forbidden, the
+All group both ways, per-receipt add/remove results, `[]` on the wire, paid-by and isolation
+filtering, ledger lifecycle, both delete refusals). The group-move detach, the bulk refusal and the
+paid-by filter were each mutation-checked: disabling them fails a named test.

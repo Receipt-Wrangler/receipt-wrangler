@@ -154,6 +154,16 @@ Class | Method | HTTP request | Description
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**getPagedProcessingSettings**](doc/ReceiptProcessingSettingsApi.md#getpagedprocessingsettings) | **POST** /receiptProcessingSettings/getPagedProcessingSettings | Gets paged processing settings
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**getReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#getreceiptprocessingsettingsbyid) | **GET** /receiptProcessingSettings/{id} | Get receipt processing settings by id
 [*ReceiptProcessingSettingsApi*](doc/ReceiptProcessingSettingsApi.md) | [**updateReceiptProcessingSettingsById**](doc/ReceiptProcessingSettingsApi.md#updatereceiptprocessingsettingsbyid) | **PUT** /receiptProcessingSettings/{id} | Update receipt processing settings by id
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**addReceiptsToClaim**](doc/ReimbursementClaimApi.md#addreceiptstoclaim) | **POST** /claim/{claimId}/addReceipts | Add receipts to a claim
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**createClaim**](doc/ReimbursementClaimApi.md#createclaim) | **POST** /claim/group/{groupId} | Create claim
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**createClaimLedgerEntry**](doc/ReimbursementClaimApi.md#createclaimledgerentry) | **POST** /claim/{claimId}/ledgerEntry | Add a ledger entry to a claim
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**deleteClaim**](doc/ReimbursementClaimApi.md#deleteclaim) | **DELETE** /claim/{claimId} | Delete claim
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**deleteClaimLedgerEntry**](doc/ReimbursementClaimApi.md#deleteclaimledgerentry) | **DELETE** /claim/{claimId}/ledgerEntry/{ledgerEntryId} | Delete a ledger entry
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**getClaimById**](doc/ReimbursementClaimApi.md#getclaimbyid) | **GET** /claim/{claimId} | Get claim
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**getClaimsForGroup**](doc/ReimbursementClaimApi.md#getclaimsforgroup) | **GET** /claim/group/{groupId} | Get claims for a group
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**removeReceiptsFromClaim**](doc/ReimbursementClaimApi.md#removereceiptsfromclaim) | **POST** /claim/{claimId}/removeReceipts | Remove receipts from a claim
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**updateClaim**](doc/ReimbursementClaimApi.md#updateclaim) | **PUT** /claim/{claimId} | Update claim
+[*ReimbursementClaimApi*](doc/ReimbursementClaimApi.md) | [**updateClaimLedgerEntry**](doc/ReimbursementClaimApi.md#updateclaimledgerentry) | **PUT** /claim/{claimId}/ledgerEntry/{ledgerEntryId} | Update a ledger entry
 [*ReportApi*](doc/ReportApi.md) | [**createReportTemplate**](doc/ReportApi.md#createreporttemplate) | **POST** /report/template | Save a report template
 [*ReportApi*](doc/ReportApi.md) | [**deleteReportTemplate**](doc/ReportApi.md#deletereporttemplate) | **DELETE** /report/template/{id} | Delete a report template
 [*ReportApi*](doc/ReportApi.md) | [**duplicateReportTemplate**](doc/ReportApi.md#duplicatereporttemplate) | **POST** /report/template/{id}/duplicate | Duplicate a report template
@@ -235,6 +245,13 @@ Class | Method | HTTP request | Description
  - [ChartGrouping](doc/ChartGrouping.md)
  - [CheckEmailConnectivityCommand](doc/CheckEmailConnectivityCommand.md)
  - [CheckReceiptProcessingSettingsConnectivityCommand](doc/CheckReceiptProcessingSettingsConnectivityCommand.md)
+ - [Claim](doc/Claim.md)
+ - [ClaimLedgerEntry](doc/ClaimLedgerEntry.md)
+ - [ClaimList](doc/ClaimList.md)
+ - [ClaimListSummary](doc/ClaimListSummary.md)
+ - [ClaimReceiptsCommand](doc/ClaimReceiptsCommand.md)
+ - [ClaimReceiptsFailure](doc/ClaimReceiptsFailure.md)
+ - [ClaimReceiptsResult](doc/ClaimReceiptsResult.md)
  - [Claims](doc/Claims.md)
  - [Comment](doc/Comment.md)
  - [CurrencySeparator](doc/CurrencySeparator.md)
@@ -340,6 +357,8 @@ Class | Method | HTTP request | Description
  - [UpdateProfileCommand](doc/UpdateProfileCommand.md)
  - [UpsertApiKeyCommand](doc/UpsertApiKeyCommand.md)
  - [UpsertCategoryCommand](doc/UpsertCategoryCommand.md)
+ - [UpsertClaimCommand](doc/UpsertClaimCommand.md)
+ - [UpsertClaimLedgerEntryCommand](doc/UpsertClaimLedgerEntryCommand.md)
  - [UpsertCommentCommand](doc/UpsertCommentCommand.md)
  - [UpsertCustomFieldCommand](doc/UpsertCustomFieldCommand.md)
  - [UpsertCustomFieldOptionCommand](doc/UpsertCustomFieldOptionCommand.md)

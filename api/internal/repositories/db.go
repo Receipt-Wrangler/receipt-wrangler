@@ -175,7 +175,10 @@ func MakeMigrations() error {
 		&models.OidcDeleteConfirmation{},
 	)
 
-	return err
+	if err != nil {
+		return err
+	}
+	return makeClaimMigrations()
 }
 
 func GetDB() *gorm.DB {

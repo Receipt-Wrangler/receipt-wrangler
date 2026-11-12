@@ -1,0 +1,32 @@
+<app-dialog [headerText]="headerText">
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <app-select
+      data-testid="claim-ledger-entry-type"
+      label="Type"
+      optionValueKey="value"
+      optionDisplayKey="displayValue"
+      [options]="typeOptions"
+      [inputFormControl]="form | formGet : 'type'"
+    ></app-select>
+    <app-datepicker
+      data-testid="claim-ledger-entry-date"
+      label="Date"
+      [inputFormControl]="form | formGet : 'date'"
+    ></app-datepicker>
+    <app-input
+      data-testid="claim-ledger-entry-amount"
+      label="Amount"
+      type="text"
+      [isCurrency]="true"
+      [hint]="isNote() ? 'Optional. A note never changes the figures.' : undefined"
+      [inputFormControl]="form | formGet : 'amount'"
+    ></app-input>
+    <app-textarea
+      data-testid="claim-ledger-entry-note"
+      label="Note"
+      [placeholder]="isNote() ? 'Called the travel office; voucher is under review' : 'Optional, e.g. EFT trace number'"
+      [inputFormControl]="form | formGet : 'note'"
+    ></app-textarea>
+    <app-dialog-footer (cancelClicked)="cancel()"></app-dialog-footer>
+  </form>
+</app-dialog>

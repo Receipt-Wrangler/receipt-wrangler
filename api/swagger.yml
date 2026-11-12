@@ -712,6 +712,348 @@ paths:
       security:
         - bearerAuth: [ ]
         - apiKeyAuth: [ ]
+  # --- Claims (fork feature): reimbursement claims bundling a group's receipts. ---
+  # Kept as one contiguous block so upstream merges do not touch it. Every enum-like
+  # field below is a plain string, never an enum; see the Claim schema.
+  /claim/group/{groupId}:
+    parameters:
+      - in: path
+        name: groupId
+        schema:
+          type: integer
+        required: true
+        description: >-
+          Id of the group. On GET this may be the caller's synthetic "All" group, which lists the
+          claims of every group where the caller holds group.receipts.read. POST rejects the All
+          group with a 400.
+    get:
+      tags:
+        - ReimbursementClaim
+      summary: Get claims for a group
+      description: >-
+        Returns the group's claims, newest first, each with its computed figures, linked receipt
+        ids and ledger entries, plus a summary for an "outstanding and ageing" header. Every
+        figure covers only what the caller may see (see Claim). Gated on group.receipts.read
+        [SYSTEM USER]
+      operationId: getClaimsForGroup
+      responses:
+        200:
+          description: The group's claims
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimList"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+    post:
+      tags:
+        - ReimbursementClaim
+      summary: Create claim
+      description: >-
+        Creates a claim in the group, with no receipts and no ledger entries; add receipts with
+        addReceiptsToClaim. Gated on group.receipts.update. The synthetic "All" group is never a
+        destination (400) [SYSTEM USER]
+      operationId: createClaim
+      requestBody:
+        description: Claim to create
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertClaimCommand"
+      responses:
+        200:
+          description: The created claim
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Claim"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /claim/{claimId}:
+    parameters:
+      - in: path
+        name: claimId
+        schema:
+          type: integer
+        required: true
+        description: Id of the claim
+    get:
+      tags:
+        - ReimbursementClaim
+      summary: Get claim
+      description: >-
+        Returns one claim with its computed figures, linked receipt ids and ledger entries.
+        Gated on group.receipts.read in the claim's group. A missing claim and one the caller may
+        not see are the same 403 [SYSTEM USER]
+      operationId: getClaimById
+      responses:
+        200:
+          description: The claim
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Claim"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+    put:
+      tags:
+        - ReimbursementClaim
+      summary: Update claim
+      description: >-
+        Replaces the claim's own fields (name, reference number, type, status, dates, claimed
+        amount, notes) with the body: an optional field that is omitted is cleared. Linked
+        receipts and ledger entries are not part of the body and are never touched here; they have
+        their own endpoints. A claim never moves between groups. Gated on group.receipts.update in
+        the claim's group [SYSTEM USER]
+      operationId: updateClaim
+      requestBody:
+        description: The claim's new fields
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertClaimCommand"
+      responses:
+        200:
+          description: The updated claim
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Claim"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+    delete:
+      tags:
+        - ReimbursementClaim
+      summary: Delete claim
+      description: >-
+        Deletes the claim with its ledger entries and receipt links. The receipts themselves are
+        not deleted. Gated on group.receipts.update in the claim's group [SYSTEM USER]
+      operationId: deleteClaim
+      responses:
+        200:
+          $ref: "#/components/responses/Ok"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /claim/{claimId}/addReceipts:
+    parameters:
+      - in: path
+        name: claimId
+        schema:
+          type: integer
+        required: true
+        description: Id of the claim to add receipts to
+    post:
+      tags:
+        - ReimbursementClaim
+      summary: Add receipts to a claim
+      description: >-
+        Links each listed receipt to the claim and reports each one it could not link. A receipt
+        must belong to the claim's group, be visible to the caller, and not already be in another
+        claim (remove it from that claim first; nothing is moved silently). A receipt already in
+        this claim counts as added. Receipts are judged independently, so one refusal does not stop
+        the others. Gated on group.receipts.update in the claim's group. The response carries only
+        ids the caller sent; fetch the claim again for its new figures [SYSTEM USER]
+      operationId: addReceiptsToClaim
+      requestBody:
+        description: Receipt ids to add
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimReceiptsCommand"
+      responses:
+        200:
+          description: Which receipts were added, and why each other one was not
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimReceiptsResult"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /claim/{claimId}/removeReceipts:
+    parameters:
+      - in: path
+        name: claimId
+        schema:
+          type: integer
+        required: true
+        description: Id of the claim to remove receipts from
+    post:
+      tags:
+        - ReimbursementClaim
+      summary: Remove receipts from a claim
+      description: >-
+        Unlinks each listed receipt from the claim and reports each one it could not unlink. A
+        receipt that is not in the claim and one the caller may not see read the same. The receipts
+        themselves are not changed. Gated on group.receipts.update in the claim's group [SYSTEM
+        USER]
+      operationId: removeReceiptsFromClaim
+      requestBody:
+        description: Receipt ids to remove
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimReceiptsCommand"
+      responses:
+        200:
+          description: Which receipts were removed, and why each other one was not
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimReceiptsResult"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /claim/{claimId}/ledgerEntry:
+    parameters:
+      - in: path
+        name: claimId
+        schema:
+          type: integer
+        required: true
+        description: Id of the claim
+    post:
+      tags:
+        - ReimbursementClaim
+      summary: Add a ledger entry to a claim
+      description: >-
+        Records a payment received, a recoupment or a note on the claim. Gated on
+        group.receipts.update in the claim's group. Fetch the claim again for its new figures
+        [SYSTEM USER]
+      operationId: createClaimLedgerEntry
+      requestBody:
+        description: Entry to add
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertClaimLedgerEntryCommand"
+      responses:
+        200:
+          description: The created entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimLedgerEntry"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  /claim/{claimId}/ledgerEntry/{ledgerEntryId}:
+    parameters:
+      - in: path
+        name: claimId
+        schema:
+          type: integer
+        required: true
+        description: Id of the claim the entry belongs to
+      - in: path
+        name: ledgerEntryId
+        schema:
+          type: integer
+        required: true
+        description: Id of the ledger entry
+    put:
+      tags:
+        - ReimbursementClaim
+      summary: Update a ledger entry
+      description: >-
+        Replaces the entry's type, date, amount and note with the body (an omitted optional field
+        is cleared). An entry that is not on this claim, or that the caller may not see, is a 403.
+        Gated on group.receipts.update in the claim's group [SYSTEM USER]
+      operationId: updateClaimLedgerEntry
+      requestBody:
+        description: The entry's new fields
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertClaimLedgerEntryCommand"
+      responses:
+        200:
+          description: The updated entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimLedgerEntry"
+        400:
+          $ref: "#/components/responses/BadRequest"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+    delete:
+      tags:
+        - ReimbursementClaim
+      summary: Delete a ledger entry
+      description: >-
+        Deletes one entry. An entry that is not on this claim, or that the caller may not see, is
+        a 403. Gated on group.receipts.update in the claim's group [SYSTEM USER]
+      operationId: deleteClaimLedgerEntry
+      responses:
+        200:
+          $ref: "#/components/responses/Ok"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        500:
+          $ref: "#/components/responses/Internal"
+      security:
+        - bearerAuth: [ ]
+        - apiKeyAuth: [ ]
+  # --- End of Claims paths. ---
   /comment/:
     post:
       tags:
@@ -1595,11 +1937,15 @@ paths:
       tags:
         - Receipt
       summary: Delete receipt
-      description: This will delete a receipt by id [SYSTEM USER]
+      description: >-
+        This will delete a receipt by id. A receipt that is in a reimbursement claim is refused
+        with a 400 naming the claim; remove it from the claim first [SYSTEM USER]
       operationId: deleteReceiptById
       responses:
         200:
           $ref: "#/components/responses/Ok"
+        400:
+          $ref: "#/components/responses/BadRequest"
         500:
           $ref: "#/components/responses/Internal"
       security:
@@ -1736,7 +2082,8 @@ paths:
         This will delete every listed receipt the caller may delete
         (group.receipts.delete on the receipt's own group) and report each one
         it did not delete. Receipts are deleted independently, so a refused
-        receipt does not stop the others [SYSTEM USER]
+        receipt does not stop the others. A receipt that is in a reimbursement
+        claim is refused with a failure naming the claim [SYSTEM USER]
       operationId: bulkDeleteReceipts
       requestBody:
         description: Receipt ids to delete
@@ -4794,6 +5141,329 @@ components:
           type: integer
           description: Number of receipts associated with this category
       description: Category to relate receipts to
+    # --- Claims (fork feature) schemas. Kept contiguous; see the /claim paths. ---
+    # Wire conventions for every schema in this block:
+    #   - Calendar days (submittedDate, dueDate, a ledger entry's date, asOfDate) are bare
+    #     yyyy-MM-dd strings. They name a day, never an instant, so no time zone shifts them.
+    #     On write the server also accepts an RFC 3339 string and reads the day as written.
+    #   - Instants (createdAt, updatedAt) are RFC 3339 strings.
+    #   - Money is a decimal string with two decimal places, e.g. "412.50", matching
+    #     Receipt.amount. On write an empty string is read as no value.
+    #   - Status and ledger entry type are plain strings, never enums: the server validates
+    #     on write and a client must tolerate values it does not know.
+    Claim:
+      type: object
+      description: >-
+        A reimbursement claim: a bundle of one group's receipts submitted together, with a ledger
+        of what happened after submission. Every computed figure and list covers only what the
+        caller may see: linked receipts hidden from them (paid-by visibility, member isolation)
+        are left out of receiptIds and of every receipt figure, and in a group with isolated
+        members, ledger entries recorded by a member the caller cannot see are left out too. The
+        response never says that anything was left out.
+      required:
+        - id
+        - groupId
+        - name
+        - status
+        - awaitingSettlement
+        - createdAt
+        - updatedAt
+        - receiptIds
+        - receiptCount
+        - receiptsTotal
+        - effectiveClaimedAmount
+        - paymentsTotal
+        - recoupmentsTotal
+        - paidAmount
+        - outstandingAmount
+        - ledgerEntries
+      properties:
+        id:
+          type: integer
+          format: uint64
+        groupId:
+          type: integer
+          format: uint64
+          description: The group the claim and all its receipts belong to
+        name:
+          type: string
+        referenceNumber:
+          type: string
+          description: A travel authorization or voucher number. Absent when not set.
+        type:
+          type: string
+          description: Free text, e.g. "Travel voucher" or "TQSA". Absent when not set.
+        status:
+          type: string
+          description: >-
+            One of DRAFT, SUBMITTED, PARTIALLY_PAID, PAID, DISPUTED, CLOSED. Set by hand; any
+            status may follow any other. A plain string, not an enum, so a client must tolerate
+            values it does not know.
+        awaitingSettlement:
+          type: boolean
+          description: >-
+            Whether the status is one the server treats as waiting on the other party (SUBMITTED,
+            PARTIALLY_PAID, DISPUTED). Drives daysWaiting and the list summary, so a client need
+            not hard-code the set.
+        submittedDate:
+          type: string
+          description: Calendar day the claim was submitted (yyyy-MM-dd). Absent when not set.
+        dueDate:
+          type: string
+          description: Calendar day a response or payment is due (yyyy-MM-dd). Absent when not set.
+        claimedAmount:
+          type: string
+          description: >-
+            The amount explicitly entered as claimed, as a decimal string. Absent when not set,
+            in which case effectiveClaimedAmount falls back to receiptsTotal.
+        notes:
+          type: string
+          description: Free-text notes. Absent when not set.
+        createdAt:
+          type: string
+          description: RFC 3339 instant
+        updatedAt:
+          type: string
+          description: RFC 3339 instant
+        createdBy:
+          type: integer
+          format: uint64
+          description: The user who created the claim
+        receiptIds:
+          type: array
+          description: >-
+            Ids of the linked receipts the caller may see, ascending. Fetch the receipts
+            themselves through the receipt endpoints. Always present; empty when none.
+          items:
+            type: integer
+            format: uint64
+        receiptCount:
+          type: integer
+          description: Number of entries in receiptIds
+        receiptsTotal:
+          type: string
+          description: Sum of the amounts of the receipts in receiptIds
+        effectiveClaimedAmount:
+          type: string
+          description: claimedAmount when set, otherwise receiptsTotal
+        paymentsTotal:
+          type: string
+          description: Sum of the amounts of the PAYMENT ledger entries
+        recoupmentsTotal:
+          type: string
+          description: Sum of the amounts of the RECOUPMENT ledger entries
+        paidAmount:
+          type: string
+          description: paymentsTotal minus recoupmentsTotal; negative when more was taken back than paid
+        outstandingAmount:
+          type: string
+          description: >-
+            effectiveClaimedAmount minus paidAmount. Negative when more was received than
+            claimed.
+        daysWaiting:
+          type: integer
+          description: >-
+            Calendar days from submittedDate to today in the app time zone, when
+            awaitingSettlement is true and submittedDate is set; otherwise absent. Never negative.
+        ledgerEntries:
+          type: array
+          description: >-
+            The claim's ledger, oldest first (by date, then id). Always present; empty when
+            none.
+          items:
+            $ref: "#/components/schemas/ClaimLedgerEntry"
+    ClaimLedgerEntry:
+      type: object
+      description: One dated event recorded on a claim after submission
+      required:
+        - id
+        - claimId
+        - type
+        - date
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+          format: uint64
+        claimId:
+          type: integer
+          format: uint64
+        type:
+          type: string
+          description: >-
+            One of PAYMENT (money received; adds to paidAmount), RECOUPMENT (money taken back;
+            subtracts from paidAmount) or NOTE (no effect on the figures). A plain string, not an
+            enum; an entry of a type the server does not recognize counts toward no figure.
+        date:
+          type: string
+          description: Calendar day the event happened (yyyy-MM-dd)
+        amount:
+          type: string
+          description: >-
+            Decimal string, always positive; the type gives the direction. Present on every
+            PAYMENT and RECOUPMENT; optional, and never counted, on a NOTE.
+        note:
+          type: string
+          description: Free text. Absent when not set.
+        createdAt:
+          type: string
+          description: RFC 3339 instant the entry was recorded
+        updatedAt:
+          type: string
+          description: RFC 3339 instant the entry was last changed
+        createdBy:
+          type: integer
+          format: uint64
+          description: The user who recorded the entry
+    ClaimList:
+      type: object
+      description: A group's claims and a summary of them
+      required:
+        - claims
+        - summary
+      properties:
+        claims:
+          type: array
+          description: Newest first. Always present; empty when none.
+          items:
+            $ref: "#/components/schemas/Claim"
+        summary:
+          $ref: "#/components/schemas/ClaimListSummary"
+    ClaimListSummary:
+      type: object
+      description: Figures for an "outstanding and ageing" header, over the claims in the list
+      required:
+        - asOfDate
+        - claimCount
+        - awaitingCount
+        - outstandingTotal
+      properties:
+        asOfDate:
+          type: string
+          description: Today in the app time zone (yyyy-MM-dd), the day daysWaiting is counted to
+        claimCount:
+          type: integer
+          description: Number of claims in the list
+        awaitingCount:
+          type: integer
+          description: Number of claims with awaitingSettlement true
+        outstandingTotal:
+          type: string
+          description: Sum of outstandingAmount over the claims with awaitingSettlement true
+        oldestDaysWaiting:
+          type: integer
+          description: The largest daysWaiting in the list; absent when no claim has one
+    UpsertClaimCommand:
+      type: object
+      description: >-
+        A claim's own fields, for create and for a full replace on update. An optional field that
+        is omitted, null or "" is stored as not set. Receipts and ledger entries are managed
+        through their own endpoints and are not part of this command.
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          description: Required, non-blank after trimming, at most 255 characters
+        referenceNumber:
+          type: string
+          nullable: true
+          description: At most 100 characters
+        type:
+          type: string
+          nullable: true
+          description: Free text, at most 100 characters
+        status:
+          type: string
+          description: >-
+            One of DRAFT, SUBMITTED, PARTIALLY_PAID, PAID, DISPUTED, CLOSED; anything else is a
+            400 keyed status
+        submittedDate:
+          type: string
+          nullable: true
+          description: Calendar day (yyyy-MM-dd)
+        dueDate:
+          type: string
+          nullable: true
+          description: Calendar day (yyyy-MM-dd)
+        claimedAmount:
+          type: string
+          nullable: true
+          description: Decimal string, zero or more, at most two decimal places
+        notes:
+          type: string
+          nullable: true
+          description: At most 10000 characters
+    UpsertClaimLedgerEntryCommand:
+      type: object
+      description: >-
+        A ledger entry's fields, for create and for a full replace on update. An optional field
+        that is omitted, null or "" is stored as not set.
+      required:
+        - type
+        - date
+      properties:
+        type:
+          type: string
+          description: One of PAYMENT, RECOUPMENT, NOTE; anything else is a 400 keyed type
+        date:
+          type: string
+          description: Calendar day (yyyy-MM-dd)
+        amount:
+          type: string
+          nullable: true
+          description: >-
+            Decimal string, greater than zero, at most two decimal places. Required for PAYMENT
+            and RECOUPMENT; optional for NOTE.
+        note:
+          type: string
+          nullable: true
+          description: At most 2000 characters. Required (non-blank) for NOTE.
+    ClaimReceiptsCommand:
+      type: object
+      required:
+        - receiptIds
+      properties:
+        receiptIds:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: integer
+          description: Receipt ids to add or remove. Between 1 and 500 ids, with no duplicates
+    ClaimReceiptsResult:
+      type: object
+      required:
+        - receiptIds
+        - failures
+      properties:
+        receiptIds:
+          type: array
+          items:
+            type: integer
+          description: Requested receipt ids that were added (or removed), in request order
+        failures:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClaimReceiptsFailure"
+          description: One entry per requested receipt that was not added (or removed)
+    ClaimReceiptsFailure:
+      type: object
+      required:
+        - receiptId
+        - message
+      properties:
+        receiptId:
+          type: integer
+          description: Requested receipt id that was not added (or removed)
+        message:
+          type: string
+          description: >-
+            Why not. A receipt that does not exist, belongs to another group, or is hidden from
+            the caller reads the same, so this never reveals that a receipt exists.
+    # --- End of Claims schemas. ---
     Comment:
       required:
         - comment
