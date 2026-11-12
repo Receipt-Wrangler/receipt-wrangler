@@ -1,4 +1,4 @@
-import { HttpClient, provideHttpClient, withInterceptors } from "@angular/common/http";
+import { HttpClient, HttpContext, provideHttpClient, withInterceptors } from "@angular/common/http";
 import { HttpTestingController, provideHttpClientTesting } from "@angular/common/http/testing";
 import { TestBed } from "@angular/core/testing";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
@@ -6,7 +6,7 @@ import { ActivatedRoute } from "@angular/router";
 import { Store } from "@ngxs/store";
 import { ApiModule } from "../open-api";
 import { SnackbarService } from "../services";
-import { httpInterceptor } from "./http-interceptor";
+import { httpInterceptor, SUPPRESS_ERROR_TOAST } from "./http-interceptor";
 
 const FORBIDDEN_MESSAGE = "You do not have permission to perform this action.";
 
@@ -159,5 +159,20 @@ describe("httpInterceptor", () => {
       );
 
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("toasts nothing for a request that reports its own errors, but still propagates them", () => {
+    const context = new HttpContext().set(SUPPRESS_ERROR_TOAST, true);
+    const statuses: number[] = [];
+
+    for (const status of [400, 403, 500]) {
+      httpClient.post("/test", {}, { context }).subscribe({ error: (e) => statuses.push(e.status) });
+      httpTestingController
+        .expectOne("/test")
+        .flush({ errorMsg: "Something broke" }, { status, statusText: "Error" });
+    }
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(statuses).toEqual([400, 403, 500]);
   });
 });

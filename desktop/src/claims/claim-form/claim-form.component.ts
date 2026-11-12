@@ -5,7 +5,7 @@ import { MatDialog } from "@angular/material/dialog";
 import { MatTableDataSource } from "@angular/material/table";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Store } from "@ngxs/store";
-import { filter, map, switchMap, take, tap } from "rxjs";
+import { filter, finalize, map, switchMap, take, tap } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG, DEFAULT_HOST_CLASS } from "../../constants";
 import { FormMode } from "../../enums/form-mode.enum";
 import {
@@ -24,6 +24,7 @@ import { TableColumn } from "../../table/table-column.interface";
 import { calendarDayToLocalDate } from "../../utils/app-time-zone";
 import { trimmedRequiredValidator } from "../../validators/text-validators";
 import { CLAIM_NOT_FOUND_MESSAGE } from "../claim.resolver";
+import { CLAIM_PACKET_DESCRIPTION, ClaimPacketDownloadService } from "../claim-packet-download.service";
 import {
   applyClaimApiErrors,
   buildUpsertClaimCommand,
@@ -75,6 +76,7 @@ type ClaimReceiptRow = Pick<Receipt, "id" | "name"> & Partial<Receipt>;
 export class ClaimFormComponent implements OnInit, AfterViewInit {
   private readonly activatedRoute = inject(ActivatedRoute);
   private readonly claimService = inject(ReimbursementClaimService);
+  private readonly claimPacketDownloadService = inject(ClaimPacketDownloadService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly matDialog = inject(MatDialog);
   private readonly receiptExportService = inject(ReceiptExportService);
@@ -243,6 +245,11 @@ export class ClaimFormComponent implements OnInit, AfterViewInit {
 
   public readonly NOTE = CLAIM_LEDGER_NOTE;
 
+  public readonly packetDescription = CLAIM_PACKET_DESCRIPTION;
+
+  /** True while the packet builds: the server sends nothing until the zip is complete. */
+  public readonly packetBusy = signal(false);
+
   public ngOnInit(): void {
     if (this.mode === FormMode.add && !this.groupId()) {
       // Only reachable by URL: the list offers "Add Claim" only when there is a
@@ -402,6 +409,30 @@ export class ClaimFormComponent implements OnInit, AfterViewInit {
     if (claim && claim.receiptIds.length > 0) {
       this.receiptExportService.exportReceiptsById(claim.receiptIds);
     }
+  }
+
+  /**
+   * Downloads the claim's packet. Failures arrive as one message, already read
+   * out of the Blob error body; the interceptor stays quiet for this request.
+   * Not cancelled on leaving the page: the user asked for the file.
+   */
+  public downloadPacket(): void {
+    const claim = this.claim();
+    if (!claim || this.packetBusy()) {
+      return;
+    }
+
+    this.packetBusy.set(true);
+    this.claimPacketDownloadService
+      .download(claim)
+      .pipe(
+        take(1),
+        finalize(() => this.packetBusy.set(false))
+      )
+      .subscribe({
+        next: (filename) => this.snackbarService.success(`Claim packet downloaded: ${filename}`),
+        error: (error: Error) => this.snackbarService.error(error.message),
+      });
   }
 
   public addLedgerEntry(): void {

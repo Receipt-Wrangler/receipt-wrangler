@@ -3,6 +3,7 @@ import { NgModule } from "@angular/core";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialogModule } from "@angular/material/dialog";
 import { MatIconModule } from "@angular/material/icon";
+import { MatMenuModule } from "@angular/material/menu";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
 import { RouterModule } from "@angular/router";
 import { ButtonModule } from "../button";
@@ -36,6 +37,7 @@ import { ReimbursementClaimsRoutingModule } from "./reimbursement-claims-routing
     InputModule,
     MatDialogModule,
     MatIconModule,
+    MatMenuModule,
     MatProgressSpinnerModule,
     PipesModule,
     ReactiveFormsModule,

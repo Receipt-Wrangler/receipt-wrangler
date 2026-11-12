@@ -225,16 +225,58 @@
         [buttonRouterLink]="['/claims', claim.id.toString(), 'edit']"
       ></app-edit-button>
     }
-    @if (claim.receiptIds.length > 0) {
-      <app-button
-        data-testid="claim-export"
-        matButtonType="iconButton"
-        icon="download"
-        color="accent"
-        tooltip="Export this claim's receipts"
-        (clicked)="exportReceipts()"
-      ></app-button>
+    <!--
+      One download entry point with two choices, each saying what it holds. The
+      entries are plain mat-menu-items in this template, per "The overflow menu"
+      in desktop/CLAUDE.md. The packet can take several seconds to build, so the
+      trigger is disabled and a spinner shows until it arrives.
+    -->
+    <app-button
+      data-testid="claim-download"
+      matButtonType="iconButton"
+      icon="download"
+      color="accent"
+      tooltip="Download"
+      aria-haspopup="menu"
+      [disabled]="packetBusy()"
+      [matMenuTriggerFor]="downloadMenu"
+    ></app-button>
+    @if (packetBusy()) {
+      <mat-spinner
+        class="claim-packet-busy"
+        data-testid="claim-packet-busy"
+        diameter="20"
+        role="status"
+        aria-label="Preparing the claim packet"
+      ></mat-spinner>
     }
+    <mat-menu #downloadMenu="matMenu">
+      <button
+        mat-menu-item
+        data-testid="claim-download-packet"
+        [disabled]="packetBusy()"
+        (click)="downloadPacket()"
+      >
+        <mat-icon>inventory_2</mat-icon>
+        <span class="claim-download-option">
+          <span>Claim packet</span>
+          <span class="claim-download-option__hint">{{ packetDescription }}</span>
+        </span>
+      </button>
+      @if (claim.receiptIds.length > 0) {
+        <button
+          mat-menu-item
+          data-testid="claim-export"
+          (click)="exportReceipts()"
+        >
+          <mat-icon>table_view</mat-icon>
+          <span class="claim-download-option">
+            <span>Receipts CSV</span>
+            <span class="claim-download-option__hint">The receipt and item rows only</span>
+          </span>
+        </button>
+      }
+    </mat-menu>
     @if (canUpdate()) {
       <app-delete-button
         data-testid="claim-delete"

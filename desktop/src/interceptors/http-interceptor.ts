@@ -1,4 +1,4 @@
-import { HttpErrorResponse, HttpInterceptorFn } from "@angular/common/http";
+import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from "@angular/common/http";
 import { inject } from "@angular/core";
 import { ActivatedRoute } from "@angular/router";
 import { Store } from "@ngxs/store";
@@ -7,6 +7,15 @@ import { SnackbarService } from "../services";
 import { AuthState } from "../store";
 
 const FORBIDDEN_MESSAGE = "You do not have permission to perform this action.";
+
+/**
+ * Set on a request whose caller reports its own failures, so this interceptor
+ * toasts nothing for it. For a `responseType: "blob"` download the server's
+ * `{ errorMsg }` arrives as a Blob, which cannot be read synchronously here:
+ * without the opt-out a 400 would toast nothing and a 5xx would toast Angular's
+ * generic message, only to be replaced by the caller's real one a moment later.
+ */
+export const SUPPRESS_ERROR_TOAST = new HttpContextToken<boolean>(() => false);
 
 export const httpInterceptor: HttpInterceptorFn = (req, next) => {
   const store = inject(Store);
@@ -17,8 +26,9 @@ export const httpInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((e: HttpErrorResponse) => {
       const isLoggedIn = store.selectSnapshot(AuthState.isLoggedIn);
 
-      // Don't intercept errors from token refresh requests — let TokenRefreshService handle them
-      if (req.url.includes("/api/token/")) {
+      // Don't intercept errors from token refresh requests — let TokenRefreshService handle them —
+      // nor from a request whose caller reports its own (SUPPRESS_ERROR_TOAST).
+      if (req.url.includes("/api/token/") || req.context.get(SUPPRESS_ERROR_TOAST)) {
         return throwError(() => e);
       }
 

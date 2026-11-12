@@ -1,12 +1,15 @@
-import { CurrencyPipe } from "@angular/common";
+import { CurrencyPipe, Location } from "@angular/common";
 import { HttpErrorResponse } from "@angular/common/http";
-import { Component, Input, NO_ERRORS_SCHEMA, provideZonelessChangeDetection } from "@angular/core";
+import { Component, EventEmitter, Input, NO_ERRORS_SCHEMA, Output, provideZonelessChangeDetection } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import { ReactiveFormsModule } from "@angular/forms";
 import { MatDialog } from "@angular/material/dialog";
+import { MatMenuModule } from "@angular/material/menu";
+import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
 import { ActivatedRoute, Router } from "@angular/router";
 import { NgxsModule, Store } from "@ngxs/store";
-import { of, throwError } from "rxjs";
+import { of, Subject, throwError } from "rxjs";
 import { DEFAULT_DIALOG_CONFIG } from "../../constants";
 import { FormMode } from "../../enums/form-mode.enum";
 import { Claim, Group, Permission, Receipt, ReceiptService, ReimbursementClaimService } from "../../open-api";
@@ -14,9 +17,11 @@ import { PipesModule } from "../../pipes";
 import { ReceiptExportService } from "../../services/receipt-export.service";
 import { SnackbarService } from "../../services/snackbar.service";
 import { ConfirmationDialogComponent } from "../../shared-ui/confirmation-dialog/confirmation-dialog.component";
+import { FormHeaderComponent } from "../../shared-ui/form-header/form-header.component";
 import { AuthState, GroupState, SetGroups, SetPermissions, SetSelectedGroupId, UserState } from "../../store";
 import { SystemSettingsState } from "../../store/system-settings.state";
 import { CLAIM_NOT_FOUND_MESSAGE } from "../claim.resolver";
+import { ClaimPacketDownloadService, ClaimPacketError } from "../claim-packet-download.service";
 import { ClaimLedgerEntryDialogComponent } from "../claim-ledger-entry-dialog/claim-ledger-entry-dialog.component";
 import { ClaimReceiptPickerDialogComponent } from "../claim-receipt-picker-dialog/claim-receipt-picker-dialog.component";
 import { ClaimFormComponent } from "./claim-form.component";
@@ -37,6 +42,17 @@ class StubStatusChipComponent {
   @Input() status = "";
 }
 
+// Renders the header's buttons so the download trigger's state can be read.
+@Component({ selector: "app-button", template: "", standalone: false })
+class StubButtonComponent {
+  @Input() matButtonType = "";
+  @Input() icon = "";
+  @Input() color = "";
+  @Input() tooltip = "";
+  @Input() disabled = false;
+  @Output() clicked = new EventEmitter<MouseEvent>();
+}
+
 describe("ClaimFormComponent", () => {
   let fixture: ComponentFixture<ClaimFormComponent>;
   let component: ClaimFormComponent;
@@ -53,6 +69,7 @@ describe("ClaimFormComponent", () => {
   };
   const receiptService = { getReceiptsForGroup: jest.fn() };
   const receiptExportService = { exportReceiptsById: jest.fn() };
+  const claimPacketDownloadService = { download: jest.fn() };
   const matDialog = { open: jest.fn() };
   const router = { navigate: jest.fn() };
   const snackbarService = { success: jest.fn(), error: jest.fn() };
@@ -107,8 +124,16 @@ describe("ClaimFormComponent", () => {
     options: { claim?: Claim; permissions?: { [groupId: number]: string[] }; groups?: Group[]; selected?: string } = {}
   ) => {
     await TestBed.configureTestingModule({
-      declarations: [ClaimFormComponent, StubSubmitButtonComponent, StubStatusChipComponent],
+      declarations: [
+        ClaimFormComponent,
+        FormHeaderComponent,
+        StubButtonComponent,
+        StubSubmitButtonComponent,
+        StubStatusChipComponent,
+      ],
       imports: [
+        MatMenuModule,
+        MatProgressSpinnerModule,
         PipesModule,
         ReactiveFormsModule,
         NgxsModule.forRoot([AuthState, GroupState, SystemSettingsState, UserState]),
@@ -120,6 +145,8 @@ describe("ClaimFormComponent", () => {
         { provide: ReimbursementClaimService, useValue: claimService },
         { provide: ReceiptService, useValue: receiptService },
         { provide: ReceiptExportService, useValue: receiptExportService },
+        { provide: ClaimPacketDownloadService, useValue: claimPacketDownloadService },
+        { provide: Location, useValue: { back: jest.fn() } },
         { provide: MatDialog, useValue: matDialog },
         { provide: Router, useValue: router },
         { provide: SnackbarService, useValue: snackbarService },
@@ -387,6 +414,65 @@ describe("ClaimFormComponent", () => {
       component.exportReceipts();
 
       expect(receiptExportService.exportReceiptsById).toHaveBeenCalledWith([1, 2, 99]);
+    });
+
+    describe("downloading the packet", () => {
+      const downloadTrigger = (): StubButtonComponent =>
+        fixture.debugElement
+          .queryAll(By.directive(StubButtonComponent))
+          .find((button) => button.attributes["data-testid"] === "claim-download")!.componentInstance;
+
+      const busySpinner = () => fixture.nativeElement.querySelector("[data-testid='claim-packet-busy']");
+
+      it("is busy until the packet arrives, then says so", async () => {
+        const response = new Subject<string>();
+        claimPacketDownloadService.download.mockReturnValue(response);
+
+        component.downloadPacket();
+        await fixture.whenStable();
+
+        expect(claimPacketDownloadService.download).toHaveBeenCalledWith(claim());
+        expect(component.packetBusy()).toBe(true);
+        expect(downloadTrigger().disabled).toBe(true);
+        expect(busySpinner()).toBeTruthy();
+
+        response.next("Voucher_14_packet_2026-11-12.zip");
+        response.complete();
+        await fixture.whenStable();
+
+        expect(component.packetBusy()).toBe(false);
+        expect(downloadTrigger().disabled).toBe(false);
+        expect(busySpinner()).toBeNull();
+        expect(snackbarService.success).toHaveBeenCalledWith(
+          "Claim packet downloaded: Voucher_14_packet_2026-11-12.zip"
+        );
+      });
+
+      it("asks for one packet at a time", () => {
+        claimPacketDownloadService.download.mockReturnValue(new Subject<string>());
+
+        component.downloadPacket();
+        component.downloadPacket();
+
+        expect(claimPacketDownloadService.download).toHaveBeenCalledTimes(1);
+      });
+
+      it("shows the failure once and is ready to try again", async () => {
+        claimPacketDownloadService.download.mockReturnValue(
+          throwError(() => new ClaimPacketError("This claim has 61 images; a packet can include at most 60"))
+        );
+
+        component.downloadPacket();
+        await fixture.whenStable();
+
+        expect(snackbarService.error).toHaveBeenCalledTimes(1);
+        expect(snackbarService.error).toHaveBeenCalledWith(
+          "This claim has 61 images; a packet can include at most 60"
+        );
+        expect(snackbarService.success).not.toHaveBeenCalled();
+        expect(component.packetBusy()).toBe(false);
+        expect(busySpinner()).toBeNull();
+      });
     });
   });
 

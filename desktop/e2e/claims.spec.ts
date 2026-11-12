@@ -1,4 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { creds, stubTokenRefresh } from './helpers/auth';
 import {
   apiCreateGroup,
@@ -8,7 +10,9 @@ import {
   uniqueName,
   withAdminApi,
 } from './helpers/provisioning';
+import { RECEIPT_PNG } from './helpers/quick-scan';
 import { openReceiptsOverflowMenu } from './helpers/receipts-table';
+import { readZipEntries } from './helpers/zip';
 
 // Reimbursement claims, end to end (see desktop/CLAUDE.md → "Claims"). The Jest specs mock
 // ReimbursementClaimService and the Go tests drive the handlers directly, so neither proves the two
@@ -17,6 +21,8 @@ import { openReceiptsOverflowMenu } from './helpers/receipts-table';
 //   - a claim created on the claim form, then filled from the receipts table's bulk action;
 //   - a receipt already in another claim refused and named, not moved;
 //   - a payment and a recoupment moving the server's figures;
+//   - the claim packet downloaded and opened: its PDF, CSVs, the original image byte for byte, and
+//     a manifest whose hashes match the files;
 //   - the receipt delete endpoints refusing a receipt that is in a claim, singly and in bulk;
 //   - a receipt moved to another group on the receipt form leaving its claim.
 //
@@ -38,6 +44,7 @@ test.describe('Reimbursement claims', () => {
   let primary: { id: number; name: string };
   let other: { id: number; name: string };
   let taxiId: number;
+  const receiptImage = readFileSync(RECEIPT_PNG);
   let claimId: string;
 
   test.beforeAll(async () => {
@@ -47,7 +54,15 @@ test.describe('Reimbursement claims', () => {
       const paidByUserId = await apiGetUserId(api, creds('admin').username);
 
       // 1000.25 + 120.50 = 1120.75, so the claimed total carries a thousands separator and cents.
-      await apiCreateReceipt(api, { groupId: primary.id, paidByUserId, name: hotel, amount: '1000.25' });
+      const hotelId = await apiCreateReceipt(api, { groupId: primary.id, paidByUserId, name: hotel, amount: '1000.25' });
+      // One image, so the packet carries an original to compare byte for byte.
+      const upload = await api.post('/api/receiptImage/', {
+        multipart: {
+          file: { name: 'receipt.png', mimeType: 'image/png', buffer: receiptImage },
+          receiptId: String(hotelId),
+        },
+      });
+      expect(upload.ok(), `image upload: HTTP ${upload.status()}`).toBe(true);
       taxiId = await apiCreateReceipt(api, { groupId: primary.id, paidByUserId, name: taxi, amount: '120.50' });
       await apiCreateReceipt(api, { groupId: primary.id, paidByUserId, name: dinner, amount: '15.00' });
     });
@@ -200,6 +215,52 @@ test.describe('Reimbursement claims', () => {
     // The list reports the same server figures.
     await page.goto(`/claims/group/${primary.id}`);
     await expect(row(page, claimName)).toContainText(money('845', '75'));
+  });
+
+  test('downloads the claim packet, and it holds what it says', async ({ page }) => {
+    await gotoClaim(page);
+
+    await page.getByTestId('claim-download').click();
+    const packetEntry = page.getByTestId('claim-download-packet');
+    await expect(packetEntry).toContainText('SHA-256 manifest');
+    // The plain CSV export is the menu's other entry.
+    await expect(page.getByTestId('claim-export')).toBeVisible();
+
+    const downloading = page.waitForEvent('download');
+    await packetEntry.click();
+    const download = await downloading;
+
+    // The server's name: the claim name reduced to letters and digits, then today's date.
+    const safeName = claimName.replace(/[^A-Za-z0-9]+/g, '_');
+    expect(download.suggestedFilename()).toMatch(new RegExp(`^${safeName}_packet_\\d{4}-\\d{2}-\\d{2}\\.zip$`));
+    await expect(page.getByText(`Claim packet downloaded: ${download.suggestedFilename()}`)).toBeVisible();
+    await expect(page.getByTestId('claim-packet-busy')).toHaveCount(0);
+
+    const zip = readFileSync((await download.path())!);
+    const files = readZipEntries(zip);
+    for (const name of ['packet.pdf', 'manifest.json', 'receipts.csv', 'items.csv']) {
+      expect([...files.keys()]).toContain(name);
+    }
+    expect(files.get('packet.pdf')!.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    expect(files.get('receipts.csv')!.toString('utf8')).toContain(hotel);
+
+    const manifest = JSON.parse(files.get('manifest.json')!.toString('utf8')) as {
+      files: { path: string; size: number; sha256: string }[];
+    };
+    expect(Array.isArray(manifest.files)).toBe(true);
+    expect(manifest.files.length).toBeGreaterThan(0);
+    const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+    for (const file of manifest.files) {
+      expect(file.sha256).toMatch(/^[0-9a-f]{64}$/);
+      // Every hash is over the bytes as written into the zip.
+      expect(sha256(files.get(file.path)!), file.path).toBe(file.sha256);
+    }
+
+    // The hotel's image is the original upload, untouched.
+    const images = manifest.files.filter((file) => file.path.startsWith('images/'));
+    expect(images).toHaveLength(1);
+    expect(files.get(images[0].path)!.equals(receiptImage)).toBe(true);
+    expect(images[0].sha256).toBe(sha256(receiptImage));
   });
 
   test('refuses to delete a receipt that is in a claim', async ({ page }) => {

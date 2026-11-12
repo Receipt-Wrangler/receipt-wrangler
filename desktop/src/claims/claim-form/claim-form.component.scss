@@ -82,3 +82,22 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+.claim-packet-busy {
+  margin: 0 variables.$spacing-sm;
+}
+
+// The download menu says what each file holds. Its items render in a CDK overlay,
+// but they are authored in this template, so the emulated styles still reach them.
+.claim-download-option {
+  display: flex;
+  flex-direction: column;
+  padding: variables.$spacing-xs 0;
+  white-space: normal;
+}
+
+.claim-download-option__hint {
+  opacity: 0.7;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}

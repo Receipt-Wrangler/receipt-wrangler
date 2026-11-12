@@ -699,6 +699,12 @@ gated by `appPermissionGuard` requiring `app.roles.read` (see **Permission-based
     branches, like the 403 one. Pinned by three cases in `http-interceptor.spec.ts`
     (5xx-with-`errorMsg`, 5xx-without, and 5xx-in-queue-mode) and by
     `e2e/auth.spec.ts` → "a wrong password reports it and leaves the form filled in".
+  - **`SUPPRESS_ERROR_TOAST`** (an `HttpContextToken` exported from the interceptor) opts one
+    request out of every toast here; the error still propagates. It exists for `responseType:
+    "blob"` downloads, whose `{ errorMsg }` arrives as a Blob the interceptor cannot read
+    synchronously: a 400 would toast nothing and a 5xx the generic message, replaced a moment later
+    by the caller's real one. The claim packet is the one user (see "Claims"). Other blob downloads
+    (exports, report generation) do not set it, so their 400s are still silent.
   - **Category/tag catalogs:** AppData also carries `groupCategories` / `groupTags` (keyed by group
     id, filtered to the user's grants), stored via `SetGroupCatalog` and read with the
     `AuthState.groupCategories(groupId)` / `groupTags(groupId)` selectors. The **receipt form** and
@@ -3140,8 +3146,27 @@ The API is `ReimbursementClaimService` (`api/swagger.yml`, tag `ReimbursementCla
 - **A receipt in a claim cannot be deleted.** Single delete gets a 400 whose `errorMsg` names the
   claim, which the interceptor toasts while the row stays. Bulk delete lists it as an ordinary
   failure. Neither delete flow needed a change.
-- **Export.** The claim page's download button reuses `ReceiptExportService.exportReceiptsById` over
-  the claim's receipt ids.
+- **Downloads.** The claim page's header `download` button (`claim-download`) opens a menu, view and
+  edit alike, with two entries that each say what they hold:
+  - **Claim packet** (`claim-download-packet`): `GET /claim/{id}/packet` through
+    `ClaimPacketDownloadService` (`claim-packet-download.service.ts`). The zip holds `packet.pdf`,
+    the original images, `receipts.csv` / `items.csv` and a SHA-256 `manifest.json` (see
+    `api/CLAUDE.md` → "Claim packet"). Offered on any claim, even one with no receipts.
+    - **The file name is the server's**, read from `Content-Disposition` (`observe: 'response'`).
+      `claimPacketFilename` mirrors the server's rule, dated today in the app zone, as the fallback.
+    - **Busy state.** Nothing arrives until the zip is complete, which can take ~10 s. While
+      `packetBusy()` the trigger and the menu entry are disabled and a spinner
+      (`claim-packet-busy`) shows. Success is a snackbar naming the file. Leaving the page does not
+      cancel it.
+    - **Errors are reported once, by the page.** The request sets `SUPPRESS_ERROR_TOAST`, and
+      `claimPacketErrorMessage` reads the server's `errorMsg` out of the Blob body, such as the
+      400 for more than 60 images. A 403 reads as `CLAIM_NOT_FOUND_MESSAGE`. A body that is not
+      JSON falls back by status: 504 gets a "took too long" message, since nginx gives up after
+      60 s. It uses `FileReader`, not `Blob.text()`, which jsdom lacks.
+  - **Receipts CSV** (`claim-export`): `ReceiptExportService.exportReceiptsById` over the claim's
+    receipt ids. Shown only when the claim has receipts.
+  - **No row action on the claim list.** The table has no actions column, and it already has ten
+    columns.
 - **Validator swaps must emit.** `app-input` / `app-textarea` build their messages from the
   control's `statusChanges` (`BaseInputComponent.formControlErrors`), so a validator change made with
   `updateValueAndValidity({ emitEvent: false })` leaves the field red with **no message**. The ledger
@@ -3154,6 +3179,11 @@ The API is `ReimbursementClaimService` (`api/swagger.yml`, tag `ReimbursementCla
   amounts typed as whole numbers so any currency format works), the single and bulk delete
   refusals naming the claim, and a receipt moved to another group on the receipt form leaving the
   claim. The Jest specs mock `ReimbursementClaimService`, so this is the only proof the halves agree.
+  It also downloads the claim packet over the real wire (`beforeAll` uploads `fixtures/receipt.png`
+  to one receipt) and opens the zip with `e2e/helpers/zip.ts`, a small central-directory reader
+  (the project has no zip dependency). It checks the file name pattern, that `packet.pdf`,
+  `receipts.csv`, `items.csv` and `manifest.json` are present, that every manifest hash matches the
+  bytes in the zip, and that the image is the uploaded original, byte for byte.
 
 ## Testing Requirements
 
