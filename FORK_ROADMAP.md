@@ -1,12 +1,20 @@
 # Fork Roadmap
 
-Features this fork means to explore. Nothing here is built yet.
+Features this fork means to explore, and what has been built.
+
+## Built
+
+- **Reimbursement claims** (branch `claims-tracking`, 2026-11-11). A claim bundles a group's
+  receipts submitted together, with a status, submitted/due dates, a claimed amount and a dated
+  ledger of payments, recoupments and notes; the server computes claimed, paid, outstanding and
+  days waiting. This is item 3 below made concrete: a recoupment is the "differential" recorded
+  against the claim it hit. See `CLAUDE.md` → "Reimbursement Claims".
 
 **Why this fork exists:** a personal record of payments that can be handed over as proof,
 exact transactions with their receipt images, independent of the system of whoever is disputing
 them. Features are judged by how well they produce that evidence.
 
-## 1. Include images in the receipt export (next up, ~1 day)
+## 1. Include images in the receipt export (in progress, as part of the claim packet)
 
 Today **Export to CSV** (filtered set or selected rows) zips `receipts.csv` + `items.csv` only;
 images can only be downloaded one at a time from each receipt.
@@ -20,13 +28,13 @@ images can only be downloaded one at a time from each receipt.
 Where: `api/internal/services/receipt_csv.go` (`GetZippedCsvFiles`), both handlers in
 `api/internal/handlers/export.go`. Filtering and permissions are already handled there.
 
-## 2. One-PDF evidence bundle (~2 days)
+## 2. One-PDF evidence bundle (in progress, as the claim packet)
 
 One page per transaction: date, amount, name and the image together, as a single PDF that is
 easy to hand over. Reuse the HTML-to-PDF path the Report Builder already uses
 (`NewHtmlToPdfService`, Chromium). Consider a cover page with totals and the date range.
 
-## 3. Discrepancy tracking ("differentials"), later
+## 3. Discrepancy tracking ("differentials") — covered by the claim ledger
 
 Recording what was billed against what is actually owed, and surfacing the difference. Likely
 built on custom fields plus the existing Report Builder / Receipt Summary totals rather than a new
