@@ -61,6 +61,8 @@ part 'paged_data_data_inner.g.dart';
 /// * [createdByString] - Created by entity's name
 /// * [emailInbox] - Set by the server on a receipt created from an email: the System Email login (IMAP username) of the inbox the email was read from. Ignored on write.
 /// * [emailSender] - Set by the server on a receipt created from an email: the sender's From address. Ignored on write.
+/// * [claimId] - Set by the server: the id of the reimbursement claim this receipt is in. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller.
+/// * [claimName] - Set by the server: the name of the claim in claimId. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller.
 /// * [description] - Custom Field description
 /// * [prompt] 
 /// * [groupSettings] 

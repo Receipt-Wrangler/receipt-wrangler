@@ -32,6 +32,9 @@ var ErrClaimAllGroupDestination = errors.New("a claim cannot be created in the a
 // exists.
 const (
 	ClaimReceiptNotAddableMessage   = "This receipt cannot be added: it is not a receipt of this claim's group that you can see"
+	// ClaimReceiptInNamedClaimMessage takes the claim's name; used instead of the
+	// message above when the caller may see that claim.
+	ClaimReceiptInNamedClaimMessage = "This receipt is already in claim '%s'; remove it from that claim first"
 	ClaimReceiptInOtherClaimMessage = "This receipt is already in another claim; remove it from that claim first"
 	ClaimReceiptNotInClaimMessage   = "This receipt is not in this claim"
 )
@@ -167,6 +170,7 @@ func (service ClaimService) AddReceiptsToClaim(userId uint, claimId uint, receip
 	if err != nil {
 		return result, err
 	}
+	visibility := newClaimVisibility(NewPermissionService(service.TX), userId)
 	linkByReceipt := make(map[uint]repositories.ReceiptClaimLink, len(links))
 	for _, link := range links {
 		linkByReceipt[link.ReceiptId] = link
@@ -184,7 +188,15 @@ func (service ClaimService) AddReceiptsToClaim(userId uint, claimId uint, receip
 		case linked && link.ClaimId == claimId:
 			// Already here: nothing to do.
 		case linked && link.ClaimGroupId == claim.GroupId:
-			result.Failures = append(result.Failures, structs.ClaimReceiptsFailure{ReceiptId: receiptId, Message: ClaimReceiptInOtherClaimMessage})
+			message := ClaimReceiptInOtherClaimMessage
+			named, err := visibility.creatorVisible(link.ClaimGroupId, link.ClaimCreatedBy)
+			if err != nil {
+				return structs.NewClaimReceiptsResult(), err
+			}
+			if named {
+				message = fmt.Sprintf(ClaimReceiptInNamedClaimMessage, link.ClaimName)
+			}
+			result.Failures = append(result.Failures, structs.ClaimReceiptsFailure{ReceiptId: receiptId, Message: message})
 			continue
 		default:
 			// Unlinked, or a stale link to a claim of a group the receipt has left.
@@ -710,4 +722,62 @@ func (visibility *claimVisibility) creatorVisible(groupId uint, createdBy *uint)
 		return true, nil
 	}
 	return isUserVisible(*createdBy, visibility.viewerId, group.visible), nil
+}
+
+// LoadReceiptClaims fills ClaimId and ClaimName on each receipt that is in a
+// claim the viewer may see, and clears them on every other, so a receipt whose
+// claim is hidden (member isolation) reads exactly like one in no claim. One
+// query covers the whole batch. Only a link the claim actually shows counts, i.e.
+// the receipt still lives in the claim's group. Judged by the claim's own group
+// and creator, so a caller need not have selected the receipts' group column.
+func (service ClaimService) LoadReceiptClaims(viewerId uint, receipts []models.Receipt) error {
+	if len(receipts) == 0 {
+		return nil
+	}
+
+	receiptIds := make([]uint, len(receipts))
+	for i := range receipts {
+		receiptIds[i] = receipts[i].ID
+		receipts[i].ClaimId = 0
+		receipts[i].ClaimName = ""
+	}
+
+	links, err := repositories.NewClaimRepository(service.TX).GetClaimLinksForGroupReceipts(receiptIds)
+	if err != nil {
+		return err
+	}
+
+	visibility := newClaimVisibility(NewPermissionService(service.TX), viewerId)
+	linkByReceipt := make(map[uint]repositories.ReceiptClaimLink, len(links))
+	for _, link := range links {
+		visible, err := visibility.creatorVisible(link.ClaimGroupId, link.ClaimCreatedBy)
+		if err != nil {
+			return err
+		}
+		if visible {
+			linkByReceipt[link.ReceiptId] = link
+		}
+	}
+
+	for i := range receipts {
+		if link, ok := linkByReceipt[receipts[i].ID]; ok {
+			receipts[i].ClaimId = link.ClaimId
+			receipts[i].ClaimName = link.ClaimName
+		}
+	}
+	return nil
+}
+
+// LoadReceiptClaim is LoadReceiptClaims for a single receipt.
+func (service ClaimService) LoadReceiptClaim(viewerId uint, receipt *models.Receipt) error {
+	if receipt == nil {
+		return nil
+	}
+	batch := []models.Receipt{*receipt}
+	if err := service.LoadReceiptClaims(viewerId, batch); err != nil {
+		return err
+	}
+	receipt.ClaimId = batch[0].ClaimId
+	receipt.ClaimName = batch[0].ClaimName
+	return nil
 }

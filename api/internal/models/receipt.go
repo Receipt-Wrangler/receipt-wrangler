@@ -35,6 +35,12 @@ type Receipt struct {
 	// PermissionService.LoadFirstVisibleComments). omitempty keeps it off every
 	// other response, where it is never loaded.
 	FirstComment *string `gorm:"-" json:"firstComment,omitempty"`
+	// ClaimId and ClaimName name the reimbursement claim the receipt is in, set
+	// only when the viewer may see that claim (ClaimService.LoadReceiptClaims).
+	// Transient, read-only projections: gorm:"-" keeps them out of every write and
+	// omitempty off every response where the receipt is in no (visible) claim.
+	ClaimId   uint   `gorm:"-" json:"claimId,omitempty"`
+	ClaimName string `gorm:"-" json:"claimName,omitempty"`
 }
 
 func (r *Receipt) ToString() (string, error) {

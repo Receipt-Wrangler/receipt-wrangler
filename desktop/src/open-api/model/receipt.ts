@@ -89,6 +89,14 @@ export interface Receipt {
      * Set by the server on a receipt created from an email: the sender\'s From address. Ignored on write.
      */
     emailSender?: string;
+    /**
+     * Set by the server: the id of the reimbursement claim this receipt is in. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller.
+     */
+    claimId?: number;
+    /**
+     * Set by the server: the name of the claim in claimId. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller.
+     */
+    claimName?: string;
 }
 export namespace Receipt {
 }

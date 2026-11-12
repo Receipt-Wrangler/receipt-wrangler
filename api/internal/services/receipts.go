@@ -106,6 +106,10 @@ func (service ReceiptService) GetReceiptForUser(userId uint, receiptId string) (
 		return models.Receipt{}, err
 	}
 
+	if err := NewClaimService(nil).LoadReceiptClaim(userId, &receipt); err != nil {
+		return models.Receipt{}, err
+	}
+
 	return receipt, nil
 }
 

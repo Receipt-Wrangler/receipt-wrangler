@@ -49,6 +49,10 @@ class _$Receipt extends Receipt {
   final String? emailInbox;
   @override
   final String? emailSender;
+  @override
+  final int? claimId;
+  @override
+  final String? claimName;
 
   factory _$Receipt([void Function(ReceiptBuilder)? updates]) =>
       (ReceiptBuilder()..update(updates))._build();
@@ -74,7 +78,9 @@ class _$Receipt extends Receipt {
       this.updatedAt,
       this.createdByString,
       this.emailInbox,
-      this.emailSender})
+      this.emailSender,
+      this.claimId,
+      this.claimName})
       : super._();
   @override
   Receipt rebuild(void Function(ReceiptBuilder) updates) =>
@@ -107,7 +113,9 @@ class _$Receipt extends Receipt {
         updatedAt == other.updatedAt &&
         createdByString == other.createdByString &&
         emailInbox == other.emailInbox &&
-        emailSender == other.emailSender;
+        emailSender == other.emailSender &&
+        claimId == other.claimId &&
+        claimName == other.claimName;
   }
 
   @override
@@ -134,6 +142,8 @@ class _$Receipt extends Receipt {
     _$hash = $jc(_$hash, createdByString.hashCode);
     _$hash = $jc(_$hash, emailInbox.hashCode);
     _$hash = $jc(_$hash, emailSender.hashCode);
+    _$hash = $jc(_$hash, claimId.hashCode);
+    _$hash = $jc(_$hash, claimName.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -161,7 +171,9 @@ class _$Receipt extends Receipt {
           ..add('updatedAt', updatedAt)
           ..add('createdByString', createdByString)
           ..add('emailInbox', emailInbox)
-          ..add('emailSender', emailSender))
+          ..add('emailSender', emailSender)
+          ..add('claimId', claimId)
+          ..add('claimName', claimName))
         .toString();
   }
 }
@@ -263,6 +275,14 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
   String? get emailSender => _$this._emailSender;
   set emailSender(String? emailSender) => _$this._emailSender = emailSender;
 
+  int? _claimId;
+  int? get claimId => _$this._claimId;
+  set claimId(int? claimId) => _$this._claimId = claimId;
+
+  String? _claimName;
+  String? get claimName => _$this._claimName;
+  set claimName(String? claimName) => _$this._claimName = claimName;
+
   ReceiptBuilder() {
     Receipt._defaults(this);
   }
@@ -291,6 +311,8 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
       _createdByString = $v.createdByString;
       _emailInbox = $v.emailInbox;
       _emailSender = $v.emailSender;
+      _claimId = $v.claimId;
+      _claimName = $v.claimName;
       _$v = null;
     }
     return this;
@@ -341,6 +363,8 @@ class ReceiptBuilder implements Builder<Receipt, ReceiptBuilder> {
             createdByString: createdByString,
             emailInbox: emailInbox,
             emailSender: emailSender,
+            claimId: claimId,
+            claimName: claimName,
           );
     } catch (_) {
       late String _$failedField;

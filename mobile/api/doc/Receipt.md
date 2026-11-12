@@ -29,6 +29,8 @@ Name | Type | Description | Notes
 **createdByString** | **String** | Created by string, which is anything that is not a user | [optional] 
 **emailInbox** | **String** | Set by the server on a receipt created from an email: the System Email login (IMAP username) of the inbox the email was read from. Ignored on write. | [optional] 
 **emailSender** | **String** | Set by the server on a receipt created from an email: the sender's From address. Ignored on write. | [optional] 
+**claimId** | **int** | Set by the server: the id of the reimbursement claim this receipt is in. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller. | [optional] 
+**claimName** | **String** | Set by the server: the name of the claim in claimId. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller. | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

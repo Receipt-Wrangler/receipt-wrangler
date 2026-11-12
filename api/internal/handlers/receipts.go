@@ -100,6 +100,11 @@ func GetPagedReceiptsForGroup(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
+			err = services.NewClaimService(nil).LoadReceiptClaims(token.UserId, receipts)
+			if err != nil {
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
+			}
+
 			anyData := make([]any, len(receipts))
 			for i := 0; i < len(receipts); i++ {
 				anyData[i] = receipts[i]
@@ -159,6 +164,11 @@ func GetReceiptsForGroupIds(w http.ResponseWriter, r *http.Request) {
 			// Mask user references (created-by, charged-to) and drop non-visible
 			// comment authors the caller may not see.
 			err = permissionService.MaskReceiptsForMemberVisibility(token.UserId, receipts)
+			if err != nil {
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
+			}
+
+			err = services.NewClaimService(nil).LoadReceiptClaims(token.UserId, receipts)
 			if err != nil {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
@@ -386,6 +396,11 @@ func writeCreatedReceipt(w http.ResponseWriter, userId uint, createdReceipt mode
 	// Mask user references (created-by, charged-to) and drop non-visible
 	// comment authors the caller may not see.
 	err = permissionService.MaskReceiptForMemberVisibility(userId, &createdReceipt)
+	if err != nil {
+		return http.StatusInternalServerError, stacktrace.WithStack(err)
+	}
+
+	err = services.NewClaimService(nil).LoadReceiptClaim(userId, &createdReceipt)
 	if err != nil {
 		return http.StatusInternalServerError, stacktrace.WithStack(err)
 	}
@@ -723,6 +738,11 @@ func UpdateReceipt(w http.ResponseWriter, r *http.Request) {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}
 
+			err = services.NewClaimService(nil).LoadReceiptClaim(token.UserId, &updatedReceipt)
+			if err != nil {
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
+			}
+
 			bytes, err := json.Marshal(updatedReceipt)
 			if err != nil {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
@@ -838,6 +858,11 @@ func BulkReceiptStatusUpdate(w http.ResponseWriter, r *http.Request) {
 			}
 
 			err = db.Table("receipts").Where("id IN ?", bulkCommand.ReceiptIds).Select("id, resolved_date, status").Find(&receipts).Error
+			if err != nil {
+				return http.StatusInternalServerError, stacktrace.WithStack(err)
+			}
+
+			err = services.NewClaimService(nil).LoadReceiptClaims(token.UserId, receipts)
 			if err != nil {
 				return http.StatusInternalServerError, stacktrace.WithStack(err)
 			}

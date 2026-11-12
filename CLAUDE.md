@@ -795,6 +795,9 @@ and paid. **Backend + desktop; mobile only carries the regenerated client.** See
   Go with `decimal`; "days waiting" counts to today in the app time zone. Calendar days are bare
   `yyyy-MM-dd` on the wire, money a two-place decimal string.
 - **The All group lists** the claims of every group the caller may read, but is never a destination.
+- **Receipts say which claim they are in**: optional `Receipt.claimId` / `claimName`, server-set, read-only,
+  omitted when in no claim or when the claim is hidden from the viewer (same rule as the claim list), so
+  clients can filter pickers and warn before a group move. See `api/CLAUDE.md` → "Receipts carry their claim".
 - **Claim packet: `GET /claim/{claimId}/packet` (`getClaimPacket`)** returns one zip per claim:
   `packet.pdf` (cover, ledger, receipts with category subtotals, a page per receipt with its
   downscaled images), `images/` (the originals, byte for byte), `receipts.csv` / `items.csv` (the

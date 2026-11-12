@@ -40,6 +40,8 @@ part 'receipt.g.dart';
 /// * [createdByString] - Created by string, which is anything that is not a user
 /// * [emailInbox] - Set by the server on a receipt created from an email: the System Email login (IMAP username) of the inbox the email was read from. Ignored on write.
 /// * [emailSender] - Set by the server on a receipt created from an email: the sender's From address. Ignored on write.
+/// * [claimId] - Set by the server: the id of the reimbursement claim this receipt is in. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller.
+/// * [claimName] - Set by the server: the name of the claim in claimId. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller.
 @BuiltValue()
 abstract class Receipt implements Built<Receipt, ReceiptBuilder> {
   /// Receipt total amount
@@ -121,6 +123,14 @@ abstract class Receipt implements Built<Receipt, ReceiptBuilder> {
   /// Set by the server on a receipt created from an email: the sender's From address. Ignored on write.
   @BuiltValueField(wireName: r'emailSender')
   String? get emailSender;
+
+  /// Set by the server: the id of the reimbursement claim this receipt is in. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller.
+  @BuiltValueField(wireName: r'claimId')
+  int? get claimId;
+
+  /// Set by the server: the name of the claim in claimId. Read-only (ignored on write). Omitted when the receipt is in no claim or its claim is not visible to the caller.
+  @BuiltValueField(wireName: r'claimName')
+  String? get claimName;
 
   Receipt._();
 
@@ -265,6 +275,20 @@ class _$ReceiptSerializer implements PrimitiveSerializer<Receipt> {
       yield r'emailSender';
       yield serializers.serialize(
         object.emailSender,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.claimId != null) {
+      yield r'claimId';
+      yield serializers.serialize(
+        object.claimId,
+        specifiedType: const FullType(int),
+      );
+    }
+    if (object.claimName != null) {
+      yield r'claimName';
+      yield serializers.serialize(
+        object.claimName,
         specifiedType: const FullType(String),
       );
     }
@@ -437,6 +461,20 @@ class _$ReceiptSerializer implements PrimitiveSerializer<Receipt> {
             specifiedType: const FullType(String),
           ) as String;
           result.emailSender = valueDes;
+          break;
+        case r'claimId':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.claimId = valueDes;
+          break;
+        case r'claimName':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.claimName = valueDes;
           break;
         default:
           unhandled.add(key);

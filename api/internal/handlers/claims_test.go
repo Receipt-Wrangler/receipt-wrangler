@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"receipt-wrangler/api/internal/commands"
 	"receipt-wrangler/api/internal/models"
 	"receipt-wrangler/api/internal/permissions"
 	"receipt-wrangler/api/internal/repositories"
@@ -368,7 +369,7 @@ func TestClaims_AddReceiptsReportsEachRefusal(t *testing.T) {
 		utils.PrintTestError(t, result.ReceiptIds, []uint{fresh, alreadyHere})
 	}
 	wantFailures := []structs.ClaimReceiptsFailure{
-		{ReceiptId: inOther, Message: services.ClaimReceiptInOtherClaimMessage},
+		{ReceiptId: inOther, Message: "This receipt is already in claim 'other'; remove it from that claim first"},
 		{ReceiptId: otherGroup, Message: services.ClaimReceiptNotAddableMessage},
 		{ReceiptId: missing, Message: services.ClaimReceiptNotAddableMessage},
 	}
@@ -643,4 +644,118 @@ func deleteReceiptRequest(userId uint, receiptId uint) (*httptest.ResponseRecord
 	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 	r = r.WithContext(context.WithValue(r.Context(), jwtmiddleware.ContextKey{}, claimsForUser(userId)))
 	return w, r
+}
+
+// getReceiptBody fetches a receipt through the real handler and returns the raw
+// JSON object, so a test can assert on key presence as well as value.
+func getReceiptBody(t *testing.T, userId uint, receiptId uint) map[string]json.RawMessage {
+	t.Helper()
+	w, r := claimRequest(http.MethodGet, userId, "", map[string]string{"id": utils.UintToString(receiptId)})
+	GetReceipt(w, r)
+	assertStatus(t, w, http.StatusOK)
+	body := map[string]json.RawMessage{}
+	decodeInto(t, w, &body)
+	return body
+}
+
+func TestReceipt_ClaimFieldsOmittedWhenNoneAndPresentWhenLinked(t *testing.T) {
+	defer tearDownGenericHandlerTest()
+	repositories.CreateTestGroupWithUsers()
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+	claim := seedClaimRow(t, 1, 1, "Rome PCS")
+	free := seedReceiptWithAmount(t, 1, 1, "1.00")
+	claimed := seedReceiptWithAmount(t, 1, 1, "2.00")
+	linkReceipts(t, claim.ID, claimed)
+
+	freeBody := getReceiptBody(t, 1, free)
+	for _, key := range []string{"claimId", "claimName"} {
+		if _, ok := freeBody[key]; ok {
+			t.Errorf("%s must be absent for a receipt in no claim", key)
+		}
+	}
+
+	claimedBody := getReceiptBody(t, 1, claimed)
+	if string(claimedBody["claimId"]) != utils.UintToString(claim.ID) || string(claimedBody["claimName"]) != `"Rome PCS"` {
+		utils.PrintTestError(t, claimedBody, "claimId and claimName of the claim")
+	}
+}
+
+func TestReceipt_HiddenClaimReadsAsNoClaimAndLoaderIsBatched(t *testing.T) {
+	defer tearDownGenericHandlerTest()
+	repositories.CreateTestGroupWithUsers()
+	repositories.GetDB().Model(&models.Group{}).Where("id = ?", 1).Update("isolate_members", true)
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead)
+	grantGroupPerms(t, 2, 1, permissions.GroupReceiptsRead)
+
+	mine := seedClaimRow(t, 1, 1, "mine")
+	theirs := seedClaimRow(t, 1, 2, "theirs")
+	inMine := seedReceiptWithAmount(t, 1, 1, "1.00")
+	inTheirs := seedReceiptWithAmount(t, 1, 1, "2.00")
+	inNone := seedReceiptWithAmount(t, 1, 1, "3.00")
+	linkReceipts(t, mine.ID, inMine)
+	linkReceipts(t, theirs.ID, inTheirs)
+
+	receipts := []models.Receipt{{BaseModel: models.BaseModel{ID: inMine}}, {BaseModel: models.BaseModel{ID: inTheirs}}, {BaseModel: models.BaseModel{ID: inNone}}}
+	if err := services.NewClaimService(nil).LoadReceiptClaims(1, receipts); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	got := []string{receipts[0].ClaimName, receipts[1].ClaimName, receipts[2].ClaimName}
+	if !reflect.DeepEqual(got, []string{"mine", "", ""}) || receipts[0].ClaimId != mine.ID || receipts[1].ClaimId != 0 {
+		utils.PrintTestError(t, got, []string{"mine", "", ""})
+	}
+
+	if _, ok := getReceiptBody(t, 1, inTheirs)["claimId"]; ok {
+		t.Errorf("a claim hidden from the viewer must read like no claim")
+	}
+	// The receipt itself is out of user 2's sight (paid by 1), so the loader is
+	// exercised directly for the claim's own creator.
+	forCreator := []models.Receipt{{BaseModel: models.BaseModel{ID: inTheirs}}}
+	if err := services.NewClaimService(nil).LoadReceiptClaims(2, forCreator); err != nil || forCreator[0].ClaimName != "theirs" {
+		utils.PrintTestError(t, forCreator[0], "the claim's own creator sees it")
+	}
+}
+
+func TestReceipt_ClaimFieldsCannotBeWritten(t *testing.T) {
+	var command commands.UpsertReceiptCommand
+	body := `{"name":"x","claimId":7,"claimName":"forged"}`
+	if err := json.Unmarshal([]byte(body), &command); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	receipt, err := command.ToReceipt()
+	if err != nil {
+		t.Fatalf("to receipt: %v", err)
+	}
+	if receipt.ClaimId != 0 || receipt.ClaimName != "" {
+		utils.PrintTestError(t, receipt, "claim fields dropped from a request body")
+	}
+}
+
+func TestClaims_AddRefusalNamesTheClaimOnlyWhenVisible(t *testing.T) {
+	defer tearDownGenericHandlerTest()
+	repositories.CreateTestGroupWithUsers()
+	repositories.GetDB().Model(&models.Group{}).Where("id = ?", 1).Update("isolate_members", true)
+	grantGroupPerms(t, 1, 1, permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate)
+	grantGroupPerms(t, 2, 1, permissions.GroupReceiptsRead, permissions.GroupReceiptsUpdate)
+
+	target := seedClaimRow(t, 1, 1, "target")
+	visibleClaim := seedClaimRow(t, 1, 1, "Rome PCS")
+	hiddenClaim := seedClaimRow(t, 1, 2, "secret")
+	inVisible := seedReceiptWithAmount(t, 1, 1, "1.00")
+	inHidden := seedReceiptWithAmount(t, 1, 1, "2.00")
+	linkReceipts(t, visibleClaim.ID, inVisible)
+	linkReceipts(t, hiddenClaim.ID, inHidden)
+
+	body, _ := json.Marshal(map[string][]uint{"receiptIds": {inVisible, inHidden}})
+	w, r := claimRequest(http.MethodPost, 1, string(body), claimParams(target.ID))
+	AddReceiptsToClaim(w, r)
+	var result structs.ClaimReceiptsResult
+	decodeInto(t, w, &result)
+
+	want := []structs.ClaimReceiptsFailure{
+		{ReceiptId: inVisible, Message: "This receipt is already in claim 'Rome PCS'; remove it from that claim first"},
+		{ReceiptId: inHidden, Message: services.ClaimReceiptInOtherClaimMessage},
+	}
+	if !reflect.DeepEqual(result.Failures, want) {
+		utils.PrintTestError(t, result.Failures, want)
+	}
 }
