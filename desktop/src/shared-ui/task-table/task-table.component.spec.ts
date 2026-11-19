@@ -47,9 +47,7 @@ describe("TaskTableComponent", () => {
 
   it("omits the source file column by default, so other hosts are unchanged", () => {
     fixture.componentRef.setInput("expandedRowTemplate", {} as any);
-    // setColumns() runs in ngAfterViewInit and mutates template-bound state, so
-    // the dev-mode check-no-changes pass would report NG0100.
-    fixture.detectChanges(false);
+    fixture.detectChanges();
 
     // ngOnInit fires the initial fetch; the afterEach httpTesting.verify() added
     // alongside the filter tests fails on any request left unflushed.
@@ -62,7 +60,7 @@ describe("TaskTableComponent", () => {
   it("adds the source file column before expand when the host opts in", () => {
     fixture.componentRef.setInput("showSourceFileActions", true);
     fixture.componentRef.setInput("expandedRowTemplate", {} as any);
-    fixture.detectChanges(false);
+    fixture.detectChanges();
 
     // ngOnInit fires the initial fetch; the afterEach httpTesting.verify() added
     // alongside the filter tests fails on any request left unflushed.

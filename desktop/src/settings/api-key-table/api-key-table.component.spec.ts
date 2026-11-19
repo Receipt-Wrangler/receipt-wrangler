@@ -120,7 +120,7 @@ describe("ApiKeyTableComponent", () => {
 
   describe("scope column", () => {
     beforeEach(() => {
-      fixture.detectChanges(false);
+      fixture.detectChanges();
     });
 
     it("is displayed after the description and is not sortable", () => {
@@ -142,7 +142,7 @@ describe("ApiKeyTableComponent", () => {
       ];
       httpMock.match(() => true).forEach((req) => req.flush({ totalCount: data.length, data }));
       await fixture.whenStable();
-      fixture.detectChanges(false);
+      fixture.detectChanges();
 
       const cells = Array.from(
         (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="api-key-scope"]')

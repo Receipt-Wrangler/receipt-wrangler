@@ -55,21 +55,16 @@ describe("GroupTableComponent", () => {
     expect(component).toBeTruthy();
   });
 
-  // This component sets `displayedColumns` in ngAfterViewInit, which trips
-  // checkNoChanges (NG0100) during a whenStable() app-tick. The FAB gating we
-  // assert here only depends on the *hasAppPermission directive's effect, so we
-  // drive change detection with detectChanges(false) to skip the verification
-  // pass rather than restructure the unrelated table column wiring.
   it("shows the Create Group FAB with the app group-create permission", () => {
     store.dispatch(new SetPermissions([Permission.AppGroupsCreate], {}));
-    fixture.detectChanges(false);
+    fixture.detectChanges();
 
     expect(queryTestId("group-create")).toBeTruthy();
   });
 
   it("hides the Create Group FAB without the app group-create permission", () => {
     store.dispatch(new SetPermissions([], {}));
-    fixture.detectChanges(false);
+    fixture.detectChanges();
 
     expect(queryTestId("group-create")).toBeFalsy();
   });
@@ -82,16 +77,16 @@ describe("GroupTableComponent", () => {
       appPermissions: string[],
       groupPermissions: { [groupId: number]: string[] } = {}
     ) => {
-      fixture.detectChanges(false);
+      fixture.detectChanges();
       component.dataSource.set(
         new MatTableDataSource([
           { id: 5, name: "Abandoned Group", groupMembers: [] } as unknown as Group,
         ])
       );
       store.dispatch(new SetPermissions(appPermissions, groupPermissions));
-      fixture.detectChanges(false);
+      fixture.detectChanges();
       TestBed.flushEffects();
-      fixture.detectChanges(false);
+      fixture.detectChanges();
     };
 
     it("shows the delete action to a member holding group.delete", () => {

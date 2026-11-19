@@ -40,13 +40,13 @@ describe("CustomFieldTableComponent", () => {
   // renders.
   const renderRowWith = (appPermissions: string[]) => {
     store.dispatch(new SetPermissions(appPermissions, {}));
-    fixture.detectChanges(false);
+    fixture.detectChanges();
     component.dataSource.set(
       new MatTableDataSource([customField as unknown as PagedDataDataInner])
     );
-    fixture.detectChanges(false);
+    fixture.detectChanges();
     TestBed.flushEffects();
-    fixture.detectChanges(false);
+    fixture.detectChanges();
   };
 
   beforeEach(async () => {
