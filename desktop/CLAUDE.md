@@ -1615,6 +1615,13 @@ Angular no longer uses zone.js. Change detection is triggered ONLY by:
     the cell templates are view queries, which is after the view was checked, so a plain field there
     only renders on some later pass. `BaseTableComponent` declares them as signals; build the arrays
     in locals, then `.set()` once (`role-list`, `category-table`).
+  - **A form field created already filled can show a stale label.** Every `app-input` binds
+    `[mask]`, so ngx-mask is its value accessor, and ngx-mask writes the DOM value in a
+    `queueMicrotask` without notifying Angular. A field created with a value therefore renders its
+    label as if empty until its view is next checked, and dev mode logs NG0100 if a full
+    check-no-changes pass reaches it first. The login form did this by re-showing itself, filled, while
+    the dashboard loaded; `auth-form` now keeps its spinner up through a successful navigation and
+    only restores the form on a failed login or a refused navigation. Don't flash a filled form back.
 - `ChangeDetectorRef.detectChanges()` still works but is rarely needed — prefer signals.
 - `setTimeout` still works for delays but won't auto-trigger CD. The callback must write to a signal if the template needs updating.
 - All `@HostListener` handlers automatically trigger CD (same as template events).
