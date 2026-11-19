@@ -7,12 +7,13 @@ import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { NoopAnimationsModule } from "@angular/platform-browser/animations";
 import { RouterTestingModule } from "@angular/router/testing";
 import { NgxsModule } from "@ngxs/store";
-import { config, of, Subject, throwError } from "rxjs";
+import { of, Subject, throwError } from "rxjs";
 import { FormMode } from "../../enums/form-mode.enum";
 import { ApiModule, OidcProviderService, OidcProviderView } from "../../open-api";
 import { SnackbarService } from "../../services/snackbar.service";
 import { OidcProviderFormComponent } from "./oidc-provider-form.component";
 import { provideNgxMask } from "ngx-mask";
+import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
 
 describe("OidcProviderFormComponent", () => {
   let component: OidcProviderFormComponent;
@@ -218,21 +219,15 @@ describe("OidcProviderFormComponent", () => {
         .mockReturnValue(throwError(() => new Error("boom")) as any);
 
       // subscribe() takes no error handler -- the interceptor is what reports
-      // a failed save -- so RxJS routes the error here rather than throwing
-      // out of submit(). Swallow it so it does not surface as an unhandled
-      // error in a later test.
-      const originalOnUnhandledError = config.onUnhandledError;
-      config.onUnhandledError = () => undefined;
-
-      try {
-        // The dialog stays open on a failure, so the form has to be usable
-        // again -- which is why the flag clears in finalize, not in tap.
+      // a failed save -- so RxJS reports each failure as unhandled.
+      // The dialog stays open on a failure, so the form has to be usable
+      // again -- which is why the flag clears in finalize, not in tap.
+      const errors = swallowUnhandledRxjsErrors(() => {
         component.submit();
         component.submit();
-      } finally {
-        config.onUnhandledError = originalOnUnhandledError;
-      }
+      });
 
+      expect(errors).toHaveLength(2);
       expect(updateSpy).toHaveBeenCalledTimes(2);
     });
   });

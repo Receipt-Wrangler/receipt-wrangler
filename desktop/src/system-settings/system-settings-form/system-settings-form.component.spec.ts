@@ -19,6 +19,7 @@ import { SystemSettingsFormComponent } from "./system-settings-form.component";
 import { provideHttpClient, withInterceptorsFromDi } from "@angular/common/http";
 import { CurrencyPipe } from "@angular/common";
 import { provideNgxMask } from "ngx-mask";
+import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
 
 describe("SystemSettingsFormComponent", () => {
   let component: SystemSettingsFormComponent;
@@ -697,8 +698,9 @@ describe("SystemSettingsFormComponent", () => {
 
       component.ngOnInit();
       component.form.get("timeZone")!.setValue("America/New_York");
-      component.submit();
+      const errors = swallowUnhandledRxjsErrors(() => component.submit());
 
+      expect(errors).toEqual([new Error("400")]);
       expect(dispatchSpy).not.toHaveBeenCalledWith(new SetTimeZone("America/New_York"));
     });
   });

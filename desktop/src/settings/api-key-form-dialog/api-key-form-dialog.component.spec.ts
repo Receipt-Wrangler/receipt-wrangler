@@ -12,6 +12,7 @@ import { LayoutState } from '../../store/layout.state';
 
 import { ApiKeyFormDialogComponent } from './api-key-form-dialog.component';
 import { provideNgxMask } from 'ngx-mask';
+import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
 
 describe('ApiKeyFormDialogComponent', () => {
   let component: ApiKeyFormDialogComponent;
@@ -251,9 +252,10 @@ describe('ApiKeyFormDialogComponent', () => {
         scope: ApiKeyScope.R
       });
 
-      component.submitButtonClicked();
+      const errors = swallowUnhandledRxjsErrors(() => component.submitButtonClicked());
 
       expect(mockApiKeyService.createApiKey).toHaveBeenCalled();
+      expect(errors).toEqual([error]);
     });
 
     it('should handle update API key error', () => {
@@ -274,9 +276,10 @@ describe('ApiKeyFormDialogComponent', () => {
         scope: ApiKeyScope.Rw
       });
 
-      component.submitButtonClicked();
+      const errors = swallowUnhandledRxjsErrors(() => component.submitButtonClicked());
 
       expect(mockApiKeyService.updateApiKey).toHaveBeenCalled();
+      expect(errors).toEqual([error]);
     });
 
     it('should handle clipboard copy failure', () => {

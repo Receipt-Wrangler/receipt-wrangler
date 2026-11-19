@@ -22,6 +22,7 @@ import { SetGroups, SetSelectedGroupId } from "../../store/group.state.actions";
 import { provideTestStore } from "../../store/test-store";
 import { ReceiptFormComponent } from "./receipt-form.component";
 import { provideNgxMask } from "ngx-mask";
+import { swallowUnhandledRxjsErrors } from "../../testing/rxjs-unhandled-errors";
 
 describe("ReceiptFormComponent", () => {
   let component: ReceiptFormComponent;
@@ -1347,7 +1348,8 @@ describe("ReceiptFormComponent", () => {
       component.imageFileLoaded(command());
       expect(component.imagesBusy()).toBe(true);
 
-      upload.error(new Error("upload failed"));
+      const errors = swallowUnhandledRxjsErrors(() => upload.error(new Error("upload failed")));
+      expect(errors).toEqual([new Error("upload failed")]);
       await render();
       expect(component.imagesBusy()).toBe(false);
       expect(spinner()).toBeNull();
